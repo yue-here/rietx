@@ -630,9 +630,16 @@ ROWS: tuple[Row, ...] = (
                   "the true one, on none where the default is right; fails where the prefit's "
                   "own cell is off (corundum x0.985, P 2_1/c x0.9975: both screens name the "
                   "same wrong class) and where the held screen names nothing (PbSO4 x0.99, "
-                  "x1.0125: the default names P c - -)"),
+                  "x1.0125: the default names P c - -). The six firing rows are corundum "
+                  "x0.995, FAP x1.0075 and the synthetic P 2_1/c at x0.998, x0.999, x1.002 "
+                  "and x1.0025 (three families, one synthetic). From the preset's all-zero "
+                  "declared background (the GUI's) it also fires needlessly at two synthetic "
+                  "P 2_1/c offsets (x1.0005, x1.001), because the held reference fit is then "
+                  "poor and the class forbidding nothing wins by elimination (#1286 round 1)"),
         grounds=("Mechanical: four unrelated real families plus a synthetic, silent on every "
-                 "row the default gets right. Judgement: two answers naming disjoint classes "
+                 "row the default gets right when the declared background is the true one "
+                 "(not from the all-zero preset: see the evidence). The five patterns were "
+                 "also WP-1910's development data on #1178, so this is not out-of-sample. Judgement: two answers naming disjoint classes "
                  "cannot both be right, so no competent refiner quotes either; ruled for this "
                  "action by the maintainer on #1178, 2026-10-26 (approval to be dated by him)."),
         response="warning",

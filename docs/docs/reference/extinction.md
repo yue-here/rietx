@@ -107,6 +107,10 @@ A held screen that names no class changes nothing.
 On SRM 676a corundum, the GSAS-II fluorapatite and the synthetic P 2₁/c, each cell scaled by ×0.97 to ×1.03, the default named a wrong class at eight offsets: the check caught six and fired at none where the default was right.
 At the other two (corundum ×0.985, P 2₁/c ×0.9975) the prefit's own cell is off, both screens name the same wrong class, and nothing here can see it.
 On the PbSO₄ X-ray histogram the held screen names no class at eleven offsets where the default names the true `P c - n`, and nothing fires; at ×0.99 and ×1.0125 the default names `P c - -` and the held screen nothing, so this check cannot see those two either.
+From the preset's all-zero background the held screen is weaker, because nothing seeds its background as the cell-free fit's is seeded, and its poorer reference fit can leave the class that forbids nothing winning by elimination.
+On the same three patterns with the background declared all-zero, the check still caught corundum ×0.995 and FAP ×1.0075, but it fired needlessly at two offsets of the synthetic P 2₁/c (×1.0005 and ×1.001, where the default names the true class) and caught one fewer of the monoclinic offsets than with the true background.
+Seeding the held screen's background removes those, and costs the eleven PbSO₄ offsets above, where the seeded held screen names `P c - -` against the default's true `P c - n`.
+A gate on the held reference fit does not separate them either: the caught corundum row's held fit is the poorer one, and the needless rows' held fits are within 7 % of the default's in χ².
 The second screen costs about a third to a half again of the screen's time.
 
 ### The reference fit is gated
