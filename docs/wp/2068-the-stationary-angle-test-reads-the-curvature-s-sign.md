@@ -96,8 +96,8 @@ difference. The FD path stays as the fallback and is kept exercised.
 ## Tasks
 
 - [x] Reproduce: a fit started on a maximum along one moment angle, and what `stationary_angle_test` returns for it today. If it passes, keep it as the failing test; if it does not, record why and re-rate to P3. — *2026-11-02: no fit on main stops there (forward-difference columns walk off); the one stall the declined analytic arm produces passes correctly, at 0.000 against a cut of 2.71. Re-rated P3; Context's correctness bullet has the numbers.*
-- [ ] Analytic angle columns and second-derivative block from `d_magnetic_f2_d_dofs`, extended one order, with an exact oracle.
-- [ ] `_joint_newton` reads the analytic block where the branch applies, FD elsewhere.
+- [x] Analytic angle columns and second-derivative block from `d_magnetic_f2_d_dofs`, extended one order, with an exact oracle. — *2026-11-02: `scattering.magnetic_f2_angle_block`, `moments.d2_moment_d_dofs`, `least_squares._analytic_angle_block`; the oracle is an 8-point DFT of the residual along one or two angles, exact because r is a degree-two trigonometric polynomial in each angle there (`tests/test_moment_angle_block.py`).*
+- [x] `_joint_newton` reads the analytic block where the branch applies, FD elsewhere. — *2026-11-02: single fits only; the joint path and an evaluated extinction keep the differences.*
 - [ ] Tests (agreement with the FD block; evaluation counts at k = 2, 4, 8; verdicts unchanged on the two acceptance files) + obs/calc/diff PNGs to `tests/output/`
 - [ ] Skill: none expected (no new verb or code).
 
