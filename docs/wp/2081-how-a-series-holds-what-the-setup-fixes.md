@@ -195,7 +195,7 @@ The rulings are in this file and the follow-up work is filed.
   tiers the ladder, WP-1325 and WP-2028 own the joint fit, WP-1317 the series viewer.
   The lead session's five-point reading verified against `efb5f2f80`, two points
   corrected (Context). Measured as in Context; script and JSON in `2081-batch/`.
-  Practice survey saved to `docs/practice.md`. Filed in PR #PRNUM, with WP-2080's
+  Practice survey saved to `docs/practice.md`. Filed in PR #1333, with WP-2080's
   ruling.
 
   *Gotchas.* The measurement forces the cold rung by patching

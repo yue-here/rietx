@@ -171,7 +171,7 @@ interact with how a series holds what the setup fixes.
 *Approval.* The tier-3 `_audit` row that task 3 adds is approved under the same
 delegation, and task 3 records that approval in the row.
 
-*Next:* task 3 once PR #1310 merges. Filed alongside this entry in PR #PRNUM.
+*Next:* task 3 once PR #1310 merges. Filed alongside this entry in PR #1333.
 
 - **2026-11-02** — created, from issue #1214 (a ghostshift runner, one session).
   The report holds on today's main: a series can keep a converged fit that sits in a
