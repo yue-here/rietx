@@ -259,7 +259,7 @@ print(prior.declared())          # {'sohncke': True}
 | `ExtinctionPrior.polar` | `True`: only the polar groups, whose point group leaves a direction fixed (a pyroelectric response); `False`: only the others |
 | `ExtinctionPrior.z` | formula units per cell; with `formula` and `ordered`, removes the groups whose orbits cannot hold that content, otherwise names them |
 | `ExtinctionPrior.density` | measured density in g/cm³, which fixes Z through the formula weight and the screened cell's volume; needs `formula` |
-| `ExtinctionPrior.formula` | the formula unit, written as a chemist writes it (`"Cu12Sb4S13"`); a fractional count declares a shared site |
+| `ExtinctionPrior.formula` | the formula unit, written as a chemist writes it (`"Cu12Sb4S13"`); a fractional count declares a shared site, unless `ordered` |
 | `ExtinctionPrior.ordered` | `True`: every site is one element at full occupancy, so a group whose orbits cannot hold the declared content is removed; needs `formula` |
 | `ExtinctionPrior.declared` | the method returning the facts actually declared, by name |
 
@@ -285,11 +285,14 @@ The orbits are derived from the group's operators (*International Tables for Cry
 This is the test of an ordered model, and the group stays: `ExtinctionCandidate.count_notes` states the failed count.
 A disordered alloy written with whole counts (`CuAu`, `Cu3Au`) fails it on its true `F m -3 m`, which a refiner of a disordered alloy would not remove.
 Declare `ordered=True` and the group is removed instead, with `exclusion_reasons` saying so.
-An element written with a fractional count (`Cu0.5Au0.5`) shares a site, and is not counted either way.
+An element written with a fractional count (`Cu0.5Au0.5`) shares a site and is not counted, unless the model is declared `ordered`.
+Then no site is shared, so the fraction belongs to the formula unit, as the `0.5` of `CaSO4·0.5H2O` does, and the element is counted whenever its atoms per cell, count × Z, are a whole number.
+Where they are not (`Fe0.95O` at Z = 4 is 3.8 Fe per cell), the element is not counted either way.
 Where Z is not a whole multiple of a kept member's general multiplicity (Z′ below one, or 3/2), the member stays and `ExtinctionCandidate.special_positions` names the special positions a formula unit then sits on.
 A molecule there must carry that site's symmetry, which nothing declared says, so this is a statement and never an exclusion: a P 2₁ salt at Z = 2 keeps P 2₁/m, with each formula unit on an inversion centre or a mirror.
 Where no sum of the group's orbit multiplicities makes Z at all (P 2₁/m at Z = 3), the note says that instead of listing positions.
 `ExtinctionCandidate.exclusion_reasons` names the fact each removed group fails.
+A `z` with no `formula` has no atoms per cell to count, so it removes no group and names only the special positions, and `EXTINCTION_PRIOR_APPLIED` says so.
 
 A `density` gives Z = ρ·V·N_A / M on the screened cell, `ExtinctionScreen.z_from_density`.
 It must sit within {{ DENSITY_Z_TOLERANCE_PCT }} % of the declared `z`, the agreement *International Tables* Vol. C asks of a measured density, or, with none declared, of exactly one whole number, and `ExtinctionScreen.z` is the Z the filter used.
