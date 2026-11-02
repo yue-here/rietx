@@ -111,8 +111,9 @@ synthetic zincite under `mccusker_structural`, O at 0.38231(57) held, each z
 ±0.00039 under the centroid, against ±0.00029 on each z unheld; WP-1912.)
 
 **A symmetry-lowering can win ΔBIC and gain nothing where it splits.** Two fits
-of one pattern, a model and its lowering (cubic, tetragonal): ΔBIC says it paid
-for itself, not where. `rx.report.split_localisation(higher, lower)` shares the
+of one pattern, a model and its lowering (cubic, tetragonal): ΔBIC (judging.md §
+adding a parameter) and a nested F-test say it paid for itself, not where, so neither settles
+which space group. `rx.report.split_localisation(higher, lower)` shares the
 Δχ² among the windows of the reflections the lowering splits, the unsplit ones
 and the rest; read `split_share` against `split_point_share`. (Measured:
 synthetic Cu, tetragonal against cubic. A truly tetragonal specimen gave ΔBIC
@@ -147,5 +148,8 @@ the table left out, call `ref.geometry({"torsions": [["C1", "C2", "C3",
 "C4"]], "distances": [["O1", ("N2", "2_555")]]})`: a label alone takes the
 image nearest the atom before it, and `(label, "n_klm")` names one. Its esds
 come from the last fit's covariance, which an edit or a checkout drops, after
-which every esd is `None`. (Measured: WP-1815, the published torsion loops of a
-TOPAS-6 and a SHELXL refinement reproduced to their printed digits.)
+which every esd is `None`. A result saved before schema 0.60 reopens with
+`torsions` set to `None`, meaning "not listed", where `[]` means none were
+found; `ref.geometry()` lists them, without esds. (Measured: WP-1815, the
+published torsion loops of a TOPAS-6 and a SHELXL refinement reproduced to
+their printed digits.)

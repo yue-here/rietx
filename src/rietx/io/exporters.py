@@ -358,9 +358,13 @@ def _profile_description(instrument: Instrument, structure: Structure | None = N
         f"Axial divergence: S/L={_value(geom.axial_sl)}, H/L={_value(geom.axial_hl)}.",
     ]
     for phase in (structure.phases if structure is not None else []):
+        # a Stephens block replaces lor_strain (WP-1467,
+        # CompiledModel.lor_strain_term): its stored value is no width the
+        # fit drew, so stating it would describe a broadening that is not there
         terms = [f"{label}={_value(getattr(phase, name))} {getattr(phase, name).unit}"
                  for name, label in _SAMPLE_BROADENING
-                 if getattr(phase, name).vary or getattr(phase, name).value != 0.0]
+                 if not (name == "lor_strain" and phase.microstrain is not None)
+                 and (getattr(phase, name).vary or getattr(phase, name).value != 0.0)]
         if terms:
             lines.append(f"Phase {phase.name}, sample broadening: "
                          + ", ".join(terms) + ".")
@@ -630,7 +634,7 @@ def _write_phase_agreement(block, row: PhaseAgreement | None) -> None:
 
 
 def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
-    """``_geom_bond`` / ``_geom_contact`` / ``_geom_angle`` for one phase.
+    """``_geom_bond`` / ``_geom_contact`` / ``_geom_angle`` / ``_geom_torsion``.
 
     Tag names are the COMCIFS core dictionary's, checked rather than
     remembered (as WP-1069 did for the R factors): the ``_geom_bond.*``,
@@ -641,6 +645,17 @@ def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
     ones, because an angle between two contacts is not a shape anybody reads.
     A bonded row and an angle carry ``publ_flag yes`` and a contact ``no``,
     the dictionary's default (ITC Vol. G ch. 4.1, pp. 236-238).
+
+    ``_geom_torsion`` (WP-1815) writes
+    :attr:`~rietx.schemas.results.GeometryTable.torsions` as the table holds
+    them: each torsion once, over a bonded chain, in Klyne and Prelog's sign
+    and the dictionary's own range (``_enumeration.range -180.0:180.0``).
+    A torsion carries ``publ_flag no``, the dictionary's default: the table
+    lists every bonded chain up to a cap, coordination contacts of an ionic
+    solid included, and a paper tabulates the few torsions its argument
+    needs (SHELXL lists torsions only on request, ``CONF``).  Its value tag is the bare ``_geom_torsion``, the
+    alias of ``_geom_torsion.angle``, for the reason the angle's is.  A table
+    from before schema 0.60 holds ``None`` there and writes no loop.
 
     :class:`~rietx.schemas.results.GeometryTable` lists every atom's whole
     environment, so a bond between two sites is in it twice, once from each
@@ -676,12 +691,19 @@ def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
     distances = [d for d in geometry.distances
                  if d.phase_index == ip and d.atom_index_1 <= d.atom_index_2]
     angles = [a for a in geometry.angles if a.phase_index == ip]
-    if not distances and not angles:
+    torsions = [t for t in geometry.torsions or () if t.phase_index == ip]
+    if not distances and not angles and not torsions:
         return
-    codable = [d for d in distances if d.symmetry_1 and d.symmetry_2]
-    angles_codable = [a for a in angles
-                      if a.symmetry_1 and a.symmetry_2 and a.symmetry_3]
-    dropped = len(distances) - len(codable) + len(angles) - len(angles_codable)
+
+    def coded(rows, n: int):
+        return [r for r in rows
+                if all(getattr(r, f"symmetry_{k}") for k in range(1, n + 1))]
+
+    codable = coded(distances, 2)
+    angles_codable = coded(angles, 3)
+    torsions_codable = coded(torsions, 4)
+    dropped = (len(distances) - len(codable) + len(angles) - len(angles_codable)
+               + len(torsions) - len(torsions_codable))
     loops = []
     for tag, rows, flag in (("_geom_bond_", [d for d in codable if d.bonded], "yes"),
                             ("_geom_contact_", [d for d in codable if not d.bonded],
@@ -693,26 +715,37 @@ def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
                             text(f"{tag}atom_site_label_2", d.atom_2),
                             number(f"{tag}distance", d.distance, d.stderr),
                             d.symmetry_1, d.symmetry_2, flag] for d in rows]))
-    if angles_codable:
-        # the angle *value* is the one tag here whose flat DDL1 alias is not
-        # ``<category>_<object>``: ``_geom_angle.value`` aliases to a bare
-        # ``_geom_angle``, so this loop cannot share a prefix with its columns
-        loops.append(("", [
-            "_geom_angle_atom_site_label_1", "_geom_angle_atom_site_label_2",
-            "_geom_angle_atom_site_label_3", "_geom_angle",
-            "_geom_angle_site_symmetry_1", "_geom_angle_site_symmetry_2",
-            "_geom_angle_site_symmetry_3", "_geom_angle_publ_flag"],
-            [[*(text(f"_geom_angle_atom_site_label_{k}", label)
-                for k, label in enumerate((a.atom_1, a.atom_2, a.atom_3), start=1)),
-              number("_geom_angle", a.angle, a.stderr),
-              a.symmetry_1, a.symmetry_2, a.symmetry_3, "yes"] for a in angles_codable]))
+    # the angle *value* is the one tag here whose flat DDL1 alias is not
+    # ``<category>_<object>``: ``_geom_angle.value`` aliases to a bare
+    # ``_geom_angle`` and ``_geom_torsion.angle`` to a bare ``_geom_torsion``,
+    # so neither loop can share a prefix with its columns
+    for cat, n, rows, flag in (("_geom_angle", 3, angles_codable, "yes"),
+                               ("_geom_torsion", 4, torsions_codable, "no")):
+        if rows:
+            loops.append(("", [
+                *(f"{cat}_atom_site_label_{k}" for k in range(1, n + 1)), cat,
+                *(f"{cat}_site_symmetry_{k}" for k in range(1, n + 1)),
+                f"{cat}_publ_flag"],
+                [[*(text(f"{cat}_atom_site_label_{k}", getattr(r, f"atom_{k}"))
+                    for k in range(1, n + 1)),
+                  number(cat, r.angle, r.stderr),
+                  *(getattr(r, f"symmetry_{k}") for k in range(1, n + 1)), flag]
+                 for r in rows]))
     # each sentence only where a written row is what it describes: stating
-    # a method no row used is a claim (_special_details' rule)
-    sus = [r.stderr for r in codable] + [a.stderr for a in angles_codable]
+    # a method no row used is a claim (_special_details' rule), so the su
+    # sentence names only the kinds a written su belongs to
+    kinds = [(name, [r.stderr for r in rows]) for name, rows in (
+        ("distances", codable), ("angles", angles_codable),
+        ("torsion angles", torsions_codable))]
+    sus = [su for _, column in kinds for su in column]
+    with_su = [name for name, column in kinds
+               if any(su is not None for su in column)]
     details = []
-    if any(su is not None for su in sus):
+    if with_su:
+        named = (with_su[0] if len(with_su) == 1
+                 else ", ".join(with_su[:-1]) + " and " + with_su[-1])
         details.append(
-            "Standard uncertainties of distances and angles are propagated "
+            f"Standard uncertainties of {named} are propagated "
             "through the full covariance of the refined parameters, cell "
             "included (McCusker et al. 1999, J. Appl. Cryst. 32, 36, section 10)"
             + (", with the Berar-Lelann factor" if result.statistics.esd_inflation

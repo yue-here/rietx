@@ -775,24 +775,28 @@ def _moment_angle_columns(entries: list[dict[tuple[int, str], float]]
 
 
 def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
-                  modulus_norms: np.ndarray) -> _StationaryPoint:
+                  modulus_norms: np.ndarray, block=None) -> _StationaryPoint:
     """Move the angles ``idx`` together until their columns vanish.
 
     Gauss-Newton on the stacked columns C(α) = ∂r/∂α, every other entry of
-    ``x`` fixed: δα = −lstsq(∂C/∂α, C), central differences at
-    :data:`STATIONARY_ANGLE_STEP` for C and for ∂C/∂α = ∂²r/∂α∂α.  Iterated,
-    because one step leaves an error of order δ³, and joint, because two
-    sites' angle columns are coupled (WP-1929's deferred measurement).  The
-    best iterate is kept, by its largest column over its modulus column.  Costs
-    2k² + 1 residual evaluations an iteration for k angles, the k columns
-    reusing the diagonal second differences' points.
+    ``x`` fixed: δα = −lstsq(∂C/∂α, C).  Iterated, because one step leaves an
+    error of order δ³, and joint, because two sites' angle columns are coupled
+    (WP-1929's deferred measurement).  The best iterate is kept, by its
+    largest column over its modulus column.
+
+    ``block(th)``, where given, returns C and ∂C/∂α = ∂²r/∂α∂α analytically
+    (:func:`_analytic_angle_block`, WP-2068), and an iteration then costs one
+    residual evaluation.  Without it both come from central differences at
+    :data:`STATIONARY_ANGLE_STEP`, 2k² + 1 residual evaluations an iteration
+    for k angles, the k columns reusing the diagonal second differences'
+    points.
     """
     from .statistics import column_norms
 
     h = STATIONARY_ANGLE_STEP
     k = len(idx)
 
-    def columns(th: np.ndarray):
+    def fd_columns(th: np.ndarray):
         plus, minus = [], []
         for i in idx:
             tp, tm = th.copy(), th.copy()
@@ -802,18 +806,10 @@ def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
             minus.append(resid(tm))
         c = np.column_stack([(p - m) / (2.0 * h)
                              for p, m in zip(plus, minus, strict=True)])
-        return c, plus, minus
+        return c, (plus, minus)
 
-    def ratios_of(c: np.ndarray) -> np.ndarray:
-        return column_norms(c) / modulus_norms
-
-    th, r0 = x.copy(), r_stop
-    c, plus, minus = columns(th)
-    ratios = ratios_of(c)
-    curvature_stop = None
-    for _ in range(STATIONARY_ANGLE_MAX_ITER):
-        if not np.all(np.isfinite(ratios)) or ratios.max() <= MOMENT_DIRECTION_SUPPORT:
-            break
+    def fd_curvature(th: np.ndarray, r0: np.ndarray, aux) -> np.ndarray:
+        plus, minus = aux
         m = np.empty((len(r0), k, k))
         for a in range(k):
             m[:, a, a] = (plus[a] - 2.0 * r0 + minus[a]) / h ** 2
@@ -828,6 +824,36 @@ def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
                 m[:, a, b] = m[:, b, a] = (
                     corner[1.0, 1.0] - corner[1.0, -1.0]
                     - corner[-1.0, 1.0] + corner[-1.0, -1.0]) / (4.0 * h ** 2)
+        return m
+
+    def fd_diagonal(r0: np.ndarray, aux) -> np.ndarray:
+        plus, minus = aux
+        return np.column_stack([(plus[a] - 2.0 * r0 + minus[a]) / h ** 2
+                                for a in range(k)])
+
+    if block is None:
+        columns, curvature, diagonal = fd_columns, fd_curvature, fd_diagonal
+    else:
+        def columns(th: np.ndarray):
+            return block(th)
+
+        def curvature(th: np.ndarray, r0: np.ndarray, aux) -> np.ndarray:
+            return aux
+
+        def diagonal(r0: np.ndarray, aux) -> np.ndarray:
+            return aux[:, np.arange(k), np.arange(k)].copy()
+
+    def ratios_of(c: np.ndarray) -> np.ndarray:
+        return column_norms(c) / modulus_norms
+
+    th, r0 = x.copy(), r_stop
+    c, aux = columns(th)
+    ratios = ratios_of(c)
+    curvature_stop = None
+    for _ in range(STATIONARY_ANGLE_MAX_ITER):
+        if not np.all(np.isfinite(ratios)) or ratios.max() <= MOMENT_DIRECTION_SUPPORT:
+            break
+        m = curvature(th, r0, aux)
         if curvature_stop is None:
             curvature_stop = m
         # block a of the stacked system is column a's rows: C[:, a] against
@@ -836,19 +862,17 @@ def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
                                 c.T.reshape(-1), rcond=None)[0]
         trial = th.copy()
         trial[idx] += step
-        c_new, plus_new, minus_new = columns(trial)
+        c_new, aux_new = columns(trial)
         ratios_new = ratios_of(c_new)
         if not np.all(np.isfinite(ratios_new)) or ratios_new.max() >= ratios.max():
             break
-        th, c, plus, minus, ratios = trial, c_new, plus_new, minus_new, ratios_new
+        th, c, aux, ratios = trial, c_new, aux_new, ratios_new
         r0 = resid(th)
-    diag = np.column_stack([(plus[a] - 2.0 * r0 + minus[a]) / h ** 2
-                            for a in range(k)])
     return _StationaryPoint(
         theta=th, ratios=ratios,
         reached=bool(np.all(np.isfinite(ratios))
                      and ratios.max() <= MOMENT_DIRECTION_SUPPORT),
-        resid=r0, curvature_stop=curvature_stop, curvature_diag=diag)
+        resid=r0, curvature_stop=curvature_stop, curvature_diag=diagonal(r0, aux))
 
 
 def _refitted_increase(jac_data: np.ndarray, angles: list[int],
@@ -906,7 +930,7 @@ def _half_widths(curvature_diag: np.ndarray, resid: np.ndarray,
 def stationary_angle_test(resid, x: np.ndarray, jac: np.ndarray, n_data: int,
                           free_paths: list[str],
                           entries: list[dict[tuple[int, str], float]],
-                          n_free: int
+                          n_free: int, angle_block=None
                           ) -> tuple[list[MomentAngleTest] | None, list[int]]:
     """Which free moment angles sit at a direction the symmetry fixes (WP-1929).
 
@@ -933,6 +957,10 @@ def stationary_angle_test(resid, x: np.ndarray, jac: np.ndarray, n_data: int,
     pass alone, and this is how they are separated.
 
     ``resid`` is the solve's residual; only its first ``n_data`` rows are read.
+    ``angle_block`` is :func:`_analytic_angle_block`'s answer for the solve's
+    model, where it has one: a round whose set it claims builds its columns
+    and curvature from it, and every other round, or a caller passing
+    ``None``, from central differences of ``resid``.
     ``jac`` is the solve's own Jacobian at ``x``, and ``n_free`` is P in
     χ²_red = χ²/(N − P), as :func:`covariance_estimates` counts it.  Returns
     the record, ``None`` where no angle was a candidate or χ²_red·f² is not
@@ -981,7 +1009,9 @@ def stationary_angle_test(resid, x: np.ndarray, jac: np.ndarray, n_data: int,
         cut = chi_bar_squared_quantile(STATIONARY_ANGLE_LEVEL, k)
         try:
             point = _joint_newton(r, x, r_stop, tested,
-                                  np.array([reference[i] for i in tested]))
+                                  np.array([reference[i] for i in tested]),
+                                  None if angle_block is None
+                                  else angle_block(tested))
             statistic = None
             if point.reached:
                 statistic = _refitted_increase(jac_data, tested, r_stop,
@@ -1485,6 +1515,116 @@ def _moment_reach_ok(path: str, extra: list[str]) -> bool:
     prefix = f"phases.{m.group(1)}.atoms."
     return all((n := _MOMENT_PATH.match(q)) and n.group(3) == "0"
                and q.startswith(prefix) for q in extra)
+
+
+def _analytic_angle_block(model: CompiledModel, table: ParameterTable):
+    """The stationary-angle test's analytic block, or ``None`` (WP-2068).
+
+    Returns ``make(idx)``, which answers for a set of θ columns either
+    ``None`` (the test keeps its central differences) or ``block(th)`` giving
+    the data rows' C = ∂r/∂θ_idx, (n, k), and ∂²r/∂θ_a∂θ_b, (n, k, k), at
+    ``th``.  The branch claims a set only when every model path each column
+    moves is a moment **angle** of a phase whose intensity is affine in
+    p²⟨|F_⊥|²⟩ (:meth:`CompiledModel.moment_angle_block_supported`); a
+    variable is dropped before that test, the forward model never reading
+    one.  The test's own candidates pass the first half by construction
+    (``_moment_angle_columns``), so the second is what sends a set back to
+    the differences.
+
+    Within that reach the chain is linear: y is affine in |F|², so
+    ∂²y/∂a∂b is ∂²|F_⊥|²/∂a∂b through the same per-reflection factor and
+    the same frozen profile Ω as the first derivative.  Neither depends on
+    an angle, so both are built once per phase, at the first ``th`` any set
+    is evaluated at, and shared by every round's set.  The coefficients are
+    C's, so a tie or a variable driving several sites' angles is carried
+    exactly, the DOFs being affine in θ.  The reach is read off
+    :meth:`~rietx.params.vector.ParameterTable.column_reach`, never C's
+    sparsity: a derived row a column moves carries no coefficient in C, and
+    the branch declines it rather than reading it as unmoved.
+    """
+    if (model.mode != "rietveld" or model.pawley is not None
+            or all(cp.magnetic is None for cp in model.phases)):
+        return None
+    coef = table.constraint_block()[0].tocsc()
+    reach = list(table.column_reach().values())
+    n_table = len(table.free_paths)
+    sqrt_w = 1.0 / model.sigma
+    n_pts = len(model.tt)
+    frozen: dict[int, list] = {}
+
+    def freeze(values: dict[str, float], phases) -> None:
+        """Per phase and drawn component, ∂y/∂(p²⟨|F_⊥|²⟩) as a sparse
+        (points × reflections) operator: Ω scattered by its window
+        indices, times the per-reflection factor the first-derivative
+        chain applies (:meth:`CompiledModel.moment_intensity_grad`)."""
+        from scipy import sparse
+
+        todo = [ip for ip in phases if ip not in frozen]
+        if not todo:
+            return
+        bases = model.derivative_bases(values, None, axial_derivs=False,
+                                       profile_derivs=False)
+        for ip in todo:
+            n_refl = len(model.phases[ip].reflections)
+            ops = []
+            for pp, fac in zip(bases.components(ip),
+                               model.moment_intensity_grad(
+                                   ip, np.ones(n_refl), values),
+                               strict=True):
+                lay = pp.layout
+                if not len(lay.i0):
+                    continue
+                row_fac = np.where(pp.finite, _gather_per_line(lay, fac), 0.0)
+                data = (np.asarray(pp.omega) * row_fac[:, None]).ravel()
+                rows = np.asarray(lay.idx).ravel()
+                refl = np.broadcast_to(np.asarray(lay.k)[:, None],
+                                       lay.idx.shape).ravel()
+                ops.append(sparse.csr_matrix((data, (rows, refl)),
+                                             shape=(n_pts, n_refl)))
+            frozen[ip] = ops
+
+    def make(idx: list[int]):
+        weights: dict[int, list[dict[tuple[int, int], float]]] = {}
+        for a, c in enumerate(idx):
+            if c >= n_table:
+                return None
+            for path in reach[c]:
+                if is_variable_path(path):
+                    continue
+                w = float(coef[table._paths[path], c])
+                m = _MOMENT_PATH.match(path)
+                if w == 0.0 or m is None or m.group(3) == "0":
+                    # a derived row (no coefficient in C), a modulus or
+                    # anything that is not a moment angle
+                    return None
+                ip = int(m.group(1))
+                if not model.moment_angle_block_supported(ip):
+                    return None
+                per = weights.setdefault(ip, [{} for _ in idx])
+                per[a][int(m.group(2)), int(m.group(3))] = w
+        if not weights:
+            return None
+        k = len(idx)
+        upper = np.triu_indices(k)
+
+        def block(th: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            values = table.decode(th[:n_table])
+            freeze(values, weights)
+            dy = np.zeros((n_pts, k + len(upper[0])))
+            for ip, w in weights.items():
+                g, h = model.moment_f2_angle_block(ip, values, w)
+                rhs = np.concatenate([g, h[:, upper[0], upper[1]]], axis=1)
+                for op in frozen[ip]:
+                    dy += op @ rhs
+            dy *= -sqrt_w[:, None]
+            curv = np.empty((n_pts, k, k))
+            curv[:, upper[0], upper[1]] = dy[:, k:]
+            curv[:, upper[1], upper[0]] = dy[:, k:]
+            return dy[:, :k], curv
+
+        return block
+
+    return make
 
 
 def _po_column(model: CompiledModel, bases: DerivativeBases,
@@ -2299,7 +2439,8 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
     ``magnetic_lor_strain`` added at a magnetic component's windows.  A
     Stephens block adds Λ(hkl)·tanθ, which its own cone holds at or above
     zero (:func:`strain_cone_inequalities`), so it is left out of the row.
-    The row is then a sufficient condition, never a necessary one.  The
+    It also replaces ``lor_strain`` (WP-1467), whose value leaves the row with
+    it.  The row is then a sufficient condition, never a necessary one.  The
     phase terms have floors of 0, so a row can bind only through X and Y.
 
     **A row at every reflection of the frozen list**, where the Gaussian rows
@@ -2344,6 +2485,13 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
         # the magnetic pair is a table row only where a moment block is declared
         if cp.win_mag is not None and all(n in table._paths for n in magnetic):
             families.append((cp.win_mag, rows + [table._paths[n] for n in magnetic]))
+        # a Stephens block replaces lor_strain (CompiledModel.lor_strain_term,
+        # WP-1467): the entry is force-fixed, so its C row is zero and only its
+        # stored value in d would reach the row, a width the model never draws
+        d_ph = d
+        if cp.strain_monomials is not None:
+            d_ph = d.copy()
+            d_ph[table._paths[f"phases.{ip}.lor_strain"]] = 0.0
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         _d, tt_lines = model._cell_block(cp, cell, lams)
@@ -2361,7 +2509,7 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
             inv_cos, t = 1.0 / np.cos(th), np.tan(th)
             basis = np.column_stack([inv_cos, t] * (len(idx) // 2))
             blocks_T.append(basis @ C[idx, :])
-            blocks_c.append(basis @ d[idx])
+            blocks_c.append(basis @ d_ph[idx])
         if not blocks_T:
             continue
         Tc = np.unique(np.column_stack([np.vstack(blocks_T),
@@ -2987,7 +3135,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
         moment_angle_tests, stationary = stationary_angle_test(
             probe, res.x, res.jac, len(model.tt), table.free_paths,
             _column_entries([table], [np.arange(n_table)], len(res.x)),
-            len(res.x))
+            len(res.x), angle_block=_analytic_angle_block(model, table))
         stderr_full, corr_full, esd_inflation, covariance_error = _guarded_covariance(
             _without_columns(res.jac, stationary), res.fun, len(res.x),
             n_data=len(model.tt))

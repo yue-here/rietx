@@ -725,6 +725,33 @@ def _stage_solve(*, nan_column: bool) -> list:
     return [] if found is None else [found]
 
 
+def _moduli(*rows: tuple[float, float | None]) -> list:
+    """``moment_unsupported_diagnostics`` over free moduli of (value, esd)."""
+    from rietx.report.magnetic import moment_unsupported_diagnostics
+    from rietx.schemas.results import RefinedParameter
+
+    return moment_unsupported_diagnostics([
+        RefinedParameter(path=f"phases.0.atoms.{i}.moment.dof0", value=value,
+                         stderr=esd, vary=True)
+        for i, (value, esd) in enumerate(rows)])
+
+
+def _unsupported_fires() -> list:
+    """#1075's repro 2 on its dead column, and a moment inside 3 esd (WP-2060)."""
+    return _moduli((-8.5e-8, 1.7e4)) + _moduli((0.5, 0.2))
+
+
+def _unsupported_silent() -> list:
+    """A moment at 35 esd (Cr2WO6 at 4 K's ratio), a held one with no esd, and
+    a non-moment row at 0."""
+    from rietx.report.magnetic import moment_unsupported_diagnostics
+    from rietx.schemas.results import RefinedParameter
+
+    return (_moduli((2.45, 0.07), (3.5, None))
+            + moment_unsupported_diagnostics([RefinedParameter(
+                path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -741,6 +768,8 @@ SILENCE: dict[str, Pair] = {
         _instprm_geometry_fires, _instprm_geometry_silent, "tests/test_gsas2_instprm.py"),
     "GSAS_PRM_PROFILE_SET_DEFAULTED": Pair(
         _profile_set_fires, _profile_set_silent, "tests/test_gsas_prm.py"),
+    "MOMENT_UNSUPPORTED": Pair(
+        _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(

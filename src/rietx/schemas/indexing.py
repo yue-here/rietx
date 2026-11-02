@@ -201,6 +201,13 @@ from .structure import Cell
 #: orbits cannot hold the declared content (removing them only under
 #: ``ordered=True``) and the special positions a Z′ below one needs.  Only a screen that declares one of them can answer differently;
 #: with none declared every screen answers as before.
+#: Also 1.12 (WP-2033, #1140's follow-ups): under ``ordered=True`` a fractional
+#: formula count whose atoms per cell are whole (``CaSO4·0.5H2O`` at Z = 2) is
+#: now counted, so the screen removes groups it used to keep; ``z`` with no
+#: formula opens ``EXTINCTION_PRIOR_APPLIED`` with "filters no group" rather
+#: than "removed 0 space group(s)"; the collapsed special-position ``where``
+#: line splits by note kind; an element an ordered count cannot test (atoms per
+#: cell not whole) gets its own ``where`` line.
 #: Also 1.12 (WP-2030): ``INDEX_DATA_INSUFFICIENT`` names an undeclared
 #: instrument first only on a laboratory source, read off the declared source
 #: (``diagnostics.lab_source``), and reads it from the list's own record when
@@ -221,6 +228,10 @@ from .structure import Cell
 #: than its parent's (``SupercellEvidence.child_seen_more``) is never
 #: ``refuted``, so a dense low-symmetry truth no longer sits below a wrong cell
 #: that p₀ near the truth's own seen fraction let refute it.
+#: Also 1.12 (#1263): the containment refuter's null is the seen test's own
+#: chance rate (``PatternScreen.p0``), so ``n_seen ≤ n_extra·p0``, both
+#: p-values and ``SupercellCheck.p0`` read the windows the count is taken in.
+#: The assumed shift bound floors only the power check (``p0_power``, #951).
 INDEXING_THRESHOLDS_VERSION = "1.12"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
@@ -1200,9 +1211,11 @@ class SupercellCheck(Base):
     extras are this lattice's lines that the parent's lattice does not predict,
     counted only where no space-group extinction could remove them
     (:func:`rietx.indexing.ambiguity.uncancellable`), and each is *seen* when it
-    falls inside an observed line's matching window.  ``p0`` is the chance of
-    that for a position no line is at, and ``p_value`` the one-sided binomial
-    chance of at least ``n_seen`` of ``n_extra``.
+    falls inside an observed line's window: the matching window on the
+    sublattice route, the reversed window at the resolution on containment's.
+    ``p0`` is the chance of that for a position no line is at, in the same
+    windows (#1263), and ``p_value`` the one-sided binomial chance of at least
+    ``n_seen`` of ``n_extra``.
 
     ``verdict`` is ``"refuted"`` when the extras are seen no more often than
     chance and the test had the power to say otherwise, and the candidate then
@@ -1212,7 +1225,8 @@ class SupercellCheck(Base):
     is a lattice statement the data make, and the candidate then sits directly
     above this parent unless another check refutes it (WP-1510).
     ``"undecided"`` means not even every extra seen could have reached the
-    significance level, which includes a parent whose lines this one only
+    significance level at ``p0_power`` (``p0`` where that is ``None``), which
+    includes a parent whose lines this one only
     repeats, or that the extras are seen beyond chance only on lines the parent
     explains.  An undecided check moves nothing.
     """
@@ -1239,6 +1253,12 @@ class SupercellCheck(Base):
     #: this many falling below α at the same ``p0``.  ``None`` in a record
     #: written before thresholds version 1.7, which did not count them
     n_seen_unexplained: int | None = None
+    #: the chance rate the power check read, counted in windows floored at the
+    #: assumed shift bound: refuted needs ``p0_power ** n_extra`` below α.
+    #: ``None`` where no floor was declared (the check then reads ``p0``), and
+    #: in a record written before #1263, whose ``p0`` was itself the floored
+    #: rate
+    p0_power: float | None = None
     verdict: Literal["supported", "refuted", "undecided"]
     #: ° 2θ of the extras nothing was seen at, lowest first and at most six:
     #: where to look in the pattern for the lines the larger cell needs
@@ -2259,8 +2279,10 @@ class ExtinctionPrior(Base):
     a measured ``density`` that fixes Z through the formula weight and the
     screened cell.  A group whose orbits cannot hold some element's atoms per
     cell is named in ``count_notes`` and kept; only under ``ordered=True`` is
-    it removed, the count being the test of an ordered model; a
-    fractional formula count declares a shared site and is not counted
+    it removed, the count being the test of an ordered model.  A
+    fractional formula count declares a shared site and is not counted,
+    unless ``ordered``: then it belongs to the formula unit (a hemihydrate)
+    and is counted where count × Z is whole
     (:func:`rietx.indexing.extinction.content_exclusion`).  Where Z is not a
     whole multiple of a member's general multiplicity (Z′ < 1, as for #935's
     P 2₁ salt against P 2₁/m) the member is kept and the special positions a
@@ -2301,7 +2323,8 @@ class ExtinctionPrior(Base):
     #: weight and the screened cell's volume
     density: float | None = Field(default=None, gt=0.0)
     #: the formula unit as a chemist writes it (``"Cu12Sb4S13"``, brackets and
-    #: ``·`` adducts allowed); a fractional count declares a shared site
+    #: ``·`` adducts allowed); a fractional count declares a shared site,
+    #: unless :attr:`ordered`
     formula: str | None = None
     #: every site is one element at full occupancy (no mixed or partial
     #: sites): only then does a group whose orbits cannot hold the declared
