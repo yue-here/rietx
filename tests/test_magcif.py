@@ -3462,3 +3462,22 @@ def test_a_component_printed_as_a_bare_zero_is_not_moved_by_its_half_width(tmp_p
     moment = structure_from_cif(path).phases[0].atoms[0].moment
     assert moment.values()[0] == pytest.approx(moment.values()[1], abs=1e-9)
     assert moment.values()[1] == pytest.approx(moment.values()[2], abs=1e-9)
+
+
+def test_a_moment_component_the_symmetry_leaves_free_keeps_its_print():
+    """On a site allowing m_y = 2·m_x with m_z free, only x and y have a
+    relation to meet.  A Chebyshev fit alone is degenerate in z, and its
+    solver moved m_z = 1.5 by the whole 0.02 μ_B cap for nothing (WP-2016);
+    the second programme leaves it where the file printed it."""
+    from rietx.crystallography.magcif import moment_within_print
+
+    class _Printed:
+        def values(self):
+            return (2.045, 4.089, 1.5)
+
+    row = {"crystalaxis_x": "2.045", "crystalaxis_y": "4.089", "crystalaxis_z": "1.5"}
+    components, shift = moment_within_print(_Printed(), row, [[1, 2, 0], [0, 0, 1]])
+    assert components == pytest.approx((2.0446666666666667, 4.0893333333333333, 1.5),
+                                       abs=1e-12)
+    assert components[2] == 1.5
+    assert shift == pytest.approx(1 / 3000, abs=1e-12)
