@@ -52,7 +52,7 @@ when U and V are both zero beside W on its floor. It is the only other
 `minimum` or `maximum` on the traced path found sitting on a bound LM lands on.
 `sharp_widths` covers W on its floor with U and V nonzero.
 
-### Inherited
+**Both apertures at zero** (folded from `### Inherited` on 2026-11-02).
 
 - **From WP-2003 (2026-10-26): both apertures at 0 cost an answer, not only an esd.** CPD
   sample 1b fitted independently under `qpa_plan()` ends with S/L and H/L both on their
@@ -91,7 +91,9 @@ when U and V are both zero beside W on its floor. It is the only other
 ## Non-goals
 
 - The FCJ limit itself and the traced kink: shipped in WP-1953 (#918).
-- The LM driver's handling of a small column: WP-1953 (#923).
+- The LM driver's handling of a small column in general: WP-1953 (#923).
+  The case at both apertures zero (#1075) is this WP's, since 1953's fix
+  does not reach it.
 
 ## Tasks
 
@@ -108,6 +110,9 @@ when U and V are both zero beside W on its floor. It is the only other
       does. Record it as `Decided YYYY-MM-DD:`.
 - [ ] Probe the Caglioti tie: U = V = 0 with W on its floor, traced against
       numpy.
+- [ ] Both apertures at 0: reproduce WP-2003's warm CPD collapse (X17) and
+      #1075's LM stop on `lab_bragg_brentano`, and say whether one remedy (a
+      floor or a lift where the column is live, WP-1938's rule) serves both.
 
 ## Acceptance
 
