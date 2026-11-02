@@ -1,6 +1,6 @@
 # WP-1815 — derived geometry: torsions, a request form, one table every writer reads
 
-Milestone: rigid-bodies · Status: 🔄 2026-11-01 — torsion rows, the request form and `TorsionRestraint` merged from outside as PR #1261 (`9c6ccf7d`); the CIF torsion loop and the skill row remain
+Milestone: rigid-bodies · Status: 🔄 2026-11-02 — claimed by @yue-here (ghostshift runner): the CIF torsion loop and the skill row
 Depends on: 1804 (the derived block's local Jacobian, for body atoms)
 Priority: P3 2026-10-16 — a view over what the fit already knows; WP-1933's CIF torsion loop waits on it
 
