@@ -392,8 +392,15 @@ def build_layer0(result: RefinementResult, *, top_n: int = 15,
     if rest:
         summary += (f" and the other {len(rest)} carry "
                     f"{sum(r.chi2_share for r in rest):.0%}")
-    summary += (f".\n{len([u for u in unmatched if u.kind == 'unmatched_obs'])} "
-                "observed peak(s) match no reflection.")
+    obs = [u for u in unmatched if u.kind == "unmatched_obs"]
+    summary += f".\n{len(obs)} observed peak(s) match no reflection"
+    # The one line every reader scans points at the evidence when any row
+    # sits on a drawn flank (WP-1977, ruled 2026-11-02): the cause is the
+    # reader's to weigh, so the count is read off the rows' own records.
+    n_flank = sum(1 for u in obs if u.flank is not None and u.flank.on_flank)
+    if n_flank:
+        summary += f" ({n_flank} on a drawn flank: see UnmatchedPeak.flank)"
+    summary += "."
 
     # The background section takes the *full* segmentation, not the top-N kept
     # above: a channel outside the fifteen largest regions is in a small one,

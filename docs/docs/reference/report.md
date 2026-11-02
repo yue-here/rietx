@@ -117,6 +117,7 @@ The blind direction is the one de Wolff's M₂₀ has, and Oishi-Tomiyasu's reve
 The data then do not resolve the two, and Layer 2 suggests no impurity phase for the entry.
 A shape or asymmetry misfit, an unmodelled Kα2 line, a symmetry lower than the model's and a foreign line all leave such a shoulder.
 `rietx.help.explain("UnmatchedPeak.flank")` says what separates them, and [Result fields](result-fields.md) describes each field.
+When any entry sits on a flank, the summary's line for the unmatched peaks says how many, and names the field.
 
 | Field | Is | Reads as |
 |---|---|---|
@@ -139,7 +140,7 @@ On the NAC Rietveld fit it reads:
 
 ```text
 53 misfit regions. The top 15 carry 74% of χ² and the other 38 carry 15%.
-53 observed peak(s) match no reflection.
+50 observed peak(s) match no reflection (11 on a drawn flank: see UnmatchedPeak.flank).
 Between the peak regions the residual is systematic (χ²_red=2.5 over 12275 channels, Durbin-Watson d=0.40 where 2 is uncorrelated).
 No region entry covers this misfit.
 Layer 1 read 9 of 14 regions.

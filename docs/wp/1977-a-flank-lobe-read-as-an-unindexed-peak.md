@@ -227,7 +227,7 @@ the impurity call is made. A tetragonal specimen modelled cubic keeps
   passed. `test_acceptance_indexing.py` 45 passed; the QPA acceptance rows
   and `test_flank_lobes.py` 19 passed. Ruff clean, `tests.audit_delta` no
   change, skill caps inside budget (body +2 B). `python -m tests.reader_output`
-  exits 0, unchanged.
+  exits 0, unchanged, before the summary clause below.
 
   *Generality* (generality-review, 2026-11-02, summarised). Flank test:
   holds, tier 3, kind 2 now handled as kind 2. The two 5σ levels: weak,
@@ -256,15 +256,19 @@ the impurity call is made. A tetragonal specimen modelled cubic keeps
   and two of the four causes have no `ActionKind`. (6) No
   `INDEXING_THRESHOLDS_VERSION` line, since the count no longer moves.
 
-  *Question for Yue.* When every strong residual sits on a flank (SRM 660c
-  with the apertures at 0), no action is built and the summary reads "11
-  observed peak(s) match no reflection." with nothing pointing at the
-  evidence. Add a summary clause such as "(11 on a drawn flank: see
-  `UnmatchedPeak.flank`)"? For: § Demotion asks the report to carry one line
-  naming a demoted statistic's field. Against: it changes printed reader
-  output, which the ruled design kept unchanged. Lean: add it, as one clause.
+  *Ruled 2026-11-02:* call 1 approved by Yue (the `UnmatchedPeak.flank`
+  field and the withheld impurity call); call 2 delegated, settled by Claude
+  (add the clause), on the agent-first thesis and Yue's ruling that the
+  driving agent decides the cause. The summary's unmatched line now adds
+  "(N on a drawn flank: see UnmatchedPeak.flank)" when at least one row is
+  on a flank, counted off the rows' records. SRM 660c's standard fit reads
+  "12 observed peak(s) match no reflection (12 on a drawn flank: see
+  UnmatchedPeak.flank).", and 11-BM NAC's "50 observed peak(s) match no
+  reflection (11 on a drawn flank: see UnmatchedPeak.flank).".
+  `python -m tests.reader_output` exits 1 with that one line changed; the
+  NAC termination golden and the manual's NAC example follow.
 
-  Next: Yue reviews PR #1295 and answers the question. Then WP-2054 builds
+  Next: Yue reviews PR #1295. Then WP-2054 builds
   its asymmetry test on the SRM 660c case, reading the flank offsets.
 
 - **2026-11-01** — closed, PR #1295. The fit report no longer calls a
