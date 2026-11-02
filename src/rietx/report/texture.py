@@ -152,10 +152,15 @@ def _score_axis(f: np.ndarray, w: np.ndarray, cos2: np.ndarray,
     # pairwise sum as a 1-D one, so the scores are bit-identical to it; the
     # loop was 121 numpy calls per axis per phase, a third of a stage report
     # (WP-1335).  The block bounds the memory to _BLOCK_ELEMENTS doubles.
+    # The March factor is evaluated once per *distinct* cos²α and indexed
+    # back, which is the same number per member: an orbit repeats few angles
+    # to an axis (a Friedel mate always repeats its partner's), and the
+    # power is what the grid's cost is.
+    distinct, member_of = np.unique(cos2, return_inverse=True)
     step = max(1, _BLOCK_ELEMENTS // max(len(cos2), 1))
     for lo in range(0, len(_R_GRID), step):
         rs = _R_GRID[lo:lo + step]
-        term = march_term(cos2[None, :], rs[:, None])
+        term = march_term(distinct[None, :], rs[:, None])[:, member_of]
         bins = (seg[None, :] + n_bins * np.arange(len(rs))[:, None]).ravel()
         p = (np.bincount(bins, weights=term.ravel(), minlength=len(rs) * n_bins)
              .reshape(len(rs), n_bins) / counts)
