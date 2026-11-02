@@ -110,6 +110,11 @@ finding goes stale (memory `queued-wp-findings-go-stale`).
   passes 25 of 25. Ruff is clean, `session_start.py` exits 0, and `tests.reader_output` exits 0,
   unchanged against the merge-base. `/code-review high --fix` found eight issues in this branch's
   own rewrites or their siblings; seven were fixed in one commit, and the eighth is owed item 2.
+  A second merge of main (WP-2082's prior-count lines) put `src/rietx/indexing/CLAUDE.md` at 363
+  against its 361 cap. The streaming bullet now drops its WP-2007 pointer and its "unvalidated
+  caps" clause, which the bullet's heading already covers. WP-2007's Inherited note still holds the
+  cap-or-refute question. The fast selection was not rerun on that merge, whose overlap with this
+  branch is three files of comments; CI runs it.
 
   *Owed to the maintainer* (each would change behaviour, a public name or a default, so the text
   now describes the code and the question waits):
