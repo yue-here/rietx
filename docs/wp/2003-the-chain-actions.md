@@ -172,6 +172,13 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
 
 ### Inherited
 
+- **2026-11-02, from WP-2080 (issue #1214).** C1's reversal condition is met on
+  the issue's synthetic chain: a converged warm first rung keeps the minor phase's
+  c 0.34 Å off at GoF 2.05, where its seed pattern reached 1.02 and `warm_staged`
+  reaches the truth. Neither the Rwp fence nor `_rejected` escalates it. WP-2080
+  owns the trigger and its ruling; nothing here changes unless that ruling asks C1
+  to be revisited.
+
 ## Non-goals
 
 - The holds inside one stage: 2002, already landed when this starts.
