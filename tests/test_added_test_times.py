@@ -51,7 +51,7 @@ def test_cases_sum_by_function_and_a_class_member_matches_its_module(tmp_path):
 
 
 def test_a_directory_reads_every_shard_of_a_leg(tmp_path):
-    """A CI leg runs as two shards, so an added test is in one file of two."""
+    """A CI leg runs as several shards, so an added test is in one file of them."""
     for shard, case in (("1", '<testcase classname="tests.test_a" name="test_new" time="3"/>'),
                         ("2", '<testcase classname="tests.sub.test_b" name="test_method" time="4"/>')):
         (tmp_path / f"junit-py3.14-{shard}").mkdir()

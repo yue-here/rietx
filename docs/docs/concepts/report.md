@@ -28,7 +28,10 @@ It gives the agreement indices and the cumulative χ² along the pattern, whose 
 It cuts the pattern into regions around peak clusters and ranks them by their share of χ².
 It lists observed peaks no calculated reflection accounts for, and calculated reflections with no observed peak.
 An observed peak must stand {{ LAYER0_PEAK_SIGMA }} esds above the calculated curve to be listed.
-Layer 2 suggests an impurity phase only for a peak above {{ IMPURITY_SIGMA }} esds.
+Each listed observed peak also says whether it sits on the flank of a calculated peak, with no valley as deep as {{ LAYER0_PEAK_SIGMA }} esds between them.
+The data do not resolve such a shoulder from its peak, and four causes leave one: a misfit of the peak's shape, an unmodelled Kα2 line, a symmetry lower than the model's, and a foreign line.
+The entry carries the evidence that separates them, and a line of a measured blank counts as a calculated peak.
+Layer 2 suggests an impurity phase only for a peak above {{ IMPURITY_SIGMA }} esds that the data resolve from every calculated peak.
 
 Layer 0 can say where the misfit is and how much of χ² it carries.
 It cannot say why.
