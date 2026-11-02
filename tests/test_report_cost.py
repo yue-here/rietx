@@ -126,15 +126,16 @@ def _score_axis_loop(f, w, cos2, seg, counts):
 
 
 @pytest.mark.parametrize("symbol", ["P -3 m 1", "I 21 3", "P 1 21/c 1"])
-@pytest.mark.parametrize("block", [None, 7])
-def test_the_blocked_texture_grid_scores_bit_identically(symbol, block, monkeypatch):
-    if block is not None:
-        # a block smaller than the grid, so the seams between blocks are tested
-        monkeypatch.setattr(texture_mod, "_BLOCK_ELEMENTS", block)
+@pytest.mark.parametrize("rows", [None, 1, 50])
+def test_the_blocked_texture_grid_scores_bit_identically(symbol, rows, monkeypatch):
     rng = np.random.default_rng(11)
     hkl = rng.integers(-5, 6, size=(60, 3))
     hkl = hkl[np.any(hkl != 0, axis=1)]
     members, seg, counts = orbit_layout(reflection_orbits(get_spacegroup(symbol), hkl))
+    if rows is not None:
+        # blocks of one r, and of 50 r values with a short last block of 21,
+        # so a block's rows and the seams between blocks are both tested
+        monkeypatch.setattr(texture_mod, "_BLOCK_ELEMENTS", rows * len(members))
     n = len(counts)
     f = 1.0 + 0.3 * rng.standard_normal(n)
     w = rng.random(n)

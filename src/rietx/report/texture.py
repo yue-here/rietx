@@ -49,8 +49,8 @@ from .schemas import (
 _R_GRID = np.geomspace(0.25, 4.0, 121)
 
 #: orbit members × r values evaluated in one block by :func:`_score_axis`:
-#: 2²¹ doubles, 16 MB, which holds the whole grid for a pattern of up to
-#: ~17 000 orbit members
+#: 2²¹ elements, 16 MB per array of that shape (a block holds a few), which
+#: holds the whole grid for a pattern of up to ~17 000 orbit members
 _BLOCK_ELEMENTS = 1 << 21
 
 
