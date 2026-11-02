@@ -60,8 +60,9 @@ esd of 0 on a symmetry-fixed 90° angle would be a claim about precision rather
 than a statement about constraint.
 
 `write_refinement_cif` writes the whole table as `_geom_bond_*`,
-`_geom_contact_*` and `_geom_angle_*` loops, with the symmetry codes resolvable
-against the `_space_group_symop_operation_xyz` loop it writes beside them.
+`_geom_contact_*`, `_geom_angle_*` and `_geom_torsion_*` loops, with the
+symmetry codes resolvable against the `_space_group_symop_operation_xyz` loop
+it writes beside them.
 
 ## §2 rules 4-5 — the two Le Bail measurements
 
