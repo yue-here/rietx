@@ -2483,6 +2483,11 @@ def test_a_bulk_glob_is_one_round_trip_and_one_history_node(blank, tmp_path,
     status, payload = client.patch("/api/params", {"vary": {"nothing.at.all": True}})
     assert status == 400 and "unknown parameter path: 'nothing.at.all'" in str(payload)
     assert len(project.history) == before + 4
+    # …and refused before a value or an earlier key in the same patch commits
+    status, payload = client.patch("/api/params", {
+        "values": {"instrument.profile.w": 0.01},
+        "vary": {"instrument.profile.u": True, "nothing.at.all": True}})
+    assert status == 400 and len(project.history) == before + 4
 
 
 def test_a_whole_model_patch_records_an_edit_node(blank, tmp_path, pattern_file):

@@ -875,6 +875,12 @@ class GuiSession:
             raise GuiError("'values' maps dot-path → number and 'vary' maps "
                            "dot-path glob → bool")
         changed: dict[str, Any] = {"values": [], "vary": {}}
+        # a literal vary key the model lacks is a typo, refused before the
+        # values or any earlier key commit a node (WP-1951)
+        try:
+            p.refinement._refuse_unknown_literals(list(vary))
+        except ValueError as exc:
+            raise GuiError(str(exc), where=sorted(vary)) from None
         if values:
             try:
                 p.refinement.set_values({k: float(v) for k, v in values.items()})

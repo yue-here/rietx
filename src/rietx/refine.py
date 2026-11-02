@@ -3216,19 +3216,17 @@ class Refinement:
         matches nothing stays silent (WP-1414), since that is how plans reach
         a component a model may not declare.
 
-        A request that frees nothing it named **warns** (issue #896), with the
-        text a stage's ``STAGE_PATH_UNKNOWN`` and ``STAGE_PATH_NOT_FREE`` give:
-        a retired spelling that matches nothing, with its current one, and,
-        when freeing, a phase literal or a glob naming one site
-        (``phases.0.atoms.0.dof.*``) that the model declines.  Those rows
-        exist, so the return value already says what changed.
+        A request that changes nothing it named **warns** (issue #896), with
+        the text a stage's ``STAGE_PATH_UNKNOWN`` and ``STAGE_PATH_NOT_FREE``
+        give: a pattern under a retired spelling that matches nothing, with its
+        current one, and, when freeing, a phase literal or a glob naming one
+        site (``phases.0.atoms.0.dof.*``) that the model declines.  A warning
+        rather than a refusal, because a declined row exists and a retired
+        pattern is a pattern, so the return value already says what changed.
         """
         globs = [path_globs] if isinstance(path_globs, str) else list(path_globs)
         table = self._working_table()
-        known = {e.path for e in table.entries}
-        if unknown := [g for g in dict.fromkeys(globs)
-                       if is_literal_path(g) and g not in known]:
-            raise _unknown_paths_error(unknown, known)
+        self._refuse_unknown_literals(globs, table)
         if vary:
             # A literal path is a claim about one parameter, and a held one
             # contradicts a declaration this same caller made, so it is
@@ -3287,6 +3285,20 @@ class Refinement:
         for message in findings:
             warnings.warn(message, UserWarning, stacklevel=2)
         return hits
+
+    def _refuse_unknown_literals(self, globs, table: ParameterTable | None = None
+                                 ) -> None:
+        """Raise on every literal among ``globs`` the model lacks (WP-1951).
+
+        :meth:`set_vary`'s first check.  A caller applying several requests as
+        one move (the GUI's ``PATCH /api/params``) asks it of all of them
+        before applying any, so one typo leaves every request unapplied.
+        """
+        table = self._working_table() if table is None else table
+        known = {e.path for e in table.entries}
+        if unknown := [g for g in dict.fromkeys(globs)
+                       if is_literal_path(g) and g not in known]:
+            raise _unknown_paths_error(unknown, known)
 
     def _set_vary_findings(self, table: ParameterTable, globs: list[str],
                            vary: bool) -> list[str]:
@@ -7911,7 +7923,7 @@ def _unknown_paths_error(paths: list[str], known) -> ValueError:
     if len(paths) == 1:
         return _unknown_path_error(paths[0], known)
     return ValueError(f"unknown parameter paths: {', '.join(map(repr, paths))}"
-                      + "".join(f"; for {p!r}, {h}" for p in paths
+                      + "".join(f"; for {p!r}, {h.rstrip('.')}" for p in paths
                                 if (h := _path_hint(p, known))))
 
 
