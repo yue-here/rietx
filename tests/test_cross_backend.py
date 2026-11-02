@@ -134,7 +134,8 @@ FD_STEP = 1e-6
 # ----------------------------------------------------------------------
 # configs: (model, table) at a compiled expansion point
 # ----------------------------------------------------------------------
-def _families_state(*, shape: str = "tchz_pv", axial_hl: float | None = None):
+def _families_state(*, shape: str = "tchz_pv", axial_hl: float | None = None,
+                    axial_sl: float | None = None):
     """The 18 analytic column families on the v0.2 lab Bragg-Brentano state.
 
     ``shape="voigt"`` swaps in WP-0405's true Gaussian⊗Lorentzian peak, which is
@@ -149,6 +150,8 @@ def _families_state(*, shape: str = "tchz_pv", axial_hl: float | None = None):
     ins.profile.shape = shape
     if axial_hl is not None:
         ins.geometry.axial_hl.value = axial_hl
+    if axial_sl is not None:
+        ins.geometry.axial_sl.value = axial_sl
     table = ParameterTable(structure, ins)
     table.set_vary(["*"], False)
     for path in ANALYTIC_FAMILIES:
@@ -1471,11 +1474,28 @@ def test_the_magnetic_config_declines_the_traced_backends_by_name(config):
         pytest.skip("no autodiff backend installed")
 
 
+#: S/L on its bound of zero beside a positive H/L: the mirror of
+#: ``axial_one_zero``, built only for the zero-aperture test below
+_AXIAL_SL_ZERO = "axial_sl_zero"
+
+
+def _zero_aperture_state(path: str):
+    if path.endswith("axial_hl"):
+        return "axial_one_zero", *_state("axial_one_zero")
+    if _AXIAL_SL_ZERO not in _STATE_CACHE:
+        _STATE_CACHE[_AXIAL_SL_ZERO] = _families_state(axial_sl=0.0,
+                                                       axial_hl=0.03)
+    model, table, _extras = _STATE_CACHE[_AXIAL_SL_ZERO]
+    return _AXIAL_SL_ZERO, model, table
+
+
 @pytest.mark.xdist_group("xb-axial_one_zero")
-@pytest.mark.parametrize("name", ["jax", "torch"])
-def test_a_zero_aperture_column_meets_its_one_sided_difference(name):
-    """WP-1953: a traced backend's ``axial_hl`` column at H/L = 0 is the
-    feasible side's, measured at its own scale.
+@pytest.mark.parametrize("path", ["instrument.geometry.axial_hl",
+                                  "instrument.geometry.axial_sl"])
+@pytest.mark.parametrize("name", ["numpy", "jax", "torch"])
+def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
+    """WP-1953, WP-1955: an aperture's column at its bound of zero is the
+    feasible side's, measured at its own scale, on every backend.
 
     The matrix row above cannot hold it: the column's norm is 0.047 against a
     largest column of 1.8e6, so it falls under ``DEAD_COL_FRAC`` once right.
@@ -1483,13 +1503,19 @@ def test_a_zero_aperture_column_meets_its_one_sided_difference(name):
     two tie at one zero aperture, where jax gives each side half the
     derivative.  Fixed, jax and torch meet the one-sided central difference to
     1.5e-3; the bar leaves 13× room for that difference's own truncation.
+
+    The numpy column was 0.232 rel-L2 off until WP-1955.  It is the small
+    residue of node terms some 1e5 times larger that cancel, and a forward
+    difference of the nodes put its O(h) error, 0.013 in norm, into that
+    residue.  A second-order difference meets the reference to 1.1e-6.
     """
-    model, table = _state("axial_one_zero")
+    config, model, table = _zero_aperture_state(path)
     theta = _theta(model, table)
-    path = "instrument.geometry.axial_hl"
     c = _labels(model, table).index(path)
-    ref = _central_fd_jacobian("axial_one_zero", model, table)(theta)[:, [c]]
-    col = _backend_jacobian(name)("axial_one_zero", model, table)(theta)[:, [c]]
+    assert table.decode(table.x0())[path] == 0.0
+    ref = _central_fd_jacobian(config, model, table)(theta)[:, [c]]
+    jac = (_analytic_jacobian if name == "numpy" else _backend_jacobian(name))
+    col = jac(config, model, table)(theta)[:, [c]]
     # alone in its own slice, the column is the largest, so it is live
     _assert_columns(ref, col, [path], rel_max=KINK_REL_L2_MAX,
                     cos_min=KINK_COSINE_MIN, what=f"{name} at 0: ")

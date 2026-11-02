@@ -97,7 +97,7 @@ when U and V are both zero beside W on its floor. It is the only other
 
 ## Tasks
 
-- [ ] Measure the numpy analytic `axial_hl` and `axial_sl` columns at one
+- [x] Measure the numpy analytic `axial_hl` and `axial_sl` columns at one
       zero aperture against the one-sided difference, and find the line in
       `model/forward.py` where the node differencing departs from it. A test
       that fails on `main`.
