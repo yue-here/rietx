@@ -341,17 +341,22 @@ series_broken = rx.refine_sequential(
 series_broken
 
 # %% [markdown]
-# [`SEQUENTIAL_RWP_OUTLIER`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-rwp-outlier) names the 700 K pattern.
-# The row's message is in `series_broken.diagnostics`.
-# It says every attempt left its Rwp far above the fence, the limit the series sets from the patterns accepted before it.
-# The series kept the best attempt and moved on.
+# The 700 K row reads Rwp 0.97 against 0.04 for its neighbours, and no series diagnostic names it.
+# Its fit converged, and a series sets no Rwp threshold of its own, so it kept that fit and moved on.
+# The entry records how far the Rwp sits above the median of the patterns accepted before it ([Quarantine](https://rietx.org/docs/stable/reference/series.html#quarantine)).
+
+# %%
+series_broken[4].rwp_over_median
+
+# %% [markdown]
+# A high ratio is not yet a bad fit, since a pattern with fewer counts has a higher Rwp too.
 # Read that pattern's own diagnostics.
 
 # %%
 series_broken[4].diagnostics
 
 # %% [markdown]
-# The best attempt put the LaB₆ scale on its floor of zero ([`FLOOR_HIT`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#floor-hit)).
+# The fit put the LaB₆ scale on its floor of zero ([`FLOOR_HIT`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#floor-hit)).
 # [`MODEL_FAR_FROM_DATA`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#model-far-from-data) says not to read any of this pattern's values.
 # [`PHASE_UNCONSTRAINED`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#phase-unconstrained) says the cell was held, because a phase with no scale does not constrain it.
 # A held value is not a measurement, so the trajectory has no 700 K point.

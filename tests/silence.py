@@ -502,6 +502,34 @@ def _parametric_range_silent() -> list:
     return _parametric_range(0.0) + _parametric_range(-2e-4)
 
 
+def _reseed(**escalation) -> list:
+    """``SEQUENTIAL_RESEED``'s builder on one synthetic converged entry,
+    escalated as ``escalation`` says."""
+    from rietx.schemas.results import Statistics
+    from rietx.schemas.sequential import SeriesEntry
+    from rietx.sequential import _reseed_diagnostics
+
+    entry = SeriesEntry(
+        index=3, label="p3", x=3.0, status="converged",
+        statistics=Statistics(rwp=0.10, rp=0.08, rexp=0.09, chi2=1.2, gof=1.1,
+                              n_points=100, n_free_parameters=5), **escalation)
+    return _reseed_diagnostics(entry)
+
+
+def _reseed_fires() -> list:
+    """The warm rungs diverged and the cold rung was kept."""
+    return _reseed(rung="cold", reseeded=True, rwp_warm=0.6,
+                   rungs_tried=["warm", "warm_staged", "cold"])
+
+
+def _reseed_silent() -> list:
+    """Fitted first time, and escalated to a warm rung that was kept: the chain
+    is unbroken in both."""
+    return (_reseed(rung="warm", rungs_tried=["warm"])
+            + _reseed(rung="warm_staged", rwp_warm=0.6,
+                      rungs_tried=["warm", "warm_staged"]))
+
+
 def _short_series(*, cancel_after_first: bool) -> list:
     """Two cheap patterns of ``tests/test_sequential.py``'s ramp, the chain
     cancelled once the first pattern's fit ends where ``cancel_after_first``,
@@ -763,6 +791,8 @@ SILENCE: dict[str, Pair] = {
         _dofs_renumbered_fires, _dofs_renumbered_silent, "tests/test_site_twins_merged.py"),
     "SEQUENTIAL_CANCELLED": Pair(
         _cancelled_fires, _cancelled_silent, "tests/test_sequential.py"),
+    "SEQUENTIAL_RESEED": Pair(
+        _reseed_fires, _reseed_silent, "tests/test_sequential.py"),
     "SERIES_PATTERN_FAILED": Pair(
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
     "RESTRAINT_PAIRS_STALE": Pair(

@@ -312,16 +312,20 @@ def signals(result: rx.SeriesResult) -> dict:
     """What the result itself says, in its own vocabulary, compactly.
 
     Read off the :class:`~rietx.SeriesResult` and nothing else (WP-1317's one
-    vocabulary): the entries above the Rwp fence (``SEQUENTIAL_RWP_OUTLIER``),
-    the largest step of each :data:`TABLE_PATHS` path
-    (:func:`largest_steps`, read off ``SeriesResult.steps``), the reseeded entries
+    vocabulary): each entry's ``rwp_over_median`` as ``[index, ratio]`` to
+    three significant figures (a record with no threshold since WP-2003
+    removed the Rwp fence, so the harness sets none either), the largest step
+    of each :data:`TABLE_PATHS` path (:func:`largest_steps`, read off
+    ``SeriesResult.steps``), the reseeded entries
     (``SEQUENTIAL_RESEED``), the quarantined ones (``SEQUENTIAL_UNRECOVERED``),
     the entries carrying ``PHASE_UNCONSTRAINED``, and every series-level code
     with its ``where``.
     """
     largest = largest_steps(result)
     return {
-        "above_fence": [e.index for e in result.entries if e.above_fence],
+        "rwp_over_median": [[e.index, float(f"{e.rwp_over_median:.3g}")]
+                            for e in result.entries
+                            if e.rwp_over_median is not None],
         "steps": [[path, *largest[path]] for path in TABLE_PATHS
                   if path in largest],
         "reseeded": [e.index for e in result.entries if e.reseeded],
@@ -351,22 +355,6 @@ def largest_steps(result: rx.SeriesResult) -> dict[str, tuple[int, int]]:
     return out
 
 
-def _run_onsets(indices: list[int]) -> list[int]:
-    """The first index of each run of consecutive indices."""
-    have = set(indices)
-    return [i for i in sorted(have) if i - 1 not in have]
-
-
-def second_phase_tolerance(length: int, onset: int) -> int:
-    """How many patterns after its onset a growing phase may first be seen.
-
-    A tenth of the patterns it grows over, rounded up: the phase grows
-    linearly from nothing, so the fence can only see it once its share has
-    grown, and on a longer series that takes more patterns.
-    """
-    return -(-(length - onset) // 10)
-
-
 def surfaced(result: rx.SeriesResult, kind: str, index: int) -> str | None:
     """The signal by which ``result`` marks the event ``kind`` planted at
     ``index``, or ``None`` when it marks none.
@@ -377,23 +365,20 @@ def surfaced(result: rx.SeriesResult, kind: str, index: int) -> str | None:
         the largest step of ``instrument.background.c0`` is between
         ``index - 1`` and ``index``;
     ``bad``
-        the frame alone above the Rwp fence, neither neighbour with it (a
-        frame inside a run is the run's), or the largest step of
-        ``phases.0.scale`` is into or out of it;
+        the largest step of ``phases.0.scale`` is into or out of it;
     ``second_phase``
-        a run of patterns above the fence beginning within
-        :func:`second_phase_tolerance` of ``index``;
+        none.  Its one trace is ``SeriesEntry.rwp_over_median`` rising from
+        the onset, a record with no threshold since WP-2003 removed the Rwp
+        fence whose run above it this rule read, and no package output
+        marks the rise: so the harness, which must not set a threshold and
+        call it the package's, marks nothing either;
     ``transition``
-        a run above the fence beginning at ``index`` or the one after it, or
         the largest step of a ``phases.0.cell`` length is between
         ``index - 1`` and ``index``.
 
-    A reseed is not a marker of its own: it fires through any run above the
-    fence wherever the ladder's first rung is cut short, on the event's
-    neighbours as readily as on the event.
+    A reseed is not a marker of its own: it fires wherever the ladder's first
+    rung is cut short, on the event's neighbours as readily as on the event.
     """
-    sig = signals(result)
-    onsets = _run_onsets(sig["above_fence"])
     largest = largest_steps(result)
     if kind == "background":
         path = "instrument.background.c0"
@@ -401,24 +386,13 @@ def surfaced(result: rx.SeriesResult, kind: str, index: int) -> str | None:
             return f"largest step {path} ({index - 1}, {index})"
         return None
     if kind == "bad":
-        above = set(sig["above_fence"])
-        if index in above and not {index - 1, index + 1} & above:
-            return f"SEQUENTIAL_RWP_OUTLIER {index}"
         pair = largest.get("phases.0.scale")
         if pair is not None and index in pair:
             return f"largest step phases.0.scale ({pair[0]}, {pair[1]})"
         return None
     if kind == "second_phase":
-        n = len(result.entries)
-        tol = second_phase_tolerance(n, index)
-        for k in onsets:
-            if index <= k <= index + tol:
-                return f"SEQUENTIAL_RWP_OUTLIER run from {k}"
         return None
     if kind == "transition":
-        for k in onsets:
-            if index <= k <= index + 1:
-                return f"SEQUENTIAL_RWP_OUTLIER run from {k}"
         for path, pair in largest.items():
             if path.startswith("phases.0.cell.") and pair == (index - 1, index):
                 return f"largest step {path} ({index - 1}, {index})"

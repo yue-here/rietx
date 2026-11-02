@@ -272,7 +272,7 @@ def _series(path, values, sd=0.01) -> SeriesResult:
                        n_points=100, n_free_parameters=3)
     return SeriesResult(x_label="T (K)", entries=[
         SeriesEntry(index=k, label=f"p{k}", x=10.0 * (k + 1), status="converged",
-                    rwp_fence=None if k == 0 else 0.1, statistics=stats,
+                    rwp_over_median=None if k == 0 else 1.0, statistics=stats,
                     parameters=[RefinedParameter(path=path, value=v, stderr=sd)])
         for k, v in enumerate(values)])
 

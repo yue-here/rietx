@@ -765,13 +765,13 @@ A warm-started chain over the round robin: what changes when only the starting p
 
 `identity` `characterisation` · dataset `qarr`
 
-**Claims:** the reseed fence's accounting is exact, the escalation ladder is only ever climbed as a prefix, and a reseed never leaves the fit worse than the warm start it rejected
+**Claims:** the reseed ladder's accounting is exact, the escalation ladder is only ever climbed as a prefix, and a reseed never leaves the fit worse than the warm start it rejected
 
-**Referenced to:** internal consistency: the SEQUENTIAL_RESEED diagnostic count must equal the number of entries flagged reseeded, exactly; every entry's rungs_tried must be a prefix of the ladder and contain the rung it kept.  The fence never fired on the hostile series — the collapsed refit recovers a bad warm start within the fit — so it is insurance, pinned by unit tests rather than by this suite
+**Referenced to:** internal consistency: the SEQUENTIAL_RESEED diagnostic count must equal the number of entries flagged reseeded, exactly; every entry's rungs_tried must be a prefix of the ladder and contain the rung it kept.  The ladder never climbed on the hostile series — the collapsed refit recovers a bad warm start within the fit — so it is insurance, pinned by unit tests rather than by this suite
 
-**Measured:** exact accounting; zero reseeds on the hostile series, every pattern after the first kept on its warm rung, and no kept rung above the Rwp fence (2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same).  1.10.0's hostile series did not finish, spending over 50 CPU minutes in the closing stage that follows cpd-1b's warm rung (Rwp 0.760)
+**Measured:** exact accounting; zero reseeds on the hostile series, every pattern after the first kept on its warm rung, and no kept rung above the 1.25× Rwp fence the default then carried (2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same; the fence left the default in WP-2003).  1.10.0's hostile series did not finish, spending over 50 CPU minutes in the closing stage that follows cpd-1b's warm rung (Rwp 0.760)
 
-**Diagnostics:** `SEQUENTIAL_RESEED`, `SEQUENTIAL_UNRECOVERED`, `SEQUENTIAL_RWP_OUTLIER`
+**Diagnostics:** `SEQUENTIAL_RESEED`, `SEQUENTIAL_UNRECOVERED`
 
 #### `test_the_first_rung_bound_moves_no_accepted_value`
 

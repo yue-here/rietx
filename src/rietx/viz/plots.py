@@ -105,10 +105,11 @@ Y_SCALES = ("linear", "sqrt", "log", "asinh")
 #: nothing else.  ``tick`` — the *single*-phase row — stays a role and stays
 #: per ground.
 #:
-#: The last five roles are :func:`plot_trajectory`'s (WP-1970): the measured
-#: series, a held or verdict-less point, a pattern refitted cold, one the
-#: ladder could not rescue, and an Rwp outlier.  Light's are the GUI's
-#: ``--accent``, ``--muted`` and ``--bad`` and two darker hues, and dark's
+#: The last four roles are :func:`plot_trajectory`'s (WP-1970): the measured
+#: series, a held or verdict-less point, a pattern refitted cold, and one the
+#: ladder could not rescue (an Rwp outlier's went with its fence, WP-2003).
+#: Light's are the GUI's ``--accent``, ``--muted`` and ``--bad`` and a darker
+#: hue, and dark's
 #: are the same tokens' dark values.  ``unrecovered`` sits nearer the type
 #: than ``reseeded`` on both grounds, so the worse verdict carries more ink.
 #:
@@ -133,7 +134,7 @@ PALETTES = {
               "tick": "#1a1a1a", "ground": "#ffffff",
               "phase": list(PHASE_COLOURS),
               "series": "#1f5fa8", "held": "#6b6b6b", "reseeded": "#c23b22",
-              "unrecovered": "#8b1a1a", "outlier": "#b8860b",
+              "unrecovered": "#8b1a1a",
               "index_obs": "#1f5fa8", "index_calc": "#c23b22",
               "index_bkg": "#7a7a7a", "index_diff": "#4a4a4a",
               "absent": "#f2c14e", "unmatched": "#7a1fa8",
@@ -145,7 +146,7 @@ PALETTES = {
              "ground": "#1d1813",
              "phase": list(PHASE_COLOURS),
              "series": "#7fb2ea", "held": "#9a9a94", "reseeded": "#e8776a",
-             "unrecovered": "#ffb0a0", "outlier": "#d9a62e",
+             "unrecovered": "#ffb0a0",
              "index_obs": "#7fb2ea", "index_calc": "#e8776a",
              "index_bkg": "#8a8a8a", "index_diff": "#b5b5b5",
              "absent": "#f2c14e", "unmatched": "#b561e8",
@@ -1487,10 +1488,9 @@ def plot_trajectory(series, paths, *, path: str | None = None,
     point of drawing it: a ringed point is a **good fit** reached from a
     different starting model, while a crossed one is a diverged fit whose value
     is not a measurement at all.  It is still plotted, because a gap in a
-    trajectory reads as data that was never collected.  A point every rung
-    left above the Rwp fence (``SEQUENTIAL_RWP_OUTLIER``, WP-1469) is boxed:
-    a fit unlike its neighbours', whose values need that pattern's own fit
-    opened before they are read.
+    trajectory reads as data that was never collected.  A high Rwp is not
+    marked: ``SeriesEntry.rwp_over_median`` records it with no threshold
+    (WP-2003), so a mark would draw one the package does not hold.
 
     ``title`` names the whole figure above its stacked panels, whose own
     left-hand titles stay the parameter each one draws; absent by default,
@@ -1518,7 +1518,6 @@ def plot_trajectory(series, paths, *, path: str | None = None,
                 if d.code == "SEQUENTIAL_PATH_DEPENDENT" and d.where}
     reseeded = {e.label for e in series.entries if e.reseeded}
     unrecovered = {e.label for e in series.entries if e.status == "diverged"}
-    outliers = {e.label for e in series.entries if e.above_fence}
 
     with _ground_context(plt, style):
         fig, axes = plt.subplots(len(paths), 1, figsize=(8, 2.4 * len(paths)),
@@ -1574,9 +1573,6 @@ def plot_trajectory(series, paths, *, path: str | None = None,
                     if label in unrecovered:
                         ax.plot(x[i], value[i], "x", ms=11, color=hue["unrecovered"],
                                 mew=2.0)
-                    if label in outliers:
-                        ax.plot(x[i], value[i], "s", ms=11, mfc="none",
-                                mec=hue["outlier"], mew=1.4)
                 for first, last in verified.get(name, []):
                     if first in traj.labels and last in traj.labels:
                         ax.axvspan(x[traj.labels.index(first)],

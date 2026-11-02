@@ -22,15 +22,12 @@ gates exist to prevent, and it gets the same treatment here — three fences,
 none of which alters a fitted value:
 
 ``SEQUENTIAL_RESEED``
-    the warm start was rejected (diverged, or Rwp far above the series median)
-    and the pattern was refitted cold, so the chain cannot be poisoned silently.
+    the warm start was rejected (it diverged or raised, or Rwp passed a fence
+    the caller set) and the pattern was refitted cold, so the chain cannot be
+    poisoned silently.
 ``SEQUENTIAL_UNRECOVERED``
     the pattern diverged and stayed diverged after every rung of the ladder
     below; it is reported, but it seeded no successor and joined no median.
-``SEQUENTIAL_RWP_OUTLIER``
-    every rung came back above the Rwp fence, so the kept fit is not like its
-    neighbours (WP-1469); the pattern is not quarantined, and the steps either
-    side of it are left out of ``SeriesResult.steps``.
 ``SEQUENTIAL_PATH_DEPENDENT``
     with ``direction="both"``, the forward and backward chains disagree by more
     than their esds allow: that parameter's trajectory is an artefact of the
@@ -72,7 +69,7 @@ hidden:
 **The fallback is a ladder, and a pattern it cannot rescue is quarantined**
 (WP-1051).  A rejected warm fit escalates one rung at a time — collapsed warm
 refit → the full staged plan *from the warm state* → the full staged plan cold
-(:func:`_ladder`) — each rung run only when the fence still fires on the best
+(:func:`_ladder`) — each rung run only when the trigger still fires on the best
 attempt so far, and the best attempt kept whichever rung produced it.  The
 middle rung is what the chain used to skip: throwing the warm start away costs
 roughly triple (838-904 iterations warm-collapsed, 1623 warm-staged, 2863 cold
@@ -82,13 +79,26 @@ not been shown to be the problem.
 Quarantine is the other half, and it is about what the chain *carries* rather
 than about what it reports: a fit that came back ``"diverged"`` after the last
 rung is not a starting point and not a scale, so the successor warm-starts from
-the last **accepted** pattern and the reseed median never sees the failure.
-Before WP-1051 a doubly-failed pattern did both — it seeded its neighbour with
-garbage and dragged the median that decides every later trigger, so one failure
-could quietly raise the bar for the rest of the series.
+the last **accepted** pattern and the accepted median (what
+``rwp_over_median`` and a caller's ``reseed_factor`` read) never sees the
+failure.  Before WP-1051 a doubly-failed pattern did both — it seeded its
+neighbour with garbage and dragged the median that then decided every later
+trigger, so one failure could quietly raise the bar for the rest of the series.
 
-**What triggers the ladder is deliberately narrow: divergence, or Rwp above
-``reseed_factor`` × the median of the accepted patterns** (:func:`_reseed_needed`).
+**What triggers the ladder is deliberately narrow: a warm rung that diverged
+or raised** (:func:`_reseed_needed`, and the raise at its own site in
+:meth:`SequentialRefinement._chain`).  Both are facts every refiner reads as a
+failed fit.  **Rwp is not a default trigger** (WP-2003, batch C1):
+``reseed_factor`` is the caller's own fence, ``None`` by default, and
+:attr:`~rietx.schemas.sequential.SeriesEntry.rwp_over_median` records each
+pattern's Rwp over the median of those accepted before it with no threshold.
+A default action's evidence is never an Rwp comparison (DESIGN.md § Rules, 4),
+and the fence that compared one pattern's Rwp with the median of its
+neighbours' bought nothing measured: on ``main`` after WP-2045 its 116
+escalations moved no value past 7.2e-4 esd, and on the planted series it
+climbed every pattern from T134, where an unmodelled phase appears, for 4.1×
+the evaluations.  Rwp tracks Rexp, so it rose on falling counts under a right
+model as readily as on a wrong one (WP-1469).
 Two candidates were considered and rejected, and the reasons are the rule a new
 trigger has to satisfy.  *Guard findings* (``HIGH_CORRELATION``, at-bounds) fire
 legitimately on perfectly converged patterns: a correlated pair is a property of
@@ -97,7 +107,7 @@ re-fit every pattern of the series, at triple cost, to reach the same minimum.
 *A discontinuity* is a post-hoc property of the whole trajectory (what counts
 as a large step is not defined until the series has been walked), so making it
 a trigger would mean re-walking a finished chain — a different algorithm, with
-no guaranteed fixpoint.  What the two accepted triggers share: each is a property of *this
+no guaranteed fixpoint.  What the accepted triggers share: each is a property of *this
 pattern's own fit*, readable the moment it finishes, and each is something a
 different starting point could plausibly fix.
 
@@ -129,6 +139,7 @@ exist partly so a sequential trajectory is never mistaken for one.
 from __future__ import annotations
 
 import fnmatch
+import math
 import numbers
 import re
 from collections.abc import Callable, Sequence
@@ -175,11 +186,6 @@ from .schemas.structure import (
 )
 from .strategy.parameter_interval import attach_stationary_intervals
 from .strategy.staged import RefinementPlan, Stage, resolve_plan
-
-#: Rwp above this multiple of the accepted-so-far **median** triggers a cold
-#: refit.  A median rather than the previous value on purpose: one bad pattern
-#: must not be able to ratchet the threshold up and let its successors through.
-RESEED_FACTOR = 1.25
 
 #: Converged first rungs needed before the chain bounds anything (WP-1127).
 #: One sample is not a spread, and the running maximum of a *short* sample is
@@ -329,7 +335,7 @@ DIRECTIONS = ("forward", "backward", "both")
 #: How ``SequentialRefinement.fit`` reacts to a pattern on which **every
 #: rung** of the ladder raised — an uncaught exception out of
 #: ``Refinement.fit`` on each attempt, not a fit that converged somewhere the
-#: reseed fence rejected (that is ``SeriesEntry.status == "diverged"``, handled
+#: ladder rejected (that is ``SeriesEntry.status == "diverged"``, handled
 #: by the quarantine below with no policy).  A rung that raises is a rung that
 #: lost and the ladder escalates past it (WP-1333), so by the time a policy is
 #: consulted the last rung tried was a **cold** fit from the initial models —
@@ -557,10 +563,10 @@ def _ladder(base_plan: RefinementPlan, warm_plan: RefinementPlan, *,
     warm-staged, 2863 cold.  So the pre-WP-1051 fallback — straight from the
     first rung to the last — paid roughly triple to discard a starting point
     that had not been shown to be the problem.  A rung is reached only when the
-    fence still fires on the *best attempt so far*, which is what makes the
-    escalation stop at the first one that works: :func:`_better` prefers a
-    converged fit and then the lower Rwp, so once any attempt clears the
-    threshold the best one does too.
+    trigger still fires on the *best attempt so far* (:func:`_reseed_needed`),
+    which is what makes the escalation stop at the first one that works:
+    :func:`_better` prefers a converged fit and then the lower Rwp, so once any
+    attempt clears the trigger the best one does too.
     """
     first = "warm_staged" if staged else "warm"
     rungs: list[tuple[str, RefinementPlan, bool]] = [(first, warm_plan, True)]
@@ -1139,7 +1145,7 @@ class SequentialRefinement:
             two_theta_limits: tuple[float, float] | None = None,
             direction: str = "forward",
             reseed: bool = True,
-            reseed_factor: float = RESEED_FACTOR,
+            reseed_factor: float | None = None,
             first_rung_factor: float | None = FIRST_RUNG_FACTOR,
             verify_steps: int = 0,
             prepare: Callable[[int, PatternData, Structure, Instrument],
@@ -1173,28 +1179,42 @@ class SequentialRefinement:
             error identical to three decimals (RMS |ΔW| 2.26 vs 2.27 wt %).
             The staged order exists to keep early stages well conditioned from
             a *poor* starting model, and a converged neighbour is not one —
-            when it turns out not to be a good one either and the pattern's Rwp
-            jumps past the chain's median, the reseed fence escalates one rung
+            when the warm fit diverges or raises, the ladder escalates one rung
             at a time (:func:`_ladder`), re-walking the staged plan from the
             warm state before giving the warm state up.  ``refit`` therefore
             sets the ladder's *first* rung, not the only plan a pattern can be
             fitted with.  **A collapse every pattern shares is not caught**,
-            since the median rises with it: under a plan freeing U, V and W the
-            round-robin chain sat 1.04-1.29× above ``"stages"`` with no reseed,
-            and what named it was ``SEQUENTIAL_PERSISTENT_FINDING`` on
-            ``RESOLUTION_UNCONSTRAINED`` for U, V and W (issue #475, WP-1469).
+            and would not be by an Rwp fence either, since the median rises
+            with it: under a plan freeing U, V and W the round-robin chain sat
+            1.04-1.29× above ``"stages"`` with no reseed, and what named it was
+            ``SEQUENTIAL_PERSISTENT_FINDING`` on ``RESOLUTION_UNCONSTRAINED``
+            for U, V and W (issue #475, WP-1469).
         direction:
             ``"forward"``, ``"backward"`` (chain from the last pattern), or
             ``"both"``, which runs it each way and reports where the two
             trajectories disagree by more than their esds allow.  The reported
             entries are the forward ones.
         reseed:
-            Escalate the ladder when a warm-started fit diverges or lands far
-            above the series median Rwp, and keep the best attempt.  Switching
-            it off leaves each pattern with its first rung — but **not** without
-            the quarantine: a diverged fit still seeds nothing and joins no
-            median, because that is about what the chain carries rather than
-            about how hard it tried.
+            Escalate the ladder when a warm-started fit diverges or raises (or
+            passes the caller's ``reseed_factor``), and keep the best attempt.
+            Switching it off leaves each pattern with its first rung — but
+            **not** without the quarantine: a diverged fit still seeds nothing
+            and joins no median, because that is about what the chain carries
+            rather than about how hard it tried.
+        reseed_factor:
+            The caller's own Rwp fence, ``None`` (the default) for none: a
+            factor escalates a warm fit whose best attempt so far lands above
+            ``reseed_factor`` × the median Rwp of the patterns accepted before
+            it, a finite positive number or a ``ValueError``.  The package sets
+            no default fence (WP-2003, batch C1), because a default action's
+            evidence is never an Rwp comparison (DESIGN.md § Rules, 4) and
+            this one bought nothing measured: on ``main`` after WP-2045 the
+            1.25 fence's 116 escalations moved no value past 7.2e-4 esd, and on
+            the planted series it climbed every pattern from T134, where an
+            unmodelled phase appears, for 4.1× the evaluations.  The ratio it
+            would compare is recorded either way, as
+            :attr:`SeriesEntry.rwp_over_median`; for the first patterns that
+            median is of one or two values.
         first_rung_factor:
             Bound what the *collapsed* first rung may spend before the ladder
             gives up on it, at this multiple of the most expensive first rung
@@ -1367,6 +1387,7 @@ class SequentialRefinement:
         if on_error not in ON_ERROR_POLICIES:
             raise ValueError(f"on_error must be one of {ON_ERROR_POLICIES}")
         _check_verify_steps(verify_steps)
+        _check_reseed_factor(reseed_factor)
         if x is not None and len(x) != len(patterns):
             raise ValueError(f"x has {len(x)} entries for {len(patterns)} patterns")
         names = _labels_for(patterns, labels)
@@ -1451,14 +1472,12 @@ class SequentialRefinement:
         self._instruments = [i for _, i in models]
         self.failures_ = failures
 
-        before = _inside_before(entries, direction)
         # ``entries`` is in series order; the quarantine's successor is the
         # next pattern *walked*, which a backward chain walks the other way
         walk = sorted(entries, key=lambda e: e.index,
                       reverse=direction == "backward")
         diagnostics = [d for e in entries
-                       for d in (_reseed_diagnostics(e) + _unrecovered_diagnostics(e, walk)
-                                 + _rwp_outlier_diagnostics(e, before.get(e.index)))]
+                       for d in (_reseed_diagnostics(e) + _unrecovered_diagnostics(e, walk))]
         diagnostics += [_series_pattern_failed_diagnostic(f) for f in failures]
         cancelled = cancel is not None and bool(cancel)
         if cancelled:
@@ -1594,7 +1613,7 @@ class SequentialRefinement:
         one's.
 
         Each pattern climbs ``ladder`` (:func:`_ladder`) until an attempt clears
-        the reseed fence, and keeps the best attempt by :func:`_better` whichever
+        :func:`_reseed_needed`, and keeps the best attempt by :func:`_better` whichever
         rung produced it; ``previous`` is the last **accepted** pattern, which is
         not always the last one walked (see the quarantine below).
 
@@ -1687,10 +1706,10 @@ class SequentialRefinement:
             cancelled = False
 
             for rung, rung_plan, rung_warm in attempts:
-                # the fence is asked about the *best* attempt, not the last one:
-                # a rung that came back worse has not made the pattern worse.
-                # A bounded first rung that spent its bound escalates whatever
-                # the fence says: it came back "max_iter", which _better reads
+                # the trigger is asked about the *best* attempt, not the last
+                # one: a rung that came back worse has not made the pattern
+                # worse.  A bounded first rung that spent its bound escalates
+                # whatever the trigger says: it came back "max_iter", which _better reads
                 # as merely not-diverged and _reseed_needed does not test at
                 # all, so without this the ladder could *accept* a fit that was
                 # cut short (WP-1127).
@@ -1826,9 +1845,9 @@ class SequentialRefinement:
                 # only the *cold* rung breaks the chain — a staged refit from
                 # the warm state still started at the neighbour's answer
                 entry.reseeded = best_rung == "cold"
-            # the limit this pattern was judged against, so the verdict on the
-            # kept attempt is readable off the entry (WP-1469)
-            entry.rwp_fence = _rwp_fence(accepted_rwp, reseed_factor)
+            # the kept attempt's Rwp over the accepted median it would have
+            # been fenced against, a record with no threshold (WP-2003, C1)
+            entry.rwp_over_median = _rwp_over_median(best, accepted_rwp)
 
             entries[k] = entry
             results[k] = best
@@ -1839,15 +1858,15 @@ class SequentialRefinement:
             # a scale, so the chain steps over it.  Its successor warm-starts
             # from the last accepted pattern and the median that decides every
             # later trigger never sees it.
-            # A pattern above the fence is *not* quarantined (WP-1469): the
-            # fence cannot tell a blank frame from a lasting change, and
-            # quarantine is the wrong answer for the second.  Measured on a
-            # 24-pattern ramp whose counts fall 4× at pattern 6, the model
-            # right: quarantined, the median never follows the drop, and every
-            # later pattern climbs the ladder (+55 % iterations) and is flagged
-            # (18 of 18, not 7); an unmodelled phase from pattern 6, +107 %.
-            # What quarantine buys on #481's blank is 2-8 % of the chain, the
-            # values identical to the digit either way.
+            # Only divergence quarantines, and never a high Rwp: Rwp cannot
+            # tell a blank frame from a lasting change, and quarantine is the
+            # wrong answer for the second (WP-1469).  Measured on a 24-pattern
+            # ramp whose counts fall 4× at pattern 6, the model right:
+            # quarantining the patterns over a 1.25× median fence kept the
+            # median from following the drop, and every later pattern climbed
+            # the ladder (+55 % iterations); an unmodelled phase from pattern
+            # 6, +107 %.  So a caller's ``reseed_factor`` decides an escalation
+            # and never what the chain carries.
             if entry.status != "diverged":
                 # WP-1329's hold along the series: a modulus this pattern did
                 # not support is reseeded to its floor before it becomes the
@@ -2142,24 +2161,37 @@ def _prefer(result: RefinementResult, truncated: bool,
     return _better(result, best)
 
 
-def _rwp_fence(accepted_rwp: list[float], factor: float) -> float | None:
-    """The Rwp above which the fence rejects an attempt, or ``None``.
+def _rwp_over_median(result: RefinementResult,
+                     accepted_rwp: list[float]) -> float | None:
+    """``result``'s Rwp over the median Rwp of the accepted patterns, or ``None``.
 
-    ``factor`` × the median of the accepted patterns: a median rather than
-    the previous value so one bad pattern cannot ratchet the limit up
-    (:data:`RESEED_FACTOR`).  ``None`` until one pattern has been accepted.
+    The record :attr:`SeriesEntry.rwp_over_median` carries (WP-2003, C1): a
+    median rather than the previous value so one bad pattern cannot move the
+    reference for its successors.  ``None`` until one pattern has been
+    accepted, and where the median or the Rwp is not a positive number.
     """
-    if not accepted_rwp:
+    if not accepted_rwp or result.statistics is None:
         return None
-    return factor * float(np.median(accepted_rwp))
+    median = float(np.median(accepted_rwp))
+    if not median > 0:
+        return None
+    return float(result.statistics.rwp) / median
 
 
 def _reseed_needed(result: RefinementResult, accepted_rwp: list[float],
-                   factor: float) -> bool:
+                   factor: float | None) -> bool:
+    """Whether the ladder climbs past ``result``, the best attempt so far.
+
+    A diverged attempt always; past that only the caller's own Rwp fence, when
+    ``factor`` is given (WP-2003, C1).  A rung that raised escalates at its own
+    site in :meth:`SequentialRefinement._chain`, having no result to test.
+    """
     if result.status == "diverged":
         return True
-    fence = _rwp_fence(accepted_rwp, factor)
-    return fence is not None and result.statistics.rwp > fence
+    if factor is None:
+        return False
+    ratio = _rwp_over_median(result, accepted_rwp)
+    return ratio is not None and ratio > factor
 
 
 def _reseed_diagnostics(entry: SeriesEntry) -> list[Diagnostic]:
@@ -2173,19 +2205,12 @@ def _reseed_diagnostics(entry: SeriesEntry) -> list[Diagnostic]:
     # pattern could not use (WP-1333)
     how = (f"raised {entry.rungs_raised[first]}" if first in entry.rungs_raised
            else f"reached Rwp {warm:.4f} against {now:.4f} cold")
-    # a cold rung kept only as the best of several rejected ones is not "a
-    # good fit", and calling it one contradicted SEQUENTIAL_RWP_OUTLIER on the
-    # same pattern — issue #481's blank frame read exactly that (WP-1469)
-    # …and neither is a cold rung kept only as the least diverged of several,
-    # which SEQUENTIAL_UNRECOVERED calls a failed fit on the same pattern
+    # a cold rung kept only as the least diverged of several is not "a good
+    # fit", which SEQUENTIAL_UNRECOVERED calls a failed fit on the same pattern
     if entry.status == "diverged":
         fit = (" The cold fit is kept only as the best attempt and diverged "
                "too.")
         advice = "Read SEQUENTIAL_UNRECOVERED on this pattern first."
-    elif entry.above_fence:
-        fit = (" The cold fit is kept only as the best attempt and is still "
-               "above the fence.")
-        advice = "Read SEQUENTIAL_RWP_OUTLIER on this pattern first."
     else:
         fit = ""
         advice = ("Check whether the specimen or the model changed at this "
@@ -2197,85 +2222,6 @@ def _reseed_diagnostics(entry: SeriesEntry) -> list[Diagnostic]:
                  f"initial model, because warm-starting from its neighbour "
                  f"{how}.{fit}"),
         suggestion=advice,
-    )]
-
-
-def _inside_before(entries: Sequence[SeriesEntry],
-                   direction: str) -> dict[int, SeriesEntry]:
-    """For each entry above the fence, the last one before it that was inside.
-
-    "Before" in the order the chain walked, which is what the fence's median
-    was taken over.  The comparison :func:`_rwp_outlier_diagnostics` quotes,
-    derived from the entries so a reloaded series says the same thing.
-    """
-    walk = sorted(entries, key=lambda e: e.index,
-                  reverse=direction == "backward")
-    out: dict[int, SeriesEntry] = {}
-    last: SeriesEntry | None = None
-    for e in walk:
-        if e.above_fence and last is not None:
-            out[e.index] = last
-        elif e.status != "diverged" and not e.above_fence:
-            last = e
-    return out
-
-
-def _rwp_outlier_diagnostics(entry: SeriesEntry,
-                             before: SeriesEntry | None) -> list[Diagnostic]:
-    """``SEQUENTIAL_RWP_OUTLIER``: every rung came back above the fence (WP-1469).
-
-    The Rwp leg of the fence triggers the ladder, and until issue #481 it was
-    never a verdict: the best rung was kept and said nothing, so a blank frame
-    fitted to noise read as a point of the trajectory.  Derived from the entry,
-    like every fence here (:attr:`SeriesEntry.above_fence`).
-
-    **It reports and does not judge**, because Rwp cannot say why it rose.
-    Rwp is GoF × Rexp near a converged fit, and the three measured causes
-    split between the two: #481's blank frame had GoF 1.00 against its
-    neighbour's 1.06 and Rexp 0.159 against 0.040 (background and noise
-    alone, fitted perfectly); a correct model over counts that fell 4× had
-    GoF 1.08 against 1.04 and Rexp twice its neighbour's, a sound
-    measurement; an unmodelled phase had GoF 16.7 against 1.04.  So the
-    message quotes both against ``before``, the last pattern the fence
-    accepted, which is the reading that separates them, and calls the point
-    neither good nor bad.
-    """
-    if not entry.above_fence:
-        return []
-    rwp, fence = entry.statistics.rwp, entry.rwp_fence
-    tried = ", ".join(entry.rungs_tried) or entry.rung
-    # the cold rung is always the ladder's last, so without it the ladder was
-    # not climbed to the end — ``reseed=False``, or a cancel mid-ladder — and
-    # "no starting point brought it near" would claim starts nobody tried
-    climbed = "cold" in entry.rungs_tried or entry.rung == "cold"
-    ratio = rwp / fence if fence > 0 else None
-    times = (", above the fence" if ratio is None
-             else f", {ratio:.2f}× the fence")
-    against = ""
-    if before is not None and before.statistics is not None:
-        s, r = entry.statistics, before.statistics
-        against = (f" Against {before.label or before.index}, the last pattern "
-                   f"before it inside the fence: GoF {s.gof:.2f} to its "
-                   f"{r.gof:.2f}, Rexp {s.rexp:.4f} to its {r.rexp:.4f}.")
-    return [Diagnostic(
-        level="warning", code="SEQUENTIAL_RWP_OUTLIER",
-        where=[entry.label or str(entry.index)], value=ratio,
-        message=(f"Pattern {entry.index} ({entry.label}) reached Rwp {rwp:.4f} "
-                 f"on its best rung{times} at {fence:.4f}, after "
-                 + ("every rung the chain tried" if climbed else
-                    "the rungs the chain tried before stopping short of its "
-                    "cold rung (reseed off, or a cancel)")
-                 + f" ({tried}).{against}"
-                 + (" No starting point brought this fit near its "
-                    "neighbours'." if climbed else
-                    " The ladder was not climbed, so a cold start may still "
-                    "bring this fit near its neighbours'.")
-                 + " The steps into and out of this pattern are left out of "
-                 "series.steps."),
-        suggestion=("Open this pattern's own fit before reading its values."
-                    if climbed else
-                    "Refit with reseed on, then open this pattern's own fit "
-                    "before reading its values."),
     )]
 
 
@@ -2491,6 +2437,30 @@ def _check_verify_steps(verify_steps: object) -> None:
         raise ValueError(f"verify_steps must be 0 or more, not {verify_steps}")
 
 
+def _check_reseed_factor(reseed_factor: object) -> None:
+    """Refuse a ``reseed_factor`` that is not a finite positive number (WP-2003).
+
+    ``None`` is no fence, and the default.  A bool is refused by name before
+    the number test it would pass: ``True`` read as 1.0 would escalate every
+    warm fit above the median, half the chain, on a switch nobody set to a
+    number.  ``inf`` used to be accepted unchecked as a spelling of "off",
+    which ``None`` now is.
+    """
+    if reseed_factor is None:
+        return
+    if isinstance(reseed_factor, bool):
+        raise ValueError(
+            f"reseed_factor takes a factor or None, not {reseed_factor!r}: it "
+            "is the caller's Rwp fence, a multiple of the accepted median "
+            "(None for no fence, the default)")
+    if not isinstance(reseed_factor, numbers.Real):
+        raise TypeError(f"reseed_factor takes a float factor or None, not "
+                        f"{type(reseed_factor).__name__}")
+    if not (math.isfinite(reseed_factor) and reseed_factor > 0):
+        raise ValueError(f"reseed_factor must be finite and positive, not "
+                         f"{reseed_factor!r} (None for no fence)")
+
+
 def _relative_paths(structure: Structure, instrument: Instrument) -> frozenset[str]:
     """The paths of this model whose values are steps, not positions.
 
@@ -2564,15 +2534,17 @@ def _series_steps(series: SeriesResult,
     is taken modulo a turn: the chart they are reported in has a cut, and a
     moment sitting on it steps by 2π in value while it does not move (#604).
 
-    **A step into or out of a pattern the fence rejected is not a row**
-    (WP-1469): a ``"diverged"`` entry (``SEQUENTIAL_UNRECOVERED``) or one
-    whose best rung is still above the fence (``SEQUENTIAL_RWP_OUTLIER``).
-    Each already has its own code naming the pattern, and a step against it
-    cannot be read apart from that code: on issue #481's ramp a blank frame's
-    cell, fitted to noise, stepped 33× its median, and a cold refit confirmed
-    it at 1.00 because both cold fits reproduce the same noise.  The steps
-    are dropped, **never bridged**: a bridge over a run of such patterns spans
-    that many of the series' steps and reads as one step.
+    **A step into or out of a quarantined pattern is not a row** (WP-1469):
+    a ``"diverged"`` entry already has ``SEQUENTIAL_UNRECOVERED`` naming it,
+    and its values are not a measurement to step from.  The steps are
+    dropped, **never bridged**: a bridge over a run of such patterns spans
+    that many of the series' steps and reads as one step.  A pattern whose
+    Rwp sits high over the accepted median (``rwp_over_median``) is listed
+    like any other since WP-2003 dropped the Rwp fence it was keyed on: on
+    issue #481's ramp a blank frame's cell, fitted to noise, steps 33× its
+    median, and a cold refit confirms it at 1.00 because both cold fits
+    reproduce the same noise, so a step's row is read beside its patterns'
+    GoF and Rexp, never alone.
 
     **A row is between consecutive entries, so no gap is bridged either.**  A
     pattern the path is absent from (its phase held, WP-1301) leaves no point
@@ -2582,7 +2554,7 @@ def _series_steps(series: SeriesResult,
     frame (WP-1965) the cell's largest step spanned the frame.
     """
     rejected = {i for i, e in enumerate(series.entries)
-                if e.status == "diverged" or e.above_fence}
+                if e.status == "diverged"}
     out: list[SeriesStep] = []
     for path in series.paths(varied_only=False):
         if path in relative:
@@ -2724,12 +2696,12 @@ def _width_growth_diagnostics(series: SeriesResult) -> list[Diagnostic]:
     trajectory itself, since a width driven by a ``vars.`` name is not
     ``vary`` and ``paths(varied_only=True)`` would lose it.
     Quarantined (``"diverged"``) entries are skipped, as they are by every
-    other fence here.  An entry above the Rwp fence (``SEQUENTIAL_RWP_OUTLIER``)
-    is **read**, although ``SeriesResult.steps`` leaves it out: a phase
-    standing in for a missing one is what lifts a pattern over that fence, and
-    every soaked pattern of the fixture in ``tests/test_sequential.py`` is
-    above it (WP-1469), so skipping them would leave the finding nothing to
-    fire on.  A width no pattern measured has no reference and is not judged.
+    other fence here.  An entry whose Rwp sits high over the accepted median
+    (``rwp_over_median``) is **read**: a phase standing in for a missing one
+    is what lifts a pattern's Rwp, and every soaked pattern of the fixture in
+    ``tests/test_sequential.py`` sat above the 1.25× fence WP-2003 removed
+    (WP-1469), so skipping them would leave the finding nothing to fire on.
+    A width no pattern measured has no reference and is not judged.
     """
     out: list[Diagnostic] = []
     by_trajectory: dict[tuple, Diagnostic] = {}

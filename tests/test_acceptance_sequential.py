@@ -362,8 +362,8 @@ def test_warm_start_iteration_cost_is_reported(chained, chained_all,
 
 @pytest.mark.slow
 def test_the_hostile_series_exercises_the_reseed_fence(chained_all):
-    """Carrying the scales across a 1 → 94 wt % swing is the failure the fence
-    is for; whether it fires is data-dependent, but every fit it accepts must
+    """Carrying the scales across a 1 → 94 wt % swing is the failure the ladder
+    is for; whether it climbs is data-dependent, but every fit it accepts must
     be the better of the ones it saw, and the ladder's accounting must add up.
 
     The escalation is only ever a *prefix* of the ladder (WP-1051) — a rung is
@@ -389,11 +389,10 @@ def test_the_hostile_series_exercises_the_reseed_fence(chained_all):
                                                    for e in chained_all)
     # every pattern converged, so the quarantine has nothing to hold
     assert codes.count("SEQUENTIAL_UNRECOVERED") == 0
-    # …and every kept rung is inside the Rwp fence it recorded (WP-1469):
-    # the code is counted off the entries, exactly, and on this series is 0
-    assert codes.count("SEQUENTIAL_RWP_OUTLIER") == sum(
-        e.above_fence for e in chained_all) == 0
-    assert all(e.rwp_fence is not None for e in chained_all.entries[1:])
+    # …and every entry after the first records its Rwp over the accepted
+    # median, a ratio with no threshold (WP-2003, C1); the first has no median
+    assert chained_all.entries[0].rwp_over_median is None
+    assert all(e.rwp_over_median is not None for e in chained_all.entries[1:])
 
 
 @pytest.fixture(scope="module")

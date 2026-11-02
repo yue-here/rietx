@@ -24,7 +24,11 @@ Since WP-2003 a step is read by rank, the largest its path took
 (:func:`tests.planted_series.largest_steps`), never against a threshold;
 re-measured then at 24 patterns on seeds 0-7 and at 248 on seed 0.  The null
 is clean at 24 patterns on all eight seeds; at 248 on seeds 0, 2, 3 and 4
-(the strict xfail at the end says why not 1).
+(the strict xfail at the end says why not 1).  Since WP-2003's C1 a high Rwp
+is ``SeriesEntry.rwp_over_median``, a record with no threshold, and the run
+above the 1.25 fence that marked the second phase and the transition planted
+alone is gone with ``SEQUENTIAL_RWP_OUTLIER``: re-measured on seed 0 at 24
+and 248, both are now strict xfails.
 """
 
 import json
@@ -41,7 +45,6 @@ from tests.planted_series import (
     null_series,
     numpy_path,
     refine,
-    second_phase_tolerance,
     signals,
     surfaced,
 )
@@ -57,16 +60,31 @@ EVENT_AT = default_events(LENGTH)
 DATA = Path(__file__).parent / "data" / "planted_series"
 #: series-level codes that mark an event; ``SEQUENTIAL_PERSISTENT_FINDING``
 #: describes the model rather than a point of the series and is not one
-EVENT_CODES = {"SEQUENTIAL_RWP_OUTLIER", "SEQUENTIAL_RESEED",
-               "SEQUENTIAL_UNRECOVERED", "SEQUENTIAL_WIDTH_GROWTH"}
+EVENT_CODES = {"SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED",
+               "SEQUENTIAL_WIDTH_GROWTH"}
 
-_MASKED = ("the transition falls inside the second phase's run of patterns "
-           "above the Rwp fence, and nothing in the result marks it: no run "
-           "starts there, and SeriesResult.steps has no row into or out of a "
-           "pattern above the fence, so the cubic cell's jump is not a step "
-           "there.  Only the RWP_OUTLIER ratio (a value, not a code) doubles "
-           "there.  Planted alone, the transition is carried "
-           "(test_the_transition_alone_starts_a_run_above_the_fence)")
+_MASKED = ("the transition falls inside the second phase's growth, and no "
+           "rule reads what marks it: no cell length steps most there, while "
+           "rwp_over_median roughly doubles (2.47 to 4.72 at 24 patterns, "
+           "2.52 to 4.70 at 248), a record with no threshold, and FLOOR_HIT "
+           "on instrument.profile.w and .x runs from it to the end, a "
+           "per-pattern code no rule reads (WP-2003, C1)")
+
+_UNMARKED = ("no package output marks the unmodelled phase since WP-2003's C1 "
+             "removed the Rwp fence: it raises no series code, no per-pattern "
+             "code from its onset to the transition, no escalation, and no "
+             "path steps most there; rwp_over_median rises from about 1.0 at "
+             "the onset to 2.5 before the transition with GoF beside it and "
+             "Rexp flat, a record the harness sets no threshold on.  Before "
+             "C1 it was 'SEQUENTIAL_RWP_OUTLIER run from 134' at 248 patterns")
+
+_ALONE = ("the transition planted alone was a run above the 1.25 Rwp fence "
+          "from its index, and nothing a rule reads replaced it (WP-2003, "
+          "C1): rwp_over_median jumps from 0.975 to 5.05 at it, a record with "
+          "no threshold; the largest steps of phases.0.scale and "
+          "instrument.zero_shift are into it and FLOOR_HIT runs from it, but "
+          "the transition rule reads only a cell length's step, which steps "
+          "most elsewhere")
 
 
 @pytest.fixture(scope="module")
@@ -107,7 +125,10 @@ def test_the_null_series_raises_no_event_signal(null):
     step and calls none a jump), and none of them lands on an event's index:
     measured on seeds 0-7 at this length."""
     sig = signals(null)
-    assert sig["above_fence"] == sig["reseeded"] == []
+    assert sig["reseeded"] == []
+    # every ratio near 1: measured 0.958-1.01 on seed 0, a bound of this test's
+    # and no threshold the package holds (WP-2003, C1)
+    assert all(0.9 < ratio < 1.1 for _, ratio in sig["rwp_over_median"])
     assert [path for path, *_ in sig["steps"]] == list(TABLE_PATHS)
     assert sig["unrecovered"] == sig["phase_unconstrained"] == []
     assert not {code for code, _ in sig["codes"]} & EVENT_CODES
@@ -122,10 +143,10 @@ def test_the_background_step_is_the_largest_step_of_its_constant(planted):
 
 
 def test_the_blank_frame_is_a_step_in_the_scale_and_an_unconstrained_phase(planted):
-    """Not an Rwp outlier: with the Bragg signal gone a background-dominated
-    frame's Rwp is 1.1-1.2× its neighbours', under the 1.25 fence.  What marks
-    it is the scale stepping to zero and back — the scale's two largest steps
-    — and the frame's own ``PHASE_UNCONSTRAINED``."""
+    """Not a high Rwp: with the Bragg signal gone a background-dominated
+    frame's ``rwp_over_median`` reads 0.97 here.  What marks it is the scale
+    stepping to zero and back — the scale's two largest steps — and the
+    frame's own ``PHASE_UNCONSTRAINED``."""
     at = EVENT_AT["bad"]
     found = surfaced(planted, "bad", at)
     assert found is not None
@@ -138,14 +159,25 @@ def test_the_blank_frame_is_a_step_in_the_scale_and_an_unconstrained_phase(plant
     assert signals(planted)["phase_unconstrained"] == [at]
 
 
-def test_the_second_phase_starts_a_run_above_the_fence(planted):
+@pytest.mark.xfail(strict=True, reason=_UNMARKED)
+def test_the_second_phase_is_marked(planted):
     at = EVENT_AT["second_phase"]
-    found = surfaced(planted, "second_phase", at)
-    assert found is not None, signals(planted)["above_fence"]
-    # …and the run lasts to the end: the median the fence follows excludes it
-    above = signals(planted)["above_fence"]
-    assert above == list(range(above[0], LENGTH))
-    assert at <= above[0] <= at + second_phase_tolerance(LENGTH, at)
+    assert surfaced(planted, "second_phase", at) is not None
+
+
+def test_the_second_phase_is_on_the_record_and_on_no_code(planted):
+    """What the result carries of the unmodelled phase since WP-2003's C1: the
+    ratio over the accepted median rising from its onset to the transition,
+    with GoF and not Rexp, and no code at all on those patterns."""
+    at, end = EVENT_AT["second_phase"], EVENT_AT["transition"]
+    run = planted.entries[at:end]
+    ratios = [e.rwp_over_median for e in run]
+    assert ratios == sorted(ratios) and ratios[-1] > 2 * ratios[0]
+    gof = [e.statistics.gof for e in run]
+    rexp = [e.statistics.rexp for e in run]
+    assert gof[-1] > 2 * gof[0] and max(rexp) < 1.05 * min(rexp)
+    assert not [d for e in run for d in e.diagnostics]
+    assert not {code for code, _ in signals(planted)["codes"]} & EVENT_CODES
 
 
 @pytest.mark.xfail(strict=True, reason=_MASKED)
@@ -154,11 +186,10 @@ def test_the_transition_is_marked_in_the_planted_series(planted):
     assert surfaced(planted, "transition", at) is not None
 
 
-def test_the_transition_alone_starts_a_run_above_the_fence(transition_alone):
+@pytest.mark.xfail(strict=True, reason=_ALONE)
+def test_the_transition_alone_is_marked(transition_alone):
     at = EVENT_AT["transition"]
-    assert surfaced(transition_alone, "transition", at) == (
-        f"SEQUENTIAL_RWP_OUTLIER run from {at}")
-    assert signals(transition_alone)["above_fence"] == list(range(at, LENGTH))
+    assert surfaced(transition_alone, "transition", at) is not None
 
 
 def test_each_matcher_is_specific_to_its_own_event(planted):
@@ -179,10 +210,11 @@ def test_the_committed_output_carries_the_same_mapping():
     assert record["length"] == 248
     assert set(record["events"]) == set(EVENTS)
     assert record["surfaced"]["transition"] is None
-    assert all(record["surfaced"][k] for k in ("background", "bad", "second_phase"))
+    assert record["surfaced"]["second_phase"] is None      # WP-2003, C1
+    assert all(record["surfaced"][k] for k in ("background", "bad"))
     null_record = json.loads((DATA / "null_signals.json").read_text(encoding="utf-8"))
     assert null_record["events"] == {}
-    assert null_record["signals"]["above_fence"] == []
+    assert null_record["signals"]["reseeded"] == []
 
 
 @pytest.mark.slow
@@ -195,14 +227,30 @@ def test_the_full_length_series_reproduces_its_committed_signals():
     record = json.loads((DATA / "signals.json").read_text(encoding="utf-8"))
     result = refine(series)
     got = signals(result)
-    for key in ("above_fence", "steps", "unrecovered", "phase_unconstrained"):
+    for key in ("steps", "unrecovered", "phase_unconstrained"):
         assert got[key] == record["signals"][key], key
+    _same_ratios(got, record["signals"])
     assert {k: surfaced(result, k, i) for k, i in series.events.items()} == (
         record["surfaced"])
 
     null_result = refine(null_series(248, seed=0))
-    assert signals(null_result) == json.loads(
+    null_got = signals(null_result)
+    null_record = json.loads(
         (DATA / "null_signals.json").read_text(encoding="utf-8"))["signals"]
+    _same_ratios(null_got, null_record)
+    assert ({k: v for k, v in null_got.items() if k != "rwp_over_median"}
+            == {k: v for k, v in null_record.items() if k != "rwp_over_median"})
+
+
+def _same_ratios(got: dict, committed: dict) -> None:
+    """The ratios at three figures, to one unit in the last: a converged fit's
+    Rwp moves in its last digits across platforms' libm, while every index is
+    exact."""
+    assert [i for i, _ in got["rwp_over_median"]] == [
+        i for i, _ in committed["rwp_over_median"]]
+    for (i, r), (_, c) in zip(got["rwp_over_median"], committed["rwp_over_median"],
+                              strict=True):
+        assert r == pytest.approx(c, rel=1e-2), i
 
 
 _LOOK_ELSEWHERE = (
