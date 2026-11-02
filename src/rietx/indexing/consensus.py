@@ -112,8 +112,9 @@ class ConsensusOutcome:
     #: ``checked`` the gate must be given.  Identical to ``checked_indices``
     #: except under a fired token (WP-1037), where the enumeration is the
     #: measured long pole (12 × 3.75 s on the corundum run) and is skipped for
-    #: the remaining candidates — which must then read "not enumerated"
-    #: (a capping caveat), never "no ambiguity found"
+    #: the remaining candidates — which must then read "not enumerated",
+    #: never "no ambiguity found".  The gate writes ``geometric_ambiguity``
+    #: for it, a refuting caveat, so such a candidate grades ``low``
     ambiguity_checked: list[int] = field(default_factory=list)
     fom_panel_disagrees: bool = False
     #: was any engine's tolerance widened by an *assumed* systematic?  Read from
@@ -454,9 +455,9 @@ def consensus(results: Sequence[EngineResult], peaks: PeakList, *,
     ``ambiguity=False`` (WP-1042) skips the enumeration entirely — it is what
     makes this callable per **completed system** mid-run, since everything else
     here is the cheap part.  ``ambiguity_checked`` then stays empty and the
-    gate reads every candidate as unchecked (a capping caveat), so a streamed
-    grade is conservative: it can rise when the full consensus runs, never
-    fall.
+    gate reads every candidate as unchecked.  It writes
+    ``geometric_ambiguity`` for each, a refuting caveat, so every streamed
+    grade is ``low``: it can rise when the full consensus runs, never fall.
 
     ``screen`` is the run's :class:`~rietx.indexing.screen.PatternScreen`
     (C3), handed to :func:`supercell_checks`; built from the peak list when
@@ -597,7 +598,8 @@ def enumerate_ambiguity(outcome: ConsensusOutcome, peaks: PeakList, *,
     one candidate's derivative cells, so a stop waits one child's work rather
     than a whole sweep.  A candidate the clock stops before or during its
     sweep stays out of ``ambiguity_checked`` with no partners written, which
-    the gate reads as an unasked question (capping), never a clean answer.
+    the gate reads as an unasked question, never a clean answer: it writes
+    ``geometric_ambiguity``, a refuting caveat.
     A sweep that refuses (the parent's own lines cannot be predicted) is the
     same unasked question, so its candidate stays out too (WP-1924).
     """

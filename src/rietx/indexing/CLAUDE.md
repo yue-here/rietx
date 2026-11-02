@@ -82,7 +82,9 @@ template. On real data with no measured shift, `high` is *unreachable* by design
   finished unit streams ≤3 `provisional` cells with **no confidence field**; a
   *completed* system streams its cumulative ranked list as a
   `consensus:<system>` unit through the real gate with validation and ambiguity
-  still open (both capping) — a streamed grade can rise, never fall. Candidate
+  still open — unvalidated caps, unenumerated ambiguity refutes, so every
+  streamed grade is `low` and can rise, never fall (WP-2007 rules on which is
+  meant). Candidate
   shape: `schemas.indexing.candidate_evidence`, shared with `evidence()` — never
   fork it. All added `data` on existing kinds; a new kind is a version bump.
 
