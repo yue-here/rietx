@@ -115,7 +115,7 @@ finding goes stale (memory `queued-wp-findings-go-stale`).
   5. The recipe reader declines dispersion above the table's 70 keV band, which for W (K edge
      69.5 keV) at 74.5 keV drops f′ and f″ that are not small.
 
-  Next: none on this WP. WP-2007 holds items 3 and 4.
+  Next: none on this WP. WP-2007 holds items 3 and 4. PR #1337 (the claim draft #1335 sits on the old branch name `wp-2013-stale-text`).
 
 - **2026-10-20** — filed by WP-1986's 8th session from its lanes' reports. No open WP owns
   docstring wording across these modules: 2005 walks `refine.py`'s codes and literals and
