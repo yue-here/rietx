@@ -295,8 +295,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   solver's 1e-9, WP-1123) is the schedule; `stage_ftols()` and `stage_window_tols()`, parallel to
   `run_stages()`, are the one authority, since the plan alone knows which stage is last — no runner
   reads `Stage.ftol` or `plan.stages`. **Cumulative staging bounds the cost**: every later stage
-  refines an intermediate stage's parameters again, so 1.2-1.6× fewer evaluations cost ≤ 0.03 esd
-  on **one fit**, and along a *chain* the effect is unbounded and of either sign (1.12× better,
+  refines an intermediate stage's parameters again, so 1.06-1.58× fewer evaluations cost ≤ 0.0004
+  esd on **one fit** (FAP, NAC, cpd-1a behind the closing stage; WP-2045 probe 7), and along a *chain* the effect is unbounded and of either sign (1.12× better,
   1.04× worse): a series is measured, never assumed. `None` for either is the bit-identical way
   back and what a golden declares; the record says what a stage **ran** at (`StageResult.ftol` and
   `.window_area_tol`, `NodeAction`'s twins), or a cherry-pick replays what never happened.
