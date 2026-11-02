@@ -231,7 +231,7 @@ about polyhedra: five readings WP-1957's reviewers made of the structure
 figure (forwarded by WP-1504), issue #1057's two ORTEP controls and its
 outline defect, and a cluster polyhedron that waits for a user to ask. No
 open WP owned them, so they moved to a new one, WP-2083, rather than being
-folded somewhere they do not belong. PR #PENDING, from a ghostshift runner,
+folded somewhere they do not belong. PR #1355, from a ghostshift runner,
 a close-only job: this session changed no code.
 
 *Done.*

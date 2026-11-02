@@ -124,7 +124,7 @@ npm --prefix gui test && npm --prefix gui run check
 
 ## Handover log
 
-- **2026-11-02** — filed at WP-1468's close by a ghostshift runner, from that
+- **2026-11-02** — filed at WP-1468's close (PR #1355) by a ghostshift runner, from that
   WP's `### Inherited` section and its one partial task. No open WP owns this
   work: WP-1505 moves the figure into its own package and changes nothing on
   its surface, and WP-1536, 1537 and 1538 add export formats and ambient
