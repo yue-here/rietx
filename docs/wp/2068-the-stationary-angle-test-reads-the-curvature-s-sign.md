@@ -118,7 +118,7 @@ evaluations than at the WP's start.
 
 ## Handover log
 
-- **2026-11-02** — tasks 2-5, PR #NNNN. The stationary-angle test no longer pays for its
+- **2026-11-02** — tasks 2-5, PR #1326. The stationary-angle test no longer pays for its
   curvature in residual evaluations. Where a set of moment angles moves nothing but the magnetic
   intensity, its columns and their second derivatives are now computed directly, so one Newton
   iteration costs one evaluation instead of 2k² + 1. At eight free angles the test drops from 2999
