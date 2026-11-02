@@ -342,7 +342,7 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
   any of them now sees 1.06-1.58× fewer evaluations on FAP, 11-BM NAC and
   cpd-1a at 0.0004 esd or less, and 3.93× on cpd-1a with an absent zircon.
   No number was measured for this change, and none is quoted that the entry
-  below does not hold. Recorded in PR #PRNUM.
+  below does not hold. Recorded in PR #1352.
 
   *Done.* The `CLAUDE.md` invariant now reads "1.06-1.58× fewer
   evaluations cost ≤ 0.0004 esd on one fit (FAP, NAC, cpd-1a behind the
