@@ -208,15 +208,21 @@ _MACRO_CALL = re.compile(
 #: character, so the tail of a longer name is not a call.
 _ANY_CALL = re.compile(r"(?<![\w.])([A-Za-z_]\w*)\s*\(")
 
-#: The names a call may carry without the reader owing the caller a word: the
-#: equation functions, and the calls this reader reads by name elsewhere. The
-#: registry's macros, the file's own ``macro`` definitions and the dataset,
-#: cell and emission macros are added at the scan (:func:`_unread_calls`).
-_EQUATION_FUNCTIONS = frozenset({
-    "Abs", "Sin", "Cos", "Tan", "Asin", "Acos", "Atan", "Atan2", "Sinh", "Cosh",
-    "Tanh", "Exp", "Ln", "Log", "Sqrt", "Mod", "Min", "Max", "If", "Get", "Val",
-    "Sign", "Floor", "Ceil", "Int", "Log10", "Pow", "Rand", "Rad", "Deg",
-    "Radius", "STR", "TOF_XYE", "TOF_GSAS"})
+#: The emission macros this reader reads into ``emission_macro`` and ``anode``:
+#: an element, ``Ka`` and an optional digit (``CuKa5``). §22.1.3's others
+#: (``CuKa4_Holzer``, ``CuKb4_Holzer``) carry a registry row instead.
+_EMISSION_MACRO = re.compile(r"(?:Cu|Co|Cr|Fe|Mo|Ag)Ka\d?")
+
+#: The macros this reader reads by name elsewhere, so a call to one is never
+#: unread: ``Radius`` and ``LP_Factor`` (instrument fields), ``STR`` (a phase),
+#: the ``A1``-``A3`` coordinate macros (:data:`_AXIS_MACROS`), and the
+#: time-of-flight macros :data:`_TOF_CONSTRUCT` names, whose dataset
+#: ``to_structure`` refuses by name (#193). The cell, emission and data-file
+#: macros are added at the scan from their own tables (:func:`_unread_calls`).
+_READ_MACROS = frozenset({
+    "Radius", "LP_Factor", "STR", "A1", "A2", "A3", "TOF_LAM",
+    "TOF_x_axis_calibration", "TOF_Exponential", "TOF_PV", "TOF_CS_L",
+    "TOF_CS_G"})
 
 #: ``Out…`` and ``Create_…`` macros write files and states about the run, not
 #: the model (the registry's IGNORED stance, by name), so their calls are not
@@ -227,19 +233,22 @@ _RUN_LEVEL_CALL = re.compile(r"(?:Out|Create)_\w*")
 def _unread_calls(unquoted: str, stripped: str) -> tuple[str, ...]:
     """The names ``unquoted`` calls that nothing here defines or reads (#651).
 
-    TOPAS stops on an undefined macro ("unknown or misplaced keyword"), so a
-    file reaching this reader either defines the name in an include the reader
-    does not have or has a typo, and the structure built from it is the same
-    in both cases: missing whatever the call states.
+    A name is accounted for by the Technical Reference's equation functions
+    and standard macros (:data:`.coverage.EQUATION_FUNCTIONS`, a registry row,
+    :data:`.coverage.MODEL_FREE_MACROS`), by a read here, or by the file's own
+    ``macro`` definition. What is left is a call TOPAS would stop on unless an
+    include the reader does not have defines it, and the structure built from
+    it is missing whatever the call states either way.
     """
-    known = (_EQUATION_FUNCTIONS | _coverage.MACROS | set(_CELL_MACROS)
-             | set(_DATASET_MACROS)
+    known = (_coverage.EQUATION_FUNCTIONS | _coverage.MACROS
+             | _coverage.MODEL_FREE_MACROS | _READ_MACROS | set(_CELL_MACROS)
+             | set(_DATA_FILE_MACROS)
              | set(re.findall(r"\bmacro\s+(\w+)", stripped)))
     return tuple(sorted({
         m.group(1) for m in _ANY_CALL.finditer(unquoted)
         if m.group(1) not in known
         and m.group(1).rstrip("_") not in known
-        and not re.fullmatch(r"(?:Cu|Co|Cr|Fe|Mo|Ag)Ka\d?", m.group(1))
+        and not _EMISSION_MACRO.fullmatch(m.group(1))
         and not _RUN_LEVEL_CALL.fullmatch(m.group(1))}))
 
 
@@ -495,6 +504,8 @@ class TopasModel:
     #: may supply the dataset — and anything above one means the phases below
     #: belong to different patterns.
     n_datasets: int = 0
+    #: The pattern file each dataset opener names, in file order, as the file
+    #: writes it (:func:`_data_file`): ``RAW(a)`` gives ``a``.
     data_files: list = field(default_factory=list)
     #: How many coefficients the ``bkg`` list states, refined or held.
     background_terms: int | None = None
@@ -1334,8 +1345,22 @@ _FOR_HEAD = re.compile(
     r"\bfor\s+(?P<kind>\w+)(?:\s+(?P<lo>\d+)\s+to\s+(?P<hi>\d+))?"
     r"(?P<rest>[^{};]*?)\s*\{")
 
-#: The macros the reference's macro index lists as stating ``xdd`` and whose
-#: datasets this reader sees as openers (:data:`_DATASET_MACROS`) but whose
+#: The data-file macros, the one list every reader of them takes (WP-1530):
+#: the dataset openers, the unread-call scan, ``data_files`` and the loop
+#: refusal below. §22.1.1 of the version 9 reference lists ``RAW``, ``DAT``,
+#: ``XDD``, ``XY``, ``XYE``, ``SCR`` and ``SHELX_HKL4`` as its "xdd macros";
+#: ``BRML`` and ``SST`` are from the macro index the reporter of #616 quoted,
+#: and version 9 does not list them. None is in :data:`_BLOCK_OPENERS`, so
+#: ``registry._TOPAS_LINE`` does not claim a file on a bare ``XY`` or ``DAT``.
+#: Each opens a dataset only **as a call**, hence the lookahead in
+#: :data:`_BLOCK`. The time-of-flight pair (§22.1.11) are block openers and
+#: are expanded over, so they are :data:`_TOF_DATA_MACROS`, kept apart.
+_DATASET_MACROS = ("RAW", "XDD", "XYE", "XY", "DAT", "SCR", "SHELX_HKL4",
+                   "BRML", "SST")
+_TOF_DATA_MACROS = ("TOF_XYE", "TOF_GSAS")
+_DATA_FILE_MACROS = _DATASET_MACROS + _TOF_DATA_MACROS
+
+#: The data-file macros whose datasets this reader sees as openers but whose
 #: loops it still does not expand (WP-1530 counted them, and left the refusal
 #: alone: no file here exercises the expansion). A ``for xdds`` loop iterates over every
 #: dataset that exists, so where one of these supplies a dataset the reader
@@ -1343,7 +1368,7 @@ _FOR_HEAD = re.compile(
 #: than expanded over the datasets it happens to see. ``yobs_eqn`` is the
 #: keyword form of the same thing — a dataset made from an equation.
 _UNSEEN_DATASETS = re.compile(
-    r"\b(?:(?:RAW|XDD|XYE|XY|DAT|BRML|SST|Create_XDDs)\s*\(|yobs_eqn\b)")
+    rf"\b(?:(?:{'|'.join((*_DATASET_MACROS, 'Create_XDDs'))})\s*\(|yobs_eqn\b)")
 
 
 def _brace_close(text: str, open_brace: int) -> int | None:
@@ -2463,13 +2488,7 @@ _UNDEFINED_CELL_MACROS = ("Orthorhombic", "Monoclinic", "Triclinic")
 #: (:data:`_DATASET_OPENERS` says why) — so a phase above one ends at it rather
 #: than running on through the next bank's dataset-level cards.
 _BLOCK_OPENERS = ("str", "hkl_Is", "xo_Is", "d_Is", "xdd_scr", "xdd_sum",
-                  "xdd", "fit_obj", "STR", "TOF_XYE", "TOF_GSAS")
-
-#: The data-file macros the reference's macro index lists as stating ``xdd``
-#: and which are not in :data:`_BLOCK_OPENERS`, so that
-#: ``registry._TOPAS_LINE`` does not claim a file on a bare ``XY`` or ``DAT``
-#: (WP-1530). Each opens a dataset only **as a call**, hence the lookahead.
-_DATASET_MACROS = ("RAW", "XDD", "XYE", "XY", "DAT", "BRML", "SST")
+                  "xdd", "fit_obj", "STR", *_TOF_DATA_MACROS)
 
 #: ``xdd`` must follow ``xdd_scr``/``xdd_sum`` in the alternation above, and the
 #: pattern is anchored with ``[ \t]`` rather than ``\s`` because ``\s`` matches
@@ -2491,7 +2510,7 @@ _BLOCK = re.compile(
 #: opening two datasets with ``RAW(a)`` and ``RAW(b)`` read as none, and
 #: ``to_structure`` built both specimens' phases into one ``Structure``. A
 #: phase above a single such macro is dataset 0 now, not ``None``.
-_DATASET_OPENERS = ("xdd", "xdd_scr", "xdd_sum", "TOF_XYE", "TOF_GSAS",
+_DATASET_OPENERS = ("xdd", "xdd_scr", "xdd_sum", *_TOF_DATA_MACROS,
                    *_DATASET_MACROS)
 
 #: What says a dataset is **time of flight**. Each is the reference's: the
@@ -2507,6 +2526,36 @@ _TOF_CONSTRUCT = re.compile(
     r"\b(?:(?P<macro>TOF_XYE|TOF_GSAS|TOF_x_axis_calibration|TOF_LAM"
     r"|TOF_Exponential|TOF_PV|TOF_CS_L|TOF_CS_G)\s*\("
     r"|(?P<gui>gui_tof_\w+)|(?P<pk>pk_xo\b[^;{}]*?\bD_spacing\b))")
+
+
+#: The file a dataset opener names: ``xdd``/``xdd_scr`` take it as the next
+#: token, quoted or bare, and a data-file macro as its first argument.
+_KEYWORD_FILE = re.compile(r'\s+(?:"(?P<q>[^"\n]*)"|(?P<bare>[^\s"{};]+))')
+_MACRO_FILE = re.compile(r'[ \t]*\(\s*(?:"(?P<q>[^"\n]*)"|(?P<bare>[^,()\n]*?))\s*[,)]')
+
+
+def _data_file(active: str, opener: re.Match) -> str | None:
+    """The pattern file one dataset opener names, as the file writes it, or
+    ``None`` where it names none (``xdd_sum``).
+
+    A data-file macro's first argument is recorded verbatim (WP-1530). §22.1.1
+    gives ``RAW``, ``DAT``, ``XDD``, ``XY``, ``SCR`` and ``SHELX_HKL4`` a
+    ``path_no_ext``, so ``RAW(a)`` records ``a``: the macro supplies the
+    extension, and which one is in its body, which this reader does not have.
+    A bare ``xdd`` path is one token. Taking the rest of the line made
+    ``xdd a.xy x_calculation_step 0.01`` a file of that whole name.
+    """
+    kw = opener["kw"]
+    if kw in ("xdd", "xdd_scr"):
+        m = _KEYWORD_FILE.match(active, opener.end())
+    elif kw in _DATA_FILE_MACROS:
+        m = _MACRO_FILE.match(active, opener.end())
+    else:
+        return None
+    if m is None:
+        return None
+    path = (m["q"] if m["q"] is not None else m["bare"]).strip()
+    return path or None
 
 
 def _time_of_flight(stripped: str, active: str) -> dict:
@@ -3106,7 +3155,7 @@ def read_topas_inp(path: str | Path, *,
             setattr(model, scalar, at_top[0])
         elif not at_top and len(found) == 1:
             setattr(model, scalar, found[0][1])
-    if m := re.search(r"\b((?:Cu|Co|Cr|Fe|Mo|Ag)Ka\d?)\s*\(", active):
+    if m := re.search(rf"\b({_EMISSION_MACRO.pattern})\s*\(", active):
         model.emission_macro = m.group(1)
         model.anode = re.sub(r"\d$", "", m.group(1))
     model.emission_lines = _emission_lines(active, masked, symbols)
@@ -3129,7 +3178,8 @@ def read_topas_inp(path: str | Path, *,
             flags.append(refined)
         model.background_terms = len(flags)
         model.background_refined = any(flags)
-    model.data_files = [d.strip() for d in re.findall(r'xdd\s+"?([^"\n]+)', active)]
+    model.data_files = [f for o in openers if o["kw"] in _DATASET_OPENERS
+                        if (f := _data_file(active, o)) is not None]
 
     parsed_site_tokens = 0        # site *tokens* read into phases, not atoms
     #: Which dataset the `str` blocks below currently sit in. `None` until an

@@ -100,13 +100,14 @@ manual's wording changes with it.
       `references/diagnostics-projects.md` stops implying a complete import
       when `coverage.partial` is `False`, if what lands makes that so
 
-- [ ] The unread-call allowlist from the Technical Reference's macro and
+- [x] The unread-call allowlist from the Technical Reference's macro and
       function index: `LP_Factor`, `Rp_Peak` and similar real library macros
       are reported today as unread. Model-bearing ones get registry rows
-      (REPORTED), the rest join the allowlist
-- [ ] `data_files` for a macro-opened dataset (`RAW(a)` gives `n_datasets` 2 and
+      (REPORTED), the rest join the allowlist. 2026-11-02, from version 9's
+      Table 3-1 and §22.1; `Rp_Peak` is in neither and stays reported
+- [x] `data_files` for a macro-opened dataset (`RAW(a)` gives `n_datasets` 2 and
       `data_files` `[]`), and one source for the data-macro list in
-      `_UNSEEN_DATASETS` and `_DATASET_MACROS`
+      `_UNSEEN_DATASETS` and `_DATASET_MACROS`. 2026-11-02
 
 ## Acceptance
 
