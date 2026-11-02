@@ -10,7 +10,7 @@ of its worker-seconds (WP-1506).  A wall-clock assertion would be a load sensor
 JUNIT comes from a run with ``--junitxml=JUNIT -o junit_duration_report=total``:
 a CI leg's ``junit-*`` artifacts when the branch has them, else the handover's
 own fast run, whose seconds understate a CI leg's by 3-4× (WP-1547).  A leg
-runs as two shards, so JUNIT may be the directory holding both.  BASE defaults
+runs as several shards, so JUNIT may be the directory holding them.  BASE defaults
 to ``origin/main``.  A test counts as added when the working tree adds its
 ``def`` line since the fork from BASE and removes none of that name in that
 module, so a renamed test is listed and one whose signature changed is not.  An
@@ -54,7 +54,7 @@ def times(junit: str, added: set[tuple[str, str]]) -> dict[tuple[str, str], list
     """Each added test's per-case seconds in a junit file, keyed as ``added`` is.
 
     ``junit`` may be a directory, and then every ``.xml`` under it is read.  A
-    CI leg runs as two shards, each with its own file (WP-1547)."""
+    CI leg runs as several shards, each with its own file (WP-1547)."""
     modules_of: dict[str, list[str]] = defaultdict(list)
     for module, test in added:
         modules_of[test].append(module)

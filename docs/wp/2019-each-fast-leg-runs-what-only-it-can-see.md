@@ -229,6 +229,24 @@ cutting it.
       15); see the newest entry.*
 - [x] **Skill:** none. This changes how the repo is tested, not how rietx is
       driven.
+- [x] **Three shards per leg** (option (a) of the 2026-11-01 entry's Next 1).
+      `ci.yml` runs each Python leg as `--shard K/3`, with `--dist loadgroup`
+      and every file and `xdist_group` still whole. The split is
+      `tests/shards.py`'s, by the recorded seconds, unchanged. *Done
+      2026-11-02. Settled by Claude under established practice and a
+      measurement (lead, 2026-11-02): splitting a suite across more parallel
+      jobs is the standard remedy for a CI wall, and the repo is public, so
+      the extra jobs cost no Actions minutes. The label "a decision for Yue"
+      on that item was written by a Claude session (9d4b7fb63), so it is
+      evidence and not a ruling. The alternative was (b), cutting about 40 %
+      of the tier's work, which needs a test-by-test review and still leaves
+      the 1.6× runner variance. Option (c), restating the written bar, is a
+      change to the WP's acceptance and stays the maintainer's; it was not
+      taken.*
+- [ ] **Restart the ten-run read.** Read the ten consecutive successful
+      `ci.yml` push runs on main whose fast jobs are named `fast py3.x K/3`,
+      that is the runs from this change's merge onwards (Acceptance). Runs
+      before the merge measure the two-shard split and do not count.
 
 ## Acceptance
 

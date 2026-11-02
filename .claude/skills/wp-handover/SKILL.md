@@ -127,7 +127,7 @@ re-reading its own diff.
    `gh run download <id> -p 'junit-py3.14-*' -D <scratchpad>/ci` on the
    newest run that has the artifacts, and name the sha it ran on. A draft's
    run and a cancelled one have none. Pass the directory, since the leg runs
-   as two shards with a file each. Read the py3.14 leg because it alone
+   as several shards with a file each. Read the py3.14 leg because it alone
    executes the tutorials. Otherwise pass the local file. The entry quotes the rows and
    the per-file totals as one run's figures on the named machine. They rank a
    test or a file against the tail and do not time it. A test or a file that
