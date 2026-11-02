@@ -5101,10 +5101,14 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
 #: record what a fit *did*: ``StageResult``, ``SeriesEntry`` and
 #: ``RefinementResult`` are the action-record types the generality record's
 #: § Acceptance names, and ``SeriesResult`` is where WP-2003's demoted step
-#: statistic lands.  Names rather than classes, because this module imports
-#: nothing but the standard library at its top.
+#: statistic lands.  ``UnmatchedPeak`` and ``FlankEvidence`` are the report's
+#: rows WP-1977 put evidence on in place of a suggestion, the seat the
+#: generality record's § Demotion names for a statistic with its meaning.
+#: Names rather than classes, because this module imports nothing but the
+#: standard library at its top.
 RESULT_FIELD_TYPES: tuple[str, ...] = (
-    "RefinementResult", "StageResult", "SeriesEntry", "SeriesResult")
+    "RefinementResult", "StageResult", "SeriesEntry", "SeriesResult",
+    "UnmatchedPeak", "FlankEvidence")
 
 #: One entry per field of every type in :data:`RESULT_FIELD_TYPES`, keyed
 #: ``"<Type>.<field>"`` (WP-2037).  A number in a result field costs nothing
@@ -5958,6 +5962,111 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "What produced the series: the package version, backend, solver, version "
             "of the report thresholds and when it ran. `None` on the reverse chain in "
             "`backward`, which carries none of its own."
+        ),
+    ),
+    # ---------------------------------------------------------- UnmatchedPeak
+    "UnmatchedPeak.two_theta": HelpEntry(
+        title="Position",
+        description="Where the residual peak or trough sits, in degrees 2θ.",
+        unit="deg",
+    ),
+    "UnmatchedPeak.height_over_sigma": HelpEntry(
+        title="Height",
+        description=(
+            "How far the residual stands above (`unmatched_obs`) or below "
+            "(`unmatched_calc`) the calculated curve there, in units of the local esd."
+        ),
+    ),
+    "UnmatchedPeak.kind": HelpEntry(
+        title="Which side is missing",
+        description=(
+            "`unmatched_obs`: an observed peak with no calculated tick within 0.08°. "
+            "`unmatched_calc`: a calculated line with too little observed intensity "
+            "under it."
+        ),
+        anchor="reference/report.html#unmatched-peaks",
+    ),
+    "UnmatchedPeak.flank": HelpEntry(
+        title="Against the drawn peaks",
+        description=(
+            "Where an `unmatched_obs` peak sits against the peaks the model draws. "
+            "`on_flank` says the observed curve rises from it into a drawn peak with "
+            "no valley as deep as `build_report`'s `min_peak_sigma` (default 5σ), so "
+            "the data do not resolve the two. Four causes leave "
+            "such a shoulder. A shape or asymmetry misfit leaves one on most strong "
+            "lines, on one side, at a similar offset in FWHM: compare "
+            "`lines_with_lobe` with `lines_as_strong`. A lobe under the detection "
+            "level is not counted, so a low count does not rule a shape misfit out. "
+            "An unmodelled Kα2 sits above "
+            "each line at the Kα1-Kα2 separation for its angle. A symmetry lower "
+            "than the model's splits the lines of some hkl classes and not others, "
+            "the split growing with tanθ. A foreign line is a lone shoulder that "
+            "fits none of these. The report suggests no impurity phase for a row on "
+            "a flank. A row the data resolve keeps the suggestion. `None` means not "
+            "measured: every `unmatched_calc` row."
+        ),
+        anchor="reference/report.html#unmatched-peaks",
+    ),
+    # ---------------------------------------------------------- FlankEvidence
+    "FlankEvidence.on_flank": HelpEntry(
+        title="Unresolved from a drawn peak",
+        description=(
+            "Whether the observed curve rises from the residual peak into a drawn "
+            "peak without falling `min_peak_sigma` (default 5σ) below its running "
+            "maximum on the way. False "
+            "where the data resolve the two, or where no drawn peak lies uphill."
+        ),
+    ),
+    "FlankEvidence.peak_two_theta": HelpEntry(
+        title="Drawn peak position",
+        description=(
+            "The apex of the drawn peak reached by walking uphill along the "
+            "calculated curve. `None` where the walk reaches the pattern edge or an "
+            "apex less prominent than `min_peak_sigma` (default 5σ)."
+        ),
+        unit="deg",
+    ),
+    "FlankEvidence.peak_prominence_over_sigma": HelpEntry(
+        title="Drawn peak strength",
+        description=(
+            "That peak's prominence in the calculated curve, in units of the esd at "
+            "its apex, to set beside the residual's own height."
+        ),
+    ),
+    "FlankEvidence.peak_fwhm_deg": HelpEntry(
+        title="Drawn peak width",
+        description="That peak's width in the calculated curve at half its prominence.",
+        unit="deg",
+    ),
+    "FlankEvidence.offset_fwhm": HelpEntry(
+        title="Offset",
+        description=(
+            "(residual − apex) divided by the drawn peak's width. Negative below "
+            "the apex."
+        ),
+    ),
+    "FlankEvidence.valley_over_sigma": HelpEntry(
+        title="Deepest valley",
+        description=(
+            "The deepest fall of the observed curve between the residual and the "
+            "apex, below the highest point it had reached, in esd. Under "
+            "`min_peak_sigma` (default 5) is `on_flank`."
+        ),
+    ),
+    "FlankEvidence.lines_as_strong": HelpEntry(
+        title="Lines as strong",
+        description=(
+            "How many drawn peaks are at least as prominent as this one, this one "
+            "included. `None` where `on_flank` is False."
+        ),
+    ),
+    "FlankEvidence.lines_with_lobe": HelpEntry(
+        title="Lines with a lobe",
+        description=(
+            "How many of those carry an `on_flank` row on the same side, this one "
+            "included. A lobe within 0.08° of a tick, or under the detection level, "
+            "is no row and is not counted. "
+            "`None` where `on_flank` is False."
         ),
     ),
 }

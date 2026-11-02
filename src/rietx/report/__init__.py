@@ -27,6 +27,7 @@ from .identifiability import (
     is_exchangeable,
 )
 from .layer0 import (
+    LAYER0_MATCH_TOL_DEG,
     background_clause,
     build_layer0,
     lebail_gap,
@@ -80,6 +81,7 @@ from .schemas import (
     DistortionRestart,
     ExchangeFinding,
     FitReport,
+    FlankEvidence,
     FreedComparison,
     FreedParameter,
     GateFailure,
@@ -119,6 +121,7 @@ __all__ = [
     "DistortionRestart",
     "ExchangeFinding",
     "FitReport",
+    "FlankEvidence",
     "FreedComparison",
     "FreedParameter",
     "GateFailure",
@@ -304,7 +307,7 @@ def _twin(model, structure, instrument, window_area_tol):
 def build_report(result: RefinementResult, *, model=None, values=None,
                  plan=None, free_paths: list[str] | None = None,
                  structure=None, instrument=None, held: list[str] | None = None,
-                 top_n: int = 15, match_tol_deg: float = 0.08,
+                 top_n: int = 15, match_tol_deg: float = LAYER0_MATCH_TOL_DEG,
                  min_peak_sigma: float = 5.0) -> FitReport:
     """Build the report, going as deep as the inputs allow.
 

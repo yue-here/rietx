@@ -13,7 +13,7 @@ Refinement.summary: converged (rietveld)
     info: CAPILLARY_OFFSET_UNAVAILABLE at instrument.geometry.goniometer_radius_mm
   report:
     # misfit regions. The top # carry #% of χ² and the other # carry #%.
-    # observed peak(s) match no reflection.
+    # observed peak(s) match no reflection (# on a drawn flank: see UnmatchedPeak.flank).
     Between the peak regions the residual is systematic (χ²_red=# over # channels, Durbin-Watson d=# where # is uncorrelated).
     No region entry covers this misfit.
     Layer # read # of # regions.

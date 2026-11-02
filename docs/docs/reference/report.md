@@ -97,6 +97,7 @@ An `unmatched_calc` entry is a local minimum of Δ/σ at least {{ LAYER0_PEAK_SI
 | `UnmatchedPeak.two_theta` | its position, in degrees | where to look |
 | `UnmatchedPeak.height_over_sigma` | its height in units of the local esd | how strong the evidence is |
 | `UnmatchedPeak.kind` | `"unmatched_obs"` or `"unmatched_calc"` | which side is missing: an observed peak the model lacks, or a predicted line with no intensity under it |
+| `UnmatchedPeak.flank` | a `FlankEvidence` on every `unmatched_obs` entry; `None` on an `unmatched_calc` one | where the peak sits against the peaks the model draws |
 
 Each entry is one local peak or trough of the residual, at least five channels from the next.
 A broad feature therefore gives a run of entries, and the length of the list measures extent, not the number of missing peaks or phases.
@@ -112,6 +113,20 @@ In those modes the count does not separate a right cell from a wrong one.
 The indexing validation counts absent reflections directly instead, as `LeBailValidation.predicted_but_absent`.
 The blind direction is the one de Wolff's M₂₀ has, and Oishi-Tomiyasu's reversed figure of merit exists to close it {cite}`oishitomiyasu2013`.
 
+`FlankEvidence.on_flank` is `True` when the observed curve rises from the residual peak into a calculated peak without falling {{ LAYER0_PEAK_SIGMA }} esds below its running maximum.
+The data then do not resolve the two, and Layer 2 suggests no impurity phase for the entry.
+A shape or asymmetry misfit, an unmodelled Kα2 line, a symmetry lower than the model's and a foreign line all leave such a shoulder.
+`rietx.help.explain("UnmatchedPeak.flank")` says what separates them, and [Result fields](result-fields.md) describes each field.
+When any entry sits on a flank, the summary's line for the unmatched peaks says how many, and names the field.
+
+| Field | Is | Reads as |
+|---|---|---|
+| `FlankEvidence.peak_two_theta` | the apex of the calculated peak uphill of the residual, in degrees; `None` where there is none at least {{ LAYER0_PEAK_SIGMA }} esds prominent | which line the shoulder belongs to |
+| `FlankEvidence.peak_prominence_over_sigma`, `FlankEvidence.peak_fwhm_deg` | that peak's prominence in esds and its width at half prominence | how strong and how wide the line is |
+| `FlankEvidence.offset_fwhm` | (residual − apex) / that width, negative below | where on the flank; compare it across entries |
+| `FlankEvidence.valley_over_sigma` | the deepest dip of the observed curve on the way, in esds | how close the data come to resolving the two |
+| `FlankEvidence.lines_as_strong`, `FlankEvidence.lines_with_lobe` | calculated peaks at least as prominent, and how many carry an `on_flank` entry on the same side | a shape misfit marks most of them; a foreign line marks one |
+
 ### Cumulative χ² and the summary
 
 `FitReport.cumulative_chi2_breakpoints` lists the 2θ positions where the running Σw·Δ² rises by more than 5 % of its total in one channel.
@@ -125,7 +140,7 @@ On the NAC Rietveld fit it reads:
 
 ```text
 53 misfit regions. The top 15 carry 74% of χ² and the other 38 carry 15%.
-53 observed peak(s) match no reflection.
+50 observed peak(s) match no reflection (11 on a drawn flank: see UnmatchedPeak.flank).
 Between the peak regions the residual is systematic (χ²_red=2.5 over 12275 channels, Durbin-Watson d=0.40 where 2 is uncorrelated).
 No region entry covers this misfit.
 Layer 1 read 9 of 14 regions.

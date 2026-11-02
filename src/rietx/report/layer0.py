@@ -12,16 +12,19 @@ cannot claim, and why that layer abstains rather than guessing:
   union of calculated tick positions and observed/residual peaks (so an
   unindexed impurity peak still gets a region);
 * unmatched-peak lists: residual peaks with no calculated reflection nearby
-  (impurity / missing-phase candidates) and calculated reflections with no
-  observed intensity.
+  (impurity / missing-phase candidates, each with where it sits against the
+  peaks the model draws) and calculated reflections with no observed
+  intensity.
 
 All quantities are 1/σ²-weighted; both Δ and Δ/σ views are reported.
 """
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, peak_prominences, peak_widths
 
 from ..schemas.results import RefinementResult
 from .background import assess_background
@@ -32,6 +35,7 @@ from .schemas import (
     OFF_REGION_DW_LOW,
     BackgroundEvidence,
     FitReport,
+    FlankEvidence,
     LeBailGap,
     Region,
     UnmatchedPeak,
@@ -70,6 +74,141 @@ def residual_peak_indices(resid_norm: np.ndarray, *,
     """
     peaks, _ = find_peaks(resid_norm, height=min_peak_sigma, distance=5)
     return peaks
+
+
+def _flank_walks(y_obs: np.ndarray, y_calc: np.ndarray, sigma: np.ndarray,
+                 i: int, *, min_sigma: float) -> list[tuple[int, float, float]]:
+    """The walks :func:`on_drawn_flank` makes from channel ``i``.
+
+    One ``(apex, valley over σ, prominence)`` per uphill direction whose apex
+    is a drawn peak the data can see; a walk ending at the pattern edge, or at
+    an apex below ``min_sigma`` σ of prominence, is left out.
+    """
+    n = len(y_calc)
+    uphill = [s for s in (-1, 1) if 0 <= i + s < n and y_calc[i + s] > y_calc[i]]
+    walks = []
+    for step in uphill or [0]:
+        # no uphill neighbour: channel i is itself a drawn apex, the case of a
+        # line no tick marks (a blank's, a declared extra peak's)
+        path = [i]
+        j = i + step
+        # strictly uphill: a flat run of the curve (a held background, a
+        # masked span) would otherwise carry the walk to a peak far away
+        while step and 0 <= j < n and y_calc[j] > y_calc[path[-1]]:
+            path.append(j)
+            j += step
+        apex = path[-1]
+        if apex in (0, n - 1):
+            continue
+        with warnings.catch_warnings():
+            # a flat channel's prominence is 0, which is the answer here
+            warnings.filterwarnings(
+                "ignore", message="some peaks have a prominence of 0")
+            prominence = float(peak_prominences(y_calc, [apex])[0][0])
+        if prominence < min_sigma * sigma[apex]:
+            continue
+        p = np.asarray(path)
+        seen = np.maximum.accumulate(y_obs[p])
+        walks.append((apex, float(np.max((seen - y_obs[p]) / sigma[p])),
+                      prominence))
+    return walks
+
+
+def on_drawn_flank(y_obs: np.ndarray, y_calc: np.ndarray, sigma: np.ndarray,
+                   i: int, *, min_sigma: float) -> bool:
+    """Whether the data leave residual peak ``i`` unresolved from a peak the
+    model draws (WP-1977).
+
+    A misfit of a peak's shape, width or asymmetry leaves a positive lobe on
+    its flank, often 1-3 FWHM from the apex: 0.15-0.19° below strong zincite
+    lines on cpd-1c, and 0.1-0.34° below each LaB₆ line on SRM 660c with the
+    axial apertures at 0 (#1106).  A fixed matching window cannot tell such a
+    lobe from a foreign line.  The difference curve tells part of it, and a
+    refiner reads it so (McCusker et al. 1999): a line standing on its own has
+    a valley between it and its neighbour.  Where there is none the data do
+    not decide.  A shape or asymmetry misfit, an unmodelled Kα2, a split of
+    the line by lower symmetry and a foreign line all leave an unresolved
+    shoulder.  So the answer is a measurement Layer 0 records on the row
+    (:class:`~rietx.report.schemas.FlankEvidence`), and the row stays listed.
+
+    From channel ``i`` it walks uphill along the calculated curve to the apex
+    of the drawn peak it sits on.  Uphill can be either way at a valley of the
+    curve, so both directions are tried, and a channel at an apex is its own.
+    The answer is ``True`` when both hold:
+
+    * the apex is a peak the data can see.  Its prominence in ``y_calc`` is at
+      least ``min_sigma`` times σ at the apex.  This excludes a wiggle of a
+      smooth background and a reflection the counting noise hides, and the
+      pattern edge is never an apex;
+    * the observed curve has no resolved valley on the way.  Along the path it
+      never falls ``min_sigma`` σ below the highest point it has reached.
+
+    The calculated curve is ``y_calc`` whole, so a line of a fixed background
+    component (a measured blank, #1217) or of a declared extra peak counts as
+    a drawn peak.  ``min_sigma`` is the level that made the residual a peak.
+    How far "unresolved" reaches grows with the neighbour's height: a line
+    8-12σ tall beside a Lorentzian of FWHM 0.1° stays unresolved out to 2 FWHM
+    at 10³ counts, 3-4 at 10⁴ and 6 at 10⁵.
+    """
+    return any(valley < min_sigma for _, valley, _ in
+               _flank_walks(y_obs, y_calc, sigma, i, min_sigma=min_sigma))
+
+
+def _flank_evidence(rows: list[int], tt: np.ndarray, y_obs: np.ndarray,
+                    y_calc: np.ndarray, sigma: np.ndarray, *,
+                    min_sigma: float) -> dict[int, FlankEvidence]:
+    """One :class:`FlankEvidence` per ``unmatched_obs`` channel in ``rows``.
+
+    Each row takes the walk with the shallowest valley, so a residual at a
+    valley of the drawn curve is read against the neighbour it joins.  The
+    recurrence counts read every row at once, which is why this builds them
+    together.
+    """
+    n = len(y_calc)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", message="some peaks have a prominence of 0")
+        maxima, props = find_peaks(y_calc, prominence=(None, None))
+    prominence_of = dict(zip(maxima.tolist(), props["prominences"].tolist()))
+    chosen: dict[int, tuple[int, float, float] | None] = {}
+    for i in rows:
+        walks = _flank_walks(y_obs, y_calc, sigma, i, min_sigma=min_sigma)
+        chosen[i] = min(walks, key=lambda w: w[1]) if walks else None
+        if chosen[i] is not None:
+            prominence_of.setdefault(chosen[i][0], chosen[i][2])
+    lobes = {(w[0], int(np.sign(tt[i] - tt[w[0]])))
+             for i, w in chosen.items()
+             if w is not None and w[1] < min_sigma}
+
+    out: dict[int, FlankEvidence] = {}
+    channels = np.arange(n, dtype=float)
+    for i, walk in chosen.items():
+        if walk is None:
+            out[i] = FlankEvidence(
+                on_flank=False, peak_two_theta=None,
+                peak_prominence_over_sigma=None, peak_fwhm_deg=None,
+                offset_fwhm=None, valley_over_sigma=None,
+                lines_as_strong=None, lines_with_lobe=None)
+            continue
+        apex, valley, prominence = walk
+        _, _, left, right = peak_widths(y_calc, [apex], rel_height=0.5)
+        fwhm = float(np.interp(right[0], channels, tt)
+                     - np.interp(left[0], channels, tt))
+        on_flank = valley < min_sigma
+        as_strong = with_lobe = None
+        if on_flank:
+            side = int(np.sign(tt[i] - tt[apex]))
+            strong = [a for a, p in prominence_of.items() if p >= prominence]
+            as_strong = len(strong)
+            with_lobe = sum(1 for a in strong if (a, side) in lobes)
+        out[i] = FlankEvidence(
+            on_flank=on_flank, peak_two_theta=float(tt[apex]),
+            peak_prominence_over_sigma=prominence / float(sigma[apex]),
+            peak_fwhm_deg=fwhm,
+            offset_fwhm=float((tt[i] - tt[apex]) / fwhm) if fwhm > 0 else None,
+            valley_over_sigma=valley,
+            lines_as_strong=as_strong, lines_with_lobe=with_lobe)
+    return out
 
 
 def lebail_gap(model, values: dict[str, float], *, rwp_rietveld: float,
@@ -170,6 +309,8 @@ def background_clause(bg: BackgroundEvidence) -> str | None:
 #: component sitting on a line the model already predicts", which is the same
 #: question this answers and must not be answered with a different number — a
 #: component inside Layer 0's tolerance is one Layer 0 would have matched.
+#: WP-1977's flank test (:func:`on_drawn_flank`) moves neither consumer's
+#: window: it measures a row this window has already listed.
 LAYER0_MATCH_TOL_DEG = 0.08
 
 
@@ -220,13 +361,18 @@ def build_layer0(result: RefinementResult, *, top_n: int = 15,
         ))
     regions.sort(key=lambda r: -r.chi2_share)
 
-    # --- unmatched peaks
+    # --- unmatched peaks: no tick within the window.  Each carries where it
+    # sits against the peaks the model draws (WP-1977): a measurement, never
+    # a filter
     unmatched: list[UnmatchedPeak] = []
-    for i in peaks_obs:
-        if len(ticks) == 0 or np.min(np.abs(ticks - tt[i])) > match_tol_deg:
-            unmatched.append(UnmatchedPeak(
-                two_theta=float(tt[i]), height_over_sigma=float(resid_norm[i]),
-                kind="unmatched_obs"))
+    rows = [int(i) for i in peaks_obs
+            if not len(ticks) or np.min(np.abs(ticks - tt[i])) > match_tol_deg]
+    flank = _flank_evidence(rows, tt, y_obs, y_calc, sigma,
+                            min_sigma=min_peak_sigma)
+    for i in rows:
+        unmatched.append(UnmatchedPeak(
+            two_theta=float(tt[i]), height_over_sigma=float(resid_norm[i]),
+            kind="unmatched_obs", flank=flank[i]))
     # calc reflections with no observed intensity: strong negative residual peak
     peaks_neg, _ = find_peaks(-resid_norm, height=min_peak_sigma, distance=5)
     for i in peaks_neg:
@@ -246,8 +392,15 @@ def build_layer0(result: RefinementResult, *, top_n: int = 15,
     if rest:
         summary += (f" and the other {len(rest)} carry "
                     f"{sum(r.chi2_share for r in rest):.0%}")
-    summary += (f".\n{len([u for u in unmatched if u.kind == 'unmatched_obs'])} "
-                "observed peak(s) match no reflection.")
+    obs = [u for u in unmatched if u.kind == "unmatched_obs"]
+    summary += f".\n{len(obs)} observed peak(s) match no reflection"
+    # The one line every reader scans points at the evidence when any row
+    # sits on a drawn flank (WP-1977, ruled 2026-11-02): the cause is the
+    # reader's to weigh, so the count is read off the rows' own records.
+    n_flank = sum(1 for u in obs if u.flank is not None and u.flank.on_flank)
+    if n_flank:
+        summary += f" ({n_flank} on a drawn flank: see UnmatchedPeak.flank)"
+    summary += "."
 
     # The background section takes the *full* segmentation, not the top-N kept
     # above: a channel outside the fifteen largest regions is in a small one,
