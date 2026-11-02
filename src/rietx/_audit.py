@@ -569,6 +569,17 @@ ROWS: tuple[Row, ...] = (
                  "paths it put back (B8, ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("CHILD_GROUP_UNNAMED", "code"),
+    Row("CIF_ANISO_COLLAPSED", "code", tier=1, ambiguity=1,
+        evidence=("a count of the sites whose _atom_site_aniso_U_ij row has a non-zero "
+                  "tensor while the reader was told aniso=False, the default that keeps "
+                  "U_eq alone; fires exactly when that count is above zero and decides "
+                  "nothing (issue #1056: COD 2104364 paracetamol, 11 of 20 sites, the nine "
+                  "hydrogens being Uiso in the file)"),
+        grounds=("Arithmetic: the reader drops a tensor the file states and says how many, "
+                 "so an ellipsoid figure of the structure is not read as the file's."),
+        response="info",
+        responds=("note that the sites' tensors were read as U_eq, and pass aniso=True if "
+                  "the anisotropy is wanted")),
     Row("CIF_CELL_ANGLE_CORRECTED", "code"),
     Row("CIF_EMPTY_BLOCK_SKIPPED", "code", tier=1, ambiguity=1,
         evidence=("a reading rule from the format's definition: cif_core.dic 3.3.0 files the "
@@ -745,13 +756,16 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SUPERCELL_REFUTED", "code", tier=3, ambiguity=2,
         evidence=("warning; fires when the containment refuter reads 'refuted' for a pair "
                   "beyond index 4: the extra lines no extinction could remove sit on an "
-                  "observed line no more often than chance p0 predicts and the child's own "
-                  "lines are seen no more often than its parent's (#1230); it ranks the "
+                  "observed line no more often than chance p0 predicts, p0 counted in the "
+                  "seen test's own windows with the assumed shift bound flooring only the "
+                  "power check (#1263), and the child's own lines are seen no more often "
+                  "than its parent's (#1230); it ranks the "
                   "superlattice below its parent and leaves it in the list; the explanation "
                   "names the weak superstructure the radiation barely sees (PR #941 round 4)"),
         grounds=("Ranks below the parent and withholds nothing else; a superstructure is "
-                 "indexed by its subcell first, as ruled on WP-1968 (C3, ruled 2026-10-21)."),
-        approved="2026-10-21"),
+                 "indexed by its subcell first, as ruled on WP-1968 (C3, ruled 2026-10-21); "
+                 "#1263's narrower null approved at PR #1302 (ruled 2026-11-01)."),
+        approved="2026-11-01"),
     Row("INDEX_SYSTEMS_NOT_COVERED", "code"),
     Row("INDEX_VALIDATION_FAILED", "code"),
     Row("INDEX_VOLUME_UNPHYSICAL", "code"),
@@ -1098,6 +1112,21 @@ ROWS: tuple[Row, ...] = (
                   "it under a tie. The direction of a "
                   "DOF is the nullspace of the site group, so the map is derived, never "
                   "chosen (#1014, rounds 5-6)")),
+    Row("SITE_MULTIPLICITY_KEPT", "code", tier=1, ambiguity=3,
+        response="warning",
+        responds=("decide whether the site is one atom on the special position or a split "
+                  "pair before quoting a weight fraction, a density or the site's occupancy "
+                  "from a later compile or the next fit"),
+        evidence=("arithmetic: reports the freeze beside it, which keeps the orbit split a "
+                  "call started with for every stage and its closing compile, as GSAS-II "
+                  "keeps a site's multiplicity (GSASIIstrIO.py:1762, Amul read once from the "
+                  "atom record; GSASIIstrMath.py:1279, Mult*frac/nOps) (WP-2052, #1088). "
+                  "Which reading the site is (one atom on the position, or a split pair) is "
+                  "a fact outside the data, as for SITE_TWINS_KEPT. It has no threshold: it fires "
+                  "exactly when a returned site's fresh split has fewer images than the "
+                  "result counted, and gives the atoms per cell both ways. A site that "
+                  "gains images (a rigid body moving one off a special position) takes "
+                  "them at the next compile, as before WP-2052")),
     Row("SITE_TWINS_KEPT", "code", tier=1, ambiguity=3,
         response="warning",
         responds=("decide which reading of the site the file meant before quoting a weight "
@@ -1376,15 +1405,19 @@ ROWS: tuple[Row, ...] = (
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
                   "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), a strict xfail (tests/test_staged_start_invariance.py, "
-                  "2026-10-25); 1.00-2.15x fewer evaluations (WP-1113/1123), of which "
+                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
+                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "1.00-2.15x fewer evaluations (WP-1113/1123), of which "
                   "converging the last declared stage hands back 1.04-1.07x (WP-2045)"),
-        grounds=("A schedule rietx chose (WP-1123); kept on four families with its failing case "
-                 "stated, where the alternative is the arm that runs out of budget (the sixth "
-                 "round's Q2, bar 0.1 plain esd, ruled 2026-10-21). The last declared stage "
+        grounds=("Cost only (ruled 2026-11-01): 1.00-2.15x fewer evaluations for answers "
+                 "within 0.1 plain esd of every stage at 1e-9 on FAP, cpd-1a and 11-BM NAC. "
+                 "The failing case the 2026-10-21 approval was weighed against, an absent "
+                 "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
+                 "esd since WP-2045. LaB6's 8.82 esd is the S/L and H/L mirror (WP-2012), "
+                 "not an accuracy loss from the tolerance. The last declared stage "
                  "converges when a closing stage follows it (WP-2045 option 5, ruled "
                  "2026-10-24)."),
-        approved="2026-10-21"),
+        approved="2026-11-01"),
     Row("rietx.schemas.results.StageResult.window_area_tol", "action", tier=2, ambiguity=1,
         evidence=("the record of the closing stage PlanSpec:closing_window_tol runs (that "
                   "row's evidence: BGMN's closing run by default), written by both stage "
@@ -2011,7 +2044,12 @@ ROWS: tuple[Row, ...] = (
                   "consensus); at 0.15 its true cell validated on both; at 0.20 also its leader. "
                   "Zircon, FAP, corundum, LaB6 validated every checked cell at all three, with "
                   "the same systems searched and incomplete; NAC's default spec lost the "
-                  "orthorhombic system at 0.15; one synchrotron pattern"),
+                  "orthorhombic system at 0.15; one synchrotron pattern. WP-2063, after the "
+                  "panel speed-up, three interleaved runs at each of 0.08/0.10/0.15 (macOS "
+                  "arm64, [dev], load 4-9 of 10 cores): NAC's true cell validated on all 18 "
+                  "NAC runs; systems searched, candidates and ranking identical across values "
+                  "on all six sets; at 0.08 and 0.10 NAC's top-ranked candidate's fit was "
+                  "cancelled on every run, at 0.15 it validated"),
         grounds=("A share of the user's ceiling moved from search to the mandatory check; the "
                  "smallest measured share that validates a heavy synchrotron pattern's true "
                  "cell.  Set under the maintainer's delegation of 2026-10-28 (WP-2011)."),
@@ -2926,6 +2964,29 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: 2^-400 = 3.9e-121 squares to 1.5e-241, a normal double; 1/d^2 stays "
                   "under 1e241 (docstring, WP-1463)")),
     Row("rietx.optimize.statistics.EFFECTIVE_OBS_ALPHA", "constant", value=2.0),
+    Row("rietx.optimize.statistics.FD_COLUMN_ERROR", "constant", tier=3, value=1.0,
+        evidence=("the free factor of resolved_correlation's cut, n*(FD_COLUMN_ERROR*FD_STEP)^2 "
+                  "on the unit-diagonal normal matrix (WP-2050, generality review 2026-11-01). "
+                  "Mechanism tier 2: GSAS-II takes correlations off a pseudo-inverse truncated "
+                  "on the unit-diagonal Hessian (SVDtol, GSASIImath.setHcorr; docs/practice.md). "
+                  "For: brucite's exactly degenerate Gaussian size, Gaussian strain and W triple "
+                  "sits at 2.7e-15 to 4.9e-14 of |lambda|max under 1e-14 nudges, corundum's at "
+                  "1.2-1.9e-12, and the next real direction (zero shift with sample "
+                  "displacement, 1.3-1.4e-10) is kept. Against: FD_STEP's row records FD columns "
+                  "up to 2.5e-4 from a Richardson oracle, so the 1 x FD_STEP premise is measured "
+                  "on width columns only (5e-7 against jax on lab brucite); brucite's seventh "
+                  "stage put the triple at 2.3x the cut under one nudge; the cut grows with n, "
+                  "and no fit with n >= 100 is measured; an exact Jacobian makes it loose. "
+                  "Firing side one family: the four round-robin standards (qarr, lab CuKa, "
+                  "development data), with the exact identity 1/cos^2 = 1 + tan^2 as the truth"),
+        grounds=("WP-2050's measured margins: at the closing stage of brucite, corundum, "
+                 "zincite and fluorite the flat triple reads 0.004-0.47x the cut, brucite's "
+                 "zero-shift/displacement direction >= 31x, and SRM 660c, FAP, NAC and the "
+                 "LaB6 capillary nothing within 1000x; a correlation whose value is rounding "
+                 "is not shown to a user, and tests/test_suite_alarms.py asserts the "
+                 "unresolved mask nightly; the cut n*FD_STEP^2 approved by Yue, 2026-11-01 "
+                 "(PR #1306)."),
+        approved="2026-11-01"),
     Row("rietx.optimize.statistics.MAX_SHIFT_CONVERGED", "constant", value=0.1),
     Row("rietx.optimize.statistics.OBS_PER_PARAMETER_MIN", "constant", value=3.0),
     Row("rietx.optimize.statistics.OBS_PER_PARAMETER_PREFERRED", "constant", value=5.0),
@@ -3421,13 +3482,17 @@ ROWS: tuple[Row, ...] = (
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
                   "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), a strict xfail (tests/test_staged_start_invariance.py, "
-                  "2026-10-25); 1.00-2.15x fewer evaluations (WP-1113/1123), of which "
+                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
+                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "1.00-2.15x fewer evaluations (WP-1113/1123), of which "
                   "converging the last declared stage hands back 1.04-1.07x (WP-2045)"),
-        grounds=("A schedule rietx chose (WP-1123); kept on four families with its failing case "
-                 "stated, where the alternative is the arm that runs out of budget (the sixth "
-                 "round's Q2, bar 0.1 plain esd, ruled 2026-10-21)."),
-        approved="2026-10-21"),
+        grounds=("Cost only (ruled 2026-11-01): 1.00-2.15x fewer evaluations for answers "
+                 "within 0.1 plain esd of every stage at 1e-9 on FAP, cpd-1a and 11-BM NAC. "
+                 "The failing case the 2026-10-21 approval was weighed against, an absent "
+                 "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
+                 "esd since WP-2045. LaB6's 8.82 esd is the S/L and H/L mirror (WP-2012), "
+                 "not an accuracy loss from the tolerance."),
+        approved="2026-11-01"),
     Row("rietx.schemas.plan.PHASE_SUPPORT_SIGMA", "constant", tier=3, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "
@@ -3840,13 +3905,17 @@ ROWS: tuple[Row, ...] = (
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
                   "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), a strict xfail (tests/test_staged_start_invariance.py, "
-                  "2026-10-25); 1.00-2.15x fewer evaluations (WP-1113/1123), of which "
+                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
+                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "1.00-2.15x fewer evaluations (WP-1113/1123), of which "
                   "converging the last declared stage hands back 1.04-1.07x (WP-2045)"),
-        grounds=("A schedule rietx chose (WP-1123); kept on four families with its failing case "
-                 "stated, where the alternative is the arm that runs out of budget (the sixth "
-                 "round's Q2, bar 0.1 plain esd, ruled 2026-10-21)."),
-        approved="2026-10-21"),
+        grounds=("Cost only (ruled 2026-11-01): 1.00-2.15x fewer evaluations for answers "
+                 "within 0.1 plain esd of every stage at 1e-9 on FAP, cpd-1a and 11-BM NAC. "
+                 "The failing case the 2026-10-21 approval was weighed against, an absent "
+                 "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
+                 "esd since WP-2045. LaB6's 8.82 esd is the S/L and H/L mirror (WP-2012), "
+                 "not an accuracy loss from the tolerance."),
+        approved="2026-11-01"),
     Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=0.001,
         evidence=("BGMN ends every refinement ladder with a closing run, all free and restarted "
                   "from the answer, by default (manual A.4; Doebelin & Kleeberg 2015 J. Appl. "
@@ -3896,13 +3965,17 @@ ROWS: tuple[Row, ...] = (
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
                   "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), a strict xfail (tests/test_staged_start_invariance.py, "
-                  "2026-10-25); 1.00-2.15x fewer evaluations (WP-1113/1123), of which "
+                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
+                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "1.00-2.15x fewer evaluations (WP-1113/1123), of which "
                   "converging the last declared stage hands back 1.04-1.07x (WP-2045)"),
-        grounds=("A schedule rietx chose (WP-1123); kept on four families with its failing case "
-                 "stated, where the alternative is the arm that runs out of budget (the sixth "
-                 "round's Q2, bar 0.1 plain esd, ruled 2026-10-21)."),
-        approved="2026-10-21"),
+        grounds=("Cost only (ruled 2026-11-01): 1.00-2.15x fewer evaluations for answers "
+                 "within 0.1 plain esd of every stage at 1e-9 on FAP, cpd-1a and 11-BM NAC. "
+                 "The failing case the 2026-10-21 approval was weighed against, an absent "
+                 "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
+                 "esd since WP-2045. LaB6's 8.82 esd is the S/L and H/L mirror (WP-2012), "
+                 "not an accuracy loss from the tolerance."),
+        approved="2026-11-01"),
     Row("rietx.schemas.plan.StageSpec:lebail_cycles", "default", tier=3, ambiguity=1, value=3,
         evidence=("no stated source; issue #740 (synthetic LaMnO3-like neutron, cell and profile "
                   "at truth): Rwp 4.56 % at 3 cycles, 1.62 % at 100-400, 1.09 % for the true "
@@ -4507,6 +4580,11 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: points at parameters() for the site, where the renumbered "
                   "paths are listed; it states no value")),
     Row("SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion", "suggestion", value=2),
+    Row("SITE_MULTIPLICITY_KEPT.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the occupancy that keeps the fitted content on the "
+                  "special position (occ x fitted / fresh multiplicity), only where it is at "
+                  "most 1, and TWIN_COORD_TOL, read from the constant, as the distance that "
+                  "keeps the site split")),
     Row("SITE_TWINS_KEPT.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence=("arithmetic: names the special-position occupancy each reading implies "
                   "(occ for one atom off its position, occ x before/after for a split pair) "

@@ -90,7 +90,7 @@ Structure/Instrument/PatternData (schemas/, pydantic, JSON round-trip)
 
 **Telemetry/cancel.** `fit`/`run_stage`/`refine` take `events=` and `cancel=` (an
 `optimize.cancel.CancelToken` another thread sets). Cancellation is **cooperative, read between
-residual evaluations**, never an interrupt, so frozen-per-stage discreteness holds; the
+residual evaluations and LM factorisations** (WP-2063), never an interrupt, so frozen-per-stage discreteness holds; the
 in-flight stage is *abandoned* — no node, no commit, models restored to pre-stage values (a
 seeding stage writes before solving). `RefinementCancelled` carries `.completed_stages` and
 `.node_id`, the last completed node the working state stands at. Event `data` is an **open
@@ -315,8 +315,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   records it. **Support is a fact about the values and a stage moves them** → re-measured at the
   answer: a phase that appeared is *released*; one that **collapsed** while solving is restored to
   where the stage found it and held (one extra solve, never a third). **A value that is not a
-  measurement is the caller's**: held paths leave `RefinementResult.parameters`, a trajectory starts
-  at the onset. Which phases: a scale under 3σ of its counting-noise esd
+  measurement is the caller's**: held paths and their ties leave `RefinementResult.parameters` (its
+  rows are `moving_paths`, WP-1999), a trajectory starts at the onset. Which phases: a scale under 3σ of its counting-noise esd
   (`refine._answer_significance`, WP-1523), never the fitted curve an absent phase's cell fits to
   noise; zero limit `phase_line_counts`. Both feed `PHASE_UNCONSTRAINED`, which says what was done;
   `SEQUENTIAL_PERSISTENT_FINDING` what no one pattern can: "42 of 68".

@@ -327,6 +327,12 @@ _RESULT_TYPE_LEADS = {
     "SeriesResult": (
         "What a sequential refinement returns: one entry per pattern, and what the "
         "chain found about the series as a whole."),
+    "UnmatchedPeak": (
+        "One row of `FitReport.unmatched`: a residual peak with no calculated tick "
+        "near it, or a calculated line with no intensity under it."),
+    "FlankEvidence": (
+        "An `unmatched_obs` row's `flank`: where the residual peak sits against the "
+        "peaks the model draws."),
 }
 
 

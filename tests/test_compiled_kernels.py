@@ -266,6 +266,28 @@ def aot_bench():
     return module
 
 
+def test_one_agreeing_numpy_pair_does_not_make_a_noisy_platform_checkable(
+        aot_bench):
+    """The gate's twins check, as run 41378211395 read it on macOS x86_64.
+
+    The numpy path agreed with itself on trigger in that run and the twins sat
+    3.0e-06 esd away, the size of the numpy path's own differences there.  One
+    agreeing pair does not show the path is deterministic, so on a platform in
+    ``NONDETERMINISTIC`` the gap is reported.  Where the path is deterministic
+    the same readings still fail the gate.
+    """
+    gap = "max 3.0e-06 esd, 7 with the same value and another esd"
+    noise = "max 1.7e-07 esd, 7 with the same value and another esd"
+    verdict = aot_bench.twins_verdict
+    assert ("darwin", "x86_64") in aot_bench.NONDETERMINISTIC
+    assert verdict(gap, "bit-identical", nondeterministic=True) == "unchecked"
+    assert verdict(gap, "bit-identical", nondeterministic=False) == "drifted"
+    assert verdict(gap, noise, nondeterministic=False) == "unchecked"
+    for noisy in (True, False):
+        assert verdict("bit-identical", noise, noisy) == "same"
+        assert verdict("bit-identical", "bit-identical", noisy) == "same"
+
+
 @pytest.mark.parametrize("hl", [0.030, 0.0])
 def test_fcj_rows_agree_to_rounding_on_every_plane(aot_bench, monkeypatch, hl):
     """Including the two axial planes, which are node-FD differences divided by

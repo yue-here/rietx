@@ -85,10 +85,8 @@ so a session loads only what it needs:
    flip its row; it ships in the next release. **Release is cut** weekly, and
    at once for a P1 fix (`RELEASING.md` § When): it carries what `main` holds,
    numbered over the last
-   release (a minor when anything was added); finish `milestones/vX.Y.md` with
-   the measured ship block naming the milestones it completes, check README's
-   claims, then move `pyproject.version` to the next minor's `.dev0` and open
-   that version's record. **A break or a user-facing addition is staged on the
+   release (a minor when anything was added), and closed by `RELEASING.md`'s
+   steps 9-11, which finish its record and open the next. **A break or a user-facing addition is staged on the
    day it lands**, in the release record and the staged notes.
    The notes are written from the **tag range**, not from the milestone, and
    v1.4's pass found two changes shipping with no record entry behind them

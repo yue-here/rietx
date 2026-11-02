@@ -27,6 +27,7 @@ from .identifiability import (
     is_exchangeable,
 )
 from .layer0 import (
+    LAYER0_MATCH_TOL_DEG,
     background_clause,
     build_layer0,
     lebail_gap,
@@ -80,6 +81,7 @@ from .schemas import (
     DistortionRestart,
     ExchangeFinding,
     FitReport,
+    FlankEvidence,
     FreedComparison,
     FreedParameter,
     GateFailure,
@@ -119,6 +121,7 @@ __all__ = [
     "DistortionRestart",
     "ExchangeFinding",
     "FitReport",
+    "FlankEvidence",
     "FreedComparison",
     "FreedParameter",
     "GateFailure",
@@ -281,14 +284,16 @@ def _reading_models(model, structure, instrument):
 
 def _twin(model, structure, instrument, window_area_tol):
     """``model`` compiled again at ``window_area_tol`` on its own grid: the
-    same channels, σ and moment frames, and its Le Bail intensities."""
-    from ..model.forward import compile_model
+    same channels, σ, moment frames and orbit split (WP-2052), and its Le Bail
+    intensities."""
+    from ..model.forward import compile_model, orbit_split_of
     from ..refine import _carry_lebail
 
     grid = PatternData(two_theta=model.tt.tolist(), intensity=model.y_obs.tolist(),
                        sigma=model.sigma.tolist())
     twin = compile_model(structure, instrument, grid, mode=model.mode,
-                         window_area_tol=window_area_tol)
+                         window_area_tol=window_area_tol,
+                         orbit_split=orbit_split_of(model))
     # the model's σ, which a measured background widened once already
     twin.sigma = model.sigma
     for cp, twin_cp in zip(model.phases, twin.phases, strict=True):
@@ -302,7 +307,7 @@ def _twin(model, structure, instrument, window_area_tol):
 def build_report(result: RefinementResult, *, model=None, values=None,
                  plan=None, free_paths: list[str] | None = None,
                  structure=None, instrument=None, held: list[str] | None = None,
-                 top_n: int = 15, match_tol_deg: float = 0.08,
+                 top_n: int = 15, match_tol_deg: float = LAYER0_MATCH_TOL_DEG,
                  min_peak_sigma: float = 5.0) -> FitReport:
     """Build the report, going as deep as the inputs allow.
 

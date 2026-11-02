@@ -27,10 +27,14 @@ class RefinedParameter(Base):
     """One row of :attr:`RefinementResult.parameters`.
 
     The membership filter **is the contract** (WP-1003, ratifying 1053): a row
-    appears iff the entry varied or was tied — a fixed parameter is *absent*,
-    not present with ``vary=False``.  The full table, held rows and their
-    reasons included, is :meth:`rietx.Refinement.parameters`, which also
-    merges these esds back in.
+    appears iff the fit could move it — a fixed parameter is *absent*, not
+    present with ``vary=False``.  "Could move" is
+    ``ParameterTable.moving_paths`` (WP-1999): the free entries, and every
+    tied or derived row a free one reaches.  So a tied row whose every source
+    is fixed, or held for the stage (WP-1301), is absent with its sources; a
+    ``vary=False`` row is always a follower of a free one.  The full table,
+    held rows and their reasons included, is
+    :meth:`rietx.Refinement.parameters`, which also merges these esds back in.
 
     **``at_bound`` has three states, and one of them is "nobody looked"**
     (WP-1076).  ``True``/``False`` are answers about a *measured* row;
@@ -283,8 +287,10 @@ class CorrelationPair(Base):
     """One entry of the worst-|ρ| list (WP-1056).
 
     ``rho`` is the signed correlation from the solver's final undamped
-    Jacobian (the same matrix the ``HIGH_CORRELATION`` guard read, so the
-    two can never disagree); the list is ordered worst first.
+    Jacobian, with any direction the Jacobian cannot resolve projected out
+    (WP-2050, :func:`~rietx.optimize.statistics.resolved_correlation`).  It is
+    the same matrix the ``HIGH_CORRELATION`` guard read, so the two can never
+    disagree; the list is ordered worst first.
     """
 
     path_a: str

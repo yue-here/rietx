@@ -44,6 +44,10 @@ from .crystallography.magnetic.moments import (
     MOMENT_DOF_PATH as _MOMENT_DOF,
 )
 from .crystallography.magnetic.scattering import check_group_is_structure_symmetry
+from .crystallography.structure_factor import (
+    _multiplicity_kept_diagnostics,
+    phase_orbit_split,
+)
 from .crystallography.symmetry import reflection_label, reflection_label_row
 from .crystallography.twins import (
     NumberingMoves,
@@ -70,6 +74,7 @@ from .model.forward import (
     CompiledModel,
     Mode,
     compile_model,
+    orbit_split_of,
     recorded_window_tol,
     window_loss,
 )
@@ -372,6 +377,35 @@ def mode_fixed_path(path: str, mode: Mode) -> bool:
             or (path.startswith("phases.") and path.endswith(".scale"))
             or (path.startswith("phases.") and ".texture." in path)
             or _MAGNETIC_WIDTH_PATH.match(path) is not None)
+
+
+def _parameter_row(e, *, tie: "TieSpec | None", esd: float | None, mode: Mode,
+                   blocked, reach, owned, origin, path: str | None = None,
+                   lo: float | None = None, hi: float | None = None) -> ParameterRow:
+    """The one place an ``Entry`` becomes a :class:`ParameterRow` (WP-2028).
+
+    ``Refinement.parameters`` and ``MultiHistogramRefinement.parameters`` both
+    call it, so the two listings cannot drift.  Every ``Entry`` field not named
+    in the keywords is copied by name from ``dataclasses.fields(Entry)``: a
+    field added to ``Entry`` and ``ParameterRow`` reaches both surfaces, and one
+    added to ``Entry`` alone fails ``ParameterRow`` (``extra="forbid"``) in the
+    first call rather than reading as an empty answer.  The keywords are what a
+    joint fit respells: ``path``, ``tie`` (its sources under the joint result's
+    paths), and ``lo``/``hi`` (a shared row's intersected window).
+    """
+    kw = {f.name: getattr(e, f.name) for f in dataclasses.fields(e)}
+    kw.update(
+        path=e.path if path is None else path,
+        lo=e.lo if lo is None else lo, hi=e.hi if hi is None else hi,
+        tie=tie, esd=esd,
+        mode_fixed=(mode_fixed_column(reach[e.path], mode)
+                    if e.path in reach else mode_fixed_path(e.path, mode)),
+        needs_held_cell=e.path in blocked,
+        body=owned.get(e.path),
+        origin_axis=origin[e.path][1] if e.path in origin else None,
+        help_key=help_key_for(e.path),
+    )
+    return ParameterRow(**kw)
 
 
 def mode_fixed_column(reached: list[str], mode: Mode) -> bool:
@@ -2549,6 +2583,12 @@ class Refinement:
         #: to what the caller asked to refine.
         self._held: list[str] = []
         self._pending_reflections: list[ReflectionState] = []
+        #: each phase's orbit split, decided once at the start of a ``fit()``
+        #: or ``run_stage()`` and handed to every compile that call makes, so
+        #: no stage and no closing compile changes a site's multiplicity
+        #: (WP-2052).  ``None`` outside a call: a compile then decides it from
+        #: the coordinates, as a fresh ``Refinement`` does.
+        self._orbit_split: list | None = None
         #: user constraints (WP-1070), path → the affine dependence declared for
         #: it.  The one authority for *which* ties are the user's: the symmetry
         #: ties are rederived by every ``ParameterTable`` build and are absent
@@ -2931,6 +2971,12 @@ class Refinement:
         # and the settings the last fit ran under, so a trial's refits hold
         # an absent phase by the caller's rule (WP-2002, B1)
         ref._plan_settings = dict(self._plan_settings)
+        # and the orbit split of the call in flight, if any (WP-2052): a trial
+        # made inside a fit (a profile-interval refit, a stage report's
+        # verification) refits at the multiplicity the answer it is measured
+        # against was solved at.  ``None`` outside a call, as for a fresh one.
+        ref._orbit_split = (None if self._orbit_split is None
+                            else list(self._orbit_split))
         # The branch is built from ``self.instrument``, which carries the last
         # stage's *refined* λ — so its own ``__init__`` snapshot would declare a
         # refined value.  A branch is "a second working tree over the same
@@ -3144,24 +3190,11 @@ class Refinement:
         reach = table.entry_reach()
         owned = table.body_rows()
         origin = table.origin_holds
-        rows = []
-        for e in table.entries:
-            rows.append(ParameterRow(
-                path=e.path, value=e.value, vary=e.vary, lo=e.lo, hi=e.hi,
-                tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
-                     if e.tie is not None else None),
-                locked=e.locked,
-                held=e.held,
-                esd=esd.get(e.path),
-                mode_fixed=(mode_fixed_column(reach[e.path], mode)
-                            if e.path in reach
-                            else mode_fixed_path(e.path, mode)),
-                needs_held_cell=e.path in blocked,
-                body=owned.get(e.path),
-                origin_axis=origin[e.path][1] if e.path in origin else None,
-                help_key=help_key_for(e.path),
-            ))
-        return rows
+        return [_parameter_row(
+            e, tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
+                    if e.tie is not None else None),
+            esd=esd.get(e.path), mode=mode, blocked=blocked, reach=reach,
+            owned=owned, origin=origin) for e in table.entries]
 
     def set_vary(self, path_globs: list[str] | str, vary: bool = True) -> list[str]:
         """Free (or hold) every parameter matching ``path_globs``.
@@ -4720,7 +4753,10 @@ class Refinement:
             # and the area its windows may drop: the closing stage's own, None
             # for every declared stage (WP-2002, the sixth round's Q1 and Q2),
             # which compiles at the declared 2 % by name
-            window_area_tol=recorded_window_tol(window_area_tol))
+            window_area_tol=recorded_window_tol(window_area_tol),
+            # the split this call decided at its start, so a stage that drove
+            # a half-occupied atom onto a mirror keeps its multiplicity
+            orbit_split=self._orbit_split)
         table.push_moment_frames(new_model)
         carried = False
         if model is not None and mode in ("lebail", "pawley") and model.mode == mode:
@@ -5266,15 +5302,35 @@ class Refinement:
         reproduced stage 1's report to three decimals.)
         """
         plan = resolve_plan(plan, mode)
-        if mode == "lebail" and plan.lebail_passes > 1 and plan.stages:
-            return self._fit_lebail_alternation(
-                data, plan=plan, two_theta_limits=two_theta_limits,
+        owns_split = self._decide_orbit_split()
+        try:
+            if mode == "lebail" and plan.lebail_passes > 1 and plan.stages:
+                return self._fit_lebail_alternation(
+                    data, plan=plan, two_theta_limits=two_theta_limits,
+                    events=events, cancel=cancel, telemetry=telemetry,
+                    label=label, stage_reports=stage_reports,
+                    progress=progress)
+            return self._fit_pass(
+                data, mode=mode, plan=plan, two_theta_limits=two_theta_limits,
                 events=events, cancel=cancel, telemetry=telemetry, label=label,
                 stage_reports=stage_reports, progress=progress)
-        return self._fit_pass(
-            data, mode=mode, plan=plan, two_theta_limits=two_theta_limits,
-            events=events, cancel=cancel, telemetry=telemetry, label=label,
-            stage_reports=stage_reports, progress=progress)
+        finally:
+            if owns_split:
+                self._orbit_split = None
+
+    def _decide_orbit_split(self) -> bool:
+        """Decide each site's orbit split for the call starting now (WP-2052).
+
+        Returns whether this call decided it, and so must clear it at its end.
+        A call made inside another one, such as a profile-interval refit inside
+        ``fit``, reuses the outer call's split, which is the split its answer
+        was solved at.  GSAS-II reads a site's multiplicity once, at setup
+        (``GSASIIstrIO.py``), and this is that rule for one call.
+        """
+        if self._orbit_split is not None:
+            return False
+        self._orbit_split = [phase_orbit_split(p) for p in self.structure.phases]
+        return True
 
     def _fit_lebail_alternation(self, data: PatternData, *,
                                 plan: RefinementPlan, **kw) -> RefinementResult:
@@ -5919,7 +5975,11 @@ class Refinement:
 
         Returns the model to report from and a ``FROZEN_COMPILE_STALE`` finding
         when the two χ² differ by more than :data:`FROZEN_COMPILE_CHI2_REL`,
-        so a caller can see when the frozen windows mattered.
+        so a caller can see when the frozen windows mattered.  Beside it, a
+        ``SITE_MULTIPLICITY_KEPT`` finding for each site whose returned
+        coordinates a fresh compile would count at another multiplicity: this
+        compile keeps the solve's orbit split, so the gap is never one of
+        composition (WP-2052).
         """
         if mode == "pawley":
             return model, []
@@ -5929,7 +5989,11 @@ class Refinement:
             moving_paths=set(table.moving_paths),
             restraint_weight_scale=stage.restraint_weight_scale,
             window_slack_deg=stage.window_slack_deg,
-            window_area_tol=recorded_window_tol(window_area_tol))
+            window_area_tol=recorded_window_tol(window_area_tol),
+            # and the solve's orbit split: the fit's own compiles all used it,
+            # and a fresh one would halve a site the last stage left on a
+            # mirror (WP-2052).  Its fresh reading is reported, never used.
+            orbit_split=orbit_split_of(model))
         # and the solve's moment frames, never the fresh compile's: this one is
         # built at the fitted cell, so a last stage that moved an angle would
         # otherwise read the refined moment DOFs in a frame they were never
@@ -5951,7 +6015,11 @@ class Refinement:
             ((model.y_obs - model.evaluate(values)) / model.sigma) ** 2))
         chi2_fresh = float(np.sum(
             ((fresh.y_obs - fresh.evaluate(values)) / fresh.sigma) ** 2))
-        return fresh, _frozen_compile_diagnostics(chi2_frozen, chi2_fresh)
+        # read off the compile the result is measured on (WP-2052)
+        kept = (_multiplicity_kept_diagnostics(self.structure,
+                                               orbit_split_of(fresh))
+                if mode == "rietveld" else [])
+        return fresh, kept + _frozen_compile_diagnostics(chi2_frozen, chi2_fresh)
 
     def _stage_report(self, name, plan, data, mode, table, model, outcome,
                       guard, stage_diagnostics, *, significance=None
@@ -6061,7 +6129,9 @@ class Refinement:
         cancel = runs.attach_cancel(runs.recorder_of(stream), cancel)   # WP-1405
         sinks = _snapshot_sinks(stream, events, recorder)
 
+        owns_split = False
         try:
+            owns_split = self._decide_orbit_split()
             table = self._prepare_table(restore=True)
             stale_since = _anti_bump_start_phases(self.structure, mode)
             # the constructed (or last-edited) λ, not the value the previous stage
@@ -6231,6 +6301,8 @@ class Refinement:
                 recorder.close("failed")
             raise
         finally:
+            if owns_split:
+                self._orbit_split = None
             if recorder is not None:
                 recorder.close()
 
@@ -6789,9 +6861,9 @@ _CELL_UNITS = {"a": "Å", "b": "Å", "c": "Å", "alpha": "°", "beta": "°", "ga
 
 def _moved(p: RefinedParameter) -> bool:
     """Whether a result row moved in the fit: a free row, or a tied one carrying
-    an esd, which only a free source gives it.  A tied row whose sources were
-    all held is listed too (the membership filter is "varied or tied") and
-    carries none."""
+    an esd, which only a free source gives it.  Since WP-1999 a tied row whose
+    sources were all held is not listed at all, so the esd test only separates
+    a follower of a free source the data gave no gradient (no esd)."""
     return p.vary or p.stderr is not None
 
 
@@ -7896,11 +7968,10 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
             fix = None      # every coordinate of the site is fixed by symmetry
         elif sources:
             fix = f"Free {', '.join(sources)} instead."
-        elif canonical is None:
-            fix = "Read held_because for this row in ref.parameters()."
         else:
-            # a joint fit has no parameters() to point at
-            fix = None
+            # a joint fit's ``parameters()`` spells the row as ``where`` does
+            # (WP-2028)
+            fix = "Read held_because for this row in ref.parameters()."
         out.append(Diagnostic(
             level="warning", code="STAGE_PATH_NOT_FREE",
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
@@ -7964,9 +8035,7 @@ def _window_loss_diagnostics(stage_results: list[StageResult]) -> list[Diagnosti
 
 
 def _unknown_path_diagnostics(stage_results: list[StageResult],
-                              known: list[str], *,
-                              listing: str = "ref.parameters()"
-                              ) -> list[Diagnostic]:
+                              known: list[str]) -> list[Diagnostic]:
     """``STAGE_PATH_UNKNOWN`` — a stage asked for a parameter by a name no row has.
 
     Issue #265: ``turn_on=["instrument.source.wavelength"]`` freed nothing,
@@ -8003,8 +8072,8 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
     paths the second and third are usually siblings of the first: for the
     issue's typo they were ``lines.0.weight`` and ``profile.w``.
 
-    ``listing`` is the call the suggestion names for seeing every path, which
-    is the caller's: a joint fit has no ``parameters()``.
+    The suggestion names ``ref.parameters()`` for seeing every path, which a
+    joint fit has too (WP-2028), spelling its rows as ``known`` does.
     """
     by_path: dict[str, list[str]] = {}
     for sr in stage_results:
@@ -8032,7 +8101,7 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
                      "for it."
                      + (f" {hint[:1].upper()}{hint[1:]}" if hint else "")),
             where=[path],
-            suggestion=(f"Correct the path ({listing} lists every path this "
+            suggestion=("Correct the path (ref.parameters() lists every path this "
                         "model has), or write a glob if the stage should "
                         "reach a component that only some models declare."),
         ))
@@ -8588,11 +8657,16 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         p for d in (diagnostics if cell_runaway is None else cell_runaway)
         if d.code == "CELL_RUNAWAY" for p in d.where))
     params = []
-    # a derived row (a rigid body's atom, WP-1805) moves with θ as a tied row
-    # does and carries its esd through the block, so it is reported like one
-    derived = table.derived_paths()
+    # A row is reported iff the fit could move it: ``moving_paths``, the free
+    # columns and every row C carries them to (WP-1999).  So a tied row is in
+    # while a source of its tie is free, and a derived row (a rigid body's
+    # atom, WP-1805) while an input of its block is.  A follower of a source
+    # that is fixed, or held for the stage (WP-1301), is a constant no column
+    # reached: it leaves with its source, as a cubic ``b`` beside an absent
+    # ``a`` or a coordinate whose site DOF no stage freed.
+    moving = set(table.moving_paths)
     for e in table.entries:
-        if e.vary or e.tie is not None or e.path in derived:
+        if e.path in moving:
             stderr = None if e.path in withheld else stderr_phys.get(e.path)
             params.append(RefinedParameter(
                 path=e.path, value=e.value, vary=e.vary, stderr=stderr,
