@@ -1,6 +1,6 @@
 # WP-1951 — a glob that names a site and frees nothing
 
-Milestone: unscheduled · Status: ✅ 2026-11-02 — a stage glob naming one site that frees nothing is reported, set_vary warns, the verbs name the nearest path; PR #1304, warning-vs-info level open for the maintainer
+Milestone: unscheduled · Status: ✅ 2026-11-02 — a stage glob naming one site that frees nothing is reported, set_vary raises on an unknown literal, the verbs name the nearest path; PR #1304, both open questions settled under delegation
 Track: What fires, and what stays silent
 Depends on: —
 
@@ -134,6 +134,98 @@ Every shipped preset fires nothing new on the acceptance fixtures.
 - Issue #896.
 
 ## Handover log
+
+- **2026-11-02 (rework)** — PR #1304. `Refinement.set_vary` now raises
+  `ValueError` on a literal path the model lacks, as `hold`, `tie`, `untie`,
+  `set_values` and `profile_interval` already did. The message names the
+  nearest real path. Every literal in the call is checked before anything is
+  applied, so a list with one wrong name leaves the model and the history as
+  they were. A pattern that matches nothing stays silent (WP-1414). The
+  warning on a declined phase literal or a one-site pattern stays a warning.
+
+  *Settled by Claude under delegation (Yue, 2026-11-02).* Yue delegated the
+  PR's two open questions ("your understanding of aim is correct. think about
+  how people and agents use the software, and make the most appropriate
+  judgement"), and the ghostshift lead settled both.
+  (1) A fully fixed site keeps the `warning` level under
+  `STAGE_PATH_NOT_FREE`, as built. Grounds: the caller asked for something
+  that will not happen, and the literal case has fired at warning since
+  WP-1414. Alternative not chosen: an `info` sibling code, moving the literal
+  case with it, which is GSAS-II 5.8.4's silent "Fixed by symmetry" practice.
+  (2) `set_vary` raises on an unknown literal. Grounds: an agent always reads
+  an exception, while a `UserWarning` can scroll past or show once per call
+  site; a person fixes the name and reruns at low cost; the four sibling verbs
+  raise; pandas raises `KeyError` on a missing column label. Alternative not
+  chosen: the warning this PR first built, which never breaks an existing
+  script. This is a behaviour break, recorded in `docs/releases/1.11.0.md`
+  under Code to check.
+
+  *Done:* `set_vary` checks literals first and raises through a new
+  `_unknown_paths_error`. One unknown path gives the sibling verbs' sentence
+  (`unknown parameter path: 'instrument.zero'; did you mean
+  'instrument.zero_shift'?`). Several give `unknown parameter paths: 'a',
+  'b'` with a hint for each, so one rerun fixes every typo. The warning for a
+  retired-spelling pattern that matches nothing is kept. Tests: the two
+  warning cases for an unknown literal became
+  `test_set_vary_refuses_an_unknown_literal_before_changing_anything`
+  (freeing and fixing; the exact message, the table and the history node
+  count untouched), and `set_vary` joined the near-miss refusal test. Docs:
+  the docstring, the manual's parameter-table page, the skill's `surprises.md` § 8.28 (both committed
+  copies re-synced), the v1.11 record and the 1.11.0 release note. No audit
+  row records `set_vary`'s response, so `_audit.py` is unchanged and no
+  generality pass was owed. The first judge's "weak" verdict on the warning
+  is answered by the raise.
+
+  *Caller audit* (every package caller of `Refinement.set_vary`, for a literal
+  that could now raise): history replay and `checkout` restore a stored
+  `set_vary` node from its state snapshot and never call the verb, so an old
+  history file opens and replays as before. `gui/session.py`'s `PATCH
+  /api/params` catches `ValueError` into a `GuiError` (a 400 naming the
+  path); the client sends a row's own path or a glob (`asGlob` wraps a bare
+  word as `*word*`), so only a stale row can reach it. The route applied
+  each key in turn after the values, so the review's fix makes it check
+  every key first. `gui/textdoc.py` applies only rows `changes` already
+  checked against the table ("unknown parameter" at parse).
+  `io/projects/topas_ties.py` passes only paths `usable` found in the row
+  table. `refine.py`'s own call is the glob `vars.*`. The internal trials
+  (`report/layer2.compare_rivals`, `strategy/fraction_profile`,
+  `strategy/parameter_interval`) pass paths of the fitted model, or a
+  caller's pair whose unknown member `set_values` already refused within the
+  same call; it now raises one line earlier. `io/recipe`, `viz/compare.py`,
+  `sequential.py` and `multi.py` call only `ParameterTable.set_vary`, which
+  is unchanged. The examples, the manual's code blocks and the skill name
+  existing paths or patterns. No caller passes a literal the model lacks, so
+  none can newly raise. One test sent the literal `nothing.at.all` as "a
+  glob nobody matches" (`tests/test_gui_server.py`); it now sends
+  `nothing.at.*` and checks the literal's 400 separately.
+
+  *Caps:* the skill's § 8.28 was tightened to stay inside
+  `tests/skill_caps.py`'s budget for `surprises.md` (3 B of room before this
+  rework). A sentence on `set_vary` in `help.py`'s `STAGE_PATH_UNKNOWN`
+  entry pushed the manual's generated refinement-diagnostics page to 50 037
+  characters against its 50 000 cap, so it was dropped; the exception text
+  carries the same fact.
+
+  *Reader-facing text* (new): the `ValueError` above, which replaces the
+  `UserWarning` for an unknown literal. `python -m tests.reader_output`:
+  exit 0, unchanged against the merge-base `4e08411e5`. Yue's 2026-11-01 ruling sends every reader-output change to
+  him before merge; this one is listed in the PR body.
+
+  *Merged origin/main* at `4e08411e5`: conflicts in `docs/milestones/v1.11.md`
+  (both sections kept) and `tests/silence.py` (WP-1951's `_site_glob` and
+  main's `_moduli` helpers, both kept); `docs/wp/README.md` regenerated,
+  unchanged.
+
+  *Review:* `/code-review high --fix 9de664d7f..HEAD` (the rework commits only) found six; four fixed in `5d07325f`. `PATCH /api/params` called `set_vary` per key after `set_values` had committed, so one typo left earlier nodes behind; it now refuses every vary key's literals first (`Refinement._refuse_unknown_literals`), with a test. The docstring and the manual now name the retired-pattern warning. A joined retired-spelling hint no longer reads `.;`. Declined: folding `set_values`' plural message into the new helper, which would change that verb's documented text; and the stale WP status line, which this entry updates.
+
+  *Measured:* `[dev]` venv, macOS arm64, Python 3.12, alone on the machine
+  under ghostshift's `serial.py` lock. Fast suite 13 563 passed, 319 skipped, 34 xfailed, none failed (passed+skipped 13 882, equal to the discovery run before the three fixes, whose three red cases are now passes).
+  The 13 237 + 310 of the previous entry was on main at `985da7ef`, so the
+  totals are not comparable across the merge. Full suite not run: no
+  measured number can move.
+
+  *Next:* none on this WP. The maintainer reads the new `ValueError` text in
+  the PR body (reader-output rule).
 
 - **2026-11-02** — PR #1304. A stage that asks to refine one atom's position
   by a pattern, where the atom sits on a fully fixed special position (Ti on
