@@ -1,6 +1,6 @@
 # WP-1467 — a Stephens block on a frozen floor, and a clamp the solver leans on
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: — (1318 soft: its strain surface would draw the region the clamp covers)
 Priority: P2 2026-09-25 — a block declared over a nonzero `lor_strain` cannot narrow below it and under `solver="lm"` nothing fires; a path few fits run
