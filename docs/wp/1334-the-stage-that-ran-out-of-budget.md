@@ -287,7 +287,7 @@ repo.
   0.320 s after, one 7-run batch each with the machine quiet. Interleaved A/B
   against an origin/main snapshot under heavy load from other sessions' suites
   (5 batches of 3): base medians 3.38-3.88 s, branch 3.31-4.24 s, so no
-  difference the load lets one see. Fast suite: FASTCOUNT.
+  difference the load lets one see. Fast suite: not completed. Other sessions' suites held the machine (6 pytest processes), and the run reached 5 % in about 12 minutes, so it was stopped. It had one failure, unidentified because a stopped run prints no summary. The 31 test files that touch the changed names passed, 997 tests in all (`-n 4`), and CI's fast matrix is the gate.
 
   *Generality* (the `generality-review` judge; its table condensed to one line a question, verdicts verbatim):
 
