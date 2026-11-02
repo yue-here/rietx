@@ -1,9 +1,8 @@
 # WP-1339 — where the improvement lives
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: ✅ 2026-11-02 — closed; the NiO acceptance stays external, the skill row is in numbers.md (PR #1325)
 Track: Render what the fit already knows
 Depends on: —
-Priority: P3 2026-09-23 — a statistic compare already computes, reached as a function
 
 ## Goal
 
@@ -177,7 +176,7 @@ are in that WP, and this one's localisation does not answer it: coexistence
       behind the judging rules and is 26 B under its budget. The comparison is
       reached by the body's §5 routing row ("quoting or comparing a number"),
       so a new shape file is not warranted. 2026-11-02 added the nested F-test
-      and the pointer to `judging.md` §4 that WP-1417 asked for.
+      and the pointer to `judging.md` § adding a parameter that WP-1417 asked for.
 - [x] The two follow-ups from #904's review (added 2026-11-02 from the
       2026-10-12 entry's *Not done*): `SplitFamily.emission_line` has no
       default, since its one writer always sets it; and a family whose parent
@@ -206,6 +205,62 @@ The pattern is not in the repo today.
 - Search the local paper corpus before requesting any of these.
 
 ## Handover log
+
+- **2026-11-02** — WP-1339 closes (ghostshift runner, PR #1325). The two
+  functions PR #904 added now report the reflections that straddle an end of
+  the fitted range, instead of losing the in-range half. An agent comparing
+  two candidate space groups is told plainly that ΔBIC and a nested F-test
+  say a lowering paid for itself and not where, so neither settles it. The
+  NiO acceptance does not ship. The pattern never reached the thread, and a
+  contributor's unpublished laboratory pattern cannot enter the public tree,
+  so the constructed Cu pair remains the acceptance and NiO an external check.
+  - *Done.* Inherited pruned: the 2026-10-16 close of #219 is folded into
+    Context; the ridge entries (2026-09-23, 2026-10-04/11/13, WP-1469) belong
+    to WP-1523, which owns the hold, and #904 shipped the 2026-09-23 note's
+    sentence fix. WP-1417's note is folded into task 7. WP-1461's described a
+    page task 1 already rewired. WP-1434's qualified #219's list of codes that
+    fired, which nothing here builds on. Task 5 closed by task 2's second branch; task 7's row stays
+    in `references/numbers.md`, now naming the F-test and pointing at
+    `judging.md` § adding a parameter. Both settlements are marked in the
+    task lines. The two #904 review follow-ups: `SplitFamily.emission_line`
+    has no default; a parent just past the range is reported when a child is
+    inside, `splits` reads every child, and a window anchors on the in-range
+    children, else on the parent. The 1.8.0 release-notes gap had already
+    closed (`docs/releases/1.8.0.md:307`).
+  - *Review.* `/code-review high --fix` found six. Fixed: a parent in range
+    with every child past the end was windowed wholly off the data (zero
+    channels, still counted split), now anchored on the parent; the window
+    and `n_unmatched` wording; the duplicated in-range predicate, now one
+    helper. Declined: the borrowed median width of an out-of-range parent is
+    a fallback in a line this branch did not change; removing the
+    `emission_line` default breaks a constructor call that omits it (a
+    model_dump always wrote the field), which the WP-1076 rule asks for.
+  - *Measured.* Fast selection on this branch with main merged
+    (unchanged, `f8559dee6`), `[dev]` venv, darwin/arm64, another session's
+    pytest running beside it: 1 failed, 13 297 passed, 310 skipped,
+    32 xfailed in 23:23. The failure is
+    `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`,
+    environmental: the user-level Jupyter kernel spec points at a deleted
+    venv. The three added tests cost 0.01 s together (local junit). The
+    test the generality review asked for came after that run and is an
+    edit to one of the three, not a new test (localisation, skill and
+    skill-copy files: 240 passed). Each new rule was failed on purpose once
+    and its test went red.
+  - *Generality.* `generality-review` held all four items: the window anchor
+    (tier 1, arithmetic), the straddling family and its `splits` (tier 1;
+    case against weak: an edge family with one child in range shows a
+    shifted peak rather than a visible split, unmeasured on real data),
+    `n_unmatched` in range only (tier 1; it asked for a test, added), and
+    the skill row (passes Rule 4; it asked that "judging.md §4" name its
+    section, since two headings start "§4", done). Its would-change: a real
+    pattern with a family at a range end where the label carries a large
+    share of `split_share`.
+  - *Reader-output change* (for the maintainer): `split_localisation` can
+    now return one more family per range end and line, a `splits` verdict
+    that changed for a family with a child past the range, and a different
+    window there. `SplitFamily(...)` without `emission_line` now raises. No
+    printed fit or report changes (`split_localisation` is called by hand).
+  - *Next:* none in this WP. Issue #219 is closed.
 
 - **2026-10-12** — PR #904 merged from outside as `9669796d`. Two fits of one
   pattern can now say *where* the richer one gained, which ΔBIC cannot.
