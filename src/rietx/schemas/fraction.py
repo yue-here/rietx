@@ -22,8 +22,9 @@ from .common import Base, Diagnostic
 #: confidence level is the choice; the number follows from it.  It is scaled by
 #: the fit's χ²_red and the square of its Bérar-Lelann factor, the calibration
 #: every reported esd already carries, so on a single quadratic basin the
-#: admissible set reproduces W ± 1.96 esd (measured: the control patterns in
-#: ``tests/test_qpa_multimodal.py`` land at 0.46-0.79 of that half-width).
+#: admissible set reproduces W ± 1.96 esd (measured 2026-11-02: the control
+#: pattern in ``tests/test_qpa_multimodal.py`` lands at 0.47 of that
+#: half-width, and the two-basin fixture at 118).
 FRACTION_PROFILE_DCHI2 = 3.84
 
 #: The default grid, as the phase's own FWHM contribution in degrees 2θ at the
