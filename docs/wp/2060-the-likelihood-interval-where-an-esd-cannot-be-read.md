@@ -33,6 +33,8 @@ What it says: where the flag fires and the model is right, every rule covers, so
 
 **Phase scale's profile changes its free set.** `profile_interval`'s pinned refits are stages, and a stage re-decides WP-1301's hold of a phase the data cannot see from the pinned values. Pinning a weak phase's scale higher makes it look supported, so its cell is freed. The reporter measured `fit_is_minimum=False` on 5-19 % of such fits with the lowest point 1.2-2.7 (up to 6.4) χ²_red·f² below the fit, while a TRF refit from the fit moves nothing. Read from the code at `c0e32ab29` (`parameter_interval.py:209-236`): each refit is `trial.run_stage`, so the hold is re-measured per point; not re-run.
 
+**The tier of each rule this WP adds** (2026-11-02). `MOMENT_UNSUPPORTED`: tier 1, kind 1 (physics: the column vanishes at m = 0, so the esd is no interval; the 3σ cut is `MOMENT_SUPPORT_SIGMA`'s own row). The modulus sign kept in `profile_interval` (`_sign_is_unseen`): tier 1, an identity of the model (one moment block, or free angles reaching −m), with the one-sided cut from Self & Liang in m² ≥ 0. The step back in and the frozen free set: arithmetic and the fit's own record, no threshold; the stop when stepping back does not lower Δχ² reuses `PARAMETER_INTERVAL_CHI2_TOL`.
+
 **Tier.** A default interval on a bound row is a new automatic action (DESIGN § Rules 1 and 4), and its trigger is new judgement: name the families. The moduli-beside-zeroed-angles rule follows from B2's own ruling (its effect on the other esds), so it re-opens B2's consequence and needs the maintainer. A modulus flag for "esd orders above the value" is tier 1 if stated as a fact (the column is dead at m = 0, Hamilton 1965's linearisation does not hold there).
 
 ### Inherited
@@ -46,13 +48,13 @@ What it says: where the flag fires and the model is right, every rule covers, so
 
 ## Tasks
 
-- [ ] Rule with the maintainer: default intervals on bound rows of phase scale, occupancy and moment modulus (yes / no / modulus only), and whether a modulus beside a zeroed angle takes the interval by default or `MOMENT_ANGLE_STATIONARY` says its modulus is conditional and points at `profile_interval`.
+- [ ] Rule with the maintainer: default intervals on bound rows of phase scale, occupancy and moment modulus (yes / no / modulus only), and whether a modulus beside a zeroed angle takes the interval by default or `MOMENT_ANGLE_STATIONARY` says its modulus is conditional and points at `profile_interval`. — *2026-11-02: scale and occupancy settled by Claude as **no** under the reporter's measurement (every rule covers there, so a default interval fixes no coverage). The modulus half is built as the pointer (no interval unasked; `MOMENT_UNSUPPORTED` and `MOMENT_ANGLE_STATIONARY` name `profile_interval`) and goes to the maintainer at the PR, under the reader-output rule: a modulus profile measured 7-58 s on 1-8 s two-site fits.*
 - [x] `profile_interval` holds the fit's own free set along its path: a pinned refit freezes WP-1301's held paths as the fit held them.
 - [x] `profile_interval`'s first step from the profile's curvature when the esd is orders above the value, and a modulus profile kept at m ≥ 0; never a zero-width interval where the walk found no end.
-- [ ] A modulus on its dead column says so in `result.diagnostics` (or the existing `supported=False` verdict reaches the result), with its `_audit` row.
-- [ ] Whatever the ruling turns on, with its `_audit` rows.
-- [ ] Tests (unit/property; acceptance if this WP carries it) + obs/calc/diff PNGs to `tests/output/`: repro 2's three seeds give a non-degenerate interval containing 0; the two-site weak modulus covers on a small replicate set; a phase-scale profile keeps the held cell held.
-- [ ] Skill: a reference row keyed by `RefinedParameter.interval` and the modulus code in `references/magnetic.md`; no body rule.
+- [x] A modulus on its dead column says so in `result.diagnostics` (or the existing `supported=False` verdict reaches the result), with its `_audit` row. — *`MOMENT_UNSUPPORTED` (warning), the report's verdict through `report.magnetic.moment_supported`; tier 1.*
+- [x] Whatever the ruling turns on, with its `_audit` rows. — *for the option built: `MOMENT_ANGLE_STATIONARY`'s message names the moduli of its sites and its suggestion points at `profile_interval`; the suggestion row's site count is unchanged.*
+- [x] Tests (unit/property; acceptance if this WP carries it) + obs/calc/diff PNGs to `tests/output/`: repro 2's three seeds give a non-degenerate interval containing 0; the two-site weak modulus covers on a small replicate set; a phase-scale profile keeps the held cell held. — *`tests/test_modulus_interval.py` (seed 4 fast, 3 and 8 slow; the weak modulus as the pinned seed 14 where the esd misses, slow), `tests/test_held_phase.py::test_a_scale_profile_keeps_the_held_cell_held`.*
+- [x] Skill: a reference row keyed by `RefinedParameter.interval` and the modulus code in `references/magnetic.md`; no body rule.
 
 ## Acceptance
 
