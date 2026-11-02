@@ -121,8 +121,12 @@ KINK_COSINE_MIN = 0.9995
 KINK_PATHS = frozenset({"instrument.geometry.axial_sl",
                         "instrument.geometry.axial_hl"})
 
-#: a column is "live" when its norm clears this fraction of the largest
-#: column's — below it the value is rounding noise, not a derivative
+#: the FD-step oracle's cut (:func:`_column_errors`): a column under this
+#: fraction of the largest is left out of *that* test.  The agreement matrix no
+#: longer uses it (WP-1955).  Every column under it in the matrix was live: the
+#: aperture at zero (2.6e-8 of the largest) and nac's two Biso and six
+#: background columns (1.3e-9 to 1.3e-7), and every backend met each at its own
+#: scale, within 1.8e-3 at the aperture and 2.4e-7 elsewhere.
 DEAD_COL_FRAC = 1e-6
 
 #: the multi-histogram reference's FD step, the v0.2 harness's rule (applied
@@ -178,7 +182,7 @@ def _state_axial_one_zero():
     return _families_state(axial_hl=0.0)
 
 
-def _state_sharp_widths():
+def _state_sharp_widths(*, uv: float = 1e-5, w_floor: float = 0.0):
     """11-BM's resolution with ``w`` an identity row on its floor (WP-1936).
 
     The peak chain differences each reflection's width, and a width is curved
@@ -189,14 +193,17 @@ def _state_sharp_widths():
     sizes a width's step by its unit, and every column lands within 1.1e-7.
     ``w`` sits on its floor, so the reference differences it from above
     (:func:`_central_fd_jacobian`).
+
+    ``uv`` and ``w_floor`` build the Caglioti tie instead (WP-1955): U = V = 0
+    beside W on the Γ_G² floor, where every reflection's g2 *is* the floor.
     """
     structure = make_lab6()
     structure.phases[0].scale.value = 2e-4
     ins = Instrument.debye_scherrer(wavelength=0.41368)
     ins.source.dispersion = None
     profile = ins.profile
-    profile.u.value, profile.v.value = 1e-5, 1e-5
-    profile.w = Parameter(value=0.0, min=0.0, max=1.0, unit="deg^2")
+    profile.u.value, profile.v.value = uv, uv
+    profile.w = Parameter(value=w_floor, min=w_floor, max=1.0, unit="deg^2")
     profile.x.value, profile.y.value = 2e-3, 1e-3
     tt = np.arange(5.0, 30.0, 0.001)
     rng = np.random.default_rng(3)
@@ -1367,14 +1374,20 @@ METHODS = {
 
 def _assert_columns(J_ref, J_test, labels, *, rel_max, cos_min,
                     kink=frozenset(), what=""):
-    """Per-column rel-L2 + cosine agreement, skipping dead columns."""
+    """Per-column rel-L2 + cosine agreement, each column at its own scale.
+
+    Only a column that is exactly zero on both sides is skipped.  Until
+    WP-1955 a column under ``DEAD_COL_FRAC`` of the largest was skipped too,
+    and a column small beside the largest escaped every row that way: the
+    numpy aperture column at zero sat 0.232 off its reference unseen.  Size
+    beside another column says nothing about whether a column is right.
+    """
     assert J_ref.shape == J_test.shape, f"{what}: {J_ref.shape} vs {J_test.shape}"
-    scale = np.linalg.norm(J_ref, axis=0).max()
     n_live = 0
     for c in range(J_ref.shape[1]):
         a, b = J_ref[:, c], J_test[:, c]
         na, nb = np.linalg.norm(a), np.linalg.norm(b)
-        if max(na, nb) < DEAD_COL_FRAC * scale:
+        if max(na, nb) == 0.0:
             continue
         n_live += 1
         bar, cbar = ((KINK_REL_L2_MAX, KINK_COSINE_MIN) if labels[c] in kink
@@ -1497,8 +1510,9 @@ def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
     """WP-1953, WP-1955: an aperture's column at its bound of zero is the
     feasible side's, measured at its own scale, on every backend.
 
-    The matrix row above cannot hold it: the column's norm is 0.047 against a
-    largest column of 1.8e6, so it falls under ``DEAD_COL_FRAC`` once right.
+    The column's norm is 0.047 against a largest column of 1.8e6, and until
+    WP-1955 the matrix skipped any column under ``DEAD_COL_FRAC`` of the
+    largest, so this test held it alone.  The matrix now checks it too.
     Wrong, it was 3360 on jax, because the FCJ kink was capped by ξ_max and the
     two tie at one zero aperture, where jax gives each side half the
     derivative.  Fixed, jax and torch meet the one-sided central difference to
@@ -1507,7 +1521,8 @@ def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
     The numpy column was 0.232 rel-L2 off until WP-1955.  It is the small
     residue of node terms some 1e5 times larger that cancel, and a forward
     difference of the nodes put its O(h) error, 0.013 in norm, into that
-    residue.  A second-order difference meets the reference to 1.1e-6.
+    residue.  A second-order difference at 3e-6 meets the reference to
+    1.8e-3 and jax to 5.3e-4, which leaves the reference's own truncation.
     """
     config, model, table = _zero_aperture_state(path)
     theta = _theta(model, table)
@@ -1519,6 +1534,41 @@ def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
     # alone in its own slice, the column is the largest, so it is live
     _assert_columns(ref, col, [path], rel_max=KINK_REL_L2_MAX,
                     cos_min=KINK_COSINE_MIN, what=f"{name} at 0: ")
+
+
+@pytest.mark.parametrize("name", ["numpy", "jax", "torch"])
+def test_a_width_on_its_floor_takes_the_feasible_side(name):
+    """WP-1955: at U = V = 0 with W on the Γ_G² floor, every width column is
+    the derivative from above the floor, the side LM keeps a step on.
+
+    ``gaussian_fwhm`` clamps g2 at the floor, and here g2 equals it at every
+    reflection.  As ``maximum`` the clamp gave jax and torch exactly half of
+    each of the three columns (rel-L2 0.500), the tie's split; numpy took the
+    feasible side.  As a select every backend meets the one-sided difference
+    from above to 3e-4, the difference's own truncation on ``w``.  The matrix
+    cannot hold U and V here, because its reference differences them
+    centrally, across the clamp.
+    """
+    from rietx.model.profiles.caglioti import _MIN_GAMMA_G2
+
+    model, table, _extras = _state_sharp_widths(uv=0.0, w_floor=_MIN_GAMMA_G2)
+    theta = table.x0()
+    labels = list(table.free_paths)
+    residual = _make_residual(model, table)
+    r0 = residual(theta)
+    if name != "numpy":
+        pytest.importorskip(name)
+    jac = _jacobian_for(model, table, name)(theta)
+    for path in ("instrument.profile.u", "instrument.profile.v",
+                 "instrument.profile.w"):
+        c = labels.index(path)
+        h = 1e-9                     # under every reflection's g2 scale
+        t1, t2 = theta.copy(), theta.copy()
+        t1[c] += h
+        t2[c] += 2.0 * h
+        up = (-3.0 * r0 + 4.0 * residual(t1) - residual(t2)) / (2.0 * h)
+        _assert_columns(up[:, None], jac[:, [c]], [path], rel_max=REL_L2_MAX,
+                        cos_min=COSINE_MIN, what=f"{name} on the floor: ")
 
 
 @pytest.mark.parametrize("config", CONFIG_PARAMS)

@@ -101,14 +101,25 @@ when U and V are both zero beside W on its floor. It is the only other
       zero aperture against the one-sided difference, and find the line in
       `model/forward.py` where the node differencing departs from it. A test
       that fails on `main`.
-- [ ] Fix it, and re-measure the fits that free one aperture from 0:
+- [x] Fix it, and re-measure the fits that free one aperture from 0:
       `test_e8`, QPA cpd-1a's `lines_axial` stage, the Stephens brucite
       protocol. Record the esds of S/L before and after.
-- [ ] The dead-column cut: count the configs whose columns fall under
+- [x] The dead-column cut: count the configs whose columns fall under
       `DEAD_COL_FRAC`, and decide whether the matrix checks such a column
       against its own difference at its own scale, as the zero-aperture test
       does. Record it as `Decided YYYY-MM-DD:`.
-- [ ] Probe the Caglioti tie: U = V = 0 with W on its floor, traced against
+      Decided 2026-11-02: the matrix checks every column at its own scale
+      and skips only a column that is exactly zero on both sides. Two of 30
+      configs had columns under the cut, nine columns in all, and every one
+      was live: the aperture at zero in `axial_one_zero` (2.6e-8 of the
+      largest), and in `nac` the two Biso and six background columns
+      (1.3e-9 to 1.3e-7). Every backend and fp32 row met each at its own
+      scale, the worst 1.8e-3 at the aperture and 2.4e-7 elsewhere, all under
+      the existing bars. Settled by Claude under the WP's acceptance line (no
+      backend row skips a live column for its size alone) and the
+      measurement. `DEAD_COL_FRAC` stays only in the FD-step oracle, which
+      is not a backend row.
+- [x] Probe the Caglioti tie: U = V = 0 with W on its floor, traced against
       numpy.
 - [ ] Both apertures at 0: reproduce WP-2003's warm CPD collapse (X17) and
       #1075's LM stop on `lab_bragg_brentano`, and say whether one remedy (a
