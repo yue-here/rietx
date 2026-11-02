@@ -40,6 +40,10 @@ export interface IndexingControls {
   engines: string[] | null;
   validate_candidates: boolean;
   check_top: number | null;
+  /** the specimen's formula (WP-2030): each candidate then carries its Z */
+  formula: string | null;
+  /** K, for the formula's volumes; null reads 298 K, and it needs a formula */
+  temperature: number | null;
 }
 
 /** How one control is stated in the form. */
@@ -55,7 +59,8 @@ export interface ControlField {
     | "prior_cells"    // the analogue-cell list editor
     | "list"           // comma-separated names (prior space groups)
     | "engines"        // checkbox per registered engine
-    | "toggle";        // a checkbox
+    | "toggle"         // a checkbox
+    | "text";          // one free-text input (the specimen's formula)
   label: string;
   /** null/absent means "package default" and is sent as null */
   optional?: boolean;
@@ -103,6 +108,9 @@ export const CONTROL_FIELDS: ControlField[] = [
   { name: "engines", kind: "engines", label: "engines" },
   { name: "validate_candidates", kind: "toggle", label: "whole-profile validation" },
   { name: "check_top", kind: "int", label: "check top", optional: true },
+  { name: "formula", kind: "text", label: "formula", optional: true },
+  { name: "temperature", kind: "number", label: "temperature (K)",
+    optional: true },
 ];
 
 /** The names this form states, for the corpus test. */
@@ -116,6 +124,12 @@ export function statedFieldNames(): { search: string[]; controls: string[] } {
 /** `doc.indexing` verbatim — the server serves the block complete. */
 export function controlsFromDoc(doc: any): IndexingControls | null {
   return doc?.indexing ?? null;
+}
+
+/** empty input → null for an optional text field; the server reads the rest */
+export function textOrNull(text: string): string | null {
+  const trimmed = text.trim();
+  return trimmed === "" ? null : trimmed;
 }
 
 /** Parse an "a b c α β γ" line into a prior cell, or return the complaint. */
@@ -151,6 +165,10 @@ export function controlsDigest(controls: IndexingControls | null,
   if (s.systems?.length) bits.push(`${s.systems.length} system${s.systems.length === 1 ? "" : "s"}`);
   const priors = (s.prior_cells?.length ?? 0) + (s.prior_spacegroups?.length ?? 0);
   if (priors) bits.push(`${priors} prior${priors === 1 ? "" : "s"}`);
+  if (controls.formula) {
+    bits.push(controls.temperature != null
+      ? `${controls.formula} at ${controls.temperature} K` : controls.formula);
+  }
   if (!controls.validate_candidates) bits.push("no validation");
   return bits.join(" · ");
 }

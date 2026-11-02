@@ -28,6 +28,7 @@
     parsePriorCell,
     priorCellText,
     searchHelp,
+    textOrNull,
     type IndexingControls,
   } from "../lib/controls";
   import { labelFor, type HelpCorpus } from "../lib/help";
@@ -269,6 +270,9 @@
   const verdicts = $derived<Array<{ allowed: boolean; why: string }>>(
     indexAnswer?.adopt ?? []);
   const columns = $derived(fomColumns(candidates));
+  /** the Z column shows when the run read a formula: every candidate then
+   *  carries its formula units, and none does otherwise (WP-2030) */
+  const zColumn = $derived(indexAnswer?.result?.formula != null);
   const best = $derived(verdicts.findIndex((v) => v.allowed));
   const quality = $derived(indexAnswer?.result?.quality ?? null);
   const screen = $derived(extinction?.result ?? null);
@@ -508,6 +512,32 @@
               onchange={(ev) => setSearch("max_volume",
                 numOrNull((ev.currentTarget as HTMLInputElement).value))} />
           </label>
+          <!-- the specimen's formula sits beside the volume limits it would
+               set (WP-2030); a temperature without one is refused, so its
+               box waits for a formula -->
+          <label class="num">
+            <Help for={searchHelp(field("formula"))}>{field("formula").label}</Help>
+            <input type="text" spellcheck="false" disabled={busy}
+              placeholder="e.g. CuSO4·5H2O"
+              value={draft.formula ?? ""}
+              onchange={(ev) => {
+                draft!.formula =
+                  textOrNull((ev.currentTarget as HTMLInputElement).value);
+                commit();
+              }} />
+          </label>
+          <label class="num">
+            <Help for={searchHelp(field("temperature"))}
+              >{field("temperature").label}</Help>
+            <input type="text" inputmode="decimal"
+              disabled={busy || draft.formula === null}
+              value={draft.temperature ?? ""}
+              onchange={(ev) => {
+                draft!.temperature =
+                  numOrNull((ev.currentTarget as HTMLInputElement).value);
+                commit();
+              }} />
+          </label>
         </div>
 
         <div class="row">
@@ -726,6 +756,7 @@ can rise when validation and ambiguity run, never fall">
           <thead>
             <tr>
               <th></th><th>cell</th><th>lattice</th>
+              {#if zColumn}<th><Help for="search_fields:formula">Z</Help></th>{/if}
               {#each columns as name (name)}<th>{name}</th>{/each}
               <th>Rwp</th><th title="lines predicted where the pattern has no
                 intensity, of the lines screened; 'in window' is the count the
@@ -755,6 +786,9 @@ and this cell's predicted lines through the data"
                   {#if i === best}<span class="chip ok">best_or_none()</span>{/if}
                 </td>
                 <td>{c.centring} {c.system}<br /><span class="muted">{c.volume.toFixed(1)} Å³</span></td>
+                {#if zColumn}
+                  <td>{c.formula_units == null ? "—" : c.formula_units.toFixed(2)}</td>
+                {/if}
                 {#each columns as name (name)}
                   {@const v = fomOf(c, name)}
                   <td>{v === null ? "—" : v.toFixed(1)}</td>
@@ -775,7 +809,7 @@ and this cell's predicted lines through the data"
               {#if expanded === i}
                 <tr class="detail">
                   <td></td>
-                  <td colspan={7 + columns.length}>
+                  <td colspan={7 + columns.length + (zColumn ? 1 : 0)}>
                     {#if c.confidence_caveats.length}
                       <p class="flags">
                         {#each c.confidence_caveats as caveat (caveat)}

@@ -22,6 +22,7 @@ import {
   priorCellText,
   searchHelp,
   statedFieldNames,
+  textOrNull,
   type IndexingControls,
 } from "./controls";
 
@@ -119,6 +120,7 @@ describe("the collapsed digest", () => {
       max_candidates: 12, seed: 0, prior_cells: null, prior_spacegroups: null,
     },
     engines: null, validate_candidates: true, check_top: null,
+    formula: null, temperature: null,
   };
 
   it("names the preset that will govern, custom budgets and priors", () => {
@@ -133,6 +135,22 @@ describe("the collapsed digest", () => {
     steered.validate_candidates = false;
     expect(controlsDigest(steered, "quick")).toBe(
       "quick · 1 engine · 2 systems · 1 prior · no validation");
+  });
+
+  it("names the specimen's formula, and its temperature when one is set", () => {
+    const withFormula = structuredClone(base);
+    withFormula.formula = "C7H6O2";
+    expect(controlsDigest(withFormula, "quick")).toBe("quick · C7H6O2");
+    withFormula.temperature = 100;
+    expect(controlsDigest(withFormula, "quick")).toBe("quick · C7H6O2 at 100 K");
+  });
+});
+
+describe("the formula field", () => {
+  it("sends an empty box as null, the package's no-formula", () => {
+    expect(textOrNull("")).toBeNull();
+    expect(textOrNull("   ")).toBeNull();
+    expect(textOrNull(" CuSO4·5H2O ")).toBe("CuSO4·5H2O");
   });
 });
 
