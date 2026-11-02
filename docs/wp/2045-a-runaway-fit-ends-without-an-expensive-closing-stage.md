@@ -345,7 +345,7 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
   0.3 s a fit. On cpd-1a with an absent zircon it is 3.9× in evaluations
   and 2.2× in seconds, because two stages at 1e-9 run to their budget. The
   rows, the `INTERMEDIATE_FTOL` docstring and `PlanSpec`'s field description
-  now say so. No default changed. Recorded in PR #PRNUM.
+  now say so. No default changed. Recorded in PR #1348.
 
   *Done.* `docs/wp/2045-batch/probe7.py` runs each protocol twice, shipped
   and `intermediate_ftol=None`, with the closing stage in both, three
@@ -372,7 +372,7 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
   Background rows moved by at most 0.0005 esd. Rwp agreed to 1e-6 in every
   case. In the all-1e-9 arm the zircon fit's `profile_w` and `lines_axial`
   stages end at `max_iter` (400 evaluations each). LaB6's first shipped run,
-  1.26 s, is the process's warm-up.
+  1.26 s, is the process's warm-up. The fast selection on this branch: 13532 passed, 319 skipped, 34 xfailed, no tests added (same venv; 20:50 beside other sessions' work).
 
   *Not changed, and why.* The brief's stop rule was a net saving under
   about 1.05× on any standard. The smallest is FAP's 1.06×, so no question
