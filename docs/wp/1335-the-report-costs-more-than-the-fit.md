@@ -1,6 +1,6 @@
 # WP-1335 — the report costs more than the fit
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by ghostshift runner
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-09-23 — cost only: a report at 26× the fit it reports on
