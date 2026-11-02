@@ -232,7 +232,7 @@ with Rwp bit-identical; a `summary()` + `report()` pair builds one report.
 
 ## Handover log
 
-- **2026-11-02** (rulings, PR #PRNUM) — The stage reports' cost is not
+- **2026-11-02** (rulings, PR #1349) — The stage reports' cost is not
   cut further. The two cuts left were fewer Gauss-Newton steps in the
   Stephens strain arm on the intermediate rungs, or a coarser March-Dollase
   grid. Either would make the rungs' numbers less accurate than the final
