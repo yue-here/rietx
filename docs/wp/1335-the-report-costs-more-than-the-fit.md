@@ -1,6 +1,6 @@
 # WP-1335 — the report costs more than the fit
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — PR #1346 cut a stage report's cost by a third, bit-identically; a joint fit's `stage_reports=` remains
+Milestone: unscheduled · Status: 🔄 2026-11-02 — PR #1346 cut a stage report's cost by a third, bit-identically; no further cut (2026-11-02 rulings entry); a joint fit's `stage_reports=` remains
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-09-23 — cost only: a report at 26× the fit it reports on
@@ -231,6 +231,32 @@ with Rwp bit-identical; a `summary()` + `report()` pair builds one report.
   platform, never as a figure.
 
 ## Handover log
+
+- **2026-11-02** (rulings, PR #1349) — The stage reports' cost is not
+  cut further. The two cuts left were fewer Gauss-Newton steps in the
+  Stephens strain arm on the intermediate rungs, or a coarser March-Dollase
+  grid. Either would make the rungs' numbers less accurate than the final
+  report's. Asked in chat on 2026-11-02, the maintainer answered "no idea".
+
+  *Settled by Claude: no further cut.* Grounds: root CLAUDE.md's companion
+  rule, the report at every stage boundary, exists because a run's last state
+  is routinely its least informative. A cheaper, less accurate rung would
+  undercut the reason the feature exists. The cost is also opt-in:
+  `stage_reports` is off by default, and PR #1346 put the rungs' wall time in
+  `fit_end.stage_report_seconds`, so a caller sees what it pays.
+
+  *Acceptance.* Its "well below 6.5×" is read as met by PR #1346's measurement:
+  NAC with its seven stage reports at 4.7-5.7× the bare fit, CPU seconds on a
+  shared machine (the entry below has the conditions), Rwp and every report
+  field bit-identical. The second half, a `summary()` + `report()` pair
+  building one report, landed with PR #259.
+
+  *Next.* A joint fit's `stage_reports=` (from WP-1341, in `### Inherited`)
+  is the one open item. `MultiHistogramRefinement.fit` declines it today;
+  offering it means one rung per histogram per stage, built from
+  `MultiHistogramRefinement.report(h)` at `_run_plan`'s stage boundary, and
+  deleting the two sentences in that docstring and in
+  `docs/docs/reference/joint.md` that say why it is declined.
 
 - **2026-11-02** — a stage report costs about a third less, with every
   report number unchanged, and its cost is now in the event log. Measured on
