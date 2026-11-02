@@ -1410,7 +1410,7 @@ class SplitFamily(Base):
     hkls: list[list[int]]
     #: which emission line's image, 0 the shortest wavelength; children are
     #: assigned within one line
-    emission_line: int = 0
+    emission_line: int
     #: its tick in the higher-symmetry fit, deg 2θ
     two_theta: float
     #: how many of the lower fit's ticks were assigned to it
@@ -1461,8 +1461,8 @@ class SplitLocalisation(Base):
     unsplit_point_share: float
     elsewhere_share: float | None = None
     elsewhere_point_share: float
-    #: the lower fit's ticks with no higher-fit reflection within two local
-    #: widths (superstructure reflections): counted, never windowed
+    #: the lower fit's ticks in range with no higher-fit reflection within two
+    #: local widths (superstructure reflections): counted, never windowed
     n_unmatched: int = 0
     families: list[SplitFamily] = Field(default_factory=list)
 

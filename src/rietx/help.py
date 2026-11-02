@@ -2048,7 +2048,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "is one orbit, used once), the test of an ordered model. A group that fails "
             "the count is kept and named, since a disordered alloy written with whole counts "
             "fails it on its true group, and is removed only when you declare the model "
-            "`ordered`. "
+            "`ordered`. A Z with no formula has no atoms to count, so it removes "
+            "nothing, and the message says so. "
             "Where Z is not a whole multiple of a kept group's general multiplicity "
             "(Z′ below one), the group stays and the message names the special "
             "positions a formula unit then needs, since a molecule there must carry "
@@ -3191,6 +3192,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the direction and whether the interval includes it. Where it does, quote "
             "the moment as lying along the symmetry direction. Where it does not, quote "
             "the angle with its interval."
+        ),
+    ),
+    "MOMENT_UNSUPPORTED": HelpEntry(
+        title="Moment the data do not support",
+        description=(
+            "A refined moment size is under three times its error estimate, or at "
+            "its floor of 0.001 Bohr magnetons. The data then cannot tell this "
+            "moment from no moment. The magnetic intensity goes as the square of the "
+            "size, so near zero the size has almost no effect on the pattern, and "
+            "its error estimate is no interval: a fit that ends on zero can report an "
+            "estimate of 10 000 Bohr magnetons. Read the moment as unsupported. For "
+            "a limit, `Refinement.profile_interval` gives the size's likelihood "
+            "interval, which stays at or above zero where the data cannot see the "
+            "moment's sign. The FitReport's "
+            "moment rows give the same verdict as `supported`."
         ),
     ),
     "MOMENT_PAIR_DEGENERATE": HelpEntry(

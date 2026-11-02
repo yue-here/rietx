@@ -72,6 +72,7 @@ from ..crystallography.magnetic.scattering import (
     compile_magnetic_sites,
     d_magnetic_f2_d_dofs,
     magnetic_f2,
+    magnetic_f2_angle_block,
     magnetic_reflections,
     merge_magnetic,
 )
@@ -2575,6 +2576,40 @@ class CompiledModel:
         return d_magnetic_f2_d_dofs(cp.mag_members, cp.mag_seg, cp.mag_counts,
                                     stol, cp.magnetic, cell, xyz, occ, biso,
                                     self._moment_dofs(ip, values))
+
+    def moment_angle_block_supported(self, ip: int) -> bool:
+        """Whether phase ip's intensity is affine in p²⟨|F_⊥|²⟩ (WP-2068).
+
+        The stationary-angle test's analytic curvature block chains the
+        second derivative of |F_⊥|² through the same factors as the first,
+        which is exact only where nothing between |F|² and the intensity
+        depends on it.  :meth:`moment_grad_supported` plus extinction skipped:
+        evaluated, extinction reads the total |F|² through x, and ∂²I picks up
+        a dG/dx term the first-order chain has no place for.  Such a phase
+        keeps the central differences.
+        """
+        return self.moment_grad_supported(ip) and self.phases[ip].skip_extinction
+
+    def moment_f2_angle_block(self, ip: int, values: dict[str, float],
+                              weights: list[dict[tuple[int, int], float]]
+                              ) -> tuple[np.ndarray, np.ndarray]:
+        """``(g, h)``, (N, k) and (N, k, k): ∂ and ∂² of p²⟨|F_⊥|²⟩ along k
+        directions in phase ip's moment DOFs (WP-2068).
+
+        ``weights[a]`` is ``{(atom, dof): coefficient}`` for direction a.
+        The arithmetic is
+        ``crystallography.magnetic.scattering.magnetic_f2_angle_block``'s, at
+        :meth:`moment_f2_grads`' arguments.
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        xyz, occ, biso, _u, _a = self._site_values(ip, values, cell)
+        stol = 1.0 / (2.0 * np.asarray(d, dtype=np.float64))
+        return magnetic_f2_angle_block(cp.mag_members, cp.mag_seg, cp.mag_counts,
+                                       stol, cp.magnetic, cell, xyz, occ, biso,
+                                       self._moment_dofs(ip, values), weights)
 
     def moment_intensity_grad(self, ip: int, df2: np.ndarray,
                               values: dict[str, float]

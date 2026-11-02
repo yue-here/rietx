@@ -819,6 +819,17 @@ ROWS: tuple[Row, ...] = (
                  "interval (B2 option 2, ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("MOMENT_PAIR_DEGENERATE", "code"),
+    Row("MOMENT_UNSUPPORTED", "code", tier=1, ambiguity=1, response="warning",
+        responds=("quote no value ± esd for the named moduli; read each moment as "
+                  "unsupported, and quote Refinement.profile_interval's upper end as a limit"),
+        evidence=("physics: the magnetic intensity goes as m^2, so the modulus column vanishes "
+                  "at m = 0 and the esd's linearisation fails near it (Hamilton 1965); #1075 "
+                  "measured value +- 1.96 esd covering a zero moment 0.745 at nominal 0.95, "
+                  "and seeds 3, 4, 8 ending converged at |m| < 1e-6 +- 1.5e4-2.4e5 mu_B with "
+                  "nothing in result.diagnostics (WP-2060). Projects the FitReport's own "
+                  "MomentEvidence.supported verdict through report.magnetic.moment_supported, "
+                  "so its cut is MOMENT_SUPPORT_SIGMA's and MOMENT_FLOOR_MU_B's rows, not "
+                  "its own")),
     Row("NEUTRON_RESONANT_ABSORBER", "code"),
     Row("OCCUPANCY_ABOVE_ONE", "code", tier=1, ambiguity=3,
         evidence=("physics: a full site is occupancy 1 by definition; reports the refined "
@@ -4450,6 +4461,10 @@ ROWS: tuple[Row, ...] = (
                  "the moment from one along it, one that excludes it measures the tilt "
                  "(B2 option 2, ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("MOMENT_UNSUPPORTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("physics: an esd is no interval where the column vanishes; the profile "
+                  "interval is the likelihood statement, kept at m >= 0 where the sign is "
+                  "unseen (WP-2060)")),
     Row("NEUTRON_RESONANT_ABSORBER.suggestion", "suggestion", value=1),
     Row("OCCUPANCY_ABOVE_ONE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("physics: names the one reading under which the value is right (site "
