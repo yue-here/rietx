@@ -100,7 +100,7 @@ These rows are the correction's evidence, because Rwp is not.
 | `PhaseTexture.name` | the phase's name | the key, as on `PhaseAgreement` |
 | `PhaseTexture.texture_index` | J = 1 + Σ C²/(2l+1) | 1 for a random powder; a lower bound on the specimen's, because odd orders and those past the declared order are not measured |
 | `PhaseTexture.min_p_reflections` | the lowest multiplier P over the phase's fitted reflections | the default driver holds it at 0 or above |
-| `PhaseTexture.min_p_sphere` | the lowest P over directions sampled on the whole sphere, the reflections included | below zero, [`TEXTURE_NOT_POSITIVE`](diagnostics-refinement.md#texture_not_positive) fires and the coefficients are not a pole density |
+| `PhaseTexture.min_p_sphere` | the lowest P over directions sampled on the whole sphere, the reflections included | below zero, [`TEXTURE_NOT_POSITIVE`](diagnostics-refinement-m-z.md#texture_not_positive) fires and the coefficients are not a pole density |
 
 A joint fit leaves `RefinementResult.texture` empty, because its shared coefficients meet each histogram at its own sample angle.
 
@@ -266,7 +266,7 @@ On a restrained refinement it is the first thing to read, before Rwp.
 
 The deviations are always reported unscaled.
 "Is this restraint satisfied?" is a question about the geometry, and c<sub>w</sub> is a choice about how hard to insist on the answer.
-A row past three σ raises [`RESTRAINT_TENSION`](diagnostics-refinement.md#restraint_tension).
+A row past three σ raises [`RESTRAINT_TENSION`](diagnostics-refinement-m-z.md#restraint_tension).
 A plane raises one between its rows, naming the atoms past three σ, worst first.
 The restraint and the data are then pulling against each other, and one of them is wrong.
 A joint fit reports the same object per histogram, on `HistogramResult.restraints`.

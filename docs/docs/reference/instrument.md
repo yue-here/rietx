@@ -499,8 +499,8 @@ Each is exactly no correction at its default values.
 | `RoughnessPitschke.tau` | 0.05 | [0, 0.3] | the dimensionless roughness τ |
 
 `RoughnessSuortti.b` gives the same loss at two values, one on each side of a peak, and past about 3 the correction does nothing.
-[`ROUGHNESS_UNCONSTRAINED`](diagnostics-refinement.md#roughness_unconstrained) reports either dead branch.
-[`ROUGHNESS_OUTSIDE_REGIME`](diagnostics-refinement.md#roughness_outside_regime) reports a τ above sin θ of the lowest fitted angle.
+[`ROUGHNESS_UNCONSTRAINED`](diagnostics-refinement-m-z.md#roughness_unconstrained) reports either dead branch.
+[`ROUGHNESS_OUTSIDE_REGIME`](diagnostics-refinement-m-z.md#roughness_outside_regime) reports a τ above sin θ of the lowest fitted angle.
 `RoughnessSuortti.kind` and `RoughnessPitschke.kind` name the model, so a saved instrument comes back as the model it was.
 
 ## Peak width
@@ -527,7 +527,7 @@ Swapping them gives a different width function.
 A stored `w` bound below that is raised to it when the object is built.
 `u`, `v` and `y` have no floor of their own, and each stops at the mirror image of its ceiling.
 What has to stay positive is the total Γ<sub>G</sub>² and the total Γ<sub>L</sub> over the measured range, {eq}`prof-lorentzian-floor`.
-The default solver holds both at every reflection, and under `solver="trf"` [`RESOLUTION_NOT_POSITIVE`](diagnostics-refinement.md#resolution_not_positive) reports where either fell below.
+The default solver holds both at every reflection, and under `solver="trf"` [`RESOLUTION_NOT_POSITIVE`](diagnostics-refinement-m-z.md#resolution_not_positive) reports where either fell below.
 Read a negative `u`, `v` or `y` as a statement about the fitted resolution curve, and check the width it gives at both ends of the range.
 
 A width is a `Parameter` carrying its own bounds, and a bare number for any width is refused by name.

@@ -62,7 +62,7 @@ angle [4, 2, 5] 110.796 +1.3
 ```
 
 `RefinementResult.restraints` holds one row per restraint, with the computed value and its deviation from the target in units of sigma.
-The P3–O6 bond ends 3.4 sigma from its target, and the fit reports [`RESTRAINT_TENSION`](../reference/diagnostics-refinement.md#restraint_tension).
+The P3–O6 bond ends 3.4 sigma from its target, and the fit reports [`RESTRAINT_TENSION`](../reference/diagnostics-refinement-m-z.md#restraint_tension).
 The diagnostic's `where` names the two atoms.
 
 Here the pattern's 5 751 points outweigh four restraints.

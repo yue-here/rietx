@@ -228,6 +228,60 @@ def test_the_index_reaches_the_shapes_a_keyword_walk_misses(tmp_path):
     assert index["TYPED_CODE"]["files"] == {"rietx/c.py"}
 
 
+def test_a_code_is_filed_by_its_area_and_the_catch_all_by_its_first_letter():
+    """`rietx/refine.py` raises most of the catch-all's codes, so the page cap
+    (#1108: 50 082 characters of 50 000) was met by filing that page's codes by
+    their first letter.  An area outranks the letter, and no code is on two pages."""
+    group = reference_pages.diagnostic_group
+    assert group({"rietx/refine.py"}, "ABSORPTION_PLATE_THICKNESS") == "diagnostics-refinement"
+    assert group({"rietx/refine.py"}, "LOW_ANGLE_UNMODELLED") == "diagnostics-refinement"
+    assert group({"rietx/refine.py"}, "MODEL_FAR_FROM_DATA") == "diagnostics-refinement-m-z"
+    assert group({"rietx/refine.py"}, "WAVELENGTH_CALIBRATION") == "diagnostics-refinement-m-z"
+    assert group({"rietx/sequential.py"}, "ZZZ") == "diagnostics-series"
+    assert group({"rietx/io/projects/gsas.py"}, "AAA") == "diagnostics-projects"
+
+    index = reference_pages.diagnostic_index()
+    stems = [stem for stem, _title, _areas, _letters in reference_pages.DIAGNOSTIC_GROUPS]
+    filed = {code: group(entry["files"], code) for code, entry in index.items()}
+    assert set(filed.values()) == set(stems), "a page of the group table files no code"
+    for code, stem in filed.items():
+        if stem.startswith("diagnostics-refinement"):
+            assert (stem == "diagnostics-refinement") == (code[0] <= "L"), code
+
+
+def _misfiled_links(text: str, index: dict, where: str) -> list[str]:
+    """Each link into a diagnostic page whose page is not the one that files its code."""
+    link = re.compile(r"(diagnostics(?:-[a-z]+)*)(?:\.md|\.html)?#([A-Za-z0-9_-]+)")
+    breaches = []
+    for stem, anchor in link.findall(text):
+        code = anchor.upper().replace("-", "_")
+        if code in index and reference_pages.diagnostic_group(index[code]["files"], code) != stem:
+            breaches.append(f"{where}: {stem}#{anchor}")
+    return breaches
+
+
+def test_every_link_into_a_diagnostic_page_names_the_page_that_files_the_code():
+    """A code that changes page leaves its links in the manual and the tutorials
+    on the old one, and a link to a page that no longer holds the anchor opens
+    at the page's top.  Sphinx sees the manual's links; only this sees the
+    tutorials' absolute ones."""
+    index = reference_pages.diagnostic_index()
+    root = DOCS_DIR.parent
+    paths = [*sorted((DOCS_DIR / "docs").rglob("*.md")),
+             *sorted((root / "examples" / "tutorials").glob("*.py"))]
+    paths = [p for p in paths if "_generated" not in p.parts and "_build" not in p.parts]
+    breaches = [b for p in paths
+                for b in _misfiled_links(p.read_text(encoding="utf-8"), index,
+                                         p.relative_to(root).as_posix())]
+    assert not breaches, "\n".join(breaches)
+    # the check can fail: a link on the page a code left, in both spellings
+    stale = ("[a](diagnostics-refinement.md#model_far_from_data) "
+             "[b](https://x/docs/stable/reference/diagnostics-series.html#model-far-from-data)")
+    assert _misfiled_links(stale, index, "t.md") == [
+        "t.md: diagnostics-refinement#model_far_from_data",
+        "t.md: diagnostics-series#model-far-from-data"]
+
+
 # ----------------------------------------------------------------------
 # The project tree
 # ----------------------------------------------------------------------

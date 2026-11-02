@@ -9,7 +9,7 @@ The explanation is the same for every case, so the package looks it up by code: 
 
 The codes are filed by the part of the package that raises them:
 
-- [Refinement](diagnostics-refinement.md): the stages, the guards, the corrections and the report.
+- [Refinement, A to L](diagnostics-refinement.md) and [refinement, M to Z](diagnostics-refinement-m-z.md): the stages, the guards, the corrections and the report, split by the first letter of the code.
 - [Series and joint fits](diagnostics-series.md): a chain of fits, or one fit over several patterns.
 - [Peaks and indexing](diagnostics-indexing.md): peak picking, the indexing search and the extinction screen.
 - [Reading files](diagnostics-files.md): patterns, instrument files and recipes.
@@ -20,6 +20,7 @@ The codes are filed by the part of the package that raises them:
 :hidden:
 
 diagnostics-refinement
+diagnostics-refinement-m-z
 diagnostics-series
 diagnostics-indexing
 diagnostics-files

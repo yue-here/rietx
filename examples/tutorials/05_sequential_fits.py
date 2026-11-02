@@ -352,8 +352,8 @@ series_broken[4].diagnostics
 
 # %% [markdown]
 # The best attempt put the LaB₆ scale on its floor of zero ([`FLOOR_HIT`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#floor-hit)).
-# [`MODEL_FAR_FROM_DATA`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#model-far-from-data) says not to read any of this pattern's values.
-# [`PHASE_UNCONSTRAINED`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#phase-unconstrained) says the cell was held, because a phase with no scale does not constrain it.
+# [`MODEL_FAR_FROM_DATA`](https://rietx.org/docs/stable/reference/diagnostics-refinement-m-z.html#model-far-from-data) says not to read any of this pattern's values.
+# [`PHASE_UNCONSTRAINED`](https://rietx.org/docs/stable/reference/diagnostics-refinement-m-z.html#phase-unconstrained) says the cell was held, because a phase with no scale does not constrain it.
 # A held value is not a measurement, so the trajectory has no 700 K point.
 
 # %%

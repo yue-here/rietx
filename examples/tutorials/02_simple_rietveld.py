@@ -49,8 +49,8 @@ print(result)
 # `structure` is the atoms, `qpa` the phase fractions, `microstructure` the crystallite size and strain, `calibration` an instrument calibrated on a standard, and `magnetic` a magnetic structure's moments.
 #
 # - [`FLOOR_HIT`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#floor-hit): the extinction coefficient ended on its floor of 0, so this specimen shows no extinction to measure.
-# - [`RESOLUTION_UNCONSTRAINED`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#resolution-unconstrained): the peaks are mostly Lorentzian, so do not quote the Gaussian widths U, V and W.
-# - [`PATTERN_UNDERSAMPLED`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#pattern-undersampled): the step count notebook 01 measured.
+# - [`RESOLUTION_UNCONSTRAINED`](https://rietx.org/docs/stable/reference/diagnostics-refinement-m-z.html#resolution-unconstrained): the peaks are mostly Lorentzian, so do not quote the Gaussian widths U, V and W.
+# - [`PATTERN_UNDERSAMPLED`](https://rietx.org/docs/stable/reference/diagnostics-refinement-m-z.html#pattern-undersampled): the step count notebook 01 measured.
 #
 # None of them invalidates the structure, but each one limits what you can quote.
 # Two are warnings under `structure`, and the third concerns only the peak widths.
