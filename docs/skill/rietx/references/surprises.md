@@ -292,9 +292,9 @@ reason is 8.13's mechanism seen from the other side: those long stages are
 walking a near-degenerate direction at ≈0.93 per iteration, and 99.99 % of the
 cost decrease is banked by evaluation 55 of 93 — the rest is digits the next
 stage refines again anyway, because stages are cumulative and the last one
-polishes everything at `1e-9`. Measured over the three lab-shaped benchmark
-cases: 1.51×, 1.62× and 1.55× fewer evaluations, every non-degenerate parameter
-within 0.03 esd of the fully converged plan, QPA within 0.0014 wt %.
+polishes everything at `1e-9`. Measured behind the closing stage on fluorapatite,
+NAC and cpd-1a: 1.06-1.58× fewer evaluations, every parameter within 0.0004 esd
+of the fully converged plan. With an absent phase it is 3.9×.
 **Corollary for the agent, in three parts.** Do not read a small parameter
 difference between a 1.0.x number and a 1.1 number as a physics change; check
 `StageResult.ftol` first. Set `intermediate_ftol = None` when a number is going
