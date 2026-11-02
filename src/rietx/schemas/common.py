@@ -622,6 +622,9 @@ from .._nearmiss import did_you_mean
 #: ``.predicted_but_absent_excess_in_window``, the windowed count's density and
 #: its excess over the run's cleanest candidate.  Additive and defaulted to
 #: ``None``, the 0.25 → 0.26 rule.
+#: Also in 0.60 (#1263): ``SupercellCheck.p0_power``, the floored chance rate
+#: the power check read, beside a ``p0`` that is now the seen test's own.
+#: Additive and defaulted to ``None``.
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
