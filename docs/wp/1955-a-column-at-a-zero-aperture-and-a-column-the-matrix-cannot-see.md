@@ -54,6 +54,7 @@ when U and V are both zero beside W on its floor. It is the only other
 
 **Both apertures at zero** (folded from `### Inherited` on 2026-11-02).
 
+- **From WP-2060 (2026-11-02): `profile_interval` no longer answers [0.0, 0.0] by its step alone.** A first probe past the Δχ² threshold now steps back in from the fit until one lands inside, so the axial-ratio profile of #1075's repro 1 should find a real end or a lower χ² (`fit_is_minimum=False`) instead of confirming the floor. Not re-run on repro 1. Re-measure it here before building on WP-2060's Context, which quotes the old [0.0, 0.0].
 - **From WP-2003 (2026-10-26): both apertures at 0 cost an answer, not only an esd.** CPD
   sample 1b fitted independently under `qpa_plan()` ends with S/L and H/L both on their
   floors at 0 (S/L esd 251). A warm refit of 1c from that state collapses: Rwp 10.724 with

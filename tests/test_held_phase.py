@@ -194,6 +194,35 @@ def test_the_message_counts_what_it_names(held_fit):
 # ----------------------------------------------------------------------
 # the cost
 # ----------------------------------------------------------------------
+def test_a_scale_profile_keeps_the_held_cell_held(held_fit, monkeypatch):
+    """The profile measures the model the fit returned, not a larger one (WP-2060).
+
+    Each pinned refit is a stage, and a stage re-decides the hold from where
+    it starts.  At the 99.99 % level the walk pins the absent phase's scale
+    out to 4 esd, past the 3 esd at which the hold's significance test calls the phase present:
+    before WP-2060 the refits there freed the cell the fit held and moved it
+    5.2 → 5.19904 Å (#1075, part 1).  Now the cell stays where the fit left it.
+    """
+    ref, result = held_fit
+    assert "phases.1.cell.a" in result.stages[-1].held
+    held_a = ref.structure.phases[1].cell.a.value
+    seen = []
+    run_stage = Refinement.run_stage
+
+    def spy(self, *args, **kwargs):
+        out = run_stage(self, *args, **kwargs)
+        seen.append((self.structure.phases[1].scale.value,
+                     self.structure.phases[1].cell.a.value))
+        return out
+
+    monkeypatch.setattr(Refinement, "run_stage", spy)
+    sigma = next(p.stderr for p in result.parameters if p.path == "phases.1.scale")
+    interval = ref.profile_interval(synthesize(), "phases.1.scale", level=0.9999)
+    assert max(s for s, _ in seen) > 3 * sigma   # past the support threshold
+    assert {a for _, a in seen} == {held_a}
+    assert interval.fit_is_minimum and interval.upper_stop == "threshold"
+
+
 def test_the_flat_column_is_gone_from_the_solve(held_fit):
     """The point of holding rather than bounding: no column to search.
 
