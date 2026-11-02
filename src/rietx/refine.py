@@ -2731,11 +2731,10 @@ class Refinement:
                 table: ParameterTable, outcome, diagnostics,
                 held_scales: set[int] | None = None,
                 window_loss: float | None = None) -> str:
-        values = table.decode(outcome.theta)
-        y_calc = model.evaluate(values)
+        y_calc, y_bkg = model.evaluate_with_background(table.decode(outcome.theta))
         stats = compute_statistics(model.y_obs, y_calc, model.sigma,
                                    n_free=len(table.free_paths) + _pawley_n(model),
-                                   y_background=model.background(values))
+                                   y_background=y_bkg)
         stats.max_shift_over_esd = outcome.max_shift_over_esd  # copied, never derived
         stderr = (table.stderr_physical(outcome.theta, outcome.stderr_internal,
                                         outcome.correlation)
@@ -5186,22 +5185,13 @@ class Refinement:
         # stage's own frozen model at its answer: ``StageResult.rwp`` and the
         # ``stage_end`` event's ``rwp`` are this one number (WP-1334).  One
         # forward evaluation, not a fit, the same pattern _record uses for a
-        # history node's metrics; paid on every stage since the field, where
-        # it was paid only when a caller asked for events.
-        # background(values) computed once and reused, never twice —
-        # evaluate() is background [+ extra_peak_curve] + bragg_component
-        # internally, so calling both would price this at two background
-        # passes.  The sum is therefore evaluate()'s, restated in its own
-        # association order: a declared peak is in the model the stage
-        # fitted but not in background(), and leaving it out made every
-        # stage Rwp that of a model with the peaks deleted (#441); a model
-        # declaring none keeps the two-term sum, bit for bit.
-        values = table.decode(outcome.theta)
-        y_bkg = model.background(values)
-        y_stage = (y_bkg + model.bragg_component(values)
-                   if not model.peak_components else
-                   y_bkg + model.extra_peak_curve(values)
-                   + model.bragg_component(values))
+        # history node's metrics.  Paid on every stage since the field, where
+        # it was paid only when a caller asked for events: a recorded fit
+        # always did, so the new charge falls on ``telemetry=False`` trials.
+        # A declared peak is in the model the stage fitted, and
+        # leaving it out made every stage Rwp that of a model with the peaks
+        # deleted (#441); evaluate_with_background keeps evaluate()'s sum.
+        y_stage, y_bkg = model.evaluate_with_background(table.decode(outcome.theta))
         stage_rwp = compute_statistics(
             model.y_obs, y_stage, model.sigma,
             n_free=len(table.free_paths) + _pawley_n(model),

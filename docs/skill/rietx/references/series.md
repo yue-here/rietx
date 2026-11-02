@@ -324,8 +324,9 @@ series **returns** what completed, with `SEQUENTIAL_CANCELLED`.  Note that
 `stage_reports=True` does *not* exist here; it is a `Refinement.fit()` argument
 and raises `TypeError`, and per-stage Rwp lives on the `stage_end` events of the
 shared `EventStream` instead (present on **637 of 637** payloads in one run).
-A single fit's `StageResult.rwp` holds the same number, but
-`SeriesEntry` carries no `stages`, so a series reaches it only through the events.
+A single fit's `StageResult.rwp` holds the same number.
+`SeriesEntry` carries no `stages`, so a series reads it from the events, or from
+`SequentialRefinement.results_`, one `RefinementResult` a pattern.
 
 Where `stage_reports=True` *does* apply — the single `Refinement.fit()` calls of a batch — it
 is expensive.  On the bundled NAC fixture it cost **6.5×**: 1.923 s against 0.296 s, median of

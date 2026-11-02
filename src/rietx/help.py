@@ -5544,6 +5544,17 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "histogram."
         ),
     ),
+    "StageResult.rwp": HelpEntry(
+        title="Stage Rwp",
+        description=(
+            "The stage's Rwp at the values it ended on, measured on the stage's own "
+            "frozen windows. It is the number the `stage_end` event carries. A joint "
+            "fit pools it over its histograms. The last stage's differs from "
+            "`statistics.rwp`, which is measured on a compile at the answer. Stages "
+            "that fit different ranges or modes cannot be compared by it. `None` "
+            "means a result stored before the field."
+        ),
+    ),
     "StageResult.n_constraint_truncations": HelpEntry(
         title="Steps held on a constraint",
         description=(

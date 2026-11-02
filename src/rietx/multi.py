@@ -1622,8 +1622,10 @@ class MultiHistogramRefinement:
         start.
         """
         per = self.mtable.decode(theta)
-        y_calc = [m.evaluate(v) for m, v in zip(models, per, strict=True)]
-        y_bkg = [m.background(v) for m, v in zip(models, per, strict=True)]
+        # one background pass a histogram: paid on every stage since
+        # ``StageResult.rwp`` (WP-1334), not only when a stream listens
+        y_calc, y_bkg = (list(c) for c in zip(*(
+            m.evaluate_with_background(v) for m, v in zip(models, per, strict=True))))
         rows = [{"histogram_index": h,
                  "rwp": compute_statistics(m.y_obs, yc, m.sigma, n_free=0,
                                            y_background=yb).rwp}

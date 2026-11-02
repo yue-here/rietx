@@ -514,6 +514,7 @@
   "result_fields:StageResult.n_lapack_fallbacks",
   "result_fields:StageResult.name",
   "result_fields:StageResult.released",
+  "result_fields:StageResult.rwp",
   "result_fields:StageResult.scale_b_held",
   "result_fields:StageResult.seeded",
   "result_fields:StageResult.status",
