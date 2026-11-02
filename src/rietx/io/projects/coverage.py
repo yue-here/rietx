@@ -250,12 +250,15 @@ FEATURES: tuple[Feature, ...] = (
            "specimen, and they are not transferable term for term",
        # §19.3.8 (intensity corrections), §19.3.6's Brindley macro and
        # §19.3.10's thickness-dependent absorption; `Absorption` from §5.2.
+       # The two cylindrical corrections are named beside their functions
+       # `AB_Cyl_Corr`/`AL_Cyl_Corr` in version 9's Table 3-1 (WP-1530).
        macros=("Absorption", "Absorption_With_Sample_Thickness_mm",
                "Absorption_With_Sample_Thickness_mm_Intensity",
                "Absorption_With_Sample_Thickness_mm_Shape_Intensity",
                "Surface_Roughness_Pitschke_et_al", "Surface_Roughness_Suortti",
                "Variable_Divergence_Intensity",
-               "Apply_Brindley_Spherical_R_PD")),
+               "Apply_Brindley_Spherical_R_PD", "Cylindrical_I_Correction",
+               "Cylindrical_2Th_Correction")),
     _f("preferred orientation", Stance.REPORTED,
        "a texture model", "normals_plot", "normals_plot_min_d",
        why="this reader translates neither a March-Dollase correction nor a "
@@ -280,7 +283,12 @@ FEATURES: tuple[Feature, ...] = (
        "box_interaction", "grs_interaction", "no_self_interaction",
        "from_N", "to_N", "qi", "qj", "sites_flatten", "sites_flatten_tol",
        why="rietx has soft restraints, but a penalty is an arbitrary equation "
-           "over the file's own parameter names and does not translate"),
+           "over the file's own parameter names and does not translate",
+       # The bond-length penalty macros, §22.1.9 in version 9 (WP-1530).
+       macros=("Anti_Bump", "AI_Anti_Bump", "Parabola_N", "Grs_Interaction",
+               "Grs_No_Repulsion", "Grs_BornMayer", "Distance_Restrain",
+               "Angle_Restrain", "Flatten", "Distance_Restrain_Keep_Within",
+               "Distance_Restrain_Keep_Out", "Keep_Atom_Within_Box")),
     _f("reflection controls", Stance.REPORTED,
        "a per-reflection control",
        "omit_hkls", "hkl_plane", "hkl_Re_Im", "str_hkl_angle",
@@ -307,6 +315,25 @@ FEATURES: tuple[Feature, ...] = (
        why="each changes what the phase contributes to the pattern, so the "
            "imported scale is the file's number without the modifier that "
            "acted on it"),
+    _f("emission profile", Stance.REPORTED,
+       "an emission profile this reader does not read",
+       why="`emission_macro`, `anode` and `emission_lines` are read from the "
+           "`CuKa5`-style macros and from `la`/`lo` lines, so a profile stated "
+           "through this macro leaves all three empty and the wavelength has to "
+           "come from the caller",
+       # §22.1.3 in version 9, less the ones the reader reads (an element, `Ka`
+       # and a digit, `topas._EMISSION_MACRO`) (WP-1530).
+       macros=("CuK1sharp", "CuKa2_analyt", "CuKa4_Holzer", "CuKa5_Berger",
+               "CoKa7_Holzer", "CrKa7_Holzer", "FeKa7_Holzer", "MnKa7_Holzer",
+               "NiKa5_Holzer", "CuKb4_Holzer", "CoKb6_Holzer", "CrKb5_Holzer",
+               "FeKb4_Holzer", "MnKb5_Holzer", "NiKb4_Holzer")),
+    _f("cell mass, volume and weight percent", Stance.REPORTED,
+       "a phase's cell mass, cell volume and weight percent stated through MVW",
+       why="this reader reads `weight_percent` as a keyword only, so a weight "
+           "percent stated as the macro's third argument does not reach the "
+           "phase's `weight_percent`",
+       # §22.1.6 in version 9 (WP-1530).
+       macros=("MVW",)),
     _f("parameter attribute edits", Stance.REPORTED,
        "an edit to a parameter declared elsewhere", "existing_prm",
        why="it changes a parameter after its declaration, so a value read at "
@@ -346,6 +373,87 @@ _BY_MACRO: dict[str, Feature] = {
 
 #: Every macro name the registry gives a stance.
 MACROS: frozenset[str] = frozenset(_BY_MACRO)
+
+#: The edition the two lists below were transcribed from (WP-1530). It is
+#: newer than :data:`SPEC`, whose section numbers are version 8's: the
+#: standard macros are §22.1 here and were §19.3 there.
+INDEX_SPEC = ("TOPAS Academic Technical Reference, version 9 "
+              "(topas-academic.com/technical_reference, read 2026-11-02), "
+              "Table 3-1 and §22.1")
+
+#: The equation functions of Table 3-1, which states them case-sensitive. A
+#: call to one computes a value inside an equation, so it is never an unread
+#: call: what the equation states is the keyword's, and the keyword has a
+#: stance of its own.
+EQUATION_FUNCTIONS: frozenset[str] = frozenset({
+    "And", "Or", "ArcCos", "ArcSin", "ArcTan", "ArcTan2", "Cos", "Cosh",
+    "Erf_Approx", "Erfc_Approx", "Exp", "Gamma_Approx", "Gamma_Ln_Approx",
+    "Gamma_P", "Gamma_Q", "Ln", "Sin", "Sinh", "Sqrt", "Tan", "Tanh", "For",
+    "Get", "If", "Sum", "Abs", "Concat", "Error", "Load_Eval", "Max", "Min",
+    "Mod", "Obj_There", "Prm_There", "Rand", "Rand_Normal", "Round", "To_Prm",
+    "To_String", "Sign", "AB_Cyl_Corr", "AL_Cyl_Corr", "Bkg_at", "Constant",
+    "Ln_Normal_x_at_CD", "PV_Lor_from_GL", "Sites_Geometry_Distance",
+    "Sites_Geometry_Angle", "Sites_Geometry_Dihedral_Angle", "Value_at_X",
+    "Voigt_FWHM_GL", "Voigt_Integral_Breadth_GL", "Ycalc_at", "Yobs_Avg",
+    "Yobs_at", "Yobs_dx_at", "Yobs_Min"})
+
+#: Every standard macro §22.1 lists with an argument list, so that a file can
+#: call it. The completeness oracle for :attr:`Coverage.unread_calls`: a test
+#: holds that each one has a disposition — a row here, a read in
+#: :mod:`~rietx.io.projects.topas`, or :data:`MODEL_FREE_MACROS` — so a
+#: library macro is never reported as "called and not read". The macros listed
+#: without arguments (``No_Th_Dependence``, ``Lorentz_Factor``,
+#: ``ADPs_Keep_PD``, ``Temperature_Regime``, ``Exclude``) cannot be a call and
+#: are not here. ``Out_*`` and ``Create_*`` (§22.1.10) are matched by prefix in
+#: the reader. A macro the reference does not list (``Rp_Peak``) is still
+#: reported as unread: nothing here says what it states.
+STANDARD_MACROS: frozenset[str] = frozenset({
+    # §22.1.1, the xdd macros
+    "RAW", "DAT", "XDD", "XY", "XYE", "SCR", "SHELX_HKL4",
+    # §22.1.2
+    "Cubic", "Tetragonal", "Hexagonal", "Rhombohedral",
+    # §22.1.3
+    "CuKa1", "CuK1sharp", "CuKa2_analyt", "CuKa2", "CuKa4_Holzer", "CuKa5",
+    "CuKa5_Berger", "CoKa3", "CoKa7_Holzer", "CrKa7_Holzer", "FeKa7_Holzer",
+    "MnKa7_Holzer", "NiKa5_Holzer", "MoKa2", "CuKb4_Holzer", "CoKb6_Holzer",
+    "CrKb5_Holzer", "FeKb4_Holzer", "MnKb5_Holzer", "NiKb4_Holzer",
+    # §22.1.4
+    "Radius", "Specimen_Tilt", "Slit_Width", "SW", "Sample_Thickness",
+    "Divergence", "Variable_Divergence", "Variable_Divergence_Shape",
+    "Simple_Axial_Model", "Full_Axial_Model", "Finger_et_al", "Tube_Tails",
+    "UVW",
+    # §22.1.5-22.1.8
+    "PV_Peak_Type", "TCHZ_Peak_Type", "PVII_Peak_Type",
+    "Apply_Brindley_Spherical_R_PD", "MVW", "Zero_Error", "ZE",
+    "Specimen_Displacement", "SD", "LP_Factor",
+    "Surface_Roughness_Pitschke_et_al", "Surface_Roughness_Suortti",
+    "Preferred_Orientation", "PO", "PO_Two_Directions",
+    "PO_Spherical_Harmonics",
+    # §22.1.9
+    "Anti_Bump", "AI_Anti_Bump", "Parabola_N", "Grs_Interaction",
+    "Grs_No_Repulsion", "Grs_BornMayer", "Distance_Restrain", "Angle_Restrain",
+    "Flatten", "Distance_Restrain_Keep_Within", "Distance_Restrain_Keep_Out",
+    "Keep_Atom_Within_Box",
+    # §22.1.10, less the Out_*/Create_* reporting macros
+    "Absorption_With_Sample_Thickness_mm_Shape_Intensity", "CS_L",
+    "Crystallite_Size", "CS", "CS_G", "Strain_L", "Microstrain", "MS",
+    "Strain_G", "LVol_FWHM_CS_G_L",
+    # §22.1.11
+    "TOF_XYE", "TOF_GSAS", "TOF_LAM", "TOF_x_axis_calibration",
+    "TOF_Exponential", "TOF_CS_L", "TOF_CS_G", "TOF_PV",
+    # §22.1.12
+    "STR", "Decompose", "Mixture_LAC_1_on_cm", "Phase_Density_g_on_cm3",
+    "Phase_LAC_1_on_cm", "Gauss", "Lorentzian"})
+
+#: The standard macros that state nothing about the model, so a call to one
+#: owes the caller no word: the three absorption and density macros of §22.1.12
+#: define a quantity the run reports, ``Gauss``/``Lorentzian`` are functions an
+#: equation evaluates, and ``Decompose`` selects which data points the run fits,
+#: the run-level class the module docstring ignores. Drawn from
+#: :data:`STANDARD_MACROS` only, which a test holds.
+MODEL_FREE_MACROS: frozenset[str] = frozenset({
+    "Decompose", "Mixture_LAC_1_on_cm", "Phase_Density_g_on_cm3",
+    "Phase_LAC_1_on_cm", "Gauss", "Lorentzian"})
 
 #: Every keyword the format allows inside a phase, from the reference's §5.1
 #: tree (``Tstr_details`` plus the ``Tphase_*``/``Tcomm_*`` groups reachable

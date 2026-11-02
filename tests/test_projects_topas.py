@@ -3558,8 +3558,9 @@ def test_every_macro_has_one_stance_and_is_no_keyword_or_read_macro():
             seen[name] = feat.name
     assert set(seen) == set(coverage.MACROS)
     assert not coverage.MACROS & coverage.PHASE_SCOPE
-    read = set(T._CELL_MACROS) | set(T._UNDEFINED_CELL_MACROS) | {
-        "A1", "A2", "A3", "STR", "Get", "Radius", "LP_Factor"}
+    read = (set(T._CELL_MACROS) | set(T._UNDEFINED_CELL_MACROS)
+            | set(T._READ_MACROS) | set(T._DATA_FILE_MACROS) | {"Get"})
+    assert {"A1", "A2", "A3", "STR", "Radius", "LP_Factor"} <= read
     assert not coverage.MACROS & read
     assert not [m for m in coverage.MACROS if re.fullmatch(r"\w+Ka\d?", m)]
     # Report-only: every macro row says what a caller loses.
@@ -3588,6 +3589,13 @@ _XDD = 'xdd "a.xy"\n  bkg @ 10 0 0\n'
     ("Specimen_Displacement(@, 0.05)", "xdd", "2θ corrections"),
     ("SD(@, 0.05)", "xdd", "2θ corrections"),
     ("Absorption(@, 50)", "xdd", "specimen corrections"),
+    # WP-1530: the reference's §22.1 macros that had no row and read as unread.
+    ("CuKa4_Holzer(0.0001)", "xdd", "emission profile"),
+    ("CuKb4_Holzer(0.0001)", "xdd", "emission profile"),
+    ("MVW(0, 0, 0)", "str", "cell mass, volume and weight percent"),
+    ("Distance_Restrain(A1 A1, 2.0, 2.0, 0.1, 1)", "str",
+     "restraints and penalties"),
+    ("Cylindrical_I_Correction(0.5)", "xdd", "specimen corrections"),
 ])
 def test_a_library_macro_is_named_as_a_partial_import(
         tmp_path, line, where, feature_name):
@@ -4397,6 +4405,96 @@ def test_a_defined_macro_a_read_macro_and_an_equation_are_not_unread_calls(tmp_p
                'prm t = Sin(1) + Max(1, 2);\n'
                'site A1 x 0 y 0 z 0 occ Na+1 1 beq b 0.5\n')
     assert read_topas_inp(inp).coverage.unread_calls == ()
+
+
+@pytest.mark.parametrize("name", sorted(coverage.STANDARD_MACROS
+                                        | coverage.EQUATION_FUNCTIONS))
+def test_no_reference_macro_or_function_is_an_unread_call(name):
+    """WP-1530: `LP_Factor(26.4)` and the reference's other library macros read
+    as "called and not read", so the report named things that are no typo.
+    Every macro §22.1 lists with arguments, and every Table 3-1 function, is
+    accounted for: a registry row, a read, or the model-free list."""
+    from rietx.io.projects import topas as T
+
+    text = f"{name}(1)\n"
+    assert T._unread_calls(text, text) == ()
+
+
+def test_the_allowlist_is_the_reference_s_and_every_reference_macro_has_a_place():
+    """The partition behind the test above, both ways. A model-free name comes
+    from the index and from nowhere else; a standard macro the reader neither
+    reads nor allowlists has a registry row, so it is *named* when called."""
+    from rietx.io.projects import topas as T
+
+    assert coverage.MODEL_FREE_MACROS <= coverage.STANDARD_MACROS
+    assert not coverage.MODEL_FREE_MACROS & coverage.MACROS
+    read = (set(T._CELL_MACROS) | set(T._READ_MACROS)
+            | set(T._DATA_FILE_MACROS))
+    rest = coverage.STANDARD_MACROS - read - coverage.MODEL_FREE_MACROS
+    unrowed = {m for m in rest - coverage.MACROS
+               if not T._EMISSION_MACRO.fullmatch(m)}
+    assert unrowed == set()
+    # §22.1.1's xdd macros, plus the two the #616 report's index added.
+    assert set(T._DATASET_MACROS) == {
+        "RAW", "DAT", "XDD", "XY", "XYE", "SCR", "SHELX_HKL4", "BRML", "SST"}
+
+
+@pytest.mark.parametrize("line", [
+    "Rp_Peak(0.1)",        # in no index of the version 9 reference
+    "Atan(0.5)",           # Table 3-1 spells it ArcTan
+    "lor_fwhmm(0.1)",
+])
+def test_a_name_outside_the_reference_is_still_an_unread_call(tmp_path, line):
+    """The negative arm: the allowlist did not become a catch-all."""
+    model = read_topas_inp(_inp(tmp_path, "outside.inp",
+                                f'xdd "a.xye"\n{line}\n' + _ONE_PHASE))
+    assert model.coverage.unread_calls == (line.split("(")[0],)
+
+
+def test_a_macro_opened_dataset_names_its_file(tmp_path):
+    """WP-1530: `RAW(a)` counted as a dataset but `data_files` read `[]`. Each
+    opener contributes the file it names, in file order: a macro's first
+    argument as written (§22.1.1's `path_no_ext` stays without one), a bare
+    `xdd` path as one token rather than the rest of its line."""
+    text = ('RAW(..\\pbso4)\n' + _ONE_PHASE
+            + 'XY("b c", 0.01)\n' + _ONE_PHASE.replace('"A"', '"B"')
+            + 'xdd d.xy x_calculation_step 0.01\n'
+            + _ONE_PHASE.replace('"A"', '"C"')
+            + 'xdd "e f.xye"\n' + _ONE_PHASE.replace('"A"', '"D"')
+            + 'SHELX_HKL4(g)\n' + _ONE_PHASE.replace('"A"', '"E"'))
+    model = read_topas_inp(_inp(tmp_path, "files.inp", text))
+    assert model.n_datasets == 5
+    assert model.data_files == ["..\\pbso4", "b c", "d.xy", "e f.xye", "g"]
+    assert [ph.dataset for ph in model.phases] == [0, 1, 2, 3, 4]
+
+
+def test_a_bare_macro_path_may_hold_parentheses(tmp_path):
+    model = read_topas_inp(_inp(tmp_path, "paren.inp",
+                                'RAW(C:\\d (old)\\a, 1)\n' + _ONE_PHASE))
+    assert model.data_files == ["C:\\d (old)\\a"]
+
+
+def test_an_xdd_naming_no_file_records_none(tmp_path):
+    """A bare path is the opener's own line: the next line's `bkg` is no file."""
+    model = read_topas_inp(_inp(tmp_path, "nofile.inp",
+                                'xdd\n  bkg @ 1 2\n' + _ONE_PHASE))
+    assert model.n_datasets == 1 and model.data_files == []
+
+
+def test_a_time_of_flight_macro_names_its_file(tmp_path):
+    model = read_topas_inp(_inp(tmp_path, "tof.inp",
+                                'TOF_XYE(bank1.xye, 0.5)\n' + _ONE_PHASE))
+    assert model.data_files == ["bank1.xye"]
+
+
+@pytest.mark.parametrize("macro", ["SCR", "SHELX_HKL4", "BRML"])
+def test_every_data_macro_refuses_an_unexpandable_loop(tmp_path, macro):
+    """One list feeds the openers and the loop refusal, so a data macro added
+    to one reaches the other (`SCR` and `SHELX_HKL4` are new to both)."""
+    with pytest.raises(TopasInpError, match=f"through `{macro}`"):
+        read_topas_inp(_inp(tmp_path, "loop.inp",
+                            f'{macro}(a)\n' + _ONE_PHASE
+                            + 'for strs { lor_fwhm 0.1 }\n'))
 
 
 # --------------------------- a moment component its site symmetry forbids

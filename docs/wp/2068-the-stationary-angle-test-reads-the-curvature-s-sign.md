@@ -1,9 +1,8 @@
 # WP-2068 — The stationary-angle test builds its angle block analytically
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — task 1 done: the maximum does not reproduce on main, so P3; the cost half (tasks 2-4) is unstarted
+Milestone: unscheduled · Status: ✅ 2026-11-02 — the angle block is analytic: 53 residual evaluations at k = 8 where the differences took 2999, every acceptance verdict unchanged
 Track: What fires, and what stays silent
 Depends on: — (1327 soft: the moment derivative `d_magnetic_f2_d_dofs` from #1206, merged 2026-10-31)
-Priority: P3 2026-11-02 — task 1 found no fit on main that stops on a maximum the test then passes wrongly, so only the cost half is left: 85-93 % of a moment-only fit at k ≥ 8, about 3 % of MAGNDATA structures
 
 ## Goal
 
@@ -79,8 +78,6 @@ bit-identical). Only the analytic route gives the sign exactly.
 CLAUDE.md): the second-derivative block needs its own exact oracle, never a forward
 difference. The FD path stays as the fallback and is kept exercised.
 
-### Inherited
-
 ## Non-goals
 
 - Seeding a moment angle off a maximum before the stage: proposed separately on #1206.
@@ -96,10 +93,10 @@ difference. The FD path stays as the fallback and is kept exercised.
 ## Tasks
 
 - [x] Reproduce: a fit started on a maximum along one moment angle, and what `stationary_angle_test` returns for it today. If it passes, keep it as the failing test; if it does not, record why and re-rate to P3. — *2026-11-02: no fit on main stops there (forward-difference columns walk off); the one stall the declined analytic arm produces passes correctly, at 0.000 against a cut of 2.71. Re-rated P3; Context's correctness bullet has the numbers.*
-- [ ] Analytic angle columns and second-derivative block from `d_magnetic_f2_d_dofs`, extended one order, with an exact oracle.
-- [ ] `_joint_newton` reads the analytic block where the branch applies, FD elsewhere.
-- [ ] Tests (agreement with the FD block; evaluation counts at k = 2, 4, 8; verdicts unchanged on the two acceptance files) + obs/calc/diff PNGs to `tests/output/`
-- [ ] Skill: none expected (no new verb or code).
+- [x] Analytic angle columns and second-derivative block from `d_magnetic_f2_d_dofs`, extended one order, with an exact oracle. — *2026-11-02: `scattering.magnetic_f2_angle_block`, `moments.d2_moment_d_dofs`, `least_squares._analytic_angle_block`; the oracle is an 8-point DFT of the residual along one or two angles, exact because r is a degree-two trigonometric polynomial in each angle there (`tests/test_moment_angle_block.py`).*
+- [x] `_joint_newton` reads the analytic block where the branch applies, FD elsewhere. — *2026-11-02: single fits only; the joint path and an evaluated extinction keep the differences.*
+- [x] Tests (agreement with the FD block; evaluation counts at k = 2, 4, 8; verdicts unchanged on the two acceptance files) + obs/calc/diff PNGs to `tests/output/` — *2026-11-02: `tests/test_moment_angle_block.py`; no PNGs, because no test in it refines (each compiles at a start and calls the test directly).*
+- [x] Skill: none expected (no new verb or code). — *2026-11-02: none; no verb, code or default changed.*
 
 ## Acceptance
 
@@ -121,6 +118,64 @@ evaluations than at the WP's start.
 
 ## Handover log
 
+- **2026-11-02** — tasks 2-5, PR #1326. The stationary-angle test no longer pays for its
+  curvature in residual evaluations. Where a set of moment angles moves nothing but the magnetic
+  intensity, its columns and their second derivatives are now computed directly, so one Newton
+  iteration costs one evaluation instead of 2k² + 1. At eight free angles the test drops from 2999
+  evaluations to 53, about ten times less wall time, and every verdict on the acceptance fixtures
+  is the one the differences gave. The recorded statistics and stationary points move by at
+  most 1.8e-7, which is the differences' own error, so the merge waits on the maintainer's
+  reader-output ruling. A phase with extinction evaluated, and every joint fit, keep the
+  differences.
+  *Done:* `moments.d2_moment_d_dofs`; `scattering.magnetic_f2_angle_block` (∂ and ∂² of
+  p²⟨|F_⊥|²⟩ along k directions in the DOFs, sharing `_projected_orbit_sum` with
+  `d_magnetic_f2_d_dofs`, which stays bit-identical); `CompiledModel.moment_angle_block_supported`
+  (= `moment_grad_supported` and extinction skipped) and `moment_f2_angle_block`;
+  `least_squares._analytic_angle_block`, which reads each column's reach off `column_reach`,
+  declines any set reaching a non-angle path, a derived row or an unsupported phase, and maps
+  ∂(|F_⊥|²) to ∂y through one sparse (points × reflections) operator per phase and component,
+  built once per test from the frozen Ω and the first-derivative chain's per-reflection factor.
+  `_joint_newton` takes it as `block=`; the FD path is unchanged in arithmetic. Only the single-fit
+  call site passes it. *The oracle:* with extinction skipped, r along one or two angles is a
+  degree-two trigonometric polynomial in each, so eight equally spaced samples over a period give
+  the derivatives exactly by DFT, and the oracle asserts its own premise (harmonics ≥ 3 at
+  ≤ 1e-14). Tests: `tests/test_moment_angle_block.py`, 6 (the moment second derivative, the
+  block against the oracle at 1e-12 of the block, the extinction decline, verdicts and counts at
+  k = 2, 4, 8). No PNGs: nothing in that file refines. *Code review* (`/code-review high --fix`):
+  seven of eight findings fixed in `bb7ab35e7` (reach from `column_reach`, operators shared across
+  rounds, no (M, k, k, 3) array, one Q̂, an early exit for a fit with no moment, the test's bar
+  and a blank line). Declined: replacing `np.add.at` in the segment sums, which the first
+  derivative uses too; a speed change for both or neither.
+  *Measured* (macOS arm64, `[dev]`, Python 3.12). Oracle: columns 3.7e-14 and curvature entries
+  5.4e-11 of each entry's own largest value (the smallest cross-site entries are 7e-3 against
+  3.4e3 on the diagonal). Evaluations in one test call from the 0.03 rad start, differences
+  against analytic: k = 2, 40 against 6; k = 4, 287 against 14; k = 8, 2999 against 53. Wall time
+  of the call, best of 3, quiet machine: 2.0×, 4.6×, 11.1× (9.6× at k = 8 with a suite running).
+  One block evaluation at k = 4 costs about two residual evaluations with an angle moved. Verdicts
+  on ten fits of the two acceptance files (`test_stationary_moment_angle._fit` at tilt 0 seeds
+  4 and 0, tilt 0.05, one site; `test_magnetic_moment_frame._fit` from β₀ 101.1°, 101.5°, 103.0°
+  under PLAN_2 and PLAN_3), forcing the differences against the branch: every round's paths,
+  reached and zeroed identical; statistic, stationary point and half-width within 1.8e-7, but
+  one. PLAN_2 from 103.0° records, in its intermediate `cell+moment` stage, a half-width of
+  2.06e9 rad for an azimuth the polar angle has made flat, where the differences read 2875 rad;
+  the exact curvature there is round-off, and the answer stage's record is unchanged. The two
+  acceptance files plus `test_moment_jacobian.py`, `test_magnetic.py` and the new file: 157 passed,
+  1 skipped (before the review fixes). `python -m tests.reader_output`: unchanged (its fit has no
+  moment). Fast selection: see the PR.
+  *Gotchas.* `_moment_reach_ok` still declines the analytic angle column in the solve's own
+  Jacobian; this branch does not touch it, so the non-goal's condition did not fire.
+  *Inherited, not acted on:* PR #1322 (WP-2060, open) forwards a note here: on seed 15 the profile
+  refits sit 5.1 above the fit's χ² against a cut of 5.0, and on 8 of 20 seeds a refit finds χ²
+  below the fit. It is outside this WP's cost scope and is recorded in WP-2060's own log. This WP
+  closes, so that forward needs another owner when #1322 merges.
+  *Settled by Claude:* `test_cross_backend.py` gains no row, under the rule's own scope (it
+  covers the solve's Jacobian columns per backend, and no backend computes this block; its exact
+  oracle sits in the new file). The alternative was a row asserting the numpy block on a backend
+  that never calls it. The joint path and an evaluated extinction keep the differences, under
+  "build the smallest thing": a joint fit's block would need per-histogram operators, and
+  extinction a dG/dx term the first-order chain has no place for.
+  *Next:* none in this WP. A joint-fit block is the obvious extension if a joint magnetic fit
+  ever spends its time here.
 - **2026-11-02** — task 1 (reproduce), PR #1320. The reported defect does not happen on main.
   The stationary-angle test cannot tell a maximum from a minimum, as the issue says. But no
   fit on main ever stops on a maximum along a moment angle. The solver's angle columns are
