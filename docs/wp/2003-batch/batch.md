@@ -82,6 +82,20 @@ asked to save; GSAS-II's and MAUD's stop is the named dissent, EasyDiffraction t
 Each entry's `ruling` field in `rows.json` carries the date; the table rows land with the
 demotions (WP task 7), each its own commit.
 
+**Relabelled 2026-11-02: these are settlements by Claude, not the maintainer's rulings.** The
+maintainer's standing instructions say an earlier settlement by Claude is evidence, never a
+ruling. They send a decision to the maintainer when a written rule gives it to them, when its
+crux is a value judgement, or when it changes a stored format. The rietx memory adds that a
+tier-3 `approved` date and any change to what a fit prints or returns are the maintainer's
+whoever drafted them (ruled 2026-11-01). The delegation above predates both. So each
+`ruling` in `rows.json` and each audit-table row citing this paragraph now reads "settled by
+Claude", and the `approved="2026-10-26"` dates on the seven WP-2003 tier-3 rows stand only
+until the maintainer approves or reverses each one. The open picks go back to the maintainer
+as briefs one at a time: C1 and PR #1310's reader-output changes, C2's question 4 (on its own
+words above, a value judgement), C5, C6, C9 and C10's question 2, with C2's question 2 and
+the seven `approved` dates as consent lines. C2's question 3 and C10's question 1 stay
+Claude's to settle, recorded as such.
+
 ---
 
 ## C1. What sends a warm fit up the ladder

@@ -15,7 +15,7 @@
   "response": "warning",
   "responds": "read the named pattern's step from its neighbour as a cold fit's, not the chain's, before quoting a trajectory's cell or fraction across it",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_RESEED.suggestion",
@@ -30,7 +30,7 @@
   "applied": false,
   "decision": null,
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_RWP_OUTLIER",
@@ -48,7 +48,7 @@
   "response": "warning",
   "responds": "open the named pattern's own fit before quoting its cell, fraction or width: its best rung is still above the chain's fence",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_RWP_OUTLIER.suggestion",
@@ -63,7 +63,7 @@
   "applied": false,
   "decision": "with its code (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_UNRECOVERED",
@@ -81,7 +81,7 @@
   "response": "warning",
   "responds": "quote no cell, fraction or width from the named pattern: its fit diverged after every rung, seeded no successor and joins no median",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_UNRECOVERED.suggestion",
@@ -96,7 +96,7 @@
   "applied": false,
   "decision": null,
   "class": "C2",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_CANCELLED",
@@ -209,7 +209,7 @@
   "response": null,
   "responds": null,
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_DISCONTINUITY.suggestion",
@@ -224,7 +224,7 @@
   "applied": false,
   "decision": "with the code",
   "class": "C4",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_PATH_DEPENDENT",
@@ -242,7 +242,7 @@
   "response": "warning",
   "responds": "if kept: hold, restrain, or quote the two directions' spread before quoting the cell, coordinate or width named",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_PATH_DEPENDENT.suggestion",
@@ -257,7 +257,7 @@
   "applied": false,
   "decision": "with the code",
   "class": "C5",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_PERSISTENT_FINDING",
@@ -275,7 +275,7 @@
   "response": null,
   "responds": null,
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_PERSISTENT_FINDING.suggestion",
@@ -290,7 +290,7 @@
   "applied": false,
   "decision": "with the code",
   "class": "C6",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_WIDTH_GROWTH",
@@ -308,7 +308,7 @@
   "response": "warning",
   "responds": "if kept: fit the onset pattern with the missing component before quoting this width, or the phase's scale and cell",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_WIDTH_GROWTH.suggestion",
@@ -323,7 +323,7 @@
   "applied": false,
   "decision": "with the code",
   "class": "C7",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_MOMENT_HOLD",
@@ -341,7 +341,7 @@
   "response": "warning",
   "responds": "quote the named patterns' moment as held, never as a value with an esd, and read the trajectory from magnetic_trajectory()",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_MOMENT_HOLD.suggestion",
@@ -356,7 +356,7 @@
   "applied": false,
   "decision": null,
   "class": "C8",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_MOMENT_ONSET",
@@ -374,7 +374,7 @@
   "response": null,
   "responds": null,
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_MOMENT_ONSET.suggestion",
@@ -389,7 +389,7 @@
   "applied": false,
   "decision": "re-count its sites after the split (advise() rewrites one through model_copy)",
   "class": "C8",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SIZE_NORMALISED_ACROSS_WAVELENGTHS",
@@ -469,7 +469,7 @@
   "response": "warning",
   "responds": "quote the equation's coefficients, not the target's value (a cell, a width), at the named patterns: there it is the equation's alone",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "PARAMETRIC_TARGET_UNSEEN.suggestion",
@@ -484,7 +484,7 @@
   "applied": false,
   "decision": null,
   "class": "C10",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "PARAMETRIC_FORM_REJECTED",
@@ -502,7 +502,7 @@
   "response": "warning",
   "responds": "quote no parametric coefficient's esd, nor the cell or width it predicts, until the next term or a narrower subset passes the form test",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "PARAMETRIC_FORM_REJECTED.suggestion",
@@ -517,7 +517,7 @@
   "applied": false,
   "decision": null,
   "class": "C10",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "STAGE_FREED_NOTHING",
@@ -563,7 +563,7 @@
   "applied": false,
   "decision": "with _ladder",
   "class": "C2",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.schemas.sequential.SeriesEntry.reseeded",
@@ -578,7 +578,7 @@
   "applied": false,
   "decision": "C1 2 (i): tier 3, the record of the kept action (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.schemas.sequential.SeriesEntry.rwp_fence",
@@ -593,7 +593,7 @@
   "applied": false,
   "decision": "C1 1 (b) (pick): demoted to the ratio field (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.schemas.sequential.SeriesEntry.rungs_tried",
@@ -608,7 +608,7 @@
   "applied": false,
   "decision": "with _ladder",
   "class": "C2",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.schemas.sequential.SeriesEntry.rungs_raised",
@@ -623,7 +623,7 @@
   "applied": false,
   "decision": "with _ladder",
   "class": "C2",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.RESEED_FACTOR",
@@ -638,7 +638,7 @@
   "applied": false,
   "decision": "C1 1 (b) and 2 (i) (pick): no default fence; escalate on diverged or raised only; (ii) max_iter and (iii) CELL_RUNAWAY measured on main and not adopted; lands in C3's order (X16) (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.FIRST_RUNG_SAMPLES",
@@ -653,7 +653,7 @@
   "applied": false,
   "decision": "C3 (a) (pick): no bound unless the caller asks, both defects fixed for the opt-in (truncation read off the rung's own stages; cap and sample one quantity), no budget under reseed=False; lands after X16 is fixed, since no bound by default with C1 2 (i) is off_nobound on planted; this constant stays inside the opt-in at tier 3, or becomes a second caller argument (revised 2026-10-25, batch.md)",
   "class": "C3",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.FIRST_RUNG_FACTOR",
@@ -668,7 +668,7 @@
   "applied": false,
   "decision": "C3 (a) (pick): no bound unless the caller asks, both defects fixed for the opt-in (truncation read off the rung's own stages; cap and sample one quantity), no budget under reseed=False; lands after X16 is fixed, since no bound by default with C1 2 (i) is off_nobound on planted (revised 2026-10-25, batch.md)",
   "class": "C3",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.DISCONTINUITY_FACTOR",
@@ -683,7 +683,7 @@
   "applied": false,
   "decision": "remove; verify_discontinuities then refits the steps the caller names or the largest k with k the caller's",
   "class": "C4",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.DISCONTINUITY_SIGMA",
@@ -698,7 +698,7 @@
   "applied": false,
   "decision": "remove; verify_discontinuities then refits the steps the caller names or the largest k with k the caller's",
   "class": "C4",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.MIN_POINTS_FOR_DISCONTINUITY",
@@ -713,7 +713,7 @@
   "applied": false,
   "decision": "remove; verify_discontinuities then refits the steps the caller names or the largest k with k the caller's",
   "class": "C4",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.MIN_POINTS_FOR_PERSISTENCE",
@@ -728,7 +728,7 @@
   "applied": false,
   "decision": "with the code; tier 3 if the code stays",
   "class": "C6",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.NOISE_FLOOR_REL",
@@ -757,7 +757,7 @@
   "applied": false,
   "decision": "demote SEQUENTIAL_PATH_DEPENDENT to a field, or keep 3 sigma at tier 3 (no family measured)",
   "class": "C5",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.WIDTH_GROWTH_FACTOR",
@@ -772,7 +772,7 @@
   "applied": false,
   "decision": "hand the ruling to WP-2004's Inherited; bump nothing here",
   "class": "C7",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
@@ -787,7 +787,7 @@
   "applied": false,
   "decision": "hand the ruling to WP-2004's Inherited; bump nothing here",
   "class": "C7",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.WIDTH_GROWTH_SIGMA",
@@ -802,7 +802,7 @@
   "applied": false,
   "decision": "hand the ruling to WP-2004's Inherited; bump nothing here",
   "class": "C7",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.refine_sequential:carry",
@@ -817,7 +817,7 @@
   "applied": false,
   "decision": "C9 question 1 (pick): the warm start the caller's, the '*' default invariant once the every-entry-against-varied test lands; where it differs, tier 3 on those paths, the two programs its dissent; and the carry x width-twin-hold clash (X11) measured on QPA before the twin hold is touched (revised 2026-10-25, batch.md)",
   "class": "C9",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.refine_sequential:carry_hkl_intensities",
@@ -832,7 +832,7 @@
   "applied": false,
   "decision": "tier 3: needs its chain measured carried and not (Le Bail and Pawley chains, tests/test_sequential.py:2245, 2673)",
   "class": "C9",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.refine_sequential:backend",
@@ -848,7 +848,7 @@
   "decision": null,
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.refine_sequential:solver",
@@ -864,7 +864,7 @@
   "decision": null,
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.refine_sequential:history",
@@ -880,7 +880,7 @@
   "decision": null,
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:x",
@@ -895,7 +895,7 @@
   "applied": false,
   "decision": "add an arm to test_a_series_observed_is_the_series_unobserved (tests/test_answer_invariant_defaults.py:171), labels with a label-blind compare since chain_answer carries labels; then invariant",
   "class": "C11",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:x_label",
@@ -910,7 +910,7 @@
   "applied": false,
   "decision": "add an arm to test_a_series_observed_is_the_series_unobserved (tests/test_answer_invariant_defaults.py:171), labels with a label-blind compare since chain_answer carries labels; then invariant",
   "class": "C11",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:labels",
@@ -925,7 +925,7 @@
   "applied": false,
   "decision": "add an arm to test_a_series_observed_is_the_series_unobserved (tests/test_answer_invariant_defaults.py:171), labels with a label-blind compare since chain_answer carries labels; then invariant",
   "class": "C11",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:mode",
@@ -954,7 +954,7 @@
   "applied": false,
   "decision": "extend B7's approval to the series seat",
   "class": "C9",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:refit",
@@ -969,7 +969,7 @@
   "applied": false,
   "decision": "confirm tier 2 (not applied: it sets the ladder's first rung, whose rungs C2 rules)",
   "class": "C2",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:two_theta_limits",
@@ -999,7 +999,7 @@
   "decision": "re-read if C5 demotes SEQUENTIAL_PATH_DEPENDENT (the switch then fills a field)",
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:reseed",
@@ -1014,7 +1014,7 @@
   "applied": false,
   "decision": "tier 3, the ladder's switch, approved with C2; under C1 2 (i) it escalates a diverged or raised rung only; the forced-escalation breach (X2) is fixed after X16 (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:reseed_factor",
@@ -1029,7 +1029,7 @@
   "applied": false,
   "decision": "C1 1 (b) (pick): caller, no default; refused unless finite and positive (inf is accepted unchecked today, sequential.py:1028-1030, and also switches off the discontinuity scan's above-fence drop) (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:first_rung_factor",
@@ -1044,7 +1044,7 @@
   "applied": false,
   "decision": "C3 (a) (pick): no bound unless the caller asks, both defects fixed for the opt-in (truncation read off the rung's own stages; cap and sample one quantity), no budget under reseed=False; lands after X16 is fixed, since no bound by default with C1 2 (i) is off_nobound on planted (revised 2026-10-25, batch.md)",
   "class": "C3",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:verify_discontinuities",
@@ -1060,7 +1060,7 @@
   "decision": "re-read once SEQUENTIAL_DISCONTINUITY goes (C4: what picks the pairs)",
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:prepare",
@@ -1104,7 +1104,7 @@
   "decision": null,
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:on_error",
@@ -1119,7 +1119,7 @@
   "applied": false,
   "decision": "open, no pick (batch.md C2 question 4): 'carry' (today; tier 3, approved as the protection of a long batch, GSAS-II's and MAUD's stop named) or 'raise' (the default changes, 'carry' becomes the caller's); a default switching on an action with a named dissent cannot be tier 2 under 'a dissent counts' (revised 2026-10-25, batch.md)",
   "class": "C2",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:events",
@@ -1135,7 +1135,7 @@
   "decision": null,
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:cancel",
@@ -1151,7 +1151,7 @@
   "decision": null,
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:progress",
@@ -1167,7 +1167,7 @@
   "decision": null,
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:telemetry",
@@ -1183,7 +1183,7 @@
   "decision": null,
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:label",
@@ -1199,7 +1199,7 @@
   "decision": null,
   "class": "C11",
   "status": "tiered 2026-10-24",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._prefer",
@@ -1215,7 +1215,7 @@
   "decision": "C2: tier 1 for the full-cost order (question 3, pick: S, not Rwp; max_iter ties converged); diverged before truncated (question 2, pick) (revised 2026-10-25, batch.md)",
   "class": "C2",
   "row_note": "no row of its own: SeriesEntry.rung records the attempt kept; the criterion is written into the ladder rows' evidence",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._reseed_needed",
@@ -1231,7 +1231,7 @@
   "decision": "C1 2 (i) (pick): diverged only (a raised rung escalates at its own site); tier 3, kind 1, approved with C2's ladder; C2 question 5 asks whether an error-level kept attempt counts as diverged (revised 2026-10-25, batch.md)",
   "class": "C1",
   "row_note": "no row of its own: what it decides is recorded by SeriesEntry.reseeded, rungs_tried and rwp_fence, whose rows carry its tier",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._ladder",
@@ -1247,7 +1247,7 @@
   "decision": "approve the rungs, their order and the give-up point after the cold rung",
   "class": "C2",
   "row_note": "no row of its own: SeriesEntry.rung, rungs_tried and rungs_raised record it and carry its tier; the middle rung's Rwp is recorded nowhere (rwp_of is local, sequential.py:1545)",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._first_rung_budget",
@@ -1263,7 +1263,7 @@
   "decision": "C3 (a) (pick): no bound unless the caller asks, both defects fixed for the opt-in (truncation read off the rung's own stages; cap and sample one quantity), no budget under reseed=False; lands after X16 is fixed, since no bound by default with C1 2 (i) is off_nobound on planted (revised 2026-10-25, batch.md)",
   "class": "C3",
   "row_note": "no row of its own: rides fit:first_rung_factor's caller row; no field says a rung was truncated or what the budget was",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement._chain.quarantine",
@@ -1279,7 +1279,7 @@
   "decision": "approve as a protection; approve SeriesEntry.seeded_from as its record; and batch.md C2 question 5: an error-level kept attempt counted as diverged (pick, after one arm on tut05-broken and CPD closing off), since a converged 1c at Rwp 10.83 with MODEL_FAR_FROM_DATA seeded 1d-1h (clashes.md X17) (revised 2026-10-25, batch.md)",
   "class": "C2",
   "row_note": "needs the record field task 3 proposes: rietx.schemas.sequential.SeriesEntry.seeded_from (the index whose state seeded this pattern's warm rungs, None on a cold-only pattern), the row this action is keyed on; it lands with the ruling",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement._chain.rwp_outlier_carve_out",
@@ -1295,7 +1295,7 @@
   "decision": "lapses under C1 1 (b) (pick), with no default fence to carve out of; under 1 (a), confirm; the scan half is ruled in C4 (revised 2026-10-25, batch.md)",
   "class": "C1",
   "row_note": "no row of its own: SeriesEntry.rwp_fence and the above_fence property record it, and SEQUENTIAL_RWP_OUTLIER names it; the scan half leaves with SEQUENTIAL_DISCONTINUITY",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._floor_unsupported_moments",
@@ -1311,7 +1311,7 @@
   "decision": "approve under the rare-feature clause; approve SeriesEntry.floored as its record",
   "class": "C8",
   "row_note": "needs the record field task 3 proposes: rietx.schemas.sequential.SeriesEntry.floored (the moment paths floored before this pattern's warm start), the row this action is keyed on; today only SEQUENTIAL_MOMENT_HOLD's message, cut at four labels",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._carry_into",
@@ -1327,7 +1327,7 @@
   "decision": "with carry (C9 question 1) (revised 2026-10-25, batch.md)",
   "class": "C9",
   "row_note": "no row of its own: keyed on SeriesEntry.seeded_from once task 3 adds it (the quarantine's row), with carry's tier",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._reanchor_carried",
@@ -1343,7 +1343,7 @@
   "decision": null,
   "class": "C9",
   "row_note": "no row: a correctness rebase, decides nothing",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._carry_variables",
@@ -1359,7 +1359,7 @@
   "decision": null,
   "class": "C9",
   "row_note": "no row: no choice beyond carry's",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._collapse",
@@ -1375,7 +1375,7 @@
   "decision": "tier 3 for its details; the closing stage kept on the warm refit (C9 question 4 (a), pick); its seed=0.0 re-read with X17's investigation; its cost along a chain is WP-2036's (revised 2026-10-25, batch.md)",
   "class": "C9",
   "row_note": "no row of its own: StageResult.name 'warm_refit' on the per-pattern results; refit's row carries the choice",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement._verify_discontinuities",
@@ -1391,7 +1391,7 @@
   "decision": "what picks the pairs once the code goes (a caller's number keeps the switch caller)",
   "class": "C4",
   "row_note": "no row of its own (caller, the switch's row is tiered); its ratio lives in Diagnostic.value on the code the WP removes, so it needs a home: a SeriesStep field (say SeriesStep.cold_ratio); and each cold refit pays the moment-angle interval unasked (gate with _auto_intervals = False)",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement._chain.on_error_carry",
@@ -1407,7 +1407,7 @@
   "decision": "with fit:on_error (open) (revised 2026-10-25, batch.md)",
   "class": "C2",
   "row_note": "no row of its own while SeriesResult is outside _audit.RECORD_SCHEMAS: fit:on_error carries its tier, SERIES_PATTERN_FAILED reports it, and SeriesEntry.seeded_from would say which pattern seeded the successor",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._persistent_diagnostics.half",
@@ -1423,7 +1423,7 @@
   "decision": "with the code",
   "class": "C6",
   "row_note": "row-less (an inline literal the walk cannot see); none needed if the field lands, a hand row (B14) if the code stays",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.NOT_A_SERIES_FINDING",
@@ -1439,7 +1439,7 @@
   "decision": "with the code",
   "class": "C6",
   "row_note": "row-less (a frozenset the walk cannot see); a hand row (B14) if the code stays, none if the field lands (its count is then one more row)",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._WIDTH_SUFFIXES",
@@ -1455,7 +1455,7 @@
   "decision": null,
   "class": "C7",
   "row_note": "row-less (a dict); its membership carries into the field if the code goes; a hand row (B14) otherwise",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._relative_paths",
@@ -1471,7 +1471,7 @@
   "decision": null,
   "class": "C4",
   "row_note": "no row: arithmetic inside the scans; its record SeriesResult.relative_paths and angle_paths sits outside _audit.RECORD_SCHEMAS",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement._fit_one.declared_wavelengths",
@@ -1487,7 +1487,7 @@
   "decision": null,
   "class": "C9",
   "row_note": "no row: moves only a diagnostic's reference",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi._hold_unsupported_phases_multi",
@@ -1503,7 +1503,7 @@
   "decision": "batch.md C10 question 2: (a) align with refine._answer_significance (pick, after one joint fixture where the two statistics disagree shows what moves) or (b) its own row, tier 3 with approval, B1's 3sigma on a second statistic; tier 3 on (b)'s wording until ruled (revised 2026-10-25, batch.md)",
   "class": "C10",
   "row_note": "proposed: a row of its own (a hand row, B14), since StageResult.held's row names B1's statistic and the joint runner reads another; none once aligned",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi._rehold_multi",
@@ -1519,7 +1519,7 @@
   "decision": "batch.md C10 question 2: (a) align with refine._answer_significance (pick, after one joint fixture where the two statistics disagree shows what moves) or (b) its own row, tier 3 with approval, B1's 3sigma on a second statistic; tier 3 on (b)'s wording until ruled (revised 2026-10-25, batch.md)",
   "class": "C10",
   "row_note": "proposed: a row of its own (a hand row, B14), since StageResult.held's row names B1's statistic and the joint runner reads another; none once aligned",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi._hold_scale_b_ridges_multi",
@@ -1535,7 +1535,7 @@
   "decision": null,
   "class": "C10",
   "row_note": "no new row: StageResult.scale_b_held (tier 1) covers it",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi._hold_flat_moments_multi",
@@ -1551,7 +1551,7 @@
   "decision": "three inline tolerances (multi.py:796, 822, 856) are hand rows (B14)",
   "class": "C10",
   "row_note": "no new row: StageResult.moment_flat_axes (tier 1) and moment_turned (tier 3, B2, approved 2026-10-19) covers it",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi._hold_width_twins_multi",
@@ -1567,7 +1567,7 @@
   "decision": null,
   "class": "C10",
   "row_note": "no new row: StageResult.width_twins_held (tier 3, approved 2026-10-23) covers it",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi._reset_cell_runaway_multi",
@@ -1583,7 +1583,7 @@
   "decision": "a bug, not a tier: _cell_runaway_diagnostic(cell_runaway) at multi.py:1632 never folds refine._vars_driven_cell_escapes (refine.py:1704; folded at 4480, 4710), so a vars.X-driven escape in a joint fit is neither reset nor named",
   "class": "C10",
   "row_note": "no new row: StageResult.cell_reset (tier 3, B8, approved 2026-10-19) covers it",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi.MultiHistogramRefinement._run_plan.seed",
@@ -1599,7 +1599,7 @@
   "decision": "the joint runner seeds no Stephens block, the single one does (Stage.strain_seed)",
   "class": "C10",
   "row_note": "no new row: StageResult.seeded (tier 3, approved 2026-10-21) covers it",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi._parametric_form_tests.at_bound_hold",
@@ -1615,7 +1615,7 @@
   "decision": "with B16's clash measurement",
   "class": "C10",
   "row_note": "row-less: the form test records no list of what it held; propose ParametricFormTest.held if B16 keeps it",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi._joint_unmeasured_phases",
@@ -1631,7 +1631,7 @@
   "decision": null,
   "class": "C10",
   "row_note": "no row: HistogramResult sits outside _audit.RECORD_SCHEMAS",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.optimize.least_squares._freeze_strain_cap_multi",
@@ -1647,7 +1647,7 @@
   "decision": null,
   "class": "C10",
   "row_note": "no row: no record, and the caps' constants are tier-1 rows; no test names it (add one)",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.optimize.least_squares._freeze_cell_windows_multi",
@@ -1663,7 +1663,7 @@
   "decision": null,
   "class": "C10",
   "row_note": "no new row: the cell window's row covers it; no test names it",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.params.multi.size_value_scales",
@@ -1679,7 +1679,7 @@
   "decision": null,
   "class": "C10",
   "row_note": "no row: the model's physics, not a choice; SIZE_NORMALISED_ACROSS_WAVELENGTHS (tier 1, applied) reports it",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.params.multi.MultiParameterTable._rebuild_columns.bound_intersection",
@@ -1695,7 +1695,7 @@
   "decision": null,
   "class": "C10",
   "row_note": "no row: no choice",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.params.multi.SharingMap.is_shared",
@@ -1711,7 +1711,7 @@
   "decision": "add the seat or a hand row; confirm the citation is read before tier 2 is written",
   "class": "C10",
   "row_note": "no row today: SharingMap is not a DEFAULT_SEATS seat; a hand row (B14) or a seat",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi.MultiHistogramRefinement.fit:weights",
@@ -1727,7 +1727,7 @@
   "decision": "add the seat or a hand row",
   "class": "C10",
   "row_note": "no row today: not a DEFAULT_SEATS seat; a hand row (B14) or a seat",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi.MultiHistogramRefinement._ticks.extra_components",
@@ -1743,6 +1743,6 @@
   "decision": null,
   "class": "C10",
   "row_note": "no row: a builder decides nothing; the risk is the member contract's (root CLAUDE.md: a third extra_components member audits this reader)",
-  "ruling": "2026-10-26: the batch's pick approved; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules"
+  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  }
 ]

@@ -1,6 +1,6 @@
 # WP-2003 — The chain actions: what a series decides between patterns
 
-Milestone: generality · Status: 🔄 2026-11-02 — C1, C2 q5 and C3 landed (no default Rwp fence or first-rung budget; an error-level fit is quarantined); next C2 q2-3, the GUI's quarantine mark, C5-C10
+Milestone: generality · Status: 🔄 2026-11-02 — C1, C2 q5 and C3 landed (no default Rwp fence or first-rung budget; an error-level fit is quarantined); the 10-26 rulings relabelled as Claude's settlements, their open picks back to the maintainer as briefs
 Track: The audits
 Depends on: 2002, 2037
 Priority: P2 2026-10-24 — 2037 closed, so its clause 1 and the response column this WP's first demotion takes are in place; the maintainer's next after 2037; the seam the maintainer's own example (a series discontinuity) lives in
@@ -252,13 +252,17 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
       docstring); the closing stage × the fence (cpd-1b escalates with it, not without it).
       Done 2026-10-25: `2003-batch/clashes.md` (`5212338`), fifteen clashes X1-X15, eleven
       measured on synthetic chains or read off the reseed JSONs.
-- [x] The batch to the maintainer, each brief opening with its stakes line (the record
+- [ ] The batch to the maintainer, each brief opening with its stakes line (the record
       § The rule, 2026-10-20); rulings dated into the table. Drafted 2026-10-25
       (`2003-batch/batch.md`, `86ffb9a`), not yet put to the maintainer: four picks are
       revised against DESIGN.md § Rules first (the 2026-10-25 handover's *Next*). Revised on
       main's numbers (`03ec3da`, a lane) and ruled 2026-10-26 (`ca3f354`): the maintainer
       delegated the rulings to the session's judgement against DESIGN.md § Rules, every pick
-      approved, `on_error` kept at `"carry"`, tier 3.
+      approved, `on_error` kept at `"carry"`, tier 3. Reopened 2026-11-02: under the
+      maintainer's standing instructions those were Claude's settlements, not rulings
+      (`batch.md` § Rulings, its relabel paragraph). The open picks go to the maintainer
+      as briefs in the house decision format, one at a time; the seven tier-3 `approved`
+      dates stand until each is approved or reversed.
 - [ ] Approved demotions, each its own commit; `SEQUENTIAL_DISCONTINUITY` replaced by the
       `SeriesResult.steps` field and its help entry (no diagnostic), if the batch agrees; the
       release notes staged. C4 landed 2026-10-26 (fourth session, a lane): the code, its

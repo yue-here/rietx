@@ -1075,13 +1075,14 @@ ROWS: tuple[Row, ...] = (
         evidence=("warning at its one site (sequential.py _reseed_diagnostics, where = the "
                   "label); fires when the kept rung is cold on a warm-startable pattern, its "
                   "trigger _reseed_needed (a rejected best attempt: diverged, or an "
-                  "error-level diagnostic since C2 q5, ruled 2026-10-26; or the caller's own "
+                  "error-level diagnostic since C2 q5, settled by Claude 2026-10-26; or the caller's own "
                   "reseed_factor) or a raised warm rung; on main under the removed 1.25 fence "
                   "it fired on planted 35 and tut05-broken 1, none on the other six families "
                   "(2003-batch/batch.md, C1)"),
         grounds=("Says out loud that the chain restarted, the package's own act, as "
-                 "CELL_RUNAWAY does (B8); the ladder's trigger is tiered with C2's ladder, "
-                 "ruled 2026-10-26, the batch's pick approved (2003-batch/batch.md, C1)."),
+                 "CELL_RUNAWAY does (B8); the ladder's trigger is tiered with C2's ladder. "
+                 "Settled by Claude 2026-10-26 under the maintainer's delegation; "
+                 "the maintainer's own approval is owed (2003-batch/batch.md, C1)."),
         approved="2026-10-26", response="warning",
         responds=("read the named pattern's step from its neighbour as a cold fit's, not the "
                   "chain's, before quoting a trajectory's cell or fraction across it")),
@@ -1089,14 +1090,14 @@ ROWS: tuple[Row, ...] = (
         evidence=("warning at one site (sequential.py _unrecovered_diagnostics, where = the "
                   "label); fires when the kept attempt is still rejected after the rungs the "
                   "chain tried (schemas/sequential.py _rejected: diverged, or an error-level "
-                  "diagnostic, since C2 q5, ruled 2026-10-26), so it reports the quarantine, "
+                  "diagnostic, since C2 q5, settled by Claude 2026-10-26), so it reports the quarantine, "
                   "names the error codes and the successor's start (seeded_from). Before q5 it "
                   "never fired on the eight measured families; under it, on the status arm, "
                   "tut05-broken scan12 (MODEL_FAR_FROM_DATA, Rwp 0.969 on every rung) and "
                   "none of CPD, CPD closing off or planted (2003-batch/batch.md, C2)"),
         grounds=("Says out loud the quarantine, the package's own protective act (as "
-                 "CELL_RUNAWAY, B8); ruled 2026-10-26, the batch's pick approved "
-                 "(2003-batch/batch.md, C2)."),
+                 "CELL_RUNAWAY, B8). Settled by Claude 2026-10-26 under the maintainer's "
+                 "delegation; the maintainer's own approval is owed (2003-batch/batch.md, C2)."),
         approved="2026-10-26", response="warning",
         responds=("quote no cell, fraction or width from the named pattern: its kept fit "
                   "diverged or carries an error-level code after every rung, seeded no "
@@ -1442,28 +1443,29 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.sequential.SeriesEntry.reseeded", "action", tier=3, ambiguity=1,
         evidence=("records that the kept attempt is the cold rung on a warm-startable pattern "
                   "(sequential.py _chain); since WP-2003 the escalation it records fires on a "
-                  "rejected (diverged, or an error-level code: C2 q5, ruled 2026-10-26) or "
+                  "rejected (diverged, or an error-level code: C2 q5, settled by Claude 2026-10-26) or "
                   "raised warm rung, and on Rwp only under the caller's "
                   "reseed_factor; on "
                   "main under the removed 1.25 fence planted 35 and tut05-broken 1, none under "
                   "the status-only trigger, CPD 0 (2003-batch/batch.md, C1)"),
         grounds=("The record of the escalation, tiered with it: trying a colder start on a "
-                 "diverged fit and keeping the better is what a refiner does by hand; "
-                 "ruled 2026-10-26, the batch's pick approved (2003-batch/batch.md, C1)."),
+                 "diverged fit and keeping the better is what a refiner does by hand. "
+                 "Settled by Claude 2026-10-26 under the maintainer's delegation; "
+                 "the maintainer's own approval is owed (2003-batch/batch.md, C1)."),
         approved="2026-10-26"),
     Row("rietx.schemas.sequential.SeriesEntry.rwp_over_median", "action", tier=1, ambiguity=3,
         evidence=("arithmetic: the kept attempt's Rwp over the median Rwp of the patterns "
                   "accepted before it in walk order (sequential.py _rwp_over_median), a record "
                   "with no threshold; it replaces SeriesEntry.rwp_fence, reseed_factor x the "
                   "same median, whose default fence was removed (WP-2003, 2003-batch/batch.md, "
-                  "C1, ruled 2026-10-26). Its help entry says the first patterns are compared "
+                  "C1, settled by Claude 2026-10-26). Its help entry says the first patterns are compared "
                   "against a median of one or two values (X8) and that Rwp tracks Rexp "
                   "(WP-1469's GoF and Rexp readings)")),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_raised", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.seeded_from", "action", tier=3, ambiguity=1,
         evidence=("WP-1051's quarantine (sequential.py _chain): a rejected kept attempt "
-                  "(diverged, or an error-level code since C2 q5, ruled 2026-10-26) seeds no "
+                  "(diverged, or an error-level code since C2 q5, settled by Claude 2026-10-26) seeds no "
                   "successor, joins no median and supplies no first-rung sample, so the next "
                   "pattern warm-starts from the last accepted one; on the measured families "
                   "it fires once, tut05-broken scan12 under q5, so scan13 starts from scan11 "
@@ -1474,7 +1476,8 @@ ROWS: tuple[Row, ...] = (
         grounds=("Rule 1's protection: no competent refiner wants a diverged fit seeding its "
                  "successors (generality.md § The rule, fourth review); the field is its "
                  "record, the substitution having been visible only through history notes "
-                 "under history=True (WP-2003 batch C2)."),
+                 "under history=True (WP-2003 batch C2). Settled by Claude 2026-10-26 under "
+                 "the maintainer's delegation; the maintainer's own approval is owed."),
         approved="2026-10-26"),
     Row("rietx.schemas.sequential.SeriesEntry.floored", "action", tier=3, ambiguity=1,
         evidence=("WP-1329, WP-1301's hold along the series (sequential.py "
@@ -1486,7 +1489,8 @@ ROWS: tuple[Row, ...] = (
                   "attempt, so a floored pattern refitted cold is not counted (WP-2003 X7)"),
         grounds=("Rare feature, judged on the judgement ground alone: a modulus the pattern did "
                  "not support is no measurement to warm-start from, as the absent-phase hold's "
-                 "cell is not (WP-2003 batch C8)."),
+                 "cell is not (WP-2003 batch C8). Settled by Claude 2026-10-26 under the "
+                 "maintainer's delegation; the maintainer's own approval is owed."),
         approved="2026-10-26"),
     Row("rietx.schemas.results.RefinementResult.absorption", "action", tier="caller", ambiguity=1,
         evidence=("opt-in: Geometry.mu_r/mu_t or capillary_radius_mm/thickness_mm, default None "
@@ -3616,8 +3620,9 @@ ROWS: tuple[Row, ...] = (
                   "cheapest pattern"),
         grounds=("Inside the caller's opt-in bound and on no default path; three is the "
                  "smallest sample past the one-sample failure measured, and the budget it "
-                 "arms is reported per pattern by STAGE_MAX_ITER and the rungs tried; ruled "
-                 "2026-10-26, the batch's pick (a) approved (2003-batch/batch.md, C3)."),
+                 "arms is reported per pattern by STAGE_MAX_ITER and the rungs tried. "
+                 "Settled by Claude 2026-10-26 under the maintainer's delegation, pick (a); "
+                 "the maintainer's own approval is owed (2003-batch/batch.md, C3)."),
         approved="2026-10-26"),
     Row("rietx.sequential.MIN_POINTS_FOR_PERSISTENCE", "constant", value=5),
     Row("rietx.sequential.NOISE_FLOOR_REL", "constant", tier=1, value=1e-09,
@@ -4271,7 +4276,7 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.sequential.SequentialRefinement.fit:reseed", "default", tier=3, ambiguity=1,
         value=True,
         evidence=("switches on the ladder's escalation, which since WP-2003 fires on a "
-                  "rejected (diverged, or an error-level code: C2 q5, ruled 2026-10-26) or "
+                  "rejected (diverged, or an error-level code: C2 q5, settled by Claude 2026-10-26) or "
                   "raised warm rung and on the caller's reseed_factor only; under "
                   "False each pattern keeps its first rung, uncut, no first-rung budget "
                   "applying there since C3 (clashes.md X2); on main with the status-only "
@@ -4282,8 +4287,9 @@ ROWS: tuple[Row, ...] = (
                   "nothing in 3 111 evaluations (2026-11-02, macOS arm64)"),
         grounds=("Trying a colder start on a diverged or unfinished fit and keeping the "
                  "better is what a refiner does by hand; the escalation never keeps a worse "
-                 "attempt (_prefer); approved with C2's ladder, ruled 2026-10-26, the "
-                 "batch's pick approved (2003-batch/batch.md, C1)."),
+                 "attempt (_prefer); tiered with C2's ladder. Settled by Claude 2026-10-26 "
+                 "under the maintainer's delegation; the maintainer's own approval is owed "
+                 "(2003-batch/batch.md, C1)."),
         approved="2026-10-26"),
     Row("rietx.sequential.SequentialRefinement.fit:reseed_factor", "default", tier="caller",
         ambiguity=1, value=None,
@@ -4293,8 +4299,8 @@ ROWS: tuple[Row, ...] = (
                   "it carried until WP-2003 (RESEED_FACTOR) was removed: its 116 escalations "
                   "on main moved no value past 7.2e-4 esd, planted from T134 paid 4.1x the "
                   "evaluations for nothing, and an Rwp comparison is no default action's "
-                  "evidence (DESIGN.md § Rules, 4; 2003-batch/batch.md, C1, ruled "
-                  "2026-10-26)")),
+                  "evidence (DESIGN.md § Rules, 4; 2003-batch/batch.md, C1, settled by "
+                  "Claude 2026-10-26)")),
     Row("rietx.sequential.SequentialRefinement.fit:first_rung_factor", "default", tier="caller",
         ambiguity=1, value=None,
         evidence=("opt-in: first_rung_factor=None bounds no first rung, and a factor is asked "
@@ -4305,7 +4311,7 @@ ROWS: tuple[Row, ...] = (
                   "value (planted T087, 6.06 esd, its winning first rung 9.8x the running "
                   "maximum), no program truncates a first rung, and its saving on main was 49 "
                   "evaluations of 13 083 on planted and none on CPD, the null twin or trigger "
-                  "(2003-batch/batch.md, C3, ruled 2026-10-26)")),
+                  "(2003-batch/batch.md, C3, settled by Claude 2026-10-26)")),
     Row("rietx.sequential.SequentialRefinement.fit:verify_steps", "default", tier="caller", ambiguity=1,
         value=0,
         evidence=("opt-in: verify_steps=0 refits nothing, and a count is asked by name; no "
@@ -4314,7 +4320,7 @@ ROWS: tuple[Row, ...] = (
                   "SeriesResult.steps and the cold step as a signed ratio of the chain's "
                   "(SeriesStep.cold_ratio, _verify_steps), moves no fitted value, and which "
                   "steps it refits is the caller's k over a list sorted by size with no "
-                  "threshold: the ruling's option (ii), approved 2026-10-26 "
+                  "threshold: the batch's option (ii), settled by Claude 2026-10-26 "
                   "(2003-batch/batch.md, C4)")),
     Row("rietx.sequential.SequentialRefinement.fit:prepare", "default", tier="caller",
         ambiguity=1, value=None,
@@ -4616,11 +4622,12 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: points at the code that already says why "
                   "(SEQUENTIAL_UNRECOVERED on a rejected cold fit) or at a specimen or model "
                   "change at that pattern (sequential.py _reseed_diagnostics); "
-                  "ruled 2026-10-26, the batch's pick approved (2003-batch/batch.md, C1)")),
+                  "settled by Claude 2026-10-26 under the maintainer's delegation "
+                  "(2003-batch/batch.md, C1)")),
     Row("SEQUENTIAL_UNRECOVERED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the one step that separates the pattern from its chain, "
-                  "fitting it alone (sequential.py _unrecovered_diagnostics); ruled "
-                  "2026-10-26, the batch's pick approved (2003-batch/batch.md, C2)")),
+                  "fitting it alone (sequential.py _unrecovered_diagnostics); settled by "
+                  "Claude 2026-10-26 under the maintainer's delegation (2003-batch/batch.md, C2)")),
     Row("SEQUENTIAL_WIDTH_GROWTH.suggestion", "suggestion", value=1),
     Row("SERIES_PATTERN_FAILED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the one step that reads the exception, the pattern fitted "
