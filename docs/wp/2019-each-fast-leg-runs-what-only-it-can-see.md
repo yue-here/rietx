@@ -255,10 +255,14 @@ cutting it.
       first record measured on three shards (the 2026-11-02 2nd-session
       entry's Next 1). *Done 2026-11-02: 317 files, 5414 s, the thirteen
       collected files the old record lacked now in it.*
-- [ ] **A per-leg record** (Next 2 of the same entry). `tests/shards.py`
+- [x] **A per-leg record** (Next 2 of the same entry). `tests/shards.py`
       `record` writes one profile per state of the documentation switch, and
       `conftest`'s `--shard` reads the one its leg runs under, so py3.11's
-      split stops carrying py3.14's documentation cost.
+      split stops carrying py3.14's documentation cost. *Done 2026-11-02:
+      profiles `docs_run` and `docs_skipped`, the leg read off the switch's
+      skip message in the junit file. Projected on the ten three-shard runs,
+      the two items together give a median slowest job of 16.2 min (newest
+      entry), still over the bar.*
 - [ ] **Read ten runs again** after both land, by the Acceptance method.
 
 ## Acceptance

@@ -19,22 +19,33 @@ until the record is rewritten.
 rewrites the record from one CI run's junit files, fetched with ``gh run
 download RUN -p 'junit-*' -D DIR``.  Each subdirectory is one job, named
 ``junit-<leg>`` or ``junit-<leg>-<shard>``, and a leg's shards sum together.  A
-file's seconds sum its cases, leaving out skipped ones.  The record holds one
-profile, ``numpy``: each file's median seconds over the Python legs that ran
-the most of its cases, each leg's put on the median leg's clock, since one
-run's legs differ by up to 1.6× on the same tree.  A leg's clock is what it
-spent on the files every leg ran alike: the same number of cases, none of them
-free.  Over the legs that ran the *most* of a file, because part of one may run
-on a leg alone: the documentation executes on the newest
-(``tests/documentation.py``), and every file holding it also holds cases that
-run everywhere, so "ran it at all" cannot tell the legs apart.  A median over
-every leg would weigh the documentation at half there, on the leg that already
-runs the most, and the clock would count it as that leg's slowness (WP-2019).
-The jax
-job is read past.  It held a second profile while it ran the whole tier in
-shards, its costs differing file by file (``test_cross_backend.py`` ~390 s there
-against ~15 s on numpy), and since WP-2019 it runs ``--jax-cases`` as one job,
-which no record places.  SOURCE names the run in the record.
+file's seconds sum its cases, leaving out skipped ones.
+
+The record holds two profiles, one per state of the documentation switch
+(``tests/documentation.py``): ``docs_run`` for the newest leg, which executes
+the tutorials, guide scripts and manual builds, and ``docs_skipped`` for every
+other.  ``conftest``'s ``--shard`` reads the one its process runs under.  One
+profile served both legs until WP-2019 measured what that cost: it weighed the
+documentation at the newest leg's price, so on py3.11 the shard holding it ran
+light.  A leg skips the documentation when one of its skipped cases gives the
+switch's reason, so the record reads which leg is which off the junit files
+and names no Python version.  On main run 41407136163 the legs ran different
+numbers of cases in four files, and all four hold documentation.
+
+Each file weighs its median seconds over the Python legs, each leg's put on
+the median leg's clock, since one run's legs differ by up to 1.6x on the same
+tree.  A leg's clock is what it spent on the files every leg ran alike: the
+same number of cases, none of them free.  A file every leg ran alike weighs
+the same in both profiles.  A file the legs ran differently weighs, in each
+profile, what that profile's legs spent on it, among them the ones that ran the
+most of its cases.  A run with no leg of one kind gives that profile every
+leg's figures.
+
+The jax job is read past.  It held a profile of its own while it ran the whole
+tier in shards, its costs differing file by file (``test_cross_backend.py``
+~390 s there against ~15 s on numpy), and since WP-2019 it runs
+``--jax-cases`` as one job, which no record places.  SOURCE names the run in
+the record.
 """
 
 from __future__ import annotations
@@ -49,10 +60,16 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 
+from tests import documentation
+
 RECORD = Path(__file__).with_name("shard_times.json")
 _SPEC = re.compile(r"\s*(\d+)\s*/\s*(\d+)\s*")
 #: ``junit-py3.11`` is leg ``py3.11``, and so is its shard ``junit-py3.11-2``.
 _JOB = re.compile(r"junit-(.+?)(?:-(\d+))?")
+#: The record's profiles, for a leg executing the documentation and one skipping it.
+DOCS_RUN, DOCS_SKIPPED = "docs_run", "docs_skipped"
+#: How a skipped case's junit message starts when the documentation switch skipped it.
+_DOCS_SKIP = f"{documentation.ENV}={documentation.SKIP}"
 
 
 def parse(spec: str) -> tuple[int, int]:
@@ -66,9 +83,10 @@ def parse(spec: str) -> tuple[int, int]:
     return k, n
 
 
-def recorded_seconds(path: Path = RECORD) -> dict[str, float]:
-    """The record's seconds, keyed by repo-relative POSIX file path."""
-    return json.loads(path.read_text(encoding="utf-8"))["numpy"]
+def recorded_seconds(path: Path = RECORD, *, docs_skipped: bool = False) -> dict[str, float]:
+    """The record's seconds, keyed by repo-relative POSIX file path, for a leg
+    that executes the documentation or, with ``docs_skipped``, one that skips it."""
+    return json.loads(path.read_text(encoding="utf-8"))[DOCS_SKIPPED if docs_skipped else DOCS_RUN]
 
 
 def units(pairs: Iterable[tuple[str, str | None]]) -> list[frozenset[str]]:
@@ -139,10 +157,13 @@ def leg_seconds(directory: Path) -> dict[str, dict[str, float]]:
     return _legs(directory)[0]
 
 
-def _legs(directory: Path) -> tuple[dict[str, dict[str, float]], dict[str, dict[str, int]]]:
-    """``leg_seconds``, and beside it how many of each file's cases each leg ran."""
+def _legs(directory: Path) -> tuple[dict[str, dict[str, float]], dict[str, dict[str, int]],
+                                    set[str]]:
+    """``leg_seconds``, and beside it how many of each file's cases each leg ran
+    and which legs the documentation switch skipped a case on."""
     legs: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     ran: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    skips_docs: set[str] = set()
     shards_of: dict[str, set[int]] = defaultdict(set)
     for junit in sorted(directory.glob("junit-*/junit.xml")):
         m = _JOB.fullmatch(junit.parent.name)
@@ -155,19 +176,23 @@ def _legs(directory: Path) -> tuple[dict[str, dict[str, float]], dict[str, dict[
             file = _file_of(case.get("classname", ""))
             if file is None:
                 continue
-            skipped = case.find("skipped") is not None
+            skip = case.find("skipped")
+            skipped = skip is not None
+            if skipped and skip.get("message", "").startswith(_DOCS_SKIP):
+                skips_docs.add(m[1])
             leg[file] += 0.0 if skipped else float(case.get("time", "0"))
             count[file] += 0 if skipped else 1
     want = set(range(1, max(map(max, shards_of.values()), default=0) + 1))
     if short := {name: sorted(want - got) for name, got in shards_of.items() if got != want}:
         raise SystemExit(f"shards missing under {directory}: {short}")
     return ({name: dict(files) for name, files in legs.items()},
-            {name: dict(files) for name, files in ran.items()})
+            {name: dict(files) for name, files in ran.items()},
+            skips_docs)
 
 
 def record(directory: Path, source: str) -> dict:
     """The record's contents from one run's junit files, its Python legs alone."""
-    seconds, ran = _legs(directory)
+    seconds, ran, skips_docs = _legs(directory)
     python = [name for name in seconds if name.startswith("py")]
     if not python:
         raise SystemExit(f"no junit-py* leg under {directory}")
@@ -178,13 +203,21 @@ def record(directory: Path, source: str) -> dict:
     speed = {name: math.fsum(seconds[name][f] for f in sorted(common)) for name in python}
     median = statistics.median(speed.values())
     factor = {name: (s / median if s and median else 1.0) for name, s in speed.items()}
-    numpy = {}
-    for f in every:
-        most = max(ran[name].get(f, 0) for name in python)
-        legs = [seconds[name][f] / factor[name] for name in python
-                if most and ran[name].get(f, 0) == most]
-        numpy[f] = round(statistics.median(legs), 1) if legs else 0.0
-    return {"source": source, "numpy": numpy}
+
+    def profile(kind: list[str]) -> dict[str, float]:
+        out = {}
+        for f in every:
+            alike = len({ran[name].get(f, 0) for name in python}) == 1
+            pool = python if alike or not kind else kind
+            most = max(ran[name].get(f, 0) for name in pool)
+            legs = [seconds[name][f] / factor[name] for name in pool
+                    if most and ran[name].get(f, 0) == most]
+            out[f] = round(statistics.median(legs), 1) if legs else 0.0
+        return out
+
+    return {"source": source,
+            DOCS_RUN: profile([name for name in python if name not in skips_docs]),
+            DOCS_SKIPPED: profile([name for name in python if name in skips_docs])}
 
 
 def main(argv: list[str]) -> int:
@@ -195,7 +228,8 @@ def main(argv: list[str]) -> int:
     source = argv[1] if len(argv) == 2 else directory.name
     out = record(directory, source)
     RECORD.write_text(json.dumps(out, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"numpy: {len(out['numpy'])} files, {math.fsum(out['numpy'].values()):.0f} s")
+    for name in (DOCS_RUN, DOCS_SKIPPED):
+        print(f"{name}: {len(out[name])} files, {math.fsum(out[name].values()):.0f} s")
     return 0
 
 

@@ -82,11 +82,13 @@ name: CI
 # the WP's bar of 15.  One shard's wall varied 1.6x between runners on
 # identical work, so a better record alone could not close that gap.  A third
 # shard cuts each job's work by a third: 22.4 worker-min a shard on the record
-# against 33.6 at two.  The largest unit the record places, test_examples.py
-# at 10.2 min, stays under a shard's share.  One split serves both legs and
-# weighs the documentation at the newest leg's cost, so on py3.11, which skips
-# it, the shard holding it runs light.  The shard count is `matrix.of`, and
-# `matrix.shard` lists 1 to it.
+# of the time against 33.6 at two.  The largest unit, test_examples.py, stays
+# under a shard's share: 19.8 against 30.1 worker-min on the newest leg's
+# profile of the record from main run 41407136163.  The shard count is `matrix.of`,
+# and `matrix.shard` lists 1 to it.  Each leg splits by the record's profile
+# for its RIETX_DOCS value: one split for both legs weighed the documentation
+# at the newest leg's cost, so on py3.11, which skips it, the shard holding it
+# ran light.
 #
 # The jax job runs only the cases that reach jax (WP-2019): a jax parameter,
 # jax named in the test or in a fixture of it, or a module that skips without
