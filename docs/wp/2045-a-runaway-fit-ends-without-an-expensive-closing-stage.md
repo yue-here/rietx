@@ -352,7 +352,8 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
   guide already says so. The Status line was stale: #1161 merged on
   2026-10-25, and the nightly `full` job has failed or been cancelled every
   night from 2026-10-24 to 2026-11-01 while every other leg passed. Those
-  failures are WP-2036's (PR #1309). *Next:* the first nightly `full` job
+  failures are WP-2036's (PR #1309). Recorded in PR #1317. *Next:* the
+  first nightly `full` job
   that completes on `main` closes this WP.
 
 ### 2026-10-25 — option 5 measured and built: the last declared stage converges, and the hostile series finishes in 92 s

@@ -98,7 +98,7 @@ choosing a fix.
   reports S/L as a measurement whenever the user declares the slit height, and the two
   mirrored minima disappear. Recorded only; nothing is built or run. While recording it,
   `lab_bragg_brentano` turned out to free both ratios as well, so the build task covers
-  both presets. *Next:* task 1 (FCJ 1994 on the symmetry), then the build.
+  both presets. PR #1317. *Next:* task 1 (FCJ 1994 on the symmetry), then the build.
 
 - **2026-10-19, filed by WP-1986's sixth session.** No open WP owns the axial ratios: a
   `git grep` for `axial_sl`/`axial_hl` over `docs/wp/` on `origin/main` finds only closed WPs

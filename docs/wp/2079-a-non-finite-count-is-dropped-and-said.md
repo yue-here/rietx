@@ -97,5 +97,5 @@ naming 30.79-36.69°. No reader returns a non-finite value.
 - **2026-11-02** — created by a ghostshift runner from the 2026-11-01
   decision briefs (§C item 1), to give #1187 an owner. No WP cited it. The
   closest owner, WP-1952, covers the xy reader alone and is being edited by
-  PR #1279. Nothing was run; every number above is the issue's. *Next:*
-  task 1.
+  PR #1279. Filed in PR #1317. Nothing was run; every number above is the
+  issue's. *Next:* task 1.

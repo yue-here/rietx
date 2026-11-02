@@ -123,8 +123,8 @@ with one phase declared and one not.
   none, and FullProf has one empirical parameter (`docs/practice.md`
   § Extinction). If the count favours the opt-in, making `Phase.extinction`
   optional is a stored-format change, and it goes back to the maintainer as
-  one consent line. Recorded by a ghostshift runner; nothing was run.
-  *Next:* task 1.
+  one consent line. Recorded by a ghostshift runner in PR #1317; nothing
+  was run. *Next:* task 1.
 
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issue #877).
   Checked against the tree at `f11e22d3`: the extinction stage's glob

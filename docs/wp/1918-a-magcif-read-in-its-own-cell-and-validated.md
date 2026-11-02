@@ -302,7 +302,7 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   and predict on #1108, and raise on `main`. A planted strain of 0.004 was
   recovered to 3e-11. A tie list cannot express the hexagonal case, since
   cos γ = −a/(2b) is nonlinear. Not covered: the magnetic layer and a real
-  MAGNDATA file. *Next:* I-a; I-d waits for #1108.
+  MAGNDATA file. Recorded in PR #1317. *Next:* I-a; I-d waits for #1108.
 
 - **2026-11-01** (`/pr-review`) — #1063's items 1 and 3 merged from outside as PR #1257 (`1c55eda6`). A CIF whose other data blocks state nothing, or only `_audit_` tags, now reads its one structure block. It records the skip as the info code `CIF_EMPTY_BLOCK_SKIPPED` (tier 1). The pre-2016 draft magnetic tags are refused by name. That refusal is the maintainer's call on file "B" in #1063: refuse. No task of this WP is ticked by it. Follow-ups, not blocking: `refuse_a_magnetic_supercell` does not consult `_magnetic_propagation_vector_kxkykz`. `refuse_draft_tags` matches `^\s*<tag>` over the raw text, so it would fire inside a semicolon text field. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
 

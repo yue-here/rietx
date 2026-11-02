@@ -314,7 +314,8 @@ green, and no ranking or class decision on the acceptance suites lost.
   first. Claude settled the rest: D stays, A2 moves here, the `lebail` names
   are renamed in the same change, and WP-1542 drops to P3. The work is now a
   build WP with five bug tasks ahead of the four sites. Recorded by a
-  ghostshift runner from the 2026-11-01 decision briefs; nothing was run.
+  ghostshift runner from the 2026-11-01 decision briefs in PR #1317; nothing
+  was run.
   Forward references went to WP-1542 (re-rated) and WP-1910 (A2's mode is
   this WP's). *Next:* the unit dependence, since its answer can reopen
   decision 0.
