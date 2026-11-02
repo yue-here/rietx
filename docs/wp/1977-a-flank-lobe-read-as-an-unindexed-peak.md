@@ -1,14 +1,17 @@
 # WP-1977 — a flank lobe read as an unindexed peak
 
-Milestone: unscheduled · Status: ✅ 2026-11-01 — PR #1295; a flank lobe is part of its drawn peak; record field asked of Yue
+Milestone: unscheduled · Status: ✅ 2026-11-02 — PR #1295; every residual peak is listed with its flank evidence, and none on a flank buys an impurity call (ruled 2026-11-01)
 Track: What fires, and what stays silent
 Depends on: —
 
 ## Goal
 
-Layer 0 calls a residual peak unindexed only when no modelled reflection
-explains it. A lobe of misfit on the flank of a strong peak counts as
-explained.
+Layer 0 says, for each residual peak it lists, whether the observed curve
+joins it to a drawn peak with no resolving dip. Layer 2 names no single cause
+for such a peak, and so suggests no impurity phase on it. A residual the data
+resolve keeps today's reading. (Rewritten 2026-11-02 to Yue's ruling of
+2026-11-01; the first goal, a flank lobe counted as explained, is the design
+the ruling replaced.)
 
 ## Context
 
@@ -77,25 +80,27 @@ test explains it like a reflection's. The issue's open questions about a
 label, a "sharp line" definition and printing the blank's σ/I are not
 answered here.
 
-**#1106 point 3 (from the 2026-10-26 triage).** The flank filter the issue
-proposed on `add_impurity_phase` is unnecessary once Layer 0 explains the
-lobes, because the action reads only `unmatched_obs`. Points 1-2, the
-asymmetry column, stay with WP-2054.
+**#1106 point 3 (from the 2026-10-26 triage).** The issue proposed a flank
+filter on `add_impurity_phase`. Since the rework this is what lands: Layer 2
+does not count a row on a flank toward the call. Points 1-2, the asymmetry
+column, stay with WP-2054.
 
-**The tier of each rule this WP adds.** One rule: a residual peak whose
-observed curve rises into a peak `y_calc` draws, with no valley of
-`min_peak_sigma` σ on the way, is explained (`report/layer0.on_drawn_flank`).
-It is a peak-resolution test, the reader's eye made explicit (McCusker et al.
-1999). Tier 3: no program does it (`docs/practice.md`). Both its levels
-reuse the report's detection level, `min_peak_sigma` = 5σ, unaudited and
-owned by WP-2004; reusing it is a choice, and the valley depth sets how far
-the rule reaches. Kind of ambiguity: where the observed curve has a valley
-the data settle it, and the rule lists the peak. Where it has none they do
-not: a shape misfit and an unresolved foreign line look the same, and the
-rule reads it as the first, following this WP's Goal. Measured on the IUCr
-CPD QPA round robin (twelve fits, one laboratory), SRM 660c and four
+**The tier of each rule this WP adds** (rewritten 2026-11-02). Two rules.
+(1) The flank test, `report/layer0.on_drawn_flank`: the observed curve rises
+from the residual into a peak `y_calc` draws, with no dip of `min_peak_sigma`
+σ on the way. It is a measurement now, recorded on every `unmatched_obs` row
+as `UnmatchedPeak.flank`, and filters no row. (2) Layer 2 does not count a row
+with `flank.on_flank` toward `add_impurity_phase`. Kind of ambiguity: 2. A
+shape or asymmetry misfit, an unmodelled Kα2, a lower symmetry and a foreign
+line all leave such a shoulder, and the data score them only partly (the
+offset in FWHM, how many lines as strong carry a lobe on the same side). So
+the package records the evidence, names the four causes in
+`rietx.help.explain("UnmatchedPeak.flank")`, and picks none. Tier 3: no
+program flags a difference-curve peak after a fit (`docs/practice.md`), and
+the 5σ levels are the report's detection level reused, owned by WP-2004.
+Measured on the IUCr CPD QPA round robin (one laboratory), SRM 660c and five
 synthetic LaB₆ cases (`tests/test_flank_lobes.py`); the firing side on real
-data is 11-BM NAC's CaF₂ (`tests/eval_report_agent`'s W1 rows, which pass).
+data is 11-BM NAC's CaF₂ (`tests/eval_report_agent`'s W1 rows).
 
 ## Non-goals
 
@@ -141,13 +146,25 @@ data is 11-BM NAC's CaF₂ (`tests/eval_report_agent`'s W1 rows, which pass).
 - [x] Skill: the `unmatched_obs` reference row, if what it means changes.
       `references/judging.md` § 4b, one sentence inside its budget, and the
       manual's `concepts/report.md`.
+- [x] Rework to Yue's ruling of 2026-11-01 (2026-11-02): every residual peak
+      stays listed and carries `UnmatchedPeak.flank`; `add_impurity_phase`
+      does not count a row on a flank; the four causes in `help.py`, one
+      skill row in `references/abstention.md`; the manual, the records and
+      the tests follow.
 
 ## Acceptance
 
-On cpd-1c and cpd-1f under `qpa_plan`, no `unmatched_obs` sits on the flank
-of a strong reflection, and Layer 1 does not suggest `add_impurity_phase`.
-On a synthetic pattern with an unmodelled second phase, its strongest
-isolated peaks still read as `unmatched_obs`.
+On cpd-1a…1h under `qpa_plan`, every `unmatched_obs` within 0.5° of a
+strong reflection carries `flank.on_flank`, and Layer 2 suggests no
+`add_impurity_phase`. On a synthetic pattern with an unmodelled second phase,
+its strongest isolated peaks still read as `unmatched_obs`, off any flank, and
+the impurity call is made. A tetragonal specimen modelled cubic keeps
+`reindex_or_recheck_cell`.
+
+```sh
+.venv/bin/python -m pytest tests/test_flank_lobes.py tests/test_fitreport_layers.py -n auto --dist loadgroup
+.venv/bin/python -m pytest tests/test_acceptance_qpa_roundrobin.py -n auto --dist loadgroup
+```
 
 ## References
 

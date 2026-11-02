@@ -116,7 +116,7 @@ The blind direction is the one de Wolff's M₂₀ has, and Oishi-Tomiyasu's reve
 `FlankEvidence.on_flank` is `True` when the observed curve rises from the residual peak into a calculated peak without falling {{ LAYER0_PEAK_SIGMA }} esds below its running maximum.
 The data then do not resolve the two, and Layer 2 suggests no impurity phase for the entry.
 A shape or asymmetry misfit, an unmodelled Kα2 line, a symmetry lower than the model's and a foreign line all leave such a shoulder.
-`rx.help.explain("UnmatchedPeak.flank")` says what separates them, and [Result fields](result-fields.md) describes each field.
+`rietx.help.explain("UnmatchedPeak.flank")` says what separates them, and [Result fields](result-fields.md) describes each field.
 
 | Field | Is | Reads as |
 |---|---|---|
