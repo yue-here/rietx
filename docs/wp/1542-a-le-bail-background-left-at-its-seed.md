@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-10-08 — #725's opt-in `auto_background(seed=True)` landed from outside (PR #744); every task remains
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-03 — a background too low reads as a good Le Bail fit and feeds every structure fit after it; a path few fits run
+Priority: P3 2026-11-01 — was P2: WP-2062 moves every site where rietx picks a structure-free fit to Pawley (decided 2026-11-01), so no default path will run Le Bail; a caller who picks `mode="lebail"` still meets this
 
 ## Goal
 
@@ -42,6 +42,15 @@ this failure lowers Rwp. WP-1323 shipped in 1.6.0 and closed with this filed
 here (2026-10-03, at the maintainer's request).
 
 ### Inherited
+
+- **2026-11-02, from WP-2062: no default path will run Le Bail.** The
+  maintainer decided on 2026-11-01 that Pawley replaces Le Bail at the
+  extinction screen, the GUI's Adopt and new-project wizard, and the prose
+  that says "Le Bail before Rietveld", after Pawley's known bugs are fixed.
+  This WP's decision 4 there said this WP drops a rung once that holds, so
+  its Priority line now reads P3. The failure here still reaches a caller
+  who picks `mode="lebail"`, and Pawley's own seed partition
+  (`refine.py:4404-4411`) is one Le Bail pass.
 
 - **2026-10-27, from WP-2011 and WP-2062: every surveyed program re-extracts
   Le Bail intensities inside the refinement, and rietx does not.** GSAS-II
