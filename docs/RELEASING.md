@@ -120,6 +120,21 @@ which is the backlog this rule exists to prevent.
    until one ships the previous minor stays stable. A patch release replaces its
    minor's tree, because the deploy keeps the newest patch of each minor.
 
+Once those checks pass, three steps close the cut and open the next release.
+They land on `main` as one pull request.
+
+9. Finish `docs/milestones/vX.Y.md` with its measured ship block, naming the
+   milestones the release completes. The suite counts go in the record's ship
+   appendix. A patch release has no record, so it skips this step.
+10. Check the claims in `README.md` against what the release ships.
+11. Move `pyproject.version` to the next minor's `.dev0`, with step 1's three
+    follow-ons: the reinstall, the skill's `metadata.version` and its two
+    copies, and the rebuilt tutorial notebooks. Then open that version's
+    record. That means `docs/milestones/vX.Y.md` and its staged notes
+    `docs/releases/X.Y.0.md`, plus its row in ROADMAP's milestone table and
+    the "next release" line in its Current focus. The precedents are
+    `2163a4a85` (1.10) and `e67490927` (1.11).
+
 ## The hosted manual's versions
 
 `rietx.org/docs/` holds `dev` (built from `main` on every push), `stable`, and

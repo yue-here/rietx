@@ -1,6 +1,6 @@
 # WP-2046 — The claim check sees a contributor's PR on the WP it runs for
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — all six tasks landed; PR #1318 in review
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-10-24 — a check that returned a false all-clear on a 1 764-line contributor PR; reading the PR list by hand is the workaround, and `/wp-start` step 2 already asks for it
@@ -50,6 +50,26 @@ too (WP-1956 cites #941 four times). The third rule showed 21 PRs of 23. Whether
 it dropped hid a real overlap is part of the first task. Closing keywords in the body
 (`Closes #N`) are the obvious addition to the title's numbers, and are not yet measured.
 
+**Measured 2026-11-02 on the 23 open PRs** (the first task; scratch scripts over `gh pr list`,
+one GraphQL call classifying the 53 numbers they cite as 34 PRs and 19 issues). #941 had
+closed, so its links come from `gh pr view 941` run through the same code.
+
+| rule | rows | PRs shown | #941 linked to |
+|---|---|---|---|
+| today | 23 | 23 | WP-1325 |
+| named only by title, else every WP file edited, else branch; the title's `#N` and GitHub's closing references, PR numbers dropped | 35 | 22 (drops #1284) | WP-1511, 1956, 1968, 2041, 2046 |
+| as above, plus a "mentions it" row for each WP the body names, when nothing names the PR outright (**chosen**) | 37 | 23 | the five above, plus 1043, 1325, 1446, 1449, 2001 by mention |
+| as above, with the body's mentions on every PR | 62 (a WP reached two ways counted twice) | 23 | as above |
+| the chosen rule, but a title's PR number kept | 42 | 23 | as above |
+
+The dropped PR hid a real overlap. #1284's title cites #1257, which is a PR, and its body says
+"Part of WP-1918". A title-and-closing rule alone puts it nowhere. Kept as a mention, it
+reaches WP-1918 and nothing else. Keeping its title's PR number instead links it to five WPs,
+because WP-1918, 1956, 1958, 2028 and 2033 all cite #1257, and only WP-1918 is real.
+Body mentions on every PR flood the table, since a WP PR's handover-written body cites many
+WPs. GitHub's closing references and a `Closes #N` regex gave the same rows; the code reads
+GitHub's (`closingIssuesReferences`), which excludes PRs by construction.
+
 **Rules that bind it.**
 
 - `tests/CLAUDE.md` § Running: a check that silently finds nothing returns a false all-clear
@@ -78,18 +98,18 @@ package makes no decision here.
 
 ## Tasks
 
-- [ ] Choose the issue set the overlap match reads (title only, title plus closing keywords, or
+- [x] Choose the issue set the overlap match reads (title only, title plus closing keywords, or
       another rule) on the day's open PRs. Quote rows and #941's links beside today's 24, and
-      name each PR the rule drops from the table.
-- [ ] A WP is named outright only by the title, the branch or a WP file the PR edits. A body
+      name each PR the rule drops from the table. *(Context § Measured 2026-11-02.)*
+- [x] A WP is named outright only by the title, the branch or a WP file the PR edits. A body
       mention is a reference, and the issue chain still runs for it.
-- [ ] Drop `#N` that are pull requests from the overlap match.
-- [ ] The own-PR filter drops the session's own PR by head branch, never every row of its WP.
-- [ ] Tests in `tests/test_workflow_hooks.py` beside the existing overlap tests (`:1110-1190`).
+- [x] Drop `#N` that are pull requests from the overlap match.
+- [x] The own-PR filter drops the session's own PR by head branch, never every row of its WP.
+- [x] Tests in `tests/test_workflow_hooks.py` beside the existing overlap tests (`:1110-1190`).
       #941's shape (a body naming another WP first, the issue in the title) reaches the WP
       citing that issue. From that WP's tree, a contributor's PR on it still shows and the
       tree's own PR does not. Fail each on purpose once against today's code.
-- [ ] Skill: none. The rietx skill drives the package, and this is a repo hook.
+- [x] Skill: none. The rietx skill drives the package, and this is a repo hook.
 
 ## Acceptance
 
@@ -107,6 +127,59 @@ python3 .claude/hooks/wp_claim.py status
 - WP-1422 (✅), which built the check and its PR → issue → WP chain.
 
 ## Handover log
+
+- **2026-11-02** — all six tasks landed, PR #1318 (a ghostshift runner's session). `/wp-start`'s
+  claim check now shows a contributor's PR on the WP it runs for. It no longer takes a WP that
+  a PR's body mentions in passing as the PR's claim. Run from a WP's own tree, it hides only
+  that tree's PR, never every PR on the WP. On the day's 23 open PRs the table grew from 23
+  rows to 37 and lists every PR. PR #941 had closed by today, so the acceptance ran on its
+  stored text and on a test of its shape, not live.
+
+  *Done.* `open_prs` (`.claude/hooks/wp_claim.py`) fills four new `PullRequest` fields. `wps`
+  holds the WPs named outright: the title's, else every WP file edited, else the branch's.
+  `mentions` holds the body's WPs. `chain` holds the title's `#N` plus GitHub's
+  `closingIssuesReferences`, less every number GitHub says is a PR, and is empty when `wps`
+  is not. `fork` is `isCrossRepository`. `wp` is gone, replaced by `wps`. `issues` is
+  unchanged, so `backlog.py`'s column reads what it did. `_pull_requests_among` asks one
+  GraphQL `issueOrPullRequest` query for the numbers in titles that name no WP. When gh
+  cannot answer, the numbers stay in the chain, which adds rows and never loses one.
+  `overlaps(prs, citations, branch)` drops the PR whose head branch is this tree's and is not
+  a fork. A PR with named WPs gets those rows only. One without gets a row per WP, its reasons
+  joined ("mentions it and issue #562"). `describe_pull_request` prints each WP with its own
+  reason when the reasons differ. `_status` reads the tree's full branch with
+  `git symbolic-ref`, because `worktree_branches` keeps only the last path segment. `/wp-start`
+  step 2's prose says what the chain now reads.
+
+  *Review.* `/code-review high --fix` found 7 and fixed 4 (commit `8ce8a26f0`). `gh api
+  graphql` exits 1 when one number does not resolve, which voided the whole classification,
+  so `_gh` takes `partial=True` there. A closing reference to another repository's issue is
+  no longer followed. Only titles naming no WP are classified. `Overlap.via`'s comment lists
+  its forms. Declined, each in a line: a body's non-closing `#N` ("Part of #283") is no longer
+  followed, which is the rule the first task measured and chose; a detached HEAD shows the
+  tree's own PR, which errs towards too much; `mentions` subtracting `wps` is redundant and
+  harmless.
+
+  *Measured.* The first task's table is in Context § Measured 2026-11-02. The new tests'
+  behavioural assertions ran against `origin/main`'s `wp_claim.py` through a scratch script:
+  the #941 shape, the contributor PR seen from its WP's tree, a title PR number followed, and
+  the second WP file all fail there and pass here. `tests/test_workflow_hooks.py`: 110 passed
+  ([dev], darwin arm64), 103 on main plus 7 added, 0.84 s for the seven (one local run).
+  Fast selection: 13291 passed, 310 skipped, 32 xfailed in 8:37 ([dev], darwin arm64, through
+  the ghostshift serialiser). It may have collected before the review fixes landed. The one
+  file those fixes touch re-ran green on the final tree. `python -m tests.reader_output`:
+  exit 0, unchanged. Full suite not run: the change is a repo hook and moves no measured
+  number.
+
+  *Gotchas.* PR #1312 (WP-2077, ghostshift runners) rewrites `_status` too, moving the
+  `mine = …` line above the local table. Whichever merges second resolves one textual
+  conflict. Keep `mine` keyed on the WP for 2077's runner marker, and pass `branch` to
+  `overlaps`. #1312 also adds an `### Inherited` note to this WP file saying so. The
+  branch-name regex still reads no WP from a contributor branch like `wp2028/joint-screens`,
+  since `/` is not a separator there. Not changed: every such PR names its WP in its title
+  today.
+
+  *Next:* review and merge #1318, then close this WP (✅, Priority line deleted, narrative to
+  the v1.11 record).
 
 - **2026-10-24** — created, from the `/wp-start 1956` session that the check gave a false
   all-clear (checked against `origin/main` `10fff0dbd`). No open WP owns `wp_claim.py`.

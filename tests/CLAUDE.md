@@ -36,7 +36,11 @@ and `ps` both saw, and it is not stable between sessions — a check that
 silently finds nothing returns a false all-clear every time, which is worse
 than no check. **Count trees, not lines**: `grep` reads the command line, so a
 background launch matches its own zsh wrapper too and `-c` says 1 on an idle
-machine. **Found one: wait or defer, and never measure anyway** — it would not be
+machine. **A ghostshift runner queues instead** (WP-2077): it starts a full
+suite only through ghostshift's `bin/serial.py` (in claude-config), which holds
+a machine-wide lock and also waits while `ps` shows a `python -m pytest`
+outside it. A `ps` line naming `serial.py` is a queued waiter, not a running
+suite. **Found one: wait or defer, and never measure anyway** — it would not be
 quotable (§ Quoting numbers). Checked in `/pr-review` step 9 and `/wp-handover`
 steps 7 and 10; rungs 1-2 skip it, being cheap to repeat.
 
