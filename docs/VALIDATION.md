@@ -1437,9 +1437,9 @@ The single-histogram refinable wavelength, on NIST SRM 640c silicon at APS 11-BM
 
 **Claims:** the held cell IS the certificate value -- the anchor of the whole protocol, asserted as the identity it is rather than measured
 
-**Referenced to:** NIST SRM 640c certificate a = 5.4311946 +- 0.0000092 A at 22.5 C.  Held, not refined: holding a certified cell is what turns a free lambda into a calibration measurement.  The cubic ties (b<-a, c<-a) carry the source's value, so this is an identity bar (exact) and the absent esd shows nothing was refined.  XND held 5.4311948, 0.4 ppm above, negligible against every band here and stated in the docstring
+**Referenced to:** NIST SRM 640c certificate a = 5.4311946 +- 0.0000092 A at 22.5 C.  Held, not refined: holding a certified cell is what turns a free lambda into a calibration measurement.  The answer lists no cell row, since a result carries only what the fit could move (WP-1999); the parameter table holds a never freed and b, c tied to it, so this is an identity bar (exact) and the absent esd shows nothing was refined.  XND held 5.4311948, 0.4 ppm above, negligible against every band here and stated in the docstring
 
-**Measured:** cell.b and cell.c both exactly 5.4311946 A, esd None
+**Measured:** no cell row in the answer; cell.a, cell.b and cell.c in the parameter table all exactly 5.4311946 A, esd None
 
 #### `test_the_sample_broadening_is_positive_and_finite`
 
