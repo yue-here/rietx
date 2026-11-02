@@ -1335,7 +1335,7 @@ class MultiHistogramRefinement:
                                  f"{i} of {n}", instrument=ins)
         if mode != "rietveld":
             raise NotImplementedError(
-                "multi-histogram refinement is Rietveld-only in v0.3; Le Bail / "
+                "multi-histogram refinement is Rietveld-only; Le Bail / "
                 "Pawley intensities are per-pattern extractions, not shared, so a "
                 "joint fit of them is just independent single-pattern fits")
         if isinstance(plan, str):

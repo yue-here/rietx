@@ -4191,8 +4191,11 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
     back into it (:func:`~.topas_ties.split_magnetic_parts`), its moments onto
     the same-label sites. That form's phase terms TOPAS has no keyword for are
     read back by the names ``p<i>_extinction``, ``p<i>_magnetic_lor_size``
-    and ``p<i>_magnetic_lor_strain`` (no writer in this tree writes them
-    yet; each one read is reported as ``TOPAS_PHASE_TERM_READ``). The merge is
+    and ``p<i>_magnetic_lor_strain``, each one read reported as
+    ``TOPAS_PHASE_TERM_READ``. :func:`write_topas_inp` writes the two widths
+    in that form; it refuses a phase carrying both a magnetic-only width and
+    extinction, so ``p<i>_extinction`` reaches this form only from another
+    writer. The merge is
     equal-or-refuse: the part's scale, cell, space group and each site's
     position, element and occupancy must equal the nuclear ``str``'s, every
     part site needs a nuclear counterpart, and the merge is reported as
