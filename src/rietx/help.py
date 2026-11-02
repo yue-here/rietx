@@ -3192,6 +3192,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the angle with its interval."
         ),
     ),
+    "MOMENT_UNSUPPORTED": HelpEntry(
+        title="Moment the data do not support",
+        description=(
+            "A refined moment size is under three times its error estimate, or at "
+            "its floor of 0.001 Bohr magnetons. The data then cannot tell this "
+            "moment from no moment. The magnetic intensity goes as the square of the "
+            "size, so near zero the size has almost no effect on the pattern, and "
+            "its error estimate is no interval: a fit that ends on zero can report an "
+            "estimate of 10 000 Bohr magnetons. Read the moment as unsupported. For "
+            "an upper limit, `Refinement.profile_interval` gives the size's "
+            "likelihood interval, which never goes below zero. The FitReport's "
+            "moment rows give the same verdict as `supported`."
+        ),
+    ),
     "MOMENT_PAIR_DEGENERATE": HelpEntry(
         title="Two moments cannot be told apart",
         description=(

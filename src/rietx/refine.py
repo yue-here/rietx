@@ -139,6 +139,7 @@ from .report.distortion import distortion_totals as _distortion_totals
 from .report.magnetic import (
     magnetic_width_findings,
     moment_angle_stationary_diagnostics,
+    moment_unsupported_diagnostics,
 )
 from .report.schemas import (
     MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA,
@@ -8669,6 +8670,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     if stage_results:
         diagnostics = diagnostics + moment_angle_stationary_diagnostics(
             stage_results[-1], params)
+    # WP-2060: a modulus the data do not support, the FitReport's verdict on
+    # the result, where its esd would otherwise read as an interval
+    diagnostics = diagnostics + moment_unsupported_diagnostics(params)
 
     # Specimen absorption: report what was applied and, crucially, the Biso
     # bias it removed — for a capillary Rwp is provably unchanged by it, so

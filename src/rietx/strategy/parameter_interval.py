@@ -254,7 +254,9 @@ def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
     solved in the logarithm of the distance, where any power law is a
     straight line and the tolerance is relative.  The bracket's inner end is
     then a measured probe and never the fit, so the end lies strictly away
-    from the value.
+    from the value.  A probe nearer the fit whose Δχ² did not fall is a
+    profile that does not return to the fit's χ² at its value, and the side
+    stops on ``"error"`` with that probe saying so.
     """
     from scipy.optimize import brentq
 
@@ -349,6 +351,15 @@ def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
                     raise _SideStopped("error")   # no distance left to probe
                 if delta(v, restart=True) < cut:
                     break
+                if measured[v] > measured[outer] - settled:
+                    # nearer the fit and no lower: the refits do not come back
+                    # to the fit's χ² near its value, so there is no end to find
+                    points[-1] = points[-1].model_copy(update={"error": (
+                        f"the refits do not return to the fit's chi2 near its "
+                        f"value: {measured[v]:.4g} above it at {abs(v - start):.3g} "
+                        f"from the value, {measured[outer]:.4g} at "
+                        f"{abs(outer - start):.3g}")})
+                    raise _SideStopped("error")
                 outer = v
             floor = PARAMETER_INTERVAL_CHI2_TOL * cut
             # the bracket's two ends are probes already measured, so they map

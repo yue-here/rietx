@@ -136,3 +136,38 @@ def test_the_sign_is_kept_only_where_the_data_cannot_see_it():
     assert not _sign_is_unseen(table, f"{mn2}.dof0", set())
     assert _sign_is_unseen(table, f"{mn2}.dof0", {f"{mn2}.dof1", f"{mn2}.dof2"})
     assert not _sign_is_unseen(table, "phases.0.scale", set())
+
+
+
+def test_a_modulus_the_data_do_not_support_says_so_on_the_result():
+    """``MOMENT_UNSUPPORTED`` is the FitReport's own verdict, on the result."""
+    ref, _data, result = _fitted(4)
+    (finding,) = [d for d in result.diagnostics if d.code == "MOMENT_UNSUPPORTED"]
+    assert finding.level == "warning" and finding.where == [MOD]
+    assert "profile_interval" in finding.suggestion
+    (row,) = ref.report().magnetic
+    assert row.path == MOD and row.supported is False
+
+
+@pytest.mark.slow
+def test_a_weak_modulus_beside_zeroed_angles_is_covered_by_its_profile():
+    """The two-site Pnma set's weak site, Mn2 at 0.7 μ_B, on seed 14.
+
+    With the angles at the symmetry direction left out of the covariance, the
+    modulus's esd is conditional on them, and the estimate sits above the
+    truth along the m·cos φ valley (#1075: 67 of 68 Wald misses).  Seed 14 is
+    one of those: 0.7029 ± 0.0011.  Its profile refits the angles and covers
+    (0.6997 to 0.7110; macOS arm64, ``[dev]``; 18 of seeds 0-19 covered, one
+    found no end).  ``MOMENT_ANGLE_STATIONARY`` says the esd is conditional
+    and points here.
+    """
+    from tests.test_stationary_moment_angle import MN2, _fit
+
+    ref, data, result = _fit(0.0, seed=14)
+    path, truth = f"{MN2}.dof0", 0.7
+    row = next(p for p in result.parameters if p.path == path)
+    assert abs(row.value - truth) > 1.96 * row.stderr
+    (finding,) = [d for d in result.diagnostics if d.code == "MOMENT_ANGLE_STATIONARY"]
+    assert f"The esd of phases.0.atoms.0.moment.dof0, {path} assumes" in finding.message
+    interval = ref.profile_interval(data, path)
+    assert interval.lower <= truth <= interval.upper

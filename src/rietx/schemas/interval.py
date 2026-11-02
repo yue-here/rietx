@@ -79,7 +79,9 @@ PARAMETER_INTERVAL_CHI2_TOL = 0.01
 #: the parameter's own limit first, so the end is the limit; a one-sided
 #: interval's bounded end always reads this.  ``"refits"``: the side spent
 #: its refit budget before it could say either, and has no end.
-#: ``"error"``: a refit raised, and the side has no end.  ``"period"``: a
+#: ``"error"``: a refit raised, or the refits stepping back toward the fit
+#: did not come back down to its χ² (WP-2060), and the side has no end; the
+#: last point's ``error`` says which.  ``"period"``: a
 #: moment angle's side reached half a turn from the value with the χ² still
 #: under the threshold, and has no end: an angle repeats every 2π, so past
 #: half a turn the side only revisits directions the other side covers

@@ -295,6 +295,23 @@ def moment_angle_stationary_diagnostics(stage, parameters=None) -> list[Diagnost
                      f"{_rad(interval.lower)} to {_rad(interval.upper)}, "
                      f"{'includes' if inside else 'excludes'} the direction.")
         message += line
+    # the moduli beside them (WP-2060): their esds are read with these angle
+    # columns out, so they hold only if the angles sit on the direction, and
+    # a weak one covered 0.83 at a nominal 0.95 (#1075).  None is computed
+    # unasked: a modulus profile cost 54-58 s on a 4-8 s two-site fit.
+    moduli = [m for m in dict.fromkeys(p.rsplit(".dof", 1)[0] + ".dof0"
+                                       for p in passed.paths)
+              if m in rows and rows[m].stderr is not None]
+    if moduli:
+        message += (f" The esd of {', '.join(moduli)} assumes the angles sit on "
+                    f"the direction.")
+        for path in moduli:
+            interval = rows[path].interval
+            if (interval is not None and interval.lower is not None
+                    and interval.upper is not None):
+                message += (f" {path}'s {100 * interval.level:g} % profile "
+                            f"interval is {interval.lower:.4g} to "
+                            f"{interval.upper:.4g} μ_B.")
     if without:
         message += (f" No profile interval was computed for "
                     f"{', '.join(without)}. On a single fit, "
@@ -313,7 +330,62 @@ def moment_angle_stationary_diagnostics(stage, parameters=None) -> list[Diagnost
                     "lands here, because it passed the test below the interval's "
                     "cut. Where an interval excludes "
                     "the direction, the data measure that tilt, so quote the "
-                    "angle with its interval."))]
+                    "angle with its interval. For a modulus of these sites, "
+                    "Refinement.profile_interval(data, path) gives the interval "
+                    "that does not assume the angles sit on the direction."))]
+
+
+def moment_supported(modulus: float, sigma: float | None) -> bool | None:
+    """Whether the data support a moment of this modulus (WP-1327).
+
+    ``False`` at :data:`~rietx.schemas.structure.MOMENT_FLOOR_MU_B` or under
+    :data:`~rietx.report.schemas.MOMENT_SUPPORT_SIGMA` times the esd, ``None``
+    without an esd.  The one authority for
+    :attr:`~rietx.report.schemas.MomentEvidence.supported` and for
+    ``MOMENT_UNSUPPORTED`` (WP-2060), so the report and the result cannot
+    disagree about a site.
+    """
+    if sigma is None:
+        return None
+    return not (modulus <= MOMENT_FLOOR_MU_B or modulus <= MOMENT_SUPPORT_SIGMA * sigma)
+
+
+def moment_unsupported_diagnostics(parameters) -> list[Diagnostic]:
+    """``MOMENT_UNSUPPORTED`` (warning): the moduli the data do not support (WP-2060).
+
+    The same verdict as the FitReport's moment rows (:func:`moment_supported`),
+    on the result, where a caller reading only ``result.diagnostics`` sees it.
+    The magnetic intensity goes as m², so the modulus's column vanishes at
+    m = 0, and the linearisation an esd rests on fails near it (Hamilton,
+    1965, Acta Cryst. 18, 502): issue #1075 measured value ± 1.96 esd
+    covering a zero moment 74.5 % of the time at a nominal 95 %, and esds of
+    1e4-1e6 μ_B on the fits that ended on m = 0.  ``where`` is the moduli,
+    ``value`` the smallest |m|/esd among them.  Silent where every free
+    modulus is supported, and where none has an esd.
+    """
+    rows = [r for r in parameters
+            if r.path.endswith(".moment.dof0")
+            and moment_supported(abs(r.value), r.stderr) is False]
+    if not rows:
+        return []
+    parts = []
+    for r in rows:
+        modulus = abs(r.value)
+        why = (f"at the floor of {MOMENT_FLOOR_MU_B:g} μ_B" if modulus <= MOMENT_FLOOR_MU_B
+               else f"{modulus / r.stderr:.2g}× its esd")
+        parts.append(f"{r.path} is {r.value:.3g} ± {r.stderr:.3g} μ_B, {why}")
+    return [Diagnostic(
+        level="warning", code="MOMENT_UNSUPPORTED", where=[r.path for r in rows],
+        value=min((abs(r.value) / r.stderr for r in rows if r.stderr > 0.0), default=None),
+        message=(f"{'; '.join(parts)}. The data do not support "
+                 f"{'this moment' if len(rows) == 1 else 'these moments'}: under "
+                 f"{MOMENT_SUPPORT_SIGMA:g} esd or at the floor. The magnetic "
+                 f"intensity goes as m², so near m = 0 the modulus's column "
+                 f"vanishes and its esd is no interval."),
+        suggestion=("Read the moment as unsupported, not as a small moment, and "
+                    "do not quote value ± esd. For an upper limit, "
+                    "Refinement.profile_interval(data, path) gives the "
+                    "modulus's likelihood interval, which keeps m ≥ 0."))]
 
 
 def _rad(x: float) -> str:
@@ -346,11 +418,7 @@ def _row(model, values, ip, j, cp, msites, phase_name, cell, held_set,
     # left the covariance as unmeasured, and in neither case did anything test
     # it — the honest empty state, which a defaulted ``True`` read as an
     # answer (review of #433, finding 5; WP-1076's first shape)
-    supported: bool | None
-    if sigma is None:
-        supported = None
-    else:
-        supported = not (at_floor or modulus <= MOMENT_SUPPORT_SIGMA * sigma)
+    supported = moment_supported(modulus, sigma)
     note = ""
     if supported is None:
         note = ("the modulus has no esd — it was stated and held, or the fit "
