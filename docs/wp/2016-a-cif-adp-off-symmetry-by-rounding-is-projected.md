@@ -1,9 +1,8 @@
 # WP-2016 — A literature CIF's U^ij that breaks site symmetry only by rounding is projected, and says so
 
-Milestone: generality · Status: 🔄 2026-11-02 — built in #1345; two questions for the maintainer (an su arm on the bar; info or silent)
+Milestone: generality · Status: ✅ 2026-11-02 — closed: a CIF U^ij off its site symmetry by rounding is read on the allowed form and reported; #1345
 Track: The audits
 Depends on: —
-Priority: P3 2026-10-20 — a reading of WP-2002's batch (Mike Gaultois, PR #1050) found that a published CIF with U^ij printed to four decimals is refused on a trigonal or hexagonal special position; the refusal is right for a contradiction and wrong for rounding
 
 ## Goal
 
@@ -71,9 +70,9 @@ bar is rounding; one outside it is a contradiction between the tensor and the si
   - Tests: four ZnO cases plus a box-edge pair in `tests/test_aniso_adp.py` (projected and quoted; ten units past the print refused with the new message; a printed zero `0`/`0.0`/`0.0000` held exact and refused; an exact tensor silent; 0.0061/0.0062 accepted and 0.0060/0.0063 refused against U11 = 0.0123), and the free-component moment case in `tests/test_magcif.py`. The WP's acceptance names `tests/test_cif.py`, which does not exist; the aniso tests live in `test_aniso_adp.py`.
 
   *Settled by Claude* (each a call a reviewer could make the other way):
-  - **The bar is the printed half-digit only; the task line's "or its su" was dropped.** Settled by Claude under the arithmetic of rounding and the two precedents (`CIF_PRINTED_ROUNDING`, `moment_within_print`), which use the print alone. A residual inside the su but outside the print cannot come from rounding: it is a tensor refined without the site's constraint, which is the case the refusal exists for. Alternative: accept within one su, as the filing proposed, which GSAS-II's tie in effect does with no bar at all (generality review, from `GSASIIstrIO.py`). **Put to the maintainer below**, since the maintainer agreed the filing's text.
+  - **The bar is the printed half-digit only; the task line's "or its su" was dropped.** Ruled by the maintainer, 2026-11-02 ("A": half a unit in the last printed digit, as built; the su bar is rejected). A residual inside the su but outside the print cannot come from rounding.
   - **A token printed as zero, at any number of decimals, is held exact.** Settled by Claude under the code review's finding: read as a rounding, `0.0` is ±0.05 Å² and would repair a hexagonal writer's U12 = 0 into 0.00615. Cost: a 2:1 tie between components small enough that one prints as zero stays refused, as before. Alternative: an absolute cap like the magnetic reader's, which needs a new constant.
-  - **Reported at info, one diagnostic per file.** Settled by Claude under the filing and root CLAUDE.md's "with the substitution recorded as a Diagnostic", with `CIF_MAGNETIC_MOMENT_ON_ALLOWED` the closest precedent. Alternative: silence, as WP-2037 made a coordinate snap inside printed rounding. **Put to the maintainer below.**
+  - **Reported at info, one diagnostic per file.** Settled by Claude under the maintainer's delegation (2026-11-02, "whatever is more consistent with our design ethos") and root CLAUDE.md's reader-repair rule: a stranger's file is repaired at read with the substitution recorded as a Diagnostic, as `CIF_SPECIES_NORMALISED` and `CIF_CELL_ANGLE_CORRECTED` do. WP-2037's silent coordinate snap differs in kind: its target is the one special position, where this target is the package's choice inside the box. `CIF_MAGNETIC_MOMENT_ON_ALLOWED` is already info and records the move (`value` the largest shift), so it needs no change.
   - **Which allowed point inside the box**: Chebyshev, then minimum summed moves. ZnO lands at U11 = 0.012333, U12 = 0.006167; keeping U11 and deriving U12 = 0.00615 is equally inside the print. Settled by Claude under the magnetic precedent's Chebyshev choice.
 
   *Generality* (the `generality-review` agent, unedited headings; full text in the session): item 1 `CIF_ADP_SYMMETRY_PROJECTED` **holds** ("with one test gap": no box-edge test; *Author:* added). Item 2a, zero held exact, **holds** ("whole-number branch untested"; *Author:* `0` is that branch, as a whole number that is also zero; a nonzero whole-number U is not a value any file prints). Item 2b, the point chosen, **holds** ("say in the handover whether any golden moved"; *Author:* no magnetic or ADP test moved; the fast suite is green with every existing `test_magcif.py` case unchanged). Item 2c, `adp_projection`, **holds** ("wording ambiguous" on the floor; *Author:* docstring reworded). Item 3a, su dropped, **weak, on process** ("the departure recorded in the WP handover with its reason"; *Author:* recorded above and put to the maintainer). Item 3b, info versus silence, **cannot tell** ("a maintainer ruling"; *Author:* put to the maintainer). It also noted the audit row's evidence read like a measured case; *Author:* reworded as a constructed case.
@@ -82,7 +81,7 @@ bar is rounding; one outside it is a contradiction between the tensor and the si
 
   *Not generalised.* The TOPAS project reader (`io/projects/topas.py`) builds `AnisoU` from the printed `u_ij` with no rounding projection, so the same rounded hexagonal tensor from a `.inp` is still refused (code review). The FullProf reader's anisotropic β lines are the same shape. Each has its own token access; neither is reported by a user. Exponential tokens: the ADP box reads `1.23E-2` as ±5e-5 (its mantissa's digits), while `magcif._last_digit_half` holds exponential notation exact.
 
-  *Questions for the maintainer.* (1) Should the bar also accept a residual within the file's su, as this WP's filing said? Today it is the printed half-digit only. (2) Should a move inside printed rounding be reported (info, as built) or silent, as WP-2037 made a coordinate snap? The answer would also settle `CIF_MAGNETIC_MOMENT_ON_ALLOWED`'s level.
+  *Answered.* Both questions above were answered on 2026-11-02: the bar by the maintainer's ruling, the level under the maintainer's delegation. The maintainer approved the PR's reader output for merge the same day.
 
-  Next: the maintainer's two answers above, and the reader-output approval on the PR. Then close.
+  Next: none; closed. The open gap is the *Not generalised* paragraph's TOPAS and FullProf readers, which no user has reported.
 - **2026-10-20** — Filed from WP-2002's session on the second read of its batch (Mike Gaultois, PR #1050, item B10.10), agreed by the maintainer the same day. Nothing built.
