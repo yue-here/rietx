@@ -121,7 +121,12 @@ reflex is to bump, and a version that moves for additive changes stops being
 usable as a compatibility signal.  A cancelled run's ``fit_end`` carries
 ``status="cancelled"`` and *omits* ``rwp``/``gof`` — there is no fitted result
 to report — which is the same rule seen from the reader's side: a consumer
-reads ``data`` with ``.get``, never by unpacking a fixed shape.
+reads ``data`` with ``.get``, never by unpacking a fixed shape.  The same rule
+took ``fit_end.stage_report_seconds`` (WP-1335): the wall seconds a
+``fit(stage_reports=True)`` spent building its rungs.  A rung is built after
+one stage's ``stage_end`` and before the next ``stage_start``, so no stage span
+holds it, and a field on ``fit_end`` makes it countable without a span kind of
+its own.  It is absent from a fit that built no rung.
 
 **Version 2** (WP-1024) is the rule's other half made real:
 ``index_start``/``index_end`` are new *kinds*, so the constant moves.  WP-1006
