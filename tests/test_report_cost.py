@@ -18,6 +18,7 @@ from rietx.crystallography.symmetry import (
     reflection_orbits,
     rotation_matrices,
 )
+from rietx.history.aggregate import _summarize_run
 from rietx.model.forward import compile_model
 from rietx.model.preferred_orientation import (
     cos2_alpha,
@@ -175,6 +176,27 @@ def _fit(stage_reports: bool, events: list[dict]):
         Stage("cell", ["phases.*.cell.*"]),
     ]), stage_reports=stage_reports, events=lambda e: events.append(e))
     return ref
+
+
+def test_fit_end_carries_the_rungs_cost_and_the_summary_counts_it():
+    events: list[dict] = []
+    ref = _fit(True, events)
+    (end,) = [e for e in events if e["kind"] == "fit_end"]
+    spent = end["data"]["stage_report_seconds"]
+    assert spent > 0.0 and len(ref.stage_reports_) == 3
+    summary = _summarize_run(None, events)
+    assert summary.stage_report_seconds == spent
+    assert "stage reports" in str(summary)
+
+
+def test_a_fit_without_rungs_carries_no_cost_field():
+    events: list[dict] = []
+    _fit(False, events)
+    (end,) = [e for e in events if e["kind"] == "fit_end"]
+    assert "stage_report_seconds" not in end["data"]
+    summary = _summarize_run(None, events)
+    assert summary.stage_report_seconds is None
+    assert "stage reports" not in str(summary)
 
 
 def test_a_rung_built_without_the_geometry_search_is_the_same_rung(monkeypatch):

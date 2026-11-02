@@ -198,8 +198,15 @@ choice.
       goes away by a documented route rather than by a caller's workaround.
       **Landed in PR #259**: `summary(report=)`, refusing `plan=` beside it;
       the test counts builds at `build_report`, the seam both routes share.
-- [ ] A span (or field) covering the stage-report work, so a caller summing
+- [x] A span (or field) covering the stage-report work, so a caller summing
       events sees it; decide the `EVENT_SCHEMA_VERSION` question deliberately.
+      **Done 2026-11-02: a field.** `fit_end.stage_report_seconds` is the
+      wall time the rungs took, absent when no rung was built, and `rietx
+      events` adds it to the fit line. Settled by Claude under
+      `history/events.py`'s written rule: a new key on an existing kind does
+      not bump `EVENT_SCHEMA_VERSION`, a new kind does. A span kind would
+      have been the first kind added for timing alone, and WP-1024's
+      precedent reused existing kinds with added keys.
 - [ ] Document what `stage_reports=True` costs, roughly, where the flag is
       documented — the reporter would have sampled rather than enabled it
       everywhere had the tax been stated.

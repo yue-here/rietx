@@ -8,6 +8,7 @@ import math
 import os
 import re
 import subprocess
+import time
 import tomllib
 import warnings
 from collections.abc import Callable, Iterable, Sequence
@@ -2519,6 +2520,9 @@ class Refinement:
         #: inside it (the arrow's direction is why ``schemas/results.py``
         #: cannot import the report contract at all).
         self.stage_reports_: list[StageReport] = []
+        #: wall seconds those rungs took to build, which the fit's ``fit_end``
+        #: event carries as ``stage_report_seconds`` (WP-1335)
+        self._stage_report_seconds = 0.0
         self._model: CompiledModel | None = None
         #: whether ``fit`` and ``run_stage`` compute the profile interval of
         #: each moment angle the stationary-angle test left out of the answer
@@ -5585,6 +5589,13 @@ class Refinement:
                 + _fixed_literal_diagnostics(plan.stages, table, self._ties))
             stage_results: list[StageResult] = []
             self.stage_reports_ = []
+            self._stage_report_seconds = 0.0
+            # the rungs' cost, on fit_end: a rung is built between one
+            # stage's stage_end and the next stage_start, so no stage span
+            # holds it (WP-1335).  Absent when no rung was asked for.
+            def report_cost() -> dict:
+                return ({"stage_report_seconds": self._stage_report_seconds}
+                        if stage_reports else {})
             outcome = None
             model = None
 
@@ -5598,7 +5609,7 @@ class Refinement:
                 if stream is not None:
                     stream.emit("fit_end", status="cancelled", stage=exc.stage,
                                 completed=[s.name for s in exc.completed_stages],
-                                node_id=exc.node_id, **stamp)
+                                node_id=exc.node_id, **report_cost(), **stamp)
                     if stream is not events:
                         stream.close()
                 raise
@@ -5677,7 +5688,8 @@ class Refinement:
                 stream.emit("fit_end", status=self.result_.status,
                             rwp=self.result_.statistics.rwp,
                             gof=self.result_.statistics.gof,
-                            node_id=self.result_.node_id, **stamp)
+                            node_id=self.result_.node_id, **report_cost(),
+                            **stamp)
                 if stream is not events:  # we created it from a path/callable
                     stream.close()
             if recorder is not None:
@@ -5889,9 +5901,11 @@ class Refinement:
                 moment_angle_tests=outcome.moment_angle_tests,
             ))
             if stage_reports:
+                t_report = time.perf_counter()
                 self.stage_reports_.append(self._stage_report(
                     stage.name, plan, data, mode, table, model, outcome, guard,
                     stage_diagnostics, significance=hold.significance))
+                self._stage_report_seconds += time.perf_counter() - t_report
             for sink in sinks:
                 # live monitoring (viz.live.LiveSession): rewrite the snapshot
                 sink.write_snapshot(model, table, outcome, stage.name)
