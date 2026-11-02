@@ -122,17 +122,6 @@ choice.
 
 ### Inherited
 
-- **2026-10-23, from [1341](1341-a-joint-fit-has-no-report.md) (closed): a joint fit has a report, so this WP's Non-goals line about it is stale.** The line "Reporting for joint fits, which has no cost because it does not exist — 1341" predates `MultiHistogramRefinement.report(h)` (2026-10-12), which builds one histogram's Layer 0-2 report and pays the same per-report cost this WP cuts. The Inherited bullet from 1341 dated 2026-10-12 (offering `stage_reports=` on a joint fit once the cost is cut) still holds. The joint report's remaining gaps are [2028](2028-a-joint-fits-guards-see-every-histogram.md)'s. Context's accidental control (the joint fit at 1.11-1.14×, "has no `.report()`") no longer holds: since 2026-10-12 the joint arm pays the report cost too.
-- **2026-10-02, from the issue triage (issue #245): the cost to cut is a fixed
-  ~0.36 s per stage report, and a docstring still quotes the old ratio.** The
-  reporter re-measured on `3d1a6feb` (2026-09-29; `11BM_NAC.fxye`, 5 stages,
-  median of 3, BLAS pinned to 1): `stage_reports=False` 0.331 s,
-  `stage_reports=True` 2.136 s, 6.45×. The per-report cost is unchanged from
-  the docstring's 0.33 s; the fit got about 3× faster, so the multiple grew
-  and will keep growing as fits speed up. *Checked at `ca9bda29`*:
-  `Refinement.fit`'s docstring (`refine.py:3376`) still says "a trajectory
-  costs ≈2.5× the fit". Correct it in the same change that cuts the cost.
-
 - **2026-10-11, from the issue triage (#245): the reporter's three paired
   timings of 2026-09-04 are not carried here.** Neutron CW, neither a
   March-Dollase nor a Stephens block, 3 292 points: 2.81 s against about
@@ -163,8 +152,8 @@ choice.
 ## Non-goals
 
 - The solver's own cost, and the exhausted-budget stop rule — 1334.
-- Reporting for joint fits, which has no cost because it does not exist —
-  1341.
+- A joint fit's `stage_reports=` (Inherited, from 1341): offered on top of
+  this WP once the per-report cost is cut far enough.
 - Removing the per-stage report. WP-1058's rule stands: **the report at every
   stage boundary, because a run's last state is routinely its least
   informative.** This WP makes it cheap and countable, not optional-by-stealth.
@@ -207,14 +196,22 @@ choice.
       not bump `EVENT_SCHEMA_VERSION`, a new kind does. A span kind would
       have been the first kind added for timing alone, and WP-1024's
       precedent reused existing kinds with added keys.
-- [ ] Document what `stage_reports=True` costs, roughly, where the flag is
+- [x] Document what `stage_reports=True` costs, roughly, where the flag is
       documented — the reporter would have sampled rather than enabled it
       everywhere had the tax been stated.
-- [ ] Tests: a counter over `build_report` across a `summary()` + `report()`
+      **Done 2026-11-02**: `Refinement.fit`'s docstring (its "≈2.5×" gone),
+      the manual's `reference/report.md` § Reports at every stage, and the
+      event tables in `reference/refinement.md` and `reference/cli.md`.
+- [x] Tests: a counter over `build_report` across a `summary()` + `report()`
       pair asserts **1**; a phase below the reflection floor costs no solve.
-- [ ] Skill: `references/batch.md` — the row on when to enable
+      The counter landed with PR #259 (`tests/test_termination_view.py`); the
+      floor test and the bit-identity oracles are `tests/test_report_cost.py`.
+- [x] Skill: `references/batch.md` — the row on when to enable
       `stage_reports`, and the row warning that per-stage sums are not fit
       cost.
+      Both rows live elsewhere since the skill was split: the cost row in
+      `references/series.md` (re-measured) and the sum row as § 9c.11 of
+      `references/batch-operating.md` (now naming the new field).
 
 ## Acceptance
 

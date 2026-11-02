@@ -5283,12 +5283,15 @@ class Refinement:
         the stages that *did* complete and the node the working state stands at.
 
         ``stage_reports`` — build the report at every stage boundary and leave
-        the rungs on :attr:`stage_reports_` (WP-1058).  **Off by default here
-        and on at the agent surface**, and the asymmetry is the measurement:
-        a report build is ~0.33 s on 59.5k channels against a ~1.0 s five-stage
-        fit, so a trajectory costs ≈2.5× the fit — nothing to a consumer that
-        calls once and reads, a tax on a library primitive that suites and
-        series call in loops.  It changes **no** number the fit produces: the
+        the rungs on :attr:`stage_reports_` (WP-1058).  **Off by default**,
+        because each rung is a whole report build and the charge is per rung,
+        so it is a tax on a fit called in a loop.  On 11-BM NAC (22 003
+        channels, seven rungs) a fit with rungs took 4.7-5.7× the fit without
+        them (WP-1335, 2026-11-02), and the multiple grows as fits get
+        faster.  Sample it: the first fit of a batch, the last, one you will
+        plot.  The time the rungs took is ``fit_end``'s
+        ``stage_report_seconds``, since no stage span holds it.  It changes
+        **no** number the fit produces: the
         rungs are read off states the plan already passes through, never
         states it is made to visit, so a fit run with them lands exactly where
         the same fit run without them does.  (That is also why this is not the
