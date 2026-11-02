@@ -445,6 +445,7 @@ for stage in result.stages:
 | `StageResult.status` | `converged` or `max_iter` |
 | `StageResult.n_iterations` | residual evaluations the solve made, the start included |
 | `StageResult.cost_initial`, `StageResult.cost_final` | the cost the stage started from and the cost it reached |
+| `StageResult.rwp` | the stage's Rwp at the values it ended on, on the stage's own frozen windows; pooled over the histograms of a joint fit |
 | `StageResult.freed` | the parameters this stage's patterns freed, less any the stage held |
 | `StageResult.ftol` | the tolerance it ran at; `None` is the solver default |
 | `StageResult.n_constraint_truncations` | steps the `lm` driver held on a linear inequality |
@@ -465,6 +466,8 @@ for stage in result.stages:
 | `StageResult.moment_angle_tests` | each round of the stationary-angle test, one `MomentAngleTest` per round; `None` when no test ran ([Magnetic refinement](magnetic.md#an-angle-at-a-symmetry-direction)) |
 
 `StageResult.scale_b_held`, `unknown_paths`, `unreached_histograms`, `seeded`, `cell_reset`, `collapsed` and `width_twins_held` are `None` on a result stored before the field existed, meaning that nothing looked.
+`StageResult.rwp` is `None` on a result stored before the field existed.
+The last stage's Rwp differs from `result.statistics.rwp` by the frozen windows alone, because the result is measured on a compile at the answer.
 The status type also admits `diverged`, which neither driver produces today.
 Both drivers accept a step only when it lowers the cost, so `cost_final` never exceeds `cost_initial`.
 
