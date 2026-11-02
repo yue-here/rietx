@@ -156,7 +156,7 @@ this session).
   trigger is a new tier-3 action with its own approval. WP-2003 is in flight on
   PR #1310, so this WP depends on it, and WP-2003 got one `### Inherited` line.
   Reproduced on `0d735f5e5` to the issue's digits. Measured as in Context, scripts in
-  `2080-batch/`. Filed in PR #PR.
+  `2080-batch/`. Filed in PR #1324.
 
   *Gotchas.* `measure_trigger.py` patches `_reseed_needed` on main's signature; after
   PR #1310 that seam is `schemas.sequential._rejected`, so the script needs porting
