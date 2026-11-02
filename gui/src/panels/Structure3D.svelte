@@ -42,6 +42,7 @@
     elements,
     focusedPolyhedra,
     legend,
+    onDarkGround,
     openingView,
     pickAtom,
     pickFace,
@@ -154,11 +155,14 @@
    *  the controls, the PNG button among them, until the next load. */
   let exportError = $state("");
 
-  const entries = $derived(geo ? legend(geo) : []);
+  /** the geometry in the theme's colours: the legend, the polyhedra's
+   *  swatches and the scene all read this one, so they cannot disagree */
+  const painted = $derived(geo && theme === "dark" ? onDarkGround(geo) : geo);
+  const entries = $derived(painted ? legend(painted) : []);
   const levels = $derived(geo ? Object.keys(geo.probability_levels) : []);
   const shown = $derived(!geo ? [] : focus !== null ? focusedPolyhedra(geo, focus)
     : shownPolyhedra(geo, polyhedraIn[mode], polyFormulas, hidden, showBoundary));
-  const polyEntries = $derived(geo ? polyhedraLegend(geo) : []);
+  const polyEntries = $derived(painted ? polyhedraLegend(painted) : []);
 
   /** Refetch whenever the model pane re-reads, and whenever a knob the *server*
    *  owns moves.
@@ -284,8 +288,8 @@
     // scene, and the first browser run drew a box nobody could see.  The a/b/c
     // letters take the same colour, so frame and labels read as one object.
     const cell = style.getPropertyValue("--accent").trim() || "#1f5fa8";
-    scene = buildScene(geometry, { mode, hidden, showBoundary, exaggeration, cell,
-                                   polyhedra: shown });
+    scene = buildScene(theme === "dark" ? onDarkGround(geometry) : geometry,
+                       { mode, hidden, showBoundary, exaggeration, cell, polyhedra: shown });
     renderer?.setScene(scene);
     paint();
   }
