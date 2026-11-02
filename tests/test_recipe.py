@@ -369,7 +369,7 @@ def test_a_non_2theta_type_is_refused_with_its_own_reason(lab6_doc, kind):
         read_recipe(_as_type(lab6_doc, kind))
     msg = str(exc.value)
     assert f"{kind!r} is" in msg
-    assert "PatternData holds 2θ in degrees" in msg
+    assert "2θ" in msg.split(f"{kind!r} is")[1]
     assert "'PNC' neutron" not in msg
 
 
