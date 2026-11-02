@@ -3232,6 +3232,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.strain._C", "constant", value=5.729577951308232e-05),
     Row("rietx.report.strain._GAUSS_NEWTON_ITERATIONS", "constant", value=4),
     Row("rietx.report.strain._QUOTABLE_WEIGHT_FRAC", "constant", value=0.01),
+    Row("rietx.report.texture._BLOCK_ELEMENTS", "constant", tier="invariant",
+        evidence="A memory bound that only partitions the r grid (WP-1335); "
+                 "tests/test_report_cost.py::test_the_blocked_texture_grid_scores_bit_identically "
+                 "holds a block of one r to the one-r-at-a-time loop's scores, to the bit.",
+        value=2097152),
     Row("rietx.report.texture._EQUIV_REF_R", "constant", value=0.5),
     Row("rietx.schemas.fraction.FRACTION_PROFILE_DCHI2", "constant", tier=2, value=3.84,
         evidence=("Venzon & Moolgavkar (1988) Appl. Statist. 37, 87: profile-likelihood cut at the "

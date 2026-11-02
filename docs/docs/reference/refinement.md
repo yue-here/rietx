@@ -645,12 +645,10 @@ A five-stage fit of the fluorapatite tutorial pattern emitted 1 `fit_start`, 5 `
 | `stage_start` | `stage`, `index`, `n_stages`, `turn_on`, `freed`, `n_free`, `free_paths`, `held`, `unknown_paths`, `n_points` |
 | `eval` | `stage`, `n_eval`, `cost`, `accepted`, `lam`, `step_norm`, `values` |
 | `stage_end` | `stage`, `status`, `termination`, `n_iterations`, `cost_initial`, `cost_final`, `rwp`, `held`, `released` |
-| `fit_end` | `status`, `rwp`, `gof`, `node_id`, and `stage_report_seconds` under `stage_reports=True` |
+| `fit_end` | `status`, `rwp`, `gof`, `node_id` |
 
 Read `data` with `.get`, because a version may add keys to a kind without a version change.
-A cancelled run's `fit_end` has `status` `"cancelled"`, the abandoned `stage`, the `completed` stage names, `node_id` and, under `stage_reports=True`, `stage_report_seconds`, and no `rwp` or `gof`, because there is no fitted result.
-`stage_report_seconds` is the wall time the fit spent building its [stage reports](report.md#reports-at-every-stage).
-No stage span holds that time, because each report is built after one `stage_end` and before the next `stage_start`.
+A cancelled run's `fit_end` has `status` `"cancelled"`, the abandoned `stage`, the `completed` stage names and `node_id`, and no `rwp` or `gof`, because there is no fitted result.
 Under `RefinementPlan.lebail_passes`, each pass's `fit_start` and `fit_end` also carry `lebail_pass` and `lebail_of`.
 A run's state is not an event: it is in the run's `status.json`, because a fit killed outright emits no `fit_end`.
 
