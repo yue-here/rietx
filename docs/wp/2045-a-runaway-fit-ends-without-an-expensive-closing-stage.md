@@ -335,6 +335,42 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
 
 ## Handover log
 
+- **2026-11-02** — the three places that still quoted the intermediate
+  tolerance's old saving now quote probe 7's. The root `CLAUDE.md`
+  invariant, skill item 8.20 and the manual's "Cost of the loose schedule"
+  table had figures measured before the closing stage existed. A reader of
+  any of them now sees 1.06-1.58× fewer evaluations on FAP, 11-BM NAC and
+  cpd-1a at 0.0004 esd or less, and 3.93× on cpd-1a with an absent zircon.
+  No number was measured for this change, and none is quoted that the entry
+  below does not hold. Recorded in PR #PRNUM.
+
+  *Done.* The `CLAUDE.md` invariant now reads "1.06-1.58× fewer
+  evaluations cost ≤ 0.0004 esd on one fit (FAP, NAC, cpd-1a behind the
+  closing stage; WP-2045 probe 7)". Item 8.20 gives the evaluations, the
+  1.02-1.14× wall clock, the absent-zircon 3.9× and why, and the LaB6
+  mirror at 8.82 esd. It drops the old QPA figure, which probe 7 did not
+  measure. The two committed skill copies were re-synced. The manual's
+  table is probe 7's five rows with evaluations, wall clock and largest
+  shift. Its cpd-1a paragraph on `x` against `lor_size` went, since cpd-1a
+  now shifts 0.0004 esd. A LaB6 paragraph and an absent-phase paragraph
+  replace it. The `trigger` series sentence went too: it was measured
+  before the closing stage, and the manual now says a chain on this
+  schedule is unmeasured.
+
+  *Other quotes found* by grepping for "1.2-1.6" and "1.00-2.15". Left as
+  they are: the `INTERMEDIATE_FTOL` comment in `schemas/plan.py`, which
+  credits the old figure to WP-1113/1123 and carries probe 7's re-measure
+  after it; the four `_audit.py` rows, which credit WP-2002 B7 the same way;
+  `docs/releases/1.1.0.md`, a shipped release's notes; and the WP files,
+  which are records. `references/series.md`'s "1.2-1.6× the collapsed
+  chain's wall clock" is a different measurement (WP-1469's refit modes).
+
+  *Verified.* The branch is prose only, so `/code-review` did not run.
+  Gates on macOS arm64, worktree venv `[dev]`: see the PR.
+
+  *Next.* Unchanged from the entry below, items (1), (3) and (4). Item (2)
+  is done.
+
 - **2026-11-02** — the intermediate tolerance's saving, measured on
   today's schedule. The four audit rows that keep it on cost grounds quoted
   1.00-2.15× fewer evaluations. That figure came from WP-2002's run, before
