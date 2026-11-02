@@ -642,10 +642,12 @@ def test_a_tensor_off_its_site_symmetry_past_its_print_is_still_refused(tmp_path
         ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
 
 
-def test_a_whole_number_component_is_held_exact(tmp_path):
-    """U12 written ``0`` where the site needs U12 = U11/2 is the hexagonal
-    writer's error, not a rounding of 0.00615 to ±0.5 Å², and stays refused."""
-    structure, hits = _read_zno(tmp_path, "0.0123 0.0123 0.0108 0 0 0")
+@pytest.mark.parametrize("zero", ["0", "0.0", "0.0000"])
+def test_a_printed_zero_is_held_exact(tmp_path, zero):
+    """U12 written as zero where the site needs U12 = U11/2 is the hexagonal
+    writer's error, not a rounding of 0.00615 (``0.0`` would be ±0.05 Å²),
+    and stays refused."""
+    structure, hits = _read_zno(tmp_path, f"0.0123 0.0123 0.0108 {zero} 0 0")
     assert hits == []
     with pytest.raises(ValueError, match="not compatible with the site symmetry"):
         ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))

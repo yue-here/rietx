@@ -1745,8 +1745,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "printed digit of each component. The message names the sites and the "
             "components moved, and the change is no larger than the rounding in the "
             "file. A larger disagreement, or one that needs a component the file "
-            "prints as a whole number such as `0`, is left as written and refused "
-            "when the parameter table is built."
+            "prints as zero, is left as written and refused when the parameter "
+            "table is built."
         ),
     ),
     "CIF_ANISO_COLLAPSED": HelpEntry(

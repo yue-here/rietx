@@ -575,8 +575,8 @@ ROWS: tuple[Row, ...] = (
                   "digit, so a tensor with a point of its site's allowed subspace inside "
                   "that box is the symmetric tensor rounded; fires exactly when such a "
                   "point exists and the print is off the subspace by more than float "
-                  "round-off (wyckoff.adp_projection); a whole-number token is held "
-                  "exact (WP-2016: ZnO on 3m, U11 0.0123 against U12 0.0062, moved "
+                  "round-off (wyckoff.adp_projection); a printed zero or whole number "
+                  "is held exact (WP-2016: ZnO on 3m, U11 0.0123 against U12 0.0062, moved "
                   "3.3e-5 A^2; ten units past the print is still refused)"),
         grounds=("Arithmetic: the move is no larger than the file's own rounding, so the "
                  "tensor stored is one the file printed; past it the table refuses, "

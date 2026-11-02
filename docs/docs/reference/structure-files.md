@@ -70,7 +70,7 @@ Choosing between them is yours, so the value is left byte for byte and the read 
 
 An anisotropic tensor read with `aniso=True` that misses the form its site symmetry allows only by the file's rounding is moved onto that form, and reported as [`CIF_ADP_SYMMETRY_PROJECTED`](diagnostics-structures.md#cif_adp_symmetry_projected).
 ZnO printed with U11 = 0.0123 and U12 = 0.0062 is U12 = U11/2 rounded to four decimals.
-Each component moves by at most half a unit in its last printed digit, and a component printed as a whole number, such as `0`, does not move.
+Each component moves by at most half a unit in its last printed digit, and a component printed as zero, such as `0` or `0.0`, does not move.
 A tensor that misses by more is left as written, and the parameter table refuses it, naming the site and the component furthest from the allowed form.
 
 A Biso of any value is kept as the file states it, because `Atom.biso` has no default bound.

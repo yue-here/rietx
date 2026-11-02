@@ -1456,7 +1456,7 @@ def moment_within_print(moment, row: dict[str, str], basis
 
     Returns ``(components, largest shift)`` for the point of the allowed
     subspace nearest the printed moment in the box's own units
-    (:func:`~rietx.crystallography.cif.nearest_allowed_within_print`, which
+    (:func:`~rietx.crystallography.wyckoff.nearest_allowed_within_print`, which
     also leaves a component the symmetry does not tie to the others where the
     file printed it), or ``None`` where nothing is
     to be moved — the moment already lies in the subspace, the row states no
@@ -1481,19 +1481,16 @@ def moment_within_print(moment, row: dict[str, str], basis
     k = len(b)
     if k == 0:
         target = np.zeros(3)
-        ratio = float(np.max(np.abs(m) / half))
-        if float(np.max(np.abs(m))) > MOMENT_FORM_AGREEMENT_MU_B:
+        if (float(np.max(np.abs(m) / half)) > 1.0 + 1e-9
+                or float(np.max(np.abs(m))) > MOMENT_FORM_AGREEMENT_MU_B):
             return None
     else:
-        from .cif import nearest_allowed_within_print
+        from .wyckoff import nearest_allowed_within_print
 
         target = nearest_allowed_within_print(
             b.T, m, half, cap=MOMENT_FORM_AGREEMENT_MU_B)
         if target is None:
             return None
-        ratio = 0.0
-    if ratio > 1.0 + 1e-9:
-        return None
     return (tuple(float(v) for v in target),
             float(np.max(np.abs(target - m))))
 

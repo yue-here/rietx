@@ -1222,6 +1222,12 @@ def _printed_decimal(token: str) -> Decimal | None:
     return value if value.is_finite() else None
 
 
+def _printed_half(token: Decimal) -> Decimal:
+    """Half a unit in ``token``'s last printed digit
+    (:data:`CIF_PRINTED_ROUNDING` scaled by its exponent): ``0.0123`` → 5e-5."""
+    return Decimal(repr(CIF_PRINTED_ROUNDING)).scaleb(token.as_tuple().exponent)
+
+
 def _within_printed_rounding(position, printed) -> bool:
     """Whether moving a site to ``position`` changes no coordinate by more than
     the file's own rounding of it (:data:`CIF_PRINTED_ROUNDING` of its last
@@ -1234,8 +1240,7 @@ def _within_printed_rounding(position, printed) -> bool:
     for value, token in zip(position, printed, strict=True):
         diff = Decimal(float(value)) - token
         diff -= diff.to_integral_value(rounding=ROUND_HALF_EVEN)
-        half = Decimal(repr(CIF_PRINTED_ROUNDING)).scaleb(token.as_tuple().exponent)
-        if abs(diff) > half:
+        if abs(diff) > _printed_half(token):
             return False
     return True
 
@@ -1274,91 +1279,23 @@ def _adp_within_print(basis: np.ndarray, u: np.ndarray,
     :func:`~rietx.crystallography.magcif.moment_within_print`, or ``None``
     where no allowed tensor lies inside the box.
 
-    A component printed as a whole number (the ``0`` many writers give a
-    component the symmetry zeroes) is held **exact** rather than read as
-    ±0.5 Å²: rounding a displacement to a whole Å² is no precision any
-    crystal's U^ij is quoted at, so such a token is the writer's exact value.
-    That keeps the hexagonal writer's error, U12 written ``0`` where the site
-    needs U12 = U11/2, a refusal rather than a repair.
+    A component printed as **zero**, at any number of decimals, or as a whole
+    number is held **exact**.  A zero is how a writer states a component the
+    symmetry zeroes, and the one error this repair must not absorb is a
+    writer's zero where the site needs a value: U12 written ``0`` or ``0.0``
+    on a hexagonal three-fold axis, where U12 = U11/2.  Read as a rounding,
+    ``0.0`` is ±0.05 Å² and would take U12 to 0.00615 Å² as a repair.  And no
+    crystal's U^ij is quoted to a whole Å², so a whole-number token is the
+    writer's exact value too.  The cost: a 2:1 tie between components small
+    enough that one prints as zero stays refused, as it was before.
     """
-    b = np.asarray(basis, dtype=np.float64)
-    half = np.array([float(Decimal(repr(CIF_PRINTED_ROUNDING))
-                           .scaleb(token.as_tuple().exponent))
-                     if token.as_tuple().exponent < 0 else 0.0
+    from .wyckoff import nearest_allowed_within_print
+
+    half = np.array([float(_printed_half(token))
+                     if token.as_tuple().exponent < 0 and token != 0 else 0.0
                      for token in printed])
-    return nearest_allowed_within_print(b.T, u, half)
-
-
-def nearest_allowed_within_print(span: np.ndarray, value: np.ndarray,
-                                 half: np.ndarray, *, cap: float = math.inf,
-                                 ) -> np.ndarray | None:
-    """The point ``span @ c`` nearest ``value`` inside the box ``±half``, or ``None``.
-
-    ``value`` is a printed quantity a symmetry confines to the column span of
-    ``span`` (n × k), and ``half`` the half-width of each component's rounding;
-    a zero half-width holds that component exact, and ``cap`` bounds every
-    component's move absolutely without changing the units the box is measured
-    in (``magcif.moment_within_print``'s bare ``0``).  Two linear programmes.  The
-    first finds the smallest box, in the box's own units, that reaches the
-    span (a Chebyshev fit); past 1 no allowed point is inside the print and
-    the answer is ``None``.  The second keeps that box and minimises the summed
-    moves, which is what leaves a component the symmetry does not tie to the
-    others exactly as printed: a Chebyshev fit alone is degenerate there, and
-    the solver's vertex moved ZnO's free U33 by a third of its rounding for
-    nothing (WP-2016).
-    """
-    from scipy.optimize import linprog
-
-    a = np.asarray(span, dtype=np.float64)
-    v = np.asarray(value, dtype=np.float64)
-    n, k = a.shape
-    boxed, exact = half > 0.0, half == 0.0
-    if not boxed.any():
-        return None
-    eq = {"A_eq": None, "b_eq": None}
-    m = int(boxed.sum())
-    # stage 1: minimise t subject to |(Ac − v)_i| <= t·half_i, exact rows equal
-    if exact.any():
-        eq = {"A_eq": np.hstack([a[exact], np.zeros((int(exact.sum()), 1))]),
-              "b_eq": v[exact]}
-    h = half[boxed, None]
-    capped = math.isfinite(cap)
-
-    def cap_rows(width):
-        if not capped:
-            return np.zeros((0, k + width)), np.zeros(0)
-        pad = np.zeros((n, width))
-        return (np.vstack([np.hstack([a, pad]), np.hstack([-a, pad])]),
-                np.r_[v + cap, cap - v])
-
-    rows, rhs = cap_rows(1)
-    fit = linprog(np.r_[np.zeros(k), 1.0],
-                  A_ub=np.vstack([np.hstack([a[boxed], -h]),
-                                  np.hstack([-a[boxed], -h]), rows]),
-                  b_ub=np.r_[v[boxed], -v[boxed], rhs], **eq,
-                  bounds=[(None, None)] * k + [(0.0, None)], method="highs")
-    if not fit.success or fit.x[-1] > 1.0 + 1e-9:
-        return None
-    t = float(fit.x[-1])
-    first = fit.x[:k]
-    # stage 2: inside that box, minimise Σ s_i with |(Ac − v)_i| <= s_i·half_i
-    if exact.any():
-        eq = {"A_eq": np.hstack([a[exact], np.zeros((int(exact.sum()), m))]),
-              "b_eq": v[exact]}
-    d = np.diag(half[boxed])
-    rows, rhs = cap_rows(m)
-    fit = linprog(np.r_[np.zeros(k), np.ones(m)],
-                  A_ub=np.vstack([np.hstack([a[boxed], -d]),
-                                  np.hstack([-a[boxed], -d]), rows]),
-                  b_ub=np.r_[v[boxed], -v[boxed], rhs], **eq,
-                  bounds=[(None, None)] * k + [(0.0, t)] * m, method="highs")
-    # the second box is the first's own optimum, so a solver that calls it
-    # infeasible by its tolerance keeps the Chebyshev point
-    target = a @ (fit.x[:k] if fit.success else first)
-    target[exact] = v[exact]          # the equality's own value, bit for bit
-    unmoved = np.abs(target - v) <= 1e-12 * np.maximum(np.abs(v), 1e-300)
-    target[unmoved] = v[unmoved]      # a component left alone keeps its print
-    return target
+    return nearest_allowed_within_print(
+        np.asarray(basis, dtype=np.float64).T, u, half)
 
 
 def _project_printed_adps(sg, atoms: list[Atom],
@@ -1392,7 +1329,9 @@ def _project_printed_adps(sg, atoms: list[Atom],
         if adp_projection(basis, u)[2]:
             continue
         target = _adp_within_print(basis, u, printed[atom.label])
-        if target is None:
+        # the table's own test, so a point the solver left off the subspace
+        # by its tolerance is left for the table to refuse, never reported moved
+        if target is None or not adp_projection(basis, target)[2]:
             continue
         names = [n for n, a, t in zip(U_NAMES, u, target, strict=True) if a != t]
         atoms[j] = atom.model_copy(update={"aniso": atom.aniso.model_copy(update={
