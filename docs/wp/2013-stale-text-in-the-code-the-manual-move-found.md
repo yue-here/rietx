@@ -1,6 +1,6 @@
 # WP-2013 — Stale text in the code that the manual move found
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by ghostshift runner
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-10-20 — text only, no behaviour moves; each line misleads the next reader of the code
