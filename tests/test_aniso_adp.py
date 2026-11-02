@@ -653,6 +653,18 @@ def test_a_printed_zero_is_held_exact(tmp_path, zero):
         ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
 
 
+@pytest.mark.parametrize(("u12", "read"), [("0.0060", False), ("0.0061", True),
+                                           ("0.0062", True), ("0.0063", False)])
+def test_the_print_box_edge(tmp_path, u12, read):
+    """Against U11 = 0.0123 (±5e-5), an allowed U12 = U11/2 lies in
+    [0.006125, 0.006175], so a printed U12 within ±5e-5 of that range,
+    [0.006075, 0.006225], is a rounding: 0.0061 and 0.0062 are read, 0.0060
+    and 0.0063 are not."""
+    structure, hits = _read_zno(tmp_path, f"0.0123 0.0123 0.0108 {u12} 0 0")
+    assert bool(hits) is read
+    assert (structure.phases[0].atoms[0].aniso.values()[3] != float(u12)) is read
+
+
 def test_a_tensor_already_on_its_site_symmetry_is_read_silently(tmp_path):
     structure, hits = _read_zno(tmp_path, "0.0124 0.0124 0.0108 0.0062 0 0")
     assert hits == []

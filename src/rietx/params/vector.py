@@ -2096,7 +2096,7 @@ class ParameterTable:
         if not compatible:
             worst = int(np.argmax(np.abs(nearest - u0)))
             raise ValueError(
-                f"{base} ({atom.label!r}): the anisotropic tensor {u0.tolist()} "
+                f"{base}: the anisotropic tensor of {atom.label!r}, {u0.tolist()}, "
                 f"is not compatible with the site symmetry, which allows only "
                 f"{basis.tolist()} in (U11, U22, U33, U12, U13, U23); the "
                 f"nearest allowed tensor is {nearest.tolist()}, "

@@ -242,9 +242,9 @@ def adp_projection(basis: np.ndarray, u: np.ndarray
     """A tensor's least-squares coefficients on :func:`adp_basis`, the nearest
     allowed tensor, and whether the tensor already lies in the allowed subspace.
 
-    The one test of "this U^ij satisfies its site symmetry": the residual of
-    the projection within 1e-6 of the tensor's largest component (floored at
-    1e-6 Å²), which is float round-off on a tensor the algebra allows, never a
+    The one test of "this U^ij satisfies its site symmetry": no component of
+    the projection's residual exceeds 1e-6 × max(the tensor's largest
+    component, 1e-6 Å²), which is float round-off on a tensor the algebra allows, never a
     tolerance for one it does not.  ``ParameterTable`` refuses a tensor that
     fails it, and the CIF reader asks it before deciding whether a printed
     tensor needs moving (:func:`~rietx.crystallography.cif.structure_from_cif`),
