@@ -72,6 +72,9 @@ Profile a row away from its bounds when it is strongly correlated with a row tha
 `level` sets the confidence level, 0.95 by default, and moves both thresholds.
 `max_refits` caps the refits on each side, {{ PARAMETER_INTERVAL_MAX_REFITS }} by default.
 Each side steps outward by 1, 2, 4, … esd until χ² passes the threshold, then solves for the end to a thousandth of an esd.
+Where the first step already passes the threshold, the esd was far too large to step in, and the side steps back in until a probe lands inside.
+A moment's modulus on its dead column at m = 0 is the usual case: an esd of 1e4 μ<sub>B</sub> against an end near 0.06 μ<sub>B</sub>.
+Every refit keeps the fit's own free set, so a parameter the fit held is not freed by a pinned value.
 `interval.n_refits` counts the refits, and `interval.points` holds each pinned value with its χ².
 
 Every refit runs on a branch of the history.

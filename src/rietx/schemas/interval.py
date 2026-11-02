@@ -51,7 +51,8 @@ PARAMETER_INTERVAL_MAX_REFITS = 60
 PARAMETER_INTERVAL_SETTLE_RUNS = 4
 
 #: The tolerance an interval's end is solved to, in units of the fit's esd for
-#: the row.  An end is quoted to two significant figures of the esd at most,
+#: the row, or as a fraction of the end's distance from the value where the
+#: first probe already passed the threshold (WP-2060, ``_walk``).  An end is quoted to two significant figures of the esd at most,
 #: so a thousandth of it is below anything a reader can see, and it moves the
 #: Δχ² at the end by about 0.1 % of the threshold.
 PARAMETER_INTERVAL_XTOL = 1e-3
@@ -117,9 +118,10 @@ class ParameterInterval(Base):
     the interval reads on its own.  ``stderr`` is ``None`` for a moment angle
     the fit's covariance left out at a direction the symmetry fixes
     (``StageResult.moment_angle_tests``, WP-1929), whose profile steps from
-    the half-width that record carries instead.  ``one_sided`` is ``True`` exactly when
-    ``at_bound`` is: the bound is one end, and the other is where the data's
-    χ² has risen by ``delta_chi2_cut``.  That threshold is ``quantile`` × χ²_red
+    the half-width that record carries instead.  ``one_sided`` is ``True`` when
+    ``at_bound`` is, and for a moment's modulus on 0 whose sign the data
+    cannot see (WP-2060): the bound is one end, and the other is where the
+    data's χ² has risen by ``delta_chi2_cut``.  That threshold is ``quantile`` × χ²_red
     × f², f the fit's ``esd_inflation``, with ``quantile`` the χ²₁ point at
     ``level`` for a two-sided interval and at 2·``level`` − 1 for a one-sided
     one (3.84 and 2.71 at 95 %).
