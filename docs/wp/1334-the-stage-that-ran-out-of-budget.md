@@ -266,8 +266,8 @@ repo.
   `StageResult.rwp`, `float | None`, `None` meaning a result stored before the
   field. Writers: `Refinement._run_stage` (both single-histogram runners read
   it off `_StageHold.rwp`) and the joint runner through `_stage_end_rows`,
-  pooled. Schema changelog line under 0.60; manual table row and a line in
-  `reference/refinement.md` § Stage results; `help.py` entry; audit
+  pooled. Schema changelog line under 0.60; three lines in the manual's
+  `concepts/fit.md` § Outputs; `help.py` entry; audit
   `OTHER_RECORD_FIELDS` row. The skill sentence in `references/series.md`
   that said `StageResult` has no `rwp` is rewritten, and
   `test_every_negative_field_claim_is_still_true` now pins "`SeriesEntry`
@@ -319,7 +319,13 @@ repo.
 
   Author: the `run_stage` path is now covered by the new test, after this review.
 
-  *Gotchas.* The last stage's `rwp` is not `result.statistics.rwp`: the
+  *Gotchas.* `reference/refinement.md`, the natural home of the field's row
+  (§ Stage results), is at the manual's 50 000-character page cap: 49 665 on
+  main, and the row plus two lines took CI's built twin to 50 352, so the field
+  is documented in `concepts/fit.md` until that page is split. The telemetry
+  test that decomposes a recorded stage's forward work
+  (`test_what_a_recorded_stage_costs_in_forward_evaluations`) now finds a
+  caller's own stream free, since every fit pays the stage Rwp. The last stage's `rwp` is not `result.statistics.rwp`: the
   result is measured on a compile at the answer, so the two differ by the
   frozen windows alone. The negative-claim regex needs the class and the
   field on one line.
