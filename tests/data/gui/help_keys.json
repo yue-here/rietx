@@ -31,6 +31,7 @@
   "diagnostics:CELL_DEGENERATE_PROBE",
   "diagnostics:CELL_RUNAWAY",
   "diagnostics:CHILD_GROUP_UNNAMED",
+  "diagnostics:CIF_ANISO_COLLAPSED",
   "diagnostics:CIF_CELL_ANGLE_CORRECTED",
   "diagnostics:CIF_EMPTY_BLOCK_SKIPPED",
   "diagnostics:CIF_MAGNETIC_CENTERING_ASSUMED",

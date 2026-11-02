@@ -1,6 +1,6 @@
 # WP-1468 — what the polyhedra still miss, and the controls a chemist would reach for
 
-Milestone: unscheduled · Status: 🔄 2026-10-03 — eleven of twelve original tasks landed; WP-1533's dark-theme C colour and two figure controls remain
+Milestone: unscheduled · Status: 🔄 2026-11-01 — eleven of twelve original tasks and the #1056 one landed (PR #1298); WP-1533's dark-theme C colour and two figure controls remain
 Track: Render what the fit already knows
 Depends on: 1466
 Priority: P3 2026-10-23 — was P4: 1504's close forwarded WP-1957's readings, and one misleads (all three reviewers read `DIM_BOUNDARY`'s shade as a second species); also left are WP-1533's C colour and two figure controls
@@ -175,7 +175,7 @@ the file and run the test to refresh the payloads.
 - **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): the a and b letters sit under atoms or bonds in a view down c.** WP-1957's reviewers, on fluorapatite.
 - **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): at the default probability, `mode="ellipsoid"` draws the atoms as pinpricks.** That is physically right at Biso ≈ 1 Å² (`structure3d.DEFAULT_PROBABILITY` is 0.50), but WP-1957's reviewers read it as a wire model.
 
-- 2026-10-26 issue triage: #1056 (maintainer, 2026-10-19): an ellipsoid figure from a CIF read with defaults draws spheres, and nothing says so. `Structure.from_cif(aniso=False)` reads the file's U_ij as U_eq, and `render_structure(mode="ellipsoid")` then draws every site as a sphere. Checked against the tree at c0e32ab29: COD paracetamol (`tests/data/cod_2104364.cif`) read with defaults gives 0 of 20 sites anisotropic, `fig.report.warnings == []`, and `from_cif(diagnostics=d)` appends nothing; with `aniso=True` it gives 11 of 20 (the 9 hydrogens are Uiso in the file). The issue asks for three small changes: an info diagnostic from the CIF reader when it collapses an aniso loop, counting the sites ("N sites carry U_ij in the file and were read as U_eq; pass aniso=True to keep them"; `gui/imports.py:_has_aniso` already detects the loop); a `FigureReport.warnings` line in ellipsoid mode counting the sites drawn as spheres, stated as a count because a file's hydrogens trigger it legitimately; and one line in `docs/skill/rietx/references/api-figure.md`. The reader diagnostic is a new code, so it needs a `rietx._audit` row and will fire on every test CIF with an aniso loop (five in `tests/data` at least), so check `tests/silence.py`.
+- 2026-10-26 issue triage, **done 2026-11-01 (the three changes below landed; see the handover entry)**: #1056 (maintainer, 2026-10-19): an ellipsoid figure from a CIF read with defaults draws spheres, and nothing says so. `Structure.from_cif(aniso=False)` reads the file's U_ij as U_eq, and `render_structure(mode="ellipsoid")` then draws every site as a sphere. Checked against the tree at c0e32ab29: COD paracetamol (`tests/data/cod_2104364.cif`) read with defaults gives 0 of 20 sites anisotropic, `fig.report.warnings == []`, and `from_cif(diagnostics=d)` appends nothing; with `aniso=True` it gives 11 of 20 (the 9 hydrogens are Uiso in the file). The issue asks for three small changes: an info diagnostic from the CIF reader when it collapses an aniso loop, counting the sites ("N sites carry U_ij in the file and were read as U_eq; pass aniso=True to keep them"; `gui/imports.py:_has_aniso` already detects the loop); a `FigureReport.warnings` line in ellipsoid mode counting the sites drawn as spheres, stated as a count because a file's hydrogens trigger it legitimately; and one line in `docs/skill/rietx/references/api-figure.md`. The reader diagnostic is a new code, so it needs a `rietx._audit` row and will fire on every test CIF with an aniso loop (five in `tests/data` at least), so check `tests/silence.py`.
 
 - 2026-10-26 issue triage: #1057 (maintainer, 2026-10-19): two figure controls an ORTEP needs, and one outline defect. A bond half always takes its atom's site colour (`viz.figure3d.scene.build_scene`), and the renderer has no per-atom draw style, so a group cannot be drawn as wireframe beside ellipsoids and bonds cannot all be grey. `outline=True` also inks the near-side edge of a thin stick, which on a stick is its whole width. Checked against the tree at c0e32ab29: on COD paracetamol (`tests/data/cod_2104364.cif`, `aniso=True`) with four site colours set, the bond halves carry exactly those four colours; `render_structure` has no bond-colour or style parameter; at `stick=0.3, outline=True` the white H bond halves are drawn with black edges (looked at). The issue proposes `rx.viz.restyle(g, mask, "wire")` (no glyph, thin lines in the bond colour, skipped by the outline) and `render_structure(bond_colour=...)` or a `bond_color` key in the build dict, both carried in `.recipe`. Its claim that Mercury and Olex2 set a display style per selection is recalled, not checked; read their manuals before choosing names, as Context § What other viewers do did.
 
@@ -202,6 +202,7 @@ Independent; take any.
 - [x] The polyhedra stop recomputing on a bond-slider release — declined on the record 2026-09-28. The recompute is kept and made cheaper (Context). A memo would be keyed on the phase and on every rule constant, and one left out of the key serves a stale picture
 - [x] One authority for "bonded" on the server and one for "drawn" on the client (2026-09-28: `structure3d.bonded`, `drawnWith` and its twin `drawn_with`)
 - [x] A source for the Te, At, Kr and Xe electronegativities (2026-10-03: three handbooks agree, read second-hand, Context; the `ELECTRONEGATIVITY` comment says so)
+- [x] An ellipsoid figure from a CIF read with defaults says it drew spheres (#1056; 2026-11-01: `CIF_ANISO_COLLAPSED` info from the reader counts the collapsed sites, `FigureReport.warnings` counts the sites an ellipsoid figure drew as spheres, one skill sentence. #1057, the two figure controls, stays open)
 - [ ] A theme-dependent C colour (from WP-1533): C's `#383838` reads at 1.56:1 on the dark `#151515`, as H's `#d8d8d8` does at 1.38:1 on the light `#fbfbfa`; a plain 3:1 rule would repaint 11 of 20 CPK colours on light. It changes the dark default picture, so re-run `measure.py` and name the rows that moved. Until then the skill tells an agent to recolour C on a dark background
 - [ ] Two figure controls the promo scripts did by hand (from WP-1533): `fig.image` cropped to its ink, and a polyhedron colour on the figure, where all six take-2 scripts read `g["sites"]` instead
 
@@ -230,6 +231,67 @@ npm --prefix gui test && npm --prefix gui run check
 - Allred, A. L. (1961). *J. Inorg. Nucl. Chem.* 17, 215.
 
 ## Handover log
+
+- **2026-11-01** — **An ellipsoid figure of a CIF read with the defaults now says
+  it drew spheres, and the reader says why.** Reading a CIF drops each site's
+  anisotropic displacement tensor unless `aniso=True` is passed, and the ellipsoid
+  figure then drew spheres with nothing said (issue #1056, maintainer). Now the
+  reader's diagnostics list gets one info line counting the sites whose tensors
+  were read as U_eq, and the figure's report gets one line counting the sites drawn
+  as spheres. A count, because a file's nine hydrogens are isotropic and trigger it
+  legitimately. The two lines come from different places and neither knows of the
+  other. PR #1298, from a ghostshift runner, for #1056 only; #1057 and the two
+  open tasks (dark-theme C colour, figure controls) are untouched.
+
+  *Done.* `CIF_ANISO_COLLAPSED` (info, `crystallography/cif.py`; message
+  "N sites carry U_ij in the file and were read as U_eq; pass aniso=True to keep
+  them", `where` the `.biso` path of each site, so it names the value that holds
+  U_eq). Its `_audit` row (tier 1, ambiguity 1, response info), `help.py` entry,
+  `help_keys.json` key, one `diagnostics-reading.md` row. `FigureReport.warnings`
+  in ellipsoid mode (`viz/figure3d/render.py`): "Drawn as spheres for want of an
+  anisotropic displacement: N of M sites (a CIF's U_ij is kept only by
+  Structure.from_cif(..., aniso=True))". The wording has no number agreement, so a
+  count of one reads right. The one skill sentence is in `docs/skill/make_api_index.py`
+  (the generator), so `api-figure.md` and both committed skill copies were
+  regenerated. Two tests in `tests/test_render_structure.py`.
+
+  *Measured* (COD 2104364 paracetamol, venv `[dev]`, darwin/arm64). Default read:
+  11 sites collapsed, 20 of 20 drawn as spheres. `aniso=True`: no reader line, 9 of
+  20 spheres (the hydrogens). Ball mode: no warning. Both ellipsoid pictures looked
+  at (spheres against ellipsoids, same view). `python -m tests.reader_output`: exit 0,
+  unchanged, because its standard fit reads no CIF with an aniso loop; the added
+  lines show only to a caller who passes `diagnostics=[]` or draws an ellipsoid
+  figure. The new tests cost 0.55 s and 0.04 s locally. `tests/silence.py` needs a
+  pair only for a `warning` code, and this one is info, so none was added.
+  The fast selection (`-m "not slow"`, whole suite) did not run here: its turn in the ghostshift suite lock queue had not come after 80 minutes behind other runners' suites, so I withdrew it. What ran, on the merged tree (main fetched 2026-11-01, `[dev]` venv, darwin/arm64, beside other sessions): the 15 files touching this change (docs consistency, audit table, help, gui help, silence, skill x4, render_structure, cif_blocks, schemas, robustness_external, manual_api, structure3d), 935 passed, 1 skipped, 81 s; ruff clean. The two new tests are in that count; no whole-suite passed+skipped delta was measured. CI's fast matrix is the whole-suite gate.
+
+  *Review.* `/code-review high --fix` found no bug and six minor points. Fixed: the
+  singular ("1 sites"), the test's prefix slicing. Declined: the `where` paths point
+  at `.biso` (consistent with `CIF_SPECIES_NORMALISED`'s `.species`); the count is
+  taken after twin merging and by label, so a file listing one site twice reports
+  the merged count, not the loop's row count (rare, and the message says "sites in
+  the file" loosely). The generality judge's one finding, that the figure
+  sentence's remedy clause fires also on a refined isotropic model, is answered by
+  rewording it to a statement of fact ("is kept only by") rather than advice.
+
+  *Generality* (judge's verdicts, edited down to the table's conclusions).
+  `CIF_ANISO_COLLAPSED`: **holds**, tier 1 fits; case against is a frequency worry
+  nobody measured (most single-crystal CIFs carry an aniso loop, so a powder refiner
+  sees it on nearly every read; it is info and only on the `diagnostics=` channel);
+  its message says "U_eq" where the reader falls back to trace/3 when the file
+  states no `_atom_site_U_iso_or_equiv` (exact only for orthogonal axes). The
+  figure warning: **holds**, no row, no threshold. Evidence that would flip it: a
+  firing rate over a CIF corpus showing it fires on almost every read while almost
+  no caller acts.
+
+  *Gotchas.* `.agents/` and `.claude/` skill copies are committed, so a skill edit
+  needs `rietx skill --install . --copy`. `api-figure.md` is generated: edit
+  `docs/skill/make_api_index.py`. A new code needs `tests/data/gui/help_keys.json`
+  too.
+
+  *Next.* The maintainer reads the two added lines (reader-output rule). Then #1057
+  (per-atom draw style, bond colour, outline defect) is the next figure task here;
+  it is independent of this one.
 
 - **2026-10-03** — **The four electronegativities nobody had checked now
   have a source.** Te, At, Kr and Xe agree with three handbooks, the CRC
