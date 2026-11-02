@@ -74,6 +74,12 @@
   "instrument.extra_components.0.position",
   "instrument.extra_components.0.height",
   "instrument.extra_components.0.fwhm",
+  "phases.0.parent_cell.cell.a",
+  "phases.0.parent_cell.cell.b",
+  "phases.0.parent_cell.cell.c",
+  "phases.0.parent_cell.cell.alpha",
+  "phases.0.parent_cell.cell.beta",
+  "phases.0.parent_cell.cell.gamma",
   "phases.0.distortion_modes.modes.0.amplitude",
   "phases.0.distortion_modes.modes.1.amplitude",
   "phases.0.distortion_modes.modes.2.amplitude"
@@ -157,7 +163,13 @@
     72,
     73,
     74,
-    75
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81
    ]
   },
   {
@@ -168,7 +180,13 @@
     2,
     3,
     4,
-    5
+    5,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78
    ]
   },
   {
@@ -232,13 +250,20 @@
     66,
     73,
     74,
-    75
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81
    ]
   },
   {
    "pattern": "phases.*.cell.a",
    "matches": [
-    0
+    0,
+    73
    ]
   },
   {
@@ -356,7 +381,13 @@
     2,
     3,
     4,
-    5
+    5,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78
    ]
   },
   {
@@ -396,7 +427,13 @@
     2,
     3,
     4,
-    5
+    5,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78
    ]
   },
   {
@@ -440,9 +477,9 @@
   {
    "pattern": "phases.*.distortion_modes.modes.*.amplitude",
    "matches": [
-    73,
-    74,
-    75
+    79,
+    80,
+    81
    ]
   },
   {
