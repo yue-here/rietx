@@ -22,7 +22,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-11-01 | P2 | [magnetic](#magnetic) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 2026-10-30 | P3 | [magnetic](#magnetic) |
 | [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | 2026-11-01 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
-| [1530](1530-the-topas-readers-last-silences.md) | The TOPAS reader's last silences: a macro-opened dataset, a line it does not know, a held background | 2026-10-03 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 2026-10-03 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1542](1542-a-le-bail-background-left-at-its-seed.md) | A Le Bail background left at its seed | 2026-10-08 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1805](1805-the-rigid-body.md) | `RigidBody`: schema, collector, anchored rotation, the body's own rows | 2026-10-08 | P2 | [rigid-bodies](#rigid-bodies) |
@@ -82,6 +81,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | P2 | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | P2 | — ([1969](1969-an-exhaustive-search-that-ends-in-no-cell.md), [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2079](2079-a-non-finite-count-is-dropped-and-said.md) | A non-finite count or σ in a pattern file is dropped, and the reader says so | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | P2 | — ([2003](2003-the-chain-actions.md) soft) | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -490,7 +490,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1433](1433-the-inp-grammar-still-refused.md) | The `.inp` grammar the reader still refuses: `STR(...)` and `#if` | ✅ 2026-10-03 | — | — |
 | [1455](1455-a-topas-tchz-profile-reads-in.md) | A TOPAS TCHZ profile reads in | ⬜ | P3 | — ([1433](1433-the-inp-grammar-still-refused.md) soft) |
 | [1527](1527-foreign-files-spell-a-species-as-the-program-does.md) | Foreign files spell a species as the other program does | ✅ 2026-10-04 | — | — |
-| [1530](1530-the-topas-readers-last-silences.md) | The TOPAS reader's last silences: a macro-opened dataset, a line it does not know, a held background | 🔄 2026-10-03 | P2 | — ([1433](1433-the-inp-grammar-still-refused.md) soft) |
+| [1530](1530-the-topas-readers-last-silences.md) | The TOPAS reader's last silences: a macro-opened dataset, a line it does not know, a held background | ✅ 2026-11-02 | — | — ([1433](1433-the-inp-grammar-still-refused.md) soft) |
 | [1543](1543-a-gsas-gaussian-width-is-a-variance.md) | A GSAS Gaussian width is a variance | ✅ 2026-10-10 | — | — |
 | [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 🔄 2026-10-12 | P3 | — (#713 soft) |
 | [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 🔄 2026-11-02 | P2 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) |
@@ -641,6 +641,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1959](1959-the-dichotomy-grid-compiled-again.md) | The dichotomy grid compiled again, so a ceiling reaches svd | ✅ 2026-10-14 | — | — |
 | [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | ✅ 2026-11-01 | — | — |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 🔄 2026-11-02 | P2 | — |
+| [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | ⬜ | P2 | — ([2003](2003-the-chain-actions.md) soft) |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
 

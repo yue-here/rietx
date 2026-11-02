@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tests import shards
+from tests import documentation, shards
 from tests.conftest import pytest_collection_modifyitems, pytest_make_collect_report
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -112,12 +112,13 @@ def test_no_shard_option_leaves_the_collection_alone():
 
 
 def test_the_record_reads_shares_of_python_legs_and_reads_past_the_jax_job(tmp_path):
-    """Two Python legs at different runner speeds give one numpy profile.
+    """Two Python legs at different runner speeds give one set of seconds.
 
     ``py3.12`` runs twice as slow and comes as two shards, which sum.  A skip
     costs nothing, a test class belongs to its module, and a module skipped at
     import (no classname) is not a file the record can place.  The jax job runs
-    ``--jax-cases`` unsharded since WP-2019, so its seconds place nothing."""
+    ``--jax-cases`` unsharded since WP-2019, so its seconds place nothing.
+    Neither leg skips the documentation, so both profiles hold every leg's."""
     def write(job, cases):
         (tmp_path / job).mkdir()
         body = "".join(
@@ -134,13 +135,15 @@ def test_the_record_reads_shares_of_python_legs_and_reads_past_the_jax_job(tmp_p
     write("junit-jax", [("tests.sub.test_c", 7.04, False), ("tests.test_a", 1, True)])
     out = shards.record(tmp_path, "run 1")
     # both legs give a 3/4 share to test_a; the median leg total is (4 + 8)/2
-    assert out == {"source": "run 1",
-                   "numpy": {"tests/test_a.py": 4.5, "tests/test_b.py": 1.5}}
+    both = {"tests/test_a.py": 4.5, "tests/test_b.py": 1.5}
+    assert out == {"source": "run 1", "docs_run": both, "docs_skipped": both}
 
 
-def test_a_file_one_leg_skips_weighs_what_the_leg_running_it_spent(tmp_path):
+def test_a_file_one_leg_skips_weighs_what_each_kind_of_leg_spent(tmp_path):
     """The documentation executes on the newest leg alone (WP-2019), so its
-    file weighs its share there: a median over two legs would halve it."""
+    file weighs its share there: a median over two legs would halve it.  The
+    leg the switch skipped it on is read off the skip's message, and weighs
+    it at what it cost there, nothing."""
     for job, docs in (("junit-py3.11", True), ("junit-py3.14", False)):
         (tmp_path / job).mkdir()
         (tmp_path / job / "junit.xml").write_text(
@@ -150,7 +153,8 @@ def test_a_file_one_leg_skips_weighs_what_the_leg_running_it_spent(tmp_path):
             + "</testcase></testsuite></testsuites>", encoding="utf-8")
     out = shards.record(tmp_path, "run 1")
     # both legs ran test_a in 6 s, so they share a clock and docs keeps its 4 s
-    assert out["numpy"] == {"tests/test_a.py": 6.0, "tests/test_docs.py": 4.0}
+    assert out["docs_run"] == {"tests/test_a.py": 6.0, "tests/test_docs.py": 4.0}
+    assert out["docs_skipped"] == {"tests/test_a.py": 6.0, "tests/test_docs.py": 0.0}
 
 
 def test_a_file_one_leg_runs_only_part_of_neither_halves_it_nor_sets_the_clock(tmp_path):
@@ -168,7 +172,35 @@ def test_a_file_one_leg_runs_only_part_of_neither_halves_it_nor_sets_the_clock(t
             + "</testcase></testsuite></testsuites>", encoding="utf-8")
     out = shards.record(tmp_path, "run 1")
     # the clock is test_a alone, 6 s on each leg, so docs keeps the 10 s it cost
-    assert out["numpy"] == {"tests/test_a.py": 6.0, "tests/test_docs.py": 10.0}
+    assert out["docs_run"] == {"tests/test_a.py": 6.0, "tests/test_docs.py": 10.0}
+    assert out["docs_skipped"] == {"tests/test_a.py": 6.0, "tests/test_docs.py": 1.0}
+
+
+def test_a_skip_for_another_reason_does_not_mark_the_leg(tmp_path):
+    """Only the switch's own message says a leg skips the documentation, so a
+    leg skipping a file for want of a library is not read as that leg."""
+    for job, msg in (("junit-py3.11", "no torch"), ("junit-py3.14", None)):
+        (tmp_path / job).mkdir()
+        (tmp_path / job / "junit.xml").write_text(
+            '<testsuites><testsuite><testcase classname="tests.test_a" name="t" time="6"/>'
+            '<testcase classname="tests.test_b" name="t" time="4">'
+            + (f'<skipped message="{msg}"/>' if msg else "")
+            + "</testcase></testsuite></testsuites>", encoding="utf-8")
+    out = shards.record(tmp_path, "run 1")
+    assert out["docs_run"] == out["docs_skipped"] == {"tests/test_a.py": 6.0,
+                                                      "tests/test_b.py": 4.0}
+
+
+@pytest.mark.parametrize(("value", "skipped"), [(documentation.SKIP, True), ("run", False)])
+def test_a_shard_splits_by_the_profile_of_its_own_documentation_switch(
+        monkeypatch, value, skipped):
+    """py3.11 skips the documentation and py3.14 executes it, so one split
+    weighed the guide scripts at py3.14's cost on both (WP-2019)."""
+    seen = []
+    monkeypatch.setattr(shards, "recorded_seconds", lambda **kw: seen.append(kw) or {})
+    monkeypatch.setenv(documentation.ENV, value)
+    pytest_collection_modifyitems(SimpleNamespace(option=SimpleNamespace(shard="1/3")), [])
+    assert seen == [{"docs_skipped": skipped}]
 
 
 def test_a_leg_missing_a_shard_another_leg_has_is_refused(tmp_path):
@@ -186,32 +218,34 @@ def test_the_committed_record_covers_most_of_the_suite():
     """A file the record lacks costs balance and never a test, so nothing goes
     red when the record goes stale.  An empty or garbled profile would be the
     same silence across every file, and this row is the one that sees it.  It
-    holds one profile: the jax job no longer shards, so a second would be a
-    name nothing reads (WP-2019)."""
+    holds one profile per state of the documentation switch and no jax one:
+    the jax job no longer shards, so that would be a name nothing reads
+    (WP-2019)."""
     record = json.loads(shards.RECORD.read_text(encoding="utf-8"))
     files = {p.relative_to(ROOT).as_posix() for p in (ROOT / "tests").rglob("test_*.py")}
-    assert set(record) == {"source", "numpy"}
+    assert set(record) == {"source", shards.DOCS_RUN, shards.DOCS_SKIPPED}
     assert record["source"]
-    seconds = shards.recorded_seconds()
-    assert all(f.startswith("tests/") and f.endswith(".py") and s >= 0
-               for f, s in seconds.items())
-    assert len(files & seconds.keys()) > len(files) / 2
+    for docs_skipped in (False, True):
+        seconds = shards.recorded_seconds(docs_skipped=docs_skipped)
+        assert all(f.startswith("tests/") and f.endswith(".py") and s >= 0
+                   for f, s in seconds.items())
+        assert len(files & seconds.keys()) > len(files) / 2
 
 
 def _collected(*extra):
     proc = subprocess.run(
         [sys.executable, "-m", "pytest", "--collect-only", *extra,
          "tests/test_suite_config.py", "tests/test_added_test_times.py",
-         "tests/test_shards.py"],
+         "tests/test_shards.py", "tests/test_documentation_switch.py"],
         cwd=ROOT, capture_output=True, encoding="utf-8")
     assert proc.returncode == pytest.ExitCode.OK, (proc.stdout + proc.stderr)[-2000:]
     return {line for line in proc.stdout.splitlines() if "::" in line}
 
 
-@pytest.mark.parametrize("n", [2, 3])
+@pytest.mark.parametrize("n", [2, 3, 4])
 def test_a_real_collection_splits_into_disjoint_shards_that_cover_it(n):
     """End-to-end, so the option, the hook's order and the path keys are real.
-    Three files, so each of CI's three shards holds one (WP-2019)."""
+    Four files, so each of CI's four shards holds one (WP-2019)."""
     whole = _collected()
     parts = [_collected("--shard", f"{k}/{n}") for k in range(1, n + 1)]
     assert all(parts)
