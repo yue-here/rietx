@@ -9,55 +9,51 @@ lands here; it earns a clause at root only if it changes behavior outside
 
 ## The governing rule
 
-The FitReport's rule one rank up: an indexer must never hand back one cell
-confidently — `IndexingResult` has **no** `.cell`/`.best`, only a gated
-`best_or_none()`; geometrical ambiguity (Mighell & Santoro 1975) is reported
-with the reflections that would break the tie, never silently resolved; coverage
-is scored in *both* directions (share-of-observed alone puts a 390-line wrong
-phase above the truth); a restricted search reports `systems_searched` rather
-than concluding anything about the sample. Engines supply the confidence by
-**agreeing** (`direction="both"`'s device) — three of them (two until WP-1040),
-`high` meaning *every* engine that ran found the lattice, so adding one raises
-the bar. They must fail differently for that to mean anything, and they do: wide
-domain (dichotomy), poisoned base line (trial_error), bad starting basin (svd).
-One step further: the **extinction symbol**, not the space group, is what a
-powder measures — `determine_extinction_symbol` answers with ranked classes,
-each carrying a *list* of space groups; there the singleton is not unsupported
-but unmeasurable. Its absence test can only speak where its own null model is
-silent — a σ threshold is counting noise, not model error, and a forbidden
-position inside a neighbour's tail measures the *profile*, which refuted
-certified corundum's own `R -3 c` (WP-1077; `_model_is_quiet` and the sham-probe
-measurement are in `extinction.py`'s docstring, and `n_testable` is `None` until
-`screened` because it needs that class's fit). Its reference fit is gated on the
+The FitReport's rule one rank up: an indexer must never hand back one cell confidently —
+`IndexingResult` has **no** `.cell`/`.best`, only a gated `best_or_none()`; geometrical
+ambiguity (Mighell & Santoro 1975) is reported with the reflections that would break the
+tie, never silently resolved; coverage is scored in *both* directions (share-of-observed
+alone puts a 390-line wrong phase above the truth); a restricted search reports
+`systems_searched` rather than concluding anything about the sample. Engines supply the
+confidence by **agreeing** (`direction="both"`'s device) — three of them (two until
+WP-1040), `high` meaning *every* engine that ran found the lattice, so adding one raises
+the bar. They must fail differently for that to mean anything, and they do: wide domain
+(dichotomy), poisoned base line (trial_error), bad starting basin (svd). One step
+further: the **extinction symbol**, not the space group, is what a powder measures —
+`determine_extinction_symbol` answers with ranked classes, each carrying a *list* of
+space groups; there the singleton is not unsupported but unmeasurable. Its absence test
+can only speak where its own null model is silent — a σ threshold is counting noise, not
+model error, and a forbidden position inside a neighbour's tail measures the *profile*,
+which refuted certified corundum's own `R -3 c` (WP-1077; `_model_is_quiet` and the
+sham-probe measurement are in `extinction.py`'s docstring, and `n_testable` is `None`
+until `screened` because it needs that class's fit). Its reference fit is gated on the
 picker's envelope (`REFERENCE_NET_RWP_MAX`).
 
 ## The pipeline
 
-`index_pattern(peaks | data+instrument)` (`workflow.py`): quality gate →
-engines → `consensus.py` (merge on the reduced cell, `found_by` union, Borda
-over the panel, two-opinion Bravais, ambiguity) → whole-profile validation → the
-gate. Three load-bearing rules. **`high` requires zero caveats**, and
-`IndexCaveat`/`INDEX_REFUTING_CAVEATS` (`schemas/indexing.py`) are the whole
-gate: any caveat in the refuting set drops a cell to `low`, the rest cap at `medium`, and
-*count* deliberately separates nothing. **Every reversed question is asked of
-inputs a candidate cannot buy, at the measured resolution** (C3, #916,
-`screen.py`: peak list + picker's envelope + the one overlap rule, after the
-common shift the forward matches imply) — never the candidate's own Le Bail
-fit (magnetite's wrong P description bought a negative background and read 0
-of 163 absent, WP-1043) and never the search window (±0.15° on a 0.023° FWHM
-read a resolved split as *supported*). The oversized cell is **capped** by the
-line screen (`predicted_but_absent`, the windowed uncancellable count) and
-**refuted** by the generalised supercell check; the whole-profile fit — **Pawley**, since one
-Le Bail pass stalls (WP-2011) — stays **mandatory for the forward direction**
+`index_pattern(peaks | data+instrument)` (`workflow.py`): quality gate → engines →
+`consensus.py` (merge on the reduced cell, `found_by` union, Borda over the panel,
+two-opinion Bravais, ambiguity) → whole-profile validation → the gate. Three
+load-bearing rules. **`high` requires zero caveats**, and
+`IndexCaveat`/`INDEX_REFUTING_CAVEATS` (`schemas/indexing.py`) are the whole gate: any
+caveat in the refuting set drops a cell to `low`, the rest cap at `medium`, and *count*
+deliberately separates nothing. **Every reversed question is asked of inputs a candidate
+cannot buy, at the measured resolution** (C3, #916, `screen.py`: peak list + picker's
+envelope + the one overlap rule, after the common shift the forward matches imply) —
+never the candidate's own Le Bail fit (magnetite's wrong P description bought a negative
+background and read 0 of 163 absent, WP-1043) and never the search window (±0.15° on a
+0.023° FWHM read a resolved split as *supported*). The oversized cell is **capped** by
+the line screen (`predicted_but_absent`, the windowed uncancellable count) and
+**refuted** by the generalised supercell check; the whole-profile fit — **Pawley**,
+since one Le Bail pass stalls (WP-2011) — stays **mandatory for the forward direction**
 (`unmatched_observed`, Rwp for a reader; `freeze_profile` is off, measured in
-`validation_plan`). Layer 0's `unmatched_calc` **cannot** serve (a phantom gets ~nothing, so it
-fires on 68 % of the truth's reflections against 55 % of a doubled cell's), nor
-`unmatched_observed` as a caveat (its level is the *specimen's* — 10-188 across
-21 correct candidates — comparative only, WP-1041). **The validation fit holds the cell**, freeing
-exactly one peak-position parameter from the candidate's own shift template.
-On real data with no measured shift, `high` is *unreachable* by design
-(`shift_allowance_assumed`); the fix is evidence, not a bigger constant
-(WP-1026).
+`validation_plan`). Layer 0's `unmatched_calc` **cannot** serve (a phantom gets
+~nothing, so it fires on 68 % of the truth's reflections against 55 % of a doubled
+cell's), nor `unmatched_observed` as a caveat (its level is the *specimen's* — 10-188
+across 21 correct candidates — comparative only, WP-1041). **The validation fit holds
+the cell**, freeing exactly one peak-position parameter from the candidate's own shift
+template. On real data with no measured shift, `high` is *unreachable* by design
+(`shift_allowance_assumed`); the fix is evidence, not a bigger constant (WP-1026).
 
 ## The scheduler, the presets and the stream (WP-1042)
 
@@ -116,41 +112,36 @@ On real data with no measured shift, `high` is *unreachable* by design
 
 ## Engines and the FoM panel
 
-Everything the engines share is `engines.py` — one `SearchSpec`, one
-`EngineResult` (carrying `CandidateFit`: consensus dedup is a χ² test needing
-`cov_af`), the live registry the agent schema quotes, `Budget`, and the
-`reflection_ceiling_ok` crash guard before every `generate_reflections` a
-search reaches. `search_dichotomy` bounds Q over boxes in A..F (corner-exact
-— Q is linear in the metric); its silence is evidence *only when*
-`search_complete[system]`. `search_trial_error` assumes base-line indices and
-solves the metric exactly — a bad base line poisons it where a wide domain
-poisons the other. `search_svd` (WP-1040) alternates assign-nearest with
-re-solve until the assignment settles — **no tolerance to search with**,
-failing on a bad starting basin; the only *stochastic* engine
-(`SearchSpec.seed` is part of its answer, never `hash()` of a name — python
-salts per process) and the only one reading observed intensities. All three
-rank on the FoM **panel** via `rank_candidates`, never on a member —
-supercells index every observed line and lose only on the reversed members,
-asked at the resolution (`fom_panel(..., fwhm_obs=)`, C3).
-Seven members: M₂₀, F_N, three coverage fractions, and Oishi-Tomiyasu
-(2013)'s `m_rev`/`m_sym` (the reversed direction as a *ratio* where ours is
-a windowed fraction — on a doubled axis `m_rev` separates truth from
-supercell 64-74× where M₂₀ manages 1.8×). Its `N^cal` is Σ 1/m over
-centring-allowed triples, **never rounded**: a complete orbit sums to
-exactly 1 (the multiplicity self-check) while a box-cut hexagonal orbit
-legitimately contributes a fraction.
-**A cap applied above the layer that ranks *is* a ranking** (WP-1046; both
-truncations measured in v1.0.md § Appendix). `max_candidates` is the **reported**
-cap, applied once, by consensus; a unit hands the merge
-`SearchSpec.engine_pool()` = `ENGINE_POOL_MULTIPLE ×` it, and consensus scores
-the *whole* merge (`shortlist=None` — the pre-rank bounds an engine's unbounded
-harvest and consensus has none). Applied lower, Borda's rank-sum over the pool
-made the cap the ranking and a **longer** search *lost* set F's truth. Two
-numbers because they price different things — the pool is panel time, the
-reported cap is validation, which `estimate_ceiling` prices; and
-`INDEX_CANDIDATES_TRUNCATED` says what the list left out, a count at the merge
-and a flag at the pool. **The known-cell corpus could not have found this**: it
-is high-symmetry, and the cap binds in the low-symmetry sets.
+Everything the engines share is `engines.py` — one `SearchSpec`, one `EngineResult`
+(carrying `CandidateFit`: consensus dedup is a χ² test needing `cov_af`), the live
+registry the agent schema quotes, `Budget`, and the `reflection_ceiling_ok` crash guard
+before every `generate_reflections` a search reaches. `search_dichotomy` bounds Q over
+boxes in A..F (corner-exact — Q is linear in the metric); its silence is evidence *only
+when* `search_complete[system]`. `search_trial_error` assumes base-line indices and
+solves the metric exactly — a bad base line poisons it where a wide domain poisons the
+other. `search_svd` (WP-1040) alternates assign-nearest with re-solve until the
+assignment settles — **no tolerance to search with**, failing on a bad starting basin;
+the only *stochastic* engine (`SearchSpec.seed` is part of its answer, never `hash()` of
+a name — python salts per process) and the only one reading observed intensities. All
+three rank on the FoM **panel** via `rank_candidates`, never on a member — supercells
+index every observed line and lose only on the reversed members, asked at the resolution
+(`fom_panel(..., fwhm_obs=)`, C3). Seven members: M₂₀, F_N, three coverage fractions,
+and Oishi-Tomiyasu (2013)'s `m_rev`/`m_sym` (the reversed direction as a *ratio* where
+ours is a windowed fraction — on a doubled axis `m_rev` separates truth from supercell
+64-74× where M₂₀ manages 1.8×). Its `N^cal` is Σ 1/m over centring-allowed triples,
+**never rounded**: a complete orbit sums to exactly 1 (the multiplicity self-check)
+while a box-cut hexagonal orbit legitimately contributes a fraction. **A cap applied
+above the layer that ranks *is* a ranking** (WP-1046; both truncations measured in
+v1.0.md § Appendix). `max_candidates` is the **reported** cap, applied once, by
+consensus; a unit hands the merge `SearchSpec.engine_pool()` = `ENGINE_POOL_MULTIPLE ×`
+it, and consensus scores the *whole* merge (`shortlist=None` — the pre-rank bounds an
+engine's unbounded harvest and consensus has none). Applied lower, Borda's rank-sum over
+the pool made the cap the ranking and a **longer** search *lost* set F's truth. Two
+numbers because they price different things — the pool is panel time, the reported cap
+is validation, which `estimate_ceiling` prices; and `INDEX_CANDIDATES_TRUNCATED` says
+what the list left out, a count at the merge and a flag at the pool. **The known-cell
+corpus could not have found this**: it is high-symmetry, and the cap binds in the
+low-symmetry sets.
 
 **Corroboration outranks every figure of merit — and it is binary, not a count**
 (`engines.corroborated`, WP-1046). The doctrine above applied to the *order*:
@@ -271,6 +262,12 @@ roughly the shift (+1400 ppm).
   skipped that and put a pseudo-cubic trigonal R description of the certified LaB6
   lattice above the cubic truth with **115 fast indexing tests green** — so run
   `tests/test_acceptance_indexing.py` before closing anything that touches an engine.
+- **A setting-change prune quotients the metric, never the centring** (WP-2066, #1258):
+  a C lattice whose every C setting was pruned came back as P at twice its volume,
+  called complete. The leaf replays the images `axis_swaps` maps C onto
+  (`dichotomy._swap_images`, derived, never tabulated) and re-sets an accepted one to C
+  (`conventional_fit`). `_accept` anneals on the driven lines; only its closing passes
+  at σ see every line.
 - Read a `predicted_but_absent` firing as "this cell predicts lines the pattern lacks",
   **never** "this cell is too big", and since C3 **it caps; the lattice statement that
   refutes is the generalised superset check**. The full-range count shows a space-group
