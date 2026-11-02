@@ -1050,6 +1050,16 @@ def test_a_ghostshift_claim_is_read_off_origin(ghost_origin) -> None:
     assert claims["wp-9103"] == claim.GhostClaim(
         "wp-9103", "9103", "laptop-ab12-c0ffee", 1_000.0, 77)
     assert claims["issue-55"].wp is None  # not a WP, so no WP row
+    # A record this cannot read is skipped: the create hook calls this, and a
+    # raise there would refuse every WP tree.
+    empty = _out(main, "mktree", stdin="")
+    for item, body in (("wp-9104", "[1, 2]"), ("wp-9105", '{"taken": "soon"}')):
+        sha = _out(main, "commit-tree", empty, stdin=body)
+        _out(main, "push", "-q", "origin", f"{sha}:{claim.GHOST_NS}/{item}")
+    assert claim.fetch_ghost_claims(main)
+    assert sorted(c.item for c in claim.read_ghost_claims(main)) == ["issue-55", "wp-9103"]
+    for item in ("wp-9104", "wp-9105"):
+        _out(main, "push", "-q", "origin", f":{claim.GHOST_NS}/{item}")
     # A released claim leaves the local copy on the next fetch.
     _out(main, "push", "-q", "origin", f":{claim.GHOST_NS}/issue-55")
     assert claim.fetch_ghost_claims(main)
@@ -1107,6 +1117,13 @@ def test_status_calls_a_runner_tree_held_rather_than_dormant(
     assert "⚠ WP-9103 held by ghostshift laptop-ab12-c0ffee" in out
     (outer_row,) = [line for line in out.splitlines() if "WP-9101 " in line]
     assert "dormant" in outer_row  # an unclaimed tree is untouched
+
+    # Naming another WP narrows the claim list, never the table's answer.
+    claim._status(main, main, "9101")
+    out = capsys.readouterr().out
+    (row,) = [line for line in out.splitlines() if "agent-a1b2c3" in line]
+    assert "held by ghostshift" in row
+    assert "none holds WP-9101" in out
 
     # From the runner's own tree, its claim is named as possibly its own.
     claim._status(main, runner, "9103")

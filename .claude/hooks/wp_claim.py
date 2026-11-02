@@ -628,17 +628,19 @@ def read_ghost_claims(root: Path) -> list[GhostClaim]:
         ref, _, body = chunk.partition("\0")
         if not ref.startswith(GHOST_NS + "/"):
             continue
-        try:
-            rec = json.loads(body.strip("\0\n"))
-        except ValueError:
-            rec = {}
         item = ref[len(GHOST_NS) + 1:]
         m = re.fullmatch(r"wp-(\d{4})", item)
-        pr = rec.get("pr")
-        found.append(GhostClaim(
-            item, m.group(1) if m else None, str(rec.get("owner", "?")),
-            float(rec.get("taken") or 0), int(pr) if pr else None,
-        ))
+        # A record this cannot read is skipped, never raised: the create hook
+        # calls this, and a raise there refuses every WP tree.
+        try:
+            rec = json.loads(body.strip("\0\n"))
+            pr = rec.get("pr")
+            found.append(GhostClaim(
+                item, m.group(1) if m else None, str(rec.get("owner", "?")),
+                float(rec.get("taken") or 0), int(pr) if pr else None,
+            ))
+        except (ValueError, TypeError, AttributeError):
+            continue
     return found
 
 
@@ -682,8 +684,8 @@ def ghost_refusal(root: Path, wp: str) -> str:
         return ""
     return (
         f"WP-{wp} is claimed by a ghostshift runner: {describe_ghost(claim, now)}.\n"
-        "A runner has no session in its agent-<id> tree, so the table reads that\n"
-        "tree as dormant; the claim on origin is what says it is live. Pick another\n"
+        "A runner has no session in its agent-<id> tree, so the process scan finds\n"
+        "nobody there; the claim on origin is what says it is live. Pick another\n"
         "WP. The claim frees itself once its PR merges or closes, or 24 h after its\n"
         "last take when it names no PR. Its owner releases it sooner with\n"
         f"  python3 ~/Code/claude-config/skills/ghostshift/bin/claim.py release {claim.item}\n"
@@ -753,12 +755,16 @@ def _status(root: Path, here: Path, wp: Optional[str] = None) -> int:
     now = time.time()
     ghosts = []
     for c in read_ghost_claims(root):
-        if c.wp is None or (wp is not None and c.wp != wp):
+        if c.wp is None:
             continue
         live = ghost_live(c, lambda n: None if open_numbers is None else n in open_numbers, now)
         if live is not False:
             ghosts.append((c, live))
+    # Every claim marks the table, which ``status NNNN`` still prints whole;
+    # the WP argument narrows only the list below it.
     ghost_held = {c.wp: c for c, live in ghosts if live}
+    if wp is not None:
+        ghosts = [(c, live) for c, live in ghosts if c.wp == wp]
 
     shown = bears_on_a_clash(holders, glyphs_for(root, holders))
     rows = [h for h in holders if h in shown or h.wp in ghost_held]
