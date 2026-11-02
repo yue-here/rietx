@@ -2014,7 +2014,7 @@ def rank_candidates(cands: Sequence[EngineCandidate], peaks: PeakList, *,
     **Whether two engines found a lattice outranks every figure of merit**
     (WP-1046, :func:`corroborated`), and this is the package's own doctrine
     applied to the order rather than only to the verdict: ``grade`` floors a
-    candidate below :data:`MIN_AGREEMENT` finders at ``low`` before a single
+    candidate below :data:`MIN_AGREEMENT` engines at ``low`` before a single
     caveat is consulted, so a list ranked on the panel alone routinely put
     candidates the gate refuses to promote above the one it could.  Measured:
     on the GSAS-II fluorapatite pattern over all seven systems, the six
@@ -2131,7 +2131,20 @@ def agreement(cand: EngineCandidate) -> int:
     reached — "a wrong prior changes no rank" has to survive the ranking key
     changing under it.
     """
-    return len({f for f in cand.found_by if f != PRIOR_FINDER}) or 1
+    return _engines_behind(cand.found_by) or 1
+
+
+def _engines_behind(found_by: Sequence[str]) -> int:
+    """Distinct engines in a ``found_by`` list, :data:`PRIOR_FINDER` excluded.
+
+    The one count both agreement readers take: :func:`agreement` (the
+    ranking's first key) and :func:`~rietx.indexing.consensus.grade` (the
+    gate's ``MIN_AGREEMENT`` floor).  A stated cell is not an independent
+    search, so it corroborates a lattice and never lifts it (WP-1003 § E;
+    WP-2082, #1308, where it lifted a prior's primitive lattice to
+    ``medium`` above the planted F lattice at ``low``).
+    """
+    return len({f for f in found_by if f != PRIOR_FINDER})
 
 
 def _peak_fwhm(peaks: PeakList) -> np.ndarray:
