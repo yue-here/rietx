@@ -2169,7 +2169,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "fit. A joint fit tests each pattern and names the worst. A large gap means the last stage carried its peaks "
             "past the windows it was solved on, so the solve may have stopped short of the "
             "minimum that windows sized at the answer give. Run one more stage with nothing "
-            "new freed and compare. A plan's closing stage does this already."
+            "new freed and compare. A plan's closing stage does this already. The fresh "
+            "calculation keeps each site's multiplicity from the fit, so the gap is never "
+            "a change of composition: `SITE_MULTIPLICITY_KEPT` reports a site whose "
+            "multiplicity the returned coordinates would change."
         ),
     ),
     "FULLPROF_LIMITS_NOT_APPLIED": HelpEntry(
@@ -4118,6 +4121,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "this is the bookkeeping of a site whose symmetry changed without a merge, "
             "for instance onto a mirror within 5e-5, after a fit wrote the coordinate "
             "back, or off one by an `edit` or a `checkout`."
+        ),
+    ),
+    "SITE_MULTIPLICITY_KEPT": HelpEntry(
+        title="A fit kept a site's multiplicity that its answer would change",
+        description=(
+            "A fit decides each site's multiplicity once, from the coordinates it "
+            "starts at, and keeps it for every stage and for the compile its result "
+            "is measured on. GSAS-II does the same for a whole refinement. This site "
+            "ended within the site tolerance of a special position it started off (1e-4 "
+            "fractional, an offset of 5e-5 on a mirror). A fresh compile of the "
+            "returned coordinates therefore counts it at fewer positions. A site that "
+            "leaves a special position, as a rigid body's pose can move one, gets its "
+            "full orbit at the next compile and is not reported. The usual case is a half-occupied general atom, written as "
+            "a split pair across a mirror, that the data do not resolve: the fit stops "
+            "on the mirror. The result, its statistics and its weight fractions use the "
+            "fitted count. Later compiles, the next fit among them, use the fresh one. "
+            "The message gives the atoms per cell both ways. The suggestion gives the "
+            "occupancy that keeps the fitted content on the special position, and the "
+            "distance that keeps the site counted as split."
         ),
     ),
     "SITE_TWINS_KEPT": HelpEntry(

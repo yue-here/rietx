@@ -345,6 +345,17 @@ def _site_kept_silent():
             + _merge_findings(Structure(phases=[_phase(*_PNMA, _ON, occ=0.5)])))
 
 
+def _multiplicity_kept(y_returned: float) -> list:
+    """The #1088 split pair, fitted general at y = 0.27, returned at ``y_returned``."""
+    from rietx.crystallography.structure_factor import phase_orbit_split
+    from rietx.refine import _multiplicity_kept_diagnostics
+    from rietx.schemas import Structure
+    from tests.test_site_multiplicity_kept import _toy
+    split = [phase_orbit_split(_toy(0.27, occ=0.5))]
+    return _multiplicity_kept_diagnostics(
+        Structure(phases=[_toy(y_returned, occ=0.5)]), split)
+
+
 def _renumbered(y: float, *, hold: bool) -> list:
     """O5 (Pnma 8d) set to ``y`` with y and z held, as ``set_values`` writes it."""
     import rietx as rx
@@ -773,6 +784,10 @@ SILENCE: dict[str, Pair] = {
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
     "RESTRAINT_PAIRS_STALE": Pair(
         _stale_fires, _stale_silent, "tests/test_planarity_restraints.py"),
+    "SITE_MULTIPLICITY_KEPT": Pair(
+        functools.partial(_multiplicity_kept, 0.25 + 1e-6),
+        functools.partial(_multiplicity_kept, 0.2501),
+        "tests/test_site_multiplicity_kept.py"),
     "SITE_SNAPPED_TO_SPECIAL_POSITION": Pair(
         _snap_fires, _snap_silent, "tests/test_cif_stated_columns.py"),
     "SITE_TWINS_KEPT": Pair(

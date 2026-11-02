@@ -1087,6 +1087,21 @@ ROWS: tuple[Row, ...] = (
                   "it under a tie. The direction of a "
                   "DOF is the nullspace of the site group, so the map is derived, never "
                   "chosen (#1014, rounds 5-6)")),
+    Row("SITE_MULTIPLICITY_KEPT", "code", tier=1, ambiguity=3,
+        response="warning",
+        responds=("decide whether the site is one atom on the special position or a split "
+                  "pair before quoting a weight fraction, a density or the site's occupancy "
+                  "from a later compile or the next fit"),
+        evidence=("arithmetic: reports the freeze beside it, which keeps the orbit split a "
+                  "call started with for every stage and its closing compile, as GSAS-II "
+                  "keeps a site's multiplicity (GSASIIstrIO.py:1762, Amul read once from the "
+                  "atom record; GSASIIstrMath.py:1279, Mult*frac/nOps) (WP-2052, #1088). "
+                  "Which reading the site is (one atom on the position, or a split pair) is "
+                  "a fact outside the data, as for SITE_TWINS_KEPT. It has no threshold: it fires "
+                  "exactly when a returned site's fresh split has fewer images than the "
+                  "result counted, and gives the atoms per cell both ways. A site that "
+                  "gains images (a rigid body moving one off a special position) takes "
+                  "them at the next compile, as before WP-2052")),
     Row("SITE_TWINS_KEPT", "code", tier=1, ambiguity=3,
         response="warning",
         responds=("decide which reading of the site the file meant before quoting a weight "
@@ -4490,6 +4505,11 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: points at parameters() for the site, where the renumbered "
                   "paths are listed; it states no value")),
     Row("SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion", "suggestion", value=2),
+    Row("SITE_MULTIPLICITY_KEPT.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the occupancy that keeps the fitted content on the "
+                  "special position (occ x fitted / fresh multiplicity), only where it is at "
+                  "most 1, and TWIN_COORD_TOL, read from the constant, as the distance that "
+                  "keeps the site split")),
     Row("SITE_TWINS_KEPT.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence=("arithmetic: names the special-position occupancy each reading implies "
                   "(occ for one atom off its position, occ x before/after for a split pair) "

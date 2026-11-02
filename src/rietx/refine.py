@@ -44,6 +44,10 @@ from .crystallography.magnetic.moments import (
     MOMENT_DOF_PATH as _MOMENT_DOF,
 )
 from .crystallography.magnetic.scattering import check_group_is_structure_symmetry
+from .crystallography.structure_factor import (
+    _multiplicity_kept_diagnostics,
+    phase_orbit_split,
+)
 from .crystallography.symmetry import reflection_label, reflection_label_row
 from .crystallography.twins import (
     NumberingMoves,
@@ -70,6 +74,7 @@ from .model.forward import (
     CompiledModel,
     Mode,
     compile_model,
+    orbit_split_of,
     recorded_window_tol,
     window_loss,
 )
@@ -2540,6 +2545,12 @@ class Refinement:
         #: to what the caller asked to refine.
         self._held: list[str] = []
         self._pending_reflections: list[ReflectionState] = []
+        #: each phase's orbit split, decided once at the start of a ``fit()``
+        #: or ``run_stage()`` and handed to every compile that call makes, so
+        #: no stage and no closing compile changes a site's multiplicity
+        #: (WP-2052).  ``None`` outside a call: a compile then decides it from
+        #: the coordinates, as a fresh ``Refinement`` does.
+        self._orbit_split: list | None = None
         #: user constraints (WP-1070), path → the affine dependence declared for
         #: it.  The one authority for *which* ties are the user's: the symmetry
         #: ties are rederived by every ``ParameterTable`` build and are absent
@@ -2922,6 +2933,12 @@ class Refinement:
         # and the settings the last fit ran under, so a trial's refits hold
         # an absent phase by the caller's rule (WP-2002, B1)
         ref._plan_settings = dict(self._plan_settings)
+        # and the orbit split of the call in flight, if any (WP-2052): a trial
+        # made inside a fit (a profile-interval refit, a stage report's
+        # verification) refits at the multiplicity the answer it is measured
+        # against was solved at.  ``None`` outside a call, as for a fresh one.
+        ref._orbit_split = (None if self._orbit_split is None
+                            else list(self._orbit_split))
         # The branch is built from ``self.instrument``, which carries the last
         # stage's *refined* λ — so its own ``__init__`` snapshot would declare a
         # refined value.  A branch is "a second working tree over the same
@@ -4750,7 +4767,10 @@ class Refinement:
             # and the area its windows may drop: the closing stage's own, None
             # for every declared stage (WP-2002, the sixth round's Q1 and Q2),
             # which compiles at the declared 2 % by name
-            window_area_tol=recorded_window_tol(window_area_tol))
+            window_area_tol=recorded_window_tol(window_area_tol),
+            # the split this call decided at its start, so a stage that drove
+            # a half-occupied atom onto a mirror keeps its multiplicity
+            orbit_split=self._orbit_split)
         table.push_moment_frames(new_model)
         carried = False
         if model is not None and mode in ("lebail", "pawley") and model.mode == mode:
@@ -5296,15 +5316,35 @@ class Refinement:
         reproduced stage 1's report to three decimals.)
         """
         plan = resolve_plan(plan, mode)
-        if mode == "lebail" and plan.lebail_passes > 1 and plan.stages:
-            return self._fit_lebail_alternation(
-                data, plan=plan, two_theta_limits=two_theta_limits,
+        owns_split = self._decide_orbit_split()
+        try:
+            if mode == "lebail" and plan.lebail_passes > 1 and plan.stages:
+                return self._fit_lebail_alternation(
+                    data, plan=plan, two_theta_limits=two_theta_limits,
+                    events=events, cancel=cancel, telemetry=telemetry,
+                    label=label, stage_reports=stage_reports,
+                    progress=progress)
+            return self._fit_pass(
+                data, mode=mode, plan=plan, two_theta_limits=two_theta_limits,
                 events=events, cancel=cancel, telemetry=telemetry, label=label,
                 stage_reports=stage_reports, progress=progress)
-        return self._fit_pass(
-            data, mode=mode, plan=plan, two_theta_limits=two_theta_limits,
-            events=events, cancel=cancel, telemetry=telemetry, label=label,
-            stage_reports=stage_reports, progress=progress)
+        finally:
+            if owns_split:
+                self._orbit_split = None
+
+    def _decide_orbit_split(self) -> bool:
+        """Decide each site's orbit split for the call starting now (WP-2052).
+
+        Returns whether this call decided it, and so must clear it at its end.
+        A call made inside another one, such as a profile-interval refit inside
+        ``fit``, reuses the outer call's split, which is the split its answer
+        was solved at.  GSAS-II reads a site's multiplicity once, at setup
+        (``GSASIIstrIO.py``), and this is that rule for one call.
+        """
+        if self._orbit_split is not None:
+            return False
+        self._orbit_split = [phase_orbit_split(p) for p in self.structure.phases]
+        return True
 
     def _fit_lebail_alternation(self, data: PatternData, *,
                                 plan: RefinementPlan, **kw) -> RefinementResult:
@@ -5948,7 +5988,11 @@ class Refinement:
 
         Returns the model to report from and a ``FROZEN_COMPILE_STALE`` finding
         when the two χ² differ by more than :data:`FROZEN_COMPILE_CHI2_REL`,
-        so a caller can see when the frozen windows mattered.
+        so a caller can see when the frozen windows mattered.  Beside it, a
+        ``SITE_MULTIPLICITY_KEPT`` finding for each site whose returned
+        coordinates a fresh compile would count at another multiplicity: this
+        compile keeps the solve's orbit split, so the gap is never one of
+        composition (WP-2052).
         """
         if mode == "pawley":
             return model, []
@@ -5958,7 +6002,11 @@ class Refinement:
             moving_paths=set(table.moving_paths),
             restraint_weight_scale=stage.restraint_weight_scale,
             window_slack_deg=stage.window_slack_deg,
-            window_area_tol=recorded_window_tol(window_area_tol))
+            window_area_tol=recorded_window_tol(window_area_tol),
+            # and the solve's orbit split: the fit's own compiles all used it,
+            # and a fresh one would halve a site the last stage left on a
+            # mirror (WP-2052).  Its fresh reading is reported, never used.
+            orbit_split=orbit_split_of(model))
         # and the solve's moment frames, never the fresh compile's: this one is
         # built at the fitted cell, so a last stage that moved an angle would
         # otherwise read the refined moment DOFs in a frame they were never
@@ -5980,7 +6028,11 @@ class Refinement:
             ((model.y_obs - model.evaluate(values)) / model.sigma) ** 2))
         chi2_fresh = float(np.sum(
             ((fresh.y_obs - fresh.evaluate(values)) / fresh.sigma) ** 2))
-        return fresh, _frozen_compile_diagnostics(chi2_frozen, chi2_fresh)
+        # read off the compile the result is measured on (WP-2052)
+        kept = (_multiplicity_kept_diagnostics(self.structure,
+                                               orbit_split_of(fresh))
+                if mode == "rietveld" else [])
+        return fresh, kept + _frozen_compile_diagnostics(chi2_frozen, chi2_fresh)
 
     def _stage_report(self, name, plan, data, mode, table, model, outcome,
                       guard, stage_diagnostics, *, significance=None
@@ -6090,7 +6142,9 @@ class Refinement:
         cancel = runs.attach_cancel(runs.recorder_of(stream), cancel)   # WP-1405
         sinks = _snapshot_sinks(stream, events, recorder)
 
+        owns_split = False
         try:
+            owns_split = self._decide_orbit_split()
             table = self._prepare_table(restore=True)
             stale_since = _anti_bump_start_phases(self.structure, mode)
             # the constructed (or last-edited) λ, not the value the previous stage
@@ -6259,6 +6313,8 @@ class Refinement:
                 recorder.close("failed")
             raise
         finally:
+            if owns_split:
+                self._orbit_split = None
             if recorder is not None:
                 recorder.close()
 
