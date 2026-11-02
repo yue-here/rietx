@@ -28,9 +28,11 @@ Three measurements:
    fit is the numpy path's, and its final parameters must be bit-identical to
    a second fit run with the tier switched off.  That proves the twins are the
    fallback on every call these fits make.  A third fit, the numpy path again,
-   says whether the comparison can be made at all.  On macOS x86_64 under
+   says whether the comparison can be made in this run.  On macOS x86_64 under
    numpy 2.4.6 two identical numpy-path fits in one process differ by up to
-   ~1e-3 esd (WP-1940), and there the twins' gap is reported, never gated.  Serial: the pool's worker count is
+   7.1e-1 esd (WP-1940), and in some runs they agree.  So on a platform in
+   :data:`NONDETERMINISTIC` the twins' gap is reported, never gated, even when
+   the third fit agreed (:func:`twins_verdict`).  Serial: the pool's worker count is
    forced to 1, so each call covers all its rows.  The comparison is over the
    rows the call wrote, in window.  Per kernel the table gives the calls, the
    calls that were bit-identical, the largest relative difference (the largest
@@ -138,6 +140,22 @@ ARM = {
 #: the platform where the C library's ``exp`` and numpy's were measured equal
 MEASURED_PLATFORM = ("darwin", "arm64")
 ON_MEASURED = (sys.platform, platform.machine()) == MEASURED_PLATFORM
+
+#: the platforms whose numpy path does not reproduce itself between identical
+#: fits in one process, so a fit-level comparison there measures that noise.
+#: macOS x86_64 under numpy 2.4.6, on GitHub's i7-8700B runner: three cpd-1a
+#: fits up to 9.7e-4 esd apart (WP-1940, run 38085279862), and up to 7.1e-1
+#: esd on trigger (run 38085484334).  The noise does not fire between every
+#: pair.  So two numpy fits that agree in one run prove nothing there, and the
+#: gate read such a run as checkable and failed on a twins' gap of the noise's
+#: own size: cpd-1a at 1.4e-06 esd (run 41367944436, attempt 1), trigger at
+#: 3.0e-06 (41378211395), and trigger on three other branches (38603684026,
+#: 38896527839, 38924988380; WP-1999 § Handover).  Each gap was of the size the
+#: numpy path's own differences take on that case, with the same count of rows
+#: that keep their value and change their esd.  Rosetta does not reproduce it: four
+#: trigger fits and three cpd-1a fits came out bit-identical under Rosetta 2.
+NONDETERMINISTIC = {("darwin", "x86_64")}
+ON_NONDETERMINISTIC = (sys.platform, platform.machine()) in NONDETERMINISTIC
 
 #: each kernel's bar against the numpy path, as tests/test_compiled_kernels.py
 #: asserts it (the module docstring names the test behind each): ``"bit"``, or
@@ -449,10 +467,15 @@ def agreement(case: str, wheel: dict) -> tuple[int, set[str], bool]:
     noise = _theta_gap(final, {p.path: (p.value, p.stderr)
                                for p in again.parameters})
     print(f"The fit on the twins' outputs, against the numpy path: {gap}.")
+    twins = twins_verdict(gap, noise, ON_NONDETERMINISTIC)
     if noise != "bit-identical":
         print(f"The numpy path against itself: {noise}.  It does not reproduce "
               "itself here, so the twins cannot be checked against it, and "
               "their gap is reported, not gated.")
+    elif twins == "unchecked":
+        print("The numpy path against itself: bit-identical in this run, but "
+              "on this platform it does not reproduce itself between fits "
+              "(NONDETERMINISTIC), so the twins' gap is reported, not gated.")
     print()
     print("| kernel | calls | arms ran (calls) | bit-identical | max rel | "
           "max ulp | bar | past the bar |")
@@ -471,9 +494,23 @@ def agreement(case: str, wheel: dict) -> tuple[int, set[str], bool]:
         print(f"| {k} | {shadow.calls[k]} | {ran} | {shadow.same.get(k, 0)} | "
               f"{shadow.rel.get(k, 0.0):.1e} | {shadow.ulps.get(k, 0.0):.0f} | "
               f"{bar} | {past} |")
-    twins = ("unchecked" if noise != "bit-identical"
-             else "same" if gap == "bit-identical" else "drifted")
     return sum(shadow.past.values()), set(shadow.calls), twins
+
+
+def twins_verdict(gap: str, noise: str, nondeterministic: bool) -> str:
+    """The twins check from the two :func:`_theta_gap` readings.
+
+    ``"same"`` when the twins' fit is bit-identical to the numpy path's.
+    Otherwise ``"unchecked"`` when the numpy path differed from itself in this
+    run, or when the platform is one where it does so between some fits
+    (:data:`NONDETERMINISTIC`), and ``"drifted"`` only where the numpy path is
+    deterministic, which only the gate fails on.
+    """
+    if gap == "bit-identical":
+        return "same"
+    if noise != "bit-identical" or nondeterministic:
+        return "unchecked"
+    return "drifted"
 
 
 def pool_engagement(setup) -> None:

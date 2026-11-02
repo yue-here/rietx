@@ -1340,7 +1340,8 @@ class ParameterTable:
             self._add(f"{base}.lor_size", phase.lor_size)
             # a Stephens block owns the tanθ Lorentzian channel outright: its
             # isotropic direction is the same column, so lor_strain is locked
-            # (the Atom.aniso ⇒ biso bargain, one level up)
+            # and the width law reads zero for it (the Atom.aniso ⇒ biso
+            # bargain, one level up; CompiledModel.lor_strain_term, WP-1467)
             self._add(f"{base}.lor_strain", phase.lor_strain,
                       force_fixed=phase.microstrain is not None)
             self._add(f"{base}.gauss_size", phase.gauss_size)
@@ -2637,8 +2638,9 @@ class ParameterTable:
         writes: the block is that row's only writer, as the space group is a
         locked coordinate's.  Every input must exist and must not be written
         by this block or a later one, so the blocks apply in one pass in
-        declaration order.  The outputs' values are written from the map at
-        once, so the table never holds a derived row that disagrees with it.
+        declaration order.  Every frame input must be an input.  The outputs'
+        values are written from the map at once, so the table never holds a
+        derived row that disagrees with it.
         """
         for q in (*block.inputs, *block.outputs):
             if q not in self._paths:
@@ -2665,6 +2667,13 @@ class ParameterTable:
         for q in block.inputs:
             if q in own:
                 raise ValueError(f"derived block reads its own output {q!r}")
+        # the data-support count drops a frame input from the atoms it reaches
+        # (statistics.structural_free_paths); a name outside the inputs would
+        # drop nothing and read as declared (WP-2067)
+        for q in block.frame_inputs:
+            if q not in block.inputs:
+                raise ValueError(
+                    f"derived block's frame input {q!r} is not one of its inputs")
         # an earlier block has already been evaluated on its inputs, so a later
         # block may not write one of them: the earlier block would hold a value
         # computed from the input's state before this write

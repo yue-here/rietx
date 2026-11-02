@@ -33,7 +33,14 @@ whole model.  Each side steps outward from the fitted value by 1, 2, 4, …
 esd until Δχ² passes the threshold or the step reaches the parameter's own
 limit, which is reported as that side's end.  Each refit starts where the
 previous one on its side finished.  ``max_refits`` caps each side, and a side
-that runs out, or whose refit raises, has no end and says why.
+that runs out, or whose refit raises, has no end and says why.  A first probe
+already past the threshold steps back in instead (:func:`_walk`, WP-2060),
+and every refit keeps the fit's own free set: what the fit held stays held.
+
+**A moment's modulus keeps its sign where the data cannot see it**
+(:func:`_sign_is_unseen`, WP-2060).  The intensity goes as m², so there the
+profile is even about 0, and 0 is a bound: a modulus on it gets a one-sided
+interval, like any bounded row.
 
 **A pinned value is refitted until its χ² settles.**  A stage sizes its peak
 windows at compile, from where it starts, and keeps them (root CLAUDE.md,
@@ -81,6 +88,36 @@ from .staged import BOUND_HIT_ESD_FRAC, Stage
 #: stops at half a turn (:data:`~rietx.schemas.interval.IntervalStop`'s
 #: ``"period"``).  The modulus, ``dof0``, is not periodic.
 _MOMENT_ANGLE = re.compile(r"\.moment\.dof[12]$")
+
+#: A moment's modulus, with its phase and its site (WP-2060).
+_MOMENT_MODULUS = re.compile(r"^(phases\.\d+)\.atoms\.\d+\.moment\.dof0$")
+
+
+def _sign_is_unseen(table, path: str, free: set[str]) -> bool:
+    """Whether the data cannot tell this modulus from its negative (WP-2060).
+
+    Two cases, each an identity of the model rather than a measurement.  A
+    phase with one moment block flips every moment it has when the modulus
+    changes sign, and an unpolarised pattern cannot see that: the magnetic
+    intensity goes as |F_M⊥|², and it adds to the nuclear intensity with no
+    cross term (Halpern & Johnson, 1939, Phys. Rev. 55, 898).  And a block
+    with two or three DOFs reaches −μ by turning its angles, (−μ, φ) being
+    (μ, φ + π) (``canonical_dofs``), so with its angles free the sign is a
+    chart, not a structure.  Elsewhere the sign is a relative orientation the
+    data can measure (a one-DOF modulus on one of two sites), and the profile
+    keeps both signs.
+    """
+    match = _MOMENT_MODULUS.match(path)
+    if match is None:
+        return False
+    phase, base = match.group(1) + ".", path[:-len(".dof0")]
+    blocks = [e.path for e in table.entries
+              if e.path.startswith(phase) and e.path.endswith(".moment.dof0")]
+    if len(blocks) == 1:
+        return True
+    angles = [e.path for e in table.entries
+              if e.path.startswith(base + ".dof") and e.path != path]
+    return bool(angles) and all(a in free for a in angles)
 
 
 def interval_quantile(level: float, one_sided: bool) -> float:
@@ -193,7 +230,8 @@ def _bounded_end(result, row, lo: float, hi: float) -> tuple[int, float]:
 def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
           step: float, cut: float, chi2_fit: float, budget: int,
           points: list[ParameterIntervalPoint], *, record: bool = True,
-          cancel=None, limit_stop: IntervalStop = "bound"
+          cancel=None, limit_stop: IntervalStop = "bound",
+          frozen: tuple[str, ...] = ()
           ) -> tuple[float | None, IntervalStop]:
     """One side: bracket the root by doubling steps, then solve it with Brent.
 
@@ -203,24 +241,61 @@ def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
     :class:`~rietx.optimize.cancel.RefinementCancelled` out of the walk
     rather than ending the side as an error.  ``limit_stop`` is what reaching
     ``limit`` means: ``"bound"``, the parameter's own limit and so the end, or
-    ``"period"``, half a turn of a moment angle and so no end.
+    ``"period"``, half a turn of a moment angle and so no end.  ``frozen`` is
+    what the fit's answer stage held, kept fixed in every refit.
+
+    **A first probe already past the threshold steps back in** (WP-2060).
+    The step is the esd, and an esd measures the curvature at the fit, which
+    can be orders too small: a moment's modulus at m = 0 has a dead column,
+    since the intensity goes as m², so its esd read 1.5e4 μ_B against an end
+    near 0.06.  Brent's tolerance is a thousandth of the step, so it returned
+    the fit itself as the end, a zero-width interval.  So each probe past the
+    threshold is replaced by one at the distance a quadratic through it puts
+    the end, divided by the growth factor, until a probe lands inside.  On a
+    quadratic profile that probe lands at half the end's distance.  On the
+    quartic one of a dead column it lands further in, so the end is then
+    solved in the logarithm of the distance, where any power law is a
+    straight line and the tolerance is relative.  The bracket's inner end is
+    then a measured probe and never the fit, so the end lies strictly away
+    from the value.  A probe nearer the fit whose Δχ² did not fall is a
+    profile that does not return to the fit's χ² at its value, and the side
+    stops on ``"error"`` with that probe saying so.
     """
     from scipy.optimize import brentq
 
     if start == limit:
         return limit, "bound"            # already on this side's limit
-    trial = refinement._trial(record=record)
-    trial.set_vary([path], False)
+    def fresh():
+        # The fit's own free set, along the whole path.  Each refit is a
+        # stage, and a stage re-decides WP-1301's hold from the values it
+        # starts at: a weak phase's scale pinned above the support threshold
+        # would free the cell the fit held, and the profile would then measure
+        # a different model from the fit it is quoted for (#1075).  A refit
+        # may still hold more, since a lower pinned scale can hide a phase the
+        # fit saw.
+        t = refinement._trial(record=record)
+        t.set_vary([path, *frozen], False)
+        return t
+
+    trial = fresh()
     measured = {start: 0.0}             # the fit itself, by definition
     settled = PARAMETER_INTERVAL_CHI2_TOL * cut
     spent = 0
 
-    def delta(v: float) -> float:
-        nonlocal spent
+    def delta(v: float, restart: bool = False) -> float:
+        nonlocal spent, trial
         if v in measured:
             return measured[v]
         if spent >= budget:
             raise _SideStopped("refits")
+        if restart:
+            # start the refit from the fit rather than from the previous
+            # probe, which past the threshold can be a state no refit finds
+            # its way back from.  A new trial and never a set_values of the
+            # fitted rows: a coordinate DOF is a displacement rederived to
+            # zero on every build, so writing its fitted value back would
+            # leave the atom where the last probe moved it.
+            trial = fresh()
         try:
             trial.set_values({path: v})
         except Exception as exc:  # a value the model refuses ends the side too
@@ -274,6 +349,42 @@ def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
             if reached:
                 return (limit, "bound") if limit_stop == "bound" else (None, limit_stop)
             inner, k = v, k + 1
+        if inner == start:
+            # the first probe passed the threshold: step back in until one
+            # does not, then solve in log distance (the docstring has why)
+            outer = v
+            while True:
+                distance = (abs(outer - start) * math.sqrt(cut / measured[outer])
+                            / PARAMETER_INTERVAL_BRACKET_GROWTH)
+                v = start + sign * distance
+                if v == start:
+                    raise _SideStopped("error")   # no distance left to probe
+                if delta(v, restart=True) < cut:
+                    break
+                if measured[v] > measured[outer] - settled:
+                    # nearer the fit and no lower: the refits do not come back
+                    # to the fit's χ² near its value, so there is no end to find
+                    points[-1] = points[-1].model_copy(update={"error": (
+                        f"the refits do not return to the fit's chi2 near its "
+                        f"value: {measured[v]:.4g} above it at {abs(v - start):.3g} "
+                        f"from the value, {measured[outer]:.4g} at "
+                        f"{abs(outer - start):.3g}")})
+                    raise _SideStopped("error")
+                outer = v
+            floor = PARAMETER_INTERVAL_CHI2_TOL * cut
+            # the bracket's two ends are probes already measured, so they map
+            # back to those values exactly rather than through exp(log(·))
+            ends = {math.log(distance): v, math.log(abs(outer - start)): outer}
+
+            def value_at(x: float) -> float:
+                return ends.get(x, start + sign * math.exp(x))
+
+            def log_excess(x: float) -> float:
+                return math.log(max(delta(value_at(x), restart=True), floor) / cut)
+
+            root = value_at(brentq(log_excess, *ends, xtol=PARAMETER_INTERVAL_XTOL))
+            delta(root)
+            return root, "threshold"
         a, b = sorted((inner, v))
         root = float(brentq(lambda x: delta(x) - cut, a, b,
                             xtol=PARAMETER_INTERVAL_XTOL * step))
@@ -313,8 +424,8 @@ def profile_interval(refinement, data, path: str, *,
             f"{path!r} has no esd from the last fit, so there is no scale to step "
             "the profile in: the residual does not move along it, and a "
             "direction the data does not see has no interval")
-    entry = next((e for e in refinement._working_table().entries
-                  if e.path == path), None)
+    table = refinement._working_table()
+    entry = next((e for e in table.entries if e.path == path), None)
     if entry is None:
         raise ValueError(f"{path!r} was in the last fit and is not in the model "
                          "now; fit again before profiling it")
@@ -332,7 +443,25 @@ def profile_interval(refinement, data, path: str, *,
             hi = row.value + math.pi
             half_turn.add(1)
 
-    one_sided = row.at_bound is True
+    # A modulus whose sign the data cannot see keeps its sign (WP-2060).  The
+    # profile is then even about 0, so it never crosses it: 0 is the bound
+    # on the side toward it.  A modulus within a hundredth of an esd of 0 sits
+    # on that bound, the test ``at_bound`` applies to a declared limit
+    # (``BOUND_HIT_ESD_FRAC``), and its interval is one-sided like any bounded
+    # row's: Self & Liang's mixture holds in m² ≥ 0, where the intensity is
+    # linear, and a likelihood ratio does not depend on the parameterisation.
+    # On a floor, the open side is m > 0, the principal chart's
+    # (``canonical_dofs``).
+    on_floor = False
+    if row.at_bound is not True and _sign_is_unseen(
+            table, path, {p.path for p in result.parameters if p.vary}):
+        on_floor = abs(row.value) <= BOUND_HIT_ESD_FRAC * row.stderr
+        if on_floor or row.value > 0.0:
+            lo = max(lo, 0.0)
+        else:
+            hi = min(hi, 0.0)
+
+    one_sided = row.at_bound is True or on_floor
     quantile = interval_quantile(level, one_sided)
     stats = result.statistics
     inflation = stats.esd_inflation if stats.esd_inflation is not None else 1.0
@@ -341,9 +470,14 @@ def profile_interval(refinement, data, path: str, *,
 
     points: list[ParameterIntervalPoint] = []
     ends: dict[int, tuple[float | None, IntervalStop]] = {}
-    if one_sided:
+    if on_floor:
+        ends[-1] = (0.0, "bound")
+    elif one_sided:
         side, end = _bounded_end(result, row, lo, hi)
         ends[side] = (end, "bound")
+    # what the fit's answer stage held, kept held by every refit
+    frozen = tuple(p for p in (result.stages[-1].held if result.stages else ())
+                   if p != path)
     with head_restored(refinement):
         for sign, limit in ((-1, lo), (1, hi)):
             if sign in ends:
@@ -351,7 +485,8 @@ def profile_interval(refinement, data, path: str, *,
             ends[sign] = _walk(refinement, data, path, row.value, sign, limit,
                                step, cut, chi2_fit, max_refits, points,
                                record=record, cancel=cancel,
-                               limit_stop="period" if sign in half_turn else "bound")
+                               limit_stop="period" if sign in half_turn else "bound",
+                               frozen=frozen)
 
     lowest = min([chi2_fit, *(p.chi2 for p in points if p.chi2 is not None)])
     (lower, lower_stop), (upper, upper_stop) = ends[-1], ends[1]

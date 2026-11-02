@@ -243,6 +243,39 @@ SRM 660c fixture, ignoring two holder lines moves the cell 0.4 ppm and reports a
 the clean fit's. Rwp rises 4.4× in the same arm, and an esd scales with √χ², so the larger
 esd reports the worse fit; it does not measure the bias.
 
+## When a peak counts as explained by a reflection
+
+Surveyed 2026-11-01 for WP-1977, on when Layer 0 should call a residual peak unindexed.
+
+- GSAS-II 5.8.4, checked. `IndexPeaks` (`GSASIIindex.py:311-352`) gives a picked peak the
+  nearest calculated d-spacing, one peak to one line, with no tolerance at all. Unindexed
+  lines are counted afterwards for M20 (`calc_M20`, :163-190). The automatic peak search
+  drops a pick within 2 × FWHM of another (`GSASIIpwdGUI.py:825`), which spaces peaks and
+  matches nothing. No check of a difference-curve peak after a Rietveld fit was found.
+- FullProf 8.20, checked. The manual has no report of unaccounted or impurity peaks. WinPLOTR
+  finds peaks from zero crossings of the derivative, above a fraction of the largest
+  derivative amplitude (`WINPLOTR.pdf` § 5.4.1). It sets no angular window.
+- TOPAS, inferred from a summarised fetch of the Durham manual (§ 12.3), not read directly.
+  `index_max_th2_error` (default 0.05° 2θ) marks un-indexed lines in indexing. No
+  residual-peak check after a fit was found.
+- Indexing programs, checked in the docs FullProf bundles. DICVOL marks a line outside a
+  fixed absolute error (default 0.03° 2θ) as impurity or spurious (`dicvol06.inf:139-157`).
+  ITO's `TOLG` is 0.06° 2θ (`ito15.inf:337-342`). TREOR's window is fixed in sin²θ
+  (`treor90.inf:786-805`), so it widens with angle and not with the peak width.
+- McCusker et al. (1999) and Toby (2006), inferred (recall, no local copy). Both tell the
+  reader to read the difference curve by eye. A derivative-shaped residual at a line is a
+  position, width or asymmetry misfit, and a peak where no line is calculated is a foreign
+  phase. Neither gives a numeric rule.
+
+So the programs match an *observed* peak list to calculated lines, inside indexing, with a
+fixed angular or sin²θ window. None scales the window with the peak width, and none flags a
+difference-curve peak after a Rietveld fit. rietx's `unmatched_obs` has no direct precedent.
+The programs leave the difference curve to the person reading it. So rietx lists every
+residual peak and records what that reader looks at: whether a valley separates the peak
+from the calculated peak beside it, how far out it sits in that peak's FWHM, and whether the
+other strong lines carry the same lobe. It names no cause for an unresolved shoulder, and
+suggests no impurity phase for one (WP-1977, ruled 2026-11-01).
+
 ## Sequential refinement
 
 Surveyed 2026-10-24 for WP-2003, one agent across the seven programs. A chain here is N
@@ -343,6 +376,28 @@ budget; the quarantine's exclusion from the median; `direction="both"` and
 floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the persistent-finding
 summary and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
 
+Parameters the setup fixes. Surveyed 2026-11-02 for WP-2081, one session. GSAS-II 5.8.4 is
+read in its source (`GSASIIstrMain.SeqRefine`, `GSASIIstrIO.ReadConstraints`,
+`GSASIIpwdGUI.OnInstFlagCopy`). FullProf rests on its manual (`FullProf_Manual.pdf` shipped
+with 8.20, the cyclic-mode and codeword passages) and TOPAS on the Technical Reference
+(version 9, topas-academic.com, sections 2.1, 2.7 and 2.26). Neither closed program was run.
+MAUD, BGMN with Profex and RIETAN-FP were not surveyed for this topic.
+
+| Program | How a parameter stays fixed down a series | What can free it anyway | One refined value shared by every pattern | "Refine on the first pattern, then freeze" |
+|---|---|---|---|---|
+| rietx | `ref.hold(glob)` inside the `constrain` hook, which runs on every rung and every `verify_steps` refit (checked) | `vary=False` on the models: any plan stage whose `turn_on` matches frees it (WP-1208), and `load_instrument_profile`'s frozen instrument comes back `vary=False` only (checked). A hold blocks the plan and raises `HOLD_BLOCKED_PLAN` (checked) | not in a chain. The joint fit (`multi.py`, `SharingMap`) shares a path across histograms; `instrument.*` is per histogram by default and a `shared=` glob overrides it (checked) | no declaration. Three hooks spell it: `on_result` keeps pattern 0's value, `prepare` writes it in, `constrain` holds it. A hold alone fixes whatever value reaches the rung, and the cold rung starts from the initial models (measured, WP-2081) |
+| GSAS-II | each histogram's own refine flags build its vary list, histogram by histogram (`SeqRefine` calls `GetHistogramData` per histogram); "Copy flags" copies one histogram's instrument flags to the others (checked) | nothing: there is no plan. With `Copy2Next` on, only parameters in the vary list pass to the next histogram, so a fixed one keeps the value stored in its own histogram (checked). Hold constraints exist; a sequential run applies only constraints whose histogram is the wildcard by default (`_seqmode` `wildcards-only`, checked) | not in a sequential run, which fits one histogram at a time and refuses lattice parameters (use Dij). A plain refinement over several histograms shares phase parameters (recall). Equations can be fitted to the sequential results table afterwards (`SeqParFitEqList`, checked) | by hand: refine, copy the values to the other histograms, turn the flags off (inferred from the menu commands) |
+| FullProf | cyclic mode (`CYC`) runs one PCR and rewrites it after each file, so every file uses the same codewords; a zero codeword fixes a parameter at the value the PCR holds (checked in the manual). An instrumental resolution file (`Res` ≠ 0) supplies the resolution function (checked) | nothing beyond the codewords (inferred) | the multi-pattern PCR (`NPATT`) refines several patterns at once (checked); which parameters it shares was not read | by hand: set the codeword to 0 in the PCR after a first run (inferred) |
+| TOPAS | a parameter is refined when named and fixed when its name carries `!` (§ 2.1, checked). A series is the user's batch file or `num_runs`, passing values through `out` and `#include` (§ 2.26, checked) | nothing: the flag is on the parameter (checked) | a parameter named at the top level of one INP is one parameter in every `xdd` (§ 2.7, checked). Parametric refinement builds on this (Stinton & Evans 2007, recall) | by hand: write the refined value into an include file and mark it `!` (inferred) |
+| EasyDiffraction | a fixed parameter keeps the template's value on every file (row above, checked) | not established | not established | not established |
+
+Every program surveyed keeps the fixed flag on the parameter itself, and its series honours
+it on every pattern. None of them has a plan that frees a parameter the user fixed. rietx
+departs in two ways. A plan replaces the vary flags, so a hold in a hook is the only flag a
+series honours. And the cold rung restarts a pattern from the initial models, which no
+other program does (the restart table above), so what a held value is on that rung is a
+question only rietx has.
+
 ## A pdCIF weight column with bad entries
 
 Surveyed 2026-10-26 for PR #1173, by the lead. The question: a `_pd_proc_ls_weight` column with
@@ -365,6 +420,37 @@ data point not used for refinement". It states no meaning for a null.
 No program surveyed uses a pdCIF weight column at all. rietx's whole-column fallback
 therefore never trusts the file less than practice does. GSAS-II's unused code shows one
 intent: a null weight means an excluded point.
+
+## A magCIF in a non-standard orientation
+
+Surveyed 2026-11-01 for WP-1918's decision on the 91 untabulated orientations, by a research
+agent for the lead. The question: a magCIF whose nuclear group has its axes in an orientation
+no tabulated setting has. An example is an orthorhombic subgroup written in its hexagonal
+parent's axes. Does a reader keep the file's axes, or restate the structure in the magnetic
+space group's standard setting?
+
+MAGNDATA writes the parent-related setting on purpose. Gallego et al. (2016, *J. Appl.
+Cryst.* 49, 1750, §2.2) say most entries keep "the origin and orientation of the
+crystallographic axes of the paramagnetic phase". They call the listed operations sufficient,
+and the BNS label and the transformation to standard "complementary information". Their §2.3
+keeps the parent's metric unless a strain is observed. The symmetry-allowed strain is stated
+in the parent's axes. The IUCr guidelines (Perez-Mato et al. 2024, *Acta Cryst.* B80) accept
+either setting, call the non-standard one "in most cases more convenient", and require the
+transformation to standard beside the label (checked through the real-case companion,
+§2.1.1).
+
+| Program | What it does |
+|---|---|
+| rietx | Refuses the file: `OperatorGroup` takes its cell ties from a tabulated closest type, and there is none (`magcif._unnamed_nuclear_group`, checked) |
+| GSAS-II 5.8.4 | Keeps the file's axes and operators. The group is built from the parent symbol, its operators are replaced by the file's (`SGFixed`), and the cell refines under the parent's Laue class (`G2phase_CIF.py:238-262, 311-318`; `GSASIIstrIO.py:1000-1027`; checked). For a nuclear CIF whose operators disagree with GSAS-II's setting, it asks before sending the file to Bilbao's standard-setting service (`G2phase_CIF.py:729-779`, checked) |
+| FullProf 8.20 | Uses explicit operators in the PCR's own setting. "Transform to standard" carries the standard operators to that setting only when none are given (FullProf News, 6 Feb 2018; checked). The cell ties for such operators were not checked |
+| Jana2020 | Supports non-standard settings. "Transform to the standard setting" is a command the user runs (changelog, checked). That its import keeps the file's setting is inferred |
+| TOPAS v9 | `#inp_from_cif` reads an mCIF only in its BNS standard setting. "A file in any other setting stops with a message" (Technical Reference, magnetic section; checked) |
+| Bilbao MVISUALIZE, STRCONVERT, ISOCIF | Change the setting on request. ISODISTORT needs the standard setting, which ISOCIF produces first (Gallego et al. 2016, §3-4; checked) |
+
+No program surveyed restates a magCIF on read. Those that read the file keep its axes. Moving
+to the standard setting is a step the user takes. GSAS-II's cell rule, the parent's Laue
+class in the file's axes, is the parent-metric model of MAGNDATA §2.3 with no strain freed.
 
 ## Structure-free fitting: Le Bail or Pawley
 
@@ -529,6 +615,47 @@ around early 2026.
 What it adds up to. Halving is established practice under a fixed budget. Under an all-or-nothing
 loss, practice is racing: drop only past the measured noise. Ruled 2026-10-31 (WP-1997): halving
 ships, and racing is the next solver PR's first task.
+
+## Correlations against a parameter the data does not determine
+
+Read 2026-11-01 for WP-2050. When the normal matrix carries a direction the data does not
+move, how does a program report the correlations of the parameters in it? rietx kept such a
+direction at an eigenvalue rounding set, and its correlation guard then reported pairs
+against the direction's members, or not, as a 1e-14 change to a start value moved them.
+
+| Program | What it does | Mark |
+|---|---|---|
+| GSAS-II 5.8.4 | Scales the Hessian to unit diagonal, then takes a pseudo-inverse that zeroes every singular value under `SVDtol` × the largest (`GSASIImath.setHcorr`, `GSASIImath.py:131-148`; `pinv`, `:64`). The default is 1e-6 (`GSASIIobj.py:20`; the GUI allows 1e-9 to 0.01, `GSASIIdataGUI.py:8261`). Correlations come off that truncated inverse. Pairs above `max(0.95, 0.99 × the largest)` are listed, or above `min(0.99, …)` once a singular value was zeroed (`GSASIImath.py:143-147`). The count of zeroed values is reported as "soft (SVD) Hessian singularities", with the parameters most involved (`setSVDwarn`, `GSASIImath.py:150-162`; `GSASIIstrMain.ReportProblems`, `:54-139`) | checked |
+| TOPAS v9 | Errors and the correlation matrix (`C_matrix_normalized`) come from an SVD by default; `use_LU_for_errors` switches to LU, which "results in very large errors" for fully correlated intensities (Technical Reference §5.10, "Errors - SVD and bootstrap errors"). The SVD cut is not stated. Nothing in the reference suppresses or flags a correlation against an undetermined parameter | checked; cut not stated |
+| FullProf 8.20 | Writes the correlation matrix on request (`Mat=1`, manual "Common flags"). The manual advises refining separately any pair above about 50 % (p. 14). No treatment of a singular direction beyond advice to start with the scale alone (Trouble shooting) | checked |
+| RIETAN-FP, BGMN, MAUD, EasyDiffraction | not checked | |
+
+**The practice.** The two programs whose solve is documented take the correlations off a
+pseudo-inverse truncated at a relative cut, so a direction below the cut contributes nothing
+to any ρ. GSAS-II's cut, 1e-6 on the eigenvalues of the unit-diagonal normal matrix, is a
+user setting with no stated derivation. No program found reports a correlation as
+undetermined. rietx takes GSAS-II's mechanism at a cut derived from its own Jacobian's
+accuracy (`statistics.resolved_correlation`): GSAS-II's 1e-6 would also have removed
+brucite's zero-shift/displacement direction at 1.4e-10, whose correlations hold to 2e-5.
+
+## Stephens anisotropic strain: the width's shape and its clamp
+
+Collected 2026-11-02 for WP-1467 from three sources. Stephens' paper was read by the lead. GSAS-II
+5.8.4's source was read by the lead. The TOPAS macros were read by the 2026-09-25 review behind the
+WP, and that reading was not repeated. Stephens (1999, eq. 6) splits the anisotropic width
+Γ_A with a mixing parameter ζ. (1−ζ)·Γ_A joins the Gaussian width in quadrature, and ζ·Γ_A
+joins the Lorentzian one. His two examples refined ζ to 0.404 and 0.558, and holding his
+first at ζ = 0 raised Rwp from 8.22 % to 10.81 % (his Table 2).
+
+| Program | Gaussian/Lorentzian split | σ²(M) < 0 |
+|---|---|---|
+| rietx | none: Λ is wholly Lorentzian (ζ = 1) | clamped to zero width; the default LM driver holds σ² ≥ 0, and `STEPHENS_STRAIN_NOT_POSITIVE` reports the clamped intensity share under TRF or a joint fit |
+| GSAS-II 5.8.4 | `Mustrain;mx`, Stephens' form: γ += Mγ·mx, σ² += (Mγ·(1−mx))² (`GSASIIstrMath.py:3330-3331`; checked) | no clamp at the width: `np.sqrt(Sum)` (`GSASIIstrMath.py:3265`; checked); what follows a negative sum was not traced |
+| TOPAS (shipped macros) | `eta`: `gauss_fwhm = 1.8/π·pp·(1−eta)·Tan(Th)`, `lor_fwhm = 1.8/π·pp·eta·Tan(Th)` | `Sqrt(Max(mhkl, 0))`, the same clamp, reported nowhere; `Stephens_tetragonal` takes `Abs()` first, folding a negative σ² back into a positive width (TOPAS wiki, read 2026-09-25 by the review) |
+
+So no program reports a fit that leaned on the clamp, and a TOPAS Stephens fit carries no
+evidence that σ²(M) stayed positive. A protocol that refines ζ cannot be mirrored in rietx
+(WP-0503's fence).
 
 ## Sources
 

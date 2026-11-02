@@ -72,6 +72,7 @@ from ..crystallography.magnetic.scattering import (
     compile_magnetic_sites,
     d_magnetic_f2_d_dofs,
     magnetic_f2,
+    magnetic_f2_angle_block,
     magnetic_reflections,
     merge_magnetic,
 )
@@ -1308,7 +1309,7 @@ class CompiledModel:
                    + values[f"phases.{ip}.lor_size"]
                    + values[f"phases.{ip}.magnetic_lor_size"])
             y_l = (values["instrument.profile.y"]
-                   + values[f"phases.{ip}.lor_strain"]
+                   + self.lor_strain_term(ip, values)
                    + values[f"phases.{ip}.magnetic_lor_strain"])
         for tt_bragg in tt_bragg_lines:
             theta = 0.5 * tt_bragg  # Bragg angle drives the widths
@@ -1323,7 +1324,7 @@ class CompiledModel:
                 gam_l = lorentzian_fwhm(
                     theta,
                     values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
-                    values["instrument.profile.y"] + values[f"phases.{ip}.lor_strain"],
+                    values["instrument.profile.y"] + self.lor_strain_term(ip, values),
                     aniso)
             out.append(self._peak_widths(gam_g, gam_l))
         return out
@@ -1673,6 +1674,28 @@ class CompiledModel:
         s = xp.stack([values[f"phases.{ip}.microstrain.{n}"] for n in S_NAMES])
         return strain_width_deg(cp.strain_monomials, s, d)
 
+    def lor_strain_term(self, ip: int, values: dict[str, float]):
+        """The isotropic tanθ Lorentzian coefficient phase ip adds to Y.
+
+        ``lor_strain``, or ``0.0`` when the phase carries a Stephens block
+        (WP-1467).  The block *replaces* the isotropic strain: its isotropic
+        direction is the ``lor_strain`` column, which is why declaring one
+        force-fixes that path.  A force-fixed entry keeps its stored value, so
+        a width law that went on reading it stacked Λ(hkl) ≥ 0 on a frozen
+        floor the block could never narrow below.  This is the Stephens half
+        of the ``Atom.aniso`` ⇒ ``biso`` bargain: an anisotropic site's
+        Debye-Waller factor never reads ``biso`` either.
+
+        Every reader of the Lorentzian strain width calls this rather than
+        reading the path: the width block, its memo key, the compile-time
+        window sizing (which spells the same test off the schema), the
+        Lorentzian-width inequality rows and the strain report.  The test is
+        compile-time structural, like :meth:`strain_width`'s.
+        """
+        if self.phases[ip].strain_monomials is not None:
+            return 0.0
+        return values[f"phases.{ip}.lor_strain"]
+
     # ------------------------------------------------------------------
     # peak-shape dispatch — the two width scalars, the unit-area profile and
     # its partials all switch on the frozen ``shape`` (default TCHZ).  Both
@@ -1992,7 +2015,7 @@ class CompiledModel:
                     float(values[f"phases.{ip}.gauss_size"]),
                     float(values[f"phases.{ip}.gauss_strain"]),
                     float(values[f"phases.{ip}.lor_size"]),
-                    float(values[f"phases.{ip}.lor_strain"]))
+                    float(self.lor_strain_term(ip, values)))
 
         if component == 0:
             widths = self._memo(cp, "widths", width_key,
@@ -2553,6 +2576,40 @@ class CompiledModel:
         return d_magnetic_f2_d_dofs(cp.mag_members, cp.mag_seg, cp.mag_counts,
                                     stol, cp.magnetic, cell, xyz, occ, biso,
                                     self._moment_dofs(ip, values))
+
+    def moment_angle_block_supported(self, ip: int) -> bool:
+        """Whether phase ip's intensity is affine in p²⟨|F_⊥|²⟩ (WP-2068).
+
+        The stationary-angle test's analytic curvature block chains the
+        second derivative of |F_⊥|² through the same factors as the first,
+        which is exact only where nothing between |F|² and the intensity
+        depends on it.  :meth:`moment_grad_supported` plus extinction skipped:
+        evaluated, extinction reads the total |F|² through x, and ∂²I picks up
+        a dG/dx term the first-order chain has no place for.  Such a phase
+        keeps the central differences.
+        """
+        return self.moment_grad_supported(ip) and self.phases[ip].skip_extinction
+
+    def moment_f2_angle_block(self, ip: int, values: dict[str, float],
+                              weights: list[dict[tuple[int, int], float]]
+                              ) -> tuple[np.ndarray, np.ndarray]:
+        """``(g, h)``, (N, k) and (N, k, k): ∂ and ∂² of p²⟨|F_⊥|²⟩ along k
+        directions in phase ip's moment DOFs (WP-2068).
+
+        ``weights[a]`` is ``{(atom, dof): coefficient}`` for direction a.
+        The arithmetic is
+        ``crystallography.magnetic.scattering.magnetic_f2_angle_block``'s, at
+        :meth:`moment_f2_grads`' arguments.
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        xyz, occ, biso, _u, _a = self._site_values(ip, values, cell)
+        stol = 1.0 / (2.0 * np.asarray(d, dtype=np.float64))
+        return magnetic_f2_angle_block(cp.mag_members, cp.mag_seg, cp.mag_counts,
+                                       stol, cp.magnetic, cell, xyz, occ, biso,
+                                       self._moment_dofs(ip, values), weights)
 
     def moment_intensity_grad(self, ip: int, df2: np.ndarray,
                               values: dict[str, float]
@@ -4189,7 +4246,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                                       instrument.profile.v.value, instrument.profile.w.value,
                                       phase.gauss_size.value, phase.gauss_strain.value)
                 x_l = instrument.profile.x.value + phase.lor_size.value
-                y_l = instrument.profile.y.value + phase.lor_strain.value
+                # a Stephens block replaces lor_strain (WP-1467,
+                # CompiledModel.lor_strain_term), so it sizes nothing here
+                y_l = instrument.profile.y.value + (
+                    0.0 if phase.microstrain is not None else phase.lor_strain.value)
                 if extra_size or extra_strain:
                     x_l = x_l + extra_size
                     y_l = y_l + extra_strain

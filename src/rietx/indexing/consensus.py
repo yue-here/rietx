@@ -65,6 +65,7 @@ from .engines import (
     EngineCandidate,
     EngineResult,
     SearchSpec,
+    _engines_behind,
     absence_window,
     candidates_truncated_diagnostic,
     dedup_groups,
@@ -230,6 +231,7 @@ def supercell_checks(candidates: Sequence[CellCandidate], peaks: PeakList, *,
                 parent_centring=parent.centring, index=ev.index,
                 relation=ev.relation,
                 n_extra=ev.n_extra, n_seen=ev.n_seen, p0=ev.p0,
+                p0_power=ev.p0_power,
                 p_value=ev.p_value, verdict=ev.verdict(),
                 n_seen_unexplained=ev.n_seen_unexplained,
                 absent_two_theta=[float(t) for t in tt]))
@@ -744,20 +746,22 @@ def grade(caveats: Sequence[str], found_by: Sequence[str],
     candidate) are the ordinary state of a peaks-only run and would otherwise
     make every answer ``low`` — which would empty the vocabulary of meaning.
 
-    **A prior corroborates but does not confirm** (WP-1003, recording 1046
-    §4): agreement means independent *searches*, and a stated cell is not
-    one.  ``found_by`` currently counts :data:`~.engines.PRIOR_FINDER` toward
-    ``MIN_AGREEMENT``, so a prior one engine also found can reach ``medium``
-    partly on the strength of its own statement; the ruled fix — count
-    engines the way ``engines.corroborated`` does, prior excluded — is
-    deferred into the post-1003 indexing work, where the acceptance suite
-    runs.  Deferred on the record, not silently frozen.
+    **A prior corroborates but does not confirm** (WP-1003 § E, recording
+    1046 §4): agreement means independent *searches*, and a stated cell is
+    not one.  So the floor counts engines the way ``engines.corroborated``
+    does, :data:`~.engines.PRIOR_FINDER` excluded (WP-2082).  Until then a
+    prior one engine also found reached ``medium`` on its own statement: on
+    #1308's planted F-cubic list under ``svd`` alone, the stated primitive
+    cell went ``low`` → ``medium`` while the planted F lattice stayed
+    ``low``.  The ``high`` clause needs no exclusion, ``"prior"`` never being
+    in ``engines_run``.
     """
     # MIN_AGREEMENT rather than a literal 2 since WP-1046: this floor and
     # ``engines.corroborated`` — the ranking's first key — are one boundary, so
-    # the reported order mirrors the gate structurally and not by coincidence
-    if len(set(found_by)) < MIN_AGREEMENT or any(c in INDEX_REFUTING_CAVEATS
-                                                 for c in caveats):
+    # the reported order mirrors the gate structurally and not by coincidence;
+    # since WP-2082 they read one count as well
+    if _engines_behind(found_by) < MIN_AGREEMENT or any(
+            c in INDEX_REFUTING_CAVEATS for c in caveats):
         return "low"
     if not caveats and set(found_by) >= set(engines_run):
         return "high"

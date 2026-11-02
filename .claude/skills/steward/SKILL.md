@@ -95,4 +95,7 @@ its asks are this session's to answer on the thread.
 
 Merge, approve, `gh pr ready --undo`, close and reopen, push an empty commit,
 re-run a job more than once, or cancel a run that is not this PR's. Whether
-green is enough is the maintainer's call (`/wp-handover` step 11).
+green is enough is the maintainer's call (`/wp-handover` step 11). A
+ghostshift shift lead may also merge a PR its checks find clear-cut, under the
+user's standing permission of 2026-10-31
+(`~/Code/claude-config/skills/ghostshift/SKILL.md` §4).

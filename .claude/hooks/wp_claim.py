@@ -59,6 +59,11 @@ one without is *dormant*.  Dormant is not a problem and is not reported at
 session start — it is the ordinary state of a tree whose session has ended with
 the work unfinished, and it is what ``/wp-start`` reads to find that work again.
 Only *held* bears on a clash.
+
+**A ghostshift runner is the one live tree with no session in it** (WP-2077).
+Its process is the shift lead's, in the main checkout, so ``status`` and the
+create hook also read the shift's own claims, refs on origin.  The section
+above the CLI says how, and why it stays out of the SessionStart hook.
 """
 
 from __future__ import annotations
@@ -71,6 +76,8 @@ import os
 import re
 import subprocess
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 from typing import Iterable, NamedTuple, Optional
@@ -413,21 +420,28 @@ class PullRequest(NamedTuple):
     branch: str
     updated: str  # YYYY-MM-DD
     draft: bool
-    wp: Optional[str]  # a WP this PR names outright, if it names one
-    issues: tuple  # int issue numbers cited in the title or body
+    wps: tuple  # WPs this PR names outright: its title, else the WP files it edits, else its branch
+    issues: tuple  # int numbers cited anywhere in the title or body (backlog.py's column)
+    mentions: tuple  # WPs its body mentions; a reference, never a claim
+    chain: tuple  # issues the overlap match follows (title's and closing); empty when wps is not
+    fork: bool  # the head branch lives on someone else's repository
 
 
 _ISSUE_RE = re.compile(r"#(\d{1,5})\b")
 _WP_TEXT_RE = re.compile(r"\bWP-(\d{4})\b")
+_WP_FILE_RE = re.compile(r"docs/wp/(\d{4})-")
 
 
-def _gh(root: Path, *args: str, timeout: int = 20) -> Optional[str]:
+def _gh(root: Path, *args: str, timeout: int = 20, partial: bool = False) -> Optional[str]:
     """``gh`` from the repo root, so it resolves this repository from the remote.
 
     ``None`` on every way it can decline — not installed, not logged in,
     offline, rate-limited, slow.  The caller turns that into a sentence rather
     than an empty table, because "no PRs" and "could not look" must not read
     alike.
+
+    *partial* keeps stdout on a non-zero exit.  ``gh api graphql`` exits 1 when
+    any one alias fails to resolve, and still prints the other aliases' data.
     """
     try:
         proc = subprocess.run(
@@ -435,7 +449,7 @@ def _gh(root: Path, *args: str, timeout: int = 20) -> Optional[str]:
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
-    return proc.stdout if proc.returncode == 0 else None
+    return proc.stdout if proc.returncode == 0 or (partial and proc.stdout) else None
 
 
 def open_prs(root: Path) -> Optional[list[PullRequest]]:
@@ -448,7 +462,8 @@ def open_prs(root: Path) -> Optional[list[PullRequest]]:
     """
     proc = _gh(
         root, "pr", "list", "--state", "open", "--limit", "100", "--json",
-        "number,title,body,author,headRefName,updatedAt,isDraft,files",
+        "number,title,body,author,headRefName,updatedAt,isDraft,files,"
+        "closingIssuesReferences,isCrossRepository,url",
     )
     if proc is None:
         return None
@@ -456,40 +471,83 @@ def open_prs(root: Path) -> Optional[list[PullRequest]]:
         raw = json.loads(proc)
     except ValueError:
         return None
+    # A number in a title may be a pull request: "#1140's follow-ups", "a
+    # follow-up to #1257".  WP files cite PR numbers too, so following one
+    # links the PR to every WP that ever named the earlier PR (WP-2046: #1257
+    # reached five WPs, one of them real).  GitHub numbers issues and PRs in one
+    # sequence, so only GitHub can say which is which.
+    # Only a title naming no WP is read for its issues, so only its numbers are asked.
+    titled = {int(n) for item in raw if not _WP_TEXT_RE.search(item.get("title", ""))
+              for n in _ISSUE_RE.findall(item.get("title", ""))}
+    pull_requests = {int(item["number"]) for item in raw}
+    pull_requests |= _pull_requests_among(root, titled - pull_requests)
     prs = []
     for item in raw:
-        text = f"{item.get('title', '')}\n{item.get('body') or ''}"
+        title, body = item.get("title", ""), item.get("body") or ""
         files = [f.get("path", "") for f in item.get("files") or []]
-        # A WP the PR names outright: its title, its body, or a WP file it
-        # edits.  This is the direct claim; the issue chain below is the
-        # indirect one a contributor's PR actually travels.
-        named = _WP_TEXT_RE.search(text)
-        wp = named.group(1) if named else None
-        if wp is None:
-            for path in files:
-                m = re.match(r"docs/wp/(\d{4})-", path)
-                if m:
-                    wp = m.group(1)
-                    break
+        # The WPs the PR names outright: its title, else every WP file it
+        # edits, else its branch.  The body is not among them.  A
+        # contributor's body cites WPs in passing, and taking the first one as
+        # the claim filed #941 (all of WP-1956) under WP-1325 (WP-2046).
+        wps = list(dict.fromkeys(_WP_TEXT_RE.findall(title)))
+        if not wps:
+            wps = list(dict.fromkeys(m.group(1) for p in files if (m := _WP_FILE_RE.match(p))))
         # The branch last, and it is not redundant: a claim PR is opened before
         # its first commit exists on some flows, and `/wp-start` names every
         # branch after its WP, so `wp1414-slug` says which WP this is when the
         # title has not been written and no WP file has been touched yet.
-        if wp is None:
-            wp = wp_from_name(item.get("headRefName", ""))
+        if not wps:
+            from_branch = wp_from_name(item.get("headRefName", ""))
+            wps = [from_branch] if from_branch else []
+        # The issues the overlap match follows: the title's, and the ones
+        # GitHub itself parsed from a closing keyword.  A body's other numbers
+        # are context ("see #1153"), and following them gave #941 eighteen WPs.
+        # A closing reference may name another repository's issue ("closes
+        # owner/repo#5"), whose number means nothing here.
+        here = (item.get("url") or "").rpartition("/pull/")[0]
+        closing = {int(c["number"]) for c in item.get("closingIssuesReferences") or []
+                   if c.get("number") is not None
+                   and not (here and c.get("url") and c["url"].rpartition("/issues/")[0] != here)}
+        # A PR that names its WP is linked to that WP alone, so it follows none.
+        chain = set() if wps else {int(n) for n in _ISSUE_RE.findall(title)} - pull_requests | closing
         prs.append(
             PullRequest(
                 number=int(item["number"]),
-                title=item.get("title", ""),
+                title=title,
                 author=(item.get("author") or {}).get("login", "?"),
                 branch=item.get("headRefName", ""),
                 updated=(item.get("updatedAt") or "")[:10],
                 draft=bool(item.get("isDraft")),
-                wp=wp,
-                issues=tuple(sorted({int(n) for n in _ISSUE_RE.findall(text)})),
+                wps=tuple(wps),
+                issues=tuple(sorted({int(n) for n in _ISSUE_RE.findall(f"{title}\n{body}")})),
+                mentions=tuple(sorted(set(_WP_TEXT_RE.findall(body)) - set(wps))),
+                chain=tuple(sorted(chain)),
+                fork=bool(item.get("isCrossRepository")),
             )
         )
     return prs
+
+
+def _pull_requests_among(root: Path, numbers: set) -> set:
+    """Which of *numbers* are pull requests in this repository: one GraphQL call.
+
+    Empty when ``gh`` cannot answer.  The numbers then stay in the issue chain,
+    which costs extra rows and never a missing one.
+    """
+    if not numbers:
+        return set()
+    fields = " ".join(f"n{n}: issueOrPullRequest(number: {n}) {{ __typename }}" for n in sorted(numbers))
+    query = f"query($owner: String!, $name: String!) {{ repository(owner: $owner, name: $name) {{ {fields} }} }}"
+    # A number resolving to nothing (a discussion, a typo, #0) nulls its own
+    # alias and fails the whole call; it must not void the other answers.
+    proc = _gh(root, "api", "graphql", "-F", "owner={owner}", "-F", "name={repo}", "-f", f"query={query}",
+               partial=True)
+    try:
+        found = json.loads(proc or "")["data"]["repository"]
+        return {int(key[1:]) for key, kind in found.items()
+                if (kind or {}).get("__typename") == "PullRequest"}
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return set()
 
 
 def wp_issue_citations(root: Path) -> dict[str, set]:
@@ -514,31 +572,37 @@ class Overlap(NamedTuple):
 
     wp: str
     pr: PullRequest
-    via: str  # "names it" or "issue #N"
+    via: str  # "names it", or "mentions it" and/or "issue #N, ...", joined by " and "
 
 
 def overlaps(
-    prs: list[PullRequest], citations: dict[str, set], mine: Optional[str] = None
+    prs: list[PullRequest], citations: dict[str, set], branch: Optional[str] = None
 ) -> list[Overlap]:
     """Which WPs the open pull requests touch, directly or through an issue.
 
-    *mine* drops this session's own PR, which is otherwise the loudest row in
-    the table and the least informative.
+    A PR that names a WP outright is linked to that WP alone, which keeps the
+    table readable.  One that names none is linked to each WP its body mentions
+    and to each WP citing an issue it follows; one row per WP, its reasons
+    joined.
+
+    *branch* is this tree's branch, and drops this session's own PR, which is
+    otherwise the loudest row in the table and the least informative.  It is
+    matched by head branch, never by WP: filtering by WP dropped every PR on
+    the tree's WP, a contributor's included (WP-2046, #941).
     """
     found: list[Overlap] = []
     for pr in prs:
-        if pr.wp is not None:
-            if pr.wp != mine:
-                found.append(Overlap(pr.wp, pr, "names it"))
+        if branch and pr.branch == branch and not pr.fork:
             continue
+        if pr.wps:
+            found.extend(Overlap(wp, pr, "names it") for wp in pr.wps)
+            continue
+        why: dict[str, list] = {wp: ["mentions it"] for wp in pr.mentions}
         for wp, cited in sorted(citations.items()):
-            if wp == mine:
-                continue
-            shared = sorted(cited & set(pr.issues))
+            shared = sorted(cited & set(pr.chain))
             if shared:
-                found.append(
-                    Overlap(wp, pr, "issue " + ", ".join(f"#{n}" for n in shared))
-                )
+                why.setdefault(wp, []).append("issue " + ", ".join(f"#{n}" for n in shared))
+        found.extend(Overlap(wp, pr, " and ".join(vias)) for wp, vias in why.items())
     return sorted(found, key=lambda o: (o.wp, o.pr.number))
 
 
@@ -563,11 +627,132 @@ def by_pull_request(found: list[Overlap]) -> list[tuple]:
 
 def describe_pull_request(pr: PullRequest, touched: list) -> str:
     draft = " (draft)" if pr.draft else ""
-    wps = ", ".join(f"WP-{wp}" for wp, _ in touched)
-    vias = sorted({via for _, via in touched})
+    vias = {via for _, via in touched}
+    if len(vias) == 1:
+        wps = ", ".join(f"WP-{wp}" for wp, _ in touched) + f" ({vias.pop()})"
+    else:
+        # Each WP keeps its own reason: one shared list cannot say which
+        # mention or which issue led to which WP.
+        wps = ", ".join(f"WP-{wp} ({via})" for wp, via in touched)
     return (
         f"PR #{pr.number}{draft} by {pr.author}, updated {pr.updated} — "
-        f"{wps} ({'; '.join(vias)})\n    {pr.title[:88]}"
+        f"{wps}\n    {pr.title[:88]}"
+    )
+
+
+# --------------------------------------------------------------------------
+# The third source: a ghostshift runner, which has no session of its own.
+#
+# Ghostshift (claude-config's maintenance skill) runs WPs as background
+# subagents.  Each sits in an Agent-isolation tree named ``agent-<id>``, but its
+# process is the shift lead's, whose cwd is the main checkout.  So the local
+# half above finds no session in a runner's tree and calls it dormant, and
+# ``/wp-start`` offers dormant work to resume (WP-2077, measured 2026-11-02 on
+# WP-1977 and WP-2067).
+#
+# The shift writes its own claims, as refs on origin: ``refs/ghostshift/claims/
+# <item>``, each a parentless commit whose message is JSON {owner, item, taken,
+# pr, at}.  Read here with git into the namespace ghostshift's ``claim.py``
+# itself fetches into, never by importing that script: it lives outside this
+# repository.  A claim is free once its PR has merged or closed, or with no PR
+# 24 h after ``taken`` (``claim.py``'s rule, restated).  The fetch needs the
+# network, so this source stays out of the SessionStart hook, like the PR half.
+
+GHOST_NS = "refs/ghostshift/claims"
+GHOST_STALE_SECONDS = 24 * 3600
+
+
+class GhostClaim(NamedTuple):
+    item: str  # wp-<N>, issue-<N>, pr-<N>, or a free-form name
+    wp: Optional[str]  # the four-digit WP, when the item is one
+    owner: str  # <machine id>-<account hash>
+    taken: float  # epoch seconds of the owner's last take
+    pr: Optional[int]
+
+
+def fetch_ghost_claims(root: Path, remote: str = "origin") -> bool:
+    """Refresh the local copy of origin's claims.  False when the fetch failed.
+
+    ``--prune`` so a released claim leaves the local copy too.  A failure is not
+    fatal: the local refs are as fresh as the last fetch on this clone, and
+    ghostshift's own ``claim.py`` fetches before every take.
+    """
+    return _git(
+        root, "fetch", "--quiet", "--prune", remote, f"+{GHOST_NS}/*:{GHOST_NS}/*"
+    ) is not None
+
+
+def read_ghost_claims(root: Path) -> list[GhostClaim]:
+    """Every claim in this clone's copy of the namespace.  Local, no network."""
+    out = _git(root, "for-each-ref", "--format=%(refname)%00%(contents)%00", GHOST_NS) or ""
+    found = []
+    for chunk in out.split("\0\n"):
+        ref, _, body = chunk.partition("\0")
+        if not ref.startswith(GHOST_NS + "/"):
+            continue
+        item = ref[len(GHOST_NS) + 1:]
+        m = re.fullmatch(r"wp-(\d{4})", item)
+        # A record this cannot read is skipped, never raised: the create hook
+        # calls this, and a raise there refuses every WP tree.
+        try:
+            rec = json.loads(body.strip("\0\n"))
+            pr = rec.get("pr")
+            found.append(GhostClaim(
+                item, m.group(1) if m else None, str(rec.get("owner", "?")),
+                float(rec.get("taken") or 0), int(pr) if pr else None,
+            ))
+        except (ValueError, TypeError, AttributeError):
+            continue
+    return found
+
+
+def ghost_live(claim: GhostClaim, pr_open, now: float) -> Optional[bool]:
+    """Whether *claim* still holds its item.  ``None`` when that cannot be told.
+
+    *pr_open* maps a PR number to True, False or None (gh could not answer).
+    ``None`` is its own answer, as in the PR half: a claim whose PR state is
+    unknown is neither reported free nor allowed to refuse a tree.
+    """
+    if claim.pr is not None:
+        return pr_open(claim.pr)
+    return now - claim.taken <= GHOST_STALE_SECONDS
+
+
+def describe_ghost(claim: GhostClaim, now: float) -> str:
+    age = max(0.0, now - claim.taken) / 3600
+    pr = f", PR #{claim.pr}" if claim.pr is not None else ""
+    return f"ghostshift {claim.owner} for {age:.1f} h{pr}"
+
+
+def ghost_refusal(root: Path, wp: str) -> str:
+    """The create hook's refusal for a WP a live ghostshift claim holds, or "".
+
+    Fetches first, so the answer is origin's.  Pays one ``gh`` call, only when a
+    claim on *wp* exists and names a PR.  Refuses only on a claim known to be
+    live: an unknown PR state passes, because a refusal that fires whenever gh is
+    offline would teach the reader to clear it unread.
+    """
+    fetch_ghost_claims(root)
+    claim = next((c for c in read_ghost_claims(root) if c.wp == wp), None)
+    if claim is None:
+        return ""
+
+    def pr_open(n: int) -> Optional[bool]:
+        state = _gh(root, "pr", "view", str(n), "--json", "state", "-q", ".state")
+        return None if state is None else state.strip() == "OPEN"
+
+    now = time.time()
+    if not ghost_live(claim, pr_open, now):
+        return ""
+    return (
+        f"WP-{wp} is claimed by a ghostshift runner: {describe_ghost(claim, now)}.\n"
+        "A runner has no session in its agent-<id> tree, so the process scan finds\n"
+        "nobody there; the claim on origin is what says it is live. Pick another\n"
+        "WP. The claim frees itself once its PR merges or closes, or 24 h after its\n"
+        "last take when it names no PR. Its owner releases it sooner with\n"
+        f"  python3 ~/Code/claude-config/skills/ghostshift/bin/claim.py release {claim.item}\n"
+        "and a claim whose shift has gone is dropped by hand with\n"
+        f"  git push origin :{GHOST_NS}/{claim.item}"
     )
 
 
@@ -619,29 +804,77 @@ def _status(root: Path, here: Path, wp: Optional[str] = None) -> int:
     # session's own row is the one marked, never the one hidden.
     holders = occupancy(trees, sibling("session_start").live_sessions(), set(),
                         read_claims(root), main)
-    rows = bears_on_a_clash(holders, glyphs_for(root, holders))
     here = here.resolve()
+    mine = next((h.wp for h in holders if h.worktree == here), None)
+    # Both network reads first: a ghostshift claim naming a PR is live only
+    # while that PR is open, and the local table needs the answer.  Side by
+    # side, so the fetch (0.54-0.64 s) hides behind gh's slower list.
+    with ThreadPoolExecutor(1) as pool:
+        fetch = pool.submit(fetch_ghost_claims, root)
+        prs = open_prs(root)
+        fetched = fetch.result()
+    open_numbers = None if prs is None else {p.number for p in prs}
+    now = time.time()
+    ghosts = []
+    for c in read_ghost_claims(root):
+        if c.wp is None:
+            continue
+        live = ghost_live(c, lambda n: None if open_numbers is None else n in open_numbers, now)
+        if live is not False:
+            ghosts.append((c, live))
+    # Every claim marks the table, which ``status NNNN`` still prints whole;
+    # the WP argument narrows only the list below it.
+    ghost_held = {c.wp: c for c, live in ghosts if live}
+    if wp is not None:
+        ghosts = [(c, live) for c, live in ghosts if c.wp == wp]
+
+    shown = bears_on_a_clash(holders, glyphs_for(root, holders))
+    rows = [h for h in holders if h in shown or h.wp in ghost_held]
     print("This machine's worktrees:")
     if not rows:
         print("  none is working an open WP")
     for h in rows:
         mark = "→" if h.worktree == here else " "
         who = ", ".join(f"pid {s.pid} up {s.age}" for s in h.sessions)
-        state = f"held by {who}" if h.held else "dormant"
+        if h.held:
+            state = f"held by {who}"
+        elif h.wp in ghost_held:
+            state = f"held by ghostshift {ghost_held[h.wp].owner}"
+        else:
+            state = "dormant"
         branch = h.branch or "detached"
         print(f"{mark} WP-{h.wp}  {state}  in {where(h, main)} ({branch}, {h.provenance})")
-    for wp in clashes(holders):
-        print(f"⚠ WP-{wp} is live in more than one tree — that is the clash")
+    for clash in clashes(holders):
+        print(f"⚠ WP-{clash} is live in more than one tree — that is the clash")
+    for clash in sorted({h.wp for h in holders if h.held} & set(ghost_held)):
+        print(f"⚠ WP-{clash} is held here and by a ghostshift runner — that is the clash")
 
-    # The other machines, which this repo can only see through GitHub.
-    mine = next((h.wp for h in holders if h.worktree == here), None)
+    # A runner on any machine, which only the shift's own claims can show.
+    print("\nGhostshift claims on origin (runners, any machine):")
+    if not fetched:
+        print("  could not fetch them; this is the clone's copy from its last fetch")
+    if not ghosts:
+        print("  none holds " + (f"WP-{wp}" if wp else "a WP"))
+    for c, live in ghosts:
+        own = (
+            "  (this tree's WP: a runner's own claim; anyone else's session clashes)"
+            if c.wp == mine else ""
+        )
+        if live:
+            print(f"⚠ WP-{c.wp} held by {describe_ghost(c, now)}{own}")
+        else:
+            print(f"? WP-{c.wp} claimed by {describe_ghost(c, now)}, PR state unknown{own}")
+
+    # The other machines, which this repo can only see through GitHub.  The
+    # tree's own PR is told apart by its branch, in full: ``worktree_branches``
+    # keeps only the last path segment, and a branch may hold a slash.
+    branch = _git(here, "symbolic-ref", "--short", "-q", "HEAD")
     print("\nOpen pull requests, including contributors' forks:")
-    prs = open_prs(root)
     if prs is None:
         print("  gh could not answer (offline, not installed, or not logged in)")
         print("  — the table above is this machine only, so ask before starting")
         return 0
-    found = overlaps(prs, wp_issue_citations(root), mine)
+    found = overlaps(prs, wp_issue_citations(root), branch)
     if wp is not None:
         found = [o for o in found if o.wp == wp]
     scope = f" touching WP-{wp}" if wp else " touching a WP"
