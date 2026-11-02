@@ -2141,7 +2141,7 @@ def _engines_behind(found_by: Sequence[str]) -> int:
     ranking's first key) and :func:`~rietx.indexing.consensus.grade` (the
     gate's ``MIN_AGREEMENT`` floor).  A stated cell is not an independent
     search, so it corroborates a lattice and never lifts it (WP-1003 § E;
-    WP-2079, #1308, where it lifted a prior's primitive lattice to
+    WP-2082, #1308, where it lifted a prior's primitive lattice to
     ``medium`` above the planted F lattice at ``low``).
     """
     return len({f for f in found_by if f != PRIOR_FINDER})

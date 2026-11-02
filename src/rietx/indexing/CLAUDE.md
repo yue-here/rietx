@@ -109,7 +109,7 @@ template. On real data with no measured shift, `high` is *unreachable* by design
   but does not confirm**: an engine count is `engines._engines_behind` (or
   `agreement`/`corroborated`), prior excluded, never `len(found_by)` — the
   ranking key and `grade`'s floor both read it; counted, a prior outgraded the
-  truth (WP-2079, #1308). A superset test against `engines_run` needs no
+  truth (WP-2082, #1308). A superset test against `engines_run` needs no
   exclusion; svd's seeded start is svd's own finding (1045 rule one).
   Traps met: `PRIOR_DRIFT_MAX`, `same_lattice`-never-cell-tuples (WP-1045).
 

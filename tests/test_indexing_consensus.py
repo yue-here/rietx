@@ -241,7 +241,7 @@ def test_best_or_none_is_none_under_every_gate_failure(break_it, expect):
 ])
 def test_a_prior_corroborates_and_never_counts_as_an_engine(
         found_by, engines_run, expect):
-    """WP-1003 § E's rule, ruled and deferred until WP-2079: the gate's
+    """WP-1003 § E's rule, ruled and deferred until WP-2082: the gate's
     two-engine floor counts independent searches, and a stated cell is not
     one.  Every other row of this table is an otherwise clean candidate."""
     cand = _candidate(TRUE_A, found_by=found_by)

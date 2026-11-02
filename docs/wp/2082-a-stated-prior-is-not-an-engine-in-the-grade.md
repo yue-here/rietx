@@ -1,4 +1,4 @@
-# WP-2079 — A stated prior is not an engine in the grade
+# WP-2082 — A stated prior is not an engine in the grade
 
 Milestone: unscheduled · Status: ✅ 2026-11-02 — the grade's two-engine floor counts engines, a stated prior excluded (PR #1327)
 Track: What fires, and what stays silent
@@ -157,6 +157,10 @@ reader-output change, and it waits for the maintainer before merge.
   constant, ordering or fallback. Not dispatched.
 - *Next.* The maintainer approves the grade change (PR #1327, Reader-output
   changes), then merges. Optional: rule on the svd seed's independence.
+- *Renumbered at the merge of main (steward, 2026-11-02).* `main` gained its
+  own WP-2079 (#1187, a non-finite count dropped) while this PR was open, and
+  2080 and 2081 were taken, so this WP moved to 2082. The branch name and the
+  earlier commit messages still say 2079; a force-push is refused here.
 
 - **2026-11-02** — created. No open WP owns the prior's place in the grade:
   WP-1956 owns the absence screen and WP-2078 the ranking under foreign

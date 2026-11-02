@@ -105,7 +105,7 @@ def test_a_wrong_prior_changes_no_rank_and_no_grade():
 
 @pytest.mark.xdist_group("indexing-priors")
 def test_a_stated_lattice_one_engine_found_does_not_outgrade_the_truth():
-    """#1308 (WP-2079): a prior merged into one engine's candidate is still
+    """#1308 (WP-2082): a prior merged into one engine's candidate is still
     one engine.  The planted lattice is F cubic; the stated prior is the
     primitive cell at the same metric, which predicts mixed-parity lines the
     data lack.  Under ``svd`` alone, counting the prior lifted the P lattice

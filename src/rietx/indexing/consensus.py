@@ -749,7 +749,7 @@ def grade(caveats: Sequence[str], found_by: Sequence[str],
     **A prior corroborates but does not confirm** (WP-1003 § E, recording
     1046 §4): agreement means independent *searches*, and a stated cell is
     not one.  So the floor counts engines the way ``engines.corroborated``
-    does, :data:`~.engines.PRIOR_FINDER` excluded (WP-2079).  Until then a
+    does, :data:`~.engines.PRIOR_FINDER` excluded (WP-2082).  Until then a
     prior one engine also found reached ``medium`` on its own statement: on
     #1308's planted F-cubic list under ``svd`` alone, the stated primitive
     cell went ``low`` → ``medium`` while the planted F lattice stayed
@@ -759,7 +759,7 @@ def grade(caveats: Sequence[str], found_by: Sequence[str],
     # MIN_AGREEMENT rather than a literal 2 since WP-1046: this floor and
     # ``engines.corroborated`` — the ranking's first key — are one boundary, so
     # the reported order mirrors the gate structurally and not by coincidence;
-    # since WP-2079 they read one count as well
+    # since WP-2082 they read one count as well
     if _engines_behind(found_by) < MIN_AGREEMENT or any(
             c in INDEX_REFUTING_CAVEATS for c in caveats):
         return "low"
