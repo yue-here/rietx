@@ -641,6 +641,10 @@ from .._nearmiss import did_you_mean
 #: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
 #: where it defaulted to 0.0.  A stored document that omits it still opens, at
 #: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
+#: Also in 0.60 (WP-2030 part 3): ``IndexingControls.formula`` and
+#: ``.temperature``, the specimen's formula a project stores for its indexing
+#: run.  Additive and defaulted to ``None``; an older build refuses a document
+#: carrying either key.
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

@@ -34,7 +34,7 @@ def no_pattern_read(monkeypatch):
     (["--formula", "ZnO", "--temperature", "-5"], "positive, finite"),
     (["--formula", "ZnO", "--temperature", "inf"], "positive, finite"),
     (["--formula", "ZnO", "--temperature", "nan"], "positive, finite"),
-    (["--temperature", "100"], "give --formula too"),
+    (["--temperature", "100"], "give a formula too"),
 ])
 def test_the_cli_refuses_a_bad_formula_input_as_a_usage_error(
         extra, named, no_pattern_read, capsys):

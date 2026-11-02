@@ -21,9 +21,11 @@ from __future__ import annotations
 import dataclasses
 import inspect
 import json
+import math
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from rietx.indexing.engines import (
     CENTRINGS,
@@ -119,8 +121,6 @@ CALL_TIME_INPUTS = {
     "shift_from_pairs",              # the screen's own switch, not a control
     "events", "cancel",              # plumbing
     "two_theta_limits",              # the project document owns this fact
-    "formula", "temperature",        # the specimen's chemistry: it checks the
-                                     # answer and steers nothing (WP-1510)
 }
 #: parameters the controls reach through ``search`` rather than by name
 VIA_SEARCH = {"spec", "preset"}
@@ -129,6 +129,10 @@ CONTROL_TO_KWARG = {
     "engines": "engines",
     "validate_candidates": "validate",
     "check_top": "check_top",
+    # the specimen's chemistry, a search setting since the 2026-11-02 ruling
+    # (WP-2030): it records each candidate's formula units and steers nothing
+    "formula": "formula",
+    "temperature": "temperature",
 }
 
 
@@ -152,7 +156,8 @@ def test_the_project_document_round_trips_the_controls():
 
     doc = ProjectDoc(indexing=IndexingControls(
         search=SearchSpecSpec(**_ROUND_TRIP), engines=["svd"],
-        validate_candidates=False, check_top=2))
+        validate_candidates=False, check_top=2, formula="C7H6O2",
+        temperature=100.0))
     back = ProjectDoc.model_validate_json(doc.model_dump_json())
     assert back.indexing == doc.indexing
 
@@ -181,6 +186,156 @@ def test_a_wrong_vocabulary_member_is_refused_with_the_live_list(bad, where):
 def test_a_wrong_engine_is_refused_with_the_live_list():
     with pytest.raises(ValueError, match="dichotomy"):
         IndexingControls(engines=["dicvol"])
+
+
+# ----------------------------------------------------------------------
+# the specimen's formula (WP-2030 part 3): refused in the CLI's words
+# ----------------------------------------------------------------------
+#: one row per refusal ``rietx index`` makes: its flags, and the controls
+#: block a project file or the GUI form would carry for the same input
+_FORMULA_REFUSALS = [
+    (["--formula", "Qq2"], {"formula": "Qq2"}),
+    (["--formula", "CuSO4.5H2O"], {"formula": "CuSO4.5H2O"}),
+    (["--formula", "ZnO", "--temperature", "0"],
+     {"formula": "ZnO", "temperature": 0.0}),
+    (["--formula", "ZnO", "--temperature", "-5"],
+     {"formula": "ZnO", "temperature": -5.0}),
+    (["--formula", "ZnO", "--temperature", "inf"],
+     {"formula": "ZnO", "temperature": math.inf}),
+    (["--formula", "ZnO", "--temperature", "nan"],
+     {"formula": "ZnO", "temperature": math.nan}),
+    (["--temperature", "100"], {"temperature": 100.0}),
+]
+
+
+def _cli_refusal(flags: list[str], capsys) -> str:
+    """The sentence ``rietx index`` refuses ``flags`` with.  It refuses before
+    the pattern is read, so the path need not exist."""
+    from rietx.cli import main
+
+    with pytest.raises(SystemExit) as stop:
+        main(["index", "never-read.xy", "--wavelength", "1.5405929", *flags])
+    assert stop.value.code == 2
+    return capsys.readouterr().err.rsplit("rietx index: error: ", 1)[1].strip()
+
+
+def _model_refusal(exc: ValidationError) -> str:
+    return str(exc.errors()[0]["msg"]).removeprefix("Value error, ")
+
+
+@pytest.mark.parametrize("flags,controls", _FORMULA_REFUSALS)
+def test_the_controls_refuse_a_formula_in_the_clis_words(flags, controls,
+                                                         capsys):
+    """One validator, ``check_formula_input``, so the project file and the
+    GUI form refuse what the CLI refuses, sentence for sentence."""
+    with pytest.raises(ValidationError) as refused:
+        IndexingControls(**controls)
+    assert _model_refusal(refused.value) == _cli_refusal(flags, capsys)
+
+
+def _a_project(root: Path):
+    import rietx as rx
+    from tests.test_project import _write_xye
+    from tests.test_refine_synthetic import perturbed_models, synthesize
+
+    structure, instrument = perturbed_models()
+    file = _write_xye(root.parent / f"{root.stem}.xye", synthesize())
+    return rx.Project.create(root, pattern=file, structure=structure,
+                             instrument=instrument)
+
+
+def test_a_project_file_keeps_the_formula_and_refuses_a_bad_one(tmp_path,
+                                                                capsys):
+    import rietx as rx
+    from rietx.project import PROJECT_JSON
+
+    project = _a_project(tmp_path / "formula.rex")
+    doc_path = project.path / PROJECT_JSON
+
+    # a file written before the fields existed has no key: it opens with no
+    # formula, and opening it leaves its bytes alone
+    raw = json.loads(doc_path.read_text(encoding="utf-8"))
+    assert raw["indexing"].pop("formula") is None
+    assert raw["indexing"].pop("temperature") is None
+    doc_path.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+    before = doc_path.read_bytes()
+    old = rx.Project.open(project.path)
+    assert old.doc.indexing == IndexingControls()
+    assert doc_path.read_bytes() == before
+
+    # both fields stored, both read back
+    old.doc.indexing = IndexingControls(formula="C7H6O2", temperature=100.0)
+    old.save()
+    back = rx.Project.open(project.path).doc.indexing
+    assert (back.formula, back.temperature) == ("C7H6O2", 100.0)
+
+    # a hand-edited bad value is refused on load, in the CLI's words
+    for flags, controls in (_FORMULA_REFUSALS[2], _FORMULA_REFUSALS[-1]):
+        raw = json.loads(doc_path.read_text(encoding="utf-8"))
+        raw["indexing"].update({"formula": None, "temperature": None,
+                                **controls})
+        doc_path.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+        with pytest.raises(ValidationError) as refused:
+            rx.Project.open(project.path)
+        assert _model_refusal(refused.value) == _cli_refusal(flags, capsys)
+
+
+@pytest.mark.xdist_group("search-controls-chairs")
+def test_the_gui_index_run_passes_the_formula(tmp_path, monkeypatch, capsys):
+    """The form's block reaches ``index_pattern`` as the CLI hands it over:
+    unset is no formula at 298 K, and a set pair arrives as stored.  The GUI's
+    settings verb refuses a bad pair with the CLI's sentence."""
+    import time
+
+    import rietx.indexing.workflow as workflow
+    from rietx.crystallography.atomic_volume import TABLE_TEMPERATURE
+    from rietx.gui import GuiSession
+    from rietx.gui.session import GuiError
+
+    calls: list[dict] = []
+
+    class Captured(Exception):
+        pass
+
+    def capture(*_args, **kwargs):
+        calls.append(kwargs)
+        raise Captured
+
+    monkeypatch.setattr(workflow, "index_pattern", capture)
+    session = GuiSession(_a_project(tmp_path / "gui.rex"),
+                         state_dir=tmp_path / "state")
+
+    def index_once() -> dict:
+        session.run({"kind": "index"})
+        deadline = time.monotonic() + 60.0
+        while session.run_state()["state"] != "idle":
+            assert time.monotonic() < deadline, "index run did not finish"
+            time.sleep(0.05)
+        return calls[-1]
+
+    try:
+        unset = index_once()
+        assert (unset["formula"], unset["temperature"]) == (
+            None, TABLE_TEMPERATURE)
+
+        session.project_patch({"indexing": {"formula": "C7H6O2"}})
+        only_formula = index_once()
+        assert (only_formula["formula"], only_formula["temperature"]) == (
+            "C7H6O2", TABLE_TEMPERATURE)
+
+        session.project_patch({"indexing": {"formula": "C7H6O2",
+                                            "temperature": 120.0}})
+        both = index_once()
+        assert (both["formula"], both["temperature"]) == ("C7H6O2", 120.0)
+
+        flags, controls = _FORMULA_REFUSALS[-1]
+        with pytest.raises(GuiError) as refused:
+            session.project_patch({"indexing": controls})
+        assert str(refused.value) == _cli_refusal(flags, capsys)
+        # the refused block was not kept
+        assert session.project_doc()["doc"]["indexing"]["temperature"] == 120.0
+    finally:
+        session.close()
 
 
 # ----------------------------------------------------------------------

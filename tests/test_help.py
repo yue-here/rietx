@@ -504,7 +504,7 @@ def test_every_indexing_search_control_has_an_entry():
     and the corpus are three views of one field list.
     """
     fields = _search_fields()
-    assert len(fields) == 21, f"the indexing control set moved: {sorted(fields)}"
+    assert len(fields) == 23, f"the indexing control set moved: {sorted(fields)}"
     assert set(SEARCH_FIELD_HELP) == fields, (
         f"missing: {sorted(fields - set(SEARCH_FIELD_HELP))}; "
         f"describing nothing: {sorted(set(SEARCH_FIELD_HELP) - fields)}")
