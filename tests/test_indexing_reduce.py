@@ -556,6 +556,50 @@ def test_rounding_is_not_a_setting_to_re_set(centring, cell):
     assert conventional_setting(af, "monoclinic", centring) is None
 
 
+@pytest.mark.parametrize("a, b, c, beta", [
+    (12.3, 6.1, 9.5, 115.0),        # #1258's monoclinic list, a > c
+    (10.2, 3.9, 7.4, 104.0),        # its control
+    (4.541, 4.884, 10.198, 98.22),
+])
+def test_a_monoclinic_a_cell_is_re_set_to_the_c_cell_of_its_lattice(a, b, c, beta):
+    """WP-2066: a↔c turns the A description of a C lattice into C, and the
+    result is the conventional C cell, the one a C description of the same
+    lattice re-sets to."""
+    from rietx.indexing.qspace import cell_from_af
+    from rietx.indexing.reduce import af_map, conventional_setting
+
+    truth = af_from_cell((a, b, c, 90.0, beta, 90.0))
+    want_change = conventional_setting(truth, "monoclinic", "C")
+    want = truth if want_change is None else af_map(want_change) @ truth
+    a_cell = af_map(((0, 0, 1), (0, -1, 0), (1, 0, 0))) @ truth   # A setting
+    change = conventional_setting(a_cell, "monoclinic", "A")
+    m = np.asarray(change)
+    assert round(np.linalg.det(m)) == 1
+    got = af_map(change) @ a_cell
+    assert cell_from_af(got) == pytest.approx(cell_from_af(want), rel=1e-9)
+    assert conventional_setting(got, "monoclinic", "C") is None
+
+
+@pytest.mark.parametrize("letter, cell, want", [
+    ("A", (4.2, 5.9, 12.9), (5.9, 12.9, 4.2)),
+    ("A", (4.2, 12.9, 5.9), (5.9, 12.9, 4.2)),
+    ("B", (4.2, 5.9, 12.9), (4.2, 12.9, 5.9)),
+    ("B", (12.9, 5.9, 4.2), (4.2, 12.9, 5.9)),
+])
+def test_an_orthorhombic_a_or_b_cell_is_re_set_to_c(letter, cell, want):
+    """WP-2066: the centred face's axes become a and b, shorter first, and the
+    change stays right-handed; a C cell is left as found."""
+    from rietx.indexing.qspace import cell_from_af
+    from rietx.indexing.reduce import af_map, conventional_setting
+
+    af = af_from_cell((*cell, 90.0, 90.0, 90.0))
+    change = conventional_setting(af, "orthorhombic", letter)
+    assert round(np.linalg.det(np.asarray(change))) == 1
+    got = cell_from_af(af_map(change) @ af)
+    assert got == pytest.approx((*want, 90.0, 90.0, 90.0), rel=1e-12)
+    assert conventional_setting(af, "orthorhombic", "C") is None
+
+
 def test_a_metric_that_is_no_lattice_has_no_setting():
     from rietx.indexing.reduce import conventional_setting
 
