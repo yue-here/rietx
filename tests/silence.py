@@ -345,6 +345,17 @@ def _site_kept_silent():
             + _merge_findings(Structure(phases=[_phase(*_PNMA, _ON, occ=0.5)])))
 
 
+def _multiplicity_kept(y_returned: float) -> list:
+    """The #1088 split pair, fitted general at y = 0.27, returned at ``y_returned``."""
+    from rietx.crystallography.structure_factor import phase_orbit_split
+    from rietx.refine import _multiplicity_kept_diagnostics
+    from rietx.schemas import Structure
+    from tests.test_site_multiplicity_kept import _toy
+    split = [phase_orbit_split(_toy(0.27, occ=0.5))]
+    return _multiplicity_kept_diagnostics(
+        Structure(phases=[_toy(y_returned, occ=0.5)]), split)
+
+
 def _renumbered(y: float, *, hold: bool) -> list:
     """O5 (Pnma 8d) set to ``y`` with y and z held, as ``set_values`` writes it."""
     import rietx as rx
@@ -672,6 +683,48 @@ def _total_scattering_silent() -> list:
     return (_read_text_pattern("spec.dat", "#L 2Theta  Detector\n" + _TS_ROWS)
             + _read_text_pattern("scan.xy", "# compare with the G(r) later\n" + _TS_ROWS))
 
+
+def _stage_solve(*, nan_column: bool) -> list:
+    """``STAGE_NOT_FINITE`` for one solve of the one-column cell of
+    ``tests/test_issue_283_cell_bounds.py``.  ``nan_column`` makes every
+    Jacobian after the first hold a NaN column, the case the nudged P 1 Le
+    Bail fit reached (``tests/test_non_finite_stage.py``); without it the same
+    solve runs to its end."""
+    import numpy as np
+    import pytest
+
+    import rietx.optimize.least_squares as lsq
+    from rietx.refine import _non_finite_diagnostic
+    from tests.test_issue_283_cell_bounds import (
+        _compile_alpha_only,
+        _rhombohedral_boundary_cell,
+    )
+
+    structure = _rhombohedral_boundary_cell()
+    structure.phases[0].cell.alpha.value = 119.0
+    model, table = _compile_alpha_only(structure)
+    real = lsq._jacobian_for
+
+    def factory(*args, **kwargs):
+        inner = real(*args, **kwargs)
+        calls = [0]
+
+        def jac(theta):
+            j = np.array(inner(theta), dtype=np.float64)
+            calls[0] += 1
+            if calls[0] > 1:
+                j[:, 0] = np.nan
+            return j
+        return jac
+
+    with pytest.MonkeyPatch.context() as mp:
+        if nan_column:
+            mp.setattr(lsq, "_jacobian_for", factory)
+        outcome = lsq.run_least_squares(model, table, max_iter=5)
+    found = _non_finite_diagnostic("cell", outcome)
+    return [] if found is None else [found]
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -714,12 +767,20 @@ SILENCE: dict[str, Pair] = {
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
     "RESTRAINT_PAIRS_STALE": Pair(
         _stale_fires, _stale_silent, "tests/test_planarity_restraints.py"),
+    "SITE_MULTIPLICITY_KEPT": Pair(
+        functools.partial(_multiplicity_kept, 0.25 + 1e-6),
+        functools.partial(_multiplicity_kept, 0.2501),
+        "tests/test_site_multiplicity_kept.py"),
     "SITE_SNAPPED_TO_SPECIAL_POSITION": Pair(
         _snap_fires, _snap_silent, "tests/test_cif_stated_columns.py"),
     "SITE_TWINS_KEPT": Pair(
         _site_kept_fires, _site_kept_silent, "tests/test_site_twins_merged.py"),
     "SITE_TWINS_MERGED": Pair(
         _site_merged_fires, _site_merged_silent, "tests/test_site_twins_merged.py"),
+    "STAGE_NOT_FINITE": Pair(
+        functools.partial(_stage_solve, nan_column=True),
+        functools.partial(_stage_solve, nan_column=False),
+        "tests/test_non_finite_stage.py"),
     "STAGE_WINDOWS_STALE": Pair(
         functools.partial(_windows_stale, 0.3), functools.partial(_windows_stale, None),
         "tests/test_window_loss.py"),

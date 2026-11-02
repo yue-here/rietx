@@ -1,6 +1,6 @@
 # WP-1991 — a site and its own image are one atom on every route
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — #1264 fixed in PR #1274 (a path follows its atom by label); open: the `adp.k` probe, series trajectories by atom, phases by name
+Milestone: unscheduled · Status: 🔄 2026-11-01 — #1264 fixed in PR #1274 (merged 2026-11-01, `95bd38953`; a path follows its atom by label); open: the `adp.k` probe, series trajectories by phase name + atom label (ruled 2026-11-01), phases by name
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-16 — a doubled composition with nothing firing, but only on a stored, hand-edited or code-built coordinate; a refined coordinate cannot drift there, and the CIF route already merges it
@@ -89,6 +89,30 @@ number, with a warning on `edit`; where its number names no atom, its paths are
 left as they were (WP-1435 keeps such a hold).
 No diagnostic code, number or default is added, so `rietx._audit` is unchanged.
 
+### Ruling: series trajectories are keyed by phase name and atom label (2026-11-01)
+
+The question left open by PR #1274 (merged 2026-11-01 as `95bd38953`): does a
+series report a parameter per atom label or per path? Yue ruled on 2026-11-01,
+about 10:00 ("confirm a"), on the lead's recommendation, option A extended to
+phases. Users and agents may add or remove phases and atoms in the middle of a
+series, so a path such as `phases.1.atoms.2.biso` names a different atom in
+different patterns. The ruling:
+
+- A trajectory is keyed by phase name, atom label and parameter.
+- A pattern where the phase or the atom is absent leaves a gap, never a zero or
+  a neighbour's value.
+- Each point carries its per-pattern dot-path beside it, so a reader can still
+  find the parameter in that pattern's model.
+- A duplicate phase name, or a duplicate atom label within a phase, is
+  **refused**, not guessed at.
+- An old `SeriesResult` file is converted at read, by the migration pattern of
+  `schemas/migrate.py`.
+
+This is a stored-format change and changes what a series returns. Its PR goes to
+Yue before merge, under the reader-output rule (`python -m tests.reader_output`),
+and no runner merges it. The phase-name matching task below is the same rule one
+level up, and the two should share one matcher.
+
 ## Non-goals
 
 - Changing `SITE_TOL`.
@@ -114,10 +138,16 @@ No diagnostic code, number or default is added, so `rietx._audit` is unchanged.
   `numbering_moves`, so a hold or tie on `adp.k` of a site that merges is not
   carried. Read off the code in PR #1223's review, never probed: probe it,
   then fix or fence.
-- [ ] A series trajectory follows its atom. `SeriesResult.trajectory(path)`
-  and the fences built on it join patterns by path, so a `prepare` that
-  changes the atom list per pattern joins two atoms into one trajectory
-  (PR #1274's handover). Decide whether a series reports per atom label.
+- [ ] A series trajectory follows its atom, as ruled 2026-11-01 (see
+  § Ruling above). `SeriesResult.trajectory(path)` and the fences built on it
+  join patterns by path, so a `prepare` that changes the atom list per pattern
+  joins two atoms into one trajectory (PR #1274's handover). Key trajectories by
+  phase name + atom label + parameter, with gaps where absent and the
+  per-pattern path beside each point; refuse duplicate phase names and duplicate
+  atom labels within a phase; convert old `SeriesResult` files at read. **Gate:**
+  a stored-format and reader-output change, so its PR goes to Yue before merge
+  (`python -m tests.reader_output`, WP-2010's rule), and the manual's series
+  chapter and the skill's series reference change in the same PR.
 - [ ] Phases are matched by name where unique, as atoms are by label.
   `atom_moves` and `numbering_moves` match phases by position, so removing a
   phase ahead of another renumbers every `phases.N` path the way #1264 did
@@ -136,6 +166,18 @@ No diagnostic code, number or default is added, so `rietx._audit` is unchanged.
 - Issues #1007, #765, #876, #215.
 
 ## Handover log
+
+### 2026-11-01 (2nd session) — PR #1297: the ruling on series trajectories recorded (docs only)
+
+When a user or an agent adds or removes an atom or a phase partway through a series, a trajectory joined by dot-path can follow two different atoms as if they were one. Yue ruled this morning how a series should report instead: by phase name and atom label, with gaps where something is absent. That ruling is now written into this WP as a task, so the next session finds it in the file and not in a chat. Nothing in the package changed. Implementing it changes what a series returns and how its files are stored, so that PR waits for Yue.
+
+  *Done.* § Ruling (2026-11-01) under Context states the ruling. The open task "A series trajectory follows its atom" now names it: key by phase name + atom label + parameter; leave gaps where a phase or atom is absent from a pattern; carry the per-pattern dot-path beside each point; refuse duplicate phase names and duplicate atom labels within a phase; convert old `SeriesResult` files at read. Its **Gate** line says the PR is a stored-format and reader-output change and goes to Yue before merge (`python -m tests.reader_output`). The Status line records that PR #1274 merged as `95bd38953` on 2026-11-01. Source of the ruling: Yue, 2026-11-01 about 10:00, "confirm a", on the lead's option A extended to phases (ghostshift 2026-10-31 note).
+
+  *Measured.* Nothing, since no code changed. Checked: PR #1274's state is MERGED at 95bd38953 (`gh pr view`). `closed_wp_writes.py` reports nothing. `/code-review` skipped: the branch touches one markdown file under `docs/wp/`.
+
+  *Gotchas.* PR #1282 (mustachefeeling, opened 2026-11-01, `fix/1264-series-carry-label-match`) is still open, CONFLICTING, and names WP-1991. It touches `twins.py`, `sequential.py` and a new test file for the same #1264 carry that #1274 fixed. It is probably superseded by #1274 and was not read for this entry. Whoever reviews it should check it against `95bd38953` before any ask for changes.
+
+  Next: the `adp.k` probe still goes first (possibly a one-line fix). The trajectory keying follows, and its PR goes to Yue before merge. The keying and phases-by-name tasks both need a phase matcher, so build one matcher and use it for both. Refusing duplicate names at read must not break old files: convert at read, and decide with Yue's rule "old files always open" what an old file with duplicate names becomes.
 
 - **2026-11-01** — PR #1274, closing #1264. A path that names an atom by its number now follows the atom when two models number their atoms differently. The issue's series case is fixed: a `prepare` hook that removes an atom ahead of a tied site no longer adds the fitted displacement twice. Three siblings with the same cause are fixed as well. The series carry wrote each value onto whichever atom held the number, so an O on a mirror could start the next pattern at a general position. The re-anchor read the previous pattern's values against the wrong numbers. And `Refinement.edit`, which the GUI's remove-atom button calls, moved a hold onto the next atom with nothing said. Nothing about which atoms or phases a series reports per pattern has changed, and that is the next thing to look at.
 

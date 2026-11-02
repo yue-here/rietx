@@ -42,6 +42,7 @@ digit.
 from __future__ import annotations
 
 import math
+import sys
 
 import numpy as np
 import pytest
@@ -1090,7 +1091,12 @@ def test_tied_angles_follow_a_restored_alpha():
 
 
 @pytest.mark.slow
-def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path):
+@pytest.mark.parametrize("nudge", [
+    pytest.param(0, id="start"),
+    # its own group, so the two rows run on two workers (WP-2048)
+    pytest.param(-1, id="nudged", marks=pytest.mark.xdist_group("cell-runaway-nudged")),
+])
+def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path, nudge):
     """The public path: a P 1 Le Bail fit of a valid but wrong ~7 Å^3 cell on
     synthetic silicon (``tests/_synthetic_silicon.py``), two
     stages.  The second ended on the window-edge clamp's degenerate corner
@@ -1103,7 +1109,14 @@ def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path)
     ``test_three_escaped_angles_put_the_whole_cell_back_at_its_start``, and
     the reset inside ``fit`` by the injected escape (``lebail_pair_fits``).
     What this row alone shows is a fit walking into the guard unaided, and
-    that is kept in the nightly's full suite."""
+    that is kept in the nightly's full suite.
+
+    ``nudged`` multiplies cell ``a`` by 1 - 1e-14 (WP-1930's nudge).  On
+    macOS arm64 that start's second plan met a Jacobian that was not finite
+    and raised ``ValueError`` out of ``fit``, as the Linux nightly did on the
+    unnudged start once (WP-2048).  It now ends the stage with
+    ``STAGE_NOT_FINITE``, asserted where the trajectory was measured, since
+    elsewhere rounding picks another one."""
     import rietx as rx
     from rietx.schemas.structure import lebail_scaffold
     from tests._synthetic_silicon import silicon_pattern
@@ -1116,8 +1129,10 @@ def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path)
     data = rx.read_pattern(path)
     ins = rx.Instrument.bragg_brentano(radiation="CuKa")
     ins.background = rx.background.auto_background(data).background
-    structure = lebail_scaffold("P 1", TRICLINIC)
-    findings = []
+    cell = list(TRICLINIC)
+    cell[0] *= 1 + nudge * 1e-14
+    structure = lebail_scaffold("P 1", cell)
+    findings, stops = [], []
     for plan in ("profile_only", "lab_bragg_brentano"):
         # TRF, because its trajectory is the one that reaches the guard, on
         # every start tried.  Under LM, the default since WP-1938, the wrong
@@ -1135,18 +1150,22 @@ def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path)
         assert math.isfinite(float(result.statistics.rwp))
         assert float(result.statistics.rwp) > 0.0
         findings += [d for d in result.diagnostics if d.code == "CELL_RUNAWAY"]
+        stops += [d for d in result.diagnostics if d.code == "STAGE_NOT_FINITE"]
         # fit plot for visual inspection (tests/output/, gitignored)
         from pathlib import Path
 
         from rietx.viz.plots import plot_result
         out = Path(__file__).parent / "output"
         out.mkdir(exist_ok=True)
-        plot_result(result, path=str(out / f"cell_runaway_p1_lebail_{plan}.png"))
+        plot_result(result, path=str(out / f"cell_runaway_p1_lebail_{plan}_{nudge}.png"))
         structure, ins = ref.fitted_structure, ref.fitted_instrument
     # pin that the runaway guard was exercised, and that it put the cell back
     assert findings, "no CELL_RUNAWAY fired: the fit no longer reaches the guard"
     assert all("restored to this stage's starting values" in d.message
                for d in findings), [d.message for d in findings]
+    import platform
+    if nudge and (sys.platform, platform.machine()) == ("darwin", "arm64"):
+        assert stops, "the nudged start no longer reaches a non-finite model"
 
 
 def test_two_solves_driven_escapes_merge_by_driver_once():

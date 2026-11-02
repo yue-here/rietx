@@ -77,7 +77,8 @@ class FigureReport:
     :func:`~rietx.viz.keep` dropped from a kept atom, running over successive
     cuts, and ``polyhedra`` adds those the atom cap left out.  ``note`` is the
     geometry's own note, the same losses in words.  ``warnings`` are
-    sentences, and one says so when either cap trimmed the cell.
+    sentences: one says so when either cap trimmed the cell, one counts the
+    sites an ellipsoid figure drew as spheres for want of a displacement tensor.
     """
     hidden: float
     hidden_atoms: list[int]

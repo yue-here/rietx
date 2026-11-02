@@ -39,6 +39,10 @@ From issue #1225 (mustachefeeling, 2026-10-29), "Kind: machinery" in #1224's sen
 
 **Check before starting.** WP-1419's 2026-10-06 entry records that a collaborator is building an ISODISTORT equivalent and asks that the maintainer be consulted before work starts there, so it is not done twice. Confirm whether this proposal is that work.
 
+### Inherited
+
+- **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: the soft dependency is delivered.** `subgroups.maximal(group)` and `wyckoff_splitting` are merged (PR #1189, PR #1239), so a parent's subgroups can be walked down to a stated child cell with their (P, p).
+
 ## Non-goals
 
 - Ranking candidates against each other (WP-1419 chunk 4, the consumer).
