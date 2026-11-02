@@ -154,15 +154,30 @@ are in that WP, and this one's localisation does not answer it: coexistence
 - [x] The disagreement case as report-only output (decided 2026-09-03: a
       number the reader judges, never a `Diagnostic` with a threshold); write
       the reason where the number lives.
-- [ ] Acceptance on the NiO pair: the localisation test must return the
+- [x] Acceptance on the NiO pair: the localisation test must return the
       negative share (~−28 % on 6.2 % of points) that reversed the answer, and
       the check must be able to fail — a genuinely localised improvement on a
       constructed case must score positive.
+      *Closed 2026-11-02 by task 2's second branch; settled by Claude under the
+      Acceptance's own clause ("the NiO pair, if it ships") and the
+      unpublished-data rule (root CLAUDE.md § Licensing).* The pattern never
+      reached the thread, #219 closed on 2026-10-16 without it, and a
+      contributor's unpublished laboratory pattern has no peer-reviewed
+      citation to ship under. The constructed pair in
+      `tests/test_localisation.py` scores positive (+68 %) and negative
+      (−30 %), so the check can fail both ways; NiO stays an external check
+      quoted from #219.
 - [x] Tests: `tests/test_compare_ui.py` keeps asserting the UI field by field;
       the new function is tested on results, not on the UI's standards.
-- [ ] Skill: `references/judging.md` — the routing row for "two candidate
+- [x] Skill: `references/judging.md` — the routing row for "two candidate
       space groups, which one", pointing at the localisation share and saying
       plainly that ΔBIC and a nested F-test do not settle it.
+      *The row stays in `references/numbers.md`; settled by Claude under
+      CONTRIBUTING.md § The agent skill.* `judging.md` holds the measurements
+      behind the judging rules and is 26 B under its budget. The comparison is
+      reached by the body's §5 routing row ("quoting or comparing a number"),
+      so a new shape file is not warranted. 2026-11-02 added the nested F-test
+      and the pointer to `judging.md` §4 that WP-1417 asked for.
 
 ## Acceptance
 
