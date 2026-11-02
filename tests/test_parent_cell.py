@@ -300,18 +300,21 @@ def test_strains_held_the_derived_cell_is_the_childs_own_and_spans_its_metrics()
 
 @pytest.mark.slow
 def test_the_whole_sweep_is_bit_identical_and_spans_the_childs_metrics():
-    """All 15 sweep rows × every candidate × both routes (208 children).
+    """All 15 sweep rows × every candidate × both routes (242 children).
 
-    The 215 candidates give 430 (candidate, route) pairs.  365 built while a
-    magnetic candidate could be stated with no moment; since #1077 it names its
-    moment-bearing species, and 157 more pairs are then refused for their
-    moments (a mixed-axis setting ``allowed_moment_basis`` cannot answer, a BNS
-    label, a site image) before any cell is built.  61 of the 208 have a
-    tabulated cell of their own, the rest need the parent's.
+    The 215 candidates give 430 (candidate, route) pairs, and 242 build.  A
+    magnetic candidate names its moment-bearing species (#1077's refusal), and
+    the other 188 are then refused before any cell is built: a mixed-axis
+    setting ``allowed_moment_basis`` cannot answer, an image of the site, or a
+    parent's group that is not a group of the child (``nuclear_group="parent"``).
+    A BNS label that disagrees with its operators no longer refuses any, since
+    #1296 made a candidate's cell right-handed.  With the species refusal
+    bypassed the same sweep builds 409.  95 of the 242 have a tabulated cell of
+    their own, the rest need the parent's.
     """
     worst = _check_sweep(SWEEP_ROWS)
     _assert_sweep(worst)
-    assert worst["children"] == 208, worst
+    assert worst["children"] == 242, worst
 
 
 #: One setting per ``cell_constraints`` branch: cubic, tetragonal, hexagonal,
