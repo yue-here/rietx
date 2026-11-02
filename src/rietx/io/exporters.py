@@ -630,7 +630,7 @@ def _write_phase_agreement(block, row: PhaseAgreement | None) -> None:
 
 
 def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
-    """``_geom_bond`` / ``_geom_contact`` / ``_geom_angle`` for one phase.
+    """``_geom_bond`` / ``_geom_contact`` / ``_geom_angle`` / ``_geom_torsion``.
 
     Tag names are the COMCIFS core dictionary's, checked rather than
     remembered (as WP-1069 did for the R factors): the ``_geom_bond.*``,
@@ -641,6 +641,15 @@ def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
     ones, because an angle between two contacts is not a shape anybody reads.
     A bonded row and an angle carry ``publ_flag yes`` and a contact ``no``,
     the dictionary's default (ITC Vol. G ch. 4.1, pp. 236-238).
+
+    ``_geom_torsion`` (WP-1815) writes
+    :attr:`~rietx.schemas.results.GeometryTable.torsions` as the table holds
+    them: each torsion once, over a bonded chain, in Klyne and Prelog's sign
+    and the dictionary's own range (``_enumeration.range -180.0:180.0``).
+    A torsion is a shape of bonded atoms, as an angle is, so it carries
+    ``publ_flag yes`` too.  Its value tag is the bare ``_geom_torsion``, the
+    alias of ``_geom_torsion.angle``, for the reason the angle's is.  A table
+    from before schema 0.60 holds ``None`` there and writes no loop.
 
     :class:`~rietx.schemas.results.GeometryTable` lists every atom's whole
     environment, so a bond between two sites is in it twice, once from each
@@ -676,12 +685,16 @@ def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
     distances = [d for d in geometry.distances
                  if d.phase_index == ip and d.atom_index_1 <= d.atom_index_2]
     angles = [a for a in geometry.angles if a.phase_index == ip]
-    if not distances and not angles:
+    torsions = [t for t in geometry.torsions or () if t.phase_index == ip]
+    if not distances and not angles and not torsions:
         return
     codable = [d for d in distances if d.symmetry_1 and d.symmetry_2]
     angles_codable = [a for a in angles
                       if a.symmetry_1 and a.symmetry_2 and a.symmetry_3]
-    dropped = len(distances) - len(codable) + len(angles) - len(angles_codable)
+    torsions_codable = [t for t in torsions if t.symmetry_1 and t.symmetry_2
+                        and t.symmetry_3 and t.symmetry_4]
+    dropped = (len(distances) - len(codable) + len(angles) - len(angles_codable)
+               + len(torsions) - len(torsions_codable))
     loops = []
     for tag, rows, flag in (("_geom_bond_", [d for d in codable if d.bonded], "yes"),
                             ("_geom_contact_", [d for d in codable if not d.bonded],
@@ -706,13 +719,29 @@ def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
                 for k, label in enumerate((a.atom_1, a.atom_2, a.atom_3), start=1)),
               number("_geom_angle", a.angle, a.stderr),
               a.symmetry_1, a.symmetry_2, a.symmetry_3, "yes"] for a in angles_codable]))
+    if torsions_codable:
+        # ``_geom_torsion.angle`` aliases to a bare ``_geom_torsion``, as above
+        loops.append(("", [
+            *(f"_geom_torsion_atom_site_label_{k}" for k in range(1, 5)),
+            "_geom_torsion",
+            *(f"_geom_torsion_site_symmetry_{k}" for k in range(1, 5)),
+            "_geom_torsion_publ_flag"],
+            [[*(text(f"_geom_torsion_atom_site_label_{k}", label)
+                for k, label in enumerate((t.atom_1, t.atom_2, t.atom_3, t.atom_4),
+                                          start=1)),
+              number("_geom_torsion", t.angle, t.stderr),
+              t.symmetry_1, t.symmetry_2, t.symmetry_3, t.symmetry_4, "yes"]
+             for t in torsions_codable]))
     # each sentence only where a written row is what it describes: stating
     # a method no row used is a claim (_special_details' rule)
-    sus = [r.stderr for r in codable] + [a.stderr for a in angles_codable]
+    sus = ([r.stderr for r in codable] + [a.stderr for a in angles_codable]
+           + [t.stderr for t in torsions_codable])
     details = []
     if any(su is not None for su in sus):
         details.append(
-            "Standard uncertainties of distances and angles are propagated "
+            "Standard uncertainties of distances"
+            + (", angles and torsion angles" if torsions_codable else " and angles")
+            + " are propagated "
             "through the full covariance of the refined parameters, cell "
             "included (McCusker et al. 1999, J. Appl. Cryst. 32, 36, section 10)"
             + (", with the Berar-Lelann factor" if result.statistics.esd_inflation

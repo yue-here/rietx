@@ -695,6 +695,66 @@ def test_refinement_cif_carries_the_geom_loops(fitted_lab6, tmp_path):
         block.find_value("_geom_special_details").split())
 
 
+def test_the_cif_torsion_loop_round_trips_the_table(fitted_lab6, tmp_path):
+    """``_geom_torsion`` reads back as the table's rows (WP-1815).
+
+    Each row the table holds comes back from the file with its four labels,
+    four symmetry codes, its value and its su, in the table's order, under the
+    bare ``_geom_torsion`` value tag the dictionary aliases.  A table from
+    before schema 0.60 (``torsions=None``) writes no loop, and a written loop
+    says in ``_geom_special_details`` that torsions are among the propagated
+    quantities, which the same result without them does not.
+    """
+    import re
+
+    from rietx.io.exporters import refinement_cif_doc
+
+    def parse_su(cell: str) -> tuple[float, float | None]:
+        # ``1.234(12)``: the su's digits sit in the value's last decimals
+        m = re.fullmatch(r"(-?\d+(?:\.(\d*))?)(?:\((\d+)\))?", cell)
+        assert m, cell
+        if m[3] is None:
+            return float(m[1]), None
+        return float(m[1]), int(m[3]) * 10.0 ** -len(m[2] or "")
+
+    ref, result, _data = fitted_lab6
+    torsions = [t for t in result.geometry.torsions if t.phase_index == 0]
+    assert torsions, "LaB6's B6 octahedra and their links form bonded chains"
+    out = tmp_path / "torsions.cif"
+    ref.write_cif(out)
+    block = gemmi.cif.read(str(out)).sole_block()
+    rows = list(block.find([
+        *(f"_geom_torsion_atom_site_label_{k}" for k in range(1, 5)),
+        "_geom_torsion",
+        *(f"_geom_torsion_site_symmetry_{k}" for k in range(1, 5)),
+        "_geom_torsion_publ_flag"]))
+    assert len(rows) == len(torsions)
+    for row, t in zip(rows, torsions, strict=True):
+        assert [row[k] for k in range(4)] == [t.atom_1, t.atom_2, t.atom_3, t.atom_4]
+        assert [row[k] for k in range(5, 9)] == [
+            t.symmetry_1, t.symmetry_2, t.symmetry_3, t.symmetry_4]
+        assert row[9] == "yes"
+        value, su = parse_su(row[4])
+        assert -180.0 < value <= 180.0
+        assert value == pytest.approx(t.angle, abs=su or 1e-9)
+        assert (su is None) == (t.stderr is None)
+        if su is not None:
+            # format_su rounds the su to two significant digits
+            assert su == pytest.approx(t.stderr, rel=0.1)
+    text = out.read_text(encoding="utf-8")
+    assert "_geom_torsion_value" not in text and "_geom_torsion_angle" not in text
+    details = " ".join(block.find_value("_geom_special_details").split())
+    assert "torsion angles" in details
+
+    old = result.model_copy(update={"geometry": result.geometry.model_copy(
+        update={"torsions": None})})
+    old_block = refinement_cif_doc(old, ref.fitted_structure,
+                                   ref.fitted_instrument).sole_block()
+    assert not old_block.find_loop("_geom_torsion")
+    assert "torsion" not in " ".join(
+        old_block.find_value("_geom_special_details").split())
+
+
 def test_refinement_helpers_smoke(fitted_lab6, tmp_path):
     """The three Refinement convenience methods all produce files."""
     ref, result, data = fitted_lab6
