@@ -206,25 +206,25 @@ U* = U^ij a*ᵢa*ⱼ the fractional form of a displacement tensor
 be a lattice translation of the group, so the new cell is a cell of the
 crystal; a supercell's extra translations become centrings, and the phase's
 scale is multiplied by (V/V′)² so that a pattern computed from it is unchanged.
-The tests hold |F(h′)|² = (det P)²·|F(h)|² reflection by reflection.
+The tests hold $|F(h')|^2 = (\det P)^2\,|F(h)|^2$ reflection by reflection.
 
 `standard_setting` applies the setting and cell rules of Parthé and Gelato's
-standardization {cite}`parthe1984` (pp. 172–173). Rule 2 is ITA's standard
+standardisation {cite}`parthe1984` (pp. 172–173). Rule 2 is ITA's standard
 setting: unique axis b with cell choice 1, the obverse hexagonal cell of an R
 lattice, origin choice 2 where ITA gives two, and of an enantiomorphic pair
 the member with the smaller screw index, the structure then its mirror image
-and the result saying so. The group step is the one standardiser above, given
+and the result saying so. The group step is the one standardising step above, given
 the Hall number of the target setting, because spglib's default for the
 two-origin types is origin choice 1. Rule 3 is the cell: the Niggli cell for a
 triclinic group; for a monoclinic P group without a glide, the shortest a and c
 normal to b with a ≤ c and β ≥ 90°; for a monoclinic group with a glide or a
 C lattice, the "best" cell for cell choice 1 {cite}`parthe1985`; for an
-orthorhombic group, a ≤ b ≤ c over the relabellings its affine normaliser
+orthorhombic group, a ≤ b ≤ c over the axis permutations its affine normaliser
 contains, computed from the operations (six for P2₁2₁2₁, two for Cmmm, three
-cyclic ones for Pbca, one for Pnma). The best cell keeps the standard symbol
+cyclic ones for $Pbca$, one for $Pnma$). The best cell keeps the standard symbol
 and has the shortest a and c normal to b that allow it, with β ≥ 90°. Writing
-a′ = pa + qc and c′ = ra + sc, the glide groups Pc, P2/c and P2₁/c allow p odd
-and r even, and the five C groups allow q even and s odd (Table 1 there,
+$a' = pa + qc$ and $c' = ra + sc$, the glide groups $Pc$, $P2/c$ and $P2_1/c$ allow
+$p$ odd and $r$ even, and the five C groups allow $q$ even and $s$ odd (Table 1 there,
 p. 146). Each set of bases is a group, so the cell is reached by repeated
 steps a′ = a + kc or c′ = c + ma of the allowed parity, each kept only if it
 shortens an axis, which is the paper's own procedure (p. 145). There is no
@@ -232,5 +232,5 @@ a ≤ c order, because exchanging a and c leaves cell choice 1. For Cc and C2/c
 a step with r odd moves the origin (by 0, ¼, 0 or ¼, ¼, 0); the shift is
 solved exactly from the operations, and the tests hold the paper's three
 worked examples (p. 147) to their printed matrices, cells and shifts. The
-representative coordinates, the standardization parameter Γ and the atom
+representative coordinates, the standardisation parameter Γ and the atom
 order (rules 4–6) are not applied.
