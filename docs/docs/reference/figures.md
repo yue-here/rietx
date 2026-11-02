@@ -101,6 +101,7 @@ The call returns a `StructureFigure`.
 | `letters` | the a, b and c on the cell's edges, each with its x and y in pixels |
 | `path` | the PNG written, or `None` |
 | `palette` | each site label drawn and its colour as `#rrggbb`, for a legend beside the figure |
+| `polyhedron_palette` | each polyhedron formula drawn, such as `"CuO₅"`, and its centre's colour as `#rrggbb` |
 | `report` | the numbers a look at the picture would give ([What the figure reports](#what-the-figure-reports)) |
 | `candidates` | with `view="auto"`, the best five views the search ranked |
 | `recipe` | the arguments that draw the picture again |
@@ -109,6 +110,8 @@ The call returns a `StructureFigure`.
 It is the map that placed `atoms`, and `rotation`, `pixels_per_angstrom` and `StructureFigure.origin` make it.
 Depth is dropped, because the projection is parallel.
 A site recoloured in part appears in `StructureFigure.palette` a second time, as `"<label> (recoloured)"`.
+A polyhedron's faces are drawn in its colour at 55 % opacity, and its edges in a darker shade of it.
+A formula drawn in two colours appears in `StructureFigure.polyhedron_palette` a second time in the same way.
 
 ### Views
 
@@ -136,6 +139,10 @@ A 17 cm figure at 300 dpi is `size=2008, dpi=300`.
 `supersample=` sets how many samples are taken along each side of a pixel, from 1 to 4, and 2 by default.
 More samples draw smoother edges.
 `path=` writes a PNG and refuses any other suffix.
+`pad=` is the share of the frame's width and height left empty on each side, 0.05 by default as in ChimeraX's `view`.
+`pad=0` crops the picture to its ink, keeping only the room a line's half-width and the a, b and c need.
+YBa₂Cu₃O₇ without its cell, at 1000 px, keeps 35 to 53 px of margin at the default and 3 px at `pad=0`.
+The crop is part of the fit, so `atoms`, `letters`, `to_px` and `recipe` stay right, as they would not for an image cut afterwards.
 
 ### Drawing options
 
@@ -197,7 +204,7 @@ For a picture in another program's style, `Structure.to_cif` writes each phase w
 Their size, type and placement differ from figure to figure, so a drawing helper would fix a style each caller then works against.
 The figure carries the data each needs instead:
 
-- `palette` gives each site's colour, for a legend;
+- `palette` gives each site's colour, and `polyhedron_palette` each polyhedron's, for a legend;
 - `to_px` maps a direction into the picture, for an axis triad;
 - `pixels_per_angstrom` gives the scale, for a scale bar.
 

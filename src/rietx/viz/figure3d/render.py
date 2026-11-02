@@ -38,7 +38,9 @@ from .report import FigureReport
 #: that window.  The canvas follows the window, so this is a choice of window.
 CANVAS_CSS_PX = 507.0
 #: The fitted content leaves this fraction of the frame's width and height on
-#: each side, ChimeraX ``view``'s default ``pad``.
+#: each side, ChimeraX ``view``'s default ``pad``: ``render_structure``'s
+#: default ``pad``.  ``pad=0`` leaves only the room a line's half-width and a
+#: letter need, 3 to 15 px at 1000 px (WP-1468).
 FIT_PAD = 0.05
 #: The GUI's a, b, c: ``--text-sm``, in CSS px.
 LETTER_EM_CSS = 11.5
@@ -85,6 +87,10 @@ class StructureFigure:
     ``#rrggbb`` before any dimming of the images outside the cell, for a legend
     drawn beside the figure.  A site recoloured in part
     (:func:`~rietx.viz.recolour`) appears again as ``"<label> (recoloured)"``.
+    ``polyhedron_palette`` is the same for each polyhedron formula drawn
+    (``"SiO₄"``): its centre's colour, which its faces are drawn in at
+    :data:`.scene.POLY_ALPHA` opacity and its edges darker.  A formula drawn
+    in two colours appears again as ``"<formula> (recoloured)"``.
 
     ``report`` is the numbers a look would give (:class:`~.report.FigureReport`).
     ``candidates`` is empty unless ``view="auto"``, and then the best few views
@@ -105,6 +111,7 @@ class StructureFigure:
     letters: list[dict]
     path: str | None = None
     palette: dict[str, str] = field(default_factory=dict)
+    polyhedron_palette: dict[str, str] = field(default_factory=dict)
     report: FigureReport | None = None
     candidates: list[dict] = field(default_factory=list)
     recipe: dict = field(default_factory=dict)
@@ -259,18 +266,33 @@ def _site_colours(geometry: Mapping) -> Mapping:
                                   for s, c in zip(geometry["sites"], colours)]}
 
 
-def _palette(geometry: Mapping, scene: dict) -> dict[str, str]:
-    drawn = {geometry["atoms"][a["index"]]["site"] for a in scene["atoms"]}
+def _named(pairs) -> dict[str, str]:
+    """``(name, colour)`` pairs as a legend: a name met again in another
+    colour is kept as ``"<name> (recoloured)"``, then ``(recoloured 2)``."""
     out: dict[str, str] = {}
-    for k in sorted(drawn):
-        site = geometry["sites"][k]
-        name = base = site["label"]
-        n = 1
-        while name in out and out[name] != site["color"]:
+    for base, colour in pairs:
+        name, n = base, 1
+        while name in out and out[name] != colour:
             n += 1
             name = f"{base} (recoloured)" if n == 2 else f"{base} (recoloured {n - 1})"
-        out.setdefault(name, site["color"])
+        out.setdefault(name, colour)
     return out
+
+
+def _palette(geometry: Mapping, scene: dict) -> dict[str, str]:
+    drawn = {geometry["atoms"][a["index"]]["site"] for a in scene["atoms"]}
+    sites = geometry["sites"]
+    return _named((sites[k]["label"], sites[k]["color"]) for k in sorted(drawn))
+
+
+def _polyhedron_palette(geometry: Mapping, scene: dict) -> dict[str, str]:
+    """Each polyhedron formula drawn and its centre's colour, ordered by the
+    centre's site as :func:`_palette` is.  Read off the faces the scene drew,
+    so a polyhedron switched off, hidden or cut is not in it."""
+    polys, sites = geometry["polyhedra"], geometry["sites"]
+    drawn = sorted({f["index"] for f in scene["faces"]}, key=lambda i: (polys[i]["site"], i))
+    return _named((sc.polyhedron_formula(geometry, polys[i]), sites[polys[i]["site"]]["color"])
+                  for i in drawn)
 
 
 def _formulas(geometry: Mapping, polyhedra: Mapping) -> dict:
@@ -342,17 +364,17 @@ def _extent(scene: dict, R: np.ndarray, with_labels: bool, extra=()):
     return min(xs), max(xs), min(ys), max(ys)
 
 
-def _fit(extent, size, margin_css: float) -> raster.Frame:
+def _fit(extent, size, margin_css: float, pad: float = FIT_PAD) -> raster.Frame:
     """Scale and place the content box in the frame (D12, D13).
 
     ``size`` is the long side, the other following the content, or
     ``(width, height)`` with the content fitted inside.  ``margin_css`` is
     what pixel-sized things (a line's half-width, a letter) add beyond the
-    box, in CSS px.
+    box, in CSS px.  ``pad`` is the share of each side left empty.
     """
     x0, x1, y0, y1 = extent
     bw, bh = max(x1 - x0, 1e-6), max(y1 - y0, 1e-6)
-    keep = 1.0 - 2.0 * FIT_PAD
+    keep = 1.0 - 2.0 * pad
     if isinstance(size, (tuple, list)):
         if len(size) != 2:
             raise ValueError(f"size {size!r}: the long side, or (width, height)")
@@ -686,8 +708,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
                      exaggeration: float = 1.0, stick: float = 1.0,
                      hidden=(), boundary: bool = True, cell: bool = True, polyhedra=None,
                      axis_labels: bool = True, atom_labels: bool = False,
-                     outline: bool = False, background="white", path=None,
-                     dpi: float | None = None) -> StructureFigure:
+                     outline: bool = False, background="white", pad: float = FIT_PAD,
+                     path=None, dpi: float | None = None) -> StructureFigure:
     """Draw one phase of a structure as the GUI's structure viewer draws it.
 
     ``structure`` is a :class:`~rietx.Structure`, or the dict
@@ -736,7 +758,10 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     what is still hidden, for ``turn=`` to work on.
 
     ``size`` is the long side in pixels, or ``(width, height)``;
-    ``supersample`` the antialiasing, 1 to 4 samples a side.  ``background``
+    ``supersample`` the antialiasing, 1 to 4 samples a side.  ``pad`` is the
+    share of the frame's width and height left empty on each side, 0.05 as in
+    ChimeraX's ``view``; ``pad=0`` crops the picture to its ink, keeping only
+    the room a line's half-width and the a, b, c need.  ``background``
     is ``"white"``, ``"black"``, ``"#rrggbb"``, three channels in 0..1, or
     ``None`` for transparent.  ``outline=True`` inks silhouettes, off by
     default because the GUI draws none.  ``atom_labels=True`` writes each site
@@ -758,6 +783,10 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     if path is not None and Path(path).suffix.lower() != ".png":
         raise ValueError("render_structure writes PNG only: JPEG's block artifacts "
                          "smear the thin rings and lines a structure figure is read by")
+    if (isinstance(pad, bool) or not isinstance(pad, (int, float, np.integer, np.floating))
+            or not 0 <= pad < 0.5):
+        raise ValueError(f"pad {pad!r}: the share of each side left empty, from 0 "
+                         "(cropped to the ink) up to but not including 0.5")
     if dpi is not None and not 0 < float(dpi) < 1e6:
         raise ValueError(f"dpi {dpi!r}: a positive resolution, in dots per inch")
     if (isinstance(stick, bool) or not isinstance(stick, (int, float, np.integer, np.floating))
@@ -823,7 +852,7 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     if atom_labels:
         extra, reach = _label_reach(scene, geometry, R)
         margin = max(margin, reach, 0.6 * LETTER_EM_CSS)
-    frame = _fit(_extent(scene, R, axis_labels, extra), size, margin + 1.0)
+    frame = _fit(_extent(scene, R, axis_labels, extra), size, margin + 1.0, float(pad))
     labels = _labels(scene, geometry, R, frame, probe.arrays, axis_labels=axis_labels,
                      atom_labels=atom_labels)
     strokes, letters = text_strokes(labels, frame, accent=tokens["--accent"],
@@ -897,10 +926,12 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         "max_atoms": max_atoms, "exaggeration": exaggeration, "stick": stick,
         "hidden": hidden_asked, "boundary": boundary, "cell": cell, "polyhedra": polyhedra,
         "axis_labels": asked_axis_labels, "atom_labels": atom_labels, "outline": outline,
-        "background": background, "dpi": dpi}.items()}
+        "background": background, "pad": pad, "dpi": dpi}.items()}
     return StructureFigure(image=image, rotation=views.as_list(R),
                            pixels_per_angstrom=frame.ppa, origin=[float(frame.x0), float(frame.y0)],
                            atoms=atoms, letters=letters,
-                           path=written, palette=_palette(geometry, scene), report=report,
+                           path=written, palette=_palette(geometry, scene),
+                           polyhedron_palette=_polyhedron_palette(geometry, scene),
+                           report=report,
                            candidates=candidates, recipe=recipe,
                            _drawn_from=drawn_from)

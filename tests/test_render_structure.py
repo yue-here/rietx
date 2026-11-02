@@ -1270,3 +1270,70 @@ def test_the_reader_counts_the_tensors_it_collapses():
     kept: list = []
     structure_from_cif(path, aniso=True, diagnostics=kept)
     assert not [d for d in kept if d.code == "CIF_ANISO_COLLAPSED"]
+
+
+# ----------------------------------------------------------------------
+# a figure cropped to its ink, and the polyhedra's colours (WP-1468, from WP-1533)
+# ----------------------------------------------------------------------
+
+def _margins(image: np.ndarray) -> list[int]:
+    """The empty columns left and right and rows above and below the ink."""
+    ink = image[..., 3] > 0
+    rows, cols = np.flatnonzero(ink.any(1)), np.flatnonzero(ink.any(0))
+    h, w = ink.shape
+    return [int(cols[0]), int(w - 1 - cols[-1]), int(rows[0]), int(h - 1 - rows[-1])]
+
+
+def test_pad_zero_crops_to_the_ink_and_keeps_every_map():
+    """All six of the second promo take's scripts cropped ``fig.image`` to its
+    alpha by hand and then shifted every anchor they read.  ``pad=0`` fits the
+    frame to the ink instead, so ``to_px``, ``atoms`` and the recipe stay
+    right.  YBa₂Cu₃O₇ without its cell at 1000 px: 35 and 53 px of margin at
+    the default, 3 at ``pad=0`` (a line's half-width and a pixel, measured)."""
+    g = s3.build(structure_from_cif(str(DATA / "cod_9007744.cif")))
+    loose = render_structure(g, view=[4, 1, 0], cell=False, background=None)
+    tight = render_structure(g, view=[4, 1, 0], cell=False, background=None, pad=0)
+    _save(tight, "pad_ybco_0")
+    assert loose.recipe["pad"] == render.FIT_PAD and tight.recipe["pad"] == 0
+    assert min(_margins(loose.image)) > 30 and max(_margins(tight.image)) <= 4
+    assert max(tight.image.shape[:2]) == max(loose.image.shape[:2]) == render.DEFAULT_SIZE
+    assert tight.pixels_per_angstrom > 1.1 * loose.pixels_per_angstrom
+    pos = np.array([g["atoms"][a["index"]]["pos"] for a in tight.atoms])
+    xy = np.array([[a["x"], a["y"]] for a in tight.atoms])
+    assert np.allclose(tight.to_px(pos), xy, atol=1e-9)
+    again = render_structure(g, **json.loads(json.dumps(tight.recipe)))
+    assert np.array_equal(again.image, tight.image)
+    default = render_structure(g, view=[4, 1, 0], cell=False, background=None,
+                               pad=render.FIT_PAD)
+    assert np.array_equal(default.image, loose.image)
+
+
+@pytest.mark.parametrize("value", [-0.1, 0.5, float("nan"), True, "0"])
+def test_pad_is_a_share_below_one_half(nac, value):
+    with pytest.raises(ValueError, match="pad"):
+        render_structure(nac, size=100, pad=value)
+
+
+def test_the_polyhedron_palette_is_what_the_faces_were_drawn_in(nac):
+    """The take-2 scripts drew a polyhedron's legend swatch from
+    ``g["sites"]`` by element, guessing which site centred which formula."""
+    g = s3.build(nac)
+    fig = render_structure(g)
+    drawn = {sc.polyhedron_formula(g, g["polyhedra"][f["index"]])
+             for f in sc.build_scene(g, polyhedra=sc.shown_polyhedra(g, True))["faces"]}
+    assert set(fig.polyhedron_palette) == drawn and drawn
+    for formula, colour in fig.polyhedron_palette.items():
+        centres = {g["sites"][p["site"]]["color"] for p in g["polyhedra"]
+                   if sc.polyhedron_formula(g, p) == formula}
+        assert centres == {colour}
+    assert render_structure(g, polyhedra=False).polyhedron_palette == {}
+    off = next(iter(fig.polyhedron_palette))
+    assert off not in render_structure(g, polyhedra={off: False}).polyhedron_palette
+    # one polyhedron recoloured: its formula appears a second time
+    centre = next(p["center"] for p in g["polyhedra"]
+                  if sc.polyhedron_formula(g, p) == off)
+    mask = np.zeros(len(g["atoms"]), dtype=bool)
+    mask[centre] = True
+    part = render_structure(recolour(g, mask, "#ff0000"))
+    assert part.polyhedron_palette[f"{off} (recoloured)"] == "#ff0000"
+    assert part.polyhedron_palette[off] == fig.polyhedron_palette[off]
