@@ -1,9 +1,8 @@
 # WP-2052 — a fit keeps each site's multiplicity from start to answer
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-01 — a fit keeps each site's orbit split; SITE_MULTIPLICITY_KEPT names a recount (PR #1307)
 Track: What fires, and what stays silent
 Depends on: 1991 soft (the verb-boundary merge, PR #1014)
-Priority: P2 2026-10-26 — a silent wrong composition (10 O for 12, Biso −1.6) on 10 of 16 fits of an unresolved split pair under the default plan; P2 rather than P1 because only split-pair models across a special position meet it, and χ²_red ≈ 24 shows the user something is wrong
 
 ## Goal
 
@@ -72,24 +71,17 @@ and reuse it for every compile, reporting a site whose fresh split differs; (2) 
 (3) conserve occupancy × multiplicity at a snap (the reporter declines it, as
 `gui/symmetry.py::_collisions` does). Record the ruling here as `Decided YYYY-MM-DD: …`.
 
-### Inherited
-
-- 2026-10-31, from the issue triage (issue #1088): the reporter's view on the
-  decision owed before code (2026-10-28). Option 1 (decide each site's orbit
-  split once per `fit()` and reuse it for every stage compile and the closing
-  compile), with option 2 beside it (after option 1, a site whose fresh orbit
-  would differ at the end is reported with its atoms per cell both ways, in a
-  sentence naming the cause). Not option 3, which rewrites an occupancy the
-  caller set. Their grounds are the 2026-10-26 measurements recorded here (the
-  closing stage giving 10 O per cell at χ²_red 23.2 on noise-free data, 10 of
-  16 Poisson draws failing, O1's y walking to −818.75 under an occupancy
-  stage) and GSAS-II reading the multiplicity once at setup. Checked against
-  the tree at d87c8cc91: PR #1014 (merged 2026-10-29, WP-1991) covers the verb
-  boundaries only. There a part-occupied site at or below occupancy × (images
-  before / after) = 1 is left as stored with `SITE_TWINS_KEPT` giving both
-  readings, and its PR body states that a stage compile mid-fit is outside it.
-  So this WP's mid-fit case is unchanged, and the ruling stays the
-  maintainer's.
+Decided 2026-11-01: option 1 with option 2 beside it. Each `fit()` and `run_stage()` decides
+every site's orbit split once, from the coordinates it starts at, and hands that split to
+every compile it makes, the closing compile included. A site whose returned coordinates
+give another split at a fresh compile is reported as `SITE_MULTIPLICITY_KEPT`, with the atoms
+per cell both ways. Option 3 is not taken. Settled by Claude under established practice:
+GSAS-II reads a site's multiplicity once, at setup, and keeps it for the whole refinement
+(the Practice paragraph above). The reporter recommends the same pair. The labels "decision
+owed" and "the ruling stays the maintainer's" were written by Claude triage sessions
+(43d164c7f, 8609e90dc), so they are evidence rather than a ruling, and none of the
+maintainer's triggers holds. The change moves what some fits return, so the PR goes to the
+maintainer under the reader-output rule before merge.
 
 ## Non-goals
 
@@ -99,20 +91,26 @@ and reuse it for every compile, reporting a site whose fresh split differs; (2) 
 
 ## Tasks
 
-- [ ] Take the decision above and record it.
-- [ ] Find every compile inside one fit that re-decides an orbit split: stage compiles, the
+- [x] Take the decision above and record it.
+- [x] Find every compile inside one fit that re-decides an orbit split: stage compiles, the
   closing stage, `_final_compile`, the joint fit in `multi.py`, a series pattern's fits in
   `sequential.py`, and rigid-body atoms (#1005).
-- [ ] Decide each site's split once per `fit()`/`run_stage()` and pass it to every compile in
+- [x] Decide each site's split once per `fit()`/`run_stage()` and pass it to every compile in
   that call (option 1), or carry the multiplicity on the compiled phase.
-- [ ] A finding at the end naming each site whose fresh split differs, with atoms per cell both
+- [x] A finding at the end naming each site whose fresh split differs, with atoms per cell both
   ways; and `FROZEN_COMPILE_STALE`'s text stops advising another stage when the gap is a
   multiplicity change.
-- [ ] The coordinate walk: a coordinate DOF whose column is zero at a special position walked
+- [x] The coordinate walk: a coordinate DOF whose column is zero at a special position walked
   819 cells in one stage. Decide whether to wrap it at the answer or report it.
-- [ ] Tests: the issue's toy, noise-free, under the default plan, returns 12 O per cell; the
+  Decided 2026-11-01: neither. The walk needed the snapped compile, and with the split kept
+  it does not recur: the noise-free four-stage plan with an occupancy stage ends 2.3e-6 off
+  the mirror, and 16 Poisson draws under the same plan end within 2.7e-3. Settled by Claude
+  under that measurement; a revert of the freeze brings the walk back (the test below).
+- [x] Tests: the issue's toy, noise-free, under the default plan, returns 12 O per cell; the
   `predict()` δ sweep pins both occupancies; a revert of the freeze fails it.
-- [ ] Skill: the reference row for the new or changed finding code.
+  `tests/test_site_multiplicity_kept.py`. At occupancy 1 the sweep reads 12 O at both
+  offsets now, because WP-1991's construction gate merges that site onto the mirror.
+- [x] Skill: the reference row for the new or changed finding code.
 
 ## Acceptance
 
@@ -129,6 +127,94 @@ and reuse it for every compile, reporting a site whose fresh split differs; (2) 
 - Issues #1088, #1007, #1010, #1014, #215, #1005.
 
 ## Handover log
+
+- **2026-11-01** — handed over, PR #1307. A fit now keeps every site's multiplicity from its
+  start to its answer. A split pair written across a mirror that the data cannot resolve used to
+  lose half its atoms at the next compile once the solver stopped on the mirror, which it does
+  on most draws: on the #1088 toy, noise-free, the default plan now returns χ²_red 1e-16, 12 O
+  per cell and O1 Biso 0.600 (the truth), where main returned χ²_red 23.2, 10 O and Biso −1.64.
+  The returned coordinates still read as the special position to anything that compiles
+  afresh, so the result now says so with `SITE_MULTIPLICITY_KEPT`, giving the atoms per cell
+  both ways. The 819-cell coordinate walk under an occupancy stage is gone with the snap. The
+  fix holds within one call only: between calls the split is decided afresh, and WP-2053 now
+  holds that, with the stored-format question it raises.
+  Next: the maintainer reviews the new finding under the reader-output rule (it changes what
+  split-pair fits return) and decides whether the freeze needs a row of its own in the audit
+  table (*Generality* below).
+
+  *Done.* Decision recorded in § Context (option 1 + 2, settled by Claude under GSAS-II
+  practice). `structure_factor.phase_orbit_split` is the one decider; `compile_phase_sites` and
+  `compile_model` take a decided split (`ops=`, `orbit_split=`), and `forward.orbit_split_of`
+  reads one off a model. `Refinement._decide_orbit_split` decides it at the start of `fit()` and
+  `run_stage()` (a nested call, such as a profile-interval refit inside a fit, reuses the
+  outer one) and clears it at the end. Users: each stage compile, `_final_compile`, the
+  report's `_twin` compiles, and the joint runner's stage and final compiles (`multi.py`, one
+  split per histogram, decided in `_run_plan`). A series runs `fit()` per pattern, so it is
+  covered. Rigid-body atoms are ordinary `phase.atoms` to the compile, so they are covered.
+  The freeze is one-way: a compile keeps a site's images but never withholds ones its current
+  coordinates need, so a site leaving a special position (only a rigid body's pose can do that)
+  takes its full orbit, as before. `structure_factor._multiplicity_kept_diagnostics` (called
+  from `_final_compile` and `multi._final_compiles`, read off the compile the result is
+  measured on) raises the new code, losses only. It lives in `crystallography/` so the manual
+  lists it on the Structures page; the Refinement page had passed its 50 000-character cap by
+  288. Help entry, audit rows (code tier 1 ambiguity 3, suggestion tier 1), silence pair,
+  skill row,
+  `docs/practice.md` § A site's multiplicity during a fit. `FROZEN_COMPILE_STALE`'s help now says
+  its gap is never a change of composition.
+
+  *Measured* (arm64 macOS, `[dev]`). Issue toy, 16 Poisson draws (seeds 1000-1015), one-stage
+  plan and a four-stage plan ending in an occupancy stage: all 32 fits χ²_red 0.95-1.03, O1
+  Biso 0.57-0.62, |Δy| ≤ 2.7e-3, no walk. 5 of 16 one-stage fits and 6 of 16 four-stage fits
+  stop within the site tolerance and carry `SITE_MULTIPLICITY_KEPT`. Main at 62034506e on the
+  noise-free toy: one stage 23.2 / 10 O / −1.637; occupancy plan y = −818.75, χ²_red 44.5.
+  Mutation checks: forcing a fresh split in `compile_phase_sites` fails three of the new tests
+  with exactly those numbers; dropping the split from the joint runner's stage compile fails
+  the joint-fit test at χ²_red 23.18. `python -m tests.reader_output`: exit 0, unchanged on the
+  standard fit (no site there crosses the tolerance). Fast suite before the review fixes: 5
+  failed, 13190 passed, 310 skipped, 32 xfailed; four of the five were this branch's (a page
+  cap, the GUI help-key fixture, the joint runner's scope census, the silence pair) and are
+  fixed, the fifth is `test_display`'s stale Jupyter kernel spec on this Mac.
+  Final fast suite (`-m "not slow"`, arm64 macOS, `[dev]`, no other suite running): 1 failed,
+  13199 passed, 310 skipped, 32 xfailed; the failure is `test_display`'s stale Jupyter kernel
+  spec on this Mac, unrelated. This branch adds 12 cases in `test_site_multiplicity_kept.py` and
+  one silence-pair row; the file costs 2.41 s locally. Full suite not run.
+
+  *Review* (`/code-review high --fix`). Applied: a trial made inside a call inherits its split
+  (`_carry_into`); the split length is checked before the species boundary. Applied after
+  thinking it through: the one-way rule above (its finding 5, a rigid body leaving a mirror
+  kept a half orbit for the whole call). Declined: quoting `SITE_TOL` in the help text (its
+  siblings state their tolerances as numbers too). Moved to WP-2053: run_stage between calls,
+  the series, `replay`, the CIF writer.
+
+  *Generality* (generality-review, abridged by the author to its verdict lines; the maintainer
+  reads the full sections in this session's report). Code row: "weak", because tier 2 and
+  ambiguity 1 described the freeze, not the report. Answer: retiered to tier 1, ambiguity 3,
+  as `SITE_TWINS_KEPT`. Suggestion row: "weak", because the one-atom reading could name an
+  occupancy above 1. Answer: offered only where it is at most 1, with a test at occupancy 1.
+  The freeze: "weak", because no row or record field declares it, and in the gaining direction
+  GSAS-II weights all operations by Mult/nOps where rietx gives the full orbit at the stated
+  occupancy. Answer: the gaining direction is pre-WP behaviour, recorded in
+  `docs/practice.md`; a seat for the freeze needs a record field or the maintainer's ruling
+  that the code row is its seat, which is left to the maintainer.
+
+  *Not generalised.* Compiles after a call decide afresh from the stored coordinates: a second
+  `run_stage` (the GUI's stage path), the next fit, a series' next pattern, `replay`,
+  `predict()` on a new grid, `suggest()`'s probe and the CIF writer. The finding names the
+  common ones. Keeping the answer's split on the `Refinement` until an edit, and on the node for
+  `replay`, would close them; the node half is a stored-format change. In WP-2053's Inherited.
+
+  *Gotchas.* At occupancy 1 the `predict()` sweep no longer shows the 16 O reading this WP's
+  Context quotes: WP-1991's construction gate merges that site onto the mirror (occupancy ×
+  8/4 > 1), so both offsets read 12 O. One draw (seed 6, occupancy stage) ended 4.4e-4 off the
+  mirror at occupancy 0.50005, outside the site tolerance but inside WP-1991's 5e-4 twin band,
+  so the next edit or new `Refinement` would merge it and halve the site under
+  `SITE_TWINS_MERGED`. That is WP-1991's documented gate, noted here only.
+
+  *Ruled* 2026-11-01, Yue in chat, "option 1". It approves the reader-output change: a
+  split-pair model that lands on its mirror now returns its full composition, and the new
+  warning `SITE_MULTIPLICITY_KEPT` joins its result. The lead also settled, with no objection
+  from Yue, that the freeze needs no audit seat or record field of its own beyond the warning's
+  tier-1 row. A record field belongs with WP-2053, which inherits the between-call gap.
 
 - **2026-10-26** — created, from the 2026-10-26 issue triage (issue #1088). Checked against
   the tree at c0e32ab29: the issue's own script no longer lands inside the snap radius (its

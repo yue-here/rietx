@@ -1098,6 +1098,21 @@ ROWS: tuple[Row, ...] = (
                   "it under a tie. The direction of a "
                   "DOF is the nullspace of the site group, so the map is derived, never "
                   "chosen (#1014, rounds 5-6)")),
+    Row("SITE_MULTIPLICITY_KEPT", "code", tier=1, ambiguity=3,
+        response="warning",
+        responds=("decide whether the site is one atom on the special position or a split "
+                  "pair before quoting a weight fraction, a density or the site's occupancy "
+                  "from a later compile or the next fit"),
+        evidence=("arithmetic: reports the freeze beside it, which keeps the orbit split a "
+                  "call started with for every stage and its closing compile, as GSAS-II "
+                  "keeps a site's multiplicity (GSASIIstrIO.py:1762, Amul read once from the "
+                  "atom record; GSASIIstrMath.py:1279, Mult*frac/nOps) (WP-2052, #1088). "
+                  "Which reading the site is (one atom on the position, or a split pair) is "
+                  "a fact outside the data, as for SITE_TWINS_KEPT. It has no threshold: it fires "
+                  "exactly when a returned site's fresh split has fewer images than the "
+                  "result counted, and gives the atoms per cell both ways. A site that "
+                  "gains images (a rigid body moving one off a special position) takes "
+                  "them at the next compile, as before WP-2052")),
     Row("SITE_TWINS_KEPT", "code", tier=1, ambiguity=3,
         response="warning",
         responds=("decide which reading of the site the file meant before quoting a weight "
@@ -1151,6 +1166,20 @@ ROWS: tuple[Row, ...] = (
                   "since one histogram can be the intent (issue #265, WP-1414)")),
     Row("STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT", "code"),
     Row("STAGE_MAX_ITER", "code"),
+    Row("STAGE_NOT_FINITE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a NaN or an infinity in the residual at a solve's start, or "
+                  "in the Jacobian at a point the driver accepted, leaves neither driver a "
+                  "step (scipy's TRF raised ValueError from its SVD, and the LM driver's "
+                  "normal equations go NaN); fires exactly when run_least_squares or "
+                  "run_multi_least_squares returns LSQOutcome.non_finite; the stage ends "
+                  "at its start, the rule a cancelled stage and a collapsed phase already "
+                  "follow; reproduced on the 1e-14-nudged P 1 Le Bail fit under TRF "
+                  "(k = -1: Jacobian column cell.alpha; k = 1: the residual at the second "
+                  "solve's start), WP-2048"),
+        response="warning",
+        responds=("read the stage it names as not run, since its values are its start, and "
+                  "hold some of its free parameters or start it nearer its answer before "
+                  "quoting what the stage was meant to refine")),
     Row("STAGE_PATH_NOT_FREE", "code"),
     Row("STAGE_PATH_UNKNOWN", "code"),
     Row("STAGE_WINDOWS_STALE", "code", tier=3, ambiguity=3,
@@ -1205,13 +1234,19 @@ ROWS: tuple[Row, ...] = (
                   "StageResult.collapsed says which (B14); WP-1958 (#954, decided "
                   "2026-10-16): with no line in range the scale is held too, its column "
                   "zero at every value (tier 1), and TRF walked bcc Fe's to 164.7 on "
-                  "WP-1534's fixture"),
-        grounds=("No competent refiner lets a phase the data cannot see refine its cell, and the "
-                 "hold touches only what the data cannot determine; on by default, which no "
-                 "program does (B1, ruled 2026-10-19). The lineless branch, which holds the "
+                  "WP-1534's fixture; WP-2049: with every phase unseen, an instrument "
+                  "column reaching the pattern only through phase peaks is held too, "
+                  "free a blank frame's zero shift read -0.0129 +/- 0.0015 deg (8.7 "
+                  "sigma, truth 0.006)"),
+        grounds=("No competent refiner lets a phase the data cannot see refine its cell, nor "
+                 "lets a frame no phase is seen in refine the instrument terms that reach the "
+                 "pattern only through phase peaks (zero shift, displacement, U..Y, the axial "
+                 "terms); the hold touches only what the data cannot determine; on by default, "
+                 "which no program does (B1, ruled 2026-10-19; the instrument widening, "
+                 "WP-2049, ruled 2026-11-01). The lineless branch, which holds the "
                  "scale, is tier-1 arithmetic (a zero column) inside a row tiered on its "
                  "contested part."),
-        approved="2026-10-23"),
+        approved="2026-11-01"),
     Row("rietx.schemas.results.StageResult.scale_b_held", "action", tier=1, ambiguity=1,
         evidence=("numerical floor: under 2*sqrt(PINV_RCOND) the covariance's pinv cut cannot see "
                   "scale and B as two directions (WP-1534 derivation); measured cases read 1e-12 or"
@@ -2901,6 +2936,29 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: 2^-400 = 3.9e-121 squares to 1.5e-241, a normal double; 1/d^2 stays "
                   "under 1e241 (docstring, WP-1463)")),
     Row("rietx.optimize.statistics.EFFECTIVE_OBS_ALPHA", "constant", value=2.0),
+    Row("rietx.optimize.statistics.FD_COLUMN_ERROR", "constant", tier=3, value=1.0,
+        evidence=("the free factor of resolved_correlation's cut, n*(FD_COLUMN_ERROR*FD_STEP)^2 "
+                  "on the unit-diagonal normal matrix (WP-2050, generality review 2026-11-01). "
+                  "Mechanism tier 2: GSAS-II takes correlations off a pseudo-inverse truncated "
+                  "on the unit-diagonal Hessian (SVDtol, GSASIImath.setHcorr; docs/practice.md). "
+                  "For: brucite's exactly degenerate Gaussian size, Gaussian strain and W triple "
+                  "sits at 2.7e-15 to 4.9e-14 of |lambda|max under 1e-14 nudges, corundum's at "
+                  "1.2-1.9e-12, and the next real direction (zero shift with sample "
+                  "displacement, 1.3-1.4e-10) is kept. Against: FD_STEP's row records FD columns "
+                  "up to 2.5e-4 from a Richardson oracle, so the 1 x FD_STEP premise is measured "
+                  "on width columns only (5e-7 against jax on lab brucite); brucite's seventh "
+                  "stage put the triple at 2.3x the cut under one nudge; the cut grows with n, "
+                  "and no fit with n >= 100 is measured; an exact Jacobian makes it loose. "
+                  "Firing side one family: the four round-robin standards (qarr, lab CuKa, "
+                  "development data), with the exact identity 1/cos^2 = 1 + tan^2 as the truth"),
+        grounds=("WP-2050's measured margins: at the closing stage of brucite, corundum, "
+                 "zincite and fluorite the flat triple reads 0.004-0.47x the cut, brucite's "
+                 "zero-shift/displacement direction >= 31x, and SRM 660c, FAP, NAC and the "
+                 "LaB6 capillary nothing within 1000x; a correlation whose value is rounding "
+                 "is not shown to a user, and tests/test_suite_alarms.py asserts the "
+                 "unresolved mask nightly; the cut n*FD_STEP^2 approved by Yue, 2026-11-01 "
+                 "(PR #1306)."),
+        approved="2026-11-01"),
     Row("rietx.optimize.statistics.MAX_SHIFT_CONVERGED", "constant", value=0.1),
     Row("rietx.optimize.statistics.OBS_PER_PARAMETER_MIN", "constant", value=3.0),
     Row("rietx.optimize.statistics.OBS_PER_PARAMETER_PREFERRED", "constant", value=5.0),
@@ -4465,6 +4523,11 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: points at parameters() for the site, where the renumbered "
                   "paths are listed; it states no value")),
     Row("SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion", "suggestion", value=2),
+    Row("SITE_MULTIPLICITY_KEPT.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the occupancy that keeps the fitted content on the "
+                  "special position (occ x fitted / fresh multiplicity), only where it is at "
+                  "most 1, and TWIN_COORD_TOL, read from the constant, as the distance that "
+                  "keeps the site split")),
     Row("SITE_TWINS_KEPT.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence=("arithmetic: names the special-position occupancy each reading implies "
                   "(occ for one atom off its position, occ x before/after for a split pair) "
@@ -4487,6 +4550,13 @@ ROWS: tuple[Row, ...] = (
                   "histogram, and picks neither (multi.py:2579-2582)")),
     Row("STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT.suggestion", "suggestion", value=1),
     Row("STAGE_MAX_ITER.suggestion", "suggestion", value=1),
+    Row("STAGE_NOT_FINITE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names the two levers that change what a stage reaches, its "
+                  "free set and its start, and picks neither; under solver='trf' alone, "
+                  "states the one difference between the drivers that bears on it, the LM "
+                  "driver's Gaussian and Lorentzian width floors "
+                  "(gaussian_width_inequalities, lorentzian_width_inequalities) that TRF "
+                  "has no vocabulary for")),
     Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=1),
     Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
     Row("STAGE_WINDOWS_STALE.suggestion", "suggestion", value=1, tier=3, ambiguity=3,

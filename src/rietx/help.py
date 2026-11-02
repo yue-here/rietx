@@ -2181,7 +2181,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "fit. A joint fit tests each pattern and names the worst. A large gap means the last stage carried its peaks "
             "past the windows it was solved on, so the solve may have stopped short of the "
             "minimum that windows sized at the answer give. Run one more stage with nothing "
-            "new freed and compare. A plan's closing stage does this already."
+            "new freed and compare. A plan's closing stage does this already. The fresh "
+            "calculation keeps each site's multiplicity from the fit, so the gap is never "
+            "a change of composition: `SITE_MULTIPLICITY_KEPT` reports a site whose "
+            "multiplicity the returned coordinates would change."
         ),
     ),
     "FULLPROF_LIMITS_NOT_APPLIED": HelpEntry(
@@ -3654,7 +3657,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the specimen and belongs out of the model, or the range must cover a "
             "reflection of it. With no reflection in range, the scale is held too, the "
             "phase has no weight fraction, and the other fractions are relative to the "
-            "phases seen in range."
+            "phases seen in range. When no phase is seen at all, the instrument terms "
+            "that act only through the peaks are held as well, for example the zero "
+            "shift, the specimen displacement and the profile widths. The message "
+            "names every one."
         ),
     ),
     "PLAN_FREES_NO_MOMENT": HelpEntry(
@@ -4129,6 +4135,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "back, or off one by an `edit` or a `checkout`."
         ),
     ),
+    "SITE_MULTIPLICITY_KEPT": HelpEntry(
+        title="A fit kept a site's multiplicity that its answer would change",
+        description=(
+            "A fit decides each site's multiplicity once, from the coordinates it "
+            "starts at, and keeps it for every stage and for the compile its result "
+            "is measured on. GSAS-II does the same for a whole refinement. This site "
+            "ended within the site tolerance of a special position it started off (1e-4 "
+            "fractional, an offset of 5e-5 on a mirror). A fresh compile of the "
+            "returned coordinates therefore counts it at fewer positions. A site that "
+            "leaves a special position, as a rigid body's pose can move one, gets its "
+            "full orbit at the next compile and is not reported. The usual case is a half-occupied general atom, written as "
+            "a split pair across a mirror, that the data do not resolve: the fit stops "
+            "on the mirror. The result, its statistics and its weight fractions use the "
+            "fitted count. Later compiles, the next fit among them, use the fresh one. "
+            "The message gives the atoms per cell both ways. The suggestion gives the "
+            "occupancy that keeps the fitted content on the special position, and the "
+            "distance that keeps the site counted as split."
+        ),
+    ),
     "SITE_TWINS_KEPT": HelpEntry(
         title="Near-duplicate atoms left as stored",
         description=(
@@ -4247,6 +4272,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "stage did not. The parameters freed in that stage are probably degenerate. "
             "Free fewer at once, or look for a correlation or a bound hit in the same "
             "stage. More iterations do not find a different minimum."
+        ),
+    ),
+    "STAGE_NOT_FINITE": HelpEntry(
+        title="A stage stopped on a model that is not finite",
+        description=(
+            "The model held a NaN or an infinity at a point the solver reached, so the "
+            "solver had no step left to take. The stage ended at the values it started "
+            "from and changed nothing. The column that went non-finite is often not the "
+            "parameter that ran away. Hold some of the parameters the stage frees, or "
+            "start it nearer its answer."
         ),
     ),
     "STAGE_PATH_NOT_FREE": HelpEntry(
