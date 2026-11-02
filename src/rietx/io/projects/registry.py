@@ -98,18 +98,18 @@ class ProjectFormat:
     #: whether the file was silent or the reader failed
     carries: tuple[str, ...]
     #: **where this format's repairs are reported.**  A real per-format
-    #: difference, not an accident to be papered over: the ``.inp`` reader
-    #: normalises species and translates an origin suffix while parsing, so its
-    #: channel is at read; the ``.pcr`` reader's four repairs all happen while
-    #: converting codewords into a ``Structure``, so its channel is at build.
-    #: ``"both"`` is the ``.EXP`` case, which arrived with the third member and
-    #: is what showed the two-valued field to be a shape rather than a fact: it
+    #: difference, not an accident to be papered over: the ``.pcr`` reader's
+    #: four repairs all happen while converting codewords into a ``Structure``,
+    #: so its channel is at build.  ``"both"`` arrived with the ``.EXP``, the
+    #: third member, and showed the field to be a shape rather than a fact: it
     #: reports the histograms it could not carry while parsing *and* the species
-    #: it normalises while building, so either single value would have dropped
-    #: one channel **in silence** — the caller gets an empty list, which reads
-    #: as "this file needed no repairs".  Pinned against the real signatures by
-    #: a meta-test that partitions **both ways**, so a reader that grows or
-    #: loses the keyword fails here rather than going quiet
+    #: it normalises while building.  The ``.inp`` is ``"both"`` too: it
+    #: normalises species and translates an origin suffix while parsing, and
+    #: reports merged site twins and magnetic parts while building.  Either
+    #: single value would drop one channel **in silence** — the caller gets an
+    #: empty list, which reads as "this file needed no repairs".  Pinned against
+    #: the real signatures by a meta-test that partitions **both ways**, so a
+    #: reader that grows or loses the keyword fails here rather than going quiet
     reports_at: Literal["read", "build", "both"]
     matches: Callable[[Path], bool]
     #: the format's own reader — returns what the file states
