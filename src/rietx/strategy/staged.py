@@ -2202,6 +2202,21 @@ def check_guards(table, outcome, threshold: float,
 
     if outcome.correlation is not None and len(free) > 1:
         corr = np.asarray(outcome.correlation)
+        if outcome.jac is not None and not outcome.n_aux:
+            # a ρ against a direction the Jacobian cannot resolve is rounding
+            # (WP-2050): such a pair is nan here and never crosses a threshold.
+            # It is not shown to a user; the unresolved mask is the developer's
+            # signal, asserted by a nightly test (ruled 2026-11-01)
+            from ..optimize.least_squares import covariance_jacobian
+            from ..optimize.statistics import resolved_correlation
+
+            try:
+                corr, _ = resolved_correlation(
+                    corr, covariance_jacobian(outcome, free))
+            except np.linalg.LinAlgError:
+                # ``soft_modes``' rule below: the stage already said so
+                if getattr(outcome, "covariance_error", None) is None:
+                    raise
         report.high_correlations, report.flat_directions = (
             _correlation_findings(corr, free, threshold))
         # measured once (WP-1056): the same matrix the loop above thresholds

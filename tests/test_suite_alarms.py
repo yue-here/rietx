@@ -57,6 +57,82 @@ def test_the_differences_name_the_code_and_the_standard_it_moved_on():
 
 
 @pytest.mark.slow
+@pytest.mark.xdist_group("brucite-nudge")
+def test_brucites_correlation_findings_do_not_move_under_a_rounding_nudge():
+    """WP-2050: a 1e-14 nudge to the start scale moved brucite between 35 and
+    42 warnings, every extra one a ρ against its unresolved Gaussian-size,
+    Gaussian-strain and W direction.  The guard now reads those ρ as not
+    determined, so the findings are the same at every nudge."""
+    import rietx as rx
+    from rietx.viz import compare
+
+    standard = STANDARD_BY_KEY["brucite"]
+    if not standard.available(compare.default_data_dir()):
+        pytest.skip("brucite's files are not here")
+    seen = []
+    for k in (0, 4, -4):  # +4 gave 42 warnings before WP-2050, -4 gave 35
+        inputs = standard.build(compare.default_data_dir())
+        inputs.structure.phases[0].scale.value *= 1 + k * 1e-14
+        fit = rx.Refinement(inputs.structure, inputs.instrument, history=False).fit(
+            inputs.data, plan=inputs.plan, telemetry=False,
+            two_theta_limits=inputs.two_theta_limits)
+        seen.append(sorted((d.code, tuple(d.where)) for d in fit.diagnostics
+                           if d.level == "warning"))
+    assert seen[0] == seen[1] == seen[2]
+
+
+#: The exactly degenerate width triple of the round-robin protocol
+#: (1/cos²θ = 1 + tan²θ): Gaussian size, Gaussian strain and Caglioti W.
+FLAT_TRIPLE = ("phases.0.gauss_size", "phases.0.gauss_strain", "instrument.profile.w")
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("brucite-nudge")
+@pytest.mark.parametrize("key", ["brucite", "corundum", "zincite", "fluorite"])
+def test_the_closing_stage_names_the_flat_width_triple_unresolved(key, monkeypatch):
+    """WP-2050, ruled 2026-11-01: no message says which correlations the guard
+    withheld, so this is the developer's signal.  At each round-robin
+    standard's closing stage ``resolved_correlation`` names the triple, whose
+    eigenvalue sat at 0.004-0.47x the cut, and on brucite leaves the zero-shift
+    and sample-displacement pair resolved (>= 31x the cut)."""
+    import sys
+
+    import rietx as rx
+    from rietx.optimize.least_squares import covariance_jacobian
+    from rietx.optimize.statistics import resolved_correlation
+    from rietx.viz import compare
+
+    standard = STANDARD_BY_KEY[key]
+    if not standard.available(compare.default_data_dir()):
+        pytest.skip(f"{key}'s files are not here")
+    refine = sys.modules["rietx.refine"]
+    closing = []
+
+    def guard(table, outcome, *args, **kwargs):
+        if kwargs.get("scan_exchangeability"):  # the plan's last stage
+            closing.append((list(table.free_paths), outcome))
+        return check_guards(table, outcome, *args, **kwargs)
+
+    check_guards = refine.check_guards
+    monkeypatch.setattr(refine, "check_guards", guard)
+    inputs = standard.build(compare.default_data_dir())
+    result = rx.Refinement(inputs.structure, inputs.instrument, history=False).fit(
+        inputs.data, plan=inputs.plan, telemetry=False,
+        two_theta_limits=inputs.two_theta_limits)
+    from rietx.viz.plots import plot_result
+    suite_alarms.OUTPUT.mkdir(exist_ok=True)
+    plot_result(result, path=str(suite_alarms.OUTPUT / f"wp2050_closing_{key}.png"))
+    free, outcome = closing[0]
+    _, unresolved = resolved_correlation(outcome.correlation,
+                                         covariance_jacobian(outcome, free))
+    named = {p for p, u in zip(free, unresolved, strict=True) if u}
+    assert set(FLAT_TRIPLE) <= named, sorted(named)
+    if key == "brucite":
+        pair = {"instrument.zero_shift", "instrument.geometry.sample_displacement"}
+        assert pair <= set(free) and not pair & named, sorted(named)
+
+
+@pytest.mark.slow
 @pytest.mark.xdist_group("suite-alarms")
 def test_the_standards_fire_what_the_pin_says():
     missing = suite_alarms.unavailable()
