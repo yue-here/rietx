@@ -208,7 +208,7 @@ unwindowed one does, and `CuSO4.5H2O` never reads as 4.5 O.
 
 ## Handover log
 
-- **2026-11-02** (rulings, PR #PRNUM) — Where the GUI stores the
+- **2026-11-02** (rulings, PR #1349) — Where the GUI stores the
   specimen's formula is settled: two optional fields, `formula` and
   `temperature`, on the search-controls block of the project file
   (`IndexingControls`), shown in the indexing form beside the volume limits.
