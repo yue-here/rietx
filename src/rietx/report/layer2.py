@@ -1279,9 +1279,9 @@ def estimate_delta_chi2(result: RefinementResult,
     applying an action achieves: a refinement also improves regions that failed a
     gate and stretches of pattern no region entry covers, and WP-1012 measured the
     observed reduction exceeding this estimate by 0.9 % on a cell correction
-    (16.16 predicted, 16.30 observed, re-measured 2026-11-02).  It is also one number for the whole
-    report, which ``build_report`` stamps on every action, so it ranks nothing —
-    see :class:`~rietx.report.schemas.SuggestedAction`.
+    (16.16 predicted, 16.30 observed, re-measured 2026-11-02).  It is also one
+    number for the whole report, which ``build_report`` stamps on every action,
+    so it ranks nothing — see :class:`~rietx.report.schemas.SuggestedAction`.
     """
     usable = [a for a in attributions if a.gates_passed]
     if not usable:

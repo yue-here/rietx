@@ -97,10 +97,10 @@ def test_at_bound_names_exactly_the_paths_bound_hit_names():
 
     The cell edge is capped 0.0012 Å below the value the free fit wants, so the
     trust region rides the upper bound: Rwp goes 0.1436 → 0.2169 (measured
-    2026-11-02) and ``a`` lands on 10.250000 exactly.  Set equality against the ``BOUND_HIT`` diagnostics is
-    the assertion; "is it really at its bound" is deliberately *not* asserted,
-    because a re-derivation here would pass against the duplicate this WP
-    removed.
+    2026-11-02) and ``a`` lands on 10.250000 exactly.  Set equality against
+    the ``BOUND_HIT`` diagnostics is the assertion; "is it really at its
+    bound" is deliberately *not* asserted, because a re-derivation here would
+    pass against the duplicate this WP removed.
     """
     data, structure, instrument = _nac()
     ref = rx.Refinement(structure, instrument)

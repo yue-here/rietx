@@ -438,7 +438,7 @@ def test_the_predicted_delta_chi2_is_one_number_for_the_whole_report(narrow):
     """It is not per suggestion, and it is not a bound. Both are measured here.
 
     ``build_report`` computes ``estimate_delta_chi2`` once and stamps it on *every*
-    Layer-1-derived action, so eight mutually-exclusive suggestions carry the
+    Layer-1-derived action, so nine mutually-exclusive suggestions carry the
     identical figure — it cannot rank them, and a strip that printed it per row
     would imply a per-action prediction that does not exist.  Measured on this
     fixture: 16.16 on all nine, against a total χ² of 16.93, because the fifteen

@@ -452,9 +452,10 @@ COLLECT_DATA_CONFIDENCE = 0.5
 #: so 5 is margin, not tuning.  ``LEBAIL_GAP_NOTABLE`` is the ratio above
 #: which the summary quotes the gap; measured separation on the same fixtures:
 #: 2.36 on the pore proxy (re-measured 2026-11-02; guest scatterer in truth
-#: only — intensity model wrong) against ≤ 1.00 on every position/profile control (+0.4 % cell 1.00,
-#: broad+0.05° zero 1.00, broad clean 1.00, sharp+0.008° zero 0.96) and 0.79
-#: on the converged clean fit — the partition is *not* a noise-floor
+#: only — intensity model wrong) against ≤ 1.00 on every position/profile
+#: control (2026-08-12: +0.4 % cell 1.00, broad+0.05° zero 1.00, broad clean
+#: 1.00, sharp+0.008° zero 0.96) and 0.79 on the converged clean fit — the
+#: partition is *not* a noise-floor
 #: estimator (its net = max(y_obs − bkg, 0) clip and profile-share weighting
 #: put its own floor above a converged least-squares fit), which is why the
 #: notable test is on the ratio, never on rwp_lebail alone.

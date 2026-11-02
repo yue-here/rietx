@@ -676,10 +676,12 @@ def _decline_dispersion_off_table(instrument: Instrument, structure: Structure,
     ``Source.dispersion`` is on by default since v1.0 because species and λ are
     all it needs — but the bundled Cromer-Liberman tabulation covers the 3-70
     keV powder band, and a PDF-beamline recipe is outside it: λ = 0.1665 Å is
-    74.5 keV.  f′ and f″ are edge effects.  For a light or middle element every
-    edge sits more than an order of magnitude below 74 keV, so f → f₀ is the
-    correct limit there.  For the heaviest elements it is an approximation: W's
-    K edge is 69.5 keV, 5 keV below the beam, where f′ and f″ are not small.
+    74.5 keV.  f′ and f″ are edge effects.  For a light element every edge sits
+    more than an order of magnitude below 74 keV (a K edge reaches 7.4 keV only
+    past Fe), so f → f₀ is the correct limit there.  The closer an element's K
+    edge climbs towards the beam, the worse the approximation: La's is 38.9
+    keV, and W's is 69.5 keV, 5 keV below the beam, where f′ and f″ are not
+    small.
     Extrapolating the table past its band would still be wrong, so the reader
     declines and says so.
 
@@ -1310,14 +1312,15 @@ def _report_engine_default(base: str, magnitude_key: str, mag_vary: bool,
 
 def _read_plan(payload: dict, structure: Structure, instrument: Instrument,
                diags: list[Diagnostic]) -> RefinementPlan:
-    """The flagged paths, freed over up to nine stages in the McCusker order.
+    """The flagged paths, freed stage by stage in the McCusker order.
 
     PowderLine runs a single refinement pass over everything flagged.  This
-    plan frees the same set, but stage by stage in :data:`_RECIPE_STAGE_ORDER`,
-    one stage per group the recipe flags, plus a ``rest`` stage for a path no
-    group claims.  Staging is cumulative, so the last stage frees exactly the
-    recipe's set, and ``RECIPE_PLAN_STAGED`` names the stages.  A recipe that
-    flags nothing gets one stage that frees nothing.  The plan carries the
+    plan frees the same set, but stage by stage in :data:`_RECIPE_STAGE_ORDER`:
+    one stage for each of its nine groups the recipe flags, plus a ``rest``
+    stage for a path no group claims.  Staging is cumulative, so the last stage
+    frees exactly the recipe's set.  Where there is more than one stage,
+    ``RECIPE_PLAN_STAGED`` names them.  A recipe that flags nothing gets one
+    stage that frees nothing.  The plan carries the
     package's closing stage like any plan a caller runs (WP-2002), which
     recompiles at the answer and solves once more with the same globs.
 

@@ -905,8 +905,9 @@ def test_pore_proxy_gap_and_contents_clause():
     """The WP-1057 headline scenario: a converged host fit over data whose
     scattering contents it lacks.  Measured (2026-11-02): Rwp 0.0403,
     GoF 2.96, partition Rwp 0.0171 → ratio 2.36; intensity carries 82 % of
-    χ² in 8 gated regions split 5+/3−, best angular template R² = 0.01.  The report must carry the gap and name the contents
-    signature — and still invent no action, because none applies."""
+    χ² in 8 gated regions split 5+/3−, best angular template R² = 0.01.  The
+    report must carry the gap and name the contents signature — and still
+    invent no action, because none applies."""
     structure, ins, data = _pore_proxy_data()
     ref = rx.Refinement(structure, ins)
     result = ref.fit(data, plan="mccusker_default")
