@@ -249,9 +249,9 @@ gave Rwp 16 % and a +390 ppm cell, while mirroring the converged `.EXP` gave
 
 ## §4b — Phase ID: the unmatched list and the Le Bail-gap read
 
-`report.unmatched`'s `kind="unmatched_obs"` entries are strong lines no modelled
-phase produces. A lobe the observed curve joins to a drawn peak (shape misfit,
-blank line) is not one: see `report.regions`. `report.lebail_gap` is the structural-against-profile
+`report.unmatched`'s `kind="unmatched_obs"` entries are the strong lines your
+phase set does not produce. One with `flank.on_flank` may be a profile misfit
+instead (abstention.md). `report.lebail_gap` is the structural-against-profile
 triage: it re-partitions the per-hkl intensities at the frozen converged state
 and reports both Rwp. A `ratio` ≫ 1 means positions and profile alone account for the pattern, so every line is indexed and phase identification is safe **at any absolute Rwp**.
 
