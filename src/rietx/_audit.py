@@ -2021,7 +2021,12 @@ ROWS: tuple[Row, ...] = (
                   "consensus); at 0.15 its true cell validated on both; at 0.20 also its leader. "
                   "Zircon, FAP, corundum, LaB6 validated every checked cell at all three, with "
                   "the same systems searched and incomplete; NAC's default spec lost the "
-                  "orthorhombic system at 0.15; one synchrotron pattern"),
+                  "orthorhombic system at 0.15; one synchrotron pattern. WP-2063, after the "
+                  "panel speed-up, three interleaved runs at each of 0.08/0.10/0.15 (macOS "
+                  "arm64, [dev], load 4-9 of 10 cores): NAC's true cell validated on all 18 "
+                  "NAC runs; systems searched, candidates and ranking identical across values "
+                  "on all six sets; at 0.08 and 0.10 NAC's top-ranked candidate's fit was "
+                  "cancelled on every run, at 0.15 it validated"),
         grounds=("A share of the user's ceiling moved from search to the mandatory check; the "
                  "smallest measured share that validates a heavy synchrotron pattern's true "
                  "cell.  Set under the maintainer's delegation of 2026-10-28 (WP-2011)."),

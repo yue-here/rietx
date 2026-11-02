@@ -186,6 +186,15 @@ above, which come from lab and synchrotron single-phase patterns
   monoclinic C, 944 columns, 1882 of 1888 products, 12 s; a shifted ILU
   fixed it offline but slowed FAP.XRA's real fit), and the panel scoring
   that spends `quick`'s reserve is WP-2063's.
+- **From WP-2063, 2026-11-01: a Pawley step now stops on its cancel, so its
+  cost shows as unvalidated candidates rather than an overrun.** One LM step
+  on 11-BM NAC's cI metric described as tP (4552 reflections) refactorised
+  its free block 1099 times in 27 s inside the projected CG. The cancel is
+  now read there, so a run ends at its ceiling (20.18 s late → 0.01 s under
+  `Deadline(15)`). Issue #1231 also reported two costs this did not address
+  and did not re-measure: under `preset="full"` on aP2 every candidate read
+  `not_validated` where Le Bail validated the top three, and peak RSS rose
+  3.0 → 7.7 GB. Both are the Pawley fit's own cost.
 
 ## Decisions (maintainer)
 
