@@ -263,7 +263,16 @@ cutting it.
       skip message in the junit file. Projected on the ten three-shard runs,
       the two items together give a median slowest job of 16.2 min (newest
       entry), still over the bar.*
-- [ ] **Read ten runs again** after both land, by the Acceptance method.
+- [x] **Four shards per leg** (Next 3 of the same entry: only if items 1
+      and 2 still miss). `ci.yml`'s `matrix.of` becomes 4. *Done 2026-11-02:
+      the projection of items 1 and 2 missed (median 16.2 min), and even a
+      perfect three-way split of the same seconds gives 14.7. Four shards
+      project to a median 12.9 min, every run of the ten under 14. Settled by
+      Claude under the lead's brief and established practice (the newest
+      entry says what it costs).*
+- [ ] **Read ten runs again** after these land, by the Acceptance method:
+      the ten successful `ci.yml` push runs on main from the first whose fast
+      jobs are named `fast py3.x K/4`.
 
 ## Acceptance
 
@@ -280,7 +289,7 @@ cutting it.
 gh run list --workflow ci.yml --branch main --event push --status success --limit 10 --json databaseId
 gh run view <id> --json jobs   # each "fast …" job's startedAt to completedAt; take the largest
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
-.venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow" --shard 1/3   # and 2/3, 3/3
+.venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow" --shard 1/4   # and 2/4 to 4/4; RIETX_DOCS=skip for py3.11's split
 ```
 
 ## References
