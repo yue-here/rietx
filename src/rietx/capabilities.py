@@ -229,10 +229,10 @@ class ProjectFormatCapability(Base):
     sniff: str
     #: what the file carries beyond a structure, in words
     carries: list[str]
-    #: ``"read"`` or ``"build"`` — where this format's repairs are reported, so
-    #: a caller knows which call to hand its diagnostics list to.  A real
-    #: per-format difference: a ``.inp``'s species and origin repairs happen
-    #: while parsing, a ``.pcr``'s while converting codewords
+    #: ``"read"``, ``"build"`` or ``"both"`` — where this format's repairs are
+    #: reported, so a caller knows which call to hand its diagnostics list to.
+    #: A real per-format difference: a ``.pcr``'s repairs happen while
+    #: converting codewords, a ``.inp``'s both while parsing and while building
     reports_at: str
     #: the top-level verb that writes this format (``"write_topas_inp"``), or
     #: ``None`` where this build has no writer for it (WP-1118).  The **name**

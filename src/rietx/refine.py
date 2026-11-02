@@ -2328,13 +2328,10 @@ def _answer_significance(model: CompiledModel, table: ParameterTable,
 class NoPhasesError(ValueError):
     """A refining verb was handed a model with no phases (WP-1207).
 
-    ``code`` is ``"NO_PHASES"``, and it is the same string on every surface: the
-    agent envelope's fourth error code, and the GUI's reason for a disabled Run
-    button.  A code rather than a sentence because the consumer's next action is
-    specific and not the one any other refusal implies — index the pattern, or
-    type a cell — where ``INVALID_REQUEST`` would send an agent back to check
-    its field spelling and ``REFINEMENT_FAILED`` would suggest the fit is worth
-    retrying.
+    ``code`` is ``"NO_PHASES"``, and the GUI server sends it on as its error
+    code (``GuiError``), beside the Run button it disables.  It is a code rather
+    than a sentence because the consumer's next action is specific: index the
+    pattern, or type a cell.  No other refusal implies that action.
 
     A :class:`~rietx.schemas.structure.Structure` with no phases is legal on
     purpose (that class says why), so this is a refusal by the **verb**: holding
@@ -2709,6 +2706,13 @@ class Refinement:
 
     def _require_history(self) -> RefinementTree:
         if self.history is None:
+            # the tree is built at the first fit (``_ensure_history``), so a
+            # ``history=True`` refinement lands here too until it has run one
+            if self._history_spec:
+                raise RuntimeError(
+                    "this Refinement has no history yet; the tree is built "
+                    "when the first fit runs, so call fit() or run_stage() "
+                    "first")
             raise RuntimeError(
                 "this Refinement has no history; construct it with "
                 "history=True (the default) or history='path.jsonl' to enable "
@@ -5393,8 +5397,9 @@ class Refinement:
                                 plan: RefinementPlan, **kw) -> RefinementResult:
         """Run the plan up to ``plan.lebail_passes`` times and keep the best pass.
 
-        The extracted intensities are frozen inside a run (the
-        frozen-per-stage invariant), so they and the profile converge only by
+        The extracted intensities are frozen inside each stage's solve (the
+        frozen-per-stage invariant) and re-extracted before and after it
+        (:meth:`_run_stage`).  So they and the profile converge only by
         alternating, and the alternation is no descent on one objective: from
         a poor start Rwp rose monotonically over 15-20 passes, from a good one
         it fell to a fixed point (#210, WP-1323's baseline table).  Hence the

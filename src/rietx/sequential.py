@@ -18,7 +18,7 @@ re-derive the axis, the esds and the status by hand.
 depends on its neighbour's, so the method can imprint a trend the data do not
 carry: one bad pattern's error is inherited by all its successors, and the
 result is a smooth-looking curve.  That is the same failure mode the FitReport
-gates exist to prevent, and it gets the same treatment here — three fences,
+gates exist to prevent, and it gets the same treatment here — four fences,
 none of which alters a fitted value:
 
 ``SEQUENTIAL_RESEED``
