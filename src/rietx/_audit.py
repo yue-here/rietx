@@ -4269,7 +4269,7 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.sequential.SequentialRefinement.fit:reseed_factor", "default", tier="caller",
         ambiguity=1, value=None,
         evidence=("opt-in: reseed_factor=None sets no Rwp fence, and a factor is asked by "
-                  "name, refused unless finite and positive (_check_reseed_factor); no default "
+                  "name, refused unless finite and positive (_check_factor); no default "
                   "path passes one, the GUI included (searched 2026-11-02). The 1.25 default "
                   "it carried until WP-2003 (RESEED_FACTOR) was removed: its 116 escalations "
                   "on main moved no value past 7.2e-4 esd, planted from T134 paid 4.1x the "
@@ -4279,7 +4279,7 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.sequential.SequentialRefinement.fit:first_rung_factor", "default", tier="caller",
         ambiguity=1, value=None,
         evidence=("opt-in: first_rung_factor=None bounds no first rung, and a factor is asked "
-                  "by name, refused unless finite and positive (_check_first_rung_factor), "
+                  "by name, refused unless finite and positive (_check_factor), "
                   "and inert under reseed=False; no default path passes one, the GUI included "
                   "(searched 2026-11-02). The 3.0 default it carried from WP-1127 "
                   "(FIRST_RUNG_FACTOR) was removed: an efficiency bet that moved an accepted "

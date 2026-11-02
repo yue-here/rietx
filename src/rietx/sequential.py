@@ -1415,8 +1415,12 @@ class SequentialRefinement:
         if on_error not in ON_ERROR_POLICIES:
             raise ValueError(f"on_error must be one of {ON_ERROR_POLICIES}")
         _check_verify_steps(verify_steps)
-        _check_reseed_factor(reseed_factor)
-        _check_first_rung_factor(first_rung_factor)
+        _check_factor("reseed_factor", reseed_factor,
+                      "the caller's Rwp fence, a multiple of the accepted median",
+                      "fence")
+        _check_factor("first_rung_factor", first_rung_factor,
+                      "the caller's bound on the first rung, a multiple of the "
+                      "dearest converged one", "bound")
         if x is not None and len(x) != len(patterns):
             raise ValueError(f"x has {len(x)} entries for {len(patterns)} patterns")
         names = _labels_for(patterns, labels)
@@ -2173,9 +2177,16 @@ def _link_history(ref: Refinement, position: int, label: str,
 
 
 def _better(a: RefinementResult, b: RefinementResult) -> bool:
-    """Is ``a`` the fit to keep?  Convergence first, then Rwp."""
-    if (a.status == "diverged") != (b.status == "diverged"):
-        return b.status == "diverged"
+    """Is ``a`` the fit to keep?  Not rejected first, then Rwp.
+
+    *Rejected* is :func:`~rietx.schemas.sequential._rejected`, the test the
+    quarantine applies to the kept attempt (WP-2003, C2 q5): ranked by
+    ``"diverged"`` alone, an attempt under an ``error``-level code with the
+    lower Rwp beat a clean later rung, and the pattern was quarantined with
+    a usable fit discarded.
+    """
+    if _rejected(a) != _rejected(b):
+        return _rejected(b)
     return a.statistics.rwp < b.statistics.rwp
 
 
@@ -2509,50 +2520,28 @@ def _check_verify_steps(verify_steps: object) -> None:
         raise ValueError(f"verify_steps must be 0 or more, not {verify_steps}")
 
 
-def _check_reseed_factor(reseed_factor: object) -> None:
-    """Refuse a ``reseed_factor`` that is not a finite positive number (WP-2003).
+def _check_factor(name: str, value: object, meaning: str, off: str) -> None:
+    """Refuse a caller's opt-in factor that is not a finite positive number.
 
-    ``None`` is no fence, and the default.  A bool is refused by name before
-    the number test it would pass: ``True`` read as 1.0 would escalate every
-    warm fit above the median, half the chain, on a switch nobody set to a
-    number.  ``inf`` used to be accepted unchecked as a spelling of "off",
-    which ``None`` now is.
+    ``reseed_factor`` and ``first_rung_factor`` (WP-2003, batch C1 and C3):
+    ``None`` is the off state, and the default.  A bool is refused by name
+    before the number test it would pass: ``True`` read as 1.0 would escalate
+    every warm fit above the median, or cut every first rung dearer than the
+    dearest so far, on a switch nobody set to a number.  ``inf`` used to be
+    accepted unchecked as a spelling of "off", which ``None`` now is.
+    ``meaning`` says what the factor is and ``off`` what ``None`` turns off.
     """
-    if reseed_factor is None:
+    if value is None:
         return
-    if isinstance(reseed_factor, bool):
-        raise ValueError(
-            f"reseed_factor takes a factor or None, not {reseed_factor!r}: it "
-            "is the caller's Rwp fence, a multiple of the accepted median "
-            "(None for no fence, the default)")
-    if not isinstance(reseed_factor, numbers.Real):
-        raise TypeError(f"reseed_factor takes a float factor or None, not "
-                        f"{type(reseed_factor).__name__}")
-    if not (math.isfinite(reseed_factor) and reseed_factor > 0):
-        raise ValueError(f"reseed_factor must be finite and positive, not "
-                         f"{reseed_factor!r} (None for no fence)")
-
-
-def _check_first_rung_factor(first_rung_factor: object) -> None:
-    """Refuse a ``first_rung_factor`` that is not a finite positive number.
-
-    ``None`` is no bound, and the default (WP-2003, batch C3).  The bool and
-    number tests are :func:`_check_reseed_factor`'s, for its reason: ``True``
-    read as 1.0 would cut every first rung dearer than the dearest so far.
-    """
-    if first_rung_factor is None:
-        return
-    if isinstance(first_rung_factor, bool):
-        raise ValueError(
-            f"first_rung_factor takes a factor or None, not {first_rung_factor!r}: "
-            "it is the caller's bound on the first rung, a multiple of the "
-            "dearest converged one (None for no bound, the default)")
-    if not isinstance(first_rung_factor, numbers.Real):
-        raise TypeError(f"first_rung_factor takes a float factor or None, not "
-                        f"{type(first_rung_factor).__name__}")
-    if not (math.isfinite(first_rung_factor) and first_rung_factor > 0):
-        raise ValueError(f"first_rung_factor must be finite and positive, not "
-                         f"{first_rung_factor!r} (None for no bound)")
+    if isinstance(value, bool):
+        raise ValueError(f"{name} takes a factor or None, not {value!r}: it is "
+                         f"{meaning} (None for no {off}, the default)")
+    if not isinstance(value, numbers.Real):
+        raise TypeError(f"{name} takes a float factor or None, not "
+                        f"{type(value).__name__}")
+    if not (math.isfinite(value) and value > 0):
+        raise ValueError(f"{name} must be finite and positive, not {value!r} "
+                         f"(None for no {off})")
 
 
 def _relative_paths(structure: Structure, instrument: Instrument) -> frozenset[str]:
