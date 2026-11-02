@@ -97,6 +97,16 @@ stand-in derivative in `sources/powsubs/psvfcjo.for:139` and `:288-299`.
 None of the seven tests whether its answer depends on the path or the start, and none of
 their manuals discusses it.
 
+## A site's multiplicity during a fit
+
+Surveyed 2026-10-26 for WP-2052 (issue #1088); the GSAS-II lines re-read 2026-11-01.
+
+| Program | When a site's multiplicity is decided | Status |
+|---|---|---|
+| rietx | once per `fit()` or `run_stage()`, from the coordinates the call starts at; every stage compile and the closing compile reuse it, and `SITE_MULTIPLICITY_KEPT` names a site the returned coordinates would recount | checked |
+| GSAS-II | once, at setup: `Amul` is read from the stored atom record (`GSASIIstrIO.py:1762`) and the structure factor weights every operation by `Mult·frac/nOps` (`GSASIIstrMath.py:1279`); it is rewritten only when the user edits or transforms the atom. Because every operation is summed at that weight, a site that leaves a special position keeps `Mult·frac` atoms per cell; rietx gives such a site its full orbit at its occupancy, as it did before WP-2052, and only a rigid body's pose reaches that case | checked (5.8.4 source) |
+| TOPAS, FullProf, RIETAN-FP, BGMN, MAUD, EasyDiffraction | | not checked |
+
 ## Surface roughness starting values
 
 | Program | Pitschke | Suortti | Default start |
