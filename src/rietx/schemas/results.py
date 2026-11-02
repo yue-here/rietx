@@ -283,8 +283,10 @@ class CorrelationPair(Base):
     """One entry of the worst-|ρ| list (WP-1056).
 
     ``rho`` is the signed correlation from the solver's final undamped
-    Jacobian (the same matrix the ``HIGH_CORRELATION`` guard read, so the
-    two can never disagree); the list is ordered worst first.
+    Jacobian, with any direction the Jacobian cannot resolve projected out
+    (WP-2050, :func:`~rietx.optimize.statistics.resolved_correlation`).  It is
+    the same matrix the ``HIGH_CORRELATION`` guard read, so the two can never
+    disagree; the list is ordered worst first.
     """
 
     path_a: str
@@ -1112,7 +1114,9 @@ class StageResult(Base):
     an exhaustive match handled a branch that could not occur and a reader of
     the type inferred a skip mechanism the package does not have.  A stage a
     plan does not run produces no ``StageResult`` at all, which is the honest
-    way to say the same thing.
+    way to say the same thing.  A solve stopped on a model that is not finite
+    is one more way to reach ``"diverged"``, never a fourth word: its stage
+    ends at its start and ``STAGE_NOT_FINITE`` says so (WP-2048).
     """
 
     name: str

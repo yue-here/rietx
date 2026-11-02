@@ -131,6 +131,15 @@ that caveat until 1421 lands.
 
 ### Inherited
 
+- 2026-11-01, from WP-2049 (PR #1305): a joint fit now holds a blank
+  histogram's own peak-only instrument rows (`hist.k.instrument.zero_shift`,
+  the profile terms) when that histogram sees no phase. `StageResult.held`
+  records it and the rows leave `result.parameters`, but no joint
+  diagnostic names it. `PHASE_UNCONSTRAINED` does not fire, since another
+  histogram sees the phase, and `PHASE_HELD_IN_PATTERNS`
+  (`multi._per_pattern_hold_diagnostics`) skips every path that names no
+  phase. Whether that code should list the instrument rows is this WP's
+  joint-report question. It is reader output, so it goes to the maintainer.
 - 2026-10-31, from the issue triage (issue #1124): task 8's measurement,
   posted by the claimant 2026-10-28. Nothing wired. No source they read
   defines observations per parameter over several patterns: McCusker 1999 §9
