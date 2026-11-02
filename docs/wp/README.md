@@ -54,6 +54,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-10-25 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2041](2041-a-tutorial-shows-the-indexer-abstain.md) | A tutorial shows the indexer abstain | 2026-10-24 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 2026-10-25 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [2050](2050-a-correlation-with-a-flat-direction-is-not-reported.md) | A correlation with a flat direction is not reported as one | 2026-11-01 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 2026-11-01 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [2059](2059-a-bruker-raw-v2-file-reads.md) | A Bruker RAW v2 file reads, checked against two descriptions and one real file | 2026-10-30 | P3 | [Unscheduled](#unscheduled-the-formats-a-lab-still-has) |
 | [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) | A complete dichotomy search holds every centred lattice and polishes its truth leaf | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -603,7 +604,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2047](2047-windows-follow-the-parameters-between-solves.md) | Windows follow the parameters between solves | ✅ 2026-10-25 | — | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) ([2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) soft) |
 | [2048](2048-a-non-finite-step-ends-a-stage-rather-than-the-fit.md) | A non-finite step ends a stage rather than the fit | ✅ 2026-11-01 | — | — |
 | [2049](2049-a-frame-no-phase-is-seen-in-holds-the-instrument-too.md) | A frame no phase is seen in holds the instrument's peak terms too | ✅ 2026-11-01 | — | — |
-| [2050](2050-a-correlation-with-a-flat-direction-is-not-reported.md) | A correlation with a flat direction is not reported as one | ⬜ | P3 | — |
+| [2050](2050-a-correlation-with-a-flat-direction-is-not-reported.md) | A correlation with a flat direction is not reported as one | 🔄 2026-11-01 | P3 | — |
 | [2051](2051-compiled-per-evaluation-windows.md) | Windows resized at every evaluation, fast enough to measure | ✅ 2026-10-25 | — | [2047](2047-windows-follow-the-parameters-between-solves.md) |
 | [2052](2052-a-fit-keeps-each-sites-multiplicity.md) | A fit keeps each site's multiplicity from start to answer | ✅ 2026-11-01 | — | — ([1991](1991-a-site-and-its-own-image-are-one-atom.md) soft) |
 | [2053](2053-a-split-site-the-data-cannot-tell-says-so.md) | A split site the data cannot tell from one elongated atom says so | ⬜ | P3 | — ([2052](2052-a-fit-keeps-each-sites-multiplicity.md) soft) |
