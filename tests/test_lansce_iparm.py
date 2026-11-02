@@ -12,6 +12,8 @@ black box; the run is recorded in the module docstring of
 
 from __future__ import annotations
 
+import math
+
 import pytest
 
 from rietx.io.instrument_tof import (
@@ -24,6 +26,7 @@ from rietx.io.legacy.lansce_iparm import (
     GSAS2_PRCF1_DESTINATIONS,
     LEGACY_PRCF1_SLOT_NAMES,
 )
+from rietx.model.tof_spectrum import incident_spectrum
 from tests.test_instrument_tof import (
     TYPE1,
     bank,
@@ -131,7 +134,16 @@ def test_a_nonzero_fifth_pair_is_read_and_reported(tmp_path, itype):
     (fifth,) = [n for n in notes if n.code == "GSAS_IPARM_LEGACY_LAYOUT"]
     assert fifth.level == "info" and fifth.where == ["bank 1", "ICOFF3"]
     assert f"bank 1 ITYP {itype}: P10 = 5.0, P11 = 0.001" in fifth.message
-    assert "nothing in this build evaluates a spectrum" in fifth.message
+    # what the message says a fit does with the pair, checked against the
+    # evaluator rather than against a copy of the sentence: the fifth term is
+    # P10·exp(−P11·T⁵) with T in ms, and nothing else moves when it is added
+    assert "a fit evaluates it as P10·exp(−P11·T⁵), T in ms" in fifth.message
+    t_us = [2000.0, 5000.0, 10000.0]
+    without = incident_spectrum(itype, coeffs[:9] + [0.0, 0.0], t_us)
+    with_pair = incident_spectrum(itype, [c.value for c in sp.coefficients], t_us)
+    for t, a, b in zip(t_us, without, with_pair):
+        assert b - a == pytest.approx(5.0 * math.exp(-1e-3 * (t / 1000.0) ** 5),
+                                      rel=1e-12)
     with pytest.raises(ValueError, match="prints no exponent for the fifth"):
         read_gsas_tof_iparm(write(tmp_path, text))
 
