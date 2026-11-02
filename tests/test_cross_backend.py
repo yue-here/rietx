@@ -1551,13 +1551,13 @@ def test_a_width_on_its_floor_takes_the_feasible_side(name):
     """
     from rietx.model.profiles.caglioti import _MIN_GAMMA_G2
 
+    if name != "numpy":
+        pytest.importorskip(name)
     model, table, _extras = _state_sharp_widths(uv=0.0, w_floor=_MIN_GAMMA_G2)
     theta = table.x0()
     labels = list(table.free_paths)
     residual = _make_residual(model, table)
     r0 = residual(theta)
-    if name != "numpy":
-        pytest.importorskip(name)
     jac = _jacobian_for(model, table, name)(theta)
     for path in ("instrument.profile.u", "instrument.profile.v",
                  "instrument.profile.w"):

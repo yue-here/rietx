@@ -411,25 +411,36 @@ def _aperture_node_derivs(nodes, two_theta_deg, sl: float, hl: float, n: int,
     second-order difference (``which`` 0 is S/L, 1 is H/L).
 
     (−3f(0) + 4f(h) − f(2h)) / 2h steps only into the feasible side, so it is
-    the same rule at an aperture on its bound of zero as above it.  A forward
-    difference was not good enough there (WP-1955): at one zero aperture the
-    column is the residue of node terms about 1e5 times its size, which cancel
-    because the profile is quadratic in that aperture, and the difference's
-    O(h) error, 0.013 in norm, was 23 % of a column of 0.047.  The O(h²) form
-    costs one more node evaluation per aperture.
+    the same rule at an aperture on its bound of zero as above it.  A
+    first-order forward difference was not good enough there (WP-1955): at
+    one zero aperture the column is the residue of node terms about 1e5 times
+    its size, which cancel because the profile is quadratic in that aperture,
+    and the difference's O(h) error, 0.013 in norm, was 23 % of a column of
+    0.047.  The O(h²) form costs one more node evaluation per aperture.
 
     The caller's step, 3e-6, is from a scan against jax's exact column: below
     it rounding grows as 1/h, above it the h² term.  At one zero aperture
     1e-7 sat 8.9e-3 rel-L2 off and 3e-6 sits 5.3e-4; at interior apertures
     every step from 3e-7 to 1e-5 is under 2e-7.
-    """
-    def at(step):
-        return fcj_offsets_weights_batch(
-            two_theta_deg, sl + (step if which == 0 else 0.0),
-            hl + (step if which == 1 else 0.0), n)
 
-    f1, f2 = at(h), at(2.0 * h)
-    return tuple((4.0 * b - 3.0 * a - c) / (2.0 * h)
+    The nodes have a kink at S/L = H/L (``min(sl, hl)`` in the overlap
+    weight).  An aperture lying under the other by at most 2h would step
+    across it, and the stencil would mix the two sides: 2.2e-3 rel-L2 off
+    jax's column at a gap of 1e-6, where the first-order rule sat at 3e-6.
+    There the stencil mirrors to (3f(0) − 4f(−h) + f(−2h)) / 2h, which stays
+    on the aperture's own side and is feasible whenever the aperture is at
+    least 2h.
+    """
+    own, other = (sl, hl) if which == 0 else (hl, sl)
+    step = -h if 0.0 < other - own <= 2.0 * h and own >= 2.0 * h else h
+
+    def at(k):
+        return fcj_offsets_weights_batch(
+            two_theta_deg, sl + (k if which == 0 else 0.0),
+            hl + (k if which == 1 else 0.0), n)
+
+    f1, f2 = at(step), at(2.0 * step)
+    return tuple((4.0 * b - 3.0 * a - c) / (2.0 * step)
                  for a, b, c in zip(nodes, f1, f2, strict=True))
 
 
