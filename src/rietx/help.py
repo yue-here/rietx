@@ -1734,6 +1734,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "check the cell transform before you compare it with a published symbol."
         ),
     ),
+    "CIF_ADP_SYMMETRY_PROJECTED": HelpEntry(
+        title="Anisotropic displacement moved onto its symmetry-allowed form",
+        description=(
+            "The file prints a site's anisotropic displacement parameters (`U^ij`) "
+            "to fewer decimals than the symmetry relation between them needs, such "
+            "as U12 = U11/2 on a hexagonal three-fold axis. The printed values then "
+            "sit slightly off the form the site symmetry allows. The reader moved "
+            "the tensor to the nearest allowed one within half a unit in the last "
+            "printed digit of each component. The message names the sites and the "
+            "components moved, and the change is no larger than the rounding in the "
+            "file. A larger disagreement, or one that needs a component the file "
+            "prints as a whole number such as `0`, is left as written and refused "
+            "when the parameter table is built."
+        ),
+    ),
     "CIF_ANISO_COLLAPSED": HelpEntry(
         title="Anisotropic displacement read as isotropic",
         description=(

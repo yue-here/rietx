@@ -68,6 +68,11 @@ A β of 90.002(3) under `P m m m` is an experimenter quoting a refined number.
 Past `rietx.crystallography.cif.CIF_ANGLE_CORRECT_MAX_DEG` the symbol and the angle contradict each other, and one of the two is wrong.
 Choosing between them is yours, so the value is left byte for byte and the read raises.
 
+An anisotropic tensor read with `aniso=True` that misses the form its site symmetry allows only by the file's rounding is moved onto that form, and reported as [`CIF_ADP_SYMMETRY_PROJECTED`](diagnostics-structures.md#cif_adp_symmetry_projected).
+ZnO printed with U11 = 0.0123 and U12 = 0.0062 is U12 = U11/2 rounded to four decimals.
+Each component moves by at most half a unit in its last printed digit, and a component printed as a whole number, such as `0`, does not move.
+A tensor that misses by more is left as written, and the parameter table refuses it, naming the site and the component furthest from the allowed form.
+
 A Biso of any value is kept as the file states it, because `Atom.biso` has no default bound.
 Published structures carry values a range would refuse.
 The methylammonium C in COD 4335638 sits at 26.8 Å², and a light atom is sometimes refined slightly negative.
