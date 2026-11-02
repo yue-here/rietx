@@ -238,29 +238,21 @@ Each stage frees its parameters on top of everything already free.
 A parameter an early stage left short of convergence keeps refining in every later stage, and the last stage converges all of them together at 1e-9.
 So stopping the earlier stages sooner moves the answer little, on any plan.
 
-Measured on five single fits from the acceptance suites, each run as shipped and with `intermediate_ftol=None`, the closing stage in both.
-Each arm ran three interleaved rounds on macOS arm64 with the `[dev]` install and the compiled tier, 2026-11-02.
-Evaluations were identical across the rounds, and the wall clock is the range over them.
+Measured on five single fits from the acceptance suites against the same plans with `intermediate_ftol=None`, the closing stage in both, three interleaved rounds each, on macOS arm64 with the `[dev]` install, 2026-11-02:
 
-| Fit | Evaluations, shipped against all at 1e-9 | Wall clock in s, shipped against all at 1e-9 | Largest shift |
+| Fit | Evaluations | Wall clock in s | Largest shift |
 |---|---|---|---|
-| fluorapatite | 49 against 52 (1.06×) | 1.30-1.35 against 1.34-1.62 | 0.000 esd |
-| 11-BM NAC | 46 against 51 (1.11×) | 0.50-0.60 against 0.52-0.55 | 0.000 esd |
-| cpd-1a | 175 against 277 (1.58×) | 1.89-1.97 against 2.18-2.28 | 0.0004 esd |
-| SRM 660c LaB6 | 90 against 116 (1.29×) | 0.48-1.26 against 0.55-0.57 | 8.82 esd, between two equivalent minima |
-| cpd-1a with an absent zircon phase | 311 against 1221 (3.93×) | 9.6-11.0 against 21.5-22.4 | 0.0092 esd |
+| fluorapatite | 52 → 49 (1.06×) | 1.34-1.62 → 1.30-1.35 | 0.000 esd |
+| 11-BM NAC | 51 → 46 (1.11×) | 0.52-0.55 → 0.50-0.60 | 0.000 esd |
+| cpd-1a | 277 → 175 (1.58×) | 2.18-2.28 → 1.89-1.97 | 0.0004 esd |
+| SRM 660c LaB6 | 116 → 90 (1.29×) | 0.55-0.57 → 0.48-1.26 | 8.82 esd, between two minima |
+| cpd-1a, absent zircon | 1221 → 311 (3.93×) | 21.5-22.4 → 9.6-11.0 | 0.0092 esd |
 
 Rwp agreed to 1e-6 in every case.
-Background terms moved by at most 0.0005 esd.
-The 1.26 s in the LaB6 row is the first fit in the process, which pays the warm-up.
-
-The 8.82 esd on LaB6 is `Geometry.axial_sl` against `Geometry.axial_hl`.
-The two axial ratios can trade places for an equally good fit, so this pattern has two minima.
-Each schedule lands in a different one.
-
-The absent-phase fit is where the loose schedule pays most.
-Its zircon phase has nothing to fit in the pattern.
-At 1e-9, two of its stages run to the iteration limit of 400 evaluations each.
+LaB6's 1.26 s was the process's first fit.
+The 8.82 esd is `Geometry.axial_sl` against `Geometry.axial_hl`.
+The two ratios can trade places for an equally good fit, and each schedule lands in a different one.
+The absent zircon phase has nothing to fit, and at 1e-9 two of its stages run to their limit of 400 evaluations.
 
 A series is the case to measure rather than assume.
 Each warm start begins from its predecessor's answer, so a small difference in one answer can change how many recovery rungs the next pattern needs.

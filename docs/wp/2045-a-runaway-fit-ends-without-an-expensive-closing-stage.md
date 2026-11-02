@@ -347,15 +347,22 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
   *Done.* The `CLAUDE.md` invariant now reads "1.06-1.58× fewer
   evaluations cost ≤ 0.0004 esd on one fit (FAP, NAC, cpd-1a behind the
   closing stage; WP-2045 probe 7)". Item 8.20 gives the evaluations, the
-  1.02-1.14× wall clock, the absent-zircon 3.9× and why, and the LaB6
-  mirror at 8.82 esd. It drops the old QPA figure, which probe 7 did not
-  measure. The two committed skill copies were re-synced. The manual's
-  table is probe 7's five rows with evaluations, wall clock and largest
-  shift. Its cpd-1a paragraph on `x` against `lor_size` went, since cpd-1a
-  now shifts 0.0004 esd. A LaB6 paragraph and an absent-phase paragraph
-  replace it. The `trigger` series sentence went too: it was measured
-  before the closing stage, and the manual now says a chain on this
-  schedule is unmeasured.
+  0.0004 esd and the absent-phase 3.9×. It drops the old QPA figure, which
+  probe 7 did not measure. The two committed skill copies were re-synced.
+  The manual's table is probe 7's five rows with evaluations, wall clock
+  and largest shift. Its cpd-1a paragraph on `x` against `lor_size` went,
+  since cpd-1a now shifts 0.0004 esd. Three sentences on the LaB6 mirror
+  and the absent zircon replace it. The `trigger` series sentence went too:
+  it was measured before the closing stage, and the manual now says a chain
+  on this schedule is unmeasured.
+
+  *Gotchas.* Both places are at a size cap. A first draft grew
+  `references/surprises.md` 231 B past its budget (`tests/skill_caps.py`),
+  so 8.20 left out the wall clock and the LaB6 sentence. The manual page's
+  plain-text twin went 287 characters over its 50 000 cap
+  (`tests/test_manual.py`), so the table took main's arrow form and the
+  background-row figure was cut. The page now ends a little smaller than on
+  `main`.
 
   *Other quotes found* by grepping for "1.2-1.6" and "1.00-2.15". Left as
   they are: the `INTERMEDIATE_FTOL` comment in `schemas/plan.py`, which
@@ -366,7 +373,11 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
   chain's wall clock" is a different measurement (WP-1469's refit modes).
 
   *Verified.* The branch is prose only, so `/code-review` did not run.
-  Gates on macOS arm64, worktree venv `[dev]`: see the PR.
+  On macOS arm64, worktree venv `[dev]`: `test_manual.py`,
+  `test_manual_api.py`, `test_skill.py`, `test_skill_cli.py` and
+  `test_docs_consistency.py` together, 294 passed. Ruff is clean.
+  `tests.reader_output` exits 0. No count can move, so neither the fast
+  nor the full selection ran.
 
   *Next.* Unchanged from the entry below, items (1), (3) and (4). Item (2)
   is done.
