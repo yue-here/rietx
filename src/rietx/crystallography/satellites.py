@@ -718,7 +718,8 @@ def zone_boundary_candidates(space_group) -> tuple[KCandidate, ...]:
 
     The set is a function of the group alone, so it is computed once per
     group and kept: the star reductions run in exact rationals and cost
-    ~0.1 s on a cubic group, which a report paid once per phase per stage
+    0.17-0.24 s on a cubic group (one loaded Mac, 2026-11-02), which a
+    report paid once per phase per stage
     (WP-1335).  The tuple and its candidates are immutable.
     """
     sg = _resolve(space_group)

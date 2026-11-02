@@ -341,9 +341,10 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
         basis = stephens_basis(resolve_group(
             cp.reflections.spacegroup,
             cp.reflections.operations)).astype(np.float64)
-        floor = max(STRAIN_MIN_REFLECTIONS, len(basis) + 1)
+        min_refl = max(STRAIN_MIN_REFLECTIONS, len(basis) + 1)
         # the floor goes in, so a phase that cannot reach it pays no solve
-        d_lambda, weight = _strain_errors(model, values, ip, min_reflections=floor)
+        d_lambda, weight = _strain_errors(model, values, ip,
+                                          min_reflections=min_refl)
         d, _gam_g, _gam_l, tan_theta, current = _components(model, values, ip)
         # ``live`` only excludes reflections with no leverage at all — the
         # solve is already weighted by leverage, so a weak one costs nothing
@@ -356,7 +357,7 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
                 * max(float(np.sqrt(weight.max(initial=0.0))), 1e-300)) \
             & np.isfinite(tan_theta[0]) & (tan_theta[0] > 0.0)
         n_used = int(live.sum())
-        if n_used < floor:
+        if n_used < min_refl:
             out.append(StrainAnalysis(phase_index=ip, n_reflections_used=n_used,
                                       n_patterns=len(basis)))
             continue

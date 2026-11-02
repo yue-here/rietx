@@ -648,7 +648,7 @@ A five-stage fit of the fluorapatite tutorial pattern emitted 1 `fit_start`, 5 `
 | `fit_end` | `status`, `rwp`, `gof`, `node_id`, and `stage_report_seconds` under `stage_reports=True` |
 
 Read `data` with `.get`, because a version may add keys to a kind without a version change.
-A cancelled run's `fit_end` has `status` `"cancelled"`, the abandoned `stage`, the `completed` stage names and `node_id`, and no `rwp` or `gof`, because there is no fitted result.
+A cancelled run's `fit_end` has `status` `"cancelled"`, the abandoned `stage`, the `completed` stage names, `node_id` and, under `stage_reports=True`, `stage_report_seconds`, and no `rwp` or `gof`, because there is no fitted result.
 `stage_report_seconds` is the wall time the fit spent building its [stage reports](report.md#reports-at-every-stage).
 No stage span holds that time, because each report is built after one `stage_end` and before the next `stage_start`.
 Under `RefinementPlan.lebail_passes`, each pass's `fit_start` and `fit_end` also carry `lebail_pass` and `lebail_of`.

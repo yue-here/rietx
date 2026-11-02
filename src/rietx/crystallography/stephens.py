@@ -143,7 +143,8 @@ def strain_basis(rotations) -> np.ndarray:
 
     The basis is a function of the distinct rotations alone, in the order
     met, so it is computed once per such list and a copy handed out.  The
-    exact-rational elimination costs ~50 ms on a cubic group, and a report
+    exact-rational elimination costs 0.12-0.26 s on a cubic group (one loaded
+    Mac, 2026-11-02), and a report
     asks for it once per phase per stage (WP-1335).
     """
     keys: list[tuple[int, ...]] = []

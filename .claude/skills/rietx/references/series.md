@@ -328,10 +328,10 @@ where `StageResult` carries no `rwp` field at all).
 
 Where `stage_reports=True` *does* apply — the single `Refinement.fit()` calls of a batch — it
 is expensive.  On the bundled NAC fixture it cost **4.7-5.7×** the same fit without it, with
-Rwp identical, after WP-1335 cut the per-rung cost by about a third with every report number
-unchanged (it was 7.1-8.3× on the same machine before).  The texture, strain and satellite
-analyses re-run at *every* stage, and the charge is per rung, so the multiple grows as fits
-get faster.  *(Measured: WP-1335, CPU seconds, seven rungs, a heavily loaded Mac.)*
+Rwp identical.  It was 7.1-8.3× on the same machine before WP-1335 cut the per-rung cost by
+about a third; every report field stayed byte-identical on the two fixtures measured.  The
+texture, strain and satellite analyses re-run at *every* stage, and the charge is per rung,
+so the multiple grows as fits get faster.  *(Measured: WP-1335, CPU seconds, seven rungs, a heavily loaded Mac.)*
 Sample it — the first fit, the last, anything you will plot — rather than setting it on every
 fit of a long run.
 
