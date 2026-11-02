@@ -329,17 +329,18 @@ A single fit's `StageResult.rwp` holds the same number.
 `SequentialRefinement.results_`, one `RefinementResult` a pattern.
 
 Where `stage_reports=True` *does* apply — the single `Refinement.fit()` calls of a batch — it
-is expensive.  On the bundled NAC fixture it cost **6.5×**: 1.923 s against 0.296 s, median of
-three, with Rwp identical to six decimal places.  `cProfile` puts 75 % of the fit inside
-`_stage_report`, whose March-Dollase texture and Stephens strain analyses re-run at *every*
-stage and each cost more than the optimiser step they describe; the solve itself is 23 %.
+is expensive.  On the bundled NAC fixture it cost **4.7-5.7×** the same fit without it, with
+Rwp identical.  It was 7.1-8.3× on the same machine before WP-1335 cut the per-rung cost by
+about a third; every report field stayed byte-identical on the two fixtures measured.  The
+texture, strain and satellite analyses re-run at *every* stage, and the charge is per rung,
+so the multiple grows as fits get faster.  *(Measured: WP-1335, CPU seconds, seven rungs, a heavily loaded Mac.)*
 Sample it — the first fit, the last, anything you will plot — rather than setting it on every
 fit of a long run.
 
 That cost sits **outside** the stage brackets: Σ(`stage_start`→`stage_end`) was 11 % of wall
 clock with stage reports on and 50 % off, unchanged at 0.225 s against 0.223 s (the solve
 alone), while `fit_start`→`fit_end` covers ~100 % either way, so take a fit's cost from that
-span (§ 9c.11).
+span (§ 9c.11), or read the rungs' own share off `fit_end`'s `stage_report_seconds`.
 
 ## Microstrain evolves along a chain — leave it free, or it lands in the fractions
 

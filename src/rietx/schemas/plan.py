@@ -156,7 +156,7 @@ def check_phase_support_sigma(value: Any) -> float | None:
 #: 0.1 plain esd of the converged tails' on three of them
 #: (``tests/test_window_domain.py``).  SRM 660c LaB6 misses by 0.9 esd on U,
 #: from the Gaussian-variance clamp its high-angle reflections sit on, which
-#: moves U at any window (WP-1467).
+#: moves U at any window (WP-1955).
 CLOSING_WINDOW_TOL = 1e-3
 
 

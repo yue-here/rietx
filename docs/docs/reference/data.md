@@ -437,6 +437,7 @@ The space group's operators decide which combinations are independent, and the c
 It is the only legal starting point, because the width goes as a square root whose slope is unbounded at zero.
 It sets `vary=True` by default.
 Declaring the block locks `Phase.lor_strain`, whose column is the block's isotropic direction.
+The block replaces it: the width reads zero for `lor_strain` while a block is declared, whatever value the path stores.
 
 σ²(M) ≥ 0 couples all fifteen coefficients, so it cannot be a bound.
 The default solver holds it as a linear inequality.

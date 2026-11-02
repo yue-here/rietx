@@ -2914,7 +2914,7 @@ INTERMEDIATE_FTOL_DEFAULT = 1e-6
 #: * *What it costs.*  1.05-2.05x the fit time on those three and SRM 660c,
 #:   the fluorapatite the dearest (two runs each, interleaved, 2026-10-21).
 #: * *Where it fails.*  SRM 660c LaB6 stays 0.9 esd from the converged answer
-#:   in U, its Gaussian variance on the clamp floor at high angle (WP-1467),
+#:   in U, its Gaussian variance on the clamp floor at high angle (WP-1955),
 #:   and its two Biso starts land in mirrored axial minima (WP-2012).
 #: * *Why the suites here ride it.*  As for the schedule above: they say what
 #:   the shipped package reproduces, and each names the setting.

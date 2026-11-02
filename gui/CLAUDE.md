@@ -728,7 +728,9 @@ The **peak picker and indexing panel** (WP-1027, `src/rietx/gui/peaks.py`,
 indexing line meets the GUI line. Peak lists are a **project artifact**
 (`peaks.json`, keyed by `data_fingerprint` and refused against the wrong
 pattern); every edit refits exactly one group through the picker's own solver,
-and the human-owned facts (`origin`, `excluded`) carry across refits. The plot
+and the human-owned facts (`origin`, `excluded`) carry across refits. **A cross-group
+mark (`duplicate_line`, the ghosts) follows the edit by its judgement's change alone**
+(WP-2030); a new cross-group flag joins `_follow_cross_group_marks`. The plot
 is an editing surface **only while the Peaks tab is active**, and every pointer
 verb has a non-pointer route (typed 2θ, the `.rxt` peaks block — whose only
 editable columns are `2theta` and `flags`; everything else is derived and
