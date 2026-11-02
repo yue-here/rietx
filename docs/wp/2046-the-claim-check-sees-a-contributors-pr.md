@@ -1,6 +1,6 @@
 # WP-2046 — The claim check sees a contributor's PR on the WP it runs for
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-10-24 — a check that returned a false all-clear on a 1 764-line contributor PR; reading the PR list by hand is the workaround, and `/wp-start` step 2 already asks for it
