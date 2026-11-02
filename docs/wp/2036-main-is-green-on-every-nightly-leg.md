@@ -342,6 +342,14 @@ gh run list --workflow nightly.yml --branch main --limit 1
   no crawl was measured on it, so it was left. `test_window_domain`'s lab6
   rows compare two polishes from one answer, so they cannot cross labellings.
 
+  *Review.* `/code-review high --fix` found no correctness bug and fixed
+  three stale texts (`4f22e8a83`): the Biso row's xfail reason, the 150 K
+  docstring's opening "both converged", the probe's printed label. Declined:
+  sharing one ordering helper with `test_seed_invariance._answer` (they take
+  different inputs, and that file is outside this diff); ordering the pair
+  inside the package (WP-2012's scope); the macOS job's 90-min limit on a
+  hand-dispatched `full_macos` run (no macOS full-suite time was measured).
+
   *Gotchas.* The Biso row's strict xfail may XPASS once WP-2012 holds H/L.
 
   Next: merge #1309, then WP-2050's #1306; the first nightly after both is
