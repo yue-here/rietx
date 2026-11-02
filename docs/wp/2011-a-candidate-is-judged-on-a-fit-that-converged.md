@@ -663,7 +663,7 @@ validates no fewer candidates than on `main`.
 
 ## Handover log
 
-### 2026-11-02 — closed (PR PRNUM)
+### 2026-11-02 — closed (PR #1313)
 
 PR #1191 merged on 2026-10-29, so the indexer has checked its shortlist with a
 Pawley fit since then. Every task here was already ticked. This entry only
