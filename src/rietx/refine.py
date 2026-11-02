@@ -7090,11 +7090,19 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
             level="warning", code="STEPHENS_STRAIN_NOT_POSITIVE",
             where=list(finding.paths), value=finding.value,
             message=f"The Stephens strain coefficients of {msg} lie outside "
-                    "the physical cone.",
-            suggestion="Restart from the isotropic limit "
-                       "(StephensStrain.isotropic), refine fewer patterns "
-                       "(a higher-symmetry Laue class has fewer), or extend "
-                       "the fit range. Do not report the S_HKL as measured.",
+                    f"the physical cone.{finding.detail}",
+            suggestion="Under solver='trf', refit with the default LM "
+                       "driver, which holds σ²(M) ≥ 0 at every reflection; "
+                       "a joint fit holds it under neither driver, so fit "
+                       "each histogram alone or drop the block from the "
+                       "joint fit. That makes the coefficients "
+                       "admissible, not measured, so compare a few starts "
+                       "(StephensStrain.isotropic at different "
+                       "microstrains). Do not report the S_HKL as measured. "
+                       "This fit's other numbers (χ², cells, phase "
+                       "fractions) also leaned on the reflections left with "
+                       "no strain width; the share says how much of the "
+                       "phase's m·|F|² they carry.",
         ))
     for finding in guard.nonpositive_texture:
         msg = str(finding)
@@ -10909,15 +10917,18 @@ def _strain_flag_diagnostics(model: CompiledModel, values: dict[str, float],
 
     ``microstrain`` blocks are deliberately **not** covered; see the module's
     ``STRAIN_FLAG_WIDTH`` note and the PR that added it.  A declared Stephens
-    block *locks* ``lor_strain`` — its isotropic direction is identically that
-    column — so this cannot contradict it: a locked term keeps whatever value
-    it was given, and the block's own Λ(hkl) is not an entry with a width.
+    block *replaces* ``lor_strain`` — its isotropic direction is identically
+    that column, so the path is locked and the width law reads zero for it
+    (``CompiledModel.lor_strain_term``, WP-1467) — so its stored value is no
+    width and is not tested; the block's own Λ(hkl) is not an entry with a
+    width.
     """
     out: list[Diagnostic] = []
     for ip in range(len(model.phases)):
         name = structure.phases[ip].name
         for term, width in (
-                ("lor_strain", values.get(f"phases.{ip}.lor_strain")),
+                ("lor_strain", None if structure.phases[ip].microstrain is not None
+                 else values.get(f"phases.{ip}.lor_strain")),
                 ("gauss_strain", _sqrt_or_none(values.get(f"phases.{ip}.gauss_strain")))):
             if width is None or not width > STRAIN_FLAG_WIDTH:
                 continue

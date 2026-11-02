@@ -1742,9 +1742,12 @@ def _gsas_widths(instrument: Instrument, phase: Phase,
     fwhm_g = float(gaussian_fwhm(theta, p.u.value, p.v.value, p.w.value,
                                  phase.gauss_size.value,
                                  phase.gauss_strain.value)[0])
+    # a Stephens block replaces lor_strain (WP-1467,
+    # CompiledModel.lor_strain_term), so its stored value is no width here
+    lor_strain = 0.0 if phase.microstrain is not None else phase.lor_strain.value
     fwhm_l = float(lorentzian_fwhm(theta,
                                    p.x.value + phase.lor_size.value,
-                                   p.y.value + phase.lor_strain.value)[0])
+                                   p.y.value + lor_strain)[0])
     sig2 = (fwhm_g / CENTIDEG_TO_DEG) ** 2 * 1e-4 / GAUSS_CENTIDEG2_TO_DEG2
     return sig2, fwhm_l / CENTIDEG_TO_DEG
 

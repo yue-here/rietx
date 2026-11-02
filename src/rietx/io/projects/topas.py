@@ -5203,9 +5203,10 @@ def _width_lines(phase, spell=_spell_number, keep=None) -> list[str]:
     The forward model's laws (:mod:`rietx.model.profiles.caglioti`):
     Γ_L = lor_size/cosθ + (lor_strain + Λ(hkl))·tanθ and
     Γ_G² = gauss_strain·tan²θ + gauss_size/cos²θ beside the instrument's
-    terms, Λ from :func:`_stephens_lambda_expr`. A Stephens block *locks*
-    ``lor_strain`` (``Phase._one_strain_model``) rather than zeroing it, and
-    the forward model adds the two, so both are written. Each zero part is
+    terms, Λ from :func:`_stephens_lambda_expr`. A Stephens block *replaces*
+    ``lor_strain``: it locks the path (``Phase._one_strain_model``) without
+    zeroing the stored value, and the forward model reads zero for it
+    (``CompiledModel.lor_strain_term``, WP-1467), so only Λ is written. Each zero part is
     dropped, and a line with no part is not written, so a phase at every
     identity writes nothing and its file is byte-identical to one written
     before these lines existed. ``spell``/``keep`` are
@@ -5222,7 +5223,8 @@ def _width_lines(phase, spell=_spell_number, keep=None) -> list[str]:
     lor = []
     if on("lor_size", size):
         lor.append(f"{spell(size, 'lor_size')}/Cos(Th)")
-    tan = (([spell(strain, "lor_strain")] if on("lor_strain", strain) else [])
+    tan = (([spell(strain, "lor_strain")]
+            if block is None and on("lor_strain", strain) else [])
            + ([aniso] if aniso else []))
     if len(tan) == 1:
         lor.append(f"{tan[0]}*Tan(Th)")

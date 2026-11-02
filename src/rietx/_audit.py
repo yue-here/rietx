@@ -3455,7 +3455,7 @@ ROWS: tuple[Row, ...] = (
                   "5e-5's at every point on SRM 660c, FAP, cpd-1a and 11-BM NAC (0.022-0.091), "
                   "and the closing answer within 0.1 plain esd of the 5e-5 fixed point on FAP, "
                   "cpd-1a and NAC (0.008-0.019); LaB6 misses that by 0.908 esd on U from the "
-                  "Gaussian-variance clamp, which moves U at any window (WP-1467); 1.05-2.05x the "
+                  "Gaussian-variance clamp, which moves U at any window (WP-1955); 1.05-2.05x the "
                   "fit time (WP-2002, the sixth round's Q1 and Q2)")),
     Row("rietx.schemas.plan.CORRELATION_GUARD", "constant", value=0.98),
     Row("rietx.schemas.plan.INTERMEDIATE_FTOL", "constant", tier=3, value=1e-06,
@@ -3784,7 +3784,14 @@ ROWS: tuple[Row, ...] = (
                   "2026-10-20 (tests/test_acceptance_stephens.py's plan): CPD brucite chi2 7.7662 "
                   "from 1000 ppm against 8.3241 from the isotropic value; CPD corundum both starts "
                   "equal to 2e-10; suggest.SUGGEST_SEED_STEPHENS and viz.compare's Stephens "
-                  "variant take it by reference since the B14 lift"),
+                  "variant take it by reference since the B14 lift. WP-1467 (2026-11-02, the "
+                  "lor_strain floor removed), 1000 ppm against the carried lor_strain on the "
+                  "ray (29 ppm on brucite): LM chi2 7.8943 against 7.8939, TRF 7.9267 against "
+                  "7.7965; operando pattern 41 LM 1.170 against 1.112 with the two phase "
+                  "fractions swapped, TRF 1.156 against 1.476. Fold has no start where the phase "
+                  "carries no lor_strain (patterns 0 and 16, and any phase given its block at "
+                  "the outset, since the block replaces lor_strain), and where it has one LM "
+                  "favoured it twice and TRF once each way, so the fixed seed stands"),
         grounds=("Some start is forced, since the width's square root has unbounded slope at "
                  "zero; kept at 1000 ppm until a second dataset compares the starts (B3, ruled "
                  "2026-10-19); the second compared them on 2026-10-20 and favoured 1000 ppm."),
@@ -3908,7 +3915,7 @@ ROWS: tuple[Row, ...] = (
                   "is CLOSING_WINDOW_TOL's row; SRM 660c's cell 4.1568823 A without it and "
                   "4.1568821 with it, +24.6 ppm from the reference both ways; it fails twice: on "
                   "SRM 660c one closing solve sits 0.908 esd from the fixed point in u (the "
-                  "Gaussian clamp, WP-1467), and under TRF it collapses CPD brucite's S_HKL "
+                  "Gaussian clamp, WP-1955), and under TRF it collapses CPD brucite's S_HKL "
                   "(t = -268); recorded in RefinementResult.stages as the stage named "
                   "'closing'; solve_magnetic runs it on its winner too, when the package "
                   "chose the plan and the verdict is solved, after ranking every trial "
