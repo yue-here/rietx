@@ -34,20 +34,37 @@ and the TYPIX-based databases:
 - rule 3, the cell: (a) triclinic, the Niggli-reduced cell
   (:func:`rietx.indexing.reduce.reduce_cell`, ε as there); (b) monoclinic P
   without a glide, the "reset" Niggli cell, a and c the shortest translations
-  ⊥ b with a ≤ c and β ≥ 90°; (c) orthorhombic, a ≤ b ≤ c where the affine
+  ⊥ b with a ≤ c and β ≥ 90°; monoclinic with a glide or a C lattice (Pc,
+  P2/c, P2₁/c, C2, Cm, Cc, C2/m, C2/c), the "best" cell for cell choice 1 of
+  Parthé & Gelato (1985), *Acta Cryst.* A41, 142–151 (page images checked;
+  ``planning/papers`` note): a and c the shortest translations ⊥ b among the
+  bases that keep the standard symbol, β non-acute, and no a ≤ c order, since
+  interchanging a and c would leave cell choice 1 (their Sc₂FeSi₂ best cell,
+  Table 3 p. 151, has a > c); (c) orthorhombic, a ≤ b ≤ c where the affine
   normaliser allows all six relabellings, a ≤ b where it allows the swap,
   computed per group from the normaliser's linear parts
   (:func:`orthorhombic_relabellings`) and applied lexicographically, which is
   the paper's statement where it applies.
 
-**Not built here (deferred):** the monoclinic centred or glide groups (C2, Pc,
-Cm, Cc, C2/m, P2/c, P2₁/c, C2/c).  Their cell is "the shortest non-parallel
-translations ⊥ b, β non-acute, that keep the standard symbol", whose details
-Parthé & Gelato defer to Parthé & Gelato (1985), *Acta Cryst.* A41, 142, which
-is not held (FETCH 469).  Until it is, only β ≥ 90° is applied to them, a flip
-of b and c every b-unique monoclinic group allows, and
-:attr:`StandardSetting.cell_rule` says the rest is owed.
-TODO(FETCH 469): the symbol-keeping monoclinic re-set.
+**The 1985 rule, as built.**  With a′ = p·a + q·c, b′ = t·b, c′ = r·a + s·c
+(the paper's eq. 1, p. 143), the bases that keep the symbol are those of its
+Table 1 (p. 146): p odd and r even for Pc, P2/c and P2₁/c (the glide stays a
+c glide); q even and s odd for the five C groups (the centring stays C); for
+Cc and C2/c also p odd, which q even and |ps − qr| = 1 already imply.  Each
+set is a group, so the cell is reached as the paper reaches it (p. 145), by
+repeated "first" transformations, each a shorter a′ = a + k·c or c′ = c + m·a
+with k, m of the allowed parity: a Gauss reduction in the (a, c) plane whose
+steps keep the parity.  It stops where no allowed step shortens a or c,
+which is the 1001 field of the paper's Figs. 3(a) and 4(a), bounded by the
+lines of its eq. (6) (p. 147); a test checks against a brute-force search
+that a and c are then the shortest allowed translations.  Of the sign
+choices the paper's note (3), p. 144, takes r, s ≥ 0, so s > 0 here (s is
+odd, never 0); then a′ is negated if β′ would be acute, and t is the sign
+that makes det P = +1 (rule 1).  For Cc and C2/c a transformation with r odd
+needs an origin shift (Table 1: 0, ¼, 0 and ¼, ¼, 0).  It is not tabulated
+here but solved exactly: the first shift on the ¼ grid, zero first, that
+carries the operation list onto ITA's.  The paper's three demonstrations
+(p. 147) and its Sc₂FeSi₂ pair (Table 3) are tests.
 
 The group step reuses the one standardiser of
 :mod:`.representation.subgroups` (``_standardise``, Yue on #806): a probe
@@ -511,6 +528,66 @@ def _reset_monoclinic(G: np.ndarray):
     return _mat(P.tolist())
 
 
+def _best_monoclinic(G: np.ndarray, centred: bool):
+    """Parthé & Gelato (1985)'s best cell for cell choice 1 of a glide or C group (module docstring).
+
+    a′ = a + k·c with k even for a C lattice (q even), any k for a c glide;
+    c′ = c + m·a with m even for a c glide (r even), any m for a C lattice.
+    Each step takes the allowed multiple nearest the projection, which is the
+    shortest of that kind, and is kept only if it shortens by more than ε.
+    """
+    eps = _eps(G)
+    step_a, step_c = (2, 1) if centred else (1, 2)
+    a, c = np.array([1, 0, 0]), np.array([0, 0, 1])
+
+    def dot(u, v):
+        return float(u @ G @ v)
+
+    def nearest(x: float, step: int) -> int:
+        return step * round(x / step)
+
+    while True:
+        moved = False
+        k = nearest(dot(a, c) / dot(c, c), step_a)
+        if k and dot(a - k * c, a - k * c) < dot(a, a) - eps:
+            a, moved = a - k * c, True
+        m = nearest(dot(a, c) / dot(a, a), step_c)
+        if m and dot(c - m * a, c - m * a) < dot(c, c) - eps:
+            c, moved = c - m * a, True
+        if not moved:
+            break
+    if c[2] < 0:  # note (3), p. 144: r, s >= 0; s is odd, so s > 0
+        c = -c
+    if dot(a, c) > eps:  # beta' non-acute
+        a = -a
+    P = np.column_stack([a, np.array([0, 1, 0]), c])
+    if round(np.linalg.det(P)) < 0:
+        P[:, 1] = -P[:, 1]
+    return _mat(P.tolist())
+
+
+@lru_cache(maxsize=None)
+def _setting_group(xhm: str) -> _Group:
+    return _from_operations(gemmi.find_spacegroup_by_name(xhm).operations())
+
+
+def _origin_keeping(xhm: str, P) -> tuple:
+    """The first shift p on the ¼ grid (zero first) with (P, p) carrying ``xhm``'s operation list onto itself.
+
+    A monoclinic operation's rotation is diagonal with entries ±1 in the b-unique
+    setting and its translations lie on the ½ grid, so (W − 1)p ≡ δ fixes p
+    modulo ½ from a δ on that grid, and the ¼ grid holds a solution whenever one
+    exists (the paper's Table 1 shifts, 0, ¼, 0 and ¼, ¼, 0, are on it).
+    """
+    group = _setting_group(xhm)
+    key = group.key()
+    grid = [Fraction(k, 4) for k in range(4)]
+    for t in itertools.product(grid, repeat=3):
+        if group.transformed(P, t).key() == key:
+            return tuple(t)
+    raise RuntimeError(f"no origin keeps {xhm!r} under the best-cell basis; this is a bug")  # pragma: no cover
+
+
 def _ordered(G: np.ndarray, relabellings) -> tuple:
     """The relabelling whose lengths are lexicographically smallest, ties (within ε) to the earlier."""
     eps = _eps(G)
@@ -543,11 +620,9 @@ def _cell_rule(number: int, xhm: str, G: np.ndarray):
     if number <= 15:
         if _primitive_without_glide(number):
             return _reset_monoclinic(G), _zero(), "R3b: reset Niggli cell (a ≤ c, β ≥ 90°)"
-        P = _mat(_I3)
-        if G[0, 2] > _eps(G):  # β < 90°: (a, -b, -c) keeps every b-unique symbol
-            P = _mat(((1, 0, 0), (0, -1, 0), (0, 0, -1)))
-        return P, _zero(), ("R3b deferred: β ≥ 90° only; the symbol-keeping shortest a, c needs "
-                          "Parthé & Gelato 1985 (FETCH 469)")
+        P = _best_monoclinic(G, centred=xhm.startswith("C"))
+        return P, _origin_keeping(xhm, P), ("R3b: best cell for cell choice 1 (Parthé & Gelato 1985): "
+                                            "a, c the shortest the symbol allows, β ≥ 90°")
     if number <= 74:
         P, p = _ordered(G, orthorhombic_relabellings(xhm))
         return P, p, "R3c: a ≤ b ≤ c over the affine normaliser's relabellings"
@@ -564,8 +639,7 @@ class StandardSetting:
     the input's type was the larger-screw member of an enantiomorphic pair, so
     the result describes its mirror image in the partner group (Parthé &
     Gelato 1984 p. 174: the true structure is −x of the standardized one, in
-    the input's type).  ``cell_rule`` names the rule-3 step taken, or says it
-    is owed.
+    the input's type).  ``cell_rule`` names the rule-3 step taken.
     """
 
     phase: object
@@ -591,9 +665,9 @@ def standard_setting(phase, *, origin_choice: int = 2, smaller_screw: bool = Tru
     ``origin_choice`` (2, the paper's rule 2(c), unless 1 is asked for).  With
     ``smaller_screw`` (rule 2(d)) a larger-screw enantiomorph is restated as
     the mirror image in its partner, ``inverted`` reporting it.  With
-    ``reduce_cell`` (rule 3), the cell step of the module docstring; the
-    monoclinic centred and glide groups get β ≥ 90° only, the rest owed to
-    Parthé & Gelato 1985 (FETCH 469).  Rules 4-6 (representative triplets, Γ,
+    ``reduce_cell`` (rule 3), the cell step of the module docstring, with
+    Parthé & Gelato (1985)'s best cell for the monoclinic centred and glide
+    groups.  Rules 4-6 (representative triplets, Γ,
     atom order) are not applied: the atom list is the input's, each atom moved
     to the new axes.
 

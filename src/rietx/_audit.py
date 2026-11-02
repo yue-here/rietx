@@ -4319,9 +4319,10 @@ ROWS: tuple[Row, ...] = (
         ambiguity=1, value=True,
         evidence=("Parthé & Gelato (1984) p. 173 rule 3 (Niggli triclinic cell; reset monoclinic "
                   "cell; orthorhombic a ≤ b ≤ c over the affine normaliser, Burzlaff & Zimmermann "
-                  "1980); its ε is indexing.reduce.NIGGLI_EPS_RELATIVE, Grosse-Kunstleve et al. 2004; "
-                  "the monoclinic glide/centred case is owed to Parthé & Gelato 1985; False stops at "
-                  "rule 2")),
+                  "1980); the monoclinic glide and C groups' best cell for cell choice 1, Parthé & "
+                  "Gelato (1985) Acta Cryst. A41, 142, Table 1 p. 146 and Figs. 3(a), 4(a), "
+                  "page-verified; its ε is indexing.reduce.NIGGLI_EPS_RELATIVE, Grosse-Kunstleve et "
+                  "al. 2004; False stops at rule 2")),
     # suggestion: 197
     Row("ABSORPTION_ESTIMATE_UNAVAILABLE.suggestion", "suggestion", value=1),
     Row("ABSORPTION_MU_R_OUT_OF_RANGE.suggestion", "suggestion", value=1),

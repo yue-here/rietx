@@ -217,10 +217,20 @@ and the result saying so. The group step is the one standardiser above, given
 the Hall number of the target setting, because spglib's default for the
 two-origin types is origin choice 1. Rule 3 is the cell: the Niggli cell for a
 triclinic group; for a monoclinic P group without a glide, the shortest a and c
-normal to b with a ≤ c and β ≥ 90°; for an orthorhombic group, a ≤ b ≤ c over
-the relabellings its affine normaliser contains, computed from the operations
-(six for P2₁2₁2₁, two for Cmmm, three cyclic ones for Pbca, one for Pnma). The
-monoclinic centred and glide groups get β ≥ 90° only: their rule keeps the
-symbol with the shortest translations, and its details are in a later paper
-the package does not yet implement. The representative coordinates, the
-standardization parameter Γ and the atom order (rules 4–6) are not applied.
+normal to b with a ≤ c and β ≥ 90°; for a monoclinic group with a glide or a
+C lattice, the "best" cell for cell choice 1 {cite}`parthe1985`; for an
+orthorhombic group, a ≤ b ≤ c over the relabellings its affine normaliser
+contains, computed from the operations (six for P2₁2₁2₁, two for Cmmm, three
+cyclic ones for Pbca, one for Pnma). The best cell keeps the standard symbol
+and has the shortest a and c normal to b that allow it, with β ≥ 90°. Writing
+a′ = pa + qc and c′ = ra + sc, the glide groups Pc, P2/c and P2₁/c allow p odd
+and r even, and the five C groups allow q even and s odd (Table 1 there,
+p. 146). Each set of bases is a group, so the cell is reached by repeated
+steps a′ = a + kc or c′ = c + ma of the allowed parity, each kept only if it
+shortens an axis, which is the paper's own procedure (p. 145). There is no
+a ≤ c order, because exchanging a and c leaves cell choice 1. For Cc and C2/c
+a step with r odd moves the origin (by 0, ¼, 0 or ¼, ¼, 0); the shift is
+solved exactly from the operations, and the tests hold the paper's three
+worked examples (p. 147) to their printed matrices, cells and shifts. The
+representative coordinates, the standardization parameter Γ and the atom
+order (rules 4–6) are not applied.

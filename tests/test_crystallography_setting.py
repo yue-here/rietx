@@ -269,7 +269,7 @@ def test_p21n_goes_to_p21c_on_the_cod_fixture():
     r = S.standard_setting(ph)
     assert r.symbol == "P 1 21/c 1" and r.phase.space_group == "P 1 21/c 1"
     assert r.phase.cell.beta.value >= 90.0
-    assert "FETCH 469" in r.cell_rule
+    assert "Parthé & Gelato 1985" in r.cell_rule
     vol = np.sqrt(np.linalg.det(_metric(_six(ph))))
     assert np.sqrt(np.linalg.det(_metric(_six(r.phase)))) == pytest.approx(vol, rel=1e-12)
     _assert_f2_invariant(ph, r.phase, r.P)
@@ -382,12 +382,140 @@ def test_orthorhombic_cell_is_ordered_where_the_normaliser_allows():
     assert _six(S.standard_setting(ph).phase)[:3] == pytest.approx((9.2, 5.3, 7.1))
 
 
-@pytest.mark.xfail(strict=True, reason="FETCH 469: the monoclinic centred/glide re-set needs "
-                                       "Parthé & Gelato (1985) Acta Cryst. A41, 142, not held")
-def test_monoclinic_glide_cell_keeps_the_symbol_with_the_shortest_axes():
-    ph = Structure.from_cif(DATA / "cod_2104364.cif").phases[0]
+# Parthé & Gelato (1985) Acta Cryst. A41, 142: the best cell for cell choice 1.  Their three
+# demonstrations (p. 147): input cell, best cell, the pqrs t of the one-step matrix
+# (a' = pa + qc, b' = tb, c' = ra + sc), and the origin shift of Table 2 added to the
+# transformed coordinates (x'' = P⁻¹x + s, so p = -P·s in the module's convention).
+PG1985_DEMOS = [
+    pytest.param("C 1 2/c 1", (25.04, 3.935, 29.53, 90, 122.0, 90), (25.04, 3.935, 26.746, 110.56),
+                 (-1, 0, 1, 1, -1), (Fraction(1, 4), Fraction(1, 4), 0), id="chlorobenzophenone-C2/c"),
+    pytest.param("C 1 c 1", (16.27, 5.632, 13.23, 90, 134.8, 90), (16.27, 5.632, 11.68, 126.5),
+                 (-1, 0, 1, 1, -1), (0, Fraction(1, 4), 0), id="afwillite-Cc"),
+    pytest.param("P 1 2/c 1", (8.96, 4.49, 14.62, 90, 145.43, 90), (8.85, 4.49, 10.17, 124.30),
+                 (-1, -1, 2, 1, 1), (0, 0, 0), id="sylvanite-P2/c"),
+]
+
+
+def _pqrst(P):
+    return (P[0][0], P[2][0], P[0][2], P[2][2], P[1][1])
+
+
+@pytest.mark.parametrize("symbol, cell, best, pqrst, shift", PG1985_DEMOS)
+def test_monoclinic_best_cell_is_the_papers_demonstration(symbol, cell, best, pqrst, shift):
+    """PG 1985 p. 147: the matrix (Figs. 3(a), 4(a)), the best cell and Table 2's origin shift, as printed."""
+    ph = _phase(symbol, cell, GENERAL, aniso=True)
     r = S.standard_setting(ph)
-    assert "deferred" not in r.cell_rule
+    assert r.symbol == symbol and r.cell_rule.startswith("R3b: best cell")
+    assert _pqrst(r.P) == pqrst
+    assert all(r.P[i][j] == 0 for i, j in ((0, 1), (1, 0), (1, 2), (2, 1)))
+    s = tuple(Fraction(x) for x in shift)
+    assert r.p == tuple(-x for x in S._mv(r.P, s))
+    a, b, c, _, beta, _ = _six(r.phase)
+    assert (a, b, c) == pytest.approx(best[:3], abs=0.006)
+    assert beta == pytest.approx(best[3], abs=0.01)
+    _assert_f2_invariant(ph, r.phase, r.P)
+    again = S.standard_setting(r.phase)
+    assert again.P == S._mat(S._I3) and all(x == 0 for x in again.p)
+
+
+def test_monoclinic_framed_matrix_needs_its_origin_shift():
+    """Table 1 (p. 146): for Cc and C2/c a matrix with r odd keeps the symbol only with the shift."""
+    for symbol in ("C 1 c 1", "C 1 2/c 1"):
+        group = _from_operations(gemmi.find_spacegroup_by_name(symbol).operations())
+        P = S._mat(((-1, 0, 1), (0, -1, 0), (0, 0, 1)))
+        assert group.transformed(P, S._zero()).key() != group.key()
+        assert group.transformed(P, S._origin_keeping(symbol, P)).key() == group.key()
+    group = _from_operations(gemmi.find_spacegroup_by_name("C 1 2/m 1").operations())
+    assert group.transformed(P, S._zero()).key() == group.key()   # no glide: no shift (Table 1)
+
+
+@pytest.mark.parametrize("symbol, cell, best", [
+    pytest.param("I 1 a 1", (11.68, 5.632, 13.23, 90, 98.7, 90), ("C 1 c 1", 16.27, 5.632, 11.68, 126.5),
+                 id="afwillite-Ia-cell-choice-3"),
+    pytest.param("P 1 2/n 1", (8.85, 4.49, 8.96, 90, 110.36, 90), ("P 1 2/c 1", 8.85, 4.49, 10.17, 124.30),
+                 id="sylvanite-P2/n-cell-choice-2"),
+])
+def test_monoclinic_other_cell_choices_reach_the_same_best_cell(symbol, cell, best):
+    """PG 1985 p. 150 (footnote): the fully reduced cells of two demonstrations, in cell choices 3 and 2."""
+    ph = _phase(symbol, cell, GENERAL)
+    r = S.standard_setting(ph)
+    assert r.symbol == best[0]
+    a, b, c, _, beta, _ = _six(r.phase)
+    assert (a, b, c) == pytest.approx(best[1:4], abs=0.006)
+    assert beta == pytest.approx(best[4], abs=0.02)
+    _assert_f2_invariant(ph, r.phase, r.P)
+
+
+def _orbit(phase, xyz):
+    sg = resolve_group(phase.space_group, phase.symmetry_operations)
+    return [np.array(op.apply_to_xyz(list(xyz))) % 1.0 for op in sg.operations()]
+
+
+def test_monoclinic_sc2fesi2_reduced_a_cell_goes_to_the_best_c_cell():
+    """PG 1985 Table 3 (p. 151), ref. (a): A 1 2/m 1 (cell choice 2) to C 1 2/m 1 with a > c, all sites 4(i).
+
+    Atoms agree with the paper's best-cell column up to their own orbit and one origin
+    shift of C2/m's normaliser (0 or ½ along each axis), the choice rule 4 (S1) makes.
+    """
+    a_cell = [("Sc", (0.1731, 0, 0.0002)), ("Sc", (0.6077, 0, 0.1856)), ("Fe", (0.1305, 0, 0.2720)),
+              ("Si", (0.0652, 0, 0.6433)), ("Si", (0.3766, 0, 0.5109))]
+    c_cell = [(-0.0002, 0, 0.3269), (0.1856, 0, 0.1077), (0.2720, 0, 0.6305), (0.3567, 0, 0.4348),
+              (0.4891, 0, 0.1234)]
+    ph = _phase("A 1 2/m 1", (9.414, 3.9912, 9.916, 90, 118.15, 90), a_cell)
+    r = S.standard_setting(ph)
+    assert r.symbol == "C 1 2/m 1"
+    assert _six(r.phase) == pytest.approx((9.916, 3.9912, 9.414, 90, 118.15, 90), abs=1e-9)
+    group = _from_operations(gemmi.find_spacegroup_by_name("C 1 2/m 1").operations())
+    shifts = [d for d in itertools.product((0, Fraction(1, 2)), repeat=3)
+              if group.transformed(S._mat(S._I3), d).key() == group.key()]
+    assert len(shifts) == 8
+
+    def matches(d):
+        for atom, want in zip(r.phase.atoms, c_cell):
+            x = np.array([atom.x.value, atom.y.value, atom.z.value]) - np.array([float(v) for v in d])
+            if not any(np.max(np.abs((y - np.array(want) + 0.5) % 1 - 0.5)) < 2e-4 for y in _orbit(r.phase, x)):
+                return False
+        return True
+
+    assert any(matches(d) for d in shifts)
+    _assert_f2_invariant(ph, r.phase, r.P)
+
+
+@pytest.mark.parametrize("centred", [False, True])
+def test_monoclinic_best_cell_is_the_shortest_the_symbol_allows(centred):
+    """Brute force over every basis with entries in [-6, 6] that keeps the symbol (Table 1 parities)."""
+    rng = np.random.default_rng(1985 + centred)
+    allowed = []
+    for p, q, r_, s in itertools.product(range(-6, 7), repeat=4):
+        if abs(p * s - q * r_) == 1 and ((q % 2 == 0 and s % 2 == 1) if centred else (p % 2 == 1 and r_ % 2 == 0)):
+            allowed.append((p, q, r_, s))
+    M = np.array(allowed)
+    for _ in range(300):
+        six = (rng.uniform(3, 15), 6.0, rng.uniform(3, 15), 90.0, rng.uniform(90.5, 165.0), 90.0)
+        G = _metric(six)
+        P = S._best_monoclinic(G, centred)
+        p, q, r_, s, t = _pqrst(P)
+        assert abs(t) == 1 and S._det(P) == 1 and s > 0
+        assert (q % 2 == 0 and s % 2 == 1) if centred else (p % 2 == 1 and r_ % 2 == 0)
+        Pf = np.array([[float(x) for x in row] for row in P])
+        Gp = Pf.T @ G @ Pf
+        assert Gp[0, 2] <= 1e-9                                   # beta' non-acute
+        G2 = G[np.ix_((0, 2), (0, 2))]
+        la = np.einsum("ni,ij,nj->n", M[:, :2], G2, M[:, :2]).min()
+        lc = np.einsum("ni,ij,nj->n", M[:, 2:], G2, M[:, 2:]).min()
+        assert Gp[0, 0] <= la + 1e-7 and Gp[2, 2] <= lc + 1e-7
+
+
+def test_monoclinic_best_cell_round_trips():
+    ph = _phase("C 1 2/c 1", (25.04, 3.935, 29.53, 90, 122.0, 90), GENERAL, aniso=True)
+    r = S.standard_setting(ph)
+    Pinv = S._inv(r.P)
+    back = S.change_basis(r.phase, Pinv, tuple(-x for x in S._mv(Pinv, r.p)))
+    np.testing.assert_allclose(_six(back), _six(ph), atol=1e-12)
+    for x, y in zip(back.atoms, ph.atoms):
+        d = np.array([x.x.value - y.x.value, x.y.value - y.y.value, x.z.value - y.z.value])
+        assert np.max(np.abs((d + 0.5) % 1 - 0.5)) < 1e-12
+        np.testing.assert_allclose(x.aniso.values(), y.aniso.values(), atol=1e-12)
 
 
 # ---------------------------------------------------------------- the whole step
