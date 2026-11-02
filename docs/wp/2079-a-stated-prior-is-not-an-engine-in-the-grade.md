@@ -1,6 +1,6 @@
 # WP-2079 — A stated prior is not an engine in the grade
 
-Milestone: unscheduled · Status: ✅ 2026-11-02 — the grade's two-engine floor counts engines, a stated prior excluded (PR #PRNUM)
+Milestone: unscheduled · Status: ✅ 2026-11-02 — the grade's two-engine floor counts engines, a stated prior excluded (PR #1327)
 Track: What fires, and what stays silent
 Depends on: —
 
@@ -155,7 +155,7 @@ reader-output change, and it waits for the maintainer before merge.
   a rule). Declined: the #1308 story written in two docstrings, cosmetic.
 - *Generality.* No row added, changed or removed in `_audit.py`; no new
   constant, ordering or fallback. Not dispatched.
-- *Next.* The maintainer approves the grade change (PR body, Reader-output
+- *Next.* The maintainer approves the grade change (PR #1327, Reader-output
   changes), then merges. Optional: rule on the svd seed's independence.
 
 - **2026-11-02** — created. No open WP owns the prior's place in the grade:
