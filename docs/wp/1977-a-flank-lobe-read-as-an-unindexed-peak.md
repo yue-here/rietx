@@ -173,6 +173,100 @@ the impurity call is made. A tetragonal specimen modelled cubic keeps
 
 ## Handover log
 
+- **2026-11-02** — reworked to Yue's ruling, PR #1295. The report no
+  longer hides a residual peak on the side of a drawn peak. It lists every
+  one again, and each says whether the observed curve joins it to a drawn
+  peak with no resolving dip, which peak, how far out in FWHM, and how many
+  lines as strong carry such a lobe on the same side. For a row on a flank
+  the report suggests no impurity phase, and it names no other single cause:
+  a shape misfit, an unmodelled Kα2, a lower symmetry and a foreign line all
+  leave that shoulder, and the agent reading the report weighs them.
+
+  *Ruled* (Yue, 2026-11-01): "better a false negative than a false
+  positive"; "rather than assign it specifically, shouldn't we leave it to a
+  driving agent to decide?"; "go -- runner first checks this design against
+  our docs". The check found no conflict (DESIGN.md Rules 1-4, generality.md
+  § The rule, § Demotion, § Attention is a cost, the skill's placement rule,
+  CLAUDE.md's WP-1076 rule).
+
+  *Done.* `report.schemas.FlankEvidence` and `UnmatchedPeak.flank`
+  (`None` = not measured, every `unmatched_calc` row); its writer
+  `report.layer0._flank_evidence`, one per `unmatched_obs` row, pinned by
+  `_every_row_measured`. `report.layer2._strong_unmatched` drops flank rows
+  from `add_impurity_phase` and from `cap_texture_crosstalk`; the rationale
+  counts them. `help.py`: twelve result-field entries, the four causes under
+  `UnmatchedPeak.flank`, and `min_peak_sigma` quoted rather than a literal
+  5σ. Skill: one `references/abstention.md` row keyed by `flank.on_flank`;
+  body rule 11, `judging.md` §4b and the `numbers.md` impurity row point
+  there, net +2 B on the body. Manual (`concepts/report.md`,
+  `reference/report.md`, `result-fields.md`), practice survey, release
+  note, milestone, `VALIDATION.md`, WP-2004 and WP-2054 notes.
+  `THRESHOLDS_VERSION` stays 1.14, its line rewritten for the new field and
+  the withheld call. The `INDEXING_THRESHOLDS_VERSION` "Also 1.12" line is
+  gone: no row leaves the list, so the indexing count is main's again.
+
+  *Measured* (`[dev]` venv, darwin/arm64; stored fits rebuilt on this head).
+  Row counts equal main's on all fourteen fits. 66 of 116 `unmatched_obs`
+  rows are on a flank, 18 of the 28 above 8σ. `add_impurity_phase` goes
+  from cpd-1b (0.50) and SRM 660c with the apertures at 0 (0.50); it stays
+  on cpd-4 (0.40) and the diverged cpd-1c 20-40° fit (0.90). SRM 660c's
+  low-side lobes recur on 2 of 2 to 4 of 7 lines as strong; a lone synthetic
+  shoulder 1 FWHM below a LaB₆ line, 84σ tall, counts 1 of 3 and buys no
+  impurity call, which is the false negative the ruling accepts. The
+  synthetic asymmetry case counts 1 of 14, its other lobes under 5σ, so the
+  count can say "most lines" and cannot say "this line only"; the help entry
+  says so. A tetragonal LaB₆ (c/a 1.004) modelled cubic keeps
+  `reindex_or_recheck_cell` 0.4 and the capped impurity call, as on main.
+  W1 (11-BM NAC CaF₂) and W2 (Kα2 satellites) pass, 3 rows: the CaF₂ call
+  still leads and the satellites still read as unmatched with the call live.
+  Gates: fast selection alone on the machine, 13221
+  passed, 310 skipped, 32 xfailed, 3 failed. Two were this branch's and are
+  fixed: the stale WP index and the GUI help-key fixture, which gains the
+  twelve entries; their files then passed, 30. The third is
+  `test_display.py`'s kernel row, this Mac's Jupyter kernel spec. Vitest 591
+  passed. `test_acceptance_indexing.py` 45 passed; the QPA acceptance rows
+  and `test_flank_lobes.py` 19 passed. Ruff clean, `tests.audit_delta` no
+  change, skill caps inside budget (body +2 B). `python -m tests.reader_output`
+  exits 0, unchanged.
+
+  *Generality* (generality-review, 2026-11-02, summarised). Flank test:
+  holds, tier 3, kind 2 now handled as kind 2. The two 5σ levels: weak,
+  tier 3, "a factor is a threshold of its own"; the help entry now quotes
+  `min_peak_sigma`, and the seat stays WP-2004's. Recurrence counts: weak,
+  arithmetic with rietx's own definitions and no threshold; the lone-shoulder
+  test now checks the count reads 1, and the help entry says what it misses.
+  Withheld `add_impurity_phase`: holds, tier 3, on the ruling. No `_audit`
+  row owed; proposed for WP-2004 (approval Yue's): a seat
+  `build_report:min_peak_sigma`, and grounds on `IMPURITY_SIGMA`'s row
+  naming the flank exclusion. Declined: a summary clause counting flank
+  rows, which the reviewer asked under § Demotion's "one line naming the
+  field"; the ruled design keeps the SRM 660c summary as it is, so it is
+  Yue's call (below). Not taken: the `_audit.py` docstring's list of what
+  the table cannot see omits Layer 2's action gates (WP-2004's area).
+
+  *Settled by Claude.* (1) The seat is a record field, not a diagnostic, under
+  generality.md § Attention is a cost, clause 1; a diagnostic would fire on
+  most fits with strong lines. (2) The four causes live in `help.py` and the
+  skill row points there, under § Demotion's "never in the skill alone".
+  (3) "Similar offset" is not a tolerance: the count is same side only, and
+  each row carries its own offset, under "a factor is a threshold of its
+  own". (4) The skill row went to `abstention.md`, because `judging.md` sits
+  at its budget (`tests/skill_caps.py`). (5) Withholding the call rather than
+  Layer 2's capped-alternative seat: a `SuggestedAction` headline is a pick,
+  and two of the four causes have no `ActionKind`. (6) No
+  `INDEXING_THRESHOLDS_VERSION` line, since the count no longer moves.
+
+  *Question for Yue.* When every strong residual sits on a flank (SRM 660c
+  with the apertures at 0), no action is built and the summary reads "11
+  observed peak(s) match no reflection." with nothing pointing at the
+  evidence. Add a summary clause such as "(11 on a drawn flank: see
+  `UnmatchedPeak.flank`)"? For: § Demotion asks the report to carry one line
+  naming a demoted statistic's field. Against: it changes printed reader
+  output, which the ruled design kept unchanged. Lean: add it, as one clause.
+
+  Next: Yue reviews PR #1295 and answers the question. Then WP-2054 builds
+  its asymmetry test on the SRM 660c case, reading the flank offsets.
+
 - **2026-11-01** — closed, PR #1295. The fit report no longer calls a
   misfit lobe on the side of a drawn peak an unindexed line. Such a lobe
   is joined to the peak by the observed curve, with no dip between them,
