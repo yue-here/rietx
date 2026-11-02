@@ -270,9 +270,11 @@ Surveyed 2026-11-01 for WP-1977, on when Layer 0 should call a residual peak uni
 So the programs match an *observed* peak list to calculated lines, inside indexing, with a
 fixed angular or sin²θ window. None scales the window with the peak width, and none flags a
 difference-curve peak after a Rietveld fit. rietx's `unmatched_obs` has no direct precedent.
-The flank test it now uses is the reader's eye made explicit. A residual peak whose observed
-curve rises without a resolved valley into a peak the model draws is part of that peak, and
-one separated from it by a valley is a line of its own.
+The programs leave the difference curve to the person reading it. So rietx lists every
+residual peak and records what that reader looks at: whether a valley separates the peak
+from the calculated peak beside it, how far out it sits in that peak's FWHM, and whether the
+other strong lines carry the same lobe. It names no cause for an unresolved shoulder, and
+suggests no impurity phase for one (WP-1977, ruled 2026-11-01).
 
 ## Sequential refinement
 

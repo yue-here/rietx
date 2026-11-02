@@ -79,15 +79,19 @@ nothing ported.
 
 ### Inherited
 
-- 2026-11-01, from WP-1977 (PR #1295): Layer 0 now explains a residual lobe
-  that the observed curve joins to a drawn peak. On #1106's script with the
-  apertures at 0, `unmatched_obs` falls from 11 to 0 and `add_impurity_phase`
-  0.50 is gone, measured on that branch (`[dev]`, darwin/arm64). The one
-  active action left is `increase_background_flexibility` 0.47. So the
-  failing test this WP plans must assert on the asymmetry action's absence;
-  its "suggests `add_impurity_phase`" half no longer reproduces once WP-1977
-  merges, and the Acceptance clause "`add_impurity_phase` is not the top
-  action" holds already.
+- 2026-11-02, from WP-1977 (PR #1295, reworked to Yue's ruling of
+  2026-11-01): every `unmatched_obs` row stays listed and carries
+  `UnmatchedPeak.flank`. On #1106's script with the apertures at 0, all 11
+  rows say `on_flank`, at 0.9-3.0 FWHM below their LaB₆ line and one 1.0
+  above, and `add_impurity_phase` 0.50 is gone, because Layer 2 no longer
+  counts a row on a flank (rebuilt from the stored fit, `[dev]`,
+  darwin/arm64). The other active action, `increase_background_flexibility`
+  0.47, is untouched. So the failing test this WP plans must assert on the
+  asymmetry action's absence; its "suggests `add_impurity_phase`" half no
+  longer reproduces once WP-1977 merges, and the Acceptance clause
+  "`add_impurity_phase` is not the top action" holds already. The flank rows'
+  offsets and their `lines_with_lobe` counts are evidence an asymmetry test
+  can read.
 
 - 2026-10-31, from the issue triage (issue #1106): the reporter (2026-10-29)
   brings evidence for direction (a) and one new ask, with no code and no

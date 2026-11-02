@@ -597,15 +597,15 @@ Quantitative phase analysis against weighed truth, at tolerances referenced to w
 
 **Diagnostics:** `BRINDLEY_OUTSIDE_REGIME`
 
-#### `test_no_flank_lobe_reads_as_unindexed`
+#### `test_flank_lobes_name_their_peak_and_buy_no_impurity`
 
 `characterisation` · dataset `qarr`
 
-**Claims:** on each of the eight weighed three-phase mixtures, the misfit lobe beside each strong line is read as part of that line: Layer 0 lists no unindexed peak within 0.5° of a strong reflection and Layer 2 suggests no impurity phase
+**Claims:** on each of the eight weighed three-phase mixtures, every unmatched observed peak within 0.5° of a strong reflection says it sits unresolved on a drawn peak (UnmatchedPeak.flank), and Layer 2 suggests no impurity phase
 
 **Referenced to:** **no accuracy band is claimed**.  The reference is the weighing: each mixture holds exactly the three modelled phases, so any impurity suggestion is wrong.  0.5° and a strong line's tenth of the tallest are the test's own scope, set by the lobes WP-1977 measured at 0.15-0.38°
 
-**Measured:** 0 listed near a strong line on 1a-1h (origin/main at 52cec09a1: cpd-1c listed six, up to 12σ; 8 of 8 rows fail there)
+**Measured:** 2-6 rows a mixture on a drawn flank, 0.7-1.2 FWHM below the line, none near a strong line off one; no impurity call (main's rule, on the fits of 52cec09a1: cpd-1b suggested add_impurity_phase at 0.50 from two such rows)
 
 ### `tests/test_acceptance_dispersion.py`
 

@@ -1000,9 +1000,10 @@ CLAIMS: tuple[Claim, ...] = (
                   "phases, so any impurity suggestion is wrong.  0.5° and a "
                   "strong line's tenth of the tallest are the test's own "
                   "scope, set by the lobes WP-1977 measured at 0.15-0.38°",
-        measured="0 listed near a strong line on 1a-1h (origin/main at "
-                 "52cec09a1: cpd-1c listed six, up to 12σ; 8 of 8 rows fail "
-                 "there)",
+        measured="2-6 rows a mixture on a drawn flank, 0.7-1.2 FWHM below "
+                 "the line, none near a strong line off one; no impurity "
+                 "call (main's rule, on the fits of 52cec09a1: cpd-1b suggested "
+                 "add_impurity_phase at 0.50 from two such rows)",
     ),
     # ---- dispersion: the pre-registered prediction -----------------------
     Claim(
