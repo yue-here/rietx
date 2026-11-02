@@ -263,7 +263,7 @@ cutting it.
 gh run list --workflow ci.yml --branch main --event push --status success --limit 10 --json databaseId
 gh run view <id> --json jobs   # each "fast …" job's startedAt to completedAt; take the largest
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
-.venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow" --shard 1/2   # and 2/2
+.venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow" --shard 1/3   # and 2/3, 3/3
 ```
 
 ## References

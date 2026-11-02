@@ -57,7 +57,7 @@ name: CI
 # workflow_dispatch still run in full.  Measured on the PR that landed this
 # (#364): a draft run is lint plus two skipped jobs, and a skipped matrix does
 # not expand — it reports once, under the literal name `fast py${{
-# matrix.python }}`.  So the four per-version contexts exist only from the
+# matrix.python }}`.  So the per-shard contexts exist only from the
 # ready_for_review run onwards, which is the run that gates the merge anyway.
 # Since WP-1506 the guard sits on `changes` and `ci-ok`, and every job that
 # needs `changes` skips with it.
@@ -79,13 +79,14 @@ name: CI
 #
 # Three shards rather than two since WP-2019.  Over main's ten runs to
 # 2026-11-01 a run waited a median 25.0 min for its slowest fast job, against
-# the WP's bar of 15.  The two shards were balanced, and one shard's wall
-# varied 1.6x between runners on identical work, so a better record could not
-# close that gap.  A third shard cuts each job's work by a third: 22.4
-# worker-min a shard on the record against 33.6 at two.  The largest unit the
-# record places, test_examples.py at 10.2 min, stays under a shard's share.
-# The shard count is written three times below: the matrix, the job name and
-# the --shard argument.  Change them together.
+# the WP's bar of 15.  One shard's wall varied 1.6x between runners on
+# identical work, so a better record alone could not close that gap.  A third
+# shard cuts each job's work by a third: 22.4 worker-min a shard on the record
+# against 33.6 at two.  The largest unit the record places, test_examples.py
+# at 10.2 min, stays under a shard's share.  One split serves both legs and
+# weighs the documentation at the newest leg's cost, so on py3.11, which skips
+# it, the shard holding it runs light.  The shard count is `matrix.of`, and
+# `matrix.shard` lists 1 to it.
 #
 # The jax job runs only the cases that reach jax (WP-2019): a jax parameter,
 # jax named in the test or in a fixture of it, or a module that skips without
@@ -269,7 +270,7 @@ jobs:
           tests/test_closed_wp_writes.py
 
   fast:
-    name: fast py${{ matrix.python }} ${{ matrix.shard }}/3
+    name: fast py${{ matrix.python }} ${{ matrix.shard }}/${{ matrix.of }}
     needs: changes
     if: needs.changes.outputs.scope == 'code'
     runs-on: ubuntu-latest
@@ -281,9 +282,11 @@ jobs:
         # runs the fast suite on 3.12 and 3.13.
         python: ["3.11", "3.14"]
         shard: [1, 2, 3]
+        # the shard count, one value: the job name and --shard read it
+        of: [3]
         # the newest leg executes the documentation, in whichever shard holds
-        # each part.  Dropping its version from the list above makes this a
-        # job of its own with no shard, and `--shard /3` then fails it: move
+        # each part.  Dropping its version from `python` above makes this a
+        # job of its own with no shard, and `--shard` then fails it: move
         # the entry to the new newest version instead.
         include:
           - python: "3.14"
@@ -320,7 +323,7 @@ jobs:
           RIETX_DOCS: ${{ matrix.docs || 'skip' }}
         run: >-
           .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
-          --shard ${{ matrix.shard }}/3 -o faulthandler_timeout=600
+          --shard ${{ matrix.shard }}/${{ matrix.of }} -o faulthandler_timeout=600
           --junitxml=junit.xml -o junit_duration_report=total
       - name: Upload per-test timings
         if: always()
