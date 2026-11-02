@@ -50,6 +50,26 @@ too (WP-1956 cites #941 four times). The third rule showed 21 PRs of 23. Whether
 it dropped hid a real overlap is part of the first task. Closing keywords in the body
 (`Closes #N`) are the obvious addition to the title's numbers, and are not yet measured.
 
+**Measured 2026-11-02 on the 23 open PRs** (the first task; scratch scripts over `gh pr list`,
+one GraphQL call classifying the 53 numbers they cite as 34 PRs and 19 issues). #941 had
+closed, so its links come from `gh pr view 941` run through the same code.
+
+| rule | rows | PRs shown | #941 linked to |
+|---|---|---|---|
+| today | 23 | 23 | WP-1325 |
+| named only by title, else every WP file edited, else branch; the title's `#N` and GitHub's closing references, PR numbers dropped | 35 | 22 (drops #1284) | WP-1511, 1956, 1968, 2041, 2046 |
+| as above, plus a "mentions it" row for each WP the body names, when nothing names the PR outright (**chosen**) | 37 | 23 | the five above, plus 1043, 1325, 1446, 1449, 2001 by mention |
+| as above, with the body's mentions on every PR | 62 (a WP reached two ways counted twice) | 23 | as above |
+| the chosen rule, but a title's PR number kept | 42 | 23 | as above |
+
+The dropped PR hid a real overlap. #1284's title cites #1257, which is a PR, and its body says
+"Part of WP-1918". A title-and-closing rule alone puts it nowhere. Kept as a mention, it
+reaches WP-1918 and nothing else. Keeping its title's PR number instead links it to five WPs,
+because WP-1918, 1956, 1958, 2028 and 2033 all cite #1257, and only WP-1918 is real.
+Body mentions on every PR flood the table, since a WP PR's handover-written body cites many
+WPs. GitHub's closing references and a `Closes #N` regex gave the same rows; the code reads
+GitHub's (`closingIssuesReferences`), which excludes PRs by construction.
+
 **Rules that bind it.**
 
 - `tests/CLAUDE.md` § Running: a check that silently finds nothing returns a false all-clear
@@ -78,18 +98,18 @@ package makes no decision here.
 
 ## Tasks
 
-- [ ] Choose the issue set the overlap match reads (title only, title plus closing keywords, or
+- [x] Choose the issue set the overlap match reads (title only, title plus closing keywords, or
       another rule) on the day's open PRs. Quote rows and #941's links beside today's 24, and
-      name each PR the rule drops from the table.
-- [ ] A WP is named outright only by the title, the branch or a WP file the PR edits. A body
+      name each PR the rule drops from the table. *(Context § Measured 2026-11-02.)*
+- [x] A WP is named outright only by the title, the branch or a WP file the PR edits. A body
       mention is a reference, and the issue chain still runs for it.
-- [ ] Drop `#N` that are pull requests from the overlap match.
-- [ ] The own-PR filter drops the session's own PR by head branch, never every row of its WP.
-- [ ] Tests in `tests/test_workflow_hooks.py` beside the existing overlap tests (`:1110-1190`).
+- [x] Drop `#N` that are pull requests from the overlap match.
+- [x] The own-PR filter drops the session's own PR by head branch, never every row of its WP.
+- [x] Tests in `tests/test_workflow_hooks.py` beside the existing overlap tests (`:1110-1190`).
       #941's shape (a body naming another WP first, the issue in the title) reaches the WP
       citing that issue. From that WP's tree, a contributor's PR on it still shows and the
       tree's own PR does not. Fail each on purpose once against today's code.
-- [ ] Skill: none. The rietx skill drives the package, and this is a repo hook.
+- [x] Skill: none. The rietx skill drives the package, and this is a repo hook.
 
 ## Acceptance
 
