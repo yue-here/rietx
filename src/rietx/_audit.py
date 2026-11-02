@@ -1412,15 +1412,17 @@ ROWS: tuple[Row, ...] = (
                   "116/90 on SRM 660c (1.29x) and 1221/311 on cpd-1a with the absent zircon "
                   "(3.93x, two stages at 1e-9 ending at their 400-evaluation budget); wall "
                   "clock ranges overlap on FAP and NAC, fits under 2 s (WP-2045 probe7, "
-                  "2026-11-02, macOS arm64); WP-1113/1123's 1.00-2.15x predates the closing "
-                  "stage"),
+                  "2026-11-02, macOS arm64); WP-2002 B7's 1.00-2.15x (2026-10-21) "
+                  "predates the closing stage"),
         grounds=("Cost only (ruled 2026-11-01): on today's schedule, the last declared stage "
                  "converged and the closing stage kept, 1.06-1.58x fewer evaluations than "
                  "every stage at 1e-9 on FAP, 11-BM NAC and cpd-1a, for answers within "
                  "0.0004 plain esd of that arm (bar 0.1; WP-2045 probe7, 2026-11-02). "
+                 "In median wall clock that is 1.02-1.14x, under 0.3 s a fit. "
                  "The failing case the 2026-10-21 approval was weighed against, an absent "
                  "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
-                 "esd since WP-2045, at 3.9x fewer evaluations. LaB6's 8.82 esd is the "
+                 "esd since WP-2045, at 3.9x fewer evaluations and 2.2x less wall clock. "
+                 "LaB6's 8.82 esd is the "
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance. The last declared stage "
                  "converges when a closing stage follows it (WP-2045 option 5, ruled "
@@ -3479,15 +3481,17 @@ ROWS: tuple[Row, ...] = (
                   "116/90 on SRM 660c (1.29x) and 1221/311 on cpd-1a with the absent zircon "
                   "(3.93x, two stages at 1e-9 ending at their 400-evaluation budget); wall "
                   "clock ranges overlap on FAP and NAC, fits under 2 s (WP-2045 probe7, "
-                  "2026-11-02, macOS arm64); WP-1113/1123's 1.00-2.15x predates the closing "
-                  "stage"),
+                  "2026-11-02, macOS arm64); WP-2002 B7's 1.00-2.15x (2026-10-21) "
+                  "predates the closing stage"),
         grounds=("Cost only (ruled 2026-11-01): on today's schedule, the last declared stage "
                  "converged and the closing stage kept, 1.06-1.58x fewer evaluations than "
                  "every stage at 1e-9 on FAP, 11-BM NAC and cpd-1a, for answers within "
                  "0.0004 plain esd of that arm (bar 0.1; WP-2045 probe7, 2026-11-02). "
+                 "In median wall clock that is 1.02-1.14x, under 0.3 s a fit. "
                  "The failing case the 2026-10-21 approval was weighed against, an absent "
                  "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
-                 "esd since WP-2045, at 3.9x fewer evaluations. LaB6's 8.82 esd is the "
+                 "esd since WP-2045, at 3.9x fewer evaluations and 2.2x less wall clock. "
+                 "LaB6's 8.82 esd is the "
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),
@@ -3917,15 +3921,17 @@ ROWS: tuple[Row, ...] = (
                   "116/90 on SRM 660c (1.29x) and 1221/311 on cpd-1a with the absent zircon "
                   "(3.93x, two stages at 1e-9 ending at their 400-evaluation budget); wall "
                   "clock ranges overlap on FAP and NAC, fits under 2 s (WP-2045 probe7, "
-                  "2026-11-02, macOS arm64); WP-1113/1123's 1.00-2.15x predates the closing "
-                  "stage"),
+                  "2026-11-02, macOS arm64); WP-2002 B7's 1.00-2.15x (2026-10-21) "
+                  "predates the closing stage"),
         grounds=("Cost only (ruled 2026-11-01): on today's schedule, the last declared stage "
                  "converged and the closing stage kept, 1.06-1.58x fewer evaluations than "
                  "every stage at 1e-9 on FAP, 11-BM NAC and cpd-1a, for answers within "
                  "0.0004 plain esd of that arm (bar 0.1; WP-2045 probe7, 2026-11-02). "
+                 "In median wall clock that is 1.02-1.14x, under 0.3 s a fit. "
                  "The failing case the 2026-10-21 approval was weighed against, an absent "
                  "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
-                 "esd since WP-2045, at 3.9x fewer evaluations. LaB6's 8.82 esd is the "
+                 "esd since WP-2045, at 3.9x fewer evaluations and 2.2x less wall clock. "
+                 "LaB6's 8.82 esd is the "
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),
@@ -3985,15 +3991,17 @@ ROWS: tuple[Row, ...] = (
                   "116/90 on SRM 660c (1.29x) and 1221/311 on cpd-1a with the absent zircon "
                   "(3.93x, two stages at 1e-9 ending at their 400-evaluation budget); wall "
                   "clock ranges overlap on FAP and NAC, fits under 2 s (WP-2045 probe7, "
-                  "2026-11-02, macOS arm64); WP-1113/1123's 1.00-2.15x predates the closing "
-                  "stage"),
+                  "2026-11-02, macOS arm64); WP-2002 B7's 1.00-2.15x (2026-10-21) "
+                  "predates the closing stage"),
         grounds=("Cost only (ruled 2026-11-01): on today's schedule, the last declared stage "
                  "converged and the closing stage kept, 1.06-1.58x fewer evaluations than "
                  "every stage at 1e-9 on FAP, 11-BM NAC and cpd-1a, for answers within "
                  "0.0004 plain esd of that arm (bar 0.1; WP-2045 probe7, 2026-11-02). "
+                 "In median wall clock that is 1.02-1.14x, under 0.3 s a fit. "
                  "The failing case the 2026-10-21 approval was weighed against, an absent "
                  "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
-                 "esd since WP-2045, at 3.9x fewer evaluations. LaB6's 8.82 esd is the "
+                 "esd since WP-2045, at 3.9x fewer evaluations and 2.2x less wall clock. "
+                 "LaB6's 8.82 esd is the "
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),

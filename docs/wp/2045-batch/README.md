@@ -30,8 +30,10 @@ Python 3.12) at `7d24e09e7`, and the numbers are in WP-2045's Context.
 was built. On a tree with option 5 its two arms run the same schedule.
 `probe7.py` ran on macOS arm64 (`[dev]`, compiled tier on) at `4e08411e5`,
 three interleaved rounds an arm. It takes the repository root as its argument
-like the others, but reads no round-robin capture, only the acceptance
-protocols through `tests/test_window_domain._protocol`.
+like the others. It captures no models. It fits the acceptance protocols
+through `tests/test_window_domain._protocol`, and cpd-1a with zircon from
+`tests/test_acceptance_qpa_roundrobin`'s builders, so its cpd-1a arms need
+the same `tests/data/qarr` data.
 
 These scripts are records, not tests. Nothing runs them, so a change to
 `compile_model`'s signature or to `CompiledPhase.win`/`fcj_n` can break them

@@ -47,6 +47,8 @@ def _zircon_inputs():
         zincite_phase,
         zircon_phase,
     )
+    if not DATA.exists():
+        raise SystemExit(f"cpd1a_zircon needs the IUCr QPA round-robin data under {DATA}")
     data = rx.read_pattern(DATA / "cpd-1a.prn")
     st = rx.Structure(phases=[corundum_phase(), zincite_phase(), fluorite_phase(),
                               zircon_phase()])
