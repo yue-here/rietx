@@ -59,10 +59,16 @@ from .common import Base
 #: it, WP-1123 made it the default and re-measured).  Both figures are
 #: properties of the tree as much as of the schedule — 1113 measured 1.5-1.7×
 #: and 0.02 esd before a Jacobian column changed underneath — so re-measure
-#: rather than inherit them.  **The bound is for one fit**: in a warm *chain*
+#: rather than inherit them.  Re-measured on 2026-11-02 behind the closing
+#: stage, with the last declared stage converged (WP-2045,
+#: ``docs/wp/2045-batch/probe7.py``): 1.06-1.58× fewer evaluations on the
+#: fluorapatite, 11-BM NAC and cpd-1a protocols, answers within 0.0004 esd;
+#: 1.29× on SRM 660c, whose 8.82 esd is its mirrored axial minima (WP-2012).
+#: **The bound is for one fit**: in a warm *chain*
 #: each pattern seeds the next, and the effect there is unbounded and not even
 #: fixed in sign.  Looser is a real choice and not a silly one — 1e-5 and 1e-4
-#: buy 1.9-2.2× at 0.01-0.2 esd — which is why this is a number a plan carries
+#: bought 1.9-2.2× at 0.01-0.2 esd before the closing stage (WP-1113) — which
+#: is why this is a number a plan carries
 #: and not a mode with two positions.
 INTERMEDIATE_FTOL = 1e-6
 
@@ -260,8 +266,9 @@ class PlanSpec(Base):
             "the tolerance every declared stage but the last stops at, unless it "
             "declares its own ftol; null = the solver default (1e-9) "
             "everywhere, i.e. the fully-converged schedule.  1e-6 is "
-            "1.2-1.6x fewer whole-plan evaluations for answers within "
-            "0.03 esd on a single fit (WP-1113/1123)"))
+            "1.06-1.58x fewer whole-plan evaluations for answers within "
+            "0.0004 esd on a single fit, behind the closing stage, on the "
+            "fluorapatite, 11-BM NAC and cpd-1a protocols (WP-2045)"))
     lebail_passes: int = Field(
         1, ge=1, description=(
             "the cap on Le Bail passes: under mode='lebail' the plan is run "

@@ -1170,6 +1170,18 @@ class StageResult(Base):
     #: stage with no Bragg intensity to compare.  Writers: the three runners
     #: that build a ``StageResult``.
     window_loss: float | None = None
+    #: the stage's Rwp at the values it ended on, measured on its own frozen
+    #: compile: the number the ``stage_end`` event carries, so a caller keeping
+    #: the best stage reads it here rather than from the event log (WP-1334).
+    #: A joint fit's is pooled over its histograms; the event carries each
+    #: histogram's beside it.  The result's own ``statistics.rwp`` is measured
+    #: on a compile at the answer, so the last stage's differs from it by the
+    #: frozen windows alone.  Not comparable across stages that fit different
+    #: ranges or modes.
+    #:
+    #: ``None`` means a result stored before the field.  Writers: the three
+    #: runners that build a ``StageResult``, on every stage.
+    rwp: float | None = None
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
     #: Stephens strain cone, or the Γ_G² floor of WP-1938 D7) during this
     #: stage: the step for the box alone crossed a row, and the step solved

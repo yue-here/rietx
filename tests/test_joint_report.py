@@ -130,6 +130,8 @@ def test_a_joint_event_log_partitions_by_histogram(two_patterns, tmp_path):
     assert start["n_points"] == sum(r["n_points"] for r in start["histograms"])
     ends = [d for k, d in log if k == "stage_end"]
     assert log[-1][1]["rwp"] == result.statistics.rwp
+    # the record carries the pooled number each stage_end emitted (WP-1334)
+    assert [s.rwp for s in result.stages] == [e["rwp"] for e in ends]
     assert ends[-1]["rwp"] == pytest.approx(result.statistics.rwp,
                                             rel=FROZEN_COMPILE_CHI2_REL / 2)
     assert "FROZEN_COMPILE_STALE" not in {d.code for d in result.diagnostics}

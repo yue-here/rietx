@@ -894,9 +894,10 @@ def test_every_dotted_name_in_an_authored_file_resolves(path: Path):
         "them to what the type carries now, or delete the claim")
 
 
-#: ```StageResult` carries no `rwp` `` — the one negative claim the tree makes
+#: ```SeriesEntry` carries no `stages` `` — the one negative claim the tree makes
 #: about a field, and the kind a walk cannot see: nothing resolves, so a field
-#: added later falsifies it silently (WP-1334 proposes exactly that one).  This
+#: added later falsifies it silently (WP-1334 added ``StageResult.rwp`` and
+#: falsified the claim this pin was written for).  This
 #: is a phrasing, not a grammar, so a claim worded another way is unpinned.
 NEGATIVE_FIELD_CLAIM = re.compile(r"`([A-Z][A-Za-z0-9_]*)` (?:carries|has) no `([a-z_][a-z0-9_]*)`")
 
