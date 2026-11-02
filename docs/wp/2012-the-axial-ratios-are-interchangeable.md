@@ -1,6 +1,6 @@
 # WP-2012 — The two axial-divergence ratios are interchangeable, and a fit reports one branch
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-01 — a silent wrong pair of numbers on `lab_calibrate` and `lab_bragg_brentano`, the presets that free both ratios; the profile it fits is right, so only a reader of S/L and H/L is misled; the fix is decided
