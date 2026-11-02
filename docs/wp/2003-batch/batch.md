@@ -96,6 +96,31 @@ words above, a value judgement), C5, C6, C9 and C10's question 2, with C2's ques
 the seven `approved` dates as consent lines. C2's question 3 and C10's question 1 stay
 Claude's to settle, recorded as such.
 
+**Sent to the maintainer 2026-11-02, awaiting answers** (in the house decision format; the
+evidence is in the class sections below and in WP-2080). Five briefs, each with Claude's pick:
+1. *What sends a warm fit up the ladder* (C1 with WP-2080's question). Options: keep main's
+   Rwp fence; (A) PR #1310 as is, diverged or error-level only; (B) A plus one rung when GoF
+   exceeds 1.25 × the seed pattern's GoF (WP-2080 option B, landing there). Pick B, a lean.
+2. *How a series reports a pattern fitting worse than its neighbours* (C1's ranked summary
+   line, the generality judge's weak verdict). Options: field only; (A) a summary line of
+   the largest `rwp_over_median`; (B) A on a GoF ratio, renaming the field before it ships,
+   since Rwp rises with falling counts (WP-1469). Pick B, a lean; an agent-harness run after,
+   spend owed the maintainer's OK.
+3. *Carry on or stop when every rung raises* (C2 q4): `carry` / `skip` / `raise`. Pick
+   `carry`, a lean; the crux a value judgement.
+4. *The persistent-finding summary* (C6): demote the half cut to a field of counts plus one
+   summary line, after an agent-harness run (spend owed the maintainer's OK). Pick demote.
+5. *What a warm start carries* (C9 q1): (A) the warm start is the caller's, `"*"` invariant
+   once its test lands; (B) tier 3 now, GSAS-II's no-carry default the dissent. Pick A.
+
+Consent lines (stand unless the maintainer objects): C5 demoted to a field of gaps with each
+walk's rung; C5's incomplete-check code split into `warning` and `info`; C9 q4 (a), the
+closing stage kept on warm refits; C9 q2 and q3 tier 3; C10 q2 (a) after a joint fixture;
+C2 q2, diverged ranks below truncated; and the seven tier-3 `approved` dates, re-dated to
+the maintainer's answer. PR #1310 does not merge before briefs 1 and 2 are answered.
+Seen 2026-11-02: PR #1331 (WP-2010's reconstructed entry) duplicates `d568e0b`/`02cad1b`
+on this branch, so whichever merges second conflicts in WP-2010's log.
+
 ---
 
 ## C1. What sends a warm fit up the ladder
