@@ -1,9 +1,8 @@
 # WP-1339 — where the improvement lives
 
-Milestone: unscheduled · Status: 🔄 2026-10-12 — asks (1) and (2) landed from outside (PR #904); the NiO acceptance and the `judging.md` row remain
+Milestone: unscheduled · Status: ✅ 2026-11-02 — closed; the NiO acceptance stays external, the skill row is in numbers.md (PR #1325)
 Track: Render what the fit already knows
 Depends on: —
-Priority: P3 2026-09-23 — a statistic compare already computes, reached as a function
 
 ## Goal
 
@@ -122,136 +121,12 @@ a `Diagnostic`, because a diagnostic needs a threshold and the package
 reports evidence rather than verdicts. The contributor's PR offer for (1)
 and (2) is accepted.
 
-### Inherited
-
-- **Decided 2026-10-16 (maintainer, from the issue triage, #219): #219 closes
-  with ask (3) done as report-only.** The seeded-pair helper is not built.
-  #219 is closed with a comment naming PR #928's measurement (real parent held
-  in 0 of 15 split starts) and the wrong-sign tetragonality that only a pair
-  of seeded fits fixes.
-
-- **2026-10-13 (2nd), from WP-1523's close: the hold no longer picks a side
-  on a collinear pair, and the wrong-sign start is yours.** A phase's scale
-  significance is now conditional on the other phases' scales
-  (`refine._significance_columns`). On #219's ridge neither phase is held
-  from a split seed: the real parent was held in 9 of 15 before, 0 now. The
-  phantom at the identity point is still held. The only report is
-  `HIGH_CORRELATION` on the two scales. TWO-PHASE-TRUTH from the degenerate
-  seed lands at −1.0e-3 against +3.0e-3 with no hold at all (5 of 5 seeds).
-  So ± seeds off the identity point and a comparison, ask (3), is the only
-  remedy. Table: WP-1523 § Decided 2026-10-13. The entry below is settled by
-  this one.
-- **2026-10-13, from WP-1523: the ridge's hold decision is WP-1523's task 7,
-  so nothing here waits on it.** WP-1523 first kept the support hold on a
-  collinear pair (§ Decided 2026-10-12) without the #219 script. The
-  triage's re-run of that script, which the 2026-10-13 entry below points
-  to, reopened the choice there as task 7. The candidate statistic is the
-  scale's z marginal over every column except the other phases' scales.
-  #904's localisation does not answer it, as the entry below says.
-- **2026-10-11, from the issue triage (#219, in PR #904; and a re-run of the
-  ridge case): asks (1) and (2) are open as the reporter's PR, and the ridge
-  now holds the wrong phase.** PR #904 (opened 2026-10-11, fork) adds
-  `report.cumulative_delta_chi2` and `report.split_localisation`, moves
-  `viz/compare.py` onto `report.cumulative_chi2`, and rewrites the
-  `schemas/sequential.py:79` sentence. Ask (3) is not in it. Its tests are
-  synthetic, and the NiO acceptance waits on permission to ship the pattern.
-  The claims match #219. Checked against the tree at d80ca5f4: no
-  `report/localisation.py`, and no `cumulative_delta_chi2` under `src/`.
-
-  The reporter re-ran the two-phase Cu toy at 08176f6f, after WP-1523, with
-  the same script, pattern and plan (comment of 2026-10-11 15:17Z). The
-  specimen is one cubic Cu phase. The model is the parent plus an
-  `I 4/m m m` subgroup that is not there. Their numbers, not re-run here,
-  since the script is not in the thread:
-
-  | subgroup seed | Rwp | `PHASE_UNCONSTRAINED` holds | its reading |
-  |---|---|---|---|
-  | degenerate | 0.0399 | the subgroup | 0.81σ |
-  | split, δ = 5e-4 | 0.0399 | **the parent** | 0.20σ |
-  | split, δ = 1e-3, 2e-3, 4e-3 | 0.0399 | **the parent** | 0.53σ |
-
-  In the last two rows the parent's cell and strain are held while the
-  phantom subgroup carries the pattern at 31-82σ. `HIGH_CORRELATION` on the
-  two scales (ρ −0.994 to −0.998) fires in every arm. The positive control (a
-  real 40 % subgroup) flags the parent at 2.3σ and 2.2σ from the degenerate
-  and δ = 5e-4 seeds. So the marginal test reads low on a collinear pair, as
-  the entry below expected, but on whichever phase the start left weaker.
-  Which of the two the rule should hold is WP-1523's decision, and its
-  Inherited carries the same numbers. Before any becomes a target, the
-  script has to be on the tree; the batch asks the reporter for it.
-
-- **From WP-1523, 2026-10-04: the support statistic changed, and the ridge
-  case is unmeasured under it.** "Seen" is now the phase scale over its esd at
-  3σ (`refine._answer_significance`). The esd comes from (JᵀWJ)⁻¹ against
-  counting noise and is marginal over every free column except displacements
-  and occupancies, so another phase's scale and cell are in it.
-  `phase_support` is now only the screen, ‖y_p/σ‖₂. The #219 entry below read
-  0.65σ, 197σ and 54-56σ on the old single-point max. Re-measure it before
-  building on it. A phase collinear with another should read low on the
-  marginal, but nobody has measured that.
-- **From WP-1469, 2026-09-29: the support statistic now has an owner.** The
-  #219 entry below found `phase_support` reading 0.65-197σ on one phantom
-  phase depending only on its seed. WP-1469 found its noise twin: a frame
-  with no phase in it, fitted alone, released its held cell at 2.14σ support
-  on a scale 1.3σ from zero, or held it, depending on the start. Both are
-  filed as [1523](1523-a-phase-fitted-to-noise-passes-the-support-test.md),
-  which owns what "the data can see this phase" means. The #219 numbers stay
-  here as this WP's evidence; a fix there changes which phases read
-  supported in any comparison this WP builds.
-- **From WP-1417, 2026-09-27: `references/judging.md` now has a § 4
-  section on adding a parameter** (the t-ratio before ΔBIC at N/f²,
-  `report.compare_freed`). This WP's routing row, that ΔBIC and a
-  nested F-test do not settle two candidate space groups, belongs
-  beside it and should cite it rather than restate N/f².
-
-- **From WP-1461, 2026-09-26: the page this WP's Context describes has
-  moved.** The compare page is files in `compare_app/static/`, and the
-  JavaScript embedded in `compare_app.py` is gone. The Δχ² against the
-  reference is now `rxplot.difference`, a plain subtraction in the chart
-  module's `overlay` figure. It was a linear interpolation between two
-  separately decimated grids. The subtraction holds because every variant of
-  a standard fits the same channels, and
-  `test_no_variant_moves_the_channels_a_standard_fits` pins that. A user's
-  two candidate models on their own data have no such guarantee unless both
-  fits share limits and exclusions. `RunRecord` now keeps float64 arrays at
-  every fitted channel, and `RunRecord.curves()` packs them for the page.
-  There is still no Python function taking two results and returning where
-  their Δχ² lives, so the lift this WP plans is unchanged.
-- **2026-09-23, from the issue triage (issue #219).** The reporter's
-  2026-09-04 comment carries this WP's question to a second phase, and no
-  session had folded it. Synthetic cubic Cu with anisotropic Stephens strain,
-  modelled as the parent plus an `I 4/m m m` subgroup phase that is not in the
-  specimen. The absent subgroup takes the misfit at 57σ support and ΔBIC −1818,
-  with no `PHASE_UNCONSTRAINED` and no hold. On the isotropic control, Rwp is
-  0.0399 in every arm, and the subgroup's support reads 0.65σ (held), 197σ or
-  54-56σ depending only on the seed. So for a phase collinear with another,
-  `phase_support` measures where the fit landed on a ridge. `HIGH_CORRELATION`
-  fires on the two scales in every arm and separates nothing. The localisation
-  statistic transfers weakly: a gain-density ratio of 2.4 for the phantom
-  against 1.3 for a real 40 % subgroup, with no sign flip. What did separate
-  them was ± seeds off the identity point and the rival with the same freedom
-  on the parent (ΔBIC +797 against the phantom). Checked against the tree at
-  `644dff84`: `schemas/sequential.py:78-81` still calls `PHASE_UNCONSTRAINED`
-  the measurement that answers "is this phase real", which this falsifies for
-  a collinear phase. That sentence is a fix whatever else this WP decides.
-- **From WP-1434, 2026-09-18: which codes fired in that measurement may no
-  longer reproduce.** `BOUND_HIT` now asks whether the limit carried load
-  instead of whether the value stopped near one, so the `lor_strain` floor
-  observation was taken under a test that no longer exists. Re-run before
-  building on the list of what fired.
-- **2026-10-13, from the issue triage (#219, after PR #904 merged
-  2026-10-12): two loose ends for the close.** First, the reporter's
-  two-phase script is now in the thread (2026-10-12 00:11Z), so the 2026-10-11
-  entry's "not re-run here, since the script is not in the thread" is stale.
-  It was re-run at c3d0367, and the result is in WP-1523's Inherited, which
-  owns the hold. PR #904's localisation does not answer it, by its own
-  docstring (coexistence "is not what this measures"). Second, this file says
-  two things about #219's ask (3): task 4 is ticked as decided report-only on
-  2026-09-03, while the 2026-10-12 handover says "Issue #219 stays open for
-  ask (3)", and #904's body says "Ask (3) is not here". Settle which, and say
-  on #219 what is left. Tasks 5 (the NiO acceptance, waiting on permission to
-  ship the pattern) and 7 (the skill's routing row, which went into
-  `numbers.md` rather than `judging.md`) are what remains here.
+**Closed out 2026-10-16** (issue triage, batch approved by the maintainer):
+#219 closed with ask (3) done as report-only, citing PR #928's measurement
+(the real parent held in 0 of 15 split starts). The two-phase ridge that the
+thread raised belongs to WP-1523, which owns the support hold. Its numbers
+are in that WP, and this one's localisation does not answer it: coexistence
+"is not what this measures", by the docstring of `report/localisation.py`.
 
 ## Non-goals
 
@@ -278,15 +153,35 @@ and (2) is accepted.
 - [x] The disagreement case as report-only output (decided 2026-09-03: a
       number the reader judges, never a `Diagnostic` with a threshold); write
       the reason where the number lives.
-- [ ] Acceptance on the NiO pair: the localisation test must return the
+- [x] Acceptance on the NiO pair: the localisation test must return the
       negative share (~−28 % on 6.2 % of points) that reversed the answer, and
       the check must be able to fail — a genuinely localised improvement on a
       constructed case must score positive.
+      *Closed 2026-11-02 by task 2's second branch; settled by Claude under the
+      Acceptance's own clause ("the NiO pair, if it ships") and the
+      unpublished-data rule (root CLAUDE.md § Licensing).* The pattern never
+      reached the thread, #219 closed on 2026-10-16 without it, and a
+      contributor's unpublished laboratory pattern has no peer-reviewed
+      citation to ship under. The constructed pair in
+      `tests/test_localisation.py` scores positive (+68 %) and negative
+      (−30 %), so the check can fail both ways; NiO stays an external check
+      quoted from #219.
 - [x] Tests: `tests/test_compare_ui.py` keeps asserting the UI field by field;
       the new function is tested on results, not on the UI's standards.
-- [ ] Skill: `references/judging.md` — the routing row for "two candidate
+- [x] Skill: `references/judging.md` — the routing row for "two candidate
       space groups, which one", pointing at the localisation share and saying
       plainly that ΔBIC and a nested F-test do not settle it.
+      *The row stays in `references/numbers.md`; settled by Claude under
+      CONTRIBUTING.md § The agent skill.* `judging.md` holds the measurements
+      behind the judging rules and is 26 B under its budget. The comparison is
+      reached by the body's §5 routing row ("quoting or comparing a number"),
+      so a new shape file is not warranted. 2026-11-02 added the nested F-test
+      and the pointer to `judging.md` § adding a parameter that WP-1417 asked for.
+- [x] The two follow-ups from #904's review (added 2026-11-02 from the
+      2026-10-12 entry's *Not done*): `SplitFamily.emission_line` has no
+      default, since its one writer always sets it; and a family whose parent
+      lies just past an end of the range is reported when a child lies inside,
+      its split read off every child.
 
 ## Acceptance
 
@@ -310,6 +205,62 @@ The pattern is not in the repo today.
 - Search the local paper corpus before requesting any of these.
 
 ## Handover log
+
+- **2026-11-02** — WP-1339 closes (ghostshift runner, PR #1325). The two
+  functions PR #904 added now report the reflections that straddle an end of
+  the fitted range, instead of losing the in-range half. An agent comparing
+  two candidate space groups is told plainly that ΔBIC and a nested F-test
+  say a lowering paid for itself and not where, so neither settles it. The
+  NiO acceptance does not ship. The pattern never reached the thread, and a
+  contributor's unpublished laboratory pattern cannot enter the public tree,
+  so the constructed Cu pair remains the acceptance and NiO an external check.
+  - *Done.* Inherited pruned: the 2026-10-16 close of #219 is folded into
+    Context; the ridge entries (2026-09-23, 2026-10-04/11/13, WP-1469) belong
+    to WP-1523, which owns the hold, and #904 shipped the 2026-09-23 note's
+    sentence fix. WP-1417's note is folded into task 7. WP-1461's described a
+    page task 1 already rewired. WP-1434's qualified #219's list of codes that
+    fired, which nothing here builds on. Task 5 closed by task 2's second branch; task 7's row stays
+    in `references/numbers.md`, now naming the F-test and pointing at
+    `judging.md` § adding a parameter. Both settlements are marked in the
+    task lines. The two #904 review follow-ups: `SplitFamily.emission_line`
+    has no default; a parent just past the range is reported when a child is
+    inside, `splits` reads every child, and a window anchors on the in-range
+    children, else on the parent. The 1.8.0 release-notes gap had already
+    closed (`docs/releases/1.8.0.md:307`).
+  - *Review.* `/code-review high --fix` found six. Fixed: a parent in range
+    with every child past the end was windowed wholly off the data (zero
+    channels, still counted split), now anchored on the parent; the window
+    and `n_unmatched` wording; the duplicated in-range predicate, now one
+    helper. Declined: the borrowed median width of an out-of-range parent is
+    a fallback in a line this branch did not change; removing the
+    `emission_line` default breaks a constructor call that omits it (a
+    model_dump always wrote the field), which the WP-1076 rule asks for.
+  - *Measured.* Fast selection on this branch with main merged
+    (unchanged, `f8559dee6`), `[dev]` venv, darwin/arm64, another session's
+    pytest running beside it: 1 failed, 13 297 passed, 310 skipped,
+    32 xfailed in 23:23. The failure is
+    `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`,
+    environmental: the user-level Jupyter kernel spec points at a deleted
+    venv. The three added tests cost 0.01 s together (local junit). The
+    test the generality review asked for came after that run and is an
+    edit to one of the three, not a new test (localisation, skill and
+    skill-copy files: 240 passed). Each new rule was failed on purpose once
+    and its test went red.
+  - *Generality.* `generality-review` held all four items: the window anchor
+    (tier 1, arithmetic), the straddling family and its `splits` (tier 1;
+    case against weak: an edge family with one child in range shows a
+    shifted peak rather than a visible split, unmeasured on real data),
+    `n_unmatched` in range only (tier 1; it asked for a test, added), and
+    the skill row (passes Rule 4; it asked that "judging.md §4" name its
+    section, since two headings start "§4", done). Its would-change: a real
+    pattern with a family at a range end where the label carries a large
+    share of `split_share`.
+  - *Reader-output change* (for the maintainer): `split_localisation` can
+    now return one more family per range end and line, a `splits` verdict
+    that changed for a family with a child past the range, and a different
+    window there. `SplitFamily(...)` without `emission_line` now raises. No
+    printed fit or report changes (`split_localisation` is called by hand).
+  - *Next:* none in this WP. Issue #219 is closed.
 
 - **2026-10-12** — PR #904 merged from outside as `9669796d`. Two fits of one
   pattern can now say *where* the richer one gained, which ΔBIC cannot.

@@ -41,6 +41,7 @@ Both return an ordinary `RefinementResult`, with the per-pattern half on `Refine
 |---|---|
 | `MultiHistogramRefinement.n_histograms` | how many patterns there are |
 | `MultiHistogramRefinement.mtable` | the multi-histogram parameter table: one ordinary table per pattern, threaded by a column map that folds the shared columns onto one |
+| `MultiHistogramRefinement.parameters()` | every parameter as `ParameterRow`s, held rows included, under the joint names; read-only ([Shared parameters](#shared-parameters)) |
 | `MultiHistogramRefinement.parametric` | the parametric declarations as resolved at construction ([Reference and scale](parametric.md#reference-and-scale)) |
 | `MultiHistogramRefinement.fitted_structures`, `MultiHistogramRefinement.fitted_instruments` | after a fit, each pattern's refined models; the shared parameters are identical across the structures |
 | `MultiHistogramRefinement.result_` | after a fit, the result |
@@ -77,6 +78,11 @@ assert per_mount.is_shared("phases.0.cell.a")
 
 A per-pattern parameter is named with a `hist.{h}.` scope (`hist.0.instrument.zero_shift`, `hist.1.phases.0.scale`), and a shared one keeps its bare path.
 A stage glob matches either form, so an existing single-pattern plan frees every pattern's copy unchanged, and a scoped glob frees one pattern's.
+`MultiHistogramRefinement.parameters()` lists every parameter under these names, before or after a fit, as `Refinement.parameters()` does for one pattern ([The parameter table](parameter-table.md)).
+A shared parameter is one row and a per-pattern one is a row per pattern.
+A row tied to a per-pattern source is that pattern's own and carries its scope too: with `SharingMap(per_histogram=["phases.0.cell.a"])` on a cubic phase, `b` follows each pattern's `a` and lists as `hist.1.phases.0.cell.b`.
+After a fit, each row carries that fit's esd.
+The listing is read-only: a joint fit frees parameters through its plan's globs, and has no `set_vary` or `set_values`.
 
 The cell is the one entry in that rule that is a judgement.
 The structure is shared because it is one structure: space group, coordinates, ADPs and occupancies together.
