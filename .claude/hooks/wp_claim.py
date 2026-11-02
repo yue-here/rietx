@@ -413,21 +413,28 @@ class PullRequest(NamedTuple):
     branch: str
     updated: str  # YYYY-MM-DD
     draft: bool
-    wp: Optional[str]  # a WP this PR names outright, if it names one
-    issues: tuple  # int issue numbers cited in the title or body
+    wps: tuple  # WPs this PR names outright: its title, else the WP files it edits, else its branch
+    issues: tuple  # int numbers cited anywhere in the title or body (backlog.py's column)
+    mentions: tuple  # WPs its body mentions; a reference, never a claim
+    chain: tuple  # issues the overlap match follows (title's and closing); empty when wps is not
+    fork: bool  # the head branch lives on someone else's repository
 
 
 _ISSUE_RE = re.compile(r"#(\d{1,5})\b")
 _WP_TEXT_RE = re.compile(r"\bWP-(\d{4})\b")
+_WP_FILE_RE = re.compile(r"docs/wp/(\d{4})-")
 
 
-def _gh(root: Path, *args: str, timeout: int = 20) -> Optional[str]:
+def _gh(root: Path, *args: str, timeout: int = 20, partial: bool = False) -> Optional[str]:
     """``gh`` from the repo root, so it resolves this repository from the remote.
 
     ``None`` on every way it can decline — not installed, not logged in,
     offline, rate-limited, slow.  The caller turns that into a sentence rather
     than an empty table, because "no PRs" and "could not look" must not read
     alike.
+
+    *partial* keeps stdout on a non-zero exit.  ``gh api graphql`` exits 1 when
+    any one alias fails to resolve, and still prints the other aliases' data.
     """
     try:
         proc = subprocess.run(
@@ -435,7 +442,7 @@ def _gh(root: Path, *args: str, timeout: int = 20) -> Optional[str]:
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
-    return proc.stdout if proc.returncode == 0 else None
+    return proc.stdout if proc.returncode == 0 or (partial and proc.stdout) else None
 
 
 def open_prs(root: Path) -> Optional[list[PullRequest]]:
@@ -448,7 +455,8 @@ def open_prs(root: Path) -> Optional[list[PullRequest]]:
     """
     proc = _gh(
         root, "pr", "list", "--state", "open", "--limit", "100", "--json",
-        "number,title,body,author,headRefName,updatedAt,isDraft,files",
+        "number,title,body,author,headRefName,updatedAt,isDraft,files,"
+        "closingIssuesReferences,isCrossRepository,url",
     )
     if proc is None:
         return None
@@ -456,40 +464,83 @@ def open_prs(root: Path) -> Optional[list[PullRequest]]:
         raw = json.loads(proc)
     except ValueError:
         return None
+    # A number in a title may be a pull request: "#1140's follow-ups", "a
+    # follow-up to #1257".  WP files cite PR numbers too, so following one
+    # links the PR to every WP that ever named the earlier PR (WP-2046: #1257
+    # reached five WPs, one of them real).  GitHub numbers issues and PRs in one
+    # sequence, so only GitHub can say which is which.
+    # Only a title naming no WP is read for its issues, so only its numbers are asked.
+    titled = {int(n) for item in raw if not _WP_TEXT_RE.search(item.get("title", ""))
+              for n in _ISSUE_RE.findall(item.get("title", ""))}
+    pull_requests = {int(item["number"]) for item in raw}
+    pull_requests |= _pull_requests_among(root, titled - pull_requests)
     prs = []
     for item in raw:
-        text = f"{item.get('title', '')}\n{item.get('body') or ''}"
+        title, body = item.get("title", ""), item.get("body") or ""
         files = [f.get("path", "") for f in item.get("files") or []]
-        # A WP the PR names outright: its title, its body, or a WP file it
-        # edits.  This is the direct claim; the issue chain below is the
-        # indirect one a contributor's PR actually travels.
-        named = _WP_TEXT_RE.search(text)
-        wp = named.group(1) if named else None
-        if wp is None:
-            for path in files:
-                m = re.match(r"docs/wp/(\d{4})-", path)
-                if m:
-                    wp = m.group(1)
-                    break
+        # The WPs the PR names outright: its title, else every WP file it
+        # edits, else its branch.  The body is not among them.  A
+        # contributor's body cites WPs in passing, and taking the first one as
+        # the claim filed #941 (all of WP-1956) under WP-1325 (WP-2046).
+        wps = list(dict.fromkeys(_WP_TEXT_RE.findall(title)))
+        if not wps:
+            wps = list(dict.fromkeys(m.group(1) for p in files if (m := _WP_FILE_RE.match(p))))
         # The branch last, and it is not redundant: a claim PR is opened before
         # its first commit exists on some flows, and `/wp-start` names every
         # branch after its WP, so `wp1414-slug` says which WP this is when the
         # title has not been written and no WP file has been touched yet.
-        if wp is None:
-            wp = wp_from_name(item.get("headRefName", ""))
+        if not wps:
+            from_branch = wp_from_name(item.get("headRefName", ""))
+            wps = [from_branch] if from_branch else []
+        # The issues the overlap match follows: the title's, and the ones
+        # GitHub itself parsed from a closing keyword.  A body's other numbers
+        # are context ("see #1153"), and following them gave #941 eighteen WPs.
+        # A closing reference may name another repository's issue ("closes
+        # owner/repo#5"), whose number means nothing here.
+        here = (item.get("url") or "").rpartition("/pull/")[0]
+        closing = {int(c["number"]) for c in item.get("closingIssuesReferences") or []
+                   if c.get("number") is not None
+                   and not (here and c.get("url") and c["url"].rpartition("/issues/")[0] != here)}
+        # A PR that names its WP is linked to that WP alone, so it follows none.
+        chain = set() if wps else {int(n) for n in _ISSUE_RE.findall(title)} - pull_requests | closing
         prs.append(
             PullRequest(
                 number=int(item["number"]),
-                title=item.get("title", ""),
+                title=title,
                 author=(item.get("author") or {}).get("login", "?"),
                 branch=item.get("headRefName", ""),
                 updated=(item.get("updatedAt") or "")[:10],
                 draft=bool(item.get("isDraft")),
-                wp=wp,
-                issues=tuple(sorted({int(n) for n in _ISSUE_RE.findall(text)})),
+                wps=tuple(wps),
+                issues=tuple(sorted({int(n) for n in _ISSUE_RE.findall(f"{title}\n{body}")})),
+                mentions=tuple(sorted(set(_WP_TEXT_RE.findall(body)) - set(wps))),
+                chain=tuple(sorted(chain)),
+                fork=bool(item.get("isCrossRepository")),
             )
         )
     return prs
+
+
+def _pull_requests_among(root: Path, numbers: set) -> set:
+    """Which of *numbers* are pull requests in this repository: one GraphQL call.
+
+    Empty when ``gh`` cannot answer.  The numbers then stay in the issue chain,
+    which costs extra rows and never a missing one.
+    """
+    if not numbers:
+        return set()
+    fields = " ".join(f"n{n}: issueOrPullRequest(number: {n}) {{ __typename }}" for n in sorted(numbers))
+    query = f"query($owner: String!, $name: String!) {{ repository(owner: $owner, name: $name) {{ {fields} }} }}"
+    # A number resolving to nothing (a discussion, a typo, #0) nulls its own
+    # alias and fails the whole call; it must not void the other answers.
+    proc = _gh(root, "api", "graphql", "-F", "owner={owner}", "-F", "name={repo}", "-f", f"query={query}",
+               partial=True)
+    try:
+        found = json.loads(proc or "")["data"]["repository"]
+        return {int(key[1:]) for key, kind in found.items()
+                if (kind or {}).get("__typename") == "PullRequest"}
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return set()
 
 
 def wp_issue_citations(root: Path) -> dict[str, set]:
@@ -514,31 +565,37 @@ class Overlap(NamedTuple):
 
     wp: str
     pr: PullRequest
-    via: str  # "names it" or "issue #N"
+    via: str  # "names it", or "mentions it" and/or "issue #N, ...", joined by " and "
 
 
 def overlaps(
-    prs: list[PullRequest], citations: dict[str, set], mine: Optional[str] = None
+    prs: list[PullRequest], citations: dict[str, set], branch: Optional[str] = None
 ) -> list[Overlap]:
     """Which WPs the open pull requests touch, directly or through an issue.
 
-    *mine* drops this session's own PR, which is otherwise the loudest row in
-    the table and the least informative.
+    A PR that names a WP outright is linked to that WP alone, which keeps the
+    table readable.  One that names none is linked to each WP its body mentions
+    and to each WP citing an issue it follows; one row per WP, its reasons
+    joined.
+
+    *branch* is this tree's branch, and drops this session's own PR, which is
+    otherwise the loudest row in the table and the least informative.  It is
+    matched by head branch, never by WP: filtering by WP dropped every PR on
+    the tree's WP, a contributor's included (WP-2046, #941).
     """
     found: list[Overlap] = []
     for pr in prs:
-        if pr.wp is not None:
-            if pr.wp != mine:
-                found.append(Overlap(pr.wp, pr, "names it"))
+        if branch and pr.branch == branch and not pr.fork:
             continue
+        if pr.wps:
+            found.extend(Overlap(wp, pr, "names it") for wp in pr.wps)
+            continue
+        why: dict[str, list] = {wp: ["mentions it"] for wp in pr.mentions}
         for wp, cited in sorted(citations.items()):
-            if wp == mine:
-                continue
-            shared = sorted(cited & set(pr.issues))
+            shared = sorted(cited & set(pr.chain))
             if shared:
-                found.append(
-                    Overlap(wp, pr, "issue " + ", ".join(f"#{n}" for n in shared))
-                )
+                why.setdefault(wp, []).append("issue " + ", ".join(f"#{n}" for n in shared))
+        found.extend(Overlap(wp, pr, " and ".join(vias)) for wp, vias in why.items())
     return sorted(found, key=lambda o: (o.wp, o.pr.number))
 
 
@@ -563,11 +620,16 @@ def by_pull_request(found: list[Overlap]) -> list[tuple]:
 
 def describe_pull_request(pr: PullRequest, touched: list) -> str:
     draft = " (draft)" if pr.draft else ""
-    wps = ", ".join(f"WP-{wp}" for wp, _ in touched)
-    vias = sorted({via for _, via in touched})
+    vias = {via for _, via in touched}
+    if len(vias) == 1:
+        wps = ", ".join(f"WP-{wp}" for wp, _ in touched) + f" ({vias.pop()})"
+    else:
+        # Each WP keeps its own reason: one shared list cannot say which
+        # mention or which issue led to which WP.
+        wps = ", ".join(f"WP-{wp} ({via})" for wp, via in touched)
     return (
         f"PR #{pr.number}{draft} by {pr.author}, updated {pr.updated} — "
-        f"{wps} ({'; '.join(vias)})\n    {pr.title[:88]}"
+        f"{wps}\n    {pr.title[:88]}"
     )
 
 
@@ -633,15 +695,17 @@ def _status(root: Path, here: Path, wp: Optional[str] = None) -> int:
     for wp in clashes(holders):
         print(f"⚠ WP-{wp} is live in more than one tree — that is the clash")
 
-    # The other machines, which this repo can only see through GitHub.
-    mine = next((h.wp for h in holders if h.worktree == here), None)
+    # The other machines, which this repo can only see through GitHub.  The
+    # tree's own PR is told apart by its branch, in full: ``worktree_branches``
+    # keeps only the last path segment, and a branch may hold a slash.
+    branch = _git(here, "symbolic-ref", "--short", "-q", "HEAD")
     print("\nOpen pull requests, including contributors' forks:")
     prs = open_prs(root)
     if prs is None:
         print("  gh could not answer (offline, not installed, or not logged in)")
         print("  — the table above is this machine only, so ask before starting")
         return 0
-    found = overlaps(prs, wp_issue_citations(root), mine)
+    found = overlaps(prs, wp_issue_citations(root), branch)
     if wp is not None:
         found = [o for o in found if o.wp == wp]
     scope = f" touching WP-{wp}" if wp else " touching a WP"
