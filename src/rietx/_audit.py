@@ -3765,7 +3765,12 @@ ROWS: tuple[Row, ...] = (
                   "2026-10-20 (tests/test_acceptance_stephens.py's plan): CPD brucite chi2 7.7662 "
                   "from 1000 ppm against 8.3241 from the isotropic value; CPD corundum both starts "
                   "equal to 2e-10; suggest.SUGGEST_SEED_STEPHENS and viz.compare's Stephens "
-                  "variant take it by reference since the B14 lift"),
+                  "variant take it by reference since the B14 lift. WP-1467 (2026-11-02, the "
+                  "lor_strain floor removed), 1000 ppm against the carried lor_strain on the "
+                  "ray: brucite LM chi2 7.8943 against 7.8939 (29 ppm), TRF 7.9267 against "
+                  "7.7965; operando pattern 41 LM 1.170 against 1.112 with the two phase "
+                  "fractions swapped, TRF 1.156 against 1.476. The starts disagree by driver, "
+                  "so the fixed seed stands"),
         grounds=("Some start is forced, since the width's square root has unbounded slope at "
                  "zero; kept at 1000 ppm until a second dataset compares the starts (B3, ruled "
                  "2026-10-19); the second compared them on 2026-10-20 and favoured 1000 ppm."),

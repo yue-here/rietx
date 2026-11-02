@@ -2299,7 +2299,8 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
     ``magnetic_lor_strain`` added at a magnetic component's windows.  A
     Stephens block adds Λ(hkl)·tanθ, which its own cone holds at or above
     zero (:func:`strain_cone_inequalities`), so it is left out of the row.
-    The row is then a sufficient condition, never a necessary one.  The
+    It also replaces ``lor_strain`` (WP-1467), whose value leaves the row with
+    it.  The row is then a sufficient condition, never a necessary one.  The
     phase terms have floors of 0, so a row can bind only through X and Y.
 
     **A row at every reflection of the frozen list**, where the Gaussian rows
@@ -2344,6 +2345,13 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
         # the magnetic pair is a table row only where a moment block is declared
         if cp.win_mag is not None and all(n in table._paths for n in magnetic):
             families.append((cp.win_mag, rows + [table._paths[n] for n in magnetic]))
+        # a Stephens block replaces lor_strain (CompiledModel.lor_strain_term,
+        # WP-1467): the entry is force-fixed, so its C row is zero and only its
+        # stored value in d would reach the row, a width the model never draws
+        d_ph = d
+        if cp.strain_monomials is not None:
+            d_ph = d.copy()
+            d_ph[table._paths[f"phases.{ip}.lor_strain"]] = 0.0
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         _d, tt_lines = model._cell_block(cp, cell, lams)
@@ -2361,7 +2369,7 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
             inv_cos, t = 1.0 / np.cos(th), np.tan(th)
             basis = np.column_stack([inv_cos, t] * (len(idx) // 2))
             blocks_T.append(basis @ C[idx, :])
-            blocks_c.append(basis @ d[idx])
+            blocks_c.append(basis @ d_ph[idx])
         if not blocks_T:
             continue
         Tc = np.unique(np.column_stack([np.vstack(blocks_T),

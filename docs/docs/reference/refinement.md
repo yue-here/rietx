@@ -618,7 +618,9 @@ Each kind has one constructor, so each format string is written once:
 `GuardFinding.code` is an open vocabulary of strings, and it is the same vocabulary as `Diagnostic.code`, so a guard maps to its diagnostic as data ([Diagnostics](result.md#diagnostics)).
 
 Read a guard as evidence about what the data could support, and not as a verdict on the model.
-A `nonpositive_strain` finding means those coefficients are not quotable, and it is no measurement of anisotropy.
+A `nonpositive_strain` finding means those coefficients are not quotable, and that the fit leaned on the clamp giving the reflections outside the cone no strain width.
+Its `detail` states the share of the phase's intensity those reflections carry, and the fit's other numbers leaned on them in that proportion.
+It is no measurement of anisotropy.
 
 ## Events
 

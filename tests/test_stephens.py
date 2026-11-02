@@ -342,6 +342,73 @@ def test_absent_and_zero_blocks_are_bit_identical():
     assert np.array_equal(y_none, y_zero)
 
 
+def _compiled_over(lor_strain: float, strain: StephensStrain, *,
+                   free: list[str] | None = None):
+    """``_compiled`` with the block declared over a stored ``lor_strain``."""
+    phase = brucite(strain, lor_strain=Parameter(value=lor_strain, min=0.0))
+    structure = Structure(phases=[phase])
+    structure.phases[0].scale.value = 1e-2
+    inst = Instrument.debye_scherrer(wavelength=1.5406)
+    inst.profile.w.value = 5e-3
+    table = ParameterTable(structure, inst)
+    table.set_vary(["*"], False)
+    for path in free or []:
+        assert table.set_vary([path], True), path
+    model = compile_model(structure, inst, _pattern(), mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    return model, table, structure
+
+
+def test_a_block_replaces_the_lor_strain_it_locks():
+    """WP-1467: the block's isotropic direction *is* the lor_strain column, so
+    the width law stops reading the locked path, as an anisotropic site's
+    Debye-Waller factor stops reading biso.  Before, a block declared over a
+    nonzero lor_strain stacked Λ ≥ 0 on a frozen floor it could not go below."""
+    strain = _strain_from_coef(_brucite_coef(600.0), vary=False)
+    m0, t0, _ = _compiled_over(0.0, strain)
+    m3, t3, _ = _compiled_over(0.3, strain)
+    v0, v3 = t0.decode(t0.x0()), t3.decode(t3.x0())
+    assert v3["phases.0.lor_strain"] == 0.3            # the path keeps its value
+    assert np.array_equal(m0.evaluate(v0), m3.evaluate(v3))
+    for cp0, cp3 in zip(m0.phases, m3.phases, strict=True):
+        assert np.array_equal(cp0.win, cp3.win)        # window sizing too
+    assert m3.lor_strain_term(0, v3) == 0.0
+    # without a block, lor_strain is the isotropic strain as before
+    m_iso, t_iso, _ = _compiled_over(0.3, None)
+    assert m_iso.lor_strain_term(0, t_iso.decode(t_iso.x0())) == 0.3
+
+
+def test_a_block_over_lor_strain_writes_no_lorentzian_floor_row():
+    """The Γ_L ≥ 0 rows read lor_strain's stored value through d; under a
+    block that value is no width, so the rows match the zero case."""
+    from rietx.optimize.least_squares import lorentzian_width_inequalities
+
+    strain = _strain_from_coef(_brucite_coef(600.0), vary=False)
+    rows = []
+    for ls in (0.0, 0.3):
+        model, table, _ = _compiled_over(ls, strain,
+                                         free=["instrument.profile.y"])
+        rows.append(lorentzian_width_inequalities(model, table, table.x0()))
+    assert len(rows[0]) == len(rows[1]) == 1
+    assert np.array_equal(rows[0][0].T, rows[1][0].T)
+    assert np.array_equal(rows[0][0].c, rows[1][0].c)
+
+
+def test_a_locked_lor_strain_is_no_microstructure_reading():
+    from rietx.model.microstructure import microstructure_table
+
+    strain = _strain_from_coef(_brucite_coef(600.0), vary=False)
+    _, table, structure = _compiled_over(0.3, strain)
+    (block,) = microstructure_table(structure, table.decode(table.x0()),
+                                    wavelength=1.5406)
+    assert "phases.0.lor_strain" not in {t.path for t in block.terms}
+    assert block.strain_agreement is None
+    _, table, structure = _compiled_over(0.3, None)
+    (block,) = microstructure_table(structure, table.decode(table.x0()),
+                                    wavelength=1.5406)
+    assert "phases.0.lor_strain" in {t.path for t in block.terms}
+
+
 def test_widths_become_direction_dependent():
     """(00l) broadens on its own when only s004 is raised — the whole point:
     two reflections at nearly the same 2θ get different widths."""
@@ -485,6 +552,56 @@ def test_guard_flags_coefficients_outside_the_physical_cone():
     diags = _guard_diagnostics(GuardReport(nonpositive_strain=flagged))
     assert [d.code for d in diags] == ["STEPHENS_STRAIN_NOT_POSITIVE"]
     assert diags[0].where == ["phases.0.microstrain"]
+
+
+def test_the_finding_carries_the_intensity_share_the_clamp_zeroed():
+    """WP-1467: the count says how many reflections lost their strain width,
+    the share says whether they mattered.  It rides in ``detail``, so the
+    rendered finding keeps its pre-v1.0 shape, and the diagnostic carries it
+    and names the LM driver first."""
+    from rietx.crystallography.stephens import sigma2_m
+    from rietx.refine import _guard_diagnostics
+    from rietx.strategy.staged import (
+        STEPHENS_CONE_TOL,
+        GuardReport,
+        check_stephens_positive,
+        stephens_clamp_share,
+    )
+
+    bad = _brucite_coef(600.0)
+    bad[_L4_ROW] = -50.0 * abs(bad[_L4_ROW])
+    model, table = _compiled(_strain_from_coef(bad, vary=False))
+    (finding,) = check_stephens_positive(table, model)
+    assert "%" not in str(finding)                 # the pinned rendering
+    values = table.decode(table.x0())
+    cp = model.phases[0]
+    s = np.array([values[f"phases.0.microstrain.{n}"] for n in S_NAMES])
+    sigma2 = np.asarray(sigma2_m(cp.strain_monomials, s))
+    clamped = sigma2 < -STEPHENS_CONE_TOL * np.abs(sigma2).max()
+    share = stephens_clamp_share(model, 0, table, clamped)
+    # the l⁴-heavy reflections leave the cone and the rest stay inside it;
+    # the two shares are complements over the reflections on the data
+    assert 0.0 < share < 1.0 and 0 < clamped.sum() < len(clamped)
+    assert f"{100.0 * share:.3g} %" in finding.detail
+    assert stephens_clamp_share(model, 0, table, ~clamped) == pytest.approx(
+        1.0 - share)
+
+    (diag,) = _guard_diagnostics(GuardReport(nonpositive_strain=[finding]))
+    assert diag.message.endswith(finding.detail)
+    assert "the physical cone. The width law" in diag.message
+    assert diag.suggestion.index("LM") < diag.suggestion.index("S_HKL")
+    assert "Do not report the S_HKL as measured" in diag.suggestion
+
+    # Le Bail and Pawley weigh by the extracted intensities instead
+    structure = Structure(phases=[brucite(_strain_from_coef(bad, vary=False))])
+    inst = Instrument.debye_scherrer(wavelength=1.5406)
+    inst.profile.w.value = 5e-3
+    lb_table = ParameterTable(structure, inst)
+    lb = compile_model(structure, inst, _pattern(), mode="lebail")
+    lb.phases[0].hkl_intensity = np.where(clamped, 3.0, 1.0)
+    on = (lb.phases[0].win[..., 1] > lb.phases[0].win[..., 0]).any(axis=0)
+    want = 3.0 * (clamped & on).sum() / (np.where(clamped, 3.0, 1.0) * on).sum()
+    assert stephens_clamp_share(lb, 0, lb_table, clamped) == pytest.approx(want)
 
 
 def test_out_of_cone_reflections_get_zero_width_not_nan():

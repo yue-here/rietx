@@ -230,9 +230,19 @@ $mmm$ 6, $2/m$ 9, $\bar 1$ 15.
 
 The coefficients refine as absolute degrees of freedom on that basis, and a set
 outside the allowed subspace raises rather than being symmetrised. A Stephens
-block locks the scalar `lor_strain`, whose isotropic direction is identically
-that column, so the block subsumes it. Free the block in the sample-broadening
-stage itself.
+block replaces the scalar `lor_strain`, whose column is identically the
+block's isotropic direction. Declaring a block locks the path, and the width
+law then reads zero for it, whatever value it stores. On the isotropic ray
+$S = \varepsilon^2\,[M^2]$ the block gives the same width a `lor_strain` of
+the same value gives, so the block nests the isotropic model. Free the block in
+the sample-broadening stage itself.
+
+$\Lambda$ is purely Lorentzian here. Stephens splits it with a mixing
+parameter $\zeta$: $(1-\zeta)\,\Gamma_A$ joins the Gaussian width in
+quadrature and $\zeta\,\Gamma_A$ the Lorentzian one (his eq. 6). His two
+examples refined $\zeta$ to 0.40 and 0.56. TOPAS's Stephens macros carry the
+same split as `eta`, and GSAS-II as `Mustrain;mx`. rietx fixes $\zeta = 1$,
+so a protocol that refines the split cannot be mirrored here.
 
 ## The positivity cone, the seed and the guard
 
@@ -241,13 +251,33 @@ so it cannot be a box bound. The default bounded-LM driver carries it as a
 linear inequality, and the guard (`STEPHENS_STRAIN_NOT_POSITIVE`) falls silent
 with nothing left to report ({ref}`ch-estimation`). Under `solver="trf"` the
 guard is the only check. A joint fit builds no cone under either driver, so the
-guard fires there too. Read a firing as "these coefficients are not quotable",
-never as evidence of anisotropy. The guard's test is one-sided, because zero
-lies on the cone itself. An earlier ≤ 0 form that flagged the inert all-zero
-block produced a since-withdrawn claim about isotropic specimens.
+guard fires there too. The width law clamps a negative $\sigma^2(M)$ to zero
+width, so a fit outside the cone has leaned on the clamp. The reflections past
+it lost all strain width, and the solver can use that set as a free hinge. Read
+a firing as "these coefficients are not quotable, and the fit leaned on the
+clamp". Its χ², cells and phase fractions carry the hinge as well as its
+$S_{HKL}$. The finding states the share of the phase's intensity on the fitted
+data that sits in the clamped reflections, which says how far. A firing is
+never evidence of anisotropy. The guard's test is one-sided, because zero lies
+on the cone itself. An earlier ≤ 0 form that flagged the inert all-zero block
+produced a since-withdrawn claim about isotropic specimens.
+
+TOPAS's shipped Stephens macros take `Sqrt(Max(mhkl, 0))`, the same clamp, and
+report nothing. `Stephens_tetragonal` takes `Abs()` first, which folds a
+negative $\sigma^2(M)$ back into a positive width. A TOPAS Stephens fit
+therefore carries no evidence that $\sigma^2(M)$ stayed positive.
 
 The isotropic limit $S = \varepsilon^2\,[M^2]$ lies exactly in the allowed
 subspace for every symmetry, and it is both the seed and the only legal start.
 At $S \equiv 0$ the square root in {eq}`ms-lambda` has unbounded slope, so strain
 stages seed through a dedicated mechanism rather than a generic parameter
 seed.
+
+The seed stays at a fixed microstrain (1000 ppm in `lab_sample_refine`) rather
+than at the `lor_strain` a phase carried before the block was declared. WP-1467
+compared the two starts. On the brucite acceptance pattern under the default LM
+driver the χ² agreed to 4 in 10⁴ (7.8943 against 7.8939). On one operando
+pattern with two phases the start at the carried strain reached a lower χ² under
+LM (1.112 against 1.170) with the two phase fractions swapped, and a higher one
+under TRF (1.476 against 1.156). The measurements disagree, so the default is
+unchanged.

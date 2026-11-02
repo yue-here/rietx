@@ -585,6 +585,25 @@ undetermined. rietx takes GSAS-II's mechanism at a cut derived from its own Jaco
 accuracy (`statistics.resolved_correlation`): GSAS-II's 1e-6 would also have removed
 brucite's zero-shift/displacement direction at 1.4e-10, whose correlations hold to 2e-5.
 
+## Stephens anisotropic strain: the width's shape and its clamp
+
+Collected 2026-11-02 for WP-1467 from three sources. Stephens' paper was read by the lead. GSAS-II
+5.8.4's source was read by the lead. The TOPAS macros were read by the 2026-09-25 review behind the
+WP, and that reading was not repeated. Stephens (1999, eq. 6) splits the anisotropic width
+Γ_A with a mixing parameter ζ. (1−ζ)·Γ_A joins the Gaussian width in quadrature, and ζ·Γ_A
+joins the Lorentzian one. His two examples refined ζ to 0.404 and 0.558, and holding his
+first at ζ = 0 raised Rwp from 8.22 % to 10.81 % (his Table 2).
+
+| Program | Gaussian/Lorentzian split | σ²(M) < 0 |
+|---|---|---|
+| rietx | none: Λ is wholly Lorentzian (ζ = 1) | clamped to zero width; the default LM driver holds σ² ≥ 0, and `STEPHENS_STRAIN_NOT_POSITIVE` reports the clamped intensity share under TRF or a joint fit |
+| GSAS-II 5.8.4 | `Mustrain;mx`, Stephens' form: γ += Mγ·mx, σ² += (Mγ·(1−mx))² (`GSASIIstrMath.py:3330-3331`; checked) | no clamp at the width: `np.sqrt(Sum)` (`GSASIIstrMath.py:3265`; checked); what follows a negative sum was not traced |
+| TOPAS (shipped macros) | `eta`: `gauss_fwhm = 1.8/π·pp·(1−eta)·Tan(Th)`, `lor_fwhm = 1.8/π·pp·eta·Tan(Th)` | `Sqrt(Max(mhkl, 0))`, the same clamp, reported nowhere; `Stephens_tetragonal` takes `Abs()` first, folding a negative σ² back into a positive width (TOPAS wiki, read 2026-09-25 by the review) |
+
+So no program reports a fit that leaned on the clamp, and a TOPAS Stephens fit carries no
+evidence that σ²(M) stayed positive. A protocol that refines ζ cannot be mirrored in rietx
+(WP-0503's fence).
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by

@@ -38,6 +38,17 @@ reproduced to the digit. Worktree venv `[dev]`, macOS.
 
 The isotropic fits are identical under both solvers on all three patterns.
 
+**Superseded in part, 2026-11-02** (re-run on `0d735f5e5`, the review's own
+`cone_probe.py`/`floor_probe.py`, worktree venv `[dev]`, macOS arm64). The
+tree moved the numbers. χ² isotropic / TRF / lm: pattern 0 1.935 / 1.794 /
+1.838, pattern 16 3.404 / 2.314 / 2.006, pattern 41 1.325 / 1.253 / 1.294. The
+clamp zeroed under TRF: pattern 0, 55 of 94 (50.5 %); pattern 16, phase 0 36
+of 94 (34.6 %) and phase 1 **none**, so the 0.5 % finding no longer fires;
+pattern 41, phase 3 158 of 378 (38.9 %) and phase 4 234 of 234 (100 %). The
+pattern 41 lm fit already sat below the isotropic one (1.294 against 1.325)
+with the floor kept. The floor variants: keep 1.253 / 1.294, zero 1.156 /
+1.170, fold 1.476 / 1.112 (TRF / lm).
+
 **Defect 1: the block stacks on the width it locks.** A declared block
 force-fixes `phases.i.lor_strain` (`params/vector.py`, commented "the
 Atom.aniso ⇒ biso bargain, one level up"). `force_fixed` keeps the stored
@@ -233,7 +244,7 @@ Debye-Waller factor is not floored, so there is no hinge to lean on.
 
 ## Tasks
 
-- [ ] Defect 1: a declared block replaces `lor_strain`. The Lorentzian width
+- [x] Defect 1: a declared block replaces `lor_strain`. The Lorentzian width
       stops reading `phases.i.lor_strain` when the phase carries a block, as
       the Debye-Waller factor stops reading `biso` for an anisotropic site.
       The lock stays, so the path still exists for globs and write-back. Reach
@@ -241,44 +252,53 @@ Debye-Waller factor is not floored, so there is no hinge to lean on.
       configs with it. `microstructure.py` stops reporting a locked
       `lor_strain` as a reading. A fixture that declares a block over a
       nonzero `lor_strain` moves, and every other golden stays bit-identical.
-- [ ] The seed. Compare the 1000 ppm `strain_seed` with a start at the
+      *Done 2026-11-02*: `CompiledModel.lor_strain_term` is 0 under a block, read by `_width_block` (both components), the width memo key and the compile-time window sizing. Four readers the list above missed take it too: the Γ_L ≥ 0 rows of `lorentzian_width_inequalities` (they read the stored value through `d`), `report/strain.py`, `STRAIN_UNUSUALLY_LARGE` (which flagged a width the model no longer draws), and the TOPAS writer's `_width_lines` (which wrote both terms). `microstructure_table` drops the term. New cross-backend config `stephens_over_lor_strain`. No golden declares a block over a nonzero `lor_strain`, so none moved. On pattern 41 "keep" now equals "zero" to every printed digit (TRF 1.156, lm 1.170). Not generalised: the FullProf and TOPAS-input writers refuse a block outright, so they had nothing to drop.
+- [x] The seed. Compare the 1000 ppm `strain_seed` with a start at the
       `lor_strain` the phase carried, folded onto the isotropic ray, on the brucite acceptance fixture
       (`tests/test_acceptance_stephens.py`) and on patterns 0, 16 and 41 with
       the probe. Pattern 41 favoured 1000 ppm. Change the default only if the
       measurements agree, and write the result beside the manual's seed
       paragraph.
-- [ ] Defect 3: `check_stephens_positive` computes each phase's share of
+      *Done 2026-11-02*, default unchanged. Brucite acceptance protocol (`seed_brucite.py` in the session scratch, isotropic fit's `lor_strain` 29 ppm): LM χ² 7.8943 (1000 ppm), 7.8945 (800), 7.8939 (fold), all inside the cone; TRF 7.9267, 7.8034, 7.7965, 23/19/19 of 43 outside. Pattern 41 (floor fixed): LM 1.170 against fold 1.112 with the two phase fractions swapped (86.5/12.9 % against 9.5/89.6 %), TRF 1.156 against 1.476. Patterns 0 and 16 carry no `lor_strain` above 1e-100, so fold has no start to take there. The measurements disagree, so the default stays; written beside the manual's seed paragraph, at `STRAIN_SEED_PPM` and in its audit row.
+- [x] Defect 3: `check_stephens_positive` computes each phase's share of
       intensity in reflections below the cone tolerance, over the fitted
       range. It rides in `GuardFinding.detail`, `str(finding)` stays
       byte-identical, and `detail`'s docstring names the second writer.
       Rietveld reads `structure_intensity_partition`; Le Bail and Pawley read
       `hkl_intensity`.
-- [ ] The suggestion names `solver="lm"` first. It says `lm` makes the
+      *Done 2026-11-02*: `staged.stephens_clamp_share`, in `detail`. Rietveld weighs m·|F|² through `_total_f2`, the I_calc half of `structure_intensity_partition` without its profile loop, over reflections whose frozen window reaches the fitted data. Agrees with the review's probe to 0.4 points on patterns 0, 16 and 41 (50.3/34.9/51.5/19.4 % against 50.5/34.6/51.6/19.6 %; the probe cut at Bragg 2θ, the guard at the window).
+- [x] The suggestion names `solver="lm"` first. It says `lm` makes the
       coefficients admissible, not measured, so vary the start. It keeps "do
       not report the S_HKL", and says the fit's other numbers leaned on the
       zeroed reflections in proportion to the share. The Laue-class remedy is
       conditioned on a wrong declared symmetry, or dropped.
-- [ ] The reading, at every place listed under defects 1 and 2:
+      *Done 2026-11-02*, in the shape the inherited WP-1938 note predicted: LM is the default, so the suggestion says to refit under it when the fit ran `trf`, and to fit each histogram alone for a joint fit (no cone under either driver). The Laue-class and fit-range remedies are dropped; "restart from the isotropic limit" too, since every staged plan seeds there.
+- [x] The reading, at every place listed under defects 1 and 2:
       `microstructure.md` (the block paragraph and the guard section),
       `using/data.md`, `help.py`, root CLAUDE.md, skill `diagnostics.md` and
       `abstention.md`. `abstention.md` drops "at a *higher* Rwp" as a general
       claim and says the direction varies, without naming the series.
       Re-sync with `rietx skill --install . --copy`.
-- [ ] The manual states the fence: Λ is purely Lorentzian here, TOPAS's `eta`
+      *Done 2026-11-02*: `theory/microstructure.md` (block paragraph and guard section), `reference/data.md` (the WP's `using/data.md`), `reference/refinement.md`, `concepts/plans.md`, `help.py` (three entries), root CLAUDE.md, skill `diagnostics.md` and `abstention.md`, re-synced.
+- [x] The manual states the fence: Λ is purely Lorentzian here, TOPAS's `eta`
       and GSAS-II's `Mustrain;mx` split it, and a protocol using the split
       cannot be mirrored. Read Stephens (1999) before attributing the
       parameter to him. It also states TOPAS's clamp, so a TOPAS Stephens fit
       carries no evidence that σ² stayed positive.
-- [ ] The sibling. On the fixture of `tests/test_walking_bounds.py`'s
+      *Done 2026-11-02*. Stephens (1999) eq. 6 calls the mixing parameter ζ, not ξ as WP-0503 has it, and refined it to 0.404 and 0.558 in his two examples. Corrected in the manual only; WP-0503 is a closed record.
+- [x] The sibling. On the fixture of `tests/test_walking_bounds.py`'s
       `test_the_collapsed_resolution_function_is_reported`, with U, V, W free, measure the share of Bragg intensity at points under
       the floor. If TRF leans on it, carry the same share in `detail`. If not,
       record the numbers here and leave it.
-- [ ] Tests: a block over a synthetic `lor_strain` of 0.3 and over 0 give the
+      *Done 2026-11-02*, left. The fixture is a flat pattern, so the measurement used LaB6 synthesised at `HEALTHY_NEGATIVE_V` and started from `COLLAPSED` (`sibling_probe.py`, session scratch). Both drivers end with all 20 on-data reflections under the floor (share 1.0), χ² 6.34 against 1.01 from the true start: TRF moved U, V, W and stayed under it, LM did not move. That is a stall on a zero gradient, not a hinge the fit benefits from, and the finding already counts every fitted point. The floor's other problem, the FD column at the clamp (the WP-2002 inherited entries), is not this task.
+- [x] Tests: a block over a synthetic `lor_strain` of 0.3 and over 0 give the
       same pattern;
       the share on the synthetic brucite block `test_stephens.py` already
       drives out of the cone; the suggestion names `lm`; the rendering pin is
       unchanged.
-- [ ] Skill: the `diagnostics.md` and `abstention.md` rows in the reading task.
+      *Done 2026-11-02*: `test_stephens.py` (+4), `test_strain_cap.py` (+1), `test_projects_topas.py` (one case), `test_cross_backend.py` (one config).
+- [x] Skill: the `diagnostics.md` and `abstention.md` rows in the reading task.
+      *Done 2026-11-02* with the reading task.
 
 ## Acceptance
 
@@ -289,10 +309,12 @@ With the tests on synthetic fixtures and the series numbers from the probe:
   isotropic fit's 1.381.
 - On pattern 16 under TRF, `STEPHENS_STRAIN_NOT_POSITIVE` reports a share near
   25 % for phase 0 and under 1 % for phase 1, and names `solver="lm"`.
+  *Superseded in part 2026-11-02*: on the current tree phase 1 stays inside the
+  cone and phase 0 reports 34.9 %; the review's probe gives 34.6 %.
 - Each hit of the grep below also says the fit leaned on the clamp.
 
 ```sh
-grep -rn "not quotable" docs/manual src/rietx/help.py CLAUDE.md docs/skill/rietx
+grep -rn "not quotable" docs/docs src/rietx/help.py CLAUDE.md docs/skill/rietx
 .venv/bin/python -m pytest tests/test_stephens.py tests/test_capabilities.py tests/test_acceptance_stephens.py tests/test_cross_backend.py -q
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 .venv/bin/python -m ruff check src tests examples
