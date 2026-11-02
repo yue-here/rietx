@@ -283,8 +283,10 @@ class CorrelationPair(Base):
     """One entry of the worst-|ρ| list (WP-1056).
 
     ``rho`` is the signed correlation from the solver's final undamped
-    Jacobian (the same matrix the ``HIGH_CORRELATION`` guard read, so the
-    two can never disagree); the list is ordered worst first.
+    Jacobian, with any direction the Jacobian cannot resolve projected out
+    (WP-2050, :func:`~rietx.optimize.statistics.resolved_correlation`).  It is
+    the same matrix the ``HIGH_CORRELATION`` guard read, so the two can never
+    disagree; the list is ordered worst first.
     """
 
     path_a: str

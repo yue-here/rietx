@@ -290,8 +290,8 @@ M_\perp = M - (M\cdot\hat{\mathbf{h}})\,\hat{\mathbf{h}},
 $\hat{\mathbf{h}}$ in one Cartesian frame, the magnetic lattice's own:
 $\mathbf{m} = \sum_i m_i \mathbf{a}_i$ for the contravariant components on the
 cell vectors, and $\mathbf{h}$ taken through the inverse of the same row-vector
-lattice. A $\mathbf{k} \neq 0$ child cell is usually rotated or left-handed
-against the parent axes, so rebuilding either vector from the six cell
+lattice. A $\mathbf{k} \neq 0$ child cell is usually rotated against the
+parent axes, so rebuilding either vector from the six cell
 parameters alone, in a standard orientation, measures the angle between
 them in two different frames. That average
 destroys some of the information the model carries: two candidate families

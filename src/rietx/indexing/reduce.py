@@ -514,8 +514,24 @@ def conventional_setting(af: np.ndarray, system: str, centring: str = "P"
     ``None`` too where ``af`` is not a lattice's metric (non-finite or not
     positive definite): there is no setting to choose, and a caller reporting
     a candidate must not be stopped by one.
+
+    **An A or B description is re-set to C** (WP-2066).  The dichotomy
+    search replays the images of C under the axis swaps it quotients by, so
+    it can accept a C lattice as A (monoclinic) or as A or B (orthorhombic).
+    Each is the same lattice on the same primitive sublattice, and the report
+    names it once, in C.
+
+    * **monoclinic A**: the centring is (b + c)/2, so a ↔ c turns it into
+      (a + b)/2, and the C reduction above runs from there.
+    * **orthorhombic A, B**: the centred face's two axes become a and b,
+      shorter first, and the third becomes c with the sign that keeps the
+      basis right-handed.  A C description is left as found.
+
+    The caller relabels the candidate's centring to ``"C"`` with the change.
     """
-    if system != "monoclinic" or centring not in ("P", "C"):
+    if system == "orthorhombic" and centring in _FACE_AXES:
+        return _orthorhombic_to_c(af, centring)
+    if system != "monoclinic" or centring not in ("P", "C", "A"):
         return None
     from .qspace import gstar_from_af
     af = np.asarray(af, dtype=np.float64)
@@ -536,6 +552,8 @@ def conventional_setting(af: np.ndarray, system: str, centring: str = "P"
         n = step @ n
         plane = step @ plane @ step.T
 
+    if centring == "A":
+        apply(np.array([[0, 1], [1, 0]]))            # a ↔ c: A becomes C
     for _ in range(_SETTING_STEPS):
         k = _gauss_step(plane[0, 1] / plane[0, 0])
         if k:
@@ -560,6 +578,37 @@ def conventional_setting(af: np.ndarray, system: str, centring: str = "P"
     rows = ((int(n[0, 0]), 0, int(n[0, 1])), (0, sb, 0),
             (int(n[1, 0]), 0, int(n[1, 1])))
     return None if rows == ((1, 0, 0), (0, 1, 0), (0, 0, 1)) else rows
+
+
+#: The two axes of each centred face, by the centring's letter
+_FACE_AXES = {"A": (1, 2), "B": (0, 2)}
+
+
+def _orthorhombic_to_c(af: np.ndarray, centring: str
+                       ) -> tuple[tuple[int, int, int], ...] | None:
+    """The axis permutation taking an orthorhombic A or B cell to C.
+
+    The face's two axes become a and b, shorter first; the third axis
+    becomes c, signed so the basis stays right-handed.  ``None`` where ``af``
+    is not a lattice's metric, as in :func:`conventional_setting`.
+    """
+    from .qspace import gstar_from_af
+    af = np.asarray(af, dtype=np.float64)
+    if not np.all(np.isfinite(af)):
+        return None
+    gstar = gstar_from_af(af)
+    if np.linalg.eigvalsh(gstar)[0] <= 0.0:
+        return None
+    lengths = np.diag(np.linalg.inv(gstar))
+    i, j = _FACE_AXES[centring]
+    if lengths[j] < lengths[i]:
+        i, j = j, i
+    k = 3 - i - j
+    eye = np.eye(3, dtype=np.int64)
+    m = np.array([eye[i], eye[j], eye[k]])
+    if round(np.linalg.det(m)) < 0:
+        m[2] = -m[2]
+    return tuple(tuple(int(v) for v in row) for row in m)
 
 
 def reduced_covariance(cov: np.ndarray | None, t: np.ndarray | None

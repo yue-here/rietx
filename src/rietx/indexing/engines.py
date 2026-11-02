@@ -2358,6 +2358,17 @@ DEFAULT_SEARCH_PRESET = "quick"
 #: specs measured, cheapest first; at 8, 15 and 20 % the lab patterns (zircon, FAP,
 #: corundum, LaB6) validated every checked cell either way, searching the same
 #: systems.  What 15 % cost: NAC's default spec no longer reached orthorhombic.
+#:
+#: **WP-2063 cut what spends it, and left the value.**  The panel scores the
+#: same answer 5.3× cheaper in consensus and 3.3-8.8× in a unit (thread CPU,
+#: NAC's captured calls replayed on both trees, digests equal), so on NAC's
+#: 80-panel merge about 1-2 s of the 18 s goes before the first fit, where
+#: 10.5 s did.  Swept at 8, 10 and 15 %, three interleaved ``quick`` runs
+#: each (2026-11-02, load 4-9 of 10 cores): NAC's true cell validated on every
+#: run at every value, and no value changed the systems searched, the
+#: candidates or their ranking on NAC or the four lab sets.  What 8 % lost is
+#: NAC's top-ranked candidate's fit, cancelled on every run, and the true
+#: cell's fit kept a 2 s margin.  So the value stays (``docs/wp/2063-*.md``).
 VALIDATION_RESERVE_FRACTION = 0.15
 
 #: name → the whole-run ceiling it fills in (``None`` = unbounded, today's
