@@ -545,7 +545,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
 })
 
 ROWS: tuple[Row, ...] = (
-    # code: 257
+    # code: 258
     Row("ABSORPTION_ESTIMATE_UNAVAILABLE", "code"),
     Row("ABSORPTION_MU_R_OUT_OF_RANGE", "code"),
     Row("ABSORPTION_PLATE_THICKNESS", "code"),
@@ -1214,6 +1214,20 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code"),
     Row("WAVELENGTH_CALIBRATION", "code"),
     Row("XRDML_ATTENUATOR_APPLIED", "code"),
+    Row("XYDATA_INTER_APPLIED", "code", tier=2, ambiguity=1,
+        evidence=("info; a record of an act the file's own heading asks for. Two claims, "
+                  "each at its own tier. Multiplying x by fac_x and y and sigma by fac_y "
+                  "is the format's own definition (Rodriguez-Carvajal, An Introduction to "
+                  "the Program FullProf 2000, LLB, July 2001, PDF p. 74, Ins = 10), so the "
+                  "numbers the file means are the written ones times the factors: tier 1. "
+                  "Taking sigma = sqrt(fac_y*w) for w the intensity as written, when the "
+                  "file has no sigma column, is the Poisson sigma of the multiplied "
+                  "intensity and rests on one program's measured behaviour, FullProf 8.20 "
+                  "run as a black box on synthetic files (#1064): tier 2, the tier of the "
+                  "row. Fires exactly when a factor is not 1"),
+        response="info",
+        responds=("nothing: compare the pattern with the file's own columns only after "
+                  "multiplying them by the factors the message names")),
     # action: 24
     Row("rietx.schemas.results.StageResult.held", "action", tier=3, ambiguity=1,
         evidence=("WP-1301/1523: free, an absent phase's cell walked 14.9 A from truth over 13 "

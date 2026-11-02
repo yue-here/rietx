@@ -222,7 +222,7 @@ def test_every_reader_format_appears_in_dispatch_order(caps):
     assert ".cif" in by_name["pdcif"].extensions
     # and it names the reader keyword a caller has to supply *and* record
     assert by_name["pdcif"].options == ["block"]
-    assert by_name["xy"].options == []
+    assert by_name["xy"].options == ["axis"]
     # a binary format's sniff has to say what it *refuses* too, since one of the
     # four Bruker RAW versions is recognised in order to be declined and a
     # client choosing what to offer an upload dialog reads this arm (WP-1047)

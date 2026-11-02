@@ -4525,6 +4525,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "reported."
         ),
     ),
+    "XYDATA_INTER_APPLIED": HelpEntry(
+        title="FullProf's INTER multipliers were applied",
+        description=(
+            "The file opens with FullProf's XYDATA heading, and its INTER line "
+            "states a multiplier other than 1. The FullProf manual defines `fac_x` as "
+            "a multiplier of the x values and `fac_y` as a multiplier of the "
+            "intensities and their esds, which FullProf applies before it uses the "
+            "data. The reader applied them the same way, so the pattern's numbers "
+            "are the file's numbers times the factors. A file with no esd column "
+            "gets the Poisson esd of the multiplied intensity, as in FullProf. "
+            "Compare the pattern against the file's own columns only after "
+            "multiplying."
+        ),
+    ),
 }
 
 
@@ -4648,6 +4662,20 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
 #: enumerating what a reader accepts.  These entries are the text a person
 #: reads beside the control.
 READER_OPTION_HELP: dict[str, HelpEntry] = {
+    "axis": HelpEntry(
+        title="Axis",
+        description=(
+            "What the x column of a plain two- or three-column file is: `two_theta`, "
+            "2θ in degrees, or `tof`, a flight time in microseconds. A file that "
+            "states no unit cannot say which, because both are ascending columns of "
+            "numbers, so the reader takes 2θ unless you declare otherwise. A "
+            "time-of-flight bank with no header needs `tof`. The pattern's metadata "
+            "records the declaration under `declared_axis`. A file that states its "
+            "own unit and disagrees with the declaration is refused, and the message "
+            "quotes both."
+        ),
+        typical="unset; `tof` for a time-of-flight bank exported without a header",
+    ),
     "bank": HelpEntry(
         title="Detector bank",
         description=(
