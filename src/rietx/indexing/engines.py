@@ -2363,9 +2363,13 @@ DEFAULT_SEARCH_PRESET = "quick"
 #: same answer 5.3× cheaper in consensus and 3.3-8.8× in a unit (thread CPU,
 #: NAC's captured calls replayed on both trees, digests equal), so on NAC's
 #: 80-panel merge about 1-2 s of the 18 s goes before the first fit, where
-#: 10.5 s did.  Lowering the value trades
-#: validated fits for search systems on the wall clock, so it waits for a
-#: repeated ``quick`` sweep on an idle machine (``docs/wp/2063-*.md``).
+#: 10.5 s did.  Swept at 8, 10 and 15 %, three interleaved ``quick`` runs
+#: each (2026-11-02, load 4-9 of 10 cores): NAC's true cell validated on every
+#: run at every value, and no value changed the systems searched, the
+#: candidates or their ranking on NAC or the four lab sets.  What 8 % lost is
+#: NAC's top-ranked candidate's fit, cancelled on every run, and the true
+#: cell's fit kept a 2 s margin.  So the value stays, pending the maintainer
+#: (``docs/wp/2063-*.md``).
 VALIDATION_RESERVE_FRACTION = 0.15
 
 #: name → the whole-run ceiling it fills in (``None`` = unbounded, today's

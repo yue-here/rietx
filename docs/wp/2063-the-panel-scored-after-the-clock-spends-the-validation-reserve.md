@@ -1,6 +1,6 @@
 # WP-2063 — the FoM panel scored after the clock spends the validation reserve
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — ready for review (PR #1221): the cancel reaches a long Pawley step, the panel is cheaper and exact; the reserve sweep waits for an idle machine
+Milestone: unscheduled · Status: 🔄 2026-11-02 — ready for review (PR #1221): the cancel reaches a long Pawley step, the panel is cheaper and exact; the reserve swept, stays at 15 % pending the maintainer
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-31 — was P3: issue #1231 shows a `full` run overrunning its declared `total_budget_seconds` by minutes, every candidate left unvalidated (a defect that fires wrongly, as WP-1924 rates a ceiling overrun)
@@ -74,11 +74,14 @@ fit is bounded, so the validation reserve reaches validation and
       1.04 s. Scaled to WP-2011's quiet 80-panel merge, the post-stop
       scoring falls from about 10.5 s to about 1-2 s, so at 15 % (18 s) the
       fits get about 16 s where they had 7.3 s.
-- [ ] Lower `VALIDATION_RESERVE_FRACTION` from a repeated `quick` sweep on
+- [x] Lower `VALIDATION_RESERVE_FRACTION` from a repeated `quick` sweep on
       an idle machine (probe 16, `RESERVE=0.08,0.10,0.15`, three runs each,
       NAC both specs and the four lab sets), with its row's evidence. The
       value trades validated fits for searched systems on the wall clock, so
-      no count can choose it.
+      no count can choose it. Swept 2026-11-02 (handover). Stays at 15 % for
+      now. NAC's true cell validated at 8 % on every run, but no arm searched
+      a system, a candidate or a ranking the others did not. The value is
+      the maintainer's call.
 - [x] Unit replay digests (`python -m tests.unit_replay`) and
       `tests/test_acceptance_indexing.py` unchanged, or each move named.
       Replay: 22 of 22 digests unchanged. Acceptance: 44 passed (macOS
@@ -98,6 +101,61 @@ fit is bounded, so the validation reserve reaches validation and
   measurement), WP-1045 (the reserve), WP-1046 (whole-merge scoring).
 
 ## Handover log
+
+- **2026-11-02** — 3rd session (ghostshift runner, PR #1221), the reserve
+  sweep. The maintainer ruled the time (02:00-05:00). The sweep ran probe 16
+  as written, Pawley, at 8, 10 and 15 %, three repetitions. The arms were
+  interleaved per case, with the start arm rotated each repetition. NAC's
+  true cell (cI, V = 1077 Å³) validated on all 18 NAC runs, at every arm, on
+  both specs. No arm changed what the search reached. Every set searched the
+  same systems, flagged the same ones incomplete, returned the same
+  candidate count and ranked the same top three at all three arms. The
+  reserve therefore bought validated fits here and cost nothing visible in
+  the search. The constant stays at 15 %, and its value goes to the
+  maintainer (see *Decision owed*).
+
+  *Measured* (macOS arm64, `[dev]` venv built for this session from
+  `cpython-3.12-macos-aarch64-none`, compiled tier loaded, on 010fbbcdd).
+  Load 3.7-9.4 on 10 cores throughout, from macOS file sync. No other
+  process ran beyond that, except a pytest from another session during two
+  corundum runs (repetition 2 at 8 %, repetition 3 at 15 %). Both were
+  repeated clean, with identical outcomes. 56 runs, 02:26-03:46 GMT. Logs
+  and the per-run JSON are in `~/.cache/ghostshift/rietx/wp-2063-sweep/`
+  (machine-local).
+
+  | set | 8 % | 10 % | 15 % |
+  |---|---|---|---|
+  | NAC, default spec | truth ✓ 3/3, first fit at 115.5-115.7 s; the top-ranked tP (V 269) cancelled 3/3 | truth ✓ 3/3, first fit at 112.8-113.0 s; tP cancelled 3/3 | truth ✓ 3/3, first fit at 106.2-106.6 s; tP ✓ 3/3; tI (V 919) cancelled 3/3 |
+  | NAC, all systems | truth ✓ 3/3, first fit at 115.9-116.1 s; oP (V 135) cancelled 3/3 | truth ✓ 3/3, first fit at 113.5-113.7 s; oP cancelled 3/3 | truth ✓ 3/3, first fit at 107.0-107.3 s; oP ✓ 3/3; tP cancelled 3/3 |
+  | zircon | 3/3 checked ✓, all 3 runs | same | same |
+  | FAP | 3/3 checked ✓, all 3 runs | same | same |
+  | corundum | 4/4 checked ✓, all 3 runs | same | same |
+  | LaB6 | 10/10 checked ✓, all 3 runs | same | same |
+
+  Systems searched, identical at every arm and run: NAC c, h, r, t, o on
+  both specs, all five incomplete. Zircon t, FAP h and r, LaB6 c, h, r, t,
+  all complete. Corundum c, h, r, t, with h, r and t incomplete. Every NAC
+  run ended at 122.8-124.1 s against the 120 s ceiling. The true cell's fit
+  cost 4.4-5.0 s on the run's clock. At 8 % it ended 2.0-2.3 s before the
+  run's last fit was cancelled. That is the margin a slower machine would
+  eat. WP-2011's cost at 15 % has gone: NAC's default spec reaches
+  orthorhombic again, because the panel no longer spends the reserve.
+
+  *Decision owed* (maintainer). The decision rule in this WP's last *Next*
+  was "lower it if NAC's true cell validates at a lower value on every
+  run". That condition held at 8 %. The rule was not applied, because its
+  premise did not hold. The task says the value trades validated fits for
+  searched systems. At these three values on these six sets, it traded
+  validated fits for nothing. A lower reserve leaves NAC's top-ranked
+  candidate unvalidated on every run and keeps a 2 s margin on the true
+  cell's fit. A heavier pattern than these six might gain a system from
+  the 8.4 s that 15 % holds back. None of these did. Lowering is a
+  one-line change: the constant, its comment, and the `_audit` row's value
+  and evidence.
+
+  *Done.* Ticked the sweep task. Recorded the outcome in the constant's
+  comment and its `_audit` row evidence. The value and the row's
+  `approved` date are unchanged.
 
 - **2026-11-01** — 2nd session (ghostshift runner, PR #1221). An indexing
   run now stops at its declared ceiling. That was issue #1231: a Pawley
