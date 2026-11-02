@@ -310,6 +310,21 @@ def test_the_flag_names_the_phase_and_the_value():
     assert d.level == "warning"
 
 
+def test_a_lor_strain_under_a_stephens_block_is_not_flagged():
+    """WP-1467: the block replaces lor_strain, so its stored value is no
+    width the model draws, and flagging it would describe a width that is
+    not there."""
+    from rietx.refine import _strain_flag_diagnostics
+
+    phase = _phase("mayenite")
+    phase.microstrain = rx.StephensStrain.isotropic(600.0, phase.cell)
+    structure = rx.Structure(phases=[phase])
+    assert _strain_flag_diagnostics(
+        _FakeModel(),
+        {"phases.0.lor_strain": 2.2e5, "phases.0.gauss_strain": 0.0},
+        structure) == []
+
+
 def test_the_flag_reads_gauss_strain_as_a_variance():
     """``gauss_strain`` is deg², so it is compared as its square root.
 

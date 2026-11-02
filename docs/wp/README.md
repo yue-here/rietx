@@ -63,7 +63,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Priority | Depends on | Section |
 |---|---|---|---|---|
 | [1420](1420-a-held-phase-re-enters-or-says-it-cannot.md) | A held phase re-enters, or the chain says it cannot | P2 | — ([1333](1333-a-series-survives-one-pattern.md), [1342](1342-a-freeze-that-reads-names.md), [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
-| [1467](1467-a-stephens-block-on-a-frozen-floor.md) | A Stephens block on a frozen floor, and a clamp the solver leans on | P2 | — ([1318](1318-strain-surface.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1514](1514-scoping-rigid-bodies.md) | Scoping rigid bodies: the milestone that makes the parameter map nonlinear | P2 | — ([1319](1319-structure-interchange.md), [1515](1515-scoping-structure-solution.md), [1516](1516-scoping-stacking-faults.md) soft) | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [1515](1515-scoping-structure-solution.md) | Scoping structure solution: which routes, which corpus, how many milestones | P2 | — ([1514](1514-scoping-rigid-bodies.md), [1511](1511-which-cell-does-this-powder-support.md), [1513](1513-the-contacts-a-chemist-checks-by-eye.md) soft) | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [1964](1964-a-nonlinear-law-through-the-derived-block.md) | A nonlinear law over the pattern coordinates, through the derived block | P2 | [1325](1325-parametric-series.md), [1804](1804-the-derived-block.md) | [Unscheduled](#unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement) |
@@ -551,7 +550,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1460](1460-one-degeneracy-one-finding.md) | One degeneracy, one finding | ⬜ | P3 | — ([1454](1454-auto-background-choices-survive-the-fit.md), [1302](1302-error-is-documentation.md) soft) |
 | [1463](1463-a-phase-at-zero-withholds-every-esd.md) | A phase at zero withholds every esd | ✅ 2026-09-28 | — | — ([1320](1320-qpa-multimodal-fraction.md) soft) |
 | [1465](1465-a-width-that-became-background.md) | A phase width that became background, and an absorption screen that never ran | ✅ 2026-09-27 | — | — |
-| [1467](1467-a-stephens-block-on-a-frozen-floor.md) | A Stephens block on a frozen floor, and a clamp the solver leans on | ⬜ | P2 | — ([1318](1318-strain-surface.md) soft) |
+| [1467](1467-a-stephens-block-on-a-frozen-floor.md) | A Stephens block on a frozen floor, and a clamp the solver leans on | ✅ 2026-11-02 | — | — ([1318](1318-strain-surface.md) soft) |
 | [1518](1518-dedup-weighs-a-difference-in-its-own-frame.md) | The dedup χ² test weighs a difference in the frame it was taken in | ✅ 2026-09-28 | — | — |
 | [1521](1521-compiled-kernels-active-means-they-ran.md) | `compiled_kernels_active` says the kernels ran, per tier, or says it does not know | 🛑 2026-10-10 | — | — |
 | [1523](1523-a-phase-fitted-to-noise-passes-the-support-test.md) | A phase fitted to noise passes the support test | ✅ 2026-10-13 | — | — ([1420](1420-a-held-phase-re-enters-or-says-it-cannot.md) soft) |
@@ -576,7 +575,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1937](1937-a-bounded-step-solved-exactly.md) | A bounded step solved exactly | ✅ 2026-10-10 | — | — ([1936](1936-a-forward-difference-step-sized-by-its-parameter.md) soft) |
 | [1938](1938-every-parameter-refined-in-its-own-units.md) | Every parameter refined in its own units | ✅ 2026-10-11 | — | [1936](1936-a-forward-difference-step-sized-by-its-parameter.md), [1937](1937-a-bounded-step-solved-exactly.md) ([1940](1940-the-kernel-tier-in-a-wheel.md) soft) |
 | [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md) | The structural plan frees extinction only where it says it does | ⬜ | P3 | — |
-| [1946](1946-a-strain-block-that-cannot-leave-its-cone.md) | A strain block that cannot leave its cone | ⬜ | P3 | [1938](1938-every-parameter-refined-in-its-own-units.md) ([1467](1467-a-stephens-block-on-a-frozen-floor.md) soft) |
+| [1946](1946-a-strain-block-that-cannot-leave-its-cone.md) | A strain block that cannot leave its cone | ⬜ | P3 | [1938](1938-every-parameter-refined-in-its-own-units.md), [1467](1467-a-stephens-block-on-a-frozen-floor.md) |
 | [1951](1951-a-glob-that-names-a-site-and-frees-nothing.md) | A glob that names a site and frees nothing | ⬜ | P3 | — |
 | [1952](1952-the-xy-reader-says-what-it-skipped.md) | The xy reader says what it skipped | ⬜ | P3 | — |
 | [1953](1953-a-large-pawley-stage-converges-under-the-default-driver.md) | A large Pawley stage converges under the default driver | ✅ 2026-10-13 | — | — |
