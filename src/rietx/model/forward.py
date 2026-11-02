@@ -3879,13 +3879,24 @@ def generation_window(tt_min: float, tt_max: float, zero: float, lambdas,
     return gen_min, hi_eff
 
 
+def orbit_split_of(model: CompiledModel) -> list:
+    """Each phase's per-atom orbit split, as ``model`` froze it.
+
+    The value ``compile_model(..., orbit_split=)`` takes: reusing it compiles
+    every site at the multiplicity ``model`` gave it, whatever the coordinates
+    now read (WP-2052).
+    """
+    return [list(cp.sites.ops) for cp in model.phases]
+
+
 def compile_model(structure: Structure, instrument: Instrument, pattern: PatternData,
                   *, mode: Mode = "rietveld",
                   two_theta_limits: tuple[float, float] | None = None,
                   moving_paths: set[str] | None = None,
                   restraint_weight_scale: float = 1.0,
                   window_slack_deg: float | None = None,
-                  window_area_tol: float | None = None) -> CompiledModel:
+                  window_area_tol: float | None = None,
+                  orbit_split: list | None = None) -> CompiledModel:
     """Freeze reflection lists, orbits, windows and FCJ nodes for one stage.
 
     ``moving_paths`` is every parameter the coming stage can move, or ``None``
@@ -3928,6 +3939,13 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     declared rule it would leave up to 5.6e-3 of a peak's maximum, 7.8x the
     lab bar, whatever its windows.
 
+    ``orbit_split`` is the orbit split a fit decided at its start, one entry
+    per phase as :func:`orbit_split_of` reads it off a model, or ``None`` to
+    decide each atom's split from its current coordinates.  A fit hands its
+    split to every compile it makes, so a stage that drives a half-occupied
+    general atom onto a mirror cannot halve that site at the next compile
+    (WP-2052; GSAS-II reads a site's multiplicity once, at setup).
+
     The pattern must be in 2θ and the instrument a constant-wavelength one:
     this is the backstop for :func:`rietx.schemas.pattern.require_two_theta`,
     below every public entry that calls it, so a caller who assembled a compile
@@ -3938,6 +3956,18 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     if restraint_weight_scale < 0.0:
         raise ValueError(
             f"restraint_weight_scale must be >= 0 (got {restraint_weight_scale})")
+    if orbit_split is not None and len(orbit_split) != len(structure.phases):
+        raise ValueError(
+            f"an orbit split for {len(orbit_split)} phases was handed to a "
+            f"structure of {len(structure.phases)}")
+    if orbit_split is not None:
+        # here, before the species boundary below re-walks every atom's
+        # species for a ValueError that is no species' fault
+        for phase, ops in zip(structure.phases, orbit_split, strict=True):
+            if len(ops) != len(phase.atoms):
+                raise ValueError(
+                    f"phase {phase.name!r}: an orbit split for {len(ops)} atoms "
+                    f"was handed to a phase of {len(phase.atoms)}")
     if window_area_tol is None:
         window_area_tol = CLOSING_WINDOW_TOL
     if not 0.0 < window_area_tol < 1.0:
@@ -4086,7 +4116,9 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             if disp is not None:
                 f_anom = resolve_dispersion([a.species for a in phase.atoms],
                                             lams, disp.overrides)
-            sites = compile_phase_sites(phase, f_anom, neutron=neutron)
+            sites = compile_phase_sites(
+                phase, f_anom, neutron=neutron,
+                ops=None if orbit_split is None else orbit_split[ip])
         except (KeyError, ValueError) as exc:
             _reraise_species_fault(phase, disp, lams, exc, neutron=neutron)
 

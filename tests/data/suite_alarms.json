@@ -65,12 +65,12 @@
   "SPACE_GROUP_SETTING_ASSUMED": 1
  },
  "warnings_per_result": {
-  "phase_id": 7.625,
-  "qpa": 8.0,
-  "structure": 8.0,
-  "cell": 7.875,
-  "microstructure": 9.375,
-  "calibration": 9.5,
-  "magnetic": 8.0
+  "phase_id": 7.5,
+  "qpa": 7.875,
+  "structure": 7.875,
+  "cell": 7.75,
+  "microstructure": 9.25,
+  "calibration": 9.375,
+  "magnetic": 7.875
  }
 }
