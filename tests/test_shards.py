@@ -201,16 +201,19 @@ def test_the_committed_record_covers_most_of_the_suite():
 def _collected(*extra):
     proc = subprocess.run(
         [sys.executable, "-m", "pytest", "--collect-only", *extra,
-         "tests/test_suite_config.py", "tests/test_added_test_times.py"],
+         "tests/test_suite_config.py", "tests/test_added_test_times.py",
+         "tests/test_shards.py"],
         cwd=ROOT, capture_output=True, encoding="utf-8")
     assert proc.returncode == pytest.ExitCode.OK, (proc.stdout + proc.stderr)[-2000:]
     return {line for line in proc.stdout.splitlines() if "::" in line}
 
 
-def test_a_real_collection_splits_into_disjoint_shards_that_cover_it():
-    """End-to-end, so the option, the hook's order and the path keys are real."""
+@pytest.mark.parametrize("n", [2, 3])
+def test_a_real_collection_splits_into_disjoint_shards_that_cover_it(n):
+    """End-to-end, so the option, the hook's order and the path keys are real.
+    Three files, so each of CI's three shards holds one (WP-2019)."""
     whole = _collected()
-    one, two = _collected("--shard", "1/2"), _collected("--shard", "2/2")
-    assert one and two
-    assert not one & two
-    assert one | two == whole
+    parts = [_collected("--shard", f"{k}/{n}") for k in range(1, n + 1)]
+    assert all(parts)
+    assert sum(map(len, parts)) == len(whole)
+    assert set().union(*parts) == whole
