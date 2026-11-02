@@ -127,6 +127,29 @@ _INSTRUMENT_WIDTH_PATHS = ["instrument.profile.u", "instrument.profile.v",
 IMPURITY_SIGMA = 8.0
 
 
+def _on_drawn_flank(u: UnmatchedPeak) -> bool:
+    """Whether Layer 0 measured ``u`` as unresolved from a drawn peak (WP-1977).
+
+    Such a peak has four readings the data do not choose between: a shape or
+    asymmetry misfit, an unmodelled Kα2, a split by lower symmetry, a foreign
+    line (:class:`~rietx.report.schemas.FlankEvidence`).  No action here names
+    one of them for it.  An ``ActionKind`` is one cause, and two of the four
+    have none.  The row and its evidence stay in ``FitReport.unmatched`` for
+    the reader to weigh.  A row nobody measured (``flank`` is ``None``) is
+    read as before.
+    """
+    return u.flank is not None and u.flank.on_flank
+
+
+def _strong_unmatched(unmatched: list[UnmatchedPeak]) -> list[UnmatchedPeak]:
+    """The ``unmatched_obs`` rows strong enough to propose a phase for, a
+    row on a drawn flank left out (:func:`_on_drawn_flank`)."""
+    return [u for u in unmatched
+            if u.kind == "unmatched_obs"
+            and u.height_over_sigma > IMPURITY_SIGMA
+            and not _on_drawn_flank(u)]
+
+
 def hamilton_justified(chi2_restricted: float, chi2_full: float,
                        n_points: int, n_free_restricted: int,
                        n_added: int, *, alpha: float = 0.05,
@@ -460,6 +483,11 @@ def layer0_actions(unmatched: list[UnmatchedPeak],
       the saturated linear fit cannot measure the offset but the pairing is
       plain in the model-free lists).
 
+    A peak Layer 0 measured as unresolved from a drawn peak
+    (``UnmatchedPeak.flank.on_flank``) is not counted at all (WP-1977,
+    :func:`_on_drawn_flank`).  When such peaks exist beside counted ones the
+    rationale says how many.
+
     When such shift-matched peaks exist alongside genuinely foreign ones, the
     call is made on the foreign count and both counts are reported.  When
     *every* strong peak matches the shift evidence the action is still
@@ -500,12 +528,17 @@ def layer0_actions(unmatched: list[UnmatchedPeak],
         return bool(far_regions and len(ucalc) and (
             np.min(np.abs(ucalc - u.two_theta)) <= SHIFT_PAIR_WINDOW_DEG))
 
-    strong = [u for u in unmatched
-              if u.kind == "unmatched_obs"
-              and u.height_over_sigma > IMPURITY_SIGMA
-              and not explained_by_shift(u)]
+    strong = [u for u in _strong_unmatched(unmatched)
+              if not explained_by_shift(u)]
     if not strong:
         return []
+    n_flank = sum(1 for u in unmatched
+                  if u.kind == "unmatched_obs"
+                  and u.height_over_sigma > IMPURITY_SIGMA
+                  and _on_drawn_flank(u))
+    flank_note = (f"  ({n_flank} further unmatched peak(s) sit unresolved on "
+                  f"the flank of a calculated peak and are not counted here: "
+                  f"see UnmatchedPeak.flank.)" if n_flank else "")
     foreign = [u for u in strong if not matches_shift_evidence(u)]
     n_matched = len(strong) - len(foreign)
 
@@ -519,6 +552,7 @@ def layer0_actions(unmatched: list[UnmatchedPeak],
             rationale += (f"  ({n_matched} further unmatched peak(s) lie where "
                           f"the position-error evidence puts them and are "
                           f"attributed to the shift, not counted here.)")
+        rationale += flank_note
         rationale += (
             "  If the extra lines are an unknown phase rather than a wrong "
             "cell, index_pattern finds its lattice — but one phase at a time: "
@@ -548,7 +582,7 @@ def layer0_actions(unmatched: list[UnmatchedPeak],
                    f"{worst.height_over_sigma:.0f}σ).  A wrong cell or a gross "
                    f"zero/displacement error displaces every line and "
                    f"manufactures exactly this signature, so re-check the "
-                   f"cell before adding a phase"),
+                   f"cell before adding a phase" + flank_note),
         alternatives=["reindex_or_recheck_cell", "refine_zero_shift",
                       "refine_sample_displacement"],
         two_theta_range=(worst.two_theta, worst.two_theta))]
@@ -872,9 +906,7 @@ def cap_texture_crosstalk(actions: list[SuggestedAction],
     (``TextureAnalysis.caveat``).  The evidence — axis, r, R² — is preserved
     untouched; only the verdict layer moves.
     """
-    strong = [u for u in unmatched
-              if u.kind == "unmatched_obs"
-              and u.height_over_sigma > IMPURITY_SIGMA]
+    strong = _strong_unmatched(unmatched)
     impurity = next((a for a in actions if a.kind == "add_impurity_phase"),
                     None)
     detected = [t for t in (texture or []) if t.detected]

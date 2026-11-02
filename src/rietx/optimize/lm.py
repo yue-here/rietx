@@ -393,6 +393,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                                 None] | None = None,
              normal_equations: Callable[[np.ndarray, np.ndarray],
                                         tuple] | None = None,
+             check: Callable[[], None] | None = None,
              ) -> LMOutcome:
     """Minimise ``S(θ) = r(θ)ᵀr(θ)`` subject to ``lo ≤ θ ≤ hi`` (and ``T·θ+c ≥ 0``).
 
@@ -469,6 +470,13 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     projected CG's and a sparse A is what lets it precondition
     (:func:`_solve_step`).  A Pawley stage passes one that knows each
     intensity column's rows (``least_squares._pawley_normal_equations``).
+
+    ``check()``, when given, is called before every trial step and, above
+    :data:`BVLS_MAX_COLUMNS`, inside the step's projected CG before each
+    factorisation attempt and CG product.  It abandons the fit by raising,
+    which is how a cancel reaches a step that outlasts a deadline (one Pawley
+    step refactorised 1099 times in 27 s, WP-2063).  A BVLS step at or below
+    the cut, and a constrained step's one eigendecomposition, run unread.
     """
     if max_nfev < 1:
         # scipy's TRF refuses the same budget in the same words.  Run on, it
@@ -528,7 +536,10 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
         exhausted = False
         spent = False
         for _inner in range(_INNER_MAX):
-            step, side = _solve_step(A, b, lam, x, lo, hi, n_rows=len(r), scale=scale)
+            if check is not None:
+                check()
+            step, side = _solve_step(A, b, lam, x, lo, hi, n_rows=len(r),
+                                     scale=scale, check=check)
             crossed = [iq.label for iq in ineqs if iq.crossed(x, step)]
             if crossed:
                 # the box-only step leaves the feasible set: solve the same
@@ -751,7 +762,8 @@ def _measured_curvature(residual: Callable[[np.ndarray], np.ndarray],
 
 def _solve_step(A: np.ndarray, b: np.ndarray, lam: float, x: np.ndarray,
                 lo: np.ndarray, hi: np.ndarray, *, n_rows: int,
-                scale: np.ndarray | None = None
+                scale: np.ndarray | None = None,
+                check: Callable[[], None] | None = None
                 ) -> tuple[np.ndarray, np.ndarray]:
     """One damped Gauss-Newton step, solved exactly inside the box (WP-1937).
 
@@ -838,7 +850,8 @@ def _solve_step(A: np.ndarray, b: np.ndarray, lam: float, x: np.ndarray,
         A_s[np.diag_indices(n)] += lam
     b_s = b * inv_d
     if n > BVLS_MAX_COLUMNS:
-        y, side = bccg.projected_cg(A_s, b_s, (lo - x) * d, (hi - x) * d)
+        y, side = bccg.projected_cg(A_s, b_s, (lo - x) * d, (hi - x) * d,
+                                    check=check)
         return y * inv_d, side
     w, V = lapack.eigh(A_s)
     w_max = float(w[-1]) if n else 0.0
