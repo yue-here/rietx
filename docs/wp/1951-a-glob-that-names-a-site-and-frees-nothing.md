@@ -208,18 +208,18 @@ Every shipped preset fires nothing new on the acceptance fixtures.
 
   *Reader-facing text* (new): the `ValueError` above, which replaces the
   `UserWarning` for an unknown literal. `python -m tests.reader_output`:
-  exit 0, unchanged against the merge-base `4e08411e5`. Yue's 2026-11-01 ruling sends every reader-output change to
+  exit 0, unchanged against the merge-base `e76818310`. Yue's 2026-11-01 ruling sends every reader-output change to
   him before merge; this one is listed in the PR body.
 
-  *Merged origin/main* at `4e08411e5`: conflicts in `docs/milestones/v1.11.md`
+  *Merged origin/main* twice, at `4e08411e5` and `e76818310`: conflicts in `docs/milestones/v1.11.md`
   (both sections kept) and `tests/silence.py` (WP-1951's `_site_glob` and
   main's `_moduli` helpers, both kept); `docs/wp/README.md` regenerated,
   unchanged.
 
   *Review:* `/code-review high --fix 9de664d7f..HEAD` (the rework commits only) found six; four fixed in `5d07325f`. `PATCH /api/params` called `set_vary` per key after `set_values` had committed, so one typo left earlier nodes behind; it now refuses every vary key's literals first (`Refinement._refuse_unknown_literals`), with a test. The docstring and the manual now name the retired-pattern warning. A joined retired-spelling hint no longer reads `.;`. Declined: folding `set_values`' plural message into the new helper, which would change that verb's documented text; and the stale WP status line, which this entry updates.
 
-  *Measured:* `[dev]` venv, macOS arm64, Python 3.12, alone on the machine
-  under ghostshift's `serial.py` lock. Fast suite 13 563 passed, 319 skipped, 34 xfailed, none failed (passed+skipped 13 882, equal to the discovery run before the three fixes, whose three red cases are now passes).
+  *Measured:* `[dev]` venv, macOS arm64, Python 3.12, under ghostshift's
+  `serial.py` lock (no other pytest). Fast suite 13 580 passed, 319 skipped, 34 xfailed, none failed, on the tree merged with origin/main at `e76818310`. On the first merge (main at `4e08411e5`) it was 13 563 passed and 319 skipped, equal in passed+skipped to the discovery run before the three fixes, whose three red cases became passes; the second merge's 17 are main's new `tests/test_report_cost.py` cases.
   The 13 237 + 310 of the previous entry was on main at `985da7ef`, so the
   totals are not comparable across the merge. Full suite not run: no
   measured number can move.
