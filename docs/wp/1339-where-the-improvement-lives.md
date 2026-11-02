@@ -1,6 +1,6 @@
 # WP-1339 — where the improvement lives
 
-Milestone: unscheduled · Status: 🔄 2026-10-12 — asks (1) and (2) landed from outside (PR #904); the NiO acceptance and the `judging.md` row remain
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here (ghostshift runner)
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-09-23 — a statistic compare already computes, reached as a function
