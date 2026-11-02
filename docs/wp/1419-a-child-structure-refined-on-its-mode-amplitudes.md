@@ -161,6 +161,21 @@ the transposed rotation set is a group too and passes any dimension count.
 
 ### Inherited
 
+- **2026-11-01, from WP-1418 (#1197, PR #1296): the magnetic cell is now
+  right-handed, and that moves two things this WP reads.** `isotropy._reduce_basis`
+  swaps its first two vectors when their determinant is negative, so
+  `magnetic_cell` and every candidate built on it is stated in a cell with
+  det P > 0. (1) The 48 refusals PR #1108's 430-pair sweep met ("bns_number …
+  is not the group this statement carries", all P4₂ parents at k = (0, 0, ½))
+  came from the left-handed cell naming the mirror type; re-run the sweep on a
+  tree with #1296 before treating any of them as #1108's. (2)
+  `distortion_candidates` reads the same cell, and a chiral child was the
+  mirror crystal: P 3₁ at k = (0, 0, ½), S1(a) was stated as "P 31" with
+  det P = −2 and is now P 3₂ with det P = +2
+  (`test_a_chiral_child_keeps_the_parents_handedness`). The probe's draws
+  moved with the cell, so the unlucky seeds were re-found (R: 55, 83, 111,
+  167, 198 of 0-199; M: 291 of 0-379).
+
 - **2026-10-16, from the issue triage (#1002): `IrrepModes.primary` compares
   operation counts only.** `_isotropy`
   (`crystallography/representation/distortion.py`, checked at `138d55dc`)

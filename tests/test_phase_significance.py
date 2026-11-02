@@ -134,7 +134,9 @@ def _assert_unseen(result, record):
 def _assert_prior_holds(result, events, path="phases.0.cell.a"):
     """Each stage after one that ended with ``path`` held starts with it held.
 
-    Such a stage then solves once, or twice if its answer releases the path.
+    Such a stage then solves once, or twice if its answer releases the path
+    or collapses something: with every phase still unseen at the answer, the
+    instrument's peak-only columns are put back and held (WP-2049).
     The check is conditional on where each answer landed, so it asserts what
     the code does with a reading and not which side of 3σ a solver endpoint
     falls on, which can differ between platforms.  These plans seed no row
@@ -151,7 +153,8 @@ def _assert_prior_holds(result, events, path="phases.0.cell.a"):
             continue
         stage = result.stages[k - 1]
         assert path in starts[k][0]["held"], stage.name
-        assert len(starts[k]) == (2 if path in stage.released else 1), stage.name
+        again = path in stage.released or bool(stage.collapsed)
+        assert len(starts[k]) == (2 if again else 1), stage.name
         checked += 1
     return checked
 

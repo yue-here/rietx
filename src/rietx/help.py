@@ -1734,6 +1734,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "check the cell transform before you compare it with a published symbol."
         ),
     ),
+    "CIF_ANISO_COLLAPSED": HelpEntry(
+        title="Anisotropic displacement read as isotropic",
+        description=(
+            "The file carries anisotropic displacement parameters (`U^ij`) for some "
+            "sites, and the reader keeps only each site's equivalent isotropic value "
+            "unless asked, because reading a file must not change which parameters a "
+            "refinement plan frees. The message counts the sites. Nothing is wrong "
+            "for a refinement of the isotropic model. An ellipsoid figure of the "
+            "structure draws these sites as spheres. Read the file again with "
+            "aniso=True to keep the tensors."
+        ),
+    ),
     "CIF_CELL_ANGLE_CORRECTED": HelpEntry(
         title="Lattice angle set to its symmetry value",
         description=(
@@ -2169,7 +2181,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "fit. A joint fit tests each pattern and names the worst. A large gap means the last stage carried its peaks "
             "past the windows it was solved on, so the solve may have stopped short of the "
             "minimum that windows sized at the answer give. Run one more stage with nothing "
-            "new freed and compare. A plan's closing stage does this already."
+            "new freed and compare. A plan's closing stage does this already. The fresh "
+            "calculation keeps each site's multiplicity from the fit, so the gap is never "
+            "a change of composition: `SITE_MULTIPLICITY_KEPT` reports a site whose "
+            "multiplicity the returned coordinates would change."
         ),
     ),
     "FULLPROF_LIMITS_NOT_APPLIED": HelpEntry(
@@ -3642,7 +3657,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the specimen and belongs out of the model, or the range must cover a "
             "reflection of it. With no reflection in range, the scale is held too, the "
             "phase has no weight fraction, and the other fractions are relative to the "
-            "phases seen in range."
+            "phases seen in range. When no phase is seen at all, the instrument terms "
+            "that act only through the peaks are held as well, for example the zero "
+            "shift, the specimen displacement and the profile widths. The message "
+            "names every one."
         ),
     ),
     "PLAN_FREES_NO_MOMENT": HelpEntry(
@@ -4117,6 +4135,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "back, or off one by an `edit` or a `checkout`."
         ),
     ),
+    "SITE_MULTIPLICITY_KEPT": HelpEntry(
+        title="A fit kept a site's multiplicity that its answer would change",
+        description=(
+            "A fit decides each site's multiplicity once, from the coordinates it "
+            "starts at, and keeps it for every stage and for the compile its result "
+            "is measured on. GSAS-II does the same for a whole refinement. This site "
+            "ended within the site tolerance of a special position it started off (1e-4 "
+            "fractional, an offset of 5e-5 on a mirror). A fresh compile of the "
+            "returned coordinates therefore counts it at fewer positions. A site that "
+            "leaves a special position, as a rigid body's pose can move one, gets its "
+            "full orbit at the next compile and is not reported. The usual case is a half-occupied general atom, written as "
+            "a split pair across a mirror, that the data do not resolve: the fit stops "
+            "on the mirror. The result, its statistics and its weight fractions use the "
+            "fitted count. Later compiles, the next fit among them, use the fresh one. "
+            "The message gives the atoms per cell both ways. The suggestion gives the "
+            "occupancy that keeps the fitted content on the special position, and the "
+            "distance that keeps the site counted as split."
+        ),
+    ),
     "SITE_TWINS_KEPT": HelpEntry(
         title="Near-duplicate atoms left as stored",
         description=(
@@ -4235,6 +4272,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "stage did not. The parameters freed in that stage are probably degenerate. "
             "Free fewer at once, or look for a correlation or a bound hit in the same "
             "stage. More iterations do not find a different minimum."
+        ),
+    ),
+    "STAGE_NOT_FINITE": HelpEntry(
+        title="A stage stopped on a model that is not finite",
+        description=(
+            "The model held a NaN or an infinity at a point the solver reached, so the "
+            "solver had no step left to take. The stage ended at the values it started "
+            "from and changed nothing. The column that went non-finite is often not the "
+            "parameter that ran away. Hold some of the parameters the stage frees, or "
+            "start it nearer its answer."
         ),
     ),
     "STAGE_PATH_NOT_FREE": HelpEntry(
@@ -5054,10 +5101,14 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
 #: record what a fit *did*: ``StageResult``, ``SeriesEntry`` and
 #: ``RefinementResult`` are the action-record types the generality record's
 #: § Acceptance names, and ``SeriesResult`` is where WP-2003's demoted step
-#: statistic lands.  Names rather than classes, because this module imports
-#: nothing but the standard library at its top.
+#: statistic lands.  ``UnmatchedPeak`` and ``FlankEvidence`` are the report's
+#: rows WP-1977 put evidence on in place of a suggestion, the seat the
+#: generality record's § Demotion names for a statistic with its meaning.
+#: Names rather than classes, because this module imports nothing but the
+#: standard library at its top.
 RESULT_FIELD_TYPES: tuple[str, ...] = (
-    "RefinementResult", "StageResult", "SeriesEntry", "SeriesResult")
+    "RefinementResult", "StageResult", "SeriesEntry", "SeriesResult",
+    "UnmatchedPeak", "FlankEvidence")
 
 #: One entry per field of every type in :data:`RESULT_FIELD_TYPES`, keyed
 #: ``"<Type>.<field>"`` (WP-2037).  A number in a result field costs nothing
@@ -5911,6 +5962,111 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "What produced the series: the package version, backend, solver, version "
             "of the report thresholds and when it ran. `None` on the reverse chain in "
             "`backward`, which carries none of its own."
+        ),
+    ),
+    # ---------------------------------------------------------- UnmatchedPeak
+    "UnmatchedPeak.two_theta": HelpEntry(
+        title="Position",
+        description="Where the residual peak or trough sits, in degrees 2θ.",
+        unit="deg",
+    ),
+    "UnmatchedPeak.height_over_sigma": HelpEntry(
+        title="Height",
+        description=(
+            "How far the residual stands above (`unmatched_obs`) or below "
+            "(`unmatched_calc`) the calculated curve there, in units of the local esd."
+        ),
+    ),
+    "UnmatchedPeak.kind": HelpEntry(
+        title="Which side is missing",
+        description=(
+            "`unmatched_obs`: an observed peak with no calculated tick within 0.08°. "
+            "`unmatched_calc`: a calculated line with too little observed intensity "
+            "under it."
+        ),
+        anchor="reference/report.html#unmatched-peaks",
+    ),
+    "UnmatchedPeak.flank": HelpEntry(
+        title="Against the drawn peaks",
+        description=(
+            "Where an `unmatched_obs` peak sits against the peaks the model draws. "
+            "`on_flank` says the observed curve rises from it into a drawn peak with "
+            "no valley as deep as `build_report`'s `min_peak_sigma` (default 5σ), so "
+            "the data do not resolve the two. Four causes leave "
+            "such a shoulder. A shape or asymmetry misfit leaves one on most strong "
+            "lines, on one side, at a similar offset in FWHM: compare "
+            "`lines_with_lobe` with `lines_as_strong`. A lobe under the detection "
+            "level is not counted, so a low count does not rule a shape misfit out. "
+            "An unmodelled Kα2 sits above "
+            "each line at the Kα1-Kα2 separation for its angle. A symmetry lower "
+            "than the model's splits the lines of some hkl classes and not others, "
+            "the split growing with tanθ. A foreign line is a lone shoulder that "
+            "fits none of these. The report suggests no impurity phase for a row on "
+            "a flank. A row the data resolve keeps the suggestion. `None` means not "
+            "measured: every `unmatched_calc` row."
+        ),
+        anchor="reference/report.html#unmatched-peaks",
+    ),
+    # ---------------------------------------------------------- FlankEvidence
+    "FlankEvidence.on_flank": HelpEntry(
+        title="Unresolved from a drawn peak",
+        description=(
+            "Whether the observed curve rises from the residual peak into a drawn "
+            "peak without falling `min_peak_sigma` (default 5σ) below its running "
+            "maximum on the way. False "
+            "where the data resolve the two, or where no drawn peak lies uphill."
+        ),
+    ),
+    "FlankEvidence.peak_two_theta": HelpEntry(
+        title="Drawn peak position",
+        description=(
+            "The apex of the drawn peak reached by walking uphill along the "
+            "calculated curve. `None` where the walk reaches the pattern edge or an "
+            "apex less prominent than `min_peak_sigma` (default 5σ)."
+        ),
+        unit="deg",
+    ),
+    "FlankEvidence.peak_prominence_over_sigma": HelpEntry(
+        title="Drawn peak strength",
+        description=(
+            "That peak's prominence in the calculated curve, in units of the esd at "
+            "its apex, to set beside the residual's own height."
+        ),
+    ),
+    "FlankEvidence.peak_fwhm_deg": HelpEntry(
+        title="Drawn peak width",
+        description="That peak's width in the calculated curve at half its prominence.",
+        unit="deg",
+    ),
+    "FlankEvidence.offset_fwhm": HelpEntry(
+        title="Offset",
+        description=(
+            "(residual − apex) divided by the drawn peak's width. Negative below "
+            "the apex."
+        ),
+    ),
+    "FlankEvidence.valley_over_sigma": HelpEntry(
+        title="Deepest valley",
+        description=(
+            "The deepest fall of the observed curve between the residual and the "
+            "apex, below the highest point it had reached, in esd. Under "
+            "`min_peak_sigma` (default 5) is `on_flank`."
+        ),
+    ),
+    "FlankEvidence.lines_as_strong": HelpEntry(
+        title="Lines as strong",
+        description=(
+            "How many drawn peaks are at least as prominent as this one, this one "
+            "included. `None` where `on_flank` is False."
+        ),
+    ),
+    "FlankEvidence.lines_with_lobe": HelpEntry(
+        title="Lines with a lobe",
+        description=(
+            "How many of those carry an `on_flank` row on the same side, this one "
+            "included. A lobe within 0.08° of a tick, or under the detection level, "
+            "is no row and is not counted. "
+            "`None` where `on_flank` is False."
         ),
     ),
 }

@@ -987,6 +987,24 @@ CLAIMS: tuple[Claim, ...] = (
         measured="corundum +24, magnetite -15, zircon -9 wt %",
         diagnostics=("BRINDLEY_OUTSIDE_REGIME",),
     ),
+    Claim(
+        "test_acceptance_qpa_roundrobin",
+        "test_flank_lobes_name_their_peak_and_buy_no_impurity",
+        "qarr", ("characterisation",),
+        "on each of the eight weighed three-phase mixtures, every unmatched "
+        "observed peak within 0.5° of a strong reflection says it sits "
+        "unresolved on a drawn peak (UnmatchedPeak.flank), and Layer 2 "
+        "suggests no impurity phase",
+        reference="**no accuracy band is claimed**.  The reference is the "
+                  "weighing: each mixture holds exactly the three modelled "
+                  "phases, so any impurity suggestion is wrong.  0.5° and a "
+                  "strong line's tenth of the tallest are the test's own "
+                  "scope, set by the lobes WP-1977 measured at 0.15-0.38°",
+        measured="2-6 rows a mixture on a drawn flank, 0.7-1.2 FWHM below "
+                 "the line, none near a strong line off one; no impurity "
+                 "call (main's rule, on the fits of 52cec09a1: cpd-1b suggested "
+                 "add_impurity_phase at 0.50 from two such rows)",
+    ),
     # ---- dispersion: the pre-registered prediction -----------------------
     Claim(
         "test_acceptance_dispersion",

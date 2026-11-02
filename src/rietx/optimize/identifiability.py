@@ -111,17 +111,22 @@ def top_correlations(correlation: np.ndarray, free_paths: list[str],
                      k: int = TOP_CORRELATIONS_K) -> list[CorrelationPair]:
     """The ``k`` worst |ρ| pairs, worst first, keyed by path.
 
-    ``correlation`` is the solver's final matrix (normalised on the raw
-    diagonal, so every guard threshold means what it says — see
-    ``covariance_estimates``); the values carried here are the same numbers
-    the ``HIGH_CORRELATION`` guard thresholds.
+    ``correlation`` is the matrix the ``HIGH_CORRELATION`` guard thresholds:
+    the solver's final one (normalised on the raw diagonal, so every guard
+    threshold means what it says — see ``covariance_estimates``), with any
+    direction the Jacobian cannot resolve projected out by
+    :func:`~.statistics.resolved_correlation` in a single fit, so its
+    resolved pairs can differ from the solver's.  A ``nan`` pair is one whose ρ
+    the data does not determine (:func:`~.statistics.resolved_correlation`)
+    and is not quoted.
     """
     corr = np.asarray(correlation)
     n = len(free_paths)
     if corr.ndim != 2 or corr.shape[0] != n or n < 2:
         return []
     pairs = sorted(((abs(float(corr[i, j])), i, j)
-                    for i in range(n) for j in range(i + 1, n)),
+                    for i in range(n) for j in range(i + 1, n)
+                    if np.isfinite(corr[i, j])),
                    key=lambda t: -t[0])
     return [CorrelationPair(path_a=free_paths[i], path_b=free_paths[j],
                             rho=float(corr[i, j]))

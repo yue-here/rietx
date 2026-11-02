@@ -97,6 +97,16 @@ stand-in derivative in `sources/powsubs/psvfcjo.for:139` and `:288-299`.
 None of the seven tests whether its answer depends on the path or the start, and none of
 their manuals discusses it.
 
+## A site's multiplicity during a fit
+
+Surveyed 2026-10-26 for WP-2052 (issue #1088); the GSAS-II lines re-read 2026-11-01.
+
+| Program | When a site's multiplicity is decided | Status |
+|---|---|---|
+| rietx | once per `fit()` or `run_stage()`, from the coordinates the call starts at; every stage compile and the closing compile reuse it, and `SITE_MULTIPLICITY_KEPT` names a site the returned coordinates would recount | checked |
+| GSAS-II | once, at setup: `Amul` is read from the stored atom record (`GSASIIstrIO.py:1762`) and the structure factor weights every operation by `Mult·frac/nOps` (`GSASIIstrMath.py:1279`); it is rewritten only when the user edits or transforms the atom. Because every operation is summed at that weight, a site that leaves a special position keeps `Mult·frac` atoms per cell; rietx gives such a site its full orbit at its occupancy, as it did before WP-2052, and only a rigid body's pose reaches that case | checked (5.8.4 source) |
+| TOPAS, FullProf, RIETAN-FP, BGMN, MAUD, EasyDiffraction | | not checked |
+
 ## Surface roughness starting values
 
 | Program | Pitschke | Suortti | Default start |
@@ -232,6 +242,39 @@ as a sound fit, not as a measured gain in accuracy. rietx's own measurement agre
 SRM 660c fixture, ignoring two holder lines moves the cell 0.4 ppm and reports an esd 9.9×
 the clean fit's. Rwp rises 4.4× in the same arm, and an esd scales with √χ², so the larger
 esd reports the worse fit; it does not measure the bias.
+
+## When a peak counts as explained by a reflection
+
+Surveyed 2026-11-01 for WP-1977, on when Layer 0 should call a residual peak unindexed.
+
+- GSAS-II 5.8.4, checked. `IndexPeaks` (`GSASIIindex.py:311-352`) gives a picked peak the
+  nearest calculated d-spacing, one peak to one line, with no tolerance at all. Unindexed
+  lines are counted afterwards for M20 (`calc_M20`, :163-190). The automatic peak search
+  drops a pick within 2 × FWHM of another (`GSASIIpwdGUI.py:825`), which spaces peaks and
+  matches nothing. No check of a difference-curve peak after a Rietveld fit was found.
+- FullProf 8.20, checked. The manual has no report of unaccounted or impurity peaks. WinPLOTR
+  finds peaks from zero crossings of the derivative, above a fraction of the largest
+  derivative amplitude (`WINPLOTR.pdf` § 5.4.1). It sets no angular window.
+- TOPAS, inferred from a summarised fetch of the Durham manual (§ 12.3), not read directly.
+  `index_max_th2_error` (default 0.05° 2θ) marks un-indexed lines in indexing. No
+  residual-peak check after a fit was found.
+- Indexing programs, checked in the docs FullProf bundles. DICVOL marks a line outside a
+  fixed absolute error (default 0.03° 2θ) as impurity or spurious (`dicvol06.inf:139-157`).
+  ITO's `TOLG` is 0.06° 2θ (`ito15.inf:337-342`). TREOR's window is fixed in sin²θ
+  (`treor90.inf:786-805`), so it widens with angle and not with the peak width.
+- McCusker et al. (1999) and Toby (2006), inferred (recall, no local copy). Both tell the
+  reader to read the difference curve by eye. A derivative-shaped residual at a line is a
+  position, width or asymmetry misfit, and a peak where no line is calculated is a foreign
+  phase. Neither gives a numeric rule.
+
+So the programs match an *observed* peak list to calculated lines, inside indexing, with a
+fixed angular or sin²θ window. None scales the window with the peak width, and none flags a
+difference-curve peak after a Rietveld fit. rietx's `unmatched_obs` has no direct precedent.
+The programs leave the difference curve to the person reading it. So rietx lists every
+residual peak and records what that reader looks at: whether a valley separates the peak
+from the calculated peak beside it, how far out it sits in that peak's FWHM, and whether the
+other strong lines carry the same lobe. It names no cause for an unresolved shoulder, and
+suggests no impurity phase for one (WP-1977, ruled 2026-11-01).
 
 ## Sequential refinement
 
@@ -519,6 +562,28 @@ around early 2026.
 What it adds up to. Halving is established practice under a fixed budget. Under an all-or-nothing
 loss, practice is racing: drop only past the measured noise. Ruled 2026-10-31 (WP-1997): halving
 ships, and racing is the next solver PR's first task.
+
+## Correlations against a parameter the data does not determine
+
+Read 2026-11-01 for WP-2050. When the normal matrix carries a direction the data does not
+move, how does a program report the correlations of the parameters in it? rietx kept such a
+direction at an eigenvalue rounding set, and its correlation guard then reported pairs
+against the direction's members, or not, as a 1e-14 change to a start value moved them.
+
+| Program | What it does | Mark |
+|---|---|---|
+| GSAS-II 5.8.4 | Scales the Hessian to unit diagonal, then takes a pseudo-inverse that zeroes every singular value under `SVDtol` × the largest (`GSASIImath.setHcorr`, `GSASIImath.py:131-148`; `pinv`, `:64`). The default is 1e-6 (`GSASIIobj.py:20`; the GUI allows 1e-9 to 0.01, `GSASIIdataGUI.py:8261`). Correlations come off that truncated inverse. Pairs above `max(0.95, 0.99 × the largest)` are listed, or above `min(0.99, …)` once a singular value was zeroed (`GSASIImath.py:143-147`). The count of zeroed values is reported as "soft (SVD) Hessian singularities", with the parameters most involved (`setSVDwarn`, `GSASIImath.py:150-162`; `GSASIIstrMain.ReportProblems`, `:54-139`) | checked |
+| TOPAS v9 | Errors and the correlation matrix (`C_matrix_normalized`) come from an SVD by default; `use_LU_for_errors` switches to LU, which "results in very large errors" for fully correlated intensities (Technical Reference §5.10, "Errors - SVD and bootstrap errors"). The SVD cut is not stated. Nothing in the reference suppresses or flags a correlation against an undetermined parameter | checked; cut not stated |
+| FullProf 8.20 | Writes the correlation matrix on request (`Mat=1`, manual "Common flags"). The manual advises refining separately any pair above about 50 % (p. 14). No treatment of a singular direction beyond advice to start with the scale alone (Trouble shooting) | checked |
+| RIETAN-FP, BGMN, MAUD, EasyDiffraction | not checked | |
+
+**The practice.** The two programs whose solve is documented take the correlations off a
+pseudo-inverse truncated at a relative cut, so a direction below the cut contributes nothing
+to any ρ. GSAS-II's cut, 1e-6 on the eigenvalues of the unit-diagonal normal matrix, is a
+user setting with no stated derivation. No program found reports a correlation as
+undetermined. rietx takes GSAS-II's mechanism at a cut derived from its own Jacobian's
+accuracy (`statistics.resolved_correlation`): GSAS-II's 1e-6 would also have removed
+brucite's zero-shift/displacement direction at 1.4e-10, whose correlations hold to 2e-5.
 
 ## Sources
 
