@@ -553,9 +553,10 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "every child with `parent_cell=True`; `False` keeps the old "
                 "refusal. `phases.*.cell.*` frees the parent's edges, never a "
                 "strain: free `phases.*.parent_cell.strain.*` by name, and "
-                "seed it off zero first with `set_values`, since the pattern "
-                "is even in a strain the parent's symmetry reverses, so its "
-                "sign is a domain and zero is a stationary point.",
+                "seed it off zero first with `set_values`, since zero is a "
+                "stationary point of every strain. The sign of a strain the "
+                "parent's symmetry reverses is a domain; the sign of one it "
+                "does not (a tetragonal strain of a cubic parent) is physical.",
                 ("rietx.crystallography.magnetic.supercell.magnetic_supercell",
                  "rx.ParentCell"),
             ),
