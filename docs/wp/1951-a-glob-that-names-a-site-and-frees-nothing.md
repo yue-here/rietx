@@ -1,6 +1,6 @@
 # WP-1951 — a glob that names a site and frees nothing
 
-Milestone: unscheduled · Status: ✅ 2026-11-01 — a stage glob naming one site that frees nothing is reported, set_vary warns, the verbs name the nearest path; PR #1304, warning-vs-info level open for the maintainer
+Milestone: unscheduled · Status: ✅ 2026-11-02 — a stage glob naming one site that frees nothing is reported, set_vary warns, the verbs name the nearest path; PR #1304, warning-vs-info level open for the maintainer
 Track: What fires, and what stays silent
 Depends on: —
 
@@ -135,7 +135,7 @@ Every shipped preset fires nothing new on the acceptance fixtures.
 
 ## Handover log
 
-- **2026-11-01** — PR #1304. A stage that asks to refine one atom's position
+- **2026-11-02** — PR #1304. A stage that asks to refine one atom's position
   by a pattern, where the atom sits on a fully fixed special position (Ti on
   rutile's 2a), now says so, where it used to freeze the atom without a word.
   `set_vary` now warns when a call changes nothing it named, and every verb
