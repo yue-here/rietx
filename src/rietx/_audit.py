@@ -3440,7 +3440,7 @@ ROWS: tuple[Row, ...] = (
                   "5e-5's at every point on SRM 660c, FAP, cpd-1a and 11-BM NAC (0.022-0.091), "
                   "and the closing answer within 0.1 plain esd of the 5e-5 fixed point on FAP, "
                   "cpd-1a and NAC (0.008-0.019); LaB6 misses that by 0.908 esd on U from the "
-                  "Gaussian-variance clamp, which moves U at any window (WP-1467); 1.05-2.05x the "
+                  "Gaussian-variance clamp, which moves U at any window (WP-1955); 1.05-2.05x the "
                   "fit time (WP-2002, the sixth round's Q1 and Q2)")),
     Row("rietx.schemas.plan.CORRELATION_GUARD", "constant", value=0.98),
     Row("rietx.schemas.plan.INTERMEDIATE_FTOL", "constant", tier=3, value=1e-06,
@@ -3890,7 +3890,7 @@ ROWS: tuple[Row, ...] = (
                   "is CLOSING_WINDOW_TOL's row; SRM 660c's cell 4.1568823 A without it and "
                   "4.1568821 with it, +24.6 ppm from the reference both ways; it fails twice: on "
                   "SRM 660c one closing solve sits 0.908 esd from the fixed point in u (the "
-                  "Gaussian clamp, WP-1467), and under TRF it collapses CPD brucite's S_HKL "
+                  "Gaussian clamp, WP-1955), and under TRF it collapses CPD brucite's S_HKL "
                   "(t = -268); recorded in RefinementResult.stages as the stage named "
                   "'closing'; solve_magnetic runs it on its winner too, when the package "
                   "chose the plan and the verdict is solved, after ranking every trial "
