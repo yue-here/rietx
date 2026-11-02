@@ -279,6 +279,21 @@ def _named(pairs) -> dict[str, str]:
     return out
 
 
+def _on_dark_ground(geometry: Mapping) -> Mapping:
+    """The geometry with each site still in its element's CPK colour given
+    that element's dark-ground colour (``structure3d.DARK_GROUND``), so a
+    colour the caller chose stays theirs."""
+    from ...gui import structure3d as s3
+
+    swap = {k: s3.DARK_GROUND[s["element"]] for k, s in enumerate(geometry["sites"])
+            if s["element"] in s3.DARK_GROUND
+            and s["color"] == s3._CPK.get(s["element"])}
+    if not swap:
+        return geometry
+    return {**geometry, "sites": [{**s, "color": swap[k]} if k in swap else s
+                                  for k, s in enumerate(geometry["sites"])]}
+
+
 def _palette(geometry: Mapping, scene: dict) -> dict[str, str]:
     drawn = {geometry["atoms"][a["index"]]["site"] for a in scene["atoms"]}
     sites = geometry["sites"]
@@ -824,6 +839,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     bg = _colour(background)
     dark = bg is not None and sum(w * v for w, v in zip(sc.LOOK["luma"], bg)) < 0.5
     tokens = TOKENS["dark" if dark else "light"]
+    if dark:
+        geometry = _on_dark_ground(geometry)
     hidden_asked = [hidden] if isinstance(hidden, str) else list(hidden)
     hidden = _species(geometry, hidden_asked)
     if polyhedra is None:

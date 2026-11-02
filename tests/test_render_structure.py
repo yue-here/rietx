@@ -1337,3 +1337,24 @@ def test_the_polyhedron_palette_is_what_the_faces_were_drawn_in(nac):
     part = render_structure(recolour(g, mask, "#ff0000"))
     assert part.polyhedron_palette[f"{off} (recoloured)"] == "#ff0000"
     assert part.polyhedron_palette[off] == fig.polyhedron_palette[off]
+
+
+def test_the_dark_ground_table_swaps_only_a_default_colour(monkeypatch):
+    """``structure3d.DARK_GROUND`` is empty until the maintainer rules on a
+    lighter C for the dark picture (WP-1468), so a dark render is unchanged;
+    filled, it repaints a site in its CPK colour on a dark ground only, and
+    never one the caller recoloured."""
+    assert s3.DARK_GROUND == {}
+    molecule = _paracetamol()
+    plain = render_structure(molecule, size=200, background="#151515")
+    assert {plain.palette[k] for k in plain.palette if k.startswith("C")} == {s3._CPK["C"]}
+    monkeypatch.setattr(s3, "DARK_GROUND", {"C": "#666666"})
+    dark = render_structure(molecule, size=200, background="#151515")
+    light = render_structure(molecule, size=200)
+    _save(dark, "dark_ground_paracetamol_C")
+    assert {dark.palette[k] for k in dark.palette if k.startswith("C")} == {"#666666"}
+    assert not np.array_equal(dark.image, plain.image)
+    assert {light.palette[k] for k in light.palette if k.startswith("C")} == {s3._CPK["C"]}
+    chosen = recolour(molecule, select(molecule, element="C"), "#383839")
+    kept = render_structure(chosen, size=200, background="#151515")
+    assert {kept.palette[k] for k in kept.palette if k.startswith("C")} == {"#383839"}

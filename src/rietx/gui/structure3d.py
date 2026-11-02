@@ -210,6 +210,16 @@ _CPK: dict[str, str] = {
     "Fe": "#c05000", "Ti": "#909090", "Na": "#8040e0", "Ca": "#40c060",
 }
 
+#: An element's colour on a dark ground, for a site still in its ``_CPK``
+#: colour there.  ``rietx.viz.render_structure`` applies it on a background
+#: darker than mid-grey; the GUI does not read it.  **Empty, so nothing
+#: changes**: C's #383838 reads at 1.56:1 against the GUI's dark #151515, and
+#: a lighter C changes the default dark picture, which is the maintainer's
+#: call (WP-1468).  The candidate is ``{"C": "#666666"}``: 3.18:1 on #151515,
+#: 3.07:1 on the notebook's #1d1813, and 0.143 in OKLab from Ti's #909090,
+#: above :data:`MIN_SEPARATION`.
+DARK_GROUND: dict[str, str] = {}
+
 
 def element_symbol(species: str) -> str:
     """The bare element of a scattering species: ``"La3+"`` → ``"La"``.
