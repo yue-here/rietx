@@ -1948,3 +1948,171 @@ def test_the_two_spectrum_tables_name_the_same_types():
     from rietx.model.tof_spectrum import COEFFICIENT_COUNTS, SPECTRUM_TYPES
 
     assert SPECTRUM_TYPES.keys() == COEFFICIENT_COUNTS.keys()
+
+
+# ---------------------------------------------------------------------------
+# the tense: what each surface says the arm can do
+# ---------------------------------------------------------------------------
+#: Sentences that were true of the flight-time arm at some rung and are false
+#: of this one.  The manual's scope said "time-of-flight data are not
+#: implemented … no time-of-flight pattern is refined", every Reference page
+#: that names a bank said "this version reads a bank and refines none", the
+#: instrument page said the ``ProfileTOF`` coefficients are carried "and
+#: nothing evaluates them" and "nothing in this version evaluates a spectrum",
+#: and the legacy LANSCE reader said, in its docstring and its own message,
+#: "nothing in this build evaluates a spectrum" — all while ``Refinement.fit``
+#: refined a bank against exactly those shapes.  Matched case-insensitively
+#: and only inside the region each surface makes its claim in.
+_STALE_TENSE = (
+    "nothing reads a tof",
+    "no refinement calls",
+    "cannot be refined",
+    "not a supported data type",
+    "nothing in this build evaluates",
+    "nothing in this version evaluates",
+    "nothing evaluates",
+    "stored, never evaluated",
+    "refines none",
+    "refine none",
+    "refines no bank",
+    "no flight-time forward model",
+    "no time-of-flight pattern is refined",
+    "time of flight is not refined",
+    "time-of-flight fit is refused",
+)
+#: A region about nothing but the flight-time arm may not say "not
+#: implemented" at all; a region about the whole package (the manual's
+#: scope) truly says it of other things, so it is held to the list above.
+_STALE_TENSE_TOF_ONLY = _STALE_TENSE + ("not implemented",)
+
+
+def _first_admonition(text: str, anchor: str) -> str:
+    """The first ```{...} fenced block after ``anchor`` — read structurally.
+
+    Located by the anchor and the fence rather than by a copy of its own
+    words, the ``tests/CLAUDE.md`` § "Guards that go quiet" rule: a guard that
+    pins a second copy of a sentence passes forever once the first copy is
+    renamed.
+    """
+    start = text.index(anchor)
+    open_at = text.index("```{", start)
+    close_at = text.index("\n```", open_at)
+    return text[open_at:close_at]
+
+
+def _section(text: str, heading: str) -> str:
+    """The body under the Markdown ``heading`` line, to the next heading of
+    its level or above, fenced code skipped.
+
+    A renamed heading raises here rather than leaving an empty region, so the
+    guard goes red, never quiet.
+    """
+    lines = text.splitlines()
+    start = lines.index(heading)
+    level = len(heading) - len(heading.lstrip("#"))
+    out, fenced = [], False
+    for line in lines[start + 1:]:
+        if line.startswith("```"):
+            fenced = not fenced
+        elif not fenced and line.startswith("#"):
+            hashes = len(line) - len(line.lstrip("#"))
+            if hashes <= level and line[hashes:hashes + 1] == " ":
+                break
+        out.append(line)
+    assert out, f"{heading!r} has no body"
+    return "\n".join(out)
+
+
+def test_no_flight_time_surface_still_says_the_arm_is_unwritten():
+    """The tense check, with the enabling facts asserted in the same test.
+
+    A guard scanning prose for a phrase goes quiet the moment the capability it
+    is about is removed, so what the arm *can* do is measured here first and
+    the prose is checked against that — not against a remembered list.
+    """
+    from pathlib import Path
+
+    from rietx.model.forward_tof import CompiledTOFModel, compile_tof_model
+    from rietx.model.tof_spectrum import incident_spectrum
+    from rietx.params.vector import ParameterTable
+
+    # (1) the enabling facts, in the order the surfaces claim them
+    grid = [8000.0 + 20.0 * i for i in range(400)]
+    pattern = PatternData(tof=grid, intensity=[10.0] * len(grid))
+    instrument = rx.Instrument.tof_neutron_bank(
+        difc=12000.0, tzero=-5.0, two_theta_bank_deg=90.0,
+        profile=ProfileTOF(alpha1=0.45, beta0=0.055, beta1=0.003, sig1=300.0))
+    structure = rx.Structure(phases=[rx.Phase(
+        name="Si", space_group="F d -3 m :2", cell=rx.Cell.cubic(SI_A),
+        atoms=[rx.Atom(label="Si", species="Si", x=rx.Parameter(value=0.125),
+                       y=rx.Parameter(value=0.125),
+                       z=rx.Parameter(value=0.125))])])
+    model = compile_tof_model(structure, instrument, pattern)
+    assert isinstance(model, CompiledTOFModel)
+    # the shapes are evaluated, the profile coefficients are table rows, and a
+    # phase's own widths reach the bank
+    paths = {e.path for e in ParameterTable(structure, instrument).entries}
+    assert "instrument.source.profile_tof.sig1" in paths
+    assert "phases.0.lor_size" in paths
+    # the spectrum is evaluated, the legacy reader's fifth pair included
+    pair = [1.0] + [0.0] * 8 + [5.0, 1e-3]
+    assert float(incident_spectrum(1, pair, [3000.0])[0]) != 1.0
+    # …and Le Bail / Pawley on a bank really are refused, which is the half of
+    # every note below that is still true
+    for mode in ("lebail", "pawley"):
+        with pytest.raises(ValueError, match="not implemented for a"):
+            compile_tof_model(structure, instrument, pattern, mode=mode)
+
+    # (2) the prose, each surface inside the region it makes its claim in
+    root = Path(__file__).resolve().parent.parent
+    docs = root / "docs" / "docs"
+    skill = root / "docs" / "skill" / "rietx" / "references"
+
+    def read(path: Path) -> str:
+        return path.read_text(encoding="utf-8")
+
+    tof_only, whole = _STALE_TENSE_TOF_ONLY, _STALE_TENSE
+    regions = {
+        "theory/profiles.md § Time-of-flight": (_first_admonition(
+            read(docs / "theory/profiles.md"), "(sec-tof-profiles)="), tof_only),
+        "theory/index.md § Scope": (_section(
+            read(docs / "theory/index.md"), "## Scope"), whole),
+        "reference/data.md § Time-of-flight patterns": (_section(
+            read(docs / "reference/data.md"), "### Time-of-flight patterns"),
+            tof_only),
+        "reference/pattern-files.md § Time-of-flight patterns": (_section(
+            read(docs / "reference/pattern-files.md"),
+            "## Time-of-flight patterns"), tof_only),
+        "reference/instrument-files.md § Time-of-flight instrument files": (
+            _section(read(docs / "reference/instrument-files.md"),
+                     "## Time-of-flight instrument files"), tof_only),
+        "reference/instrument.md § Time-of-flight bank": (_section(
+            read(docs / "reference/instrument.md"), "## Time-of-flight bank"),
+            tof_only),
+        "reference/programs.md § Radiations": (_section(
+            read(docs / "reference/programs.md"), "### Radiations"), whole),
+        "switching/at-a-glance.md § Data rietx fits": (_section(
+            read(docs / "switching/at-a-glance.md"), "## Data rietx fits"),
+            whole),
+        "skill api-io.md § Recipes and instrument files": (_section(
+            read(skill / "api-io.md"), "## Recipes and instrument files"),
+            whole),
+        "skill diagnostics-gsas.md § the time-of-flight readers": (_section(
+            read(skill / "diagnostics-gsas.md"),
+            "## The time-of-flight instrument-parameter readers"), tof_only),
+        "capabilities().radiations": (next(
+            r.scatterer for r in rx.capabilities().radiations
+            if r.kind == "neutron_tof"), tof_only),
+        "io/instrument_tof.py": (read(
+            root / "src/rietx/io/instrument_tof.py").split('"""')[1], tof_only),
+        # the whole module, because its claim is made twice: in the docstring
+        # and in the GSAS_IPARM_LEGACY_LAYOUT message it emits
+        "io/legacy/lansce_iparm.py": (read(
+            root / "src/rietx/io/legacy/lansce_iparm.py"), whole),
+    }
+    for where, (region, phrases) in regions.items():
+        lowered = " ".join(region.lower().split())
+        for phrase in phrases:
+            assert phrase not in lowered, (
+                f"{where} still says {phrase!r} about the flight-time arm, "
+                f"which this test has just measured it doing")
