@@ -1,6 +1,6 @@
 # WP-2028 — a joint fit's guards see every histogram
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`) and 7's census as PR #1205 (`d0d4831d`); 4 measured, not wired; 8 measured on #1124, its two wording edits merged as PR #1277 (`e0cb41ea`); the two follow-on items 7's census opened are listed as tasks and each has a PR open (#1270, #1272)
+Milestone: unscheduled · Status: 🔄 2026-11-01 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`) and 7's census as PR #1205 (`d0d4831d`); 4 measured, not wired; 8 measured on #1124, its two wording edits merged as PR #1277 (`e0cb41ea`); the two follow-on items 7's census opened are listed as tasks and each has a PR open (#1270, #1272); its joint `parameters()` built 2026-10-31 (#1270)
 Track: What fires, and what stays silent
 Depends on: — (1341 closed: it built the joint report this WP completes; 1325
 soft: its parametric codes and per-pattern holds are what tasks 3 and 6
@@ -212,7 +212,7 @@ that caveat until 1421 lands.
       `soft_modes`) run on the joint matrix, since that is what was solved; the
       declared-peak absorption screen runs per histogram, since a declared peak
       is one instrument's. This adds output, so it is its own change.
-- [ ] A joint `parameters()` (census, ruled 2026-10-31 on #1205): read-only
+- [x] A joint `parameters()` (census, ruled 2026-10-31 on #1205): read-only
       first, returning the single fit's `ParameterRow` with paths spelled as
       the joint table spells them; `set_vary` and `set_values` on the joint
       follow when someone needs them. Re-point `STAGE_PATH_UNKNOWN`'s
@@ -257,6 +257,28 @@ shows the findings that name histogram h.
 - **2026-11-01** (`/pr-review`) — task 8's two wording edits, asked on #1124, merged from outside as PR #1277 (`e0cb41ea`). The `_data_support_diagnostics` scope reason now says there is no agreed joint definition of observations per parameter, and points to task 8's measurement on #1124. Three comments in `multi.py` that named WP-1341 as owner of the joint report now name this WP. No number moves. This is the re-pointing and the written reason that task 8 asks for, so the PR looks to complete it. The box stays unticked for the maintainer. Gap, not blocking: the reason string now says "no agreed joint definition" twice. Open for this WP: PR #1270 (a read-only joint `parameters()`) and PR #1272 (the joint identifiability screens). Both were reviewed today with items to settle before merge. Both add a handover entry to this file, so the second to merge will conflict on this log. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
 
 - **2026-10-31** (`/pr-review`) — task 7's census merged from outside as PR #1205 (`d0d4831d`) after two rounds. The contributor's 2026-10-28 and 2026-10-31 entries, ticks and `Status:` edit stand as written, as WP-2030's did (ruled 2026-10-29), so this entry adds the merge record. Round 2 built the three rulings: a shared B is tested against the loosest bound among the histograms that hold it and the message names that histogram (`_large_biso_once`), a per-histogram B keeps its own cell's bound, and the identifiability screens and a read-only joint `parameters()` became their own tasks. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Gap, not blocking: `docs/releases/1.11.0.md` does not say that a shared B over per-histogram cells now fires only past the loosest bound, where 1.10.0 read histogram 0 alone.
+
+- **2026-10-31** — the joint `parameters()`, from outside (#1205's third
+  ruling). `MultiHistogramRefinement.parameters()` returns the single fit's
+  `ParameterRow` for every table entry, held rows included, before or after a
+  fit: a shared row once, at its first histogram's place, and a per-histogram
+  one per histogram, `hist.<h>.`-scoped. Each row is read off its own
+  histogram's table by `Refinement.parameters()`'s rules (`mode_fixed` for
+  `"rietveld"`, `needs_held_cell` from that histogram's cell, the esd from
+  `result_.parameters` under the same path). The spelling is the joint
+  result's, now `MultiParameterTable.row_path` (the `_row_shared` rule moved
+  to `params.multi.row_shared`). It differs from `_canonical` for a tied row
+  whose sources are per histogram: under `per_histogram=["phases.0.cell.a"]`
+  a cubic `b` is `hist.1.phases.0.cell.b`. So that every listed path is one
+  the joint fit accepts, `known_paths` adds that spelling, and
+  `STAGE_PATH_NOT_FREE` matches it: on `main` the literal
+  `hist.1.phases.0.cell.b` fired `STAGE_PATH_UNKNOWN` for a path the result
+  itself prints, and here it is `STAGE_PATH_NOT_FREE` naming
+  `hist.1.phases.0.cell.a`. `STAGE_PATH_UNKNOWN`'s suggestion names
+  `ref.parameters()` on both paths, and a locked joint literal's
+  `STAGE_PATH_NOT_FREE` suggestion points at `held_because` there, as a single
+  fit's does. No other joint finding's text moves. `set_vary` and `set_values` on the
+  joint are not built.
 
 - **2026-10-31** — review round on #1205 (task 7's census closed). The
   maintainer ruled on the three open questions. (1) *Lindemann bound for a

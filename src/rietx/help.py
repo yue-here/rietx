@@ -508,8 +508,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The tanθ term of the Lorentzian FWHM. The tanθ shape is microstrain "
             "broadening, and a phase's `lor_strain` adds to it. An anisotropic strain "
-            "block replaces the specimen part of this term with an hkl-dependent width "
-            "and locks `lor_strain`. The instrumental Y stays as it was. Y can go "
+            "block replaces the specimen part of this term with an hkl-dependent width. "
+            "It locks `lor_strain`, and the width then reads zero for it whatever value "
+            "it stores. The instrumental Y stays as it was. Y can go "
             "negative while X keeps the total width at or above zero."
         ),
         unit="deg 2θ", default="0.0",
@@ -1260,8 +1261,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "coefficients as a cone, so it cannot be a bound on each coefficient. The "
             "default Levenberg-Marquardt solver holds it as a linear inequality. Under "
             "`solver=\"trf\"` and in a joint fit, `STEPHENS_STRAIN_NOT_POSITIVE` reports "
-            "it instead. Read that flag as 'these coefficients are not quotable'. It is "
-            "no evidence of anisotropy."
+            "it instead. Read that flag as 'these coefficients are not quotable, and the "
+            "fit leaned on the clamp'. It is no evidence of anisotropy."
         ),
         unit=None, default=None,
         typical="the isotropic seed is ε²·[M²] for a strain ε of 1e-4 to 1e-3",
@@ -2047,7 +2048,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "is one orbit, used once), the test of an ordered model. A group that fails "
             "the count is kept and named, since a disordered alloy written with whole counts "
             "fails it on its true group, and is removed only when you declare the model "
-            "`ordered`. "
+            "`ordered`. A Z with no formula has no atoms to count, so it removes "
+            "nothing, and the message says so. "
             "Where Z is not a whole multiple of a kept group's general multiplicity "
             "(Z′ below one), the group stays and the message names the special "
             "positions a formula unit then needs, since a molecule there must carry "
@@ -3192,6 +3194,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the angle with its interval."
         ),
     ),
+    "MOMENT_UNSUPPORTED": HelpEntry(
+        title="Moment the data do not support",
+        description=(
+            "A refined moment size is under three times its error estimate, or at "
+            "its floor of 0.001 Bohr magnetons. The data then cannot tell this "
+            "moment from no moment. The magnetic intensity goes as the square of the "
+            "size, so near zero the size has almost no effect on the pattern, and "
+            "its error estimate is no interval: a fit that ends on zero can report an "
+            "estimate of 10 000 Bohr magnetons. Read the moment as unsupported. For "
+            "a limit, `Refinement.profile_interval` gives the size's likelihood "
+            "interval, which stays at or above zero where the data cannot see the "
+            "moment's sign. The FitReport's "
+            "moment rows give the same verdict as `supported`."
+        ),
+    ),
     "MOMENT_PAIR_DEGENERATE": HelpEntry(
         title="Two moments cannot be told apart",
         description=(
@@ -4327,9 +4344,15 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The refined anisotropic strain coefficients give a negative variance at "
             "some reflections. A variance cannot be negative, so the coefficients lie "
             "outside the physical set. Those reflections receive no strain broadening, "
-            "and nothing else says so. A negative value is not evidence of large "
-            "anisotropy. Restart from the isotropic limit, refine fewer strain terms, or "
-            "extend the fitted range. Do not quote the coefficients."
+            "so the fit leaned on that clamp, and the finding states the share of the "
+            "phase's m·|F|² they carry. The fit's χ², cells and phase fractions lean "
+            "on those reflections too. A negative value is not evidence of large "
+            "anisotropy. Under `solver=\"trf\"`, refit with the default "
+            "Levenberg-Marquardt driver, which holds the variance at or above zero; a "
+            "joint fit holds it under neither driver, so fit each pattern alone or drop "
+            "the block from the joint fit. That "
+            "makes the coefficients admissible, not measured, so compare a few starts. "
+            "Do not quote the coefficients."
         ),
     ),
     "STRAIN_UNUSUALLY_LARGE": HelpEntry(
