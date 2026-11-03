@@ -4160,7 +4160,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "holds the coupled direction, the one direction that moves x; a free path "
             "follows only where every coordinate that direction moves was free; a tie, "
             "which needs a single direction, is dropped. One on a direction the position "
-            "fixes is dropped. The message names every one that followed and every one "
+            "fixes is dropped. "
+            "The message names every one that followed and every one "
             "that was dropped. Nothing was moved: "
             "this is the bookkeeping of a site whose symmetry changed without a merge, "
             "for instance onto a mirror within 5e-5, after a fit wrote the coordinate "
@@ -4578,6 +4579,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "reported."
         ),
     ),
+    "XYDATA_INTER_APPLIED": HelpEntry(
+        title="FullProf's INTER multipliers were applied",
+        description=(
+            "The file opens with FullProf's XYDATA heading, and its INTER line "
+            "states a multiplier other than 1. The FullProf manual defines `fac_x` as "
+            "a multiplier of the x values and `fac_y` as a multiplier of the "
+            "intensities and their esds, which FullProf applies before it uses the "
+            "data. The reader applied them the same way, so the pattern's numbers "
+            "are the file's numbers times the factors. A file with no esd column "
+            "gets the Poisson esd of the multiplied intensity, as in FullProf. "
+            "Compare the pattern against the file's own columns only after "
+            "multiplying."
+        ),
+    ),
 }
 
 
@@ -4701,6 +4716,20 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
 #: enumerating what a reader accepts.  These entries are the text a person
 #: reads beside the control.
 READER_OPTION_HELP: dict[str, HelpEntry] = {
+    "axis": HelpEntry(
+        title="Axis",
+        description=(
+            "What the x column of a plain two- or three-column file is: `two_theta`, "
+            "2θ in degrees, or `tof`, a flight time in microseconds. A file that "
+            "states no unit cannot say which, because both are ascending columns of "
+            "numbers, so the reader takes 2θ unless you declare otherwise. A "
+            "time-of-flight bank with no header needs `tof`. The pattern's metadata "
+            "records the declaration under `declared_axis`. A file that states its "
+            "own unit and disagrees with the declaration is refused, and the message "
+            "quotes both."
+        ),
+        typical="unset; `tof` for a time-of-flight bank exported without a header",
+    ),
     "bank": HelpEntry(
         title="Detector bank",
         description=(
@@ -5897,6 +5926,16 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`SEQUENTIAL_MOMENT_HOLD` names these patterns."
         ),
     ),
+    "SeriesEntry.pattern_paths": HelpEntry(
+        title="This pattern's own paths",
+        description=(
+            "This pattern's own dot-path for each path of the entry that its model numbers "
+            "differently, keyed by the entry's path. Every path of a series reads one "
+            "numbering, so a trajectory follows one phase by name and one atom by label "
+            "where a `prepare` hook added or removed either. `{}` where the two agree; "
+            "`None` in a series saved before 1.11, whose paths are each pattern's own."
+        ),
+    ),
     "SeriesEntry.node_id": HelpEntry(
         title="Pattern history node",
         description=(
@@ -5991,6 +6030,23 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The moment angle DOFs, whose differences across patterns are taken modulo "
             "a full turn. Recorded as `relative_paths` is, and `None` means the same."
+        ),
+    ),
+    "SeriesResult.phase_names": HelpEntry(
+        title="Series phase names",
+        description=(
+            "The phase each path of the series names by number: phase `i` is "
+            "`phase_names[i]`. The series' own structure's phases, then each phase a "
+            "`prepare` hook added, in the order the walk met it. `None` in a series "
+            "saved before 1.11."
+        ),
+    ),
+    "SeriesResult.atom_labels": HelpEntry(
+        title="Series atom labels",
+        description=(
+            "The atom each path of the series names by number: atom `j` of phase `i` is "
+            "`atom_labels[i][j]`, numbered as `phase_names` is. `None` in a series saved "
+            "before 1.11."
         ),
     ),
     "SeriesResult.failures": HelpEntry(
