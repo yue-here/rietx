@@ -113,9 +113,11 @@ which some overlapping reflection stands higher. An isolated line contributes 1
 and the weaker of an exactly coincident pair contributes 0, so the pair is one
 observation. The guideline built on it asks for at least
 {{ OBS_PER_PARAMETER_MIN }} and preferably {{ OBS_PER_PARAMETER_PREFERRED }}
-effective observations per structural parameter. Those are the atomic ones,
-since peak positions rather than intensities pay for the cell, profile and
-background terms.
+effective observations per structural parameter. Those are the ones that
+move an atom, whatever their names: an atom's own coordinates, occupancy and
+displacement, and a mode amplitude, a named variable or a rigid body's pose
+that drives them. Peak positions rather than intensities pay for the cell,
+profile and background terms.
 
 The estimate is not a theorem, and both papers say so: the approach "may not
 have a rigorous basis". Its own $\alpha$ is a case in point. The paper's check
@@ -315,7 +317,10 @@ honestly. Four cases qualify:
   variance below {{ VARIANCE_CANCELLATION_FLOOR }} of its own form's absolute
   terms. A symmetry-fixed 90° angle has exactly zero variance while its partials
   against $x$, $y$ and $z$ do not vanish, so the quadratic form lands on
-  roundoff;
+  roundoff. A torsion held at 180° by an inversion centre cancels one step
+  earlier, between the two images of one atom, so every net partial is
+  roundoff; its absolute terms are therefore taken from the partials before
+  they are summed;
 * an angle within {{ ANGLE_LINEARISATION_LIMIT_DEG }}° of 0° or 180°, where the
   angle is a stationary point of the coordinates and the linearisation the
   propagation rests on does not hold at all.
@@ -405,7 +410,22 @@ gives $P(T > c) = \tfrac12 P(\chi^2_1 > c)$, so $c$ = 2.71 at 95 %, and the
 interval is one-sided with the bound as one end. The two scaling factors put a
 two-sided interval on a quadratic profile at the value ± 1.96 esd. Each end is
 bracketed by steps of 1, 2, 4, … esd and solved by Brent's method on the
-refitted $\chi^2$.
+refitted $\chi^2$. Every refit keeps the fit's own free set: a parameter the
+fit held stays held, whatever the pinned value would have the stage decide.
+
+A moment's modulus $m$ has no declared bound, but the magnetic intensity goes
+as $m^2$. Where the sign of $m$ changes no intensity (one moment block in the
+phase, or a block whose free angles reach $-m$ by turning), the profile is
+even about 0, and the parameter the data measure is $u = m^2 \ge 0$, in which
+the intensity is linear. A likelihood ratio does not depend on the
+parameterisation, so the profile keeps $m \ge 0$, and a fit that ends on
+$m = 0$ is on the boundary of $u$: its interval is one-sided at $c$ = 2.71,
+with 0 as one end. Such a fit has a dead column, and its esd from
+{eq}`est-cov` can exceed the end by six orders of magnitude. A first step of
+one esd then overshoots the threshold. The walk steps back in to where a
+parabola through that probe puts the end, halved, until a probe lands inside,
+and solves the end in the logarithm of its distance from $\hat p$, where the
+quartic profile of a dead column is a straight line.
 
 A bound the data press against is not a stationary point of $\chi^2$. There
 $\chi^2$ rises from the bound with a slope as well as a curvature, and the

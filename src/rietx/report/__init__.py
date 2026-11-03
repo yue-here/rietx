@@ -15,12 +15,19 @@ from ..schemas.pattern import PatternData
 from ..schemas.results import RefinementResult
 from .apply import RECIPES, Recipe, describe_action, recipe, stage_for
 from .background import assess_background
+from .distortion import (
+    block_comparison,
+    detectability_amplitude,
+    detectability_target,
+    distortion_blocks,
+)
 from .identifiability import (
     assess_identifiability,
     identifiability_clause,
     is_exchangeable,
 )
 from .layer0 import (
+    LAYER0_MATCH_TOL_DEG,
     background_clause,
     build_layer0,
     lebail_gap,
@@ -69,8 +76,12 @@ from .schemas import (
     BasisCoefficient,
     DeltaChi2Profile,
     DeltaChi2Quantile,
+    DistortionBlockTest,
+    DistortionBlockTests,
+    DistortionRestart,
     ExchangeFinding,
     FitReport,
+    FlankEvidence,
     FreedComparison,
     FreedParameter,
     GateFailure,
@@ -105,8 +116,12 @@ __all__ = [
     "BasisCoefficient",
     "DeltaChi2Profile",
     "DeltaChi2Quantile",
+    "DistortionBlockTest",
+    "DistortionBlockTests",
+    "DistortionRestart",
     "ExchangeFinding",
     "FitReport",
+    "FlankEvidence",
     "FreedComparison",
     "FreedParameter",
     "GateFailure",
@@ -141,6 +156,7 @@ __all__ = [
     "attribute_regions",
     "background_actions",
     "background_clause",
+    "block_comparison",
     "build_layer0",
     "build_report",
     "cap_texture_crosstalk",
@@ -151,6 +167,9 @@ __all__ = [
     "cumulative_delta_chi2",
     "delta_bic",
     "describe_action",
+    "detectability_amplitude",
+    "detectability_target",
+    "distortion_blocks",
     "estimate_delta_chi2",
     "hamilton_justified",
     "identifiability_clause",
@@ -265,14 +284,16 @@ def _reading_models(model, structure, instrument):
 
 def _twin(model, structure, instrument, window_area_tol):
     """``model`` compiled again at ``window_area_tol`` on its own grid: the
-    same channels, σ and moment frames, and its Le Bail intensities."""
-    from ..model.forward import compile_model
+    same channels, σ, moment frames and orbit split (WP-2052), and its Le Bail
+    intensities."""
+    from ..model.forward import compile_model, orbit_split_of
     from ..refine import _carry_lebail
 
     grid = PatternData(two_theta=model.tt.tolist(), intensity=model.y_obs.tolist(),
                        sigma=model.sigma.tolist())
     twin = compile_model(structure, instrument, grid, mode=model.mode,
-                         window_area_tol=window_area_tol)
+                         window_area_tol=window_area_tol,
+                         orbit_split=orbit_split_of(model))
     # the model's σ, which a measured background widened once already
     twin.sigma = model.sigma
     for cp, twin_cp in zip(model.phases, twin.phases, strict=True):
@@ -286,7 +307,7 @@ def _twin(model, structure, instrument, window_area_tol):
 def build_report(result: RefinementResult, *, model=None, values=None,
                  plan=None, free_paths: list[str] | None = None,
                  structure=None, instrument=None, held: list[str] | None = None,
-                 top_n: int = 15, match_tol_deg: float = 0.08,
+                 top_n: int = 15, match_tol_deg: float = LAYER0_MATCH_TOL_DEG,
                  min_peak_sigma: float = 5.0) -> FitReport:
     """Build the report, going as deep as the inputs allow.
 

@@ -201,17 +201,37 @@ from .structure import Cell
 #: orbits cannot hold the declared content (removing them only under
 #: ``ordered=True``) and the special positions a Z′ below one needs.  Only a screen that declares one of them can answer differently;
 #: with none declared every screen answers as before.
+#: Also 1.12 (WP-2033, #1140's follow-ups): under ``ordered=True`` a fractional
+#: formula count whose atoms per cell are whole (``CaSO4·0.5H2O`` at Z = 2) is
+#: now counted, so the screen removes groups it used to keep; ``z`` with no
+#: formula opens ``EXTINCTION_PRIOR_APPLIED`` with "filters no group" rather
+#: than "removed 0 space group(s)"; the collapsed special-position ``where``
+#: line splits by note kind; an element an ordered count cannot test (atoms per
+#: cell not whole) gets its own ``where`` line.
 #: Also 1.12 (WP-2030): ``INDEX_DATA_INSUFFICIENT`` names an undeclared
 #: instrument first only on a laboratory source, read off the declared source
 #: (``diagnostics.lab_source``), and reads it from the list's own record when
-#: no instrument is passed.  No search, rank or grade moves.
+#: no instrument is passed.  No search, rank or grade moves.  Part 2:
+#: ``SearchSpec.from_formula`` sets a ceiling only, for every formula, so a
+#: search declared through it no longer drops the cells below 0.8 of the
+#: formula's volume and can rank a smaller cell it used to exclude.  And
+#: ``INDEX_Z_NOT_INTEGER`` (``Z_INTEGER_TOLERANCE`` 0.08) is withdrawn: it fired
+#: on 12 of 16 true inorganic cells, and the number it judged is now recorded
+#: as ``CellCandidate.formula_units``.  No rank or grade moves without a formula.
 #: Also 1.12 (WP-2011): the whole-pattern validation fits by Pawley, so every
 #: candidate's ``lebail.rwp`` and ``unmatched_observed`` move, and a cell that
 #: predicts every reflection of another now reads that cell's Rwp or lower.
+#: Also 1.12 (#939's follow-ups): ``EXTINCTION_SCREEN_UNRELIABLE``'s message
+#: says whether weak data or misfit failed the gate, from
+#: ``ExtinctionScreen.perfect_fit_rwp_net``; no threshold or verdict moved.
 #: Also 1.12 (#1230): a containment child whose own lines are seen more often
 #: than its parent's (``SupercellEvidence.child_seen_more``) is never
 #: ``refuted``, so a dense low-symmetry truth no longer sits below a wrong cell
 #: that p₀ near the truth's own seen fraction let refute it.
+#: Also 1.12 (#1263): the containment refuter's null is the seen test's own
+#: chance rate (``PatternScreen.p0``), so ``n_seen ≤ n_extra·p0``, both
+#: p-values and ``SupercellCheck.p0`` read the windows the count is taken in.
+#: The assumed shift bound floors only the power check (``p0_power``, #951).
 INDEXING_THRESHOLDS_VERSION = "1.12"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
@@ -1014,11 +1034,20 @@ class PeakList(Base):
 
     @model_validator(mode="after")
     def _q_matches_two_theta(self) -> "PeakList":
-        """Q is derived, so it cannot be allowed to drift from 2θ.
+        """Q and σ(Q) are derived, so neither may drift from 2θ and σ(2θ).
 
-        Cheap (one vectorised pass) and it makes the derived field
+        Cheap (one vectorised pass) and it makes the derived fields
         self-guarding: a caller that builds a peak by hand and forgets Q gets an
         error here rather than a silently mis-indexed pattern later.
+
+        ``q_esd`` is checked the same way (#1236): the engines weight lines by
+        :meth:`q_esd`, so an edit to ``two_theta_esd`` that left the stored
+        ``q_esd`` behind would never reach the search, and nothing would say
+        so.  The tolerance is relative only: σ(Q) is ~1e-5 Å⁻², so the position
+        check's floor of 1.0 would make it an absolute 1e-9 Å⁻², blind to an
+        edit of a line whose σ(2θ) is below ~1e-7°.  A pair where both
+        numbers are non-finite agrees: an infinite σ(2θ) gives an infinite or
+        undefined σ(Q), and both mean "unmeasured".
         """
         if not self.peaks:
             return self
@@ -1033,6 +1062,22 @@ class PeakList(Base):
                 f"but 1/d² at λ = {self.wavelength} Å is {float(want[k])!r}; "
                 "build peaks with PeakList.from_positions or "
                 "indexing.pick_peaks rather than setting q by hand")
+        esd = np.array([p.two_theta_esd for p in self.peaks])
+        with np.errstate(invalid="ignore"):
+            want_esd = q_esd_of_two_theta(tt, esd, self.wavelength)
+        got_esd = np.array([p.q_esd for p in self.peaks])
+        agree = (np.isclose(got_esd, want_esd, rtol=1e-9, atol=0.0)
+                 | (~np.isfinite(got_esd) & ~np.isfinite(want_esd)))
+        if not agree.all():
+            k = int(np.flatnonzero(~agree)[0])
+            raise ValueError(
+                f"peak {k} at 2θ = {tt[k]:.4f}° carries q_esd = "
+                f"{float(got_esd[k])!r} but two_theta_esd = {float(esd[k])!r}° gives "
+                f"σ(1/d²) = {float(want_esd[k])!r} at λ = {self.wavelength} Å; "
+                "set both fields together, deriving q_esd with "
+                "rietx.schemas.indexing.q_esd_of_two_theta, or rebuild the "
+                "list with indexing.pick_peaks or PeakList.from_positions "
+                "(which marks every σ assumed)")
         return self
 
     def usable(self) -> list[ObservedPeak]:
@@ -1182,9 +1227,11 @@ class SupercellCheck(Base):
     extras are this lattice's lines that the parent's lattice does not predict,
     counted only where no space-group extinction could remove them
     (:func:`rietx.indexing.ambiguity.uncancellable`), and each is *seen* when it
-    falls inside an observed line's matching window.  ``p0`` is the chance of
-    that for a position no line is at, and ``p_value`` the one-sided binomial
-    chance of at least ``n_seen`` of ``n_extra``.
+    falls inside an observed line's window: the matching window on the
+    sublattice route, the reversed window at the resolution on containment's.
+    ``p0`` is the chance of that for a position no line is at, in the same
+    windows (#1263), and ``p_value`` the one-sided binomial chance of at least
+    ``n_seen`` of ``n_extra``.
 
     ``verdict`` is ``"refuted"`` when the extras are seen no more often than
     chance and the test had the power to say otherwise, and the candidate then
@@ -1194,7 +1241,8 @@ class SupercellCheck(Base):
     is a lattice statement the data make, and the candidate then sits directly
     above this parent unless another check refutes it (WP-1510).
     ``"undecided"`` means not even every extra seen could have reached the
-    significance level, which includes a parent whose lines this one only
+    significance level at ``p0_power`` (``p0`` where that is ``None``), which
+    includes a parent whose lines this one only
     repeats, or that the extras are seen beyond chance only on lines the parent
     explains.  An undecided check moves nothing.
     """
@@ -1221,6 +1269,12 @@ class SupercellCheck(Base):
     #: this many falling below α at the same ``p0``.  ``None`` in a record
     #: written before thresholds version 1.7, which did not count them
     n_seen_unexplained: int | None = None
+    #: the chance rate the power check read, counted in windows floored at the
+    #: assumed shift bound: refuted needs ``p0_power ** n_extra`` below α.
+    #: ``None`` where no floor was declared (the check then reads ``p0``), and
+    #: in a record written before #1263, whose ``p0`` was itself the floored
+    #: rate
+    p0_power: float | None = None
     verdict: Literal["supported", "refuted", "undecided"]
     #: ° 2θ of the extras nothing was seen at, lowest first and at most six:
     #: where to look in the pattern for the lines the larger cell needs
@@ -1349,7 +1403,9 @@ class CellCandidate(Base):
     Deliberately *not* named "solution" and deliberately carrying no "is correct"
     field.  ``found_by`` is the engines that produced it — agreement between
     independent engines is the confidence, the same device as the cross-backend
-    Jacobian matrix and ``direction="both"`` — and ``ambiguity`` is populated
+    Jacobian matrix and ``direction="both"`` — plus ``"prior"`` for a checked
+    prior cell, which is not an engine and counts toward no agreement
+    (WP-2082); ``ambiguity`` is populated
     whenever a geometrically indistinguishable partner exists.
 
     ``cell`` is a bare (a, b, c, α, β, γ) tuple in Å and degrees, kept so for
@@ -1423,6 +1479,19 @@ class CellCandidate(Base):
     #: :data:`IndexCaveat` vocabulary
     confidence_caveats: list[IndexCaveat] = Field(default_factory=list)
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+    #: formula units this cell's volume holds by Hofmann's (2002) average atomic
+    #: volumes (WP-2030): :attr:`volume` over one formula unit's volume at the
+    #: run's temperature (``IndexingResult.formula`` and ``.temperature``).
+    #: Written by :func:`rietx.index_pattern` when it is given ``formula=``;
+    #: ``None`` means no formula was given.  A number, judged by no diagnostic.
+    #: On an organic or metal-organic cell the true Z usually lies within a few
+    #: per cent of it (one crystal scatters about 4 %, Hofmann Fig. 1).  An
+    #: ionic or mainly inorganic cell reads low, often far low (his § 3 (iii)):
+    #: the 16 inorganic standards measured read 0.38-0.87 of their Z.  The one
+    #: bound that holds for any formula is the window's ceiling, so the true Z
+    #: is at least this number over 1.25, short of a porous framework whose
+    #: formula leaves its pore contents out.
+    formula_units: float | None = None
 
     @property
     def a(self) -> float:
@@ -1726,7 +1795,7 @@ class SearchSpecSpec(Base):
         "cell is what supplies them"))
     budget_seconds: float = Field(30.0, gt=0.0, description=(
         "wall clock per (engine x crystal system) SLICE of the search, not per "
-        "run: a default two-engine, seven-system call is up to 2x7x30 s of "
+        "run: a default three-engine, seven-system call is up to 3x7x30 s of "
         "search before the probe and validation. An engine stopped by it "
         "reports search_complete[system] = false, and a negative result there "
         "is not evidence. total_budget_seconds is the whole-run bound"))
@@ -2057,8 +2126,9 @@ class IndexingResult(Base):
     #: collide
     engine_stats: dict[str, float] = Field(default_factory=dict)
     #: do the panel's members put different candidates first?  A *result*-level
-    #: fact (it is a statement about the comparison, not about one cell) that caps
-    #: every candidate's confidence
+    #: fact (it is a statement about the comparison, not about one cell) that
+    #: refutes every candidate: ``fom_panel_disagrees`` is a refuting caveat, so
+    #: each grades ``low``
     fom_panel_disagrees: bool = False
     quality: DataQualityReport | None = None
     #: was a pattern supplied, i.e. did Le Bail validation run at all?  ``False``
@@ -2073,13 +2143,14 @@ class IndexingResult(Base):
     #: ``total_budget_seconds`` did, or ``None`` on a result recorded before
     #: presets existed.  The ceiling itself is in ``provenance.notes``.
     preset: str | None = None
-    #: the chemical formula each candidate's ``INDEX_Z_NOT_INTEGER`` check read
-    #: (WP-2030), written verbatim by :func:`rietx.index_pattern` from its
-    #: ``formula=``.  ``None`` means no formula was given, so no candidate was
-    #: checked against one; a result recorded before 0.60 also reads ``None``.
-    #: It checked the answer and never narrowed the search.
+    #: the chemical formula each candidate's
+    #: :attr:`~CellCandidate.formula_units` was read against (WP-2030), written
+    #: verbatim by :func:`rietx.index_pattern` from its ``formula=``.  ``None``
+    #: means no formula was given, so no candidate was read against one; a
+    #: result recorded before 0.60 also reads ``None``.  It never narrowed the
+    #: search.
     formula: str | None = None
-    #: the temperature in K that check read Hofmann's (2002) volumes at,
+    #: the temperature in K Hofmann's (2002) volumes were read at,
     #: written by :func:`rietx.index_pattern` beside :attr:`formula` and
     #: ``None`` whenever :attr:`formula` is, since without a formula no
     #: temperature was read.
@@ -2091,7 +2162,8 @@ class IndexingResult(Base):
     def _temperature_needs_a_formula(self):
         if self.formula is None and self.temperature is not None:
             raise ValueError("IndexingResult.temperature is the temperature "
-                             "the formula's Z check read, so it needs a formula")
+                             "the formula's volumes were read at, so it needs a "
+                             "formula")
         return self
 
     def __str__(self) -> str:
@@ -2226,8 +2298,10 @@ class ExtinctionPrior(Base):
     a measured ``density`` that fixes Z through the formula weight and the
     screened cell.  A group whose orbits cannot hold some element's atoms per
     cell is named in ``count_notes`` and kept; only under ``ordered=True`` is
-    it removed, the count being the test of an ordered model; a
-    fractional formula count declares a shared site and is not counted
+    it removed, the count being the test of an ordered model.  A
+    fractional formula count declares a shared site and is not counted,
+    unless ``ordered``: then it belongs to the formula unit (a hemihydrate)
+    and is counted where count × Z is whole
     (:func:`rietx.indexing.extinction.content_exclusion`).  Where Z is not a
     whole multiple of a member's general multiplicity (Z′ < 1, as for #935's
     P 2₁ salt against P 2₁/m) the member is kept and the special positions a
@@ -2268,7 +2342,8 @@ class ExtinctionPrior(Base):
     #: weight and the screened cell's volume
     density: float | None = Field(default=None, gt=0.0)
     #: the formula unit as a chemist writes it (``"Cu12Sb4S13"``, brackets and
-    #: ``·`` adducts allowed); a fractional count declares a shared site
+    #: ``·`` adducts allowed); a fractional count declares a shared site,
+    #: unless :attr:`ordered`
     formula: str | None = None
     #: every site is one element at full occupancy (no mixed or partial
     #: sites): only then does a group whose orbits cannot hold the declared
@@ -2468,6 +2543,14 @@ class ExtinctionScreen(Base):
     #: :data:`~rietx.indexing.extinction.REFERENCE_NET_RWP_MAX` the screen is
     #: ``"unreliable"``; ``None`` until the reference fit ran
     reference_rwp_net: float | None = None
+    #: what ``reference_rwp_net`` would read for a fit that left only the
+    #: counting noise: √(N/(N + S)), N the fitted channels and S the weighted
+    #: net Bragg power.  Past the bound too, either the data are too weak for the
+    #: gate (S < N) or the picker's envelope sits inside the lines over this range
+    #: (the pair cannot tell which); below it, the gap to ``reference_rwp_net`` is
+    #: misfit.  ``None``
+    #: until the reference fit ran
+    perfect_fit_rwp_net: float | None = None
     #: formula units per cell the member filter used: the declared ``z``, or
     #: the one whole number the declared density gives on :attr:`cell`.
     #: ``None`` with no Z declared, and when a declared density does not give

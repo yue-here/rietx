@@ -91,16 +91,16 @@ number. A sentence that nobody would use to make a choice does not belong here.
    it was measured on), never only a pass; and it says whether the data is development
    data. Where no claim compares a topic with an independent measurement, the equation,
    its source and its code are stated plainly, and the topic is recorded *not yet
-   validated* until one does. A result that reports a number from such a topic says so
-   once in its report, naming each such number. That is the one place the fact reaches a
-   reader of results (the writer is WP-2010's). That state is
+   validated* until one does. That state is
    separate from *provisional*, which rietx keeps for an API that may still change (PEP
    411's sense). The validation record is for the developers. An agent or a user
    chooses a feature by the sample and the data, and whether the package has validated
    the feature should not move that choice. So the record is kept in the matrix and its
-   generated page, and no surface an agent reads to choose a feature carries a
-   validation verdict: `capabilities()`, the help entries, the agent skill and the GUI's
-   help (ruled 2026-10-27).
+   generated page alone. No surface an agent reads while choosing carries a validation
+   verdict: `capabilities()`, the help entries, the agent skill, the GUI's help (ruled
+   2026-10-27) and the fit report (ruled 2026-11-01). The report is on that list
+   because an agent reads it between stages, while it still chooses what to free, and a
+   sentence there would read the same for every fit with the same free parameters.
 
    *A dataset is unused, sealed or development data.* Data that nobody who changes the
    package has run is unused. A family is sealed when its first run is on the tree as it

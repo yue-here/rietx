@@ -276,6 +276,9 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-10-31  src/rietx/io/CLAUDE.md        563 -> 565  for Yue's review of #1241: § Refusals' fourth
 #                                                          case (a name-only refusal) and the table
 #                                                          row's no-fixture sentence; landed LANDED
+#   2026-11-03  src/rietx/io/CLAUDE.md        565 -> 571  for the finite-row drop (WP-2079, #1187): its
+#                                                          reader-repair row and one rule for every
+#                                                          reader's pre-drop decisions; landed 571
 SIZE_CAPS: dict[str, int | None] = {
     # 739 -> 755 (WP-1102): two standing rules for the component seam — that an
     # additive non-Bragg term is a union *member* and not a new field, and that
@@ -634,7 +637,11 @@ SIZE_CAPS: dict[str, int | None] = {
     # every WP that adds a test.  § CI's rewrite for the docs job came out even
     # by dropping the free-tier history, which ci.yml's header and WP-1003
     # already hold.  Landed at 301; the +1 is headroom.
-    "tests/CLAUDE.md": 302,
+    # 302 -> 307 (WP-2077): one standing rule, that a ghostshift runner's
+    # suite queues through `serial.py`, so a `ps` line naming it is a waiter.
+    # It governs every session that runs the look-first check, and without it
+    # a queued waiter reads as a running suite.  Landed at 306; +1 headroom.
+    "tests/CLAUDE.md": 307,
     # 300 -> 306 (WP-1446): one standing rule, on the bullet that already owns
     # the question.  A space-group absence and an oversized cell are not
     # separable by the reversed members either, measured rather than reasoned,
@@ -762,7 +769,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # on a banner rather than by escalating, and that a Windows-written header
     # ends in `\r`, which `$` under `re.M` does not match.  Landed at 562; the
     # +1 is headroom.
-    "src/rietx/io/CLAUDE.md": 565,
+    "src/rietx/io/CLAUDE.md": 571,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs

@@ -1,8 +1,7 @@
 # WP-2034 — the satellite arm generates over `compile_model`'s window, not a copy of it
 
-Milestone: magnetic · Status: 🔄 2026-10-27 — merged from outside as PR #1139 (`2cf63737`); the close is owed (✅ and the release record's narrative)
+Milestone: magnetic · Status: ✅ 2026-10-31 — merged from outside as PR #1139 (in 1.11)
 Depends on: — (1908, closed: the apparent-position shift both windows widen by; 1326, closed: the arm)
-Priority: P3 2026-10-23 — a satellite that should be ranked can go unenumerated near either end of the range, unmeasured on a real pattern; the fix is one shared helper
 
 ## Goal
 
@@ -61,6 +60,11 @@ under any emission line lands inside the fitted range is enumerated.
 - #1130: taken by @mustachefeeling, with the plan this WP's handover follows.
 
 ## Handover log
+
+- **2026-10-31** (close, ghostshift batch, PR #1287) — closed. A satellite whose image under one emission line falls inside the fitted range is now enumerated, even when the other line's image of it falls outside. The report's satellite arm and the forward model share one window. Nothing else moved: no reflection list in the tree changed, and no real pattern in the tree has a satellite in the strip where the two windows used to disagree.
+  *Done*: all three tasks landed in PR #1139 (`2cf63737`). This session closed the bookkeeping: ✅, the `Priority:` line deleted, the narrative moved to the v1.11 record. The WP has no `### Inherited` section to consume.
+  *Checked against the tree and `gh`*: `model.forward.generation_window` exists (module function and `CompiledModel.generation_window`), PR #1139 is merged, and claim issue #1130 is closed. Acceptance: `tests/test_satellites.py` (inside the 200 passed, 2 warnings of the run named under WP-1958's entry; `-m "not slow"`, macOS arm64, `[dev]`, Python 3.12, alone). `tests/test_satellites_acceptance.py` is a slow file and was not run here. PR #1139's gate ran it with the whole `-m slow` suite: 417 passed, 14 skipped, 15 xfailed.
+  *What it does not do*: no release is owed (P3).
 
 - **2026-10-27** — PR #1139 (@mustachefeeling) merged as `2cf63737`, from the
   `/pr-review` run of 2026-10-27. Every task above is ticked and the

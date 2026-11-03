@@ -381,12 +381,15 @@ def test_driving_is_the_built_from_irrep_and_primary_is_the_isotropy_test(at_r):
 K_X = (Fraction(0), Fraction(0), Fraction(1, 2))
 K_M = (Fraction(1, 2), Fraction(1, 2), Fraction(0))
 #: Seeds whose *first* draw keeps an accidental operation of S6(a,b) at R on
-#: the O site (4 of seeds 0-199 do; at Γ on Mn none): a single-draw probe
-#: refused that child as ``DISTORTION_CHILD_LARGER``.
-UNLUCKY_SEEDS = (142, 194)
-#: The one seed of 0-79 whose first draw keeps an accidental operation at X
-#: or M (S10(a,b) at M, all sites; review round 3).
-UNLUCKY_SEED_AT_M = 41
+#: the O site (5 of seeds 0-199 do, 55, 83, 111, 167 and 198; at Γ on Mn
+#: none): a single-draw probe refused that child as ``DISTORTION_CHILD_LARGER``.
+#: The draws are in the magnetic cell, which #1197 made right-handed; in the
+#: left-handed one the seeds were 142 and 194 (4 of 0-199).
+UNLUCKY_SEEDS = (55, 83)
+#: The one seed of 0-379 whose first draw keeps an accidental operation at M
+#: (S10(a,b), all sites; review round 3 found 41 of 0-79 in the left-handed
+#: cell before #1197, and in the right-handed one none of 0-79 does).
+UNLUCKY_SEED_AT_M = 291
 
 
 def _setting(cands):
@@ -532,8 +535,9 @@ def test_fewer_operations_than_the_group_is_not_reported_as_more(at_gamma, monke
 def test_one_refused_candidate_leaves_the_others(at_r, monkeypatch):
     """A refused child comes back as a refusal beside the others, not as an abort.
 
-    One draw at seed 142 refuses S6(a,b) at R on O (review round 2's unlucky
-    seed).  On main that raised, and the call lost its 15 other candidates.
+    One draw at seed 55 refuses S6(a,b) at R on O (review round 2's unlucky
+    seed was 142, before #1197 made the magnetic cell right-handed).  On main
+    that raised, and the call lost its 15 other candidates.
     """
     parent, expected = at_r
     monkeypatch.setattr(I, "_PROBE_SEED", UNLUCKY_SEEDS[0])
@@ -760,3 +764,148 @@ def test_the_child_setting_is_read_by_the_subgroups_standardiser(at_gamma, at_x_
                             origin_shift=np.asarray(data.origin_shift) + [0.25, 0, 0])
     with pytest.raises(RuntimeError, match="is not the subgroup's operation list"):
         real(group, wrong, cell, bound)
+
+
+# --------------------------------------------------------------------------
+# #1247: a centred parent.  ``_standard_child`` listed each atom once per
+# ``site_orbit`` image, which already carries the centrings, and again per
+# shift of the magnetic cell's translations, which at k = 0 are those
+# centrings: every position twice, and ``image_of`` raised "this is a bug".
+# --------------------------------------------------------------------------
+
+def _cell(a, b, c, alpha=90.0, beta=90.0, gamma=90.0):
+    return rx.Cell(**{n: P_(value=v) for n, v in zip(
+        ("a", "b", "c", "alpha", "beta", "gamma"), (a, b, c, alpha, beta, gamma))})
+
+
+def _rocksalt():
+    """NaCl, B1: Na on 4a, Cl on 4b of F m -3 m."""
+    return rx.Phase(name="NaCl", space_group="F m -3 m", cell=rx.Cell.cubic(5.64), atoms=[
+        _atom("Na", "Na", 0, 0, 0), _atom("Cl", "Cl", 0.5, 0.5, 0.5)])
+
+
+def _mosi2():
+    """MoSi₂, C11b: Mo on 2a, Si on 4e (0, 0, ⅓) of I 4/m m m."""
+    return rx.Phase(name="MoSi2", space_group="I 4/m m m", cell=_cell(3.2, 3.2, 7.85), atoms=[
+        _atom("Mo", "Mo", 0, 0, 0), _atom("Si", "Si", 0, 0, 1 / 3)])
+
+
+def _c2m():
+    """A synthetic C 1 2/m 1 parent: one atom on 2a, one on 4i."""
+    return rx.Phase(name="C2m", space_group="C 1 2/m 1", cell=_cell(9.0, 4.0, 5.0, beta=105.0),
+                    atoms=[_atom("A", "Na", 0, 0, 0), _atom("X", "Cl", 0.3, 0, 0.2)])
+
+
+def _rhombohedral():
+    """A synthetic R -3 m parent on hexagonal axes: one atom on 3a, one on 6c."""
+    return rx.Phase(name="R-3m", space_group="R -3 m:H", cell=_cell(3.0, 3.0, 15.0, gamma=120.0),
+                    atoms=[_atom("A", "Na", 0, 0, 0), _atom("X", "Cl", 0, 0, 0.25)])
+
+
+CENTRED = [
+    pytest.param(_rocksalt, K_GAMMA, 6, id="F-rocksalt-Gamma"),
+    pytest.param(_rocksalt, K_R, 8, id="F-rocksalt-L"),
+    pytest.param(_mosi2, K_GAMMA, 8, id="I-MoSi2-Gamma"),
+    pytest.param(_c2m, K_GAMMA, 4, id="C-C2m-Gamma"),
+    pytest.param(_rhombohedral, K_GAMMA, 8, id="R-R-3m-Gamma"),
+]
+
+
+def _order(symbol) -> int:
+    """|G| per conventional cell: the point operations times the centrings."""
+    ops = gemmi.find_spacegroup_by_name(symbol).operations()
+    return len(ops.sym_ops) * len(ops.cen_ops)
+
+
+def _index_of_the_candidate(parent, candidate) -> Fraction:
+    """[G : H] from the candidate's own list: |G| × (cell volume ratio) / |H in its cell|."""
+    det = abs(I._operators._rational_determinant(candidate.cell.basis))
+    return Fraction(_order(parent.space_group)) * det / len(I._colourless_operations(
+        candidate.group))
+
+
+def _index_of_the_child(parent, symbol, big) -> Fraction:
+    """[G : H] from the stated child: |G| × det P / |H| in its standard setting."""
+    det = Fraction(abs(float(np.linalg.det(big)))).limit_denominator(1000)
+    return Fraction(_order(parent.space_group)) * det / _order(symbol)
+
+
+@pytest.mark.parametrize(("build", "k", "n"), CENTRED)
+def test_a_centred_parent_states_every_child(build, k, n):
+    """#1247: each (irrep, direction) of a centred parent gets a child, of the candidate's index.
+
+    The loop is ``distortion_candidates``' own without the mode basis, which
+    costs seconds a candidate at L and is built below at Γ only.  Before the
+    fix every one of these calls raised.
+    Each child's index, from the symbol spglib named and (P, p), is the one the
+    candidate's operator list in its magnetic cell implies, and an integer.
+    """
+    parent = build()
+    group = _parent_group(parent)
+    seen = {}
+    for atom in parent.atoms:
+        xyz = (atom.x.value, atom.y.value, atom.z.value)
+        for c in I.candidates(group, xyz, k, kind="displacive"):
+            seen.setdefault((c.irrep_label, c.direction.label), c)
+    assert len(seen) == n
+    for c in seen.values():
+        symbol, big, _small, _ = I._standard_child(parent, group, c)
+        index = _index_of_the_candidate(parent, c)
+        assert index.denominator == 1, (c.label, index)
+        assert _index_of_the_child(parent, symbol, big) == index, (c.label, symbol)
+
+
+@pytest.mark.parametrize(("build", "numbers"), [
+    pytest.param(_rocksalt, [1, 8, 8, 44, 107, 160], id="F-rocksalt"),
+    pytest.param(_mosi2, None, id="I-MoSi2"),
+    pytest.param(_c2m, None, id="C-C2m"),
+])
+def test_a_centred_parents_children_hold_its_atoms(build, numbers):
+    """#1247 through the public call at Γ: every child stated, with the parent's atoms per volume.
+
+    The dedupe keeps each atom once modulo the magnetic cell: the child's atoms,
+    each over its own orbit in its conventional cell, are the parent's per
+    conventional cell times det P, so no image was merged that is not the same
+    atom and none was kept twice.  Rocksalt's children are those of Γ4− (T1u),
+    the polar vector irrep of O_h: (a,0,0) I4mm, (a,a,a) R3m, (a,a,0) Imm2,
+    Cm twice and P1 (C4v, C3v, C2v, Cs, Cs, C1; Stokes & Hatch 1988,
+    *Isotropy Subgroups of the 230 Crystallographic Space Groups*).
+    """
+    parent = build()
+    group = _parent_group(parent)
+    per_cell = sum(len(site_orbit(group, (a.x.value, a.y.value, a.z.value)).images)
+                   for a in parent.atoms)
+    cands = I.distortion_candidates(parent, K_GAMMA)
+    assert cands and all(c.refusal is None for c in cands), _refused(cands)
+    for c in cands:
+        child_group = resolve_group(c.child.space_group, c.child.symmetry_operations)
+        held = sum(len(site_orbit(child_group, (a.x.value, a.y.value, a.z.value)).images)
+                   for a in c.child.atoms)
+        assert held == round(per_cell * abs(np.linalg.det(c.transform[0]))), c.label
+        assert _index_of_the_child(parent, c.child_group, c.transform[0]) == (
+            _index_of_the_candidate(parent, c.candidate)), c.label
+    if numbers is not None:
+        assert sorted(_number(c) for c in cands) == numbers
+        assert len({c.irrep for c in cands}) == 1
+
+
+def _hexagonal_p31():
+    cell = rx.Cell(**{k: P_(value=v) for k, v in
+                      dict(a=4.0, b=4.0, c=6.0, alpha=90.0, beta=90.0, gamma=120.0).items()})
+    return rx.Phase(name="p31", space_group="P 31", cell=cell,
+                    atoms=[_atom("Fe", "Fe", 0.11, 0.23, 0.31)])
+
+
+def test_a_chiral_child_keeps_the_parents_handedness():
+    """P 3₁ at k = (0, 0, ½): the S1(a) child is P 3₂ in a right-handed (P, p) (#1197's sibling).
+
+    The threefold that survives is the parent's 3₁ composed with the lost
+    translation c, at 2/3 of the child's c' = 2c: a 3₂.  Until #1197 the
+    magnetic cell was left-handed, the child's (P, p) had det P = −2, and its
+    atoms, read as written, were the mirror crystal under the label P 3₁.
+    """
+    cands = I.distortion_candidates(_hexagonal_p31(), (0, 0, Fraction(1, 2)))
+    (chiral,) = [c for c in cands if c.label == "S1(a)"]
+    assert chiral.refusal is None
+    assert chiral.child.space_group == "P 32"
+    assert np.linalg.det(chiral.transform[0]) == pytest.approx(2.0)

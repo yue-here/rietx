@@ -191,6 +191,24 @@ REFUSED_TAGS: tuple[tuple[str, str], ...] = (
 )
 
 
+#: Tag families of the magnetic-CIF draft that ``cif_mag.dic`` replaced (issue
+#: #1063, item 3), each refused **by name** when a file states it.  The
+#: dictionary defines none of them under any name or alias (0.9.9, whose
+#: revision history opens at 0.1.0, 2016-05-24, "Initial automatic conversion
+#: from draft magCIF format"), and no source this package holds maps them onto
+#: its items, so a file written in them is not read: as an ordinary CIF it
+#: finds no atom sites, or reads its nuclear half and drops the moments in
+#: silence.  Matched as case-blind tag **prefixes**.  Other ``_magnetic_``
+#: spellings (``_magnetic_space_group_standard_setting``,
+#: ``_magnetic_propagation_vector_``) are not in this list and refuse nothing:
+#: they are written beside the dictionary's own items in files that read.
+DRAFT_TAGS: tuple[tuple[str, str], ...] = (
+    ("_magnetic_atom_site_", "the sites or their moments"),
+    ("_magnetic_cell_", "the cell"),
+    ("_magnetic_space_group_symop_operation_", "the magnetic operators"),
+)
+
+
 class MagCifError(ValueError):
     """Raised naming the file, the construct and what would make it readable.
 
@@ -273,6 +291,19 @@ _KVEC_BLOCK = re.compile(
     r"_parent_propagation_vector[._]kxkykz\b(?P<body>(?:(?!\n\s*(?:loop_|_[A-Za-z]|data_))"
     r"[\s\S])*)")
 _BRACKETED = re.compile(r"\[([^\]]*)\]")
+#: The draft's spelling of the same item, ``_magnetic_propagation_vector_kxkykz``
+#: (a loop column or a single value).  It is not one of :data:`DRAFT_TAGS`:
+#: written beside the dictionary's own items it refuses nothing, but a k ≠ 0
+#: stated only under it must still reach the supercell refusal.  Its value is a
+#: quoted ``'1/2 0 0'`` or a bracketed ``[1/2 0 0]``, with or without a leading
+#: sequence id in the loop row.
+DRAFT_KVEC_TAG = "_magnetic_propagation_vector_kxkykz"
+#: The dictionary's spelling, as the refusal names it.
+PARENT_KVEC_TAG = "_parent_propagation_vector.kxkykz"
+_DRAFT_KVEC_BLOCK = re.compile(
+    rf"(?i){DRAFT_KVEC_TAG}\b(?P<body>(?:(?!\n\s*(?:loop_|_[A-Za-z]|data_))"
+    r"[\s\S])*)")
+_QUOTED_OR_BRACKETED = re.compile(r"'([^'\n]*)'|\"([^\"\n]*)\"|\[([^\]]*)\]")
 _RATIONAL = re.compile(r"^[+-]?\d+(?:/\d+)?$")
 #: A decimal that is exactly an integer — ``0.0``, ``1.00``, ``-0.`` — which a
 #: producer writing k in floating point uses for a Γ component.  Only an
@@ -290,7 +321,8 @@ def _integer_component(text: str) -> bool:
 
 
 def propagation_vectors(text: str) -> tuple[tuple[str, str, str], ...]:
-    """Every ``_parent_propagation_vector.kxkykz`` in a magCIF's raw text.
+    """Every ``_parent_propagation_vector.kxkykz`` in a magCIF's raw text, and
+    every ``_magnetic_propagation_vector_kxkykz`` (the pre-2016 draft's tag).
 
     Returned as three exact rational **strings** per vector, because k is
     exact and a float would put a tolerance where none belongs.  The reader
@@ -300,13 +332,72 @@ def propagation_vectors(text: str) -> tuple[tuple[str, str, str], ...]:
     an incommensurate k) is returned verbatim, so the caller refuses it by name
     rather than rounding it into a commensurate one.
     """
-    out: list[tuple[str, str, str]] = []
-    for block in _KVEC_BLOCK.finditer(text):
+    return tuple(k for _tag, k in _tagged_propagation_vectors(text))
+
+
+def _tagged_propagation_vectors(
+        text: str) -> tuple[tuple[str, tuple[str, str, str]], ...]:
+    """:func:`propagation_vectors`, each k beside the tag it was read under.
+
+    The refusal names the tag a file actually used, so a file that wrote only
+    the 2016 tag is not told about the draft's and the reverse.  Both scans run
+    over the text with text-field content blanked: a ``_parent_propagation_
+    vector.kxkykz [1/2 0 0]`` quoted in a ``_publ_section_comment`` is prose,
+    not a k (review of #1284).
+    """
+    out: list[tuple[str, tuple[str, str, str]]] = []
+    for block in _KVEC_BLOCK.finditer(_without_text_fields(text)):
         for group in _BRACKETED.finditer(block.group("body")):
             parts = group.group(1).replace(",", " ").split()
             if len(parts) == 3:
+                out.append((PARENT_KVEC_TAG, (parts[0], parts[1], parts[2])))
+    return tuple(out) + tuple((DRAFT_KVEC_TAG, k)
+                              for k in _draft_propagation_vectors(text))
+
+
+def _draft_propagation_vectors(text: str) -> tuple[tuple[str, str, str], ...]:
+    """Every k stated under :data:`DRAFT_KVEC_TAG`, as exact strings.
+
+    Read off the raw text like :data:`_KVEC_BLOCK`, for the same reason: the
+    three components share one quoted value.  A row with no quote or bracket
+    is read as ``id k1 k2 k3`` (the last three tokens) only when it has
+    exactly four tokens, so that nothing else is guessed into a k.
+    """
+    out: list[tuple[str, str, str]] = []
+    for block in _DRAFT_KVEC_BLOCK.finditer(_without_text_fields(text)):
+        body = block.group("body")
+        found = False
+        for group in _QUOTED_OR_BRACKETED.finditer(body):
+            parts = next(g for g in group.groups() if g is not None)
+            parts = parts.replace(",", " ").split()
+            if len(parts) == 3:
                 out.append((parts[0], parts[1], parts[2]))
+                found = True
+        if not found:
+            for row in body.splitlines():
+                tokens = row.split()
+                if len(tokens) == 4:
+                    out.append((tokens[1], tokens[2], tokens[3]))
     return tuple(out)
+
+
+def _without_text_fields(text: str) -> str:
+    """``text`` with the content of every semicolon-delimited text field blanked.
+
+    A CIF text field opens with a ``;`` in the first column and closes with
+    the next line that begins with one; what lies between is prose or an
+    embedded document, never a tag.  Lines are kept (blank) so nothing else
+    moves, and the delimiter lines themselves are kept.
+    """
+    out: list[str] = []
+    inside = False
+    for line in text.split("\n"):
+        if line.startswith(";"):
+            inside = not inside
+            out.append(line)
+        else:
+            out.append("" if inside else line)
+    return "\n".join(out)
 
 
 def is_commensurate_zero(k: tuple[str, str, str]) -> bool:
@@ -466,7 +557,8 @@ def refuse_modulation(text: str, path: str) -> None:
     prevent (WP-1118).
     """
     found = [(tag, what) for tag, what in REFUSED_TAGS
-             if re.search(rf"(?m)^\s*{re.escape(tag)}[._]", text)]
+             if re.search(rf"(?m)^\s*{re.escape(tag)}[._]",
+                          _without_text_fields(text))]
     if not found:
         return
     named = "; ".join(f"{tag}* ({what})" for tag, what in found)
@@ -479,6 +571,35 @@ def refuse_modulation(text: str, path: str) -> None:
         f"(3+d)-dimensional moment model; nothing in this package has one, and "
         f"the incommensurate fence is stated in the manual's interchange "
         f"chapter.")
+
+
+def refuse_draft_tags(text: str, path: str) -> None:
+    """Raise naming every :data:`DRAFT_TAGS` tag the file states.
+
+    A refusal and not a read: mapping the draft's items onto the dictionary's
+    needs a source for what each meant, and this package has none.  Run before
+    the reader decides whether the file has atom sites at all, because a file
+    written wholly in these tags has none under the dictionary's names and was
+    refused as "no atom sites found", which names the wrong cause.
+    """
+    found = sorted({match.group(1) for tag, _what in DRAFT_TAGS
+                    for match in re.finditer(
+                        rf"(?mi)^\s*({re.escape(tag)}[A-Za-z0-9_.\-]*)",
+                        _without_text_fields(text))})
+    if not found:
+        return
+    families = "; ".join(f"{tag}* ({what})" for tag, what in DRAFT_TAGS
+                         if any(t.lower().startswith(tag) for t in found))
+    shown = ", ".join(found[:4]) + (f" and {len(found) - 4} more"
+                                    if len(found) > 4 else "")
+    raise MagCifError(
+        f"{path} uses the pre-2016 draft magnetic-CIF tags: {shown}. "
+        f"cif_mag.dic, which replaced that draft in 2016, defines none of "
+        f"{families} under any name or alias, and this reader has no source "
+        f"mapping them onto its items, so the file is refused rather than read "
+        f"without its magnetic structure. Re-export it with the dictionary's "
+        f"tags: _space_group_symop_magn_operation.xyz, the _atom_site_moment "
+        f"loop, and the ordinary _cell_ and _atom_site_ items.")
 
 
 def read_magnetic_symmetry(block, text: str, path: str, *,
@@ -642,8 +763,8 @@ def refuse_a_magnetic_supercell(block, text: str, path: str) -> None:
     an enlargement of it.
     """
     child = _value(block, "_parent_space_group.child_transform_Pp_abc")
-    kvectors = propagation_vectors(text)
-    nonzero = [k for k in kvectors if not is_commensurate_zero(k)]
+    tagged = _tagged_propagation_vectors(text)
+    nonzero = [(t, k) for t, k in tagged if not is_commensurate_zero(k)]
     child_det = _transform_determinant(child)
     is_supercell_transform = child_det is None or abs(child_det) != 1
     if not is_supercell_transform and not nonzero:
@@ -652,9 +773,10 @@ def refuse_a_magnetic_supercell(block, text: str, path: str) -> None:
     if is_supercell_transform:
         reason.append(f"_parent_space_group.child_transform_Pp_abc {child!r}")
     if nonzero:
-        reason.append("_parent_propagation_vector.kxkykz "
-                      + ", ".join("[" + " ".join(k) + "]" for k in nonzero))
-    incommensurate = [k for k in nonzero
+        for tag in dict.fromkeys(t for t, _k in nonzero):
+            reason.append(tag + " " + ", ".join(
+                "[" + " ".join(k) + "]" for t, k in nonzero if t == tag))
+    incommensurate = [k for _t, k in nonzero
                       if any(not (_RATIONAL.match(c) or _INTEGER_DECIMAL.match(c))
                              for c in k)]
     fence = (" The k stated here is not a rational, so this is an "
@@ -1409,16 +1531,16 @@ def moment_within_print(moment, row: dict[str, str], basis
     group disagree and the refusal stands.
 
     Returns ``(components, largest shift)`` for the point of the allowed
-    subspace nearest the printed moment in the box's own units (a Chebyshev
-    fit, solved exactly as a linear programme), or ``None`` where nothing is
+    subspace nearest the printed moment in the box's own units
+    (:func:`~rietx.crystallography.wyckoff.nearest_allowed_within_print`, which
+    also leaves a component the symmetry does not tie to the others where the
+    file printed it), or ``None`` where nothing is
     to be moved — the moment already lies in the subspace, the row states no
     crystal-axis components (a spherical or Cartesian row's precision is not
     a box on these components), or no point of the subspace lies inside the
     box and the cap, which leaves the refusal to the phase's own check
     (:class:`~rietx.schemas.structure.Phase`, rule 2) exactly as before.
     """
-    from scipy.optimize import linprog
-
     from .magnetic.operators import in_span
 
     m = np.asarray(moment.values(), dtype=np.float64)
@@ -1435,28 +1557,16 @@ def moment_within_print(moment, row: dict[str, str], basis
     k = len(b)
     if k == 0:
         target = np.zeros(3)
-        ratio = float(np.max(np.abs(m) / half))
-        if float(np.max(np.abs(m))) > MOMENT_FORM_AGREEMENT_MU_B:
+        if (float(np.max(np.abs(m) / half)) > 1.0 + 1e-9
+                or float(np.max(np.abs(m))) > MOMENT_FORM_AGREEMENT_MU_B):
             return None
     else:
-        # minimise t subject to |(Bᵀc − m)_i| <= t·half_i and <= the cap
-        cap = MOMENT_FORM_AGREEMENT_MU_B
-        a_ub = np.vstack([np.hstack([b.T, -half[:, None]]),
-                          np.hstack([-b.T, -half[:, None]]),
-                          np.hstack([b.T, np.zeros((3, 1))]),
-                          np.hstack([-b.T, np.zeros((3, 1))])])
-        b_ub = np.concatenate([m, -m, m + cap, cap - m])
-        cost = np.zeros(k + 1)
-        cost[-1] = 1.0
-        fit = linprog(cost, A_ub=a_ub, b_ub=b_ub,
-                      bounds=[(None, None)] * k + [(0.0, None)],
-                      method="highs")
-        if not fit.success:
+        from .wyckoff import nearest_allowed_within_print
+
+        target = nearest_allowed_within_print(
+            b.T, m, half, cap=MOMENT_FORM_AGREEMENT_MU_B)
+        if target is None:
             return None
-        target = b.T @ fit.x[:k]
-        ratio = float(fit.x[-1])
-    if ratio > 1.0 + 1e-9:
-        return None
     return (tuple(float(v) for v in target),
             float(np.max(np.abs(target - m))))
 

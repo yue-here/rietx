@@ -345,6 +345,17 @@ def _site_kept_silent():
             + _merge_findings(Structure(phases=[_phase(*_PNMA, _ON, occ=0.5)])))
 
 
+def _multiplicity_kept(y_returned: float) -> list:
+    """The #1088 split pair, fitted general at y = 0.27, returned at ``y_returned``."""
+    from rietx.crystallography.structure_factor import phase_orbit_split
+    from rietx.refine import _multiplicity_kept_diagnostics
+    from rietx.schemas import Structure
+    from tests.test_site_multiplicity_kept import _toy
+    split = [phase_orbit_split(_toy(0.27, occ=0.5))]
+    return _multiplicity_kept_diagnostics(
+        Structure(phases=[_toy(y_returned, occ=0.5)]), split)
+
+
 def _renumbered(y: float, *, hold: bool) -> list:
     """O5 (Pnma 8d) set to ``y`` with y and z held, as ``set_values`` writes it."""
     import rietx as rx
@@ -377,7 +388,8 @@ def _screen_diagnostics(status: str, net: float | None) -> list:
     from rietx.indexing.diagnostics import extinction_diagnostics
 
     return extinction_diagnostics(SimpleNamespace(
-        status=status, reference_rwp_net=net, prefit_rwp=None, candidates=[],
+        status=status, reference_rwp_net=net, perfect_fit_rwp_net=None,
+        prefit_rwp=None, candidates=[],
         lattice_group="F m -3 m", system="cubic", centring="F",
         cell=(5.4311, 5.4311, 5.4311, 90.0, 90.0, 90.0), two_theta_range=(12.1, 60.0)))
 
@@ -583,6 +595,28 @@ def _windows_stale(axial_to: float | None) -> list:
         cost_final=1.0, window_loss=loss)])
 
 
+def _held_moment(plan: str, *, moment: bool = True) -> list:
+    """``refine._held_moment_diagnostics`` on the #1081 synthetic child's
+    start (moment 3.6 against 3.0 μ_B), read off the table before any stage,
+    as ``fit`` reads it; ``moment=False`` drops every moment block."""
+    from rietx import Instrument, Structure
+    from rietx.params.vector import ParameterTable
+    from rietx.refine import _held_moment_diagnostics
+    from rietx.strategy.staged import resolve_plan
+    from tests.test_magnetic_structural_preset import _start
+
+    phase = _start()
+    if not moment:
+        for atom in phase.atoms:
+            atom.moment = None
+        phase.magnetic_symmetry = None
+    structure = Structure(phases=[phase])
+    table = ParameterTable(
+        structure, Instrument.constant_wavelength_neutron(1.54, fwhm_deg=0.35))
+    return _held_moment_diagnostics(resolve_plan(plan, "rietveld"), table,
+                                    structure, "rietveld")
+
+
 def _stale_structure(*, drift: bool):
     """The carbons of ``tests/test_planarity_restraints.py`` with the bond
     C1-C2 left out of the pair list, and the phase as the run started.
@@ -649,6 +683,92 @@ def _total_scattering_silent() -> list:
     return (_read_text_pattern("spec.dat", "#L 2Theta  Detector\n" + _TS_ROWS)
             + _read_text_pattern("scan.xy", "# compare with the G(r) later\n" + _TS_ROWS))
 
+
+def _stage_solve(*, nan_column: bool) -> list:
+    """``STAGE_NOT_FINITE`` for one solve of the one-column cell of
+    ``tests/test_issue_283_cell_bounds.py``.  ``nan_column`` makes every
+    Jacobian after the first hold a NaN column, the case the nudged P 1 Le
+    Bail fit reached (``tests/test_non_finite_stage.py``); without it the same
+    solve runs to its end."""
+    import numpy as np
+    import pytest
+
+    import rietx.optimize.least_squares as lsq
+    from rietx.refine import _non_finite_diagnostic
+    from tests.test_issue_283_cell_bounds import (
+        _compile_alpha_only,
+        _rhombohedral_boundary_cell,
+    )
+
+    structure = _rhombohedral_boundary_cell()
+    structure.phases[0].cell.alpha.value = 119.0
+    model, table = _compile_alpha_only(structure)
+    real = lsq._jacobian_for
+
+    def factory(*args, **kwargs):
+        inner = real(*args, **kwargs)
+        calls = [0]
+
+        def jac(theta):
+            j = np.array(inner(theta), dtype=np.float64)
+            calls[0] += 1
+            if calls[0] > 1:
+                j[:, 0] = np.nan
+            return j
+        return jac
+
+    with pytest.MonkeyPatch.context() as mp:
+        if nan_column:
+            mp.setattr(lsq, "_jacobian_for", factory)
+        outcome = lsq.run_least_squares(model, table, max_iter=5)
+    found = _non_finite_diagnostic("cell", outcome)
+    return [] if found is None else [found]
+
+
+def _site_glob(*turn_ons: list[str]) -> list:
+    """``STAGE_PATH_NOT_FREE``'s site arm on LaB6 (``perturbed_models``), one
+    stage per ``turn_on``.  La on 1a has no ``dof`` rows, so its ``dof.*``
+    frees nothing (issue #896); B's ``dof.*`` frees its one row, a wildcard
+    index is WP-1414's healthy miss, and a ``biso`` answers the ``adp.*``
+    beside it."""
+    from rietx.params.vector import ParameterTable
+    from rietx.refine import _site_glob_diagnostics
+    from rietx.strategy.staged import Stage
+    from tests.test_refine_synthetic import perturbed_models
+
+    table = ParameterTable(*perturbed_models())
+    stages = [Stage(f"s{i}", ["phases.*.scale", *turn_on])
+              for i, turn_on in enumerate(turn_ons)]
+    return _site_glob_diagnostics(stages, table, {})
+
+
+def _moduli(*rows: tuple[float, float | None]) -> list:
+    """``moment_unsupported_diagnostics`` over free moduli of (value, esd)."""
+    from rietx.report.magnetic import moment_unsupported_diagnostics
+    from rietx.schemas.results import RefinedParameter
+
+    return moment_unsupported_diagnostics([
+        RefinedParameter(path=f"phases.0.atoms.{i}.moment.dof0", value=value,
+                         stderr=esd, vary=True)
+        for i, (value, esd) in enumerate(rows)])
+
+
+def _unsupported_fires() -> list:
+    """#1075's repro 2 on its dead column, and a moment inside 3 esd (WP-2060)."""
+    return _moduli((-8.5e-8, 1.7e4)) + _moduli((0.5, 0.2))
+
+
+def _unsupported_silent() -> list:
+    """A moment at 35 esd (Cr2WO6 at 4 K's ratio), a held one with no esd, and
+    a non-moment row at 0."""
+    from rietx.report.magnetic import moment_unsupported_diagnostics
+    from rietx.schemas.results import RefinedParameter
+
+    return (_moduli((2.45, 0.07), (3.5, None))
+            + moment_unsupported_diagnostics([RefinedParameter(
+                path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -665,6 +785,8 @@ SILENCE: dict[str, Pair] = {
         _instprm_geometry_fires, _instprm_geometry_silent, "tests/test_gsas2_instprm.py"),
     "GSAS_PRM_PROFILE_SET_DEFAULTED": Pair(
         _profile_set_fires, _profile_set_silent, "tests/test_gsas_prm.py"),
+    "MOMENT_UNSUPPORTED": Pair(
+        _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
@@ -673,6 +795,11 @@ SILENCE: dict[str, Pair] = {
         _total_scattering_fires, _total_scattering_silent, "tests/test_readers.py"),
     "PATTERN_UNDERSAMPLED": Pair(
         _undersampled_fires, _undersampled_silent, "tests/test_data_support.py"),
+    "PLAN_FREES_NO_MOMENT": Pair(
+        functools.partial(_held_moment, "mccusker_structural"),
+        lambda: (_held_moment("magnetic_structural")
+                 + _held_moment("mccusker_structural", moment=False)),
+        "tests/test_magnetic_structural_preset.py"),
     "PATTERN_WEIGHT_UNUSABLE": Pair(
         _weight_unusable_fires, _weight_unusable_silent, "tests/test_readers.py"),
     "RESOLUTION_UNCONSTRAINED": Pair(
@@ -686,12 +813,26 @@ SILENCE: dict[str, Pair] = {
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
     "RESTRAINT_PAIRS_STALE": Pair(
         _stale_fires, _stale_silent, "tests/test_planarity_restraints.py"),
+    "SITE_MULTIPLICITY_KEPT": Pair(
+        functools.partial(_multiplicity_kept, 0.25 + 1e-6),
+        functools.partial(_multiplicity_kept, 0.2501),
+        "tests/test_site_multiplicity_kept.py"),
     "SITE_SNAPPED_TO_SPECIAL_POSITION": Pair(
         _snap_fires, _snap_silent, "tests/test_cif_stated_columns.py"),
     "SITE_TWINS_KEPT": Pair(
         _site_kept_fires, _site_kept_silent, "tests/test_site_twins_merged.py"),
     "SITE_TWINS_MERGED": Pair(
         _site_merged_fires, _site_merged_silent, "tests/test_site_twins_merged.py"),
+    "STAGE_NOT_FINITE": Pair(
+        functools.partial(_stage_solve, nan_column=True),
+        functools.partial(_stage_solve, nan_column=False),
+        "tests/test_non_finite_stage.py"),
+    "STAGE_PATH_NOT_FREE": Pair(
+        functools.partial(_site_glob, ["phases.0.atoms.0.dof.*"]),
+        functools.partial(_site_glob, ["phases.0.atoms.1.dof.*"],
+                          ["phases.*.atoms.*.dof.*"],
+                          ["phases.0.atoms.0.biso", "phases.0.atoms.0.adp.*"]),
+        "tests/test_params_surface.py"),
     "STAGE_WINDOWS_STALE": Pair(
         functools.partial(_windows_stale, 0.3), functools.partial(_windows_stale, None),
         "tests/test_window_loss.py"),

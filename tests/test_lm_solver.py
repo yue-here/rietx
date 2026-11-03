@@ -393,8 +393,9 @@ def test_a_step_that_crosses_no_row_is_the_box_step_bit_for_bit(monkeypatch):
     for blocks in ([], [far]):
         steps, trials = [], []
 
-        def spy(A, b, lam, x, lo_, hi_, *, n_rows, scale=None):
-            step, side = real(A, b, lam, x, lo_, hi_, n_rows=n_rows, scale=scale)
+        def spy(A, b, lam, x, lo_, hi_, *, n_rows, scale=None, check=None):
+            step, side = real(A, b, lam, x, lo_, hi_, n_rows=n_rows, scale=scale,
+                              check=check)
             landed = np.where(side < 0, lo_, np.where(side > 0, hi_,
                                                       np.clip(x + step, lo_, hi_)))
             steps.append(landed)
@@ -664,6 +665,45 @@ def test_a_block_above_the_bvls_cut_takes_the_projected_cg_step(monkeypatch):
     assert not calls
     np.testing.assert_allclose(step, exact, atol=1e-9 * float(np.max(np.abs(exact))))
     assert np.array_equal(side, exact_side)
+
+
+def _bounded_linear_fit(n: int, seed: int):
+    """A linear fit above the BVLS cut whose floor binds on some columns."""
+    rng = np.random.default_rng(seed)
+    J = rng.standard_normal((3 * n, n))
+    y = J @ rng.uniform(-0.5, 1.0, n)
+    return (lambda x: J @ x - y), (lambda x: J), np.zeros(n), np.full(n, np.inf)
+
+
+def test_a_bounded_step_reads_the_cancel_and_changes_nothing_while_unset():
+    """WP-2063, issue #1231: one LM step on a Pawley block refactorised 1099
+    times in 27 s, so a cancel read only between residual evaluations landed
+    20 s past a deadline.  The token is also read inside the step's projected
+    CG.  Set, it abandons the stage from there, before any trial residual;
+    unset, the fit is bit-identical to one with no token."""
+    from rietx.optimize.cancel import CancelToken, RefinementCancelled
+    from rietx.optimize.least_squares import _lm_outcome
+
+    n = lm.BVLS_MAX_COLUMNS + 8
+    residual, jacobian, lo, hi = _bounded_linear_fit(n, seed=11)
+    x0 = np.full(n, 0.5)
+    calls = {"n": 0}
+
+    def counted(x):
+        calls["n"] += 1
+        return residual(x)
+
+    kw = dict(max_nfev=400, ftol=1e-9, inequalities=None, events=None,
+              stage="s")
+    token = CancelToken()
+    token.cancel()
+    with pytest.raises(RefinementCancelled):
+        _lm_outcome(counted, jacobian, x0, lo, hi, cancel=token, **kw)
+    assert calls["n"] == 1, "only the starting residual ran"
+    plain = _lm_outcome(residual, jacobian, x0, lo, hi, **kw)
+    unset = _lm_outcome(residual, jacobian, x0, lo, hi, cancel=CancelToken(),
+                        **kw)
+    assert plain.status > 0 and np.array_equal(plain.x, unset.x)
 
 
 def test_a_sparse_normal_matrix_reaches_the_dense_answer():

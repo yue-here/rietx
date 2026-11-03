@@ -734,12 +734,19 @@ def test_abstained_branch_actions_carry_execution_too(truth):
 def test_broad_peak_lobes_cap_impurity_without_reindex():
     """The broad-peak variant: residual lobes of 0.66°-wide peaks under a
     0.05° zero error read as unmatched (the 0.08° matching tolerance is tiny
-    against the peak), and pre-WP they bought ``add_impurity_phase`` at 0.7.
-    They all sit within a fraction of a FWHM of a calculated position, so the
-    call is capped — and *no* reindex pointer is emitted, because the
-    validity failures here are saturated-fit artefacts (4 of 12 misfitting
-    regions, below the widespread-failure fraction; the true shift is inside
-    the validity radius of these broad peaks)."""
+    against the peak), and pre-WP-1054 they bought ``add_impurity_phase`` at
+    0.7.
+
+    Since WP-1977 each row says it sits unresolved on the flank of a drawn
+    peak (``UnmatchedPeak.flank``), and Layer 2 suggests no impurity phase
+    for such a row.  The rows stay listed.  Layer 2's older guard stays
+    measured on the same rows with the flank evidence taken off: they sit
+    within a fraction of a FWHM of a calculated position, so the call is
+    capped, and *no* reindex pointer is emitted, because the validity
+    failures here are saturated-fit artefacts (4 of 12 misfitting regions,
+    below the widespread-failure fraction; the true shift is inside the
+    validity radius of these broad peaks)."""
+    from rietx.report.layer2 import layer0_actions
     from rietx.report.schemas import IMPURITY_SHIFT_CAP
 
     structure, ins, data = _broad_truth(0.6)
@@ -751,12 +758,19 @@ def test_broad_peak_lobes_cap_impurity_without_reindex():
     strong = [u for u in report.unmatched
               if u.kind == "unmatched_obs" and u.height_over_sigma > 8.0]
     assert strong, "the residual lobes must still appear as unmatched"
+    assert all(u.flank.on_flank for u in strong), strong
+    kinds = [a.kind for a in report.suggested_actions]
+    assert "add_impurity_phase" not in kinds, kinds
+    assert "reindex_or_recheck_cell" not in kinds, kinds
 
-    impurity = report.action("add_impurity_phase")
+    unmeasured = [u.model_copy(update={"flank": None}) for u in report.unmatched]
+    ticks = [t for v in _result_for(structure, perturbed, data)[0].ticks.values()
+             for t in v]
+    impurity = next(a for a in layer0_actions(unmeasured, report.attribution,
+                                              ticks=ticks)
+                    if a.kind == "add_impurity_phase")
     assert impurity.confidence <= IMPURITY_SHIFT_CAP, impurity
     assert impurity.alternatives[0] == "reindex_or_recheck_cell", impurity
-    assert "reindex_or_recheck_cell" not in [a.kind
-                                             for a in report.suggested_actions]
 
     _plot_state(structure, perturbed, data, "wp1054_broad_zero_lobes")
 
@@ -889,11 +903,11 @@ def _pore_proxy_data(seed=17):
 
 def test_pore_proxy_gap_and_contents_clause():
     """The WP-1057 headline scenario: a converged host fit over data whose
-    scattering contents it lacks.  Measured (2026-08-12): Rwp 0.0405,
-    GoF 2.97, partition Rwp 0.0170 → ratio 2.38; intensity carries 83 % of
-    the misfit in 8 gated regions split 5+/3−, best angular template
-    R² = 0.011.  The report must carry the gap and name the contents
-    signature — and still invent no action, because none applies."""
+    scattering contents it lacks.  Measured (2026-11-02): Rwp 0.0403,
+    GoF 2.96, partition Rwp 0.0171 → ratio 2.36; intensity carries 82 % of
+    χ² in 8 gated regions split 5+/3−, best angular template R² = 0.01.  The
+    report must carry the gap and name the contents signature — and still
+    invent no action, because none applies."""
     structure, ins, data = _pore_proxy_data()
     ref = rx.Refinement(structure, ins)
     result = ref.fit(data, plan="mccusker_default")
@@ -904,7 +918,7 @@ def test_pore_proxy_gap_and_contents_clause():
     assert gap is not None
     assert gap.rwp_rietveld == pytest.approx(result.statistics.rwp, rel=1e-6)
     assert gap.rwp_lebail < gap.rwp_rietveld
-    assert gap.ratio > 2.0, gap                    # measured 2.38
+    assert gap.ratio > 2.0, gap                    # measured 2.36
     assert "Le Bail partition" in report.summary
     assert "intensity model carries the misfit" in report.summary
 

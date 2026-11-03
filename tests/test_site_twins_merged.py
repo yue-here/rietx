@@ -1600,3 +1600,412 @@ def test_a_hook_tie_on_a_renumbered_sites_dof_is_reanchored_not_added_twice(pbso
     fitted = {p.path: p.value for p in series[0].parameters}[f"{site}.z"]
     assert abs(fitted - start.phases[0].atoms[j].z.value) > 1e-3      # the fit moved it
     assert started[1] == pytest.approx(fitted, abs=1e-9)
+
+
+# ------------------------------------------------ #1264: an atom's number is not its identity
+
+
+def _series_with_o3_dropped(pbso4, drop_at: tuple[int, ...]):
+    """A two-pattern series whose ``prepare`` removes O3 (ahead of O4 and O5) on the
+    patterns ``drop_at`` names, and whose hook ties O5's z (``dof.2`` on the general
+    position) to ``vars.dz``, finding O5 by label as a hook beside such a ``prepare``
+    must.  Returns each pattern's starting coordinates by label, and the first
+    pattern's fitted ones."""
+    from rietx.sequential import SequentialRefinement
+    from rietx.strategy.staged import RefinementPlan
+    data = _pattern(Structure(phases=[_moved(pbso4, "O5", z=0.01)]))
+    started: dict[int, dict[str, tuple[float, float, float]]] = {}
+
+    def prepare(index, data, structure, instrument):
+        if index in drop_at:
+            phase = structure.phases[0]
+            phase.atoms = [a for a in phase.atoms if a.label != "O3"]
+
+    def constrain(index, ref):
+        j = [a.label for a in ref.structure.phases[0].atoms].index("O5")
+        ref.add_variable("dz", 0.0, min=-0.05, max=0.05)
+        ref.tie(f"phases.0.atoms.{j}.dof.2", "vars.dz")
+        inner = ref.fit
+
+        def fit(*args, **kwargs):
+            # the warm rung's start; a later rung of the ladder starts cold
+            started.setdefault(index, {a.label: (a.x.value, a.y.value, a.z.value)
+                                       for a in ref.structure.phases[0].atoms})
+            return inner(*args, **kwargs)
+        ref.fit = fit
+
+    plan = RefinementPlan(stages=[Stage("dz", ["vars.*", "phases.*.scale"], max_iter=20)])
+    chain = SequentialRefinement(Structure(phases=[pbso4]), INSTRUMENT)
+    chain.fit([data, data], plan=plan, prepare=prepare, constrain=constrain)
+    fitted = {a.label: (a.x.value, a.y.value, a.z.value)
+              for a in chain.fitted_structures[0].phases[0].atoms}
+    return started, fitted
+
+
+def test_a_hook_tie_on_an_atom_a_prepare_renumbered_is_reanchored_not_added_twice(pbso4):
+    """#1264, the issue's case on PbSO4.  ``prepare`` removes O3 from the second pattern
+    only, so O5 is atom 4 as declared and atom 3 as built, with no DOF renumbered.
+    ``_displaced_as_built`` passed ``atoms.4.dof.2`` through by index, the re-anchor
+    missed the hook's tie on ``atoms.3.dof.2``, and the warmed variable added the
+    fitted displacement a second time."""
+    started, fitted = _series_with_o3_dropped(pbso4, drop_at=(1,))
+    assert abs(fitted["O5"][2] - pbso4.atoms[4].z.value) > 1e-3       # the fit moved it
+    assert started[1]["O5"][2] == pytest.approx(fitted["O5"][2], abs=1e-9)
+
+
+def test_the_carry_reads_each_atom_by_label_when_prepare_renumbers_every_pattern(pbso4):
+    """#1264's sibling one bridge earlier.  With O3 removed from every pattern, the
+    carry's source (the first pattern as built) numbers O4 as 2 and O5 as 3, while the
+    declared structure it writes into numbers them 3 and 4; read by index, O4 took O5's
+    general position, off the mirror it sits on.  Each atom starts the second pattern
+    where the first left it."""
+    started, fitted = _series_with_o3_dropped(pbso4, drop_at=(0, 1))
+    assert "O3" not in started[1]
+    for label in ("Pb1", "S2", "O4", "O5"):
+        assert started[1][label] == pytest.approx(fitted[label], abs=1e-9), label
+    assert started[1]["O4"][1] == 0.25
+
+
+def test_an_edit_that_removes_an_atom_moves_each_constraint_onto_its_own_atom(pbso4):
+    """#1264's sibling in ``Refinement.edit``, the GUI's remove-atom route.  Removing O3
+    shifts O4 and O5 down one number with no DOF renumbered; a hold on O4's Biso held
+    O5's, a tie on O5 named nothing and was dropped, and O5's free DOFs pointed at
+    nothing.  Each follows its atom, and a constraint on O3 itself is dropped and said."""
+    ref = rx.Refinement(Structure(phases=[pbso4]), INSTRUMENT, history=False)
+    ref.hold(["phases.0.atoms.3.biso", "phases.0.atoms.2.biso"])       # O4, O3
+    ref.tie("phases.0.atoms.4.biso", "phases.0.atoms.1.biso")          # O5 <- S2
+    ref.tie("phases.0.atoms.0.biso", "phases.0.atoms.2.biso")          # Pb1 <- O3
+    ref.set_vary(["phases.0.atoms.4.dof.*"], True)
+    candidate = ref.structure.model_copy(deep=True)
+    candidate.phases[0].atoms = [a for a in candidate.phases[0].atoms if a.label != "O3"]
+    with pytest.warns(UserWarning, match="no longer has") as caught:
+        ref.edit(structure=candidate)
+    assert ref._user_holds == {"phases.0.atoms.2.biso"}                # O4, now atom 2
+    assert list(ref._ties) == ["phases.0.atoms.3.biso"]                # O5, now atom 3
+    assert ref._ties["phases.0.atoms.3.biso"].sources == ["phases.0.atoms.1.biso"]
+    assert set(ref._free_paths) >= {f"phases.0.atoms.3.dof.{k}" for k in range(3)}
+    assert not [p for p in ref._free_paths if p.startswith("phases.0.atoms.4.")]
+    (message,) = [str(w.message) for w in caught if "no longer has" in str(w.message)]
+    assert "the hold on phases.0.atoms.2.biso" in message
+    assert "the tie phases.0.atoms.0.biso" in message
+
+
+@pytest.mark.parametrize(("old", "new", "expected"), [
+    (["A", "B", "C"], ["A", "B", "C"], {}),
+    (["A", "B", "C"], ["A", "C"], {"phases.0.atoms.1": None,
+                                   "phases.0.atoms.2": "phases.0.atoms.1"}),
+    (["A", "B", "C"], ["C", "A", "B"], {"phases.0.atoms.0": "phases.0.atoms.1",
+                                        "phases.0.atoms.1": "phases.0.atoms.2",
+                                        "phases.0.atoms.2": "phases.0.atoms.0"}),
+    (["A", "B", "C"], ["A", "B2", "C"], {}),                           # renamed in place
+    (["A", "B", "C"], ["A", "B", "C", "D"], {}),                       # appended
+    (["O", "O", "S"], ["O", "O"], {}),             # repeated labels; S's number names nothing
+    (["O", "O", "S"], ["O", "O", "S", "O"], {}),                       # a repeat appended
+    (["O", "S", "O"], ["O", "O"], {"phases.0.atoms.1": None,            # one place only
+                                   "phases.0.atoms.2": "phases.0.atoms.1"}),
+    (["O", "O"], ["O"], {"phases.0.atoms.0": None}),                    # which O went?
+    (["X", "A", "X"], ["A", "X", "X"], {"phases.0.atoms.0": "phases.0.atoms.1",
+                                        "phases.0.atoms.1": "phases.0.atoms.0"}),
+    (["O", "O", "S"], ["O", "S"], {"phases.0.atoms.0": None,            # which O went?
+                                   "phases.0.atoms.1": None,
+                                   "phases.0.atoms.2": "phases.0.atoms.1"}),
+    (["A", "B", "C"], ["A", "C2"], {"phases.0.atoms.1": None}),        # removed and renamed:
+                                                                       # which one went?
+])
+def test_atom_moves_names_every_atom_whose_number_changes(old, new, expected):
+    """``twins.atom_moves``: a label held equally often by both pairs in order, an atom
+    renamed in place pairs by position, and an atom it cannot place maps to nothing
+    where another atom took its number (the generality review's two cases are the last
+    two).  One whose number names no atom keeps its path, which names nothing."""
+    from rietx.crystallography.twins import CoordinateSnapshot, atom_moves, renumber_path
+
+    def snap(labels):
+        return CoordinateSnapshot((("P 1", None, tuple(labels), np.zeros((len(labels), 3))),))
+
+    moves = atom_moves(snap(old), snap(new))
+    assert moves == expected
+    for j in range(len(old)):
+        site = f"phases.0.atoms.{j}"
+        assert renumber_path(f"{site}.biso", moves) == (
+            None if moves.get(site, site) is None else f"{moves.get(site, site)}.biso")
+    assert renumber_path("phases.0.atoms.*.biso", moves) == "phases.0.atoms.*.biso"
+    assert renumber_path("phases.0.atoms.11.biso", {"phases.0.atoms.1": None}) \
+        == "phases.0.atoms.11.biso"
+
+
+# ------------------------------------------------ WP-1991: ADP DOFs renumber with the site
+#
+# ``phases.i.atoms.j.adp.k`` is the k-th U^ij pattern ``wyckoff.adp_basis`` allows,
+# so a site that changes its symmetry renumbers its ADP DOFs as it renumbers its
+# coordinates.  International Tables vol. A: on Pnma's 4c mirror (y = ¼) U12 and U23
+# are zero, so the six patterns U11 … U23 of 8d become U11, U22, U33, U13 there.
+
+
+def _with_tensor(phase: Phase, label: str) -> Phase:
+    doc = phase.model_dump()
+    for atom in doc["atoms"]:
+        if atom["label"] == label:
+            atom["biso"]["vary"] = False
+            atom["aniso"] = {n: {"value": v, "vary": True} for n, v in zip(
+                ("u11", "u22", "u33", "u12", "u13", "u23"),
+                (0.010, 0.012, 0.011, 3e-4, 1e-3, 2e-4), strict=True)}
+    return Phase.model_validate(doc)
+
+
+def _tied_to(ref, path: str) -> list[str]:
+    """The DOFs the U^ij component ``path`` is written in, in the table as built now."""
+    table = ref._working_table()
+    (entry,) = [e for e in table.entries if e.path == path]
+    return [p for p, _ in entry.tie.terms] if entry.tie is not None else []
+
+
+def test_a_hold_and_a_tie_on_an_adp_pattern_follow_it_onto_the_mirror(pbso4):
+    """The WP's probe.  Held U12 and U13 on 8d: on the mirror U12 is zero, so its hold
+    is dropped and said, and U13's hold follows U13 to ``adp.3``.  Before, the hold on
+    ``adp.3`` stayed put and held U13 while U13's own hold named a DOF that no longer
+    exists; a tie from U11 to U13 was dropped as "no longer exists"."""
+    phase = _with_tensor(pbso4, "O5")
+    j = _o5(phase)
+    site = f"phases.0.atoms.{j}"
+    ref = rx.Refinement(Structure(phases=[phase]), INSTRUMENT, history=False)
+    assert _tied_to(ref, f"{site}.u12") == [f"{site}.adp.3"]
+    assert _tied_to(ref, f"{site}.u13") == [f"{site}.adp.4"]
+    ref.hold([f"{site}.adp.3", f"{site}.adp.4"])             # U12 and U13 on 8d
+    ref.tie(f"{site}.adp.0", f"{site}.adp.4")                # U11 follows U13
+    ref.set_values({f"{site}.dof.1": 0.2501 - phase.atoms[j].y.value})
+    assert _y(ref.structure, "O5") == 0.25
+    (u13,) = _tied_to(ref, f"{site}.u13")
+    assert _tied_to(ref, f"{site}.u12") == []                # zero on the mirror
+    assert ref._user_holds == {u13}
+    assert [s for s, _ in ref._ties[f"{site}.adp.0"].terms] == [u13]
+    rows = {r.path: r for r in ref.parameters()}
+    assert [p for p in rows if ".adp." in p and "hold()" in (rows[p].held_because or "")] \
+        == [u13]
+    (d,) = [d for d in ref._twin_findings if d.code == "SITE_TWINS_MERGED"]
+    assert f"the hold on {site}.adp.3 was dropped" in d.message
+    assert f"the hold on {site}.adp.4 now reads {u13}" in d.message
+
+
+def test_a_hold_on_u22_holds_the_adp_pattern_a_position_couples_it_into():
+    """On P 6₃/mmc 12k (x, 2x, z) the site symmetry ties U22 = 2·U12 and U23 = 2·U13
+    (ITA vol. A; Peterse & Palm, 1966), so no pattern moves U22 alone.  A hold on
+    8d's U22 then holds every pattern on 12k that moves U22, and the message names the
+    components in U^ij rather than in x, y, z."""
+    group, cell, y_of_x, mult = _COUPLED[0]
+    x, z = 0.17, 0.0705
+    phase = _with_tensor(_phase(group, cell, (x, 0.29, z)), "X")
+    ref = rx.Refinement(Structure(phases=[phase]), INSTRUMENT, history=False)
+    site = "phases.0.atoms.0"
+    assert _tied_to(ref, f"{site}.u22") == [f"{site}.adp.1"]
+    ref.hold([f"{site}.adp.1"])                              # U22 on the general position
+    ref.set_values({f"{site}.dof.1": (y_of_x(x) % 1.0) + 2e-4 - 0.29})
+    assert _multiplicity(ref.structure.phases[0], "X") == mult
+    want = set(_tied_to(ref, f"{site}.u22"))
+    assert want and ref._user_holds == want
+    (d,) = [d for d in ref._twin_findings if d.code == "SITE_TWINS_MERGED"]
+    assert "in U11, U22, U33, U12, U13, U23" in d.message
+    assert "x, y, z" not in d.message.split("Constraints:")[1]
+
+
+def test_numbering_moves_lists_the_adp_patterns_of_a_site_that_moved(pbso4):
+    """``twins.numbering_moves`` names the ``adp.k`` keys beside the ``dof.k`` ones, so
+    every carrier that splits a move by site (holds, ties, free paths, a stored node's
+    recorded action) reaches them through the one reading."""
+    from rietx.crystallography.twins import numbering_moves, site_of
+    j = _o5(pbso4)
+    site = f"phases.0.atoms.{j}"
+    moved = _moved(pbso4, "O5", y=0.25 - pbso4.atoms[j].y.value)
+    moves = numbering_moves(Structure(phases=[pbso4]), Structure(phases=[moved]))
+    assert {p for p in moves if ".adp." in p} == {f"{site}.adp.{k}" for k in range(6)}
+    assert [moves[f"{site}.adp.{k}"].path for k in range(6)] == [
+        f"{site}.adp.0", f"{site}.adp.1", f"{site}.adp.2", None, f"{site}.adp.3", None]
+    assert {site_of(p) for p in moves} == {site}
+
+
+# ------------------------------------------------ WP-1991: phases are matched by name
+
+
+def _two_phases() -> Structure:
+    a = _phase("P m -3 m", (4.0, 4.0, 4.0, 90, 90, 90), (0.0, 0.0, 0.0))
+    b = _phase("P m -3 m", (5.0, 5.0, 5.0, 90, 90, 90), (0.0, 0.0, 0.0))
+    return Structure(phases=[a.model_copy(update={"name": "A"}),
+                             b.model_copy(update={"name": "B"})])
+
+
+def test_atom_moves_matches_phases_by_name():
+    """Removing phase A ahead of B renumbers every ``phases.1`` path onto ``phases.0``;
+    A's own paths name nothing, since B now has its number.  A phase renamed where it
+    stands keeps its number, as an atom renamed in place does."""
+    from rietx.crystallography.twins import atom_moves, renumber_path
+    both = _two_phases()
+    only_b = Structure(phases=[both.phases[1]])
+    moves = atom_moves(both, only_b)
+    assert moves == {"phases.0": None, "phases.1": "phases.0"}
+    assert renumber_path("phases.1.cell.a", moves) == "phases.0.cell.a"
+    assert renumber_path("phases.1.atoms.0.biso", moves) == "phases.0.atoms.0.biso"
+    assert renumber_path("phases.0.scale", moves) is None
+    assert renumber_path("phases.*.scale", moves) == "phases.*.scale"
+    renamed = Structure(phases=[both.phases[0].model_copy(update={"name": "A2"}),
+                                both.phases[1]])
+    assert atom_moves(both, renamed) == {}
+    swapped = Structure(phases=[both.phases[1], both.phases[0]])
+    assert atom_moves(both, swapped) == {"phases.0": "phases.1", "phases.1": "phases.0"}
+    # one name twice (a CIF loaded twice): by position, as before, so renaming the
+    # second leaves the first's constraints where they were (/code-review)
+    twice = Structure(phases=[both.phases[0], both.phases[0]])
+    renamed_second = Structure(phases=[both.phases[0],
+                                       both.phases[0].model_copy(update={"name": "Z"})])
+    assert atom_moves(twice, renamed_second) == {}
+
+
+def test_an_edit_that_removes_a_phase_keeps_the_hold_on_the_phase_behind_it():
+    """``Refinement.edit`` with phase A removed: a hold on B's cell follows B to
+    ``phases.0``, and a hold on A's is dropped and said, where before both stayed on
+    their numbers and B's cell refined."""
+    ref = rx.Refinement(_two_phases(), INSTRUMENT, history=False)
+    ref.hold(["phases.0.cell.a", "phases.1.cell.a"])
+    with pytest.warns(UserWarning, match="the hold on phases.0.cell.a"):
+        ref.edit(structure=Structure(phases=[ref.structure.phases[1]]))
+    assert ref._user_holds == {"phases.0.cell.a"}
+    assert ref.structure.phases[0].name == "B"
+
+
+def test_a_series_carry_reads_a_value_onto_its_phase_by_name():
+    """``sequential._values_onto``: a ``prepare`` that removed phase A hands pattern
+    n + 1 a model in which B is ``phases.0``, and B's fitted cell lands on B."""
+    from rietx.sequential import _values_onto
+    both = _two_phases()
+    values = _values_onto((both, INSTRUMENT), Structure(phases=[both.phases[1]]))
+    assert values["phases.0.cell.a"] == 5.0
+
+
+# ------------------------------------------------ WP-1991: a series trajectory follows its atom
+#
+# Yue's ruling of 2026-11-01: a trajectory is keyed by phase name, atom label and
+# parameter, a pattern without the phase or the atom leaves a gap, and each point
+# carries its own pattern's path.
+
+
+def _series_biso(structure: Structure, prepare,
+                 free=("phases.*.scale", "phases.*.atoms.*.biso")):
+    from rietx.sequential import SequentialRefinement
+    from rietx.strategy.staged import RefinementPlan
+    data = _pattern(Structure(phases=[structure.phases[0]]))
+    plan = RefinementPlan(stages=[Stage("b", list(free), max_iter=6)])
+    chain = SequentialRefinement(structure, INSTRUMENT)
+    series = chain.fit([data, data], plan=plan, prepare=prepare)
+    return chain, series
+
+
+def _biso_of(structure: Structure, label: str) -> float:
+    (a,) = [a for a in structure.phases[0].atoms if a.label == label]
+    return a.biso.value
+
+
+def test_a_trajectory_follows_its_atom_by_label_when_prepare_removes_one_ahead(pbso4):
+    """``prepare`` removes O3 from the second pattern, so O4 and O5 are atoms 3 and 4
+    as declared and 2 and 3 there.  Joined by path, ``atoms.3.biso`` read O4 and then
+    O5.  Each trajectory now follows one atom, O3's has a gap, and each point names
+    its own pattern's path."""
+    def prepare(index, data, structure, instrument):
+        if index == 1:
+            structure.phases[0].atoms = [a for a in structure.phases[0].atoms
+                                         if a.label != "O3"]
+
+    chain, series = _series_biso(Structure(phases=[pbso4]), prepare)
+    o4 = series.trajectory("phases.0.atoms.3.biso")
+    assert (o4.phase, o4.atom) == (pbso4.name, "O4")
+    assert o4.pattern_paths == ["phases.0.atoms.3.biso", "phases.0.atoms.2.biso"]
+    assert o4.value == [_biso_of(s, "O4") for s in chain.fitted_structures]
+    o5 = series.trajectory("phases.0.atoms.4.biso")
+    assert o5.value == [_biso_of(s, "O5") for s in chain.fitted_structures]
+    o3 = series.trajectory("phases.0.atoms.2.biso")
+    assert o3.atom == "O3" and o3.positions == [0]                     # a gap, not O4
+    assert series[1].pattern_paths["phases.0.atoms.4.biso"] == "phases.0.atoms.3.biso"
+    assert series[0].pattern_paths == {}
+    assert series.atom_labels == [[a.label for a in pbso4.atoms]]
+    assert "phases.0.atoms.4.biso" in series.paths()
+    reread = type(series).model_validate_json(series.model_dump_json())
+    assert reread.trajectory("phases.0.atoms.3.biso") == o4
+
+
+def test_a_phase_a_prepare_adds_takes_the_next_number_and_a_gap_before_it(pbso4):
+    """A phase that only the second pattern holds is ``phases.1`` in the series
+    numbering, whatever number that pattern gives it, and its trajectory starts there."""
+    extra = pbso4.model_copy(update={"name": "second"}, deep=True)
+
+    def prepare(index, data, structure, instrument):
+        if index == 1:
+            structure.phases.insert(0, extra.model_copy(deep=True))
+
+    _, series = _series_biso(Structure(phases=[pbso4]), prepare, free=["phases.*.scale"])
+    assert series.phase_names == [pbso4.name, "second"]
+    first = series.trajectory("phases.0.scale")
+    assert first.phase == pbso4.name and first.pattern_paths == [
+        "phases.0.scale", "phases.1.scale"]
+    added = series.trajectory("phases.1.scale")
+    assert added.phase == "second" and added.positions == [1]
+    assert added.pattern_paths == ["phases.0.scale"]
+
+
+@pytest.mark.parametrize("where", ["declared", "prepare"])
+def test_a_series_refuses_an_atom_label_used_twice_in_a_phase(pbso4, where):
+    """The key is the label, so a repeat is refused rather than guessed at."""
+    from rietx.sequential import SequentialRefinement
+    doubled = pbso4.model_copy(deep=True)
+    doubled.atoms[3] = doubled.atoms[3].model_copy(update={"label": "O5"})
+
+    def prepare(index, data, structure, instrument):
+        structure.phases[0] = doubled.model_copy(deep=True)
+
+    data = _pattern(Structure(phases=[pbso4]))
+    start = doubled if where == "declared" else pbso4
+    with pytest.raises(ValueError, match=r"atom label\(s\) \['O5'\] more than once"):
+        SequentialRefinement(Structure(phases=[start]), INSTRUMENT).fit(
+            [data], prepare=None if where == "declared" else prepare)
+
+
+def test_a_series_refuses_a_phase_name_used_twice(pbso4):
+    from rietx.sequential import SequentialRefinement
+    data = _pattern(Structure(phases=[pbso4]))
+    with pytest.raises(ValueError, match="phase name"):
+        SequentialRefinement(Structure(phases=[pbso4, pbso4]), INSTRUMENT).fit([data])
+
+
+def test_a_series_written_before_the_numbering_opens_as_written(pbso4):
+    """A document without the WP-1991 fields reads its paths as stored, each point's
+    pattern path being the path itself, and names no phase or atom."""
+    from rietx.schemas.sequential import SeriesResult
+    doc = {"entries": [{"index": k, "parameters": [
+        {"path": "phases.0.atoms.3.biso", "value": 0.5 + k}]} for k in range(2)]}
+    old = SeriesResult.model_validate(doc)
+    assert old.phase_names is None and old[0].pattern_paths is None
+    traj = old.trajectory("phases.0.atoms.3.biso")
+    assert traj.value == [0.5, 1.5]
+    assert traj.pattern_paths == ["phases.0.atoms.3.biso"] * 2
+    assert (traj.phase, traj.atom) == (None, None)
+
+
+def test_a_persistent_finding_counts_one_atom_across_a_renumbering():
+    """A finding on one atom stays one count where a ``prepare`` renumbered it.
+
+    Half the patterns removed an atom ahead of it, so their diagnostics name it
+    ``atoms.1`` and the rest ``atoms.2``.  Counted as written, each half is 3 of
+    6 and nothing reaches the series line.  The ``uiso`` path is in no row,
+    so it follows the atom's prefix rather than a row of its own.
+    """
+    from rietx.schemas.common import Diagnostic
+    from rietx.schemas.sequential import SeriesEntry, SeriesResult
+    from rietx.sequential import _persistent_diagnostics
+
+    def entry(k):
+        moved = k % 2 == 0
+        own = "phases.0.atoms.1" if moved else "phases.0.atoms.2"
+        return SeriesEntry(
+            index=k, label=f"p{k}", pattern_paths=(
+                {"phases.0.atoms.2.biso": "phases.0.atoms.1.biso"} if moved else {}),
+            diagnostics=[Diagnostic(level="warning", code="BOUND_HIT",
+                                    where=[f"{own}.uiso"], message="...")])
+
+    out = _persistent_diagnostics(SeriesResult(entries=[entry(k) for k in range(6)]))
+    assert [(d.where, d.value) for d in out] == [(["phases.0.atoms.2.uiso"], 1.0)]

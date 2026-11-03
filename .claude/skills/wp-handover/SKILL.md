@@ -13,8 +13,14 @@ the missing entry from `git log --stat` over that WP's commits and the
 current state of its checklist, date it with the commits' own date (never
 today's), and mark it "(reconstructed post hoc)". A reconstruction records
 what the commits show, not what the session might have known — where the
-diff does not say why, say so rather than inventing a rationale. All other
-steps below run unchanged.
+diff does not say why, say so rather than inventing a rationale. **A repair
+on a later day than the work also writes its own entry, dated today**, above
+the reconstruction: a paragraph saying it is a repair and what it changed.
+The repair commit carries the `WP-NNNN:` prefix and today's date, and the
+hook's date rule wants an entry no older than that commit. Without the second
+entry the flag comes back the moment the repair is committed, and step 10's
+scan sees it only if it runs after the commit (measured on WP-2010,
+2026-11-02). All other steps below run unchanged.
 
 **The handover runs at the session's largest context, so every request and
 every read costs the most here** (`docs/milestones/process.md` § What a
@@ -127,7 +133,7 @@ re-reading its own diff.
    `gh run download <id> -p 'junit-py3.14-*' -D <scratchpad>/ci` on the
    newest run that has the artifacts, and name the sha it ran on. A draft's
    run and a cancelled one have none. Pass the directory, since the leg runs
-   as two shards with a file each. Read the py3.14 leg because it alone
+   as several shards with a file each. Read the py3.14 leg because it alone
    executes the tutorials. Otherwise pass the local file. The entry quotes the rows and
    the per-file totals as one run's figures on the named machine. They rank a
    test or a file against the tail and do not time it. A test or a file that
@@ -263,6 +269,14 @@ re-reading its own diff.
       per `tests/CLAUDE.md` § Quoting numbers), what it deliberately did not
       do, and any finding filed into another WP, named with its number. End
       with the repo's two-line Claude Code footer.
+    - **Say what a reader now receives** (ruled 2026-11-01: no junk passed
+      back to a reader, a person or an agent). Run `.venv/bin/python -m
+      tests.reader_output`. On exit 1, the body gains a section headed
+      `What a reader receives` with its diff, and step 12 shows the diff to
+      the person and asks whether each added line belongs. A field added to
+      a result or report type gets the same section, read off the generated
+      `docs/skill/rietx/references/api*.md`. On exit 0 with no such field,
+      the body says so in one line.
     - **A closing keyword is plain text, never a code span.** GitHub does not
       parse `` `Closes #148` `` inside backticks, so the issue stays open with
       its work merged and nothing says so. Measured 2026-09-16 over the last
@@ -277,7 +291,10 @@ re-reading its own diff.
       `gh pr view N --json closingIssuesReferences`, and clear a stray link by
       taking the **number** out, since editing the words around it does not.
     - **Never merge, and never wait on CI to decide.** Whether green is
-      enough, and when to merge, is the maintainer's call.
+      enough, and when to merge, is the maintainer's call. A ghostshift
+      shift lead may also merge a PR its checks find clear-cut, under the
+      user's standing permission of 2026-10-31
+      (`~/Code/claude-config/skills/ghostshift/SKILL.md` §4).
     - **Then subscribe to it**, where `subscribe_pr_activity` exists (a cloud
       session; `ToolSearch` loads it). `.claude/hooks/pr_subscribe.py` puts
       the call, number filled in, in front of you after `gh pr ready`. From
@@ -289,6 +306,7 @@ re-reading its own diff.
 12. **Report**, to the person and not to the log: **first the same
     plain-language paragraph the entry opens with** — what this session's work
     means, in a few sentences someone can read without opening the diff — then
+    step 11's reader diff with its question, where there is one — then
     the next actions, then the PR URL, and that CI is the gate — the required checks run
     ruff plus the fast suite across the supported Pythons and a `[dev,jax]`
     job. Subscribed (step 11), say so; without the tool, offer to watch the

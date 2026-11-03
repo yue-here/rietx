@@ -733,9 +733,11 @@ def _stream_system_snapshot(progress, system: str, units: dict, names,
     forked), graded by the same gate as the final answer with two questions
     deliberately still open: nothing is validated yet and no ambiguity has
     been enumerated (``consensus(..., ambiguity=False)`` — the enumeration is
-    the measured long pole, 45 s of a 105 s corundum run).  Both read as
-    capping caveats, so a streamed grade can only *rise* when the full
-    consensus and validation run — never fall.  Raw candidates from units of a
+    the measured long pole, 45 s of a 105 s corundum run).  An unvalidated
+    candidate reads as ``not_validated``, a capping caveat; an unenumerated
+    one as ``geometric_ambiguity``, a refuting one, so every streamed grade
+    is ``low``.  It can only *rise* when the full consensus and validation
+    run — never fall.  Raw candidates from units of a
     system still in progress are different: they have been through no
     consensus at all, and ride the search units' ``provisional`` field with no
     confidence at all (``engines.provisional_payload``).
@@ -845,16 +847,17 @@ def index_pattern(peaks: PeakList | None = None, *,
     capped by the ``fom_panel_reduced`` caveat — each absent figure named with
     its reason on ``quality.fom_undefined``.
 
-    ``formula`` checks each candidate against the chemistry (WP-1510).  The
-    number of formula units a cell's volume implies, by Hofmann's (2002) volumes
-    at ``temperature`` in K, is reported as ``INDEX_Z_NOT_INTEGER`` when it is
-    far from a whole number.  It reports and never narrows.  The search window
-    a formula implies is :meth:`~rietx.indexing.engines.SearchSpec.from_formula`,
-    declared by the caller, because narrowing is the caller's own act.  A
-    formula the table cannot read raises before peaks are picked.  The result
-    records the formula and temperature the check read
-    (:attr:`~rietx.schemas.indexing.IndexingResult.formula`), so a reopened
-    result says what its Z checks were measured against.
+    ``formula`` records, on each candidate, the number of formula units its
+    volume holds by Hofmann's (2002) volumes at ``temperature`` in K
+    (:attr:`~rietx.schemas.indexing.CellCandidate.formula_units`).  It reports
+    and never narrows, and since WP-2030 no diagnostic judges the number: a
+    correct ionic or inorganic cell holds far fewer units by that table than it
+    does (Hofmann's § 3 (iii)), so a test for a whole number fires on true
+    cells.  The search window a formula implies is
+    :meth:`~rietx.indexing.engines.SearchSpec.from_formula`, declared by the
+    caller, because narrowing is the caller's own act.  A formula the table
+    cannot read raises before peaks are picked.  The result records the formula
+    and temperature read (:attr:`~rietx.schemas.indexing.IndexingResult.formula`).
     """
     from ..history.events import as_event_stream
     from ..optimize.cancel import RefinementCancelled
@@ -887,8 +890,8 @@ def index_pattern(peaks: PeakList | None = None, *,
     if formula is not None:
         from ..crystallography.atomic_volume import formula_unit_volume
 
-        formula_unit_volume(formula, temperature)   # a bad formula raises here
-    # what the result records the Z check read at: nothing, with no formula
+        v_fu, _ = formula_unit_volume(formula, temperature)   # a bad formula raises here
+    # what the result records the formula read at: nothing, with no formula
     checked_at = None if formula is None else float(temperature)
     if data is not None:
         # Checked whether or not the peaks are picked here: ``data`` also drives
@@ -1181,8 +1184,8 @@ def index_pattern(peaks: PeakList | None = None, *,
 
     # the deferred ambiguity pass, on whatever clock validation left — read
     # between candidates and between one candidate's derivative cells (#895),
-    # so a fired token leaves the question unasked
-    # (capping) rather than half-answered
+    # so a fired token leaves the question unasked rather than half-answered
+    # (the gate then writes ``geometric_ambiguity``, a refuting caveat)
     from .consensus import absence_excess, enumerate_ambiguity
 
     absence_excess(outcome.candidates)
@@ -1216,8 +1219,9 @@ def index_pattern(peaks: PeakList | None = None, *,
                shift_allowance_assumed=outcome.shift_allowance_assumed,
                checked=outcome.ambiguity_checked, quality=quality)
     for cand in outcome.candidates:
-        cand.diagnostics = list(cand.diagnostics) + candidate_diagnostics(
-            cand, formula=formula, temperature=temperature)
+        cand.diagnostics = list(cand.diagnostics) + candidate_diagnostics(cand)
+        if formula is not None:
+            cand.formula_units = cand.volume / v_fu
 
     result = IndexingResult(
         candidates=outcome.candidates, engines_run=outcome.engines_run,

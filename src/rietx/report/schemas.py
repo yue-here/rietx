@@ -25,6 +25,7 @@ from ..schemas.results import (
     CorrelationPair,
     GeometryTable,
     PhaseMicrostructure,
+    RefinementResult,
     RestraintReport,
     SoftMode,
 )
@@ -276,7 +277,16 @@ from ..strategy.staged import BACKGROUND_ABSORPTION_GUARD
 #   z moves little there; where the width is the misfit, z grows by the ratio
 #   of the two scatters.  A consumer comparing z against a number sees the
 #   change, on 1.10 → 1.11's precedent.
-THRESHOLDS_VERSION = "1.13"
+# 1.13 → 1.14 (WP-1977, #1106, #1217): no number moved and no row left
+#   ``unmatched``, but what Layer 2 does with one did.  Every ``unmatched_obs``
+#   row now carries ``UnmatchedPeak.flank`` (``FlankEvidence``): whether the
+#   observed curve joins it to a peak ``y_calc`` draws with no valley of
+#   ``min_peak_sigma`` σ, that peak's position, prominence and width, the
+#   offset in its FWHM, and how many lines as strong carry a lobe on the same
+#   side.  ``add_impurity_phase`` no longer counts a row on a flank.  A new
+#   type a consumer reads, on 1.11 → 1.12's precedent, and an action a
+#   consumer may count, on 1.12 → 1.13's.
+THRESHOLDS_VERSION = "1.14"
 
 #: WP-1343.  How far the moment must move when a magnetic width is released
 #: before the release is called a *measurement of the correlation*, in units
@@ -437,14 +447,15 @@ COLLECT_DATA_CONFIDENCE = 0.5
 
 #: Le Bail gap (WP-1057) — the structural-vs-profile triage statistic.
 #: ``LEBAIL_GAP_CYCLES`` partition cycles at the frozen converged state: the
-#: fixed point is reached by cycle 2-3 on the LaB₆ pore-proxy fixture
-#: (Rwp_lebail 0.01713 after one cycle, 0.01700 from two onward, 2026-08-12),
+#: fixed point is reached by cycle 2 on the LaB₆ pore-proxy fixture
+#: (Rwp_lebail 0.01708 after one cycle, 0.01706 from two onward, 2026-11-02),
 #: so 5 is margin, not tuning.  ``LEBAIL_GAP_NOTABLE`` is the ratio above
 #: which the summary quotes the gap; measured separation on the same fixtures:
-#: 2.38 on the pore proxy (guest scatterer in truth only — intensity model
-#: wrong) against ≤ 1.00 on every position/profile control (+0.4 % cell 1.00,
-#: broad+0.05° zero 1.00, broad clean 1.00, sharp+0.008° zero 0.96) and 0.79
-#: on the converged clean fit — the partition is *not* a noise-floor
+#: 2.36 on the pore proxy (re-measured 2026-11-02; guest scatterer in truth
+#: only — intensity model wrong) against ≤ 1.00 on every position/profile
+#: control (2026-08-12: +0.4 % cell 1.00, broad+0.05° zero 1.00, broad clean
+#: 1.00, sharp+0.008° zero 0.96) and 0.79 on the converged clean fit — the
+#: partition is *not* a noise-floor
 #: estimator (its net = max(y_obs − bkg, 0) clip and profile-share weighting
 #: put its own floor above a converged least-squares fit), which is why the
 #: notable test is on the ratio, never on rwp_lebail alone.
@@ -596,15 +607,65 @@ class Region(Base):
     n_reflections: int
 
 
+class FlankEvidence(Base):
+    """Where an ``unmatched_obs`` peak sits against the peaks the model draws
+    (WP-1977, #1106, #1217).  Built by :func:`.layer0.build_layer0` for every
+    ``unmatched_obs`` row, by the walk :func:`.layer0.on_drawn_flank` makes.
+
+    From the residual peak the walk goes uphill along ``y_calc`` to the apex
+    of the drawn peak it sits under.  That apex counts only when its
+    prominence in ``y_calc`` is at least ``min_peak_sigma`` times σ there and
+    it is not the pattern's edge.  ``on_flank`` says the observed curve rises
+    from the residual into that peak with no valley of ``min_peak_sigma`` σ.
+    The data then do not resolve the residual from the peak.  A shape or
+    asymmetry misfit, an unmodelled Kα2, a split of the line by lower symmetry
+    and a foreign line all look like that, and the evidence here is what
+    separates them (``rietx.help.explain("UnmatchedPeak.flank")``).  Layer 2
+    suggests no impurity phase for such a row.
+
+    ``peak_two_theta`` and the four fields after it are ``None`` where no
+    drawn peak lies uphill of the residual, and ``on_flank`` is then False.
+    ``peak_fwhm_deg`` is the drawn curve's width at half its prominence, and
+    ``offset_fwhm`` is (residual − apex)/that width, negative below the apex.
+    ``valley_over_sigma`` is the deepest fall of ``y_obs`` on the way, below
+    the highest point it had reached, in σ.
+
+    ``lines_as_strong`` counts the drawn peaks whose prominence is at least
+    this one's, this one included.  ``lines_with_lobe`` counts those carrying
+    an ``on_flank`` row on the same side, this one included.  A shape misfit
+    leaves a lobe on every line strong enough to show it, so 6 of 6 reads
+    differently from 1 of 20.  Both counts are ``None`` where ``on_flank`` is
+    False.  A lobe within ``LAYER0_MATCH_TOL_DEG`` of a tick is no row, so it
+    is not counted.  "Same side" is the whole test of similarity: each row's
+    ``offset_fwhm`` is there to compare.
+    """
+
+    on_flank: bool
+    peak_two_theta: float | None
+    peak_prominence_over_sigma: float | None
+    peak_fwhm_deg: float | None
+    offset_fwhm: float | None
+    valley_over_sigma: float | None
+    lines_as_strong: int | None
+    lines_with_lobe: int | None
+
+
 class UnmatchedPeak(Base):
     """One Layer-0 peak-accounting row; the list is ``FitReport.unmatched``,
     and its counts alone (no positions) ride on
     :class:`StageReport` as ``n_unmatched_obs``/``n_unmatched_calc``.
+
+    ``flank`` is ``None`` where it was not measured: every ``unmatched_calc``
+    row, and a row built outside :func:`.layer0.build_layer0`.  Its absence
+    never means "not on a flank".
     """
 
     two_theta: float
     height_over_sigma: float
-    kind: str  # "unmatched_obs" (no calc tick nearby) | "unmatched_calc"
+    # "unmatched_obs" (no calc tick within LAYER0_MATCH_TOL_DEG) |
+    # "unmatched_calc"
+    kind: str
+    flank: FlankEvidence | None = None
 
 
 class SatelliteCandidate(Base):
@@ -889,18 +950,19 @@ class LeBailGap(Base):
     and profile* alone support, not a Le Bail fit (a fit would also relax
     the background and cell).  The partition is not a noise-floor estimator
     either: its ``max(y_obs − bkg, 0)`` clip and profile-share weighting
-    leave it above a converged least-squares fit (measured 0.0172 against a
-    converged Rwp of 0.0137 on clean LaB₆ data), which is why ``ratio`` — not
-    ``rwp_lebail`` — is the statistic.
+    leave it above a converged least-squares fit (measured 2026-11-02: 0.0174
+    against a converged Rwp of 0.0137 on clean LaB₆ data), which is why
+    ``ratio`` — not ``rwp_lebail`` — is the statistic.
 
     **Reading it.**  ``ratio`` ≫ 1 means the partition, free to reassign
     every intensity, removes most of the misfit: every line is indexed and
     the profile is right — the *intensity model* (structure, contents,
     occupancies) is what is wrong, and phase ID is safe at any absolute Rwp.
     Measured on the LaB₆ pore-proxy fixture (guest scatterer in the data
-    only): 2.38, against ≤ 1.00 on every position/profile control — a wrong
-    cell or zero displaces the partition's peaks identically, so the gap
-    stays flat and cannot be confused with position error.  ``ratio`` ≲ 1
+    only): 2.36 (2026-11-02), against ≤ 1.00 on every position/profile
+    control — a wrong cell or zero displaces the partition's peaks
+    identically, so the gap stays flat and cannot be confused with position
+    error.  ``ratio`` ≲ 1
     says intensities are not where the remaining misfit lives — it never
     says the fit is good (both Rwp may be terrible together).
     """
@@ -1156,7 +1218,7 @@ class SuggestedAction(Base):
     And it is **not a bound on what applying the action achieves**: it bounds the
     misfit the linear model attributes inside the *gated* regions, while the
     refinement also moves regions that failed a gate and stretches no region entry
-    covers (measured: 16.19 predicted against 16.33 observed for ``refine_cell``).
+    covers (measured: 16.16 predicted against 16.30 observed for ``refine_cell``).
     ``predict_then_verify`` in :mod:`.layer2` measures the real one and rolls back
     if it disagrees.  ``vetoed_by`` is set when the staged plan already refines the
     parameter, or when a guard forbids it.
@@ -1234,6 +1296,84 @@ class FreedComparison(Base):
     delta_bic_raw_n: float
 
 
+class DistortionBlockTest(Base):
+    """One held set of irrep blocks, compared by a refit with it held at 0 (WP-1419).
+
+    Built by :meth:`~rietx.Refinement.distortion_block_tests`.  ``held`` names
+    the blocks, each ``(irrep, k, isotropy_group)`` of phase ``phase``, held at
+    0 together in one restricted refit that frees everything else the full fit
+    freed and starts from the full optimum, so the restricted model is the
+    profile at A_B = 0 (Kerman et al. 2012, *Acta Cryst.* A**68**, 222, p. 231).
+    ``m`` is the number of free amplitudes held.
+
+    ``delta_bic`` is :func:`~rietx.report.compare_freed`'s figure,
+    N_eff·ln(χ²_r/χ²_f) − m·ln N_eff at N_eff = N/f², with f the **restricted**
+    fit's ``esd_inflation`` (Schwarz 1978; Kass & Raftery 1995); positive
+    favours the blocks.  ``lambda_`` is Δχ²/(χ²_red·f²) with χ²_red and f both
+    of the **full** fit, Hamilton's (1965) F form on rietx's esd scale, and
+    ``lambda_p`` its upper tail against χ²_m.  ``chi2_restricted`` and
+    ``chi2_full`` are the unreduced Σw·Δ², as :class:`FreedComparison` carries
+    them.  ``a_det`` is the predicted smallest amplitude of the held set at
+    which its ``delta_bic`` reaches the caller's ``detectability_bar``, in Å,
+    when one was passed (``None`` otherwise, and where no held mode moves the
+    pattern).
+
+    **There is deliberately no verdict field**, on :class:`FreedComparison`'s
+    precedent: every field is a number, a key or a count.
+    """
+
+    phase: int
+    held: list[tuple[str, tuple[str, str, str], str]]
+    m: int
+    n_points: int
+    chi2_restricted: float
+    chi2_full: float
+    esd_inflation_restricted: float | None = None
+    esd_inflation_full: float | None = None
+    chi2_red_full: float
+    delta_bic: float
+    lambda_: float
+    lambda_p: float
+    a_det: float | None = None
+    #: wall time of this row's restricted refit, s
+    wall_s: float
+
+
+class DistortionRestart(Base):
+    """One restart of the full fit by :meth:`~rietx.Refinement.distortion_block_tests`.
+
+    A restricted refit landed below the full fit, which proves the full fit
+    had not reached its optimum: the full model was refitted from that
+    restricted optimum with the held blocks re-seeded.  ``held`` is the set
+    whose refit triggered it, ``chi2_restricted`` its χ², and ``lowered`` says
+    whether the refit took the full χ² below ``chi2_full_before``.
+    """
+
+    held: list[tuple[str, tuple[str, str, str], str]]
+    chi2_full_before: float
+    chi2_restricted: float
+    chi2_full_after: float
+    lowered: bool
+
+
+class DistortionBlockTests(Base):
+    """The block comparisons of one call to :meth:`~rietx.Refinement.distortion_block_tests`.
+
+    ``tests`` holds one :class:`DistortionBlockTest` per held set, each against
+    the final full fit.  ``restarts`` lists every restart of the full fit, in
+    order, so its length is the count.  ``restarted_result`` is the full fit
+    the rows compare against when a restart moved it, the caller's own result
+    otherwise being that fit (``None``).  ``detectability_bar`` is the bar and ``detectability_probe`` the probe
+    amplitude (Å) the ``a_det`` column was read at, the caller's arguments.
+    """
+
+    tests: list[DistortionBlockTest]
+    restarts: list[DistortionRestart] = Field(default_factory=list)
+    detectability_bar: float | None = None
+    detectability_probe: float | None = None
+    restarted_result: RefinementResult | None = None
+
+
 class DeltaChi2Quantile(Base):
     """One equal-count run of channels in a :class:`DeltaChi2Profile`."""
 
@@ -1272,7 +1412,7 @@ class SplitFamily(Base):
     hkls: list[list[int]]
     #: which emission line's image, 0 the shortest wavelength; children are
     #: assigned within one line
-    emission_line: int = 0
+    emission_line: int
     #: its tick in the higher-symmetry fit, deg 2θ
     two_theta: float
     #: how many of the lower fit's ticks were assigned to it
@@ -1323,8 +1463,8 @@ class SplitLocalisation(Base):
     unsplit_point_share: float
     elsewhere_share: float | None = None
     elsewhere_point_share: float
-    #: the lower fit's ticks with no higher-fit reflection within two local
-    #: widths (superstructure reflections): counted, never windowed
+    #: the lower fit's ticks in range with no higher-fit reflection within two
+    #: local widths (superstructure reflections): counted, never windowed
     n_unmatched: int = 0
     families: list[SplitFamily] = Field(default_factory=list)
 

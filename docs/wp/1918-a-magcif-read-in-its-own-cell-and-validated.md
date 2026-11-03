@@ -1,8 +1,8 @@
 # WP-1918 — a magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out
 
-Milestone: unscheduled · Status: 🔄 2026-10-29 — FullProf's `_parent_space_group.name_H-M` spelling read, from outside as PR #1193 (`cd1c39ff`); the six maintainer decisions and I-a onwards open
+Milestone: unscheduled · Status: 🔄 2026-11-03 — FullProf's `_parent_space_group.name_H-M` spelling read, from outside as PR #1193 (`cd1c39ff`); an empty second block skipped and the draft magnetic tags refused, as PR #1257 (`1c55eda6`, #1063 items 1 and 3); its review follow-ups (text fields skipped by every raw-text scan, the draft k tag reaching the supercell refusal) as PR #1284 (`fd5c0bf5`); the six decisions recorded; I-a onwards open, I-d waiting on PR #1108
 Track: Coming from another code
-Depends on: — (1911 soft: the structure-level setting transform the BNS restatement uses)
+Depends on: 1419 soft (I-d reads through its `Phase.parent_cell`, PR #1108)
 Priority: P2 2026-10-08 — a refusal that fires on readable files: 615 of the 900 supercell refusals name a double count the file does not have
 
 ## Goal
@@ -80,22 +80,26 @@ before `write_magnetic_block` and `write_topas_inp`. Two report fields on
 - I-a. `refuse_a_magnetic_supercell` says which case the file is (one moment
   per orbit, several, a k = 0 nuclear superstructure, an irrational k). No read
   changes.
-- I-b. A parent record on `MagneticSymmetry` (`space_group`,
-  `child_transform_Pp_abc`, `propagation_vector`) read from `_parent_*`, with
-  k taken as stated. An integer k in a centred parent is a zone-boundary
+- I-b. A parent record on `MagneticSymmetry`, one nested `parent` record
+  (`space_group`, `child_transform_Pp_abc`, `propagation_vector`) as decided
+  below, read from `_parent_*`, with k taken as stated. Old files migrate at
+  read, and `propagation_vector_parent` keeps no alias. An integer k in a centred parent is a zone-boundary
   vector, and `is_commensurate_zero` (`magcif.py:312`) reads it as Γ today.
   `SCHEMA_VERSION` bump.
 - I-c. A rational k ≠ 0 or |det| ≠ 1 file read under tiers 2/3, with
   `CIF_MAGNETIC_SUPERCELL_READ` (info). `nuclear_group="parent"` refused by
   name. An unrecognised parent symbol falls through. An irrational k stays
   refused and names #678.
-- I-d. A family group in an untabulated orientation restated at its BNS
-  standard setting through the file's `transform_BNS_Pp_abc`, with
-  `CIF_MAGNETIC_RESTATED_BNS` (warning) and `setting="file"` to opt out.
+- I-d. A family group in an untabulated orientation read in the file's own
+  axes, through PR #1108's `Phase.parent_cell` (settled below). The child
+  cell is the parent cell plus a strain, with ties derived from the
+  operators. No restatement and no `setting=` keyword. #757 had proposed a
+  BNS restatement with `CIF_MAGNETIC_RESTATED_BNS`.
 - I-e. A 5d ⟨j₀⟩ table, Kobayashi, Nagao & Ito (2011).
 - I-f. rietx's own triplet parser in `MagneticGroup.from_xyz`, gemmi as
   oracle wherever gemmi parses.
-- I-g. Two repairable text faults with `CIF_TEXT_REPAIRED`, and `encoding=`.
+- I-g. Two repairable text faults, repaired by default with
+  `CIF_TEXT_REPAIRED` naming the lines (settled below), and `encoding=`.
 - V-a. `crystallography/magnetic/validate.py`, `validate_magnetic_phase`,
   the P1 |F|² check, at read and before both writers.
 - V-b. The check at `Refinement.__init__`; the two report fields.
@@ -141,37 +145,73 @@ transcriptions were deliberately not copied. TOPAS is a black box.
 - Modulated files and an irrational k (164 files): #678 and the v2+ fence.
 - The CIF writer and the tag registry: WP-1319 (#756). Writing the parent
   record back is #756's C-f; which WP owns it is open (Tasks).
-- The structure-level setting transform itself: WP-1911 owns "the shared
-  transform". I-d consumes it, or builds it if it lands first; it is built
-  once.
+- The structure-level setting transform itself: WP-1911 owns it, for the
+  TOPAS export (#721 item 2). I-d keeps the file's axes and does not need it
+  (settled 2026-11-02).
 - The P1 export route and the foreign writers' magnetic legs: WP-1911
   Part D (#713, #721).
 - The overlap repair (`CIF_SITE_TWINS_MERGED`, `CIF_SITE_LISTED_TWICE`) and
   the M1 forward-model fix: landed as PRs #765 and #763.
 - `MagneticCandidate.verified` (#607): WP-1418.
-- Metric ties derived from the operators in the file's own orientation: the
-  alternative to I-d (see the decision below).
+- A restatement at the BNS standard setting on read. No surveyed program
+  does it (`docs/practice.md` § A magCIF in a non-standard orientation).
 
 ## Tasks
 
-- [ ] **Decision (maintainer):** lift the supercell refusal for a rational k
-      and |det| ≠ 1 (#757 decision 2).
-- [ ] **Decision (maintainer):** the parent record as one nested record or
+- [x] **Decision (maintainer):** lift the supercell refusal for a rational k
+      and |det| ≠ 1 (#757 decision 2). **Settled 2026-11-01 by Claude under
+      measurement:** yes, once V-a's P1 check has landed, as the issue's
+      order says. The refusal names a double count that 615 of the 900
+      refused files do not have (the reporter's count). The read form is the
+      one `magnetic_supercell` already builds (#477).
+- [x] **Decision (maintainer):** the parent record as one nested record or
       two flat fields, `propagation_vector_parent` kept as an alias for one
-      release (#757 decision 3). Needed before I-b.
-- [ ] **Decision (maintainer):** the 91 untabulated orientations. 1328's
+      release (#757 decision 3). Needed before I-b. **Decided 2026-11-01
+      (maintainer), by consent:** one nested `parent` record on
+      `MagneticSymmetry`, mirroring magCIF's own `_parent_*` categories. Old
+      saved files migrate at read (`SCHEMA_VERSION` bump), and
+      `propagation_vector_parent` keeps no Python alias. Grounds: the CIF
+      dictionary groups these tags as one category, and the maintainer's
+      standing ruling is that old files must always open and old code need
+      not.
+- [x] **Decision (maintainer):** the 91 untabulated orientations. 1328's
       closing handover expected WP-1419's operator-derived metric subspace to
       carry them. #757 proposes a BNS restatement on read instead, with a
       warning and `setting="file"`. Which, and whether I-d builds WP-1911's
-      transform or waits for it.
-- [ ] **Decision (maintainer):** lenient repair of the two text faults by
-      default, or only under `encoding=` (#757 decision 1).
-- [ ] **Decision (maintainer):** `verify=True` by default at read and at
+      transform or waits for it. **Settled 2026-11-02 by Claude under
+      established practice**, on the maintainer's ask of 2026-11-01 ("look
+      closer into practice and 1108, that will probably resolve it"): keep
+      the file's axes, through PR #1108's `Phase.parent_cell`. No automatic
+      restatement and no `setting=` keyword. Strain amplitudes are read from
+      the file's cell and held by default. Grounds: MAGNDATA writes the
+      parent-related setting on purpose (Gallego et al. 2016, §2.2-2.3). The
+      IUCr magCIF guidelines accept it (Perez-Mato et al. 2024). GSAS-II
+      5.8.4 keeps the file's axes and operators, and no surveyed program
+      restates a magCIF on read (`docs/practice.md` § A magCIF in a
+      non-standard orientation). I-d waits for #1108. WP-1911's transform
+      stays with the TOPAS export (#721 item 2).
+- [x] **Decision (maintainer):** lenient repair of the two text faults by
+      default, or only under `encoding=` (#757 decision 1). **Settled
+      2026-11-01 by Claude under the reader-repair rule** (root CLAUDE.md;
+      precedent `CIF_SPECIES_NORMALISED`, which repairs by default and says
+      so): repair by default, with a `CIF_TEXT_REPAIRED` warning naming the
+      lines. At most 21 files. The new warning's text goes to the maintainer
+      before merge under the reader-output rule.
+- [x] **Decision (maintainer):** `verify=True` by default at read and at
       `Refinement.__init__`, with the fit refused on `MAGNETIC_P1_MISMATCH`;
       and whether `write_topas_inp` refuses such a phase or writes it with
-      the diagnostic in the header (#758 questions 1 and 3).
-- [ ] **Decision (maintainer):** whether this WP joins the `magnetic`
-      milestone.
+      the diagnostic in the header (#758 questions 1 and 3). **Settled
+      2026-11-01 by Claude under the rule against a confident wrong answer**
+      and the measured M1 misread (20 files whose `predict()` was off by
+      0.5-32 % of the pattern maximum with no diagnostic): `verify=True` by
+      default, the fit refused on `MAGNETIC_P1_MISMATCH`, and
+      `write_topas_inp` refusing such a phase. The check's cost is not
+      measured. Reopen this if V-a measures it as large against a fit.
+- [x] **Decision (maintainer):** whether this WP joins the `magnetic`
+      milestone. **Settled 2026-11-01 by Claude under ROADMAP rule 6:** it
+      stays unscheduled. The milestone's scope names its seven WPs, and its
+      acceptance rows were written at its opening. Adding a WP now would
+      change a milestone's acceptance after the fact.
 - [ ] I-a: the supercell refusal names its case; reads unchanged
 - [ ] I-b: the parent record, read from `_parent_*`; `SCHEMA_VERSION` bump
 - [ ] V-a: `validate_magnetic_phase` with `MAGNETIC_P1_MISMATCH`, at read and
@@ -180,7 +220,15 @@ transcriptions were deliberately not copied. TOPAS is a black box.
       `CIF_MAGNETIC_SUPERCELL_READ`
 - [ ] V-b: the check at `Refinement.__init__`; `net_moment_per_cell` and
       `ferromagnetic_component_allowed` on `FitReport.magnetic`
-- [ ] I-d: untabulated orientation, as decided
+- [ ] I-d: untabulated orientation, read in the file's axes through
+      `Phase.parent_cell`, after PR #1108 merges. To build: read
+      `_parent_space_group` (I-b), split the file's cell exactly into the
+      parent cell plus a strain within `PARENT_CELL_DRIFT_TOL`, and set
+      `parent_cell` where `_closest_type` is `None`. A file with no parent
+      block falls back to the BNS standard group through the inverse of
+      `transform_BNS_Pp_abc`, at zero strain (untested). Before ticking: a
+      `slow` run over the reporter's MAGNDATA mirror counts how many of the
+      91 read this way, and each read passes V-a's P1 check.
 - [ ] I-e: the 5d ⟨j₀⟩ table with its source row
 - [ ] I-f: the triplet parser
 - [ ] I-g: the two repairs, as decided
@@ -237,6 +285,28 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   the CIF writer.
 
 ## Handover log
+
+- **2026-11-03** (`/pr-review`) — the two review follow-ups of PR #1257 merged from outside as PR #1284 (`fd5c0bf5`). Every raw-text scan of a magCIF now skips the content of semicolon text fields. The four scans are `refuse_draft_tags`, `refuse_modulation`, the k reader `propagation_vectors` and `cif._magnetic_content`. So prose that quotes a tag no longer refuses a file, supplies a k, or sends a nuclear CIF to the magnetic reader. A k ≠ 0 stated only under the draft tag `_magnetic_propagation_vector_kxkykz` now reaches `refuse_a_magnetic_supercell`. The refusal names only the k tag the file used. No task of this WP is ticked by it. Follow-ups, not blocking: a commented-out k line (`# _parent_propagation_vector.kxkykz [1/2 0 0]`) still reads as a k, as it did on `main` before the PR. Text on a field's opening `;` line is not blanked, so a k there still reads. A loop that lists `kxkykz` before its id column reads no k. The draft reader's four-token fallback has no test. What ran, on the review's merge of head `06909a34` into `main` `62724a30` (Mac arm64, Python 3.12; the slow selection under `[dev,jax]`): fast 13 605 passed, 319 skipped, 34 xfailed, 1 failed; full `-m slow` 921 passed, 16 skipped, 17 xfailed, 1 failed in 46:36. The fast failure is `test_display`'s kernel row, whose Jupyter kernel spec points at a deleted venv on this Mac. The slow failure is `test_watch_app`'s GUI-boot socket timeout, which passed alone. Targeted magCIF rows 505 passed; ruff, the audit delta and the reader output were clean. The PR's later head `81fa6bb3` only merged `main` in.
+
+- **2026-11-02** — the six decisions are recorded, so I-a, I-b and V-a can
+  start. One was the maintainer's: the parent record is one nested `parent`
+  record, migrated at read with no alias (by consent, 2026-11-01). Claude
+  settled the other five. The 91 untabulated orientations keep the file's
+  axes through PR #1108's `Phase.parent_cell`, on a practice survey the
+  maintainer asked for. No surveyed program restates a magCIF on read, and
+  the survey is now `docs/practice.md` § A magCIF in a non-standard
+  orientation. The supercell refusal lifts after V-a. The two text faults
+  are repaired by default and say so. `verify=True` is the default, and the
+  WP stays unscheduled. Measured by a research agent on #1108's head
+  `a8bcdd66` (synthetic, no MAGNDATA file): `metric.invariant_metric_basis`
+  takes any rotation list. Two untabulated cases (8 operators of P6/mmm
+  fixing a, and 8 of Pm-3m with two-folds on face diagonals) build a table
+  and predict on #1108, and raise on `main`. A planted strain of 0.004 was
+  recovered to 3e-11. A tie list cannot express the hexagonal case, since
+  cos γ = −a/(2b) is nonlinear. Not covered: the magnetic layer and a real
+  MAGNDATA file. Recorded in PR #1317. *Next:* I-a; I-d waits for #1108.
+
+- **2026-11-01** (`/pr-review`) — #1063's items 1 and 3 merged from outside as PR #1257 (`1c55eda6`). A CIF whose other data blocks state nothing, or only `_audit_` tags, now reads its one structure block. It records the skip as the info code `CIF_EMPTY_BLOCK_SKIPPED` (tier 1). The pre-2016 draft magnetic tags are refused by name. That refusal is the maintainer's call on file "B" in #1063: refuse. No task of this WP is ticked by it. Follow-ups, not blocking: `refuse_a_magnetic_supercell` does not consult `_magnetic_propagation_vector_kxkykz`. `refuse_draft_tags` matches `^\s*<tag>` over the raw text, so it would fire inside a semicolon text field. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
 
 - **2026-10-29** (`/pr-review`) — merged from outside as PR #1193 (`cd1c39ff`): where `_parent_space_group.name_H-M_alt` is absent, the reader takes FullProf's `_parent_space_group.name_H-M`, which `cif_mag.dic` does not define, and says so with `CIF_MAGNETIC_PARENT_TAG_UNDEFINED` (info, tier 1). Two tags naming different groups raise `MagCifError` quoting both. Review noted one gap for this WP: `magcif.py` promises the known tags as lists (`READ_TAGS`, `IGNORED_TAGS`, `PRIVATE_TAGS`), and this tag is in none of them, so the completeness oracle cannot see it. None of this WP's tasks is ticked by it; the six decisions stand.
 

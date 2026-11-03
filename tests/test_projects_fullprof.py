@@ -792,12 +792,13 @@ def test_a_multi_pattern_file_is_refused_naming_the_pattern_count(tmp_path):
 
 
 @pytest.mark.parametrize("nba, why", [
-    # corpus file 5 has Nba 0 and writes six polynomial coefficients
-    # per pattern — but only in the multi-pattern layout, so where the
-    # coefficient line sits in a *single*-pattern file is unevidenced.
-    (0, "a polynomial background"),
-    (1, "one interpolated point"),
-    (-3, "a background model with no description here"),
+    # Both read LINE 17 over a background held in a companion CODFIL.bac
+    # (manual pp. 69-70); the analytic forms 0, -1, -3, -4 and -5 read
+    # (test_projects_fullprof_flags).
+    (1, "a background file refined by four coefficients"),
+    (-2, "a background file smoothed by a Fourier filter"),
+    # The manual's "cubic splines" and the 2011 notes' Chebyshev -5 disagree.
+    (-6, "a background form two sources describe two ways"),
 ])
 def test_a_background_this_reader_cannot_place_is_refused(tmp_path, nba, why):
     pcr = _pcr(tmp_path, "bkg.pcr", _phase())
@@ -811,8 +812,9 @@ def test_a_background_this_reader_cannot_place_is_refused(tmp_path, nba, why):
 @pytest.mark.parametrize("field, position", [
     # The control line's 19 fields, by position:
     # Job Npr Nph Nba Nex Nsc Nor Dum Iwg Ilo Ias Res Ste Nre Cry Uni Cor Opt Aut
-    ("Nsc", 5), ("Nor", 6), ("Dum", 7), ("Res", 11), ("Ste", 12), ("Nre", 13),
-    ("Cry", 14), ("Uni", 15), ("Cor", 16), ("Opt", 17),
+    # Nor, Dum, Nre and Opt read at every value the manual defines
+    # (test_projects_fullprof_flags), and refuse any other by name there.
+    ("Nsc", 5), ("Res", 11), ("Ste", 12), ("Cry", 14), ("Uni", 15), ("Cor", 16),
 ])
 def test_a_layout_changing_control_flag_is_refused_by_name(
         tmp_path, field, position):
@@ -854,11 +856,12 @@ def test_a_control_line_of_the_wrong_width_is_refused(tmp_path):
         read_fullprof_pcr(pcr)
 
 
-@pytest.mark.parametrize("jbt", [2, 10, -3])
+@pytest.mark.parametrize("jbt", [2, 4, -3])
 def test_an_unknown_jbt_is_refused_naming_it(tmp_path, jbt):
-    """Only ``Jbt`` 0 (nuclear) and ±1 (magnetic) are read. The others select
-    Le Bail intensity extraction, a combined nuclear+magnetic phase or a
-    form-factor phase, each of which changes the *atom block's* own layout.
+    """Only ``Jbt`` 0 (nuclear), ±1 (magnetic) and ±10 (both in one phase,
+    ``test_projects_fullprof_magnetic``) are read. The others select Le Bail
+    intensity extraction, a rigid-body or a form-factor phase, each of which
+    changes the *atom block's* own layout.
     ``Jbt = -1`` left this list with WP-1328: the manual states its atom block
     is Jbt = 1's with the moment as (M, phi, theta), same positions
     (``test_projects_fullprof_magnetic``)."""

@@ -1,9 +1,8 @@
 # WP-1958 — A phase with no reflection in range walks its scale under TRF
 
-Milestone: unscheduled · Status: 🔄 2026-10-24 — merged from outside as PR #1103 (`594d7beb`); the close is owed (the v1.10 record's narrative and ✅)
+Milestone: unscheduled · Status: ✅ 2026-10-31 — merged from outside as PR #1103 (in 1.10.0) and its follow-ups as PR #1176 (in 1.11)
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-10-13 — a quoted fraction is wrong, but `PHASE_UNCONSTRAINED` and `QPA_ESD_UNAVAILABLE` fire, and only `solver="trf"` reaches it
 
 ## Goal
 
@@ -42,31 +41,6 @@ Relevant rules, restated:
   (WP-1110 item 14): the covariance already drops the zero column; the QPA
   marks its block unmeasured. The fraction is the open half.
 
-### Inherited
-
-- **Decided 2026-10-16 (maintainer, from the issue triage, #954): both
-  halves.** A phase with no reflection in the fitted range gets no QPA
-  fraction under every solver, and its scale is held so a walked value reaches
-  no later stage, chain or export. The remaining fractions are reported
-  relative to the phases seen in range, and the report says so. This carries
-  the absent-rather-than-zero rule (WP-1072, WP-1110 item 14) to the fraction.
-
-- **2026-10-16, from the issue triage (#954): the reporter's answer to task
-  2's choice (2026-10-14) is not in the WP.** @mustachefeeling takes the QPA
-  half as the required one: no fraction for a phase with no reflection in the
-  fitted range, under every solver, with the scale held beside it so a TRF fit
-  does not hand a walked 164.7 to a later stage, a chain or an export. Reason:
-  LM already holds the scale and QPA prints 0.61 wt%, the start value, so
-  holding alone leaves the same unmeasured number. They add that the other
-  fractions are normalised over the unseen phase too (moved by 99.99 wt% under
-  TRF, 0.61 wt% under LM in the fixture), so the report should say "relative
-  to the phases seen in range; phase N not measured". Their test asserts both
-  under both solvers: scale unchanged, no fraction for that phase. DECISION
-  (maintainer, task 2): recommend taking both, since it is the package's
-  "absent rather than zero" rule (WP-1072, WP-1110 item 14, `qpa` marking the
-  block unmeasured) carried to the fraction. Checked at `2c94d848`: no code
-  moved, no PR.
-
 ## Non-goals
 
 - Whether a phase is seen at all: WP-1523's significance, closed.
@@ -94,6 +68,13 @@ Relevant rules, restated:
 - #954, the public report of this defect.
 
 ## Handover log
+
+- **2026-10-31** (close, ghostshift batch, PR #1287) — closed. A phase with no reflection in the fitted range keeps the scale it was given under both solvers and has no weight fraction. The other fractions are relative to the phases seen in range, and the report says so. Nothing is owed: every task landed in PR #1103, and its follow-ups in PR #1176.
+  *Done*: the two PRs' handover entries below are the record. This session only closed the bookkeeping: ✅, the `Priority:` line and the consumed `### Inherited` section deleted (it held the #954 decision, built by #1103), and the narrative moved to the v1.11 record.
+  *Checked against the tree and `gh`*: #1103 (`594d7beb`) is in the `v1.10.0` tag and #1176 (`0a6142c3`) is not, so it ships in 1.11 (`docs/releases/1.11.0.md` carries its notes). The WP's status line asked for the v1.10 record. That release is cut, and protocol rule 5 names the record of the release in flight, so the narrative went to v1.11 and says #1103 shipped in 1.10.0. Acceptance: `tests/test_scale_b_ridge.py` and `tests/test_qpa.py`, run with `-m "not slow"` beside `test_satellites.py` and `test_rigid_body_special.py`: 200 passed, 2 warnings (macOS arm64, worktree `.venv` `[dev]`, Python 3.12, nothing else running).
+  *What it does not do*: no release is owed. The WP was P3.
+
+- **2026-10-31** (`/pr-review`) — the follow-ups merged from outside as PR #1176 (`0a6142c3`) after two rounds: the QPA trajectory's basis flag, a variable-held scale's message, joint scales tied to one variable, and the missing-radius advice. Round 2 closed the review's gap: `_constant_link_reach` (`multi.py`) blocks every coefficient of a link whose basis is not constant, so a + b·T on a scale over one wide and one narrow scan leaves the narrow scan's phase unmeasured, and a test pins it. `references/series.md` gains a measured bullet on `qpa_trajectory` and `basis_changes`. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Two follow-ups from the PR's description wait to be placed: a test that the covariance read is exact, and `PARAMETRIC_TARGET_UNSEEN` on scale targets.
 
 - **2026-10-24** — PR #1103 merged (`594d7beb`, review round 3), by `/pr-review`.
   *Done*: every task. A phase with no reflection in the fitted range keeps the

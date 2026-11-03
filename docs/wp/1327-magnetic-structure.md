@@ -140,6 +140,50 @@ rule above applies to the form factors.
 
 ### Inherited
 
+- **From WP-2068 (2026-11-02), for the PR that returns the angle seed with the analytic angle
+  columns.** That PR owes "a comparison with the curvature-sign step #1207 would allow". WP-2068's
+  task 1 measured what such a step would change, on macOS arm64 at `a8f679858`. With the
+  analytic angle column let through `_moment_reach_ok`, the frame fixture's PLAN_3 stall at
+  φ = −5e-17 passes `stationary_angle_test` at statistic 0.000. From the minimum at φ = 0.047 the
+  same test reads 0.137, against a cut of 2.71. So a sign check would not change that verdict,
+  and WP-2068 dropped the sign check. Six one-site starts placed exactly on a deeper maximum
+  (`test_stationary_moment_angle`'s Pnma fixture, truth tilt or azimuth 0.05-0.8 rad) did not
+  stall under either column. When this PR turns the angle columns on, re-run those six
+  (WP-2068 § Non-goals, the condition). A stall on a maximum deeper than the cut would bring the
+  sign check back, read at the stop and never at the stationary point.
+- **From WP-1329 (closed 2026-11-01), three notes it could not finish, folded here
+  because this WP owns the moment and its hold.** Each was read against main
+  `4a93e8587` before the move (the code, not a run); none was run.
+  (1) *The moment in a joint fit is never held as flat when its DOFs are per-histogram*
+  (WP-1325's finding, 2026-10-14; found by reading, never run). Under
+  `SharingMap(per_histogram=["phases.*"])` a moment DOF's scoped name is
+  `hist.{h}.…`, and `multi._flat_moments_multi` compares scoped free paths against each
+  table's bare entry names, so none matches and nothing is held;
+  `_turn_flat_axes_multi` then writes one turn into every table. WP-1325 fixed the same
+  class for a phase's cell (`multi._unseen` judges each entry in its own histogram). The
+  task: run it on a two-histogram moment with a flat direction first, then fix by the
+  same rule if it holds.
+  (2) *A powder twin is read as path dependence* (WP-1938 D13, 2026-10-11). Reversing
+  every moment gives the same powder pattern, and so does a mirror of the lattice that
+  fixes the site. On `tests/test_moment_angle_chart.py`'s series (one Mn on **a** in
+  P m m m) the backward chain, where the azimuth is unmeasured (esd 10²-10⁴), lands on a
+  twin: φ = 0.077 under LM, −0.077 under TRF, against the forward chain's 3.065 at
+  equal χ². `sequential._angle_difference` takes an angle modulo a whole turn only, so
+  both fences (`_path_dependence_diagnostics`, `_discontinuity_steps`) report up to
+  97σ. The task: compare a moment's direction modulo the twins the powder cannot
+  separate. Time reversal is universal and a phase reverses all its moments together. A
+  mirror depends on the crystal and the site. The GUI's disagreement column must measure
+  what the fences do (`sequential._angle_paths`).
+  (3) *`MagneticTrajectory` and `MagneticOnset` ship without a provisional declaration a
+  test can see* (WP-1541, 2026-10-03). Both live in `rietx.schemas.sequential` beside 102
+  stable names, so no `PROVISIONAL_MODULES` prefix covers them, and only the
+  compatibility page's prose says they are provisional. The fix: move both to a module of
+  their own (for example `rietx.schemas.magnetic_series`), re-export them from
+  `rietx.schemas.sequential`, declare it in `tests/api_surface.py` with the reason that
+  they were measured on one synthetic ramp, one two-pattern pair and one real k ≠ 0 ramp
+  (PR #1073), and the bracket-folding rule changed after they landed (#589); then drop
+  the prose sentence.
+
 - **From WP-2010 (2026-10-27): the magnetic "not yet validated" label became a report
   sentence, and a published moment would verify, not validate.** The maintainer ruled
   that the validation record is for the developers (DESIGN.md § Rules, 2, narrowed that
@@ -391,6 +435,34 @@ rule above applies to the form factors.
   must still validate") and `Refinement.__init__` calling it on a refined phase
   disagree; whichever option lands decides which one is right.
 
+- 2026-10-31, from the issue triage (issue #1260): the published LaMnO₃
+  references this WP's 2026-10-19 Inherited note said nobody had searched for.
+  Huang et al. (1997), *Phys. Rev. B* 55, 14987: magnetic group Pn′ma′ (p.
+  14988), spin along a, μ(Mn) = 3.65(3) μ_B at 14 K and 2.09(3) μ_B at 121 K
+  (Table IV, sample IIa, NIST BT-1). Moussa et al. (1996), *Phys. Rev. B* 54,
+  15149: μ(Mn) = 3.87(3) μ_B at 1.4 K (Table I, Orphée G4.2, λ = 2.59 Å, Pbnm,
+  moment along b, which is a in the Pnma setting). The proposed acceptance:
+  `solve_magnetic` ranks Pn′ma′ (BNS 62.448) first; the 50 K |m| lies within
+  the interval spanned by each paper's value scaled to 50 K by that paper's
+  own temperature curve (Huang Fig. 2, Moussa Fig. 5; reading them is part of
+  the work); the moment lies along a; the report says the c component has no
+  published value (Moussa p. 15154 calls the G_x component too weak to
+  measure). Tiering, under DESIGN.md § Rules 2: Huang verifies once the
+  tutorial pattern is confirmed to be Huang's (the tutorial credits Q. Huang;
+  whether it is sample IIa is not established). Moussa validates only if a
+  powder neutron refinement of a different specimen, laboratory and instrument
+  counts as an independent measurement. Rule 2's examples (a certified cell, a
+  weighed composition, a composition from another probe) do not settle it, and
+  WP-2010's wording for this WP names magnetometry or a single-crystal
+  experiment. That ruling is the maintainer's. Checked against the tree at
+  d87c8cc91: `tests/test_acceptance_magnetic_lamno3.py` pins `PN_MA =
+  "62.448"`; `docs/VALIDATION.md` records `lamno3_bt1` as `characterisation`
+  with |m| 3.560 ± 0.043 μ_B and m = (3.546, 0, 0.317) μ_B. The group-ranking
+  test is WP-1418's (`test_lamno3_at_50k_ranks_a_type_first_of_four`); only
+  its tier would change. Open PR #1266 (WP-2010) lists #1260 as a filed
+  follow-up and tags the LaMnO₃ claims `features=("magnetic_structure",)` at
+  `characterisation`, which agrees with the issue.
+
 ## Non-goals
 
 - Determining a magnetic structure: representation analysis, k-SUBGROUPSMAG,
@@ -500,6 +572,9 @@ rule above applies to the form factors.
   [1312](1312-neutron-followthrough.md) the joint-fit audit this term joins.
 
 ## Handover log
+
+- **2026-11-01** (ghostshift close-batch, PR #1287) — no work on the moment this session. WP-1329 closed and its three unfinished notes were folded into this WP's `### Inherited`: the joint-fit hold of a per-histogram moment, the powder-twin reading of path dependence in the series fences, and the provisional declaration for `MagneticTrajectory` and `MagneticOnset`. The maintainer ruled the fold on 2026-11-01. This WP was chosen because it owns the moment and its hold, and no session or open pull request holds it. Nothing else in the WP moved, and the code of the three notes was read, not run.
+  Next: unchanged (the analytic moment branch); the three notes wait in `### Inherited`, and note (1) should be run on a two-histogram moment before it is fixed.
 
 ### 2026-10-31 — the moment moduli's analytic Jacobian landed from outside
 

@@ -50,6 +50,24 @@ reads.
 
 ### Inherited
 
+- 2026-10-31, from the issue triage (issue #1008): the reporter (2026-10-30)
+  proposes splitting this WP in two and offers to build the first part. Part 1
+  is the arm: the released arm frees the heavy-atom members and each riding H
+  follows its parent, through `Refinement.tie(..., offset=)` at a held cell if
+  a check shows that suffices; Δk is read off the fit (36 on acridine IX, 14 ×
+  3 − 6); the arm is built by a public function that `check_rigid_bodies`
+  calls, so a caller can fit it by hand and choose which members are freed;
+  verified by the parameter count, each H–parent vector kept after the fit,
+  and the public arm's χ² equal to the same arm assembled by hand; the ΔBIC on
+  the stretched body measured and reported, not asserted. Part 2 is the
+  verdict: the stretched body fires, the deposited body does not, and the
+  skill row. Part 1 changes no `MISFIT_ALPHA`, `MISFIT_BIC` or `fires`. If
+  riding on a free atom (#759) is needed instead of ties, they will stop and
+  say so first. Checked against the tree at d87c8cc91: `Refinement.tie` takes
+  `scale` and `offset` (`refine.py:3429`); the released arm is still assembled
+  inside `report/body_misfit.rigid_body_misfit` (`released_phase`, line 256),
+  with no public builder. The public arm builder is a new public name.
+
 ## Non-goals
 
 - The "right body does not fire" arm, which the issue says is unaffected.

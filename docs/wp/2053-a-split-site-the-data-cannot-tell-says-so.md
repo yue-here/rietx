@@ -2,7 +2,7 @@
 
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
-Depends on: 2053 soft (#1088's WP: the stage compile halves a collapsed split pair, which corrupts this WP's d = 0 arm)
+Depends on: 2052 soft (#1088's WP: the stage compile halved a collapsed split pair, which corrupted this WP's d = 0 arm; fixed within one call by PR #1307)
 Priority: P3 2026-10-26 — a diagnostic that would say more than the fit does today, with nothing wrong in the numbers; its first task is the maintainer's ruling on the reporter's two questions
 
 ## Goal
@@ -64,6 +64,19 @@ the reporter); Jana2020 has Gram-Charlier terms to sixth order (Petříček et a
 row to `docs/practice.md` once checked.
 
 ### Inherited
+
+- 2026-11-01, from WP-2052 (PR #1307): the dependency is met within one call. `fit()`,
+  `run_stage()` and a joint fit now keep each site's orbit split from start to answer, so a
+  collapsed split pair keeps its atoms, and `SITE_MULTIPLICITY_KEPT` names a site whose
+  returned coordinates a fresh compile would count at fewer positions. The d = 0 arm can be
+  run. Between calls the split is still decided afresh from the stored coordinates, so the
+  halving returns at the next call: a second `run_stage` (the GUI's stage-by-stage path), the
+  next pattern of a series, `replay` of a node, `predict()` on a new grid, `suggest()`'s probe,
+  and the CIF writer's `_multiplicities` (`io/cif/blocks.py`), which then disagrees with the
+  result's weight fractions. The finding says so at the end of every call. The fix that
+  covers them all is to keep the answer's split on the `Refinement` until an edit or a
+  checkout, and record it on the history node for `replay`. The node half is a stored-format
+  change, so it is the maintainer's call. This WP's ruling is the natural place to ask.
 
 ## Non-goals
 

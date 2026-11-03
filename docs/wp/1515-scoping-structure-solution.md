@@ -82,6 +82,15 @@ the whole surface with real agents.
 
 ### Inherited
 
+- **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: #677 step 7 can start from the generator.** `subgroups.maximal(group)` gives each maximal subgroup of the leading group with its (P, p) to the standard setting, in exact arithmetic (PR #1189, `crystallography/representation/subgroups.py`). Nothing is read from a printed table.
+
+- **2026-11-01, from WP-1809 (closed, PR #1287): a radii-backed default for the
+  anti-bump pair-list builder is a later convenience, and this WP is its home.** The
+  maintainer ruled on 2026-11-01 that `anti_bump_restraints` keeps the caller-stated
+  minimum as the settled design. Reading Shannon, Pyykkö and Pauling radii
+  (`crystallography/radii.py`) for an r₀, and saying which species pairs got no row,
+  stays open here beside the clash floor this WP already names them for (#677).
+
 - **2026-10-16, from the issue triage (#998): `solve_seed` checkpoint,
   resume and progress.** The reporter's blind kit (36 atoms, 4 species, lab
   X-ray) ran single seeds at `budget=3` past 1 h and then 8 h timeouts, and
@@ -210,6 +219,22 @@ the whole surface with real agents.
   `crystallography/site_classes.py` exists, and no open PR claims it. The
   module takes the next free number when it is cut, and the thread is
   corrected in the same triage.
+
+- 2026-10-31, from the issue triage (issue #562): the reporter proposes
+  (2026-10-30) making March-Dollase r a parameter of the solve cost.
+  `SolveCost` folds each reflection's preferred-orientation factor into Ω at
+  extraction. So the cost is a function of |F|² at the extraction's texture
+  only. The reporter ran a body search outside the package on a strongly
+  textured molecular pattern. It reached the structure's basin only once r was
+  a search coordinate. The proposal evaluates the cost and ∂/∂r at a stated r
+  and axis, reusing `march_term`. It would be verified against Rietveld-mode
+  `evaluate`, with a wrong-factor arm. Whether a search moves r is left to the
+  engine. The reporter asks where it sits: in `SolveCost`, or as a factor the
+  engine applies to |F|². Checked against the tree at d87c8cc91:
+  `solve/cost.py`'s docstring confirms that preferred orientation is folded
+  into Ω's columns. `model/preferred_orientation.march_term` and
+  `march_term_and_dr` exist. WP-1997 lists preferred orientation (S9, #677) as
+  a non-goal, so this belongs with S9.
 
 ## What the scoping decides
 

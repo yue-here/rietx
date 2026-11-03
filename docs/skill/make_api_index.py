@@ -242,7 +242,11 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "yourself. `fig.to_px(points)` carries Cartesian Å into the "
                 "image's pixels, so a legend from `.palette`, an axis triad and a "
                 "scale bar from `.pixels_per_angstrom` are drawn in matplotlib as "
-                "`examples/structure_furniture.py` draws them. For a site's colour (`#rrggbb`, `white` or `black`; "
+                "`examples/structure_furniture.py` draws them; a polyhedron's "
+                "swatch takes `.polyhedron_palette[formula]`. `pad=0` crops the "
+                "picture to its ink with every map kept; never cut `.image` "
+                "yourself (Measured: WP-1468, YBa₂Cu₃O₇ at 1000 px 3 px of "
+                "margin against 35-53). For a site's colour (`#rrggbb`, `white` or `black`; "
                 "anything else raises) or radius, edit the dict "
                 "`rietx.gui.structure3d.build` returns and pass that. "
                 "Another program's picture: `Structure.to_cif` writes the "
@@ -262,8 +266,13 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "bond. `empty` is the share of "
                 "the frame with nothing drawn. `cut` counts what `keep` and "
                 "`build`'s atom cap dropped, `atoms` the cell's images the cap "
-                "left out, and `warnings` says when the cap trimmed the cell "
-                "or a tensor was drawn flat. A cell past `max_atoms` (400) "
+                "left out, and `warnings` says when the cap trimmed the cell, "
+                "a tensor was drawn flat, or `mode=\"ellipsoid\"` drew sites "
+                "as spheres, counted. A CIF read with the default `aniso=False` "
+                "has none anisotropic and its reader says "
+                "`CIF_ANISO_COLLAPSED`; pass `aniso=True` (Measured: #1056, "
+                "COD 2104364 paracetamol, 0 of 20 sites, 11 with `aniso=True`, "
+                "the nine hydrogens staying spheres). A cell past `max_atoms` (400) "
                 "raises from a structure, so pass the count it names "
                 "(Measured: #665, HKUST-1 648). "
                 "There is no quality score, so the judgement is yours. Iterate "
@@ -323,8 +332,9 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "`max_atoms`; each atom's `image` says which atom of the cell it "
                 "is, and `periodicity(g, mask)` reads 0 to 3 for a motif "
                 "(Measured: WP-1502, NAC 3x3x3 in 44-62 ms). On a dark "
-                "`background`, `recolour` C, whose default #383838 reads at "
-                "1.56:1 against #151515 (Measured: WP-1533).",
+                "`background` C draws #666666, 3.18:1 against #151515, and a "
+                "light one keeps #383838; a `recolour` stays yours (Measured: "
+                "WP-1468).",
                 ("rx.viz.keep", "rx.viz.select", "rx.viz.plane", "rx.viz.sphere",
                  "rx.viz.component", "rx.viz.periodicity", "rx.viz.recolour"),
             ),
@@ -391,8 +401,8 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "nobody can rebuild from a CIF plus a pattern (Measured: WP-1118 — six "
                 "agents handed a hand-transcribed series all named the transcription as "
                 "the hardest part of the work). Read `.format.reports_at` to know which "
-                "call takes your `diagnostics=` list: a `.inp` reports at read, a `.pcr` "
-                "at `to_structure`, a `.EXP` at both. A GSAS `.EXP` carries the whole "
+                "call takes your `diagnostics=` list: a `.pcr` reports at `to_structure`, "
+                "a `.inp`, `.EXP` and `.gpx` at both. A GSAS `.EXP` carries the whole "
                 "experiment rather than one phase, so read the wavelengths, excluded "
                 "regions and refined profile terms off `model.stated` — a `Structure` "
                 "cannot hold them. **A blank field there "
@@ -491,6 +501,26 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                  "rietx.crystallography.representation.distortion.DisplaciveStatement"),
             ),
             (
+                "What a fit on mode amplitudes reports",
+                "A fit of a phase carrying `Phase.distortion_modes` returns "
+                "`RefinementResult.distortion_totals`: one `DistortionTotal` per "
+                "irrep block (every mode of one irrep, k and isotropy group), "
+                "with A_τ in Å, its esd from the block's covariance (linearised; "
+                "undefined at A_τ = 0, Rice-biased below about 2 esd) and "
+                "Hotelling's T² with m and no p. "
+                "`ref.distortion_block_tests(data, hold=None, "
+                "detectability_bar=None, detectability_probe=None)` refits with each named block, or set of "
+                "blocks, held at 0 and returns ΔBIC at N/f², Λ and its p, both χ² "
+                "and, with a bar and your probe amplitude, A_det; a restricted fit below the full one "
+                "restarts the full fit and is recorded. Numbers only, no verdict; "
+                "readings in `references/magnetic.md`.",
+                ("rietx.schemas.results.DistortionTotal",
+                 "rietx.report.DistortionBlockTests",
+                 "rietx.report.DistortionBlockTest",
+                 "rietx.report.block_comparison",
+                 "rietx.report.detectability_amplitude"),
+            ),
+            (
                 "Displacive candidates of a parent",
                 "`distortion_candidates(parent, k, sites=None)` from "
                 "`rietx.crystallography.magnetic.isotropy` lists every child a "
@@ -523,16 +553,18 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
 #: raised cap).  ``tests/test_skill.py`` holds every name here to a real field.
 TECHNIQUE_FIELDS: dict[str, frozenset[str]] = {
     "rx.Phase": frozenset({"rigid_bodies", "distortion_modes"}),
+    "rx.RefinementResult": frozenset({"distortion_totals"}),
     "rx.ParameterRow": frozenset({"body"}),
 }
 
 #: Union members a technique owns, elided from a field's rendered annotation
 #: for the same reason: ``Phase.restraints`` is an everyday field, but the
-#: tether, anti-bump and planarity kinds are the rigid-body track's, and their verbs get
-#: their own index in WP-1812 (WP-1809: no raised cap).  Deferred from the
-#: manual in ``tests/api_surface_deferred.txt`` meanwhile.
+#: tether, anti-bump, planarity and torsion kinds are the rigid-body track's,
+#: and their verbs get their own index in WP-1812 (WP-1809, WP-1815: no raised
+#: cap).  The manual documents them in the restraints guide.
 TECHNIQUE_MEMBERS: frozenset[str] = frozenset({"TetherRestraint", "AntiBumpRestraint",
-                                               "PlanarityRestraint"})
+                                               "PlanarityRestraint",
+                                               "TorsionRestraint"})
 
 HEADER = """# The API index
 
@@ -717,13 +749,17 @@ def model_field_parts(cls, skip: frozenset[str] = frozenset()) -> list[tuple[str
     from pydantic_core import PydanticUndefined
 
     out = []
+    # a factory a caller cannot reach (HumpComponent.position) prints as required
+    required = set(getattr(cls, "_required_of_a_caller", ()))
     for name, info in cls.model_fields.items():
         if name in skip:
             continue
         ann = _ann(info.annotation)
         for member in TECHNIQUE_MEMBERS:
             ann = ann.replace(f" | {member}", "")
-        if info.default_factory is not None:
+        if name in required:
+            default = None
+        elif info.default_factory is not None:
             default = _default(info.default_factory())
         elif info.default is not PydanticUndefined:
             default = _default(info.default)

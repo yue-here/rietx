@@ -699,7 +699,8 @@ def test_cherry_pick_replays_a_stage_action(synthetic_pattern):
 # ----------------------------------------------------------------------
 # stage_end.rwp is the Rwp of the model the stage fitted (WP-1457, #441)
 # ----------------------------------------------------------------------
-def _one_stage_fit(*, peak: bool, two_theta_limits=None):
+def _one_stage_fit(*, peak: bool, two_theta_limits=None, events: bool = True,
+                   keep: list | None = None):
     """A one-stage LaB6 fit freeing only linear parameters, events captured.
 
     Scale, background and a declared peak's area are all the model is linear
@@ -760,9 +761,13 @@ def _one_stage_fit(*, peak: bool, two_theta_limits=None):
         free.append("instrument.extra_components.0.area")
     seen: list[dict] = []
     # the declared stage's stage_end; the closing stage is tests/test_closing_stage.py's
-    result = rx.Refinement(structure, ins, history=False).fit(
+    ref = rx.Refinement(structure, ins, history=False)
+    if keep is not None:
+        keep.append(ref)
+    result = ref.fit(
         data, plan=rx.RefinementPlan(stages=[Stage("all", free)], closing_window_tol=None),
-        two_theta_limits=two_theta_limits, events=seen.append, telemetry=False)
+        two_theta_limits=two_theta_limits,
+        events=seen.append if events else None, telemetry=False)
 
     def of(kind):
         return [e["data"] for e in seen if e["kind"] == kind]
@@ -815,6 +820,35 @@ def test_a_fit_without_peaks_keeps_its_stage_rwp_to_the_bit(compiled_path):
     [fit_end] = of("fit_end")
     assert stage_end["rwp"] == fit_end["rwp"] == result.statistics.rwp
     assert stage_end["rwp"] == pytest.approx(PRE_FIX_NO_PEAK_RWP, rel=1e-12)
+
+
+def test_stage_result_carries_the_stage_end_rwp_with_or_without_events():
+    """``StageResult.rwp`` is the number ``stage_end`` emits, and it is
+    written whether or not a caller asked for events (WP-1334): a caller
+    keeping the best stage reads the object, never the log.  The empty state
+    ``None`` is a document stored before the field, so an old record reads.
+    """
+    from rietx.schemas.results import StageResult
+
+    _, result, of = _one_stage_fit(peak=True)
+    [stage_end] = of("stage_end")
+    assert result.stages[0].rwp == stage_end["rwp"]
+
+    # the same fit with no stream: the field is still written, and equal
+    kept: list = []
+    data, quiet, _ = _one_stage_fit(peak=True, events=False, keep=kept)
+    assert quiet.stages[0].rwp == stage_end["rwp"]
+
+    # the incremental verb is the third writer
+    seen: list[dict] = []
+    again = kept[0].run_stage(data, Stage("again", ["phases.0.scale"]),
+                              events=seen.append, telemetry=False)
+    [again_end] = [e["data"] for e in seen if e["kind"] == "stage_end"]
+    assert again.stages[-1].rwp == again_end["rwp"]
+
+    old = result.stages[0].model_dump(mode="json")
+    del old["rwp"]
+    assert StageResult.model_validate(old).rwp is None
 
 
 def test_fit_start_keeps_the_file_count_and_adds_the_fitted_count():

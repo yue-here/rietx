@@ -699,7 +699,14 @@ reverse it knowing what it would be giving up.
   number (rietx's own, unsourced) on its path, the background picker 13 and the staged
   plan 15. Reversed on a user's or a handover's report that the report sentence is
   ignored or misread, in which case the record stays for the handovers and the sentence
-  goes.
+  goes. *Reversed 2026-11-01* (the maintainer, in session), on a different ground: the
+  audit is for development, and the report is a surface an agent reads between stages,
+  while it still chooses what to free. The sentence depends only on which parameters are
+  free, so the one action it can prompt that differs between fits is changing them,
+  which the first half of this ruling forbids. Built in #1266, it named 20 of the 26
+  reported parameters on `examples/srm660c_lab.py` in 930 characters (macOS arm64; the
+  PR measured 21 and 970 on Linux). The sentence goes. The record stays in the matrix
+  and its generated page.
 
 ## The two reviews at the open
 

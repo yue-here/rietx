@@ -226,7 +226,12 @@ _ROUGHNESS_STAGE = (
 #: The microstrain, in ppm of ΔM/M, that ``lab_sample_refine`` puts an all-zero
 #: Stephens block at before solving (``Stage.strain_seed``): the width's square
 #: root has unbounded slope at zero, so some start is forced.  1000 ppm is
-#: GSAS-II's isotropic microstrain default, on the isotropic ray (WP-1467).
+#: GSAS-II's isotropic microstrain default, on the isotropic ray.  WP-1467
+#: compared it with a start at the ``lor_strain`` the phase carried, folded onto
+#: the ray: equal on brucite under LM (χ² 7.8943 against 7.8939), and on one
+#: two-phase operando pattern lower under LM (1.112 against 1.170, the phase
+#: fractions swapped) and higher under TRF (1.476 against 1.156).  The
+#: measurements disagree, so the fixed seed stands.
 STRAIN_SEED_PPM = 1000.0
 
 
@@ -524,12 +529,74 @@ class RefinementPlan:
         ])
 
     @classmethod
+    def magnetic_structural(cls) -> "RefinementPlan":
+        """:meth:`mccusker_structural` with the magnetic moments refined from
+        its second stage on (WP-1418, issue #1082).
+
+        After the scale and background, the moment **moduli** refine alone
+        (``…moment.dof0``), then every moment DOF, moduli and angles; the
+        zero, cell, widths, coordinates and displacement parameters follow in
+        :meth:`mccusker_structural`'s order.  Staging is cumulative, so the
+        moments stay free in every later stage and the closing stage.  The
+        precedent for each part:
+
+        - **the nuclear order** is McCusker, Von Dreele, Cox, Louër & Scardi
+          (1999), *J. Appl. Cryst.* **32**, 36, as in
+          :meth:`mccusker_structural` (no program ships it as a default);
+        - **the moduli before the angles** is the order
+          ``strategy.magnetic.SOLVE_STAGE_PATHS`` refines a trial in, for
+          WP-1938 D12's measurement there: an angle's column scales with its
+          modulus, and freed together from a small modulus LM stopped at χ²
+          454 660 against 2556.06.  Measured for this preset on that two-site
+          P n m a set (WP-1418, macOS arm64): from moduli 20 % high the stage
+          changes no value beyond 1e-6 μ_B; from 0.1 μ_B with the directions
+          0.4 rad off, this preset and the same plan without the
+          ``moment_moduli`` stage (every moment DOF freed together) both
+          converge.  That is start dependence, not an effect of the order:
+          from this cold start the fit can reach either of two minima tied in
+          χ² (planted 3.50 / 0.70 μ_B, or 3.34 / 1.25 at a χ² 0.07 lower),
+          and the moduli stage reached the planted one here.  Freeing every
+          moment DOF together reaches the planted values from another start
+          (``docs/skill/rietx/references/magnetic.md``, WP-1938 and WP-1953).
+          The tie itself is an identifiability finding about the model, not
+          the plan (WP-1418's follow-ups);
+        - **the moments before the coordinates** is the solve's order too
+          (moment, scale and background before anything nuclear).  The reason
+          is the confound the solve leaves coordinates out for: with the
+          moment held, a coordinate or a Biso freed later absorbs the
+          magnetic intensity the held moment misplaces.  Measured on a
+          synthetic k = (0, 0, ½) child, moment started 20 % high and every
+          Biso 0.3 Å² high: under :meth:`mccusker_structural` the moment
+          stays at 3.6 μ_B and the O Biso falls to 0.33 Å² (planted 0.6, esd
+          770); under this plan the moment returns 2.997 ± 0.005 μ_B
+          (planted 3.0) and each Biso is within 1.0 esd of its planted
+          value.
+
+        The last two are rietx's own order.  A refiner may dissent on it,
+        refining the structure first and the moments after; that sequence was
+        not measured, so nothing above is evidence for or against it.  This is
+        a preset a caller chooses and never a default.  The two moment stages
+        free nothing on a phase without a moment.
+        """
+        first, *rest = cls.mccusker_structural().stages
+        return cls(stages=[
+            first,
+            Stage("moment_moduli", ["phases.*.atoms.*.moment.dof0"]),
+            Stage("moments", ["phases.*.atoms.*.moment.dof*"]),
+            *rest,
+        ])
+
+    @classmethod
     def lab_bragg_brentano(cls) -> "RefinementPlan":
         """Lab flat-plate plan: adds sample displacement (with zero), then the
-        Kα2/Kα1 intensity ratio and FCJ axial-divergence parameters last —
-        the McCusker ordering extended by the v0.2 lab-instrument physics.
+        Kα2/Kα1 intensity ratio and the FCJ axial ratio S/L last — the
+        McCusker ordering extended by the v0.2 lab-instrument physics.
         Sample transparency stays fixed (free it explicitly for low-absorbing
-        samples)."""
+        samples).
+
+        **H/L stays at its declared value** (WP-2012): the FCJ weight is
+        symmetric under S/L ↔ H/L, so two free ratios have two mirrored
+        minima and a fit reports whichever it reached as two measurements."""
         return cls(stages=[
             Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
             Stage("zero_disp", ["instrument.zero_shift",
@@ -539,8 +606,7 @@ class RefinementPlan:
             Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                               "instrument.profile.x", "instrument.profile.y"]),
             Stage("lines_axial", ["instrument.source.lines.*.weight",
-                                  "instrument.geometry.axial_sl",
-                                  "instrument.geometry.axial_hl"]),
+                                  "instrument.geometry.axial_sl"]),
             *_ROUGHNESS_STAGE,
         ])
 
@@ -551,8 +617,14 @@ class RefinementPlan:
         what pins the dispersion axis and decorrelates the otherwise-sloppy
         {zero (const), displacement (cosθ), cell (tanθ)} triple — while zero,
         displacement, the resolution function, the Kα2 ratio and the axial
-        ratios refine.  Export the result with ``save_instrument_profile``;
+        ratio S/L refine.  Export the result with ``save_instrument_profile``;
         refine unknowns against it with the ``lab_sample_refine`` plan.
+
+        **H/L stays at its declared value**, the receiving slit's height over
+        the goniometer radius (WP-2012, the maintainer's ruling of
+        2026-11-01).  The FCJ weight is symmetric under S/L ↔ H/L, so a
+        pattern cannot tell the two apart; left at 0 it gives a one-ratio
+        model, close to GSAS-II's single SH/L.
 
         **No roughness stage here, deliberately.**  A certified line-profile
         standard is a carefully prepared specimen, and this plan's job is to
@@ -568,8 +640,7 @@ class RefinementPlan:
             Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                               "instrument.profile.x", "instrument.profile.y"]),
             Stage("lines_axial", ["instrument.source.lines.*.weight",
-                                  "instrument.geometry.axial_sl",
-                                  "instrument.geometry.axial_hl"]),
+                                  "instrument.geometry.axial_sl"]),
             Stage("biso", list(_DISPLACEMENT_GLOBS)),
         ])
 
@@ -708,6 +779,7 @@ PLAN_PRESETS = {
     name: _PlanFactory(build) for name, build in {
         "mccusker_default": RefinementPlan.mccusker_default,
         "mccusker_structural": RefinementPlan.mccusker_structural,
+        "magnetic_structural": RefinementPlan.magnetic_structural,
         "lab_bragg_brentano": RefinementPlan.lab_bragg_brentano,
         "lab_calibrate": RefinementPlan.lab_calibrate,
         "lab_sample_refine": RefinementPlan.lab_sample_refine,
@@ -811,12 +883,34 @@ PLAN_INFO: dict[str, PlanInfo] = {
             "A structure worth refining against data good enough to carry it. "
             "Run the profile-only plan first if the fit is not already close."),
     ),
+    "magnetic_structural": PlanInfo(
+        title="Standard + structure + magnetic moments",
+        description=(
+            "The structural order with the magnetic moments refined from the "
+            "start. After the scale and background, the moment moduli refine "
+            "alone, then every moment degree of freedom, moduli and "
+            "directions. The zero shift, lattice parameters, widths, "
+            "coordinates and displacement parameters follow as in "
+            "`mccusker_structural`. The moments keep refining in every later "
+            "stage, because staging is cumulative."),
+        modes=("rietveld",),
+        when_to_use=(
+            "A magnetic phase refined together with its nuclear structure: "
+            "the final joint fit of a stated magnetic structure, or a nuclear "
+            "model that has not converged with the moment present. Freeing "
+            "the moments before the coordinates keeps a coordinate or a "
+            "displacement parameter from absorbing magnetic intensity a held "
+            "moment leaves unexplained. Declare the moments and their symmetry "
+            "first; a supercell statement needs its anti-translation ties."),
+    ),
     "lab_bragg_brentano": PlanInfo(
         title="Lab diffractometer (one pass)",
         description=(
-            "Bragg-Brentano flat-plate order. The specimen displacement and "
-            "transparency corrections join the zero shift. The axial "
-            "(Finger-Cox-Jephcoat) apertures refine with the widths."),
+            "Bragg-Brentano flat-plate order. The specimen displacement joins "
+            "the zero shift. The transparency stays fixed. The axial "
+            "(Finger-Cox-Jephcoat) ratio S/L refines with the emission-line "
+            "weights. H/L stays at the value you set, because swapping the two "
+            "ratios leaves the pattern unchanged."),
         modes=("rietveld",),
         when_to_use=(
             "A lab pattern where something outside the fit pins the zero shift "
@@ -835,7 +929,10 @@ PLAN_INFO: dict[str, PlanInfo] = {
             "profile and the position corrections on a line-position standard "
             "with its certified lattice parameters held fixed. Holding them "
             "fixed decorrelates the zero shift, the specimen displacement and "
-            "the lattice parameters from one another."),
+            "the lattice parameters from one another. Of the two axial ratios "
+            "only S/L refines. Set H/L to the receiving slit's height over the "
+            "goniometer radius first, because swapping the two ratios leaves "
+            "the pattern unchanged."),
         modes=("rietveld",),
         when_to_use=(
             "A standard (LaB6, Si or corundum), once per instrument "
@@ -957,9 +1054,11 @@ class GuardFinding:
     #: rendered form, identical to the pre-v1.0 list entry
     message: str
     #: a clause a *diagnostic* appends to its own sentence, already rendered.
-    #: Written only by :meth:`at_bound` and read only where ``BOUND_HIT`` and
-    #: ``FLOOR_HIT`` build their ``Diagnostic`` (WP-1434 gives that finding
-    #: evidence to carry; WP-1076 wants both ends of a new field named).  It
+    #: Two writers, each read only where its own code builds the
+    #: ``Diagnostic`` (WP-1076 wants both ends of a field named):
+    #: :meth:`at_bound`, read by ``BOUND_HIT`` and ``FLOOR_HIT`` (WP-1434 gives
+    #: that finding evidence to carry), and :meth:`nonpositive_strain`, read by
+    #: ``STEPHENS_STRAIN_NOT_POSITIVE`` (the intensity share, WP-1467).  It
     #: is deliberately not part of :meth:`__str__`, which is the pre-v1.0 text
     #: byte for byte and is what the other diagnostics are built from.
     detail: str = ""
@@ -1020,10 +1119,19 @@ class GuardFinding:
 
     @classmethod
     def nonpositive_strain(cls, path: str, n_bad: int, n_total: int,
-                           worst: float, hkl: str) -> "GuardFinding":
+                           worst: float, hkl: str,
+                           share: float | None = None) -> "GuardFinding":
+        """``share`` is the fraction of the phase's m·|F|² (no Lp, absorption
+        or texture) over the reflections in the fitted range that sits in the reflections the clamp left with no strain width
+        (:func:`stephens_clamp_share`, WP-1467).  It rides in ``detail``, so
+        the rendered finding is the pre-v1.0 text byte for byte."""
+        detail = ("" if share is None else
+                  f" The width law gives those reflections no strain width, "
+                  f"and they carry {100.0 * share:.3g} % of the phase's "
+                  f"m·|F|² over the reflections in the fitted range.")
         return cls("STEPHENS_STRAIN_NOT_POSITIVE", (path,), float(worst),
                    f"{path} ({n_bad} of {n_total} reflections, "
-                   f"worst σ²(M) {worst:+.2e} at {hkl})")
+                   f"worst σ²(M) {worst:+.2e} at {hkl})", detail=detail)
 
     @classmethod
     def nonpositive_texture(cls, path: str, n_bad: int, n_total: int,
@@ -1416,6 +1524,14 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
     cone condition off the measured directions is unobservable, and flagging it
     would be a claim the data cannot support.  Needs the compiled model for
     that list, so it returns ``[]`` when none is supplied.
+
+    **The finding carries the share of intensity the clamp zeroed** (WP-1467),
+    in ``detail``: the reflections outside the cone get no strain width at all,
+    so a solver can lean on that set as a free hinge, and the count alone
+    cannot say whether it did.  29 of 96 and 1 of 463 fired at one level on
+    one pattern, carrying 25 % and 0.5 % of their phases' intensity.  The share
+    is :func:`stephens_clamp_share`'s, over the reflections whose frozen window
+    reaches the fitted data.  ``str(finding)`` is unchanged.
     """
     import numpy as np
 
@@ -1438,8 +1554,45 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
             k = int(np.argmin(sigma2))
             hkl = reflection_label(cp.reflections.hklm[k])
             out.append(GuardFinding.nonpositive_strain(
-                base, int(bad.sum()), len(sigma2), float(sigma2[k]), hkl))
+                base, int(bad.sum()), len(sigma2), float(sigma2[k]), hkl,
+                share=stephens_clamp_share(model, ip, table, bad)))
     return out
+
+
+def stephens_clamp_share(model, ip: int, table, bad) -> float | None:
+    """Phase ip's share of intensity in the reflections ``bad`` marks (WP-1467).
+
+    The weight of a reflection is its own integrated intensity with the scale
+    and every angle-dependent correction left out: m·|F|² in Rietveld mode,
+    the same I_calc :meth:`~rietx.model.forward.CompiledModel.structure_intensity_partition`
+    returns, and the extracted per-hkl intensity (``hkl_intensity``) under Le
+    Bail and Pawley, where no structure factor exists.  Summed over the
+    reflections whose frozen window reaches the fitted data, so a reflection
+    the pattern does not show weighs nothing.
+
+    ``None`` where the phase carries no intensity on the data at all, since a
+    share of nothing is not zero.
+    """
+    import numpy as np
+
+    from ..crystallography.lattice import d_spacings
+
+    cp = model.phases[ip]
+    on = (np.asarray(cp.win[..., 1]) > np.asarray(cp.win[..., 0])).any(axis=0)
+    if model.mode == "rietveld":
+        values = table.decode(table.x0())
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        f2 = np.asarray(model._total_f2(ip, d, values, cell), dtype=np.float64)
+        weight = np.asarray(cp.reflections.multiplicity, dtype=np.float64) * f2
+    else:
+        weight = np.asarray(cp.hkl_intensity, dtype=np.float64)
+    weight = np.where(on, np.abs(weight), 0.0)
+    total = float(weight.sum())
+    if not total > 0.0:
+        return None
+    return float(weight[np.asarray(bad, dtype=bool)].sum()) / total
 
 
 def check_texture_positive(table, model) -> list[GuardFinding]:
@@ -2123,6 +2276,21 @@ def check_guards(table, outcome, threshold: float,
 
     if outcome.correlation is not None and len(free) > 1:
         corr = np.asarray(outcome.correlation)
+        if outcome.jac is not None and not outcome.n_aux:
+            # a ρ against a direction the Jacobian cannot resolve is rounding
+            # (WP-2050): such a pair is nan here and never crosses a threshold.
+            # It is not shown to a user; the unresolved mask is the developer's
+            # signal, asserted by a nightly test (ruled 2026-11-01)
+            from ..optimize.least_squares import covariance_jacobian
+            from ..optimize.statistics import resolved_correlation
+
+            try:
+                corr, _ = resolved_correlation(
+                    corr, covariance_jacobian(outcome, free))
+            except np.linalg.LinAlgError:
+                # ``soft_modes``' rule below: the stage already said so
+                if getattr(outcome, "covariance_error", None) is None:
+                    raise
         report.high_correlations, report.flat_directions = (
             _correlation_findings(corr, free, threshold))
         # measured once (WP-1056): the same matrix the loop above thresholds

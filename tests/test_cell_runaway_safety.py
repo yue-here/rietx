@@ -42,6 +42,7 @@ digit.
 from __future__ import annotations
 
 import math
+import sys
 
 import numpy as np
 import pytest
@@ -407,7 +408,7 @@ def _cubic_pair_pattern(wavelength: float = 0.4139, seed: int = 7):
 
 
 def _fit_with_injected_escape(stages, *, mode, escape_at, restore_at,
-                              second_escape=None, log=None):
+                              second_escape=None, log=None, refs=None):
     """Fit :func:`_cubic_pair` under ``stages`` with the escape **injected**:
     ``escape_at``'s first solve answers ``ESCAPE`` times what it found for
     ``ESCAPED``, and ``restore_at``'s solve (if that stage runs) answers the
@@ -460,6 +461,8 @@ def _fit_with_injected_escape(stages, *, mode, escape_at, restore_at,
         mp.setattr(refine_module, "run_least_squares", solve)
         mp.setattr(refine_module, "_unsupported_phase_paths", lambda *a, **k: [])
         ref = Refinement(_cubic_pair(), ins, history=False)
+        if refs is not None:     # the working model, for a value no row reports
+            refs.append(ref)
         # the declared stages' reset; the closing stage is tests/test_closing_stage.py's
         result = ref.fit(_cubic_pair_pattern(), mode=mode,
                          plan=RefinementPlan(stages=list(stages), closing_window_tol=None))
@@ -487,9 +490,11 @@ def lebail_pair_fits():
     out = {}
     for name, stages in (("end", _LEBAIL_STAGES[:2]), ("early", _LEBAIL_STAGES)):
         log: list = []
+        refs: list = []
         out[name] = (_fit_with_injected_escape(
             stages, mode="lebail", escape_at="cell", restore_at="widths",
-            log=log), log)
+            log=log, refs=refs), log)
+        out[f"{name}_ref"] = refs[0]
     return out
 
 
@@ -521,8 +526,12 @@ def test_a_reset_cell_is_held_for_its_stage_and_the_stage_solves_again(
     assert "held while the stage solved again" in diag.message
     assert "window edge" not in diag.message
     start = TRUE_A * CUBIC_TWIN
-    for n in "bc":   # the held a has left ``parameters``; its tied b, c report it
-        assert _cell_rows(end, 1)[n].value == pytest.approx(start, rel=1e-14)
+    # the held a has left ``parameters`` and its tied b, c with it (WP-1999),
+    # so the value it was held at is read off the working model
+    held = lebail_pair_fits["end_ref"].fitted_structure.phases[1].cell
+    for n in "abc":
+        assert _cell_rows(end, 1)[n] is None, n
+        assert getattr(held, n).value == pytest.approx(start, rel=1e-14), n
     # the earlier stage reset nothing, and says so rather than staying silent
     assert end.stages[0].cell_reset == []
 
@@ -534,13 +543,14 @@ def test_a_reset_cell_is_held_for_its_stage_and_the_stage_solves_again(
 
 def test_a_reset_cells_stderr_is_withheld(lebail_pair_fits):
     """Review of #385 round 3: the esd is withheld only where the reset
-    happened in the stage that produced the answer, and on every path tied to
-    a withheld one (a tie inherits its source's blindness).
+    happened in the stage that produced the answer.
 
     "end": the answer stage put ``phases.1.cell.a`` back and held it, so the
     row has left ``parameters`` (a held path does, as WP-1301's collapse
-    does), and the cubic ``b``/``c`` tied to it report ``stderr=None``, while
-    phase 0, never reset, keeps its esd.  "early": the same reset fired in
+    does), and the cubic ``b``/``c`` tied to it leave with it (WP-1999), while
+    phase 0, never reset, keeps its esd.  So "end" no longer shows a tied
+    row inheriting a withheld esd: since WP-1999 that happens only where the
+    named cell stays a free column.  "early": the same reset fired in
     ``cell``, and the later stages refined the cell again from its start, so
     the value reported is a fit result and every cell row carries the esd that
     last stage measured.  Before round 3 "early" withheld ``a``'s esd off the
@@ -551,9 +561,8 @@ def test_a_reset_cells_stderr_is_withheld(lebail_pair_fits):
     assert len(fired) == 1 and fired[0].where == [ESCAPED]
     assert [s.name for s in end.stages][-1] == "cell"
     rows = _cell_rows(end, 1)
-    assert rows["a"] is None
-    for n in "bc":
-        assert rows[n] is not None and rows[n].stderr is None, f"end: phases.1.cell.{n}"
+    for n in "abc":
+        assert rows[n] is None, f"end: phases.1.cell.{n}"
     for n, row in _cell_rows(end, 0).items():
         assert row is not None and row.stderr is not None, f"end: phases.0.cell.{n}"
 
@@ -1090,7 +1099,12 @@ def test_tied_angles_follow_a_restored_alpha():
 
 
 @pytest.mark.slow
-def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path):
+@pytest.mark.parametrize("nudge", [
+    pytest.param(0, id="start"),
+    # its own group, so the two rows run on two workers (WP-2048)
+    pytest.param(-1, id="nudged", marks=pytest.mark.xdist_group("cell-runaway-nudged")),
+])
+def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path, nudge):
     """The public path: a P 1 Le Bail fit of a valid but wrong ~7 Å^3 cell on
     synthetic silicon (``tests/_synthetic_silicon.py``), two
     stages.  The second ended on the window-edge clamp's degenerate corner
@@ -1103,7 +1117,14 @@ def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path)
     ``test_three_escaped_angles_put_the_whole_cell_back_at_its_start``, and
     the reset inside ``fit`` by the injected escape (``lebail_pair_fits``).
     What this row alone shows is a fit walking into the guard unaided, and
-    that is kept in the nightly's full suite."""
+    that is kept in the nightly's full suite.
+
+    ``nudged`` multiplies cell ``a`` by 1 - 1e-14 (WP-1930's nudge).  On
+    macOS arm64 that start's second plan met a Jacobian that was not finite
+    and raised ``ValueError`` out of ``fit``, as the Linux nightly did on the
+    unnudged start once (WP-2048).  It now ends the stage with
+    ``STAGE_NOT_FINITE``, asserted where the trajectory was measured, since
+    elsewhere rounding picks another one."""
     import rietx as rx
     from rietx.schemas.structure import lebail_scaffold
     from tests._synthetic_silicon import silicon_pattern
@@ -1116,8 +1137,10 @@ def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path)
     data = rx.read_pattern(path)
     ins = rx.Instrument.bragg_brentano(radiation="CuKa")
     ins.background = rx.background.auto_background(data).background
-    structure = lebail_scaffold("P 1", TRICLINIC)
-    findings = []
+    cell = list(TRICLINIC)
+    cell[0] *= 1 + nudge * 1e-14
+    structure = lebail_scaffold("P 1", cell)
+    findings, stops = [], []
     for plan in ("profile_only", "lab_bragg_brentano"):
         # TRF, because its trajectory is the one that reaches the guard, on
         # every start tried.  Under LM, the default since WP-1938, the wrong
@@ -1135,18 +1158,22 @@ def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path)
         assert math.isfinite(float(result.statistics.rwp))
         assert float(result.statistics.rwp) > 0.0
         findings += [d for d in result.diagnostics if d.code == "CELL_RUNAWAY"]
+        stops += [d for d in result.diagnostics if d.code == "STAGE_NOT_FINITE"]
         # fit plot for visual inspection (tests/output/, gitignored)
         from pathlib import Path
 
         from rietx.viz.plots import plot_result
         out = Path(__file__).parent / "output"
         out.mkdir(exist_ok=True)
-        plot_result(result, path=str(out / f"cell_runaway_p1_lebail_{plan}.png"))
+        plot_result(result, path=str(out / f"cell_runaway_p1_lebail_{plan}_{nudge}.png"))
         structure, ins = ref.fitted_structure, ref.fitted_instrument
     # pin that the runaway guard was exercised, and that it put the cell back
     assert findings, "no CELL_RUNAWAY fired: the fit no longer reaches the guard"
     assert all("restored to this stage's starting values" in d.message
                for d in findings), [d.message for d in findings]
+    import platform
+    if nudge and (sys.platform, platform.machine()) == ("darwin", "arm64"):
+        assert stops, "the nudged start no longer reaches a non-finite model"
 
 
 def test_two_solves_driven_escapes_merge_by_driver_once():

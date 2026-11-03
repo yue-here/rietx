@@ -8,7 +8,9 @@ interface convention.  See ``ATTRIBUTION.md``.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -588,11 +590,15 @@ from .._nearmiss import did_you_mean
 #: dropped at read (``SeriesResult``'s ``mode="before"`` validator) and its
 #: ``steps`` reads ``None``, "not recorded".
 #: Also in 0.60 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
-#: formula and temperature the Z check read, and ``PeakList.instrument_undeclared``,
+#: formula and temperature read, and ``PeakList.instrument_undeclared``,
 #: the instrument blocks the picker found at default on a lab source.  Additive
 #: and defaulted to ``None``, "not recorded", the 0.25 → 0.26 rule;
 #: ``index_pattern`` writes the first two on every result, ``pick_peaks`` and
-#: ``fit_peaks`` the third on every list.
+#: ``fit_peaks`` the third on every list.  Part 2 added
+#: ``CellCandidate.formula_units``, the units a cell holds by Hofmann's
+#: volumes, written by ``index_pattern`` when a formula is given and ``None``
+#: otherwise (additive, the same rule); ``INDEX_Z_NOT_INTEGER``, which judged
+#: that number, is gone, so a document carrying one still reads.
 #: Also in 0.60 (WP-1419 C3a): ``Phase.distortion_modes``, a child stated as
 #: its parent plus absolute mode amplitudes (``DistortionModes``: the parent
 #: group, the transform, the reference metric, one base position per atom and
@@ -601,11 +607,44 @@ from .._nearmiss import did_you_mean
 #: ``displacive_statement``.  An older build refuses a phase carrying it.
 #: Also in 0.60 (WP-2011): ``LeBailValidation.mode``, additive, its default
 #: ``"lebail"`` being what every record written before it ran.
+#: Also in 0.60 (#939's follow-ups): ``ExtinctionScreen.perfect_fit_rwp_net``,
+#: what that Rwp would read for a fit leaving only the noise, √(N/(N+S)).
+#: Additive and defaulted to ``None``, the same rule.
+#: Also in 0.60 (WP-1815): ``GeometryTable.torsions``, a ``GeometryTorsion``
+#: per torsion over bonded chains (four labels, indices and symmetry codes, the
+#: angle in (−180°, 180°] and its two esds), defaulted to ``None``, which an
+#: older table reads as "not listed" (``[]`` is "listed, none found"); and ``TorsionRestraint`` joins the
+#: ``Restraint`` union, ``RestraintRow.kind`` gaining ``"torsion"``.  Additive:
+#: no existing document carries either, and an older build refuses one that
+#: does.  ``GeometryRequest`` is an argument and is never stored.
+#: Also in 0.60 (WP-1419 C4a): ``RefinementResult.distortion_totals``, one
+#: ``DistortionTotal`` per irrep block of a phase on mode amplitudes (A_τ, its
+#: esd and label, T², ``driving`` (``None`` where the record's parent
+#: operations miss its reference structure), the sign convention, the largest
+#: displacement), additive and defaulted to ``None`` where no phase carries
+#: ``distortion_modes``.
 #: Also in 0.60 (#941's follow-ups): ``LeBailValidation.n_lines_screened_in_window``,
 #: ``.predicted_but_absent_density_in_window`` and
 #: ``.predicted_but_absent_excess_in_window``, the windowed count's density and
 #: its excess over the run's cleanest candidate.  Additive and defaulted to
 #: ``None``, the 0.25 → 0.26 rule.
+#: Also in 0.60 (#1263): ``SupercellCheck.p0_power``, the floored chance rate
+#: the power check read, beside a ``p0`` that is now the seen test's own.
+#: Additive and defaulted to ``None``.
+#: Also in 0.60 (WP-1334): ``StageResult.rwp``, the stage's Rwp at its answer on
+#: its own frozen compile, the number ``stage_end`` already emitted.  Additive
+#: and defaulted to ``None``, "a result stored before the field", the 0.25 →
+#: 0.26 rule; all three runners write it on every stage.
+#: Also in 0.60 (WP-1991, Yue's ruling of 2026-11-01): a ``SeriesResult``'s
+#: paths read one series numbering, matched by phase name and atom label
+#: (``SeriesResult.phase_names``/``.atom_labels``), and
+#: ``SeriesEntry.pattern_paths`` names each pattern's own path where it
+#: differs.  Additive and defaulted to ``None``: a document written before the
+#: fields stores each pattern's own paths, and nothing stored the names to
+#: translate them, so it opens as written.
+#: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
+#: where it defaulted to 0.0.  A stored document that omits it still opens, at
+#: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
@@ -869,6 +908,21 @@ def legacy_transform_bounds(kind: str, lo: float, hi: float) -> tuple[float, flo
 #: only trace an omission left once it was serialized.
 BARE_PARAMETER_ATTRS: dict[str, object] = {
     "min": -math.inf, "max": math.inf, "unit": None}
+
+
+#: The pydantic validation context a reader of a **stored document** passes,
+#: at each reader :data:`rietx.schemas.migrate.STORED_DOCUMENT_READ_POINTS`
+#: names.  A field a release made required is filled there with the
+#: placeholder its old default held, and raises everywhere else: old files
+#: open, old code does not (``HumpComponent.position``, WP-2013).  Read only
+#: through :func:`reading_stored_document`.
+STORED_DOCUMENT = MappingProxyType({"stored_document": True})
+
+
+def reading_stored_document(info) -> bool:
+    """Whether this validation is a stored document's read (:data:`STORED_DOCUMENT`)."""
+    context = info.context
+    return isinstance(context, Mapping) and bool(context.get("stored_document"))
 
 
 def declared_fills(declared: Parameter, present) -> dict[str, object]:

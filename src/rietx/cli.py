@@ -300,10 +300,9 @@ def _index(argv: list[str]) -> int:
                         "in a widened window absorbs the shift")
     p.add_argument("--formula", default=None,
                    help="the specimen's chemical formula (e.g. C7H6O2; write a "
-                        "hydrate with '·'). Each candidate is checked for a "
-                        "whole number of formula units by Hofmann's (2002) "
-                        "volumes, reported as INDEX_Z_NOT_INTEGER; it never "
-                        "narrows the search")
+                        "hydrate with '·'). Each candidate records the "
+                        "formula units it holds by Hofmann's (2002) volumes "
+                        "(formula_units); it never narrows the search")
     p.add_argument("--temperature", type=float, default=None,
                    help="the pattern's temperature in K, for --formula's "
                         "volumes (default 298); needs --formula")

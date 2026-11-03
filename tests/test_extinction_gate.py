@@ -19,7 +19,13 @@ generated here from the structure — public, and the generator of the drafted
 issue's reproducer.  The public rows behind
 :data:`~rietx.indexing.extinction.REFERENCE_NET_RWP_MAX` (this pattern, the
 synthetic P 2₁/c, FAP, 11-BM NAC, SRM 676a corundum, PbSO₄): every right or
-nearly right cell read ≤ 0.36, every cell outside the refinable basin ≥ 1.6.
+nearly right cell read ≤ 0.36, and every cell outside the refinable basin read
+≥ 1.0 but one, PbSO₄ X-ray at ×0.99, which reads 0.45 and passes (a known miss,
+pinned below).
+
+Round 4 of #939's review asked for three follow-ups, all here: the perfect-fit
+value beside ``reference_rwp_net`` (weak data or misfit), the gate firing on a
+real family, and the envelope's bias in a continuum of lines.
 """
 
 from __future__ import annotations
@@ -166,10 +172,74 @@ def test_the_gate_reads_a_background_no_fit_can_move():
     assert fit_bs < 0.1 * REFERENCE_NET_RWP_MAX     # the fit's own net form passes
     lost = SimpleNamespace(two_theta=tt, y_obs=y_obs, y_calc=y_calc, sigma=sigma,
                            y_background=y_bkg)
-    assert _reference_net_rwp(lost) > 1.3 * REFERENCE_NET_RWP_MAX
+    assert _reference_net_rwp(lost)[0] > 1.3 * REFERENCE_NET_RWP_MAX
     good = SimpleNamespace(two_theta=tt, y_obs=y_obs, y_calc=y_obs + 0.5 * sigma,
                            sigma=sigma, y_background=pedestal)
-    assert _reference_net_rwp(good) < 0.3 * REFERENCE_NET_RWP_MAX
+    assert _reference_net_rwp(good)[0] < 0.3 * REFERENCE_NET_RWP_MAX
+
+
+# ----------------------------------------------------------------------
+# the perfect-fit value: weak data or misfit (review of #939, round 4)
+# ----------------------------------------------------------------------
+def _lines_on_a_pedestal(height: float, seed: int = 4):
+    """Three Gaussian lines of the given height on a 3000-count pedestal, with
+    Poisson noise; returns the noiseless truth beside them."""
+    tt = np.arange(10.0, 40.0, 0.01)
+    truth = 3000.0 + height * np.exp(
+        -4 * np.log(2) * ((tt[:, None] - [15.0, 22.0, 31.0]) / 0.05) ** 2).sum(axis=1)
+    y_obs = np.random.default_rng(seed).poisson(truth).astype(float)
+    return tt, truth, y_obs, np.sqrt(np.maximum(y_obs, 1.0))
+
+
+@pytest.mark.parametrize("height", [60.0, 5000.0])
+def test_the_perfect_fit_value_is_what_a_noise_only_fit_reads(height):
+    """√(N/D) is the gate's quantity for a fit that leaves only the noise: hand
+    the gate the noiseless truth as its calculated pattern and the two agree,
+    at S < N (60-count lines on 3000, the value past the bound) and at S ≫ N."""
+    tt, truth, y_obs, sigma = _lines_on_a_pedestal(height)
+    perfect_fit = SimpleNamespace(two_theta=tt, y_obs=y_obs, y_calc=truth,
+                                  sigma=sigma)
+    net, perfect = _reference_net_rwp(perfect_fit)
+    assert perfect == pytest.approx(net, rel=0.05)
+    s_over_n = float(np.sum(((truth - 3000.0) / sigma) ** 2)) / len(tt)
+    assert perfect == pytest.approx(np.sqrt(1.0 / (1.0 + s_over_n)), rel=0.05)
+    assert (perfect > REFERENCE_NET_RWP_MAX) == (s_over_n < 1.0)
+
+
+def test_the_message_says_weak_data_when_no_fit_could_pass(si):
+    """S < N: Si at its own cell, its lines cut to 3000 counts on the 7700-count
+    background (S/N ≈ 0.5).  The gate fires at the right cell, and the message
+    now says the data are weak rather than leaving the cell under suspicion."""
+    data, instrument, _peaks = si
+    tt = np.asarray(data.two_theta)
+    y = rx.Refinement(_si_structure(), instrument, history=False).predict(two_theta=tt)
+    obs = np.random.default_rng(1).poisson(y / y.max() * 3.0e3 + 7700.0).astype(float)
+    weak = rx.PatternData(two_theta=tt.tolist(), intensity=obs.tolist(),
+                          sigma=np.sqrt(np.maximum(obs, 1.0)).tolist())
+    screen = determine_extinction_symbol(weak, _cubic_f(SI_A), instrument,
+                                         two_theta_limits=LIMITS, refine_cell=False)
+    assert screen.status == "unreliable" and screen.best_or_none() is None
+    # measured 0.816 against √(N/(N+S)) = 0.814 from the noiseless truth
+    assert screen.perfect_fit_rwp_net > REFERENCE_NET_RWP_MAX
+    message = next(d.message for d in screen.diagnostics
+                   if d.code == "EXTINCTION_SCREEN_UNRELIABLE")
+    assert f"would read {screen.perfect_fit_rwp_net:.3f}" in message
+    assert "the data are weak" in message and "misfits" not in message
+    # the pair cannot separate weak data from an envelope inside the lines
+    assert "envelope sits inside the lines" in message
+
+
+def test_the_message_says_misfit_when_the_data_could_pass(si):
+    """S ≫ N: the 1 % cell the prefit cannot bring back.  A noise-only fit would
+    read 0.024, so the gate's 1.17 is misfit, and the message says by how much."""
+    screen = _screen(si, 1.01)
+    assert screen.status == "unreliable"
+    assert screen.perfect_fit_rwp_net < 0.1 * REFERENCE_NET_RWP_MAX
+    message = next(d.message for d in screen.diagnostics
+                   if d.code == "EXTINCTION_SCREEN_UNRELIABLE")
+    ratio = screen.reference_rwp_net / screen.perfect_fit_rwp_net
+    assert f"misfits them, by {ratio:.1f}×" in message
+    assert "the data are weak" not in message
 
 
 # ----------------------------------------------------------------------
@@ -198,6 +268,42 @@ def test_only_the_presets_all_zero_background_is_replaced():
 # ----------------------------------------------------------------------
 # the prefit on real data: #726's public case
 # ----------------------------------------------------------------------
+def _pbso4_arrays():
+    """The X-ray histogram of ``tests/data/gsas2_pbso4.gpx`` (Hill 1992): 2θ,
+    counts, weights, and GSAS-II's own fitted pattern and background."""
+    from pathlib import Path
+
+    from rietx.io.projects.gsas2 import _read_tree
+
+    tree = _read_tree(Path(__file__).parent / "data" / "gsas2_pbso4.gpx")
+    head = next(item[0] for item in tree if isinstance(item[0], list)
+                and str(item[0][0]).startswith("PWDR PBSO4.XRA"))
+    return tuple(np.asarray(a, dtype=float) for a in head[1][1][:5])
+
+
+def _pbso4_inputs(factor: float = 1.0):
+    """The issue's reproducer: the X-ray histogram on the preset instrument at
+    the cell ``index_pattern`` returned for its neutron twin (0.1-0.2 % long),
+    scaled by ``factor``."""
+    from rietx.schemas.instrument import EmissionLine, Source
+
+    x, y, w, _calc, _bkg = _pbso4_arrays()
+    data = rx.PatternData(two_theta=x.tolist(), intensity=y.tolist(),
+                          sigma=(1.0 / np.sqrt(np.maximum(w, 1e-12))).tolist())
+    instrument = rx.Instrument.bragg_brentano()
+    instrument.source = Source(
+        lines=[EmissionLine(wavelength=1.5405),
+               EmissionLine(wavelength=1.5443,
+                            weight=rx.Parameter(value=0.5, min=0.0, max=1.0))],
+        polarization=rx.Parameter(value=0.5, min=0.0, max=1.0), dispersion=None)
+    limits = (15.0, float(x.max()))
+    peaks = rx.pick_peaks(data, instrument, two_theta_range=limits)
+    cell = tuple(v * factor for v in (6.9644, 5.4038, 8.4956)) + (90.0, 90.0, 90.0)
+    candidate = CellCandidate(cell=cell, cell_esd=(0.0,) * 6, system="orthorhombic",
+                              centring="P", volume=float(np.prod(cell[:3])))
+    return data, instrument, limits, peaks, candidate
+
+
 @pytest.mark.slow
 def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
     """The X-ray histogram of ``tests/data/gsas2_pbso4.gpx`` (Hill 1992) at the
@@ -209,29 +315,7 @@ def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
     the same prefit from the preset's all-zero background returns ``P - - n``,
     confidently and wrongly, which is why the prefit seeds it.
     """
-    from pathlib import Path
-
-    from rietx.io.projects.gsas2 import _read_tree
-    from rietx.schemas.instrument import EmissionLine, Source
-
-    path = Path(__file__).parent / "data" / "gsas2_pbso4.gpx"
-    tree = _read_tree(path)
-    head = next(item[0] for item in tree if isinstance(item[0], list)
-                and str(item[0][0]).startswith("PWDR PBSO4.XRA"))
-    x, y, w = (np.asarray(a, dtype=float) for a in head[1][1][:3])
-    data = rx.PatternData(two_theta=x.tolist(), intensity=y.tolist(),
-                          sigma=(1.0 / np.sqrt(np.maximum(w, 1e-12))).tolist())
-    instrument = rx.Instrument.bragg_brentano()
-    instrument.source = Source(
-        lines=[EmissionLine(wavelength=1.5405),
-               EmissionLine(wavelength=1.5443,
-                            weight=rx.Parameter(value=0.5, min=0.0, max=1.0))],
-        polarization=rx.Parameter(value=0.5, min=0.0, max=1.0), dispersion=None)
-    limits = (15.0, float(x.max()))
-    peaks = rx.pick_peaks(data, instrument, two_theta_range=limits)
-    cell = (6.9644, 5.4038, 8.4956, 90.0, 90.0, 90.0)
-    candidate = CellCandidate(cell=cell, cell_esd=(0.0,) * 6, system="orthorhombic",
-                              centring="P", volume=float(np.prod(cell[:3])))
+    data, instrument, limits, peaks, candidate = _pbso4_inputs()
 
     screen = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
                                          two_theta_limits=limits)
@@ -245,6 +329,118 @@ def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
                                        two_theta_limits=limits, refine_cell=False)
     held_best = held.best_or_none()
     assert held_best is None or held_best.symbol != "P c - n"
+
+
+# ----------------------------------------------------------------------
+# the gate on real families (review of #939, round 4)
+# ----------------------------------------------------------------------
+def _corundum():
+    from tests.test_extinction_symbol import (
+        CORUNDUM_CELL,
+        CORUNDUM_RANGE,
+        corundum_inputs,
+    )
+
+    data, _cand, instrument = corundum_inputs.__wrapped__()
+    return data, instrument, CORUNDUM_RANGE, CORUNDUM_CELL, "trigonal", "R", "R - c -"
+
+
+def _fap():
+    from tests.test_extinction_symbol import DATA, _fap_inputs
+
+    if not (DATA / "FAP.XRA").exists():
+        pytest.skip("GSAS-II LabData tutorial dataset not present")
+    data, cand, instrument = _fap_inputs()
+    return data, instrument, (15.0, 90.0), cand.cell, "hexagonal", "P", "P 63 - -"
+
+
+@pytest.mark.parametrize(("inputs", "factor"), [(_corundum, 1.02), (_fap, 0.99)],
+                         ids=["srm676a-x1.02", "fap-x0.99"])
+def test_the_gate_fires_on_a_real_family_outside_the_prefits_basin(inputs, factor):
+    """The firing side on real patterns, not only synthetic Si.
+
+    The cell is the right one scaled past the prefit's basin: for SRM 676a
+    corundum the basin is measured from ×0.998 to ×1.01
+    (``test_extinction_refine_cell``), so ×1.02 is the next step out; for the
+    GSAS-II fluorapatite ×0.99 is the first of ±0.5 %, ±1 % that the prefit does
+    not bring back.  The prefit's own cell is the evidence: it stays ≥ 0.5 %
+    off.  Measured: 1.00 against 0.19 at the right cell (corundum), 1.00
+    against 0.12 (FAP), with a perfect fit reading 0.09 and 0.07, so misfit.
+
+    Fast tier on purpose: it runs two real fits per case, measured at 0.96 s and
+    2.95 s alone (``tests/CLAUDE.md``: a fast test that runs real fits says why).
+    """
+    data, instrument, limits, cell, system, centring, truth = inputs()
+
+    def screen_at(f):
+        scaled = tuple(v * f for v in cell[:3]) + tuple(cell[3:])
+        return determine_extinction_symbol(data, CellCandidate(
+            cell=scaled, cell_esd=(0.0,) * 6, system=system, centring=centring,
+            volume=1.0), instrument, two_theta_limits=limits)
+
+    right = screen_at(1.0)
+    assert right.status == "converged"
+    assert right.reference_rwp_net < 0.5 * REFERENCE_NET_RWP_MAX
+    best = right.best_or_none()
+    assert best is not None and best.symbol == truth
+
+    wrong = screen_at(factor)
+    assert abs(wrong.cell[0] / cell[0] - 1.0) > 0.005      # outside the basin
+    assert wrong.status == "unreliable", wrong.reference_rwp_net
+    assert wrong.reference_rwp_net > REFERENCE_NET_RWP_MAX
+    assert wrong.best_or_none() is None
+    assert wrong.perfect_fit_rwp_net < 0.2 * REFERENCE_NET_RWP_MAX   # misfit
+
+
+@pytest.mark.slow
+@pytest.mark.xfail(strict=True, reason=(
+    "known miss: PbSO4 X-ray at x0.99 of its index cell; the prefit stops about "
+    "0.3 % short, the reference reads 0.45 (below 1/sqrt(2)) and the screen "
+    "returns P c - - confidently, where the specimen is P c - n; belongs to "
+    "WP-1910's open task (re-screen at the prefit's cell, held, flag a "
+    "disagreement between the two screens, ruled 2026-10-26), which may not "
+    "flag it either, since a held re-screen with no decisive class is "
+    "recorded, not flagged: strict until a run shows it does"))
+def test_the_gate_misses_pbso4_at_one_percent_short():
+    """The counter-example to "every cell outside the basin reads ≥ 1.6": an
+    out-of-basin cell inside the 0.36-1.6 gap.  The prefit moves 6.895 Å to
+    6.935 (the specimen's is 6.959), short on every axis, and the reference
+    fit's widths absorb the rest.  Pinned strict, so a fix shows up as a pass."""
+    data, instrument, limits, peaks, candidate = _pbso4_inputs(0.99)
+    screen = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
+                                         two_theta_limits=limits)
+    best = screen.best_or_none()
+    assert best is None or best.symbol == "P c - n"
+
+
+# ----------------------------------------------------------------------
+# the envelope in a continuum of lines (review of #939, round 1)
+# ----------------------------------------------------------------------
+def test_the_envelope_rides_up_where_the_lines_form_a_continuum():
+    """A known limit, pinned so a change to the envelope is seen.
+
+    GSAS-II's own Rietveld fit of the PbSO₄ X-ray histogram (Hill 1992), read by
+    the gate's quantity against the picker's envelope and against GSAS-II's
+    fitted background: the two agree where the lines are resolved, and at high
+    angle, where orthorhombic lines run together, the envelope sits in the
+    tails, the net shrinks and the same fit reads 1.8× worse."""
+    from rietx.indexing.peaks import _debiased_envelope
+
+    x, y, w, calc, bkg = _pbso4_arrays()
+    keep = (x >= 15.0) & (w > 0)
+    x, y, w, calc, bkg = x[keep], y[keep], w[keep], calc[keep], bkg[keep]
+    env = _debiased_envelope(x, y)
+
+    def ratio(lo, hi):
+        m = (x >= lo) & (x < hi)
+        chi = np.sum(w[m] * (y[m] - calc[m]) ** 2)
+        return [float(np.sqrt(chi / np.sum(w[m] * (y[m] - b[m]) ** 2)))
+                for b in (env, bkg)]
+
+    low_env, low_bkg = ratio(15.0, 60.0)          # 0.136 against 0.128
+    high_env, high_bkg = ratio(110.0, 160.0)      # 0.436 against 0.245
+    assert low_env / low_bkg < 1.15
+    assert high_env / high_bkg > 1.5
 
 
 # ----------------------------------------------------------------------

@@ -42,6 +42,26 @@ So the seam does not need FPA. FPA would change how a size convolves, not which 
 
 ### Inherited
 
+- 2026-10-31, from the issue triage (issue #1065): the reporter (2026-10-28)
+  answered the issue's questions 1 and 2 for this WP's first task. Question 1
+  (leaving WP-1131's "with FPA at v2+") is settled by this WP's placement, and
+  they agree. Question 2 (the schema shape), their view: a separate
+  `Phase.size_harmonics` beside `Phase.microstrain`, and AS-2 as a third field
+  `Phase.size_families`, rather than one microstructure block. Their reasons:
+  `microstrain` appears in 34 files under `src/` and 70 with `tests/` (the
+  GSAS-II, TOPAS and FullProf project readers and writers, `io/recipe.py`,
+  `params/vector.py`, the GUI, `help.py`), so a block would migrate a landed
+  field and every saved project and recipe path naming it;
+  `model/microstructure.py` already joins size and strain in the report;
+  GSAS-II (`Size`/`Mustrain`), FullProf (separate model codes) and TOPAS
+  (`CS_L`/`Strain_L`) keep size and strain apart, so an exporter maps field to
+  field. The cost they name: the `lor_size` lock and the non-negativity guard
+  are written across two fields, as WP-0503 already does for Stephens.
+  Question 3: no public anisotropic-size dataset found by them either. Checked
+  against the tree at d87c8cc91: no landing on this subject since 2026-10-26.
+  The schema shape stays the maintainer's decision (this WP's task "Decide the
+  schema shape with the maintainer"); a block would be a stored-format change.
+
 ## Non-goals
 
 - AS-4, the terms on a TOF bank: behind the TOF fence (ROADMAP § v2+, #193; T-2/T-3).

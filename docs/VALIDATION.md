@@ -597,6 +597,16 @@ Quantitative phase analysis against weighed truth, at tolerances referenced to w
 
 **Diagnostics:** `BRINDLEY_OUTSIDE_REGIME`
 
+#### `test_flank_lobes_name_their_peak_and_buy_no_impurity`
+
+`characterisation` · dataset `qarr`
+
+**Claims:** on each of the eight weighed three-phase mixtures, every unmatched observed peak within 0.5° of a strong reflection says it sits unresolved on a drawn peak (UnmatchedPeak.flank), and Layer 2 suggests no impurity phase
+
+**Referenced to:** **no accuracy band is claimed**.  The reference is the weighing: each mixture holds exactly the three modelled phases, so any impurity suggestion is wrong.  0.5° and a strong line's tenth of the tallest are the test's own scope, set by the lobes WP-1977 measured at 0.15-0.38°
+
+**Measured:** 2-6 rows a mixture on a drawn flank, 0.7-1.2 FWHM below the line, none near a strong line off one; no impurity call (main's rule, on the fits of 52cec09a1: cpd-1b suggested add_impurity_phase at 0.50 from two such rows)
+
 ### `tests/test_acceptance_dispersion.py`
 
 The same round robin with anomalous scattering applied — a pre-registered, parameter-free prediction about numbers already recorded in the v0.3 milestone.
@@ -1225,6 +1235,16 @@ The only externally *graded* feature in the package. Bergmann et al. (2004) publ
 
 **Diagnostics:** `INDEX_SEARCH_INCOMPLETE`, `INDEX_ABSTAINED`
 
+#### `test_the_formula_window_ranks_the_fluorapatite_cell_where_the_search_does`
+
+`own_result` · dataset `fap`
+
+**Claims:** SearchSpec.from_formula('Ca5P3O12F', z=2), a ceiling only since WP-2030 part 2, keeps the fluorapatite cell and ranks it where the same search under the row's hand-set 600 A^3 ceiling does; 1.10.0's window (738-1153 A^3) excluded it
+
+**Referenced to:** the same pattern, systems and budgets searched under fap_index's declared 600 A^3 ceiling, the in-band cell read at that row's 500 ppm band on GSAS's FAP.EXP cell
+
+**Measured:** ranked first in both (pearl, 2026-10-30, WP-2030 part 2)
+
 #### `test_the_cross_code_cell_leads_because_the_engines_agree_on_it`
 
 `cross_code` `characterisation` · dataset `fap`
@@ -1417,9 +1437,9 @@ The single-histogram refinable wavelength, on NIST SRM 640c silicon at APS 11-BM
 
 **Claims:** the held cell IS the certificate value -- the anchor of the whole protocol, asserted as the identity it is rather than measured
 
-**Referenced to:** NIST SRM 640c certificate a = 5.4311946 +- 0.0000092 A at 22.5 C.  Held, not refined: holding a certified cell is what turns a free lambda into a calibration measurement.  The cubic ties (b<-a, c<-a) carry the source's value, so this is an identity bar (exact) and the absent esd shows nothing was refined.  XND held 5.4311948, 0.4 ppm above, negligible against every band here and stated in the docstring
+**Referenced to:** NIST SRM 640c certificate a = 5.4311946 +- 0.0000092 A at 22.5 C.  Held, not refined: holding a certified cell is what turns a free lambda into a calibration measurement.  The answer lists no cell row, since a result carries only what the fit could move (WP-1999); no stage's free set holds a cell path, and the parameter table ties b and c to a, so this is an identity bar (exact).  XND held 5.4311948, 0.4 ppm above, negligible against every band here and stated in the docstring
 
-**Measured:** cell.b and cell.c both exactly 5.4311946 A, esd None
+**Measured:** no cell row in the answer and none in any stage's free set; cell.a, cell.b and cell.c in the parameter table all exactly 5.4311946 A, b and c tied to a
 
 #### `test_the_sample_broadening_is_positive_and_finite`
 

@@ -420,39 +420,49 @@ class SearchSpec:
     def from_formula(cls, formula: str, *,
                      z: int | tuple[int, int] | None = None,
                      temperature: float = 298.0, **fields) -> SearchSpec:
-        """A spec whose volume window comes from the chemical formula (WP-1510).
+        """A spec whose volume ceiling comes from the chemical formula
+        (WP-1510; a ceiling only since WP-2030).
 
         One formula unit's volume is Hofmann's (2002) sum of average atomic
         volumes at ``temperature`` in K
         (:func:`~rietx.crystallography.atomic_volume.formula_unit_volume`).
-        The window holds ``z`` formula units, widened to the ratio bounds
-        :data:`~rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS`
-        (V_obs/V_est from 0.8 to 1.25).  Hofmann found 1746 of 182 239
-        structures beyond them.  The window takes that wide bound rather than
-        the 4 % scatter of one crystal, because a window that excludes the true
-        cell makes the search return a wrong answer.
+        ``max_volume`` is ``z`` formula units times the upper ratio bound,
+        1.25 (:data:`~rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS`).
+        Hofmann's 0.8-1.25 band is where he starts calling a structure
+        unusual, not an error bound he measured: about 1 % of his 182 239 CSD
+        structures lie past 25 % either way (1746), and the typical scatter is
+        about 4 % (Fig. 1).  The window has no floor, for any formula.  An
+        ionic or mainly inorganic cell comes out smaller than the estimate
+        (his § 3 (iii)): every inorganic cell measured lies at 0.38-0.87 of it,
+        and nine of the 16 below 0.57, so a floor would exclude the truth.  A
+        ceiling only tolerates that direction.  What it does not hold is a
+        cell larger than its formula: a framework whose formula leaves out
+        what fills its pores (HKUST-1 reads 2.28).
 
         ``z`` counts formula units in the conventional cell: an integer, a
-        ``(min, max)`` pair, or ``None``.  ``None`` sets only the floor of one
-        formula unit and leaves ``max_volume`` to the data-quality envelope,
-        because a formula says nothing about how many units the cell holds.
-        The floor never drops below :data:`DEFAULT_MIN_VOLUME`: both are lower
-        bounds, so the larger binds.  Every other field passes through
-        ``fields``.
+        ``(min, max)`` pair, or ``None``.  Only the largest ``z`` sets the
+        ceiling: **a pair's minimum is checked and then ignored**, so
+        ``z=(4, 8)`` and ``z=(1, 8)`` give the same spec, and nothing here
+        raises a floor from it (1.10.0's window did).  **With ``z=None`` the
+        window narrows nothing:** ``min_volume`` stays
+        :data:`DEFAULT_MIN_VOLUME` and ``max_volume`` is left to the
+        data-quality envelope, because a formula says nothing about how many
+        units the cell holds.  Every other field passes through ``fields``,
+        ``min_volume`` included, for a caller who declares a floor of their own.
 
         Narrowing the search is the caller's own act, so ``index_pattern``
         never builds this window from its ``formula=`` argument, which only
-        reports (``INDEX_Z_NOT_INTEGER``).
+        records the formula units each cell holds
+        (:attr:`~rietx.schemas.indexing.CellCandidate.formula_units`).
         """
         from ..crystallography.atomic_volume import (
             VOLUME_RATIO_BOUNDS,
             formula_unit_volume,
         )
 
-        clash = sorted({"min_volume", "max_volume"} & fields.keys())
-        if clash:
-            raise ValueError(f"from_formula sets {' and '.join(clash)} from the "
-                             "formula; build SearchSpec directly to declare it")
+        if "max_volume" in fields:
+            raise ValueError("from_formula sets max_volume from the formula; "
+                             "build SearchSpec directly to declare it")
         if z is None:
             z_min, z_max = 1, None
         elif isinstance(z, (tuple, list)):
@@ -465,15 +475,17 @@ class SearchSpec:
             raise ValueError(f"z must be a whole number of formula units, at "
                              f"least 1, with min <= max; got {z!r}")
         v_fu, _ = formula_unit_volume(formula, temperature)
-        low, high = VOLUME_RATIO_BOUNDS
-        v_min = max(DEFAULT_MIN_VOLUME, z_min * v_fu * low)
-        v_max = None if z_max is None else z_max * v_fu * high
-        if v_max is not None and v_max < v_min:
-            # the floor binds above the formula's ceiling: an empty window
-            # would search nothing and report silence
+        v_max = None if z_max is None else z_max * v_fu * VOLUME_RATIO_BOUNDS[1]
+        floor = fields.get("min_volume", DEFAULT_MIN_VOLUME)
+        if floor is None:
+            raise ValueError("min_volume must be a number of Å³, not None; "
+                             "leave it out for the default floor")
+        if v_max is not None and v_max < floor:
+            # the floor binds above the formula's ceiling: an empty window would
+            # search nothing and report silence
             raise ValueError(f"{formula!r} with z={z!r} allows at most "
-                             f"{v_max:.1f} Å³, below the {v_min:g} Å³ floor")
-        return cls(min_volume=v_min, max_volume=v_max, **fields)
+                             f"{v_max:.1f} Å³, below the {floor:g} Å³ floor")
+        return cls(max_volume=v_max, **fields)
 
     def engine_pool(self) -> int:
         """Candidates one (engine × system) unit hands to the merge.
@@ -2011,7 +2023,7 @@ def rank_candidates(cands: Sequence[EngineCandidate], peaks: PeakList, *,
     **Whether two engines found a lattice outranks every figure of merit**
     (WP-1046, :func:`corroborated`), and this is the package's own doctrine
     applied to the order rather than only to the verdict: ``grade`` floors a
-    candidate below :data:`MIN_AGREEMENT` finders at ``low`` before a single
+    candidate below :data:`MIN_AGREEMENT` engines at ``low`` before a single
     caveat is consulted, so a list ranked on the panel alone routinely put
     candidates the gate refuses to promote above the one it could.  Measured:
     on the GSAS-II fluorapatite pattern over all seven systems, the six
@@ -2128,7 +2140,20 @@ def agreement(cand: EngineCandidate) -> int:
     reached — "a wrong prior changes no rank" has to survive the ranking key
     changing under it.
     """
-    return len({f for f in cand.found_by if f != PRIOR_FINDER}) or 1
+    return _engines_behind(cand.found_by) or 1
+
+
+def _engines_behind(found_by: Sequence[str]) -> int:
+    """Distinct engines in a ``found_by`` list, :data:`PRIOR_FINDER` excluded.
+
+    The one count both agreement readers take: :func:`agreement` (the
+    ranking's first key) and :func:`~rietx.indexing.consensus.grade` (the
+    gate's ``MIN_AGREEMENT`` floor).  A stated cell is not an independent
+    search, so it corroborates a lattice and never lifts it (WP-1003 § E;
+    WP-2082, #1308, where it lifted a prior's primitive lattice to
+    ``medium`` above the planted F lattice at ``low``).
+    """
+    return len({f for f in found_by if f != PRIOR_FINDER})
 
 
 def _peak_fwhm(peaks: PeakList) -> np.ndarray:
@@ -2355,6 +2380,17 @@ DEFAULT_SEARCH_PRESET = "quick"
 #: specs measured, cheapest first; at 8, 15 and 20 % the lab patterns (zircon, FAP,
 #: corundum, LaB6) validated every checked cell either way, searching the same
 #: systems.  What 15 % cost: NAC's default spec no longer reached orthorhombic.
+#:
+#: **WP-2063 cut what spends it, and left the value.**  The panel scores the
+#: same answer 5.3× cheaper in consensus and 3.3-8.8× in a unit (thread CPU,
+#: NAC's captured calls replayed on both trees, digests equal), so on NAC's
+#: 80-panel merge about 1-2 s of the 18 s goes before the first fit, where
+#: 10.5 s did.  Swept at 8, 10 and 15 %, three interleaved ``quick`` runs
+#: each (2026-11-02, load 4-9 of 10 cores): NAC's true cell validated on every
+#: run at every value, and no value changed the systems searched, the
+#: candidates or their ranking on NAC or the four lab sets.  What 8 % lost is
+#: NAC's top-ranked candidate's fit, cancelled on every run, and the true
+#: cell's fit kept a 2 s margin.  So the value stays (``docs/wp/2063-*.md``).
 VALIDATION_RESERVE_FRACTION = 0.15
 
 #: name → the whole-run ceiling it fills in (``None`` = unbounded, today's

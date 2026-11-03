@@ -1,6 +1,6 @@
 # WP-1418 — the magnetic structure is determined, not only stated
 
-Milestone: magnetic · Status: 🔄 2026-10-30 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086); M-8, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
+Milestone: magnetic · Status: 🔄 2026-11-01 — #1197's right-handed magnetic cell in review (PR #1296); M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082); M-8, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
 Depends on: PR #290's `crystallography.magnetic` (landed 2026-09-10);
 1326 (the k candidates) for the k-search rung; 1327 (the moment, the hold)
 for the determination verb. The irrep and isotropy rungs depend on nothing
@@ -124,6 +124,8 @@ either is named; `Magnetic-V` (Mn₃O₄, POWGEN) is TOF and stays fenced.
 MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
+
+- **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: the maximal-subgroup list this WP wanted now exists.** `rietx.crystallography.representation.subgroups.maximal(group, kind, max_index)` returns every maximal t- and k-subgroup of a space group, each with its conjugacy class and its (P, p) checked exactly (PR #1189). `strategy/magnetic.py` `_maximal_subgroups` is still maximal only among the classes enumerated at the winner's k, so the descent audit can take its nuclear part from the new list. Wyckoff splittings come from `wyckoff_splitting(group, sub)` (PR #1239).
 
 - **2026-10-23, from [1326](1326-satellites-without-a-moment.md)'s close
   (originally WP-1541, 2026-10-03): the satellite types have no provisional
@@ -830,6 +832,25 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 - 2026-10-26 issue triage: #455 closed. The reporter's re-run of the cubic `P n -3 m:1` case on main at 7472e200 gave one partition in 9 of 9 seed × basis runs, the condition this WP's 2026-10-15 note set. Checked against the tree at c0e32ab29.
 
+- 2026-10-31, from the issue triage (issue #795): the reporter splits K1 under
+  #1224's machinery-before-heuristics rule (2026-10-29). K1a is the machinery,
+  and nothing in it ranks or chooses. It gives the candidate k's by stratum,
+  with denominator, radius, strata and exclusion windows as required
+  arguments. It scores any named k. It reports the shuffle null's full sample,
+  with its threshold as a number. It adds the equivalents and
+  `K_SEARCH_PARTNER`. K1b is the heuristic: `search_kvector` and its ranked
+  result, the default radius, `K_SEARCH_AT_CHANCE` and the few-peaks floor,
+  both nulls measured on one grid, and the validation arm. Decisions 1
+  (placement) and 2 (rational grid now, or real k after N-W3) of the
+  2026-10-08 entry gate K1a. Decision 3 (schema) concerns only K1b, and
+  decision 4 changes neither. All four are still the maintainer's and
+  unanswered. Checked against the tree at d87c8cc91: no `search_kvector`
+  exists, and M-8 is unticked.
+
+- 2026-10-31, from the issue triage (issue #1197): the BNS label of an
+  enantiomorphic candidate named the mirror type. Fixed 2026-11-01 (PR #1296);
+  the handover entry of that date holds the record.
+
 ## Non-goals
 
 - Modulated and incommensurate structures (superspace): issue #258 holds the
@@ -893,6 +914,92 @@ no magnetic model declared.
 - The full register with DOIs is issue #256's comment of 2026-09-06.
 
 ## Handover log
+
+### 2026-11-01 (2nd session) — #1197, a candidate names its own handedness
+
+A magnetic candidate at k ≠ 0 now carries the BNS number of its own
+operators. Before, every k = (0, 0, ½) child cell the package built was
+left-handed, and spglib read the operators as if the axes were right-handed.
+So a group whose type has a mirror twin (a 4₁ against a 4₃, a 3₁ against a
+3₂) was printed with the twin's number. The cell is now right-handed by
+construction, and that also fixed a displacive child that had been stated as
+the mirror crystal. No checklist item is ticked: #1197 was an inherited bug.
+
+*Done.* Three commits on PR #1296. `_reduce_basis` returns a right-handed
+basis through a new `_right_handed`, which swaps the two shortest vectors
+when their determinant is negative. Both readers of the reduction inherit it,
+`magnetic_cell` and the reduced-cell identification retry. P 4₂ c m S5(rank
+1)#1 at k = (0, 0, ½) now prints 76.10 (was 78.22), and P 3₁ S1(a) and P 6₁
+S3(a,b) print 145.9 (was 144.6). Each of these was checked by hand: the
+unprimed 90° operator of the 4₂ parent carries c′/4 in 2c, a 4₁, and the
+unprimed threefold of the 3₁ parent carries 2c′/3, a 3₂. The third reader,
+the displacive child of `_standard_child`, gave P 3₁'s S1(a) child as
+"P 31" with det P = −2 (the mirror crystal) and now gives P 3₂ with
+det P = +2. Tests added: the cell is right-handed over 16 cases, every
+candidate's label equals spglib's on the unreduced child cell of
+`supercell.child_basis` (6 parents), the three swaps pinned at their numbers,
+the retry agrees with spglib in three right-handed settings, and the chiral
+child. Each was made to fail on purpose with the swap disabled (15 of the
+isotropy rows and the chiral row failed, and the retry's doubled-c row names
+the mirror). The review pass (`/code-review high --fix`) fixed two stale
+"left-handed" sentences (the module docstring and the Theory chapter
+`representation-analysis.md`), a site chosen by a branch on the group name,
+and a lattice named `metric`. It found one behaviour change and it was kept:
+a retry on a lattice already primitive in (b, a, c) order used to run in that
+left-handed setting and now raises "already primitive", which the caller
+catches as unnamed. The retry is unreached on spglib 2.8.0.
+
+*Moved, and why.* Nine tests moved. One asserted the old handedness. The
+other eight draw random models in the candidate's cell, so their draws
+changed with it. The five isotropy ones passed on a `main` snapshot and were
+re-read off the new tree. The physical claims hold. The #565 known
+answer (P n -3 m:1, general site, k = (0, 0, ½)) keeps four classes, and all
+54 cross-irrep pairs stay proved. One of them, S3(a,b) → S4(a,b), is now
+proved by containment, because its own draws certify nothing. Re-pinned:
+the G-type cell's handedness assertion flips to det > 0 (a left-handed frame
+stays under test through `RIGID_MAPS`' rotoreflection); the P m -3 m X
+kernel draw's d_lo 0.0055 → 0.0238; S1(a,b) → S2(rank 1)#1 certifies at
+draw 2, not 4; the exact-check pair at draw 3, not 2; the carried-proof case
+moves to S4(rank 1)#2 → S3(a,b), since S1(rank 1)#2 → S2(a,b) now certifies
+on its own draws; the known answer's d_lo band runs 0.0036-0.057 (was
+0.0013-0.032), so its bar rose from 0.05 to 0.1. The distortion probe's
+unlucky seeds were scanned again: 55, 83, 111, 167 and 198 of 0-199 refuse
+S6(a,b) at R (was 142 and 194 among four), and 291 is the one seed of 0-379
+refusing S10(a,b) at M (was 41 of 0-79).
+
+*Measured* (macOS arm64, Python 3.12, `[dev]`, other suites running beside
+it, so no wall clock is quotable). The fast selection on the branch before
+the main merge: 4 failed, 13 187 passed, 310 skipped, 32 xfailed. Three
+failures were the unlucky seeds, fixed in the second commit; the fourth is
+`test_display`'s kernel test, which needs `JUPYTER_PREFER_ENV_PATH=1` on this
+machine. On the final tree, merged with `main` `0c39ed98c`, with `JUPYTER_PREFER_ENV_PATH=1`: 1 failed, 13 205 passed, 310 skipped, 32 xfailed. The failure is `test_site_classes.py::test_an_unplaceable_species_does_not_enumerate_the_others`, a 15 s wall-clock guard that took 18.3 s under the shared load; it is in a file this branch does not touch. The branch adds 29 fast cases in five tests, 3.9 s in all on that run (`tests.added_test_times`), none near the slow tail. The full selection did not run: other suites were running, and the lead stopped the session at its context limit. The magnetic symmetry files, slow rows included, before
+the re-pins: 6 failed (the six above), 763 passed, 1 xfailed.
+`tests.reader_output` exits 0: the LaB6 standard fit prints the same text.
+What this does change for a reader is magnetic: a candidate table's BNS
+number and its "magnetic cell" transform at k ≠ 0 (b,a,2c becomes a,b,2c;
+b,a+b,2c becomes a+b,b,2c).
+
+*Settled by Claude.* The root fix (a right-handed cell) over the narrower
+one (identify a left-handed cell's group after a swap, keep the cell): the
+displacive child was a third reader of the same cell and gave the mirror
+crystal, so a label-only fix would have left it. The cost is the eight
+re-pinned seeded tests. Which two vectors to swap: the two shortest, which
+keeps every length and turns the reporter's (b, a, 2c) into (a, b, 2c).
+
+*Gotchas.* The isotropy file's slow rows took 32 min under load here, the
+known answer alone 90-240 s. A seeded test in `test_magnetic_isotropy.py` or
+`test_distortion_candidates.py` pins draws made in the candidate's cell, so
+any change to that cell moves them; re-read the values on `main` first.
+
+*Not done.* #1081 is WP-1327's (its 2026-10-26 entry), and its choice of
+option is the maintainer's. #795's K1 (M-8) is the contributor's, waiting on
+the maintainer's decisions 1 and 2 of the 2026-10-08 entry. Forward note to
+WP-1419: PR #1108's 48 refusals should be re-run on this tree.
+
+*Next:* M-8 once #795's decisions are ruled; M-9's `help.py` entries,
+Part 2 and the M-9 PNGs.
+
+- **2026-11-01** (`/pr-review`) — #1082 merged from outside as PR #1204 (`502316ac`). It adds the `magnetic_structural` plan preset. It also adds `PLAN_FREES_NO_MOMENT` (warning, tier 1), which fires when no stage frees a moment degree of freedom that the caller did not hold. Its `where` holds each held site's modulus path, then the phase's `scale`. No task is ticked by it. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
 
 - **2026-10-30** (`/pr-review`) — #853's follow-ups merged from outside as PR #1228 (`fbc618e3`), four `WP-1418:` commits in `isotropy.py` and its tests. `powder_equivalent` now hands the caller's little group to the span certificate, and `_classify` shares one pattern cache with it. A spy test shows the caller's group arrives and none is rebuilt. `_verify_witness` recomputes `Witness.margin` and refuses a stored margin that differs by more than 4(n + S)ε (n amplitudes, S live shells). That is a rounding allowance with no module constant, so no audit row is owed. Six wrong margins (doubled, halved, zero, negated, NaN, ten allowances off) re-verified on main and are refused now. Two hand-written witnesses in the tests carried rounded margins and now carry the full value. `ISOMETRY_RESIDUAL`'s docstring covers both its uses, and both LAPACK citations give edition, publisher and DOI. The fit-cache item was already #936's. This closes the 2026-10-11 entry's "left open" list. One observation stays open: `_verify_transfer` compares μ to an absolute 1e-9 while transfer margins go down to 1.7e-9, so a transfer record with μ wrong by up to 1e-9 re-verifies. The review asked the contributor to file it as an issue. No checklist item is ticked. Gate (a stack of eleven PRs on main `b40bc994`, tree `307eff83`; macOS arm64, `[dev,jax]`, Python 3.12): 13 217 passed, 216 skipped, 48 xfailed, 0 failed, with ruff, the `-W` manual build and the GUI ladder green.
 

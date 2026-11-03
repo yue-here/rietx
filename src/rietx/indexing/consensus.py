@@ -65,6 +65,7 @@ from .engines import (
     EngineCandidate,
     EngineResult,
     SearchSpec,
+    _engines_behind,
     absence_window,
     candidates_truncated_diagnostic,
     dedup_groups,
@@ -112,8 +113,9 @@ class ConsensusOutcome:
     #: ``checked`` the gate must be given.  Identical to ``checked_indices``
     #: except under a fired token (WP-1037), where the enumeration is the
     #: measured long pole (12 × 3.75 s on the corundum run) and is skipped for
-    #: the remaining candidates — which must then read "not enumerated"
-    #: (a capping caveat), never "no ambiguity found"
+    #: the remaining candidates — which must then read "not enumerated",
+    #: never "no ambiguity found".  The gate writes ``geometric_ambiguity``
+    #: for it, a refuting caveat, so such a candidate grades ``low``
     ambiguity_checked: list[int] = field(default_factory=list)
     fom_panel_disagrees: bool = False
     #: was any engine's tolerance widened by an *assumed* systematic?  Read from
@@ -230,6 +232,7 @@ def supercell_checks(candidates: Sequence[CellCandidate], peaks: PeakList, *,
                 parent_centring=parent.centring, index=ev.index,
                 relation=ev.relation,
                 n_extra=ev.n_extra, n_seen=ev.n_seen, p0=ev.p0,
+                p0_power=ev.p0_power,
                 p_value=ev.p_value, verdict=ev.verdict(),
                 n_seen_unexplained=ev.n_seen_unexplained,
                 absent_two_theta=[float(t) for t in tt]))
@@ -453,9 +456,9 @@ def consensus(results: Sequence[EngineResult], peaks: PeakList, *,
     ``ambiguity=False`` (WP-1042) skips the enumeration entirely — it is what
     makes this callable per **completed system** mid-run, since everything else
     here is the cheap part.  ``ambiguity_checked`` then stays empty and the
-    gate reads every candidate as unchecked (a capping caveat), so a streamed
-    grade is conservative: it can rise when the full consensus runs, never
-    fall.
+    gate reads every candidate as unchecked.  It writes
+    ``geometric_ambiguity`` for each, a refuting caveat, so every streamed
+    grade is ``low``: it can rise when the full consensus runs, never fall.
 
     ``screen`` is the run's :class:`~rietx.indexing.screen.PatternScreen`
     (C3), handed to :func:`supercell_checks`; built from the peak list when
@@ -596,7 +599,8 @@ def enumerate_ambiguity(outcome: ConsensusOutcome, peaks: PeakList, *,
     one candidate's derivative cells, so a stop waits one child's work rather
     than a whole sweep.  A candidate the clock stops before or during its
     sweep stays out of ``ambiguity_checked`` with no partners written, which
-    the gate reads as an unasked question (capping), never a clean answer.
+    the gate reads as an unasked question, never a clean answer: it writes
+    ``geometric_ambiguity``, a refuting caveat.
     A sweep that refuses (the parent's own lines cannot be predicted) is the
     same unasked question, so its candidate stays out too (WP-1924).
     """
@@ -744,20 +748,22 @@ def grade(caveats: Sequence[str], found_by: Sequence[str],
     candidate) are the ordinary state of a peaks-only run and would otherwise
     make every answer ``low`` — which would empty the vocabulary of meaning.
 
-    **A prior corroborates but does not confirm** (WP-1003, recording 1046
-    §4): agreement means independent *searches*, and a stated cell is not
-    one.  ``found_by`` currently counts :data:`~.engines.PRIOR_FINDER` toward
-    ``MIN_AGREEMENT``, so a prior one engine also found can reach ``medium``
-    partly on the strength of its own statement; the ruled fix — count
-    engines the way ``engines.corroborated`` does, prior excluded — is
-    deferred into the post-1003 indexing work, where the acceptance suite
-    runs.  Deferred on the record, not silently frozen.
+    **A prior corroborates but does not confirm** (WP-1003 § E, recording
+    1046 §4): agreement means independent *searches*, and a stated cell is
+    not one.  So the floor counts engines the way ``engines.corroborated``
+    does, :data:`~.engines.PRIOR_FINDER` excluded (WP-2082).  Until then a
+    prior one engine also found reached ``medium`` on its own statement: on
+    #1308's planted F-cubic list under ``svd`` alone, the stated primitive
+    cell went ``low`` → ``medium`` while the planted F lattice stayed
+    ``low``.  The ``high`` clause needs no exclusion, ``"prior"`` never being
+    in ``engines_run``.
     """
     # MIN_AGREEMENT rather than a literal 2 since WP-1046: this floor and
     # ``engines.corroborated`` — the ranking's first key — are one boundary, so
-    # the reported order mirrors the gate structurally and not by coincidence
-    if len(set(found_by)) < MIN_AGREEMENT or any(c in INDEX_REFUTING_CAVEATS
-                                                 for c in caveats):
+    # the reported order mirrors the gate structurally and not by coincidence;
+    # since WP-2082 they read one count as well
+    if _engines_behind(found_by) < MIN_AGREEMENT or any(
+            c in INDEX_REFUTING_CAVEATS for c in caveats):
         return "low"
     if not caveats and set(found_by) >= set(engines_run):
         return "high"

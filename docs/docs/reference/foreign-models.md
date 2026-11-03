@@ -18,7 +18,7 @@ The models differ from each other because the formats do, and each one changes a
 | `TopasModel.r_wp`, `TopasModel.gof` | the run's own figures, stated at top level above every block. `None` where the file states none there or several, since `Tr_wp` can hang off each dataset as well |
 | `TopasModel.r_wp_all`, `TopasModel.gof_all` | every such value in file order, since a multi-dataset file states one per dataset |
 | `TopasModel.n_datasets` | how many `xdd`-family blocks the file opens, a data-file macro (`RAW(…)`, `XYE(…)`, `TOF_XYE(…)`) counting as one. More than one means the phases belong to different patterns |
-| `TopasModel.data_files` | the pattern files it points at |
+| `TopasModel.data_files` | the pattern file each dataset opener names, in file order. A data-file macro contributes its first argument as written, so `RAW(a)` gives `a`: the macro supplies the extension |
 | `TopasModel.emission_lines`, `TopasModel.emission_macro`, `TopasModel.anode` | every emission line in file order, and the macro that named the profile (`CuKa5`, read as anode `CuKa`) |
 | `TopasModel.wavelength` | the profile's reference wavelength: the `lo` of the `lo_ref` line, else of the line with the largest `la`, and `None` where the file states no profile |
 | `TopasModel.geometry` | `"debye_scherrer"` only where the file states a capillary construct, `None` where every dataset is time of flight, and otherwise `"bragg_brentano"`. That last value is the reader's default, so read this field only as "a capillary was declared, or not" |
@@ -48,6 +48,8 @@ The models differ from each other because the formats do, and each one changes a
 | `FullProfModel.lambda_slot` | the refinable-wavelength slot of the zero-shift line, read for provenance. It can hold a stale value FullProf never used, so `lambda1` is the wavelength |
 | `FullProfModel.zero_shift` | the zero correction and the sample-displacement terms, with their codewords decoded |
 | `FullProfModel.background` | the background points the file declares, as (2θ, value) with their codewords |
+| `FullProfModel.background_kind`, `FullProfModel.background_coefficients` | which background the file's `Nba` selects (interpolated points, or a polynomial, Fourier or Chebyshev series), and a series' coefficients with their codewords. A background held in a companion `.bac` file is refused at read |
+| `FullProfModel.parameter_limits` | the hard limits the file's `Nre` count declares, one per refined parameter number. They are reported at the build (`FULLPROF_LIMITS_NOT_APPLIED`) and set no bound |
 | `FullProfModel.excluded_regions`, `FullProfModel.fitted_range` | what the run left out, and the range it fitted |
 | `FullProfModel.user_scatterers` | a neutron file's LINE-12 user scattering lengths, each read as the isotope it is the Sears b of. A name that is not an element and a mass number with that b is refused at read |
 | `FullProfModel.dispersion` | an X-ray file's LINE-12 f′ and f″ per element, as stated. A pair differing from rietx's Cromer-Liberman value at the file's wavelength is refused at read |

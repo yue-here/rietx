@@ -340,6 +340,109 @@ class LSQOutcome:
     #: ``None`` on the single-histogram path, which has one layout and no
     #: choice to report.
     jacobian_layout: str | None = None
+    #: why the solve stopped on a non-finite model, or ``None`` when it did
+    #: not (WP-2048).  Written by both solver entry points, at the two places
+    #: a driver would otherwise raise: a residual that is not finite at the
+    #: start, and a Jacobian that is not finite at a point the driver
+    #: accepted.  Such an outcome hands back the solve's **start**
+    #: (:attr:`theta`, :attr:`cost_final` equal to :attr:`cost_initial`), with
+    #: ``status="diverged"``, no Jacobian and no esds; ``refine`` and
+    #: ``multi`` end the stage there and say so in ``STAGE_NOT_FINITE``.
+    non_finite: NonFiniteStop | None = None
+
+
+@dataclass(frozen=True)
+class NonFiniteStop:
+    """Where a solve met a model that is not finite (WP-2048).
+
+    ``kind`` is ``"residual"`` when the residual at the solve's start holds a
+    NaN or an infinity, and ``"jacobian"`` when the Jacobian does at a point
+    the driver had accepted, whose residual was finite.  ``columns`` names
+    the Jacobian's non-finite columns, and is empty for a residual stop.
+    ``free`` is every free path of the solve, in column order.
+
+    A trial step into a non-finite residual is no stop: both drivers reject
+    it and shorten the step (scipy's TRF by its own test, the LM driver
+    because ``S = nan`` never compares lower).  The two kinds here are the
+    points at which neither driver has a step left to shorten.
+    """
+
+    kind: str
+    columns: tuple[str, ...]
+    free: tuple[str, ...]
+
+
+class _NonFiniteJacobian(Exception):
+    """Raised by :class:`_FiniteJacobianGuard` through a driver, and caught by
+    the solver entry point that installed the guard; never seen outside."""
+
+    def __init__(self, columns: np.ndarray):
+        super().__init__("the Jacobian is not finite")
+        self.columns = columns
+
+
+def _non_finite_columns(j) -> np.ndarray:
+    """The column indices of ``j`` holding a NaN or an infinity, dense or
+    :class:`~.blocked.BlockJacobian`.  A column sum is NaN or infinite
+    whenever the column holds one, so a finite sum clears the column without
+    the full-size boolean mask; only a non-finite sum (possibly a finite
+    column that overflowed) is checked entry by entry."""
+    def bad_of(m: np.ndarray) -> np.ndarray:
+        bad = ~np.isfinite(m.sum(axis=0))
+        if bad.any():
+            bad[bad] = ~np.isfinite(m[:, bad]).all(axis=0)
+        return bad
+
+    if isinstance(j, BlockJacobian):
+        bad = np.zeros(j.n_cols, dtype=bool)
+        for block, cols in zip(j.blocks, j.col_maps, strict=True):
+            bad[cols] |= bad_of(block)
+        return np.flatnonzero(bad)
+    return np.flatnonzero(bad_of(np.asarray(j)))
+
+
+class _FiniteJacobianGuard:
+    """Stops a solve at the first Jacobian that is not finite (WP-2048).
+
+    Both drivers ask for the Jacobian only at a point they have accepted, so
+    the residual there was finite and the trust region has no smaller step to
+    try.  scipy's TRF raised ``ValueError`` from its SVD on such a matrix, and
+    the LM driver would form NaN normal equations.  This guard raises
+    :class:`_NonFiniteJacobian` instead, which the entry point turns into an
+    outcome carrying :class:`NonFiniteStop`.  Outermost of the Jacobian
+    wrappers, so a degenerate-cell fallback is checked like any other matrix.
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        # ``inspect.unwrap`` reaches the guard below, as it reaches the
+        # residual guard under the TRF event wrapper
+        self.__wrapped__ = inner
+
+    def __call__(self, theta: np.ndarray):
+        j = self._inner(theta)
+        bad = _non_finite_columns(j)
+        if bad.size:
+            raise _NonFiniteJacobian(bad)
+        return j
+
+
+def _non_finite_outcome(kind: str, columns, free_paths, x0: np.ndarray,
+                        n_table: int, cost0: float, solver: str,
+                        cell_guard, lapack_start: int,
+                        jacobian_layout: str | None = None) -> LSQOutcome:
+    """The outcome of a solve stopped on a non-finite model: its own start,
+    named as such (:attr:`LSQOutcome.non_finite`)."""
+    free = tuple(free_paths)
+    names = tuple(free[c] if c < len(free) else f"aux.{c - len(free)}"
+                  for c in np.asarray(columns, dtype=int))
+    return LSQOutcome(np.array(x0[:n_table], dtype=np.float64), cost0, cost0,
+                      cell_guard.n_calls, "diverged", None, None, None, solver=solver,
+                      termination=f"non_finite_{kind}",
+                      n_degenerate_cell_probes=cell_guard.n_degenerate,
+                      n_lapack_fallbacks=lapack.retries() - lapack_start,
+                      jacobian_layout=jacobian_layout,
+                      non_finite=NonFiniteStop(kind, names, free))
 
 
 def stationary_columns(outcome: LSQOutcome, free_paths: list[str]) -> list[int]:
@@ -672,24 +775,28 @@ def _moment_angle_columns(entries: list[dict[tuple[int, str], float]]
 
 
 def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
-                  modulus_norms: np.ndarray) -> _StationaryPoint:
+                  modulus_norms: np.ndarray, block=None) -> _StationaryPoint:
     """Move the angles ``idx`` together until their columns vanish.
 
     Gauss-Newton on the stacked columns C(α) = ∂r/∂α, every other entry of
-    ``x`` fixed: δα = −lstsq(∂C/∂α, C), central differences at
-    :data:`STATIONARY_ANGLE_STEP` for C and for ∂C/∂α = ∂²r/∂α∂α.  Iterated,
-    because one step leaves an error of order δ³, and joint, because two
-    sites' angle columns are coupled (WP-1929's deferred measurement).  The
-    best iterate is kept, by its largest column over its modulus column.  Costs
-    2k² + 1 residual evaluations an iteration for k angles, the k columns
-    reusing the diagonal second differences' points.
+    ``x`` fixed: δα = −lstsq(∂C/∂α, C).  Iterated, because one step leaves an
+    error of order δ³, and joint, because two sites' angle columns are coupled
+    (WP-1929's deferred measurement).  The best iterate is kept, by its
+    largest column over its modulus column.
+
+    ``block(th)``, where given, returns C and ∂C/∂α = ∂²r/∂α∂α analytically
+    (:func:`_analytic_angle_block`, WP-2068), and an iteration then costs one
+    residual evaluation.  Without it both come from central differences at
+    :data:`STATIONARY_ANGLE_STEP`, 2k² + 1 residual evaluations an iteration
+    for k angles, the k columns reusing the diagonal second differences'
+    points.
     """
     from .statistics import column_norms
 
     h = STATIONARY_ANGLE_STEP
     k = len(idx)
 
-    def columns(th: np.ndarray):
+    def fd_columns(th: np.ndarray):
         plus, minus = [], []
         for i in idx:
             tp, tm = th.copy(), th.copy()
@@ -699,18 +806,10 @@ def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
             minus.append(resid(tm))
         c = np.column_stack([(p - m) / (2.0 * h)
                              for p, m in zip(plus, minus, strict=True)])
-        return c, plus, minus
+        return c, (plus, minus)
 
-    def ratios_of(c: np.ndarray) -> np.ndarray:
-        return column_norms(c) / modulus_norms
-
-    th, r0 = x.copy(), r_stop
-    c, plus, minus = columns(th)
-    ratios = ratios_of(c)
-    curvature_stop = None
-    for _ in range(STATIONARY_ANGLE_MAX_ITER):
-        if not np.all(np.isfinite(ratios)) or ratios.max() <= MOMENT_DIRECTION_SUPPORT:
-            break
+    def fd_curvature(th: np.ndarray, r0: np.ndarray, aux) -> np.ndarray:
+        plus, minus = aux
         m = np.empty((len(r0), k, k))
         for a in range(k):
             m[:, a, a] = (plus[a] - 2.0 * r0 + minus[a]) / h ** 2
@@ -725,6 +824,36 @@ def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
                 m[:, a, b] = m[:, b, a] = (
                     corner[1.0, 1.0] - corner[1.0, -1.0]
                     - corner[-1.0, 1.0] + corner[-1.0, -1.0]) / (4.0 * h ** 2)
+        return m
+
+    def fd_diagonal(r0: np.ndarray, aux) -> np.ndarray:
+        plus, minus = aux
+        return np.column_stack([(plus[a] - 2.0 * r0 + minus[a]) / h ** 2
+                                for a in range(k)])
+
+    if block is None:
+        columns, curvature, diagonal = fd_columns, fd_curvature, fd_diagonal
+    else:
+        def columns(th: np.ndarray):
+            return block(th)
+
+        def curvature(th: np.ndarray, r0: np.ndarray, aux) -> np.ndarray:
+            return aux
+
+        def diagonal(r0: np.ndarray, aux) -> np.ndarray:
+            return aux[:, np.arange(k), np.arange(k)].copy()
+
+    def ratios_of(c: np.ndarray) -> np.ndarray:
+        return column_norms(c) / modulus_norms
+
+    th, r0 = x.copy(), r_stop
+    c, aux = columns(th)
+    ratios = ratios_of(c)
+    curvature_stop = None
+    for _ in range(STATIONARY_ANGLE_MAX_ITER):
+        if not np.all(np.isfinite(ratios)) or ratios.max() <= MOMENT_DIRECTION_SUPPORT:
+            break
+        m = curvature(th, r0, aux)
         if curvature_stop is None:
             curvature_stop = m
         # block a of the stacked system is column a's rows: C[:, a] against
@@ -733,19 +862,17 @@ def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
                                 c.T.reshape(-1), rcond=None)[0]
         trial = th.copy()
         trial[idx] += step
-        c_new, plus_new, minus_new = columns(trial)
+        c_new, aux_new = columns(trial)
         ratios_new = ratios_of(c_new)
         if not np.all(np.isfinite(ratios_new)) or ratios_new.max() >= ratios.max():
             break
-        th, c, plus, minus, ratios = trial, c_new, plus_new, minus_new, ratios_new
+        th, c, aux, ratios = trial, c_new, aux_new, ratios_new
         r0 = resid(th)
-    diag = np.column_stack([(plus[a] - 2.0 * r0 + minus[a]) / h ** 2
-                            for a in range(k)])
     return _StationaryPoint(
         theta=th, ratios=ratios,
         reached=bool(np.all(np.isfinite(ratios))
                      and ratios.max() <= MOMENT_DIRECTION_SUPPORT),
-        resid=r0, curvature_stop=curvature_stop, curvature_diag=diag)
+        resid=r0, curvature_stop=curvature_stop, curvature_diag=diagonal(r0, aux))
 
 
 def _refitted_increase(jac_data: np.ndarray, angles: list[int],
@@ -803,7 +930,7 @@ def _half_widths(curvature_diag: np.ndarray, resid: np.ndarray,
 def stationary_angle_test(resid, x: np.ndarray, jac: np.ndarray, n_data: int,
                           free_paths: list[str],
                           entries: list[dict[tuple[int, str], float]],
-                          n_free: int
+                          n_free: int, angle_block=None
                           ) -> tuple[list[MomentAngleTest] | None, list[int]]:
     """Which free moment angles sit at a direction the symmetry fixes (WP-1929).
 
@@ -830,6 +957,10 @@ def stationary_angle_test(resid, x: np.ndarray, jac: np.ndarray, n_data: int,
     pass alone, and this is how they are separated.
 
     ``resid`` is the solve's residual; only its first ``n_data`` rows are read.
+    ``angle_block`` is :func:`_analytic_angle_block`'s answer for the solve's
+    model, where it has one: a round whose set it claims builds its columns
+    and curvature from it, and every other round, or a caller passing
+    ``None``, from central differences of ``resid``.
     ``jac`` is the solve's own Jacobian at ``x``, and ``n_free`` is P in
     χ²_red = χ²/(N − P), as :func:`covariance_estimates` counts it.  Returns
     the record, ``None`` where no angle was a candidate or χ²_red·f² is not
@@ -878,7 +1009,9 @@ def stationary_angle_test(resid, x: np.ndarray, jac: np.ndarray, n_data: int,
         cut = chi_bar_squared_quantile(STATIONARY_ANGLE_LEVEL, k)
         try:
             point = _joint_newton(r, x, r_stop, tested,
-                                  np.array([reference[i] for i in tested]))
+                                  np.array([reference[i] for i in tested]),
+                                  None if angle_block is None
+                                  else angle_block(tested))
             statistic = None
             if point.reached:
                 statistic = _refitted_increase(jac_data, tested, r_stop,
@@ -1003,8 +1136,13 @@ class _DegenerateCellGuard:
         self._inner = inner
         self._last: np.ndarray | None = None
         self.n_degenerate = 0
+        #: every call, refused or not: the evaluation count a solve stopped
+        #: on a non-finite Jacobian reports, having no driver result to read
+        #: one off (WP-2048)
+        self.n_calls = 0
 
     def __call__(self, theta: np.ndarray) -> np.ndarray:
+        self.n_calls += 1
         try:
             r = self._inner(theta)
         except DegenerateCellError:
@@ -1377,6 +1515,116 @@ def _moment_reach_ok(path: str, extra: list[str]) -> bool:
     prefix = f"phases.{m.group(1)}.atoms."
     return all((n := _MOMENT_PATH.match(q)) and n.group(3) == "0"
                and q.startswith(prefix) for q in extra)
+
+
+def _analytic_angle_block(model: CompiledModel, table: ParameterTable):
+    """The stationary-angle test's analytic block, or ``None`` (WP-2068).
+
+    Returns ``make(idx)``, which answers for a set of θ columns either
+    ``None`` (the test keeps its central differences) or ``block(th)`` giving
+    the data rows' C = ∂r/∂θ_idx, (n, k), and ∂²r/∂θ_a∂θ_b, (n, k, k), at
+    ``th``.  The branch claims a set only when every model path each column
+    moves is a moment **angle** of a phase whose intensity is affine in
+    p²⟨|F_⊥|²⟩ (:meth:`CompiledModel.moment_angle_block_supported`); a
+    variable is dropped before that test, the forward model never reading
+    one.  The test's own candidates pass the first half by construction
+    (``_moment_angle_columns``), so the second is what sends a set back to
+    the differences.
+
+    Within that reach the chain is linear: y is affine in |F|², so
+    ∂²y/∂a∂b is ∂²|F_⊥|²/∂a∂b through the same per-reflection factor and
+    the same frozen profile Ω as the first derivative.  Neither depends on
+    an angle, so both are built once per phase, at the first ``th`` any set
+    is evaluated at, and shared by every round's set.  The coefficients are
+    C's, so a tie or a variable driving several sites' angles is carried
+    exactly, the DOFs being affine in θ.  The reach is read off
+    :meth:`~rietx.params.vector.ParameterTable.column_reach`, never C's
+    sparsity: a derived row a column moves carries no coefficient in C, and
+    the branch declines it rather than reading it as unmoved.
+    """
+    if (model.mode != "rietveld" or model.pawley is not None
+            or all(cp.magnetic is None for cp in model.phases)):
+        return None
+    coef = table.constraint_block()[0].tocsc()
+    reach = list(table.column_reach().values())
+    n_table = len(table.free_paths)
+    sqrt_w = 1.0 / model.sigma
+    n_pts = len(model.tt)
+    frozen: dict[int, list] = {}
+
+    def freeze(values: dict[str, float], phases) -> None:
+        """Per phase and drawn component, ∂y/∂(p²⟨|F_⊥|²⟩) as a sparse
+        (points × reflections) operator: Ω scattered by its window
+        indices, times the per-reflection factor the first-derivative
+        chain applies (:meth:`CompiledModel.moment_intensity_grad`)."""
+        from scipy import sparse
+
+        todo = [ip for ip in phases if ip not in frozen]
+        if not todo:
+            return
+        bases = model.derivative_bases(values, None, axial_derivs=False,
+                                       profile_derivs=False)
+        for ip in todo:
+            n_refl = len(model.phases[ip].reflections)
+            ops = []
+            for pp, fac in zip(bases.components(ip),
+                               model.moment_intensity_grad(
+                                   ip, np.ones(n_refl), values),
+                               strict=True):
+                lay = pp.layout
+                if not len(lay.i0):
+                    continue
+                row_fac = np.where(pp.finite, _gather_per_line(lay, fac), 0.0)
+                data = (np.asarray(pp.omega) * row_fac[:, None]).ravel()
+                rows = np.asarray(lay.idx).ravel()
+                refl = np.broadcast_to(np.asarray(lay.k)[:, None],
+                                       lay.idx.shape).ravel()
+                ops.append(sparse.csr_matrix((data, (rows, refl)),
+                                             shape=(n_pts, n_refl)))
+            frozen[ip] = ops
+
+    def make(idx: list[int]):
+        weights: dict[int, list[dict[tuple[int, int], float]]] = {}
+        for a, c in enumerate(idx):
+            if c >= n_table:
+                return None
+            for path in reach[c]:
+                if is_variable_path(path):
+                    continue
+                w = float(coef[table._paths[path], c])
+                m = _MOMENT_PATH.match(path)
+                if w == 0.0 or m is None or m.group(3) == "0":
+                    # a derived row (no coefficient in C), a modulus or
+                    # anything that is not a moment angle
+                    return None
+                ip = int(m.group(1))
+                if not model.moment_angle_block_supported(ip):
+                    return None
+                per = weights.setdefault(ip, [{} for _ in idx])
+                per[a][int(m.group(2)), int(m.group(3))] = w
+        if not weights:
+            return None
+        k = len(idx)
+        upper = np.triu_indices(k)
+
+        def block(th: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            values = table.decode(th[:n_table])
+            freeze(values, weights)
+            dy = np.zeros((n_pts, k + len(upper[0])))
+            for ip, w in weights.items():
+                g, h = model.moment_f2_angle_block(ip, values, w)
+                rhs = np.concatenate([g, h[:, upper[0], upper[1]]], axis=1)
+                for op in frozen[ip]:
+                    dy += op @ rhs
+            dy *= -sqrt_w[:, None]
+            curv = np.empty((n_pts, k, k))
+            curv[:, upper[0], upper[1]] = dy[:, k:]
+            curv[:, upper[1], upper[0]] = dy[:, k:]
+            return dy[:, :k], curv
+
+        return block
+
+    return make
 
 
 def _po_column(model: CompiledModel, bases: DerivativeBases,
@@ -2191,7 +2439,8 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
     ``magnetic_lor_strain`` added at a magnetic component's windows.  A
     Stephens block adds Λ(hkl)·tanθ, which its own cone holds at or above
     zero (:func:`strain_cone_inequalities`), so it is left out of the row.
-    The row is then a sufficient condition, never a necessary one.  The
+    It also replaces ``lor_strain`` (WP-1467), whose value leaves the row with
+    it.  The row is then a sufficient condition, never a necessary one.  The
     phase terms have floors of 0, so a row can bind only through X and Y.
 
     **A row at every reflection of the frozen list**, where the Gaussian rows
@@ -2236,6 +2485,13 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
         # the magnetic pair is a table row only where a moment block is declared
         if cp.win_mag is not None and all(n in table._paths for n in magnetic):
             families.append((cp.win_mag, rows + [table._paths[n] for n in magnetic]))
+        # a Stephens block replaces lor_strain (CompiledModel.lor_strain_term,
+        # WP-1467): the entry is force-fixed, so its C row is zero and only its
+        # stored value in d would reach the row, a width the model never draws
+        d_ph = d
+        if cp.strain_monomials is not None:
+            d_ph = d.copy()
+            d_ph[table._paths[f"phases.{ip}.lor_strain"]] = 0.0
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         _d, tt_lines = model._cell_block(cp, cell, lams)
@@ -2253,7 +2509,7 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
             inv_cos, t = 1.0 / np.cos(th), np.tan(th)
             basis = np.column_stack([inv_cos, t] * (len(idx) // 2))
             blocks_T.append(basis @ C[idx, :])
-            blocks_c.append(basis @ d[idx])
+            blocks_c.append(basis @ d_ph[idx])
         if not blocks_T:
             continue
         Tc = np.unique(np.column_stack([np.vstack(blocks_T),
@@ -2324,6 +2580,22 @@ def _free_values(table, theta: np.ndarray) -> list[float]:
     return table.free_values(theta)
 
 
+def _cancel_check(cancel, stage: str):
+    """A function raising :class:`RefinementCancelled` once ``cancel`` is set.
+
+    The residual reads it at each evaluation boundary (:func:`_cancellable`)
+    and the LM driver inside a step's bounded solve, between factorisations
+    (:func:`.bccg.projected_cg`), where one step on a large Pawley block
+    outlasted a deadline by 20 s (WP-2063).
+    """
+    def check() -> None:
+        if cancel.is_set():
+            raise RefinementCancelled(
+                f"cancelled during stage {stage!r}" if stage else "cancelled",
+                stage=stage)
+    return check
+
+
 def _cancellable(residual, cancel, stage: str):
     """``residual`` behind a read of ``cancel`` at each evaluation boundary.
 
@@ -2331,11 +2603,10 @@ def _cancellable(residual, cancel, stage: str):
     :func:`run_multi_least_squares`.  ``__wrapped__`` lets ``inspect.unwrap``
     reach the closure underneath.
     """
+    check = _cancel_check(cancel, stage)
+
     def checked(theta: np.ndarray):
-        if cancel.is_set():
-            raise RefinementCancelled(
-                f"cancelled during stage {stage!r}" if stage else "cancelled",
-                stage=stage)
+        check()
         return residual(theta)
 
     checked.__wrapped__ = residual
@@ -2374,7 +2645,7 @@ def _tracked(residual, tracker: _StepTracker, events, stage: str, table):
 
 def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
                 inequalities, events, stage: str, track=None, table=None,
-                normal_equations=None):
+                normal_equations=None, cancel=None):
     """Run the bounded-LM driver, adapted to the scipy result shape.
 
     The two drivers are kept interchangeable at exactly this point: everything
@@ -2392,7 +2663,8 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
     (:func:`.lm._measured_curvature`) evaluate the residual too, but as
     derivative information, like scipy's finite-difference Jacobian calls, so
     they emit nothing and ``nfev`` leaves them out (WP-1953).
-    ``normal_equations`` is the driver's own (:func:`.lm.minimize`).
+    ``normal_equations`` is the driver's own (:func:`.lm.minimize`), and
+    ``cancel`` is also read inside each step's bounded solve.
     """
     from . import lm as lm_mod
 
@@ -2415,7 +2687,9 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
                            inequalities=inequalities,
                            callback=accept_cb if track is not None else None,
                            on_trial=trial_cb if events is not None else None,
-                           normal_equations=normal_equations)
+                           normal_equations=normal_equations,
+                           check=(None if cancel is None
+                                  else _cancel_check(cancel, stage)))
 
 
 class _StepTracker:
@@ -2699,6 +2973,43 @@ def _check_magnetic_width_compiled(model: CompiledModel,
                 f"or seed the term off zero before compiling")
 
 
+def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobian,
+                  x0: np.ndarray, lo: np.ndarray, hi: np.ndarray, *, n_table: int,
+                  n_aux: int, max_nfev: int, ftol: float, events, stage: str,
+                  tracker, backend: str, solver: str, cancel=None):
+    """One driver run of :func:`run_least_squares`, either driver's result
+    shape; a function of its own so that one ``try`` covers both drivers
+    (WP-2048)."""
+    if solver == "lm":
+        # the strain cone and the Γ_G² and Γ_L floors (WP-1938 D7, WP-2002)
+        # are built against the *starting* point, because feasibility is
+        # maintained rather than restored (see the builders)
+        ineqs = _pad_inequalities(
+            strain_cone_inequalities(model, table, x0[:n_table])
+            + texture_positivity_inequalities(model, table, x0[:n_table])
+            + gaussian_width_inequalities(model, table, x0[:n_table])
+            + lorentzian_width_inequalities(model, table, x0[:n_table]), n_aux)
+        from . import lm as lm_mod
+
+        # a Pawley block past the BVLS cut takes its normal matrix sparse,
+        # where its windows are narrow enough (``PAWLEY_SPARSE_DENSITY``), so
+        # the projected CG can precondition (WP-2011).  numpy only: the
+        # pattern is read off the writer in ``_make_jacobian``, and the
+        # traced backends' columns were never checked against it
+        normal_equations = (_pawley_normal_equations(model, n_table)
+                            if model.pawley is not None and backend == "numpy"
+                            and len(x0) > lm_mod.BVLS_MAX_COLUMNS else None)
+        res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
+                          ftol=ftol, inequalities=ineqs, events=events, stage=stage,
+                          track=tracker, table=table,
+                          normal_equations=normal_equations, cancel=cancel)
+    else:
+        with lapack.scipy_trf():
+            res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
+                                ftol=ftol, xtol=XTOL, gtol=GTOL, max_nfev=max_nfev)
+    return res
+
+
 def run_least_squares(model: CompiledModel, table: ParameterTable,
                       *, max_iter: int = 100, ftol: float = FTOL,
                       compute_uncertainties: bool = True,
@@ -2731,6 +3042,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     residual = cell_guard
     jacobian = _jacobian_for(model, table, backend)
     jacobian = _DegenerateCellJacobianGuard(jacobian, cell_guard)
+    jacobian = _FiniteJacobianGuard(jacobian)
 
     if cancel is not None:
         # Both drivers, and *before* the event wrapper, so the check costs one
@@ -2782,37 +3094,31 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                           solver=solver,
                           n_degenerate_cell_probes=cell_guard.n_degenerate)
 
+    def stopped(kind: str, columns=()) -> LSQOutcome:
+        if model.pawley is not None:
+            # the residual evaluations wrote their trial intensities into
+            # the per-phase buffers; the outcome is the start, so are they
+            model.set_pawley_intensities(x0[n_table:])
+        return _non_finite_outcome(kind, columns, table.free_paths, x0, n_table,
+                                   cost0, solver, cell_guard, lapack_start)
+
+    if not np.all(np.isfinite(r0)):
+        # both drivers refuse this start with a ValueError (WP-2048)
+        return stopped("residual")
+
     n_truncated, truncated_by = 0, {}
     # one budget, in residual evaluations, for both drivers (WP-1937)
     max_nfev = max_iter * NFEV_PER_ITERATION
+    try:
+        res = _drive_single(model, table, residual, jacobian, x0, lo, hi,
+                            n_table=n_table, n_aux=n_aux, max_nfev=max_nfev,
+                            ftol=ftol, events=events, stage=stage,
+                            tracker=tracker, backend=backend, solver=solver,
+                            cancel=cancel)
+    except _NonFiniteJacobian as stop:
+        return stopped("jacobian", stop.columns)
     if solver == "lm":
-        # the strain cone and the Γ_G² and Γ_L floors (WP-1938 D7, WP-2002)
-        # are built against the *starting* point, because feasibility is
-        # maintained rather than restored (see the builders)
-        ineqs = _pad_inequalities(
-            strain_cone_inequalities(model, table, x0[:n_table])
-            + texture_positivity_inequalities(model, table, x0[:n_table])
-            + gaussian_width_inequalities(model, table, x0[:n_table])
-            + lorentzian_width_inequalities(model, table, x0[:n_table]), n_aux)
-        from . import lm as lm_mod
-
-        # a Pawley block past the BVLS cut takes its normal matrix sparse,
-        # where its windows are narrow enough (``PAWLEY_SPARSE_DENSITY``), so
-        # the projected CG can precondition (WP-2011).  numpy only: the
-        # pattern is read off the writer in ``_make_jacobian``, and the
-        # traced backends' columns were never checked against it
-        normal_equations = (_pawley_normal_equations(model, n_table)
-                            if model.pawley is not None and backend == "numpy"
-                            and len(x0) > lm_mod.BVLS_MAX_COLUMNS else None)
-        res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
-                          ftol=ftol, inequalities=ineqs, events=events, stage=stage,
-                          track=tracker, table=table,
-                          normal_equations=normal_equations)
         n_truncated, truncated_by = res.n_truncated, res.truncated_by
-    else:
-        with lapack.scipy_trf():
-            res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
-                                ftol=ftol, xtol=XTOL, gtol=GTOL, max_nfev=max_nfev)
     status = "converged" if res.status > 0 else ("max_iter" if res.status == 0 else "diverged")
     termination = (res.termination if solver == "lm"
                    else _TRF_TERMINATION.get(res.status, str(res.status)))
@@ -2829,7 +3135,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
         moment_angle_tests, stationary = stationary_angle_test(
             probe, res.x, res.jac, len(model.tt), table.free_paths,
             _column_entries([table], [np.arange(n_table)], len(res.x)),
-            len(res.x))
+            len(res.x), angle_block=_analytic_angle_block(model, table))
         stderr_full, corr_full, esd_inflation, covariance_error = _guarded_covariance(
             _without_columns(res.jac, stationary), res.fun, len(res.x),
             n_data=len(model.tt))
@@ -3026,6 +3332,7 @@ def run_multi_least_squares(models: list[CompiledModel],
     cell_guard = _DegenerateCellGuard(residual)
     residual = cell_guard
     jacobian = _DegenerateCellJacobianGuard(jacobian, cell_guard)
+    jacobian = _FiniteJacobianGuard(jacobian)
     n_cols = len(mtable.free_paths)
 
     if cancel is not None:
@@ -3063,16 +3370,30 @@ def run_multi_least_squares(models: list[CompiledModel],
                           n_degenerate_cell_probes=cell_guard.n_degenerate,
                           jacobian_layout=layout)
 
+    def stopped(kind: str, columns=()) -> LSQOutcome:
+        return _non_finite_outcome(kind, columns, mtable.free_paths, x0, n_cols,
+                                   cost0, solver, cell_guard, lapack_start,
+                                   jacobian_layout=layout)
+
+    if not np.all(np.isfinite(r0)):
+        # the single-histogram rule (WP-2048), on the stacked residual
+        return stopped("residual")
+
     max_nfev = max_iter * NFEV_PER_ITERATION
-    if solver == "lm":
-        res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
-                          ftol=ftol,
-                          inequalities=_joint_width_inequalities(models, mtable, x0),
-                          events=events, stage=stage, track=tracker, table=mtable)
-    else:
-        with lapack.scipy_trf():
-            res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
-                                ftol=ftol, xtol=XTOL, gtol=GTOL, max_nfev=max_nfev)
+    try:
+        if solver == "lm":
+            res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
+                              ftol=ftol,
+                              inequalities=_joint_width_inequalities(models, mtable, x0),
+                              events=events, stage=stage, track=tracker, table=mtable,
+                              cancel=cancel)
+        else:
+            with lapack.scipy_trf():
+                res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi),
+                                    method="trf", ftol=ftol, xtol=XTOL, gtol=GTOL,
+                                    max_nfev=max_nfev)
+    except _NonFiniteJacobian as stop:
+        return stopped("jacobian", stop.columns)
     status = "converged" if res.status > 0 else ("max_iter" if res.status == 0 else "diverged")
     termination = (res.termination if solver == "lm"
                    else _TRF_TERMINATION.get(res.status, str(res.status)))

@@ -347,11 +347,12 @@ def test_no_link_means_the_manual_and_lands_on_this_page(any_page):
 
 
 def test_every_link_into_the_manual_lands_on_a_page(any_page):
-    """A chapter link is either a page of the manual under `/docs/<version>/` or an
-    old-tree address `docs_versions.RETIRED` stubs, which sends the reader to the
-    released tree once one carries the page and to `dev/` until then (WP-1986).  A
-    stub link carries no `#fragment`: the stub carries one over, but a chapter's
-    sections took new heading ids on their new pages."""
+    """A chapter link is a page of the manual under `/docs/stable/`.  Until the
+    1.10 cut it could be an old-tree address `docs_versions.RETIRED` stubs, but a
+    stub lands on a chapter's successor, which for a feature whose section moved
+    is not the page holding it (WP-1986).  Whether an anchor is on its page is
+    `test_manual.py::test_every_link_from_outside_the_manual_is_on_its_page`,
+    which has the built manual."""
     name, page = any_page
     retired = _versions().RETIRED
     tree = REPO_ROOT / "docs" / "docs"
@@ -361,9 +362,8 @@ def test_every_link_into_the_manual_lands_on_a_page(any_page):
             continue
         if path.startswith("lite/"):
             continue
-        target, _, fragment = path.partition("#")
-        target = target.removesuffix(".html")
-        version = re.match(r"docs/[^/]+/", target)
+        target = path.partition("#")[0].removesuffix(".html")
+        version = re.match(r"docs/stable/", target)
         if version:
             rel = target[version.end():]
             source = tree / rel
@@ -374,9 +374,9 @@ def test_every_link_into_the_manual_lands_on_a_page(any_page):
             assert source.with_suffix(".md").is_file() or notebook, (
                 f"{name}: {link} names no page of docs/docs/")
         else:
-            assert target in retired, f"{name}: {link} is neither a manual page nor a stub"
-            assert not fragment, (
-                f"{name}: {link} carries #{fragment}, which names an old-tree heading")
+            assert target not in retired, (
+                f"{name}: {link} is a retired address; name its page under /docs/stable/")
+            raise AssertionError(f"{name}: {link} names no page under /docs/stable/")
 
 
 def test_the_landing_page_alone_is_written_at_the_site_root():
@@ -572,19 +572,15 @@ def test_every_read_link_is_a_page_the_manual_builds(site_html):
     """A Read link lands on the notebook's manual page, which exists while the
     tutorials index lists it in its toctree (`start/tutorials.md`, WP-1916).
 
-    The link reaches the page either directly, under `/docs/<version>/`, or
-    through the redirect stub the retired old tree's address became
-    (`docs/docs_versions.py`'s `RETIRED`, WP-1986), which must then send the
-    reader to that same page."""
-    versions = _versions()
+    The link names the page under `/docs/stable/`, the release tree the
+    notebooks are built from, never the retired tree's stub (WP-1986)."""
     index = (REPO_ROOT / "docs" / "docs" / "start" / "tutorials.md").read_text(encoding="utf-8")
     toctree = re.search(r"```\{toctree\}(.*?)```", index, re.S).group(1).split()
     reads = re.findall(r'href="https://rietx\.org/([^"]+)\.html">Read</a>', site_html)
     assert len(reads) == len(_rows(site_html))
     for path in reads:
-        if not re.match(r"docs/[^/]+/start/tutorials/", path):
-            assert path in versions.RETIRED, f"/{path}.html is neither a manual page nor a stub"
-            path = versions.RETIRED[path]
+        assert path.startswith("docs/stable/start/tutorials/"), (
+            f"/{path}.html is not a tutorial page of the stable manual")
         page = "tutorials/" + path.rsplit("/", 1)[-1]
         assert path.endswith(f"start/{page}") and page in toctree, (
             f"/{path}.html is not in the manual's tutorials toctree")

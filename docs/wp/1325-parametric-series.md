@@ -1119,6 +1119,13 @@ Their numbers are as reported and were not re-measured here.
 
 ### Inherited
 
+- **2026-11-01, from [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md): a held
+  coefficient's target rows leave `parameters`.** A result now lists only the rows the fit
+  could move (`ParameterTable.moving_paths`). When the support hold takes `vars.b_0`, the
+  `hist.h.phases.1.cell.*` rows it drives are absent, so their `RefinedParameter.equations`
+  is no longer readable there. `PARAMETRIC_TARGET_UNSEEN` and `result.parametric` still name
+  both. `test_a_joint_fit_holds_a_coefficient_whose_phase_no_pattern_sees` was re-pinned to
+  that.
 - **2026-10-23, from [1341](1341-a-joint-fit-has-no-report.md) (closed): joint-report items now go
   to [2028](2028-a-joint-fits-guards-see-every-histogram.md).** The four joint items and the
   three `PARAMETRIC_*` rendering notes this WP sent 1341 on 2026-10-14 are 2028's Context items
@@ -1138,6 +1145,25 @@ Their numbers are as reported and were not re-measured here.
     clears its open stages at each `fit_start` (`aggregate.py:185`).
   - A segmented chain's summed fit time is not its wall time: 700 s against
     148 s on one chain, as reported and not re-measured.
+
+- 2026-10-31, from the issue triage (issue #1218, row S2): a pure-error
+  lack-of-fit beside the declared-form test. For every group of patterns that
+  share every declared coordinate, the χ² of the free-fit targets about their
+  inverse-variance mean on n_g − 1 dof, per group and pooled, with esds
+  uncorrected (the choice the form test already makes), and "no replicate
+  groups: not measured" when no coordinate repeats. It would sit on
+  `ParametricFormTest` as `replicates`, or on the series summary. Measured by
+  the reporter on one synthetic series (16 patterns, cubic perovskite
+  capillary, a = a₀(1 + αΔT) + 0.02·x, a ramp to 700 K then a hold): when x
+  drifts during the hold the 9 held patterns differ in `phases.0.cell.a` by χ²
+  = 24 054 on 8 dof; when x stays put, χ² = 12.0 on 8 dof (p ≈ 0.15). The
+  score test cannot see a misfit that varies at a repeated coordinate, which
+  is what replicates measure (Draper & Smith 1998, pure error). Checked
+  against the tree at d87c8cc91: `ParametricFormTest`
+  (`schemas/parametric.py:320`) carries `n_patterns`, `n_subset`, `tied`,
+  `others_freed`, `rejected` and no replicate reading; this WP's ticked
+  lack-of-fit task built the score test only. Not re-run here. The reporter
+  proposes landing S2 before S1.
 
 ## Non-goals
 
