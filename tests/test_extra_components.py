@@ -897,6 +897,76 @@ def test_writing_the_old_field_name_in_code_still_raises():
         ins.background_peaks = [_peak()]
 
 
+# ----------------------------------------------------------------------
+# a hump's position is required: old files open, old code does not (WP-2013)
+# ----------------------------------------------------------------------
+def test_a_hump_built_in_code_needs_its_position():
+    """The maintainer's ruling of 2026-11-02: no placeholder for a caller.
+
+    The old default put a hump at 0° 2θ, below any measured range, and a
+    stage that freed it started from there.  A caller now says where it is.
+    """
+    with pytest.raises(ValidationError, match="position is required"):
+        HumpComponent()
+    with pytest.raises(ValidationError, match="position is required"):
+        Instrument.model_validate(
+            {**json.loads(_instrument().model_dump_json()),
+             "extra_components": [{"kind": "hump"}]})
+
+
+def test_a_stored_hump_without_a_position_still_opens(tmp_path):
+    """The other half: a stored document that omits it reads at the old 0.0.
+
+    Every writer here has always written the field, so such a document was
+    written by hand or by another tool; it opens because old files do
+    (``schemas/migrate.py``'s ``STORED_DOCUMENT_READ_POINTS``).
+    """
+    from rietx.history.store import read_records
+    from rietx.schemas.history import (
+        HistoryNode,
+        HistoryRecord,
+        NodeAction,
+        RefinementState,
+    )
+
+    node = HistoryNode(id="n1", action=NodeAction(kind="stage"),
+                       state=RefinementState(structure=make_lab6(),
+                                             instrument=_instrument(peaks=(_peak(),))))
+    doc = json.loads(HistoryRecord(record="node", node=node).model_dump_json())
+    del doc["node"]["state"]["instrument"]["extra_components"][0]["position"]
+    path = tmp_path / "history.jsonl"
+    path.write_text(json.dumps(doc) + "\n", encoding="utf-8")
+    got, = list(read_records(path))
+    hump = got.node.state.instrument.extra_components[0]
+    assert hump.position.value == 0.0 and hump.position.unit == "deg"
+    assert hump.height.value == pytest.approx(400.0)
+    # and the model it opened into is an ordinary one: an edit re-validates
+    hump.height.value = 10.0
+    got.node.state.instrument.extra_components[0].label = "edited"
+
+
+def test_every_stored_document_read_point_passes_the_context():
+    """``STORED_DOCUMENT_READ_POINTS`` is a claim, checked the way
+    ``READ_POINTS`` is (WP-1076): each names a reader that exists and that
+    validates with the stored-document context."""
+    import importlib
+    import inspect
+
+    from rietx.schemas.migrate import STORED_DOCUMENT_READ_POINTS
+
+    for dotted in STORED_DOCUMENT_READ_POINTS:
+        parts = dotted.split(".")
+        for i in range(len(parts), 1, -1):
+            try:
+                target = importlib.import_module(".".join(parts[:i]))
+            except ModuleNotFoundError:
+                continue
+            break
+        for part in parts[i:]:
+            target = getattr(target, part)
+        assert "context=STORED_DOCUMENT" in inspect.getsource(target), dotted
+
+
 def test_a_stored_plan_glob_is_migrated_and_not_merely_the_value():
     """The silent half, and the whole reason the repair is textual.
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -629,6 +630,9 @@ from .._nearmiss import did_you_mean
 #: its own frozen compile, the number ``stage_end`` already emitted.  Additive
 #: and defaulted to ``None``, "a result stored before the field", the 0.25 →
 #: 0.26 rule; all three runners write it on every stage.
+#: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
+#: where it defaulted to 0.0.  A stored document that omits it still opens, at
+#: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
@@ -892,6 +896,20 @@ def legacy_transform_bounds(kind: str, lo: float, hi: float) -> tuple[float, flo
 #: only trace an omission left once it was serialized.
 BARE_PARAMETER_ATTRS: dict[str, object] = {
     "min": -math.inf, "max": math.inf, "unit": None}
+
+
+#: The pydantic validation context a reader of a **stored document** passes,
+#: at each reader :data:`rietx.schemas.migrate.STORED_DOCUMENT_READ_POINTS`
+#: names.  A field a release made required is filled there with the
+#: placeholder its old default held, and raises everywhere else: old files
+#: open, old code does not (``HumpComponent.position``, WP-2013).  Read only
+#: through :func:`reading_stored_document`.
+STORED_DOCUMENT = MappingProxyType({"stored_document": True})
+
+
+def reading_stored_document(info) -> bool:
+    """Whether this validation is a stored document's read (:data:`STORED_DOCUMENT`)."""
+    return bool(info.context) and bool(info.context.get("stored_document"))
 
 
 def declared_fills(declared: Parameter, present) -> dict[str, object]:

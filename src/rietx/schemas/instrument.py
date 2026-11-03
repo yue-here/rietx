@@ -16,10 +16,10 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from ..model.profiles.caglioti import _MIN_GAMMA_G2
-from .common import Base, Parameter, _InheritsDeclaredDefaults
+from .common import Base, Parameter, _InheritsDeclaredDefaults, reading_stored_document
 
 if TYPE_CHECKING:  # the blank a measured background is built from
     from .pattern import PatternData
@@ -1945,7 +1945,7 @@ class HumpComponent(_InheritsDeclaredDefaults):
 
     Fields, and the reason each bound is the bound it is:
 
-    * ``position`` — °2θ, **unbounded by default**.  It is
+    * ``position`` — °2θ, **required**, and **unbounded by default**.  It is
       not a Bragg position, so nothing constrains it but the data; and the
       bound one would want — the fitted range — is not a fact this schema can
       see, since it depends on the pattern and on the excluded regions.  That
@@ -1981,9 +1981,11 @@ class HumpComponent(_InheritsDeclaredDefaults):
     bit-identical to no peak at all.
     """
 
-    #: apparent position of the hump in °2θ.  It defaults to 0.0, a placeholder
-    #: below any measured range rather than a place for a feature; with the
-    #: default ``height = 0`` the hump adds nothing until a caller places it.
+    #: apparent position of the hump in °2θ.  **Required**: a caller who omits
+    #: it is refused (:meth:`_position_is_required`).  The factory is not a
+    #: default a caller can reach.  It declares the unit a caller's own
+    #: ``Parameter`` inherits, and it is the 0.0 placeholder a stored document
+    #: written without the field is read at (WP-2013).
     position: Parameter = Field(
         default_factory=lambda: Parameter(value=0.0, unit="deg"))
     height: Parameter = Field(
@@ -1999,6 +2001,30 @@ class HumpComponent(_InheritsDeclaredDefaults):
     #: any dot-path — the paths index the list, so a relabelled peak keeps its
     #: refined values.
     label: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _position_is_required(cls, data: Any, info: ValidationInfo) -> Any:
+        """Refuse a hump with no position, except in a stored document.
+
+        Until 1.11 the field defaulted to 0.0 °2θ, which sits below any
+        measured range, so a stage that freed an unplaced hump started it
+        there.  The maintainer ruled on 2026-11-02 that a caller must place
+        it.  A document stored before the ruling may still omit it (every
+        writer here has always written it, so such a file was written by
+        hand or by another tool).  Old files open, so a read under
+        :data:`~rietx.schemas.common.STORED_DOCUMENT` falls through to the
+        field's factory and reads at the old 0.0.  An edit re-validates with
+        every field present, so a hump opened that way stays editable.
+        """
+        if (isinstance(data, dict) and "position" not in data
+                and not reading_stored_document(info)):
+            raise ValueError(
+                "HumpComponent.position is required: give the hump's apparent "
+                "2θ, e.g. position=Parameter(value=5.0, unit='deg'). It is "
+                "unbounded, so seed it where the feature is, from a blank scan "
+                "or from the pattern itself.")
+        return data
 
     @model_validator(mode="after")
     def _fwhm_floor_is_reachable(self) -> "HumpComponent":
