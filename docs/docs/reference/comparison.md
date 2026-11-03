@@ -31,6 +31,7 @@ Its keywords are `top_n` (5 groups by default), `include` and `exclude` (dot-pat
 |---|---|---|
 | `SuggestionResult.groups` | the ranked answer, at most `top_n` `CandidateGroup` entries | descending gain, and only candidates above the noise floor; a converged fit has an empty list, which is the right suggestion |
 | `SuggestionResult.non_separable` | the candidates the absorption gate refused | each one's `ParameterCandidate.absorption` says why; reported, not dropped |
+| `SuggestionResult.bound_limited` | the separable candidates whose gain clears the floor only with their bounds ignored | a parameter on its bound with the data pushing it through: the data would move it and its box will not; `ParameterCandidate.gain_unbounded` says how far |
 | `SuggestionResult.skipped` | dot-paths whose columns are zero at this state | no leverage either way |
 | `SuggestionResult.n_evaluated` | how many candidates were scored | what tells "no suggestion" from "nothing was looked at" |
 | `SuggestionResult.chi2_red` | the current state's reduced χ², seeded candidates excluded | the scale the floor is set from |
@@ -60,7 +61,8 @@ That is what a pair of nested refits would measure, available before you run the
 | Field | Is | Reads as |
 |---|---|---|
 | `ParameterCandidate.path` | the dot-path | what `Refinement.set_vary` takes |
-| `ParameterCandidate.gain` | the exact Gauss-Newton predicted fall in χ² from freeing this parameter alone | in units of Σw·Δ², not divided by N − P; compare it with `SuggestionResult.noise_floor` and nothing else |
+| `ParameterCandidate.gain` | the exact Gauss-Newton predicted fall in χ² from freeing this parameter alone, as far as its bounds let it move | in units of Σw·Δ², not divided by N − P; compare it with `SuggestionResult.noise_floor` and nothing else; 0 on a bound the data push it through |
+| `ParameterCandidate.gain_unbounded` | the same prediction with the bounds ignored | equal to `gain` unless a bound is nearer than the step; `None` on a candidate `suggest` did not build |
 | `ParameterCandidate.gradient` | ∂χ²/∂p in the parameter's physical units, sign included | which way the parameter wants to move |
 | `ParameterCandidate.absorption` | the R² of this column on the span of the free columns | 0.0 when nothing is free; near 1 puts the candidate in `SuggestionResult.non_separable` |
 | `ParameterCandidate.seeded` | whether the score was measured away from the stored value | true for surface roughness at 0 and a Stephens block at S ≡ 0, scored where their stage would start the solve; a width at 0 is scored at 0 and never seeded |

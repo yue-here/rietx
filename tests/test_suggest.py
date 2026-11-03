@@ -259,6 +259,127 @@ def test_build_top_n_truncates_groups():
 
 
 # ----------------------------------------------------------------------
+# a box around the candidate: the gain it can reach (WP-1998)
+# ----------------------------------------------------------------------
+def _bounded_oracle(jac, r, free, cols, lo, hi):
+    """Σr² drop over the free block alone when ``cols`` are freed inside
+    ``[lo, hi]`` (step offsets): one bounded solve of the whole linearised
+    problem, the free block unbounded, no projection anywhere."""
+    from scipy.optimize import lsq_linear
+
+    a = jac[:, list(free) + list(cols)]
+    lb = np.r_[np.full(len(free), -np.inf), lo]
+    ub = np.r_[np.full(len(free), np.inf), hi]
+    sol = lsq_linear(a, -r, bounds=(lb, ub), method="trf", tol=1e-14)
+    f = jac[:, list(free)]
+    base = r + f @ np.linalg.lstsq(f, -r, rcond=None)[0]
+    after = r + a @ sol.x
+    return float(base @ base) - float(after @ after)
+
+
+def _free_step(jac, r, free, col):
+    """The unconstrained Gauss-Newton step of ``col`` with ``free`` re-solved."""
+    a = jac[:, list(free) + [col]]
+    return float(np.linalg.lstsq(a, -r, rcond=None)[0][-1])
+
+
+@pytest.mark.parametrize("side", ["floor", "ceiling"])
+def test_build_a_candidate_on_its_bound_facing_out_scores_zero(side):
+    """The WP-1998 case: the data pushes the parameter through its bound, so
+    no step inside the box moves χ², and it is listed, not suggested."""
+    jac, r = _planted(signal=30.0 if side == "floor" else -30.0)
+    step = _free_step(jac, r, [0, 1, 2], 3)
+    assert (step < 0) == (side == "floor")      # facing out of the box below
+    box = {"value": 2.0, "lo": 2.0} if side == "floor" else {"value": 2.0, "hi": 2.0}
+    res = _build(jac, r, [0, 1, 2], [("c0", 3, box), ("c1", 4, {})])
+    free_of_box = _build(jac, r, [0, 1, 2], [("c0", 3, {}), ("c1", 4, {})])
+    assert all(pc.path != "c0" for g in res.groups for pc in g.members)
+    [held] = res.bound_limited
+    assert held.path == "c0" and held.gain == 0.0
+    assert held.gain_unbounded == free_of_box.groups[0].gain > res.noise_floor
+    assert res.best_or_none() is None or res.best_or_none().path != "c0"
+    assert "1 held back by a bound" in res.summary
+    assert "held back" not in free_of_box.summary
+
+
+@pytest.mark.parametrize("where", ["behind", "beyond"])
+def test_build_a_bound_the_step_does_not_reach_changes_no_bit(where):
+    """A bound behind the step, or farther than it, is the unbounded answer to
+    the bit: gain, ΔBIC and summary alike."""
+    jac, r = _planted(signal=30.0)
+    step = _free_step(jac, r, [0, 1, 2], 3)          # < 0, see above
+    box = ({"value": 0.0, "hi": 0.0} if where == "behind"
+           else {"value": 0.0, "lo": 1.01 * step})
+    res = _build(jac, r, [0, 1, 2], [("c0", 3, box)])
+    ref = _build(jac, r, [0, 1, 2], [("c0", 3, {})])
+    assert res.groups == ref.groups and res.summary == ref.summary
+    assert res.groups[0].members[0].gain == res.groups[0].members[0].gain_unbounded
+    assert res.bound_limited == []
+
+
+@pytest.mark.parametrize("seeded", [False, True])
+def test_build_a_bound_inside_the_step_matches_a_bounded_solve(seeded):
+    """Near a bound the gain is the one a bounded least squares reaches, and a
+    seeded candidate's room is measured from its seed, not its stored value."""
+    jac, r = _planted(signal=30.0)
+    step = _free_step(jac, r, [0, 1, 2], 3)
+    value = 0.3 if seeded else 5.0
+    lo = value + 0.3 * step                          # room for 30 % of the step
+    extra = {"value": value, "lo": lo}
+    if seeded:
+        extra.update(seeded=True, seed_value=value)
+    res = _build(jac, r, [0, 1, 2], [("c0", 3, extra)])
+    pc = res.groups[0].members[0]
+    assert pc.gain == pytest.approx(pc.gain_unbounded * 0.3 * 1.7, rel=1e-12)
+    assert pc.gain == pytest.approx(
+        _bounded_oracle(jac, r, [0, 1, 2], [3], [lo - value], [np.inf]), rel=1e-8)
+    assert res.groups[0].gain == pc.gain
+
+
+def test_build_a_groups_joint_gain_is_bounded_by_its_members_boxes():
+    """A tie whose joint step leaves the box is scored at the bounded joint
+    optimum — never above the unbounded joint gain, and equal to a direct
+    bounded solve of the whole linearised problem."""
+    rng = np.random.default_rng(53)
+    m = 200
+    jac = rng.standard_normal((m, 5))
+    jac[:, 4] = jac[:, 3] + 0.1 * rng.standard_normal(m)
+    r = rng.standard_normal(m) + 40.0 * jac[:, 3] / np.linalg.norm(jac[:, 3])
+    a = jac[:, [0, 1, 2, 3, 4]]
+    joint = np.linalg.lstsq(a, -r, rcond=None)[0][3:]
+    # each member keeps 60 % of its own share of the joint step
+    lo = np.where(joint < 0, 0.6 * joint, -np.inf)
+    hi = np.where(joint > 0, 0.6 * joint, np.inf)
+    boxes = [{"value": 0.0, "lo": float(lo[k]), "hi": float(hi[k])} for k in range(2)]
+    res = _build(jac, r, [0, 1, 2], [("p", 3, boxes[0]), ("q", 4, boxes[1])])
+    ref = _build(jac, r, [0, 1, 2], [("p", 3, {}), ("q", 4, {})])
+    assert len(res.groups) == 1 and not res.groups[0].resolved
+    assert len(ref.groups) == 1
+    assert res.groups[0].gain < ref.groups[0].gain
+    assert res.groups[0].gain == pytest.approx(
+        _bounded_oracle(jac, r, [0, 1, 2], [3, 4], lo, hi), rel=1e-8)
+    assert res.groups[0].delta_bic < ref.groups[0].delta_bic
+
+
+def test_build_a_groups_box_that_holds_the_joint_step_changes_no_bit():
+    """A box wider than every step the group or its members take is the
+    unbounded answer to the bit."""
+    rng = np.random.default_rng(53)
+    m = 200
+    jac = rng.standard_normal((m, 5))
+    jac[:, 4] = jac[:, 3] + 0.1 * rng.standard_normal(m)
+    r = rng.standard_normal(m) + 40.0 * jac[:, 3] / np.linalg.norm(jac[:, 3])
+    joint = np.linalg.lstsq(jac, -r, rcond=None)[0][3:]
+    # wide enough for the joint step and for each member's own single step
+    reach = [2 * max(abs(joint[k]), abs(_free_step(jac, r, [0, 1, 2], 3 + k)))
+             for k in range(2)]
+    boxes = [{"value": 1.0, "lo": 1.0 - d, "hi": 1.0 + d} for d in reach]
+    res = _build(jac, r, [0, 1, 2], [("p", 3, boxes[0]), ("q", 4, boxes[1])])
+    ref = _build(jac, r, [0, 1, 2], [("p", 3, {}), ("q", 4, {})])
+    assert res.groups == ref.groups and res.summary == ref.summary
+
+
+# ----------------------------------------------------------------------
 # schemas — round-trip, forbid, and the best_or_none gate
 # ----------------------------------------------------------------------
 def _candidate(path="instrument.zero_shift", gain=120.0, **kw):
@@ -281,7 +402,9 @@ def test_suggestion_result_json_round_trip():
                                             seeded=True, seed_value=1e-3)],
                         gain=41.0, resolved=False, delta_bic=8.5)],
         non_separable=[_candidate("phases.0.scale", 5.0, absorption=0.99)],
-        skipped=["phases.0.extinction"], n_evaluated=5)
+        bound_limited=[_candidate("phases.0.extinction", 0.0,
+                                  gain_unbounded=96.1)],
+        skipped=["phases.0.biso"], n_evaluated=5)
     back = SuggestionResult.model_validate_json(res.model_dump_json())
     assert back == res
     assert back.groups[1].members[1].seed_value == 1e-3
@@ -413,17 +536,22 @@ def test_zero_shift_layer2_agreement_recorded(truth):
         assert m.action_kind is None or m.action_kind in vocabulary
 
 
-def test_injected_w_error_resolved_and_identity_pairs_tie(truth):
-    """A W error yields a *resolved* W winner, while the exact-identity pair
-    (instrument X vs phase lor_size — both Lorentzian FWHM/cosθ) comes back
-    as one unresolved group whatever the injection."""
+def test_injected_w_error_resolved_and_sample_widths_held_by_their_floor(truth):
+    """A W error yields a *resolved* W winner.  The peaks are too broad, so
+    every sample width, sitting on its floor of 0, could only help by going
+    negative: each scores 0 and is listed in ``bound_limited`` with its
+    unbounded leverage beside it (WP-1998), where before it tied with its
+    instrument twin (X with lor_size) on a step its floor forbids."""
     r, data = _refinement(truth)
     r.instrument.profile.w.value = 6e-3
     res = r.suggest(data)
     best = res.best_or_none()
     assert best is not None and best.path == "instrument.profile.w"
-    ties = [{m.path for m in g.members} for g in res.groups if not g.resolved]
-    assert {"instrument.profile.x", "phases.0.lor_size"} in ties
+    held = {pc.path: pc for pc in res.bound_limited}
+    for p in ("phases.0.lor_size", "phases.0.lor_strain",
+              "phases.0.gauss_size", "phases.0.gauss_strain"):
+        assert held[p].gain == 0.0 and held[p].gain_unbounded > res.noise_floor
+    assert not set(held) & set(_member_paths(res))
 
 
 def test_candidate_absorbed_by_free_set_is_not_a_winner(truth):
@@ -441,19 +569,41 @@ def test_candidate_absorbed_by_free_set_is_not_a_winner(truth):
 
 
 def test_a_floored_width_is_scored_where_it_sits(truth):
-    """An X error must surface lor_size, which sits on its floor of 0, scored
-    at 0 from its physical column and reported unseeded (WP-1938).  Until
-    then the probe lifted it to 1e-3 first, and on BT-1 and Si 640c that
-    seed put widths at the top that stayed on their floor when freed."""
+    """An X error that leaves the peaks too *narrow* must surface lor_size,
+    which sits on its floor of 0, scored at 0 from its physical column and
+    reported unseeded (WP-1938).  Until then the probe lifted it to 1e-3
+    first, and on BT-1 and Si 640c that seed put widths at the top that
+    stayed on their floor when freed.  Its step points into its box, so the
+    floor costs it nothing (WP-1998), and the exact-identity pair (instrument
+    X vs phase lor_size — both Lorentzian FWHM/cosθ) comes back as one
+    unresolved group."""
     r, data = _refinement(truth)
-    r.instrument.profile.x.value = 9e-3
+    r.instrument.profile.x.value = 3e-3
     res = r.suggest(data)
     top = res.groups[0]
     assert {m.path for m in top.members} == {
         "instrument.profile.x", "phases.0.lor_size"}
     lor = next(m for m in top.members if m.path == "phases.0.lor_size")
     assert not lor.seeded and lor.seed_value is None
-    assert not top.resolved  # the identity pair again — never a fake winner
+    assert lor.gain == lor.gain_unbounded
+    assert not top.resolved  # the identity pair — never a fake winner
+
+
+def test_a_floored_width_facing_its_floor_leaves_its_twin_alone(truth):
+    """The same X error the other way: the peaks are too *broad*, lor_size on
+    its floor could only narrow them by going negative, so the identity pair
+    has one member that can move.  lor_size scores 0 and is listed in
+    ``bound_limited``; X is the resolved leader (WP-1998)."""
+    r, data = _refinement(truth)
+    r.instrument.profile.x.value = 9e-3
+    res = r.suggest(data)
+    best = res.best_or_none()
+    assert best is not None and best.path == "instrument.profile.x"
+    lor = next(pc for pc in res.bound_limited if pc.path == "phases.0.lor_size")
+    assert lor.gain == 0.0 and lor.gradient > 0.0
+    # its unbounded leverage is its twin's: the identity the tie was
+    assert lor.gain_unbounded == pytest.approx(res.groups[0].gain, rel=1e-6)
+    assert "held back by a bound" in res.summary
 
 
 def test_suggest_is_read_only(truth, monkeypatch):

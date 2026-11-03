@@ -4239,7 +4239,10 @@ class Refinement:
         absorption by the free set and grouped by pairwise collinearity, so a
         tie comes back as one unresolved :class:`CandidateGroup`, never a
         confident winner (:meth:`SuggestionResult.best_or_none` returns
-        ``None`` rather than defend one).
+        ``None`` rather than defend one).  Each gain is the one reachable
+        inside the parameter's bounds, so a parameter on its floor whose
+        gradient points through it is not suggested (WP-1998): it is listed
+        in ``bound_limited`` with its unbounded figure beside it.
 
         Read-only means literally: the probe table is applied to **deep
         copies** of the models before compiling, no history node is recorded
@@ -4387,9 +4390,15 @@ class Refinement:
         # in Pawley mode the intensity block co-refines with anything, so it
         # belongs to the free block, not to the candidates
         free_idx += list(range(len(fp), jac.shape[1]))
+        # where each column was measured and the box a stage would solve it
+        # in, read after seeding so a seeded row's room starts at its seed:
+        # a gain the bounds cannot reach is not a suggestion (WP-1998)
+        x_at = table.x0()
+        lo_at, hi_at = table.bounds()
         candidates = [
             Candidate(path=p, index=i, seeded=p in seeded,
-                      seed_value=seeded.get(p))
+                      seed_value=seeded.get(p), value=float(x_at[i]),
+                      lo=float(lo_at[i]), hi=float(hi_at[i]))
             for i, p in enumerate(fp) if p not in free_before]
         chi2_red = float(resid @ resid) / max(len(resid) - len(free_idx), 1)
         actions = () if report is None else getattr(

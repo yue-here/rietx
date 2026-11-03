@@ -48,6 +48,19 @@ True)`) therefore frees a parameter the same result refuses. Either gate on
 reader does not take it as the answer. The new guide says it does not check
 ΔBIC; a change updates that sentence.
 
+The tier of each rule this WP adds (written 2026-11-03, the WP predating the
+template line):
+- **Bounded gain** — tier 1, arithmetic. The linearised Σr² along one
+  candidate, with the free block re-solved, is an exact quadratic in its step,
+  so the reachable drop at a clipped step is `gain·α(2 − α)`; a group's is the
+  bounded least-squares optimum of the same linearisation (BVLS, Stark &
+  Parker 1995). No threshold, no default: the box is the solver's own
+  (`ParameterTable.bounds()`).
+- **`best_or_none` abstains when the leader's ΔBIC ≤ 0** — statistic tier 2
+  (Schwarz 1978, the package's one BIC form), threshold 0 tier 1 (the sign
+  the criterion defines), action: *abstain*, the conservative direction —
+  `None` names nothing, and the groups stay for a caller who reads them.
+
 ### Inherited
 
 ## Non-goals
@@ -57,7 +70,7 @@ reader does not take it as the answer. The new guide says it does not check
 
 ## Tasks
 
-- [ ] Bounded gain for a candidate on or near a bound, both sides, seeded
+- [x] Bounded gain for a candidate on or near a bound, both sides, seeded
       candidates included; a test on the fluorapatite state above where
       extinction drops below the noise floor.
 - [ ] `best_or_none` and ΔBIC: decide the gate, then make the summary, the
