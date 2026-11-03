@@ -1850,6 +1850,12 @@ def test_atom_moves_matches_phases_by_name():
     assert atom_moves(both, renamed) == {}
     swapped = Structure(phases=[both.phases[1], both.phases[0]])
     assert atom_moves(both, swapped) == {"phases.0": "phases.1", "phases.1": "phases.0"}
+    # one name twice (a CIF loaded twice): by position, as before, so renaming the
+    # second leaves the first's constraints where they were (/code-review)
+    twice = Structure(phases=[both.phases[0], both.phases[0]])
+    renamed_second = Structure(phases=[both.phases[0],
+                                       both.phases[0].model_copy(update={"name": "Z"})])
+    assert atom_moves(twice, renamed_second) == {}
 
 
 def test_an_edit_that_removes_a_phase_keeps_the_hold_on_the_phase_behind_it():

@@ -2845,8 +2845,9 @@ class Refinement:
                     message=(f"site {site} changed its site symmetry, so its {what} "
                              f"were renumbered: " + "; ".join(notes)
                              + "."),
-                    suggestion="check the holds and ties on this site's "
-                               "coordinates against parameters()."))
+                    suggestion=f"check the holds and ties on this site's "
+                               f"{what.replace(' directions', 's')} against "
+                               f"parameters()."))
 
     def _renumber_atoms(self, moves: NumberingMoves) -> None:
         """Read every constraint register into ``moves``' new atom numbering.

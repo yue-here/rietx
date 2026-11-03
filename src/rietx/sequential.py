@@ -712,22 +712,20 @@ class _SeriesNumbering:
 def _into_series_numbering(entry: SeriesEntry, moves: dict[str, str | None]) -> None:
     """Rewrite ``entry``'s paths into the series numbering, in place (WP-1991).
 
-    The parameter rows, the moment rows and :attr:`SeriesEntry.floored` take
-    the series path, and :attr:`SeriesEntry.pattern_paths` records the
-    pattern's own path for each that changed.  Every reader of the entries
-    (trajectories, steps, fences, the table) then joins patterns by phase name
-    and atom label without knowing that it does.
+    The parameter rows and the moment rows take the series path, and
+    :attr:`SeriesEntry.pattern_paths` records the pattern's own path for each
+    that changed.  Every reader of the entries (trajectories, steps, fences,
+    the table) then joins patterns by phase name and atom label without
+    knowing that it does.  :attr:`SeriesEntry.floored` is left alone: the
+    chain writes it in the series numbering already, from the pattern the
+    floor was taken on.
     """
-    def series(path: str) -> str:
-        return renumber_path(path, moves) or path
-
     mapping: dict[str, str] = {}
     for row in [*entry.parameters, *entry.magnetic]:
-        new = series(row.path)
+        new = renumber_path(row.path, moves) or row.path
         if new != row.path:
             mapping[new] = row.path
             row.path = new
-    entry.floored = [series(path) for path in entry.floored]
     entry.pattern_paths = mapping
 
 
@@ -1598,6 +1596,7 @@ class SequentialRefinement:
             # The halfway point (#218), on WP-1333's early-publication point:
             # the forward chain is final, and everything the backward walk
             # adds goes onto ``series``, never onto this copy.
+            self._stamp_numbering(series)
             self.forward_ = series.model_copy(update={
                 "direction": "forward", "diagnostics": list(diagnostics)})
             try:
@@ -1663,8 +1662,7 @@ class SequentialRefinement:
         # chain may have met a name the forward chain did not (WP-1991)
         for result in (series, series.backward):
             if result is not None:
-                result.phase_names = [name for name, _ in self._numbering.phases]
-                result.atom_labels = [list(labels) for _, labels in self._numbering.phases]
+                self._stamp_numbering(result)
         self.result_ = series
         if recorder is not None:
             # a series has no single ``RefinementResult``; its termination view
@@ -1672,6 +1670,11 @@ class SequentialRefinement:
             # rule ``fit`` follows — never ``summary()``, which builds reports
             recorder.write_summary(series)
         return series
+
+    def _stamp_numbering(self, result: SeriesResult) -> None:
+        """Write the series numbering as it stands onto ``result`` (WP-1991)."""
+        result.phase_names = [name for name, _ in self._numbering.phases]
+        result.atom_labels = [list(labels) for _, labels in self._numbering.phases]
 
     # ------------------------------------------------------------------
     def _chain(self, order, patterns, names, xs, mode, base_plan, ladder,
@@ -1953,8 +1956,16 @@ class SequentialRefinement:
                 # caller reads back as ``fitted_structures()`` — keeps the
                 # fitted value; only the *carry source* is floored, and on a
                 # chain with no unsupported moment it is the same object.
-                carried, pending_floor = _floor_unsupported_moments(
-                    models[k][0], entry.magnetic)
+                # the floor is applied to this pattern's own model, so it reads
+                # the moment rows in that model's numbering, and the paths it
+                # floored are recorded in the series' (WP-1991)
+                own = entry.pattern_paths or {}
+                to_series = {p: s for s, p in own.items()}
+                carried, floored_own = _floor_unsupported_moments(
+                    models[k][0],
+                    [r.model_copy(update={"path": own.get(r.path, r.path)})
+                     for r in entry.magnetic])
+                pending_floor = [to_series.get(p, p) for p in floored_own]
                 previous = (carried, models[k][1])
                 previous_index = k
                 previous_hkl = _extract_reflections(best_ref._model)
@@ -2953,8 +2964,10 @@ def _moment_diagnostics(series: SeriesResult) -> list[Diagnostic]:
         # WP-1418: a pattern whose plan freed no moment says so itself
         # (``PLAN_FREES_NO_MOMENT``, keyed on this modulus path), and that is
         # the cause of its missing esd, so the sentence names it there
+        # (a pattern's own diagnostics name its own path, WP-1991)
         unfreed = {e.label for e in series.entries
-                   if any(d.code == "PLAN_FREES_NO_MOMENT" and site in d.where
+                   if any(d.code == "PLAN_FREES_NO_MOMENT"
+                          and (e.pattern_paths or {}).get(site, site) in d.where
                           for d in e.diagnostics)}
         if n_held or blind:
             message = (

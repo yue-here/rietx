@@ -337,11 +337,15 @@ def _phase_pairs(old: CoordinateSnapshot, new: CoordinateSnapshot) -> list[tuple
     """(old index, new index) of the phases two snapshots both hold.
 
     By name, as :func:`_matched_atoms` matches atoms by label, where both
-    snapshots carry names (WP-1991): removing a phase ahead of another
-    renumbers every ``phases.N`` path, as removing an atom did (#1264).  By
-    position where either has none.
+    snapshots carry names and no name repeats (WP-1991): removing a phase
+    ahead of another renumbers every ``phases.N`` path, as removing an atom
+    did (#1264).  By position otherwise, so a model holding one CIF twice
+    under one name keeps its constraints through an edit, as it always did.
     """
-    if len(old.names) == len(old.phases) and len(new.names) == len(new.phases):
+    def named(s: CoordinateSnapshot) -> bool:
+        return len(s.names) == len(s.phases) == len(set(s.names))
+
+    if named(old) and named(new):
         return _matched_atoms(old.names, new.names)
     return [(i, i) for i in range(min(len(old.phases), len(new.phases)))]
 
