@@ -954,6 +954,7 @@ def test_an_arpls_scan_that_falls_back_says_so():
     strength returned and carries the best d as ``value``."""
     humpy = _peaky_pattern(background=_hump_bkg)
     chosen = select_arpls_lambda(humpy)
+    assert chosen.selected == 1e7
     assert chosen.stopped_by_whiteness and not chosen.diagnostics
 
     fell_back = select_arpls_lambda(humpy, candidates=(1e10, 1e9))

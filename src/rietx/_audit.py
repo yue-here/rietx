@@ -1709,9 +1709,10 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: exp[-4 ln2 (x/Gamma)^2] has half height at x = Gamma/2"),
     Row("rietx.background.select.ARPLS_DW_FLOOR", "constant", tier=3, value=1.2,
         evidence=("v0.2: the largest lambda whose masked residuals look white; no source for "
-                  "1.2, no measurement recorded; feeds only PatternDiagnostics.baseline_lambda, "
-                  "which nothing in src reads; select_arpls_lambda's signature default until "
-                  "the B14 lift"),
+                  "1.2; feeds PatternDiagnostics.baseline_lambda, which nothing in src reads, "
+                  "and whether BACKGROUND_SMOOTHING_AT_FLEXIBLE_END fires (WP-1931: none of "
+                  "the 20 patterns under tests/data falls short of it, FAP.XRA nearest at "
+                  "d = 1.26); select_arpls_lambda's signature default until the B14 lift"),
         grounds=("Reached through diagnose(), which auto_background calls on the default path; "
                  "its answer is reported on PatternDiagnostics.baseline_lambda and read by "
                  "nothing (B12, ruled 2026-10-19)."),
