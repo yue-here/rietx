@@ -274,6 +274,19 @@ alone.
     task 2) and 4 in `test_lab_instrument.py` (the lift's three starts and
     the no-relift row).
     Fast and full counts on the merged tree: the PR body.
+  - Re-measured after merging `origin/main` at 5d7622d60, whose WP-2012
+    has `lab_bragg_brentano` free S/L alone with H/L held. #1075 repro 1
+    (seed 1, H/L at the constructor's 0): main stops `converged` at S/L
+    0.00012, Rwp 0.0834, `profile_interval` [0.0, 0.0529]
+    `fit_is_minimum=False`. Lifted: S/L 0.04535, Rwp 0.0632, the one-ratio
+    minimum (a further stage from main's answer reaches the same 0.0632),
+    interval [0.04490, 0.04578], True; `FLOOR_HIT` on the profile's W,
+    whose simulated value is 1e-4. The 0.0453 above is the two-ratio fit,
+    which now needs H/L freed by hand. `examples/guides/calibrate.py` passes
+    unchanged on the merged tree. `python -m tests.reader_output`:
+    unchanged, exit 0. The added tests' local seconds: the gap test 24.75 s
+    over its 2 rows (it sat in the fast tier before #1321 reverted it), the
+    lift's 4 rows 1.64 s.
 
   *Generality* (judge's verdicts, summary). The lift: weak. The action is
   kind 1 (a free parameter whose column vanishes at its start cannot be
