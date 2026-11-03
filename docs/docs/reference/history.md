@@ -30,9 +30,11 @@ Until then `Refinement.history` is `None`.
 A recording verb such as `Refinement.set_vary` or `Refinement.edit` changes the working state and commits nothing, so its change arrives in the root.
 `Refinement.checkout`, `Refinement.branch`, `Refinement.merge` and `Refinement.cherry_pick` raise `RuntimeError` until the tree exists.
 
-A path that already holds a log gains a second tree after the first, with its own header and node ids that start again at `n0000`.
-`RefinementTree.load` reads such a file as one tree that holds each id twice.
-To continue a saved log, load it and open a refinement on it with `Refinement.from_node`.
+A log holds one tree.
+So a path that already holds a log raises `FileExistsError` naming the path, at the `Refinement` constructor and again when the tree is created.
+An empty file holds no tree and is used.
+To continue a saved log, load it with `RefinementTree.load` and open a refinement on it with `Refinement.from_node`.
+A series given a history directory checks it before its first fit, and raises `FileExistsError` when the directory holds a log this run would write.
 A `RefinementTree` passed to the constructor takes new nodes on top of its head, with the models you passed as the working state.
 
 ## Nodes
@@ -536,6 +538,8 @@ So a reloaded tree resumes at the last commit or the last checkout, whichever ca
 A log written by a plain fit, with no annotation line at all, resumes at its last node.
 Blank lines are skipped.
 A file with no header line raises `ValueError` saying it is not a history log.
+A second header line raises `ValueError` naming the file and the line.
+Releases before 1.11 could write one, by appending a second run to a reused path.
 A line that does not parse raises `ValueError` naming the file and the line number.
 
 A log has one writer.

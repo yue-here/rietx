@@ -1069,7 +1069,9 @@ class SequentialRefinement:
 
     ``history`` accepts ``False`` (default — a long series makes a lot of
     trees), ``True`` for in-memory trees, or a **directory** path, in which case
-    each pattern's history is written to ``<dir>/<label>.jsonl``.  There is one
+    each pattern's history is written to ``<dir>/<label>.jsonl``.  A directory
+    already holding a log this run would write raises ``FileExistsError`` before
+    the first fit, since a log holds one tree (WP-2031).  There is one
     tree per pattern, never one for the series: a tree is pinned to its pattern
     by ``TreeHeader.data_fingerprint``, and that check is what stops a node
     being replayed against the wrong data.  The chain is recorded instead as

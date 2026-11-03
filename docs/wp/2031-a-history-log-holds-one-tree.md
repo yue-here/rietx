@@ -88,9 +88,17 @@ call.
       feeds the same log to `progress_writer` and asserts `2s` from both. The
       pre-WP writer printed `102s` on that log, timed from the dead start
       (checked by running the old function on it).
-- [ ] `docs/docs/reference/history.md`: replace the workaround with the rule.
-- [ ] Skill: a row only if the refusal raises something an agent meets;
+- [x] `docs/docs/reference/history.md`: replace the workaround with the rule.
+      Also one sentence each in `guides/branch.md` and `reference/series.md`,
+      and the `Refinement` and `SequentialRefinement` docstrings.
+- [x] Skill: a row only if the refusal raises something an agent meets;
       otherwise "none" and why.
+      **None.** An agent does meet it: the skill's canonical loop
+      (`references/history.md`) passes `history="session.jsonl"`, and a rerun
+      of that script raises. But the message names both ways on (load and
+      `Refinement.from_node`, or another path), and the package's own output is
+      the cheapest place that holds the guidance (WP-1338). The error is a
+      `FileExistsError`, not a diagnostic code, so no code row is owed.
 
 ## Acceptance
 

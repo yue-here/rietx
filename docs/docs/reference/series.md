@@ -64,6 +64,7 @@ Given a directory, each pattern's first attempt is written to `<dir>/<label>.jso
 A later attempt on the same pattern writes `<label>.warm_staged.jsonl` or `<label>.cold.jsonl`, and the backward chain of `direction="both"` adds `.backward` before that suffix.
 So the tree a refitted pattern's `SeriesEntry.node_id` points into is in the suffixed file.
 There is one tree per fit and none for the series.
+A rerun into a directory that already holds one of these logs raises `FileExistsError` before its first fit, and names the logs.
 A tree is pinned to its pattern by a data fingerprint, and that pin stops a node being replayed against the wrong data.
 The chain is recorded instead as annotation notes on each tree's root node ([Tags and annotations](history.md#tags-and-annotations)).
 The default is `False`, because a long series makes many trees.
