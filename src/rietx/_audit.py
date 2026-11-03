@@ -1507,7 +1507,9 @@ ROWS: tuple[Row, ...] = (
                   "exact. This field records each path it rewrote. A PbSO4 series with O3 "
                   "removed from one pattern joined O4 and O5 into one trajectory before it "
                   "(tests/test_site_twins_merged.py). GSAS-II keys a constraint on an atom by a "
-                  "stable random ID rather than its number (G2VarObj, GSASIIobj.py 937-963)")),
+                  "stable random ID rather than its number (G2VarObj, GSASIIobj.py 937-963). "
+                  "A file written before 1.11 stores no names, so it opens as written "
+                  "(pattern_paths None) rather than being converted at read")),
     Row("rietx.schemas.results.RefinementResult.absorption", "action", tier="caller", ambiguity=1,
         evidence=("opt-in: Geometry.mu_r/mu_t or capillary_radius_mm/thickness_mm, default None "
                   "(off); choosing flat_plate_transmission applies sec theta; Rouse et al. (1970) "
