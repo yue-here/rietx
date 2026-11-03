@@ -530,6 +530,39 @@ def _reseed_silent() -> list:
                       rungs_tried=["warm", "warm_staged"]))
 
 
+def _path_chains(missing: int | None = None):
+    """Two one-path chains over three patterns, the backward one lacking the
+    pattern ``missing`` when it is given."""
+    from rietx.schemas.results import RefinedParameter
+    from rietx.schemas.sequential import SeriesEntry, SeriesResult
+
+    def chain(skip):
+        return SeriesResult(entries=[
+            SeriesEntry(index=k, label=f"p{k}", parameters=[RefinedParameter(
+                path="phases.0.cell.a", value=4.156 + 1e-4 * k, stderr=1e-5)])
+            for k in range(3) if k != skip])
+
+    return chain(None), chain(missing)
+
+
+def _path_not_run_fires() -> list:
+    """The comparison never ran: the builder ``fit`` calls for each way it
+    cannot (a cancel on either chain, a backward chain that raised)."""
+    from rietx.sequential import _path_check_not_run
+
+    return [_path_check_not_run("the backward chain was cancelled on pattern 2 (p2)")]
+
+
+def _path_not_run_silent() -> list:
+    """The comparison ran, on the whole series and on part of it: what it
+    reports is coverage at ``info``, never the warning."""
+    from rietx.sequential import _direction_gaps
+
+    whole = _direction_gaps(*_path_chains())[1]
+    part = _direction_gaps(*_path_chains(missing=1))[1]
+    return whole + part
+
+
 def _unrecovered(status: str, *codes: str) -> list:
     """``SEQUENTIAL_UNRECOVERED``'s builder on one synthetic entry kept after
     every rung, ending ``status`` and carrying each of ``codes`` at the level
@@ -874,6 +907,9 @@ SILENCE: dict[str, Pair] = {
         _dofs_renumbered_fires, _dofs_renumbered_silent, "tests/test_site_twins_merged.py"),
     "SEQUENTIAL_CANCELLED": Pair(
         _cancelled_fires, _cancelled_silent, "tests/test_sequential.py"),
+    "SEQUENTIAL_PATH_CHECK_NOT_RUN": Pair(
+        _path_not_run_fires, _path_not_run_silent,
+        "tests/test_sequential.py, tests/test_series_error_policy.py"),
     "SEQUENTIAL_RESEED": Pair(
         _reseed_fires, _reseed_silent, "tests/test_sequential.py"),
     "SEQUENTIAL_UNRECOVERED": Pair(

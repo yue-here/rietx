@@ -928,6 +928,13 @@ def _dictate(runner, script, stages=None):
             attempts = script[label]
             status, rwp, *code = attempts[min(n, len(attempts) - 1)]
             result.status, result.statistics.rwp = status, rwp
+            # the full cost the ladder ranks by (WP-2003, C2 q3), dictated to
+            # agree with the Rwp: on one objective with no penalty or
+            # restraint rows S = Rwp² · Σ(y/σ)² / 2
+            if result.stages and result.y_obs:
+                y, sig = np.asarray(result.y_obs), np.asarray(result.sigma)
+                result.stages[-1].cost_final = 0.5 * rwp ** 2 * float(
+                    np.sum((y / sig) ** 2))
             result.diagnostics = [d for d in result.diagnostics
                                   if d.level != "error"]
             result.diagnostics += [Diagnostic(
