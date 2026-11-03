@@ -1,6 +1,6 @@
 # WP-2054 — the report names an asymmetric residual the model cannot draw
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — direction (b) landed in PR #PRNUM; waits on the maintainer's reader-output approval and the reply on #1106
+Milestone: unscheduled · Status: 🔄 2026-11-03 — direction (b) landed in PR #1363; waits on the maintainer's reader-output approval and the reply on #1106
 Track: What fires, and what stays silent
 Depends on: 1977 soft (the flank-lobe half of the same symptom); 2004 soft (a new template's thresholds take audit rows there)
 Priority: P2 2026-10-26 — a report that names the wrong cause: on a lab Bragg–Brentano fit with the apertures at their default 0, Layer 2 suggests an impurity phase at 0.50 and nothing mentions asymmetry (#1106, NIST SRM 660c)
@@ -182,7 +182,7 @@ from today. The synthetic controls hold.
 
 ## Handover log
 
-- **2026-11-03** — direction (b) landed (PR #PRNUM). A lab fit that leaves both axial
+- **2026-11-03** — direction (b) landed (PR #1363). A lab fit that leaves both axial
   apertures at 0 now gets a report that names the one-sided low-angle residual as axial
   asymmetry and says the apertures are 0, where before it named nothing. The report
   draws the asymmetry column from a copy of the model with both apertures at 0.02 and
