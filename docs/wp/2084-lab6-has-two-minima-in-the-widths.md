@@ -53,6 +53,14 @@ minima differently on Linux before (WP-2036).
       and a finding that says which minimum the fit is in. The deeper χ² is not by itself
       the evidence (root CLAUDE.md: never an Rwp comparison).
 - [ ] Make the lab6 axial-floor row strict, or drop its mark.
+- [ ] Re-word three `_audit.py` evidence strings that still quote LaB6 from before WP-2012:
+      `AXIAL_SIZING_FLOOR` (the floors' answers agreeing behind the closing stage, now
+      0.582 plain esd on u), and `INTERMEDIATE_FTOL` with `StageResult.ftol` ("fails on
+      SRM 660c, 8.82 esd on axial_sl"; the row passes since WP-2036 ordered the pair and
+      still passes with H/L held). WP-2012 left them because a table edit sends the
+      branch to the generality judge. The three LaB6 strict xfails in
+      `tests/test_window_domain.py` also quote both-free numbers; they still fail as
+      expected and were not re-measured.
 
 ## Acceptance
 

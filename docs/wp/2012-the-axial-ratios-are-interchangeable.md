@@ -1,9 +1,9 @@
 # WP-2012 — The two axial-divergence ratios are interchangeable, and a fit reports one branch
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here
+Milestone: unscheduled · Status: 🔄 2026-11-02 — both lab presets free S/L alone with H/L held; SRM 660c numbers moved, PR #1356 waits on the maintainer; the recipe sibling is open
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-11-01 — a silent wrong pair of numbers on `lab_calibrate` and `lab_bragg_brentano`, the presets that free both ratios; the profile it fits is right, so only a reader of S/L and H/L is misled; the fix is decided
+Priority: P3 2026-11-02 — was P2: both presets fixed (PR #1356); what is left is an imported GSAS-II recipe freeing both ratios from one SH/L flag
 
 ## Goal
 
@@ -48,18 +48,6 @@ refines S_L and D_L separately. TOPAS's full axial model takes the slit and Soll
 not these ratios. Finger, Cox and Jephcoat (1994, *J. Appl. Cryst.* **27**, 892) define both.
 Read the paper for whether the symmetry is the model's or this implementation's before
 choosing a fix.
-
-### Inherited
-
-- **From WP-2036 (2026-11-02, PR #1309): the start rows now compare the axial pair ordered, so two of the three LaB6 rows pass and carry no mark.** `tests/test_staged_start_invariance.py::_axial_pair_ordered` reports the smaller of S/L and H/L first, each with its esd, before the 0.1-esd comparison, as `test_seed_invariance._answer` already did. On an arm64 Mac (`[dev]`) at 1e-14 nudges of `w`, 49 arm pairs each: the axial-floor row crossed 24 times unordered (8.822 esd) and reads 0.0068 at most ordered; the intermediate-tolerance row crossed 23 times and reads 0.0000 ordered. Both rows' marks are gone. The Biso row is two distinct minima and still fails ordered, 1.156 plain esd on `u`, under its strict xfail. When your fix holds H/L, that row may XPASS(strict): drop its mark then. The ordering becomes a no-op once only S/L is free, and can stay.
-- **From WP-2036 (2026-10-25, PR #1165): rounding picks each arm's minimum, so the lab6 intermediate-tolerance row is no longer a strict xfail.** On `deff4c301` Linux passed the row (XPASS(strict)) while the Mac failed it. Under 1e-14 nudges to cell `a` on an arm64 Mac (`[dev]`), the two minima are (`axial_sl`, `axial_hl`) = (0.025461, 0.036669) and its swap, at Rwp 0.087428899057 and …058. Of 49 nudged arm pairs, 23 crossed minima (8.82 plain esd) and 26 agreed (7.4e-6). WP-2036 made the mark `strict=False`, citing you. When your fix lands, make it strict again or drop it. Two siblings were not re-measured. The Biso row's strict mark may flip the same way. The axial-floor row (`test_the_axial_sizing_floor_does_not_change_the_answer[lab6]`) carries no mark: it failed on Linux on `c9dde14` at 8.820 plain esd on `axial_hl` and passed on `deff4c301`, so rounding picks it too.
-- **From WP-2002 (2026-10-23, 9th session, PR #1113): the floor removal makes LaB6's intermediate tolerance reach the mirrored minima too.** With the U, V and Y floors gone (the maintainer's ruling), `tests/test_staged_start_invariance.py`'s `intermediate_tolerance[lab6]` row lands its two schedules 8.82 plain esd apart on `axial_sl` (0.000 before) and is a strict xfail citing this WP. The Biso row on LaB6 now differs by 1.16 esd on `u` (9.36 on `axial_sl` before), still a strict xfail.
-
-- **From WP-2002 (2026-10-22, 6th session, PR #1085): which mirrored minimum LaB6 reaches depends on where the declared stages stop.** Behind the shipped closing stage the two Biso starts land 9.14 plain esd apart on `axial_hl`; with `intermediate_ftol` 1e-4 instead of 1e-6 they land 0.050 apart, on one minimum. A sibling degeneracy on cpd-1a, not generalised here: its QPA protocol frees the instrument Lorentzian `x` and each phase's `lor_size` together, against `help.py`'s advice to calibrate `x` and hold it. Both scale as 1/cosθ, so only their sum is determined: the sums agree between the two starts while fluorite's split differs by a factor 2.5 (0.018° against 0.007°), with esds from 0.011 to 43. `tests/test_staged_start_invariance.py`'s yardstick, the larger of the two plain esds, hides it.
-
-- **From WP-2002 (2026-10-21, 5th session, PR #1085).** Behind the closing stage two Biso starts (0.5 and 1.5 Å²) on SRM 660c still land in the mirrored S/L ↔ H/L minima, 9.36 plain esd apart on `axial_sl`; the closing stage does not choose between them. `tests/test_staged_start_invariance.py`'s lab6 Biso row is a strict xfail citing this WP.
-- **From WP-2002 (2026-10-21, 4th session): no window setting moves the split.** Biso started at 0.5 and at 1.5 Å² on every atom lands the two starts in the two mirrored minima, 9.0 esd apart in `axial_sl` with today's windows, 9.0 with `WINDOW_AREA_TOL` 1e-3 on the last stage, and 9.4 with a closing all-free stage at 1e-3. The protocol run at 1e-3 throughout lands in the other basin from today's, 9.2 esd away. So which minimum SRM 660c reaches depends on the start and on the early stages' windows, and the start tests WP-2002 runs will fail on LaB6 until this WP removes the pair's symmetry. Numbers: `docs/wp/2002-batch/rulings.md` § Sixth round.
-- **From WP-2002 (2026-10-21, PR #1085).** On NIST SRM 660c under `tests/test_acceptance_srm660c.py`'s protocol there are two distinct minima 46.7 apart in absolute χ² (N = 5332), nearly mirror images under S/L ↔ H/L: (0.0367, 0.0254) from the protocol start and (0.0254, 0.0368) from a start with x at 0.03, the second the deeper. They differ in Caglioti u, v and w by 0.38, 0.20 and 0.12 esd and in the cell by 0.04 esd. The objective is bit-symmetric under the swap, so these are two minima, not one point twice, and the protocol's own answer is the shallower. LM and TRF also land in different minima on that protocol (χ² 18934 against 18594, u −0.00050 against −0.00127, the cell 3 ppm apart). The (100) reflection carries 39 FCJ nodes in one and 40 in the other, measured not to cause the split. Numbers: `tests/test_seed_invariance.py`'s width-start docstring, `docs/wp/2002-batch/waiting.md` § B8 and B9.
 
 ## Tasks
 
@@ -126,6 +114,14 @@ choosing a fix.
       than disproved; with one ratio free there is no flat pair for the `rcond` cut to
       straddle.
 
+- [ ] An imported GSAS-II recipe frees both ratios from one flag (found by
+      `/code-review` on 2026-11-02). `io/recipe.py` splits `SH/L` into
+      `axial_sl = axial_hl = SH/L / 2` and gives both its refine flag, so `_read_plan`
+      frees the pair from the swap-symmetric diagonal. GSAS-II refines one `SH/L`, so the
+      faithful mirror is a tie S/L = H/L, which `Recipe` has no field to carry; freeing
+      S/L alone is the other option. Either changes what an import refines, and the
+      reader's `RECIPE_CONVENTION_ASSUMED` text follows it.
+
 ## Acceptance
 
 ```sh
@@ -133,6 +129,99 @@ choosing a fix.
 ```
 
 ## Handover log
+
+- **2026-11-02 (ghostshift runner)** — `lab_calibrate` and `lab_bragg_brentano`
+  now refine the axial-divergence ratio S/L and hold H/L at the value the user sets, as the
+  maintainer ruled on 2026-11-01. A calibration no longer reports two interchangeable numbers
+  as two measurements. The same change reached the report's axial suggestion and the NIST
+  SRM 660c protocol, which mirrors `lab_bragg_brentano`, so the absolute anchor's numbers
+  moved by small amounts and the PR waits for the maintainer. Holding H/L did not give
+  LaB6 one answer: the protocol still has two minima, in the Gaussian widths, and that is
+  filed as WP-2084. The FCJ paper itself was not read, because no local corpus holds it;
+  the symmetry follows from the model's own weight function. One sibling stays open: an
+  imported GSAS-II recipe still frees both ratios from its single SH/L flag.
+
+  *Done.* The six tasks the WP was filed with; a seventh, the recipe, is new. `### Inherited`
+  is consumed and deleted: its WP-2036 and WP-2002 entries were the lab6 start rows
+  (settled above), its cpd-1a x/`lor_size` note is the sibling task's not-generalised line,
+  and its SRM 660c two-minima entry is WP-2084. The build edited both presets
+  (`strategy/staged.py`) with their docstrings and `PLAN_INFO` text; the ruling named `lab_calibrate` alone, and
+  `lab_bragg_brentano` follows because its `lines_axial` stage freed the same pair.
+  Siblings changed the same way: `report/layer2.py`'s `refine_axial_asymmetry` names S/L
+  alone, and `test_acceptance_srm660c._nist_calibrated_plan`,
+  `examples/srm660c_lab.py:nist_protocol_plan` and
+  `examples/validate_cuda_mixed_precision.py:nist_plan` free S/L alone with H/L held at the
+  protocol's declared 0.025. Settled by Claude under the protocol's own docstring
+  ("`lab_bragg_brentano` minus the zero error") and this WP's build task, which expected the
+  Biso row to XPASS. The other choice was to leave the absolute anchor's protocol freeing
+  both. The repo's other lab acceptance protocols already freed S/L alone (FAP's
+  `_gsas_protocol_plan`, the QPA round robin's `qpa_plan`). `help.py`'s two entries, the calibration guide (its H/L hold and the
+  `HOLD_BLOCKED_PLAN` it printed are gone, every quoted number unchanged), tutorial 04
+  (rebuilt; three diagnostics fewer), the theory chapter's FCJ section, the concepts plans
+  table and two skill rows follow. The skill's `lab_calibrate` row did not grow: the body is
+  at its byte budget and `help.py` holds the rule.
+  `test_seed_invariance`'s width-start test stops ordering the pair and asserts H/L is not
+  refined. `test_staged_start_invariance`: the lab6 Biso row lost its strict xfail (it
+  XPASSed), and the lab6 axial-floor row is a non-strict xfail citing WP-2084.
+
+  *Measured* (macOS arm64, worktree venv `[dev]`, compiled tier on, dispersion declined), the
+  NIST protocol on SRM 660c, `origin/main` `62724a30f` → this branch, value(esd) as
+  `RefinedParameter.stderr`:
+
+  | quantity | before | after |
+  |---|---|---|
+  | cell a (Å) | 4.1568817(214) | 4.1568832(152) |
+  | specimen displacement (mm) | −0.07903(184) | −0.07917(123) |
+  | Kα2/Kα1 weight | 0.51251(479) | 0.51252(479) |
+  | S/L | 0.02546(357) | 0.03704(74) |
+  | H/L | 0.03667(328) | 0.025, held |
+  | Biso La, B (Å²) | 0.4380(189), 0.5704(727) | 0.4381(189), 0.5706(728) |
+  | u, v, w (deg²) | −0.000504(202), 0.001723(473), 0.000513(286) | −0.000506(200), 0.001733(463), 0.000505(277) |
+  | x, y (deg) | 0.02807(209), 0.01518(286) | 0.02813(208), 0.01512(285) |
+  | Rwp, GoF | 0.087429, 1.88633 | 0.087431, 1.88619 |
+
+  The cell moved 0.36 ppm, a fifteenth of its esd, against the acceptance band of ±2e-4 Å
+  (48 ppm). The cell and displacement esds fell to 0.71 and 0.67 of their old size, because
+  the near-degenerate pair no longer inflates them. The diagnostics are the same four codes.
+  `tests/reader_output.py` (the `srm660c_lab.py` fit, background from `auto_background`):
+  exit 1, no line added or removed; the displacement reads −0.0791139 at 66σ against
+  −0.0789974 at 44σ, the `CONSTRAINT_ACTIVE` count 7 against 12, and three stages' evaluation
+  counts move.
+
+  *The second minimum* (WP-2084's Context has the table). With H/L held, the axial-floor row's
+  0.05 arm reaches χ²_red 3.549273 against the shipped arm's 3.557722, and a warm refit at
+  the shipped floor from the 0.05 answer stays at 3.549378. So the shipped start reaches the
+  shallower of two minima 0.24 % apart, which differ in u by 0.58 plain esd. The same gap,
+  0.25 % and 46.7 in absolute χ², is in `test_seed_invariance`'s docstring from WP-2002's B10
+  lane, where it was read as the S/L ↔ H/L mirror; that sentence now says the mirror rode
+  along. The esd split on the compiled and numpy paths did not reproduce on tutorial 04's
+  data with one ratio free or both (task 6).
+
+  *Gates.* Rows run on this branch, each green: `tests/test_acceptance_srm660c.py` (2),
+  the lab6 rows of `tests/test_staged_start_invariance.py` (Biso and intermediate pass,
+  axial-floor xfails), `test_seed_invariance.py::test_the_peak_width_start_does_not_change_the_answer`,
+  `tests/test_acceptance_dispersion.py` with `tests/test_acceptance_extra_peaks.py` (19),
+  the acceptance command `tests/test_examples.py -k calibrate` (1), `-k srm660c` (2),
+  `tests/test_tutorials.py` (35), and the touched-area fast files (help, skill, report-apply,
+  roughness, audit, manual, reported-rows, FitReport layers: 475 after two fixes). The full
+  suite did not run, by the runner brief: targeted LaB6 rows instead.
+
+  *Review.* `/code-review high --fix` found seven; four fixed in `01e22d1ab` (the
+  `rietx compare` srm660c standard still freed H/L, and its anti-drift test never compared
+  the plan; `PLAN_INFO` said `lab_bragg_brentano` frees the transparency; the SRM 660c
+  test's H/L range check checked an input). Two not fixed: the recipe sibling (the new
+  task) and the three lab6 strict xfails in `test_window_domain.py`, whose reasons quote
+  numbers from the both-free protocol; they still fail as expected and were not
+  re-measured (WP-2084's last task, with three stale `_audit.py` evidence strings). One dropped: "hold" in prose is the `hold()` verb's effect too.
+
+  *Gotchas.* A help entry's growth lands in `reference/parameters.html.md`, whose twin is
+  capped at 50 000 characters and sat within ~30 of it; this branch's text is net shorter.
+
+  *Next:* the maintainer approves the moved SRM 660c numbers above (or asks for the anchor's
+  protocol to keep both ratios free), then merge. Then the recipe task: `Recipe` carries no
+  ties, so the faithful mirror of GSAS-II's one SH/L (a tie S/L = H/L) needs a field or a
+  plan that frees S/L alone; that choice changes what an import refines. WP-2084 is the
+  width-minima follow-up.
 
 - **2026-11-02** — the fix is decided. The maintainer chose option 1 on 2026-11-01:
   `lab_calibrate` frees S/L alone, with H/L held at its declared value. A calibration then
