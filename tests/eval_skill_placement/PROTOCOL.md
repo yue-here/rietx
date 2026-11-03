@@ -245,8 +245,9 @@ script's 0.02, so H/L is no row of the result. `colleague_fit.py` therefore prin
 `instrument.geometry.axial_sl` and no longer asks for `instrument.geometry.axial_hl`, which
 raised `KeyError` in the 2026-11-03 nightly. The output also loses two findings, the
 `HIGH_CORRELATION` and the `FLAT_DIRECTION` on the S/L ~ H/L pair (ρ = −1.000). S/L reads
-0.020237(890) where it read 0.020126 ± 1.168. The other five `EPISODE_CODES` still fire,
-`FLAT_DIRECTION` on another pair. No rubric item here or in `tests/eval_skill/`'s
-`fap-judge` case concerns the axial pair. A re-run of round 1.1 still builds from
+0.020237(890) where it read 0.020126 ± 1.168. All five `EPISODE_CODES` still fire.
+`FLAT_DIRECTION` and `HIGH_CORRELATION` now fire on the zero shift ~ sample displacement
+pair, and `HIGH_CORRELATION` also on each cell axis against either of the two. No rubric
+item here or in `tests/eval_skill/`'s `fap-judge` case concerns the axial pair. A re-run of round 1.1 still builds from
 `db4a8582`, and a later round, or a `fap-judge` round staged through `build_episode`, builds
 this episode and pools with no round built before it.

@@ -4,7 +4,8 @@ A plausible fluorapatite refinement with two choices a reviewer would query: the
 `lab_bragg_brentano` plan, atoms added, frees zero and sample displacement together, and a
 24-term Chebyshev background is flexible enough to reach an ADP. Its printed
 output is `fit_output.txt` in the workspace, and it fires the codes
-`runner.EPISODE_CODES` names (PROTOCOL.md § The episode and § Amendment, 2026-10-24).
+`runner.EPISODE_CODES` names (PROTOCOL.md § The episode and the amendments of
+2026-10-24 and 2026-11-03).
 
 Data: `FAP.XRA` and `fluorapatite.cif`, the GSAS-II LabData tutorial pair
 (`tests/data/README.md` has their provenance). Nothing here is part of the
