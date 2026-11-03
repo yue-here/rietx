@@ -206,8 +206,8 @@ from today. The synthetic controls hold.
   `tests.reader_output`: unchanged against the merge-base. Report tests, the SRM 660c
   zero-aperture slow row and the validation matrix: 815 passed. `test_audit_table` and
   `test_docs_consistency`: 48 passed. Ruff clean. Fast suite, alone under the suite lock:
-  13642 passed, 319 skipped, 34 xfailed, 0 failed (31 more passed than the first session's
-  13611, from main's merged tests; no test added here).
+  13642 passed, 319 skipped, 34 xfailed, 0 failed. No test was added in this session; the
+  first session's two failures now pass, and the rest of the difference is main's merge.
 
   *Open for the maintainer.* (2) The reply on #1106: drafted, unposted, at
   `~/.cache/ghostshift/rietx/wp-2054/reply-1106.md`. (3) The reporter's `t_noise` ask stays
