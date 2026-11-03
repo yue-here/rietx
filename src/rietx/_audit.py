@@ -564,8 +564,8 @@ ROWS: tuple[Row, ...] = (
         grounds=("Arithmetic: the scan says which of its two return lines produced the "
                  "answer, so a fallback is not read as a choice."),
         response="info",
-        responds=("note that the baseline's smoothing strength is the grid's end, and "
-                  "co-refine the background rather than hold that baseline fixed"),
+        responds=("note that the baseline's smoothing strength is the grid's end and not "
+                  "the scan's choice, before holding that baseline fixed"),
         scope=("all",)),
     Row("BISO_NEGATIVE", "code"),
     Row("BISO_UNUSUALLY_LARGE", "code"),
@@ -4452,10 +4452,9 @@ ROWS: tuple[Row, ...] = (
     Row("BACKGROUND_ORDER_AT_CAP.suggestion", "suggestion", value=1),
     Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END.suggestion", "suggestion", tier=1, ambiguity=1,
         value=1,
-        evidence=("follows from the code's own condition: a baseline the data did not choose "
-                  "is no measured curve to hold fixed, which leaves the package's other form, a "
-                  "background co-refined under a smoothness penalty (root CLAUDE.md, the "
-                  "weights clause)")),
+        evidence=("arithmetic: names the argument that overrides the fallback and the "
+                  "package's other background forms, and ranks none of them, so no dissenter is "
+                  "left (a held SNIP under a broad hump is one, references/judging.md)")),
     Row("BISO_NEGATIVE.suggestion", "suggestion", value=1),
     Row("BISO_UNUSUALLY_LARGE.suggestion", "suggestion", value=1),
     Row("BOUND_HIT.suggestion", "suggestion", value=1),

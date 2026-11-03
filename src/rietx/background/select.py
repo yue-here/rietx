@@ -251,8 +251,8 @@ def select_arpls_lambda(data: PatternData, *,
                      f"masked channels was {d_best:.3f}, short of the "
                      f"{dw_floor:g} floor. The strength returned is the grid's "
                      f"end, not a choice."),
-            suggestion=("Co-refine the background rather than holding this "
-                        "baseline fixed (auto_background builds one)."),
+            suggestion=("Pass a strength of your own, co-refine the background "
+                        "(auto_background), or hold a measured blank."),
             value=d_best))
     return BackgroundSelection(method="arpls_lambda", selected=float(selected),
                                n_masked_channels=m, scores=scores,

@@ -1646,9 +1646,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The scan for the arPLS baseline's smoothing strength tried every "
             "candidate from stiff to flexible. None left the peak-free channels "
             "with a serially uncorrelated residual, so the data did not choose the "
-            "strength, and the most flexible candidate was returned. A baseline "
-            "estimated this way and held fixed carries that misfit into the fit. "
-            "Co-refine the background instead."
+            "strength, and the most flexible candidate was returned. Hold that "
+            "baseline fixed only knowing it is the grid's end, not a choice. The "
+            "alternatives are a strength of your own, a co-refined background, or a "
+            "measured blank."
         ),
     ),
     "BISO_NEGATIVE": HelpEntry(
