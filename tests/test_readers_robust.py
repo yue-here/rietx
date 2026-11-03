@@ -21,6 +21,7 @@ network-mounted instrument share drive all produce for real.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -592,3 +593,177 @@ def test_no_real_fixture_trips_a_check_on_what_its_reader_hands_back(
     found = []
     rx.read_pattern(DATA / fixture, diagnostics=found)
     assert not {d.code for d in found} & _WP1332_CODES
+
+
+# ------------------------------------------------- non-finite rows (WP-2079)
+#: Twelve points, and the bad value goes at index 5.
+_NF_N, _NF_AT = 12, 5
+_NF_TT = [10.0 + 0.02 * i for i in range(_NF_N)]
+_NF_Y = [500.0 + i % 7 for i in range(_NF_N)]
+_NF_S = [22.0 + i % 3 for i in range(_NF_N)]
+_NF_BAD = (float("nan"), float("inf"), float("-inf"))
+
+#: Each reader that can carry a float, with the columns its file can hold one
+#: in: ``x`` the 2θ, ``y`` the count, ``s`` the σ.  A reader whose 2θ is built
+#: from a start and a step has no ``x``.
+_NF_COLUMNS = {"xy": "xys", "chi": "xy", "gsas_fxye": "xys", "gsas_esd": "ys",
+               "ras": "xy", "uxd": "xy", "xrdml": "y", "udf": "y", "rasx": "xy",
+               "brml": "xy", "pdcif": "xys"}
+#: Bruker RAW stores float32 counts, and a non-finite one is its evidence that
+#: the stride is wrong: the reader refuses the file, and that refusal stays.
+_NF_REFUSED = {"raw4": "y", "raw3": "x"}
+#: Philips ``.rd`` stores √-packed uint16 counts, which cannot be NaN or ±inf.
+_NF_CANNOT_CARRY = {"philips_rd"}
+
+
+def _nonfinite_file(kind: str, column: str, bad: float, d: Path) -> Path:
+    from tests.test_readers import (
+        _write_pdcif,
+        write_brml,
+        write_chi,
+        write_gsas,
+        write_gsas_esd,
+        write_ras,
+        write_rasx,
+        write_udf,
+        write_uxd,
+        write_xrdml,
+        write_xy,
+    )
+    from tests.writers_xrd import write_raw3, write_raw4
+
+    def put(seq, col):
+        return [bad if (i == _NF_AT and col == column) else v
+                for i, v in enumerate(seq)]
+
+    tt, y, s = put(_NF_TT, "x"), put(_NF_Y, "y"), put(_NF_S, "s")
+    if kind == "xy":
+        return write_xy(d / "a.xye", tt, y, s)
+    if kind == "chi":
+        return write_chi(d / "a.chi", "2-Theta Angle (Degrees)", tt, y)
+    if kind == "gsas_fxye":
+        body = "".join(f"  {a * 100}  {b}  {c}\n" for a, b, c in zip(tt, y, s))
+        return write_gsas(d / "a.fxye", bintype="CONST", flag="FXYE", body=body,
+                          nchan=_NF_N, nrec=_NF_N, coeffs=(1000.0, 2.0, 0, 0))
+    if kind == "gsas_esd":
+        return write_gsas_esd(d / "a.gsas", y, s, start=1000.0, step=2.0)
+    if kind == "ras":
+        return write_ras(d / "a.ras", [(a, b, 1.0) for a, b in zip(tt, y)])
+    if kind == "uxd":
+        return write_uxd(d / "a.uxd", [dict(drive="COUPLED", marker="_2THETACOUNTS",
+                                           steptime=1.0, rows=list(zip(tt, y)))])
+    if kind == "xrdml":
+        return write_xrdml(d / "a.xrdml", start=_NF_TT[0], end=_NF_TT[-1], counts=y)
+    if kind == "udf":
+        return write_udf(d / "a.udf", y, lo=_NF_TT[0], step=0.02)
+    if kind == "rasx":
+        return write_rasx(d / "a.rasx", [dict(rows=[(a, b, 1.0)
+                                                    for a, b in zip(tt, y)])])
+    if kind == "brml":
+        return write_brml(d / "a.brml", [dict(rows=[(1, 1, a, 5.0, b)
+                                                    for a, b in zip(tt, y)])])
+    if kind == "pdcif":
+        return _write_pdcif(d / "a.cif", {"_pd_meas_2theta_scan": tt,
+                                          "_pd_meas_counts_total": y,
+                                          "_pd_meas_counts_total_su": s})
+    if kind == "raw4":
+        return write_raw4(d / "a.raw", [dict(start=10.0, step=0.02, intensity=y)])
+    assert kind == "raw3"
+    return write_raw3(d / "a.raw", [dict(start=10.0, step=0.02, intensity=y,
+                                         two_theta=tt)])
+
+
+@pytest.mark.parametrize("kind,column,bad", [
+    (k, c, b) for k, cols in _NF_COLUMNS.items() for c in cols for b in _NF_BAD])
+def test_a_non_finite_value_drops_its_row_and_says_where(kind, column, bad,
+                                                         tmp_path):
+    path = _nonfinite_file(kind, column, bad, tmp_path)
+    found = []
+    pat = rx.read_pattern(path, diagnostics=found)
+    assert len(pat.intensity) == _NF_N - 1
+    assert all(map(math.isfinite, pat.tt()))
+    assert all(map(math.isfinite, pat.intensity))
+    assert pat.sigma is None or all(map(math.isfinite, pat.sigma))
+    # nothing else moves: a NaN count once withheld σ from the whole scan
+    assert [d.code for d in found] == ["PATTERN_ROWS_DROPPED"]
+    (d,) = found
+    assert d.value == 1.0 and d.level == "warning"
+    # CIF has no infinity, and gemmi reads ``inf`` as a null, which is NaN
+    what = "a NaN" if math.isnan(bad) or kind == "pdcif" else "an infinite"
+    name = {"x": "2θ", "y": "count", "s": "σ"}[column]
+    assert f"1 of {_NF_N} points have {what} {name} " in d.message
+    if column == "x":
+        # a row with no finite 2θ has no position to name
+        assert d.where == ["two_theta"]
+        assert "1 with no finite 2θ" in d.message
+    else:
+        assert d.where == [f"{_NF_TT[_NF_AT]:.3f}-{_NF_TT[_NF_AT]:.3f}"]
+
+
+@pytest.mark.parametrize("kind", sorted(_NF_REFUSED))
+def test_bruker_raw_refuses_a_non_finite_value_as_a_wrong_stride(kind, tmp_path):
+    path = _nonfinite_file(kind, _NF_REFUSED[kind], float("nan"), tmp_path)
+    assert identify_format(path).name == "bruker_raw"
+    with pytest.raises(ValueError, match="not finite numbers") as exc:
+        rx.read_pattern(path)
+    assert path.name in str(exc.value)
+
+
+def test_every_reader_is_classified_for_non_finite_values():
+    """A new reader fails here until it is tested for NaN rows or says why not."""
+    from rietx.io.readers import PATTERN_FORMATS
+
+    readers = {f.name for f in PATTERN_FORMATS if f.refuses is None}
+    covered = ({k.removesuffix("_fxye").removesuffix("_esd") for k in _NF_COLUMNS}
+               | {"bruker_raw"} | _NF_CANNOT_CARRY)
+    assert covered == readers
+
+
+def test_separate_runs_are_named_three_at_a_time(tmp_path):
+    from tests.test_readers import write_xy
+
+    tt = [10.0 + 0.1 * i for i in range(20)]
+    y = [float("nan") if i in (2, 3, 7, 11, 15, 18) else 100.0
+         for i in range(20)]
+    found = []
+    pat = rx.read_pattern(write_xy(tmp_path / "runs.xy", tt, y),
+                          diagnostics=found)
+    assert len(pat.intensity) == 14
+    (d,) = found
+    assert d.where == ["10.200-10.300", "10.700-10.700", "11.100-11.100",
+                       "11.500-11.500", "11.800-11.800"]
+    assert d.message.endswith(
+        "at 2θ 10.2-10.3°, 10.7°, 11.1°, and 2 more range(s).")
+
+
+def test_a_descending_scan_drops_its_nan_row_before_it_is_reversed(tmp_path):
+    from tests.test_readers import write_xy
+
+    tt = [12.0 - 0.5 * i for i in range(5)]
+    found = []
+    pat = rx.read_pattern(write_xy(tmp_path / "down.xy", tt,
+                                   [1.0, 2.0, float("nan"), 4.0, 5.0]),
+                          diagnostics=found)
+    assert pat.two_theta == [10.0, 10.5, 11.5, 12.0]
+    assert [d.code for d in found] == ["PATTERN_ROWS_DROPPED",
+                                       "PATTERN_SCAN_REVERSED"]
+    assert found[0].where == ["11.000-11.000"]
+
+
+def test_a_file_with_no_finite_row_is_refused_by_name(tmp_path):
+    from tests.test_readers import write_xy
+
+    path = write_xy(tmp_path / "void.xy", [10.0, 10.1, 10.2], [float("nan")] * 3)
+    with pytest.raises(ValueError, match="every one of its 3 points") as exc:
+        rx.read_pattern(path)
+    assert "void.xy" in str(exc.value)
+
+
+def test_a_reader_that_skips_the_check_is_refused_at_the_schema(tmp_path):
+    """``pattern_data`` is the backstop for a reader that never called
+    ``ascending``: it refuses rather than hand the fit a NaN."""
+    from rietx.io.formats.base import pattern_data
+
+    with pytest.raises(ValueError, match="skipped.cif: a NaN or infinite"):
+        pattern_data(tmp_path / "skipped.cif", [10.0, 10.1, 10.2],
+                     [1.0, float("nan"), 3.0])

@@ -385,7 +385,8 @@ def _rows_dropped(name: str, x: np.ndarray, y: np.ndarray,
     values = np.concatenate([x[bad_x], y[bad_y],
                              np.empty(0) if sig is None else sig[bad_s]])
     nan, inf = bool(np.isnan(values).any()), bool(np.isinf(values).any())
-    what = "NaN or infinite" if nan and inf else ("NaN" if nan else "infinite")
+    what = ("a NaN or infinite" if nan and inf else
+            ("a NaN" if nan else "an infinite"))
     placed = np.flatnonzero(bad & ~bad_x)
     runs = (np.split(placed, np.flatnonzero(np.diff(placed) > 1) + 1)
             if placed.size else [])
@@ -402,7 +403,7 @@ def _rows_dropped(name: str, x: np.ndarray, y: np.ndarray,
     n = int(bad.sum())
     return Diagnostic(
         level="warning", code="PATTERN_ROWS_DROPPED",
-        message=(f"{name}: {n} of {x.size} points have a {what} "
+        message=(f"{name}: {n} of {x.size} points have {what} "
                  f"{' or '.join(columns)} and were not read as data, "
                  f"{where_text}."),
         where=[f"{lo:.3f}-{hi:.3f}" for lo, hi in spans] or [axis],
@@ -658,8 +659,12 @@ INTEGRAL_TOL = 1e-3
 
 
 def integral(values: Any) -> bool:
-    """Whether every value is a whole number — the counts test."""
+    """Whether every value is a whole number — the counts test.
+
+    A NaN or infinite value is left out of the test: :func:`ascending` drops its
+    row, so the unit is decided on the rows the pattern keeps (WP-2079)."""
     y = np.asarray(values, dtype=np.float64)
+    y = y[np.isfinite(y)]
     return bool(y.size) and bool(np.all(np.abs(y - np.round(y)) < INTEGRAL_TOL))
 
 
