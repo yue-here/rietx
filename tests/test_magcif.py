@@ -1242,6 +1242,92 @@ def test_the_supercell_refusal_names_the_k_tag_the_file_used(tmp_path):
     assert "_parent_propagation_vector" not in msg
 
 
+def test_a_k_column_listed_before_its_id_is_read(tmp_path):
+    """Review of #1284, follow-up 1: both k readers stopped the value at the
+    next tag line, so they saw a loop's rows only when ``kxkykz`` was its last
+    column, and a k != 0 listed before its ``id`` read as Γ.  The column is
+    found by the loop's header now, the rows are read in order, and k = 0 in
+    the reordered loop still reads."""
+    def reordered(k):
+        path = _fixture(tmp_path, "LaMnO3", k=k)
+        text = path.read_text(encoding="utf-8")
+        swapped = text.replace(
+            "_parent_propagation_vector.id\n_parent_propagation_vector.kxkykz\n"
+            f"k1 [{k}]\n",
+            "_parent_propagation_vector.kxkykz\n_parent_propagation_vector.id\n"
+            f"[{k}] k1\n")
+        assert swapped != text
+        path.write_text(swapped, encoding="utf-8")
+        return structure_from_cif(str(path), moment_ions=_IONS["LaMnO3"])
+
+    with pytest.raises(magcif.MagCifError, match="magnetic supercell") as e:
+        reordered("1/2 0 0")
+    assert "_parent_propagation_vector.kxkykz [1/2 0 0]" in str(e.value)
+    baseline = _stored(_read(tmp_path, "LaMnO3").phases[0])
+    assert _stored(reordered("0 0 0").phases[0]) == baseline
+    draft = ("\nloop_\n_magnetic_propagation_vector_kxkykz\n"
+             "_magnetic_propagation_vector_seq_id\n'1/2 0 0' 1\n")
+    with pytest.raises(magcif.MagCifError, match="magnetic supercell") as e:
+        _read(tmp_path, "LaMnO3", extra=draft)
+    assert "_magnetic_propagation_vector_kxkykz [1/2 0 0]" in str(e.value)
+    assert magcif.propagation_vectors(
+        "loop_\n_parent_propagation_vector.kxkykz\n"
+        "_parent_propagation_vector.id\n[0 0 0] k1\n[1/2 0 0] k2\n") == (
+        ("0", "0", "0"), ("1/2", "0", "0"))
+
+
+def test_the_draft_reader_reads_an_unquoted_four_token_row_as_id_and_k(tmp_path):
+    """Review of #1284, follow-up 2: the draft reader's fallback for a row with
+    no quote or bracket had no test.  It reads ``id k1 k2 k3`` from a row of
+    exactly four tokens, so a malformed k != 0 row errs toward the refusal
+    rather than reading as Γ, and no other row shape is guessed into a k.
+    Pinned as it stands."""
+    loop = ("\nloop_\n_magnetic_propagation_vector_seq_id\n"
+            "_magnetic_propagation_vector_kxkykz\n{row}\n")
+    assert magcif.propagation_vectors(loop.format(row="1 1/2 0 0")) == (
+        ("1/2", "0", "0"),)
+    with pytest.raises(magcif.MagCifError, match="magnetic supercell") as e:
+        _read(tmp_path, "LaMnO3", extra=loop.format(row="1 1/2 0 0"))
+    assert "_magnetic_propagation_vector_kxkykz [1/2 0 0]" in str(e.value)
+    for row in ("1/2 0 0", "1 1/2 0 0 0", "1 1/2 0"):
+        assert magcif.propagation_vectors(loop.format(row=row)) == ()
+
+
+def test_a_commented_out_k_is_not_a_k(tmp_path):
+    """Review of #1284, round-2 follow-up 1: a ``#`` that begins a token
+    outside a quoted string starts a CIF comment, but both k readers read a
+    commented-out k line as a k, so a nuclear-cell file was refused.  A
+    trailing comment no longer adds its k beside the real one, and a ``#``
+    inside a token or a quoted string is still data."""
+    baseline = _stored(_read(tmp_path, "LaMnO3").phases[0])
+    for line in ("# _parent_propagation_vector.kxkykz [1/2 0 0]",
+                 "#_magnetic_propagation_vector_kxkykz '1/2 0 0'"):
+        assert magcif.propagation_vectors(line + "\n") == ()
+        assert _stored(_read(tmp_path, "LaMnO3",
+                             extra=f"\n{line}\n").phases[0]) == baseline
+    assert magcif.propagation_vectors(
+        "_parent_propagation_vector.kxkykz [0 0 0]  # was [1/2 0 0]\n") == (
+        ("0", "0", "0"),)
+    for row in ("' #1' [1/2 0 0]", "k#1 [1/2 0 0]"):
+        assert magcif.propagation_vectors(
+            "loop_\n_parent_propagation_vector.id\n"
+            f"_parent_propagation_vector.kxkykz\n{row}\n") == (("1/2", "0", "0"),)
+
+
+def test_a_k_on_a_text_field_s_opening_line_is_not_a_k(tmp_path):
+    """Review of #1284, round-2 follow-up 2: text after the ``;`` that opens a
+    field is the field's first line in CIF 1.1, but ``_without_text_fields``
+    kept that line whole, so a k written there read as one.  It keeps only the
+    ``;`` and the line count now, and a closing line stays whole."""
+    baseline = _stored(_read(tmp_path, "LaMnO3").phases[0])
+    for tag in ("_parent_propagation_vector.kxkykz [1/2 0 0]",
+                "_magnetic_propagation_vector_kxkykz '1/2 0 0'"):
+        field = f"\n_publ_section_comment\n;{tag}\nmore prose\n;\n"
+        assert magcif.propagation_vectors(field) == ()
+        assert _stored(_read(tmp_path, "LaMnO3", extra=field).phases[0]) == baseline
+    assert magcif._without_text_fields(";a tag\nprose\n; after") == ";\n\n; after"
+
+
 def test_an_incommensurate_k_is_refused_with_its_own_sentence(tmp_path):
     """A k that is not a rational has no commensurate cell to be read in at
     all, which is a different refusal from the supercell one and says so."""
