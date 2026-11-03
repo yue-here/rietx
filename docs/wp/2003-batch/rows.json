@@ -81,7 +81,7 @@
   "response": "warning",
   "responds": "quote no cell, fraction or width from the named pattern: its fit diverged after every rung, seeded no successor and joins no median",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer let the consent list stand ('All stand'): the approval re-dated to the maintainer's. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_UNRECOVERED.suggestion",
@@ -146,7 +146,8 @@
   "class": "C5",
   "response": null,
   "responds": null,
-  "scope": null
+  "scope": null,
+  "ruling": "2026-11-03: the maintainer let the consent list stand ('All stand'): C5 q2, split into a warning (did not run) and an info (ran on fewer patterns). Before it: none recorded"
  },
  {
   "name": "SEQUENTIAL_PATH_CHECK_INCOMPLETE.suggestion",
@@ -242,7 +243,7 @@
   "response": "warning",
   "responds": "if kept: hold, restrain, or quote the two directions' spread before quoting the cell, coordinate or width named",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer let the consent list stand ('All stand'): C5 q1, demoted to a field of gaps with each walk's rung, plus one summary line naming it. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_PATH_DEPENDENT.suggestion",
@@ -757,7 +758,7 @@
   "applied": false,
   "decision": "demote SEQUENTIAL_PATH_DEPENDENT to a field, or keep 3 sigma at tier 3 (no family measured)",
   "class": "C5",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer let the consent list stand ('All stand'): C5 q1, removed with its code. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.WIDTH_GROWTH_FACTOR",
@@ -954,7 +955,7 @@
   "applied": false,
   "decision": "extend B7's approval to the series seat",
   "class": "C9",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer let the consent list stand ('All stand'): tier 3 on B7's approval, extended to the series seat. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:refit",
@@ -1215,7 +1216,7 @@
   "decision": "C2: tier 1 for the full-cost order (question 3, pick: S, not Rwp; max_iter ties converged); diverged before truncated (question 2, pick) (revised 2026-10-25, batch.md)",
   "class": "C2",
   "row_note": "no row of its own: SeriesEntry.rung records the attempt kept; the criterion is written into the ladder rows' evidence",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer let the consent list stand ('All stand'): C2 q2, a diverged attempt ranks below a truncated finite one. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._reseed_needed",
@@ -1503,7 +1504,7 @@
   "decision": "batch.md C10 question 2: (a) align with refine._answer_significance (pick, after one joint fixture where the two statistics disagree shows what moves) or (b) its own row, tier 3 with approval, B1's 3sigma on a second statistic; tier 3 on (b)'s wording until ruled (revised 2026-10-25, batch.md)",
   "class": "C10",
   "row_note": "proposed: a row of its own (a hand row, B14), since StageResult.held's row names B1's statistic and the joint runner reads another; none once aligned",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer let the consent list stand ('All stand'): C10 q2 (a), the joint absent-phase hold aligned with _answer_significance after a joint fixture shows what moves. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi._rehold_multi",
@@ -1519,7 +1520,7 @@
   "decision": "batch.md C10 question 2: (a) align with refine._answer_significance (pick, after one joint fixture where the two statistics disagree shows what moves) or (b) its own row, tier 3 with approval, B1's 3sigma on a second statistic; tier 3 on (b)'s wording until ruled (revised 2026-10-25, batch.md)",
   "class": "C10",
   "row_note": "proposed: a row of its own (a hand row, B14), since StageResult.held's row names B1's statistic and the joint runner reads another; none once aligned",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer let the consent list stand ('All stand'): C10 q2 (a), the joint absent-phase hold aligned with _answer_significance after a joint fixture shows what moves. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.multi._hold_scale_b_ridges_multi",

@@ -1,6 +1,6 @@
 # WP-2003 — The chain actions: what a series decides between patterns
 
-Milestone: generality · Status: 🔄 2026-11-03 — C1, C2 q5 and C3 landed (no default Rwp fence or first-rung budget; an error-level fit is quarantined); C1 ruled by the maintainer 2026-11-03, briefs 2-5 open
+Milestone: generality · Status: 🔄 2026-11-03 — C1, C2 q5 and C3 landed (no default Rwp fence or first-rung budget; an error-level fit is quarantined); the batch ruled by the maintainer 2026-11-03 (five briefs and the consent list); implementation, two measurements and the agent run owed
 Track: The audits
 Depends on: 2002, 2037
 Priority: P2 2026-10-24 — 2037 closed, so its clause 1 and the response column this WP's first demotion takes are in place; the maintainer's next after 2037; the seam the maintainer's own example (a series discontinuity) lives in

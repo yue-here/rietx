@@ -179,6 +179,23 @@ varied ones becomes `invariant` once the test C9 names shows the two bit-identic
 differs comes back to the maintainer at tier 3. `refine_sequential:carry` leaves
 `UNAUDITED_BASELINE`. WP-2081's questions on the cold rung stay open there.
 
+**The consent list, re-checked against DESIGN.md and generality.md and sent 2026-11-03; the
+maintainer: "All stand".** (1) C2 q2: a diverged attempt ranks below a truncated finite one.
+(2) C5 q1: `SEQUENTIAL_PATH_DEPENDENT` and `PATH_DEPENDENCE_SIGMA` go; a record field gives
+each path's forward-backward gap in combined esds per pattern, largest first, with each walk's
+rung, and the summary prints one line naming it (§ Demotion, as brief 4; changed from field
+only in the check). (3) C5 q2: `SEQUENTIAL_PATH_CHECK_INCOMPLETE` splits into a `warning` (did
+not run) and an `info` (ran on fewer patterns). (4) C9 q4 (a): a warm refit keeps the closing
+stage. (5) C9 q3: `SequentialRefinement.fit:plan` tier 3 on B7's approval (2026-10-19),
+extended to the series seat. (6) C10 q2 (a): the joint absent-phase hold is aligned with
+`_answer_significance` after a joint fixture shows what moves; tier 3 on (b)'s wording until
+then. (7) Approval dated 2026-11-03 on `SEQUENTIAL_UNRECOVERED`, `SeriesEntry.seeded_from` and
+`SeriesEntry.floored`, and WP-2080's GoF-step row approved under the 2026-11-02 delegation when
+it lands. Held back for measurement in the check, approval still owed: C9 q2
+(`carry_hkl_intensities`, a Le Bail and a Pawley chain carried and not) and
+`FIRST_RUNG_SAMPLES` (re-measured at 1, 2 and 3 samples on the dearest-stage quantity, the
+judge's ask). The agent-harness run for the wording of (2) and brief 4 awaits a costed menu.
+
 ---
 
 ## C1. What sends a warm fit up the ladder

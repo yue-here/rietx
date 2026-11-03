@@ -1096,9 +1096,9 @@ ROWS: tuple[Row, ...] = (
                   "tut05-broken scan12 (MODEL_FAR_FROM_DATA, Rwp 0.969 on every rung) and "
                   "none of CPD, CPD closing off or planted (2003-batch/batch.md, C2)"),
         grounds=("Says out loud the quarantine, the package's own protective act (as "
-                 "CELL_RUNAWAY, B8). Settled by Claude 2026-10-26 under the maintainer's "
-                 "delegation; the maintainer's own approval is owed (2003-batch/batch.md, C2)."),
-        approved="2026-10-26", response="warning",
+                 "CELL_RUNAWAY, B8). Settled by Claude 2026-10-26; approved by the maintainer 2026-11-03 "
+                 "(2003-batch/batch.md, C2)."),
+        approved="2026-11-03", response="warning",
         responds=("quote no cell, fraction or width from the named pattern: its kept fit "
                   "diverged or carries an error-level code after every rung, seeded no "
                   "successor and joins no median")),
@@ -1479,9 +1479,9 @@ ROWS: tuple[Row, ...] = (
         grounds=("Rule 1's protection: no competent refiner wants a diverged fit seeding its "
                  "successors (generality.md § The rule, fourth review); the field is its "
                  "record, the substitution having been visible only through history notes "
-                 "under history=True (WP-2003 batch C2). Settled by Claude 2026-10-26 under "
-                 "the maintainer's delegation; the maintainer's own approval is owed."),
-        approved="2026-10-26"),
+                 "under history=True (WP-2003 batch C2). Settled by Claude 2026-10-26; "
+                 "approved by the maintainer 2026-11-03."),
+        approved="2026-11-03"),
     Row("rietx.schemas.sequential.SeriesEntry.floored", "action", tier=3, ambiguity=1,
         evidence=("WP-1329, WP-1301's hold along the series (sequential.py "
                   "_floor_unsupported_moments): an unsupported modulus is scaled to "
@@ -1492,9 +1492,9 @@ ROWS: tuple[Row, ...] = (
                   "attempt, so a floored pattern refitted cold is not counted (WP-2003 X7)"),
         grounds=("Rare feature, judged on the judgement ground alone: a modulus the pattern did "
                  "not support is no measurement to warm-start from, as the absent-phase hold's "
-                 "cell is not (WP-2003 batch C8). Settled by Claude 2026-10-26 under the "
-                 "maintainer's delegation; the maintainer's own approval is owed."),
-        approved="2026-10-26"),
+                 "cell is not (WP-2003 batch C8). Settled by Claude 2026-10-26; approved by "
+                 "the maintainer 2026-11-03."),
+        approved="2026-11-03"),
     Row("rietx.schemas.results.RefinementResult.absorption", "action", tier="caller", ambiguity=1,
         evidence=("opt-in: Geometry.mu_r/mu_t or capillary_radius_mm/thickness_mm, default None "
                   "(off); choosing flat_plate_transmission applies sec theta; Rouse et al. (1970) "
@@ -4269,7 +4269,15 @@ ROWS: tuple[Row, ...] = (
                   "(docs/practice.md): none defaults to Le Bail; FullProf, RIETAN-FP and TOPAS "
                   "make the user state it. GSAS-II fits each histogram of a series by RefineCore, "
                   "the single fit's solver (docs/practice.md § Sequential refinement, checked)")),
-    Row("rietx.sequential.SequentialRefinement.fit:plan", "default", value="mccusker_default"),
+    Row("rietx.sequential.SequentialRefinement.fit:plan", "default", tier=3, ambiguity=1,
+        value="mccusker_default",
+        evidence=("the first pattern's plan and, collapsed, every warm refit's; the same "
+                  "value as Refinement.fit:plan, whose row carries the evidence (McCusker et "
+                  "al. 1999, the order only; no program ships a default plan)"),
+        grounds=("B7's approval of the single fit's default plan (ruled 2026-10-19), "
+                 "extended to the series seat by the maintainer 2026-11-03 "
+                 "(2003-batch/batch.md, C9 q3)."),
+        approved="2026-11-03"),
     Row("rietx.sequential.SequentialRefinement.fit:refit", "default", value="single"),
     Row("rietx.sequential.SequentialRefinement.fit:two_theta_limits", "default", tier=2,
         ambiguity=1, value=None,
@@ -5568,7 +5576,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.sequential.MIN_POINTS_FOR_PERSISTENCE",
     "rietx.sequential.PATH_DEPENDENCE_SIGMA",
     "rietx.sequential.SequentialRefinement.fit:labels",
-    "rietx.sequential.SequentialRefinement.fit:plan",
     "rietx.sequential.SequentialRefinement.fit:refit",
     "rietx.sequential.SequentialRefinement.fit:x",
     "rietx.sequential.SequentialRefinement.fit:x_label",
