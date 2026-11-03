@@ -227,24 +227,60 @@ from today. The synthetic controls hold.
     running beside it.
   - `python -m tests.reader_output`: unchanged (exit 0), because the standard fit
     declares its apertures. Every zero-aperture fit's printed report does change.
+  - The nominal value decides the reading (asked by the generality judge). Gated
+    regions and the action, by nominal aperture, tangent column:
+    | fit (apertures 0) | before | 0.01 | 0.02 | 0.03 | 0.05 |
+    |---|---|---|---|---|---|
+    | SRM 660c | 12/15, no action | 1/15, none | 12/15, fires | — | 12/15, none |
+    | cpd-1c | 5/14 | 2/14, none | 5/14, fires | 8/14, fires | 6/14, none |
+    | cpd-1a | 4/14 | — | 5/14, fires | — | — |
+    | cpd-1f | 3/14 | — | 10/14, fires | — | — |
+    Below 0.02 the smear is a shift and the column runs into position; above the
+    data's own aperture (SRM 660c refines to about 0.025/0.037, cpd-1c to S/L 0.040
+    with H/L held 0) the tangent points elsewhere and the low-angle coefficients
+    fall insignificant. The secant from 0 was tried as an alternative and is
+    sensitive the other way (3/15 gated on SRM 660c at 0.02, 14/15 at 0.05), so
+    the tangent stays. At 0.02 no fit lost a gated region.
+  - Freeing the axial term in the QPA protocol on cpd-1c moves Rwp 0.1076 → 0.1052
+    (S/L 0.040), so the three cpd samples do carry the asymmetry the action names.
 
   *Settled by Claude* (each could have gone the other way).
   - (b) over (a) and (c), on the grounds in the first task above.
   - The tangent at the nominal aperture over the secant from 0: the twin's existing
-    bases give it with no new arithmetic, and only its direction and sign are read.
+    bases give it with no new arithmetic, and the sweep above has it no more
+    sensitive to the value than the secant.
   - The sign rule at zero apertures: a physical bound (an aperture cannot go below 0),
     not a tuned threshold, so no audit row.
   - No new audit row and no `THRESHOLDS_VERSION` bump: no threshold moved.
-    `AXIAL_SIZING_FLOOR` gains a second consumer, the report's nominal aperture. Its
-    row is approved (2026-10-22), so its evidence text was not edited; the
-    generality judge's reading is below.
+    `AXIAL_SIZING_FLOOR` gains a second consumer, the report's nominal aperture,
+    and the sweep shows the value matters there. Its row is approved (2026-10-22),
+    so its evidence was not edited, and a row of its own at tier 3 needs an
+    `approved` date. Both are the maintainer's (open item 4).
+  - The skill row carries the description only: the generality judge read its
+    Rwp parenthesis as an Rwp comparison offered as evidence, and the rationale
+    already carries the advice.
 
   *Open for the maintainer.* (1) Approve the reader-output change: every fit with
   both apertures at 0 gains an asymmetry coefficient per region and, where the
   residual is one-sided, the action with its new clause. (2) Reply on #1106. (3) The
   reporter's further ask, a `t_noise` field on `BasisCoefficient` and ungated
   per-term roll-ups, is not done: it adds a public report field, which is reader
-  output and a schema change, and nothing in this WP needed it.
+  output and a schema change, and nothing in this WP needed it. (4) The nominal
+  aperture: keep reading it off `AXIAL_SIZING_FLOOR` (its approved row then needs
+  an evidence line for the report's use), or give the report its own constant at
+  0.02 with a tier-3 row, which needs an `approved` date.
+
+  *Generality* (the judge's sections, condensed by this session to the verdicts,
+  with the answers).
+  - `AXIAL_SIZING_FLOOR` as the report's nominal: **weak**. The value decides which
+    reflections get a column and so which regions pass the gates; GSAS-II floors
+    at 0.002; one real family. *Answer:* measured at 0.01/0.02/0.03/0.05 on SRM
+    660c and cpd-1c, and at 0.02 on cpd-1a and -1f (table above). It moves, so per
+    the judge it needs its own constant and row; that row's `approved` is open item 4.
+  - Sign rule at zero apertures: **holds** (tier 1, a physical bound). Minor gap:
+    nothing records that a negative coefficient was left out of the action.
+  - Rationale clause **holds**; skill row's measured parenthesis **weak** (an Rwp
+    comparison, one family). *Answer:* cut.
 
 - **2026-10-26** — created, from the 2026-10-26 issue triage (issue #1106). Checked against
   the tree at c0e32ab29: the issue's script reproduces (Rwp 0.1288 → 0.0867 with the
