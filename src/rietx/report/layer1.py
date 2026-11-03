@@ -145,9 +145,8 @@ def nominal_axial_columns(bases: DerivativeBases) -> dict:
     aperture, #1075), so Layer 1 had no column to name a one-sided residual
     with and the asymmetry action could not fire on the fits that need it
     most (#1106, WP-2054).  The column is borrowed from a twin drawn at
-    :data:`~rietx.model.forward.AXIAL_SIZING_FLOOR`, the aperture the package
-    already sizes a refine-from-zero stage at, and it keeps that twin's node
-    rule: a reflection whose smear there is under the rule's fraction of its
+    :data:`~rietx.report.NOMINAL_AXIAL_APERTURE`, a typical lab aperture, and
+    it keeps that twin's node rule: a reflection whose smear there is under the rule's fraction of its
     width gets no column, exactly as on a fit that declares the aperture.
     """
     out: dict = {}
