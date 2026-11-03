@@ -149,7 +149,7 @@ programs were not surveyed for this.
 rietx's `.pcr` reader follows that mapping since 1.11.0. It sets a limit as the built entry's
 `min` and `max` where the value it belongs to builds an entry in FullProf's own units: a cell
 entry rietx refines, a `Biso`, or March r. It reports every other limit with its reason, at
-`warning` where the file's value sits on the limit
+`warning` where the file's value sits on the limit or past it
 (`rietx.io.projects.fullprof.limit_readings`, checked).
 
 ## Instrument and specimen widths refined together

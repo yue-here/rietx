@@ -701,7 +701,9 @@ ROWS: tuple[Row, ...] = (
                   "top carrying its parameter number at multiplier +1, lies on or past an "
                   "end of the interval as the file prints both; FullProf clamps such a "
                   "parameter in least squares (fp2k 8.20 on its own ce1.pcr, "
-                  "docs/practice.md), so the recorded answer rested on the limit; the "
+                  "docs/practice.md), so a value on the limit is an answer that rested on it, "
+                  "and a value past it is one FullProf, rerun on the file, would hold at "
+                  "the limit (a reading: practice.md does not state the starting value); the "
                   "level is io/CLAUDE.md's for a flag the model cannot honour; acts on "
                   "nothing"),
         response="warning",

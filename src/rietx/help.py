@@ -2223,8 +2223,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "The FullProf file holds a hard limit on a refined parameter, and the "
             "file's own value sits on that limit or past it. FullProf holds a limited "
-            "parameter inside its interval during least squares, so the refinement the "
-            "file records ended against the limit. The reader could not carry the limit "
+            "parameter inside its interval during least squares. A value on the limit "
+            "is a refinement that ended against it. A value past the limit is one "
+            "FullProf, rerun on this file, would hold at the limit. The reader could "
+            "not carry the limit "
             "over, and the message says why: the value builds no parameter in "
             "FullProf's units, or the limit reaches a value where the model is "
             "undefined. The built parameter is free to leave the limit, so the two fits "
