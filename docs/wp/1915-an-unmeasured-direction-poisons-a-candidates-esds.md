@@ -15,9 +15,9 @@ come back NaN.
 `refine_candidate` refuses any fit whose free metric variance is not finite, so
 no candidate carries NaN esds and the four sites below never see an infinity.
 Measured on the triclinic fixture (handover log, 2026-11-03): the lines' Q are
-bit-identical along the dead D direction while a, b, c and α all move (b by 5 %),
-so a, b and c are *not* measured by those lines. Only their reciprocal
-counterparts are. The goal's "every other esd exactly" would have been a finite
+bit-identical along the dead D direction while a, b, c and α all move (b by
+2.7 % at D = 0.01), so a, b and c are *not* measured by those lines. Only their
+reciprocal counterparts are. The goal's "every other esd exactly" would have been a finite
 esd on an unbounded length. The refusal stands, and the work below pins why.
 
 ## Context
@@ -65,9 +65,10 @@ clamp" (root CLAUDE.md, the equilibration invariant).
 - [🛑] One propagation helper for the indexing side, on `_cov_free`'s pattern:
   zero the infinite entries, propagate the rest exactly, and return which
   outputs use an unmeasured input. Use it at all four sites.
-  *Withdrawn 2026-11-03: since #1232 `refine_candidate` is the only producer of
-  a `cov_af` and refuses a non-finite free variance, so no site sees an
-  infinity, and a helper there would have no input.*
+  *Withdrawn 2026-11-03: since #1232 `refine_candidate` is the only place a
+  `cov_af` is formed (`engines.conventional_fit` only carries one through an
+  integer change of basis) and it refuses a non-finite free variance, so no
+  site sees an infinity, and a helper there would have no input.*
 - [x] Decide what an unmeasured cell esd is in `CandidateFit.cell_esd`, `inf` or
   NaN, and what `bravais_screen` and the dedup do with it. Measure both on the
   triclinic fixture above before choosing.

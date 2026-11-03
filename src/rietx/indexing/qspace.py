@@ -421,8 +421,9 @@ def refine_candidate(q: np.ndarray, q_esd: np.ndarray, hkl: np.ndarray, *,
     # A dead *cross* term is refused too, though the metric is sound and only
     # an angle looks unmeasured: G = (G*)⁻¹ puts every cross term into every
     # length, so the lines' Q stay bit-identical while a, b and c move, and no
-    # direct-cell esd is honest.  Only the first-order one at the minimum-norm
-    # solution is finite (WP-1915).
+    # direct-cell esd is honest.  Let through, this propagation gives NaN; with
+    # the infinities zeroed, the first-order esds at the minimum-norm solution
+    # come out finite, and those are the wrong ones (WP-1915).
     if not np.all(np.isfinite(np.diag(cov)[:n_free])):
         raise ValueError(
             f"no assigned line constrains every metric direction of this "

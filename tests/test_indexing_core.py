@@ -291,7 +291,7 @@ def test_a_dead_cross_term_leaves_no_direct_length_measured():
     m = design_matrix(hkl)
     q = m @ af_from_cell((5.1, 6.3, 7.2, 90.0, 101.0, 90.0))
     q = q * (1.0 + 1e-5 * np.sin(np.arange(len(q))))
-    with pytest.raises(ValueError, match="not a lattice"):
+    with pytest.raises(ValueError, match="constrains every metric direction"):
         refine_candidate(q, 1e-4 * q, hkl, system="triclinic")
 
     held = refine_candidate(q, 1e-4 * q, hkl, system="monoclinic")
