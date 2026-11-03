@@ -341,9 +341,9 @@ repo.
   `sequential.py` now reads a cut first rung as converged, so it escalates
   no rung and feeds the first-rung budget (WP-1127).
 
-  Fast suite (`-m "not slow"`, `[dev]`, macOS arm64, through `serial.py`,
+  Fast suite before the ruling (`-m "not slow"`, `[dev]`, macOS arm64, through `serial.py`,
   another shift's suites running): 5 failed, 13608 passed, 319 skipped,
-  34 xfailed. `test_audit_table`'s approval row is decision 2. The other four
+  34 xfailed. `test_audit_table`'s approval row was decision 2. The other four
   were re-run alone. `test_display`'s kernel row also fails with the rule off,
   so it belongs to this machine and not to this branch. Three are this rule's
   status label. `guides/stage.py` prints `cell max_iter Rwp 0.4919` where its
@@ -354,15 +354,28 @@ repo.
   common outside the nine acceptance configurations, and under `max_iter` the
   rule mislabels it.
 
-  Next: the maintainer's answer to decision 1. If `converged`: set `status = 1`
-  where `lm.minimize` sets `termination = "slow_descent"`. Move the
-  `STAGE_MAX_ITER` branch for it to an info sibling code, with its audit row,
-  `references/diagnostics.md` row and test. Update `test_slow_descent.py`'s
-  status assertion, `results.py`/`help.py`/`concepts/fit.md`'s "status is
-  `max_iter`" lines and the PR body. Re-run the fast suite and the Cr₂WO₆
-  (`cr2wo6.py`) and zircon probes. Then the approvals, `gh pr ready`, then
-  merge. The runner stopped here at its context limit, so the PR is still a
-  draft.
+  After the ruling (second runner, head `239df5efc` merged with main, `[dev]`,
+  macOS arm64, through `serial.py`): 1 failed, 13644 passed, 319 skipped,
+  34 xfailed. The failure was the manual's page cap. The new
+  `STAGE_SLOW_DESCENT` section took the generated refinement diagnostics
+  page's text twin to 50 625 characters against the 50 000 cap; it had
+  stood about 165 under. Most of its codes are raised in one file,
+  `refine.py`, so the file-area rule cannot split it. The codes prefixed
+  `STAGE_`, `PLAN_` and `HOLD_` there now go to a new page,
+  `reference/diagnostics-stages.md` ("Stages and plans",
+  `reference_pages.STAGE_CODE_PREFIXES`), and the six hand-written links to
+  those anchors moved with them (the tutorial notebook's link edited in
+  place, its outputs untouched). `test_manual`, `test_manual_api`,
+  `test_gui_manual`, `test_docs_consistency` and `test_help` then pass.
+  Targeted rows, run alone: the LaB6 hump acceptance test, the `next` and
+  `stage` guide rows, the indexing Le Bail validation rows,
+  `test_validation_matrix`, `test_slow_descent`, `test_lm_solver`,
+  `test_audit_table`, `test_help`, `test_gui_help`, `test_docs_consistency`,
+  the skill tests and `test_manual_api` pass. `tests.audit_delta`: six rows
+  added, none new at `unaudited`. `tests.reader_output`: unchanged. ruff clean.
+
+  Next: the maintainer reads `STAGE_SLOW_DESCENT`'s message and suggestion
+  (quoted in the PR body), then merges. The PR is ready for review.
 
 - **2026-11-02** — ghostshift runner, PR #1343. A caller holding a stage's
   record can now read that stage's Rwp from it, so keeping the best stage of a
