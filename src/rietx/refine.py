@@ -8,6 +8,7 @@ import math
 import os
 import re
 import subprocess
+import time
 import tomllib
 import warnings
 from collections.abc import Callable, Iterable, Sequence
@@ -56,10 +57,11 @@ from .crystallography.twins import (
     coordinate_snapshot,
     merge_site_twins,
     numbering_moves,
+    site_of,
 )
 from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
-from .history.store import fingerprint
+from .history.store import fingerprint, refuse_existing_log
 from .history.tree import RefinementTree
 from .model.absorption import (
     CYLINDER_MU_R_MAX,
@@ -513,6 +515,8 @@ class _StageHold:
     #: ``StageResult.window_loss`` (WP-2047): measured on the stage's own
     #: frozen model at its answer, which only ``_run_stage`` still holds
     window_loss: float | None = None
+    #: ``StageResult.rwp`` (WP-1334), the same frozen model at the same answer
+    rwp: float | None = None
 
 
 def _tie_terms(source: "str | dict[str, float] | Sequence[tuple[str, float]]",
@@ -2325,13 +2329,10 @@ def _answer_significance(model: CompiledModel, table: ParameterTable,
 class NoPhasesError(ValueError):
     """A refining verb was handed a model with no phases (WP-1207).
 
-    ``code`` is ``"NO_PHASES"``, and it is the same string on every surface: the
-    agent envelope's fourth error code, and the GUI's reason for a disabled Run
-    button.  A code rather than a sentence because the consumer's next action is
-    specific and not the one any other refusal implies — index the pattern, or
-    type a cell — where ``INVALID_REQUEST`` would send an agent back to check
-    its field spelling and ``REFINEMENT_FAILED`` would suggest the fit is worth
-    retrying.
+    ``code`` is ``"NO_PHASES"``, and the GUI server sends it on as its error
+    code (``GuiError``), beside the Run button it disables.  It is a code rather
+    than a sentence because the consumer's next action is specific: index the
+    pattern, or type a cell.  No other refusal implies that action.
 
     A :class:`~rietx.schemas.structure.Structure` with no phases is legal on
     purpose (that class says why), so this is a refusal by the **verb**: holding
@@ -2430,7 +2431,9 @@ class Refinement:
     down a different branch with :meth:`run_stage`.
 
     Pass ``history=False`` for the light path: no snapshots, no per-stage
-    statistics, no serialisation.
+    statistics, no serialisation.  A ``history`` path that already holds a log
+    raises ``FileExistsError`` here, because a log holds one tree (WP-2031);
+    continue one with :meth:`from_node` on the loaded tree.
     """
 
     def __init__(self, structure: Structure, instrument: Instrument, *,
@@ -2519,6 +2522,9 @@ class Refinement:
         #: inside it (the arrow's direction is why ``schemas/results.py``
         #: cannot import the report contract at all).
         self.stage_reports_: list[StageReport] = []
+        #: wall seconds those rungs took to build, which the fit's ``fit_end``
+        #: event carries as ``stage_report_seconds`` (WP-1335)
+        self._stage_report_seconds = 0.0
         self._model: CompiledModel | None = None
         #: whether ``fit`` and ``run_stage`` compute the profile interval of
         #: each moment angle the stationary-angle test left out of the answer
@@ -2553,6 +2559,10 @@ class Refinement:
         if isinstance(history, RefinementTree):
             self.history = history
             self._head_id = history.head
+        elif isinstance(history, str | Path):
+            # before any fit is paid for; ``RefinementTree.for_data`` asks
+            # again when the tree is made, for a file written in between
+            refuse_existing_log(history)
 
         # carried across calls so a checkout can be continued
         self._mode: Mode = "rietveld"
@@ -2703,6 +2713,13 @@ class Refinement:
 
     def _require_history(self) -> RefinementTree:
         if self.history is None:
+            # the tree is built at the first fit (``_ensure_history``), so a
+            # ``history=True`` refinement lands here too until it has run one
+            if self._history_spec:
+                raise RuntimeError(
+                    "this Refinement has no history yet; the tree is built "
+                    "when the first fit runs, so call fit() or run_stage() "
+                    "first")
             raise RuntimeError(
                 "this Refinement has no history; construct it with "
                 "history=True (the default) or history='path.jsonl' to enable "
@@ -2729,11 +2746,10 @@ class Refinement:
                 table: ParameterTable, outcome, diagnostics,
                 held_scales: set[int] | None = None,
                 window_loss: float | None = None) -> str:
-        values = table.decode(outcome.theta)
-        y_calc = model.evaluate(values)
+        y_calc, y_bkg = model.evaluate_with_background(table.decode(outcome.theta))
         stats = compute_statistics(model.y_obs, y_calc, model.sigma,
                                    n_free=len(table.free_paths) + _pawley_n(model),
-                                   y_background=model.background(values))
+                                   y_background=y_bkg)
         stats.max_shift_over_esd = outcome.max_shift_over_esd  # copied, never derived
         stderr = (table.stderr_physical(outcome.theta, outcome.stderr_internal,
                                         outcome.correlation)
@@ -2806,10 +2822,9 @@ class Refinement:
         if isinstance(moves, NumberingMoves) and moves.atoms:
             self._renumber_atoms(moves)
             moves = moves.in_new_numbering()
-        sites = sorted({path.rsplit(".dof.", 1)[0] for path in moves})
+        sites = sorted({site_of(path) for path in moves})
         for site in sites:
-            site_moves = {p: m for p, m in moves.items()
-                          if p.rsplit(".dof.", 1)[0] == site}
+            site_moves = {p: m for p, m in moves.items() if site_of(p) == site}
             holds, ties, free, notes = carry_constraints(
                 site_moves, holds=sorted(self._user_holds), ties=self._ties,
                 free_paths=self._free_paths)
@@ -2829,13 +2844,16 @@ class Refinement:
                         + "; ".join(notes) + "."})
                     break
             else:
+                what = ("coordinate directions and anisotropic ADP patterns"
+                        if any(".adp." in n for n in notes) else "coordinate directions")
                 found.append(Diagnostic(
                     level="warning", code="SITE_DOFS_RENUMBERED", where=[site],
-                    message=(f"site {site} changed its site symmetry, so its coordinate "
-                             f"directions were renumbered: " + "; ".join(notes)
+                    message=(f"site {site} changed its site symmetry, so its {what} "
+                             f"were renumbered: " + "; ".join(notes)
                              + "."),
-                    suggestion="check the holds and ties on this site's "
-                               "coordinates against parameters()."))
+                    suggestion=f"check the holds and ties on this site's "
+                               f"{what.replace(' directions', 's')} against "
+                               f"parameters()."))
 
     def _renumber_atoms(self, moves: NumberingMoves) -> None:
         """Read every constraint register into ``moves``' new atom numbering.
@@ -3206,9 +3224,27 @@ class Refinement:
         on the first ``fit``/``run_stage``, because a tree is pinned to its
         pattern by a fingerprint and no pattern has been seen before then.  The
         working state changes either way.
+
+        A literal path the model lacks **raises** ``ValueError`` naming the
+        nearest real path, as :meth:`hold`, :meth:`tie`, :meth:`untie` and
+        :meth:`set_values` do (WP-1951).  Every literal is checked before
+        anything is applied, so a list with one typo leaves the model and the
+        history as they were.  An agent reads an exception every time, where a
+        warning can scroll past or show once per call site.  A pattern that
+        matches nothing stays silent (WP-1414), since that is how plans reach
+        a component a model may not declare.
+
+        A request that changes nothing it named **warns** (issue #896), with
+        the text a stage's ``STAGE_PATH_UNKNOWN`` and ``STAGE_PATH_NOT_FREE``
+        give: a pattern under a retired spelling that matches nothing, with its
+        current one, and, when freeing, a phase literal or a glob naming one
+        site (``phases.0.atoms.0.dof.*``) that the model declines.  A warning
+        rather than a refusal, because a declined row exists and a retired
+        pattern is a pattern, so the return value already says what changed.
         """
         globs = [path_globs] if isinstance(path_globs, str) else list(path_globs)
         table = self._working_table()
+        self._refuse_unknown_literals(globs, table)
         if vary:
             # A literal path is a claim about one parameter, and a held one
             # contradicts a declaration this same caller made, so it is
@@ -3244,6 +3280,9 @@ class Refinement:
                     f"{blocked[0]!r} is held by this refinement and cannot be "
                     "freed; unhold it first if you mean to refine it")
         hits = table.set_vary(globs, vary)
+        # warned once the call has committed, so a caller turning warnings
+        # into errors loses nothing the call did
+        findings = self._set_vary_findings(table, globs, vary)
         # A carried hold (WP-1301) is lifted at the start of the next stage, so
         # a path the caller has just declared on must leave it: otherwise the
         # lift re-frees a parameter the caller explicitly fixed, and the
@@ -3253,16 +3292,56 @@ class Refinement:
             self._held = [p for p in self._held if p not in declared]
         self._free_paths = list(table.free_paths)
         self._free_set_declared = True
-        if self.history is None:
-            return hits
-        node = self.history.add(
-            parents=[self._head_id] if self._head_id else [],
-            action=NodeAction(kind="set_vary",
-                              turn_on=hits if vary else [],
-                              turn_off=[] if vary else hits),
-            state=self.snapshot())
-        self._head_id = node.id
+        if self.history is not None:
+            node = self.history.add(
+                parents=[self._head_id] if self._head_id else [],
+                action=NodeAction(kind="set_vary",
+                                  turn_on=hits if vary else [],
+                                  turn_off=[] if vary else hits),
+                state=self.snapshot())
+            self._head_id = node.id
+        for message in findings:
+            warnings.warn(message, UserWarning, stacklevel=2)
         return hits
+
+    def _refuse_unknown_literals(self, globs, table: ParameterTable | None = None
+                                 ) -> None:
+        """Raise on every literal among ``globs`` the model lacks (WP-1951).
+
+        :meth:`set_vary`'s first check.  A caller applying several requests as
+        one move (the GUI's ``PATCH /api/params``) asks it of all of them
+        before applying any, so one typo leaves every request unapplied.
+        """
+        table = self._working_table() if table is None else table
+        known = {e.path for e in table.entries}
+        if unknown := [g for g in dict.fromkeys(globs)
+                       if is_literal_path(g) and g not in known]:
+            raise _unknown_paths_error(unknown, known)
+
+    def _set_vary_findings(self, table: ParameterTable, globs: list[str],
+                           vary: bool) -> list[str]:
+        """What :meth:`set_vary` warns, one sentence pair per path it names.
+
+        The stage's own builders asked of the call as if it were a stage, so
+        the two surfaces cannot disagree about which requests are claims.
+        """
+        known = [e.path for e in table.entries]
+        verb = "freed" if vary else "fixed"
+        out = []
+        for path in table.unknown_paths(globs):
+            hint = _path_hint(path, known)
+            out.append(f"set_vary {verb} nothing for {path!r}, which names no "
+                       "parameter of this model."
+                       + (f" {hint[:1].upper()}{hint[1:]}" if hint else ""))
+        if vary:
+            request = [Stage("set_vary", globs)]
+            subject = "a set_vary call"
+            for d in (_fixed_literal_diagnostics(request, table, self._ties,
+                                                 subject=subject)
+                      + _site_glob_diagnostics(request, table, self._ties,
+                                               subject=subject)):
+                out.append(d.message + (f" {d.suggestion}" if d.suggestion else ""))
+        return out
 
     def set_values(self, values: dict[str, float]) -> None:
         """Set parameter values by dot-path, recording a ``set_value`` node.
@@ -3287,7 +3366,9 @@ class Refinement:
         by_path = {e.path: e for e in table.entries}
         unknown = [p for p in values if p not in by_path]
         if unknown:
-            raise ValueError(f"unknown parameter path(s): {sorted(unknown)}")
+            raise ValueError(f"unknown parameter path(s): {sorted(unknown)}" + "".join(
+                f"; for {p!r}, {h}" for p in sorted(unknown)
+                if (h := _path_hint(p, by_path))))
         for path, value in values.items():
             e = by_path[path]
             if e.locked:
@@ -3493,7 +3574,7 @@ class Refinement:
         by_path = {e.path: e for e in table.entries}
         entry = by_path.get(path)
         if entry is None:
-            raise ValueError(f"unknown parameter path: {path!r}")
+            raise _unknown_path_error(path, by_path)
         if entry.locked:
             raise ValueError(
                 f"{path!r} is structurally fixed (symmetry, or a representation "
@@ -3757,7 +3838,7 @@ class Refinement:
                 continue
             entry = known.get(glob)
             if entry is None:
-                raise ValueError(f"unknown parameter path: {glob!r}")
+                raise _unknown_path_error(glob, known)
             if entry.tie is not None:
                 raise ValueError(
                     f"{glob!r} is tied by symmetry, not by this refinement, and "
@@ -3822,7 +3903,7 @@ class Refinement:
         for glob in globs:
             if not is_literal_path(glob) or glob in known:
                 continue
-            raise ValueError(f"unknown parameter path: {glob!r}")
+            raise _unknown_path_error(glob, known)
         hits = sorted(p for p in known
                       if any(fnmatch.fnmatchcase(p, g) for g in globs))
         # a body owns its atoms' coordinates as symmetry owns a special
@@ -3966,10 +4047,10 @@ class Refinement:
                     and g not in origin_hits]
         if literals:
             glob = literals[0]
-            raise ValueError(
-                f"{glob!r} is not held by this refinement"
-                if any(e.path == glob for e in table.entries)
-                else f"unknown parameter path: {glob!r}")
+            known = [e.path for e in table.entries]
+            if glob not in known:
+                raise _unknown_path_error(glob, known)
+            raise ValueError(f"{glob!r} is not held by this refinement")
         if not hits and not origin_hits:
             return []
         if hits:
@@ -5180,29 +5261,23 @@ class Refinement:
         # there (WP-2047): after the collapse and the Le Bail update, so it
         # reads the answer the stage hands on
         loss = window_loss(model, table.decode(outcome.theta))
+        # a real number, not the raw least-squares cost, measured on the
+        # stage's own frozen model at its answer: ``StageResult.rwp`` and the
+        # ``stage_end`` event's ``rwp`` are this one number (WP-1334).  One
+        # forward evaluation, not a fit, the same pattern _record uses for a
+        # history node's metrics.  Paid on every stage since the field, where
+        # it was paid only when a caller asked for events: a recorded fit
+        # always did, so the new charge falls on ``telemetry=False`` trials.
+        # A declared peak is in the model the stage fitted, and
+        # leaving it out made every stage Rwp that of a model with the peaks
+        # deleted (#441); evaluate_with_background keeps evaluate()'s sum.
+        y_stage, y_bkg = model.evaluate_with_background(table.decode(outcome.theta))
+        stage_rwp = compute_statistics(
+            model.y_obs, y_stage, model.sigma,
+            n_free=len(table.free_paths) + _pawley_n(model),
+            y_background=y_bkg).rwp
         if events is not None:
-            # a real number, not the raw least-squares cost: additive on the
-            # existing kind (history/events.py's rule), paid only when a
-            # caller asked for events at all — one forward evaluation, not a
-            # fit, the same pattern _record uses for a history node's metrics.
-            # background(values) computed once and reused, never twice —
-            # evaluate() is background [+ extra_peak_curve] + bragg_component
-            # internally, so calling both would price this at two background
-            # passes.  The sum is therefore evaluate()'s, restated in its own
-            # association order: a declared peak is in the model the stage
-            # fitted but not in background(), and leaving it out made every
-            # stage Rwp that of a model with the peaks deleted (#441); a model
-            # declaring none keeps the two-term sum, bit for bit.
-            values = table.decode(outcome.theta)
-            y_bkg = model.background(values)
-            y_stage = (y_bkg + model.bragg_component(values)
-                       if not model.peak_components else
-                       y_bkg + model.extra_peak_curve(values)
-                       + model.bragg_component(values))
-            stage_rwp = compute_statistics(
-                model.y_obs, y_stage, model.sigma,
-                n_free=len(table.free_paths) + _pawley_n(model),
-                y_background=y_bkg).rwp
+            # additive on the existing kind (history/events.py's rule)
             events.emit("stage_end", stage=stage.name, status=outcome.status,
                         n_iterations=outcome.n_iterations,
                         termination=outcome.termination,
@@ -5229,7 +5304,7 @@ class Refinement:
             # Le Bail and Pawley read the screen alone, which the result
             # measures on its own compile as it always has
             significance=support if mode == "rietveld" else None,
-            window_loss=loss)
+            window_loss=loss, rwp=stage_rwp)
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
             plan: RefinementPlan | str = "mccusker_default",
@@ -5279,12 +5354,15 @@ class Refinement:
         the stages that *did* complete and the node the working state stands at.
 
         ``stage_reports`` — build the report at every stage boundary and leave
-        the rungs on :attr:`stage_reports_` (WP-1058).  **Off by default here
-        and on at the agent surface**, and the asymmetry is the measurement:
-        a report build is ~0.33 s on 59.5k channels against a ~1.0 s five-stage
-        fit, so a trajectory costs ≈2.5× the fit — nothing to a consumer that
-        calls once and reads, a tax on a library primitive that suites and
-        series call in loops.  It changes **no** number the fit produces: the
+        the rungs on :attr:`stage_reports_` (WP-1058).  **Off by default**,
+        because each rung is a whole report build and the charge is per rung,
+        so it is a tax on a fit called in a loop.  On 11-BM NAC (22 003
+        channels, seven rungs) a fit with rungs took 4.7-5.7× the fit without
+        them (WP-1335, 2026-11-02), and the multiple grows as fits get
+        faster.  Sample it: the first fit of a batch, the last, one you will
+        plot.  The time the rungs took is ``fit_end``'s
+        ``stage_report_seconds``, since no stage span holds it.  It changes
+        **no** number the fit produces: the
         rungs are read off states the plan already passes through, never
         states it is made to visit, so a fit run with them lands exactly where
         the same fit run without them does.  (That is also why this is not the
@@ -5328,8 +5406,9 @@ class Refinement:
                                 plan: RefinementPlan, **kw) -> RefinementResult:
         """Run the plan up to ``plan.lebail_passes`` times and keep the best pass.
 
-        The extracted intensities are frozen inside a run (the
-        frozen-per-stage invariant), so they and the profile converge only by
+        The extracted intensities are frozen inside each stage's solve (the
+        frozen-per-stage invariant) and re-extracted before and after it
+        (:meth:`_run_stage`).  So they and the profile converge only by
         alternating, and the alternation is no descent on one objective: from
         a poor start Rwp rose monotonically over 15-20 passes, from a good one
         it fell to a fixed point (#210, WP-1323's baseline table).  Hence the
@@ -5582,9 +5661,17 @@ class Refinement:
                 + _held_moment_diagnostics(plan, table, self.structure, mode)
                 # a plan read too, and here for the same reason: a literal a
                 # stage cannot free is decided by the model before any stage
-                + _fixed_literal_diagnostics(plan.stages, table, self._ties))
+                + _fixed_literal_diagnostics(plan.stages, table, self._ties)
+                + _site_glob_diagnostics(plan.stages, table, self._ties))
             stage_results: list[StageResult] = []
             self.stage_reports_ = []
+            self._stage_report_seconds = 0.0
+            # the rungs' cost, on fit_end: a rung is built between one
+            # stage's stage_end and the next stage_start, so no stage span
+            # holds it (WP-1335).  Absent when no rung was asked for.
+            def report_cost() -> dict:
+                return ({"stage_report_seconds": self._stage_report_seconds}
+                        if stage_reports else {})
             outcome = None
             model = None
 
@@ -5598,7 +5685,7 @@ class Refinement:
                 if stream is not None:
                     stream.emit("fit_end", status="cancelled", stage=exc.stage,
                                 completed=[s.name for s in exc.completed_stages],
-                                node_id=exc.node_id, **stamp)
+                                node_id=exc.node_id, **report_cost(), **stamp)
                     if stream is not events:
                         stream.close()
                 raise
@@ -5677,7 +5764,8 @@ class Refinement:
                 stream.emit("fit_end", status=self.result_.status,
                             rwp=self.result_.statistics.rwp,
                             gof=self.result_.statistics.gof,
-                            node_id=self.result_.node_id, **stamp)
+                            node_id=self.result_.node_id, **report_cost(),
+                            **stamp)
                 if stream is not events:  # we created it from a path/callable
                     stream.close()
             if recorder is not None:
@@ -5881,7 +5969,8 @@ class Refinement:
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths,
-                window_loss=hold.window_loss,
+                window_loss=hold.window_loss, rwp=hold.rwp,
+                termination=outcome.termination or None,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
                 # checked, trivially: one histogram has no elsewhere
@@ -5889,9 +5978,11 @@ class Refinement:
                 moment_angle_tests=outcome.moment_angle_tests,
             ))
             if stage_reports:
+                t_report = time.perf_counter()
                 self.stage_reports_.append(self._stage_report(
                     stage.name, plan, data, mode, table, model, outcome, guard,
                     stage_diagnostics, significance=hold.significance))
+                self._stage_report_seconds += time.perf_counter() - t_report
             for sink in sinks:
                 # live monitoring (viz.live.LiveSession): rewrite the snapshot
                 sink.write_snapshot(model, table, outcome, stage.name)
@@ -6043,7 +6134,7 @@ class Refinement:
             mu_r_skipped=self._mu_r_skipped, guard=guard,
             max_shift_over_esd=outcome.max_shift_over_esd,
             significance=significance,
-            phase_support_sigma=plan.phase_support_sigma)
+            phase_support_sigma=plan.phase_support_sigma, with_geometry=False)
         report = build_report(result, model=model,
                               values=table.decode(outcome.theta), plan=plan,
                               structure=self.structure, instrument=self.instrument,
@@ -6138,6 +6229,7 @@ class Refinement:
             order = _stage_order_diagnostics(
                 RefinementPlan(stages=[stage]), table, mode)
             order += _fixed_literal_diagnostics([stage], table, self._ties)
+            order += _site_glob_diagnostics([stage], table, self._ties)
             try:
                 with self._abandon_on_cancel(cancel, stage.name, [], stream):
                     model, outcome, guard, freed, hold = self._run_stage(
@@ -6198,7 +6290,8 @@ class Refinement:
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, unreached_histograms={},
-                window_loss=hold.window_loss,
+                window_loss=hold.window_loss, rwp=hold.rwp,
+                termination=outcome.termination or None,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
                 moment_angle_tests=outcome.moment_angle_tests)
@@ -7827,8 +7920,44 @@ def _stage_list(names: list[str]) -> str:
             f"stages {', '.join(repr(s) for s in names)}")
 
 
+def _path_hint(path: str, known) -> str:
+    """The spelling a caller most likely meant by an unknown ``path``, or ``""``.
+
+    ``STAGE_PATH_UNKNOWN``'s two answers, for the verbs that take a path
+    (WP-1951): a spelling a release retired is named with its current one
+    (:func:`~rietx.params.vector.retired_spelling`), and anything else gets
+    the nearest real path (:mod:`rietx._nearmiss`).  Before this the verbs
+    answered ``instrument.zero`` with the bare refusal, and ``set_vary`` with
+    nothing at all.
+    """
+    current = retired_spelling(path)
+    if current is not None:
+        return f"it is a spelling retired after v1.2, now spelled {current!r}."
+    return did_you_mean(path, known, n=1)
+
+
+def _unknown_path_error(path: str, known) -> ValueError:
+    """``unknown parameter path: 'p'``, with :func:`_path_hint` when it has one."""
+    hint = _path_hint(path, known)
+    return ValueError(f"unknown parameter path: {path!r}"
+                      + (f"; {hint}" if hint else ""))
+
+
+def _unknown_paths_error(paths: list[str], known) -> ValueError:
+    """:func:`_unknown_path_error` for one path; for several, every one named.
+
+    ``set_vary`` takes a list, and naming each typo saves a rerun per typo.
+    """
+    if len(paths) == 1:
+        return _unknown_path_error(paths[0], known)
+    return ValueError(f"unknown parameter paths: {', '.join(map(repr, paths))}"
+                      + "".join(f"; for {p!r}, {h.rstrip('.')}" for p in paths
+                                if (h := _path_hint(p, known))))
+
+
 def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
-                               canonical=None) -> list[Diagnostic]:
+                               canonical=None,
+                               subject: str | None = None) -> list[Diagnostic]:
     """``STAGE_PATH_NOT_FREE`` — a literal phase path the model will not free.
 
     ``STAGE_PATH_UNKNOWN``'s other half.  A literal names one parameter, and
@@ -7860,6 +7989,10 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
     row exactly when ``MultiParameterTable.set_vary`` would match it, and
     ``where`` and the suggestion name rows as the joint result spells them.
     A single fit's row has one name and passes nothing.
+
+    ``subject`` replaces the stage list at the head of the message, for a
+    caller that is not a stage: :meth:`Refinement.set_vary` passes ``"a
+    set_vary call"`` (WP-1951).
     """
     name_of = canonical or (lambda p: p)
     by_path = {e.path: e for e in table.entries}
@@ -7887,7 +8020,7 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
                 names.append(stage.name)
     out = []
     for row, (path, names) in asked.items():
-        which = _stage_list(names)
+        which = subject or _stage_list(names)
         entry = by_path[row]
         sources = ([] if entry.tie is None else
                    [name_of(src) for src, _ in entry.tie.terms])
@@ -7912,6 +8045,127 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
                      f"{why}, so nothing was freed for it."),
             where=[name_of(row)], suggestion=fix))
+    return out
+
+
+#: the fixed leading segments of a glob that names one site
+_SITE_GLOB = re.compile(r"^(phases\.\d+\.atoms\.\d+)\.")
+
+
+def _frees_for_request(entry, turn_on, user_ties) -> bool:
+    """Whether a request naming ``entry`` gets a parameter that can move.
+
+    The other side of :func:`_fixed_literal_diagnostics`' test, asked of one
+    row: a locked row never does, a free or held row does (a hold has its own
+    report, ``HOLD_BLOCKED_PLAN``), and so does a row the caller tied.  A
+    symmetry tie does only when the same request frees every source it follows.
+    """
+    if entry.locked:
+        return False
+    if entry.tie is None or entry.path in user_ties:
+        return True
+    return all(any(fnmatch.fnmatchcase(src, g) for g in turn_on)
+               for src, _ in entry.tie.terms)
+
+
+def _reaches_displacement(glob: str, site: str) -> bool:
+    """Does ``glob`` reach the site's displacement, as ``biso`` or ``adp.k``?"""
+    return any(fnmatch.fnmatchcase(f"{site}.{tail}", glob)
+               for tail in ("biso", "adp.0"))
+
+
+def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
+                           subject: str | None = None) -> list[Diagnostic]:
+    """``STAGE_PATH_NOT_FREE`` — a glob that names one site and frees nothing.
+
+    Issue #896: an application frees Ti's position on rutile (P4₂/mnm, Ti on
+    2a) as ``phases.0.atoms.0.dof.*``.  A fully fixed special position has no
+    ``dof`` rows at all, so the glob matched nothing, the stage froze the site
+    where it started, and nothing said so.  The literal ``phases.0.atoms.0.x``
+    was already reported by :func:`_fixed_literal_diagnostics`.
+
+    **Only a glob whose fixed leading segments name one existing site**
+    (``phases.<i>.atoms.<j>.``).  WP-1414 kept every other pattern that matches
+    nothing silent, because the shipped plans free families some models lack
+    (``phases.*.microstrain.dof.*``), and no preset names a concrete index.
+    A glob with a concrete site is the caller's claim about that site, so it
+    cannot be a healthy plan's miss.  A site the model does not have stays
+    silent here; that is a typo of the index, not a site the model holds.
+
+    It fires when no row the glob matches can move, by
+    :func:`_frees_for_request`: it matched nothing, or only locked rows and
+    symmetry ties whose sources the request does not free.  The message then
+    says why when the glob reached the coordinates: the site's symmetry fixes
+    them all, a rigid body places them, or they move through the site's
+    ``dof`` rows, which the suggestion names.  One family is asked two ways:
+    the shipped displacement stages free ``…biso`` beside ``…adp.*``, so a
+    request copying that pair for one isotropic atom has its ``adp.*`` answered
+    by the ``biso`` it freed, and stays silent.
+
+    A plan read, like :func:`_fixed_literal_diagnostics`, and one diagnostic
+    per glob naming its stages.  ``where`` is the glob, as
+    ``STAGE_PATH_UNKNOWN``'s is the missing path, since no row carries it.
+    ``subject`` is that function's, for :meth:`Refinement.set_vary`.
+    """
+    entries = table.entries
+    asked: dict[str, list[str]] = {}
+    for stage in stages:
+        for glob in stage.turn_on:
+            m = _SITE_GLOB.match(glob)
+            if m is None or is_literal_path(glob):
+                continue
+            site = m.group(1)
+            rows = [e for e in entries if e.path.startswith(f"{site}.")]
+            if not rows or any(fnmatch.fnmatchcase(e.path, glob)
+                               and _frees_for_request(e, stage.turn_on, user_ties)
+                               for e in rows):
+                continue
+            if (_reaches_displacement(glob, site) and any(
+                    _reaches_displacement(e.path, site)
+                    and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
+                    and _frees_for_request(e, stage.turn_on, user_ties)
+                    for e in rows)):
+                # ``biso`` and ``adp.*`` are one displacement asked two ways:
+                # the shipped stages name both, so either answers it
+                continue
+            names = asked.setdefault(glob, [])
+            if stage.name not in names:
+                names.append(stage.name)
+    by_path = {e.path: e for e in entries}
+    owned = table.body_rows()
+    out = []
+    for glob, names in asked.items():
+        which = subject or _stage_list(names)
+        site = _SITE_GLOB.match(glob).group(1)
+        matched = [e.path for e in entries if fnmatch.fnmatchcase(e.path, glob)]
+        dofs = [e.path for e in entries if e.path.startswith(f"{site}.dof.")]
+        coords = [by_path.get(f"{site}.{axis}") for axis in "xyz"]
+        reaches = any(fnmatch.fnmatchcase(f"{site}.{tail}", glob)
+                      for tail in ("x", "y", "z", "dof.0"))
+        what = (f"matches only rows the model fixes or ties ({', '.join(matched)})"
+                if matched else "matches no parameter")
+        why, fix = "", None
+        if reaches and f"{site}.x" in owned:
+            why = f" Rigid body {owned[f'{site}.x']!r} places {site}."
+            fix = ("Free the body's own origin, rotation and torsions instead "
+                   "(phases.*.rigid_bodies.*.origin.dof.*, "
+                   "phases.*.rigid_bodies.*.rotation.*, "
+                   "phases.*.rigid_bodies.*.torsions.*.twist).")
+        elif (reaches and not dofs
+              and all(e is not None and e.locked for e in coords)):
+            why = (f" Every coordinate of {site} is fixed by its site symmetry, "
+                   "so the site has no dof rows.")
+        elif reaches and dofs:
+            fix = f"Free {site}.dof.* ({', '.join(dofs)}) instead."
+        elif matched:
+            fix = "Read held_because for these rows in ref.parameters()."
+        else:
+            fix = "ref.parameters() lists every path this site has."
+        out.append(Diagnostic(
+            level="warning", code="STAGE_PATH_NOT_FREE",
+            message=(f"{which[:1].upper()}{which[1:]} asked for {glob}, which "
+                     f"{what}, so nothing was freed for it.{why}"),
+            where=[glob], suggestion=fix))
     return out
 
 
@@ -8555,6 +8809,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                   significance: np.ndarray | None = None,
                   phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                   held_scales: set[int] | None = None,
+                  with_geometry: bool = True,
                   ) -> RefinementResult:
     values = table.decode(theta)
     y_calc = model.evaluate(values)
@@ -8646,9 +8901,13 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # McCusker §10) — built here because that covariance is read off the final
     # Jacobian and never serialized, the Identifiability carrier argument.  The
     # table judges nothing; §11's "chemical sense" is the reader's call.
-    geometry = geometry_table(model, table, theta, structure,
-                              stderr_internal=stderr_internal,
-                              correlation=correlation)
+    # ``with_geometry=False`` is a trajectory rung's: its report is projected
+    # onto a StageReport that carries no geometry, and the search was a third
+    # of a rung's result build (WP-1335)
+    geometry = (geometry_table(model, table, theta, structure,
+                               stderr_internal=stderr_internal,
+                               correlation=correlation)
+                if with_geometry else None)
     volumes = cell_volumes(table, theta, structure,
                            stderr_internal=stderr_internal, correlation=correlation)
 
@@ -8788,7 +9047,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # solver and false of the answer (WP-1028 §§(c),(d)).
     diagnostics = (diagnostics
                    + _far_from_data_diagnostics(model, y_calc, y_bkg, stats)
-                   + _max_iter_diagnostics(stage_results))
+                   + _max_iter_diagnostics(stage_results)
+                   + _slow_descent_diagnostics(stage_results))
 
     # Does the data support it (WP-1071): the observation/parameter ratio and
     # the step size, both reported and neither gating.  Built before the
@@ -10381,6 +10641,9 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
     is now ``max_iter ×`` :data:`~rietx.optimize.least_squares.NFEV_PER_ITERATION`,
     sized from the measured worst-case rejection rate, so a stage that stalls
     reports it roughly 30x sooner with its answer unchanged.
+
+    A stage the slow-descent rule stopped (WP-1334) is ``converged`` and
+    never reaches this code: :func:`_slow_descent_diagnostics` names it.
     """
     hit = [s.name for s in stage_results if s.status == "max_iter"]
     if not hit:
@@ -10395,6 +10658,46 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
         where=[],
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",
+    )]
+
+
+def _slow_descent_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``STAGE_SLOW_DESCENT``: the stages the slow-descent rule stopped.
+
+    The rule (WP-1334, ``optimize.lm.SLOW_DESCENT_ESD``) ends a stage whose
+    cost is still falling, but so slowly that the next
+    :data:`~rietx.optimize.lm._SLOW_DESCENT_HORIZON` evaluations would move
+    its parameters by less than one esd.  Such a stage reports ``converged``
+    (Yue's ruling of 2026-11-03), since more iterations would not change the
+    answer by an esd, which is McCusker et al. (1999) §7's test.  So this
+    code is ``info`` and only names the stages, read off
+    ``StageResult.termination``, so a reader can tell a slow crawl from a
+    stage that met the solver's own tests.  It states and gates nothing.
+    """
+    from .optimize import lm
+
+    slow = [s.name for s in stage_results if s.termination == "slow_descent"]
+    if not slow:
+        return []
+    esd = lm.SLOW_DESCENT_ESD
+    esds = "one esd" if esd in (None, 1.0) else f"{esd:g} esd"
+    one = len(slow) == 1
+    return [Diagnostic(
+        level="info", code="STAGE_SLOW_DESCENT",
+        message=(("Stage " if one else "Stages ")
+                 + ", ".join(repr(n) for n in slow)
+                 + " stopped while " + ("its" if one else "their")
+                 + " χ² was still falling slowly. At that rate, another "
+                 f"{lm._SLOW_DESCENT_HORIZON} evaluations would have moved "
+                 + ("its" if one else "their")
+                 + f" parameters by less than {esds}, so the "
+                 + ("stage counts" if one else "stages count")
+                 + " as converged."),
+        where=[],
+        suggestion="Quote the stage's answer as converged. A high correlation "
+                   "or a bound hit reported for the same parameters names a "
+                   "shallow direction the descent may have crawled along, "
+                   "and its own suggestion names the remedies.",
     )]
 
 

@@ -195,6 +195,33 @@ def _instprm_geometry_silent() -> list:
     return found
 
 
+# ------------------------------------------------------------- the history reader
+
+
+def _load_log(n_trees: int) -> list:
+    """``RefinementTree.load``'s diagnostics for a log of ``n_trees`` headers."""
+    from rietx.history.tree import RefinementTree
+    from rietx.schemas.history import HistoryRecord, TreeHeader
+
+    line = HistoryRecord(record="header", header=TreeHeader(tree_id="t0")).model_dump_json()
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / "fit.jsonl"
+        path.write_text((line + "\n") * n_trees, encoding="utf-8")
+        RefinementTree.load(path, diagnostics=found)
+    return found
+
+
+def _earlier_tree_fires() -> list:
+    """A log an older release doubled: two headers, as a rerun appended them."""
+    return _load_log(2)
+
+
+def _earlier_tree_silent() -> list:
+    """The same log holding one tree."""
+    return _load_log(1)
+
+
 # ------------------------------------------------------- the data-support check
 
 
@@ -725,6 +752,23 @@ def _stage_solve(*, nan_column: bool) -> list:
     return [] if found is None else [found]
 
 
+def _site_glob(*turn_ons: list[str]) -> list:
+    """``STAGE_PATH_NOT_FREE``'s site arm on LaB6 (``perturbed_models``), one
+    stage per ``turn_on``.  La on 1a has no ``dof`` rows, so its ``dof.*``
+    frees nothing (issue #896); B's ``dof.*`` frees its one row, a wildcard
+    index is WP-1414's healthy miss, and a ``biso`` answers the ``adp.*``
+    beside it."""
+    from rietx.params.vector import ParameterTable
+    from rietx.refine import _site_glob_diagnostics
+    from rietx.strategy.staged import Stage
+    from tests.test_refine_synthetic import perturbed_models
+
+    table = ParameterTable(*perturbed_models())
+    stages = [Stage(f"s{i}", ["phases.*.scale", *turn_on])
+              for i, turn_on in enumerate(turn_ons)]
+    return _site_glob_diagnostics(stages, table, {})
+
+
 def _moduli(*rows: tuple[float, float | None]) -> list:
     """``moment_unsupported_diagnostics`` over free moduli of (value, esd)."""
     from rietx.report.magnetic import moment_unsupported_diagnostics
@@ -768,6 +812,8 @@ SILENCE: dict[str, Pair] = {
         _instprm_geometry_fires, _instprm_geometry_silent, "tests/test_gsas2_instprm.py"),
     "GSAS_PRM_PROFILE_SET_DEFAULTED": Pair(
         _profile_set_fires, _profile_set_silent, "tests/test_gsas_prm.py"),
+    "HISTORY_EARLIER_TREE_SKIPPED": Pair(
+        _earlier_tree_fires, _earlier_tree_silent, "tests/test_history.py"),
     "MOMENT_UNSUPPORTED": Pair(
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
@@ -810,6 +856,12 @@ SILENCE: dict[str, Pair] = {
         functools.partial(_stage_solve, nan_column=True),
         functools.partial(_stage_solve, nan_column=False),
         "tests/test_non_finite_stage.py"),
+    "STAGE_PATH_NOT_FREE": Pair(
+        functools.partial(_site_glob, ["phases.0.atoms.0.dof.*"]),
+        functools.partial(_site_glob, ["phases.0.atoms.1.dof.*"],
+                          ["phases.*.atoms.*.dof.*"],
+                          ["phases.0.atoms.0.biso", "phases.0.atoms.0.adp.*"]),
+        "tests/test_params_surface.py"),
     "STAGE_WINDOWS_STALE": Pair(
         functools.partial(_windows_stale, 0.3), functools.partial(_windows_stale, None),
         "tests/test_window_loss.py"),

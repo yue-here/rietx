@@ -38,6 +38,7 @@ import {
   legend,
   lookFrom,
   mul3,
+  onDarkGround,
   openingView,
   pickAtom,
   pickFace,
@@ -161,6 +162,19 @@ describe("the scene", () => {
     const scene = buildScene(geometry(), { mode: "ball" });
     expect(scene.atoms[1].color).toEqual(rgb(dim("#aabbcc")));
     expect(scene.atoms[0].color).toEqual(rgb("#aabbcc"));
+  });
+
+  it("draws a site in its dark-ground colour on the dark theme alone", () => {
+    const plain = geometry();
+    expect(onDarkGround(plain)).toBe(plain);   // nothing to change, same object
+    const carbon = geometry({ sites: [site({ dark_color: "#666666" }), plain.sites[1]] });
+    const dark = onDarkGround(carbon);
+    expect(dark.sites.map((s) => s.color)).toEqual(["#666666", "#e0a080"]);
+    expect(carbon.sites[0].color).toBe("#aabbcc");   // the payload is not edited
+    const scene = buildScene(dark, { mode: "ball" });
+    expect(scene.atoms[0].color).toEqual(rgb("#666666"));
+    expect(scene.atoms[1].color).toEqual(rgb(dim("#666666")));
+    expect(legend(dark).find((e) => e.species === "La")?.color).toBe("#666666");
   });
 
   it("rings only an anisotropic site, and only in ellipsoid mode", () => {

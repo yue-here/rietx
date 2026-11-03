@@ -238,25 +238,26 @@ Each stage frees its parameters on top of everything already free.
 A parameter an early stage left short of convergence keeps refining in every later stage, and the last stage converges all of them together at 1e-9.
 So stopping the earlier stages sooner moves the answer little, on any plan.
 
-Measured on the single-fit cases of `examples/bench_refinement.py` against the same plans with `intermediate_ftol=None`, three interleaved repeats each, on macOS arm64 with the `[dev]` install, 2026-10-20:
+Measured on five single fits from the acceptance suites against the same plans with `intermediate_ftol=None`, the closing stage in both, three interleaved rounds each, on macOS arm64 with the `[dev]` install, 2026-11-02:
 
-| Case | Evaluations | Wall clock in s | Largest shift | Largest phase-fraction change |
-|---|---|---|---|---|
-| `nac` | 44 → 39 (1.13×) | 0.36-0.38 → 0.35-0.36 | 0.000 esd | 0.0000 wt % |
-| `cpd-1a` | 265 → 162 (1.64×) | 1.22-1.29 → 1.01-1.05 | 1.23 esd, inside a degenerate pair | 0.0055 wt % |
-| `cpd-2` | 395 → 256 (1.54×) | 3.14-3.24 → 2.29-2.34 | 0.001 esd | 0.0003 wt % |
-| `trigger` | 89 → 73 (1.22×) | 2.04-2.18 → 1.75-1.88 | 0.001 esd | 0.0000 wt % |
+| Fit | Evaluations | Wall clock in s | Largest shift |
+|---|---|---|---|
+| fluorapatite | 52 → 49 (1.06×) | 1.34-1.62 → 1.30-1.35 | 0.000 esd |
+| 11-BM NAC | 51 → 46 (1.11×) | 0.52-0.55 → 0.50-0.60 | 0.000 esd |
+| cpd-1a | 277 → 175 (1.58×) | 2.18-2.28 → 1.89-1.97 | 0.0004 esd |
+| SRM 660c LaB6 | 116 → 90 (1.29×) | 0.55-0.57 → 0.48-1.26 | 8.82 esd, between two minima |
+| cpd-1a, absent zircon | 1221 → 311 (3.93×) | 21.5-22.4 → 9.6-11.0 | 0.0092 esd |
 
-Rwp agreed to five decimal places or better in every case.
-The 1.23 esd on `cpd-1a` is the instrument's Lorentzian `x` against the phases' `lor_size`.
-Lorentzian widths add, and both terms widen peaks as 1/cos θ, so the data fix their sum and not the split.
-`x` fell by 0.00286 while the `lor_size` of phases 1 and 2 each rose by 0.00286, so the width they add up to stayed put.
-Every other parameter moved by less than 0.1 esd.
+Rwp agreed to 1e-6 in every case.
+LaB6's 1.26 s was the process's first fit.
+The 8.82 esd is `Geometry.axial_sl` against `Geometry.axial_hl`.
+The two ratios can trade places for an equally good fit, and each schedule lands in a different one.
+The absent zircon phase has nothing to fit, and at 1e-9 two of its stages run to their limit of 400 evaluations.
 
 A series is the case to measure rather than assume.
 Each warm start begins from its predecessor's answer, so a small difference in one answer can change how many recovery rungs the next pattern needs.
 The per-fit bound above therefore does not carry over to a chain, and the difference can go either way.
-On the ten-pattern simulated `trigger` series, the loose schedule took 201 evaluations against 213 (8.6-8.7 s against 8.7-8.8 s), with no pattern escalating.
+A chain on this schedule has not been measured.
 
 ### Converging every stage
 
@@ -361,7 +362,7 @@ assert stage.lebail_cycles == 3
 
 `Stage.max_iter` bounds the solver's work.
 Both drivers count residual evaluations, so the bound is four evaluations per iteration, the measured worst case.
-A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER`](diagnostics-refinement.md#stage_max_iter), a result to read and not an exception.
+A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER`](diagnostics-stages.md#stage_max_iter), a result to read and not an exception.
 
 `Stage.ftol` overrides the plan's schedule for one stage: an early stage whose answer the next is unusually sensitive to, or a one-stage fit that must converge as hard as a last stage.
 
@@ -476,7 +477,7 @@ A pattern that matches no parameter is not an error, because that is how the shi
 
 A literal name, with no `*`, `?` or `[`, names one parameter.
 If the model has no such parameter the plan is wrong, through a typo or a renamed path.
-`StageResult.unknown_paths` lists it, and [`STAGE_PATH_UNKNOWN`](diagnostics-refinement.md#stage_path_unknown) reports it at `warning` with the nearest real name: `instrument.source.lines.0.wavelength` for a stage that names the wavelength without its line index.
+`StageResult.unknown_paths` lists it, and [`STAGE_PATH_UNKNOWN`](diagnostics-stages.md#stage_path_unknown) reports it at `warning` with the nearest real name: `instrument.source.lines.0.wavelength` for a stage that names the wavelength without its line index.
 It is a diagnostic and not an exception, because one plan runs every pattern of a series.
 A wrongly spelt family name inside a pattern looks like one that correctly matched nothing, so no rule can report it, and `freed` is the place to look.
 
@@ -488,7 +489,7 @@ A pattern under the instrument's `background_peaks`, the name up to v1.2, matche
 A literal phase name can also name a parameter the model will not free.
 An atom's coordinates refine along the directions its site symmetry allows, as `phases.0.atoms.2.dof.*`, and its `x`, `y` and `z` are each fixed or follow those directions.
 A cubic cell's `b` follows `a`.
-A stage naming such a parameter frees nothing for it, so [`STAGE_PATH_NOT_FREE`](diagnostics-refinement.md#stage_path_not_free) reports it at `warning` before the first stage runs, with the names that would free it.
+A stage naming such a parameter frees nothing for it, so [`STAGE_PATH_NOT_FREE`](diagnostics-stages.md#stage_path_not_free) reports it at `warning` before the first stage runs, with the names that would free it.
 For an oxygen on 16h in I4<sub>1</sub>/amd, `phases.0.atoms.2.x` is fixed at 0, and `y` and `z` follow `dof.0` and `dof.1`.
 A name you tied yourself is not reported, and neither is an instrument name: the shipped plans name `instrument.geometry.sample_displacement`, which a capillary geometry locks.
 A pattern can reach too far the other way: `phases.0.atoms.2.*` frees the site's `occ` and `biso` beside its directions, so write `phases.0.atoms.2.dof.*` for the position alone.

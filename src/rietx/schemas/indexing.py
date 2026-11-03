@@ -1779,7 +1779,7 @@ class SearchSpecSpec(Base):
         "cell is what supplies them"))
     budget_seconds: float = Field(30.0, gt=0.0, description=(
         "wall clock per (engine x crystal system) SLICE of the search, not per "
-        "run: a default two-engine, seven-system call is up to 2x7x30 s of "
+        "run: a default three-engine, seven-system call is up to 3x7x30 s of "
         "search before the probe and validation. An engine stopped by it "
         "reports search_complete[system] = false, and a negative result there "
         "is not evidence. total_budget_seconds is the whole-run bound"))
@@ -2110,8 +2110,9 @@ class IndexingResult(Base):
     #: collide
     engine_stats: dict[str, float] = Field(default_factory=dict)
     #: do the panel's members put different candidates first?  A *result*-level
-    #: fact (it is a statement about the comparison, not about one cell) that caps
-    #: every candidate's confidence
+    #: fact (it is a statement about the comparison, not about one cell) that
+    #: refutes every candidate: ``fom_panel_disagrees`` is a refuting caveat, so
+    #: each grades ``low``
     fom_panel_disagrees: bool = False
     quality: DataQualityReport | None = None
     #: was a pattern supplied, i.e. did Le Bail validation run at all?  ``False``

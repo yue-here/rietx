@@ -12,6 +12,13 @@ every read point already crosses.  ``Parameter.transform`` (schema 0.46,
 ``Parameter._fold_transform``) and ``StageResult.floor_unseeded`` are the
 current two.
 
+A field a release made **required** is the vanished field's mirror, and the
+same ``mode="before"`` validator cannot tell a stored document from a caller's
+constructor call.  So a reader of stored models validates with the
+:data:`~rietx.schemas.common.STORED_DOCUMENT` context, and the validator fills
+the old placeholder only under it (:data:`STORED_DOCUMENT_READ_POINTS`).
+``HumpComponent.position`` (schema 0.60, WP-2013) is the one such field.
+
 **The rename is textual on purpose.**  A dot-path is not confined to
 one schema field: it is a value in a history node's ``free_paths``, a glob in a
 saved plan's ``turn_on``, a key in a tie table, a row label in an ``.rxt``.
@@ -63,8 +70,23 @@ from .structure import Atom
 #:   reader here.
 READ_POINTS: tuple[str, ...] = (
     "rietx.project.Project.open",
-    "rietx.history.store.read_records",
+    "rietx.history.store.read_numbered_records",
     "rietx.gui.textdoc.parse",
+)
+
+#: Where a stored document carrying models is validated with the
+#: :data:`~rietx.schemas.common.STORED_DOCUMENT` context, so a field a release
+#: made required reads at its old placeholder rather than refusing the file.
+#: A reader of stored models that does not appear here refuses such a file.
+#:
+#: The history reader is the one that matters: a project's models live in its
+#: ``history.jsonl`` and nowhere else.  ``project.json`` holds settings and no
+#: model, and an ``.rxt`` edits a live model, never building a component.  An
+#: instrument profile strips its components on save, so only a profile written
+#: by hand can carry one; its reader passes the context all the same.
+STORED_DOCUMENT_READ_POINTS: tuple[str, ...] = (
+    "rietx.history.store.read_numbered_records",
+    "rietx.io.instrument_profile.load_instrument_profile",
 )
 
 #: The legacy name as a whole word: not followed by a letter, digit or

@@ -232,6 +232,13 @@ higher cap: each term gains 50-800 in BIC against a penalty $\ln m \approx 10$,
 and the masked residual's serial correlation comes from profile misfit, which
 no polynomial removes (issue #833).
 
+The arPLS scan has the same fallback at its other end. When no smoothing
+strength reaches $d \ge 1.2$, it returns the most flexible candidate, and
+`BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` says so with the largest $d$ reached.
+None of the 20 patterns under `tests/data` falls back. FAP.XRA comes
+nearest: it reaches the floor only at the last candidate, $10^4$, with
+$d = 1.26$ (WP-1931).
+
 {source}`rietx.background.select`
 
 ## Background flexibility and bias

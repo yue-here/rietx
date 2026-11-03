@@ -438,10 +438,10 @@ def test_the_predicted_delta_chi2_is_one_number_for_the_whole_report(narrow):
     """It is not per suggestion, and it is not a bound. Both are measured here.
 
     ``build_report`` computes ``estimate_delta_chi2`` once and stamps it on *every*
-    Layer-1-derived action, so eight mutually-exclusive suggestions carry the
+    Layer-1-derived action, so nine mutually-exclusive suggestions carry the
     identical figure — it cannot rank them, and a strip that printed it per row
     would imply a per-action prediction that does not exist.  Measured on this
-    fixture: 16.19 on all eight, against a total χ² of 16.96, because the fifteen
+    fixture: 16.16 on all nine, against a total χ² of 16.93, because the fifteen
     region entries happen to contain almost the whole misfit of a synthetic
     fifteen-peak pattern.
 
@@ -466,7 +466,7 @@ def test_applying_a_suggestion_runs_one_stage_and_undo_is_a_checkout(fresh):
     """The whole loop: predict, apply, measure, undo.
 
     ``expected_delta_chi2`` is documented as an optimistic upper bound, and on
-    this fit it is **not one**: predicted 16.19 against 16.33 observed, 0.8 % low.
+    this fit it is **not one**: predicted 16.16 against 16.30 observed, 0.9 % low.
     It bounds the misfit the linear model attributes *inside the gated regions*,
     while applying the action also moves regions that failed a gate and stretches
     of pattern no region entry covers.  So what is asserted is that the two agree

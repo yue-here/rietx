@@ -340,10 +340,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Finger-Cox-Jephcoat axial-divergence ratio S/L. It is the illuminated "
             "specimen length divided by the goniometer radius. It sets how strongly "
-            "low-angle peaks lean toward low 2θ. Fit it on a standard together with "
-            "`axial_hl`. The two are strongly correlated and are usually reported as a "
-            "pair. With both at zero and either refined, the peaks are computed with "
-            "windows and integration points sized for a ratio of 0.02 (see `axial_hl`)."
+            "low-angle peaks lean toward low 2θ. Refine it on a standard and hold "
+            "`axial_hl`: swapping the two gives the same pattern. With both at zero and "
+            "either refined, the peaks are computed with windows and integration points "
+            "sized for a ratio of 0.02 (see `axial_hl`)."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -354,9 +354,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Finger-Cox-Jephcoat axial-divergence ratio H/L. It is the "
             "receiving-slit height divided by the goniometer radius. It is the second "
-            "half of the axial asymmetry. It is so strongly correlated with `axial_sl` "
-            "that refining one and holding the other is a common protocol. One ratio "
-            "alone still smears the peaks. Only both at zero switch the asymmetry off. "
+            "half of the axial asymmetry. Swapping it with `axial_sl` gives the same "
+            "pattern, so set it from the instrument and hold it, as the lab plans do. "
+            "One ratio alone still smears the peaks. Only both at zero switch the "
+            "asymmetry off. "
             "With both at zero and either refined, the peaks are computed with windows "
             "and integration points sized for a ratio of 0.02, so the curve differs from the same model with "
             "both held by up to about 5e-5 of the strongest peak."
@@ -779,14 +780,15 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The centre, in °2θ, of an explicit Gaussian background term, such as a "
             "diffuse or amorphous hump or a cryostat or sample-container contribution. "
-            "It has no default bounds. It is not a Bragg position, so only the data "
+            "It has no default value and no default bounds. It is not a Bragg "
+            "position, so only the data "
             "constrain it. Set min and max if you know the fitted range. A declared "
             "term is inert (`vary=False`, height 0) until a stage frees it, and nothing "
             "in the package adds one on its own. Freeing position, height and width "
             "together amounts to a reflection with no cell behind it. `HUMP_TOO_NARROW` "
             "flags a fitted width near the instrumental resolution."
         ),
-        unit="deg 2θ", default="0.0",
+        unit="deg 2θ", default=None,
         typical="wherever the diffuse feature sits, for example 14.4 on NIST BT-1",
         anchor="theory/background.html#explicit-humps",
     ),
@@ -1640,6 +1642,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "background."
         ),
     ),
+    "BACKGROUND_SMOOTHING_AT_FLEXIBLE_END": HelpEntry(
+        title="Baseline smoothing stopped at its most flexible setting",
+        description=(
+            "The scan for the arPLS baseline's smoothing strength tried every "
+            "candidate from stiff to flexible. None left the peak-free channels "
+            "with a serially uncorrelated residual, so the data did not choose the "
+            "strength, and the most flexible candidate was returned. Hold that "
+            "baseline fixed only knowing it is the grid's end, not a choice. The "
+            "alternatives are a strength of your own, a co-refined background, or a "
+            "measured blank."
+        ),
+    ),
     "BISO_NEGATIVE": HelpEntry(
         title="A displacement parameter is negative",
         description=(
@@ -1733,6 +1747,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "a bracketed label that names the closest group type. The statement is "
             "complete. The leading symbol of the label generates a different group, so "
             "check the cell transform before you compare it with a published symbol."
+        ),
+    ),
+    "CIF_ADP_SYMMETRY_PROJECTED": HelpEntry(
+        title="Anisotropic displacement moved onto its symmetry-allowed form",
+        description=(
+            "The file prints a site's anisotropic displacement parameters (`U^ij`) "
+            "to fewer decimals than the symmetry relation between them needs, such "
+            "as U12 = U11/2 on a hexagonal three-fold axis. The printed values then "
+            "sit slightly off the form the site symmetry allows. The reader moved "
+            "the tensor to the nearest allowed one within half a unit in the last "
+            "printed digit of each component. The message names the sites and the "
+            "components moved, and the change is no larger than the rounding in the "
+            "file. A larger disagreement, or one that needs a component the file "
+            "prints as zero, is left as written and refused when the parameter "
+            "table is built."
         ),
     ),
     "CIF_ANISO_COLLAPSED": HelpEntry(
@@ -2753,6 +2782,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "matrix."
         ),
     ),
+    "HISTORY_EARLIER_TREE_SKIPPED": HelpEntry(
+        title="Earlier tree in a history file skipped",
+        description=(
+            "A history file holds one refinement's tree. Releases before 1.11 "
+            "appended a second refinement to a reused history file, so an old file "
+            "can hold two or more trees. Loading it returns the last tree, the most "
+            "recent run, and skips each earlier one. A refinement continued from the "
+            "loaded tree adds its nodes to the last tree. Nothing was deleted, and the "
+            "skipped tree's lines are still in the file."
+        ),
+    ),
     "HOLD_BLOCKED_PLAN": HelpEntry(
         title="A hold overrode part of the plan",
         description=(
@@ -3368,13 +3408,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "PATTERN_ROWS_DROPPED": HelpEntry(
-        title="Some numeric rows were not read as data",
+        title="Some rows were not read as data",
         description=(
-            "The reader takes the most common number of values per line as the file's "
-            "layout, and it skipped numeric lines with a different count. A header table "
-            "or a limits row usually causes this. If a skipped line was a real "
-            "measurement, the file mixes layouts. Re-export it with the same number of "
-            "values on every row."
+            "The reader dropped rows from the file, for one of two reasons, and the "
+            "message says which. Every reader drops a point whose 2θ, count or error "
+            "estimate is NaN or infinite, and names the dropped points by their 2θ. "
+            "A NaN is what a reduction writes where it divided by a zero monitor or "
+            "detector efficiency, so these points hold no measurement. Left in, one "
+            "such point made every statistic of the fit NaN. The two- and "
+            "three-column text reader also takes the most common number of values "
+            "per line as the file's layout, and it skips numeric lines with a "
+            "different count, naming them by line. A header table or a limits row "
+            "usually causes this. If a skipped line was a real measurement, the file "
+            "mixes layouts. Re-export it with the same number of values on every row."
         ),
     ),
     "PATTERN_SCAN_REVERSED": HelpEntry(
@@ -4145,7 +4191,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "holds the coupled direction, the one direction that moves x; a free path "
             "follows only where every coordinate that direction moves was free; a tie, "
             "which needs a single direction, is dropped. One on a direction the position "
-            "fixes is dropped. The message names every one that followed and every one "
+            "fixes is dropped. "
+            "The message names every one that followed and every one "
             "that was dropped. Nothing was moved: "
             "this is the bookkeeping of a site whose symmetry changed without a merge, "
             "for instance onto a mirror within 5e-5, after a fit wrote the coordinate "
@@ -4308,7 +4355,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "that follows another parameter. Nothing was freed for it, yet the fit "
             "converged. The parameter kept its value. Free the parameter it follows, or "
             "for a coordinate free the directions that the site symmetry allows. If the "
-            "model holds it fixed, there is nothing to refine."
+            "model holds it fixed, there is nothing to refine. A pattern that names one "
+            "atom site, such as `phases.0.atoms.0.dof.*`, gets the same report when it "
+            "frees nothing at that site. An atom on a fully fixed special position has "
+            "no directions, so its `dof.*` pattern matches no parameter."
         ),
     ),
     "STAGE_PATH_UNKNOWN": HelpEntry(
@@ -4320,6 +4370,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "stays silent, because some models lack a component. Correct the name, or "
             "use a wildcard if the stage should reach a component that only some models "
             "declare."
+        ),
+    ),
+    "STAGE_SLOW_DESCENT": HelpEntry(
+        title="A stage stopped while still falling slowly",
+        description=(
+            "The stage's cost was still falling when it stopped, but so slowly that "
+            "another 300 evaluations would have moved its parameters by less than one "
+            "esd. The stage counts as converged. The stop says how fast the cost was "
+            "falling, not how far the minimum is, so a crawl along a shallow or "
+            "constrained direction can stop well above it. A high correlation or a "
+            "bound hit reported for the same parameters names such a direction, and "
+            "its own entry gives the remedies."
         ),
     ),
     "STAGE_WINDOWS_STALE": HelpEntry(
@@ -4560,6 +4622,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "reported."
         ),
     ),
+    "XYDATA_INTER_APPLIED": HelpEntry(
+        title="FullProf's INTER multipliers were applied",
+        description=(
+            "The file opens with FullProf's XYDATA heading, and its INTER line "
+            "states a multiplier other than 1. The FullProf manual defines `fac_x` as "
+            "a multiplier of the x values and `fac_y` as a multiplier of the "
+            "intensities and their esds, which FullProf applies before it uses the "
+            "data. The reader applied them the same way, so the pattern's numbers "
+            "are the file's numbers times the factors. A file with no esd column "
+            "gets the Poisson esd of the multiplied intensity, as in FullProf. "
+            "Compare the pattern against the file's own columns only after "
+            "multiplying."
+        ),
+    ),
 }
 
 
@@ -4683,6 +4759,20 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
 #: enumerating what a reader accepts.  These entries are the text a person
 #: reads beside the control.
 READER_OPTION_HELP: dict[str, HelpEntry] = {
+    "axis": HelpEntry(
+        title="Axis",
+        description=(
+            "What the x column of a plain two- or three-column file is: `two_theta`, "
+            "2θ in degrees, or `tof`, a flight time in microseconds. A file that "
+            "states no unit cannot say which, because both are ascending columns of "
+            "numbers, so the reader takes 2θ unless you declare otherwise. A "
+            "time-of-flight bank with no header needs `tof`. The pattern's metadata "
+            "records the declaration under `declared_axis`. A file that states its "
+            "own unit and disagrees with the declaration is refused, and the message "
+            "quotes both."
+        ),
+        typical="unset; `tof` for a time-of-flight bank exported without a header",
+    ),
     "bank": HelpEntry(
         title="Detector bank",
         description=(
@@ -5551,6 +5641,35 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "histogram."
         ),
     ),
+    "StageResult.rwp": HelpEntry(
+        title="Stage Rwp",
+        description=(
+            "The stage's Rwp at the values it ended on, measured on the stage's own "
+            "frozen windows. It is the number the `stage_end` event carries. A joint "
+            "fit pools it over its histograms. The last stage's differs from "
+            "`statistics.rwp`, which is measured on a compile at the answer. Stages "
+            "that fit different ranges or modes cannot be compared by it. `None` "
+            "means a result stored before the field."
+        ),
+    ),
+    "StageResult.termination": HelpEntry(
+        title="Stage stopping test",
+        description=(
+            "Which test ended the stage's solve, where `status` says only whether it "
+            "converged. The default solver writes `ftol_runs`, `no_descent` or "
+            "`exhausted_fp64` when it met its own convergence test. It writes "
+            "`slow_descent` when the cost was still falling, but so slowly that "
+            "another 300 evaluations would have moved the parameters by less than "
+            "one esd. Both have `status` `converged`, and `STAGE_SLOW_DESCENT` names "
+            "a stage stopped the second way. It writes `max_nfev`, with `status` "
+            "`max_iter`, when the budget ran out. `solver=\"trf\"` writes "
+            "scipy's `ftol`, `xtol`, `gtol`, `ftol+xtol` and `max_nfev`. A model "
+            "that stopped being finite writes `non_finite_residual` or "
+            "`non_finite_jacobian`, with `status` `diverged`. `None` means "
+            "a result stored before the field, or a stage with nothing free."
+        ),
+        anchor="theory/estimation.html#convergence",
+    ),
     "StageResult.n_constraint_truncations": HelpEntry(
         title="Steps held on a constraint",
         description=(
@@ -5868,6 +5987,16 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`SEQUENTIAL_MOMENT_HOLD` names these patterns."
         ),
     ),
+    "SeriesEntry.pattern_paths": HelpEntry(
+        title="This pattern's own paths",
+        description=(
+            "This pattern's own dot-path for each path of the entry that its model numbers "
+            "differently, keyed by the entry's path. Every path of a series reads one "
+            "numbering, so a trajectory follows one phase by name and one atom by label "
+            "where a `prepare` hook added or removed either. `{}` where the two agree; "
+            "`None` in a series saved before 1.11, whose paths are each pattern's own."
+        ),
+    ),
     "SeriesEntry.node_id": HelpEntry(
         title="Pattern history node",
         description=(
@@ -5962,6 +6091,23 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The moment angle DOFs, whose differences across patterns are taken modulo "
             "a full turn. Recorded as `relative_paths` is, and `None` means the same."
+        ),
+    ),
+    "SeriesResult.phase_names": HelpEntry(
+        title="Series phase names",
+        description=(
+            "The phase each path of the series names by number: phase `i` is "
+            "`phase_names[i]`. The series' own structure's phases, then each phase a "
+            "`prepare` hook added, in the order the walk met it. `None` in a series "
+            "saved before 1.11."
+        ),
+    ),
+    "SeriesResult.atom_labels": HelpEntry(
+        title="Series atom labels",
+        description=(
+            "The atom each path of the series names by number: atom `j` of phase `i` is "
+            "`atom_labels[i][j]`, numbered as `phase_names` is. `None` in a series saved "
+            "before 1.11."
         ),
     ),
     "SeriesResult.failures": HelpEntry(

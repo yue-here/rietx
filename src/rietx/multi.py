@@ -128,6 +128,7 @@ from .refine import (
     _scale_b_ridge_diagnostics,
     _site,
     _size_flag_diagnostics,
+    _slow_descent_diagnostics,
     _species_fallback_diagnostics,
     _strain_flag_diagnostics,
     _symmetry_silence_diagnostics,
@@ -303,6 +304,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "worst histogram's loss (WP-2047)"),
     "_max_iter_diagnostics": (
         (FIT,), "a stage's budget is spent by the one joint solve"),
+    "_slow_descent_diagnostics": (
+        (FIT,), "the slow-descent rule reads the one joint solve's cost"),
     "_frozen_compile_diagnostics": (
         (FIT,), "one finding per fit naming the histogram whose own χ² moved "
                 "most: a pooled χ² would hide one pattern (WP-1421)"),
@@ -342,6 +345,11 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "never both on one histogram, and a shared row fixed in "
                 "several tables is one finding"),
     # -- deliberately not computed ---------------------------------------------
+    "_site_glob_diagnostics": (
+        (ABSENT,), "not called from multi.py yet: a single fit reports a glob "
+                   "naming one site that frees nothing (WP-1951), and wiring it "
+                   "beside _joint_fixed_literals waits on PR #1270 reshaping "
+                   "that wrapper; the follow-up is in WP-2028's Inherited"),
     "_hold_diagnostics": (
         (ABSENT,), "a joint fit has no hold verb: the one hold its tables "
                    "carry is the floating origin's, which HOLD_BLOCKED_PLAN "
@@ -1417,7 +1425,7 @@ class MultiHistogramRefinement:
                                  f"{i} of {n}", instrument=ins)
         if mode != "rietveld":
             raise NotImplementedError(
-                "multi-histogram refinement is Rietveld-only in v0.3; Le Bail / "
+                "multi-histogram refinement is Rietveld-only; Le Bail / "
                 "Pawley intensities are per-pattern extractions, not shared, so a "
                 "joint fit of them is just independent single-pattern fits")
         if isinstance(plan, str):
@@ -1622,8 +1630,10 @@ class MultiHistogramRefinement:
         start.
         """
         per = self.mtable.decode(theta)
-        y_calc = [m.evaluate(v) for m, v in zip(models, per, strict=True)]
-        y_bkg = [m.background(v) for m, v in zip(models, per, strict=True)]
+        # one background pass a histogram: paid on every stage since
+        # ``StageResult.rwp`` (WP-1334), not only when a stream listens
+        y_calc, y_bkg = (list(c) for c in zip(*(
+            m.evaluate_with_background(v) for m, v in zip(models, per, strict=True))))
         rows = [{"histogram_index": h,
                  "rwp": compute_statistics(m.y_obs, yc, m.sigma, n_free=0,
                                            y_background=yb).rwp}
@@ -1921,6 +1931,9 @@ class MultiHistogramRefinement:
                 losses = [x for x in (window_loss(m, v) for m, v in zip(
                     models, self.mtable.decode(outcome.theta), strict=True))
                     if x is not None]
+                # the pooled Rwp at the answer, on the stage's own compile: the
+                # record's and the ``stage_end`` event's one number (WP-1334)
+                rwp, rows = self._stage_end_rows(models, outcome.theta)
                 stage_results.append(StageResult(
                     name=stage.name, status=outcome.status,
                     n_iterations=outcome.n_iterations,
@@ -1940,9 +1953,9 @@ class MultiHistogramRefinement:
                     seeded=seeded, blocked_by_hold=blocked_by_hold,
                     moment_angle_tests=outcome.moment_angle_tests,
                     cell_reset=cell_reset, collapsed=restored,
-                    window_loss=max(losses) if losses else None))
+                    window_loss=max(losses) if losses else None, rwp=rwp,
+                    termination=outcome.termination or None))
                 if stream is not None:
-                    rwp, rows = self._stage_end_rows(models, outcome.theta)
                     stream.emit("stage_end", stage=stage.name, status=outcome.status,
                                 n_iterations=outcome.n_iterations,
                                 termination=outcome.termination,
@@ -2280,6 +2293,7 @@ class MultiHistogramRefinement:
                                                               mt)
         # a stage's budget is spent by the one joint solve (FIT)
         diagnostics = diagnostics + _max_iter_diagnostics(stage_results)
+        diagnostics = diagnostics + _slow_descent_diagnostics(stage_results)
         # one CELL_RUNAWAY per stage that fired the joint reset above,
         # collected during the loop since there is no per-stage StageReport
         # here to carry it on (review of #385 finding 2)
@@ -3070,8 +3084,8 @@ def _unreached_histogram_diagnostics(stage_results: list[StageResult],
                      f"nothing in histogram {h} ({label}): "
                      f"{', '.join(where)} matched rows of another histogram "
                      "and none of this one."),
-            suggestion=("List this histogram's parameters with "
-                        f"[e.path for e in ref.mtable.tables[{h}].entries] "
+            suggestion=("List this histogram's own parameters with "
+                        f"[r.path for r in ref.parameters() if r.path.startswith('hist.{h}.')] "
                         "and add a glob that reaches them. Scope the stage "
                         "(hist.<k>.…) if one histogram was the intent."),
         ))
