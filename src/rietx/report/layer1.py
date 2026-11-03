@@ -72,13 +72,17 @@ _KINDS = ("intensity", "position", "width", "mixing", "asymmetry")
 
 
 def _region_columns(model: CompiledModel, bases: DerivativeBases,
-                    lo: float, hi: float
+                    lo: float, hi: float, axial: dict | None = None
                     ) -> tuple[np.ndarray, np.ndarray, float, float, int]:
     """Assemble the (5, n_points_in_region) basis for one region.
 
     Every peak whose *centre* lies in the region contributes; its full frozen
     window is used, clipped to the region, so a peak's tail outside the region
     is simply not scored (regions are cut between peaks).
+
+    ``axial`` is :func:`nominal_axial_columns`' lookup, given when the model's
+    apertures are both zero: a peak with no ∂Ω/∂(S/L) of its own takes the
+    one drawn at the nominal aperture, on that peak's own window there.
     """
     m = (model.tt >= lo) & (model.tt <= hi)
     idx = np.nonzero(m)[0]
@@ -94,7 +98,7 @@ def _region_columns(model: CompiledModel, bases: DerivativeBases,
     # zero amplitude here, and its misfit would be attributed elsewhere
     counted: set[tuple[int, int, int]] = set()
     for ip in range(len(bases.planes)):
-        for rows, peaks in bases.component_entries(ip):
+        for ic, (rows, peaks) in enumerate(bases.component_entries(ip)):
             for (il, k, w0, w1, omega, d_pos, d_gamma, d_eta, d_sl,
                  _d_hl) in rows:
                 pos, gamma, _eta, intensity = peaks[il]
@@ -120,18 +124,47 @@ def _region_columns(model: CompiledModel, bases: DerivativeBases,
                 cols[3, dst_a:dst_b] += amp * d_eta[sl_a:sl_b]
                 if d_sl is not None:
                     cols[4, dst_a:dst_b] += amp * d_sl[sl_a:sl_b]
+                elif axial is not None and (ip, ic, il, k) in axial:
+                    v0, v1, nominal = axial[(ip, ic, il, k)]
+                    n0, n1 = max(v0, i_start), min(v1, i_stop)
+                    if n1 > n0:
+                        cols[4, n0 - i_start:n1 - i_start] += (
+                            amp * nominal[n0 - v0:n1 - v0])
 
     mean_tt = tt_sum / weight_sum if weight_sum > 0 else 0.5 * (lo + hi)
     mean_fwhm = fwhm_sum / weight_sum if weight_sum > 0 else 0.0
     return cols, np.arange(i_start, i_stop), mean_tt, mean_fwhm, n_refl
 
 
+def nominal_axial_columns(bases: DerivativeBases) -> dict:
+    """``{(phase, component, line, reflection): (i0, i1, ∂Ω/∂(S/L))}`` off
+    bases drawn at the nominal aperture (``report._nominal_axial``).
+
+    At both apertures zero the model draws no asymmetry and its own
+    ∂Ω/∂(S/L) is identically zero (the FCJ shift goes as the square of the
+    aperture, #1075), so Layer 1 had no column to name a one-sided residual
+    with and the asymmetry action could not fire on the fits that need it
+    most (#1106, WP-2054).  The column is borrowed from a twin drawn at
+    :data:`~rietx.model.forward.AXIAL_SIZING_FLOOR`, the aperture the package
+    already sizes a refine-from-zero stage at, and it keeps that twin's node
+    rule: a reflection whose smear there is under the rule's fraction of its
+    width gets no column, exactly as on a fit that declares the aperture.
+    """
+    out: dict = {}
+    for ip in range(len(bases.planes)):
+        for ic, (rows, _peaks) in enumerate(bases.component_entries(ip)):
+            for (il, k, w0, w1, _om, _dp, _dg, _de, d_sl, _dh) in rows:
+                if d_sl is not None:
+                    out[(ip, ic, il, k)] = (w0, w1, d_sl)
+    return out
+
+
 def attribute_region(model: CompiledModel, bases: DerivativeBases,
-                     region: Region, delta: np.ndarray, sqrt_w: np.ndarray
-                     ) -> RegionAttribution | None:
+                     region: Region, delta: np.ndarray, sqrt_w: np.ndarray,
+                     axial: dict | None = None) -> RegionAttribution | None:
     """Joint weighted solve of one region's residual against the shape basis."""
     cols, idx, mean_tt, mean_fwhm, n_refl = _region_columns(
-        model, bases, region.two_theta_lo, region.two_theta_hi)
+        model, bases, region.two_theta_lo, region.two_theta_hi, axial)
     if len(idx) == 0 or n_refl == 0:
         return None
 
@@ -217,21 +250,26 @@ def attribute_region(model: CompiledModel, bases: DerivativeBases,
 
 def attribute_regions(model: CompiledModel, values: dict[str, float],
                       regions: list[Region], *,
-                      shapes: CompiledModel | None = None) -> list[RegionAttribution]:
+                      shapes: CompiledModel | None = None,
+                      axial: DerivativeBases | None = None
+                      ) -> list[RegionAttribution]:
     """Layer-1 attribution for every region (gates evaluated per region).
 
     The misfit is read off ``model`` and the shape basis off ``shapes``
     (``model`` when not given), which must share its grid: the report hands in
     a model at the closing precision and one at the declared stages' precision
-    (``report._reading_models``).
+    (``report._reading_models``).  ``axial`` is the bases of a twin at the
+    nominal aperture, which the report hands in when the model's apertures are
+    both zero (:func:`nominal_axial_columns`).
     """
     y_calc = model.evaluate(values)
     delta = model.y_obs - y_calc
     sqrt_w = 1.0 / model.sigma
     bases = (model if shapes is None else shapes).derivative_bases(values)
+    lookup = None if axial is None else nominal_axial_columns(axial)
     out = []
     for region in regions:
-        att = attribute_region(model, bases, region, delta, sqrt_w)
+        att = attribute_region(model, bases, region, delta, sqrt_w, lookup)
         if att is not None:
             out.append(att)
     return out

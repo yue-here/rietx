@@ -282,6 +282,35 @@ def _reading_models(model, structure, instrument):
     return misfit, shapes
 
 
+def _nominal_axial(shapes, structure, instrument, values):
+    """Bases drawn at the nominal axial aperture, or ``None`` (WP-2054).
+
+    Given only when the fit's apertures are both zero, where the model draws
+    no asymmetry and Layer 1 has no column of its own to read one with
+    (:func:`.layer1.nominal_axial_columns`).  ``shapes`` is compiled again with
+    S/L = H/L = :data:`~rietx.model.forward.AXIAL_SIZING_FLOOR` on its own grid
+    and precision, and its bases are taken at the fit's values with those two
+    apertures.  Only the ∂Ω/∂(S/L) planes are read; the misfit and every other
+    column stay the fit's own.  A Pawley model and one built by hand are
+    ``None``, for the reason :func:`_reading_models` gives.
+    """
+    from ..model.forward import AXIAL_SIZING_FLOOR
+    from ..model.profiles.fcj import fcj_live
+
+    if (shapes.mode == "pawley" or shapes.window_area_tol is None
+            or fcj_live(values["instrument.geometry.axial_sl"],
+                        values["instrument.geometry.axial_hl"])):
+        return None
+    nominal = instrument.model_copy(deep=True)
+    nominal.geometry.axial_sl.value = AXIAL_SIZING_FLOOR
+    nominal.geometry.axial_hl.value = AXIAL_SIZING_FLOOR
+    twin = _twin(shapes, structure, nominal, shapes.window_area_tol)
+    at = dict(values)
+    at["instrument.geometry.axial_sl"] = AXIAL_SIZING_FLOOR
+    at["instrument.geometry.axial_hl"] = AXIAL_SIZING_FLOOR
+    return twin.derivative_bases(at)
+
+
 def _twin(model, structure, instrument, window_area_tol):
     """``model`` compiled again at ``window_area_tol`` on its own grid: the
     same channels, σ, moment frames and orbit split (WP-2052), and its Le Bail
@@ -428,7 +457,9 @@ def build_report(result: RefinementResult, *, model=None, values=None,
                    else None),
         turned=(result.stages[-1].moment_turned if result.stages else None))
     misfit, shapes = _reading_models(model, structure, instrument)
-    attributions = attribute_regions(misfit, values, report.regions, shapes=shapes)
+    nominal_axial = _nominal_axial(shapes, structure, instrument, values)
+    attributions = attribute_regions(misfit, values, report.regions,
+                                     shapes=shapes, axial=nominal_axial)
     report.attribution = attributions
     # March-Dollase texture and Stephens anisotropic strain are computed before
     # the maturity gate: an uncorrected intensity or width *direction* is a
@@ -535,7 +566,8 @@ def build_report(result: RefinementResult, *, model=None, values=None,
     actions = suggest_actions(attributions, report.trends, report.unmatched,
                               rwp=result.statistics.rwp, ticks=ticks,
                               geometry=model.geometry_kind,
-                              wavelength=model.wavelength)
+                              wavelength=model.wavelength,
+                              axial_off=nominal_axial is not None)
     predicted = estimate_delta_chi2(result, attributions)
     for action in actions:
         action.expected_delta_chi2 = predicted
