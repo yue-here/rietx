@@ -1,6 +1,6 @@
 # WP-1468 — what the polyhedra still miss, and the controls a chemist would reach for
 
-Milestone: unscheduled · Status: ✅ 2026-11-02 — closed: 14 of 15 tasks landed, the 15th in part (PR #1342 the last); cluster polyhedra, the readings from WP-1504 and issue #1057 moved to WP-2083
+Milestone: unscheduled · Status: ✅ 2026-11-02 — closed: 14 of 15 tasks landed, the 15th in part (PR #1342 the last); cluster polyhedra, the readings from WP-1504 and issue #1057 moved to issue #1371
 Track: Render what the fit already knows
 Depends on: 1466
 
@@ -112,7 +112,7 @@ Read 2026-09-26 from each program's manual.
   non-goals. An antiperovskite or an oxynitride is read by its anion-centred
   shapes. *Resolved in part 2026-09-28:* anion-centred ones come through the
   lists. A cluster polyhedron has no atom at its centre, which the payload's
-  `center` index cannot say. *Moved 2026-11-02* to WP-2083, to wait there for
+  `center` index cannot say. *Moved 2026-11-02* to issue #1371, to wait there for
   a user's request.
 
 ### Ties, the cap and the cost
@@ -184,7 +184,7 @@ Independent; take any.
 - [x] Cyanide and carbonyl ligands: find a rule that keeps SiO₄ and PO₄ and gives Prussian blue FeC₆, and measure it on the 21 phases (2026-09-28: a donor is a ligand, and an atom behind a bonded ligand is screened. The 21-phase default picture is unchanged; two hidden gaps moved, pyrite 1.52 → 1.60 and LaB6 1.45 → 1.90)
 - [x] Centre and ligand overrides on the query string, as Mercury's two lists (2026-09-28: `centres=` and `ligands=`, element lists that replace the rule, and the `round` and `corners` rows under `drawing`)
 - [x] One atom's environment on request, for an intermetallic (2026-09-28: a double-click on an atom draws its shell among every element alone, and an element's environments come through the lists; Cu₃Au draws AuCu₁₂ and CuAu₄Cu₈)
-- [~] Anion-centred and cluster polyhedra, if a user asks for them (2026-09-28: anion-centred ones come through the lists, as fluorite's FCa₄. A cluster polyhedron round no atom, B₆, does not; 2026-11-02: that half moved to WP-2083)
+- [~] Anion-centred and cluster polyhedra, if a user asks for them (2026-09-28: anion-centred ones come through the lists, as fluorite's FCa₄. A cluster polyhedron round no atom, B₆, does not; 2026-11-02: that half moved to issue #1371)
 - [x] The two-gap tie: find a real case, then decide whether to apply Daams & Villars' rule (2026-09-28: found, COD 1509685's Ag2 and 37 more; the rule declined and the rival reported in the hover, Context § Ties)
 - [x] A hidden shell dropped at the atom cap stays in the legend as unavailable, or the cap stops counting it (2026-09-28: the payload's `polyhedra_dropped` lists each by site and ligands, and the legend greys a formula that has nothing else to draw. The cap still counts every shell: it bounds what the viewer draws)
 - [x] The polyhedra stop recomputing on a bond-slider release — declined on the record 2026-09-28. The recompute is kept and made cheaper (Context). A memo would be keyed on the phase and on every rule constant, and one left out of the key serves a stale picture
@@ -220,7 +220,7 @@ npm --prefix gui test && npm --prefix gui run check
 
 ## Handover log
 
-### 2026-11-02 (3rd session) — closed; what is left moved to WP-2083
+### 2026-11-02 (3rd session) — closed; what is left moved to issue #1371
 
 **WP-1468 is closed, and nothing it still carried is lost.** Its polyhedra
 now handle disorder, split sites, cyanide and carbonyl ligands, user-chosen
@@ -230,24 +230,25 @@ colours and a lighter carbon on a dark ground. What was left was mostly not
 about polyhedra: five readings WP-1957's reviewers made of the structure
 figure (forwarded by WP-1504), issue #1057's two ORTEP controls and its
 outline defect, and a cluster polyhedron that waits for a user to ask. No
-open WP owned them, so they moved to a new one, WP-2083, rather than being
-folded somewhere they do not belong. PR #1355, from a ghostshift runner,
+open WP owned them, so they moved to issue #1371 rather than being
+folded somewhere they do not belong. A new WP is the maintainer's to open. PR #1355, from a ghostshift runner,
 a close-only job: this session changed no code.
 
 *Done.*
 - Status ✅, the `Priority:` line deleted, the `### Inherited` section
   deleted as consumed: all seven entries (five from WP-1504, the #1056 note
   already done on 2026-11-01, the #1057 note) are accounted for. The #1056
-  note was done and is dropped; the other six are restated in WP-2083's
+  note was done and is dropped; the other six are restated in issue #1371's
   Context, each rechecked against the tree at b0c79e12d (`DIM_BOUNDARY` still
   0.62, no label merge reads `stacked`, `DEFAULT_PROBABILITY` still 0.50, no
   `restyle` and no bond-colour parameter).
 - The partial task (anion-centred and cluster polyhedra) stays `[~]`: its
-  anion-centred half landed 2026-09-28, and its cluster half is WP-2083's
+  anion-centred half landed 2026-09-28, and its cluster half is issue #1371's
   last task.
-- **Where the leftovers went, and why a new WP.** Filed as WP-2083
-  (unscheduled, same track, P3 carried from this WP's 2026-10-23 rating).
-  Checked for an owner first (`grep -rln` over `docs/wp/` for the figure
+- **Where the leftovers went, and why an issue.** Filed as issue #1371
+  (P3 carried from this WP's 2026-10-23 rating). A first draft filed them as
+  a new WP; it was withdrawn to the issue on 2026-11-03, since proposals to
+  this repository go to issues and the maintainer opens WPs. Checked for an owner first (`grep -rln` over `docs/wp/` for the figure
   code, `DIM_BOUNDARY`, `#1057`, `view="auto"`, `atom_labels`): the open
   candidates were WP-1505, which moves the figure into its own package and
   changes nothing on its surface, and WP-1536, 1537 and 1538, which add the
@@ -258,14 +259,14 @@ a close-only job: this session changed no code.
 *Measured* (`[dev]` venv, darwin/arm64, on origin/main b0c79e12d plus this
 close). `tests/test_docs_consistency.py`: 25 passed. ruff clean.
 `python -m tests.reader_output`: exit 0, unchanged against the merge-base.
-`session_start.py` raises no flag for this WP or WP-2083, and
+`session_start.py` raises no flag for this WP, and
 `closed_wp_writes.py` finds nothing added to a closed WP.
 
 *Not run, and why.* `/code-review` (step 6): a prose-only branch. No
 `CLAUDE.md` edit, no lane, no `_audit.py` change and no new heuristic, so no
 generality judge. No full suite: nothing could move a measured number.
 
-*Next.* None here. WP-2083: the label merge or the axis letters first, since
+*Next.* None here. Issue #1371: the label merge or the axis letters first, since
 neither needs a ruling; the `DIM_BOUNDARY` shade waits on the maintainer, and
 the `auto` ranking on an agent round.
 
