@@ -66,13 +66,13 @@ it writes beside them.
 
 ## §2 rules 4-5 — the two Le Bail measurements
 
-**Alternate under a cap, and keep the best pass.** On PbSO4 pass 1 ends at Rwp 20.756 % with an unphysical Caglioti **V = +0.0615**; passes 2-4 reach 10.247 % with the curve sane. On Tb2BaCoO5 a later pass rose, 17.3 % → 18.7 %. `plan.lebail_passes` stops at the first pass that does not lower Rwp and keeps the best. `LEBAIL_ALTERNATION_STOPPED` names the stop; `non_monotone` or a cap hit is no fixed point. Rwp % per pass (Measured: 11-BM LaB6+cBN, `profile_only`): exact cells 16.821, 16.907, pass 1 kept; 0.3 % off, a fixed point at 16.967; 2 % off, 230, 207, 175, 195, pass 3 kept.
+**Alternate under a cap, and keep the best pass.** On PbSO4 pass 1 ends at Rwp 20.756 % with an unphysical Caglioti **V = +0.0615**; passes 2-4 reach 10.247 % with the curve sane. On Tb2BaCoO5 a later pass rose, 17.3 % → 18.7 %. `plan.lebail_passes` stops at the first pass that does not lower Rwp and keeps the best. `LEBAIL_ALTERNATION_STOPPED` names the stop; `non_monotone` or a cap hit is no fixed point.
 
 **A known structure is no Le Bail job.** One staged Rietveld calibration took 43.8 s against ~40 min of Le Bail (#210).
 
 **Seed the background first.** `auto_background` starts every coefficient at **0.0**, and the first `lebail_update` runs before the background is fitted, so the reflections get the whole pedestal: **571×** their true intensity under a background 5× the strongest peak. `seed=True` starts at a low count percentile.
 
-**Under a broad hump, hold SNIP.** Each stage partitions against its starting background, so a co-refined one stops short and the reflections keep the rest. Hold `rx.BackgroundFixedPlusChebyshev.from_pattern(rx.PatternData(two_theta=tt, intensity=rx.background.snip(y, w)))`, `w` ≈ 3 FWHMs in points. (Measured, WP-1542 fixture: Rwp 9.37 % seeded, 4.41 % held, 20.9 % at a hump-wide `w`, which clips it.)
+**Under a broad hump, hold SNIP.** Each stage partitions against its starting background, so a co-refined one stops short and the reflections keep the rest. Hold `rx.BackgroundFixedPlusChebyshev.from_pattern(rx.PatternData(two_theta=tt, intensity=rx.background.snip(y, w)), source="snip")`, half-window `w` ≈ 3 FWHMs in points. (Measured, one synthetic fixture, WP-1542: background/truth at the hump 0.83 seeded; held, 0.97 at `w` = 3 FWHMs, 0.87 at 6, 0.62 at the hump's σ, which clips it.)
 
 **The cell is the weaker half.** Peterson (2005, *Powder Diffr.* **20**, 14)
 fitted triclinic tricalcium silicate at NSLS X7A. Le Bail won on χ² (16.46 against 22.81) and R_p (2.34 against

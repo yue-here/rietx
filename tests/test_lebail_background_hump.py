@@ -32,6 +32,9 @@ drawn at about twice the observed height, with the hump beneath them.
 The SNIP window matters.  At 15 points (three peak FWHMs) the held curve
 keeps the hump.  At 60 points, the width of the hump itself, SNIP clips the
 hump too and the fit ends at Rwp 20.9 %, worse than any seed.
+
+Not ``slow``: the four fits take about a second together, and the rest of the
+module's setup is drawing its six PNGs.
 """
 
 from __future__ import annotations
@@ -44,33 +47,13 @@ import pytest
 import rietx as rx
 from rietx.background import diagnose, snip
 from rietx.background.auto import HUMP_TRIGGER
+from tests.test_auto_background_seed import _neutron, _phase
 
-P = rx.Parameter
 GRID = np.arange(10.0, 150.0, 0.1)
 LIMITS = (10.0, 150.0)
 HUMP_HEIGHT, HUMP_CENTRE, HUMP_SIGMA = 600.0, 50.0, 6.0
 #: the fixture's peak FWHM in channels (0.5° on a 0.1° step)
 FWHM_POINTS = 5
-
-
-def _phase() -> rx.Phase:
-    cell = rx.Cell(a=P(value=5.74), b=P(value=7.69), c=P(value=5.54),
-                   alpha=P(value=90.0), beta=P(value=90.0), gamma=P(value=90.0))
-
-    def atom(label, species, x, y, z, b):
-        return rx.Atom(label=label, species=species, x=P(value=x), y=P(value=y),
-                       z=P(value=z), biso=P(value=b))
-
-    return rx.Phase(
-        name="pv", space_group="P n m a", cell=cell, scale=P(value=0.02),
-        atoms=[atom("La", "La", 0.0505, 0.25, 0.9945, 0.5),
-               atom("Mn", "Mn", 0.0, 0.0, 0.5, 0.4),
-               atom("O1", "O", 0.4876, 0.25, 0.0804, 0.6),
-               atom("O2", "O", 0.2837, 0.0368, 0.7155, 0.6)])
-
-
-def _neutron() -> rx.Instrument:
-    return rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.5)
 
 
 def _true_background(hump: bool) -> np.ndarray:
@@ -81,7 +64,7 @@ def _true_background(hump: bool) -> np.ndarray:
 
 
 def _pattern(hump: bool) -> rx.PatternData:
-    truth = rx.Refinement(rx.Structure(phases=[_phase()]), _neutron())
+    truth = rx.Refinement(rx.Structure(phases=[_phase(0.02)]), _neutron())
     y = np.asarray(truth.predict(GRID)) + _true_background(hump)
     y = np.maximum(y + np.random.default_rng(1).normal(
         scale=np.sqrt(np.maximum(y, 1.0))), 0)
@@ -96,17 +79,18 @@ def _snip_held(data: rx.PatternData, half_window: int):
         source="snip")
 
 
-def _fit(data: rx.PatternData, background, name: str, hump: bool):
+def _fit(data: rx.PatternData, background, name: str, hump: bool, zoom: bool = False):
     ins = _neutron()
     ins.background = background
-    ref = rx.Refinement(rx.Structure(phases=[_phase()]), ins)
+    ref = rx.Refinement(rx.Structure(phases=[_phase(0.02)]), ins)
     result = ref.fit(data, mode="lebail", plan="profile_only", telemetry=False)
     from rietx.viz.plots import plot_result
     out = Path(__file__).parent / "output"
     out.mkdir(exist_ok=True)
     plot_result(result, path=str(out / f"lebail_hump_{name}.png"))
-    plot_result(result, path=str(out / f"lebail_hump_{name}_zoom.png"),
-                two_theta_range=(30.0, 70.0))
+    if zoom:
+        plot_result(result, path=str(out / f"lebail_hump_{name}_zoom.png"),
+                    two_theta_range=(30.0, 70.0))
     widths = {p.path.rsplit(".", 1)[-1]: (p.value, p.stderr) for p in result.parameters
               if p.path.startswith("instrument.profile.")}
     ratio = (np.interp(HUMP_CENTRE, result.two_theta, result.y_background)
@@ -124,8 +108,8 @@ def fits(hump):
     flat = _pattern(False)
     seeded = rx.auto_background(hump, two_theta_limits=LIMITS, seed=True).background
     return {
-        "seed": _fit(hump, seeded, "seed", True),
-        "snip": _fit(hump, _snip_held(hump, 3 * FWHM_POINTS), "snip", True),
+        "seed": _fit(hump, seeded, "seed", True, zoom=True),
+        "snip": _fit(hump, _snip_held(hump, 3 * FWHM_POINTS), "snip", True, zoom=True),
         "snip_wide": _fit(hump, _snip_held(hump, 60), "snip_wide", True),
         "no_hump": _fit(flat, rx.auto_background(
             flat, two_theta_limits=LIMITS, seed=True).background, "no_hump", False),
@@ -141,24 +125,33 @@ def test_from_a_seed_part_of_the_hump_goes_to_the_reflections(fits):
     assert rwp_seed > 1.5 * rwp_snip
 
 
+def _widths_off(widths, flat) -> list[str]:
+    """The widths further than two combined esds from the no-hump fit's."""
+    assert widths and widths.keys() == flat.keys()
+    return [name for name, (value, esd) in widths.items()
+            if abs(value - flat[name][0]) > 2.0 * np.hypot(esd or 0.0, flat[name][1] or 0.0)]
+
+
 @pytest.mark.xdist_group("lebail-hump")
 def test_snip_held_keeps_the_hump_and_the_no_hump_widths(fits):
+    """The width bar is coarse: the esds are as large as the widths, so the
+    seeded fit's X (0.048 ± 0.046) passes it too.  It catches a gross failure,
+    the 60-point window below, and the background ratio carries the rest."""
     _, at_centre, widths = fits["snip"]
-    _, _, flat = fits["no_hump"]
     assert 0.93 < at_centre < 1.07  # 0.966
-    for name, (value, esd) in widths.items():
-        ref_value, ref_esd = flat[name]
-        bar = 2.0 * np.hypot(esd or 0.0, ref_esd or 0.0)
-        assert abs(value - ref_value) <= bar, (name, value, ref_value, bar)
+    assert _widths_off(widths, fits["no_hump"][2]) == []
 
 
 @pytest.mark.xdist_group("lebail-hump")
 def test_a_snip_window_as_wide_as_the_hump_clips_the_hump_too(fits):
-    # 20.9 % at 60 points against 4.41 % at 15
-    assert fits["snip_wide"][0] > 2.0 * fits["snip"][0]
-    assert fits["snip_wide"][1] < 0.8
+    # 20.9 % at 60 points against 4.41 % at 15, and X 0.33 against 0
+    rwp, at_centre, widths = fits["snip_wide"]
+    assert rwp > 2.0 * fits["snip"][0]
+    assert at_centre < 0.8
+    assert "x" in _widths_off(widths, fits["no_hump"][2])
 
 
+@pytest.mark.xdist_group("lebail-hump")
 def test_the_hump_score_sees_the_hump_and_not_the_pedestal(hump):
     # 0.23 against 0.032; the trigger is 0.05
     assert diagnose(hump).amorphous_hump_score > HUMP_TRIGGER

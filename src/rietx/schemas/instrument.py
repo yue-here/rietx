@@ -1650,8 +1650,9 @@ class BackgroundFixedPlusChebyshev(_InheritsDeclaredDefaults):
 
     The curve is either an estimate — :func:`rietx.background.snip` or
     :func:`rietx.background.arpls` — or a **measurement**: an empty vanadium
-    can, a blank capillary, a matrix-only scan, an empty furnace.  Holding it inside the model keeps the
-    Poisson weights correct where subtracting it would not.
+    can, a blank capillary, a matrix-only scan, an empty furnace.  Holding it
+    inside the model keeps the Poisson weights correct where subtracting it
+    would not.
 
     ``scale`` is the multiplier the measured case needs, and it is TOPAS's
     ``bkg_file("f.xy", @, s)`` against its ``bkg_file("f.xy")`` (Coelho,

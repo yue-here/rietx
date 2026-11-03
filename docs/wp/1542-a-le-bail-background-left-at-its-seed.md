@@ -207,7 +207,7 @@ here (2026-10-03, at the maintainer's request).
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_lebail_alternation.py tests/test_background_auto.py tests/test_skill.py
+.venv/bin/python -m pytest tests/test_lebail_alternation.py tests/test_background_auto.py tests/test_skill.py tests/test_lebail_background_hump.py
 .venv/bin/python -m ruff check src tests examples
 ```
 
@@ -293,7 +293,10 @@ within their no-hump values.
   is over its trigger, pointing at the held SNIP; or (c), which reports that
   nearly every seeded Le Bail fit has not converged its background. Each new
   finding changes what a fit prints, so it comes to you under the
-  reader-output rule anyway. Lean: the hump-score finding, if any.
+  reader-output rule anyway. Lean: no finding yet. The hump score's audit
+  row (`_audit.py`) says that on 30 real patterns it separates lab from
+  synchrotron data and does not detect a hump, so a finding keyed on it would
+  rest on one synthetic fixture.
 
   *Q2, for the maintainer: does `auto_background`'s `seed` default move?*
   The 2026-10-06 ruling kept `seed=False` until these numbers existed. They
@@ -316,13 +319,47 @@ within their no-hump values.
   Bail pass but its intensities refine jointly afterwards, so the lag does not
   carry. The PbSO₄ neutron and #726's lab patterns (Inherited) were not run.
 
+  *Also cut from judging.md:* rule 4's per-pass Rwp sentence (11-BM LaB6 +
+  cBN, 16.821 / 16.907 …). It was stale: WP-1930 moved that pass 1 to
+  14.220 % (`tests/test_lebail_alternation.py`'s docstring), and WP-1323's
+  file keeps the original numbers.
+
+  *Review* (`/code-review high`, ten findings). Fixed: the width check now
+  asserts both fits free the same widths and fails on the 60-point window's
+  X; the `hump` consumer carries the module's `xdist_group`; the builders are
+  imported from `test_auto_background_seed.py`, so "the same pattern" is
+  structural; six PNGs instead of eight, and the module says why it is not
+  `slow`; the acceptance command runs the new file; the docstring is
+  rewrapped; the window number is back in judging.md beside its bounds.
+  Declined: the finding that the width bar cannot fail for the seeded fit.
+  It cannot, and that is Q1(b)'s measurement; the test's docstring says so.
+  Declined: naming the hump score in rule 5, for the audit row's reason above.
+
+  *Generality* (`generality-review`, on the skill rule; summarised). Item 1,
+  SKILL.md rule 5: **weak**. Tier 3, one synthetic family with a truth plus
+  the private run judged by Rwp; no outside source holds a background under
+  Le Bail; the cause is partly rietx's own (every surveyed program
+  re-extracts per cycle, `docs/practice.md` § Structure-free fitting); GSAS-II
+  users declare an amorphous hump as a background peak; the agent gets no test
+  for "a broad hump". Item 2, judging.md: **fails as written**, for quoting Rwp
+  as its evidence, a window number from one fixture, and a snippet without
+  `source=`. *Author's answer:* item 2 now quotes the background-over-truth
+  ratios rather than Rwp, passes `source="snip"`, and states the window with
+  the measured point where the gain is lost (6 FWHMs). The window stays a
+  number, because `snip` needs one and the 60-point case shows the natural
+  guess failing. Item 1 stands as a tier-3 rule with its evidence tagged;
+  what would lift it is the held SNIP on PbSO₄ and #726's lab pattern,
+  scored against a reference over the whole range, and a declared background
+  peak (`instrument.extra_components`) tried on the same fixture.
+
   *Gotchas.* `judging.md` and the skill body both sit at their budgets, so
   the next skill edit in this section pays with a cut. `run_stage` after a
   Le Bail `fit` re-partitions at its start, and its Rwp can come back above
   the fit's (7.69 % to 9.90 % on three background stages), so do not use it
   as a cheap "one more alternation step".
-  *Next:* the maintainer's Q1 and Q2; then tasks 2-3 as Q1 decides, and
-  task 4's high-pedestal cases on PbSO₄ (Inherited).
+  *Next:* the maintainer's Q1 and Q2; then tasks 2-3 as Q1 decides; then
+  the held SNIP and a declared background peak on PbSO₄ and #726's pattern
+  (Inherited), which is what would move the skill rule off tier 3.
 
 - **2026-10-06** — Maintainer decision on #725, through draft PR #744:
   `auto_background(..., seed=True)` is wanted as an option, and the default
