@@ -692,7 +692,12 @@ ROWS: tuple[Row, ...] = (
                   "the program's own practice is the other reading"),
         grounds=("the cell states rhombohedral axes, the hexagonal reading turns it "
                  "into a different crystal, and pre-#733 rietx wrote such files; "
-                 "ruled by the maintainer 2026-11-03 (WP-1911): read, and notify"),
+                 "kind 1 because FullProf's reading is a parser rule that imposes "
+                 "other angles, never a second reading of this cell, and the "
+                 "refusal the angle rule would give was ruled against; tested on "
+                 "two synthetic R -3 c phases only, every corpus R phase being "
+                 "hexagonal; ruled by the maintainer 2026-11-03 (WP-1911): read, "
+                 "and notify"),
         approved="2026-11-03", response="warning",
         responds=("check the phase's cell against the intended structure, and quote "
                   "no cell or coordinate FullProf refined from this file, since "
