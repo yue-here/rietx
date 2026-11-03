@@ -284,7 +284,7 @@ If the phase appears while a stage is still solving, that stage lifts the hold a
 | `Trajectory.labels` | the pattern label at each point |
 | `Trajectory.positions` | which entry of `SeriesResult.entries` each point came from |
 | `Trajectory.phase`, `Trajectory.atom` | the phase name and atom label it follows |
-| `Trajectory.pattern_paths` | each point's path in its own pattern's model |
+| `Trajectory.pattern_paths` | each point's path in its pattern's model |
 | `Trajectory.arrays` | `(x, value, stderr)` as float arrays, a missing esd as NaN |
 
 A pattern where the path is absent has no point.
@@ -312,8 +312,8 @@ It rings a point refitted from the starting models, crosses a `SEQUENTIAL_UNRECO
 
 ### Phases and atoms added or removed
 
-A `prepare` hook may add or remove a phase or an atom.
-Every path of a series reads the numbering of the structure you gave it, so a trajectory follows one atom by name.
+`prepare` may add or remove a phase or an atom.
+Every path reads the numbering of the structure you gave, so a trajectory follows one atom by name.
 A repeated phase name, or atom label within a phase, raises `ValueError`.
 
 ### Paths to plot
