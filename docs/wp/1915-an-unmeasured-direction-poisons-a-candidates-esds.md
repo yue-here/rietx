@@ -1,6 +1,6 @@
 # WP-1915 — an unmeasured direction poisons every esd of an indexing candidate
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-07 — NaN in every cell esd of a candidate whose lines leave one metric term unconstrained, silent on macOS; it reaches the Bravais screen's tolerance and the χ² dedup
