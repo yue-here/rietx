@@ -70,7 +70,7 @@ from .structure import Atom
 #:   reader here.
 READ_POINTS: tuple[str, ...] = (
     "rietx.project.Project.open",
-    "rietx.history.store.read_records",
+    "rietx.history.store.read_numbered_records",
     "rietx.gui.textdoc.parse",
 )
 
@@ -85,7 +85,7 @@ READ_POINTS: tuple[str, ...] = (
 #: instrument profile strips its components on save, so only a profile written
 #: by hand can carry one; its reader passes the context all the same.
 STORED_DOCUMENT_READ_POINTS: tuple[str, ...] = (
-    "rietx.history.store.read_records",
+    "rietx.history.store.read_numbered_records",
     "rietx.io.instrument_profile.load_instrument_profile",
 )
 
