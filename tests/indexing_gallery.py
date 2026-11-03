@@ -789,7 +789,8 @@ SPECIMEN_ORDER = ("lab6", "corundum", "nac", "fap", "zincite", "zircon",
 #: ``corundum_shift`` and ``lab6_calibrated`` are deliberately absent: they are
 #: the *second step* of a two-step protocol on a dataset already counted, and
 #: counting a dataset twice is how the pre-WP-1041 scoreboard came to name nine
-#: datasets under a total of eight.
+#: datasets under a total of eight.  ``silicon_steep`` has a known cell and is
+#: absent too: it is synthetic, and the scoreboard counts measured patterns.
 SCOREBOARD_STEMS = ("lab6", "corundum", "nac", "fap", "zincite", "zircon",
                     "brucite", "magnetite", "fluorite")
 

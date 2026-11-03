@@ -113,13 +113,14 @@ cpd-1a 30/30/30, 1b 65/65/66, 1c 39/39/44, 1d 55/55/56, 1e 67/67/67,
 1f 58/58/61, 1g 61/61/63, 1h 69/69/67, cpd-2 74/73/77, cpd-4 75/75/76,
 fluorite 17/17/17, magnetite 18/17/17, zincite 27/27/32, zircon 56/55/56.
 
-- **(a) removes only what it was built to remove**: four components over 18
+- **(a) removes only what it was built to remove**: four components over the 20
   patterns, each under I/σ_I 0.9.
 - **(b) is not a local repair.** It moves components on all 16 lists, from
   one line shifted 0.011° (cpd-1a) to 12 out and 12 in (zircon). It adds 5
   lines at I/σ_I 2.9-10.5 to zincite and 7 to cpd-1c, and on NAC it takes 18
   off (I/σ_I 0.15-9.2) for 5 new ones. It would also move the refinement's
-  width census and the background diagnostics, which share the envelope. On
+  width census, the q-screen and the extinction test, which share
+  `_debiased_envelope`. On
   the steep fixture it removes nothing that (a) and `width_capped` have not
   already removed.
 - **The merge made the choice.** #741 shipped (a), and the maintainer merged
@@ -165,7 +166,7 @@ fluorite 17/17/17, magnetite 18/17/17, zincite 27/27/32, zircon 56/55/56.
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_peak_picking.py tests/test_indexing*.py -n auto --dist loadgroup -m "not slow"
+.venv/bin/python -m pytest tests/test_peak_picking.py tests/test_peak_picking_flank.py tests/test_indexing*.py -n auto --dist loadgroup -m "not slow"
 .venv/bin/python -m pytest tests/test_acceptance_indexing.py -n auto --dist loadgroup
 .venv/bin/python -m ruff check src tests examples
 ```
