@@ -1,6 +1,6 @@
 # WP-1528 — the cell box is declined where the cell is declared
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P4 2026-10-06 — was P2 for #719, which PR #736 fixed; the docstring task remains
