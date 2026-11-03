@@ -217,7 +217,7 @@ The target is per-histogram in every pattern, so each pattern reports its own va
 What the target drives follows it, such as a cubic cell's `b` and `c`.
 Each of those rows names the declaration in `RefinedParameter.equations`, and so does each coefficient's `vars.` row.
 A target row's value and esd are the equation's at that pattern's coordinates, and can be far tighter than the pattern measures on its own.
-A coefficient that drives a phase no pattern can see is held like the cell it drives, and [`PHASE_UNCONSTRAINED`](diagnostics-refinement-m-z.md#phase_unconstrained) names the coefficient.
+A coefficient that drives a phase no pattern can see is held like the cell it drives, and [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) names the coefficient.
 
 ### Large libraries
 

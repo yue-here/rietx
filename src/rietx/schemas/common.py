@@ -638,6 +638,10 @@ from .._nearmiss import did_you_mean
 #: its own frozen compile, the number ``stage_end`` already emitted.  Additive
 #: and defaulted to ``None``, "a result stored before the field", the 0.25 →
 #: 0.26 rule; all three runners write it on every stage.
+#: Also in 0.60 (WP-1334): ``StageResult.termination``, which test ended the
+#: solve, the token ``stage_end`` already emitted; ``slow_descent`` is the LM
+#: driver's new one (``optimize.lm.SLOW_DESCENT_ESD``).  Additive and
+#: defaulted to ``None``, the same rule.
 #: Also in 0.60 (WP-1991, Yue's ruling of 2026-11-01): a ``SeriesResult``'s
 #: paths read one series numbering, matched by phase name and atom label
 #: (``SeriesResult.phase_names``/``.atom_labels``), and

@@ -177,7 +177,7 @@ plan.stages.append(Stage("wavelength",
 result = rx.refine_multi([xray, neutron], structure, [ins_x, ins_n], plan=plan)
 ```
 
-The number to read is the [`WAVELENGTH_CALIBRATION`](diagnostics-refinement-m-z.md#wavelength_calibration) diagnostic on that pattern.
+The number to read is the [`WAVELENGTH_CALIBRATION`](diagnostics-refinement.md#wavelength_calibration) diagnostic on that pattern.
 It reports how far λ moved from its declared value in ppm, the unit a calibration error is quoted in, and how that compares with its own esd.
 A refined λ inside its own esd measured nothing, and the diagnostic says so.
 

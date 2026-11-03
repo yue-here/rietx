@@ -62,7 +62,7 @@ Freeing both wavelengths is refused, because the cell would then have no fixed l
 2 of 2 wavelengths are free; hold one.
 ```
 
-[`WAVELENGTH_CALIBRATION`](../reference/diagnostics-refinement-m-z.md#wavelength_calibration) reports the shift in ppm and against its own esd.
+[`WAVELENGTH_CALIBRATION`](../reference/diagnostics-refinement.md#wavelength_calibration) reports the shift in ppm and against its own esd.
 It sits in `result.histograms[1].diagnostics`, with the other findings that belong to one pattern.
 A shift inside its esd means the wavelength was already right.
 

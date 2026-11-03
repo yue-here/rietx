@@ -217,7 +217,7 @@ A rigid body can converge to a good pose with the wrong shape, and nothing in th
 `Refinement.check_rigid_bodies(data)` refits each body twice from the fitted state: as the body, and as free atoms held near the template by soft restraints on every template bond and bonded angle.
 Both refits run under the refinement's own 2θ limits, ties, holds, backend and solver.
 It compares them on the data χ² with Hamilton's R-factor ratio test {cite}`hamilton1965` and with ΔBIC {cite}`schwarz1978`, both at the effective observation count.
-It warns ([`RIGID_BODY_MISFIT`](diagnostics-refinement-m-z.md#rigid_body_misfit)) only when both prefer the released atoms.
+It warns ([`RIGID_BODY_MISFIT`](diagnostics-refinement.md#rigid_body_misfit)) only when both prefer the released atoms.
 It costs two refinements per body and is not part of `fit`.
 
 <!-- api-doc: no-exec — it needs a refinement of a rigid-body phase that has run -->
@@ -244,7 +244,7 @@ It returns a `rietx.report.body_misfit.BodyMisfitResult`, whose `rows` hold one 
 
 The warnings are on the returned object, not on the fit's `RefinementResult.diagnostics`.
 Each message names the three template bonds or angles the released refit moved furthest, in units of their restraint σ.
-[`RIGID_BODY_MISFIT`](diagnostics-refinement-m-z.md#rigid_body_misfit) gives the explanation the package attaches to the code.
+[`RIGID_BODY_MISFIT`](diagnostics-refinement.md#rigid_body_misfit) gives the explanation the package attaches to the code.
 
 A template bond wrong by more than the bonding criterion's slack is not found as a bond, so the check cannot see it.
 A tie or hold on the released body, or on a later body of its phase whose index the release shifts, is dropped from the released refit and listed in `dropped`.

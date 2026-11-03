@@ -65,7 +65,7 @@ The zero shift and the specimen displacement still correlate with the cell held.
 The zero shift refined to 0.01976(61)° against 0.02° in the instrument that made the data, and the displacement to −0.0006(14) mm against zero.
 The profile keeps the zero shift and drops the displacement, and the sample fit refines a displacement of its own.
 
-Do not save a calibration that reports [`RESOLUTION_NOT_POSITIVE`](../reference/diagnostics-refinement-m-z.md#resolution_not_positive).
+Do not save a calibration that reports [`RESOLUTION_NOT_POSITIVE`](../reference/diagnostics-refinement.md#resolution_not_positive).
 It says U, V and W give a negative Gaussian width somewhere in the fitted range.
 The model then clamps the width to a floor finer than any diffractometer, so a size or strain read against it is wrong.
 

@@ -310,7 +310,7 @@ Under `solver="trf"` a bound changes how a parameter moves even when it is never
 Such a cell can report [`BOUND_HIT`](diagnostics-refinement.md#bound_hit) while its `ParameterRow.hi` still reads `inf`.
 
 In a staged plan the window is rarely reached, because the stage holds that phase's structural parameters instead (`StageResult.held`, [Held parameters](refinement.md#held-parameters)).
-[`PHASE_UNCONSTRAINED`](diagnostics-refinement-m-z.md#phase_unconstrained) names a phase the data cannot tell from absent and says what the run did with its parameters.
+[`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) names a phase the data cannot tell from absent and says what the run did with its parameters.
 
 A free cell that moves more than ±15 % in length or ±6° in angle within one stage has run away.
 The stage puts that phase's free cell parameters back at the values the stage started from, holds them, and solves the stage again.

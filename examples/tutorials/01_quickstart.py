@@ -159,7 +159,7 @@ result
 #    The fit was not told its purpose, so each one prints as a line and a `means:` paragraph.
 #    The line names the code, any parameters it concerns, and the purposes it is a warning under.
 #    `result.diagnostics` holds each one in full, with what to do about it.
-#    [`PATTERN_UNDERSAMPLED`](https://rietx.org/docs/stable/reference/diagnostics-refinement-m-z.html#pattern-undersampled) is the step count from `diagnose`.
+#    [`PATTERN_UNDERSAMPLED`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#pattern-undersampled) is the step count from `diagnose`.
 # 3. The agreement indices come last. Rwp compares two fits of the same data over the same channels, and says little on its own.
 #
 # The table under the summary is [every refined parameter](https://rietx.org/docs/stable/reference/parameter-table.html#refined-rows) with its esd.
@@ -202,7 +202,7 @@ best
 
 # %% [markdown]
 # The kept pass carries its own diagnostics, and they differ from the first pass's.
-# [`RESOLUTION_UNCONSTRAINED`](https://rietx.org/docs/stable/reference/diagnostics-refinement-m-z.html#resolution-unconstrained) is new, and it names U, V and W.
+# [`RESOLUTION_UNCONSTRAINED`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#resolution-unconstrained) is new, and it names U, V and W.
 # It says the peak widths are not quotable until the instrument's own widths are calibrated on a standard.
 # Notebook 04 does that calibration.
 #

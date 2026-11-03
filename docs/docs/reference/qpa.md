@@ -57,8 +57,8 @@ The site multiplicities are the ones the model compiled, so a coordinate that dr
 
 `PhaseQuantity.weight_fraction_stderr` is propagated through the covariance of all the scales together, rather than from each scale's esd alone, so it carries the same conditioning as every other esd rietx reports.
 W<sub>p</sub> divides by a sum over every phase, so one scale the data carry no gradient in makes every fraction's esd unknown.
-The whole block of esds is then `None`, and [`QPA_ESD_UNAVAILABLE`](diagnostics-refinement-m-z.md#qpa_esd_unavailable) names the phase that withheld it.
-Where the refined scales give a non-positive Σ S·ZMV, there are no fractions to form: `RefinementResult.qpa` is `None`, and [`QPA_UNAVAILABLE`](diagnostics-refinement-m-z.md#qpa_unavailable) names the scales at or below zero.
+The whole block of esds is then `None`, and [`QPA_ESD_UNAVAILABLE`](diagnostics-refinement.md#qpa_esd_unavailable) names the phase that withheld it.
+Where the refined scales give a non-positive Σ S·ZMV, there are no fractions to form: `RefinementResult.qpa` is `None`, and [`QPA_UNAVAILABLE`](diagnostics-refinement.md#qpa_unavailable) names the scales at or below zero.
 
 ### A mixture of three phases
 
@@ -153,7 +153,7 @@ The range is an inner bound.
 Each admissible point's fraction is inside the 95 % profile interval for W, so a finer grid can only widen it.
 When `FractionProfile.fit_admissible` is `False`, a pinned refit found χ² lower than the fit's by more than the cut, so the fit did not reach the lowest basin along this ridge.
 
-Every profile of a fit with an esd carries a [`QPA_FRACTION_RANGE`](diagnostics-refinement-m-z.md#qpa_fraction_range) info record.
+Every profile of a fit with an esd carries a [`QPA_FRACTION_RANGE`](diagnostics-refinement.md#qpa_fraction_range) info record.
 It names the range and the widths that produced it, and its value is `FractionProfile.excess`, the farthest admissible fraction's distance from the fit's in the esd's 95 % half-widths.
 Below 1, the profile confirms the esd: the controls reached at most 0.79.
 Well above 1, the fraction is not determined by this pattern, whatever its esd says, so quote the range rather than the point: the synthetic trace below reached about 99.
@@ -192,7 +192,7 @@ A phase none of whose reflections lies in the fitted range has no fraction: its 
 Its scale's column is zero at every value, so the stage holds the scale at the value you handed in, under every solver, and a fraction read off it would be that start value.
 The other fractions are normalised over the phases seen in range, so they sum to 1 without it.
 They are relative to those phases, not to the crystalline content: a specimen known to hold the unmeasured phase has no absolute fractions from this range.
-[`PHASE_UNCONSTRAINED`](diagnostics-refinement-m-z.md#phase_unconstrained) says so, and so do the QPA table's caveats.
+[`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained) says so, and so do the QPA table's caveats.
 The Brindley correction is skipped while a phase is unmeasured, with that reason in `microabsorption_skipped`, because its mixture-average µ needs every phase's fraction.
 A phase with no line wants a wider range; one whose scale a stage held (a refined zero shift moved a line into range afterwards) wants a start where a reflection is already in range, so its scale refines. Either may be taken out of the model.
 Internal-standard and amorphous quantification, spiking a known weight of a known phase and solving for the rest, is not implemented.
@@ -206,7 +206,7 @@ The correction needs a particle radius for every phase, and the pattern cannot g
 Set `Phase.particle_radius_um` on every phase from a micrograph or a particle-size measurement.
 Profile broadening measures a coherent domain size, which is not a particle size ([Size and strain](derived.md#size-and-strain)).
 With no radius on any phase the correction is not attempted.
-With a radius on some phases but not all, it is skipped, `QuantitativePhaseAnalysis.microabsorption_skipped` says why, and [`MICROABSORPTION_SKIPPED`](diagnostics-refinement-m-z.md#microabsorption_skipped) is reported.
+With a radius on some phases but not all, it is skipped, `QuantitativePhaseAnalysis.microabsorption_skipped` says why, and [`MICROABSORPTION_SKIPPED`](diagnostics-refinement.md#microabsorption_skipped) is reported.
 
 µ comes from the pattern's own radiation.
 An X-ray pattern reads the McMaster photoabsorption table by element, and a constant-wavelength neutron one reads the Sears (1992) cross-sections by nuclide, the same two tables the capillary µR estimate uses.

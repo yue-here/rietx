@@ -269,7 +269,7 @@ The preset continues from a converged nuclear fit and frees no cell, coordinate 
 result = ref.fit(data, plan="magnetic_width")
 ```
 
-A plan that frees a magnetic width in the stage that first frees the moment is reported as [`STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT`](diagnostics-refinement-m-z.md#stage_frees_magnetic_width_with_moment) before the first stage runs, by `Refinement.fit` and `Refinement.run_stage` alike.
+A plan that frees a magnetic width in the stage that first frees the moment is reported as [`STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT`](diagnostics-stages.md#stage_frees_magnetic_width_with_moment) before the first stage runs, by `Refinement.fit` and `Refinement.run_stage` alike.
 
 While the terms are held at zero, [`MAGNETIC_WIDTH_UNMODELLED`](diagnostics-structures.md#magnetic_width_unmodelled) says whether they are needed.
 It reads the shape of the converged residual, since the package measures no observed width.
@@ -289,7 +289,7 @@ The preset frees both terms, because which one carries an excess is a property o
 
 An unmeasured width is not necessarily one you can drop.
 The preset fits the moment twice, with the widths at zero in the first stage and with them free in the last.
-[`MAGNETIC_WIDTH_MOVED_MOMENT`](diagnostics-refinement-m-z.md#magnetic_width_moved_moment) fires when releasing the widths moved the moment by more than the tighter of the two esds.
+[`MAGNETIC_WIDTH_MOVED_MOMENT`](diagnostics-refinement.md#magnetic_width_moved_moment) fires when releasing the widths moved the moment by more than the tighter of the two esds.
 Beside `MAGNETIC_WIDTH_UNMEASURED` on the same term, it means the width is correlated with the moment rather than absent, and holding it at zero puts the moment back where the first stage had it.
 Quote the released moment, and give the width as an upper bound, value plus esd, not as a coherence length.
 

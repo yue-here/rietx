@@ -182,7 +182,7 @@ d = rx.diagnose(data)
 print(d.steps_per_fwhm, "steps per FWHM over", d.n_peaks_measured, "peaks")
 ```
 
-A refinement reports the same measurement on its fitted channels, as the [`PATTERN_UNDERSAMPLED`](diagnostics-refinement-m-z.md#pattern_undersampled) diagnostic, and only when it falls below five.
+A refinement reports the same measurement on its fitted channels, as the [`PATTERN_UNDERSAMPLED`](diagnostics-refinement.md#pattern_undersampled) diagnostic, and only when it falls below five.
 No code covers the upper end of the band, because oversampling costs beam time and does not bias the answer.
 
 ## Contamination

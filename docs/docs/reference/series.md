@@ -251,7 +251,7 @@ A series is where one unread warning multiplies: in the in-situ run this diagnos
 `SeriesEntry.phase_agreement` does not test whether a minor phase is real.
 Both indices are biased towards the model being tested, and a trace phase's index is not comparable with the major phase's ([Structure agreement indices](result.md#structure-agreement-indices)).
 In a series the field serves the trajectory: one pattern's R<sub>Bragg</sub> is a value, and sixty of them are a shape.
-Whether the data can see a phase at all is measured by [`PHASE_UNCONSTRAINED`](diagnostics-refinement-m-z.md#phase_unconstrained), from each phase scale's value over its counting-noise esd.
+Whether the data can see a phase at all is measured by [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained), from each phase scale's value over its counting-noise esd.
 It reaches an entry through `SeriesEntry.diagnostics`, and aggregates over the chain as `SEQUENTIAL_PERSISTENT_FINDING`, which says what no per-pattern diagnostic can: 42 of 68.
 Read R<sub>Bragg</sub> beside that, and beside the weight fraction with its esd.
 

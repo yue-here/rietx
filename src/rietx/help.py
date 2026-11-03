@@ -2794,6 +2794,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "matrix."
         ),
     ),
+    "HISTORY_EARLIER_TREE_SKIPPED": HelpEntry(
+        title="Earlier tree in a history file skipped",
+        description=(
+            "A history file holds one refinement's tree. Releases before 1.11 "
+            "appended a second refinement to a reused history file, so an old file "
+            "can hold two or more trees. Loading it returns the last tree, the most "
+            "recent run, and skips each earlier one. A refinement continued from the "
+            "loaded tree adds its nodes to the last tree. Nothing was deleted, and the "
+            "skipped tree's lines are still in the file."
+        ),
+    ),
     "HOLD_BLOCKED_PLAN": HelpEntry(
         title="A hold overrode part of the plan",
         description=(
@@ -4386,6 +4397,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "declare."
         ),
     ),
+    "STAGE_SLOW_DESCENT": HelpEntry(
+        title="A stage stopped while still falling slowly",
+        description=(
+            "The stage's cost was still falling when it stopped, but so slowly that "
+            "another 300 evaluations would have moved its parameters by less than one "
+            "esd. The stage counts as converged. The stop says how fast the cost was "
+            "falling, not how far the minimum is, so a crawl along a shallow or "
+            "constrained direction can stop well above it. A high correlation or a "
+            "bound hit reported for the same parameters names such a direction, and "
+            "its own entry gives the remedies."
+        ),
+    ),
     "STAGE_WINDOWS_STALE": HelpEntry(
         title="A stage's peaks outgrew the windows it was solved on",
         description=(
@@ -5653,6 +5676,24 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "that fit different ranges or modes cannot be compared by it. `None` "
             "means a result stored before the field."
         ),
+    ),
+    "StageResult.termination": HelpEntry(
+        title="Stage stopping test",
+        description=(
+            "Which test ended the stage's solve, where `status` says only whether it "
+            "converged. The default solver writes `ftol_runs`, `no_descent` or "
+            "`exhausted_fp64` when it met its own convergence test. It writes "
+            "`slow_descent` when the cost was still falling, but so slowly that "
+            "another 300 evaluations would have moved the parameters by less than "
+            "one esd. Both have `status` `converged`, and `STAGE_SLOW_DESCENT` names "
+            "a stage stopped the second way. It writes `max_nfev`, with `status` "
+            "`max_iter`, when the budget ran out. `solver=\"trf\"` writes "
+            "scipy's `ftol`, `xtol`, `gtol`, `ftol+xtol` and `max_nfev`. A model "
+            "that stopped being finite writes `non_finite_residual` or "
+            "`non_finite_jacobian`, with `status` `diverged`. `None` means "
+            "a result stored before the field, or a stage with nothing free."
+        ),
+        anchor="theory/estimation.html#convergence",
     ),
     "StageResult.n_constraint_truncations": HelpEntry(
         title="Steps held on a constraint",

@@ -534,41 +534,43 @@ def diagnostic_index(root: _Path = SOURCE_ROOT) -> dict[str, dict[str, set]]:
     return out
 
 
-#: The diagnostic pages: (page stem, title, the source areas it takes, the
-#: first letters of the codes it takes).  One page of every code passed the page
-#: contract's 50 000-character cap once each code carried its explanation, so
-#: codes are filed by where they are raised.  The first area prefix a code's
-#: first file matches decides; "" takes the rest.  The refinement page is that
-#: rest, and `rietx/refine.py` raises 67 of its 76 codes, so no area splits it:
-#: it was 50 082 characters at WP-1419's C2 (#1108).  Its codes are filed by
-#: their first letter instead, a rule no new code can fall outside.
-_ANY_LETTER = "A-Z"
+#: The diagnostic pages: (page stem, title, the source areas it takes).  One
+#: page of every code passed the page contract's 50 000-character cap once each
+#: code carried its explanation, so codes are filed by where they are raised.
+#: The first area prefix a code's first file matches decides; "" takes the rest.
 DIAGNOSTIC_GROUPS = (
-    ("diagnostics-projects", "Other programs' projects", ("rietx/io/projects/",),
-     _ANY_LETTER),
-    ("diagnostics-files", "Reading files", ("rietx/io/",), _ANY_LETTER),
-    ("diagnostics-indexing", "Peaks and indexing", ("rietx/indexing/",), _ANY_LETTER),
+    ("diagnostics-projects", "Other programs' projects", ("rietx/io/projects/",)),
+    # the history log's reader too: a file read, not a fit (WP-2031)
+    ("diagnostics-files", "Reading files", ("rietx/io/", "rietx/history/")),
+    ("diagnostics-indexing", "Peaks and indexing", ("rietx/indexing/",)),
     # not `rietx/schemas/`: the codes raised there are a result's capped
     # correlation counts and a stored file's migrated ranges, not structure
     ("diagnostics-structures", "Structures and magnetism",
      ("rietx/crystallography/", "rietx/strategy/magnetic",
-      "rietx/report/magnetic"), _ANY_LETTER),
-    ("diagnostics-series", "Series and joint fits", ("rietx/sequential", "rietx/multi"),
-     _ANY_LETTER),
+      "rietx/report/magnetic")),
+    ("diagnostics-series", "Series and joint fits", ("rietx/sequential", "rietx/multi")),
     # out of the catch-all, whose page reached the cap with its second code (WP-1931)
-    ("diagnostics-background", "Background selection", ("rietx/background/",),
-     _ANY_LETTER),
-    ("diagnostics-refinement", "Refinement, A to L", ("",), "A-L"),
-    ("diagnostics-refinement-m-z", "Refinement, M to Z", ("",), "M-Z"),
+    ("diagnostics-background", "Background selection", ("rietx/background/",)),
+    # no area: STAGE_CODE_PREFIXES files its codes
+    ("diagnostics-stages", "Stages and plans", ()),
+    ("diagnostics-refinement", "Refinement", ("",)),
 )
 
+#: The refinement page passed the 50 000-character cap too (WP-1334), and
+#: most of its codes are raised in one file, ``refine.py``, so the area rule
+#: cannot split it.  Its codes about how a stage or a plan ran are filed by
+#: their code's prefix instead, on ``diagnostics-stages``.
+STAGE_CODE_PREFIXES = ("STAGE_", "PLAN_", "HOLD_")
 
-def diagnostic_group(files: set[str], code: str) -> str:
+
+def diagnostic_group(files: set[str], code: str = "") -> str:
     """The page stem a code with these raising files is listed on."""
     first = sorted(files)[0]
-    return next(stem for stem, _title, areas, letters in DIAGNOSTIC_GROUPS
-                if any(first.startswith(area) for area in areas)
-                and _re.match(f"[{letters}]", code))
+    stem = next(stem for stem, _title, areas in DIAGNOSTIC_GROUPS
+                if any(first.startswith(area) for area in areas))
+    if stem == "diagnostics-refinement" and code.startswith(STAGE_CODE_PREFIXES):
+        return "diagnostics-stages"
+    return stem
 
 
 def _levels(entry: dict[str, set]) -> str:
@@ -583,7 +585,7 @@ def diagnostic_page() -> str:
     from rietx.help import explain
 
     index = diagnostic_index()
-    titles = {stem: title for stem, title, _areas, _letters in DIAGNOSTIC_GROUPS}
+    titles = {stem: title for stem, title, _areas in DIAGNOSTIC_GROUPS}
     out = [_BANNER.format(source="the source tree under src/rietx/"), "",
            f"The package raises {len(index)} codes.", "",
            "| Code | Name | Page |", "| --- | --- | --- |"]
@@ -984,7 +986,7 @@ BODIES = {
     "plans.md": plan_ladder,
     "diagnostics.md": diagnostic_page,
     **{f"{stem}.md": _functools.partial(diagnostic_group_page, stem)
-       for stem, _title, _areas, _letters in DIAGNOSTIC_GROUPS},
+       for stem, _title, _areas in DIAGNOSTIC_GROUPS},
     "project.md": project_tree,
     "roadmap.md": roadmap_page,
     "api.md": api_everyday,
