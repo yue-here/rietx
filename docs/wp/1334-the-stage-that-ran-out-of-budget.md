@@ -1,6 +1,6 @@
 # WP-1334 — the stage that ran out of budget
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 1-2 landed (PR #1343); the termination split, the stop rule and its measurement next
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by ghostshift runner (tasks 3-7; tasks 1-2 landed in PR #1343)
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-09-23 — cost only: 46.6 % of stage time for a 1.23 % median gain
