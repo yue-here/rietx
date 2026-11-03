@@ -23,7 +23,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-11-01 | P2 | [magnetic](#magnetic) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 2026-10-30 | P3 | [magnetic](#magnetic) |
 | [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | 2026-11-02 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
-| [1528](1528-the-cell-box-is-declined-where-the-cell-is-declared.md) | The cell box is declined where the cell is declared | 2026-11-03 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 2026-10-03 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1542](1542-a-le-bail-background-left-at-its-seed.md) | A Le Bail background left at its seed | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1805](1805-the-rigid-body.md) | `RigidBody`: schema, collector, anchored rotation, the body's own rows | 2026-10-08 | P2 | [rigid-bodies](#rigid-bodies) |
@@ -555,7 +554,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1518](1518-dedup-weighs-a-difference-in-its-own-frame.md) | The dedup χ² test weighs a difference in the frame it was taken in | ✅ 2026-09-28 | — | — |
 | [1521](1521-compiled-kernels-active-means-they-ran.md) | `compiled_kernels_active` says the kernels ran, per tier, or says it does not know | 🛑 2026-10-10 | — | — |
 | [1523](1523-a-phase-fitted-to-noise-passes-the-support-test.md) | A phase fitted to noise passes the support test | ✅ 2026-10-13 | — | — ([1420](1420-a-held-phase-re-enters-or-says-it-cannot.md) soft) |
-| [1528](1528-the-cell-box-is-declined-where-the-cell-is-declared.md) | The cell box is declined where the cell is declared | 🔄 2026-11-03 | P4 | — |
+| [1528](1528-the-cell-box-is-declined-where-the-cell-is-declared.md) | The cell box is declined where the cell is declared | ✅ 2026-11-03 | — | — |
 | [1534](1534-a-scale-and-a-b-the-range-cannot-separate.md) | A scale and a B the fitted range cannot separate | ✅ 2026-10-04 | — | — |
 | [1535](1535-a-discarded-direction-reads-as-measured.md) | A direction the covariance discards reads as measured | ✅ 2026-10-02 | — | — |
 | [1539](1539-the-declared-optics-reach-every-caller.md) | The declared optics reach every caller and every reader | 🔄 2026-10-03 | P4 | — |
