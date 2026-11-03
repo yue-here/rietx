@@ -55,17 +55,10 @@ order in `base.ascending()`, the one place it lives:
 | non-monotone (stitched, restarts) | contradiction — concatenate, sort or separate are three measurements | **raise**; name `scan=` only where the format has it |
 | non-constant step | neither | nothing — SRM 660c is 24 stitched regions and is legal |
 
-The finite-row drop (`base.finite_rows`, WP-2079) has three consequences for a
-reader. **A decision a reader makes before `ascending` reads finite values
-only**: a NaN count once failed `base.integral` and withheld σ from a whole
-`.ras`; a finite count still votes whatever its 2θ. **A non-finite value is never
-dropped row by row on the way**: GSAS's σ ≤ 0 filter kept a NaN esd out of the
-report until it let non-finite through. A σ column with no positive value at all
-still reads as no σ column (GSAS, xy, chi), unreported. And two
-readers differ by design. pdCIF passes `keep_infinite_sigma=True`, because σ = +∞
-is its zero-weight marker. Bruker RAW refuses a non-finite float32, because
-there it is evidence of a wrong stride. `pattern_data` refuses any non-finite
-value that reaches it, as the backstop for a reader that skipped `ascending`.
+The finite-row drop (`base.finite_rows`, WP-2079): **a reader's decisions before
+`ascending` skip non-finite values and drop none of their rows**, so the report
+sees every one. pdCIF keeps σ = +∞ (its zero-weight marker), Bruker RAW refuses
+(stride evidence), and `pattern_data` refuses whatever non-finite value is left.
 
 `ascending(..., fmt=)` takes the format so the non-monotone refusal names
 `scan=` **only** where the option exists: telling someone to select a scan in a

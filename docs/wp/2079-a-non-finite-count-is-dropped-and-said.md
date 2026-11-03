@@ -130,7 +130,14 @@ naming 30.79-36.69°. No reader returns a non-finite value.
   points, a = 8.0698(17) Å, against 1 180 points before. `-n auto`, reader
   files only: test_readers_robust + test_readers + test_d1b_co3o4_quench
   345 passed, 1 skipped with the drop and none of the new tests; 424
-  passed, 1 skipped at the end (+79 tests added, all passes). `python -m tests.reader_output`: unchanged against `62724a30f`,
+  passed, 1 skipped at the end (+79 tests added, all passes). Fast
+  selection at `e424a622f`, alone on the lock: 13 677 passed, 319 skipped,
+  34 xfailed, 2 failed. One was `src/rietx/io/CLAUDE.md` over its line cap,
+  fixed after by compressing the rule and raising the cap 565 → 571 with a
+  ledger entry (`test_docs_consistency.py` then 25 passed). The other is
+  `test_display.py`'s kernel test, which fails on this machine because its
+  `python3` kernel spec points at a deleted venv; unrelated. The added tests
+  cost 0.31 s together in that run (`tests.added_test_times`). `python -m tests.reader_output`: unchanged against `62724a30f`,
   because the LaB6 standard fit has no NaN.
 
   *Review.* `/code-review high --fix` found ten. Fixed: the brml absorber,
