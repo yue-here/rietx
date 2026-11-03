@@ -64,7 +64,7 @@ The figure differs between platforms by tens of ppm, so the script prints the fl
 
 <!-- output of examples/guides/hold.py -->
 ```text
-without the hold: a moves by more than 250 ppm
+without the hold: a moves by more than 150 ppm
 ```
 
 The full script is `examples/guides/hold.py`.
