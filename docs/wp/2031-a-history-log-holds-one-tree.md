@@ -1,9 +1,8 @@
 # WP-2031 — a history log holds one tree, and a stage is timed in one place
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — all four tasks landed (PR #1358); a ruling is owed on loading a log an older release doubled
+Milestone: unscheduled · Status: ✅ 2026-11-03 — a reused history path is refused, a doubled old log loads its last tree (ruled by Yue), one stage timer; PR #1358
 Track: Render what the fit already knows
 Depends on: — (1322 soft, closed: the event log's run header is the precedent)
-Priority: P3 2026-10-23 — a wrong node count and a doubled node on a reused path, with a documented workaround (load the log and continue with `Refinement.from_node`)
 
 ## Goal
 
@@ -72,12 +71,13 @@ call.
       (`SequentialRefinement._refuse_a_reused_history`), over `<label>.jsonl`
       and every rung's `<label>.<suffix>.jsonl`. Pattern by pattern, a rung's
       log would have raised mid-chain, since it exists only where the earlier
-      run escalated. **A log a release before this WP doubled now raises on
-      load**, `ValueError` naming the file and the second header's line, as a
-      malformed line already does. Reading it as one tree reported nodes
-      neither run committed. Tests: `test_history.py`
+      run escalated. **A log a release before this WP doubled loads its last
+      tree** (ruled by Yue 2026-11-03, under "old files must always open"),
+      and each earlier tree is reported as `HISTORY_EARLIER_TREE_SKIPPED` on
+      `load`'s `diagnostics=` list with its line range. Reading it as one tree
+      reported nodes neither run committed. Tests: `test_history.py`
       (`…reused_history_path_is_refused…`, `…empty_history_file…`,
-      `…two_trees_refuses_to_load…`) and `test_sequential.py`
+      `…two_trees_loads_the_last…`) and `test_sequential.py`
       (`…rerun_into_a_used_history_directory…`).
 - [x] One stage-timing helper, called by `history.aggregate` and
       `events.progress_writer`. A test whose stage starts and never ends
@@ -95,6 +95,9 @@ call.
 - [x] `docs/docs/reference/history.md`: replace the workaround with the rule.
       Also one sentence each in `guides/branch.md` and `reference/series.md`,
       and the `Refinement` and `SequentialRefinement` docstrings.
+      (`reference/series.md`'s sentence came back out at the close: main's
+      growth put that page 84 characters over the manual's 50 000-character
+      page cap, and `reference/history.md` already states the series rule.)
 - [x] Skill: a row only if the refusal raises something an agent meets;
       otherwise "none" and why.
       **None.** An agent does meet it: the skill's canonical loop
@@ -102,7 +105,10 @@ call.
       of that script raises. But the message names both ways on (load and
       `Refinement.from_node`, or another path), and the package's own output is
       the cheapest place that holds the guidance (WP-1338). The error is a
-      `FileExistsError`, not a diagnostic code, so no code row is owed.
+      `FileExistsError`, not a diagnostic code. The ruling's new code,
+      `HISTORY_EARLIER_TREE_SKIPPED`, has its row in §7i
+      (`references/diagnostics-reading.md`), beside the history reader's other
+      codes.
 
 ## Acceptance
 
@@ -121,6 +127,81 @@ call.
 - WP-1322 (the event log's run header, PR #902); WP-1986's 2026-10-20 note.
 
 ## Handover log
+
+### 2026-11-03 (2nd session) — the ruling carried out; the WP closes
+
+An old history file that a rerun doubled now opens again. Before this PR it
+read as one tree with every node id twice. The PR's first landing made it
+raise, so the user had to split the file by hand. Now the file loads its most
+recent run and warns once for each earlier run it skipped, giving the lines
+that hold it and how many nodes it has. Nothing in the file is deleted, and
+the warning says how to read a skipped run. A new run on a used path is still
+refused, since that is a new write and not an old file.
+
+*Ruled by Yue 2026-11-03:* a history log an older release already doubled
+must load, not raise, under the standing rule that old files must always
+open. Build: load the last tree, report the earlier ones under a new warning
+code on `load`'s `diagnostics=` list.
+
+*Done.* `RefinementTree.load` keeps the last header's records and emits one
+`HISTORY_EARLIER_TREE_SKIPPED` (warning, `value` = the skipped tree's node
+count) per earlier tree, before the declared-range and twin notes. `load`
+already had the `diagnostics=` channel (WP-1321), so none was added.
+`help.py` entry; `_audit.py` code and suggestion rows at tier 1 (none enters
+at `unaudited`); a silence pair in `tests/silence.py`; a §7i skill row, copies
+re-synced; `reference/history.md`; the `Project.history_diagnostics` comment;
+an inherited note in WP-1522 (the GUI shows that list). The GUI help-key
+fixture gained the code.
+
+*Settled by Claude.* (1) The **last** tree, as the ruling proposed, kept on
+the store's own grounds: it only appends, so a node committed on the loaded
+tree lands at the end of the file, inside the last tree. Loading any other
+tree would put the next commit in a tree that was not loaded. The test commits
+on the loaded tree and reloads it. (2) The history reader's codes file under
+the manual's **Reading files** diagnostics page, not Refinement
+(`docs/reference_pages.DIAGNOSTIC_GROUPS` gains `rietx/history/`). Grounds:
+the page contract's 50 000-character cap, which the Refinement page's twin
+passed by 594 characters with the new entry, and the code is a file reader's.
+This is the only code raised there. (3) `reference/series.md` drops its
+sentence on the series refusal, under the same cap (main's growth put the
+page 84 over); `reference/history.md` already states it. (4) The code's
+name follows `CIF_EMPTY_BLOCK_SKIPPED` and `TOPAS_BLOCK_SKIPPED`.
+
+*What a reader receives* (new text, not yet seen by the maintainer). On a
+real doubled log of two four-node fits:
+
+```text
+warning[HISTORY_EARLIER_TREE_SKIPPED]: <dir>/session.jsonl holds 2 trees; loaded the last, from line 6, and skipped the tree at lines 1-5 (4 nodes, recorded 2026-11-03T10:15:35Z).
+  help: To read the skipped tree, copy lines 1-5 into a file of their own and load that file with RefinementTree.load.
+```
+
+Its explanation (`help.py`, also the manual's entry): title "Earlier tree in
+a history file skipped"; "A history file holds one refinement's tree.
+Releases before 1.11 appended a second refinement to a reused history file,
+so an old file can hold two or more trees. Loading it returns the last tree,
+the most recent run, and skips each earlier one. A refinement continued from
+the loaded tree adds its nodes to the last tree. Nothing was deleted, and the
+skipped tree's lines are still in the file." A fit prints and returns the
+same: `tests.reader_output` unchanged against `cef9aef7c`.
+
+*Measured* (`[dev]` venv, darwin/arm64, another shift on the machine):
+`test_history`, `test_silence`, `test_gui_help`, `test_docs_consistency`,
+`test_help`, `test_audit_table`, `test_manual_api`, `test_project`,
+`test_skill`, `test_skill_claims`, `test_skill_surface`, `test_manual`,
+`test_gui_manual`, `-m "not slow"`: 501 passed. `tests.audit_delta`: 2 added,
+0 new at `unaudited`. Ruff clean. The fast selection is CI's gate.
+
+*Generality* (`generality-review` agent, unedited verdict lines):
+`HISTORY_EARLIER_TREE_SKIPPED` (code) **holds**. "A file the store only
+appends to admits one self-consistent tree to load, and the action deletes
+nothing, rewrites nothing and is reported." Its one case against: an old
+script that crashed after writing a header and before its first commit leaves
+an empty last tree, while the earlier tree holds the work. The warning's node
+count makes that visible, and every alternative puts the next commit in a
+tree that was not loaded. `HISTORY_EARLIER_TREE_SKIPPED.suggestion`
+**holds**: "the test runs that recipe and recovers the skipped tree exactly."
+
+Next: none. WP-1522 inherits showing the code in the GUI.
 
 - **2026-11-03** — all four tasks landed (PR #1358, ghostshift runner). A
   history file now holds one refinement's tree. Running a second refinement
