@@ -316,11 +316,23 @@ def test_a_stage_that_raised_does_not_lend_its_start_to_the_next_fit(
     # the positive arm: within one fit a release's second start keeps the span
     path2 = tmp_path / "second.jsonl"
     with EventStream(path=path2) as stream:
-        for t, kind in [(0.0, "fit_start"), (1.0, "stage_start"),
-                        (2.0, "stage_start"), (4.0, "stage_end")]:
+        for t, kind, data in [(0.0, "fit_start", {}), (1.0, "stage_start", {}),
+                              (2.0, "stage_start", {"released": []}),
+                              (4.0, "stage_end", {})]:
+            now[0] = t
+            stream.emit(kind, stage="cell", **data)
+    assert summarize_events(path2).runs[0].stages[0].seconds == \
+        pytest.approx(3.0)
+
+    # run_stage emits no fit_start, so a plain second start is what says the
+    # first one died: two run_stage calls on one stream, the first raising
+    path3 = tmp_path / "third.jsonl"
+    with EventStream(path=path3) as stream:
+        for t, kind in [(0.0, "stage_start"), (50.0, "stage_start"),
+                        (53.0, "stage_end")]:
             now[0] = t
             stream.emit(kind, stage="cell")
-    assert summarize_events(path2).runs[0].stages[0].seconds == \
+    assert summarize_events(path3).runs[0].stages[0].seconds == \
         pytest.approx(3.0)
 
 

@@ -82,8 +82,12 @@ call.
 - [x] One stage-timing helper, called by `history.aggregate` and
       `events.progress_writer`. A test whose stage starts and never ends
       shows that the next same-named stage is timed from its own start.
-      `history.events.StageClock`: first `stage_start` of a name to its
-      `stage_end`, forgotten at each `fit_start`. The aggregator's test
+      `history.events.StageClock`: a stage's `stage_start` to its
+      `stage_end`. A release's second `stage_start` (it carries `released`)
+      keeps the first start, and any other `stage_start` replaces an open one
+      of its name, since `Refinement.run_stage` emits no `fit_start` (found by
+      the handover's review). Every `fit_start` still forgets the open
+      starts. The aggregator's test
       (`test_a_stage_that_raised_does_not_lend_its_start_to_the_next_fit`) now
       feeds the same log to `progress_writer` and asserts `2s` from both. The
       pre-WP writer printed `102s` on that log, timed from the dead start

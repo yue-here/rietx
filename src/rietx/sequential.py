@@ -2065,7 +2065,11 @@ class SequentialRefinement:
         would meet its own earlier ``<label>.jsonl`` and raise at pattern 0.
         A rung's log (``<label>.cold.jsonl``) exists only where the earlier run
         escalated, so its raise would land mid-chain.  Asked once, before the
-        first fit, over every name a pattern's logs can take.
+        first fit, over every name :meth:`_history_spec` can be handed: a
+        pass's suffix (none, ``.backward``, ``.verify``), then a rung's (none,
+        or one of :data:`RUNGS`).  Exact names, never a ``<label>.`` prefix,
+        which would refuse another series' ``run1.2.jsonl`` for a label
+        ``run1``.
         """
         spec = self._history
         if isinstance(spec, bool):
@@ -2073,10 +2077,10 @@ class SequentialRefinement:
         directory = Path(spec)
         if not directory.is_dir():
             return
-        stems = set(names)
-        taken = sorted(
-            f.name for f in directory.glob("*.jsonl") if holds_a_log(f)
-            and (f.stem in stems or any(f.name.startswith(n + ".") for n in stems)))
+        rungs = ("", *(f".{r}" for r in RUNGS))
+        candidates = {f"{n}{p}{r}.jsonl" for n in names
+                      for p in ("", ".backward", ".verify") for r in rungs}
+        taken = sorted(c for c in candidates if holds_a_log(directory / c))
         if taken:
             shown = ", ".join(taken[:3]) + (f" and {len(taken) - 3} more"
                                              if len(taken) > 3 else "")

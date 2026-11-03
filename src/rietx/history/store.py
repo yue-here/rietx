@@ -58,12 +58,13 @@ def holds_a_log(path: str | Path) -> bool:
     **A log holds one tree** (WP-2031): one header, then that tree's nodes and
     annotations.  A second tree appended after the first restarted its ids at
     ``n0000``, so a reload held each id twice.  Every writer of a header asks
-    this first and refuses; an empty or absent file holds no tree.
+    this first and refuses; an empty or absent file holds no tree.  A file
+    that is not UTF-8 text holds something, and is refused the same way.
     """
     p = Path(path)
     if not p.is_file():
         return False
-    with p.open(encoding="utf-8") as fh:
+    with p.open(encoding="utf-8", errors="replace") as fh:
         return any(line.strip() for line in fh)
 
 

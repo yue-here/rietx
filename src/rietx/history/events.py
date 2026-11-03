@@ -304,29 +304,38 @@ class StageClock:
 
     The one rule both readers of a stage's wall clock call:
     :func:`~rietx.history.aggregate.summarize_events` and
-    :func:`progress_writer`.  A stage is timed from the **first**
-    ``stage_start`` of its name to its ``stage_end``, since a WP-1301 phase
-    release emits a second ``stage_start`` before re-solving and the stage's
-    time includes both solves.  Every ``fit_start`` forgets the open starts:
-    a stage that raised or was abandoned emitted no ``stage_end``, and its
-    start must not time the next fit's stage of the same name.  One progress
-    writer serves a whole series, so without that the stale start crossed
-    patterns.
+    :func:`progress_writer`.  A stage is timed from its ``stage_start`` to
+    its ``stage_end``.  A WP-1301 phase release emits a second
+    ``stage_start`` before re-solving, marked by its ``released`` field
+    (``resumed=True`` here), and that one keeps the first start, so the
+    stage's time includes both solves.  Any other ``stage_start`` replaces an
+    open start of its name: a stage that raised or was abandoned emitted no
+    ``stage_end``, and its start must not time the next run of that name.
+    ``fit_start`` alone cannot say so, because ``Refinement.run_stage`` emits
+    none and one stream may carry several of its calls.  Every ``fit_start``
+    still forgets the open starts.  One progress writer serves a whole
+    series, so without these rules a stale start crossed patterns.
     """
 
     def __init__(self) -> None:
         self._open: dict[str, float] = {}
 
     def observe(self, kind: str | None, stage: str | None,
-                t: float | None) -> float | None:
-        """Feed one event; a ``stage_end`` returns its stage's seconds."""
+                t: float | None, *, resumed: bool = False) -> float | None:
+        """Feed one event; a ``stage_end`` returns its stage's seconds.
+
+        ``resumed`` marks a ``stage_start`` that continues an open stage of
+        its name: the one a release emits, whose ``data`` has ``released``.
+        """
         if kind == "fit_start":
             self._open.clear()
         elif stage is None:
             return None
         elif kind == "stage_start":
-            if t is not None:
+            if t is not None and resumed:
                 self._open.setdefault(stage, t)
+            elif t is not None:
+                self._open[stage] = t
         elif kind == "stage_end":
             start = self._open.pop(stage, None)
             if start is not None and t is not None:
@@ -360,7 +369,7 @@ def progress_writer(sink) -> Any:
     # own stream owns its newline translation, as they own its encoding.
     fh = (open(sink, "a", encoding="utf-8", newline="\n")
           if owns_fh else sink)
-    #: the first stage_start of a name, forgotten at each fit_start (unlike
+    #: a release's second stage_start keeps the first one's time (unlike
     #: ``values``, which wants the most recent alignment; see this module's
     #: docstring — a different question, a different answer)
     clock = StageClock()
@@ -369,7 +378,8 @@ def progress_writer(sink) -> Any:
         kind = event.get("kind")
         data = event.get("data", {})
         stage = data.get("stage")
-        elapsed = clock.observe(kind, stage, event.get("t"))
+        elapsed = clock.observe(kind, stage, event.get("t"),
+                                resumed="released" in data)
         if stage is None or kind != "stage_end":
             return
         parts = []

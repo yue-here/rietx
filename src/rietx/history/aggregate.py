@@ -206,7 +206,7 @@ def _summarize_run(header: dict | None, events: list[dict]) -> RunSummary:
         data = event.get("data") or {}
         t = event.get("t")
         stage = data.get("stage")
-        elapsed = clock.observe(kind, stage, t)
+        elapsed = clock.observe(kind, stage, t, resumed="released" in data)
         if kind == "fit_start":
             n_fits += 1
             fit_open = t
