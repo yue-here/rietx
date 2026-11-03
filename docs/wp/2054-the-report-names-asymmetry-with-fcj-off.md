@@ -1,6 +1,6 @@
 # WP-2054 — the report names an asymmetric residual the model cannot draw
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — direction (b) landed in PR #1363; waits on the maintainer's reader-output approval and the reply on #1106
+Milestone: unscheduled · Status: 🔄 2026-11-03 — direction (b) in PR #1363, both rulings carried out; waits on merge and the reply on #1106
 Track: What fires, and what stays silent
 Depends on: 1977 soft (the flank-lobe half of the same symptom); 2004 soft (a new template's thresholds take audit rows there)
 Priority: P2 2026-10-26 — a report that names the wrong cause: on a lab Bragg–Brentano fit with the apertures at their default 0, Layer 2 suggests an impurity phase at 0.50 and nothing mentions asymmetry (#1106, NIST SRM 660c)
@@ -181,6 +181,34 @@ from today. The synthetic controls hold.
 - Issues #1106, #1075 (repro 1), #1090 (the related model proposal), #1166.
 
 ## Handover log
+
+- **2026-11-03 (second session)** — the maintainer's two rulings are carried out on
+  PR #1363. The report's nominal aperture is now a constant of its own,
+  `rietx.report.NOMINAL_AXIAL_APERTURE` = 0.02, and the report no longer reads
+  `AXIAL_SIZING_FLOOR`. Next: merge, and the reply on #1106 once approved.
+
+  *Ruled by Yue 2026-11-03.*
+  - The reader-output change (the `refine_axial_asymmetry` suggestion at zero
+    apertures, its rationale clause, and each region's `asymmetry` coefficient entry) is
+    approved as written. Closes open item (1) below.
+  - The nominal aperture gets its own constant, 0.02, so a later change to the FCJ
+    quadrature floor cannot move the report. It carries a tier-3 audit row whose evidence
+    is the nominal sweep below, `approved="2026-11-03"`. `AXIAL_SIZING_FLOOR`'s row stays
+    as it was. Closes open item (4) and supersedes the "no new audit row" settlement below.
+
+  *Done.* `NOMINAL_AXIAL_APERTURE` sits beside `report._nominal_axial` with its comment;
+  `_nominal_axial` and `layer1.nominal_axial_columns`' docstring name it. The `_audit`
+  row is added at tier 3 with grounds and the sweep's numbers. No value moved, so no
+  reported number changes.
+
+  *Measured* (`[dev]`, darwin/arm64, after merging origin/main at cef9aef7c).
+  `tests.audit_delta`: 1 added (this row), 0 changed, 0 new at `unaudited`.
+  `tests.reader_output`: unchanged against the merge-base. Gate counts are in the PR body.
+
+  *Open for the maintainer.* (2) The reply on #1106: drafted, unposted, at
+  `~/.cache/ghostshift/rietx/wp-2054/reply-1106.md`. (3) The reporter's `t_noise` ask stays
+  open on #1106. The new tier-3 row is measured on two families (SRM 660c and the cpd
+  round-robin) where WP-2017's second pass asks three; it is not on WP-2017's list.
 
 - **2026-11-03** — direction (b) landed (PR #1363). A lab fit that leaves both axial
   apertures at 0 now gets a report that names the one-sided low-angle residual as axial
