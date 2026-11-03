@@ -1403,9 +1403,11 @@ class MultiHistogramRefinement:
         **No** ``stage_reports=``.  A rung would be one report per histogram
         per stage, and a report build costs a fixed ~0.36 s (issue #245), so
         the trajectory would multiply the solo tax by the histogram count.
-        WP-1335 owns that cost.  Until it lands, the stage trajectory of a
-        joint fit is its event log, and :meth:`report` builds the answer's
-        report per histogram.
+        WP-1335 cut that cost by about a third and stopped there by ruling, so
+        the multiple stands; whether to offer rungs here anyway is an open
+        call (WP-1335's last handover entry).  Until it is made, the stage
+        trajectory of a joint fit is its event log, and :meth:`report` builds
+        the answer's report per histogram.
         """
         _refuse_without_phases(self.mtable.structures[0], "refine_multi")
         data = list(data)
