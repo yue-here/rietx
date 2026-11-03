@@ -8,6 +8,7 @@ interface convention.  See ``ATTRIBUTION.md``.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from functools import lru_cache
 from types import MappingProxyType
 from typing import Annotated, ClassVar, Literal
@@ -909,7 +910,8 @@ STORED_DOCUMENT = MappingProxyType({"stored_document": True})
 
 def reading_stored_document(info) -> bool:
     """Whether this validation is a stored document's read (:data:`STORED_DOCUMENT`)."""
-    return bool(info.context) and bool(info.context.get("stored_document"))
+    context = info.context
+    return isinstance(context, Mapping) and bool(context.get("stored_document"))
 
 
 def declared_fills(declared: Parameter, present) -> dict[str, object]:

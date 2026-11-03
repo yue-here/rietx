@@ -2002,6 +2002,12 @@ class HumpComponent(_InheritsDeclaredDefaults):
     #: refined values.
     label: str | None = None
 
+    #: Fields a caller must give although each keeps a factory, which declares
+    #: the unit a caller's own ``Parameter`` inherits and the placeholder a
+    #: stored document is read at.  Read by :meth:`_position_is_required` and
+    #: by the API reference generator, which prints no default for them.
+    _required_of_a_caller: ClassVar[tuple[str, ...]] = ("position",)
+
     @model_validator(mode="before")
     @classmethod
     def _position_is_required(cls, data: Any, info: ValidationInfo) -> Any:
@@ -2017,7 +2023,8 @@ class HumpComponent(_InheritsDeclaredDefaults):
         field's factory and reads at the old 0.0.  An edit re-validates with
         every field present, so a hump opened that way stays editable.
         """
-        if (isinstance(data, dict) and "position" not in data
+        if (isinstance(data, dict)
+                and not set(cls._required_of_a_caller) <= data.keys()
                 and not reading_stored_document(info)):
             raise ValueError(
                 "HumpComponent.position is required: give the hump's apparent "

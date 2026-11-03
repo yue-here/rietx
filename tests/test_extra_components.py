@@ -945,6 +945,18 @@ def test_a_stored_hump_without_a_position_still_opens(tmp_path):
     got.node.state.instrument.extra_components[0].label = "edited"
 
 
+def test_a_hand_written_profile_hump_without_a_position_opens(tmp_path):
+    """The second read point, exercised: the writer strips components, so a
+    profile carrying one was written by hand, and it opens at the old 0.0."""
+    path = tmp_path / "profile.json"
+    save_instrument_profile(_instrument(), path)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc["instrument"]["extra_components"] = [{"kind": "hump", "label": "by hand"}]
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    hump, = rx.load_instrument_profile(path).extra_components
+    assert hump.position.value == 0.0 and hump.label == "by hand"
+
+
 def test_every_stored_document_read_point_passes_the_context():
     """``STORED_DOCUMENT_READ_POINTS`` is a claim, checked the way
     ``READ_POINTS`` is (WP-1076): each names a reader that exists and that
@@ -962,6 +974,8 @@ def test_every_stored_document_read_point_passes_the_context():
             except ModuleNotFoundError:
                 continue
             break
+        else:                                    # pragma: no cover - a failure
+            raise AssertionError(f"no importable module in {dotted}")
         for part in parts[i:]:
             target = getattr(target, part)
         assert "context=STORED_DOCUMENT" in inspect.getsource(target), dotted
