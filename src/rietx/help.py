@@ -780,14 +780,15 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The centre, in °2θ, of an explicit Gaussian background term, such as a "
             "diffuse or amorphous hump or a cryostat or sample-container contribution. "
-            "It has no default bounds. It is not a Bragg position, so only the data "
+            "It has no default value and no default bounds. It is not a Bragg "
+            "position, so only the data "
             "constrain it. Set min and max if you know the fitted range. A declared "
             "term is inert (`vary=False`, height 0) until a stage frees it, and nothing "
             "in the package adds one on its own. Freeing position, height and width "
             "together amounts to a reflection with no cell behind it. `HUMP_TOO_NARROW` "
             "flags a fitted width near the instrumental resolution."
         ),
-        unit="deg 2θ", default="0.0",
+        unit="deg 2θ", default=None,
         typical="wherever the diffuse feature sits, for example 14.4 on NIST BT-1",
         anchor="theory/background.html#explicit-humps",
     ),
@@ -1639,6 +1640,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "peak-shape misfit leaks into those channels at every order. Check whether "
             "the background absorbs peak intensity, or switch to the penalised spline "
             "background."
+        ),
+    ),
+    "BACKGROUND_SMOOTHING_AT_FLEXIBLE_END": HelpEntry(
+        title="Baseline smoothing stopped at its most flexible setting",
+        description=(
+            "The scan for the arPLS baseline's smoothing strength tried every "
+            "candidate from stiff to flexible. None left the peak-free channels "
+            "with a serially uncorrelated residual, so the data did not choose the "
+            "strength, and the most flexible candidate was returned. Hold that "
+            "baseline fixed only knowing it is the grid's end, not a choice. The "
+            "alternatives are a strength of your own, a co-refined background, or a "
+            "measured blank."
         ),
     ),
     "BISO_NEGATIVE": HelpEntry(

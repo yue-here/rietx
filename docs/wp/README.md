@@ -32,7 +32,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 2026-10-12 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1913](1913-what-the-benchmark-agents-wrote-by-hand.md) | What the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd` | 2026-10-08 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 2026-11-03 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
-| [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 2026-10-12 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 2026-10-09 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) | A cell pays for the lines it predicts and the pattern lacks | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -50,7 +50,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 2026-11-02 | P2 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-11-02 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2041](2041-a-tutorial-shows-the-indexer-abstain.md) | A tutorial shows the indexer abstain | 2026-10-24 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
-| [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 2026-11-02 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 2026-11-03 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 2026-11-01 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -566,7 +566,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1923](1923-a-candidate-in-its-conventional-setting.md) | A candidate is reported as a lattice in its conventional setting, and the reduction is an exact change of basis | ✅ 2026-10-11 | — | — ([1915](1915-an-unmeasured-direction-poisons-a-candidates-esds.md) soft) |
 | [1929](1929-an-esd-follows-where-the-solver-stopped-beside-a-flat-column.md) | An esd follows where the solver stopped beside a flat column | ✅ 2026-10-12 | — | [1938](1938-every-parameter-refined-in-its-own-units.md) |
 | [1930](1930-a-width-freed-on-its-floor-leaves-it-by-rounding.md) | A width freed on its floor leaves it by rounding | ✅ 2026-10-13 | — | — |
-| [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 🔄 2026-10-12 | P3 | — ([1542](1542-a-le-bail-background-left-at-its-seed.md) soft) |
+| [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 🔄 2026-11-03 | P3 | — ([1542](1542-a-le-bail-background-left-at-its-seed.md) soft) |
 | [1932](1932-two-candidates-compared-across-a-reduction-boundary.md) | Two candidates compared across a reduction boundary | ✅ 2026-10-23 | — | — ([1923](1923-a-candidate-in-its-conventional-setting.md), [1915](1915-an-unmeasured-direction-poisons-a-candidates-esds.md) soft) |
 | [1936](1936-a-forward-difference-step-sized-by-its-parameter.md) | A forward-difference step sized by its parameter | ✅ 2026-10-09 | — | — |
 | [1937](1937-a-bounded-step-solved-exactly.md) | A bounded step solved exactly | ✅ 2026-10-10 | — | — ([1936](1936-a-forward-difference-step-sized-by-its-parameter.md) soft) |
@@ -636,7 +636,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | ✅ 2026-11-03 | — | [1959](1959-the-dichotomy-grid-compiled-again.md) ([1520](1520-a-search-refines-each-assignment-once.md) soft) |
 | [1959](1959-the-dichotomy-grid-compiled-again.md) | The dichotomy grid compiled again, so a ceiling reaches svd | ✅ 2026-10-14 | — | — |
 | [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | ✅ 2026-11-01 | — | — |
-| [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 🔄 2026-11-02 | P2 | — |
+| [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 🔄 2026-11-03 | P2 | — |
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | ⬜ | P2 | — ([2003](2003-the-chain-actions.md) soft) |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
@@ -760,7 +760,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1988](1988-a-pr-put-up-for-review-is-watched.md) | A PR put up for review is watched by the session that opened it | 🔄 2026-10-23 | P4 | — |
 | [1994](1994-a-note-into-a-closed-wp-is-caught-at-handover.md) | A note written into a closed WP is caught at handover | ✅ 2026-10-16 | — | — |
 | [1996](1996-the-switching-tab-says-only-what-its-tests-show.md) | The Switching tab says only what its tests show | ✅ 2026-10-17 | — | [1984](1984-the-switching-tab.md) |
-| [2013](2013-stale-text-in-the-code-the-manual-move-found.md) | Stale text in the code that the manual move found | ✅ 2026-11-02 | — | — |
+| [2013](2013-stale-text-in-the-code-the-manual-move-found.md) | Stale text in the code that the manual move found | ✅ 2026-11-03 | — | — |
 | [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 🔄 2026-11-02 | P2 | — |
 | [2021](2021-the-manual-and-the-landing-page-are-one-site.md) | The manual and the landing page are one site | ✅ 2026-10-22 | — | — ([1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) soft) |
 | [2022](2022-the-api-reference-renders-as-python-objects.md) | The API reference renders as Python objects | ✅ 2026-10-23 | — | — |
