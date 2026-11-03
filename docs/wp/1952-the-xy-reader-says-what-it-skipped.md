@@ -176,6 +176,8 @@ PR #1279 (merge sha: 3f10c88f8) lands the two #1064 parts this WP inherited on 2
 
 Gate on the merged tree (main 625b33678, arm64 Mac, `[dev,jax]`): fast 13 714 passed, 231 skipped, 34 xfailed, 1 failed (environmental Jupyter kernel spec); `-m slow` 922 passed, 16 skipped, 17 xfailed.
 
+This entry lands in PR #1367.
+
 *Next:* task 1, unchanged by this merge.
 
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issue #897).
