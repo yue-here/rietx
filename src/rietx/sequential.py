@@ -168,7 +168,13 @@ from .schemas.history import ReflectionState
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.results import RefinementResult
-from .schemas.sequential import SeriesEntry, SeriesFailure, SeriesResult, SeriesStep
+from .schemas.sequential import (
+    _NAMED_PATH,
+    SeriesEntry,
+    SeriesFailure,
+    SeriesResult,
+    SeriesStep,
+)
 from .schemas.structure import (
     MOMENT_COMPONENTS,
     MOMENT_FLOOR_MU_B,
@@ -2750,6 +2756,31 @@ def _series_steps(series: SeriesResult,
     return out
 
 
+def _where_in_series_numbering(entry: SeriesEntry, path: str) -> str:
+    """A diagnostic's ``where`` path read into the series numbering (WP-1991).
+
+    A pattern's diagnostics name its own model, so a ``prepare`` hook that
+    removed an atom ahead of this one gives the same atom another number here.
+    Counted as written, one atom's finding would split into two counts that
+    each miss half the series.  The atom (or phase) prefix is read off
+    :attr:`SeriesEntry.pattern_paths`, so a path that is not itself a
+    parameter row still follows.  An atom none of whose rows was reported
+    keeps its own number, there being nothing to read the move off.
+    """
+    own = entry.pattern_paths
+    m = _NAMED_PATH.match(path)
+    if not own or m is None:
+        return path
+    prefixes: dict[str, str] = {}
+    for series_path, own_path in own.items():
+        ms, mo = _NAMED_PATH.match(series_path), _NAMED_PATH.match(own_path)
+        if ms is not None and mo is not None:
+            prefixes[mo.group(0)] = ms.group(0)
+            prefixes.setdefault(f"phases.{mo.group(1)}", f"phases.{ms.group(1)}")
+    key = m.group(0)
+    return prefixes[key] + path[len(key):] if key in prefixes else path
+
+
 def _persistent_diagnostics(series: SeriesResult) -> list[Diagnostic]:
     """``SEQUENTIAL_PERSISTENT_FINDING`` — a per-pattern code that is really
     about the series (WP-1110 item 8).
@@ -2792,7 +2823,7 @@ def _persistent_diagnostics(series: SeriesResult) -> list[Diagnostic]:
             if d.code in NOT_A_SERIES_FINDING:
                 continue
             for p in (d.where or [""]):
-                key = (d.code, p)
+                key = (d.code, _where_in_series_numbering(entry, p))
                 if key not in seen:
                     seen.add(key)
                     counts[key] = counts.get(key, 0) + 1

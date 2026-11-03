@@ -1984,3 +1984,28 @@ def test_a_series_written_before_the_numbering_opens_as_written(pbso4):
     assert traj.value == [0.5, 1.5]
     assert traj.pattern_paths == ["phases.0.atoms.3.biso"] * 2
     assert (traj.phase, traj.atom) == (None, None)
+
+
+def test_a_persistent_finding_counts_one_atom_across_a_renumbering():
+    """A finding on one atom stays one count where a ``prepare`` renumbered it.
+
+    Half the patterns removed an atom ahead of it, so their diagnostics name it
+    ``atoms.1`` and the rest ``atoms.2``.  Counted as written, each half is 3 of
+    6 and nothing reaches the series line.  The ``uiso`` path is in no row,
+    so it follows the atom's prefix rather than a row of its own.
+    """
+    from rietx.schemas.common import Diagnostic
+    from rietx.schemas.sequential import SeriesEntry, SeriesResult
+    from rietx.sequential import _persistent_diagnostics
+
+    def entry(k):
+        moved = k % 2 == 0
+        own = "phases.0.atoms.1" if moved else "phases.0.atoms.2"
+        return SeriesEntry(
+            index=k, label=f"p{k}", pattern_paths=(
+                {"phases.0.atoms.2.biso": "phases.0.atoms.1.biso"} if moved else {}),
+            diagnostics=[Diagnostic(level="warning", code="BOUND_HIT",
+                                    where=[f"{own}.uiso"], message="...")])
+
+    out = _persistent_diagnostics(SeriesResult(entries=[entry(k) for k in range(6)]))
+    assert [(d.where, d.value) for d in out] == [(["phases.0.atoms.2.uiso"], 1.0)]
