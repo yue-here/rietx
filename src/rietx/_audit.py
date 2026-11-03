@@ -515,7 +515,6 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.StageResult.name",
     "rietx.schemas.results.StageResult.rwp",
     "rietx.schemas.results.StageResult.status",
-    "rietx.schemas.results.StageResult.termination",
     "rietx.schemas.results.StageResult.unknown_paths",
     "rietx.schemas.results.StageResult.unreached_histograms",
     "rietx.schemas.results.StageResult.window_loss",
@@ -1274,6 +1273,16 @@ ROWS: tuple[Row, ...] = (
     Row("WAVELENGTH_CALIBRATION", "code"),
     Row("XRDML_ATTENUATOR_APPLIED", "code"),
     # action: 24
+    Row("rietx.schemas.results.StageResult.termination", "action", tier=3, ambiguity=1,
+        evidence=("WP-1334: reports the slow-descent stop (termination 'slow_descent', status "
+                  "max_iter) beside the solver's own tests; the stop is SLOW_DESCENT_ESD's row. "
+                  "Dissent measured: on cpd-1a with an absent zircon at intermediate_ftol=None "
+                  "two stages that would have converged were cut, so the result reads max_iter; "
+                  "on Cr2WO6 150 K solve_magnetic class 3 went from ranked to unranked"),
+        grounds=("Every refiner stops a refinement that has stopped paying (GSAS-II's default "
+                 "3 cycles and 1e-3 per-cycle dM/M), but rietx's form of the stop is its own; "
+                 "tier 3 with SLOW_DESCENT_ESD."),
+        approved=None),
     Row("rietx.schemas.results.StageResult.held", "action", tier=3, ambiguity=1,
         evidence=("WP-1301/1523: free, an absent phase's cell walked 14.9 A from truth over 13 "
                   "sub-onset ramp patterns at unchanged Rwp; silent on IUCr CPD cpd-1c; GSAS-II, "
