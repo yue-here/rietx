@@ -156,6 +156,19 @@ options".** `on_error="carry"` stays the default, now tier 3 with this date as i
 off `UNAUDITED_BASELINE`; `"skip"` and `"raise"` stay the caller's, as they are today. GSAS-II's
 and MAUD's stop is the named dissent.
 
+**Ruled by the maintainer 2026-11-03: brief 4 (C6), a field of counts plus one summary line.**
+`SEQUENTIAL_PERSISTENT_FINDING`, its suggestion, the half cut and `MIN_POINTS_FOR_PERSISTENCE`
+go. A record field on the series lists each per-pattern code and path with its count, the
+number of patterns and the worst level, largest first, with no threshold, and
+`SeriesResult.summary` prints one line naming the top counts and the field. Dropping the cut
+was settled by Claude on DESIGN.md § Rules, 1 and the maintainer's 2026-08-11 ruling on
+editorial thresholds. The line follows generality.md § Demotion as written. Brief 2's
+field-only ruling is an exception to that clause, on the maintainer's grounds that a misfit
+ratio restates metrics every pattern already prints. A tally across patterns is something no
+single pattern shows (WP-1110's 425 unread `BOUND_HIT`s, "42 of 68"). The agent-harness run
+§ "A contested demotion is measured on agents" asks for checks the wording and gates nothing
+(ruled 2026-10-19). Its spend waits on the maintainer's OK.
+
 ---
 
 ## C1. What sends a warm fit up the ladder

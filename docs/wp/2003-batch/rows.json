@@ -275,7 +275,7 @@
   "response": null,
   "responds": null,
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C6 (brief 4): demoted to a record field of counts, largest first, no threshold, with one summary line naming the top counts and the field; the half cut settled away by Claude on DESIGN.md § Rules, 1. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_PERSISTENT_FINDING.suggestion",
@@ -290,7 +290,7 @@
   "applied": false,
   "decision": "with the code",
   "class": "C6",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C6 (brief 4): demoted to a record field of counts, largest first, no threshold, with one summary line naming the top counts and the field; the half cut settled away by Claude on DESIGN.md § Rules, 1. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_WIDTH_GROWTH",
@@ -728,7 +728,7 @@
   "applied": false,
   "decision": "with the code; tier 3 if the code stays",
   "class": "C6",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C6 (brief 4): demoted to a record field of counts, largest first, no threshold, with one summary line naming the top counts and the field; the half cut settled away by Claude on DESIGN.md § Rules, 1. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.NOISE_FLOOR_REL",
@@ -1423,7 +1423,7 @@
   "decision": "with the code",
   "class": "C6",
   "row_note": "row-less (an inline literal the walk cannot see); none needed if the field lands, a hand row (B14) if the code stays",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C6 (brief 4): demoted to a record field of counts, largest first, no threshold, with one summary line naming the top counts and the field; the half cut settled away by Claude on DESIGN.md § Rules, 1. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.NOT_A_SERIES_FINDING",
@@ -1439,7 +1439,7 @@
   "decision": "with the code",
   "class": "C6",
   "row_note": "row-less (a frozenset the walk cannot see); a hand row (B14) if the code stays, none if the field lands (its count is then one more row)",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C6 (brief 4): demoted to a record field of counts, largest first, no threshold, with one summary line naming the top counts and the field; the half cut settled away by Claude on DESIGN.md § Rules, 1. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._WIDTH_SUFFIXES",
