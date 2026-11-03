@@ -1193,9 +1193,10 @@ class StageResult(Base):
     #: writes scipy's ``ftol``, ``xtol``, ``gtol``, ``ftol+xtol`` and
     #: ``max_nfev``.  A model that stopped being finite writes
     #: ``non_finite_residual`` or ``non_finite_jacobian`` (WP-2048).  The
-    #: status follows from it: ``slow_descent`` and ``max_nfev`` are
-    #: ``"max_iter"``, a non-finite stop ``"diverged"``, the rest
-    #: ``"converged"``.  An open vocabulary, like a guard's ``code``.
+    #: status follows from it: ``max_nfev`` is ``"max_iter"``, a non-finite
+    #: stop ``"diverged"``, the rest ``"converged"``, ``slow_descent`` included
+    #: (Yue's ruling of 2026-11-03; ``STAGE_SLOW_DESCENT`` names such a stage).
+    #: An open vocabulary, like a guard's ``code``.
     #:
     #: ``None`` means a result stored before the field, or a stage with no
     #: free parameter, where no test was consulted.  Writers: the three

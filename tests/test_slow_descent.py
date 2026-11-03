@@ -2,8 +2,9 @@
 300 evaluations would buy less than one esd of travel, and says so.
 
 The rule is ``optimize.lm.SLOW_DESCENT_ESD``'s.  A stage the rule stops ends
-``slow_descent`` with status ``max_iter``, and ``STAGE_MAX_ITER`` names it as
-cut by the rule rather than by the budget.
+``slow_descent`` with status ``converged`` (Yue's ruling of 2026-11-03), and
+the info code ``STAGE_SLOW_DESCENT`` names it.  ``STAGE_MAX_ITER`` stays the
+budget's alone.
 
 The crawls here are made by handing the driver a Jacobian ``f`` times too
 large, so every Gauss-Newton step is ``1/f`` of the true one and the cost
@@ -27,7 +28,7 @@ import numpy as np
 import pytest
 
 from rietx.optimize import lm
-from rietx.refine import _max_iter_diagnostics
+from rietx.refine import _max_iter_diagnostics, _slow_descent_diagnostics
 from rietx.schemas.results import StageResult
 
 FLOOR_ROWS = 1000
@@ -64,7 +65,7 @@ def test_a_crawl_for_nothing_stops_and_gives_up_less_than_an_esd(monkeypatch):
 
     cut = _solve(3e4, 10.0, 1.0, monkeypatch)
     assert cut.termination == "slow_descent"
-    assert cut.status == 0, "a stop the rule makes is never convergence"
+    assert cut.status == 1, "more evaluations would not move it by an esd"
     # at or past the first whole window and well short of the budget
     assert lm._SLOW_DESCENT_WINDOW < cut.nfev < 400
     # the claim: what the rest of the budget bought is under chi2_red,
@@ -113,23 +114,30 @@ def test_the_rule_switched_off_reads_nothing(monkeypatch):
 
 
 def _stage(name, termination):
-    status = "converged" if termination == "ftol_runs" else "max_iter"
+    status = "max_iter" if termination in ("max_nfev", None) else "converged"
     return StageResult(name=name, status=status, n_iterations=400,
                        cost_initial=1.0, cost_final=1.0, termination=termination)
 
 
-def test_stage_max_iter_says_which_stop_the_rule_made():
-    [d] = _max_iter_diagnostics([_stage("scale", "ftol_runs"),
-                                 _stage("biso", "slow_descent")])
-    assert d.code == "STAGE_MAX_ITER"
-    assert "'biso' stopped early" in d.message
-    assert "budget." not in d.message
+def test_a_stage_the_rule_stopped_is_named_once_and_not_as_out_of_budget():
+    stages = [_stage("scale", "ftol_runs"), _stage("biso", "slow_descent")]
+    assert _max_iter_diagnostics(stages) == []
+    [d] = _slow_descent_diagnostics(stages)
+    assert (d.code, d.level) == ("STAGE_SLOW_DESCENT", "info")
+    assert d.message == (
+        "Stage 'biso' stopped while its χ² was still falling slowly. At that "
+        "rate, another 300 evaluations would have moved its parameters by less "
+        "than one esd, so the stage counts as converged.")
 
-    [both] = _max_iter_diagnostics([_stage("biso", "slow_descent"),
-                                    _stage("profile", "max_nfev")])
-    assert "'profile' stopped on its iteration budget." in both.message
-    assert "'biso' stopped early" in both.message
+    both = [_stage("biso", "slow_descent"), _stage("profile", "max_nfev"),
+            _stage("cell", "slow_descent")]
+    [budget] = _max_iter_diagnostics(both)
+    assert budget.message == "Stage 'profile' stopped on its iteration budget."
+    [slow] = _slow_descent_diagnostics(both)
+    assert slow.message.startswith("Stages 'biso', 'cell' stopped while their χ²")
+    assert "so the stages count as converged." in slow.message
 
-    # a record stored before the field reads as a budget stop, as it was
+    # a record stored before the field reads as it did
     [old] = _max_iter_diagnostics([_stage("profile", None)])
     assert old.message == "Stage 'profile' stopped on its iteration budget."
+    assert _slow_descent_diagnostics([_stage("profile", None)]) == []

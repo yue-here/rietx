@@ -9041,7 +9041,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # solver and false of the answer (WP-1028 §§(c),(d)).
     diagnostics = (diagnostics
                    + _far_from_data_diagnostics(model, y_calc, y_bkg, stats)
-                   + _max_iter_diagnostics(stage_results))
+                   + _max_iter_diagnostics(stage_results)
+                   + _slow_descent_diagnostics(stage_results))
 
     # Does the data support it (WP-1071): the observation/parameter ratio and
     # the step size, both reported and neither gating.  Built before the
@@ -10635,42 +10636,62 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
     sized from the measured worst-case rejection rate, so a stage that stalls
     reports it roughly 30x sooner with its answer unchanged.
 
-    The slow-descent rule (WP-1334, ``optimize.lm.SLOW_DESCENT_ESD``) is the
-    budget's sibling and shares the code, because the advice is the same and
-    every consumer keyed on the code keeps working.  The message says which
-    stages it cut, from ``StageResult.termination``, so a reader can tell "ran
-    out" from "stopped because the rest would have bought less than an esd".
+    A stage the slow-descent rule stopped (WP-1334) is ``converged`` and
+    never reaches this code: :func:`_slow_descent_diagnostics` names it.
     """
-    from .optimize import lm
-
-    hit = [s for s in stage_results if s.status == "max_iter"]
+    hit = [s.name for s in stage_results if s.status == "max_iter"]
     if not hit:
         return []
-    slow = [s.name for s in hit if s.termination == "slow_descent"]
-    spent = [s.name for s in hit if s.termination != "slow_descent"]
-
-    def _stages(names: list[str], one: str, many: str) -> str:
-        return (("Stage " if len(names) == 1 else "Stages ")
-                + ", ".join(repr(n) for n in names)
-                + (one if len(names) == 1 else many))
-
-    esd = lm.SLOW_DESCENT_ESD
-    esds = "one esd" if esd in (None, 1.0) else f"{esd:g} esd"
-    parts = []
-    if spent:
-        parts.append(_stages(spent, " stopped on its iteration budget.",
-                             " stopped on their iteration budgets."))
-    if slow:
-        tail = (" stopped early: at the rate the cost was falling, another "
-                f"{lm._SLOW_DESCENT_HORIZON} evaluations would have lowered χ² "
-                f"by less than {esds} of travel buys.")
-        parts.append(_stages(slow, tail, tail))
     return [Diagnostic(
         level="warning", code="STAGE_MAX_ITER",
-        message=" ".join(parts),
+        message=(("Stage " if len(hit) == 1 else "Stages ")
+                 + ", ".join(repr(n) for n in hit)
+                 + (" stopped on its iteration budget."
+                    if len(hit) == 1 else
+                    " stopped on their iteration budgets.")),
         where=[],
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",
+    )]
+
+
+def _slow_descent_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``STAGE_SLOW_DESCENT``: the stages the slow-descent rule stopped.
+
+    The rule (WP-1334, ``optimize.lm.SLOW_DESCENT_ESD``) ends a stage whose
+    cost is still falling, but so slowly that the next
+    :data:`~rietx.optimize.lm._SLOW_DESCENT_HORIZON` evaluations would move
+    its parameters by less than one esd.  Such a stage reports ``converged``
+    (Yue's ruling of 2026-11-03), since more iterations would not change the
+    answer by an esd, which is McCusker et al. (1999) §7's test.  So this
+    code is ``info`` and only names the stages, read off
+    ``StageResult.termination``, so a reader can tell a slow crawl from a
+    stage that met the solver's own tests.  It states and gates nothing.
+    """
+    from .optimize import lm
+
+    slow = [s.name for s in stage_results if s.termination == "slow_descent"]
+    if not slow:
+        return []
+    esd = lm.SLOW_DESCENT_ESD
+    esds = "one esd" if esd in (None, 1.0) else f"{esd:g} esd"
+    one = len(slow) == 1
+    return [Diagnostic(
+        level="info", code="STAGE_SLOW_DESCENT",
+        message=(("Stage " if one else "Stages ")
+                 + ", ".join(repr(n) for n in slow)
+                 + " stopped while " + ("its" if one else "their")
+                 + " χ² was still falling slowly. At that rate, another "
+                 f"{lm._SLOW_DESCENT_HORIZON} evaluations would have moved "
+                 + ("its" if one else "their")
+                 + f" parameters by less than {esds}, so the "
+                 + ("stage counts" if one else "stages count")
+                 + " as converged."),
+        where=[],
+        suggestion="Quote the answer as converged. Where the same stage "
+                   "reports a high correlation, the slow descent ran along "
+                   "that pair, and freeing fewer parameters at once lets the "
+                   "stage meet the solver's own convergence test.",
     )]
 
 

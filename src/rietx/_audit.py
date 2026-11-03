@@ -1229,6 +1229,17 @@ ROWS: tuple[Row, ...] = (
                   "io/recipe's flagged coordinates); a user tie, a hold, and an adp.* "
                   "glob answered by the same request's biso are excluded")),
     Row("STAGE_PATH_UNKNOWN", "code"),
+    Row("STAGE_SLOW_DESCENT", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: names the stages whose StageResult.termination is "
+                  "'slow_descent', the LM driver's stop under SLOW_DESCENT_ESD (WP-1334); "
+                  "the stop and its 'converged' status are that row's and "
+                  "StageResult.termination's, ruled 2026-11-03; this code states the stop "
+                  "beside the status and gates nothing; its 300 and 'one esd' are read off "
+                  "_SLOW_DESCENT_HORIZON and SLOW_DESCENT_ESD"),
+        response="info",
+        responds=("nothing: quote the stage as converged; where the same stage reports "
+                  "HIGH_CORRELATION, read the slow descent as running along that pair"),
+        scope=("all",)),
     Row("STAGE_WINDOWS_STALE", "code", tier=3, ambiguity=3,
         evidence=("warning; fires when StageResult.window_loss, the Bragg intensity a "
                   "stage's frozen windows drop at its answer against windows sized there, "
@@ -1289,14 +1300,16 @@ ROWS: tuple[Row, ...] = (
     # action: 24
     Row("rietx.schemas.results.StageResult.termination", "action", tier=3, ambiguity=1,
         evidence=("WP-1334: reports the slow-descent stop (termination 'slow_descent', status "
-                  "max_iter) beside the solver's own tests; the stop is SLOW_DESCENT_ESD's row. "
-                  "Dissent measured: on cpd-1a with an absent zircon at intermediate_ftol=None "
-                  "two stages that would have converged were cut, so the result reads max_iter; "
-                  "on Cr2WO6 150 K solve_magnetic class 3 went from ranked to unranked"),
+                  "converged, ruled 2026-11-03, with STAGE_SLOW_DESCENT naming it) beside the "
+                  "solver's own tests; the stop is SLOW_DESCENT_ESD's row. Dissent measured "
+                  "under the first form, status max_iter: on cpd-1a with an absent zircon at "
+                  "intermediate_ftol=None a stage that would have converged was cut, so the "
+                  "result read max_iter, and the guides stage and next read max_iter at an "
+                  "unchanged Rwp; the converged status removes those labels"),
         grounds=("Every refiner stops a refinement that has stopped paying (GSAS-II's default "
                  "3 cycles and 1e-3 per-cycle dM/M), but rietx's form of the stop is its own; "
                  "tier 3 with SLOW_DESCENT_ESD."),
-        approved=None),
+        approved="2026-11-03"),
     Row("rietx.schemas.results.StageResult.held", "action", tier=3, ambiguity=1,
         evidence=("WP-1301/1523: free, an absent phase's cell walked 14.9 A from truth over 13 "
                   "sub-onset ramp patterns at unchanged Rwp; silent on IUCr CPD cpd-1c; GSAS-II, "
@@ -2954,14 +2967,14 @@ ROWS: tuple[Row, ...] = (
         grounds=("A constant that decides where a solve stops, rietx's own; tier 3 until "
                  "three families on either side give one answer, as the solver's other "
                  "stopping constants (B10)."),
-        approved=None),
+        approved="2026-11-03"),
     Row("rietx.optimize.lm._SLOW_DESCENT_HORIZON", "constant", tier=3, value=300,
         evidence=("WP-1334: the evaluations the slow-descent rule projects over, the rest of "
                   "a default 400-evaluation stage after its first window; a count so the "
                   "rule does not depend on max_iter"),
         grounds=("Sets where the slow-descent rule can act; rietx's own, tier 3 with "
                  "SLOW_DESCENT_ESD."),
-        approved=None),
+        approved="2026-11-03"),
     Row("rietx.optimize.lm._SLOW_DESCENT_WINDOW", "constant", tier=3, value=100,
         evidence=("WP-1334: the slow-descent window in evaluations, a quarter of a default "
                   "stage's 400, and the first point the rule is read, so no stage converging "
@@ -2970,7 +2983,7 @@ ROWS: tuple[Row, ...] = (
                   "are bit-identical with the rule on"),
         grounds=("Sets where the slow-descent rule can act; rietx's own, tier 3 with "
                  "SLOW_DESCENT_ESD."),
-        approved=None),
+        approved="2026-11-03"),
     Row("rietx.optimize.lm._CURVATURE_GATE", "constant", tier=3, value=100.0,
         evidence=("WP-1953: 3762 of 3831 LM solves never raise lambda past 10, and the crawls it "
                   "catches pass 1e8; no measurement chose 100 over 30 or 1000; second pass owed "
@@ -4760,6 +4773,10 @@ ROWS: tuple[Row, ...] = (
                   "has no vocabulary for")),
     Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=2),
     Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
+    Row("STAGE_SLOW_DESCENT.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: points at the correlation finding the same stage carries "
+                  "and names the plan change, freeing fewer parameters at once, that lets "
+                  "the solver's own test end the stage; picks nothing")),
     Row("STAGE_WINDOWS_STALE.suggestion", "suggestion", value=1, tier=3, ambiguity=3,
         evidence=("WP-2045's re-solve from the runaway went from axial_sl 558 to 4114, "
                   "behind the warning against polishing; both runaway steps were the "

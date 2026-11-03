@@ -345,7 +345,7 @@ states it.)*
 Each `StageResult` carries its own `rwp` and `termination`, so a batch driver
 keeping the best stage of a fit picks from `result.stages` alone. Compare `rwp`
 only between stages that fit the same range and mode, and read a stage whose
-`status` is `max_iter` as unfinished whatever its `rwp` says, since its
-`termination` tells you whether the budget ran out (`max_nfev`) or the
-slow-descent rule cut it (`slow_descent`). *(Hypothesis: the fields are new in
-WP-1334, and no batch has used them yet.)*
+`status` is `max_iter` as unfinished whatever its `rwp` says. A `converged`
+stage whose `termination` is `slow_descent` stopped while still falling
+slowly (`STAGE_SLOW_DESCENT`). *(Hypothesis: the fields are new in WP-1334,
+and no batch has used them yet.)*

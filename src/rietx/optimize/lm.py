@@ -168,8 +168,11 @@ _CONVERGED_RUNS = 3
 #:
 #: N counts every row the driver sees, penalty and restraint rows included,
 #: so this χ²_red differs from the data-only one the reported esds use by
-#: those rows' share.  Its status is ``max_iter``, never ``converged``,
-#: because no test of a minimum was met.  ``None`` switches the rule off and
+#: those rows' share.  Its status is ``converged`` (Yue's ruling of
+#: 2026-11-03): further iterations would not move the answer by an esd, which
+#: is how McCusker §7 and GSAS-II call a refinement converged.  The stop is
+#: named by ``STAGE_SLOW_DESCENT``, an info diagnostic, beside ``termination``,
+#: so a reader can still tell it from the solver's own tests.  ``None`` switches the rule off and
 #: restores the driver before WP-1334 bit for bit.  The TRF driver has no such
 #: rule, since scipy owns its loop.
 SLOW_DESCENT_ESD: float | None = 1.0
@@ -707,6 +710,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
             break
         if _descent_too_slow(accepted_at, accepted_s, n_fev, max_nfev,
                     n_dof=len(r) - len(x)):
+            status = 1
             termination = "slow_descent"
             break
 

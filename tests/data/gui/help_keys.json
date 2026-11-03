@@ -270,6 +270,7 @@
   "diagnostics:STAGE_NOT_FINITE",
   "diagnostics:STAGE_PATH_NOT_FREE",
   "diagnostics:STAGE_PATH_UNKNOWN",
+  "diagnostics:STAGE_SLOW_DESCENT",
   "diagnostics:STAGE_WINDOWS_STALE",
   "diagnostics:STEPHENS_STRAIN_NOT_POSITIVE",
   "diagnostics:STRAIN_UNUSUALLY_LARGE",
