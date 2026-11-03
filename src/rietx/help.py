@@ -1642,6 +1642,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "background."
         ),
     ),
+    "BACKGROUND_SMOOTHING_AT_FLEXIBLE_END": HelpEntry(
+        title="Baseline smoothing stopped at its most flexible setting",
+        description=(
+            "The scan for the arPLS baseline's smoothing strength tried every "
+            "candidate from stiff to flexible. None left the peak-free channels "
+            "with a serially uncorrelated residual, so the data did not choose the "
+            "strength, and the most flexible candidate was returned. Hold that "
+            "baseline fixed only knowing it is the grid's end, not a choice. The "
+            "alternatives are a strength of your own, a co-refined background, or a "
+            "measured blank."
+        ),
+    ),
     "BISO_NEGATIVE": HelpEntry(
         title="A displacement parameter is negative",
         description=(
