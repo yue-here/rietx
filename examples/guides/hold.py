@@ -50,7 +50,8 @@ ppm = 1e6 * (a_held - a_free) / a_held
 # 281 ppm on the compiled path and 324 on the numpy one (RIETX_COMPILED=0) on
 # macOS arm64, measured 2026-10-21, and 348.5 on Linux x86-64, which became
 # 351.9 once the CIF's Ca1 was read on 1/3 (WP-2037, 2026-10-24): a free cell
-# lands at one of several nearby points.  Rounded to 100 ppm, that range
-# straddles 350, so the line states the floor every platform clears.
-print("without the hold: a moves by more than 250 ppm")
-assert 250 <= ppm < 400, ppm
+# lands at one of several nearby points.  Since lab_bragg_brentano frees S/L
+# alone (WP-2012, 2026-11-03) both macOS paths read 215.6; Linux was not
+# measured, so the line states a floor well under every reading.
+print("without the hold: a moves by more than 150 ppm")
+assert 150 <= ppm < 400, ppm
