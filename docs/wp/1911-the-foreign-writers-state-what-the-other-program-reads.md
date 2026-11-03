@@ -1,6 +1,6 @@
 # WP-1911 — the foreign writers state what the other program reads: the setting, the scale, the free set
 
-Milestone: unscheduled · Status: 🔄 2026-10-12 — PRs #720, #731, #710, #733, #713, #771, #782, #770 (Part B's TOPAS writer), #755 (C1's `Zero`) and #815 (#732's whole TOPAS input) and #839 (its X-ray extinction) and #912 (#721's item 3 on the P1 route) merged from outside; the decision on the rest of #721 is due
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @yue-here (ghostshift runner); the PRs merged from outside before are in the handover log
 Track: Coming from another code
 Depends on: — (#713 soft: the P1 restatement Part D builds on)
 Priority: P3 2026-10-06 — was P2 for #716, which PR #733 fixed; the remaining issues cost a user hand edits
