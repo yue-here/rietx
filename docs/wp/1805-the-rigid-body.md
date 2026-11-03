@@ -1,6 +1,6 @@
 # WP-1805 — `RigidBody`: schema, collector, anchored rotation, the body's own rows
 
-Milestone: rigid-bodies · Status: 🔄 2026-10-08 — every original task landed from outside (PR #801, merged as `089f24bc`). The maintainer answered #801's three questions, and two follow-ups they opened remain. #824's joint-commit rollback landed (PR #825)
+Milestone: rigid-bodies · Status: 🔄 2026-11-03 — claimed by @mustachefeeling
 Depends on: 1802, 1804
 Priority: P2 2026-10-06 — the feature the milestone was opened for; every later body WP depends on it
 
