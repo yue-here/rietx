@@ -101,13 +101,14 @@ assert {"instrument.geometry.axial_sl", "instrument.geometry.axial_hl"} <= {
     c.path for c in at_profile.non_separable}
 # Narrowed to the phase without occupancies: extinction, on its floor with
 # the data pushing it below, can reach none of its gain and is held back by
-# its bound (WP-1998); ΔBIC refuses what is left.
+# its bound (WP-1998); ΔBIC refuses what is left, and so does `best_or_none`.
 [held] = narrowed.bound_limited
 assert held.path == "phases.0.extinction" and held.gain == 0.0
 assert f"{held.gain_unbounded:.1f}" == "96.1" and held.gradient > 0
 assert "1 held back by a bound" in narrowed.summary
 assert [g.members[0].path for g in narrowed.groups] == ["phases.0.atoms.6.biso"]
-assert narrowed.best_or_none().path == "phases.0.atoms.6.biso"
+assert narrowed.best_or_none() is None
+assert narrowed.summary.startswith("phases.0.atoms.6.biso leads: ")
 assert "ΔBIC refuses it" in narrowed.summary
 assert f"{narrowed.groups[0].gain:.1f}" == "32.7"
 assert f"{narrowed.groups[0].delta_bic:.1f}" == "-5.0"

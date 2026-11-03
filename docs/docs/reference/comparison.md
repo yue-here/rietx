@@ -38,7 +38,7 @@ Its keywords are `top_n` (5 groups by default), `include` and `exclude` (dot-pat
 | `SuggestionResult.noise_floor` | the gain a group must exceed to be listed | {{ SUGGEST_MIN_GAIN }} × the larger of `chi2_red` and 1, stored so a serialised result explains its own gate |
 | `SuggestionResult.n_effective` | the observation count every `CandidateGroup.delta_bic` was charged at | the probe's residual rows over the square of their Bérar-Lelann factor (`rietx.optimize.statistics.effective_sample_size`); `None` where no factor was measured, and the ΔBIC is then at the raw count |
 | `SuggestionResult.summary` | one sentence | the whole answer for a reader |
-| `SuggestionResult.best_or_none` | the top group's parameter, or `None` | `None` when no group clears the floor or the top group is a tie; it does not check `delta_bic` |
+| `SuggestionResult.best_or_none` | the top group's parameter, or `None` | `None` when no group clears the floor, the top group is a tie, or the top group's `delta_bic` is not positive; a lower group ΔBIC admits is not promoted |
 
 | Field | Is | Reads as |
 |---|---|---|

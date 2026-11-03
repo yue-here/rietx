@@ -182,11 +182,18 @@ class SuggestionResult(Base):
     def best_or_none(self) -> ParameterCandidate | None:
         """The one defensible winner, or ``None``.
 
-        ``None`` whenever there is nothing above the noise floor, or the top
-        group is an unresolved tie — never a confident singleton the gates
-        cannot defend.  A caller who wants the full evidence reads
-        ``groups`` directly.
+        ``None`` whenever there is nothing above the noise floor, the top
+        group is an unresolved tie, or the top group's own ``delta_bic`` is
+        at or below zero (WP-1998) — never a confident singleton the gates
+        cannot defend, and never a parameter the same result's ΔBIC refuses.
+        The ΔBIC gate is Schwarz's (1978) criterion, which the summary
+        already applied to the same group ("ΔBIC refuses it"); it is read on
+        the **leader** only, so a lower-ranked group ΔBIC admits is not
+        promoted — the groups are ranked by Δχ², and choosing among them on
+        a second statistic is the caller's.  A caller who wants the full
+        evidence reads ``groups`` directly.
         """
-        if not self.groups or not self.groups[0].resolved:
+        if (not self.groups or not self.groups[0].resolved
+                or self.groups[0].delta_bic <= 0.0):
             return None
         return self.groups[0].members[0]

@@ -73,9 +73,9 @@ template line):
 - [x] Bounded gain for a candidate on or near a bound, both sides, seeded
       candidates included; a test on the fluorapatite state above where
       extinction drops below the noise floor.
-- [ ] `best_or_none` and ΔBIC: decide the gate, then make the summary, the
+- [x] `best_or_none` and ΔBIC: decide the gate, then make the summary, the
       method and its docstring say one thing.
-- [ ] Update `examples/guides/next.py`'s assertions and
+- [x] Update `examples/guides/next.py`'s assertions and
       `docs/docs/guides/next.md`'s sentence on `best_or_none` if either moves.
 - [ ] Skill: the row on reading `suggest`, or "none" and why.
 

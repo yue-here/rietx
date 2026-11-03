@@ -371,9 +371,11 @@ def _summary(groups: list[CandidateGroup], floor: float, n_evaluated: int,
     −1.299 or −1.3 by the start.  The noise floor is the data's and did not
     move, so it keeps four.
 
-    The candidates a bound kept below the floor (WP-1998) are counted in the
-    tail only when there are any, so a box that changed nothing changes no
-    text.
+    A resolved leader ΔBIC refuses is said to *lead*, never to be freed next
+    (WP-1998): :meth:`~rietx.schemas.suggest.SuggestionResult.best_or_none`
+    returns ``None`` for it, and the sentence says the same thing.  The
+    candidates a bound kept below the floor are counted in the tail only when
+    there are any, so a box that changed nothing changes no text.
     """
     tail = (f"{n_evaluated} candidate(s) evaluated, {n_non_separable} "
             f"non-separable from the free set, {n_skipped} without leverage"
@@ -385,7 +387,8 @@ def _summary(groups: list[CandidateGroup], floor: float, n_evaluated: int,
                 f"every separable held parameter ({tail})")
     top = groups[0]
     if top.resolved:
-        head = (f"free {top.members[0].path} next: predicted "
+        verb = ("free {} next" if top.delta_bic > 0.0 else "{} leads")
+        head = (verb.format(top.members[0].path) + ": predicted "
                 f"Δχ² {top.gain:.3g}, ΔBIC {top.delta_bic:+.1f}")
         if top.members[0].action_kind:
             head += f" (Layer 2 agrees: {top.members[0].action_kind})"

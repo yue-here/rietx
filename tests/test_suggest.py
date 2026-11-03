@@ -434,7 +434,8 @@ def test_candidate_group_needs_its_delta_bic():
 
 
 def test_best_or_none_gates():
-    """Empty list and unresolved-top both refuse; a resolved top answers."""
+    """Empty list, unresolved top and a top ΔBIC refuses all abstain; a
+    resolved top ΔBIC admits answers."""
     assert _result([]).best_or_none() is None
     tie = CandidateGroup(members=[_candidate(), _candidate("instrument.profile.w")],
                          gain=50.0, resolved=False, delta_bic=30.0)
@@ -443,6 +444,36 @@ def test_best_or_none_gates():
                          delta_bic=104.0)
     best = _result([win, tie]).best_or_none()
     assert best is not None and best.path == "instrument.zero_shift"
+
+
+@pytest.mark.parametrize("delta_bic", [-1.3, 0.0])
+def test_best_or_none_never_names_what_delta_bic_refuses(delta_bic):
+    """WP-1998: the resolved leader of a result whose own ΔBIC refuses it is
+    not the answer, and a group below it that ΔBIC admits is not promoted —
+    the groups rank by Δχ², and picking on a second statistic is the caller's."""
+    refused = CandidateGroup(members=[_candidate("phases.0.extinction")],
+                             gain=96.1, resolved=True, delta_bic=delta_bic)
+    admitted = CandidateGroup(members=[_candidate()], gain=60.0, resolved=True,
+                              delta_bic=12.0)
+    assert _result([refused]).best_or_none() is None
+    assert _result([refused, admitted]).best_or_none() is None
+
+
+def test_summary_says_a_refused_leader_leads_and_an_admitted_one_is_next():
+    """The sentence and ``best_or_none`` say one thing (WP-1998)."""
+    jac, r = _planted(signal=30.0)
+    admitted = _build(jac, r, [0, 1, 2], [("c0", 3, {})])
+    assert admitted.groups[0].delta_bic > 0
+    assert admitted.summary.startswith("free c0 next: ")
+    assert admitted.best_or_none().path == "c0"
+    # a gain over the floor that does not pay for itself at N_eff = N/3²
+    jac, r = _planted(signal=4.5)
+    refused = _build(jac, r, [0, 1, 2], [("c0", 3, {})], esd_inflation=3.0)
+    assert refused.groups[0].gain > refused.noise_floor
+    assert refused.groups[0].delta_bic < 0
+    assert refused.summary.startswith("c0 leads: ")
+    assert "ΔBIC refuses it" in refused.summary
+    assert refused.best_or_none() is None
 
 
 def test_pairwise_r2_via_nuisance_matches_projected_correlation():
