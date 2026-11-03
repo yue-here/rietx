@@ -322,28 +322,26 @@ it. Chapter: `docs/docs/reference/recipe.md`; measured convention table:
 ## Adding a format
 
 1. **Check the fixture licence per *file*, before writing the reader.** A repo
-   LICENSE covers the repo's own work, not user-contributed instrument output,
-   and a repo may have none at all. This has already cost the two best fixtures
-   found (`xrd-toolkit`'s real `.ras`; every real `.uxd`). If a file cannot be
-   vendored, that format's whole test strategy changes — and what the real file
-   established goes in `tests/data/README.md` regardless, since that is then the
-   only place the design is checkable.
-2. **Byte offsets, magic strings, tag names and element paths are
-   specification facts** — merger, not expression — so they may be written down
-   from any source, including one whose licence would bar a port. Extract them
-   into a table first, then write the parser **with the source file closed**.
-   `ATTRIBUTION.md` § Format specifications records which source each came from.
-3. One module, exporting a `PatternFormat`; add it to `PATTERN_FORMATS` in
-   dispatch order and say why the position is right.
-4. Add its fixture to `test_readers_robust.py` — `REAL_FIXTURES` if it has one,
-   the synthetic arm if it cannot. A **binary** format's synthesized fixture is
-   written in `tests/writers_xrd.py` and **packs its offsets literally, never
-   from the reader's own table**: a writer that shares constants with the parser
-   can only confirm that the parser agrees with itself. Text formats' writers
-   stay inline in `test_readers.py`, where a line is self-describing and the
-   circularity does not arise.
-5. A new rule lands here; it earns a root CLAUDE.md clause only if it changes
-   behaviour outside `io/`.
+LICENSE covers the repo's own work, not user-contributed instrument output, and
+a repo may have none at all. This has already cost the two best fixtures found
+(`xrd-toolkit`'s real `.ras`; every real `.uxd`). If a file cannot be vendored,
+that format's whole test strategy changes — and what the real file established
+goes in `tests/data/README.md` regardless, since that is then the only place the
+design is checkable. 2. **Byte offsets, magic strings, tag names and element
+paths are specification facts** — merger, not expression — so they may be
+written down from any source, including one whose licence would bar a port.
+Extract them into a table first, then write the parser **with the source file
+closed**. `ATTRIBUTION.md` § Format specifications records which source each
+came from. 3. One module, exporting a `PatternFormat`; add it to
+`PATTERN_FORMATS` in dispatch order and say why the position is right. 4. Add
+its fixture to `test_readers_robust.py` — `REAL_FIXTURES` if it has one, the
+synthetic arm if it cannot. A **binary** format's synthesized fixture is written
+in `tests/writers_xrd.py` and **packs its offsets literally, never from the
+reader's own table**: a writer that shares constants with the parser can only
+confirm that the parser agrees with itself. Text formats' writers stay inline in
+`test_readers.py`, where a line is self-describing and the circularity does not
+arise. 5. A new rule lands here; it earns a root CLAUDE.md clause only if it
+changes behaviour outside `io/`.
 
 ## Project readers (`io/projects/`)
 
@@ -394,14 +392,13 @@ same reason. Six rules the pattern readers do not need:
   WP-1118's six grammar corrections are invisible to any sweep (a parameter's
   *name* is its refine flag; a block comment *nests*; a conditional is a token,
   not a line). Enumerate the keyword space from the spec, classify **every**
-  name read / refused / deliberately ignored, and decide even at zero
-  incidence. Numbers: `tests/data/README.md` and the WP. **That classification is
-  a table, not a habit** — `projects/coverage.py` declares one stance per
-  construct (read / ignored / reported / refused) with the argument for it, and
-  `PHASE_SCOPE` is partitioned against the spec's own phase tree by test, so a
-  keyword without a stance fails rather than being dropped in silence. Support
-  for a construct arrives by moving its row; until then every import that meets
-  it says so.
+  name read / refused / deliberately ignored, and decide even at zero incidence.
+  Numbers: `tests/data/README.md` and the WP. **That classification is a table,
+  not a habit** — `projects/coverage.py` declares one stance per construct (read
+  / ignored / reported / refused) with the argument for it, and `PHASE_SCOPE` is
+  partitioned against the spec's own phase tree by test, so a keyword without a
+  stance fails rather than being dropped in silence. Support for a construct
+  arrives by moving its row; until then every import that meets it says so.
 - **A reader that *runs* what it reads resolves an allow-list, and refuses a
   name rather than a record** (WP-1118). A `.gpx` is a sequence of pickles, so
   loading one calls whatever it names: `projects/gsas2.ALLOWED_GLOBALS` is the
@@ -509,8 +506,7 @@ black box, never its source, recorded with its version.
 A writer is its own reader's inverse and its acceptance is the **round trip**:
 export, re-import, compare field by field. No fixture is needed and none is
 added, which is what made this the cheapest adversarial test the readers have.
-Rules the readers do not need (WP-1118, four formats: `.inp`, `.pcr`,
-`.EXP`, `.prm`).
+Rules the readers do not need (WP-1118: `.inp`, `.pcr`, `.EXP`, `.prm`).
 
 - **Refuse on the way out whatever the reader refuses on the way in**, and
   refuse it where the value is still in hand rather than leaving the file on
@@ -543,13 +539,10 @@ Rules the readers do not need (WP-1118, four formats: `.inp`, `.pcr`,
   too: a line break splits a card in two under keys nothing wrote, and a
   character the file's encoding cannot spell must be refused at the field
   rather than at the encode, which names a byte offset into the finished file.
-- **A fact two programs can read differently is tested the target's way**
-  (WP-1527, WP-1911). The round trip passes whatever the target makes of the
-  file, so each such fact (a species, a setting, a scale) gets an *oracle*: a
-  test function that reads the written file by the target program's measured
-  rule and shares nothing with this package's reader. The oracle is held to
-  the measurement table it implements before it judges a writer, so it is the
-  program's rule rather than a second copy of the writer's.
+- **A fact two programs read differently gets an oracle** (WP-1527, WP-1911; a
+  species, a setting, a scale), since a round trip passes whatever the target
+  makes of it: a test that reads the file by the target's measured rule, shares
+  nothing with this reader, and is held first to its measurement table.
 - **A flag narrower than the model merges free, and the group is named.** GSAS
   states one refine flag for a whole cell and one for a site's three
   coordinates, both meaning "as symmetry permits". Freeing keeps more of the
