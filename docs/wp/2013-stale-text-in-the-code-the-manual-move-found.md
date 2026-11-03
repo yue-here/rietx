@@ -128,7 +128,19 @@ finding goes stale (memory `queued-wp-findings-go-stale`).
   WP's own record of how its owed questions ended, and every follow-up it
   names sits in an open WP (2006, 1925).
 
-  *Gates* GATES-PENDING
+  *Gates*, on the branch with origin/main d0c4bded0 merged ([dev] venv,
+  macOS arm64). The fast selection gave 13607 passed, 319 skipped,
+  34 xfailed and 1 failed. The failure was this branch's: the sentence
+  added to the hump position's help entry pushed the generated
+  `reference/parameters` twin to 50 021 characters, over its 50 000 cap.
+  The entry now says "no default value and no default bounds" in one
+  sentence, and `test_manual.py` plus `test_help.py` then gave 89 passed.
+  Collection of the fast selection is 13 953 against main's 13 949, the
+  four tests added. They cost 0.01 s together. `tests.reader_output` exits
+  0 (unchanged). `test_docs_consistency.py` 25 passed, ruff clean, and
+  `session_start.py` raises no flag for the five WPs. Main then moved to
+  e7f04f02a (WP-1952's reader change, WP-2066) and merged clean, so CI's
+  run is the first on that tree.
 
   Next: none on this WP.
 

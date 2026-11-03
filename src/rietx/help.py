@@ -779,8 +779,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The centre, in °2θ, of an explicit Gaussian background term, such as a "
             "diffuse or amorphous hump or a cryostat or sample-container contribution. "
-            "You give it when you declare the hump, since it has no default. "
-            "It has no default bounds. It is not a Bragg position, so only the data "
+            "It has no default value and no default bounds. It is not a Bragg "
+            "position, so only the data "
             "constrain it. Set min and max if you know the fitted range. A declared "
             "term is inert (`vary=False`, height 0) until a stage frees it, and nothing "
             "in the package adds one on its own. Freeing position, height and width "
