@@ -428,10 +428,15 @@ land alone before the transform exists.
       illegal), held first to the reporter's table.
       *Restated by PR #733, arm inverted there; the oracle is
       `_fullprof_r_cell` (2026-11-03), and it fails on the pre-#733 writer.*
-- [ ] A: GSAS-II phase CIF: read GSAS-II's `SpcGroup` grammar (spec only) for
+- [x] A: GSAS-II phase CIF: read GSAS-II's `SpcGroup` grammar (spec only) for
       a rhombohedral-axes spelling, measure it by black box, or refuse; fix
       `GSAS2_CIF_SETTING_IN_OPERATORS`' message, which calls an axis choice an
-      origin choice
+      origin choice.
+      *PR #733 restates the phase. 2026-11-03, measured on GSAS-II 5.8.4's
+      `SpcGroup` as a black box: a bare R symbol is hexagonal axes (three
+      centrings), as in gemmi, and `R -3 c R` or `R -3 c:R` is rhombohedral.
+      So an R phase no longer raises the setting note, which now fires only
+      for an origin choice.*
 - [ ] A: `.EXP`: measure what GSAS-I reads for `R -3 c:R` and `F d -3 m:2`;
       refuse what it does not, and correct `gsas.py:1852`'s claim
 - [ ] A: `.pcr` reader: a bare R symbol beside a = b = c, α = β = γ ≠ 90 is
