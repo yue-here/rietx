@@ -80,13 +80,14 @@ declare module "rxplot" {
     backward?: readonly (number | null)[] | null;
   }
 
-  export type TrajectoryMark = "forward" | "esd" | "backward" | "rings" | "crosses";
+  export type TrajectoryMark = "forward" | "esd" | "backward" | "rings" | "crosses" | "squares";
 
   export interface TrajectorySpec {
     colors: () => { tone: string; warn: string; muted: string };
     dashed?: boolean;
     rings?: readonly boolean[];
     crosses?: readonly boolean[];
+    squares?: readonly boolean[];
     hidden?: readonly TrajectoryMark[];
     xLabel?: string;
     yLabel?: string;
@@ -101,4 +102,31 @@ declare module "rxplot" {
 
   export function trajectory(uPlot: any, host: HTMLElement, traj: TrajectoryData,
                              spec: TrajectorySpec): TrajectoryFigure;
+
+  export type TraceGlyph = "bar" | "cross" | "square" | "ring" | "tick";
+
+  export interface TraceData {
+    index: readonly number[];
+    y: readonly (number | null)[] | null;
+    marks: readonly (readonly TraceGlyph[])[];
+    findings: readonly number[];
+  }
+
+  export interface TraceSpec {
+    colors: () => { line: string; warn: string; muted: string; cursor: string };
+    at?: number | null;
+    step?: readonly [number, number] | null;
+    xLabel?: string;
+    yLabel?: string;
+  }
+
+  export interface TraceFigure extends Group {
+    onScrub: ((i: number) => void) | null;
+    onPoint: ((hit: { i: number; left: number; top: number } | null) => void) | null;
+    setAt(at: number | null): void;
+    setStep(step: readonly [number, number] | null): void;
+  }
+
+  export function trace(uPlot: any, host: HTMLElement, data: TraceData,
+                        spec: TraceSpec): TraceFigure;
 }

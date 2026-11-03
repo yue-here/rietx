@@ -2833,6 +2833,26 @@ def test_a_series_member_has_curves_of_its_own(series):
     assert status == 404 and payload["error"]["where"] == ["index"]
 
 
+def test_the_series_answer_carries_the_trace_it_is_scrubbed_along(series):
+    """WP-1317: the trace rides the answer, built by ``series.trace`` from the
+    run's own result and its staged members' coordinates, so the panel draws
+    nothing a second authority computed."""
+    import json
+
+    from rietx.gui.series import TRACE_VOCABULARY, trace
+
+    session, client, _ = series
+    status, payload = client.get("/api/series/result")
+    assert status == 200
+    entry = session._series_run
+    want = trace(entry["result"], [m["x"] for m in entry["members"]])
+    assert payload["trace"] == json.loads(json.dumps(want))
+    got = payload["trace"]
+    assert [p["label"] for p in got["points"]] == [m["label"] for m in entry["members"]]
+    assert [p["x"] for p in got["points"]] == [m["x"] for m in entry["members"]]
+    assert [r["key"] for r in got["vocabulary"]] == [r["key"] for r in TRACE_VOCABULARY]
+
+
 def test_the_result_says_when_a_fit_is_past_the_point_of_being_a_fit(fitted):
     """WP-1029 item (c): one honest signal, in the report's own vocabulary."""
     from rietx.report.schemas import MATURITY_MAX_RWP

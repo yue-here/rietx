@@ -202,13 +202,17 @@ screenshots come from `docs/manual/make_screenshots.py`.
 
 ## Tasks
 
-- [ ] The vocabulary: enumerate the marker set from `SeriesResult`'s own
+- [x] The vocabulary: enumerate the marker set from `SeriesResult`'s own
       findings and per-pattern flags; write it down once, view and docs both
-      quoting it.
-- [ ] The trace: T/t vs index from series metadata, markers placed, owned
-      by a panel decided here.
-- [ ] Scrubbing: drag updates the linked pattern+fit view at interactive
-      speed; the drill-down stays one click away.
+      quoting it. *(2026-11-04: `rietx.gui.series.TRACE_VOCABULARY`, served by
+      `/api/series/result` as `trace.vocabulary`; the GUI guide's table is held
+      to it both ways by `tests/test_gui_series_trace.py`.)*
+- [x] The trace: T/t vs index from series metadata, markers placed, owned
+      by a panel decided here. *(The Series panel owns it, above its plot:
+      `rxplot.trace`, fed by `series.trace`.)*
+- [x] Scrubbing: drag updates the linked pattern+fit view at interactive
+      speed; the drill-down stays one click away. *(Curves cached per answer,
+      the member figure updated in place with the zoom kept; History button.)*
 - [ ] External annotations decided (schema vs view-side) and, if schema, the
       minimal addition with its round-trip test.
 - [ ] GUI manual chapter + screenshots via `make_screenshots.py`; vitest
