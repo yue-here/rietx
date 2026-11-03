@@ -1460,7 +1460,10 @@ ROWS: tuple[Row, ...] = (
                   "same median, whose default fence was removed (WP-2003, 2003-batch/batch.md, "
                   "C1, ruled by the maintainer 2026-11-03). Its help entry says the first patterns are compared "
                   "against a median of one or two values (X8) and that Rwp tracks Rexp "
-                  "(WP-1469's GoF and Rexp readings)")),
+                  "(WP-1469's GoF and Rexp readings). No summary line or code reads it, "
+                  "ruled by the maintainer 2026-11-03: inspecting each pattern's metrics "
+                  "is part of reading any series, so a ranked line would be noise "
+                  "(2003-batch/batch.md, decision 2)")),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_raised", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.seeded_from", "action", tier=3, ambiguity=1,

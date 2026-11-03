@@ -48,7 +48,7 @@
   "response": "warning",
   "responds": "open the named pattern's own fit before quoting its cell, fraction or width: its best rung is still above the chain's fence",
   "scope": null,
-  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step; what reports a misfit in the fence's place is the maintainer's decision 2, open. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step; and brief 2, field only: no summary line or code reports a pattern above its neighbours, since a reader inspects each pattern's metrics (ruled 2026-11-03). Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_RWP_OUTLIER.suggestion",
@@ -63,7 +63,7 @@
   "applied": false,
   "decision": "with its code (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step; what reports a misfit in the fence's place is the maintainer's decision 2, open. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step; and brief 2, field only: no summary line or code reports a pattern above its neighbours, since a reader inspects each pattern's metrics (ruled 2026-11-03). Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_UNRECOVERED",
@@ -593,7 +593,7 @@
   "applied": false,
   "decision": "C1 1 (b) (pick): demoted to the ratio field (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step; what reports a misfit in the fence's place is the maintainer's decision 2, open. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step; and brief 2, field only: no summary line or code reports a pattern above its neighbours, since a reader inspects each pattern's metrics (ruled 2026-11-03). Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.schemas.sequential.SeriesEntry.rungs_tried",

@@ -137,6 +137,20 @@ of the escalation (`SEQUENTIAL_RESEED`, `SeriesEntry.reseeded`, `fit:reseed`) ca
 date as their approval. Open: briefs 2-5 and the consent lines, with WP-2080's tier-3 row,
 approved under the 2026-11-02 delegation, added to the approval dates the maintainer confirms.
 
+**Ruled by the maintainer 2026-11-03: brief 2, field only.** No summary line and no code
+report a pattern fitting worse than its neighbours. The maintainer's grounds: looking at the
+refinement metrics is a normal part of assessing series output, and both humans and agents
+should inspect any refinement that is off, so a ranked line is noise. This reverses Claude's
+pick (B, a summary line on a GoF ratio). The brief carried a measurement (24-pattern planted
+series, this branch, macOS arm64, `[dev]`): the largest Rwp and GoF ratios were 5.19 and 6.15
+on the planted series, 1.01 and 1.01 on its null twin, and 2.21 and 1.10 on the null twin with
+its counts cut 4× from pattern 6 under a right model. `SeriesEntry.rwp_over_median` stays as
+it is, settled by Claude: it is the statistic a caller's `reseed_factor` compares, so a GoF
+rename would part it from the fence it records. Owed by the ruling: the skill's series
+reference tells an agent to read each entry's Rwp and GoF down the series, since nothing in
+the package flags a pattern above its neighbours (the fence paragraph there is stale too).
+The agent-harness run brief 2 asked for is moot.
+
 ---
 
 ## C1. What sends a warm fit up the ladder
