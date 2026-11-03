@@ -18,11 +18,10 @@ moyopy "for everything at some point". moyopy is the Python binding of moyo,
 spglib's Rust successor (`spglib/moyo` on GitHub, MIT OR Apache-2.0). The
 reason is one symmetry dependency with a maintained Python API that exposes
 Wyckoff data. spglib's Python API (2.7) does not expose it, so rietx rebuilds
-or ports what it needs. WP-2085's port of spglib's `coordinates_first` table
-(the first printed coordinates of each Wyckoff position) is one such
-stop-gap, and this migration retires it in favour of moyopy's
-`WyckoffPosition.coordinates`. No milestone is set. The first task is an
-inventory only.
+or ports what it needs. WP-2085 needs the first printed coordinates of each
+Wyckoff position. It waits for this migration and reads them from moyopy's
+`WyckoffPosition.coordinates` (ruled by Yue 2026-11-03). No milestone is
+set. The first task is an inventory only.
 
 Issue #426 (2026-09-23) and the maintainer's reply on its thread the same
 day, which took the timing decision: **one migration, after the v1.6
@@ -209,9 +208,9 @@ spglib convention, as PRs against the migration branch once it exists.
 - [ ] Inventory only, no migration: list every spglib call site in `src/`
       (`subgroups._spglib_letters` and `_hall_table` among them) and every
       place that would gain from moyopy, such as code that rebuilds or ports
-      Wyckoff data spglib's Python API does not expose (WP-2085's
-      `coordinates_first` port is one). Record the list here as the port's
-      checklist. A first count at origin/main `85d2ab514`: 23
+      Wyckoff data spglib's Python API does not expose (WP-2085's S1 waits
+      on this for moyopy's Wyckoff coordinates). Record the list here as
+      the port's checklist. A first count at origin/main `85d2ab514`: 23
       `spglib.<fn>(` calls in 10 files (`git grep -E 'spglib\.[a-z_]+\('
       -- src`), against 15 in 8 on 2026-10-16.
 - [ ] Settle difference 1 against the Stokes & Campbell BNS tables, and
@@ -250,8 +249,9 @@ spglib convention, as PRs against the migration branch once it exists.
 - **2026-11-03** — Yue's direction ruling folded in (Context's first
   paragraph, the Priority line and a new first task, the inventory). The
   brief asked for a new WP. This one already owns the migration, so the
-  ruling went here instead. WP-2085 now ports spglib's `coordinates_first`
-  as a stop-gap this WP retires. Next: the inventory.
+  ruling went here instead. WP-2085 then planned to port spglib's
+  `coordinates_first` as a stop-gap. A later ruling the same day dropped
+  the port, and WP-2085 now depends on this WP. Next: the inventory.
 
 - **2026-10-10** (reconstructed post hoc) — A session fixing main's red CI
   landed `b0d5c521` under this WP's prefix (PR #861, merged as `f52167e9`).
