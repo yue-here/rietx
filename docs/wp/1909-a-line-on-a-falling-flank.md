@@ -1,6 +1,6 @@
 # WP-1909 — a line on a falling flank, at a third of its own esd
 
-Milestone: unscheduled · Status: 🔄 2026-10-12 — the 1σ floor (PR #741) and #878's alias step (PR #880) landed from outside; the 1σ floor's dossier line, the census and the PNGs remain
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-05 — a defect that fires wrongly: three unflagged false lines cost the indexer the true cell, and cropping the range is the workaround; indexing is a path few fits run
