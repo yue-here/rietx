@@ -63,8 +63,15 @@ choosing a fix.
 
 ## Tasks
 
-- [ ] Read Finger, Cox and Jephcoat (1994) on the S ↔ H symmetry, and check `profiles/fcj.py`
-      against it.
+- [x] Read Finger, Cox and Jephcoat (1994) on the S ↔ H symmetry, and check `profiles/fcj.py`
+      against it. **Done 2026-11-02 from the derivation; the paper itself was not read.**
+      It is in none of the three local corpora (`~/Zotero yue-here/storage`, `~/Zotero/storage`,
+      `~/Code/rietx-refs-misc`; searched for "Jephcoat"). The symmetry is the model's, not
+      this implementation's: the weight of an axial offset is the overlap of the specimen's
+      axial extent and the slit's, the convolution of two boxcars of half-widths S and H,
+      and a convolution commutes. `fcj.py`'s W(ξ) = clip(s + h − ξ, 0, 2·min(s, h)), its
+      ξmax = min(s + h, |tan 2θ|) and its normalising integral are each symmetric in s and
+      h, which is why `calibrate.py`'s swap assertion holds to the bit.
 - [x] Decide the fix with the maintainer: `lab_calibrate` frees S/L alone with H/L held at
       its declared value; or one combined parameter, as GSAS-II has; or a finding when both
       are free. **Decided 2026-11-01 (maintainer): option 1.** `lab_calibrate` frees S/L

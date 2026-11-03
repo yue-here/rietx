@@ -93,9 +93,9 @@ def _nist_calibrated_plan() -> rx.RefinementPlan:
         rx.Stage("profile_w", ["instrument.profile.w"]),
         rx.Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                              "instrument.profile.x", "instrument.profile.y"]),
+        # S/L alone, H/L held at its declared 0.025, as the preset (WP-2012).
         rx.Stage("lines_axial", ["instrument.source.lines.*.weight",
-                                 "instrument.geometry.axial_sl",
-                                 "instrument.geometry.axial_hl"]),
+                                 "instrument.geometry.axial_sl"]),
         rx.Stage("biso", ["phases.*.atoms.*.biso"]),
     ])
     # WP-1123: the shipped convergence schedule, named rather than inherited.
