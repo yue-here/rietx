@@ -138,7 +138,7 @@ For a format that reports only at build, that tuple is always empty and says not
 | `ProjectFormat.extensions` | the conventional suffixes, informational only |
 | `ProjectFormat.sniff` | how the format is recognised, in words |
 | `ProjectFormat.carries` | what the file holds beyond a structure, in words |
-| `ProjectFormat.reports_at` | `"read"`, `"build"` or `"both"`, as above |
+| `ProjectFormat.reports_at` | `"build"` or `"both"`, as above |
 | `ProjectFormat.matches` | the test the dispatch calls on a path |
 | `ProjectFormat.read` | the format's reader, which returns its model |
 | `ProjectFormat.to_structure` | the format's conversion to a `Structure` |

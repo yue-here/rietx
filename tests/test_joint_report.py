@@ -685,6 +685,30 @@ def test_a_stage_that_freed_nothing_in_a_histogram_reaches_its_view(two_patterns
             if d.code == "STAGE_FREED_NOTHING"] == [top]
 
 
+def test_a_stage_that_freed_nothing_lists_the_histogram_through_parameters(two_patterns):
+    """#1270's follow-up: the suggestion's listing is the public read-only one.
+
+    It names ``ref.parameters()``, not the internal ``ref.mtable``, and the
+    expression it prints runs as written on the fit it came from, listing the
+    passed-over histogram's own rows under the names a stage accepts.
+    """
+    from rietx.schemas.instrument import BackgroundChebyshev
+
+    structure, instruments = perturbed_inputs()
+    instruments[0].background = BackgroundChebyshev.with_terms(4)
+    ref = MultiHistogramRefinement(structure, instruments)
+    result = ref.fit(two_patterns, plan=RefinementPlan(stages=[
+        Stage("only", ["instrument.background.c3"], max_iter=3)]))
+    (top,) = _codes(result, "STAGE_FREED_NOTHING")
+    assert "mtable" not in top.suggestion
+    expression = top.suggestion.split(" with ", 1)[1].split(" and add", 1)[0]
+    assert expression.startswith("[r.path for r in ref.parameters()")
+    listed = eval(expression, {"ref": ref})  # noqa: S307 — the package's own text
+    assert listed and all(p.startswith("hist.1.") for p in listed)
+    assert "hist.1.instrument.background.c0" in listed
+    assert "hist.1.instrument.background.c3" not in listed
+
+
 def test_a_fit_level_finding_appears_once_in_every_view(two_patterns):
     """The FIT findings a reader of one pattern must see
     (``SCALE_B_INSEPARABLE``, ``PARAMETRIC_OUT_OF_RANGE``,
