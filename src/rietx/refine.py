@@ -60,7 +60,7 @@ from .crystallography.twins import (
 )
 from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
-from .history.store import fingerprint
+from .history.store import fingerprint, refuse_existing_log
 from .history.tree import RefinementTree
 from .model.absorption import (
     CYLINDER_MU_R_MAX,
@@ -2556,6 +2556,10 @@ class Refinement:
         if isinstance(history, RefinementTree):
             self.history = history
             self._head_id = history.head
+        elif isinstance(history, str | Path):
+            # before any fit is paid for; ``RefinementTree.for_data`` asks
+            # again when the tree is made, for a file written in between
+            refuse_existing_log(history)
 
         # carried across calls so a checkout can be continued
         self._mode: Mode = "rietveld"

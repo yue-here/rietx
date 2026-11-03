@@ -303,6 +303,58 @@ def test_jsonl_round_trip(tmp_path, pattern):
     assert math.isinf(atom_x.max) and math.isinf(atom_x.min)
 
 
+def test_a_reused_history_path_is_refused_and_the_log_keeps_one_tree(tmp_path, pattern):
+    """A log holds one tree (WP-2031).
+
+    Until then a second ``Refinement`` on the same path appended a second
+    header and restarted the ids at ``n0000``, so ``load`` reported 4 nodes
+    where its dict held 2 and the summary drew ``n0001`` twice.
+    """
+    path = tmp_path / "fit.jsonl"
+    ref = rx.Refinement(*perturbed_models(), history=path)
+    ref.fit(pattern, plan=SHORT)
+    before = path.read_bytes()
+
+    with pytest.raises(FileExistsError, match=re.escape(str(path))):
+        rx.Refinement(*perturbed_models(), history=str(path))
+    with pytest.raises(FileExistsError, match="Refinement.from_node"):
+        rx.RefinementTree.for_data(pattern, path=path)
+    assert path.read_bytes() == before                   # nothing appended
+
+    loaded = rx.RefinementTree.load(path)
+    assert len(loaded) == len(loaded.nodes) == len(ref.history)
+    ids = re.findall(r"\bn\d{4}\b", loaded.summary())
+    assert len(ids) == len(set(ids)) == len(loaded)
+
+    # the documented way on: load, then open a refinement on the tree
+    resumed = rx.Refinement.from_node(loaded, "head")
+    resumed.run_stage(pattern, rx.Stage("zero", ["instrument.zero_shift"], max_iter=5))
+    again = rx.RefinementTree.load(path)
+    assert len(again) == len(again.nodes) == len(resumed.history) == len(ref.history) + 1
+
+
+def test_an_empty_history_file_holds_no_tree(tmp_path, pattern):
+    path = tmp_path / "empty.jsonl"
+    path.write_text("\n", encoding="utf-8")
+    ref = rx.Refinement(*perturbed_models(), history=path)
+    ref.run_stage(pattern, rx.Stage("scale", ["phases.*.scale"], max_iter=5))
+    assert len(rx.RefinementTree.load(path)) == len(ref.history) == 2
+
+
+def test_a_log_written_with_two_trees_refuses_to_load_and_names_the_line(tmp_path, pattern):
+    """A release before WP-2031 could write one; reading it as one tree lied."""
+    first, second = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
+    for path in (first, second):
+        rx.Refinement(*perturbed_models(), history=path).run_stage(
+            pattern, rx.Stage("scale", ["phases.*.scale"], max_iter=5))
+    lines = first.read_text(encoding="utf-8").splitlines()
+    doubled = tmp_path / "doubled.jsonl"
+    doubled.write_text(first.read_text(encoding="utf-8") + second.read_text(encoding="utf-8"),
+                       encoding="utf-8")
+    with pytest.raises(ValueError, match=re.escape(f"{doubled}:{len(lines) + 1}:")):
+        rx.RefinementTree.load(doubled)
+
+
 def test_save_rewrites_an_in_memory_tree(tmp_path, fitted):
     ref, _ = fitted
     path = tmp_path / "saved.jsonl"

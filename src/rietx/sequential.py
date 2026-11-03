@@ -147,6 +147,7 @@ from .crystallography.twins import (
     renumber_path,
 )
 from .history.events import EventStream, _attach_progress, as_event_stream
+from .history.store import holds_a_log
 from .history.tree import RefinementTree
 from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import DEFAULT_SOLVER, NFEV_PER_ITERATION, SOLVERS
@@ -1370,6 +1371,7 @@ class SequentialRefinement:
         if x is not None and len(x) != len(patterns):
             raise ValueError(f"x has {len(x)} entries for {len(patterns)} patterns")
         names = _labels_for(patterns, labels)
+        self._refuse_a_reused_history(names)
         xs = [None] * len(patterns) if x is None else [float(v) for v in x]
         if x is not None and x_label == "index":
             x_label = "x"
@@ -2053,6 +2055,33 @@ class SequentialRefinement:
                 # measured as the chain's step was measured (#604)
                 cold_step = float(_angle_difference(cold_step))
             s.cold_ratio = cold_step / s.step
+
+    def _refuse_a_reused_history(self, names: Sequence[str]) -> None:
+        """Refuse a history directory holding a log this run could write.
+
+        A log holds one tree (WP-2031), so a rerun into the same directory
+        would meet its own earlier ``<label>.jsonl`` and raise at pattern 0.
+        A rung's log (``<label>.cold.jsonl``) exists only where the earlier run
+        escalated, so its raise would land mid-chain.  Asked once, before the
+        first fit, over every name a pattern's logs can take.
+        """
+        spec = self._history
+        if isinstance(spec, bool):
+            return
+        directory = Path(spec)
+        if not directory.is_dir():
+            return
+        stems = set(names)
+        taken = sorted(
+            f.name for f in directory.glob("*.jsonl") if holds_a_log(f)
+            and (f.stem in stems or any(f.name.startswith(n + ".") for n in stems)))
+        if taken:
+            shown = ", ".join(taken[:3]) + (f" and {len(taken) - 3} more"
+                                             if len(taken) > 3 else "")
+            raise FileExistsError(
+                f"{directory} already holds history logs this series would write "
+                f"({shown}), and a log holds one tree. Pass another directory, "
+                "or move these logs away.")
 
     def _history_spec(self, label: str):
         """Per-pattern history target: a file under the given directory.

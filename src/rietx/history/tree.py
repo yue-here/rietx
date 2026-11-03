@@ -38,7 +38,13 @@ from ..schemas.migrate import (
     schema_key,
 )
 from ..schemas.pattern import PatternData
-from .store import append_record, fingerprint, read_records, write_records
+from .store import (
+    append_record,
+    fingerprint,
+    read_numbered_records,
+    refuse_existing_log,
+    write_records,
+)
 
 HEAD = "head"
 
@@ -127,6 +133,14 @@ class RefinementTree:
     @classmethod
     def for_data(cls, data: PatternData, *, path: str | Path | None = None,
                  plan: Any = None, package_version: str = "") -> "RefinementTree":
+        """A new tree pinned to ``data``, its header appended to ``path`` if given.
+
+        A ``path`` that already holds a log raises ``FileExistsError`` naming
+        it, because a log holds one tree (WP-2031).  Appending a second header
+        restarted the node ids at ``n0000``, and the reload held each id twice.
+        """
+        if path is not None:
+            refuse_existing_log(path)
         created = _utcnow()
         # The pattern's abscissa **as measured** — ``x()`` rather than
         # ``two_theta``, which is ``None`` on a time-of-flight histogram.  The
@@ -180,11 +194,23 @@ class RefinementTree:
         after it, and a log written by a plain ``fit`` — which appends nodes and
         no annotation at all — reloaded with **no HEAD**, so ``tree["head"]``
         raised and there was nothing to resume from.
+
+        A log holds one tree, so a second header raises ``ValueError`` naming
+        the file and its line (WP-2031).  Only a release before that WP wrote
+        one, by appending a second run to a reused ``history=`` path.
         """
         header: TreeHeader | None = None
         pending: list[HistoryNode | Annotation] = []
-        for rec in read_records(path):
+        for lineno, rec in read_numbered_records(path):
             if rec.record == "header" and rec.header is not None:
+                if header is not None:
+                    # a release before WP-2031 appended a second run's tree
+                    # to a reused path; its ids restart at n0000, so merging
+                    # the two would answer for nodes neither run committed
+                    raise ValueError(
+                        f"{path}:{lineno}: a second tree's header; a history log "
+                        "holds one tree. Split the file before this line to "
+                        "read each tree.")
                 header = rec.header
             elif rec.record == "node" and rec.node is not None:
                 pending.append(rec.node)

@@ -53,9 +53,32 @@ call.
 
 ## Tasks
 
-- [ ] Reproduce the doubled node on a reused `history=` path in a test, then
+- [x] Reproduce the doubled node on a reused `history=` path in a test, then
       refuse or split (decide, and record why here). `load` and the summary
       agree on the node count either way.
+      **Decided: refuse** (settled by Claude under the history store's written
+      format and its one-writer rule, `history/store.py`'s docstring: one
+      header, then that tree's records, one writer per file; and under
+      `Project.create`'s precedent, which refuses a directory already holding a
+      `project.json` with `FileExistsError`). A split would make one file hold
+      several trees, and `RefinementTree.load` returns one, so it would need a
+      new way to say which. An overwrite would delete evidence, which the
+      retention rule forbids. Three places now refuse.
+      `Refinement(..., history=path)` raises `FileExistsError` naming the path
+      at construction, before a fit is paid for. `RefinementTree.for_data` asks
+      again when the tree is made, for a file written in between. An empty or
+      blank file holds no tree and is used. **A series rerun into the same
+      directory is refused before its first fit**
+      (`SequentialRefinement._refuse_a_reused_history`), over `<label>.jsonl`
+      and every rung's `<label>.<suffix>.jsonl`. Pattern by pattern, a rung's
+      log would have raised mid-chain, since it exists only where the earlier
+      run escalated. **A log a release before this WP doubled now raises on
+      load**, `ValueError` naming the file and the second header's line, as a
+      malformed line already does. Reading it as one tree reported nodes
+      neither run committed. Tests: `test_history.py`
+      (`…reused_history_path_is_refused…`, `…empty_history_file…`,
+      `…two_trees_refuses_to_load…`) and `test_sequential.py`
+      (`…rerun_into_a_used_history_directory…`).
 - [ ] One stage-timing helper, called by `history.aggregate` and
       `events.progress_writer`. A test whose stage starts and never ends
       shows that the next same-named stage is timed from its own start.

@@ -52,6 +52,31 @@ def _locked(handle: IO[str]) -> Iterator[None]:
             pass
 
 
+def holds_a_log(path: str | Path) -> bool:
+    """Whether ``path`` already holds history records (a non-blank line).
+
+    **A log holds one tree** (WP-2031): one header, then that tree's nodes and
+    annotations.  A second tree appended after the first restarted its ids at
+    ``n0000``, so a reload held each id twice.  Every writer of a header asks
+    this first and refuses; an empty or absent file holds no tree.
+    """
+    p = Path(path)
+    if not p.is_file():
+        return False
+    with p.open(encoding="utf-8") as fh:
+        return any(line.strip() for line in fh)
+
+
+def refuse_existing_log(path: str | Path) -> None:
+    """Raise ``FileExistsError`` naming ``path`` when it already holds a log."""
+    if holds_a_log(path):
+        raise FileExistsError(
+            f"{path} already holds a history log, and a log holds one tree. "
+            "To continue it, load it with RefinementTree.load and open a "
+            "refinement on it with Refinement.from_node(tree, 'head'). "
+            "To start a new tree, pass another path.")
+
+
 def append_record(path: str | Path, record: HistoryRecord) -> None:
     """Append one record.  Creates the file (and parents) if absent."""
     p = Path(path)
@@ -75,6 +100,12 @@ def write_records(path: str | Path, records: list[HistoryRecord]) -> None:
 
 def read_records(path: str | Path) -> Iterator[HistoryRecord]:
     """Yield validated records.  Blank lines are skipped; bad lines raise."""
+    for _, record in read_numbered_records(path):
+        yield record
+
+
+def read_numbered_records(path: str | Path) -> Iterator[tuple[int, HistoryRecord]]:
+    """:func:`read_records` with each record's 1-based line number beside it."""
     with Path(path).open(encoding="utf-8") as fh:
         for lineno, line in enumerate(fh, start=1):
             line = line.strip()
@@ -85,9 +116,10 @@ def read_records(path: str | Path) -> Iterator[HistoryRecord]:
                 # in ``free_paths`` and in the stage globs it recorded; repaired
                 # here rather than per-field (schemas/migrate.py's docstring)
                 line, _ = migrate_document_text(line)
-                yield HistoryRecord.model_validate_json(line)
+                record = HistoryRecord.model_validate_json(line)
             except ValueError as exc:
                 raise ValueError(f"{path}:{lineno}: malformed history record") from exc
+            yield lineno, record
 
 
 def fingerprint(two_theta, intensity) -> str:
