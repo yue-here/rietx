@@ -637,6 +637,34 @@ def test_a_floored_width_facing_its_floor_leaves_its_twin_alone(truth):
     assert "held back by a bound" in res.summary
 
 
+def test_the_box_is_the_stages_own_cap_included(truth, monkeypatch):
+    """A sample strain already on its cap is scored inside the cap a stage
+    would arm, not inside the stored ±inf (WP-1998): ``suggest`` freezes the
+    stage's per-stage bounds where ``run_least_squares`` does, so a term the
+    stage would hold at its cap is never scored as if it could widen."""
+    import rietx.strategy.suggest as suggest_mod
+    from rietx.params.vector import strain_cap
+
+    seen = {}
+    real = suggest_mod.build_suggestion
+
+    def spy(jac, resid, free, candidates, **kw):
+        seen.update({c.path: c for c in candidates})
+        return real(jac, resid, free, candidates, **kw)
+
+    monkeypatch.setattr(suggest_mod, "build_suggestion", spy)
+    r, data = _refinement(truth)
+    cap = strain_cap(min(data.two_theta), max(data.two_theta))
+    r.structure.phases[0].lor_strain.value = cap
+    r.suggest(data)
+    c = seen["phases.0.lor_strain"]
+    assert c.value == cap and c.hi == pytest.approx(cap, rel=1e-12)
+    # a term inside the cap is not armed, so its box stays the stored one
+    r.structure.phases[0].lor_strain.value = 0.5 * cap
+    r.suggest(data)
+    assert seen["phases.0.lor_strain"].hi == np.inf
+
+
 def test_suggest_is_read_only(truth, monkeypatch):
     """No history node, no model/value/vary/result mutation, no leaked seed."""
     from rietx.params.vector import ParameterTable

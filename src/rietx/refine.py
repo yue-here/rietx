@@ -4312,10 +4312,17 @@ class Refinement:
             table.set_vary([p for p in cand_paths if p in lam], True)
             table.set_vary([p for p in cand_paths if p not in lam], True)
 
-        from .optimize.least_squares import _jacobian_for, _make_residual
+        from .optimize.least_squares import (
+            _freeze_cell_windows,
+            _freeze_size_cap,
+            _freeze_strain_cap,
+            _jacobian_for,
+            _make_residual,
+        )
 
         n_data = [0]
         blocks = [()]
+        compiled = [None]
 
         def probe():
             """Compile the table's state on model copies; return (jac, resid)."""
@@ -4356,6 +4363,8 @@ class Refinement:
                 x0 = np.concatenate([x0, model.pawley_x0()])
             n_data[0] = len(model.tt)
             blocks[0] = row_layout(model)
+            if compiled[0] is None:
+                compiled[0] = model
             return (_jacobian_for(model, table, self._backend)(x0),
                     _make_residual(model, table)(x0))
 
@@ -4392,7 +4401,15 @@ class Refinement:
         free_idx += list(range(len(fp), jac.shape[1]))
         # where each column was measured and the box a stage would solve it
         # in, read after seeding so a seeded row's room starts at its seed:
-        # a gain the bounds cannot reach is not a suggestion (WP-1998)
+        # a gain the bounds cannot reach is not a suggestion (WP-1998).  The
+        # stage's own per-stage bounds are frozen here exactly as
+        # ``run_least_squares`` freezes them, or a sample width already on its
+        # strain/size cap (armed only once reached) scores its full gain
+        # against a box the stage would never give it
+        _freeze_cell_windows(compiled[0], table,
+                             self._plan_settings["phase_support_sigma"])
+        _freeze_strain_cap(compiled[0], table)
+        _freeze_size_cap(compiled[0], table)
         x_at = table.x0()
         lo_at, hi_at = table.bounds()
         candidates = [
@@ -6643,8 +6660,12 @@ class Refinement:
                            sigma=model.sigma.tolist())
         s = self.suggest(data)
         if not s.groups:
+            # a bound-held candidate is leverage the box refuses, not leverage
+            # the data lacks (WP-1998): say it, as the summary does
+            held = (f", {len(s.bound_limited)} held back by a bound"
+                    if s.bound_limited else "")
             return (f"  next: nothing to free — no held parameter clears the "
-                    f"noise floor ({s.n_evaluated} evaluated)")
+                    f"noise floor ({s.n_evaluated} evaluated{held})")
         top = s.groups[0]
         what = (top.members[0].path if top.resolved
                 else "|".join(pc.path for pc in top.members) + " (a tie)")

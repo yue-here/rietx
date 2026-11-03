@@ -141,8 +141,8 @@ def _scaled(col: np.ndarray) -> tuple[np.ndarray, float]:
     return (col if s is None else col * f), f
 
 
-def _bounded_single(jac: np.ndarray, q: np.ndarray | None, rt: np.ndarray,
-                    c: Candidate, gain: float) -> float:
+def _bounded_single(proj: np.ndarray, rt: np.ndarray, c: Candidate,
+                    gain: float) -> float:
     """The one-parameter gain reachable inside ``c``'s box (WP-1998).
 
     With the free block ``F`` projected out of the column and the residual
@@ -158,8 +158,8 @@ def _bounded_single(jac: np.ndarray, q: np.ndarray | None, rt: np.ndarray,
     room = _box_offsets(c)
     if room is None or gain <= 0.0:
         return gain
-    j, f = _scaled(np.asarray(jac[:, c.index], dtype=np.float64))
-    jt = _off_span(q, j) if q is not None else j
+    # ``proj`` is the Jacobian with the free block already projected out
+    jt, f = _scaled(np.asarray(proj[:, c.index], dtype=np.float64))
     denom = float(jt @ jt)
     if denom <= 0.0:
         return gain
@@ -173,7 +173,7 @@ def _bounded_single(jac: np.ndarray, q: np.ndarray | None, rt: np.ndarray,
     return gain if alpha == 1.0 else gain * alpha * (2.0 - alpha)
 
 
-def _bounded_group(jac: np.ndarray, q: np.ndarray | None, rt: np.ndarray,
+def _bounded_group(proj: np.ndarray, rt: np.ndarray,
                    members: Sequence[Candidate], gain: float) -> float:
     """A group's joint gain reachable inside its members' boxes (WP-1998).
 
@@ -188,11 +188,9 @@ def _bounded_group(jac: np.ndarray, q: np.ndarray | None, rt: np.ndarray,
     rooms = [_box_offsets(c) for c in members]
     if all(r is None for r in rooms) or gain <= 0.0:
         return gain
-    cols, scales = zip(*(_scaled(np.asarray(jac[:, c.index], dtype=np.float64))
+    cols, scales = zip(*(_scaled(np.asarray(proj[:, c.index], dtype=np.float64))
                          for c in members))
     b = np.column_stack(cols)
-    if q is not None:
-        b = _off_span(q, b)
     norms = np.linalg.norm(b, axis=0)
     if not np.all(norms > 0.0):
         return gain
@@ -262,6 +260,9 @@ def build_suggestion(jac: np.ndarray, resid: np.ndarray, free: list[int],
     # ``one_parameter_gains`` built its own from
     q = _span_basis(jac, free) if free else None
     rt = _off_span(q, resid) if q is not None else resid
+    # the projected columns, built once: the bounded gains read them here and
+    # the candidate-vs-candidate ties below
+    proj = _off_span(q, jac) if q is not None else jac
 
     scored: list[tuple[Candidate, ParameterCandidate]] = []
     for c in candidates:
@@ -269,7 +270,7 @@ def build_suggestion(jac: np.ndarray, resid: np.ndarray, free: list[int],
             continue
         gradient = 2.0 * float(jac[:, c.index] @ resid)
         scored.append((c, ParameterCandidate(
-            path=c.path, gain=_bounded_single(jac, q, rt, c, gains[c.path]),
+            path=c.path, gain=_bounded_single(proj, rt, c, gains[c.path]),
             gain_unbounded=gains[c.path], gradient=gradient,
             absorption=absorption.get(c.path, 0.0), seeded=c.seeded,
             seed_value=c.seed_value,
@@ -289,7 +290,6 @@ def build_suggestion(jac: np.ndarray, resid: np.ndarray, free: list[int],
     # candidate-vs-candidate ties, measured on the free-block-projected
     # columns (one shared projection, then ρ² per pair through the same
     # block_projection_r2 every other collinearity statistic uses)
-    proj = _off_span(q, jac) if q is not None else jac
     links: list[tuple[int, int]] = []
     for a in range(len(survivors)):
         ca = survivors[a][0]
@@ -317,7 +317,7 @@ def build_suggestion(jac: np.ndarray, resid: np.ndarray, free: list[int],
         else:
             cols = [survivors[i][0].index for i in comp]
             gain = one_parameter_gains(jac, resid, free, [(cols, "g")])["g"]
-            gain = _bounded_group(jac, q, rt, [survivors[i][0] for i in comp],
+            gain = _bounded_group(proj, rt, [survivors[i][0] for i in comp],
                                   gain)
         groups.append(CandidateGroup(
             members=members, gain=gain, resolved=len(members) == 1,
