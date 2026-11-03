@@ -1,6 +1,6 @@
 # WP-2066 — a complete dichotomy search holds every centred lattice and polishes its truth leaf
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — option 1 + V3 landed, PR #1301 ready; the orthorhombic-F lab list (#780 set) still to re-measure
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by ghostshift runner (the orthorhombic-F re-measure, then the close)
 Track: What fires, and what stays silent
 Depends on: — (1924 soft: the same engine, the same #780 units)
 Priority: P2 2026-10-31 — a defect that fires wrongly: `search_complete=True` while the true cell is absent, on 22-32 % of C-centred monoclinic lattices by the reporter's draw; end to end the gate abstains rather than promoting the supercell (all `low`, `INDEX_ABSTAINED`), so a clean pattern returns no cell rather than a wrong one
