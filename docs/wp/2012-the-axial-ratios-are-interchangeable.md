@@ -102,10 +102,29 @@ choosing a fix.
       its now-redundant hold on H/L and the `HOLD_BLOCKED_PLAN` it printed; its both-free
       demonstration builds its own plan. Tutorial 04, the theory chapter's FCJ section and
       the concepts plans table follow.
-- [ ] Look for the class's siblings: any other pair of parameters the model treats
-      symmetrically, where a fit can land on either assignment.
-- [ ] Reproduce the esd difference between the compiled and numpy paths in a test, or show
-      it cannot happen once the pair is no longer both free.
+- [x] Look for the class's siblings: any other pair of parameters the model treats
+      symmetrically, where a fit can land on either assignment. **Done 2026-11-02.** Two
+      more surfaces freed the pair and now free S/L alone: the `refine_axial_asymmetry`
+      suggestion (`report/layer2.py`, which a stage applies as written) and the three
+      NIST protocol mirrors named in the build item. Left as they are: the Si 640c
+      acceptance ties S/L = H/L (`tie_equal`), which removes the mirror its own way; and
+      `test_mixed_precision.py`, `test_high_correlation_dedup.py` and the cross-backend
+      rows free both on purpose, comparing two arms or two columns rather than quoting
+      the pair. Not generalised: X against `lor_size` and Y against `lor_strain` are one
+      ridge with only the sum measured, not two mirrored minima (WP-2002's cpd-1a
+      entry); a magnetic structure's global moment sign is a mirror by physics, not
+      checked here.
+- [x] Reproduce the esd difference between the compiled and numpy paths in a test, or show
+      it cannot happen once the pair is no longer both free. **Done 2026-11-02: not
+      reproduced, either way.** On tutorial 04's synthetic LaB6 (no axial divergence, cell
+      held), `lab_calibrate` gives u 0.00407(15), v −0.00303(19), w 0.003005(58),
+      x 0.01486(32), y 0.02004(82) on the compiled tier and on `RIETX_COMPILED=0` alike,
+      with S/L alone and with H/L freed beside it. Both-free reports `FLAT_DIRECTION` with
+      the same "Flagged in stages: lines_axial, biso, closing." on both paths; S/L alone
+      reports `FLOOR_HIT` on S/L and no `FLAT_DIRECTION`. The 2026-10-19 difference was on
+      another synthetic standard that the WP does not name, so it is unreproduced rather
+      than disproved; with one ratio free there is no flat pair for the `rcond` cut to
+      straddle.
 
 ## Acceptance
 
