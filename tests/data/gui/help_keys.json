@@ -127,6 +127,7 @@
   "diagnostics:HARMONIC_HELD",
   "diagnostics:HIGH_CORRELATION",
   "diagnostics:HIGH_CORRELATION_OMITTED",
+  "diagnostics:HISTORY_EARLIER_TREE_SKIPPED",
   "diagnostics:HOLD_BLOCKED_PLAN",
   "diagnostics:HUMP_TOO_NARROW",
   "diagnostics:INDEX_ABSTAINED",

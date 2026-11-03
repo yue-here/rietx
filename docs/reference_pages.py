@@ -529,7 +529,8 @@ def diagnostic_index(root: _Path = SOURCE_ROOT) -> dict[str, dict[str, set]]:
 #: The first area prefix a code's first file matches decides; "" takes the rest.
 DIAGNOSTIC_GROUPS = (
     ("diagnostics-projects", "Other programs' projects", ("rietx/io/projects/",)),
-    ("diagnostics-files", "Reading files", ("rietx/io/",)),
+    # the history log's reader too: a file read, not a fit (WP-2031)
+    ("diagnostics-files", "Reading files", ("rietx/io/", "rietx/history/")),
     ("diagnostics-indexing", "Peaks and indexing", ("rietx/indexing/",)),
     # not `rietx/schemas/`: the codes raised there are a result's capped
     # correlation counts and a stored file's migrated ranges, not structure

@@ -105,9 +105,10 @@ class Project:
         #: "a reader change, not a corrupt project" message.
         self.data_diagnostics: list[Diagnostic] = list(data_diagnostics or [])
         #: what :meth:`RefinementTree.load` repaired on the last open of the
-        #: history log — today only ``DECLARED_RANGE_RESTORED``, a caller's own
+        #: history log: ``DECLARED_RANGE_RESTORED``, a caller's own
         #: ``Parameter`` a release before its class inherited left unbounded
-        #: (issue #204).  In memory only, for ``data_diagnostics``' reason: a
+        #: (issue #204), and ``HISTORY_EARLIER_TREE_SKIPPED``, a log an older
+        #: release doubled (WP-2031), among them.  In memory only, for ``data_diagnostics``' reason: a
         #: deterministic function of the log and this release, so storing it
         #: would be a second authority.  Empty for a project this release made.
         self.history_diagnostics: list[Diagnostic] = list(history_diagnostics or [])

@@ -538,8 +538,12 @@ So a reloaded tree resumes at the last commit or the last checkout, whichever ca
 A log written by a plain fit, with no annotation line at all, resumes at its last node.
 Blank lines are skipped.
 A file with no header line raises `ValueError` saying it is not a history log.
-A second header line raises `ValueError` naming the file and the line.
-Releases before 1.11 could write one, by appending a second run to a reused path.
+A file that holds more than one tree loads its last tree.
+Releases before 1.11 could write such a file, by appending a second run to a reused path.
+The last tree is the most recent run, and a node committed on it is appended at the end of the file, inside that tree.
+Each earlier tree is skipped and reported as a [`HISTORY_EARLIER_TREE_SKIPPED`](diagnostics-files.md#history_earlier_tree_skipped) warning naming its lines and its node count.
+Pass `diagnostics=[]` to collect it.
+Nothing is deleted from the file, so an earlier tree is read by copying its lines into a file of their own and loading that.
 A line that does not parse raises `ValueError` naming the file and the line number.
 
 A log has one writer.
