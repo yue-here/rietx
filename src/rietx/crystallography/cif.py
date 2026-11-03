@@ -665,6 +665,7 @@ def _magnetic_content(text: str) -> bool:
     structure this reader has always returned and which is WP-1319's to fence,
     not this rung's.
     """
+    text = magcif._without_text_fields(text)   # prose is not a tag (review of #1284)
     if re.search(r"(?m)^\s*_atom_site_moment[._]", text):
         return True
     if re.search(r"(?m)^\s*_space_group_(?:symop_)?magn[._]", text):
