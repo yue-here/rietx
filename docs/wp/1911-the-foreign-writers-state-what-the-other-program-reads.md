@@ -1,6 +1,6 @@
 # WP-1911 — the foreign writers state what the other program reads: the setting, the scale, the free set
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @yue-here (ghostshift runner); the PRs merged from outside before are in the handover log
+Milestone: unscheduled · Status: 🔄 2026-11-03 — PR #1370 lands Part A's reader and writer items; Parts B-D wait on the maintainer's decisions
 Track: Coming from another code
 Depends on: — (#713 soft: the P1 restatement Part D builds on)
 Priority: P3 2026-10-06 — was P2 for #716, which PR #733 fixed; the remaining issues cost a user hand edits
@@ -554,6 +554,100 @@ land alone before the transform exists.
   keywords (specification only, per ATTRIBUTION.md).
 
 ## Handover log
+
+- **2026-11-03** — Part A's remaining reader and writer items are done, and
+  the `.pcr` reader now says when it reads a file differently from FullProf.
+  A test now reads a written R phase the way FullProf does, and it fails on
+  the writer before PR #733. A `.pcr` with a bare R symbol beside a
+  rhombohedral cell still reads on rhombohedral axes, and it now carries a
+  warning that FullProf would refine the same file as a hexagonal cell. Yue
+  ruled that direction on 2026-11-03. The TOPAS writer refuses a tie group
+  whose members disagree, which its own reader would refuse. The magnetic
+  family-group refusal now counts what each site loses. Part B, C and D's
+  decisions and the GSAS-I measurement are untouched. PR #1370 (ghostshift
+  runner, one session across a pause).
+  - Done:
+    - FullProf oracle `_fullprof_r_cell` (`tests/test_projects_fullprof.py`),
+      held to the reporter's table first, mutation-checked against the
+      pre-#733 writer.
+    - `GSAS2_CIF_SETTING_IN_OPERATORS` no longer fires for an R axis
+      choice: GSAS-II 5.8.4's `SpcGroup`, run as a black box, reads a bare R
+      symbol on hexagonal axes, as gemmi does.
+    - The TOPAS writer refuses a `tie_equal` group stated at two values
+      (`topas_refined.render_slots`, at the reader's 1e-6 bar);
+      `docs/docs/reference/foreign-writers.md` says so.
+    - The `.EXP` writer's docstring says the setting suffix is not measured
+      (`gsas.py` ~1868); the GSAS-I measurement task stays open.
+    - The family-group refusal counts each site's positions under both
+      groups and names the split sites, or says none is split.
+    - `src/rietx/io/CLAUDE.md` § Project writers states the oracle rule.
+    - Ruling (Yue, 2026-11-03), "read but notify": `to_structure` reports
+      `FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED` (warning) for a bare R symbol read
+      on rhombohedral axes from the cell. `FULLPROF_ORIGIN_CHOICE` now covers
+      the origin choice alone. Audit row tier 3 approved 2026-11-03, help
+      entry, skill row, GUI help-key fixture.
+  - Review: `/code-review high --fix` ran before the pause and landed two
+    fixes (887e996bc). Declined: reusing `cell_volume` in the oracle, since
+    an oracle shares nothing with the package. The fast suite then found two
+    reds this branch caused, both fixed in 9d3b9346f: a warning code needs a
+    silence pair (`tests/silence.py`), and the oracle rule took
+    `src/rietx/io/CLAUDE.md` seven lines over its 565-line cap.
+  - Measured: fast suite on the final tree (macOS arm64, `[dev]`, run alone through
+    the serial lock): 13626 passed, 319 skipped, 34 xfailed. An earlier run
+    on the tree before 9d3b9346f had 2 failed and 13623 passed; the one
+    passed+skipped added since is the new silence pair. The branch adds 11
+    cases (8 functions, 10 cases, plus that pair); no main baseline was
+    measured here.
+    `tests.added_test_times` (local junit, this run): 0.20 s over the 8
+    added functions, none in the slow tail.
+    `python -m tests.reader_output`: unchanged against the merge-base
+    (e7f04f02a). `tests.audit_delta`: 1 added, 0 new at unaudited.
+  - Generality (the judge's sections, condensed; its full tables are in
+    the PR body):
+    - `FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED` (added code row: tier 3,
+      ambiguity 1, response `warning`, approved 2026-11-03). **Verdict:
+      weak.** The evidence for acting is stronger: reading the file on the
+      axes its cell states keeps the crystal the file's author meant, and the
+      maintainer ruled for it. The row's weakness is in what it certifies. It
+      labels the ambiguity kind 1 (every competent refiner would act the same
+      way), yet its own `evidence` names the opposite reading as FullProf's
+      practice. It also never states a mechanical ground (which families of
+      data the firing rule was checked on). Questions 1, 4, 5 and 7 hold;
+      question 2 "disagrees with its own evidence" (one argument could carry
+      kind 1: FullProf's reading is a parser rule, and it produces a different
+      crystal, not an alternative reading of this one; the row does not make
+      that argument); question 3 "real, and partly answered by the warning"
+      (GSAS-II 5.8.4 and gemmi also read a bare R as hexagonal, so no measured
+      program takes the cell's word for a bare symbol); question 6 "missing"
+      (two synthetic `.pcr` phases; the rare-feature clause asks `grounds` and
+      the help text to name the one family). Evidence that would change the
+      verdict: a sentence in `grounds` explaining why FullProf's reading and
+      the refusal rule are not competent dissents, or `ambiguity` changed;
+      plus a stated family count, or the rare-feature wording in `grounds`
+      and the help entry.
+      *Author: `grounds` now says why it is kind 1 (FullProf's rule imposes
+      other angles, and the refusal was ruled against) and that it was tested
+      on two synthetic R -3 c phases only (79f821f79). The help entry is left
+      without test-coverage wording, since it is text a user reads.*
+    - `topas_ties.SHARED_NAME_RTOL = 1e-6` (a module-level number added under
+      `io`, which `NOT_WALKED` declares out of the audit walk). **Verdict:
+      fails**, as a claim that no number there decides anything. The number
+      decides whether rietx's TOPAS reader refuses a file, and now also
+      whether the writer refuses a structure; `NOT_WALKED["io"]`'s reason
+      ("byte offsets, field widths, unit factors and size caps") does not
+      describe a refusal threshold. The value looks sound: unchanged from the
+      two inline literals it replaces, and on the writer side the margin is
+      large. No file has tested the bar. Evidence that would change the
+      verdict: `topas_ties.py` and `topas_refined.py` added to `WALKED` with a
+      row, or a `NOT_WALKED` reason that covers a refusal threshold.
+      *Author: the hoist was an optional tidy, so it is reverted (6d682876c)
+      and the two inline literals are back. The finding stands for whoever
+      next widens the walk: a refusal threshold sits in an unwalked `io`
+      file.*
+  - Next: the maintainer's decision on #722's options (Part B), which the
+    `free=` task and #761 wait on; then #723's package order (Part C); then
+    #721's items 2-4 (Part D). The `.EXP` measurement waits on a GSAS-I
+    binary.
 
 - **2026-10-12** — a P 1 file now refines as the model does. PR #912 (head
   `2c31b2c5`) merged as `a8960f79` after two rounds. It is #721's proposed
