@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any
 
 from . import _about
-from .history.store import fingerprint
+from .history.store import fingerprint, holds_a_log
 from .history.tree import RefinementTree
 from .io.formats.gsas import _first_bank_number
 from .io.readers import identify_format, read_pattern, reader_options_for
@@ -105,9 +105,10 @@ class Project:
         #: "a reader change, not a corrupt project" message.
         self.data_diagnostics: list[Diagnostic] = list(data_diagnostics or [])
         #: what :meth:`RefinementTree.load` repaired on the last open of the
-        #: history log — today only ``DECLARED_RANGE_RESTORED``, a caller's own
+        #: history log: ``DECLARED_RANGE_RESTORED``, a caller's own
         #: ``Parameter`` a release before its class inherited left unbounded
-        #: (issue #204).  In memory only, for ``data_diagnostics``' reason: a
+        #: (issue #204), and ``HISTORY_EARLIER_TREE_SKIPPED``, a log an older
+        #: release doubled (WP-2031), among them.  In memory only, for ``data_diagnostics``' reason: a
         #: deterministic function of the log and this release, so storing it
         #: would be a second authority.  Empty for a project this release made.
         self.history_diagnostics: list[Diagnostic] = list(history_diagnostics or [])
@@ -157,6 +158,14 @@ class Project:
             raise FileExistsError(
                 f"{root} already holds a {PROJECT_JSON}; open it instead of "
                 "creating over it")
+        if holds_a_log(root / HISTORY_FILE):
+            # a create that raised part-way wrote the log's header and no
+            # project.json; a log holds one tree (WP-2031), so it is refused
+            # here, before the pattern is copied, with what left it there
+            raise FileExistsError(
+                f"{root} holds a {HISTORY_FILE} but no {PROJECT_JSON}, so an "
+                "earlier create stopped part-way. Remove that directory, or "
+                "create the project at another path")
         if not src.is_file():
             raise FileNotFoundError(f"pattern file not found: {src}")
         root.mkdir(parents=True, exist_ok=True)

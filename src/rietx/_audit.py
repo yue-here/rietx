@@ -747,6 +747,18 @@ ROWS: tuple[Row, ...] = (
     Row("HARMONIC_HELD", "code"),
     Row("HIGH_CORRELATION", "code"),
     Row("HIGH_CORRELATION_OMITTED", "code"),
+    Row("HISTORY_EARLIER_TREE_SKIPPED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("check that the loaded tree is the run you meant before quoting a cell, a "
+                  "fraction or any other value from its nodes: the skipped tree's are not in it"),
+        scope=("all",),
+        evidence=("a statement about the file: fires exactly when RefinementTree.load meets a "
+                  "second header record, one note per earlier tree with its line range and "
+                  "node count. Loading the last tree follows from the store, which only "
+                  "appends: a node committed on the loaded tree lands at the end of the file, "
+                  "inside the last tree, so no other choice reloads with it. Nothing is "
+                  "deleted. Load, not raise, is the maintainer's ruling of 2026-11-03 (old "
+                  "files must always open; WP-2031)")),
     Row("HOLD_BLOCKED_PLAN", "code"),
     Row("HUMP_TOO_NARROW", "code"),
     Row("INDEX_ABSTAINED", "code"),
@@ -4622,6 +4634,10 @@ ROWS: tuple[Row, ...] = (
     Row("HARMONIC_FRACTION.suggestion", "suggestion", value=1),
     Row("HARMONIC_HELD.suggestion", "suggestion", value=1),
     Row("HIGH_CORRELATION.suggestion", "suggestion", value=1),
+    Row("HISTORY_EARLIER_TREE_SKIPPED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: names the skipped tree's line range, which is the whole of "
+                  "what reading it needs, and the reader that loads it")),
     Row("HOLD_BLOCKED_PLAN.suggestion", "suggestion", value=1),
     Row("HUMP_TOO_NARROW.suggestion", "suggestion", value=1),
     Row("INDEX_ABSTAINED.suggestion", "suggestion", value=1),
