@@ -132,6 +132,18 @@ export function textOrNull(text: string): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
+/**
+ * The formula box's new text, as one edit of the controls. Emptying the box
+ * also clears the temperature: the server refuses a temperature without a
+ * formula, and the form would otherwise re-sync the old formula back.
+ */
+export function setFormula(
+  controls: IndexingControls, text: string,
+): void {
+  controls.formula = textOrNull(text);
+  if (controls.formula === null) controls.temperature = null;
+}
+
 /** Parse an "a b c α β γ" line into a prior cell, or return the complaint. */
 export function parsePriorCell(text: string): number[] | string {
   const parts = text.trim().split(/[\s,]+/).filter(Boolean).map(Number);

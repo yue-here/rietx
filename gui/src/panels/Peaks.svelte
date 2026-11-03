@@ -28,6 +28,7 @@
     parsePriorCell,
     priorCellText,
     searchHelp,
+    setFormula,
     textOrNull,
     type IndexingControls,
   } from "../lib/controls";
@@ -521,8 +522,8 @@
               placeholder="e.g. CuSO4·5H2O"
               value={draft.formula ?? ""}
               onchange={(ev) => {
-                draft!.formula =
-                  textOrNull((ev.currentTarget as HTMLInputElement).value);
+                setFormula(draft!,
+                  (ev.currentTarget as HTMLInputElement).value);
                 commit();
               }} />
           </label>

@@ -262,7 +262,7 @@ Three things to understand before reading an answer:
 Beside the volume limits, `formula` takes the specimen's chemical formula and
 `temperature (K)` the temperature the pattern was measured at, and the project
 stores both. The temperature box waits for a formula, since a temperature only
-scales the formula's volumes. A run with a formula adds a `Z` column to the
+scales the formula's volumes. Emptying the formula box clears the temperature with it. A run with a formula adds a `Z` column to the
 candidate table: the formula units each cell's volume holds by Hofmann's average
 atomic volumes. Z moves no search and no rank. A correct inorganic cell reads
 0.4 to 0.9 of its true Z, so read it as a guide rather than a test.

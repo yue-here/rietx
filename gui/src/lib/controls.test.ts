@@ -21,6 +21,7 @@ import {
   parsePriorCell,
   priorCellText,
   searchHelp,
+  setFormula,
   statedFieldNames,
   textOrNull,
   type IndexingControls,
@@ -147,10 +148,34 @@ describe("the collapsed digest", () => {
 });
 
 describe("the formula field", () => {
+  const stored = (): IndexingControls => ({
+    search: {} as IndexingControls["search"],
+    engines: null, validate_candidates: true, check_top: null,
+    formula: null, temperature: null,
+  });
+
   it("sends an empty box as null, the package's no-formula", () => {
     expect(textOrNull("")).toBeNull();
     expect(textOrNull("   ")).toBeNull();
     expect(textOrNull(" CuSO4·5H2O ")).toBe("CuSO4·5H2O");
+  });
+
+  it("clears the temperature with the formula, so one edit is accepted", () => {
+    const c = stored();
+    c.formula = "ZnO";
+    c.temperature = 120;
+    setFormula(c, "  ");
+    expect(c.formula).toBeNull();
+    expect(c.temperature).toBeNull();
+  });
+
+  it("leaves the temperature alone while a formula remains", () => {
+    const c = stored();
+    c.formula = "ZnO";
+    c.temperature = 120;
+    setFormula(c, "C7H6O2");
+    expect(c.formula).toBe("C7H6O2");
+    expect(c.temperature).toBe(120);
   });
 });
 
