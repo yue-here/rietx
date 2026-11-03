@@ -48,11 +48,17 @@ order in `base.ascending()`, the one place it lives:
 
 | deviation | verdict | action |
 |---|---|---|
+| NaN or ±inf in 2θ, count or σ | report — the file states no value there; a zero monitor's division writes one | drop the row **first**, `PATTERN_ROWS_DROPPED` naming the 2θ runs; no finite row left → **raise** |
 | strictly descending | report — the same measurement stored backwards; reversal is lossless | reverse, `PATTERN_SCAN_REVERSED` |
 | duplicate 2θ, equal y | report — a format artefact | drop the repeat, `PATTERN_DUPLICATE_POINTS` |
 | duplicate 2θ, **different** y | contradiction — averaging invents a datum, dropping picks one | **raise**, naming the 2θ |
 | non-monotone (stitched, restarts) | contradiction — concatenate, sort or separate are three measurements | **raise**; name `scan=` only where the format has it |
 | non-constant step | neither | nothing — SRM 660c is 24 stitched regions and is legal |
+
+The finite-row drop (`base.finite_rows`, WP-2079): **a reader's decisions before
+`ascending` skip non-finite values and drop none of their rows**, so the report
+sees every one. pdCIF keeps σ = +∞ (its zero-weight marker), Bruker RAW refuses
+(stride evidence), and `pattern_data` refuses whatever non-finite value is left.
 
 `ascending(..., fmt=)` takes the format so the non-monotone refusal names
 `scan=` **only** where the option exists: telling someone to select a scan in a

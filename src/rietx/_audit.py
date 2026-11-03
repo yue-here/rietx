@@ -555,6 +555,18 @@ ROWS: tuple[Row, ...] = (
     Row("AIR_SCATTER_UNDECLARED", "code"),
     Row("BACKGROUND_ABSORPTION", "code"),
     Row("BACKGROUND_ORDER_AT_CAP", "code"),
+    Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END", "code", tier=1, ambiguity=1,
+        evidence=("a reading of the scan's own record: fires exactly when no candidate of "
+                  "select_arpls_lambda's grid reached its Durbin-Watson floor, so the "
+                  "returned strength is the grid's flexible end by the fallback line and not "
+                  "by the criterion; decides nothing (WP-1931: none of the 20 patterns under "
+                  "tests/data falls back, FAP.XRA nearest at the last candidate, d = 1.26)"),
+        grounds=("Arithmetic: the scan says which of its two return lines produced the "
+                 "answer, so a fallback is not read as a choice."),
+        response="info",
+        responds=("note that the baseline's smoothing strength is the grid's end and not "
+                  "the scan's choice, before holding that baseline fixed"),
+        scope=("all",)),
     Row("BISO_NEGATIVE", "code"),
     Row("BISO_UNUSUALLY_LARGE", "code"),
     Row("BOUND_HIT", "code"),
@@ -1532,6 +1544,17 @@ ROWS: tuple[Row, ...] = (
                  "not support is no measurement to warm-start from, as the absent-phase hold's "
                  "cell is not (WP-2003 batch C8)."),
         approved="2026-10-26"),
+    Row("rietx.schemas.sequential.SeriesEntry.pattern_paths", "action", tier=1, ambiguity=1,
+        evidence=("WP-1991, Yue's ruling of 2026-11-01: a series writes every entry path in one "
+                  "numbering (sequential._SeriesNumbering, the declared structure's, extended by "
+                  "first appearance) and matches each pattern's phases and atoms to it by name, "
+                  "a repeated name being refused (_refuse_duplicate_names), so the match is "
+                  "exact. This field records each path it rewrote. A PbSO4 series with O3 "
+                  "removed from one pattern joined O4 and O5 into one trajectory before it "
+                  "(tests/test_site_twins_merged.py). GSAS-II keys a constraint on an atom by a "
+                  "stable random ID rather than its number (G2VarObj, GSASIIobj.py 937-963). "
+                  "A file written before 1.11 stores no names, so it opens as written "
+                  "(pattern_paths None) rather than being converted at read")),
     Row("rietx.schemas.results.RefinementResult.absorption", "action", tier="caller", ambiguity=1,
         evidence=("opt-in: Geometry.mu_r/mu_t or capillary_radius_mm/thickness_mm, default None "
                   "(off); choosing flat_plate_transmission applies sec theta; Rouse et al. (1970) "
@@ -1716,9 +1739,10 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: exp[-4 ln2 (x/Gamma)^2] has half height at x = Gamma/2"),
     Row("rietx.background.select.ARPLS_DW_FLOOR", "constant", tier=3, value=1.2,
         evidence=("v0.2: the largest lambda whose masked residuals look white; no source for "
-                  "1.2, no measurement recorded; feeds only PatternDiagnostics.baseline_lambda, "
-                  "which nothing in src reads; select_arpls_lambda's signature default until "
-                  "the B14 lift"),
+                  "1.2; feeds PatternDiagnostics.baseline_lambda, which nothing in src reads, "
+                  "and whether BACKGROUND_SMOOTHING_AT_FLEXIBLE_END fires (WP-1931: none of "
+                  "the 20 patterns under tests/data falls short of it, FAP.XRA nearest at "
+                  "d = 1.26); select_arpls_lambda's signature default until the B14 lift"),
         grounds=("Reached through diagnose(), which auto_background calls on the default path; "
                  "its answer is reported on PatternDiagnostics.baseline_lambda and read by "
                  "nothing (B12, ruled 2026-10-19)."),
@@ -1890,7 +1914,17 @@ ROWS: tuple[Row, ...] = (
         value=48,
         evidence=("arithmetic: as _FLOAT_DENOMINATOR_MAX, the denominator of a (P, p) over a "
                   "t-subgroup (index <= 4) divides 48; the 230-type sweep in tests/test_subgroups.py "
-                  "standardises every one exactly")),
+                  "standardises every one exactly; rietx.crystallography.magnetic.isotropy."
+                  "_standard_child bounds its setting the same way, as max(48, 12 * index), so 48 "
+                  "binds only at index <= 4, the range that evidence covers; "
+                  "tests/test_distortion_candidates.py::"
+                  "test_the_child_setting_is_read_by_the_subgroups_standardiser pins that the "
+                  "child's setting goes through the same standardiser; "
+                  "rietx.crystallography.representation.subgroups._spglib_letters rounds spglib's "
+                  "transformation matrix and origin shift for a Hall setting to a denominator of at "
+                  "most 48, the floor alone, and tests/test_subgroups.py::"
+                  "test_the_letters_follow_spglibs_frame_and_not_the_input_order reaches it in the "
+                  "17 settings whose frame permutes letters")),
     Row("rietx.crystallography.representation.subgroups._PROBE_DENOMINATOR_PER_INDEX", "constant",
         tier="invariant", value=12,
         evidence=("answer-invariant: the bound only recovers the rational spglib's float stands for, "
@@ -3239,6 +3273,23 @@ ROWS: tuple[Row, ...] = (
                   "substitution is reported; the maintainer's choice on issue #202")),
     Row("rietx.refine.STRAIN_FLAG_WIDTH", "constant", value=1.5),
     Row("rietx.refine._CENTROID_SITES_NAMED", "constant", value=12),
+    Row("rietx.report.NOMINAL_AXIAL_APERTURE", "constant", tier=3, value=0.02,
+        evidence=("the S/L = H/L at which the report borrows its asymmetry column when a fit "
+                  "declares both apertures 0; it shapes only that borrowed dOmega/d(S/L) column, "
+                  "never the misfit, the fit's own four columns or a fitted value; 0.02 is a "
+                  "typical lab axial ratio; fails above the data's own aperture: on SRM 660c "
+                  "(refines to about 0.025/0.037) the action fires at 0.005, 0.01 and 0.02 "
+                  "(gated regions 14/15, 15/15, 15/15, against 12/15 before WP-2054) and falls "
+                  "silent at 0.05 (14/15, low-angle coefficients insignificant); on cpd-1c "
+                  "(S/L about 0.040) it fires at 0.01, 0.02 and 0.03 (5/14, 9/14, 9/14) and falls "
+                  "silent at 0.05 (7/14); at 0.02 it fires on cpd-1a (6/14) and cpd-1f (11/14); "
+                  "the failure above the aperture is silence, never a wrong call (WP-2054's "
+                  "nominal sweep, 2026-11-03)"),
+        grounds=("A reading setting whose domain test fails over part of its domain, above the "
+                 "data's own aperture; tier 3 like AXIAL_SIZING_FLOOR, whose number it shares.  "
+                 "Kept a constant of its own by the maintainer's ruling (2026-11-03), so that a "
+                 "change to the FCJ quadrature floor cannot move the report."),
+        approved="2026-11-03"),
     Row("rietx.report.body_misfit.MISFIT_ALPHA", "constant", value=0.001),
     Row("rietx.report.body_misfit.MISFIT_BIC", "constant", value=10.0),
     Row("rietx.report.distortion.EVEN_EXPONENT", "constant", tier=1, value=4,
@@ -4456,6 +4507,11 @@ ROWS: tuple[Row, ...] = (
     Row("AIR_SCATTER_UNDECLARED.suggestion", "suggestion", value=1),
     Row("BACKGROUND_ABSORPTION.suggestion", "suggestion", value=1),
     Row("BACKGROUND_ORDER_AT_CAP.suggestion", "suggestion", value=1),
+    Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: names the argument that overrides the fallback and the "
+                  "package's other background forms, and ranks none of them, so no dissenter is "
+                  "left (a held SNIP under a broad hump is one, references/judging.md)")),
     Row("BISO_NEGATIVE.suggestion", "suggestion", value=1),
     Row("BISO_UNUSUALLY_LARGE.suggestion", "suggestion", value=1),
     Row("BOUND_HIT.suggestion", "suggestion", value=1),
@@ -4596,7 +4652,7 @@ ROWS: tuple[Row, ...] = (
                   "_pd_proc_intensity_bkg_calc where the file states one, an empty stretch "
                   "of baseline otherwise) and names each reading's fix; it prescribes "
                   "neither branch, so no dissenter is left; takes no action itself")),
-    Row("PATTERN_ROWS_DROPPED.suggestion", "suggestion", value=1),
+    Row("PATTERN_ROWS_DROPPED.suggestion", "suggestion", value=2),
     Row("PATTERN_SIGMA_CONSTANT.suggestion", "suggestion", value=1),
     Row("PATTERN_UNDERSAMPLED.suggestion", "suggestion", value=1),
     Row("PATTERN_X_AXIS_ASSUMED.suggestion", "suggestion", value=1),

@@ -2,8 +2,8 @@
 
 Milestone: unscheduled · Status: ⬜
 Track: Data and metadata in, a structure out
-Depends on: #1332 (S0, the setting and the cell)
-Priority: P3 2026-11-03 — a workaround covers it (STRUCTURE TIDY or spglib outside the package), and no fit's number depends on it; the public name waits on the maintainer
+Depends on: #1332 (S0, the setting and the cell), 1452 (moyopy, whose Wyckoff coordinates S1 reads)
+Priority: P3 2026-11-03 — a workaround covers it (STRUCTURE TIDY or spglib outside the package), and no fit's number depends on it
 
 ## Goal
 
@@ -62,10 +62,10 @@ normaliser as new. It is on `main` already.
 - `crystallography/site_classes.py` (the `wyckoff` attribute docstring) records
   that spglib fixes Wyckoff letters only up to the normaliser. Its letter
   for a coordinate appears to differ from the ITA coordinate list in the
-  origin-2 settings of `Fd-3m` and `Pn-3m`. The issue's third check of the
-  first-triplet table runs against spglib's letters. A disagreement on those
-  groups is then expected, so the check must classify it before counting it a
-  transcription error.
+  origin-2 settings of `Fd-3m` and `Pn-3m`. S1a reads its coordinates from
+  moyopy, whose Wyckoff convention on those groups is not checked. A
+  disagreement there with `wyckoff_positions` may be the same normaliser
+  ambiguity, so the check must classify it before counting it a defect.
 - Present as the issue states: `indexing.reduce.reduce_cell` and
   `conventional_setting` (WP-1923), `superspace.generation.standard_setting`,
   `representation.subgroups._standardise` and `wyckoff_positions` (#1239),
@@ -75,12 +75,13 @@ normaliser as new. It is on `main` already.
 **The first-printed-triplet table.** The form of each Wyckoff position's first
 printed triplet is an ITA convention. The group's algebra does not give it.
 Im3̄m 6b prints (0, ½, ½), and P4₁32 8c has two triplets of the form x, x, x.
-The issue proposes one line per Wyckoff position, transcribed from ITA (2002)
-under a transcribe-then-check protocol. It is checked three ways: against the
-positions `wyckoff_positions` computes, against the forms a licensed
-database's standardized entries use (aggregate counts only), and against
-spglib's letters. Whether that table may ship in the wheel is open (Tasks,
-second decision).
+The issue proposed transcribing one line per Wyckoff position from ITA (2002).
+**Ruled by Yue 2026-11-03: S1 reads the table from moyopy** (Tasks, second
+decision). moyopy's `WyckoffPosition.coordinates` gives each position's
+coordinates. [1452](1452-spglib-to-moyo.md) moves rietx from spglib to
+moyopy, so S1 starts after 1452 lands. rietx ports no table. S1a validates
+moyopy's coordinates against the positions `wyckoff_positions` computes on
+all 230 groups.
 
 **Tier.** Rules 1 to 4 are named practice, tier 2, citing the 1984 paper. The
 issue proposes one caller argument beyond the paper: hydrogen left out of Γ,
@@ -88,8 +89,9 @@ off by default, until TYPIX (Parthé et al. 1993/94) has been read. If TYPIX
 states a rule, the default follows it with that citation. Aligning an entry
 with its structure type is a judgement and stays out (Non-goals).
 
-**Licensing.** STRUCTURE TIDY and TYPIX are read as papers. spglib and moyopy
-run as black-box oracles on results. No library's internal tables are read.
+**Licensing.** STRUCTURE TIDY and TYPIX are read as papers. No library code
+or table is ported. moyopy is called through its Python API after 1452, and
+spglib and moyopy otherwise run as black-box oracles on results.
 A licensed database contributes aggregate counts only. Nothing from it enters
 the repository (CLAUDE.md § Licensing, and the unpublished-data rule).
 
@@ -116,7 +118,7 @@ the repository (CLAUDE.md § Licensing, and the unpublished-data rule).
 
 ## Tasks
 
-- [ ] **Decision (maintainer): the public name.** Trigger: it names something
+- [x] **Decision (maintainer): the public name.** Trigger: it names something
       on the main user surface. The issue proposes `standardize(phase)`. Two
       questions. (a) Does it join the top-level `rx.` namespace, or stay at
       `rietx.crystallography.setting` beside S0's `standard_setting`? (b)
@@ -127,19 +129,35 @@ the repository (CLAUDE.md § Licensing, and the unpublished-data rule).
       package's own identifiers mix the two spellings: `normalize_species`
       and `summarize_events` beside `subgroups._standardise` and
       `superspace.generation.standardised`. The top-level namespace has no
-      word ending in -ise or -ize yet. Ask before the first commit names it.
-- [ ] **Decision (maintainer): whether the first-printed-triplet table may ship
+      word ending in -ise or -ize yet. **Settled 2026-11-03 by Claude under
+      the package's practice, unopposed by Yue:** the function is
+      `standardize`, in `rietx.crystallography.setting` beside
+      `standard_setting`. Grounds: the public names spell -ize
+      (`normalize_species`, `summarize_events`), as spglib's
+      `standardize_cell` does. The top-level `rx.` namespace holds workflow
+      verbs (`read_pattern`, `index_pattern`, `solve_magnetic`) and no
+      structure utility.
+- [x] **Decision (maintainer): whether the first-printed-triplet table may ship
       in the wheel.** Trigger: its crux is a licensing judgement nothing
       written settles. CLAUDE.md § Licensing requires a wheel file to state
       its status where it ships. It does not say whether a table of facts
       transcribed from ITA may ship. The issue cites Bilbao and spglib as
-      shipping equivalents (spglib's Wyckoff database, BSD-3; recall, not
-      checked). The alternative is to derive the forms at run time from
-      `wyckoff_positions` plus a short list of the cases the algebra cannot
-      fix. Measure that list's length first, because a short one may make the
-      question moot.
-- [ ] S1a: the first-triplet forms, as data or as rules per the decision
-      above, checked against `wyckoff_positions` on all 230 groups.
+      shipping equivalents. **Ruled by Yue 2026-11-03 (second ruling):
+      build S1 and S2 on moyopy's `WyckoffPosition.coordinates` once 1452
+      lands, and ship no table.** This accepts the contributor's proposal on
+      issue #1330. Grounds: nothing waits on S1 (P3, and S0 lands as PR
+      #1332). A port would be replaced when 1452 lands. Yue's direction is
+      moyopy for everything. The contributor declined to port spglib
+      themselves, since their house rule keeps their agents out of
+      reference implementations' source. Weighed and dropped: transcribing
+      from ITA leaves the UK/EU database right uncertain; PyXtal's MIT
+      `wyckoff_list.csv` is a third party's transcription. *Superseded:
+      the same day's first ruling, to port spglib's `coordinates_first`
+      array under BSD-3-Clause.* No count gates S1a.
+- [ ] S1a, after 1452 lands: read each position's first printed triplet
+      from moyopy's `WyckoffPosition.coordinates`. Validate it against
+      `wyckoff_positions` on all 230 groups, classing each disagreement (the
+      `site_classes.py` normaliser ambiguity first).
 - [ ] S1b: Γ and σ_Γ over `solve.cluster.equivalences`, with the hydrogen
       argument, and the call itself under the decided name. Wyckoff order last.
 - [ ] S2: the standardized structure block through `rietx/io/cif/`, with the
@@ -182,6 +200,21 @@ nothing.
   tables; Part 15 (2005) for the Euclidean normalisers.
 
 ## Handover log
+
+- **2026-11-03** — Yue reversed the table ruling in chat, accepting the
+  contributor's proposal on issue #1330. S1 and S2 build on moyopy's
+  `WyckoffPosition.coordinates` after [1452](1452-spglib-to-moyo.md), and
+  rietx ports no spglib table (Tasks, second decision; the Context table
+  paragraph, Licensing and S1a reworded; 1452 added to Depends on). Next: S1a
+  once #1332 has merged and 1452 has landed.
+
+- **2026-11-03** — Yue ruled the table decision in chat: port spglib's
+  `coordinates_first` under BSD-3-Clause, and validate it against
+  `wyckoff_positions` (Tasks, second decision; S1a reworded; the Licensing
+  paragraph updated). The same day Yue set the direction that rietx moves from
+  spglib to moyopy for everything, folded into
+  [1452](1452-spglib-to-moyo.md). Superseded the same day by the entry
+  above. Next: S1a once #1332 has merged.
 
 - **2026-11-03** — created, from the 2026-11-03 issue triage (issue #1330;
   PR #1362).

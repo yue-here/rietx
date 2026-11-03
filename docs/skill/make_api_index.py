@@ -749,13 +749,17 @@ def model_field_parts(cls, skip: frozenset[str] = frozenset()) -> list[tuple[str
     from pydantic_core import PydanticUndefined
 
     out = []
+    # a factory a caller cannot reach (HumpComponent.position) prints as required
+    required = set(getattr(cls, "_required_of_a_caller", ()))
     for name, info in cls.model_fields.items():
         if name in skip:
             continue
         ann = _ann(info.annotation)
         for member in TECHNIQUE_MEMBERS:
             ann = ann.replace(f" | {member}", "")
-        if info.default_factory is not None:
+        if name in required:
+            default = None
+        elif info.default_factory is not None:
             default = _default(info.default_factory())
         elif info.default is not PydanticUndefined:
             default = _default(info.default)
