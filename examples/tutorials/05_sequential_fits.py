@@ -243,7 +243,7 @@ series.plot("phases.0.cell.a")
 # Each answer depends on the one before it.
 # An error in one fit can therefore travel down the chain and still draw a smooth curve.
 # [`direction="both"`](https://rietx.org/docs/stable/reference/series.html#forward-and-backward-chains) fits the chain from cold to hot and again from hot to cold, and compares the two.
-# A parameter they disagree on is flagged [`SEQUENTIAL_PATH_DEPENDENT`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-path-dependent).
+# `both.direction_gaps` lists each parameter's gap between the two at each pattern, in esds, largest first.
 #
 # [`summary(deliverable="series")`](https://rietx.org/docs/stable/reference/result.html#printing-a-result) prints the rows that decide whether a trajectory can be quoted.
 
@@ -261,7 +261,7 @@ both = rx.refine_sequential(
 print(both.summary(deliverable="series"))
 
 # %% [markdown]
-# The `ordering artefact` row says the comparison ran and no parameter disagreed.
+# The `ordering artefact` row says the comparison ran and names the largest gap.
 # The `2θ-scale anchor` row and the two after it are yours to answer.
 # Nothing in a pattern file says what pins the 2θ scale.
 #

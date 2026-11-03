@@ -4072,24 +4072,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "SEQUENTIAL_PATH_CHECK_INCOMPLETE": HelpEntry(
-        title="The forward and backward comparison was partial",
+        title="The forward and backward comparison covered part of the series",
         description=(
-            "The check that compares the forward and backward chains either did not run "
-            "or covered less than the whole series. Zero path-dependent findings is a "
-            "clean result only when the check ran in full. A chain may have stopped, a "
-            "pattern may have failed, or a parameter may have had no esd in both chains. "
-            "Rerun in both directions to completion before you quote per-pattern esds as "
-            "the uncertainty."
+            "The comparison of the forward and backward chains ran, on less than the "
+            "whole series. A pattern may have failed in one chain, or a parameter may "
+            "have had no esd in both chains on any pattern. The named patterns and "
+            "parameters are unchecked, and every other gap in `direction_gaps` stands."
         ),
     ),
-    "SEQUENTIAL_PATH_DEPENDENT": HelpEntry(
-        title="A trajectory depends on the refinement order",
+    "SEQUENTIAL_PATH_CHECK_NOT_RUN": HelpEntry(
+        title="The forward and backward comparison did not run",
         description=(
-            "A parameter takes different values when the series is refined forward and "
-            "backward, by more than their esds allow. The data alone do not determine "
-            "it, so the path of the chain decides the value. Its per-pattern esd "
-            "understates the uncertainty. Hold the parameter, restrain it, or report the "
-            "spread between the two directions."
+            "You asked for both directions, and the comparison of the two chains did "
+            "not run. The forward chain may have been cancelled, or the backward chain "
+            "cancelled or raised. `direction_gaps` is then `None`, and no trajectory has "
+            "been checked against its refinement order. Rerun in both directions to "
+            "completion before you quote per-pattern esds as the uncertainty."
         ),
     ),
     "SEQUENTIAL_RESEED": HelpEntry(
@@ -5990,23 +5988,24 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "Which way the chain ran: `forward`, `backward`, or `both`, which runs it "
             "each way and compares the two trajectories. Under `both` the entries are "
-            "the forward chain's and the comparison is `SEQUENTIAL_PATH_DEPENDENT`."
+            "the forward chain's and the comparison is `direction_gaps`."
         ),
     ),
     "SeriesResult.backward": HelpEntry(
         title="Reverse chain",
         description=(
             "The reverse chain's own series result when `direction` is `both`, so the "
-            "trajectory a path-dependence finding is about can be read. `None` for a "
-            "one-way run."
+            "trajectory each gap in `direction_gaps` compares against can be read. "
+            "`None` for a one-way run."
         ),
     ),
     "SeriesResult.diagnostics": HelpEntry(
         title="Series findings",
         description=(
-            "Findings about the series as a whole, such as path dependence, reseeds "
-            "and patterns that failed. Each pattern's own findings stay on its entry, "
-            "and the steps between patterns are `steps`, not findings."
+            "Findings about the series as a whole, such as reseeds and patterns that "
+            "failed. Each pattern's own findings stay on its entry and are counted in "
+            "`code_counts`. The steps between patterns are `steps`, and the gaps "
+            "between the two directions `direction_gaps`, not findings."
         ),
     ),
     "SeriesResult.steps": HelpEntry(
@@ -6023,6 +6022,22 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`cold_ratio`: near 1 the step is in the data, near 0 the chain made it. "
             "Steps into or out of a rejected pattern are left out; `None` means a "
             "document written before the field."
+        ),
+    ),
+    "SeriesResult.direction_gaps": HelpEntry(
+        title="Gaps between the two directions",
+        description=(
+            "Under `direction=\"both\"`, every parameter's forward minus backward value "
+            "at every pattern both chains fitted, in combined esds, largest first, with "
+            "the attempt each chain kept beside each gap. The size is `None` where "
+            "either chain measured no esd. rietx sets no threshold on it. Where a gap is "
+            "large against its esds, the data alone do not fix that parameter, and the "
+            "chain's order decides it. Hold the parameter, restrain it, or quote the "
+            "spread between the two directions as its uncertainty. A gap whose two "
+            "chains kept different attempts measures the restart ladder as well as the "
+            "order. A parameter near zero with an esd near zero can show thousands of "
+            "esds with no physical size, so read the two values too. `None` when the "
+            "comparison did not run, or in a document written before the field."
         ),
     ),
     "SeriesResult.code_counts": HelpEntry(

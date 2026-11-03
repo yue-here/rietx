@@ -412,8 +412,8 @@ is resolution-limited changes numbers it cannot justify.
 ## §4b — the trajectory deliverable, and where its rows come from
 
 Four codes on `SeriesResult.summary(deliverable="series")` carry the chain's
-own rows. `SEQUENTIAL_PATH_DEPENDENT` is an ordering artefact — only a
-`direction="both"` chain can produce one, so a one-way chain has not looked.
+own rows. `series.direction_gaps` measures an ordering artefact, and only a
+`direction="both"` chain fills it, so a one-way chain has not looked.
 `series.code_counts` states a count across the chain no per-pattern code
 can, measured at **42 of 68** patterns on this ramp (`BOUND_HIT` on one cell, original run). A large entry in
 `series.steps` is either the science or a chain failure, and `verify_steps=k`

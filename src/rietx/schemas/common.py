@@ -597,6 +597,13 @@ from .._nearmiss import did_you_mean
 #: "not recorded", the 0.25 → 0.26 rule; ``SequentialRefinement.fit`` writes
 #: it on every series.  ``SEQUENTIAL_PERSISTENT_FINDING``, the threshold it
 #: replaces, is gone, so a document carrying one still reads.
+#: Also in 0.60 (WP-2003, C5): ``SeriesResult.direction_gaps``, a
+#: ``DirectionGap`` per path and pattern under ``direction="both"``.  Additive
+#: and defaulted to ``None``, "not compared"; ``SequentialRefinement.fit``
+#: writes it whenever the two chains were compared.
+#: ``SEQUENTIAL_PATH_DEPENDENT`` is gone, and ``SEQUENTIAL_PATH_CHECK_NOT_RUN``
+#: takes the ``warning`` half of ``SEQUENTIAL_PATH_CHECK_INCOMPLETE``; a stored
+#: INCOMPLETE at ``warning`` still reads as not run.
 #: Also in 0.60 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
 #: formula and temperature read, and ``PeakList.instrument_undeclared``,
 #: the instrument blocks the picker found at default on a lab source.  Additive

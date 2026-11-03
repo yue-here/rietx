@@ -802,8 +802,8 @@ def test_a_total_disagreement_between_the_chains_is_reported(
     either side, and still the extreme of what ``direction="both"`` is for.
 
     Skipping every monotone backward reading without a bracket wrote nothing
-    here, in both orderings — and neither the forward diagnostics nor
-    ``SEQUENTIAL_PATH_DEPENDENT`` (which divides by the held point's esd) said
+    here, in both orderings.  Neither the forward diagnostics nor the removed
+    ``SEQUENTIAL_PATH_DEPENDENT`` (which divided by the held point's esd) said
     it anywhere else.
     """
     (row,) = _agreement(forward_flags, backward_flags)

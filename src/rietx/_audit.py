@@ -1117,13 +1117,32 @@ ROWS: tuple[Row, ...] = (
     Row("SEQUENTIAL_MOMENT_HOLD", "code"),
     Row("SEQUENTIAL_MOMENT_ONSET", "code"),
     Row("SEQUENTIAL_PATH_CHECK_INCOMPLETE", "code", tier="caller", ambiguity=1,
+        response="info",
+        responds=("treat the patterns or paths `where` names as unchecked by the "
+                  "forward-backward comparison; every other row of "
+                  "SeriesResult.direction_gaps stands"),
         evidence=("opt-in: fires only under direction='both', off by default, which no default "
                   "path sets (the GUI series panel defaults to 'forward', gui/series.py:80; "
-                  "searched 2026-10-24). It reports that the requested comparison did not run "
-                  "or ran on less than the series (sequential.py:2170-2241) and moves no value. "
-                  "No response yet: its sites raise at warning (did not run) and info (ran on "
-                  "less), two consequences in one code (WP-2003 batch)")),
-    Row("SEQUENTIAL_PATH_DEPENDENT", "code"),
+                  "searched 2026-10-24). It reports that the requested comparison ran on less "
+                  "than the series: the patterns one chain has no entry for, or the paths some "
+                  "chain measured that no pattern could judge (sequential.py "
+                  "_path_check_coverage), and moves no value. Its 'did not run' half is "
+                  "SEQUENTIAL_PATH_CHECK_NOT_RUN since the split (2003-batch/batch.md, C5 q2, "
+                  "ruled by the maintainer 2026-11-03)")),
+    Row("SEQUENTIAL_PATH_CHECK_NOT_RUN", "code", tier="caller", ambiguity=1,
+        response="warning",
+        responds=("the forward-backward comparison the caller asked for did not run, so "
+                  "SeriesResult.direction_gaps is None: quote no trajectory's cell, fraction "
+                  "or width as independent of the refinement order"),
+        scope=("all",),
+        evidence=("opt-in: fires only under direction='both', off by default, which no default "
+                  "path sets (searched 2026-10-24). It reports that the requested comparison "
+                  "did not run, naming the chain that stopped and the pattern: a forward chain "
+                  "cancelled, a backward chain cancelled or raised (sequential.py "
+                  "_path_check_not_run), and moves no value. Split from "
+                  "SEQUENTIAL_PATH_CHECK_INCOMPLETE, whose sites raised at warning and info, two "
+                  "consequences in one code (2003-batch/batch.md, C5 q2, ruled by the "
+                  "maintainer 2026-11-03)")),
     Row("SEQUENTIAL_RESEED", "code", tier=3, ambiguity=1,
         evidence=("warning at its one site (sequential.py _reseed_diagnostics, where = the "
                   "label); fires when the kept rung is cold on a warm-startable pattern, its "
@@ -1571,6 +1590,17 @@ ROWS: tuple[Row, ...] = (
                   "planted's FLOOR_HIT, 63 of 248, silent. The summary prints one line naming "
                   "the three largest counts and the field; the reading is its help entry "
                   "(2003-batch/batch.md, C6, ruled by the maintainer 2026-11-03)")),
+    Row("rietx.schemas.sequential.SeriesResult.direction_gaps", "action", tier=1, ambiguity=3,
+        evidence=("arithmetic: under direction='both', every path's forward-minus-backward value "
+                  "at every pattern both chains fitted, over the combined esd sqrt(sf^2 + sb^2), "
+                  "None where either chain measured no esd, largest first and no threshold, with "
+                  "each walk's kept rung beside each gap (sequential.py _direction_gaps; X15: a "
+                  "pattern kept cold in one walk and warm in the other measures the ladder). It "
+                  "replaces SEQUENTIAL_PATH_DEPENDENT and PATH_DEPENDENCE_SIGMA, a 3-sigma bar with "
+                  "no provenance met by chance over n paths x m patterns; the suggestion's three "
+                  "alternatives live in the field's help entry. The summary prints one line naming "
+                  "the largest gaps and the field (2003-batch/batch.md, C5 q1, ruled by the "
+                  "maintainer 2026-11-03)")),
     Row("rietx.schemas.sequential.SeriesResult.steps", "action", tier=1, ambiguity=3,
         evidence=("arithmetic: every refined path's step between consecutive accepted "
                   "patterns over the later fit's esd, largest first and no threshold "
@@ -3790,9 +3820,8 @@ ROWS: tuple[Row, ...] = (
                   "a 4.75804(38), 8e-5; 2003-batch/reseed.md), so only a constant trajectory "
                   "falls under it; before it an unrefinable profile.y read as a 29 000x step and "
                   "1e16 sigma of path dependence (its comment). What it guards is tiered on its "
-                  "own: PATH_DEPENDENCE_SIGMA, and SeriesStep.size_esd, which it sets to 0 under "
+                  "own: SeriesStep.size_esd and DirectionGap.gap_esd, which it sets to 0 under "
                   "the floor (WP-2003)")),
-    Row("rietx.sequential.PATH_DEPENDENCE_SIGMA", "constant", value=3.0),
     Row("rietx.sequential.WIDTH_GROWTH_FACTOR", "constant", value=3.0),
     Row("rietx.sequential.WIDTH_GROWTH_GOF_FACTOR", "constant", value=2.0),
     Row("rietx.sequential.WIDTH_GROWTH_SIGMA", "constant", value=3.0),
@@ -4486,8 +4515,8 @@ ROWS: tuple[Row, ...] = (
                   "the skill says to run 'both' for any trajectory to be published "
                   "(references/series.md), and the default stays visible in SeriesResult.direction "
                   "and the summary's 'ordering artefact: NOT measured' line. What 'both' turns on "
-                  "is tiered on its own: PATH_DEPENDENCE_SIGMA, NOISE_FLOOR_REL and "
-                  "SEQUENTIAL_PATH_DEPENDENT (WP-2003)")),
+                  "is tiered on its own: NOISE_FLOOR_REL and SeriesResult.direction_gaps, which "
+                  "replaced PATH_DEPENDENCE_SIGMA and SEQUENTIAL_PATH_DEPENDENT (WP-2003, C5)")),
     Row("rietx.sequential.SequentialRefinement.fit:reseed", "default", tier=3, ambiguity=1,
         value=True,
         evidence=("switches on the ladder's escalation, which since WP-2003 fires on a "
@@ -4846,12 +4875,14 @@ ROWS: tuple[Row, ...] = (
     Row("SEQUENTIAL_MOMENT_HOLD.suggestion", "suggestion", value=1),
     Row("SEQUENTIAL_MOMENT_ONSET.suggestion", "suggestion", value=6),
     Row("SEQUENTIAL_PATH_CHECK_INCOMPLETE.suggestion", "suggestion", tier="caller", ambiguity=1,
-        value=3,
-        evidence=("opt-in, as its code: re-run direction='both' to completion, treat the named "
-                  "patterns as unchecked, or read both trajectories of an unjudged path "
-                  "(sequential.py:2187-2239); each restates what the requested check left "
-                  "undone")),
-    Row("SEQUENTIAL_PATH_DEPENDENT.suggestion", "suggestion", value=1),
+        value=2,
+        evidence=("opt-in, as its code: treat the named patterns as unchecked, or read both "
+                  "trajectories of an unjudged path (sequential.py _path_check_coverage); each "
+                  "restates what the requested check left undone")),
+    Row("SEQUENTIAL_PATH_CHECK_NOT_RUN.suggestion", "suggestion", tier="caller", ambiguity=1,
+        value=1,
+        evidence=("opt-in, as its code: re-run direction='both' to completion (sequential.py "
+                  "_path_check_not_run), the one way to have the check the caller asked for")),
     Row("SEQUENTIAL_RESEED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: points at the code that already says why "
                   "(SEQUENTIAL_UNRECOVERED on a rejected cold fit) or at a specimen or model "
@@ -5291,8 +5322,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "SEQUENTIAL_MOMENT_HOLD.suggestion",
     "SEQUENTIAL_MOMENT_ONSET",
     "SEQUENTIAL_MOMENT_ONSET.suggestion",
-    "SEQUENTIAL_PATH_DEPENDENT",
-    "SEQUENTIAL_PATH_DEPENDENT.suggestion",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SEQUENTIAL_WIDTH_GROWTH.suggestion",
     "SITE_SNAPPED_TO_SPECIAL_POSITION",
@@ -5768,7 +5797,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.schemas.suggest.SUGGEST_ABSORPTION_MAX",
     "rietx.schemas.suggest.SUGGEST_GROUP_R2",
     "rietx.schemas.suggest.SUGGEST_MIN_GAIN",
-    "rietx.sequential.PATH_DEPENDENCE_SIGMA",
     "rietx.sequential.SequentialRefinement.fit:labels",
     "rietx.sequential.SequentialRefinement.fit:refit",
     "rietx.sequential.SequentialRefinement.fit:x",
@@ -6000,8 +6028,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "SCALE_B_INSEPARABLE",
     "SEQUENTIAL_MOMENT_HOLD",
     "SEQUENTIAL_MOMENT_ONSET",
-    "SEQUENTIAL_PATH_CHECK_INCOMPLETE",
-    "SEQUENTIAL_PATH_DEPENDENT",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",

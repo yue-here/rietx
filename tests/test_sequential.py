@@ -35,9 +35,9 @@ from rietx.sequential import (
     _better,
     _carry_into,
     _collapse,
+    _direction_gaps,
     _entry_from_result,
     _labels_for,
-    _path_dependence_diagnostics,
     _reseed_diagnostics,
     _reseed_needed,
     _series_steps,
@@ -2135,6 +2135,14 @@ def test_the_plot_shades_only_a_step_re_measured_cold():
     plt.close(fig)
 
 
+def _largest_gap(forward, backward, relative=frozenset(), angles=frozenset()):
+    """The comparison's largest gap in combined esds, signed, and the coverage
+    diagnostics beside it: ``(None, [...])`` where no gap has a size."""
+    gaps, coverage = _direction_gaps(forward, backward, relative, angles)
+    sized = [g for g in gaps if g.gap_esd is not None]
+    return (sized[0] if sized else None), coverage
+
+
 def test_a_relative_dof_is_judged_by_neither_fence_nor_stepped():
     """A coordinate DOF's value is the step its fit took, not a position.
 
@@ -2150,12 +2158,12 @@ def test_a_relative_dof_is_judged_by_neither_fence_nor_stepped():
     forward = _synthetic_series(B_DOF, steps, [4e-4] * 6)
     backward = _synthetic_series(B_DOF, [-s for s in steps], [4e-4] * 6)
     assert _series_steps(forward)[0].indices == (0, 1)
-    assert [d.code for d in _path_dependence_diagnostics(forward, backward)] == [
-        "SEQUENTIAL_PATH_DEPENDENT"]
+    top, _ = _largest_gap(forward, backward)
+    assert abs(top.gap_esd) > 30, top     # 0.0192 over 5.7e-4
 
     relative = frozenset({B_DOF})
     assert _series_steps(forward, relative) == []
-    assert _path_dependence_diagnostics(forward, backward, relative) == []
+    assert _direction_gaps(forward, backward, relative) == ([], [])
 
 
 def test_a_chained_coordinate_is_judged_on_its_coordinate(thermal_patterns):
@@ -2172,8 +2180,8 @@ def test_a_chained_coordinate_is_judged_on_its_coordinate(thermal_patterns):
         thermal_patterns[:5], structure, instrument, direction="both",
         plan=_coordinate_plan("phases.*.atoms.*.dof.*"))
     assert {B_X, B_DOF} <= set(series.paths(varied_only=False))
-    assert [d.where for d in series.diagnostics
-            if d.code == "SEQUENTIAL_PATH_DEPENDENT"] == []
+    gapped = {g.path for g in series.direction_gaps}
+    assert B_X in gapped and B_DOF not in gapped
     stepped = {s.path for s in series.steps}
     assert B_X in stepped and B_DOF not in stepped
     assert {s.path for s in series.backward.steps} == stepped
@@ -2185,14 +2193,16 @@ def test_path_dependence_ignores_numerically_identical_chains():
                                 [2.2e-74, 1e-60, 1e-60], [1e-70] * 3)
     backward = _synthetic_series("instrument.profile.y",
                                  [2.1e-60, 1e-60, 1e-60], [1e-70] * 3)
-    assert _path_dependence_diagnostics(forward, backward) == []
+    top, coverage = _largest_gap(forward, backward)
+    assert (top.gap_esd, coverage) == (0.0, [])
 
     moved = _synthetic_series("phases.0.cell.a", [4.1566, 4.1570, 4.1574],
                               [1e-5] * 3)
     shifted = _synthetic_series("phases.0.cell.a", [4.1576, 4.1570, 4.1574],
                                 [1e-5] * 3)
-    assert [d.code for d in _path_dependence_diagnostics(moved, shifted)] == [
-        "SEQUENTIAL_PATH_DEPENDENT"]
+    top, _ = _largest_gap(moved, shifted)
+    assert top.gap_esd == pytest.approx(-1e-3 / (2 ** 0.5 * 1e-5))
+    assert (top.label, top.forward, top.backward) == ("p0", 4.1566, 4.1576)
 
 
 def test_path_dependence_needs_an_esd_from_both_chains():
@@ -2218,17 +2228,19 @@ def test_path_dependence_needs_an_esd_from_both_chains():
         [None, None, None, None, esd, esd, esd, esd])
     # nothing is judged — and since WP-1333 that is said, rather than being
     # the same empty list an agreed path returns (issue #269)
-    assert _unjudged(_path_dependence_diagnostics(held_late, held_early)) == [
+    assert _unjudged(_direction_gaps(held_late, held_early)) == [
         ["phases.1.cell.b"]]
 
 
-def _unjudged(diagnostics) -> list[list[str]]:
+def _unjudged(compared) -> list[list[str]]:
     """Every diagnostic must be the #269 finding; return what each names.
 
-    The shape these tests pin is that the comparison judged nothing: no
-    ``SEQUENTIAL_PATH_DEPENDENT`` at all, and one ``info``
-    ``SEQUENTIAL_PATH_CHECK_INCOMPLETE`` naming the paths it could not reach.
+    The shape these tests pin is that the comparison judged nothing: no gap
+    with a size at all, and one ``info`` ``SEQUENTIAL_PATH_CHECK_INCOMPLETE``
+    naming the paths it could not reach.
     """
+    gaps, diagnostics = compared
+    assert all(g.gap_esd is None for g in gaps), gaps
     assert all(d.code == "SEQUENTIAL_PATH_CHECK_INCOMPLETE" and d.level == "info"
                for d in diagnostics), [d.code for d in diagnostics]
     return [d.where for d in diagnostics]
@@ -2249,14 +2261,18 @@ def test_path_dependence_keeps_the_patterns_both_chains_measured():
         "phases.1.cell.b",
         [5.4001, 5.4011, 5.4019, 5.4031, 5.4039, 5.4051, 5.4130, 5.4140],
         [esd] * 6 + [None, None])
-    assert _path_dependence_diagnostics(forward, backward) == []
+    gaps, coverage = _direction_gaps(forward, backward)
+    assert coverage == []
+    assert [g.label for g in gaps if g.gap_esd is None] == ["p6", "p7"]
+    top, _ = _largest_gap(forward, backward)
+    assert abs(top.gap_esd) == pytest.approx(1e-4 / (2 ** 0.5 * esd))
 
-    # …and a real disagreement inside the comparable patterns still fires,
-    # with the one-sided pair present and ignored: the two channels are
+    # …and a real disagreement inside the comparable patterns leads the list,
+    # with the one-sided pair present and unsized: the two channels are
     # separable, and only one of them is an artefact.
     backward.entries[5].parameters[0].value = 5.4060
-    assert [d.code for d in _path_dependence_diagnostics(forward, backward)] == [
-        "SEQUENTIAL_PATH_DEPENDENT"]
+    top, _ = _largest_gap(forward, backward)
+    assert (top.label, round(top.gap_esd, 2)) == ("p5", -7.07)
 
 
 def test_path_dependence_pairs_the_two_chains_by_pattern():
@@ -2281,16 +2297,16 @@ def test_path_dependence_pairs_the_two_chains_by_pattern():
     assert len(f) == len(b) == 7          # the length gate lets this through
     assert f.labels != b.labels           # and they are not the same patterns
 
-    assert _path_dependence_diagnostics(forward, backward) == []
+    gaps, coverage = _direction_gaps(forward, backward)
+    assert coverage == [] and {g.gap_esd for g in gaps} == {0.0}
+    assert [g.label for g in gaps] == [f"p{k}" for k in range(1, 7)]
 
     # The positive arm: a real disagreement on a pattern both chains *did*
-    # measure still fires, and the label in the message is the pattern the
-    # two values actually come from.
+    # measure leads the list, and its label is the pattern the two values
+    # actually come from.
     backward.entries[3].parameters[0].value = 4.1600
-    fired = _path_dependence_diagnostics(forward, backward)
-    assert [d.code for d in fired] == ["SEQUENTIAL_PATH_DEPENDENT"]
-    assert "at p3:" in fired[0].message
-    assert "4.153 vs 4.16" in fired[0].message
+    top, _ = _largest_gap(forward, backward)
+    assert (top.label, top.forward, top.backward) == ("p3", pytest.approx(4.153), 4.16)
 
 
 def test_path_dependence_judges_the_overlap_of_unequal_chains():
@@ -2308,15 +2324,14 @@ def test_path_dependence_judges_the_overlap_of_unequal_chains():
 
     assert len(forward.trajectory("phases.1.cell.a")) == 7
     assert len(backward.trajectory("phases.1.cell.a")) == 8
-    fired = _path_dependence_diagnostics(forward, backward)
-    assert [d.code for d in fired] == ["SEQUENTIAL_PATH_DEPENDENT"]
-    assert "at p4:" in fired[0].message
+    top, _ = _largest_gap(forward, backward)
+    assert top.label == "p4" and abs(top.gap_esd) > 100
 
 
 def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
     """The skill row's own remedy, run on the two shapes it exists to catch.
 
-    ``abstention.md``'s ``SEQUENTIAL_PATH_DEPENDENT`` row told an agent to
+    ``abstention.md``'s path-dependence row told an agent to
     compare ``len(series.trajectory(path))`` against the backward chain's
     before reading silence as clearance.  @yue-here measured both states in
     which that returns "fine": two chains whose held stretches sit at opposite
@@ -2351,7 +2366,7 @@ def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
     fa, ba = a.trajectory(path), a.backward.trajectory(path)
     assert len(fa) == len(ba) == 4          # the old check: EQUAL -> clearance
     assert set(fa.labels) & set(ba.labels) == set()
-    assert _unjudged(_path_dependence_diagnostics(a, a.backward)) == [[path]]
+    assert _unjudged(_direction_gaps(a, a.backward)) == [[path]]
     assert patterns_judged(a, path) == 0
 
     # B — the esd half.  Identical labels, identical lengths, and the
@@ -2364,7 +2379,8 @@ def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
     # the two chains' values are *identical*, which the comparison's noise
     # floor calls agreement whatever the esds say, so there is nothing an esd
     # could have changed and nothing to name (WP-1333)
-    assert _path_dependence_diagnostics(b, b.backward) == []
+    gaps, coverage = _direction_gaps(b, b.backward)
+    assert coverage == [] and all(g.gap_esd is None for g in gaps)
     assert patterns_judged(b, path) == 0
 
     # B' — the same esd pattern over values that differ: now the silence
@@ -2372,7 +2388,7 @@ def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
     shifted = [v + 2e-3 for v in ramp]
     b2 = both(_series_missing(path, ramp, [None] * 8, absent=set()),
               _series_missing(path, shifted, [esd] * 8, absent=set()))
-    assert _unjudged(_path_dependence_diagnostics(b2, b2.backward)) == [[path]]
+    assert _unjudged(_direction_gaps(b2, b2.backward)) == [[path]]
     assert patterns_judged(b2, path) == 0
 
     # The positive arm, because a count that only ever answers 0 is not
@@ -2410,13 +2426,17 @@ def test_forward_and_backward_chains_agree_on_a_clean_series(thermal_patterns):
     series = refine_sequential(thermal_patterns[:5], structure, ins,
                                direction="both")
     assert series.direction == "both"
-    assert [d.code for d in series.diagnostics
-            if d.code == "SEQUENTIAL_PATH_DEPENDENT"] == []
+    # every gap is recorded, the cell's under the 3 esds the removed code read
+    cell = [g for g in series.direction_gaps if g.path == "phases.0.cell.a"]
+    assert len(cell) == 5 and all(abs(g.gap_esd) < 3 for g in cell), cell
+    assert {(g.forward_rung, g.backward_rung) for g in cell} <= {
+        ("warm", "warm"), ("cold", "warm"), ("warm", "cold")}
+    assert series.backward.direction_gaps is None
     # the backward chain is kept, and reported in series order
     assert [e.index for e in series.entries] == [0, 1, 2, 3, 4]
 
-    # …and the one-shot API hands it back, so the trajectory the
-    # path-dependence diagnostics are about is reachable (WP-1076).  Before
+    # …and the one-shot API hands it back, so the trajectory the gaps are
+    # about is reachable (WP-1076).  Before
     # that WP it lived only on `SequentialRefinement.backward_`, which
     # `refine_sequential` never returns.
     assert series.backward is not None
@@ -2806,16 +2826,14 @@ def test_a_cancelled_chain_does_not_run_the_verification_pass():
 
     assert set(passes) == {"forward"}
     assert runner.backward_ is None
-    # the comparison that never ran says so (WP-1333): zero
-    # SEQUENTIAL_PATH_DEPENDENT findings is what a clean series reports too
+    # the comparison that never ran says so (WP-1333), and records no gap
     assert [d.code for d in series.diagnostics] == [
-        "SEQUENTIAL_CANCELLED", "SEQUENTIAL_PATH_CHECK_INCOMPLETE"]
+        "SEQUENTIAL_CANCELLED", "SEQUENTIAL_PATH_CHECK_NOT_RUN"]
     not_run = series.diagnostics[1]
     assert not_run.level == "warning"
     assert "did not run" in not_run.message
     assert "forward chain was cancelled" in not_run.message
-    assert not any(d.code == "SEQUENTIAL_PATH_DEPENDENT"
-                   for d in series.diagnostics)
+    assert series.direction_gaps is None
 
 
 # ------------------------------------------------ agreement trajectories ---
@@ -3329,3 +3347,88 @@ def test_a_width_that_grows_for_real_is_not_named():
     assert not [d for d in series.diagnostics
                 if d.code == "SEQUENTIAL_WIDTH_GROWTH"]
     _soak_pngs(runner, "wp1465_real_growth")
+
+
+# --------------------------------------------------------------------------- #
+# SeriesResult.direction_gaps (WP-2003, C5): the gaps recorded, no threshold
+# --------------------------------------------------------------------------- #
+
+def _gapped_pair():
+    """A hand-built pair whose chains part at p2, with different kept rungs."""
+    forward = _synthetic_series("phases.0.cell.a", [4.1560, 4.1570, 4.1580],
+                                [1e-4] * 3)
+    backward = _synthetic_series("phases.0.cell.a", [4.1560, 4.1570, 4.1600],
+                                 [1e-4] * 3)
+    forward.entries[2].rung = "cold"
+    backward.entries[2].rung = "warm_staged"
+    forward.direction, forward.backward = "both", backward
+    forward.direction_gaps, coverage = _direction_gaps(forward, backward)
+    assert coverage == []
+    return forward
+
+
+def test_a_gap_carries_each_chains_kept_rung_and_no_verdict():
+    series = _gapped_pair()
+    top = series.direction_gaps[0]
+    assert (top.label, top.forward_rung, top.backward_rung) == (
+        "p2", "cold", "warm_staged")
+    assert top.gap == pytest.approx(-0.002)
+    assert top.gap_esd == pytest.approx(-0.002 / (2 ** 0.5 * 1e-4))
+    # rows past 3 esds and under it sit in one list, and nothing fires
+    assert [abs(g.gap_esd) > 3 for g in series.direction_gaps] == [
+        True, False, False]
+    assert series.diagnostics == []
+
+
+def test_the_summary_names_the_largest_gap_and_the_field():
+    series = _gapped_pair()
+    text = series.summary()
+    line = [ln for ln in text.splitlines() if "forward-backward gaps" in ln]
+    assert line == ["    largest forward-backward gaps: phases.0.cell.a 14.1σ "
+                    "at p2 (cold/warm_staged) (series.direction_gaps)"], text
+    row = [ln for ln in series.summary(deliverable="series").splitlines()
+           if "ordering artefact" in ln]
+    assert row == ["    ordering artefact: measured both ways, largest gap "
+                   "phases.0.cell.a 14.1σ at p2 (series.direction_gaps)"]
+
+
+def test_a_one_way_or_old_series_has_no_gaps_rather_than_an_empty_list():
+    """``None`` is "not compared" and ``[]`` is "compared, nothing to size";
+    a document written before the field reads ``None`` and keeps its
+    removed verdicts as written."""
+    one_way = _synthetic_series("phases.0.cell.a", [4.156, 4.157], [1e-4] * 2)
+    assert one_way.direction_gaps is None
+    assert "forward-backward" not in one_way.summary()
+
+    stored = _gapped_pair().model_dump(mode="json")
+    del stored["direction_gaps"]
+    stored["diagnostics"] = [{"level": "warning", "code": "SEQUENTIAL_PATH_DEPENDENT",
+                              "message": "phases.0.cell.a: 14.1σ at p2",
+                              "where": ["phases.0.cell.a"]}]
+    old = SeriesResult.model_validate(stored)
+    assert old.direction_gaps is None
+    row = [ln for ln in old.summary(deliverable="series").splitlines()
+           if "ordering artefact" in ln]
+    assert row == ["    ordering artefact: measured both ways, before "
+                   "SeriesResult.direction_gaps; 1 parameter(s) past the "
+                   "removed 3σ test"]
+
+
+def test_the_trajectory_plot_quotes_the_largest_gap_as_a_number():
+    pytest.importorskip("matplotlib")
+    from pathlib import Path
+
+    series = _gapped_pair()
+    series.x_label = "pattern"
+    for k, e in enumerate(series.entries):
+        e.x = float(k)
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    fig = series.plot("phases.0.cell.a", path=str(out / "wp2003_direction_gap.png"))
+    title = fig.axes[0].get_title(loc="left")
+    assert title == "phases.0.cell.a  [largest forward-backward gap 14.1σ]"
+    one_way = _synthetic_series("phases.0.cell.a", [4.156, 4.157], [1e-4] * 2)
+    for k, e in enumerate(one_way.entries):
+        e.x = float(k)
+    assert one_way.plot("phases.0.cell.a").axes[0].get_title(loc="left") == (
+        "phases.0.cell.a")

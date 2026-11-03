@@ -106,7 +106,7 @@ related specimens). `sequential.py` (`SequentialRefinement`/`refine_sequential`)
 (pinned by `TreeHeader.data_fingerprint`), linked by annotation notes. Not `multi.py`, which
 stacks patterns into **one joint residual**. Chaining buys ≈3× in iterations and nothing in
 accuracy, and its trajectory is path-dependent by construction → `direction="both"` runs the
-chain each way and flags parameters the two disagree on (`SEQUENTIAL_PATH_DEPENDENT`), the only
+chain each way and records every path's gap, unthresholded (`SeriesResult.direction_gaps`), the only
 check separating a measured trajectory from an ordering artefact. A warm fit that diverged,
 raised or carries an `error`-level code (`schemas.sequential._rejected`, one test for both uses)
 **escalates a rung at a time**, keeping the best attempt (`entry.rung`); still rejected after the

@@ -1491,7 +1491,10 @@ def plot_trajectory(series, paths, *, path: str | None = None,
     is not a measurement at all.  It is still plotted, because a gap in a
     trajectory reads as data that was never collected.  A high Rwp is not
     marked: ``SeriesEntry.rwp_over_median`` records it with no threshold
-    (WP-2003), so a mark would draw one the package does not hold.
+    (WP-2003), so a mark would draw one the package does not hold.  For the
+    same reason a panel's title quotes the path's largest forward-backward gap
+    from ``SeriesResult.direction_gaps`` as a number, under ``direction="both"``
+    alone.
 
     ``title`` names the whole figure above its stacked panels, whose own
     left-hand titles stay the parameter each one draws; absent by default,
@@ -1515,8 +1518,12 @@ def plot_trajectory(series, paths, *, path: str | None = None,
     for s in series.steps or []:
         if s.cold_ratio is not None:
             verified.setdefault(s.path, []).append(s.labels)
-    unstable = {d.where[0] for d in series.diagnostics
-                if d.code == "SEQUENTIAL_PATH_DEPENDENT" and d.where}
+    # each path's largest forward-backward gap in combined esds, read off the
+    # record (WP-2003, C5): the title quotes the number and draws no threshold
+    largest_gap: dict[str, float] = {}
+    for g in series.direction_gaps or []:
+        if g.gap_esd is not None:
+            largest_gap[g.path] = max(largest_gap.get(g.path, 0.0), abs(g.gap_esd))
     reseeded = {e.label for e in series.entries if e.reseeded}
     # the quarantine's own test (WP-2003, C2 q5), so the cross marks exactly
     # the points SEQUENTIAL_UNRECOVERED names
@@ -1581,7 +1588,8 @@ def plot_trajectory(series, paths, *, path: str | None = None,
                         ax.axvspan(x[traj.labels.index(first)],
                                    x[traj.labels.index(last)],
                                    color=hue["reseeded"], alpha=0.10, lw=0)
-            flag = "  [path-dependent]" if name in unstable else ""
+            flag = (f"  [largest forward-backward gap {largest_gap[name]:.1f}σ]"
+                    if name in largest_gap else "")
             ax.set_ylabel(name.split(".")[-1] if len(name) > 24 else name, fontsize=8)
             ax.set_title(f"{name}{flag}", fontsize=9, loc="left")
             ax.tick_params(labelsize=8)

@@ -19,11 +19,13 @@ series = rx.refine_sequential(patterns, *starting_model(), plan="mccusker_defaul
                               x=TEMPERATURES, x_label="T (K)", direction="both")
 
 print([d.code for d in series.diagnostics])
-forward = series.trajectory("phases.0.cell.a")
-backward = series.backward.trajectory("phases.0.cell.a")
-gap = max(abs(f - b) / e for f, b, e in zip(forward.value, backward.value, forward.stderr))
-print(f"largest forward-backward gap: {gap:.2f} esd")
+gaps = series.direction_gaps
+print(f"{len(gaps)} gaps, the largest {abs(gaps[0].gap_esd):.2f} esd")
+a = next(g for g in gaps if g.path == "phases.0.cell.a" and g.label == "p004")
+print(f"cell.a at {a.label}: {a.forward:.5f} vs {a.backward:.5f} "
+      f"({a.forward_rung}/{a.backward_rung})")
 # guide: end
+gap = max(abs(g.gap_esd) for g in gaps if g.gap_esd is not None)
 
 # guide: jump start
 jumped = list(patterns)
@@ -58,3 +60,5 @@ assert all(e.rwp_warm is None for e in series)
 # page quotes two
 assert all(abs(r - 0.040) < 0.001 for r in series.rwp[4:6]), series.rwp[4:6]
 assert gap < 0.005
+assert len(gaps) == 91 and (a.forward_rung, a.backward_rung) == ("warm", "warm")
+assert round(a.forward, 5) == round(a.backward, 5) == 4.16491

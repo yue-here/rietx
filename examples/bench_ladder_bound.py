@@ -25,7 +25,8 @@ kill criterion clauses 2-4:
     report it this way — and the second number is the one clause 3 is about.
 ``direction="both"``
     the read-out that retired WP-1124's predictors.  Both of its arms turned
-    ``SEQUENTIAL_PATH_DEPENDENT`` from absent to reported, because a first-order
+    the removed ``SEQUENTIAL_PATH_DEPENDENT`` from absent to reported (now the
+    largest gap in ``SeriesResult.direction_gaps``), because a first-order
     predictor cannot seed the first two patterns of a pass and is therefore
     asymmetric in the series coordinate.  The bound has a weaker version of the
     same shape — the *first* warm pattern of a pass has no accepted first rung
@@ -70,6 +71,7 @@ from bench_series_predictor import (  # noqa: E402
     _escalations,
     _quarantined,
     _wasted,
+    largest_gap,
 )
 
 from rietx import _about  # noqa: E402
@@ -141,7 +143,8 @@ def _run_arm(setup, factor: float | None, direction: str) -> ArmRun:
                     entry.rung, list(entry.rungs_tried), entry.status, spans))
         endpoints.append({p.path: (p.value, p.stderr) for p in entry.parameters})
     return ArmRun(wall, counts.nfev, counts.njev, 0.0, 0, 0, [], [], per,
-                  [d.code for d in series.diagnostics], endpoints)
+                  [d.code for d in series.diagnostics], endpoints,
+                  largest_gap(series))
 
 
 def _statuses(run: ArmRun) -> set[str]:
@@ -203,16 +206,16 @@ def _report(case: str, base: ArmRun, arm: ArmRun) -> None:
 def _report_both(case: str, base: ArmRun, arm: ArmRun) -> None:
     print(f"\n  {case}  direction='both'")
     for name, run in (("unbounded", base), ("bounded", arm)):
-        path_dep = "SEQUENTIAL_PATH_DEPENDENT" in run.diagnostics
+        gap = "none sized" if run.gap is None else f"{run.gap:.2f} esd"
         print(f"    {name:10s} {run.wall:7.2f} s  {run.nfev:5d} nfev  "
-              f"SEQUENTIAL_PATH_DEPENDENT {'FIRES' if path_dep else 'absent'}")
+              f"largest forward-backward gap {gap}")
         if run.diagnostics:
             print(f"               diagnostics: {sorted(set(run.diagnostics))}")
-    base_dep = "SEQUENTIAL_PATH_DEPENDENT" in base.diagnostics
-    arm_dep = "SEQUENTIAL_PATH_DEPENDENT" in arm.diagnostics
-    verdict = ("FIRES — absent unbounded, reported bounded"
-               if arm_dep and not base_dep else "silent")
-    print(f"    clause 4: {verdict}")
+    if base.gap is not None and arm.gap is not None:
+        print(f"    clause 4: the bound moves the largest gap "
+              f"{base.gap:.2f} -> {arm.gap:.2f} esd")
+    else:
+        print("    clause 4: no gap sized in one of the arms")
 
 
 def _header() -> str:

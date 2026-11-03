@@ -18,7 +18,7 @@ re-derive the axis, the esds and the status by hand.
 depends on its neighbour's, so the method can imprint a trend the data do not
 carry: one bad pattern's error is inherited by all its successors, and the
 result is a smooth-looking curve.  That is the same failure mode the FitReport
-gates exist to prevent, and it gets the same treatment here — four fences,
+gates exist to prevent, and it gets the same treatment here — fences,
 none of which alters a fitted value:
 
 ``SEQUENTIAL_RESEED``
@@ -29,17 +29,19 @@ none of which alters a fitted value:
     the pattern's kept fit was still rejected — diverged, or carrying an
     ``error``-level code — after every rung of the ladder below; it is
     reported, but it seeded no successor and joined no median.
-``SEQUENTIAL_PATH_DEPENDENT``
-    with ``direction="both"``, the forward and backward chains disagree by more
-    than their esds allow: that parameter's trajectory is an artefact of the
-    ordering, not a measurement.
+``SEQUENTIAL_PATH_CHECK_NOT_RUN``
+    ``direction="both"`` was asked for and the comparison of the two chains
+    did not run, so no gap in ``SeriesResult.direction_gaps`` was measured.
 
 **A step is a record, never a fence** (WP-2003).  ``SeriesResult.steps``
 lists every refined path's change between consecutive patterns in esds of the
 later fit, largest first, with no threshold: a jump may be a transition, a
 sample shift, a beam dump or a wrong model, and only the sample's history can
 say which, so the package names none (the ``SEQUENTIAL_DISCONTINUITY`` scan it
-replaces did, from a 5×-median-and-3σ threshold no measurement set).
+replaces did, from a 5×-median-and-3σ threshold no measurement set).  The same
+holds for ``SeriesResult.direction_gaps`` under ``direction="both"``: every
+path's forward-backward gap in combined esds, largest first, with no 3σ
+verdict (the removed ``SEQUENTIAL_PATH_DEPENDENT``).
 ``fit(..., verify_steps=k)`` re-measures the k largest by refitting each
 pair's two patterns cold and independently, and writes what the pair
 reproduces as ``SeriesStep.cold_ratio`` (WP-1305's check).
@@ -190,6 +192,7 @@ from .schemas.pattern import PatternData, require_two_theta
 from .schemas.results import RefinementResult
 from .schemas.sequential import (
     _NAMED_PATH,
+    DirectionGap,
     SeriesCodeCount,
     SeriesEntry,
     SeriesFailure,
@@ -214,7 +217,7 @@ from .strategy.staged import CLOSING_STAGE_NAME, RefinementPlan, Stage, resolve_
 #: wanted **17**, a one-evaluation margin that darwin cleared and Linux did not.
 FIRST_RUNG_SAMPLES = 3
 
-#: The path-dependence fence below and :attr:`SeriesStep.size_esd` are both
+#: :attr:`DirectionGap.gap_esd` and :attr:`SeriesStep.size_esd` are both
 #: *ratios*, and a ratio is meaningless once its
 #: denominator is floating-point noise.  A parameter the data do not constrain
 #: at all is where this bites, and before WP-1938 a coefficient sitting on its
@@ -228,9 +231,6 @@ FIRST_RUNG_SAMPLES = 3
 #: below that the trajectory is a constant, whatever the ratios say, and a
 #: step's ``size_esd`` is 0 (``_series_steps``).
 NOISE_FLOOR_REL = 1e-9
-
-#: Forward and backward chains are called to disagree at this many combined σ.
-PATH_DEPENDENCE_SIGMA = 3.0
 
 #: Per-pattern codes :func:`_code_counts` never counts, because they are about
 #: how the package *measured* a pattern rather than about the model, so a count
@@ -1295,9 +1295,10 @@ class SequentialRefinement:
             counted on ``SeriesResult.code_counts`` (issue #475, WP-1469).
         direction:
             ``"forward"``, ``"backward"`` (chain from the last pattern), or
-            ``"both"``, which runs it each way and reports where the two
-            trajectories disagree by more than their esds allow.  The reported
-            entries are the forward ones.
+            ``"both"``, which runs it each way and records every path's gap
+            between the two chains in combined esds
+            (``SeriesResult.direction_gaps``).  The reported entries are the
+            forward ones.
         reseed:
             Escalate the ladder when a warm-started fit is rejected (diverged,
             or carrying an ``error``-level code) or raises (or passes the
@@ -1633,9 +1634,8 @@ class SequentialRefinement:
         if direction == "both" and cancelled:
             # a cancelled forward chain gets no verification pass: the
             # comparison is between two *complete* chains, and half of one says
-            # nothing — and the result says it did not run, because zero
-            # SEQUENTIAL_PATH_DEPENDENT findings is also what a clean series
-            # reports (WP-1333)
+            # nothing — and the result says it did not run, because an
+            # absent comparison must not read as a clean one (WP-1333)
             diagnostics.append(_path_check_not_run(
                 f"the forward chain was cancelled after {len(entries)} of "
                 f"{len(patterns)} patterns, so the backward chain was never "
@@ -1695,15 +1695,16 @@ class SequentialRefinement:
                     f"{len(back_entries)} of {len(patterns)} patterns"
                     f"{in_flight}"))
             else:
-                diagnostics += _path_dependence_diagnostics(series, back, relative,
-                                                            angles)
+                series.direction_gaps, coverage = _direction_gaps(
+                    series, back, relative, angles)
+                diagnostics += coverage
                 # the onset in *each direction of the chain*, compared: the one
                 # reading a single pass cannot produce (WP-1329)
                 diagnostics = _with_onset_agreement(diagnostics, series, back)
             self.backward_ = back
             # …and on the result, so `refine_sequential` — the one-shot API the
             # manual recommends — hands back the trajectory its
-            # SEQUENTIAL_PATH_DEPENDENT diagnostics are about (WP-1076)
+            # direction_gaps are about (WP-1076)
             series.backward = back
 
         series.diagnostics = diagnostics
@@ -1799,7 +1800,7 @@ class SequentialRefinement:
         accepted_first: list[int] = []
         #: the series index of the pattern in flight when a cancel ended the
         #: walk, ``None`` when it ran to the end — what
-        #: ``SEQUENTIAL_PATH_CHECK_INCOMPLETE`` names as "the pattern it died on"
+        #: ``SEQUENTIAL_PATH_CHECK_NOT_RUN`` names as "the pattern it died on"
         stopped_at: int | None = None
         #: the last exception a failed pattern raised, for the one case a
         #: non-raising policy still raises: a chain that fitted nothing
@@ -2500,20 +2501,24 @@ def _cancelled_diagnostic(n_done: int, n_total: int, *,
 
 
 def _path_check_not_run(reason: str) -> Diagnostic:
-    """``SEQUENTIAL_PATH_CHECK_INCOMPLETE`` — the comparison never ran (WP-1333).
+    """``SEQUENTIAL_PATH_CHECK_NOT_RUN`` — the comparison never ran (WP-1333).
 
-    ``direction="both"`` exists for one reading, and its absence has the same
-    shape as its success: zero ``SEQUENTIAL_PATH_DEPENDENT`` findings.  Issue
+    ``direction="both"`` exists for one reading, and its absence once had the
+    same shape as its success: zero ``SEQUENTIAL_PATH_DEPENDENT`` findings, a
+    code WP-2003 removed for ``SeriesResult.direction_gaps``, which reads
+    ``None`` here.  Issue
     #224's series C had the forward chain whole and the backward chain dead,
     and reported exactly what a clean series reports.  So every way the
     comparison can fail to happen says so, naming the chain that stopped and
     the pattern it stopped on — a forward chain cancelled (the backward one is
     never started), a backward chain cancelled, a backward chain that raised
     under ``on_error="raise"`` — and zero findings with none of these is what
-    *checked and clean* means.  ``warning``: the caller asked for this check.
+    *checked* means.  ``warning``: the caller asked for this check.  Its own
+    code since WP-2003 (C5 q2): it shared ``SEQUENTIAL_PATH_CHECK_INCOMPLETE``
+    at a second level, and two consequences are two codes.
     """
     return Diagnostic(
-        level="warning", code="SEQUENTIAL_PATH_CHECK_INCOMPLETE", where=[],
+        level="warning", code="SEQUENTIAL_PATH_CHECK_NOT_RUN", where=[],
         message=(f"The forward/backward path-dependence comparison did not "
                  f"run: {reason}."),
         suggestion=("Re-run with direction='both' to completion before "
@@ -2531,7 +2536,7 @@ def _path_check_coverage(missing: list[tuple[int, str, str]], n_patterns: int,
     for — every rung raised there under ``on_error="skip"``/``"carry"`` — are
     not compared at all.  **Paths** no pattern could judge are the #269 case:
     the comparison is per pattern and only where both chains measured an esd
-    (``_path_dependence_diagnostics``' ``comparable`` mask), so a path held,
+    (``_direction_gaps``' ``comparable`` mask), so a path held,
     fixed or tied to an unmeasured source throughout one direction is never
     judged, and before this said so by saying nothing, exactly as an agreed
     path does.  Only a path *some* chain measured is named: one with no esd on
@@ -3256,8 +3261,8 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
     # including a monotone one with no bracket, whenever it is not the forward
     # chain's own kind: "supported everywhere" against "supported nowhere" is
     # the extreme of the disagreement, and no other row on the top level says
-    # it (the HOLD row sits on the chain that held; PATH_DEPENDENT divides by a
-    # held point's esd and cannot fire).
+    # it (the HOLD row sits on the chain that held; a direction gap divides by
+    # a held point's esd and has no size).
     for site, back_traj in by_site.items():
         other = back_traj.onset
         if site in seen or other is None:
@@ -3327,40 +3332,54 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
     return out
 
 
-def _path_dependence_diagnostics(forward: SeriesResult,
-                                 backward: SeriesResult,
-                                 relative: frozenset[str] = frozenset(),
-                                 angles: frozenset[str] = frozenset()
-                                 ) -> list[Diagnostic]:
-    """Where the forward and backward chains disagree beyond their esds.
+def _direction_gaps(forward: SeriesResult,
+                    backward: SeriesResult,
+                    relative: frozenset[str] = frozenset(),
+                    angles: frozenset[str] = frozenset()
+                    ) -> tuple[list[DirectionGap], list[Diagnostic]]:
+    """Every path's gap between the forward and backward chains, largest first.
 
-    The one measurement that says whether a sequential trajectory is a
-    measurement or an artefact of the ordering.  Two chains that agree are two
-    different starting-point sequences reaching the same answer; two that do
-    not have found a parameter whose value the data do not determine on their
-    own.
+    The one writer of ``SeriesResult.direction_gaps`` (WP-2003, C5), and the
+    arithmetic of the ``SEQUENTIAL_PATH_DEPENDENT`` test it replaced with the
+    threshold taken out.  Two chains that agree are two different
+    starting-point sequences reaching the same answer.  Two that do not have
+    found a parameter whose value the data do not determine on their own.  How
+    far apart is far was a 3σ bar no measurement set, met by chance on n paths
+    times m patterns, so every gap is a row and none is called a verdict.
 
-    Both restrictions below narrow that claim, and neither is cosmetic: the
-    comparison is made **per pattern, between the same pattern in each chain**,
-    and only where *both* chains measured an esd for it.  A pattern one chain
-    never refined this path in is not compared at all, so a path can be
-    reported on for part of a series and be silent for the rest of it — and a
-    path the two chains share no measured pattern for is not judged here at
-    all.
+    The comparison is made **per pattern, between the same pattern in each
+    chain**, paired by label, never by position.  Equal lengths do not make
+    two trajectories comparable: ``trajectory()`` skips patterns where the
+    path is absent, and WP-1301 drops a held structural path from
+    ``RefinedParameter`` rows entirely, so a path held in the forward chain's
+    first pattern and in the backward chain's last yields two seven-long
+    trajectories over *different* patterns.  Subtracting those position by
+    position compared p1 against p0 the whole way down and reported a clean
+    ramp as tens of sigma.
 
-    ``relative`` paths are not compared, for :func:`_series_steps`'
-    reason and more sharply: the two chains start a pattern from opposite
-    neighbours, so a coordinate DOF's value — the step from that start — has
-    opposite signs in the two by construction.  Compared, it named the DOF
-    path-dependent on a series whose coordinate agreed in both chains
-    (WP-1333).  The coordinate rows are compared instead, and they are what
-    the check was asked about.
+    A gap's size is its signed value over the combined esd √(σ_f² + σ_b²),
+    and ``None`` where either chain measured no esd at that pattern: a tie row
+    reaches one chain's esd and not the other's routinely, since
+    ``_build_result`` emits tie rows whether or not their source was refined,
+    and dividing by one side alone reports a significance the other never
+    earned.  A gap under the noise floor (:data:`NOISE_FLOOR_REL`) has size 0.
+    Sorted by ``|gap_esd|``, largest first, ``None`` after every number, ties
+    in path then series order.  Each row carries both walks' kept rung
+    (``SeriesEntry.rung``): a pattern kept cold in one walk and warm in the
+    other measures the ladder as well as the order.
 
-    ``angles`` paths are compared modulo a turn (:func:`_angle_difference`):
-    two chains that end one pattern either side of the azimuth's cut agree on
-    the moment and differ by 2π in value (#604).
+    ``relative`` paths are not compared, for :func:`_series_steps`' reason
+    and more sharply: the two chains start a pattern from opposite
+    neighbours, so a coordinate DOF's value has opposite signs in the two by
+    construction (WP-1333).  The coordinate rows are compared instead.
+    ``angles`` paths are compared modulo a turn (:func:`_angle_difference`,
+    #604).
+
+    The second return is ``SEQUENTIAL_PATH_CHECK_INCOMPLETE`` at ``info``
+    (:func:`_path_check_coverage`): the patterns one chain has no entry for,
+    and the paths some chain measured that no pattern could judge.
     """
-    out: list[Diagnostic] = []
+    out: list[DirectionGap] = []
     # which patterns the comparison can reach at all: a pattern one chain
     # has no entry for is compared on no path (WP-1333)
     fitted = {"forward": {e.index: e.label for e in forward.entries},
@@ -3375,18 +3394,6 @@ def _path_dependence_diagnostics(forward: SeriesResult,
         if path in relative:
             continue
         f, b = forward.trajectory(path), backward.trajectory(path)
-        # Pair the two chains by *pattern label*, not by position.  Equal
-        # lengths do not make two trajectories comparable: ``trajectory()``
-        # skips patterns where the path is absent, and WP-1301 drops a held
-        # structural path from ``RefinedParameter`` rows entirely, so a path
-        # held in the forward chain's first pattern and in the backward
-        # chain's last yields two seven-long trajectories over *different*
-        # patterns.  Subtracting those position by position compares p1
-        # against p0 the whole way down and reports a clean, monotonic ramp as
-        # tens of sigma of path dependence — with every esd two-sided, so the
-        # mask below never sees it.  Intersecting on labels is also what lets
-        # the old ``len(f) != len(b)`` gate go: unequal lengths no longer mean
-        # the path goes unexamined, only that fewer patterns are comparable.
         first_in_b: dict[str, int] = {}
         for j, label in enumerate(b.labels):
             first_in_b.setdefault(label, j)
@@ -3403,48 +3410,37 @@ def _path_dependence_diagnostics(forward: SeriesResult,
             if measured:
                 unjudged.append(path)
             continue
-        fi = np.asarray([i for i, _ in pairs], dtype=int)
-        bj = np.asarray([j for _, j in pairs], dtype=int)
-        labels = [f.labels[i] for i in fi]
+        fi = np.asarray([i for i, _ in pairs], dtype=np.intp)
+        bj = np.asarray([j for _, j in pairs], dtype=np.intp)
         vf, sf = vf_all[fi], sf_all[fi]
         vb, sb = vb_all[bj], sb_all[bj]
-        # Judge a pattern only where *both* chains measured an esd.  A
-        # parameter with no esd anywhere cannot be judged this way at all, and
-        # neither can a pattern one chain refined and the other held: its esd
-        # exists on one side only, and dividing the two values' difference by
-        # it reports a significance the held side never earned.  A tied
-        # dependent path reaches exactly that state routinely, since
-        # ``_build_result`` emits tie rows whether or not their source was
-        # refined.  The mask is per pattern rather than per path, so the
-        # patterns both chains did measure are still judged.
         comparable = np.isfinite(sf) & np.isfinite(sb)
         combined = np.sqrt(np.nan_to_num(sf) ** 2 + np.nan_to_num(sb) ** 2)
-        gap = np.abs(_angle_difference(vf - vb) if path in angles else vf - vb)
-        if not np.any(comparable & (combined > 0.0)):
-            # …nor one whose two chains agree below the noise floor on every
-            # shared pattern: the comparison calls that agreement whatever
-            # the esds say (the n_sigma floor below), so there was nothing an
-            # esd could have changed — a coefficient on its floor, measured
-            # on different patterns by each chain, is the case
-            if measured and np.any(gap > _noise_floor(vf, vb)):
-                unjudged.append(path)
-            continue
-        with np.errstate(divide="ignore", invalid="ignore"):
-            n_sigma = gap / np.where(combined > 0.0, combined, np.nan)
-        n_sigma = np.where(gap > _noise_floor(vf, vb), n_sigma, 0.0)
-        n_sigma = np.where(comparable, n_sigma, 0.0)
-        if not np.any(n_sigma > PATH_DEPENDENCE_SIGMA):
-            continue
-        k = int(np.nanargmax(n_sigma))
-        out.append(Diagnostic(
-            level="warning", code="SEQUENTIAL_PATH_DEPENDENT", where=[path],
-            message=(f"{path} differs between the forward and backward chains "
-                     f"by up to {n_sigma[k]:.1f}σ (at {labels[k]}: "
-                     f"{vf[k]:.6g} vs {vb[k]:.6g})."),
-            suggestion=("Hold it fixed, restrain it, or report the spread "
-                        "between the two directions as its uncertainty."),
-        ))
-    return out + _path_check_coverage(missing, len(known), unjudged)
+        signed = _angle_difference(vf - vb) if path in angles else vf - vb
+        floor = _noise_floor(vf, vb)
+        if measured and not np.any(comparable & (combined > 0.0)) \
+                and np.any(np.abs(signed) > floor):
+            # no pattern carries an esd in both chains, and the two chains
+            # do not agree below the noise floor: the #269 case
+            unjudged.append(path)
+        for k, (i, j) in enumerate(pairs):
+            gap = float(signed[k])
+            if not (comparable[k] and combined[k] > 0.0 and np.isfinite(gap)):
+                size = None
+            elif abs(gap) <= floor:
+                size = 0.0
+            else:
+                size = gap / float(combined[k])
+            fe = forward.entries[f.positions[i]]
+            be = backward.entries[b.positions[j]]
+            out.append(DirectionGap(
+                path=path, label=f.labels[i], index=fe.index,
+                forward=float(vf[k]), backward=float(vb[k]), gap=gap,
+                gap_esd=size, forward_rung=fe.rung, backward_rung=be.rung))
+    # stable, so equal sizes keep path order, then series order
+    out.sort(key=lambda g: (g.gap_esd is None,
+                            0.0 if g.gap_esd is None else -abs(g.gap_esd)))
+    return out, _path_check_coverage(missing, len(known), unjudged)
 
 
 def refine_sequential(patterns: Sequence[PatternData], structure: Structure,

@@ -393,8 +393,8 @@ def test_a_series_that_predates_the_width_check_says_not_measured():
 
 
 def test_series_deliverable_says_a_one_way_chain_did_not_measure_ordering():
-    """The absence of a SEQUENTIAL_PATH_DEPENDENT row is not evidence: a
-    forward-only chain never ran the comparison that produces one."""
+    """An empty ``direction_gaps`` is not evidence.  A forward-only chain
+    never ran the comparison that fills it."""
     assert "NOT measured" in _series_result().summary(deliverable="series")
     both = _series_result(direction="both", backward=_series_result())
     assert "measured both ways" in both.summary(deliverable="series")
@@ -402,8 +402,9 @@ def test_series_deliverable_says_a_one_way_chain_did_not_measure_ordering():
 
 def test_series_deliverable_will_not_call_a_cancelled_both_run_measured():
     """`direction` is what was asked for, not what ran.  A cancel takes the
-    reverse chain out — never started, or started and never compared — and an
-    empty SEQUENTIAL_PATH_DEPENDENT list then means silence, not agreement."""
+    reverse chain out, never started or started and never compared.  An empty
+    ``direction_gaps`` then means silence, and the row must not read it as
+    agreement."""
     never_started = _series_result(direction="both")
     assert "NOT measured" in never_started.summary(deliverable="series")
 
@@ -418,13 +419,24 @@ def test_series_deliverable_reads_the_comparisons_own_record():
     """WP-1333: a backward pass that *raised* is not a cancel, and the row
     quotes the record's reason rather than guessing one; a comparison that ran
     on less than the series says so beside the count."""
-    raised = _series_result(direction="both", diagnostics=[rx.Diagnostic(
-        level="warning", code="SEQUENTIAL_PATH_CHECK_INCOMPLETE",
-        message="the forward/backward path-dependence comparison did not run: "
-                "the backward chain raised ValueError('x') on pattern 1 (p1)")])
+    message = ("the forward/backward path-dependence comparison did not run: "
+               "the backward chain raised ValueError('x') on pattern 1 (p1)")
+    raised = _series_result(direction="both", backward=_series_result(),
+                            diagnostics=[rx.Diagnostic(
+                                level="warning",
+                                code="SEQUENTIAL_PATH_CHECK_NOT_RUN",
+                                message=message)])
     text = raised.summary(deliverable="series")
     assert "NOT measured" in text and "backward chain raised" in text
     assert "cancelled" not in text
+    # a series stored before WP-2003 split the code carries the same finding
+    # as INCOMPLETE at warning, and reads the same
+    stored = _series_result(direction="both", backward=_series_result(),
+                            diagnostics=[rx.Diagnostic(
+                                level="warning",
+                                code="SEQUENTIAL_PATH_CHECK_INCOMPLETE",
+                                message=message)])
+    assert "backward chain raised" in stored.summary(deliverable="series")
 
     partial = _series_result(
         direction="both", backward=_series_result(),

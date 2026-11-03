@@ -1,6 +1,6 @@
 # Sequential refinement
 
-This page gives the calls that fit a series of patterns one after another, the arguments of a series, what crosses from one pattern to the next, the `SeriesResult` they return with its trajectories, the checks against a trend the chain made, and the events and cancellation of a series.
+This page gives the calls that fit a series of patterns one after another, their arguments, what crosses between patterns, the `SeriesResult` and its trajectories, the checks against a trend the chain made, and events and cancellation.
 
 A series is N separate refinements in order, each starting from the answer of the one before.
 A joint fit is one refinement whose residual stacks several patterns, and the patterns share the parameters that describe the specimen ([Joint refinement](joint.md)).
@@ -132,7 +132,7 @@ The degree of freedom a plan frees (`phases.*.atoms.*.dof.*`) is rebuilt at zero
 A glob naming either the coordinate or its degree of freedom moves every coordinate the site ties to it, and the atom stays on its special position.
 The degree of freedom's value is measured from where its fit began, which in a chain is the previous pattern's answer, so its trajectory is each pattern's step.
 Chart the coordinate rows instead.
-They carry the same esd, `SeriesResult.steps` lists their steps, and the path-dependence check judges them.
+They carry the same esd, and `SeriesResult.steps` and `SeriesResult.direction_gaps` list them.
 
 A Le Bail or Pawley pattern's per-hkl intensities are not parameters, so no glob reaches them.
 `SequentialRefinement.carry_hkl_intensities` decides whether they cross.
@@ -198,6 +198,7 @@ The curves stay on `SequentialRefinement.results_`.
 | `SeriesResult.x_label` | the axis name |
 | `SeriesResult.diagnostics` | the series diagnostics ([Series diagnostics](#series-diagnostics)) |
 | `SeriesResult.code_counts` | one `SeriesCodeCount` per per-pattern code and parameter, largest count first ([Per-pattern codes counted](#per-pattern-codes-counted)); `None` in a document written before the field existed |
+| `SeriesResult.direction_gaps` | under `direction="both"`, one `DirectionGap` per path and pattern, largest in esds first ([Forward and backward chains](#forward-and-backward-chains)); `None` when the comparison did not run |
 | `SeriesResult.steps` | one `SeriesStep` per step of every refined path between consecutive patterns, largest in esds first ([Steps between patterns](#steps-between-patterns)); `None` in a document written before the field existed |
 | `SeriesResult.relative_paths`, `SeriesResult.angle_paths` | the paths whose value is a step from where each fit began, and the angle paths ([Paths to plot](#paths-to-plot)) |
 | `SeriesResult.phase_names`, `SeriesResult.atom_labels` | the series numbering ([below](#phases-and-atoms-added-or-removed)) |
@@ -252,7 +253,7 @@ A series is where one unread warning multiplies: in the in-situ run this diagnos
 Both indices are biased towards the model being tested, and a trace phase's index is not comparable with the major phase's ([Structure agreement indices](result.md#structure-agreement-indices)).
 In a series the field serves the trajectory: one pattern's R<sub>Bragg</sub> is a value, and sixty of them are a shape.
 Whether the data can see a phase at all is measured by [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained), from each phase scale's value over its counting-noise esd.
-It reaches an entry through `SeriesEntry.diagnostics`, and `SeriesResult.code_counts` counts it over the chain, which says what no per-pattern diagnostic can: 42 of 68.
+It reaches an entry through `SeriesEntry.diagnostics`, and `SeriesResult.code_counts` counts it over the chain.
 Read R<sub>Bragg</sub> beside that, and beside the weight fraction with its esd.
 
 ### A phase that appears part-way
@@ -298,17 +299,15 @@ Its `QPATrajectory.path`, `QPATrajectory.x`, `QPATrajectory.x_label`, `QPATrajec
 `SeriesResult.agreement_phases` lists the phases that carry one.
 A phase can carry an agreement index without a weight fraction, because a weight fraction needs Z and a molar mass and an R index does not.
 Every esd of an agreement index is `None`, because R<sub>Bragg</sub> is a residual and has no covariance entry to propagate from.
-`arrays()` turns them into NaN, for which a plot draws no error bar.
 Outside Rietveld mode the agreement trajectory is empty.
 In Le Bail mode the partition is the fit, and in Pawley mode the intensities are refined, so a zero would read as a perfect fit.
 
 `SeriesResult.resolve_trajectory` is the one call behind these and the moment's trajectory ([Magnetic moment across a transition](#magnetic-moment-across-a-transition)).
 It dispatches on a display path's `qpa.`, `r_bragg.`, `r_f.` or `magnetic.` prefix, and passes any other dot-path to `trajectory`.
-The plots and the GUI call it.
 `SeriesResult.is_derived_path` says whether a display path names one of those four derived curves.
 
 `SeriesResult.plot` plots one or more trajectories against the series axis, and `style="dark"` draws it for a dark page.
-It rings a point refitted from the starting models, crosses a `SEQUENTIAL_UNRECOVERED` point, shades the pair of each step re-measured cold, and tags the title of a path-dependent trajectory.
+It rings a point refitted from the starting models, crosses a `SEQUENTIAL_UNRECOVERED` point, shades the pair of each step re-measured cold, and quotes the largest forward-backward gap in each title.
 
 ### Phases and atoms added or removed
 
@@ -455,8 +454,7 @@ On a synthetic ramp starved to `max_iter=1`, the moment above the transition cam
 
 ## Series diagnostics
 
-A sequential fit is path-dependent by construction.
-Every pattern's answer depends on its neighbour's, so one bad pattern's error passes to every successor and still draws a smooth curve.
+A sequential fit is path-dependent by construction, so one bad pattern's error can pass to every successor and still draw a smooth curve.
 These diagnostics fence that, and none of them alters a fitted value.
 [Series and joint fits](diagnostics-series.md) gives each code's full entry.
 
@@ -464,9 +462,9 @@ These diagnostics fence that, and none of them alters a fitted value.
 |---|---|
 | `SEQUENTIAL_RESEED` | the warm start was rejected and the pattern was refitted cold |
 | `SEQUENTIAL_UNRECOVERED` | the pattern's fit was rejected on every attempt; it seeded no successor and joined no median |
-| `SEQUENTIAL_PATH_DEPENDENT` | under `direction="both"`, forward and backward disagree by more than their esds allow |
-| `SEQUENTIAL_PATH_CHECK_INCOMPLETE` | under `direction="both"`, the comparison did not run, or ran on fewer patterns or paths than the series has |
-| `SEQUENTIAL_WIDTH_GROWTH` | a phase width reached 3× the first value the series measured above three esds, by more than three combined esds, while GoF reached 2× its own at the same pattern; a width that grows at a flat GoF is real broadening and fires nothing |
+| `SEQUENTIAL_PATH_CHECK_NOT_RUN` | under `direction="both"`, the comparison did not run |
+| `SEQUENTIAL_PATH_CHECK_INCOMPLETE` | under `direction="both"`, the comparison ran on fewer patterns or paths than the series has |
+| `SEQUENTIAL_WIDTH_GROWTH` | a phase width reached 3× its first measured value while GoF reached 2× its own at the same pattern; a width growing at a flat GoF fires nothing |
 | `SEQUENTIAL_MOMENT_HOLD` | how many patterns' moment came back unsupported, and which successors' modulus was reseeded to its floor |
 | `SEQUENTIAL_MOMENT_ONSET` | where along the axis the moment stops being supported, as a bracket |
 | `SEQUENTIAL_CANCELLED` | the series stopped before its last pattern ([Events, history and cancellation](#events-history-and-cancellation)) |
@@ -481,7 +479,6 @@ One `BOUND_HIT` is a pattern that hit a bound, while a `BOUND_HIT` in most patte
 `SeriesCodeCount.count` is the patterns it fired on, `SeriesCodeCount.n_patterns` the patterns in the series, and `SeriesCodeCount.level` the worst level among them.
 The summary prints the three largest in its trajectory block, and the entries still carry every occurrence.
 No count is called persistent, and no diagnostic fires on one.
-Until 1.11 `SEQUENTIAL_PERSISTENT_FINDING` reported a pair only above half of a series of five or more, and no measurement set either number.
 A code about how a pattern was measured, listed in `rietx.sequential.NOT_A_SERIES_FINDING`, is never counted.
 
 ### Steps between patterns
@@ -495,7 +492,6 @@ The summary prints the first row in its trajectory block.
 No step is called a jump, and no diagnostic fires on one.
 A step may be a phase transition, a sample shift, a beam dump or a wrong model, and only the sample's history can say which.
 A symmetry-mode refinement across the step is what separates a transition from the rest.
-Until 1.11 the `SEQUENTIAL_DISCONTINUITY` diagnostic flagged a step over five times the path's median and three combined esds; no measurement set either number, so the list replaced it.
 
 `verify_steps=k` re-measures the k largest steps.
 Each step's two patterns are refitted cold and independently, with no warm start and no neighbour, and `SeriesStep.cold_ratio` is the cold step over the chain's ([How to check a series for path dependence](../guides/path.md)).
@@ -531,8 +527,7 @@ A rejected warm fit escalates one attempt at a time: the collapsed warm refit, t
 Under `refit="stages"` the first attempt already is the staged warm fit, so the ladder has two attempts, `"warm_staged"` and `"cold"`, and `"warm"` never appears.
 Each attempt runs only when the trigger still fires on the best attempt so far, and the entry keeps the best.
 `SeriesEntry.rungs_tried` names the attempts, and `SeriesEntry.n_iterations` sums those that returned a fit.
-The middle attempt matters most.
-Throwing a warm start away roughly triples the work, and before the middle attempt existed that work went on a start not shown to be the problem.
+The middle attempt matters most, because throwing a warm start away roughly triples the work.
 
 What triggers the ladder is a warm attempt that raised or was rejected: it diverged, or carries an `error` diagnostic such as `MODEL_FAR_FROM_DATA`.
 A `max_iter` attempt is not rejected.
@@ -542,7 +537,6 @@ An Rwp comparison is not a default trigger.
 The 1.25 fence that was the default before 1.11 escalated 116 patterns across eight measured series and moved no value by more than 7.2e-4 of its esd.
 On a series where an unmodelled phase appears part-way, it refitted every later pattern for 4.1 times the evaluations.
 A guard finding such as `HIGH_CORRELATION` is neither, since it fires on converged patterns and no attempt changes the model or data behind it.
-A step's size is a property of the finished trajectory, so making it a trigger would mean walking a finished chain again.
 
 The first attempt is unbounded unless you pass `first_rung_factor`.
 Each stage of it, the closing one included, may then spend that multiple of the dearest stage of the first attempts this chain has converged, once three have.
@@ -566,7 +560,6 @@ Your own `prepare` and `constrain` are never guarded: a raise there ends the ser
 ### Quarantine
 
 A fit still rejected after the last attempt is quarantined, and [`SEQUENTIAL_UNRECOVERED`](diagnostics-series.md#sequential_unrecovered) names it and its `error` code.
-On the path guide's jumped ramp, an 800 K warm fit at Rwp 0.917 under `MODEL_FAR_FROM_DATA` had collapsed the 900 K fit too.
 Its successor warm-starts from the last accepted pattern, and the accepted median never sees the failure.
 Otherwise one failure would seed its neighbour with a bad start and drag the median that `rwp_over_median` and your `reseed_factor` read.
 
@@ -580,7 +573,7 @@ Near a converged fit Rwp is GoF times R<sub>exp</sub>, and three measured causes
 - An unmodelled phase raises the GoF: 16.7 against 1.04.
 
 So compare a high ratio's GoF and R<sub>exp</sub> with an accepted neighbour's before reading its values.
-The first patterns walked are compared against a median of one or two values: accepted Rwp 0.30 and 0.10 give a median of 0.20, against 0.10 for 0.10 and 0.10.
+The first patterns walked are compared against a median of only one or two values.
 
 Quarantined, a lasting change could never become the chain's new normal.
 On a 24-pattern ramp whose counts fell from pattern 6, quarantining the patterns over a 1.25× fence made every later pattern climb the ladder, with 55 % more iterations.
@@ -590,24 +583,26 @@ On the blank frame, quarantine saved 2-8 % of the chain, and the values were ide
 ### Forward and backward chains
 
 `direction="both"` runs the series forward and backward and compares the two trajectories.
-`SeriesResult.entries` are the forward ones, and the comparison arrives as [`SEQUENTIAL_PATH_DEPENDENT`](diagnostics-series.md#sequential_path_dependent) diagnostics, one per parameter that disagrees ([How to check a series for path dependence](../guides/path.md)).
+`SeriesResult.entries` are the forward ones.
+`SeriesResult.direction_gaps` lists each path's gap at each pattern, one `DirectionGap` each, largest first ([How to check a series for path dependence](../guides/path.md)).
+`DirectionGap.path`, `DirectionGap.label` and `DirectionGap.index` name the parameter and the pattern.
+`DirectionGap.forward` and `DirectionGap.backward` are the two values, and `DirectionGap.gap` is their signed difference.
+`DirectionGap.forward_rung` and `DirectionGap.backward_rung` are the rungs each chain kept.
+`DirectionGap.gap_esd` is the gap over the two esds combined in quadrature, 0 under the noise floor and `None` where either chain has no esd.
+No gap is called a verdict, and the summary line names the largest.
 
-It is the only check that separates a measured trajectory from an ordering artefact, and on real data it is selective.
-On the round-robin series it flagged nine parameters, every one a peak-shape term: `phases.*.lor_size`, `gauss_size`, `gauss_strain`, `lor_strain`, `instrument.profile.x` and `instrument.geometry.axial_sl`.
-It flagged no cell parameter and no scale.
+It is the only check that separates a measured trajectory from an ordering artefact.
+On the round-robin series the nine paths past 3 esds were all peak-shape terms, such as `lor_size`, `gauss_strain` and `instrument.profile.x`, and none was a cell parameter or a scale.
+A parameter near zero with an esd near zero can show thousands of esds with no physical size, so read the two values.
 
-The σ multiples in those messages are ratios to a fitted esd.
-A parameter near zero with an esd near zero reports a spread of thousands of σ with no physical size, so read the two values the message quotes.
-The trajectory the messages compare against is `SeriesResult.backward`, the reverse chain's own `SeriesResult`, and `SequentialRefinement.backward_` is the same object.
-Its own `backward` and `provenance` are `None`, its `steps` are its own and never re-measured cold, and its `diagnostics` hold only the moment diagnostics.
-The comparison and every other series diagnostic are on the forward result.
+`SeriesResult.backward` is the reverse chain's own `SeriesResult`, and `SequentialRefinement.backward_` is the same object.
+Its `backward`, `direction_gaps` and `provenance` are `None`, its `steps` are never re-measured cold, and its `diagnostics` hold only the moment diagnostics.
 
-No `SEQUENTIAL_PATH_DEPENDENT` finding is also what a comparison that never happened would give, so a comparison that did not run says so.
-When the forward chain was cancelled, or the backward chain was cancelled or raised, [`SEQUENTIAL_PATH_CHECK_INCOMPLETE`](diagnostics-series.md#sequential_path_check_incomplete) fires at `warning`, naming the chain and the pattern it stopped on.
-When the comparison ran on less than the series, the same code fires at `info`, and `where` names the patterns one chain has no entry for, or the paths no pattern has an esd for in both chains.
-So no finding with neither of these present means the comparison was made and found nothing.
+`direction_gaps` is `None` when the comparison did not run.
+[`SEQUENTIAL_PATH_CHECK_NOT_RUN`](diagnostics-series.md#sequential_path_check_not_run) then fires at `warning`, naming the chain that was cancelled or raised and the pattern it stopped on.
+When it ran on less than the series, [`SEQUENTIAL_PATH_CHECK_INCOMPLETE`](diagnostics-series.md#sequential_path_check_incomplete) fires at `info`, its `where` naming the patterns one chain lacks or the paths no pattern has two esds for.
 A backward chain's own failures are on `result.backward.failures`.
-Its raise under `on_error="raise"` keeps the forward chain, which is on `SequentialRefinement.result_` and on the exception as `series_result`.
+Its raise under `on_error="raise"` keeps the forward chain, on `SequentialRefinement.result_` and on the exception as `series_result`.
 
 `SeriesResult.n_iterations` counts the chain the result reports, the forward one under `direction="both"`.
 The backward chain is a second complete set of fits, and `result.backward.n_iterations` counts it.

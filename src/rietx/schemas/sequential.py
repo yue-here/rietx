@@ -491,6 +491,44 @@ class SeriesStep(Base):
     cold_ratio: float | None = None
 
 
+class DirectionGap(Base):
+    """One path's gap between the forward and backward chains at one pattern
+    (WP-2003, C5).
+
+    A row of :attr:`SeriesResult.direction_gaps`, written by
+    ``sequential._direction_gaps`` under ``direction="both"``.  It asserts
+    nothing about the gap.  The removed ``SEQUENTIAL_PATH_DEPENDENT`` called a
+    path path-dependent above 3 combined esds, a number no measurement set, and
+    a series of n paths and m patterns met that bar by chance.  The help entry
+    of ``SeriesResult.direction_gaps`` carries the reading.
+
+    Each walk's kept rung rides beside the gap.  One pattern can be kept cold
+    in one walk and warm in the other, and the gap then measures the ladder as
+    well as the order.
+    """
+
+    path: str
+    #: the pattern's label, the key both chains share
+    label: str
+    #: its :attr:`SeriesEntry.index`
+    index: int
+    #: the path's value in each chain
+    forward: float
+    backward: float
+    #: forward minus backward, **signed**, and modulo a turn on a moment angle
+    #: path, so a moment either side of the azimuth's cut is no gap
+    gap: float
+    #: :attr:`gap` over the combined esd, √(σ_f² + σ_b²), signed.  ``None``
+    #: where either chain measured no esd at this pattern: a gap against one
+    #: side's esd is a significance the other side never earned.  0 under the
+    #: trajectory's noise floor (``sequential.NOISE_FLOOR_REL``).  The list
+    #: sorts ``None`` after every number.
+    gap_esd: float | None = None
+    #: :attr:`SeriesEntry.rung` of this pattern in each chain
+    forward_rung: Literal["warm", "warm_staged", "cold"]
+    backward_rung: Literal["warm", "warm_staged", "cold"]
+
+
 class SeriesCodeCount(Base):
     """How many patterns one per-pattern code fired on, at one path (WP-2003).
 
@@ -867,15 +905,14 @@ class SeriesResult(Base):
     #: ``"forward"``/``"backward"``: the chain direction whose fits are
     #: reported in :attr:`entries`.  ``"both"`` means the series was run twice
     #: and the two trajectories compared — the reported entries are the forward
-    #: ones, and the comparison is in :attr:`diagnostics`.
+    #: ones, and the comparison is in :attr:`direction_gaps`.
     direction: Literal["forward", "backward", "both"] = "forward"
     #: the reverse chain, present iff ``direction == "both"`` (WP-1076).
     #: Its own ``backward`` is always ``None``: it is one extra level, not a
     #: cycle.  Without it a caller of :func:`~rietx.refine_sequential` received
-    #: the ``SEQUENTIAL_PATH_DEPENDENT`` diagnostics and had no way to reach
-    #: the trajectory they are about — the comparison was reachable only from
-    #: ``SequentialRefinement.backward_``, which the one-shot API never
-    #: returns.
+    #: the comparison and had no way to reach the trajectory it is about: that
+    #: trajectory was reachable only from ``SequentialRefinement.backward_``,
+    #: which the one-shot API never returns.
     backward: "SeriesResult | None" = None
     diagnostics: list[Diagnostic] = Field(default_factory=list)
     #: Every refined path's change between consecutive patterns, as a
@@ -898,6 +935,17 @@ class SeriesResult(Base):
     #: the field, "not recorded", never "nothing recurred"; ``[]`` on a series
     #: whose entries carry no counted code.
     code_counts: list[SeriesCodeCount] | None = None
+    #: Under ``direction="both"``, every path's gap between the forward and
+    #: backward chains at every pattern both fitted, in combined esds, as a
+    #: :class:`DirectionGap` with each walk's kept rung, largest
+    #: :attr:`DirectionGap.gap_esd` in magnitude first and the rows with no
+    #: size last (WP-2003, C5).  No threshold and no diagnostic: the help
+    #: entry carries the reading.  A relative path
+    #: (:attr:`relative_paths`) is not a row.  Written by
+    #: ``SequentialRefinement.fit`` when both chains completed; ``None`` when
+    #: the comparison did not run (a one-way chain, a cancel, a backward chain
+    #: that raised) and in a document written before the field.
+    direction_gaps: list[DirectionGap] | None = None
     #: The paths whose values are **steps, not positions** (WP-1317): a
     #: coordinate DOF measured from where its fit began, a rigid body's
     #: rotation DOF (``sequential._relative_paths``, WP-1333).  Nothing in an
@@ -1486,6 +1534,20 @@ class SeriesResult(Base):
             lines.append(f"    largest step {largest.path} {largest.size_esd:.1f}σ "
                          f"at {largest.labels[0]}→{largest.labels[1]} "
                          f"(series.steps)")
+        # the forward-backward gaps' one line (WP-2003, C5): the largest gap
+        # of each of the three paths that lead the field
+        named: list[DirectionGap] = []
+        for g in self.direction_gaps or []:
+            if g.gap_esd is None or len(named) == 3:
+                break
+            if all(g.path != n.path for n in named):
+                named.append(g)
+        if named:
+            top = ", ".join(f"{g.path} {abs(g.gap_esd):.1f}σ at {g.label} "
+                            f"({g.forward_rung}/{g.backward_rung})"
+                            for g in named)
+            lines.append(f"    largest forward-backward gaps: {top} "
+                         f"(series.direction_gaps)")
         # and the counts' one line (WP-2003, C6): the three largest, read
         # off the field, which is sorted largest first
         if self.code_counts:
@@ -1544,29 +1606,48 @@ class SeriesResult(Base):
             by_code.setdefault(d.code, []).append(d)
         lines = ["  deliverable: series (a parameter against the series axis)"]
 
-        depend = by_code.get("SEQUENTIAL_PATH_DEPENDENT", [])
         # `direction` is what was *asked for*; the comparison exists only when
         # the reverse chain actually completed.  A cancel takes the backward
         # pass out (forward-cancelled: it is never started, so `backward` stays
         # None despite direction="both"; backward-cancelled: the pass is
-        # recorded but `_path_dependence_diagnostics` is not run) — and an
-        # empty `depend` then reads as "checked, nothing disagreed", which is
-        # the confident wrong answer this row exists to avoid.
+        # recorded but `_direction_gaps` is not run), and a row reading
+        # "measured" would then be the confident wrong answer this row exists
+        # to avoid.
         interrupted = any(d.code == "SEQUENTIAL_CANCELLED"
                           for d in self.diagnostics)
         # WP-1333's record of the comparison, which is the authority where it
-        # exists: ``warning`` is "did not run" and says why (a backward pass
-        # that *raised* is not a cancel, and the row must not call it one),
-        # ``info`` is "ran on less than the series".  A series stored before
-        # schema 0.25 carries neither, and the cancel test above still speaks.
+        # exists: SEQUENTIAL_PATH_CHECK_NOT_RUN says why it did not run (a
+        # backward pass that *raised* is not a cancel, and the row must not
+        # call it one), SEQUENTIAL_PATH_CHECK_INCOMPLETE that it ran on less
+        # than the series.  Before WP-2003 split them, one code carried both
+        # at two levels, so a stored series' INCOMPLETE at ``warning`` is a
+        # NOT_RUN.  A series stored before schema 0.25 carries neither, and
+        # the cancel test above still speaks.
         incomplete = by_code.get("SEQUENTIAL_PATH_CHECK_INCOMPLETE", [])
-        not_run = [d for d in incomplete if d.level == "warning"]
+        not_run = by_code.get("SEQUENTIAL_PATH_CHECK_NOT_RUN", []) + [
+            d for d in incomplete if d.level == "warning"]
         partial = [d for d in incomplete if d.level != "warning"]
         if self.direction == "both" and self.backward is not None \
                 and not interrupted and not not_run:
-            paths = ", ".join(p for d in depend for p in d.where) or "none"
-            lines.append(f"    ordering artefact: measured both ways, "
-                         f"{len(depend)} parameter(s) disagree ({paths})")
+            largest = next((g for g in self.direction_gaps or []
+                            if g.gap_esd is not None), None)
+            if self.direction_gaps is None:
+                # a series written before the field: its diagnostics carry
+                # the removed 3σ verdicts, as written
+                depend = by_code.get("SEQUENTIAL_PATH_DEPENDENT", [])
+                lines.append(f"    ordering artefact: measured both ways, "
+                             f"before SeriesResult.direction_gaps; "
+                             f"{len(depend)} parameter(s) past the removed "
+                             f"3σ test")
+            elif largest is None:
+                lines.append("    ordering artefact: measured both ways, and "
+                             "no pattern has an esd in both chains for any "
+                             "path (series.direction_gaps)")
+            else:
+                lines.append(f"    ordering artefact: measured both ways, "
+                             f"largest gap {largest.path} "
+                             f"{abs(largest.gap_esd):.1f}σ at {largest.label} "
+                             f"(series.direction_gaps)")
             # a message is a sentence of its own (WP-1985): spliced into this
             # one, it loses its capital and its full stop
             for d in partial:
@@ -1575,8 +1656,8 @@ class SeriesResult(Base):
             why = (_clause(not_run[0].message) if not_run else
                    "direction='both' was asked for but the chain was "
                    "cancelled before the two directions could be compared")
-            lines.append(f"    ordering artefact: NOT measured — {why}, so an "
-                         f"empty disagreement list is silence, not agreement")
+            lines.append(f"    ordering artefact: NOT measured — {why}, so "
+                         f"no gap was measured")
         else:
             lines.append(f"    ordering artefact: NOT measured — this chain ran "
                          f"{self.direction} only, and direction='both' is the "
