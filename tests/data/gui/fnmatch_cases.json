@@ -494,12 +494,6 @@
    ]
   },
   {
-   "pattern": "instrument.geometry.axial_hl",
-   "matches": [
-    30
-   ]
-  },
-  {
    "pattern": "phases.*.lor_size",
    "matches": [
     8

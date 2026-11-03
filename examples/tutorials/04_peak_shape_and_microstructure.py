@@ -153,9 +153,10 @@ calibration.hold(["phases.0.cell.*"])
 # %% [markdown]
 # `hold` returns the paths it now holds.
 #
-# The `lab_calibrate` plan refines the instrument's position corrections, widths and axial divergence, one group a stage.
+# The `lab_calibrate` plan refines the instrument's position corrections, widths and the axial-divergence ratio S/L, one group a stage.
+# It holds the other ratio, H/L, at the value you set, because swapping the two gives the same pattern.
 # [Plan presets](https://rietx.org/docs/stable/reference/plans.html#lab-calibrate) draws its stages.
-# The synthetic instrument has no axial divergence, so expect warnings about those two terms.
+# The synthetic instrument has no axial divergence, so expect a warning about S/L.
 
 # %%
 calibrated = calibration.fit(standard_data, plan="lab_calibrate")
@@ -164,7 +165,7 @@ calibrated
 # %% [markdown]
 # The diagnostics come first.
 #
-# - The data cannot tell the two axial-divergence terms apart. The synthetic instrument has neither, so there is nothing to separate.
+# - S/L refined to its floor of zero. The synthetic instrument has no axial divergence.
 # - The zero shift and the specimen displacement still move together, even with the cell held. On real data, read the displacement's esd before quoting it.
 #
 # Now compare the refined terms with the instrument that made the data.
