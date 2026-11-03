@@ -377,12 +377,29 @@ export function reseededFlags(traj: Trajectory, entries: SeriesEntry[]): boolean
   return flagsFor(traj, entries, (e) => e.reseeded);
 }
 
-/** Which entries no rung of the ladder recovered (WP-1051).
+/** Which entries the library quarantined (`SEQUENTIAL_UNRECOVERED`, WP-1051).
  *
- * Read off `status` rather than a flag of its own, exactly as the library's
- * diagnostic is: "diverged after the last rung" and "diverged" are the same
- * statement once the chain has run, and a second field could disagree with it. */
-export function unrecoveredFlags(traj: Trajectory,
-                                 entries: SeriesEntry[]): boolean[] {
-  return flagsFor(traj, entries, (e) => e.status === "diverged");
+ * `rejected` is the server's, one boolean per entry in series order, computed by
+ * the test the chain itself applies (`schemas.sequential._rejected`): the solver
+ * diverged, or the fit carries an `error`-level code. It is more than
+ * `status === "diverged"`, a fit can converge and still be rejected, and a
+ * display reads the field and never re-derives the test (WP-2003, C2 q5). */
+export function unrecoveredFlags(traj: Trajectory, entries: SeriesEntry[],
+                                 rejected: boolean[]): boolean[] {
+  return flagsFor(traj, entries, (e) => rejected[e.index] === true);
+}
+
+/** Why the library rejected an entry, in the entry's own fields: the solver
+ *  status and the `error`-level codes it carries. The test is the server's; this
+ *  only names what made it true, for the chip's caption. */
+export function rejectedBecause(e: SeriesEntry): string {
+  const codes = [...new Set(e.diagnostics.filter((d) => d.level === "error")
+    .map((d) => d.code))];
+  const parts: string[] = [];
+  if (e.status === "diverged") parts.push("the solver diverged");
+  if (codes.length) {
+    parts.push(`it carries the error-level code${codes.length > 1 ? "s" : ""} `
+      + codes.join(", "));
+  }
+  return parts.join(" and ");
 }

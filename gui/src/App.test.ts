@@ -548,6 +548,7 @@ const SERIES_ANSWER = {
   has_backward: true,
   n_iterations: 43,
   curves: [true, true],
+  rejected: [false, false],
   running: false,
 };
 
@@ -5124,6 +5125,39 @@ describe("the series panel", () => {
     expect(curves?.url).toContain("index=1");
     expect([...seriesPane("main").data[0]]).toEqual([9, 9.4]);
     expect(() => seriesPane("traj")).toThrow();
+  });
+
+  it("marks a pattern the library quarantined even when the solver converged", async () => {
+    // T400 converged under an error-level code: `_rejected` quarantines it, so
+    // the server says `rejected` and the panel marks it — a status read would not
+    const [first, second] = SERIES_ANSWER.result.entries;
+    const answer = {
+      ...SERIES_ANSWER,
+      rejected: [false, true],
+      result: { ...SERIES_ANSWER.result, entries: [first, {
+        ...second, status: "converged", reseeded: false, rung: "cold",
+        rungs_tried: ["warm", "warm_staged", "cold"],
+        diagnostics: [{ level: "error", code: "MODEL_FAR_FROM_DATA",
+                        message: "the model is far from the data" }] }] },
+    };
+    await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: answer }),
+    });
+    const rows = [...host.querySelectorAll<HTMLTableRowElement>(".side .panel:not(.hidden) tbody tr")];
+    const row = rows.find((r) => r.textContent?.includes("T400") && r.querySelector(".chip"))!;
+    expect(row.textContent).toContain("converged");
+    expect(row.querySelector(".chip")?.textContent).toBe("unrecovered");
+    // the caption names why, from the entry's own error-level code
+    expect(row.querySelector(".chip")?.getAttribute("title"))
+      .toContain("it carries the error-level code MODEL_FAR_FROM_DATA");
+    expect(row.classList.contains("out")).toBe(true);
+    // …and the trajectory crosses that point, offering the mark in its legend
+    expect([...host.querySelectorAll<HTMLButtonElement>(".legend button")]
+      .map((b) => b.textContent?.trim())).toContain("unrecovered");
+    // the first pattern is not marked
+    const t300 = rows.find((r) => r.textContent?.includes("T300") && r.querySelector("button"))!;
+    expect(t300.querySelector(".chip")).toBeNull();
   });
 
   it("runs the chain through the one run machine", async () => {

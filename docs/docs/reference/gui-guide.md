@@ -462,7 +462,10 @@ The status column carries four chips, best learnt as two pairs. `restaged` and
 `reseeded` are both recoveries, the first still from the neighbour's answer so
 the chain is unbroken, the second only from a cold start. `hard` means nothing
 rescued it but a warm attempt was still the best available, and `unrecovered`
-means it diverged on every attempt: it seeded no successor and joined no median.
+means the chain kept a fit it rejected after its last attempt: the solver
+diverged, or the fit carries an error-level diagnostic. A fit can converge and
+still be rejected, so the chip can sit beside `converged`, and its tooltip names
+the reason. A rejected pattern seeded no successor and joined no median.
 On the trajectory plot a ring marks a reseed and a cross marks an `unrecovered`
 point. They say opposite things: a ring is a good fit from a different starting
 model, a cross is not a measurement.

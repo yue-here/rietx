@@ -3967,6 +3967,36 @@ def test_the_gap_names_its_pattern_and_the_rung_each_chain_kept():
     assert "discontinuous" not in row
 
 
+def test_rejected_is_the_librarys_quarantine_test_not_a_status_read():
+    """The panel marks what the chain quarantined, and that is more than
+    ``status == "diverged"``.
+
+    ``schemas.sequential._rejected`` is diverged, raised, or carrying an
+    ``error``-level code, and a fit can be ``converged`` and still carry one
+    (``MODEL_FAR_FROM_DATA`` on the jumped ramp of the path guide).  The
+    server serves that test's answer per entry, so the GUI re-derives none of
+    it (WP-2003, C2 q5).
+    """
+    from rietx.gui import series as series_mod
+    from rietx.schemas.common import Diagnostic
+    from rietx.schemas.sequential import _rejected
+
+    forward, backward = _series_pair([4.156, 4.158, 4.160], [4.156, 4.158, 4.160])
+    forward.entries[1].status = "diverged"
+    forward.entries[2].diagnostics = [Diagnostic(
+        level="error", code="MODEL_FAR_FROM_DATA", message="the model is far")]
+    payload = series_mod.result_payload(forward, backward, running=False,
+                                        curves=[True] * 3)
+    assert payload["rejected"] == [False, True, True]
+    assert payload["rejected"] == [_rejected(e) for e in forward.entries]
+    # the status alone would have missed the second
+    assert [e.status == "diverged" for e in forward.entries] == [False, True, False]
+    # and a warning is not a rejection
+    forward.entries[2].diagnostics[0].level = "warning"
+    assert series_mod.result_payload(forward, backward, running=False,
+                                     curves=[True] * 3)["rejected"] == [False, True, False]
+
+
 def test_an_unjudgeable_parameter_gets_no_disagreement_rather_than_zero():
     """Where the record has no size, the number has none either.
 

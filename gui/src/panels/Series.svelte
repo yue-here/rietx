@@ -41,6 +41,7 @@
     moveBy,
     pointText,
     rankTrajectories,
+    rejectedBecause,
     reseededFlags,
     sortByX,
     topGapPath,
@@ -96,6 +97,9 @@
   const entries = $derived<SeriesEntry[]>(answer?.result?.entries ?? []);
   const trajectories = $derived<Trajectory[]>(answer?.trajectories ?? []);
   const ranked = $derived(rankTrajectories(trajectories));
+  /** per entry, whether the library quarantined it: the server's answer from the
+   *  chain's own test, so this panel re-derives nothing from `status` */
+  const rejected = $derived<boolean[]>(answer?.rejected ?? []);
   const diagnostics = $derived<any[]>(answer?.result?.diagnostics ?? []);
   /** the comparison of the two chains as one line, `""` where it did not run */
   const gaps = $derived(gapLine(answer?.result?.direction_gaps));
@@ -397,7 +401,7 @@
     if (!current) return;
     const traj = current;
     const reseeded = reseededFlags(traj, entries);
-    const unrecovered = unrecoveredFlags(traj, entries);
+    const unrecovered = unrecoveredFlags(traj, entries, rejected);
     legend = trajectoryLegend(traj, reseeded, unrecovered);
     fig = chart.mountTrajectory(plotNode, traj, {
       colors: () => ({ tone: colors.diff, warn: colors.warn, muted: colors.edge }),
@@ -654,15 +658,16 @@ every rung of the escalation ladder included — what the warm start actually bu
         </thead>
         <tbody>
           {#each entries as e, i (e.index)}
-            <tr class:lit={selectedPattern === i} class:out={e.status === "diverged"}>
+            <tr class:lit={selectedPattern === i} class:out={rejected[i]}>
               <td class="muted">{e.index}</td>
               <td>{e.label}</td>
               <td>{e.x === null ? e.index : e.x}</td>
               <td>
                 {e.status}
-                {#if e.status === "diverged"}
-                  <span class="chip warn" title="no rung of the escalation ladder
-recovered this pattern (tried: {e.rungs_tried.join(" → ")}). It is reported because it
+                {#if rejected[i]}
+                  <span class="chip warn" title="the chain rejected this fit
+({rejectedBecause(e) || "see its diagnostics"}) and no rung of the escalation ladder
+recovered it (tried: {e.rungs_tried.join(" → ")}). It is reported because it
 was measured, but the chain stepped over it: it seeded no successor and its Rwp was
 left out of the series median. Read it as a failed fit, not as a datum.">unrecovered</span>
                 {:else if e.reseeded}

@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Any
 
 from ..schemas.pattern import PatternData
-from ..schemas.sequential import SeriesResult
+from ..schemas.sequential import SeriesResult, _rejected
 from ..sequential import (
     DIRECTIONS,
     REFIT_MODES,
@@ -392,6 +392,13 @@ def result_payload(series: SeriesResult, backward: SeriesResult | None, *,
     ``result``, ranks every gap with no threshold (WP-2003, C5), and each
     trajectory's ``n_sigma`` is its largest.
 
+    ``rejected`` says per entry whether the library quarantined it, by the
+    test the chain itself applies (:func:`~rietx.schemas.sequential._rejected`:
+    the solver diverged, or the fit carries an ``error``-level code), so the
+    panel marks what the library marked and re-derives nothing.  A rejected
+    entry is the one ``SEQUENTIAL_UNRECOVERED`` names: it seeded no successor
+    and joined no median.
+
     ``relative`` is the runner's ``sequential._relative_paths``, and
     ``angles`` its ``sequential._angle_paths``, both passed on to
     :func:`trajectories`.
@@ -402,5 +409,6 @@ def result_payload(series: SeriesResult, backward: SeriesResult | None, *,
         "has_backward": backward is not None,
         "n_iterations": series.n_iterations,
         "curves": list(curves),
+        "rejected": [_rejected(entry) for entry in series.entries],
         "running": running,
     }

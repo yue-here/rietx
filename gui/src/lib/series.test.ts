@@ -9,6 +9,7 @@ import {
   esdText,
   gapLine,
   rankTrajectories,
+  rejectedBecause,
   reseededFlags,
   rungNote,
   sortByX,
@@ -296,12 +297,40 @@ describe("matching the reseed flags to a trajectory", () => {
     expect(reseededFlags(whole, rows)).toEqual([false, true, false]);
   });
 
-  it("reads unrecovered off the status, not off a flag of its own", () => {
-    // "diverged after the last rung" and "diverged" are the same statement once
-    // the chain has run, so a second field could only disagree with this one
-    const rows = entries([{}, { status: "diverged", reseeded: false },
-                          { status: "max_iter" }]);
-    expect(unrecoveredFlags(traj({ labels: ["p0", "p1", "p2"] }), rows))
-      .toEqual([false, true, false]);
+  it("marks what the library rejected, not only what diverged", () => {
+    // `rejected` is the server's answer from the chain's own quarantine test:
+    // diverged, or carrying an error-level code. A fit that converged under
+    // MODEL_FAR_FROM_DATA is quarantined and must be marked, and a status read
+    // would have missed it (WP-2003, C2 q5).
+    const error = { level: "error", code: "MODEL_FAR_FROM_DATA", message: "far" };
+    const rows = entries([{}, { status: "diverged" },
+                          { status: "converged", diagnostics: [error] }]);
+    const rejected = [false, true, true];
+    expect(unrecoveredFlags(traj({ labels: ["p0", "p1", "p2"] }), rows, rejected))
+      .toEqual([false, true, true]);
+    // the panel derives nothing: a diverged status the server did not reject
+    // (no `rejected` row) is not marked here
+    expect(unrecoveredFlags(traj({ labels: ["p0", "p1", "p2"] }), rows, []))
+      .toEqual([false, false, false]);
+  });
+
+  it("matches the rejection on the entry's index when a trajectory skips patterns", () => {
+    const rows = entries([{ label: "p0" }, { label: "p1" }, { label: "p2" }]);
+    const partial = traj({ labels: ["p1", "p2"], x: [400, 500], value: [4.2, 4.3],
+                           stderr: [null, null] });
+    expect(unrecoveredFlags(partial, rows, [true, false, true])).toEqual([false, true]);
+  });
+
+  it("names what made the library reject a fit, from the entry's own fields", () => {
+    const error = (code: string) => ({ level: "error", code, message: "m" });
+    const warn = { level: "warning", code: "BOUND_HIT", message: "m" };
+    expect(rejectedBecause(entries([{ status: "diverged" }])[0]))
+      .toBe("the solver diverged");
+    expect(rejectedBecause(entries([{ diagnostics: [warn, error("MODEL_FAR_FROM_DATA")] }])[0]))
+      .toBe("it carries the error-level code MODEL_FAR_FROM_DATA");
+    expect(rejectedBecause(entries([{ status: "diverged",
+      diagnostics: [error("A"), error("B"), error("A")] }])[0]))
+      .toBe("the solver diverged and it carries the error-level codes A, B");
+    expect(rejectedBecause(entries([{}])[0])).toBe("");
   });
 });
