@@ -286,7 +286,10 @@ alone.
     unchanged on the merged tree. `python -m tests.reader_output`:
     unchanged, exit 0. The added tests' local seconds: the gap test 24.75 s
     over its 2 rows (it sat in the fast tier before #1321 reverted it), the
-    lift's 4 rows 1.64 s.
+    lift's 4 rows 1.64 s. The full suite's one failure,
+    `test_eval_skill.py::test_the_placement_episode_builds_and_fires_its_codes`
+    (`KeyError` on `axial_hl`), fails on `main` at 9b888120c too: issue
+    #1384, not this WP's.
 
   *Generality* (judge's verdicts, summary). The lift: weak. The action is
   kind 1 (a free parameter whose column vanishes at its start cannot be
