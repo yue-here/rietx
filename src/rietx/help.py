@@ -3383,13 +3383,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "PATTERN_ROWS_DROPPED": HelpEntry(
-        title="Some numeric rows were not read as data",
+        title="Some rows were not read as data",
         description=(
-            "The reader takes the most common number of values per line as the file's "
-            "layout, and it skipped numeric lines with a different count. A header table "
-            "or a limits row usually causes this. If a skipped line was a real "
-            "measurement, the file mixes layouts. Re-export it with the same number of "
-            "values on every row."
+            "The reader dropped rows from the file, for one of two reasons, and the "
+            "message says which. Every reader drops a point whose 2θ, count or error "
+            "estimate is NaN or infinite, and names the dropped points by their 2θ. "
+            "A NaN is what a reduction writes where it divided by a zero monitor or "
+            "detector efficiency, so these points hold no measurement. Left in, one "
+            "such point made every statistic of the fit NaN. The two- and "
+            "three-column text reader also takes the most common number of values "
+            "per line as the file's layout, and it skips numeric lines with a "
+            "different count, naming them by line. A header table or a limits row "
+            "usually causes this. If a skipped line was a real measurement, the file "
+            "mixes layouts. Re-export it with the same number of values on every row."
         ),
     ),
     "PATTERN_SCAN_REVERSED": HelpEntry(
