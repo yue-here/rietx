@@ -1871,7 +1871,17 @@ ROWS: tuple[Row, ...] = (
         value=48,
         evidence=("arithmetic: as _FLOAT_DENOMINATOR_MAX, the denominator of a (P, p) over a "
                   "t-subgroup (index <= 4) divides 48; the 230-type sweep in tests/test_subgroups.py "
-                  "standardises every one exactly")),
+                  "standardises every one exactly; rietx.crystallography.magnetic.isotropy."
+                  "_standard_child bounds its setting the same way, as max(48, 12 * index), so 48 "
+                  "binds only at index <= 4, the range that evidence covers; "
+                  "tests/test_distortion_candidates.py::"
+                  "test_the_child_setting_is_read_by_the_subgroups_standardiser pins that the "
+                  "child's setting goes through the same standardiser; "
+                  "rietx.crystallography.representation.subgroups._spglib_letters rounds spglib's "
+                  "transformation matrix and origin shift for a Hall setting to a denominator of at "
+                  "most 48, the floor alone, and tests/test_subgroups.py::"
+                  "test_the_letters_follow_spglibs_frame_and_not_the_input_order reaches it in the "
+                  "17 settings whose frame permutes letters")),
     Row("rietx.crystallography.representation.subgroups._PROBE_DENOMINATOR_PER_INDEX", "constant",
         tier="invariant", value=12,
         evidence=("answer-invariant: the bound only recovers the rational spglib's float stands for, "
