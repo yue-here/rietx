@@ -172,6 +172,14 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
 
 ### Inherited
 
+- **2026-11-03, from WP-1955 (PR #1372).** X17's floored-aperture collapse is
+  fixed by a lift: a stage that newly frees an FCJ axial ratio sitting on zero
+  starts it at 0.02 (`forward.apertures_to_lift`), warm collapsed refits
+  included. Re-measured on X17's probe (independent 1b under `qpa_plan()`, then
+  a warm 1c): closing stage off, Rwp 10.73 → 0.10881 in 43 evaluations
+  (independent 1c 0.10901); on, 0.10495 (independent 0.10518). 1b itself still
+  walks back to its floor. X17's row can say fixed; C2 question 5 and the fence
+  are untouched, since they catch other collapses.
 - **2026-11-02, from WP-2080 (issue #1214).** C1's reversal condition is met on
   the issue's synthetic chain: a converged warm first rung keeps the minor phase's
   c 0.34 Å off at GoF 2.05, where its seed pattern reached 1.02 and `warm_staged`

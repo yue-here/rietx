@@ -1,9 +1,9 @@
 # WP-1955 — a column at a zero aperture, and a column the agreement matrix cannot see
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @mustachefeeling; tasks 1, 3 and 4 landed (PR #1321); task 2 returns with task 5
+Milestone: unscheduled · Status: 🔄 2026-11-03 — tasks 1-5 landed (PRs #1321, #1372): the exact column and the lift off a zero aperture; tasks 6-8 open
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-26 — two measurements the same day: WP-2003's double-zero aperture collapsing a warm-started CPD fit (Rwp 0.79-10.7 against 0.109), and #1075's LM ending converged at S/L = H/L = 0 on lab_bragg_brentano from defaults while one TRF stage drops χ² by ~1 200 χ²_red·f²; the single-zero column is still off its difference with no test
+Priority: P3 2026-11-03 — the stall and the collapse are fixed (tasks 2 and 5, PR #1372); left are the start value's evidence across families, the Gaussian-width floor and suggest's scoring of a zero aperture
 
 ## Goal
 
@@ -172,6 +172,23 @@ when U and V are both zero beside W on its floor. It is the only other
       guide's second calibration leaves zero again. Settled by Claude on
       those measurements; the start value reuses an approved constant, and
       the PR asks Yue to confirm its row covers the second use.
+- [ ] The start value's evidence (added 2026-11-03 from the generality
+      judge's "weak"): a start-invariance test for the lift, 0.02 against
+      0.002 and 0.005 and against TRF from zero, on three unrelated families,
+      one of them synchrotron (`tests/test_seed_invariance.py` is the
+      roughness seed's precedent), and the exact column's comparison against
+      jax at S/L and H/L from 0.001 to 0.005 and at a low-angle reflection
+      under the ξ cap. Then the `AXIAL_SIZING_FLOOR` and `StageResult.seeded`
+      audit rows amended for the start use, for Yue's approval.
+- [ ] The Gaussian-width floor (Context, from WP-1467): the FD width column
+      at `caglioti._MIN_GAMMA_G2` and the strict xfails that cite this WP
+      (`test_fd_columns_hold_at_every_protocol_answer` on lab6 and cpd1a,
+      `test_window_domain.py::test_the_closing_stage_meets_the_bar[lab6]`).
+- [ ] `Refinement.suggest` scores an aperture on zero from its exact,
+      nearly zero column, while a stage freeing it now starts at 0.02.
+      Measure whether it should score from the lifted state, as it does a
+      roughness at b = 0, without manufacturing a gain (`strategy/suggest.py`
+      § the seeds' history).
 
 ## Acceptance
 
@@ -192,6 +209,92 @@ alone.
   **27**, 892-900.
 
 ## Handover log
+
+- **2026-11-03** — A fit that frees an axial-divergence ratio sitting on zero
+  now leaves zero. Each stage that newly frees S/L or H/L at zero starts it at
+  0.02, the value its peak windows were already sized for. With that in place
+  the exact aperture column, reverted from PR #1321, is back. Three cases that
+  stalled or collapsed are cured: issue #1075's lab fit that stopped
+  `converged` at S/L = H/L = 0 (Rwp 0.0834 → 0.0453 on four seeds of four),
+  WP-2003's warm CPD series refit that collapsed (Rwp 10.73 → 0.10881, against
+  the independent fit's 0.10901), and the calibrate guide's second
+  calibration. A positive floor was ruled out: the column at a small floor is
+  as flat as at zero. The start value 0.02 has one real lab family behind it
+  and no synchrotron one, so the generality judge rated it weak, and task 6
+  holds the evidence it asks for. This entry is a ghostshift runner's; the PR
+  is #1372.
+
+  *Done.* Task 2: the four reverts of #1321 reverted (one commit), so
+  `_aperture_node_derivs` (second-order, h = 3e-6, mirrored at the kink), its
+  gap test, the batched-bases oracle and the `srm660c`/`toy_rich` goldens are
+  back. Task 5: `forward.apertures_to_lift` plus the lift in
+  `Refinement._run_stage` and `MultiHistogramRefinement`'s stage loop, before
+  the plan's `Stage.seed`, recorded in `StageResult.seeded`; the strict xfail
+  and `KNOWN_DEFECT_COLUMNS` are gone. `/code-review high --fix` found the
+  closing stage re-lifting an aperture an earlier stage had walked back to
+  zero; the lift now applies only to a path the stage newly frees (fixed,
+  with a test). Help entries for both ratios and `StageResult.seeded`, the
+  calibrate guide page and script (its both-free fit now lands on the
+  exchanged pair, which the profile's S/L ↔ H/L symmetry allows), and
+  `_collapse`'s docstring follow. Review findings declined: `suggest` still
+  scores an aperture on zero from its exact column (task 8); a stencil can
+  still straddle the kink with both apertures under 2h (rare, needs a new
+  rule); the second-order rule costs two more node evaluations per bucket
+  (accepted in its docstring); `apertures_to_lift` repeats
+  `params.multi._unscoped`'s one line rather than import a private helper
+  across the layer.
+
+  *Measured* (macOS arm64, Python 3.12.13, `[dev,jax,torch]`; probes in the
+  runner's scratch, control arm `main` at 4099cbd07 on the same machine).
+  - #1075 repro 1 (the issue's script; seed 1): main `converged` at 0/0, Rwp
+    0.0834, one TRF stage 0.0454. Lifted: S/L 0.030, H/L 0.030, Rwp 0.0453,
+    and a further TRF stage moves nothing. Seeds 2-4: Rwp 0.0454, 0.0455,
+    0.0459, S/L ≈ H/L ≈ 0.030. A (0.02, 0.01) start gave the same answer as
+    (0.02, 0.02), so an equal start does not trap the fit on the diagonal.
+    `profile_interval` on S/L: main [0.0, 0.0533] `fit_is_minimum=False`;
+    lifted [0.02744, 0.03251], True.
+  - X17 (independent CPD 1b under `qpa_plan()`, warm collapsed 1c): closing
+    stage off, main max_iter at Rwp 10.726 with `axial_sl` 64.8; lifted
+    converged 0.10881 in 43 evaluations (independent 1c 0.10901). Closing on,
+    lifted 0.10495 (independent 0.10518); main's closing-on control was
+    stopped after 14 min (WP-2003 records 0.79140 there). 1b walks from 0.02
+    back to its floor, the same answer as main.
+  - Task 2's list, S/L ± esd main → branch: cpd-1a 0.036439 ± 0.002867 →
+    ± 0.002809, Rwp 0.163072 both, fractions within 5e-11. Stephens brucite
+    iso (LM) 0 ± 363.7 → 0 ± 363.6. Brucite aniso (TRF) 2.6e-26 ± 3915 →
+    2.6e-8 ± 7445, Rwp 0.180419 → 0.180453. `test_e8` report loop: main S/L
+    0.04132 ± 0.0161, H/L 0 ± 13 232; branch the mirror answer, S/L 0 ± 41 350,
+    H/L 0.04132 ± 0.000307 (as with the column alone).
+  - Calibrate guide: both calibrations quote main's numbers to every digit;
+    the both-free fit returns S/L 0.01542(87), H/L 0.02476(78), the pair
+    exchanged.
+  - Tests: `tests/test_cross_backend.py` 241 passed, 36 skipped, 2 xfailed
+    (the two numpy zero-aperture rows now pass, xfailed → passed). Against
+    main the fast selection gains 6 tests: the gap test's 2 rows (back with
+    task 2) and 4 in `test_lab_instrument.py` (the lift's three starts and
+    the no-relift row).
+    Fast and full counts on the merged tree: the PR body.
+
+  *Generality* (judge's verdicts, summary). The lift: weak. The action is
+  kind 1 (a free parameter whose column vanishes at its start cannot be
+  refined), strong for; the start value reuses the approved
+  `AXIAL_SIZING_FLOOR` row, whose evidence covers sizing only, and
+  `StageResult.seeded`'s row names only the roughness seed; one real
+  family; a synchrotron refiner (apertures 0.001-0.005) would start nearer
+  GSAS-II's 0.002. Would change it: a start-invariance test on three
+  families, one synchrotron, and the rows amended and approved. The column
+  stencil: weak, better than before; untested at apertures 0.001-0.005 and
+  under the ξ cap. Author's answer: both are task 6; the PR asks Yue whether
+  to amend the two rows or give the start value its own.
+
+  *Gotchas.* A lift on every freed path re-lifts on the closing stage, which
+  re-frees every glob; compare against the free set before `set_vary`.
+  A fast run started before `/code-review --fix` finishes measures a tree
+  that changes under it; the first fast run here was discarded for that.
+
+  Next: Yue's ruling on the audit rows (PR body). Then task 6 (the
+  start-invariance test with a synchrotron family decides whether 0.02 stays
+  or the start depends on the instrument), task 7, task 8.
 
 - **2026-11-02 (second)** — Yue ruled the open question: split. PR #1321
   now carries only the test and traced-backend half, and changes no default
