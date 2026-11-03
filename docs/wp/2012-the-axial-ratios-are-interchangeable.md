@@ -79,13 +79,19 @@ choosing a fix.
       goniometer radius (the calibration guide's 3 mm / 200 mm). H/L left at its default 0
       gives a one-ratio model, close to GSAS-II's single SH/L. Its fit-quality cost on a
       real instrument is not measured.
-- [ ] Build option 1: the `lines_axial` stage of `lab_calibrate` drops
+- [x] Build option 1: the `lines_axial` stage of `lab_calibrate` drops
       `instrument.geometry.axial_hl` (`strategy/staged.py:628-630`). A sibling found while
       recording the decision: `lab_bragg_brentano`'s `lines_axial` stage frees both ratios
       too (`:599-601`), so the same symmetry reaches it. Apply the same change there, and
       say so in the handover, since the ruling named `lab_calibrate` alone. Then drop the
       Biso start row's strict xfail if it XPASSes; the other lab6 start rows carry no mark
-      since WP-2036 ordered the pair (§ Inherited, WP-2036).
+      since WP-2036 ordered the pair (§ Inherited, WP-2036). **Done 2026-11-02.** Both
+      presets, the `refine_axial_asymmetry` suggestion, and the three NIST protocol
+      mirrors of `lab_bragg_brentano` (`test_acceptance_srm660c._nist_calibrated_plan`,
+      `examples/srm660c_lab.py`, `examples/validate_cuda_mixed_precision.py`) free S/L
+      alone. The Biso row XPASSed and lost its mark. The axial-floor row turned red at
+      0.582 plain esd on u: the protocol has two minima in the widths that the axial
+      mirror did not make. It is a non-strict xfail citing WP-2084, filed for it.
 - [ ] Rewrite the two `help.py` entries to say the pair is interchangeable, and follow a
       changed preset into the skill's `lab_calibrate` row (`docs/skill/rietx/SKILL.md`, the
       presets table) and the calibration guide's axial paragraph.

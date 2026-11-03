@@ -617,6 +617,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2079](2079-a-non-finite-count-is-dropped-and-said.md) | A non-finite count or σ in a pattern file is dropped, and the reader says so | ⬜ | P2 | — |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 🔄 2026-11-02 | P2 | [2003](2003-the-chain-actions.md) |
 | [2082](2082-a-stated-prior-is-not-an-engine-in-the-grade.md) | A stated prior is not an engine in the grade | ✅ 2026-11-02 | — | — |
+| [2084](2084-lab6-has-two-minima-in-the-widths.md) | The SRM 660c protocol has two minima in the Gaussian widths, and the shipped start reaches the shallower | ⬜ | P3 | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
