@@ -131,6 +131,14 @@ that caveat until 1421 lands.
 
 ### Inherited
 
+- 2026-11-03, from WP-1335 (closed, PR #1364): the Non-goal below that sends
+  a joint fit's `stage_reports=` to WP-1335 now points at a closed WP. 1335
+  cut a stage report's cost by about a third and stopped there by ruling, so
+  whether to offer rungs on a joint fit is an open maintainer question with
+  no owner. The question, and the three choices that go with building it
+  (whether a third is enough, the rung shape, which compile a rung reads),
+  are in WP-1335's 2026-11-03 handover entry. Re-point the Non-goal to
+  wherever the maintainer's answer files the work.
 - 2026-11-01, from WP-1951 (issue #896): a single fit now reports a stage
   glob that names one site (`phases.0.atoms.0.dof.*`) and frees nothing,
   through `refine._site_glob_diagnostics` beside
