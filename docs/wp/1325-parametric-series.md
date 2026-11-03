@@ -87,6 +87,17 @@ standing concern is a check calibrated on one example.
    union bound, and its tied half could flag a right law beside a wrong
    one.
 
+### Direction, 2026-11-03
+
+The maintainer set the track's direction: all the machinery in place for
+experienced users who build their own parametric refinements in TOPAS or
+GSAS-II, on an accessible and well-documented surface. Built-in heuristics
+matter less, because these users will write their own, and presets for
+beginners can follow later. So [1964](1964-a-parametric-equation-the-user-writes.md)
+now owns equations the user writes. The checks here (the next-term test, the
+replicate reading from #1218) rank below a missing primitive. How the rest of
+this WP's tasks move awaits the maintainer's ruling on the track.
+
 ### The general shape, and which part this WP builds
 
 Every precedent below is one case of two independent choices. Write pattern
@@ -197,7 +208,7 @@ changes what every coefficient means.
    round-trip. It has:
    - targets as globs (superseded 2026-10-14: the declaration landed with
      one bare path per target, and a glob is
-     [1965](1965-a-law-declared-by-formula-condition-and-glob.md)'s);
+     [1965](1965-a-parametric-equation-declared-by-formula-condition-and-glob.md)'s);
    - a basis from a **closed** vocabulary: `constant`, `polynomial` (terms over
      named coordinates, e.g. `[[], ["x"], ["y"], ["x", "y"]]`), or `design`
      (explicit per-pattern rows; this is the escape hatch for splines,
@@ -1081,8 +1092,8 @@ right, each freed gain is 0.92-1.10 of its refit.
 October series work found. Neither comment asks for a change to #977. A
 private bundle with the harness, drafts and data goes to the maintainer
 separately. The points for this WP are below. The subset boundary and the
-detectors went to [1965](1965-a-law-declared-by-formula-condition-and-glob.md),
-the scanned nonlinear laws to [1964](1964-a-nonlinear-law-through-the-derived-block.md),
+detectors went to [1965](1965-a-parametric-equation-declared-by-formula-condition-and-glob.md),
+the scanned nonlinear laws to [1964](1964-a-parametric-equation-the-user-writes.md),
 and the telemetry and event pairing to [1322](1322-events-aggregator.md) (closed 2026-10-23; it returned the per-equation line here, see § Inherited).
 Their numbers are as reported and were not re-measured here.
 
@@ -1138,7 +1149,7 @@ Their numbers are as reported and were not re-measured here.
   (`history.aggregate.summarize_events`) shipped in PR #902. The line would
   carry the subset size, the form verdict, and whether a detector fired inside
   the subset (the subset boundary and the detectors are
-  [1965](1965-a-law-declared-by-formula-condition-and-glob.md)'s). Two rules
+  [1965](1965-a-parametric-equation-declared-by-formula-condition-and-glob.md)'s). Two rules
   for whoever builds it:
   - Pair events in file order, never by `(series_index, series_pass)`, since
     indices recur on reseeds and restarted segments. The aggregator already
@@ -1169,19 +1180,19 @@ Their numbers are as reported and were not re-measured here.
 
 - A library of physical models: here the caller supplies the basis, or names
   a polynomial. Named nonlinear laws are
-  [1964](1964-a-nonlinear-law-through-the-derived-block.md)'s.
+  [1964](1964-a-parametric-equation-the-user-writes.md)'s.
 - Replacing the chain: it stays the exploratory tool and the seed.
 - Laws nonlinear in their coefficients: an order parameter's
   (1 − T/T_c)^β with T_c and β refined, an Avrami rate, an Einstein
   temperature. Filed 2026-10-14 as
-  [1964](1964-a-nonlinear-law-through-the-derived-block.md). The fence here
+  [1964](1964-a-parametric-equation-the-user-writes.md). The fence here
   rested on WP-1119's reading that only C·θ + d is exact under autodiff, and
   WP-1804's derived block has since given the table a second, nonlinear seam.
   A law nonlinear in the coordinates alone is already declarable as a
   `design` basis.
 - Declaring a law by a formula string, a subset by a condition on the
   coordinates, or a target by a glob:
-  [1965](1965-a-law-declared-by-formula-condition-and-glob.md).
+  [1965](1965-a-parametric-equation-declared-by-formula-condition-and-glob.md).
 - One pattern as a sum over several specimens (A ≠ identity): direct XRD-CT,
   depth profiles. That is [1962](1962-xrd-ct-a-pattern-summed-over-the-voxels-its-beam-crosses.md).
 - Soft forms: partial pooling toward the surface, or a P-spline smoothness
@@ -1412,7 +1423,7 @@ Their numbers are as reported and were not re-measured here.
   `d9_02592_3phase_01.inp`. The ZrP₂O₇ input is refused at read, on its
   `B1(...)` site macros, so its phases need building by hand.
   - WO₃'s TOPAS law refines its Einstein temperature, which no linear
-    basis expresses ([1964](1964-a-nonlinear-law-through-the-derived-block.md)).
+    basis expresses ([1964](1964-a-parametric-equation-the-user-writes.md)).
     Held at TOPAS's 125.4 K it is a `design` law with columns 1 and
     1/(exp(θ/T) − 1), which is how to declare it here.
   - ZrP₂O₇'s TOPAS law calibrates the temperature itself, a law on a

@@ -86,7 +86,7 @@ screenshots come from `docs/manual/make_screenshots.py`.
   1.9.0.dev0: the positive series is missed and the null fires. A detector
   calibrated inside the suite against a seeded planted-events series would
   fail a test when a fitting change moves it. That series still owes its
-  seeded generator. [1965](1965-a-law-declared-by-formula-condition-and-glob.md)
+  seeded generator. [1965](1965-a-parametric-equation-declared-by-formula-condition-and-glob.md)
   holds the rest.
 
 - **2026-10-11, from the issue triage (#218, in PR #903): the two asks are

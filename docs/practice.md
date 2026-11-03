@@ -674,6 +674,57 @@ So no program reports a fit that leaned on the clamp, and a TOPAS Stephens fit c
 evidence that σ²(M) stayed positive. A protocol that refines ζ cannot be mirrored in rietx
 (WP-0503's fence).
 
+## A parameter set by an equation the user writes
+
+Surveyed 2026-11-03 for WP-1964, three agents and the lead, across scattering software, global
+fitting in other fields, and expression languages. The lead re-read the TOPAS rows in the Technical
+Reference and in the Durham inputs. Web pages were read through a summarising tool, so wording in
+the non-TOPAS rows is unverified. "Checked" means the page or file was read; "recall" means it was
+not. Every source is a user document or paper, and no closed or GPL code was read.
+
+| Program or format | How the form is written | Parameters, sharing, bounds | Per-dataset values | Derivatives | Status |
+|---|---|---|---|---|---|
+| TOPAS | a string on any parameter, one grammar throughout (Tech. Ref. Table 3-1): `+ - * / ^`, `If`, `And`, `Or`, `Min`, `Max`, `Exp`, `Ln`, `Gamma_P` and more; user `fn` with `def` and `return` (§21.3) | `prm` is global and `local` per `xdd` or `str` (§2.2); sharing is by name; min and max are equations (§2.3) | `#list` of macros, or a generated `prm` per pattern (§2.26.2) | computer algebra carries the chain through equations (§21.3.2, Coelho 2018 abstract); `del` is the step for numerical derivatives of the pattern (§2.3) | checked |
+| GSAS-II | a Python-syntax string, fitted to the sequential table after the refinement, never in a joint residual; external functions allowed | a repeated label links equations; a `b` is auto-renamed to stop accidental sharing | the table's columns | not stated | checked, derivatives recall |
+| FullProf | `EQUAL` and `PEQU_pat` link parameters; no equation in a coordinate found | none found | none found | none found | search excerpts |
+| Jana2020, MAUD | no equation across datasets found | | | | not found |
+| Artemis, Larch | strings on path parameters, with roles `guess`, `def`, `set`, `lguess`, `restrain`, and built-in `eins()`, `debye()` | by name | `set` per dataset | finite difference (recall) | checked |
+| Mantid | tie strings, muParser (search excerpt) | `$domains=All`, ties, bound strings | from the workspace | analytic if the function supplies it, else numerical with a named step | checked |
+| Bumps, refnx | operator overloading on `Parameter` objects builds a lazy tree | one shared object | model objects | not stated | checked, refnx syntax recall |
+| lmfit | a Python-syntax string run by asteval | `Parameter(value, min, max, vary, expr)` | caller's own | finite difference (recall) | checked |
+| PEtab (systems biology) | formula strings in tables; v1's page names no grammar | one parameter table holds bounds, start and estimate; v2 removed `parameterScale` as "a constant source of confusion" | a condition table of overrides by id | AMICI: symbolic partials, sparse assembly, threads over conditions | checked |
+| NONMEM, Monolix, nlmixr2 | code lines; the structural model and the covariate model are separate layers | `(low, init, up)` per coefficient; covariates centred on a reference | columns of the dataset | sensitivity equations (recall) | checked |
+| pyhf, HS3 (particle physics) | pyhf: seven closed modifier types; HS3: a graph with a generic-expression escape, its grammar the least specified part | by name, in a flat namespace; bounds sit in a separate measurement block | channels | autodiff (recall) | checked |
+| RooFit | `RooFormulaVar` strings over shared objects | one object, many models | an index category | numerical, or generated code with Clad | checked |
+| JuMP, CasADi, AMPL | the system owns an operator tree or graph with a registered vocabulary, and never evaluates host code | variables apart from data | data apart from the model | exact, on the graph; forward mode for small user operators | checked, AMPL recall |
+| CEL | a written grammar with a version and conformance tests, no side effects, always terminates | | bindings | none | checked |
+
+What they agree on.
+
+- **Form.** Every system with exact derivatives owns a tree with a closed operator list. `asteval`
+  and `simpleeval` evaluate python values, so they expose nothing to differentiate. sympy's
+  `parse_expr` calls `eval` and `lambdify` calls `exec`. sympy 1.14.0's `lambdify` lists no torch
+  module (checked 2026-11-03), so DESIGN.md's rejection of it still stands.
+- **Sharing.** Every program shares a coefficient by name. The per-dataset value is an ordinary
+  fixed number. Start, bounds and fixed flag sit beside the equations.
+- **Grammar.** Where a format left its grammar unwritten (PEtab v1, HS3), the first parser became
+  the specification. PEtab's test suite and CEL's conformance tests are the counter-examples: small
+  cases with an expected number.
+- **Presets.** Monolix's library and nlmixr2's `linCmt()` expand into the expert layer. No program
+  found has a second parser for its presets.
+- **Traps.** TOPAS ignores min and max on a parameter defined by an equation, as stated in its forum
+  (threads 767 and 831, checked). The Reference pages read here do not say so. A generated
+  equation's error points at `topas.log` rather than the user's text. `x^y^z` is left-associative in
+  TOPAS (Table 3-1) and right-associative in python and most mathematics. `^` is XOR in python's
+  parser.
+- **Nonlinear fits.** Systems biology treats multi-start with a sorted-objective plot as routine, and
+  profile likelihood as the honest interval, because a Wald interval is symmetric (Villaverde et al.
+  protocol, checked). Evans warns that a wrong form can fit better than the right one, and recommends
+  a sequential fit unless there is a good reason (slides and forum 582, checked).
+
+Not reached: `Topas.inc`, the full text of Stinton & Evans (2007) and of Coelho (2018), the Jana2020
+and MAUD manuals, the HS3 expression appendix, and MathOptInterface's nonlinear pages.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by

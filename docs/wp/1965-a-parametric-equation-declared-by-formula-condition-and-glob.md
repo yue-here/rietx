@@ -1,4 +1,4 @@
-# WP-1965 — a parametric law declared by formula, condition and glob
+# WP-1965 — a parametric equation declared by formula, condition and glob
 
 Milestone: unscheduled · Status: ⬜
 Track: Candidates — named on a use case, not yet on a measurement
@@ -7,10 +7,10 @@ Priority: P3 2026-10-14 — writing the lists by hand is the workaround, and no 
 
 ## Goal
 
-A parametric law can be declared in the notation statisticians already use.
+A parametric equation can be declared in the notation statisticians already use.
 Its terms come from a formula string, its subset from a condition on the
 coordinates, and its target from a glob. Each form is lowered to today's
-`ParametricTie` when the declaration is resolved, so the stored declaration
+`ParametricEquation` when the declaration is resolved, so the stored declaration
 keeps its current data form.
 
 ## Context
@@ -67,7 +67,7 @@ column on `CoordinateTable` or a condition is the key.
 Decide what is stored. Patsy's lesson, which 1325 applies to the reference
 and scale, is that a coefficient's meaning must not move when patterns join.
 Subset membership is different: a new pattern inside a phase field should
-join that field's law. So storing the condition, and re-evaluating it at
+join that field's equation. So storing the condition, and re-evaluating it at
 each resolution, may be right here. A `design` basis keeps positional rows,
 or needs a key per row.
 
@@ -125,7 +125,7 @@ one declaration per matched path, each with its own coefficients.
     subset.
 
 - **2026-10-14, from [1325](1325-parametric-series.md) (seventh session,
-  PR #977): a result now carries each law as resolved.**
+  PR #977): a result now carries each equation as resolved.**
   `RefinementResult.parametric_laws[k].tie` is the declaration with its
   reference and scale filled in, the form a refit passes back. A formula,
   condition or glob spelling should resolve to that same `ParametricTie`,
@@ -135,8 +135,8 @@ one declaration per matched path, each with its own coefficients.
 
 - Storing a formula string. It is lowered at construction.
 - Arithmetic inside a formula (`I()` beyond a closed power construct), and
-  laws nonlinear in their coefficients:
-  [1964](1964-a-nonlinear-law-through-the-derived-block.md).
+  equations nonlinear in their coefficients:
+  [1964](1964-a-parametric-equation-the-user-writes.md).
 - A pandas dependency. A condition reads `CoordinateTable` columns.
 
 ## Tasks
@@ -148,7 +148,7 @@ one declaration per matched path, each with its own coefficients.
   `using/series.md` lowers to the hand-written terms, and every refusal
   names its fix.
 - [ ] A subset by condition, or by label. Decide what is stored, and pin a
-  dropped pattern by test: the law covers the same specimens afterwards.
+  dropped pattern by test: the equation covers the same specimens afterwards.
 - [ ] A glob target, expanded at resolution, with skipped paths reported.
 - [ ] Manual: `using/series.md` § Declaring one shows the new forms beside
   the data form.
