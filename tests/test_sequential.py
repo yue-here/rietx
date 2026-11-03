@@ -2667,6 +2667,23 @@ def test_the_backward_pass_writes_its_own_logs(thermal_patterns, tmp_path):
         assert rx.RefinementTree.load(forward).header.tree_id
 
 
+def test_a_rerun_into_a_used_history_directory_is_refused_before_any_fit(
+        thermal_patterns, tmp_path):
+    """A log holds one tree (WP-2031), and a rung's log exists only where a
+    run escalated, so a rerun is refused up front rather than mid-chain."""
+    structure, ins = _start_models()
+    hist = tmp_path / "h"
+    hist.mkdir()
+    (hist / "b.cold.jsonl").write_text('{"record": "header"}\n', encoding="utf-8")
+    (hist / "bb.jsonl").write_text('{"record": "header"}\n', encoding="utf-8")  # not ours
+    (hist / "a.jsonl").write_text("\n", encoding="utf-8")       # empty: holds no tree
+    series = SequentialRefinement(structure, ins, history=hist)
+    with pytest.raises(FileExistsError, match=r"\(b\.cold\.jsonl\)") as caught:
+        series.fit(thermal_patterns[:2], labels=["a", "b"])
+    assert str(hist) in str(caught.value)
+    assert sorted(f.name for f in hist.iterdir()) == ["a.jsonl", "b.cold.jsonl", "bb.jsonl"]
+
+
 # -- Le Bail --------------------------------------------------------------
 
 @pytest.mark.slow

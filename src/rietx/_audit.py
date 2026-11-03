@@ -761,6 +761,18 @@ ROWS: tuple[Row, ...] = (
     Row("HARMONIC_HELD", "code"),
     Row("HIGH_CORRELATION", "code"),
     Row("HIGH_CORRELATION_OMITTED", "code"),
+    Row("HISTORY_EARLIER_TREE_SKIPPED", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("check that the loaded tree is the run you meant before quoting a cell, a "
+                  "fraction or any other value from its nodes: the skipped tree's are not in it"),
+        scope=("all",),
+        evidence=("a statement about the file: fires exactly when RefinementTree.load meets a "
+                  "second header record, one note per earlier tree with its line range and "
+                  "node count. Loading the last tree follows from the store, which only "
+                  "appends: a node committed on the loaded tree lands at the end of the file, "
+                  "inside the last tree, so no other choice reloads with it. Nothing is "
+                  "deleted. Load, not raise, is the maintainer's ruling of 2026-11-03 (old "
+                  "files must always open; WP-2031)")),
     Row("HOLD_BLOCKED_PLAN", "code"),
     Row("HUMP_TOO_NARROW", "code"),
     Row("INDEX_ABSTAINED", "code"),
@@ -1302,6 +1314,17 @@ ROWS: tuple[Row, ...] = (
                   "io/recipe's flagged coordinates); a user tie, a hold, and an adp.* "
                   "glob answered by the same request's biso are excluded")),
     Row("STAGE_PATH_UNKNOWN", "code"),
+    Row("STAGE_SLOW_DESCENT", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: names the stages whose StageResult.termination is "
+                  "'slow_descent', the LM driver's stop under SLOW_DESCENT_ESD (WP-1334); "
+                  "the stop and its 'converged' status are that row's and "
+                  "StageResult.termination's, ruled 2026-11-03; this code states the stop "
+                  "beside the status and gates nothing; its 300 and 'one esd' are read off "
+                  "_SLOW_DESCENT_HORIZON and SLOW_DESCENT_ESD"),
+        response="info",
+        responds=("nothing: quote the stage as converged, and read a correlation or "
+                  "bound finding on the same parameters for the direction it was slow along"),
+        scope=("all",)),
     Row("STAGE_WINDOWS_STALE", "code", tier=3, ambiguity=3,
         evidence=("warning; fires when StageResult.window_loss, the Bragg intensity a "
                   "stage's frozen windows drop at its answer against windows sized there, "
@@ -1360,6 +1383,24 @@ ROWS: tuple[Row, ...] = (
         responds=("nothing: compare the pattern with the file's own columns only after "
                   "multiplying them by the factors the message names")),
     # action: 24
+    Row("rietx.schemas.results.StageResult.termination", "action", tier=3, ambiguity=1,
+        evidence=("WP-1334: reports the slow-descent stop (termination 'slow_descent', status "
+                  "converged, ruled 2026-11-03, with STAGE_SLOW_DESCENT naming it) beside the "
+                  "solver's own tests; the stop is SLOW_DESCENT_ESD's row. Dissent measured "
+                  "under the first form, status max_iter: on cpd-1a with an absent zircon at "
+                  "intermediate_ftol=None a stage that would have converged was cut, so the "
+                  "result read max_iter, the guides stage and next and an indexing Le Bail "
+                  "validation fit read max_iter at an unchanged Rwp, and on Cr2WO6 150 K "
+                  "solve_magnetic class 3 ran out of continuations and went unranked. "
+                  "Re-measured under the converged form: those labels read converged, and "
+                  "class 3 converges after one continuation (cut at 102) and is ranked, Rwp "
+                  "0.0978985 against 0.0979014 with the rule off, 913 against 2540 "
+                  "evaluations, verdict unchanged. Not measured: sequential's rung "
+                  "escalation and first-rung budget, which now read a cut rung as converged"),
+        grounds=("Every refiner stops a refinement that has stopped paying (GSAS-II's default "
+                 "3 cycles and 1e-3 per-cycle dM/M), but rietx's form of the stop is its own; "
+                 "tier 3 with SLOW_DESCENT_ESD."),
+        approved="2026-11-03"),
     Row("rietx.schemas.results.StageResult.held", "action", tier=3, ambiguity=1,
         evidence=("WP-1301/1523: free, an absent phase's cell walked 14.9 A from truth over 13 "
                   "sub-onset ramp patterns at unchanged Rwp; silent on IUCr CPD cpd-1c; GSAS-II, "
@@ -3094,6 +3135,37 @@ ROWS: tuple[Row, ...] = (
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."),
         approved="2026-10-20"),
+    Row("rietx.optimize.lm.SLOW_DESCENT_ESD", "constant", tier=3, value=1.0,
+        evidence=("WP-1334 (issue #222): a stage stops once the rest of its budget, at the "
+                  "rate the last 100 evaluations lowered the cost, would lower chi2 over the next 300 by less than "
+                  "SLOW_DESCENT_ESD^2 x chi2_red, the decrease one esd of joint travel buys at "
+                  "a quadratic minimum (Press et al. 2007 §15.6; McCusker et al. 1999 §7 states "
+                  "convergence as shift/esd). GSAS-II 5.8.4 stops on a per-cycle relative chi2 "
+                  "decrease under 1e-3 after at most 3 cycles by default (GSASIIobj.py:20, "
+                  "checked), looser than this. Measured on the WP's fixtures (powderline LaB6, "
+                  "cpd-1a with zircon at 1e-6 and 1e-9, the 1e-9 acceptance protocols): "
+                  "816 -> 539 evaluations on LaB6, worst shift 0.064 plain esd, on background "
+                  "c5 beside the degenerate hump; see the WP's handover for every row"),
+        grounds=("A constant that decides where a solve stops, rietx's own; tier 3 until "
+                 "three families on either side give one answer, as the solver's other "
+                 "stopping constants (B10)."),
+        approved="2026-11-03"),
+    Row("rietx.optimize.lm._SLOW_DESCENT_HORIZON", "constant", tier=3, value=300,
+        evidence=("WP-1334: the evaluations the slow-descent rule projects over, the rest of "
+                  "a default 400-evaluation stage after its first window; a count so the "
+                  "rule does not depend on max_iter"),
+        grounds=("Sets where the slow-descent rule can act; rietx's own, tier 3 with "
+                 "SLOW_DESCENT_ESD."),
+        approved="2026-11-03"),
+    Row("rietx.optimize.lm._SLOW_DESCENT_WINDOW", "constant", tier=3, value=100,
+        evidence=("WP-1334: the slow-descent window in evaluations, a quarter of a default "
+                  "stage's 400, and the first point the rule is read, so no stage converging "
+                  "inside test_budget_and_tolerance_invariance's asserted 4x margin (largest "
+                  "measured use 49 of 400 on the shipped schedule) can reach it; such fits "
+                  "are bit-identical with the rule on"),
+        grounds=("Sets where the slow-descent rule can act; rietx's own, tier 3 with "
+                 "SLOW_DESCENT_ESD."),
+        approved="2026-11-03"),
     Row("rietx.optimize.lm._CURVATURE_GATE", "constant", tier=3, value=100.0,
         evidence=("WP-1953: 3762 of 3831 LM solves never raise lambda past 10, and the crawls it "
                   "catches pass 1e8; no measurement chose 100 over 30 or 1000; second pass owed "
@@ -3405,6 +3477,23 @@ ROWS: tuple[Row, ...] = (
                   "substitution is reported; the maintainer's choice on issue #202")),
     Row("rietx.refine.STRAIN_FLAG_WIDTH", "constant", value=1.5),
     Row("rietx.refine._CENTROID_SITES_NAMED", "constant", value=12),
+    Row("rietx.report.NOMINAL_AXIAL_APERTURE", "constant", tier=3, value=0.02,
+        evidence=("the S/L = H/L at which the report borrows its asymmetry column when a fit "
+                  "declares both apertures 0; it shapes only that borrowed dOmega/d(S/L) column, "
+                  "never the misfit, the fit's own four columns or a fitted value; 0.02 is a "
+                  "typical lab axial ratio; fails above the data's own aperture: on SRM 660c "
+                  "(refines to about 0.025/0.037) the action fires at 0.005, 0.01 and 0.02 "
+                  "(gated regions 14/15, 15/15, 15/15, against 12/15 before WP-2054) and falls "
+                  "silent at 0.05 (14/15, low-angle coefficients insignificant); on cpd-1c "
+                  "(S/L about 0.040) it fires at 0.01, 0.02 and 0.03 (5/14, 9/14, 9/14) and falls "
+                  "silent at 0.05 (7/14); at 0.02 it fires on cpd-1a (6/14) and cpd-1f (11/14); "
+                  "the failure above the aperture is silence, never a wrong call (WP-2054's "
+                  "nominal sweep, 2026-11-03)"),
+        grounds=("A reading setting whose domain test fails over part of its domain, above the "
+                 "data's own aperture; tier 3 like AXIAL_SIZING_FLOOR, whose number it shares.  "
+                 "Kept a constant of its own by the maintainer's ruling (2026-11-03), so that a "
+                 "change to the FCJ quadrature floor cannot move the report."),
+        approved="2026-11-03"),
     Row("rietx.report.body_misfit.MISFIT_ALPHA", "constant", value=0.001),
     Row("rietx.report.body_misfit.MISFIT_BIC", "constant", value=10.0),
     Row("rietx.report.distortion.EVEN_EXPONENT", "constant", tier=1, value=4,
@@ -4795,6 +4884,10 @@ ROWS: tuple[Row, ...] = (
     Row("HARMONIC_FRACTION.suggestion", "suggestion", value=1),
     Row("HARMONIC_HELD.suggestion", "suggestion", value=1),
     Row("HIGH_CORRELATION.suggestion", "suggestion", value=1),
+    Row("HISTORY_EARLIER_TREE_SKIPPED.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: names the skipped tree's line range, which is the whole of "
+                  "what reading it needs, and the reader that loads it")),
     Row("HOLD_BLOCKED_PLAN.suggestion", "suggestion", value=1),
     Row("HUMP_TOO_NARROW.suggestion", "suggestion", value=1),
     Row("INDEX_ABSTAINED.suggestion", "suggestion", value=1),
@@ -4995,6 +5088,11 @@ ROWS: tuple[Row, ...] = (
                   "has no vocabulary for")),
     Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=2),
     Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
+    Row("STAGE_SLOW_DESCENT.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: points at the findings that name a shallow direction, "
+                  "HIGH_CORRELATION and a bound hit, and defers the remedy to their own "
+                  "suggestions; picks no lever and claims no outcome, as "
+                  "STAGE_NOT_FINITE.suggestion")),
     Row("STAGE_WINDOWS_STALE.suggestion", "suggestion", value=1, tier=3, ambiguity=3,
         evidence=("WP-2045's re-solve from the runaway went from axial_sl 558 to 4114, "
                   "behind the warning against polishing; both runaway steps were the "

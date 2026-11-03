@@ -291,6 +291,16 @@ The absolute lab anchor. NIST's own SRM 660c certification measurement, refined 
 
 **Measured:** a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
+#### `test_srm660c_zero_apertures_report_names_axial_asymmetry`
+
+`characterisation` · dataset `srm660c`
+
+**Claims:** with both axial apertures at 0 the report names the one-sided low-angle residual as axial asymmetry, and no impurity phase leads
+
+**Referenced to:** the shape of a known systematic: the certification data carry axial divergence (the apertures refine to about 0.025 and 0.037 when declared), so the action must fire and its rationale name the zero apertures; no accuracy is asserted
+
+**Measured:** three gated regions below 40 deg read asymmetry +0.020 to +0.025 at 7-9 esd; refine_axial_asymmetry 0.50 first, increase_background_flexibility 0.49 (WP-2054)
+
 #### `test_srm660c_extinction_does_no_harm`
 
 `characterisation` `ceiling` · dataset `srm660c`
@@ -419,9 +429,9 @@ The only fixtures carrying **two** reference engines, and they disagree: 2668 pp
 
 **Referenced to:** the two engines' own answers for the same peak, from opposite ends: GSAS-II let it run to 8.77e10 deg 2theta at esd 0 (off the pattern, unmeasured) and TOPAS kept it at 1.63 deg with an esd 188x its own value.  Here it correlates with the low-order background at |rho| = 1 and its stage spends its budget.  A measured failure recorded as a result: the recipe is over-parameterised and no fit of it can say otherwise
 
-**Measured:** HIGH_CORRELATION on the peak against the background, and the last stage freeing it at max_iter: since WP-2002 that is the closing stage, and the declared extra_components stage converges at the intermediate tolerance (1.9.0: the extra_components stage at max_iter); GSAS-II's own committed position 8.77e10 with esd exactly 0
+**Measured:** HIGH_CORRELATION on the peak against the background, and the last stage freeing it, the closing stage since WP-2002, never meeting the solver's own convergence test: since WP-1334 the slow-descent rule stops it at 123 evaluations (STAGE_SLOW_DESCENT), the declared extra_components stage spending its 400 (STAGE_MAX_ITER); GSAS-II's own committed position 8.77e10 with esd exactly 0
 
-**Diagnostics:** `HIGH_CORRELATION`, `STAGE_MAX_ITER`
+**Diagnostics:** `HIGH_CORRELATION`, `STAGE_MAX_ITER`, `STAGE_SLOW_DESCENT`
 
 #### `test_the_written_tables_reproduce_the_answer_they_came_from`
 
