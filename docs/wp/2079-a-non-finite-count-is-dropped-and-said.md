@@ -119,7 +119,12 @@ naming 30.79-36.69°. No reader returns a non-finite value.
 
   *Measured* (`[dev]` venv, darwin/arm64). test_readers_robust +
   test_readers + test_d1b_co3o4_quench + test_tof_axis, `-n auto`: 543
-  passed, 1 skipped.
+  passed, 1 skipped. test_docs_consistency + test_help + test_audit_table:
+  74 passed. ruff, `tests.audit_delta` and `tests.reader_output` clean
+  (reader output unchanged against `cef9aef7c`). Fast selection on the
+  merged tree at `988f14832`, through `serial.py`: 13 709 passed, 319
+  skipped, 34 xfailed, none failed. That is not comparable with the first
+  entry's count, because `main` added tests in between.
 
 - **2026-11-03** — Every pattern reader now drops a point whose 2θ, count or
   σ is NaN or infinite, and says which points by their 2θ. Before, one such
