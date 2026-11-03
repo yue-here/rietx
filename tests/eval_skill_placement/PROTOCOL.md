@@ -236,3 +236,17 @@ item concerns that code. Round 1.1's scoring list is unchanged, so its results
 above read the same, and a re-run of it builds from `db4a8582`, where the code
 fires. `runner.RETIRED_CODES` names the code and why; `build_episode` requires
 the other five (`runner.EPISODE_CODES`). A later round registers its own codes.
+
+## Amendment, 2026-11-03, made after round 1.1 and before any later round
+
+A build from the tree at or after WP-2012 (merge `01ef7b61a`) prints a different episode.
+The `lab_bragg_brentano` plan now frees the axial ratio S/L alone and holds H/L at the
+script's 0.02, so H/L is no row of the result. `colleague_fit.py` therefore prints
+`instrument.geometry.axial_sl` and no longer asks for `instrument.geometry.axial_hl`, which
+raised `KeyError` in the 2026-11-03 nightly. The output also loses two findings, the
+`HIGH_CORRELATION` and the `FLAT_DIRECTION` on the S/L ~ H/L pair (ρ = −1.000). S/L reads
+0.020237(890) where it read 0.020126 ± 1.168. The other five `EPISODE_CODES` still fire,
+`FLAT_DIRECTION` on another pair. No rubric item here or in `tests/eval_skill/`'s
+`fap-judge` case concerns the axial pair. A re-run of round 1.1 still builds from
+`db4a8582`, and a later round, or a `fap-judge` round staged through `build_episode`, builds
+this episode and pools with no round built before it.

@@ -35,7 +35,7 @@ print(f"status {result.status}   Rwp {result.statistics.rwp:.4f}   "
 print()
 for path in ("phases.0.cell.a", "phases.0.cell.c",
              "instrument.zero_shift", "instrument.geometry.sample_displacement",
-             "instrument.geometry.axial_sl", "instrument.geometry.axial_hl"):
+             "instrument.geometry.axial_sl"):
     p = result.parameter(path)
     print(f"{path:42s} {p.value:12.6f} +/- {p.stderr:.6f}")
 for i, atom in enumerate(structure.phases[0].atoms):
