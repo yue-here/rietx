@@ -2554,7 +2554,8 @@ class GuiSession:
         return series_mod.result_payload(
             entry["result"], entry["backward"], running=busy,
             curves=[bool(r.two_theta) for r in runner.results_],
-            relative=entry["relative"], angles=entry["angles"])
+            relative=entry["relative"], angles=entry["angles"],
+            coordinates=[m["x"] for m in entry["members"]])
 
     def _series_member_result(self, index: int):
         """The series entry and member ``index``'s result, which has curves, or a refusal."""
