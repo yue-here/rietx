@@ -1,6 +1,6 @@
 # WP-1542 — a Le Bail background left at its seed
 
-Milestone: unscheduled · Status: 🔄 2026-10-08 — #725's opt-in `auto_background(seed=True)` landed from outside (PR #744); every task remains
+Milestone: unscheduled · Status: 🔄 2026-11-03 — fixture, skill protocol and tests landed (PR #1357); tasks 2-3 and the seed default wait on the maintainer
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-01 — was P2: WP-2062 moves every site where rietx picks a structure-free fit to Pawley (decided 2026-11-01), so no default path will run Le Bail; a caller who picks `mode="lebail"` still meets this
@@ -161,19 +161,10 @@ here (2026-10-03, at the maintainer's request).
   not reproduced on lab silicon by the reporter. *Checked at `32ef5a6`*:
   `auto_background` returns all-zero coefficients for both kinds (15 P-spline
   and 5 Chebyshev on the issue's silicon, 5th percentile 893 counts), and the
-  first `lebail_update` runs at stage compile on `y_obs − 0`. Task 4 should
+  first `lebail_update` runs at stage compile on `y_obs − 0`. *Superseded in
+  part 2026-11-03: the seed landed as an opt-in (PR #744), and task 4 measured it.* Task 4 should
   measure this seed beside the SNIP-held protocol, on the hump fixture and a
   high-pedestal one. Whether a default changes is the maintainer's.
-- **2026-10-07, from WP-1545 (notebook 03): the indexer's own validation Le
-  Bail may be a sibling.** On a synthetic aragonite pattern (Cu Kα, 10-80°,
-  flat 200-count background, reproducible from
-  `examples/tutorials/03_peaks_indexing_lebail.py`) the true cell's validation
-  fit returns Rwp 0.257 and `INDEX_IMPURITY_LINES` says 96 of 105 observed
-  peaks are unmatched. A Le Bail fit of the same candidate with the constant
-  term seeded at the 5th percentile reaches 0.071 then 0.061 over two passes,
-  and matches every peak. Not measured: whether the validation fit seeds its
-  background at all. The tutorial tells the reader the impurity count follows
-  from the poor fit.
 - **2026-10-13, from the issue triage (#725): the showcase pattern cannot be
   shared, and the PbSO₄ neutron histogram is offered instead.** Posted
   2026-10-12: the run where the TCHZ terms went to their bounds is not the
@@ -185,14 +176,6 @@ here (2026-10-03, at the maintainer's request).
   (the 2026-10-11 entry from #726 above), not TCHZ terms reaching their bounds,
   so it is a fixture for task 4 and not a reproduction of that run.
 
-- **2026-10-12, from WP-1930 (#832's sweep of 2026-10-08): five indexing
-  Le Bail validation fits split by platform after #741.** The short-wavelength
-  P candidate left `profile.y` on its floor on Linux, χ²_red 32.27 against
-  29.38 on macOS. A Le Bail fit left where its start put it is this WP's
-  subject, and `validate_by_lebail` is its unmeasured path. Since WP-1938 a
-  width's floor is an ordinary bound of 0 with its physical column, which
-  ended the LaB₆ + cBN split, so this one may be gone too; unmeasured.
-
 - **From WP-2002 (2026-10-19, PR #1050).** Batch class B11. GSAS-II's stand-alone `DoLeBail` runs 10 cycles by default (`GSASIIstrMain.py:761`), and FullProf's manual says "a few cycles (say 10)". On #740's pattern the Le Bail fit plateaus at Rwp 1.62 % from 100 to 400 cycles, against 1.09 % for the true structure (`2002-batch/i740.json`). More cycles close the 4.56 % to 1.62 % gap and not the rest. The batch proposes a converge-with-cap cycle rule inside this WP, pending the ruling.
 
 ## Non-goals
@@ -202,23 +185,29 @@ here (2026-10-03, at the maintainer's request).
 
 ## Tasks
 
-- [ ] Reproduce on a fixture the tree can hold: a synthetic pattern with a
+- [x] Reproduce on a fixture the tree can hold: a synthetic pattern with a
       broad hump under the peaks, Le Bail from a low-percentile seed. Record
       the background's movement from its seed and the width terms per pass.
+      `tests/test_lebail_background_hump.py`; numbers in the 2026-11-03 entry.
 - [ ] Name the test for "the background never left its seed while a width
       grew", with where its threshold comes from (measured here or quoted).
-- [ ] A finding that names it, on the Le Bail path at least.
-- [ ] The protocol: whether the Le Bail call should start from a SNIP estimate
+      *2026-11-03: the named test did not reproduce, and no statistic measured
+      separates the hump from the benign pedestal. Waits on the maintainer's
+      answer to Q1 of the 2026-11-03 entry.*
+- [ ] A finding that names it, on the Le Bail path at least. *Waits on Q1.*
+- [x] The protocol: whether the Le Bail call should start from a SNIP estimate
       held under a low-order Chebyshev, as a default or as the skill's rule.
-      Measure both on the fixture before choosing.
-- [ ] Skill: SKILL.md §2 rule 5 and `references/judging.md` name
+      Measure both on the fixture before choosing. *The skill's rule, settled
+      by Claude under the measurement (2026-11-03 entry). Whether
+      `auto_background`'s `seed` default moves is Q2, the maintainer's.*
+- [x] Skill: SKILL.md §2 rule 5 and `references/judging.md` name
       `rietx.background.snip` and this failure.
-- [ ] Tests, with obs/calc/diff PNGs to `tests/output/`.
+- [x] Tests, with obs/calc/diff PNGs to `tests/output/`.
 
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_lebail_alternation.py tests/test_background_auto.py tests/test_skill.py
+.venv/bin/python -m pytest tests/test_lebail_alternation.py tests/test_background_auto.py tests/test_skill.py tests/test_lebail_background_hump.py
 .venv/bin/python -m ruff check src tests examples
 ```
 
@@ -234,6 +223,154 @@ within their no-hump values.
   `rietx.background.estimators` cites it.
 
 ## Handover log
+
+- **2026-11-03** — PR #1357 (ghostshift runner). The failure now has a
+  fixture in the tree, and the skill has a protocol that fixes it on that
+  fixture. A Le Bail fit seeded at a low percentile under a broad hump ends at
+  Rwp 9.37 %, with part of the hump handed to the reflections. Holding a SNIP
+  estimate under a 4-term Chebyshev ends at 4.41 %, against 4.07 % for the
+  true background held, with every width as it is without the hump. The
+  finding the WP asked for is not built. Its named test did not reproduce,
+  and none of three statistics measured here tells the hump case from the
+  benign one, so whether a finding exists at all goes to the maintainer (Q1).
+
+  *Done.* `tests/test_lebail_background_hump.py`: the Pnma neutron pedestal
+  pattern of `test_auto_background_seed.py` plus a Gaussian hump (600 counts
+  at 50°, σ 6°), four tests, eight PNGs. SKILL.md rule 5 and judging.md
+  § rules 4-5 name `rietx.background.snip`, the held protocol, its window and
+  the failure; two paragraphs of that section were tightened to pay for it,
+  since judging.md sat 7 B under its budget and the body 12 B. The
+  `BackgroundFixedPlusChebyshev` docstring named `rietx.background.estimate`,
+  which does not exist; it now names `snip` and `arpls` (a sweep of every
+  `rietx.background.*` name in `src`, `docs` and `tests` found no other).
+  Inherited pruned: the WP-1545 and WP-1930 entries are deleted, since both
+  were about the indexer's Le Bail validation, which is Pawley since
+  WP-2011; the #725 entry is marked superseded in part.
+
+  *Measured* (macOS arm64, `[dev]`, one `profile_only` Le Bail pass from the
+  true cell and widths; Rwp, background over the truth at 50°, Lorentzian X
+  ± esd, true X 0.001):
+
+  | protocol | hump | no hump |
+  |---|---|---|
+  | P-spline at 0 | 10.13 %, 0.82, 0.072 ± 0.054 | 5.71 % |
+  | P-spline `seed=True` | 9.37 %, 0.83, 0.048 ± 0.046 | 4.76 %, X 0 |
+  | seed, 4 `lebail_passes` | 8.67 %, 0.82, 0.085 | — |
+  | seed, 3 background stages first | 7.69 %, 0.85, 0.007 | 4.40 % |
+  | seed, 5 background stages first | 6.32 %, 0.87, 0 | 4.33 % |
+  | P-spline co-refined from a SNIP start | 6.26 %, 0.87, 0 | 4.32 % |
+  | SNIP held, 15-point window, Cheb 4 | 4.41 %, 0.97, 0 | 4.28 % |
+  | SNIP held, 30 points | 6.55 %, 0.87, 0 | 4.30 % |
+  | SNIP held, 60 points (the hump's σ) | 20.9 %, 0.62, 0.33 | 4.33 % |
+  | true background held, Cheb 4 | 4.07 %, 1.00, 0.006 | — |
+
+  The mechanism. Each stage partitions the intensities against the
+  background it starts from and holds them through its solve. So a stage
+  closes about half of the background's remaining gap: 0.35, 0.64, 0.76, 0.81,
+  0.84, 0.86 of the truth at 50° from the seed through the first five stages,
+  and the same shape without the hump (0.60, 0.77, 0.87, 0.92, 0.95 at 140°).
+  Every protocol that co-refines the background settles near 0.87 at the hump
+  centre. In the seeded fit's zoom the three reflections at 49-54° are drawn
+  at twice the observed height. The width growth the WP names is in the
+  closing stage (X 0.0076 to 0.048) and is under one esd of X. This agrees
+  with #740's reading in Inherited and with the survey's per-iteration
+  re-extraction (2026-10-27 entry), which rietx does not do.
+
+  *Q1, for the maintainer: should the Le Bail path carry a finding for this
+  at all?* The Goal says the fit "says so". Three candidate tests were
+  measured and none separates the hump fit from the benign pedestal fit.
+  (a) The background leaving its seed: it leaves it in both (4.2σ rms in the
+  hump's first stage, 2.4σ in the pedestal's). (b) A width growing: X ends
+  at 0.048 ± 0.046, inside its own esd. (c) The alternation's next step,
+  max shift/su of the background (one more background stage after the fit,
+  against `MAX_SHIFT_CONVERGED`, 0.1 from McCusker 1999 §7): 1.0 on the hump,
+  1.35 on the pedestal, 0.55 SNIP-held, 0.15 on 11-BM LaB6 + cBN, so it fires
+  on every seeded fit. One test that does separate exists already and is not
+  a fit test: `diagnose(data).amorphous_hump_score` is 0.23 on the hump and
+  0.032 on the pedestal against `HUMP_TRIGGER` 0.05. Options: no finding, the
+  skill rule and the starting-model plot (2026-10-24 entry) carry it; a
+  finding on a Le Bail fit with a co-refined background where the hump score
+  is over its trigger, pointing at the held SNIP; or (c), which reports that
+  nearly every seeded Le Bail fit has not converged its background. Each new
+  finding changes what a fit prints, so it comes to you under the
+  reader-output rule anyway. Lean: no finding yet. The hump score's audit
+  row (`_audit.py`) says that on 30 real patterns it separates lab from
+  synchrotron data and does not detect a hump, so a finding keyed on it would
+  rest on one synthetic fixture.
+
+  *Q2, for the maintainer: does `auto_background`'s `seed` default move?*
+  The 2026-10-06 ruling kept `seed=False` until these numbers existed. They
+  favour the seed on both fixtures (hump 9.37 % against 10.13 %, pedestal
+  4.76 % against 5.71 %), and a held SNIP beats both. A default change moves
+  every fit that calls `auto_background`, so it is yours and goes through the
+  reader-output gate.
+
+  *Settled by Claude under the measurement:* the protocol is the skill's rule,
+  not a package default. The held SNIP needs a window sized to the peaks
+  (15 points good, 60 points worse than any seed), which the caller knows and
+  a default would have to guess. The alternative, a default inside
+  `fit(mode="lebail")`, is reversible but moves every Le Bail number.
+
+  *Not generalised:* the class is "a stage partitions against a background it
+  then moves". The same frozen partition governs the widths and the cell, and
+  the indexer's former Le Bail validation and the extinction screen are its
+  siblings. Not measured here: the validation is Pawley since WP-2011, and
+  the screen moves to Pawley under WP-2062. Pawley's seed partition is one Le
+  Bail pass but its intensities refine jointly afterwards, so the lag does not
+  carry. The PbSO₄ neutron and #726's lab patterns (Inherited) were not run.
+
+  *Also cut from judging.md:* rule 4's per-pass Rwp sentence (11-BM LaB6 +
+  cBN, 16.821 / 16.907 …). It was stale: WP-1930 moved that pass 1 to
+  14.220 % (`tests/test_lebail_alternation.py`'s docstring), and WP-1323's
+  file keeps the original numbers.
+
+  *Review* (`/code-review high`, ten findings). Fixed: the width check now
+  asserts both fits free the same widths and fails on the 60-point window's
+  X; the `hump` consumer carries the module's `xdist_group`; the builders are
+  imported from `test_auto_background_seed.py`, so "the same pattern" is
+  structural; six PNGs instead of eight, and the module says why it is not
+  `slow`; the acceptance command runs the new file; the docstring is
+  rewrapped; the window number is back in judging.md beside its bounds.
+  Declined: the finding that the width bar cannot fail for the seeded fit.
+  It cannot, and that is Q1(b)'s measurement; the test's docstring says so.
+  Declined: naming the hump score in rule 5, for the audit row's reason above.
+
+  *Generality* (`generality-review`, on the skill rule; summarised). Item 1,
+  SKILL.md rule 5: **weak**. Tier 3, one synthetic family with a truth plus
+  the private run judged by Rwp; no outside source holds a background under
+  Le Bail; the cause is partly rietx's own (every surveyed program
+  re-extracts per cycle, `docs/practice.md` § Structure-free fitting); GSAS-II
+  users declare an amorphous hump as a background peak; the agent gets no test
+  for "a broad hump". Item 2, judging.md: **fails as written**, for quoting Rwp
+  as its evidence, a window number from one fixture, and a snippet without
+  `source=`. *Author's answer:* item 2 now quotes the background-over-truth
+  ratios rather than Rwp, passes `source="snip"`, and states the window with
+  the measured point where the gain is lost (6 FWHMs). The window stays a
+  number, because `snip` needs one and the 60-point case shows the natural
+  guess failing. Item 1 stands as a tier-3 rule with its evidence tagged;
+  what would lift it is the held SNIP on PbSO₄ and #726's lab pattern,
+  scored against a reference over the whole range, and a declared background
+  peak (`instrument.extra_components`) tried on the same fixture.
+
+  *Gates* (macOS arm64, `[dev]`, another shift sharing the machine). Fast
+  selection, on the tree before the review fixes: 13603 passed, 319 skipped,
+  34 xfailed, 1 failed in 14:59. The failure is
+  `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`,
+  whose Jupyter kernel spec points at a deleted venv on this Mac (environment,
+  not this branch). The four added tests cost 5.1 s there, all in the shared
+  fixture. After the fixes: the touched files and the skill suites, 235
+  passed; `test_docs_consistency.py` 25 passed; ruff clean;
+  `tests.reader_output` unchanged. Full suite not run: the change moves no
+  package number.
+
+  *Gotchas.* `judging.md` and the skill body both sit at their budgets, so
+  the next skill edit in this section pays with a cut. `run_stage` after a
+  Le Bail `fit` re-partitions at its start, and its Rwp can come back above
+  the fit's (7.69 % to 9.90 % on three background stages), so do not use it
+  as a cheap "one more alternation step".
+  *Next:* the maintainer's Q1 and Q2; then tasks 2-3 as Q1 decides; then
+  the held SNIP and a declared background peak on PbSO₄ and #726's pattern
+  (Inherited), which is what would move the skill rule off tier 3.
 
 - **2026-10-06** — Maintainer decision on #725, through draft PR #744:
   `auto_background(..., seed=True)` is wanted as an option, and the default
