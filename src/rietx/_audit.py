@@ -683,6 +683,20 @@ ROWS: tuple[Row, ...] = (
     Row("FULLPROF_MAGNETIC_PHASE_READ", "code"),
     Row("FULLPROF_OCCUPANCY_UNCHECKED", "code"),
     Row("FULLPROF_ORIGIN_CHOICE", "code"),
+    Row("FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED", "code", tier=3, ambiguity=1,
+        evidence=("warning; a .pcr states a bare R symbol beside a = b = c, "
+                  "alpha = beta = gamma (fullprof._is_rhombohedral_metric), and the "
+                  "reader builds the phase on rhombohedral axes, as "
+                  "read_small_structure does for a CIF; FullProf.2k 8.50 reads the "
+                  "same symbol on hexagonal axes and imposes 90/90/120 (#716), so "
+                  "the program's own practice is the other reading"),
+        grounds=("the cell states rhombohedral axes, the hexagonal reading turns it "
+                 "into a different crystal, and pre-#733 rietx wrote such files; "
+                 "ruled by the maintainer 2026-11-03 (WP-1911): read, and notify"),
+        approved="2026-11-03", response="warning",
+        responds=("check the phase's cell against the intended structure, and quote "
+                  "no cell or coordinate FullProf refined from this file, since "
+                  "FullProf refined the hexagonal reading")),
     Row("FULLPROF_RHOMBOHEDRAL_RESTATED", "code"),
     Row("FULLPROF_SPECIES_NORMALISED", "code"),
     Row("FULLPROF_SPECIES_WRITTEN_NEUTRAL", "code"),

@@ -91,7 +91,8 @@ bare R symbol on hexagonal axes and forces the angles, so a `.pcr` stating
 a = b = c, α = β = γ ≠ 90 beside a bare R symbol is, to FullProf, a symbol and
 a cell that contradict. Root CLAUDE.md's rule for that case is refusal (a
 symmetry-fixed angle disagreeing with its symmetry is refused, not
-normalised).
+normalised). The maintainer ruled the other way on 2026-11-03: read on the
+cell's axes and report it (the Tasks list has the ruling).
 
 ### Part B — the scale and the free set (#722)
 
@@ -440,9 +441,17 @@ land alone before the transform exists.
       *2026-11-03: the claim is corrected (now `gsas.py:1868`, "not
       measured"). The measurement waits on a GSAS-I run, which this machine
       has no binary for, so the task stays open.*
-- [ ] A: `.pcr` reader: a bare R symbol beside a = b = c, α = β = γ ≠ 90 is
+- [x] A: `.pcr` reader: a bare R symbol beside a = b = c, α = β = γ ≠ 90 is
       refused as a contradiction (root CLAUDE.md's angle rule), or kept with
-      a written reason
+      a written reason.
+      *Ruling (Yue, 2026-11-03): "favour correctness. there should be very few
+      if any old rietx .pcr users. I think read but notify makes sense." So
+      the reader keeps building the phase on rhombohedral axes from the cell,
+      as `read_small_structure` does for a CIF, and `to_structure` reports
+      `FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED` (warning). The message names the
+      bare symbol, the setting read, the cell that decided it, and FullProf's
+      hexagonal reading. The axes case left `FULLPROF_ORIGIN_CHOICE`, which
+      now covers the origin choice alone.*
 - [ ] The shared transform: a `Phase` restated by an exact change of basis
       (cell, coordinates, U, moments, operators), refusing a Stephens block or
       restraints; tested by `predict()` agreement, never by a count

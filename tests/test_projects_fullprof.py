@@ -1835,7 +1835,8 @@ def test_an_integer_model_selector_still_reads(tmp_path):
 # a_rh = sqrt(a^2/3 + c^2/9) = 5.206833 and
 # sin(alpha/2) = 3 / (2*sqrt(3 + (c/a)^2)) => alpha = 57.388870 — so the pair
 # describes one lattice in two settings, which is what the test needs.
-# This closes a gap; it is not a wrong answer any file here produced.
+# FullProf itself reads the rhombohedral pair's bare symbol on hexagonal axes,
+# so that file is read on the cell's axes and reported (ruled 2026-11-03).
 _R_PHASE_RHOMBOHEDRAL_CELL = (
     "   5.206833   5.206833   5.206833  57.388870  57.388870  57.388870")
 _R_PHASE_HEXAGONAL_CELL = (
@@ -1882,6 +1883,53 @@ def test_a_hexagonal_r_cell_is_left_on_the_default_setting(tmp_path):
                _phase(sg="R -3 c", cell=_R_PHASE_HEXAGONAL_CELL,
                       cell_codes=_PHASE_CELL_CODES))
     assert read_fullprof_pcr(pcr).phases[0].space_group == "R -3 c"
+
+
+# One site at the origin, which is a position in both R settings, so the
+# phase builds under either and only the setting differs.
+_R_PHASE_ORIGIN_SITE = (
+    "Fe1    FE      0.00000  0.00000  0.00000  0.35000   0.16667"
+    "   0   0   0    1\n"
+    "                  0.00     0.00     0.00     0.00      0.00")
+
+
+def test_a_bare_r_symbol_over_a_rhombohedral_cell_is_read_and_reported(
+        tmp_path):
+    """FullProf reads a bare R symbol on hexagonal axes whatever the cell says
+    (#716, FullProf.2k 8.50), so this file means a different crystal to the
+    program it is for. rietx's writer wrote such files before PR #733. Ruled
+    2026-11-03: read it on the axes the cell states, and say so."""
+    pcr = _pcr(tmp_path, "rhombo.pcr",
+               _phase(nat=1, sg="R -3 c", atoms=_R_PHASE_ORIGIN_SITE,
+                      cell=_R_PHASE_RHOMBOHEDRAL_CELL,
+                      cell_codes=_PHASE_CELL_CODES))
+    diagnostics: list = []
+    structure = to_structure(read_fullprof_pcr(pcr), diagnostics=diagnostics)
+    assert structure.phases[0].space_group == "R -3 c:R"
+    axes = [d for d in diagnostics
+            if d.code == "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED"]
+    assert len(axes) == 1
+    assert axes[0].level == "warning"
+    assert axes[0].where == ["phases.0.space_group"]
+    assert "'R -3 c'" in axes[0].message
+    assert "'R -3 c:R'" in axes[0].message
+    assert "hexagonal axes" in axes[0].message
+    # One fact, one code: the axes arm is not also an origin choice.
+    assert [d for d in diagnostics if d.code == "FULLPROF_ORIGIN_CHOICE"] == []
+
+
+def test_a_bare_r_symbol_over_a_hexagonal_cell_reports_nothing(tmp_path):
+    """The reading FullProf and rietx share needs no word."""
+    pcr = _pcr(tmp_path, "hex.pcr",
+               _phase(nat=1, sg="R -3 c", atoms=_R_PHASE_ORIGIN_SITE,
+                      cell=_R_PHASE_HEXAGONAL_CELL,
+                      cell_codes=_PHASE_CELL_CODES))
+    diagnostics: list = []
+    structure = to_structure(read_fullprof_pcr(pcr), diagnostics=diagnostics)
+    assert structure.phases[0].space_group == "R -3 c"
+    assert [d.code for d in diagnostics
+            if d.code in ("FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED",
+                          "FULLPROF_ORIGIN_CHOICE")] == []
 
 
 # The two lower-confidence items the review raised, both surfaced rather than

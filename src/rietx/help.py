@@ -2250,11 +2250,24 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "FULLPROF_ORIGIN_CHOICE": HelpEntry(
         title="A FullProf space group setting was chosen",
         description=(
-            "FullProf writes a space group symbol with no origin choice or axes suffix. "
-            "The reader added one: origin choice 2 where the bare symbol allows two, and "
-            "rhombohedral axes where the cell shows them. A wrong choice moves the "
-            "special positions and changes the multiplicities, so the structure would be "
-            "a different one. The choice is tested against the site occupancies."
+            "FullProf writes a space group symbol with no origin choice suffix. The "
+            "reader added one: origin choice 2 where the bare symbol allows two. A wrong "
+            "choice moves the special positions and changes the multiplicities, so the "
+            "structure would be a different one. The choice is tested against the site "
+            "occupancies."
+        ),
+    ),
+    "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED": HelpEntry(
+        title="A FullProf R phase was read on rhombohedral axes",
+        description=(
+            "The file states an R space group symbol with no axes suffix beside a "
+            "rhombohedral cell, with three equal edges and three equal angles. The "
+            "reader took the cell's word and read the phase on rhombohedral axes. "
+            "FullProf reads a bare R symbol on hexagonal axes and imposes 90°, 90° and "
+            "120° as the angles, so in FullProf the same file is a different cell. "
+            "Older rietx versions wrote such files. Check the cell against the "
+            "structure you meant, and treat any value FullProf refined from this file "
+            "as belonging to the hexagonal reading."
         ),
     ),
     "FULLPROF_RHOMBOHEDRAL_RESTATED": HelpEntry(
