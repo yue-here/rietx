@@ -53,7 +53,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 2026-11-02 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 2026-11-01 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) | A complete dichotomy search holds every centred lattice and polishes its truth leaf | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## Next, by priority
@@ -607,7 +606,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | 🔄 2026-11-02 | P2 | — |
 | [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | ⬜ | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) |
 | [2063](2063-the-panel-scored-after-the-clock-spends-the-validation-reserve.md) | The FoM panel scored after the clock spends the validation reserve | ✅ 2026-11-02 | — | — |
-| [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) | A complete dichotomy search holds every centred lattice and polishes its truth leaf | 🔄 2026-11-01 | P2 | — ([1924](1924-a-monoclinic-search-inside-its-ceiling.md) soft) |
+| [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) | A complete dichotomy search holds every centred lattice and polishes its truth leaf | ✅ 2026-11-03 | — | — ([1924](1924-a-monoclinic-search-inside-its-ceiling.md) soft) |
 | [2067](2067-the-data-support-count-reads-what-drives-an-atom.md) | The data-support count reads what drives an atom, not its name | ✅ 2026-11-01 | — | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md), [1805](1805-the-rigid-body.md) soft) |
 | [2068](2068-the-stationary-angle-test-reads-the-curvature-s-sign.md) | The stationary-angle test builds its angle block analytically | ✅ 2026-11-02 | — | — ([1327](1327-magnetic-structure.md) soft) |
 | [2071](2071-a-peak-list-refuses-a-q-esd-its-two-theta-esd-does-not-give.md) | A peak list refuses a q_esd that its two_theta_esd does not give | ✅ 2026-11-01 | — | — |
