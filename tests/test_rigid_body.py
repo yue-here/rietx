@@ -118,8 +118,8 @@ def test_a_body_atom_refuses_vary_and_shared_membership():
     with pytest.raises(ValueError, match="placed by rigid body 'c6br'") as err:
         ParameterTable(s, INS)
     # the owning body's own DOFs, never every body's (WP-1951's follow-up)
-    assert ("(phases.0.rigid_bodies.0.origin.dof.*, phases.0.rigid_bodies.0.rotation.*)"
-            in str(err.value))
+    assert ("(phases.0.rigid_bodies.0.origin.dof.*, phases.0.rigid_bodies.0.rotation.*, "
+            "phases.0.rigid_bodies.0.torsions.*.twist)" in str(err.value))
     s = body_structure(Q_TRUE)
     phase = s.phases[0]
     twin = RigidBody(name="twin", atoms=["C0", "C1"], template=[(0, 0, 0), (1.39, 0, 0)],
@@ -776,6 +776,18 @@ def test_a_hold_on_a_body_atom_row_raises_and_on_a_body_dof_holds():
     assert ref.hold("phases.0.rigid_bodies.0.origin.dof.*")
 
 
+def test_a_hold_sweeping_two_bodies_names_both_and_each_ones_dofs():
+    """A glob over two bodies' atoms: the refusal names both bodies and each
+    one's own DOFs, the name and the globs the same bodies'."""
+    s = body_structure(Q_TRUE)
+    s.phases.append(linear_structure(Q_TRUE).phases[0])
+    ref = Refinement(s, INS, history=False)
+    with pytest.raises(ValueError, match="placed by rigid bodies 'c6br', 'c2br2'") as err:
+        ref.hold("phases.*.atoms.*.y")
+    for bbase in ("phases.0.rigid_bodies.0", "phases.1.rigid_bodies.0"):
+        assert f"{bbase}.rotation.*" in str(err.value)
+
+
 def test_a_site_glob_on_a_body_atom_names_the_owning_body_dofs():
     """``STAGE_PATH_NOT_FREE``'s body arm (WP-1951): a glob naming a body
     atom's ``dof`` rows frees nothing, and the suggestion names that body's
@@ -1148,6 +1160,23 @@ def test_the_joint_runner_refuses_a_partial_turn_too():
     plan = RefinementPlan(stages=[Stage("body", [*ORIGIN_GLOBS, f"{ROT}.0", f"{ROT}.1"])])
     with pytest.raises(ValueError, match="RIGID_BODY_PARTIAL_TURN: rigid body 'c6br'"):
         joint.fit(data, plan=plan)
+
+
+def test_a_profile_of_one_turn_direction_of_three_says_why_it_has_no_ends():
+    """``profile_interval`` pins one DOF and refits the rest as stages, so on a
+    three-direction body's rotation every refit is the refused shape.  Each
+    side then stops on ``"error"`` with the refusal as its point's reason,
+    rather than an interval read off refits the re-chart cannot follow
+    (WP-1805; whether a profile refit should be exempt is the open question
+    the PR names)."""
+    pattern = synthesize(body_structure(Q_TRUE))
+    ref = Refinement(body_structure(_turned(Q_TRUE, 2.0)), INS, history=False)
+    ref.fit(pattern, plan=RefinementPlan(stages=[Stage("body", BODY_GLOBS)]))
+    interval = ref.profile_interval(pattern, f"{ROT}.0", max_refits=2)
+    assert interval.lower is None and interval.upper is None
+    assert interval.lower_stop == interval.upper_stop == "error"
+    assert all(p.error.startswith("RIGID_BODY_PARTIAL_TURN: rigid body 'c6br'")
+               for p in interval.points)
 
 
 def test_unsupported_advice_never_names_the_refused_hold():
