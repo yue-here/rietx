@@ -1,6 +1,6 @@
 # WP-1991 — a site and its own image are one atom on every route
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @yue-here (ghostshift runner); open: the `adp.k` probe, series trajectories by phase name + atom label (ruled 2026-11-01), phases by name
+Milestone: unscheduled · Status: 🔄 2026-11-03 — every task done in PR #1360; waits for Yue (a stored-format and series-output change)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-16 — a doubled composition with nothing firing, but only on a stored, hand-edited or code-built coordinate; a refined coordinate cannot drift there, and the CIF route already merges it
