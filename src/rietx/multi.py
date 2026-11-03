@@ -1401,11 +1401,12 @@ class MultiHistogramRefinement:
         no history.
 
         **No** ``stage_reports=``.  A rung would be one report per histogram
-        per stage, and a report build costs a fixed ~0.36 s (issue #245), so
-        the trajectory would multiply the solo tax by the histogram count.
+        per stage, and a report build's cost is set by the pattern, not the
+        fit (issue #245 measured about 0.36 s a build on its fixture), so the
+        trajectory would multiply the solo tax by the histogram count.
         WP-1335 cut that cost by about a third and stopped there by ruling, so
         the multiple stands; whether to offer rungs here anyway is an open
-        call (WP-1335's last handover entry).  Until it is made, the stage
+        call (WP-1335's 2026-11-03 handover entry).  Until it is made, the stage
         trajectory of a joint fit is its event log, and :meth:`report` builds
         the answer's report per histogram.
         """
