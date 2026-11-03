@@ -3297,17 +3297,79 @@ def test_an_xydata_heading_line_is_never_read_as_a_point(tmp_path):
     assert min(read.two_theta) == pytest.approx(10.0)
 
 
+def _xydata_two_column(path: Path, inter: str) -> Path:
+    """The same file with no σ column, so σ is the reader's to derive."""
+    rows = [f"{10 + 0.1 * i:.3f} {100.0 + 50.0 * (i == 50):.3f}" for i in range(120)]
+    path.write_text("\n".join(["XYDATA", "TITLE synthetic", "COND: neutrons",
+                               "FILE: synthetic.xys", "TEMP 4.25",
+                               f"INTER {inter} 0.05", *rows]) + "\n",
+                    encoding="utf-8")
+    return path
+
+
+def test_an_xydata_multiplier_is_applied_as_the_manual_defines_it(tmp_path):
+    """#1064: ``fac_x`` multiplies x, ``fac_y`` multiplies y and σ (FullProf
+    manual, 2001, PDF p. 74, ``Ins = 10``), and a factor other than 1 says so.
+
+    Main before this refused the file by name ("fac_y = 2"), and before #1080
+    read it as written.  The unit factors of the same file are the negative
+    arm: the numbers are the file's and nothing is reported.
+    """
+    notes: list = []
+    read = rx.read_pattern(_xydata(tmp_path / "y.xys", inter="1.0 2.0 0"),
+                           diagnostics=notes)
+    assert read.intensity[0] == 200.0 and read.intensity[50] == 300.0
+    assert read.sigma[0] == 20.0
+    assert read.two_theta[0] == pytest.approx(10.0)
+    (note,) = [n for n in notes if n.code == "XYDATA_INTER_APPLIED"]
+    assert note.level == "info" and "fac_y = 2" in note.message
+    assert note.where == ["intensity", "sigma"]
+
+    notes = []
+    read = rx.read_pattern(_xydata(tmp_path / "x.xys", inter="0.5 1.0 0"),
+                           diagnostics=notes)
+    assert read.two_theta[0] == pytest.approx(5.0)
+    assert read.two_theta[-1] == pytest.approx(0.5 * (10 + 0.1 * 119))
+    assert read.intensity[0] == 100.0 and read.sigma[0] == 10.0
+    (note,) = [n for n in notes if n.code == "XYDATA_INTER_APPLIED"]
+    assert "fac_x = 0.5" in note.message and note.where == ["two_theta"]
+
+    notes = []
+    unit = rx.read_pattern(_xydata(tmp_path / "u.xys", inter="1.0000 1.0000 2"),
+                           diagnostics=notes)
+    assert unit.intensity[0] == 100.0 and unit.sigma[0] == 10.0
+    assert "XYDATA_INTER_APPLIED" not in [n.code for n in notes]
+
+
+def test_an_xydata_multiplier_without_a_sigma_column_gives_the_poisson_sigma_of_the_product(
+        tmp_path):
+    """No σ column: σ is √(fac_y·y), the Poisson value of the multiplied y.
+
+    The manual does not say whether FullProf multiplies before or after
+    taking √y.  FullProf 8.20 run as a black box on synthetic files refines a
+    file of y/2 under ``fac_y = 2`` to the same χ² as the file of y under
+    ``fac_y = 1``, which is √(fac_y·y); fac_y·√y would have halved it.  So σ
+    stays the fallback, computed on the multiplied intensity.
+    """
+    notes: list = []
+    read = rx.read_pattern(_xydata_two_column(tmp_path / "p.xys", "1.0 2.0 0"),
+                           diagnostics=notes)
+    assert read.intensity[0] == 200.0 and read.sigma is None
+    assert read.sig()[0] == pytest.approx(200.0 ** 0.5)
+    (note,) = [n for n in notes if n.code == "XYDATA_INTER_APPLIED"]
+    assert note.where == ["intensity"] and "no σ column" in note.message
+
+
 @pytest.mark.parametrize(("inter", "named"), [
-    ("1.0 2.0 0", "fac_y = 2"), ("0.5 1.0 0", "fac_x = 0.5"),
-    ("1.0 1.0 1", "Interpol = 1")])
-def test_an_xydata_multiplier_or_interpolation_is_refused_by_name(
+    ("1.0 1.0 1", "Interpol = 1"), ("1.0 0.0 0", "fac_y = 0"),
+    ("-1.0 1.0 0", "fac_x = -1"), ("1.0 nan 0", "fac_y = nan")])
+def test_an_xydata_interpolation_or_unusable_multiplier_is_refused_by_name(
         tmp_path, inter, named):
-    """FullProf scales or interpolates these numbers before using them, and
-    this reader does not; main before this read them as written, silently."""
+    """Interpolating to a constant step would read a different pattern from
+    FullProf's, and a multiplier that is not positive would reverse or collapse
+    the axis or flip every intensity's sign: each is refused, naming the value."""
     with pytest.raises(ValueError, match=named):
         rx.read_pattern(_xydata(tmp_path / "f.xys", inter=inter))
-    assert rx.read_pattern(_xydata(tmp_path / "u.xys",
-                                   inter="1.0000 1.0000 2")).intensity[0] == 100.0
 
 
 # ----------------------------------------------- pdCIF: the net intensity column
