@@ -184,7 +184,7 @@ def _variant_models() -> list[tuple[Structure, Instrument]]:
                               surface_roughness=RoughnessSuortti()),
             background=spline,
             extra_components=[
-                HumpComponent(),
+                HumpComponent(position=Parameter(value=20.0, unit="deg")),
                 PeakComponent(center=Parameter(value=30.0, min=29.0, max=31.0,
                                                unit="deg")),
             ])),

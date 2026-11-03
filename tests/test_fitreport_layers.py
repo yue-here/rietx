@@ -903,11 +903,11 @@ def _pore_proxy_data(seed=17):
 
 def test_pore_proxy_gap_and_contents_clause():
     """The WP-1057 headline scenario: a converged host fit over data whose
-    scattering contents it lacks.  Measured (2026-08-12): Rwp 0.0405,
-    GoF 2.97, partition Rwp 0.0170 → ratio 2.38; intensity carries 83 % of
-    the misfit in 8 gated regions split 5+/3−, best angular template
-    R² = 0.011.  The report must carry the gap and name the contents
-    signature — and still invent no action, because none applies."""
+    scattering contents it lacks.  Measured (2026-11-02): Rwp 0.0403,
+    GoF 2.96, partition Rwp 0.0171 → ratio 2.36; intensity carries 82 % of
+    χ² in 8 gated regions split 5+/3−, best angular template R² = 0.01.  The
+    report must carry the gap and name the contents signature — and still
+    invent no action, because none applies."""
     structure, ins, data = _pore_proxy_data()
     ref = rx.Refinement(structure, ins)
     result = ref.fit(data, plan="mccusker_default")
@@ -918,7 +918,7 @@ def test_pore_proxy_gap_and_contents_clause():
     assert gap is not None
     assert gap.rwp_rietveld == pytest.approx(result.statistics.rwp, rel=1e-6)
     assert gap.rwp_lebail < gap.rwp_rietveld
-    assert gap.ratio > 2.0, gap                    # measured 2.38
+    assert gap.ratio > 2.0, gap                    # measured 2.36
     assert "Le Bail partition" in report.summary
     assert "intensity model carries the misfit" in report.summary
 

@@ -36,8 +36,7 @@ class CancelToken:
     """A thread-safe "stop asking for evaluations" flag.
 
     Wraps :class:`threading.Event` rather than a bare bool because the setter
-    and the reader are genuinely on different threads in the GUI, and because
-    :meth:`wait` costs nothing to inherit.
+    and the reader are genuinely on different threads in the GUI.
     """
 
     __slots__ = ("_event",)

@@ -53,7 +53,7 @@ moves are logged in the schema version history:
 | `refine_profile_widths` | stage | a width template is significant — always as the instrument-side peer of the sample action, at half its confidence, because a width trend alone cannot separate the two sides (the instrument's Gaussian polynomial spans the same shapes; Toby 2024 §4's U/V/W example). Try the sample terms first; reach for this when they leave the trend standing (measured: the sample proxy stalls at χ²_red 4.3 on a planted Gaussian deficit, this action takes the same state to the 1.01 noise floor — WP-1106) | `instrument.profile.u`, `…v`, `…w` — the Gaussian half only: a *Lorentzian* instrument width error is column-degenerate with `phases.*.lor_size`/`…lor_strain`, so the sample actions absorb it exactly |
 | `refine_sample_size_broadening` | stage | the `inv_cos_theta` width template is significant | `phases.*.lor_size` |
 | `refine_sample_strain_broadening` | stage | the `tan_theta` width template is significant | `phases.*.lor_strain` |
-| `refine_axial_asymmetry` | stage | a significant asymmetry coefficient in gated regions below 2θ = 40° | `instrument.geometry.axial_sl`, `…axial_hl` |
+| `refine_axial_asymmetry` | stage | a significant asymmetry coefficient in gated regions below 2θ = 40° | `instrument.geometry.axial_sl` alone: swapping it with `…axial_hl` gives the same pattern (WP-2012) |
 | `refine_biso` | stage | the relative intensity error trends with sin²θ/λ² — the ADP signature | `phases.*.atoms.*.biso` |
 | `refine_preferred_orientation` | stage | `TextureAnalysis.detected` with a best axis (both sides of the maturity gate); capped below a coexisting impurity call (§6's caveat row) | `phases.N.preferred_orientation.r` — named even when the phase declares no such block, on purpose: the rationale says which axis to declare first, and freeing nothing rolls back. A phase with no single fibre axis takes `Phase.texture` instead, at order 4 (6 on good data), freeing `phases.N.texture.*`, and is judged by `result.texture` and the composition (Measured: CPD-2 brucite, worst weighed fraction 3.41 wt % at order 4 and 2.71 at 6 against March-Dollase's 2.80). On a phase that declares `texture`, the rationale says to raise the order instead |
 | `refine_scale` | stage | the `constant` intensity template is significant — an angle-independent scale error | `phases.*.scale` |
@@ -111,8 +111,9 @@ synthetic zincite under `mccusker_structural`, O at 0.38231(57) held, each z
 ±0.00039 under the centroid, against ±0.00029 on each z unheld; WP-1912.)
 
 **A symmetry-lowering can win ΔBIC and gain nothing where it splits.** Two fits
-of one pattern, a model and its lowering (cubic, tetragonal): ΔBIC says it paid
-for itself, not where. `rx.report.split_localisation(higher, lower)` shares the
+of one pattern, a model and its lowering (cubic, tetragonal): ΔBIC (judging.md §
+adding a parameter) and a nested F-test say it paid for itself, not where, so neither settles
+which space group. `rx.report.split_localisation(higher, lower)` shares the
 Δχ² among the windows of the reflections the lowering splits, the unsplit ones
 and the rest; read `split_share` against `split_point_share`. (Measured:
 synthetic Cu, tetragonal against cubic. A truly tetragonal specimen gave ΔBIC
@@ -147,5 +148,8 @@ the table left out, call `ref.geometry({"torsions": [["C1", "C2", "C3",
 "C4"]], "distances": [["O1", ("N2", "2_555")]]})`: a label alone takes the
 image nearest the atom before it, and `(label, "n_klm")` names one. Its esds
 come from the last fit's covariance, which an edit or a checkout drops, after
-which every esd is `None`. (Measured: WP-1815, the published torsion loops of a
-TOPAS-6 and a SHELXL refinement reproduced to their printed digits.)
+which every esd is `None`. A result saved before schema 0.60 reopens with
+`torsions` set to `None`, meaning "not listed", where `[]` means none were
+found; `ref.geometry()` lists them, without esds. (Measured: WP-1815, the
+published torsion loops of a TOPAS-6 and a SHELXL refinement reproduced to
+their printed digits.)

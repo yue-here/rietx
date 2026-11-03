@@ -199,6 +199,7 @@ The curves stay on `SequentialRefinement.results_`.
 | `SeriesResult.diagnostics` | the series diagnostics ([Series diagnostics](#series-diagnostics)) |
 | `SeriesResult.steps` | one `SeriesStep` per step of every refined path between consecutive patterns, largest in esds first ([Steps between patterns](#steps-between-patterns)); `None` in a document written before the field existed |
 | `SeriesResult.relative_paths`, `SeriesResult.angle_paths` | the paths whose value is a step from where each fit began, and the angle paths ([Paths to plot](#paths-to-plot)) |
+| `SeriesResult.phase_names`, `SeriesResult.atom_labels` | the series numbering ([below](#phases-and-atoms-added-or-removed)) |
 | `SeriesResult.failures`, `SeriesResult.n_failed` | the patterns on which every attempt raised, and how many ([Restart ladder](#restart-ladder)) |
 | `SeriesResult.provenance` | package version, timestamp and settings, as for a single fit |
 | `SeriesResult.x` | the axis: the coordinate given, or the pattern index |
@@ -236,6 +237,7 @@ A series is where one unread warning multiplies: in the in-situ run this diagnos
 | `SeriesEntry.rwp_over_median` | the kept attempt's Rwp over the median Rwp of the patterns accepted before it in the walk, with no threshold; `None` where no median existed, on the first pattern walked or after every earlier pattern was quarantined |
 | `SeriesEntry.seeded_from` | the index of the pattern whose fitted state seeded this pattern's warm rungs: the last one accepted before it in the walk, which skips a quarantined pattern; `None` where there was no warm start |
 | `SeriesEntry.floored` | the moment modulus paths that reached the kept attempt at their floor, because the pattern it warm-started from did not support them; empty when the kept attempt started cold |
+| `SeriesEntry.pattern_paths` | this pattern's own path, where it differs |
 | `SeriesEntry.node_id`, `SeriesEntry.tree_id` | where this pattern's history lives |
 
 `SeriesEntry.value` and `SeriesEntry.stderr` look a path up in the entry's parameters and return `None` when it is absent.
@@ -280,6 +282,8 @@ If the phase appears while a stage is still solving, that stage lifts the hold a
 | `Trajectory.stderr` | its esd, `None` wherever that pattern estimated none |
 | `Trajectory.labels` | the pattern label at each point |
 | `Trajectory.positions` | which entry of `SeriesResult.entries` each point came from |
+| `Trajectory.phase`, `Trajectory.atom` | the phase name and atom label it follows |
+| `Trajectory.pattern_paths` | each point's path in its pattern's model |
 | `Trajectory.arrays` | `(x, value, stderr)` as float arrays, a missing esd as NaN |
 
 A pattern where the path is absent has no point.
@@ -304,6 +308,12 @@ The plots and the GUI call it.
 
 `SeriesResult.plot` plots one or more trajectories against the series axis, and `style="dark"` draws it for a dark page.
 It rings a point refitted from the starting models, crosses a `SEQUENTIAL_UNRECOVERED` point, shades the pair of each step re-measured cold, and tags the title of a path-dependent trajectory.
+
+### Phases and atoms added or removed
+
+`prepare` may add or remove a phase or an atom.
+Every path reads the numbering of the structure you gave, so a trajectory follows one atom by name.
+A repeated phase name, or atom label within a phase, raises `ValueError`.
 
 ### Paths to plot
 

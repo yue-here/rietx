@@ -715,8 +715,27 @@ def zone_boundary_candidates(space_group) -> tuple[KCandidate, ...]:
     Pr₀.₅Sr₀.₅MnO₃ structure of the GSAS-II tutorial "Magnetic-IV" orders, is
     not among them — so the set is derived from the lattice.  It is never
     longer than seven before the star merge, on any lattice.
+
+    The set is a function of the group alone, so it is computed once per
+    group and kept: the star reductions run in exact rationals and cost
+    0.17-0.24 s on a cubic group (one loaded Mac, 2026-11-02), which a
+    report paid once per phase per stage
+    (WP-1335).  The tuple and its candidates are immutable.
     """
     sg = _resolve(space_group)
+    key = (("hall", sg.hall) if isinstance(sg, gemmi.SpaceGroup) else ("ops", sg))
+    held = _ZONE_BOUNDARY_CACHE.get(key)
+    if held is None:
+        held = _ZONE_BOUNDARY_CACHE[key] = _zone_boundary_candidates(sg)
+    return held
+
+
+#: :func:`zone_boundary_candidates` per group: one entry per setting a
+#: process meets, so it is never evicted.
+_ZONE_BOUNDARY_CACHE: dict[tuple, tuple[KCandidate, ...]] = {}
+
+
+def _zone_boundary_candidates(sg) -> tuple[KCandidate, ...]:
     stars: dict[frozenset[KVector], KVector] = {}
     for kk in _order_two_kvectors(sg):
         arms = frozenset(star(sg, kk))

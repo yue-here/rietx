@@ -95,12 +95,12 @@ def test_a_free_row_is_measured_and_a_tied_row_is_not(lebail):
 def test_at_bound_names_exactly_the_paths_bound_hit_names():
     """The flag is the guard's finding list, projected — not a second opinion.
 
-    The cell edge is capped 0.0013 Å below the value the free fit wants, so the
-    trust region rides the upper bound: Rwp goes 0.1457 → 0.2194 and ``a`` lands
-    on 10.250000 exactly.  Set equality against the ``BOUND_HIT`` diagnostics is
-    the assertion; "is it really at its bound" is deliberately *not* asserted,
-    because a re-derivation here would pass against the duplicate this WP
-    removed.
+    The cell edge is capped 0.0012 Å below the value the free fit wants, so the
+    trust region rides the upper bound: Rwp goes 0.1436 → 0.2169 (measured
+    2026-11-02) and ``a`` lands on 10.250000 exactly.  Set equality against
+    the ``BOUND_HIT`` diagnostics is the assertion; "is it really at its
+    bound" is deliberately *not* asserted, because a re-derivation here would
+    pass against the duplicate this WP removed.
     """
     data, structure, instrument = _nac()
     ref = rx.Refinement(structure, instrument)

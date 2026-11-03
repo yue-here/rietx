@@ -340,10 +340,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Finger-Cox-Jephcoat axial-divergence ratio S/L. It is the illuminated "
             "specimen length divided by the goniometer radius. It sets how strongly "
-            "low-angle peaks lean toward low 2θ. Fit it on a standard together with "
-            "`axial_hl`. The two are strongly correlated and are usually reported as a "
-            "pair. With both at zero and either refined, the peaks are computed with "
-            "windows and integration points sized for a ratio of 0.02 (see `axial_hl`)."
+            "low-angle peaks lean toward low 2θ. Refine it on a standard and hold "
+            "`axial_hl`: swapping the two gives the same pattern. With both at zero and "
+            "either refined, the peaks are computed with windows and integration points "
+            "sized for a ratio of 0.02 (see `axial_hl`)."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -354,9 +354,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Finger-Cox-Jephcoat axial-divergence ratio H/L. It is the "
             "receiving-slit height divided by the goniometer radius. It is the second "
-            "half of the axial asymmetry. It is so strongly correlated with `axial_sl` "
-            "that refining one and holding the other is a common protocol. One ratio "
-            "alone still smears the peaks. Only both at zero switch the asymmetry off. "
+            "half of the axial asymmetry. Swapping it with `axial_sl` gives the same "
+            "pattern, so set it from the instrument and hold it, as the lab plans do. "
+            "One ratio alone still smears the peaks. Only both at zero switch the "
+            "asymmetry off. "
             "With both at zero and either refined, the peaks are computed with windows "
             "and integration points sized for a ratio of 0.02, so the curve differs from the same model with "
             "both held by up to about 5e-5 of the strongest peak."
@@ -508,8 +509,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The tanθ term of the Lorentzian FWHM. The tanθ shape is microstrain "
             "broadening, and a phase's `lor_strain` adds to it. An anisotropic strain "
-            "block replaces the specimen part of this term with an hkl-dependent width "
-            "and locks `lor_strain`. The instrumental Y stays as it was. Y can go "
+            "block replaces the specimen part of this term with an hkl-dependent width. "
+            "It locks `lor_strain`, and the width then reads zero for it whatever value "
+            "it stores. The instrumental Y stays as it was. Y can go "
             "negative while X keeps the total width at or above zero."
         ),
         unit="deg 2θ", default="0.0",
@@ -778,14 +780,15 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The centre, in °2θ, of an explicit Gaussian background term, such as a "
             "diffuse or amorphous hump or a cryostat or sample-container contribution. "
-            "It has no default bounds. It is not a Bragg position, so only the data "
+            "It has no default value and no default bounds. It is not a Bragg "
+            "position, so only the data "
             "constrain it. Set min and max if you know the fitted range. A declared "
             "term is inert (`vary=False`, height 0) until a stage frees it, and nothing "
             "in the package adds one on its own. Freeing position, height and width "
             "together amounts to a reflection with no cell behind it. `HUMP_TOO_NARROW` "
             "flags a fitted width near the instrumental resolution."
         ),
-        unit="deg 2θ", default="0.0",
+        unit="deg 2θ", default=None,
         typical="wherever the diffuse feature sits, for example 14.4 on NIST BT-1",
         anchor="theory/background.html#explicit-humps",
     ),
@@ -1260,8 +1263,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "coefficients as a cone, so it cannot be a bound on each coefficient. The "
             "default Levenberg-Marquardt solver holds it as a linear inequality. Under "
             "`solver=\"trf\"` and in a joint fit, `STEPHENS_STRAIN_NOT_POSITIVE` reports "
-            "it instead. Read that flag as 'these coefficients are not quotable'. It is "
-            "no evidence of anisotropy."
+            "it instead. Read that flag as 'these coefficients are not quotable, and the "
+            "fit leaned on the clamp'. It is no evidence of anisotropy."
         ),
         unit=None, default=None,
         typical="the isotropic seed is ε²·[M²] for a strain ε of 1e-4 to 1e-3",
@@ -1639,6 +1642,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "background."
         ),
     ),
+    "BACKGROUND_SMOOTHING_AT_FLEXIBLE_END": HelpEntry(
+        title="Baseline smoothing stopped at its most flexible setting",
+        description=(
+            "The scan for the arPLS baseline's smoothing strength tried every "
+            "candidate from stiff to flexible. None left the peak-free channels "
+            "with a serially uncorrelated residual, so the data did not choose the "
+            "strength, and the most flexible candidate was returned. Hold that "
+            "baseline fixed only knowing it is the grid's end, not a choice. The "
+            "alternatives are a strength of your own, a co-refined background, or a "
+            "measured blank."
+        ),
+    ),
     "BISO_NEGATIVE": HelpEntry(
         title="A displacement parameter is negative",
         description=(
@@ -1732,6 +1747,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "a bracketed label that names the closest group type. The statement is "
             "complete. The leading symbol of the label generates a different group, so "
             "check the cell transform before you compare it with a published symbol."
+        ),
+    ),
+    "CIF_ADP_SYMMETRY_PROJECTED": HelpEntry(
+        title="Anisotropic displacement moved onto its symmetry-allowed form",
+        description=(
+            "The file prints a site's anisotropic displacement parameters (`U^ij`) "
+            "to fewer decimals than the symmetry relation between them needs, such "
+            "as U12 = U11/2 on a hexagonal three-fold axis. The printed values then "
+            "sit slightly off the form the site symmetry allows. The reader moved "
+            "the tensor to the nearest allowed one within half a unit in the last "
+            "printed digit of each component. The message names the sites and the "
+            "components moved, and the change is no larger than the rounding in the "
+            "file. A larger disagreement, or one that needs a component the file "
+            "prints as zero, is left as written and refused when the parameter "
+            "table is built."
         ),
     ),
     "CIF_ANISO_COLLAPSED": HelpEntry(
@@ -2047,7 +2077,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "is one orbit, used once), the test of an ordered model. A group that fails "
             "the count is kept and named, since a disordered alloy written with whole counts "
             "fails it on its true group, and is removed only when you declare the model "
-            "`ordered`. "
+            "`ordered`. A Z with no formula has no atoms to count, so it removes "
+            "nothing, and the message says so. "
             "Where Z is not a whole multiple of a kept group's general multiplicity "
             "(Z′ below one), the group stays and the message names the special "
             "positions a formula unit then needs, since a molecule there must carry "
@@ -3192,6 +3223,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the angle with its interval."
         ),
     ),
+    "MOMENT_UNSUPPORTED": HelpEntry(
+        title="Moment the data do not support",
+        description=(
+            "A refined moment size is under three times its error estimate, or at "
+            "its floor of 0.001 Bohr magnetons. The data then cannot tell this "
+            "moment from no moment. The magnetic intensity goes as the square of the "
+            "size, so near zero the size has almost no effect on the pattern, and "
+            "its error estimate is no interval: a fit that ends on zero can report an "
+            "estimate of 10 000 Bohr magnetons. Read the moment as unsupported. For "
+            "a limit, `Refinement.profile_interval` gives the size's likelihood "
+            "interval, which stays at or above zero where the data cannot see the "
+            "moment's sign. The FitReport's "
+            "moment rows give the same verdict as `supported`."
+        ),
+    ),
     "MOMENT_PAIR_DEGENERATE": HelpEntry(
         title="Two moments cannot be told apart",
         description=(
@@ -3351,13 +3397,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "PATTERN_ROWS_DROPPED": HelpEntry(
-        title="Some numeric rows were not read as data",
+        title="Some rows were not read as data",
         description=(
-            "The reader takes the most common number of values per line as the file's "
-            "layout, and it skipped numeric lines with a different count. A header table "
-            "or a limits row usually causes this. If a skipped line was a real "
-            "measurement, the file mixes layouts. Re-export it with the same number of "
-            "values on every row."
+            "The reader dropped rows from the file, for one of two reasons, and the "
+            "message says which. Every reader drops a point whose 2θ, count or error "
+            "estimate is NaN or infinite, and names the dropped points by their 2θ. "
+            "A NaN is what a reduction writes where it divided by a zero monitor or "
+            "detector efficiency, so these points hold no measurement. Left in, one "
+            "such point made every statistic of the fit NaN. The two- and "
+            "three-column text reader also takes the most common number of values "
+            "per line as the file's layout, and it skips numeric lines with a "
+            "different count, naming them by line. A header table or a limits row "
+            "usually causes this. If a skipped line was a real measurement, the file "
+            "mixes layouts. Re-export it with the same number of values on every row."
         ),
     ),
     "PATTERN_SCAN_REVERSED": HelpEntry(
@@ -4118,7 +4170,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "holds the coupled direction, the one direction that moves x; a free path "
             "follows only where every coordinate that direction moves was free; a tie, "
             "which needs a single direction, is dropped. One on a direction the position "
-            "fixes is dropped. The message names every one that followed and every one "
+            "fixes is dropped. "
+            "The message names every one that followed and every one "
             "that was dropped. Nothing was moved: "
             "this is the bookkeeping of a site whose symmetry changed without a merge, "
             "for instance onto a mirror within 5e-5, after a fit wrote the coordinate "
@@ -4281,7 +4334,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "that follows another parameter. Nothing was freed for it, yet the fit "
             "converged. The parameter kept its value. Free the parameter it follows, or "
             "for a coordinate free the directions that the site symmetry allows. If the "
-            "model holds it fixed, there is nothing to refine."
+            "model holds it fixed, there is nothing to refine. A pattern that names one "
+            "atom site, such as `phases.0.atoms.0.dof.*`, gets the same report when it "
+            "frees nothing at that site. An atom on a fully fixed special position has "
+            "no directions, so its `dof.*` pattern matches no parameter."
         ),
     ),
     "STAGE_PATH_UNKNOWN": HelpEntry(
@@ -4317,9 +4373,15 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The refined anisotropic strain coefficients give a negative variance at "
             "some reflections. A variance cannot be negative, so the coefficients lie "
             "outside the physical set. Those reflections receive no strain broadening, "
-            "and nothing else says so. A negative value is not evidence of large "
-            "anisotropy. Restart from the isotropic limit, refine fewer strain terms, or "
-            "extend the fitted range. Do not quote the coefficients."
+            "so the fit leaned on that clamp, and the finding states the share of the "
+            "phase's m·|F|² they carry. The fit's χ², cells and phase fractions lean "
+            "on those reflections too. A negative value is not evidence of large "
+            "anisotropy. Under `solver=\"trf\"`, refit with the default "
+            "Levenberg-Marquardt driver, which holds the variance at or above zero; a "
+            "joint fit holds it under neither driver, so fit each pattern alone or drop "
+            "the block from the joint fit. That "
+            "makes the coefficients admissible, not measured, so compare a few starts. "
+            "Do not quote the coefficients."
         ),
     ),
     "STRAIN_UNUSUALLY_LARGE": HelpEntry(
@@ -4527,6 +4589,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "reported."
         ),
     ),
+    "XYDATA_INTER_APPLIED": HelpEntry(
+        title="FullProf's INTER multipliers were applied",
+        description=(
+            "The file opens with FullProf's XYDATA heading, and its INTER line "
+            "states a multiplier other than 1. The FullProf manual defines `fac_x` as "
+            "a multiplier of the x values and `fac_y` as a multiplier of the "
+            "intensities and their esds, which FullProf applies before it uses the "
+            "data. The reader applied them the same way, so the pattern's numbers "
+            "are the file's numbers times the factors. A file with no esd column "
+            "gets the Poisson esd of the multiplied intensity, as in FullProf. "
+            "Compare the pattern against the file's own columns only after "
+            "multiplying."
+        ),
+    ),
 }
 
 
@@ -4650,6 +4726,20 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
 #: enumerating what a reader accepts.  These entries are the text a person
 #: reads beside the control.
 READER_OPTION_HELP: dict[str, HelpEntry] = {
+    "axis": HelpEntry(
+        title="Axis",
+        description=(
+            "What the x column of a plain two- or three-column file is: `two_theta`, "
+            "2θ in degrees, or `tof`, a flight time in microseconds. A file that "
+            "states no unit cannot say which, because both are ascending columns of "
+            "numbers, so the reader takes 2θ unless you declare otherwise. A "
+            "time-of-flight bank with no header needs `tof`. The pattern's metadata "
+            "records the declaration under `declared_axis`. A file that states its "
+            "own unit and disagrees with the declaration is refused, and the message "
+            "quotes both."
+        ),
+        typical="unset; `tof` for a time-of-flight bank exported without a header",
+    ),
     "bank": HelpEntry(
         title="Detector bank",
         description=(
@@ -5518,6 +5608,17 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "histogram."
         ),
     ),
+    "StageResult.rwp": HelpEntry(
+        title="Stage Rwp",
+        description=(
+            "The stage's Rwp at the values it ended on, measured on the stage's own "
+            "frozen windows. It is the number the `stage_end` event carries. A joint "
+            "fit pools it over its histograms. The last stage's differs from "
+            "`statistics.rwp`, which is measured on a compile at the answer. Stages "
+            "that fit different ranges or modes cannot be compared by it. `None` "
+            "means a result stored before the field."
+        ),
+    ),
     "StageResult.n_constraint_truncations": HelpEntry(
         title="Steps held on a constraint",
         description=(
@@ -5844,6 +5945,16 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`SEQUENTIAL_MOMENT_HOLD` names these patterns."
         ),
     ),
+    "SeriesEntry.pattern_paths": HelpEntry(
+        title="This pattern's own paths",
+        description=(
+            "This pattern's own dot-path for each path of the entry that its model numbers "
+            "differently, keyed by the entry's path. Every path of a series reads one "
+            "numbering, so a trajectory follows one phase by name and one atom by label "
+            "where a `prepare` hook added or removed either. `{}` where the two agree; "
+            "`None` in a series saved before 1.11, whose paths are each pattern's own."
+        ),
+    ),
     "SeriesEntry.node_id": HelpEntry(
         title="Pattern history node",
         description=(
@@ -5938,6 +6049,23 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The moment angle DOFs, whose differences across patterns are taken modulo "
             "a full turn. Recorded as `relative_paths` is, and `None` means the same."
+        ),
+    ),
+    "SeriesResult.phase_names": HelpEntry(
+        title="Series phase names",
+        description=(
+            "The phase each path of the series names by number: phase `i` is "
+            "`phase_names[i]`. The series' own structure's phases, then each phase a "
+            "`prepare` hook added, in the order the walk met it. `None` in a series "
+            "saved before 1.11."
+        ),
+    ),
+    "SeriesResult.atom_labels": HelpEntry(
+        title="Series atom labels",
+        description=(
+            "The atom each path of the series names by number: atom `j` of phase `i` is "
+            "`atom_labels[i][j]`, numbered as `phase_names` is. `None` in a series saved "
+            "before 1.11."
         ),
     ),
     "SeriesResult.failures": HelpEntry(

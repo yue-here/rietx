@@ -8,7 +8,9 @@ interface convention.  See ``ATTRIBUTION.md``.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -631,6 +633,20 @@ from .._nearmiss import did_you_mean
 #: Also in 0.60 (#1263): ``SupercellCheck.p0_power``, the floored chance rate
 #: the power check read, beside a ``p0`` that is now the seen test's own.
 #: Additive and defaulted to ``None``.
+#: Also in 0.60 (WP-1334): ``StageResult.rwp``, the stage's Rwp at its answer on
+#: its own frozen compile, the number ``stage_end`` already emitted.  Additive
+#: and defaulted to ``None``, "a result stored before the field", the 0.25 →
+#: 0.26 rule; all three runners write it on every stage.
+#: Also in 0.60 (WP-1991, Yue's ruling of 2026-11-01): a ``SeriesResult``'s
+#: paths read one series numbering, matched by phase name and atom label
+#: (``SeriesResult.phase_names``/``.atom_labels``), and
+#: ``SeriesEntry.pattern_paths`` names each pattern's own path where it
+#: differs.  Additive and defaulted to ``None``: a document written before the
+#: fields stores each pattern's own paths, and nothing stored the names to
+#: translate them, so it opens as written.
+#: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
+#: where it defaulted to 0.0.  A stored document that omits it still opens, at
+#: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
@@ -894,6 +910,21 @@ def legacy_transform_bounds(kind: str, lo: float, hi: float) -> tuple[float, flo
 #: only trace an omission left once it was serialized.
 BARE_PARAMETER_ATTRS: dict[str, object] = {
     "min": -math.inf, "max": math.inf, "unit": None}
+
+
+#: The pydantic validation context a reader of a **stored document** passes,
+#: at each reader :data:`rietx.schemas.migrate.STORED_DOCUMENT_READ_POINTS`
+#: names.  A field a release made required is filled there with the
+#: placeholder its old default held, and raises everywhere else: old files
+#: open, old code does not (``HumpComponent.position``, WP-2013).  Read only
+#: through :func:`reading_stored_document`.
+STORED_DOCUMENT = MappingProxyType({"stored_document": True})
+
+
+def reading_stored_document(info) -> bool:
+    """Whether this validation is a stored document's read (:data:`STORED_DOCUMENT`)."""
+    context = info.context
+    return isinstance(context, Mapping) and bool(context.get("stored_document"))
 
 
 def declared_fills(declared: Parameter, present) -> dict[str, object]:

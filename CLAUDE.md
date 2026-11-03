@@ -295,8 +295,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   solver's 1e-9, WP-1123) is the schedule; `stage_ftols()` and `stage_window_tols()`, parallel to
   `run_stages()`, are the one authority, since the plan alone knows which stage is last — no runner
   reads `Stage.ftol` or `plan.stages`. **Cumulative staging bounds the cost**: every later stage
-  refines an intermediate stage's parameters again, so 1.2-1.6× fewer evaluations cost ≤ 0.03 esd
-  on **one fit**, and along a *chain* the effect is unbounded and of either sign (1.12× better,
+  refines an intermediate stage's parameters again, so 1.06-1.58× fewer evaluations cost ≤ 0.0004
+  esd on **one fit** (FAP, NAC, cpd-1a behind the closing stage; WP-2045 probe 7), and along a *chain* the effect is unbounded and of either sign (1.12× better,
   1.04× worse): a series is measured, never assumed. `None` for either is the bit-identical way
   back and what a golden declares; the record says what a stage **ran** at (`StageResult.ftol` and
   `.window_area_tol`, `NodeAction`'s twins), or a cherry-pick replays what never happened.
@@ -789,13 +789,13 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   the **FWHM** (not σ) of the ΔM/M distribution; coefficients are in **10⁻¹² Å⁻⁴** (physical values
   ~10⁻⁸ would be finite-differenced with a step 100× their own size); they multiply the **literal**
   monomials, where other codes fold symmetry multiplicities in. A block **locks `lor_strain`** (its
-  isotropic direction is identically that column), so the block subsumes it and must itself be
-  freed *in* the sample-broadening stage, not after. The isotropic limit S = ε²·[M²] is both the
+  isotropic direction is identically that column) **and replaces it**: every width reader takes
+  `CompiledModel.lor_strain_term`, 0 under a block, since a locked entry keeps its stored value and a
+  reader of the path stacked Λ on a frozen floor (WP-1467). The block is freed *in* the sample-broadening stage, not after. The isotropic limit S = ε²·[M²] is both the
   seed and the only legal start: at S ≡ 0 the √ has unbounded slope, so `Stage.strain_seed`, not
   `Stage.seed`, which lifts only a row sitting on a floor at or above 0. σ²(M) ≥ 0 is a *cone* coupling all fifteen, so it cannot be a box bound. The default
   LM driver holds it as a linear inequality. Under `solver="trf"`, and in a joint fit (no cone), it
-  is a guard (`STEPHENS_STRAIN_NOT_POSITIVE`). Read a firing as "these coefficients are
-  not quotable", never as evidence *of* anisotropy. **Zero is on the cone, not outside it** — the
+  is a guard (`STEPHENS_STRAIN_NOT_POSITIVE`). Read a firing as "not quotable, and the fit leaned on the clamp" (σ² < 0 → zero strain width, a free hinge; `detail` carries the m·|F|² share), never as evidence *of* anisotropy. **Zero is on the cone, not outside it** — the
   guard's test is one-sided; v0.6's record has the ≤ 0 form's withdrawn claim and the re-measured
   brucite and corundum cone counts.
 - **Anomalous scattering is ON by default since v1.0** (`Source.dispersion`, f = f₀ + f′ + i·f″

@@ -697,9 +697,11 @@ def _stream_system_snapshot(progress, system: str, units: dict, names,
     forked), graded by the same gate as the final answer with two questions
     deliberately still open: nothing is validated yet and no ambiguity has
     been enumerated (``consensus(..., ambiguity=False)`` — the enumeration is
-    the measured long pole, 45 s of a 105 s corundum run).  Both read as
-    capping caveats, so a streamed grade can only *rise* when the full
-    consensus and validation run — never fall.  Raw candidates from units of a
+    the measured long pole, 45 s of a 105 s corundum run).  An unvalidated
+    candidate reads as ``not_validated``, a capping caveat; an unenumerated
+    one as ``geometric_ambiguity``, a refuting one, so every streamed grade
+    is ``low``.  It can only *rise* when the full consensus and validation
+    run — never fall.  Raw candidates from units of a
     system still in progress are different: they have been through no
     consensus at all, and ride the search units' ``provisional`` field with no
     confidence at all (``engines.provisional_payload``).
@@ -1146,8 +1148,8 @@ def index_pattern(peaks: PeakList | None = None, *,
 
     # the deferred ambiguity pass, on whatever clock validation left — read
     # between candidates and between one candidate's derivative cells (#895),
-    # so a fired token leaves the question unasked
-    # (capping) rather than half-answered
+    # so a fired token leaves the question unasked rather than half-answered
+    # (the gate then writes ``geometric_ambiguity``, a refuting caveat)
     from .consensus import absence_excess, enumerate_ambiguity
 
     absence_excess(outcome.candidates)

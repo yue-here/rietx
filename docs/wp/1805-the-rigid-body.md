@@ -71,6 +71,15 @@ round trips, the hold-on-a-body-atom test and the inertia-rank DOF count.
 
 ### Inherited
 
+- **2026-11-01, from WP-1951 (PR #1304): the body advice names every body.**
+  `Refinement.hold`'s refusal on a body-placed row, and now
+  `STAGE_PATH_NOT_FREE`'s site arm (`refine._site_glob_diagnostics`), both
+  tell the caller to free `phases.*.rigid_bodies.*.origin.dof.*`,
+  `…rotation.*` and `…torsions.*.twist`. That is every body in every phase,
+  wider than the one site asked about. The generality judge marked the
+  suggestion weak on it. Narrowing both to the owning body's
+  `phases.<i>.rigid_bodies.<k>.` is one change; `table.body_rows()` gives
+  the body's name, not its index.
 - **2026-10-08, from the issue triage (issue #824): a joint commit is not
   atomic.** `MultiParameterTable.commit` (`params/multi.py`) commits its tables
   in turn with no rollback. Since #801 a table's commit-time body guard

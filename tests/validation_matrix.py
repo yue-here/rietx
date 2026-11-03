@@ -2464,11 +2464,15 @@ CLAIMS: tuple[Claim, ...] = (
         reference="NIST SRM 640c certificate a = 5.4311946 +- 0.0000092 A at "
                   "22.5 C.  Held, not refined: holding a certified cell is what "
                   "turns a free lambda into a calibration measurement.  The "
-                  "cubic ties (b<-a, c<-a) carry the source's value, so this is "
-                  "an identity bar (exact) and the absent esd shows nothing was "
-                  "refined.  XND held 5.4311948, 0.4 ppm above, negligible "
-                  "against every band here and stated in the docstring",
-        measured="cell.b and cell.c both exactly 5.4311946 A, esd None",
+                  "answer lists no cell row, since a result carries only what "
+                  "the fit could move (WP-1999); no stage's free set holds a "
+                  "cell path, and the parameter table ties b and c to a, so "
+                  "this is an identity bar (exact).  XND held 5.4311948, 0.4 "
+                  "ppm above, negligible against every band here and stated "
+                  "in the docstring",
+        measured="no cell row in the answer and none in any stage's free "
+                 "set; cell.a, cell.b and cell.c in the parameter table all "
+                 "exactly 5.4311946 A, b and c tied to a",
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2912,7 +2916,7 @@ INTERMEDIATE_FTOL_DEFAULT = 1e-6
 #: * *What it costs.*  1.05-2.05x the fit time on those three and SRM 660c,
 #:   the fluorapatite the dearest (two runs each, interleaved, 2026-10-21).
 #: * *Where it fails.*  SRM 660c LaB6 stays 0.9 esd from the converged answer
-#:   in U, its Gaussian variance on the clamp floor at high angle (WP-1467),
+#:   in U, its Gaussian variance on the clamp floor at high angle (WP-1955),
 #:   and its two Biso starts land in mirrored axial minima (WP-2012).
 #: * *Why the suites here ride it.*  As for the schedule above: they say what
 #:   the shipped package reproduces, and each names the setting.

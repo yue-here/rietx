@@ -83,6 +83,52 @@ so measure how many goldens and tests move before choosing.
 
 ## Handover log
 
+- **2026-11-02** — a ghostshift runner took main's red slow test to PR
+  #1334. `test_acceptance_si640c.py::test_the_held_cell_is_the_certificate`
+  raised KeyError on `phases.0.cell.b` after PR #1046 merged. The test was
+  wrong and the behaviour is the ruled one. The si640c fit holds the
+  certified cell and never frees it, so its cubic `b` and `c` are exactly the
+  rows the 2026-11-01 ruling removed from the answer. The test now reads the
+  held cell from the model and asserts the answer has no cell row. It was the
+  only casualty: the whole slow tier is green on the fixed tree. This entry
+  corrects this closed WP's own record and asks for no work.
+
+  *Cause, verified.* `refine._build_result` keeps a row only when
+  `ParameterTable.moving_paths` holds it. The si640c plan's stages never
+  match `phases.0.cell.a`, so `a` cannot move, and `b` and `c` are tied to
+  it. #1046's own table lists the same case (LaB6 `lab_calibrate` with the
+  cell held drops `b`, `c` and `x`). #1046 did not run the slow tier, which
+  is where this test lives.
+
+  *Done.* The test takes a new `full_fit` fixture, which returns the
+  refinement beside the result, so the one fit is still shared. It asserts
+  four things. The answer has no cell row. No stage's `freed` list holds a
+  cell path. `a`, `b` and `c` in `Refinement.parameters()` equal the
+  certificate to the bit. `b` and `c` are tied to `phases.0.cell.a` by name.
+  The generated sibling followed: the claim in `tests/validation_matrix.py`
+  and the `docs/VALIDATION.md` entry rendered from it. `/code-review high
+  --fix` made five findings and three are fixed. The old esd check could
+  never fail, because a parameter-table row takes its esd from the answer's
+  row. The final `vary` flag says only what the last stage freed. The tie
+  check did not name its source. Declined: folding `_fit` into
+  `_fit_with_model`, which is cosmetic.
+
+  *Siblings.* No other reader of a held source's tied follower was found.
+  The static sweep covered `src/`, `examples/`, `docs/` and the skill.
+  `examples/guides/cell.py` reads `cell.b`, but its `a` is free. The slow
+  tier ran whole as the empirical sweep, with 0 failures.
+
+  *Measured* (`[dev]` venv, darwin/arm64, tree 6eb40ac04, each run under the
+  shift's suite lock with nothing else running). The si640c file: 18
+  passed. The slow tier (`-m slow`): 912 passed, 21 skipped, 18 xfailed, 0
+  failed, in 30:04. The fast selection: 13286 passed, 310 skipped, 32
+  xfailed, 0 failed, in 7:43. No test was added, so passed+skipped owes no
+  delta. `python -m tests.reader_output` exited 0, so the printed text is
+  unchanged. After origin/main was merged in (b397dcd3e), the si640c file,
+  `test_reported_rows_move.py`, `test_validation_matrix.py` and
+  `test_docs_consistency.py` were re-run: 790 passed, 0 skipped.
+
+  Next: merge the PR. Nothing else is owed here.
 - **2026-11-02** — a ghostshift runner chased the Kernels workflow's
   intermittent macOS x86_64 failure on this PR. *Cause:* the gate, not this
   PR. The PR reaches Kernels only through a comment in

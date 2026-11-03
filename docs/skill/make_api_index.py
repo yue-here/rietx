@@ -242,7 +242,11 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "yourself. `fig.to_px(points)` carries Cartesian Å into the "
                 "image's pixels, so a legend from `.palette`, an axis triad and a "
                 "scale bar from `.pixels_per_angstrom` are drawn in matplotlib as "
-                "`examples/structure_furniture.py` draws them. For a site's colour (`#rrggbb`, `white` or `black`; "
+                "`examples/structure_furniture.py` draws them; a polyhedron's "
+                "swatch takes `.polyhedron_palette[formula]`. `pad=0` crops the "
+                "picture to its ink with every map kept; never cut `.image` "
+                "yourself (Measured: WP-1468, YBa₂Cu₃O₇ at 1000 px 3 px of "
+                "margin against 35-53). For a site's colour (`#rrggbb`, `white` or `black`; "
                 "anything else raises) or radius, edit the dict "
                 "`rietx.gui.structure3d.build` returns and pass that. "
                 "Another program's picture: `Structure.to_cif` writes the "
@@ -328,8 +332,9 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "`max_atoms`; each atom's `image` says which atom of the cell it "
                 "is, and `periodicity(g, mask)` reads 0 to 3 for a motif "
                 "(Measured: WP-1502, NAC 3x3x3 in 44-62 ms). On a dark "
-                "`background`, `recolour` C, whose default #383838 reads at "
-                "1.56:1 against #151515 (Measured: WP-1533).",
+                "`background` C draws #666666, 3.18:1 against #151515, and a "
+                "light one keeps #383838; a `recolour` stays yours (Measured: "
+                "WP-1468).",
                 ("rx.viz.keep", "rx.viz.select", "rx.viz.plane", "rx.viz.sphere",
                  "rx.viz.component", "rx.viz.periodicity", "rx.viz.recolour"),
             ),
@@ -396,8 +401,8 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "nobody can rebuild from a CIF plus a pattern (Measured: WP-1118 — six "
                 "agents handed a hand-transcribed series all named the transcription as "
                 "the hardest part of the work). Read `.format.reports_at` to know which "
-                "call takes your `diagnostics=` list: a `.inp` reports at read, a `.pcr` "
-                "at `to_structure`, a `.EXP` at both. A GSAS `.EXP` carries the whole "
+                "call takes your `diagnostics=` list: a `.pcr` reports at `to_structure`, "
+                "a `.inp`, `.EXP` and `.gpx` at both. A GSAS `.EXP` carries the whole "
                 "experiment rather than one phase, so read the wavelengths, excluded "
                 "regions and refined profile terms off `model.stated` — a `Structure` "
                 "cannot hold them. **A blank field there "
@@ -744,13 +749,17 @@ def model_field_parts(cls, skip: frozenset[str] = frozenset()) -> list[tuple[str
     from pydantic_core import PydanticUndefined
 
     out = []
+    # a factory a caller cannot reach (HumpComponent.position) prints as required
+    required = set(getattr(cls, "_required_of_a_caller", ()))
     for name, info in cls.model_fields.items():
         if name in skip:
             continue
         ann = _ann(info.annotation)
         for member in TECHNIQUE_MEMBERS:
             ann = ann.replace(f" | {member}", "")
-        if info.default_factory is not None:
+        if name in required:
+            default = None
+        elif info.default_factory is not None:
             default = _default(info.default_factory())
         elif info.default is not PydanticUndefined:
             default = _default(info.default)

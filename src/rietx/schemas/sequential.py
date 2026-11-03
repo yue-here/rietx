@@ -20,6 +20,7 @@ of each pattern stays reachable in memory on the
 from __future__ import annotations
 
 import math
+import re
 from typing import ClassVar, Literal
 
 from pydantic import Field, model_validator
@@ -240,6 +241,17 @@ class SeriesEntry(Base):
     #: written before the field.  ``SEQUENTIAL_MOMENT_HOLD`` reads it.  Written
     #: by ``SequentialRefinement._chain``.
     floored: list[str] = Field(default_factory=list)
+    #: This pattern's own dot-path for each path of the entry that the series
+    #: numbering names differently, keyed by the series path (WP-1991).  Every
+    #: path of the entry reads the series numbering
+    #: (:attr:`SeriesResult.phase_names`), which is the pattern's own unless a
+    #: ``prepare`` hook added or removed a phase or an atom ahead of it; this
+    #: is how to find the parameter in that pattern's model.  ``{}`` where the
+    #: two numberings agree.  ``None`` in a document written before the field,
+    #: whose paths are the pattern's own: nothing recorded the names to
+    #: translate them, so such a document opens as written.  Written by
+    #: ``sequential._into_series_numbering``.
+    pattern_paths: dict[str, str] | None = None
 
     #: Where this pattern's own history lives (one tree per pattern — a tree is
     #: pinned to one pattern by its data fingerprint).
@@ -322,6 +334,23 @@ class Trajectory(Base):
     #: exists to remove.  Positional rather than ``SeriesEntry.index``, since
     #: the row being filled is a position.
     positions: list[int] = Field(default_factory=list)
+    #: The phase and atom ``path`` follows, by name (WP-1991): a trajectory
+    #: is keyed by phase name, atom label and parameter, and ``path`` is that
+    #: key in the series numbering (:attr:`SeriesResult.phase_names`).
+    #: ``None`` where the path is on no phase (or no atom), and in a series
+    #: written before the numbering was recorded.  Filled by
+    #: :meth:`SeriesResult.trajectory`, and ``phase`` by every trajectory of
+    #: one phase (a weight fraction, an agreement index, a moment).
+    phase: str | None = None
+    atom: str | None = None
+    #: Each point's dot-path in its own pattern's model, aligned with
+    #: ``value``: ``path`` itself except where a ``prepare`` hook added or
+    #: removed a phase or an atom ahead of this one (WP-1991).  Filled by
+    #: :meth:`SeriesResult.trajectory` and :meth:`SeriesResult.magnetic_trajectory`;
+    #: empty on the trajectories that are not of a dot-path
+    #: (:meth:`SeriesResult.qpa_trajectory`,
+    #: :meth:`SeriesResult.agreement_trajectory`).
+    pattern_paths: list[str] = Field(default_factory=list)
 
     def __len__(self) -> int:
         return len(self.value)
@@ -380,6 +409,10 @@ class QPATrajectory(Trajectory):
                 notes.append(f"  {label or f'point {k}'}: relative to the phases "
                              f"seen; {', '.join(u)} not measured")
         return "\n".join([text, *notes])
+
+
+#: A phase, and an atom of it, at the start of a dot-path.
+_NAMED_PATH = re.compile(r"^phases\.(\d+)(?:\.atoms\.(\d+))?(?=\.|$)")
 
 
 def _unservable(series: "SeriesResult", path: str) -> str:
@@ -855,6 +888,16 @@ class SeriesResult(Base):
     #: the same reason ``StageResult.n_degenerate_cell_probes`` sits beside a
     #: guard that could otherwise only be read by counting diagnostics.
     n_failed: int = 0
+    #: The series numbering every path of :attr:`entries` reads (WP-1991,
+    #: Yue's ruling of 2026-11-01): phase ``i`` of a path is
+    #: ``phase_names[i]`` and its atom ``j`` is ``atom_labels[i][j]``.  It is
+    #: the series' own structure's numbering, extended by each phase or atom
+    #: a ``prepare`` hook added, in the order the walk met them, so a
+    #: trajectory follows one atom by name whatever each pattern's model
+    #: numbers it.  ``None`` in a document written before the fields.  Written
+    #: by ``SequentialRefinement.fit``.
+    phase_names: list[str] | None = None
+    atom_labels: list[list[str]] | None = None
     provenance: Provenance | None = None
 
     @model_validator(mode="before")
@@ -913,6 +956,11 @@ class SeriesResult(Base):
     def trajectory(self, path: str) -> Trajectory:
         """One parameter's trajectory across the series.
 
+        ``path`` reads the series numbering (:attr:`phase_names`), so the
+        trajectory follows one phase and one atom by name, and each point
+        carries the path that pattern's own model gives it
+        (:attr:`Trajectory.pattern_paths`, WP-1991).
+
         Patterns where the path is absent are skipped rather than filled — a
         gap in a trajectory is a real thing (a phase that was not in the model
         yet, a stage that did not run) and inventing a value for it would be
@@ -920,6 +968,7 @@ class SeriesResult(Base):
         against.
         """
         traj = Trajectory(path=path, x_label=self.x_label)
+        traj.phase, traj.atom = self._names_of(path)
         for i, (e, xv) in enumerate(zip(self.entries, self.x, strict=True)):
             found = next((p for p in e.parameters if p.path == path), None)
             if found is None:
@@ -929,7 +978,22 @@ class SeriesResult(Base):
             traj.stderr.append(found.stderr)
             traj.labels.append(e.label)
             traj.positions.append(i)
+            traj.pattern_paths.append((e.pattern_paths or {}).get(path, path))
         return traj
+
+    def _names_of(self, path: str) -> tuple[str | None, str | None]:
+        """The phase name and atom label a series path names, where recorded."""
+        m = _NAMED_PATH.match(path)
+        if m is None or self.phase_names is None:
+            return None, None
+        i = int(m.group(1))
+        if i >= len(self.phase_names):
+            return None, None
+        if m.group(2) is None or self.atom_labels is None:
+            return self.phase_names[i], None
+        labels = self.atom_labels[i] if i < len(self.atom_labels) else []
+        j = int(m.group(2))
+        return self.phase_names[i], labels[j] if j < len(labels) else None
 
     def paths(self, *, varied_only: bool = False) -> list[str]:
         """Every parameter path present in the series, in first-seen order.
@@ -955,7 +1019,7 @@ class SeriesResult(Base):
         """A phase's weight fraction (as a percentage) across the series,
         with the phases each point leaves out of its basis
         (:attr:`QPATrajectory.unmeasured`)."""
-        traj = QPATrajectory(path=f"qpa.{phase}", x_label=self.x_label)
+        traj = QPATrajectory(path=f"qpa.{phase}", x_label=self.x_label, phase=phase)
         for i, (e, xv) in enumerate(zip(self.entries, self.x, strict=True)):
             if e.qpa is None:
                 continue
@@ -998,7 +1062,8 @@ class SeriesResult(Base):
         if metric not in ("r_bragg", "r_f"):
             raise ValueError(
                 f"metric must be 'r_bragg' or 'r_f', got {metric!r}")
-        traj = Trajectory(path=f"{metric}.{phase}", x_label=self.x_label)
+        traj = Trajectory(path=f"{metric}.{phase}", x_label=self.x_label,
+                          phase=phase)
         for i, (e, xv) in enumerate(zip(self.entries, self.x, strict=True)):
             row = next((r for r in e.phase_agreement if r.name == phase), None)
             if row is None:
@@ -1063,7 +1128,7 @@ class SeriesResult(Base):
             if row is None:
                 continue
             traj.path = row.path or site
-            traj.atom, traj.ion = row.atom, row.ion
+            traj.phase, traj.atom, traj.ion = row.phase, row.atom, row.ion
             traj.x.append(xv)
             traj.value.append(float(row.magnitude))
             measured = row.supported is not None and not _rejected(e)
@@ -1074,6 +1139,7 @@ class SeriesResult(Base):
             traj.status.append(e.status)
             traj.labels.append(e.label)
             traj.positions.append(i)
+            traj.pattern_paths.append((e.pattern_paths or {}).get(row.path, row.path))
         traj.onset = locate_onset(traj)
         return traj
 

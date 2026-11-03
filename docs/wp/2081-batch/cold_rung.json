@@ -1,0 +1,211 @@
+{
+ "platform": "Darwin arm64",
+ "python": "3.12.10",
+ "rietx": "1.11.0.dev0",
+ "venv": "worktree .venv, [dev]",
+ "true_zero_shift": 0.008,
+ "start_zero_shift": 0.0,
+ "rows": [
+  {
+   "arm": "free",
+   "frame": 0,
+   "rung": "cold",
+   "rungs_tried": [
+    "cold"
+   ],
+   "zero_shift": 0.007974441079636643,
+   "zero_esd": 1.650853850616976e-05,
+   "cell_a_ppm": -1.7470266813125896,
+   "gof": 1.068700587208885
+  },
+  {
+   "arm": "free",
+   "frame": 1,
+   "rung": "warm",
+   "rungs_tried": [
+    "warm"
+   ],
+   "zero_shift": 0.007988711069465713,
+   "zero_esd": 1.6534914778037277e-05,
+   "cell_a_ppm": -1.0614401552398935,
+   "gof": 1.0686704542795222
+  },
+  {
+   "arm": "free",
+   "frame": 2,
+   "rung": "warm",
+   "rungs_tried": [
+    "warm"
+   ],
+   "zero_shift": 0.00800632346907527,
+   "zero_esd": 1.5561682926630508e-05,
+   "cell_a_ppm": 0.24372358717365206,
+   "gof": 1.037262520694362
+  },
+  {
+   "arm": "free",
+   "frame": 3,
+   "rung": "warm",
+   "rungs_tried": [
+    "warm"
+   ],
+   "zero_shift": 0.008019325607330966,
+   "zero_esd": 1.6277229963454065e-05,
+   "cell_a_ppm": 1.0807379036588836,
+   "gof": 1.0615955588177162
+  },
+  {
+   "arm": "free_forced",
+   "frame": 0,
+   "rung": "cold",
+   "rungs_tried": [
+    "cold"
+   ],
+   "zero_shift": 0.007974441079636643,
+   "zero_esd": 1.650853850616976e-05,
+   "cell_a_ppm": -1.7470266813125896,
+   "gof": 1.068700587208885
+  },
+  {
+   "arm": "free_forced",
+   "frame": 1,
+   "rung": "warm",
+   "rungs_tried": [
+    "warm"
+   ],
+   "zero_shift": 0.007988711069465713,
+   "zero_esd": 1.6534914778037277e-05,
+   "cell_a_ppm": -1.0614401552398935,
+   "gof": 1.0686704542795222
+  },
+  {
+   "arm": "free_forced",
+   "frame": 2,
+   "rung": "cold",
+   "rungs_tried": [
+    "warm",
+    "warm_staged",
+    "cold"
+   ],
+   "zero_shift": 0.008006323469309668,
+   "zero_esd": 1.556168295187301e-05,
+   "cell_a_ppm": 0.24372361620497415,
+   "gof": 1.037262520694308
+  },
+  {
+   "arm": "free_forced",
+   "frame": 3,
+   "rung": "warm",
+   "rungs_tried": [
+    "warm"
+   ],
+   "zero_shift": 0.008019325607271852,
+   "zero_esd": 1.627723003257078e-05,
+   "cell_a_ppm": 1.08073790003178,
+   "gof": 1.06159555881798
+  },
+  {
+   "arm": "held_forced",
+   "frame": 0,
+   "rung": "cold",
+   "rungs_tried": [
+    "cold"
+   ],
+   "zero_shift": 0.007974441079636643,
+   "zero_esd": 1.650853850616976e-05,
+   "cell_a_ppm": -1.7470266813125896,
+   "gof": 1.068700587208885
+  },
+  {
+   "arm": "held_forced",
+   "frame": 1,
+   "rung": "warm",
+   "rungs_tried": [
+    "warm"
+   ],
+   "zero_shift": 0.007974441079636643,
+   "zero_esd": null,
+   "cell_a_ppm": -2.03941546664144,
+   "gof": 1.0686996516043175
+  },
+  {
+   "arm": "held_forced",
+   "frame": 2,
+   "rung": "cold",
+   "rungs_tried": [
+    "warm",
+    "warm_staged",
+    "cold"
+   ],
+   "zero_shift": 0.0,
+   "zero_esd": null,
+   "cell_a_ppm": -546.4533692658282,
+   "gof": 9.726679769853897
+  },
+  {
+   "arm": "held_forced",
+   "frame": 3,
+   "rung": "warm_staged",
+   "rungs_tried": [
+    "warm",
+    "warm_staged",
+    "cold"
+   ],
+   "zero_shift": 0.0,
+   "zero_esd": null,
+   "cell_a_ppm": -546.9441183274298,
+   "gof": 9.75884790533357
+  },
+  {
+   "arm": "hooks_forced",
+   "frame": 0,
+   "rung": "cold",
+   "rungs_tried": [
+    "cold"
+   ],
+   "zero_shift": 0.007974441079636643,
+   "zero_esd": 1.650853850616976e-05,
+   "cell_a_ppm": -1.7470266813125896,
+   "gof": 1.068700587208885
+  },
+  {
+   "arm": "hooks_forced",
+   "frame": 1,
+   "rung": "warm",
+   "rungs_tried": [
+    "warm"
+   ],
+   "zero_shift": 0.007974441079636643,
+   "zero_esd": null,
+   "cell_a_ppm": -2.03941546664144,
+   "gof": 1.0686996516043175
+  },
+  {
+   "arm": "hooks_forced",
+   "frame": 2,
+   "rung": "cold",
+   "rungs_tried": [
+    "warm",
+    "warm_staged",
+    "cold"
+   ],
+   "zero_shift": 0.007974441079636643,
+   "zero_esd": null,
+   "cell_a_ppm": -1.9428861000959021,
+   "gof": 1.0379438434757118
+  },
+  {
+   "arm": "hooks_forced",
+   "frame": 3,
+   "rung": "warm",
+   "rungs_tried": [
+    "warm"
+   ],
+   "zero_shift": 0.007974441079636643,
+   "zero_esd": null,
+   "cell_a_ppm": -1.9989281080779437,
+   "gof": 1.0630331812553377
+  }
+ ],
+ "seconds": 1.7
+}
