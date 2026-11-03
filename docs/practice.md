@@ -220,6 +220,24 @@ only"). RIETAN-FP 3.12 manual, by full-text search (one hit, on secondary
 extinction). BGMN by the binary's keyword table, with no manual
 installed.
 
+### Is powder extinction refined unasked?
+
+Surveyed 2026-11-03 for WP-1944 (issue #877), on whether a structural
+refinement frees extinction by default.
+
+| Program | Where the parameter lives | Refined by default | Mark |
+|---|---|---|---|
+| GSAS-II 5.8.4 | every phase-histogram pair carries `'Extinction': [0.0, False]` | no; the user ticks it | checked: `GSASIIddataGUI.py:1436`, `GSASIIphsGUI.py:9412`, `GSASIImath.py:6300` |
+| FullProf | `Extinc` on each phase's scale line, with its own codeword | no; a codeword of 0 holds it, and nothing turns it on unasked | recall, not checked |
+| TOPAS | no keyword (table above) | nothing to refine | checked, table above |
+| RIETAN-FP | none (table above) | nothing to refine | checked, table above |
+| BGMN | none found (table above) | nothing to refine | checked, table above |
+
+No program surveyed refines powder extinction unless the user asks. GSAS-II
+matches rietx's data shape: the parameter exists on every phase at 0. It
+differs in the refine flag. None of these programs ships a staged plan, so
+none has a stage that could free it on the user's behalf.
+
 ## A sharp peak no phase accounts for
 
 Surveyed 2026-10-25 for WP-2036, on what `tests/test_acceptance_extra_peaks.py` should assert.
