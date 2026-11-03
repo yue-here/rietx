@@ -1,6 +1,6 @@
 # WP-1334 — the stage that ran out of budget
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — tasks 3-7 landed and ruled (PR #1366); waits on the maintainer: the new diagnostic's reader text, then merge
+Milestone: unscheduled · Status: 🔄 2026-11-03 — tasks 3-7 landed and ruled (PR #1366); text approved; waits on the merge
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-09-23 — cost only: 46.6 % of stage time for a 1.23 % median gain
@@ -219,9 +219,9 @@ repo.
   hump is a degenerate direction) the fit spends 539 evaluations instead of
   816, and no parameter moves by more than 0.064 of its esd. A stage the rule
   stops reads `converged`, and an info diagnostic, `STAGE_SLOW_DESCENT`, names
-  it (ruled by Yue 2026-11-03, the second runner implementing it). Its message
-  and suggestion are reader output the maintainer has not yet seen. They are
-  quoted in the PR body's "What a reader receives".
+  it (ruled by Yue 2026-11-03, the second runner implementing it). Its text,
+  quoted in the PR body's "What a reader receives", was approved by Yue the
+  same day.
 
   *Done.* Task 3: `StageResult.termination`, the `stage_end` token, written by
   the three runners; `None` on a record stored before it. Task 4: the
@@ -308,8 +308,23 @@ repo.
   2. The four tier-3 rows are approved: `SLOW_DESCENT_ESD` (1.0),
      `_SLOW_DESCENT_WINDOW` (100), `_SLOW_DESCENT_HORIZON` (300) and the
      `StageResult.termination` action row, each `approved="2026-11-03"`.
-  3. Reader output: `STAGE_SLOW_DESCENT`'s code, message and suggestion are
-     new text, quoted in the PR body for the maintainer.
+  3. Reader output: `STAGE_SLOW_DESCENT`'s code, both message forms, its
+     suggestion and its help title, quoted in the PR body: text approved by
+     Yue 2026-11-03, after the series check below.
+
+  *Series check* (a separate runner, 2026-11-03, PR head `c7e7ee088`,
+  macOS arm64; numbers in `~/.cache/ghostshift/rietx/wp-1334-series/report.md`).
+  `sequential.py` never reads `termination`; it sees a slow-descent stop only
+  as `converged`. The 47 series test files, slow rows included, pass on both
+  trees, along with the series and path guides, tutorial 05 and the ladder
+  bench. Bounded and unbounded first rungs still give bit-identical accepted
+  values (0 of 610 and 0 of 336 differ). Against main, 6 of 184 series fits
+  in 5 chains move, by at most 0.067 esd, with fewer evaluations. Their
+  rungs, statuses, first-rung budgets, quarantines and series codes are
+  unchanged; their `STAGE_MAX_ITER` becomes `STAGE_SLOW_DESCENT`. Untested
+  route: a bounded first rung whose closing stage the rule stops below the
+  bound. No fixture produced it, and it is the one route that could break the
+  bit-identity.
 
   *Generality, second pass* (the `generality-review` judge on the ruled
   form, condensed). `STAGE_SLOW_DESCENT` code row, tier 1: **holds**. It
@@ -337,9 +352,8 @@ repo.
   *Not done.* The moment guide's 800-evaluation crawl (Inherited, 10-25) was
   not re-run. A per-stage off switch was not added: under the converged
   status the cases that wanted it (the guides, the `solve_magnetic`
-  continuations) no longer mislabel. Not measured: a series, where
-  `sequential.py` now reads a cut first rung as converged, so it escalates
-  no rung and feeds the first-rung budget (WP-1127).
+  continuations) no longer mislabel. A series is measured in the series
+  check above.
 
   Fast suite before the ruling (`-m "not slow"`, `[dev]`, macOS arm64, through `serial.py`,
   another shift's suites running): 5 failed, 13608 passed, 319 skipped,
@@ -377,8 +391,7 @@ repo.
   the skill tests and `test_manual_api` pass. `tests.audit_delta`: six rows
   added, none new at `unaudited`. `tests.reader_output`: unchanged. ruff clean.
 
-  Next: the maintainer reads `STAGE_SLOW_DESCENT`'s message and suggestion
-  (quoted in the PR body), then merges. The PR is ready for review.
+  Next: the merge. The PR is ready for review, its reader text approved.
 
 - **2026-11-02** — ghostshift runner, PR #1343. A caller holding a stage's
   record can now read that stage's Rwp from it, so keeping the best stage of a
