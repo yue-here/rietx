@@ -171,9 +171,34 @@ background. Tasks 7 and 8 are outside that ruling.
       and after, with obs/calc/diff PNGs to `tests/output/`.
 - [ ] Skill: the new code's `references/judging.md` row; a SKILL.md line only
       if the default changes.
-- [ ] Score the order scan's BIC at the effective sample size of the masked
+- [x] Score the order scan's BIC at the effective sample size of the masked
       residual, as `report.body_misfit` does for its ΔBIC, and measure where
-      FAP.XRA and Si 640c then stop.
+      FAP.XRA and Si 640c then stop. *Measured 2026-11-03 and declined; the
+      selector is unchanged (settled by Claude under the measurement below).*
+      N_eff = m/f², with f the Bérar-Lelann factor of the masked weighted
+      residual (`optimize.statistics.effective_sample_size`). Picked orders,
+      at caps 16 / 32:
+
+      | f taken from | FAP.XRA | Si 640c 8-30° | LaB₆ 660a 4-30° |
+      |---|---|---|---|
+      | raw m (today) | 16 / 32 | 16 / 32 | 16 / 31 |
+      | the cap's residual, one N_eff for the scan | 15 / 15 | 15 / 32 | 14 / 17 |
+      | each order's own residual | 2 / 2 | 4 / 4 | 14 / 17 |
+      | the order-2 residual | 6 / 6 | 11 / 11 | 14 / 17 |
+      | pairwise, order n's f, stop at the first loss | 6 / 6 | 2 / 2 | 5 / 5 |
+
+      The principled reading is the second row: one N_eff for every candidate,
+      as BIC needs, from the residual least shaped by the background. It moves
+      16 to 15 and still returns the cap on Si 640c at 32 (m 20 542, f 3.60,
+      N_eff 1589). Each term's gain at that N_eff alternates in sign (FAP:
+      +158, +359, +39, +172, −5.6, +24, +5.9, −1.0, …), so the scan has no
+      turning point to find. The other rows stop early for reasons that are
+      not the noise. A low order's f carries the background shape the next
+      terms remove (FAP's order-2 f is 19.5, N_eff 8), and the first-loss
+      stop ends Si 640c at 2 because its 3rd term costs 4.5. So ESS scoring
+      does not answer the cap, and `BACKGROUND_ORDER_AT_CAP` stays the
+      honest report. Probe: `select_chebyshev_order`'s own masking and
+      design, this branch's `[dev]` venv, macOS arm64.
 - [ ] `select_arpls_lambda` says when it falls back to the flexible end of its
       grid (no smoothing strength reached `dw_floor`), the cap code's sibling,
       unless PR #871 carries it.
