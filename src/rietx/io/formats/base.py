@@ -140,6 +140,14 @@ class ReaderOption:
 #: A meta-test pins it equal to the union of every ``PatternFormat.options``, so
 #: neither half can grow an entry the other does not know about.
 READER_OPTIONS: dict[str, ReaderOption] = {
+    "axis": ReaderOption(
+        name="axis", kind="str",
+        help="what the x column is, declared by the caller: 'two_theta' (2θ "
+             "in degrees) or 'tof' (a flight time in µs), the spellings of "
+             "PatternData's own axis. For a file that states no unit, such as "
+             "a time-of-flight bank with no header, whose numbers cannot say what "
+             "they are. Recorded in the pattern's metadata as declared; a file "
+             "stating a unit that contradicts it is refused, quoting both"),
     "bank": ReaderOption(
         name="bank", kind="int",
         help="which detector bank to read, by the number the file's own BANK "
@@ -178,6 +186,10 @@ METADATA_KEYS: dict[str, str] = {
     "x_label": "the x-axis label a file states in prose, verbatim and "
                "un-normalised — the only record of what was actually written",
     "scan_axis": "the goniometer axis scanned, as the file names it",
+    "declared_axis": "the abscissa the caller declared with the `axis` reader "
+                     "option ('two_theta' or 'tof'), where one was. A "
+                     "declaration, not a finding: the file did not establish "
+                     "it, and absent means nothing was declared",
     "scan": "which scan was read, counting from 0",
     "scan_count": "how many scans the file holds. Carried from the single read "
                   "so a preview never parses a 60 MB file twice",
