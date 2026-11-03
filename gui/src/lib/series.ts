@@ -10,13 +10,12 @@
  * test can judge without a DOM.
  *
  * **A smooth curve is exactly what a poisoned chain produces** (WP-0505's
- * measured lesson), so `SEQUENTIAL_PATH_DEPENDENT` is the headline and a flagged
- * trajectory is drawn differently rather than annotated in a footnote: the
- * panel gives a flagged parameter the warning colour, dashes its line
- * (`trajectoryLegend`), and — when `direction="both"` ran — draws the backward
- * chain beside it,
- * because the disagreement *is* the evidence and describing it in words would be
- * asking the reader to take it on trust.
+ * measured lesson), so when `direction="both"` ran the panel draws the backward
+ * chain beside the forward one and states the gap between them as a number, in
+ * esds, for every parameter and largest first (`SeriesResult.direction_gaps`).
+ * No gap is called path-dependent: the 3σ line that once did was a number no
+ * measurement set (WP-2003, C5), so a trajectory is ranked by its gap and
+ * carries it, and the reader decides what size matters for their specimen.
  */
 
 export interface SeriesPattern {
@@ -54,6 +53,31 @@ export interface SeriesSetup {
   running: boolean;
 }
 
+export type Rung = "warm" | "warm_staged" | "cold";
+
+/** Where a path's largest forward/backward gap sits, and what each chain kept
+ *  there (the server's `gap_at`, read off `DirectionGap`). */
+export interface GapAt {
+  label: string;
+  index: number;
+  forward_rung: Rung;
+  backward_rung: Rung;
+}
+
+/** One row of `SeriesResult.direction_gaps`: a path's gap at one pattern. */
+export interface DirectionGap {
+  path: string;
+  label: string;
+  index: number;
+  forward: number;
+  backward: number;
+  gap: number;
+  /** `gap` over the two chains' combined esd; `null` where either had none */
+  gap_esd: number | null;
+  forward_rung: Rung;
+  backward_rung: Rung;
+}
+
 export interface Trajectory {
   path: string;
   x: number[];
@@ -61,13 +85,13 @@ export interface Trajectory {
   value: number[];
   stderr: Array<number | null>;
   labels: string[];
-  path_dependent: boolean;
-  discontinuous: boolean;
   /** the backward chain's values, aligned with `x`, when `direction="both"` ran */
   backward: number[] | null;
-  /** the largest forward/backward difference in combined σ; `null` when neither
-   *  chain estimated an esd, which is where the fence itself abstains */
+  /** the largest forward/backward gap in combined esds; `null` when the
+   *  comparison did not run or no gap of this path has an esd on both sides */
   n_sigma: number | null;
+  /** the pattern that gap sits at; `null` exactly where `n_sigma` is */
+  gap_at: GapAt | null;
 }
 
 export interface SeriesEntry {
@@ -132,29 +156,70 @@ export function sortByX(patterns: SeriesPattern[]): SeriesPattern[] {
 }
 
 /**
- * The trajectories worth showing first: the path-dependent ones, then the rest.
+ * The trajectories by their forward/backward gap, largest first, with no
+ * threshold (WP-2003, C5).
  *
- * Ranked on `n_sigma` **inside the flagged group only**, which is why the server
- * computes it — a `Diagnostic` carries `where` and no magnitude, so "which
- * parameter disagrees *most*" is not answerable from the fences alone (WP-1012 hit
- * the same wall; the answer was to compute it from the two chains rather than to
- * grow the schema).
+ * `n_sigma` is the record's own number (`DirectionGap.gap_esd`, read by the
+ * server), so a parameter that disagrees most comes first and nothing is
+ * called path-dependent. A trajectory with no gap in esds (`null`: the
+ * comparison did not run, a chain gave no esd, or the path is a relative one)
+ * goes after every number, in the series' first-seen order, which
+ * `Array.prototype.sort` keeps for ties.
  *
- * Sorting the *unflagged* ones by σ too was the first version and a browser
- * showed why not: on a clean ramp nothing is flagged, every distance is under
- * 5e-4 σ, and ordering 15 parameters by that noise put `phases.0.cell.a` — the
- * one anybody opens a ramp to look at — eighth, in an order that reads as random.
- * Below the fence there is nothing to rank, so the series' own first-seen order
- * stands (`Array.prototype.sort` is stable).
+ * The first version ranked only the flagged group, because on a clean ramp
+ * the unflagged distances were noise (under 5e-4 σ) and ordering fifteen
+ * parameters by it put `phases.0.cell.a` eighth. The record now sets a gap
+ * under the trajectory's noise floor to exactly 0
+ * (`sequential.NOISE_FLOOR_REL`), so those ties keep the first-seen order
+ * without a threshold here.
  */
 export function rankTrajectories(trajectories: Trajectory[]): Trajectory[] {
-  const score = (t: Trajectory) => (t.path_dependent ? 2 : t.discontinuous ? 1 : 0);
   return [...trajectories].sort((a, b) => {
-    const diff = score(b) - score(a);
-    if (diff !== 0) return diff;
-    if (!a.path_dependent) return 0;
-    return (b.n_sigma ?? 0) - (a.n_sigma ?? 0);
+    if (a.n_sigma === null || b.n_sigma === null) {
+      return Number(a.n_sigma === null) - Number(b.n_sigma === null);
+    }
+    return b.n_sigma - a.n_sigma;
   });
+}
+
+/** A size in esds as the panel prints it: one decimal, `<0.1` below that, and
+ *  `0` for the exact zero the record writes under the noise floor. */
+export function esdText(v: number): string {
+  const a = Math.abs(v);
+  if (a === 0) return "0";
+  return a < 0.1 ? "<0.1" : a.toFixed(1);
+}
+
+/** The words for two chains that kept different attempts at one pattern, or
+ *  `""` when they kept the same. Where they differ the gap measures the
+ *  escalation ladder as well as the order the series was walked in. */
+export function rungNote(at: GapAt | null): string {
+  if (!at || at.forward_rung === at.backward_rung) return "";
+  return `At ${at.label} the forward chain kept the ${at.forward_rung} attempt and `
+    + `the backward chain the ${at.backward_rung} one, so this gap measures the `
+    + "escalation ladder as well as the order.";
+}
+
+/** The panel's one line over the whole comparison: the largest gap in the
+ *  record, where it is, and what it orders. `""` where the comparison did not
+ *  run (`direction_gaps` is `null`; the fences say why). */
+export function gapLine(gaps: DirectionGap[] | null | undefined): string {
+  if (!gaps) return "";
+  const top = gaps.find((g) => g.gap_esd !== null);
+  if (!top) {
+    return "Forward and backward chains compared: no gap could be put in esds, "
+      + "because one chain gave no esd.";
+  }
+  const at: GapAt = { label: top.label, index: top.index,
+                      forward_rung: top.forward_rung, backward_rung: top.backward_rung };
+  return `Forward and backward chains differ by ${esdText(top.gap_esd as number)} `
+    + `esd at most, in ${top.path} at ${top.label}. Parameters are listed by `
+    + `their largest gap. ${rungNote(at)}`.trim();
+}
+
+/** The path with the largest gap, for the line's button. */
+export function topGapPath(gaps: DirectionGap[] | null | undefined): string | null {
+  return gaps?.find((g) => g.gap_esd !== null)?.path ?? null;
 }
 
 /**
@@ -183,25 +248,25 @@ export function axisTitle(traj: Trajectory | null): string {
   return traj.path.split(".").at(-1) ?? traj.path;
 }
 
-/** A one-line reading of a trajectory's standing — the panel's caption. */
-export function trajectoryNote(traj: Trajectory | null, sigmaBar: number): string {
-  if (!traj) return "";
-  if (traj.path_dependent) {
-    const n = traj.n_sigma === null ? "" : ` by up to ${traj.n_sigma.toFixed(1)}σ`;
-    return `the forward and backward chains disagree${n} (over ${sigmaBar}σ): this `
-      + "trajectory depends on the order the series was refined in, so it is not "
-      + "determined by the data alone — hold the parameter, restrain it, or quote "
-      + "the between-chain spread as its uncertainty";
+/**
+ * What the record says about a trajectory's two chains — the panel's caption.
+ *
+ * The number and where it sits, then the rung clause where the two chains kept
+ * different attempts, and no verdict: the size that matters is the reader's
+ * (WP-2003, C5). Empty where `direction="both"` did not run.
+ */
+export function trajectoryNote(traj: Trajectory | null): string {
+  if (!traj || traj.backward === null) return "";
+  if (traj.n_sigma === null || traj.gap_at === null) {
+    return "The backward chain is drawn beside the forward one. The record "
+      + "holds no gap in esds for this parameter: a chain gave no esd, or the "
+      + "parameter is relative to where each fit began.";
   }
-  if (traj.discontinuous) {
-    return "a step far larger than this parameter's own scatter: either the "
-      + "specimen changed here or the chain failed and carried the error onward "
-      + "— open that pattern's own fit before reading the jump as physics";
-  }
-  if (traj.backward !== null) {
-    return "the forward and backward chains agree within their esds";
-  }
-  return "";
+  const where = `Forward and backward differ by ${esdText(traj.n_sigma)} esd at `
+    + `${traj.gap_at.label}, their largest gap. An esd here is the two chains' `
+    + "esds combined.";
+  const rung = rungNote(traj.gap_at);
+  return rung ? `${where} ${rung}` : where;
 }
 
 /** One legend entry: the mark it toggles, what it says, and the custom property
@@ -219,10 +284,9 @@ export interface LegendEntry {
 /**
  * What the trajectory's legend offers — the marks `rxplot.trajectory` draws.
  *
- * A flagged parameter's forward chain wears `--warn` and is dashed, and its
- * name says why: the disagreement between the chains is the evidence, so it is
- * drawn rather than described. The backward chain is offered only when
- * `direction="both"` ran.
+ * The forward chain is one ink for every parameter, since no parameter is
+ * called path-dependent (WP-2003, C5); the disagreement is the backward chain
+ * drawn beside it. That chain is offered only when `direction="both"` ran.
  *
  * Reseeded points are ringed and never dropped: the fit is good, but its
  * starting values did not come from its neighbour, so it is not evidence that
@@ -242,11 +306,9 @@ export interface LegendEntry {
  */
 export function trajectoryLegend(traj: Trajectory, reseeded: boolean[] = [],
                                  unrecovered: boolean[] = []): LegendEntry[] {
-  const flagged = traj.path_dependent;
-  const tone = flagged ? "--warn" : "--plot-diff";
+  const tone = "--plot-diff";
   const out: LegendEntry[] = [
-    { id: "forward", label: flagged ? "forward (path-dependent)" : "forward",
-      ink: tone, mark: flagged ? "dash" : "line" },
+    { id: "forward", label: "forward", ink: tone, mark: "line" },
   ];
   if (traj.stderr.some((e) => typeof e === "number" && Number.isFinite(e))) {
     out.push({ id: "esd", label: "esd", ink: tone, mark: "line" });

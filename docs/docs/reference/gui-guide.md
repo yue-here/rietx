@@ -445,11 +445,18 @@ The panel states those rather than offering them, because one protocol over N
 specimens is what makes their trajectories comparable.
 
 Run it both ways once. `direction="both"` refines the chain forwards and
-backwards and flags the parameters the two passes disagree about. It is the only
-check that separates a measured trajectory from an ordering artefact, and a
-smooth curve is exactly what a poisoned chain produces. The panel banners the
-disagreement and draws the backward chain beside the forward one. Then decide
-whether you need to keep paying for the second pass.
+backwards and records how far the two passes differ. It is the only check that
+separates a measured trajectory from an ordering artefact, and a smooth curve is
+exactly what a poisoned chain produces. The panel opens with one line giving the
+largest gap in esds (the two chains' esds combined) and the parameter and
+pattern it sits at. Every trajectory is listed with its own largest gap, largest
+first, and the backward chain is drawn beside the forward one. No parameter is
+called path-dependent, because no gap size separates a real dependence from
+chance across many parameters and patterns. You decide which size matters for
+your specimen. Where the two chains kept different attempts at that pattern (one
+warm, the other cold), the caption says so, and the gap then measures the
+escalation ladder as well as the order. Then decide whether you need to keep
+paying for the second pass.
 
 The status column carries four chips, best learnt as two pairs. `restaged` and
 `reseeded` are both recoveries, the first still from the neighbour's answer so

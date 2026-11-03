@@ -3939,6 +3939,34 @@ def test_the_served_disagreement_is_the_records_own_number():
     assert "path_dependence_sigma" not in payload
 
 
+def test_the_gap_names_its_pattern_and_the_rung_each_chain_kept():
+    """``gap_at`` is the largest gap's pattern and both chains' rungs.
+
+    Where the rungs differ the gap measures the escalation ladder as well as
+    the order, which only the record knows (``DirectionGap.forward_rung``), so
+    the server hands it on and the panel says so.  It is ``None`` exactly where
+    ``n_sigma`` is.
+    """
+    from rietx.gui import series as series_mod
+
+    forward, backward = _series_pair([4.1560, 4.1580, 4.1600],
+                                     [4.1560, 4.1580, 4.1607])
+    forward.entries[2].rung = "cold"
+    forward = _with_gaps(forward, backward)
+    top = forward.direction_gaps[0]
+    row, = series_mod.trajectories(forward, backward)
+    assert row["gap_at"] == {"label": top.label, "index": 2,
+                             "forward_rung": "cold", "backward_rung": "warm"}
+    assert top.label == "T500"
+
+    forward, backward = _series_pair([4.156, 4.158, 4.160],
+                                     [4.156, 4.158, 4.171], esd=None)
+    row, = series_mod.trajectories(_with_gaps(forward, backward), backward)
+    assert row["n_sigma"] is None
+    assert row["gap_at"] is None
+    assert "discontinuous" not in row
+
+
 def test_an_unjudgeable_parameter_gets_no_disagreement_rather_than_zero():
     """Where the record has no size, the number has none either.
 

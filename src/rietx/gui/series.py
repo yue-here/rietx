@@ -316,24 +316,27 @@ def trajectories(series: SeriesResult,
     """Every parameter's path across the series, plus the QPA fractions.
 
     One entry per dot-path in first-seen order, then one ``qpa.<phase>`` per
-    phase a Rietveld fit weighed.  ``discontinuous`` is read off the series'
-    ``steps``: true where a step of that path was re-measured cold
-    (``fit(verify_steps=k)``), the plot's shading rule, since ``steps`` calls
-    no step a jump (WP-2003).  ``n_sigma`` is the path's largest
+    phase a Rietveld fit weighed.  ``n_sigma`` is the path's largest
     forward-backward gap in combined esds, read off
     ``SeriesResult.direction_gaps`` (WP-2003, C5), ``None`` where no row of
-    the path has a size or the comparison did not run.
+    the path has a size or the comparison did not run.  ``gap_at`` names the
+    pattern that gap sits at and the rung each chain kept there, so a panel
+    can say when the two chains kept different attempts and the gap measures
+    the ladder as well as the order.  It is ``None`` exactly where
+    ``n_sigma`` is.  The steps between neighbouring patterns are not repeated
+    here: they are ``SeriesResult.steps``, served whole in ``result``.
 
     ``relative`` paths keep their backward values and get no ``n_sigma``,
     because the record has no row for them (``sequential._relative_paths``).
     ``angles`` is kept for the caller's signature; the record already compares
     those paths modulo a turn (#604).
     """
-    jumps = {s.path for s in series.steps or [] if s.cold_ratio is not None}
-    largest: dict[str, float] = {}
+    # the record lists gaps largest |gap_esd| first, so the first row of a
+    # path with a size is its largest
+    largest: dict[str, Any] = {}
     for g in series.direction_gaps or []:
         if g.gap_esd is not None:
-            largest.setdefault(g.path, abs(g.gap_esd))
+            largest.setdefault(g.path, g)
     names = list(series.paths(varied_only=False))
     phases = []
     for entry in series.entries:
@@ -354,8 +357,7 @@ def trajectories(series: SeriesResult,
         row = {"path": path, "x": list(traj.x), "x_label": traj.x_label,
                "value": list(traj.value), "stderr": list(traj.stderr),
                "labels": list(traj.labels),
-               "discontinuous": path in jumps,
-               "backward": None, "n_sigma": None}
+               "backward": None, "n_sigma": None, "gap_at": None}
         # Only an ordinary parameter path gets a forward/backward comparison.
         # A prefixed one is derived, not refined: a QPA's esd is a propagated
         # one while an agreement index has none at all, so a gap would be a
@@ -364,8 +366,12 @@ def trajectories(series: SeriesResult,
             other = backward.trajectory(path)
             if len(other) == len(traj):
                 row["backward"] = list(other.value)
-                if path not in relative:
-                    row["n_sigma"] = largest.get(path)
+                top = largest.get(path)
+                if path not in relative and top is not None:
+                    row["n_sigma"] = abs(top.gap_esd)
+                    row["gap_at"] = {"label": top.label, "index": top.index,
+                                     "forward_rung": top.forward_rung,
+                                     "backward_rung": top.backward_rung}
         out.append(row)
     return out
 

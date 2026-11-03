@@ -7,9 +7,10 @@
    * path-dependent by construction, so **a smooth curve is exactly what a
    * poisoned chain produces** (WP-0505). Hence the shape of the panel. The
    * `direction="both"` verification pass has its own control and its answer —
-   * `SEQUENTIAL_PATH_DEPENDENT` — is a banner at the top, not a diagnostic in a
-   * strip; a flagged trajectory is *drawn* differently and has the other chain
-   * drawn beside it, because the disagreement is the evidence.
+   * `SeriesResult.direction_gaps` — is one line at the top stating the largest
+   * gap in esds, with every trajectory ranked by its own and the other chain
+   * drawn beside it, because the disagreement is the evidence. No parameter is
+   * called path-dependent: the record holds no threshold (WP-2003, C5).
    *
    * Two structural facts about where a series lives. Its patterns are staged
    * uploads and its answer is session-scoped (`ProjectDoc.patterns` stays length
@@ -34,12 +35,15 @@
   import {
     asRequest,
     axisTitle,
+    esdText,
+    gapLine,
     memberLegend,
     moveBy,
     pointText,
     rankTrajectories,
     reseededFlags,
     sortByX,
+    topGapPath,
     trajectoryLegend,
     trajectoryNote,
     unrecoveredFlags,
@@ -92,12 +96,10 @@
   const entries = $derived<SeriesEntry[]>(answer?.result?.entries ?? []);
   const trajectories = $derived<Trajectory[]>(answer?.trajectories ?? []);
   const ranked = $derived(rankTrajectories(trajectories));
-  const flagged = $derived<string[]>(answer?.path_dependent ?? []);
-  const sigmaBar = $derived<number>(answer?.path_dependence_sigma ?? 3);
   const diagnostics = $derived<any[]>(answer?.result?.diagnostics ?? []);
-  /** every fence except the headline one, which has its own banner */
-  const otherDiagnostics = $derived(
-    diagnostics.filter((d) => d.code !== "SEQUENTIAL_PATH_DEPENDENT"));
+  /** the comparison of the two chains as one line, `""` where it did not run */
+  const gaps = $derived(gapLine(answer?.result?.direction_gaps));
+  const gapPath = $derived(topGapPath(answer?.result?.direction_gaps));
   const current = $derived<Trajectory | null>(
     trajectories.find((t) => t.path === selectedPath)
       ?? ranked[0] ?? null);
@@ -398,9 +400,7 @@
     const unrecovered = unrecoveredFlags(traj, entries);
     legend = trajectoryLegend(traj, reseeded, unrecovered);
     fig = chart.mountTrajectory(plotNode, traj, {
-      colors: () => ({ tone: traj.path_dependent ? colors.warn : colors.diff,
-                       warn: colors.warn, muted: colors.edge }),
-      dashed: traj.path_dependent,
+      colors: () => ({ tone: colors.diff, warn: colors.warn, muted: colors.edge }),
       rings: reseeded,
       crosses: unrecovered,
       xLabel: traj.x_label,
@@ -417,24 +417,15 @@
 </script>
 
 <section bind:clientWidth={panelWidth}>
-  <!-- the headline, not a footnote: the one check that separates a measured
-       trajectory from an ordering artefact (WP-0505) -->
-  {#if flagged.length}
-    <p class="banner bad">
-      <strong>{flagged.length} parameter{flagged.length === 1 ? "" : "s"}
-        path-dependent</strong> — the forward and backward chains disagree by more
-      than {sigmaBar}σ, so {flagged.length === 1 ? "its" : "their"} trajector{flagged.length === 1 ? "y is" : "ies are"}
-      an artefact of the order the series was refined in, not a measurement.
-      {#each flagged.slice(0, 6) as path (path)}
-        <button class="ghost" onclick={() => showTrajectory(path)}
-          title="show this trajectory with the backward chain beside it">{path}</button>
-      {/each}
-      {#if flagged.length > 6}<span class="muted">+{flagged.length - 6}</span>{/if}
-    </p>
-  {:else if answer?.has_backward}
-    <p class="banner ok">
-      Both chain directions agree within their esds — the trajectories below are
-      measurements rather than ordering artefacts.
+  <!-- the comparison of the two chains, stated as a number and not a verdict:
+       the record holds no threshold, so the size that matters is the reader's
+       (WP-2003, C5) -->
+  {#if gaps}
+    <p class="banner">
+      {gaps}
+      {#if gapPath}
+        <button class="ghost" onclick={() => showTrajectory(gapPath)}>{gapPath}</button>
+      {/if}
     </p>
   {/if}
 
@@ -610,8 +601,8 @@ plot's x-axis title, and the column above">
         onchange={(ev) => showTrajectory((ev.currentTarget as HTMLSelectElement).value)}>
         {#each ranked as t (t.path)}
           <option value={t.path}>
-            {t.path_dependent ? "⚠ " : t.discontinuous ? "↕ " : ""}{t.path}
-            {#if t.n_sigma !== null && t.path_dependent}({t.n_sigma.toFixed(1)}σ){/if}
+            {t.path}
+            {#if t.n_sigma !== null}({esdText(t.n_sigma)} esd){/if}
           </option>
         {/each}
       </select>
@@ -621,9 +612,8 @@ plot's x-axis title, and the column above">
       {/if}
     </div>
     {#if selectedPattern === null && current}
-      <p class:warn={current.path_dependent}>
-        {trajectoryNote(current, sigmaBar)}
-      </p>
+      {@const note = trajectoryNote(current)}
+      {#if note}<p class="muted">{note}</p>{/if}
     {/if}
     <!-- the legend is the pattern panel's curve toggles with a swatch in each,
          in the flow above the figure: this panel scrolls, so a row it gains
@@ -741,10 +731,10 @@ different starting point could not fix">hard</span>
       </ul>
     {/if}
 
-    {#if otherDiagnostics.length}
+    {#if diagnostics.length}
       <h2>Fences</h2>
       <ul class="strip">
-        {#each otherDiagnostics as d (d.code + d.message)}
+        {#each diagnostics as d (d.code + d.message)}
           <li class={d.level}>
             <span class="mono">{d.code}</span> {d.message}
             {#if d.suggestion}<span class="muted"> — {d.suggestion}</span>{/if}
@@ -801,16 +791,6 @@ different starting point could not fix">hard</span>
     border-radius: 3px;
     font-size: var(--text-sm);
     flex: 0 0 auto;
-  }
-
-  .banner.bad {
-    border-left-color: var(--warn);
-    color: var(--fg);
-  }
-
-  .banner.ok {
-    border-left-color: var(--ok);
-    color: var(--muted);
   }
 
   /* Bounded like the peak panel's tables and for the same measured reason: as

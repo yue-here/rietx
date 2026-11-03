@@ -505,7 +505,8 @@ const SERIES_STAGED = {
   sigma_mixed: true,
 };
 
-/** A finished two-pattern series whose cell edge is path-dependent — the case
+/** A finished two-pattern series whose cell edge differs most between the two
+ *  chains, 5.2 esd at T400 where the chains kept different rungs — the case
  *  the panel exists to make un-missable. */
 const SERIES_ANSWER = {
   result: {
@@ -520,11 +521,15 @@ const SERIES_ANSWER = {
         diagnostics: [], n_iterations: 12, reseeded: true, rwp_warm: 0.31,
         node_id: "n0002", tree_id: "t2" },
     ],
+    direction_gaps: [
+      { path: "phases.0.cell.a", label: "T400", index: 1, forward: 4.1587,
+        backward: 4.1592, gap: -0.0005, gap_esd: -5.2,
+        forward_rung: "cold", backward_rung: "warm" },
+      { path: "instrument.zero_shift", label: "T400", index: 1, forward: 0.0081,
+        backward: 0.0081, gap: 0, gap_esd: 0.4,
+        forward_rung: "cold", backward_rung: "cold" },
+    ],
     diagnostics: [
-      { level: "warning", code: "SEQUENTIAL_PATH_DEPENDENT",
-        where: ["phases.0.cell.a"],
-        message: "phases.0.cell.a differs between the forward and backward chains",
-        suggestion: "hold it, restrain it, or quote the spread" },
       { level: "warning", code: "SEQUENTIAL_RESEED", where: ["T400"],
         message: "pattern 1 (T400) was refitted from the initial model",
         suggestion: "check whether the specimen changed here" },
@@ -533,15 +538,13 @@ const SERIES_ANSWER = {
   trajectories: [
     { path: "instrument.zero_shift", x: [300, 400], x_label: "T",
       value: [0.008, 0.0081], stderr: [1e-5, 1e-5], labels: ["T300", "T400"],
-      path_dependent: false, discontinuous: false, backward: [0.008, 0.0081],
-      n_sigma: 0.4 },
+      backward: [0.008, 0.0081], n_sigma: 0.4,
+      gap_at: { label: "T400", index: 1, forward_rung: "cold", backward_rung: "cold" } },
     { path: "phases.0.cell.a", x: [300, 400], x_label: "T",
       value: [4.1566, 4.1587], stderr: [1e-4, null], labels: ["T300", "T400"],
-      path_dependent: true, discontinuous: false, backward: [4.1571, 4.1592],
-      n_sigma: 5.2 },
+      backward: [4.1571, 4.1592], n_sigma: 5.2,
+      gap_at: { label: "T400", index: 1, forward_rung: "cold", backward_rung: "warm" } },
   ],
-  path_dependent: ["phases.0.cell.a"],
-  path_dependence_sigma: 3.0,
   has_backward: true,
   n_iterations: 43,
   curves: [true, true],
@@ -4949,8 +4952,9 @@ describe("the extinction screen table (WP-1027)", () => {
  * A sequential fit is path-dependent by construction, so what these mounts assert
  * is the honesty of the presentation: the list the panel sends is the order it is
  * showing, the σ inconsistency is surfaced before the chain runs rather than
- * after, and `SEQUENTIAL_PATH_DEPENDENT` reaches the top of the panel with the
- * parameter named. jsdom cannot see the plot, so the trajectory drawing is
+ * after, and the largest forward/backward gap (`SeriesResult.direction_gaps`)
+ * reaches the top of the panel as a number with the parameter named, without a
+ * verdict. jsdom cannot see the plot, so the trajectory drawing is
  * asserted in `lib/series.test.ts` and the *requests* are asserted here.
  */
 describe("the series panel", () => {
@@ -5044,7 +5048,7 @@ describe("the series panel", () => {
     expect(stub.calls.some((c) => c.method === "PUT")).toBe(false);
   });
 
-  it("puts the path-dependence where it cannot be missed", async () => {
+  it("puts the forward/backward gap where it cannot be missed", async () => {
     const stub = await openSeries({
       "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
       "/api/series/result": () => ({ body: SERIES_ANSWER }),
@@ -5065,29 +5069,40 @@ describe("the series panel", () => {
         ] } }),
     });
 
-    // the banner, not a strip entry — and it names the parameter
-    const banner = host.querySelector(".banner.bad")!;
-    expect(banner.textContent).toContain("1 parameter");
-    expect(banner.textContent).toContain("path-dependent");
-    expect(banner.textContent).toContain("phases.0.cell.a");
+    // the line over the whole comparison, not a strip entry: the largest gap
+    // as a number, where it is, and that the two chains kept different rungs
+    // there. It calls nothing path-dependent.
+    const banner = host.querySelector(".banner")!;
+    expect(banner.textContent).toContain("differ by 5.2 esd at most");
+    expect(banner.textContent).toContain("phases.0.cell.a at T400");
+    expect(banner.textContent).toContain("escalation ladder");
+    expect(host.textContent).not.toMatch(/path-dependent|artefact/i);
+    expect(host.querySelector(".banner.bad")).toBeNull();
 
     // the reseed fence rides the row it is about, and the ranking put the
-    // flagged trajectory on the plot first
+    // trajectory with the largest gap on the plot first
     expect(host.textContent).toContain("reseeded");
     expect(host.textContent).toContain("Trajectory — phases.0.cell.a");
-    expect(host.textContent).toContain("5.2σ");
+    expect(host.textContent).toContain("phases.0.cell.a (5.2 esd)");
+    expect(host.textContent).toContain("instrument.zero_shift (0.4 esd)");
+    const options = [...host.querySelectorAll<HTMLOptionElement>(".side select option")]
+      .map((o) => o.value).filter((v) => v.includes("."));
+    expect(options.slice(0, 2)).toEqual(["phases.0.cell.a", "instrument.zero_shift"]);
+    // the caption states the same number for the trajectory on screen
+    expect(host.textContent).toContain("Forward and backward differ by 5.2 esd at T400");
 
-    // …and drew it as the evidence it is: the forward chain in the warning ink
-    // and dashed, the reseeded T400 ringed in the same ink, and the backward
-    // chain beside it, muted and dotted
+    // …and drew it as the evidence it is: the forward chain in the one ink
+    // every parameter wears, the reseeded T400 ringed in the warning ink, and
+    // the backward chain beside it, muted and dotted
     const marks = seriesPane("traj").marks;
     const strokes = (style: string) => marks.filter((m) => m.op === "stroke" && m.style === style);
-    expect(strokes(WARN).some((m) => m.dash && m.points!.length === 2)).toBe(true);
+    expect(strokes(INK.diff).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
+    expect(strokes(WARN).some((m) => m.dash)).toBe(false);
     expect(strokes(WARN).some((m) => m.points!.some((p) => p.length === 3))).toBe(true);
     expect(strokes(INK.edge).some((m) => m.dash)).toBe(true);
     const legend = () => [...host.querySelectorAll<HTMLButtonElement>(".legend button")];
     expect(legend().map((b) => b.textContent?.trim()))
-      .toEqual(["forward (path-dependent)", "esd", "backward", "reseeded"]);
+      .toEqual(["forward", "esd", "backward", "reseeded"]);
     // a legend click hides that mark, and says so on the button
     legend()[2].click();
     await flush();
