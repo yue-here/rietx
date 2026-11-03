@@ -384,6 +384,11 @@ the rulings landed on the main checkout's tree.
   `test_sequential.py` 14.9 s for 22, `test_joint_phase_significance.py` 6.3 s for 3, the rest
   under 0.1 s. None joins the slow tail.
 - Lane A's fast run on its own tree, before the joint and GUI lanes: 13746 passed, 326 skipped.
+- Full suite on the final tree (`799f062`, main `d7b62a3` merged), alone on the machine, 52 min:
+  14700 passed, 339 skipped, 53 xfailed, 3 failed, none of them this branch's. The skill
+  placement episode's `KeyError: 'instrument.geometry.axial_hl'` is on main's nightly of
+  2026-11-03. The srm660c golden (2.3e-13 off, darwin) failed on main's own source in the fifth
+  session. The scratch-copy GUI boot test timed out under load and passed alone in 8 s.
 - Vitest: 592 → 603 (lane G's ten, plus one from the review).
 - The joint fit on two copies of #481's seed-107 blank frame. Before, the cell was released at
   `profile_w` (screen 3.25, joint marginal 2.61) and reported 4.1517 ± 0.0168 Å. After, it is held
