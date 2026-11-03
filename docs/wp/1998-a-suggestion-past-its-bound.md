@@ -54,10 +54,14 @@ template line):
   candidate, with the free block re-solved, is an exact quadratic in its step,
   so the reachable drop at a clipped step is `gain·α(2 − α)`; a group's is the
   bounded least-squares optimum of the same linearisation (BVLS, Stark &
-  Parker 1995). No threshold, no default: the box is the solver's own
-  (`ParameterTable.bounds()`).
+  Parker 1995). No threshold, no default. The box is the probe table's
+  `ParameterTable.bounds()`: the stored bounds plus tie windows. The
+  stage-compile windows (cell window, strain and size caps) are not frozen
+  on the probe, so a candidate only those would stop is still over-scored.
 - **`best_or_none` abstains when the leader's ΔBIC ≤ 0** — statistic tier 2
-  (Schwarz 1978, the package's one BIC form), threshold 0 tier 1 (the sign
+  (Schwarz 1978, the package's one BIC form) charged at N_eff = N/f², which
+  is tier 3 and already rietx's (#270), and *predicted* from the linearised
+  gain rather than refitted; threshold 0 tier 1 (the sign
   the criterion defines), action: *abstain*, the conservative direction —
   `None` names nothing, and the groups stay for a caller who reads them.
 
