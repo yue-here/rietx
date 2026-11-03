@@ -140,7 +140,11 @@ runs before close, since the peak list feeds every engine.
       docstring, `INDEXING_THRESHOLDS_VERSION` bumped, and the mirrors above.
 - [ ] If the envelope changed: the refinement width census on the same
       patterns, before and after.
-- [ ] Tests, with obs/calc/diff PNGs to `tests/output/`.
+- [x] Tests, with obs/calc/diff PNGs to `tests/output/`. *2026-11-03:* the
+      tests are #741's `tests/test_peak_picking_flank.py`; the PNGs go through
+      `tests/indexing_gallery.py` (`silicon_steep_peaks`, `silicon_steep`:
+      peak list, candidates, Le Bail obs/calc/diff), and the index row now
+      asserts cubic F first rather than present.
 - [ ] Skill: none beyond the new flag's `help.py` entry, which is where an
       agent reads a flag (WP-1338's cheapest place); a `references/` row only
       if the flag needs a judgement the entry cannot carry.
