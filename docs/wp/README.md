@@ -714,6 +714,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 🔄 2026-11-02 | P2 | — ([1510](1510-what-the-chemist-knows-reaches-the-search.md) soft) |
 | [2033](2033-a-declared-z-filters-the-extinction-class.md) | A declared Z or density filters an extinction class's members | ✅ 2026-11-02 | — | — ([1967](1967-what-the-chemist-declares-reaches-the-extinction-screen.md), [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) soft) |
 | [2069](2069-every-displacive-child-of-a-parent-in-a-stated-cell.md) | Every displacive child of a parent in a stated cell, several irreps included | ⬜ | P3 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md), [1919](1919-maximal-subgroups-generated-from-the-operators.md) soft) |
+| [2085](2085-a-phase-in-its-standardized-description.md) | A phase in its standardized description: the Parthé–Gelato Γ rule and the standardized CIF | ⬜ | P3 | #1332 |
 
 ### <a id="unscheduled-the-repo-s-own-process"></a>The repo's own process
 
