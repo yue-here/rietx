@@ -1112,7 +1112,7 @@ ROWS: tuple[Row, ...] = (
                   "the exception"),
         evidence=("arithmetic: fires exactly when every rung the chain tried on a pattern raised, "
                   "one per SeriesFailure (sequential.py:2244-2278); the policy that carries on "
-                  "past it is SequentialRefinement.fit:on_error's own row, still unaudited")),
+                  "past it is SequentialRefinement.fit:on_error's own row, tier 3")),
     Row("SITE_SNAPPED_TO_SPECIAL_POSITION", "code", response="warning",
         responds=("check the site's multiplicity against the source before quoting a weight "
                   "fraction, a density or a site's occupancy from this fit")),
@@ -4339,7 +4339,19 @@ ROWS: tuple[Row, ...] = (
                   "(gui/session.py:1706-1716; searched 2026-10-24)")),
     Row("rietx.sequential.SequentialRefinement.fit:on_result", "default", tier="invariant", ambiguity=1, value=None,
         evidence=("answer-invariant: a callback handed each kept fit; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
-    Row("rietx.sequential.SequentialRefinement.fit:on_error", "default", value="carry"),
+    Row("rietx.sequential.SequentialRefinement.fit:on_error", "default", tier=3, ambiguity=1,
+        value="carry",
+        evidence=("consulted only once every rung of a pattern raised (sequential.py _chain): "
+                  "'carry' records a SeriesFailure with SERIES_PATTERN_FAILED and warm-starts "
+                  "the successor from the last accepted pattern, 'skip' starts it cold, "
+                  "'raise' ends the chain keeping what completed; no case on disk outside "
+                  "injected raises; GSAS-II and MAUD stop the chain, EasyDiffraction carries "
+                  "on (docs/practice.md § Sequential refinement, checked)"),
+        grounds=("A long unattended batch finishes past a pattern it could not fit and names "
+                 "it, and the caller chooses 'skip' or 'raise' by name. Ruled by the "
+                 "maintainer 2026-11-03, 'carry by default, but let people set options' "
+                 "(2003-batch/batch.md, C2 q4), GSAS-II's and MAUD's stop the dissent."),
+        approved="2026-11-03"),
     Row("rietx.sequential.SequentialRefinement.fit:events", "default", tier="invariant", ambiguity=1, value=None,
         evidence=("answer-invariant: an observation channel; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
     Row("rietx.sequential.SequentialRefinement.fit:cancel", "default", tier="invariant", ambiguity=1, value=None,
@@ -5542,7 +5554,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.sequential.MIN_POINTS_FOR_PERSISTENCE",
     "rietx.sequential.PATH_DEPENDENCE_SIGMA",
     "rietx.sequential.SequentialRefinement.fit:labels",
-    "rietx.sequential.SequentialRefinement.fit:on_error",
     "rietx.sequential.SequentialRefinement.fit:plan",
     "rietx.sequential.SequentialRefinement.fit:refit",
     "rietx.sequential.SequentialRefinement.fit:x",

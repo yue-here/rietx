@@ -1119,7 +1119,7 @@
   "applied": false,
   "decision": "open, no pick (batch.md C2 question 4): 'carry' (today; tier 3, approved as the protection of a long batch, GSAS-II's and MAUD's stop named) or 'raise' (the default changes, 'carry' becomes the caller's); a default switching on an action with a named dissent cannot be tier 2 under 'a dissent counts' (revised 2026-10-25, batch.md)",
   "class": "C2",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C2 q4 (brief 3): 'carry by default, but let people set options'; 'carry' stays the default at tier 3, 'skip' and 'raise' the caller's. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:events",
@@ -1407,7 +1407,7 @@
   "decision": "with fit:on_error (open) (revised 2026-10-25, batch.md)",
   "class": "C2",
   "row_note": "no row of its own while SeriesResult is outside _audit.RECORD_SCHEMAS: fit:on_error carries its tier, SERIES_PATTERN_FAILED reports it, and SeriesEntry.seeded_from would say which pattern seeded the successor",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C2 q4 (brief 3): 'carry by default, but let people set options'; 'carry' stays the default at tier 3, 'skip' and 'raise' the caller's. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._persistent_diagnostics.half",

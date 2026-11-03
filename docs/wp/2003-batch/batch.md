@@ -151,6 +151,11 @@ reference tells an agent to read each entry's Rwp and GoF down the series, since
 the package flags a pattern above its neighbours (the fence paragraph there is stale too).
 The agent-harness run brief 2 asked for is moot.
 
+**Ruled by the maintainer 2026-11-03: brief 3 (C2 q4), "carry by default, but let people set
+options".** `on_error="carry"` stays the default, now tier 3 with this date as its approval and
+off `UNAUDITED_BASELINE`; `"skip"` and `"raise"` stay the caller's, as they are today. GSAS-II's
+and MAUD's stop is the named dissent.
+
 ---
 
 ## C1. What sends a warm fit up the ladder
