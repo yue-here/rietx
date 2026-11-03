@@ -70,20 +70,16 @@ it writes beside them.
 
 **A known structure is no Le Bail job.** One staged Rietveld calibration took 43.8 s against ~40 min of Le Bail (#210).
 
-**Seed the background first.** `auto_background` chooses the knot spacing or the Chebyshev *order* but starts every coefficient at **0.0**, so the first `lebail_update` runs *before* the background is fitted. It partitions `max(y_obs − 0, 0)` (the whole pedestal) and gives it to the Bragg reflections. Measured on a synthetic pattern whose background is 5× its
-strongest peak: cycle one claims **571×** the true Bragg intensity. `seed=True` starts them at a low percentile of the counts.
+**Seed the background first.** `auto_background` starts every coefficient at **0.0**, and the first `lebail_update` runs before the background is fitted, so the reflections get the whole pedestal: **571×** their true intensity under a background 5× the strongest peak. `seed=True` starts at a low count percentile.
+
+**Under a broad hump, hold SNIP.** Each stage partitions against its starting background, so a co-refined one stops short and the reflections keep the rest. Hold `rx.BackgroundFixedPlusChebyshev.from_pattern(rx.PatternData(two_theta=tt, intensity=rx.background.snip(y, w)))`, `w` ≈ 3 FWHMs in points. (Measured, WP-1542 fixture: Rwp 9.37 % seeded, 4.41 % held, 20.9 % at a hump-wide `w`, which clips it.)
 
 **The cell is the weaker half.** Peterson (2005, *Powder Diffr.* **20**, 14)
-fitted triclinic tricalcium silicate at NSLS X7A. The Le Bail fit won on both
-indices reported (χ² 16.46 against 22.81, R_p 2.34 against 3.52 at ambient) and
-its cell parameters wandered over a heating and cooling series, while the
-Rietveld cell from an admittedly imperfect model stayed consistent. The cause is
-reflection density rather than low symmetry alone.
+fitted triclinic tricalcium silicate at NSLS X7A. Le Bail won on χ² (16.46 against 22.81) and R_p (2.34 against
+3.52) while its cell wandered over a heating and cooling series; the Rietveld cell from an imperfect model stayed
+consistent. Reflection density, not low symmetry, is the cause.
 
-**Measured at the other end of that variable**, one range and one instrument
-treatment, three modes: 11-BM LaB₆, 2-40°, 55 reflections, mean FWHM 0.0097°,
-**0.014 reflections per FWHM**. Rietveld a = 4.1568414(45) Å, Le Bail
-4.1568425(44), Pawley 4.1568431(44). They spread 0.4 ppm, two-fifths of one esd, and the esds agree within 3 %. Le Bail also won on Rwp there (0.0861 against 0.0879), so a better Rwp does not show the cell is wrong or right. Where reflections crowd, check the cell against a structural model; where resolved, skip it.
+**At the other end of that variable** (11-BM LaB₆, 2-40°, 55 reflections, **0.014 reflections per FWHM**) the modes agree: Rietveld a = 4.1568414(45) Å, Le Bail 4.1568425(44), Pawley 4.1568431(44), a 0.4 ppm spread. Le Bail won on Rwp there too (0.0861 against 0.0879), so Rwp cannot judge the cell. Where reflections crowd, check the cell against a structural model; where resolved, skip it.
 
 **Multi-phase Le Bail** works since v1.0. The shares sum to 1 across all phases at every channel (measured Σ calculated / Σ observed excess **1.79 → 1.0000** on LaB₆ + CaF₂, single-phase path bit-identical). One caveat is the method's own. The data do not split the intensity of two phases whose reflections *coincide*, so the partition splits it by the current model, a starting value. Treat a high multi-phase Le Bail Rwp as a reason to check the
 seeding above.

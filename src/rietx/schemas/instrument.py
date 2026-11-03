@@ -1648,9 +1648,9 @@ class BackgroundFixedPlusChebyshev(_InheritsDeclaredDefaults):
     """A fixed curve held in the model, a small refinable Chebyshev correction
     on top, and a scale on the curve itself.
 
-    The curve is either an estimate — :func:`rietx.background.estimate`, arPLS
-    or SNIP — or a **measurement**: an empty vanadium can, a blank capillary, a
-    matrix-only scan, an empty furnace.  Holding it inside the model keeps the
+    The curve is either an estimate — :func:`rietx.background.snip` or
+    :func:`rietx.background.arpls` — or a **measurement**: an empty vanadium
+    can, a blank capillary, a matrix-only scan, an empty furnace.  Holding it inside the model keeps the
     Poisson weights correct where subtracting it would not.
 
     ``scale`` is the multiplier the measured case needs, and it is TOPAS's
