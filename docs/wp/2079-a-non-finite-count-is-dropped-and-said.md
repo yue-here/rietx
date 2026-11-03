@@ -1,9 +1,8 @@
 # WP-2079 — a non-finite count or σ in a pattern file is dropped, and the reader says so
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: ✅ 2026-11-03 — every pattern reader drops a non-finite row and says so; message text approved by Yue (PR #1359)
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-11-02 — a real file's dead channels reach the fit with no word from the reader; what a fit then does with them is not measured, and task 1 measures it
 
 ## Goal
 
@@ -51,8 +50,6 @@ open PR (#1279), so this was filed apart rather than folded. A session on
 either WP reads the other's state first: the two share `PATTERN_ROWS_DROPPED`
 and `tests/test_readers_robust.py`.
 
-### Inherited
-
 ## Non-goals
 
 - The xy reader's other silent drops (a text row inside the data, a decimal
@@ -82,7 +79,7 @@ and `tests/test_readers_robust.py`.
       planted file. Every existing fixture reads with the same arrays and no
       new diagnostic. The planted file's assertion is in
       `tests/test_d1b_co3o4_quench.py`, beside the other planted files.
-- [ ] The reader-output approval for the new message text, before merge.
+- [x] The reader-output approval for the new message text, before merge.
 - [x] Skill: the diagnostics reference row for `PATTERN_ROWS_DROPPED`, if its
       meaning widens. Nothing else expected.
 
@@ -102,6 +99,27 @@ naming 30.79-36.69°. No reader returns a non-finite value.
 - Issues #1187 (the report) and #1162 (the planted file).
 
 ## Handover log
+
+- **2026-11-03 (2nd)** — Ruled by Yue 2026-11-03: the reader-output text
+  in PR #1359's "What a reader receives" is approved as written. That
+  covers the `PATTERN_ROWS_DROPPED` message, its suggestion, the refusal of
+  a file with no finite point, and the help title change ("Some rows were
+  not read as data"). Task 4 is ticked and the WP closes. Ghostshift
+  runner session.
+
+  *Done.* Merged `origin/main` at `cef9aef7c`, which brings PR #1279
+  (WP-1952: the `XYDATA` `INTER` multipliers applied, and the caller's
+  `axis=` on `xy`). Git merged it with no conflict, and none of the
+  approved text changed. Both new paths already reach the drop, because
+  `read_xy` applies the multipliers and the declared axis before it calls
+  `ascending`. Two tests pin that: an `XYDATA` file under `INTER 1 2` with a
+  NaN count drops the row and scales the rest, and a headerless bank read
+  with `axis="tof"` names its dropped row as "flight time 2064 µs". No code
+  changed.
+
+  *Measured* (`[dev]` venv, darwin/arm64). test_readers_robust +
+  test_readers + test_d1b_co3o4_quench + test_tof_axis, `-n auto`: 543
+  passed, 1 skipped.
 
 - **2026-11-03** — Every pattern reader now drops a point whose 2θ, count or
   σ is NaN or infinite, and says which points by their 2θ. Before, one such

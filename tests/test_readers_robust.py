@@ -768,6 +768,45 @@ def test_a_descending_scan_drops_its_nan_row_before_it_is_reversed(tmp_path):
     assert found[0].where == ["11.000-11.000"]
 
 
+def test_an_xydata_file_under_multipliers_drops_its_nan_row_and_scales_the_rest(
+        tmp_path):
+    """The ``XYDATA`` heading's ``INTER`` multipliers (#1064) are applied before
+    the order checks, so the NaN row they leave NaN is dropped there and the
+    finite rows carry the product.  Issue #1187's file is this format."""
+    rows = [f"{10 + 0.1 * i:.3f} {'nan' if i == 3 else f'{100.0 + i:.1f}'} "
+            f"{10.0 + 0.1 * i:.1f}"
+            for i in range(8)]
+    path = tmp_path / "d1b.xys"
+    path.write_text("\n".join(["XYDATA", "TITLE synthetic", "COND: neutrons",
+                               "FILE: d1b.xys", "TEMP 4.25", "INTER 1.0 2.0 0 0.05",
+                               *rows]) + "\n", encoding="utf-8")
+    found = []
+    pat = rx.read_pattern(path, diagnostics=found)
+    assert len(pat.intensity) == 7
+    assert pat.intensity[0] == 200.0 and pat.sigma[0] == 20.0
+    assert sorted(d.code for d in found) == ["PATTERN_ROWS_DROPPED",
+                                             "XYDATA_INTER_APPLIED"]
+    (d,) = [d for d in found if d.code == "PATTERN_ROWS_DROPPED"]
+    assert d.message.endswith("was not read as data, at 2θ 10.3°.")
+
+
+def test_a_declared_flight_time_bank_names_its_dropped_row_in_microseconds(
+        tmp_path):
+    """``axis="tof"`` (#1064) reaches the drop, which names the row by its
+    flight time rather than calling it a 2θ."""
+    rows = [f"{2000.0 + 16.0 * i:.1f} {'nan' if i == 4 else '100.0'} "
+            f"{10.0 + 0.1 * i:.1f}"
+            for i in range(10)]
+    path = tmp_path / "bank.dat"
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    found = []
+    pat = rx.read_pattern(path, axis="tof", diagnostics=found)
+    assert pat.axis == "tof" and len(pat.tof) == 9
+    (d,) = found
+    assert d.code == "PATTERN_ROWS_DROPPED"
+    assert d.message.endswith("was not read as data, at flight time 2064 µs.")
+
+
 def test_a_file_with_no_finite_row_is_refused_by_name(tmp_path):
     from tests.test_readers import write_xy
 
