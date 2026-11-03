@@ -199,9 +199,12 @@ background. Tasks 7 and 8 are outside that ruling.
       does not answer the cap, and `BACKGROUND_ORDER_AT_CAP` stays the
       honest report. Probe: `select_chebyshev_order`'s own masking and
       design, this branch's `[dev]` venv, macOS arm64.
-- [ ] `select_arpls_lambda` says when it falls back to the flexible end of its
+- [x] `select_arpls_lambda` says when it falls back to the flexible end of its
       grid (no smoothing strength reached `dw_floor`), the cap code's sibling,
-      unless PR #871 carries it.
+      unless PR #871 carries it. *Landed 2026-11-03 as
+      `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` (info, on
+      `BackgroundSelection.diagnostics` only); none of the 20 patterns under
+      `tests/data` falls back.*
 
 ## Acceptance
 

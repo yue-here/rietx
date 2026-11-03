@@ -22,6 +22,7 @@
   "diagnostics:AIR_SCATTER_UNDECLARED",
   "diagnostics:BACKGROUND_ABSORPTION",
   "diagnostics:BACKGROUND_ORDER_AT_CAP",
+  "diagnostics:BACKGROUND_SMOOTHING_AT_FLEXIBLE_END",
   "diagnostics:BISO_NEGATIVE",
   "diagnostics:BISO_UNUSUALLY_LARGE",
   "diagnostics:BOUND_HIT",

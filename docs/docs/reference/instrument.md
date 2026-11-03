@@ -611,7 +611,7 @@ The order scan is a `BackgroundSelection`, the same object `rietx.background.sel
 | `BackgroundSelection.n_masked_channels` | the background channels the scan scored, after the peaks were masked |
 | `BackgroundSelection.scores` | one `CandidateScore` per order tried: `CandidateScore.complexity` (the order), `CandidateScore.bic` and `CandidateScore.durbin_watson` |
 | `BackgroundSelection.stopped_by_whiteness` | whether Durbin-Watson d reached the stop, 1.8, and ended the scan |
-| `BackgroundSelection.diagnostics` | `BACKGROUND_ORDER_AT_CAP` when the order is the scan's cap rather than a choice |
+| `BackgroundSelection.diagnostics` | `BACKGROUND_ORDER_AT_CAP` when the order is the scan's cap rather than a choice; on an arPLS scan, `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` when no strength reached the floor and the grid's most flexible end came back |
 
 ### Fixed curve plus Chebyshev
 

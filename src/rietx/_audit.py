@@ -555,6 +555,18 @@ ROWS: tuple[Row, ...] = (
     Row("AIR_SCATTER_UNDECLARED", "code"),
     Row("BACKGROUND_ABSORPTION", "code"),
     Row("BACKGROUND_ORDER_AT_CAP", "code"),
+    Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END", "code", tier=1, ambiguity=1,
+        evidence=("a reading of the scan's own record: fires exactly when no candidate of "
+                  "select_arpls_lambda's grid reached its Durbin-Watson floor, so the "
+                  "returned strength is the grid's flexible end by the fallback line and not "
+                  "by the criterion; decides nothing (WP-1931: none of the 20 patterns under "
+                  "tests/data falls back, FAP.XRA nearest at the last candidate, d = 1.26)"),
+        grounds=("Arithmetic: the scan says which of its two return lines produced the "
+                 "answer, so a fallback is not read as a choice."),
+        response="info",
+        responds=("note that the baseline's smoothing strength is the grid's end, and "
+                  "co-refine the background rather than hold that baseline fixed"),
+        scope=("all",)),
     Row("BISO_NEGATIVE", "code"),
     Row("BISO_UNUSUALLY_LARGE", "code"),
     Row("BOUND_HIT", "code"),
@@ -4437,6 +4449,12 @@ ROWS: tuple[Row, ...] = (
     Row("AIR_SCATTER_UNDECLARED.suggestion", "suggestion", value=1),
     Row("BACKGROUND_ABSORPTION.suggestion", "suggestion", value=1),
     Row("BACKGROUND_ORDER_AT_CAP.suggestion", "suggestion", value=1),
+    Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("follows from the code's own condition: a baseline the data did not choose "
+                  "is no measured curve to hold fixed, which leaves the package's other form, a "
+                  "background co-refined under a smoothness penalty (root CLAUDE.md, the "
+                  "weights clause)")),
     Row("BISO_NEGATIVE.suggestion", "suggestion", value=1),
     Row("BISO_UNUSUALLY_LARGE.suggestion", "suggestion", value=1),
     Row("BOUND_HIT.suggestion", "suggestion", value=1),
