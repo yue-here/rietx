@@ -42,7 +42,9 @@ Linux, is one answer read under two labels.  The Finger-Cox-Jephcoat profile
 is symmetric in S/L and H/L, and rounding picks which way round an arm reports
 the pair.  Every comparison here orders the pair first (``_axial_pair_ordered``),
 after which both rows read 0.0068 plain esd or less at every one of 49 nudged
-start pairs (2026-11-02).
+start pairs (2026-11-02).  Since WP-2012 no protocol here frees H/L, so the
+ordering is a no-op, kept because ``docs/wp/2036-batch/lab6_axial_pairs.py``
+imports it.
 
 The axial sizing floor (``forward.AXIAL_SIZING_FLOOR``) sizes the windows and
 FCJ nodes of a stage that frees S/L or H/L from zero.  At 0.02 a stage reaching
@@ -186,7 +188,8 @@ def test_the_biso_start_does_not_change_the_answer(family):
 
 # lab6 was a non-strict xfail here (WP-2036): its two arms took opposite
 # labellings of one S/L <-> H/L answer in 23 of 49 nudged pairs.  The pair is
-# compared ordered since 2026-11-02 (``_axial_pair_ordered``), and passes.
+# compared ordered since 2026-11-02 (``_axial_pair_ordered``), and since WP-2012
+# holds H/L there is no pair to order.
 @pytest.mark.parametrize("family", ["fap", "cpd1a", "nac", "lab6"])
 def test_the_intermediate_tolerance_does_not_change_the_answer(family):
     """``intermediate_ftol`` 1e-6 against every stage at the solver's 1e-9."""

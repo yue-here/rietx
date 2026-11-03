@@ -906,8 +906,8 @@ PLAN_INFO: dict[str, PlanInfo] = {
     "lab_bragg_brentano": PlanInfo(
         title="Lab diffractometer (one pass)",
         description=(
-            "Bragg-Brentano flat-plate order. The specimen displacement and "
-            "transparency corrections join the zero shift. The axial "
+            "Bragg-Brentano flat-plate order. The specimen displacement joins "
+            "the zero shift. The transparency stays fixed. The axial "
             "(Finger-Cox-Jephcoat) ratio S/L refines with the emission-line "
             "weights. H/L stays at the value you set, because swapping the two "
             "ratios leaves the pattern unchanged."),
