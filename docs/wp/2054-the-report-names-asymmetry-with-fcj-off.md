@@ -211,8 +211,8 @@ from today. The synthetic controls hold.
 
   *Merged with #1356 (WP-2012, 01ef7b61a).* `refine_axial_asymmetry` now names S/L alone,
   and the zero-aperture rationale clause follows that rule. It read "take them from a standard's calibration, or add a stage freeing them to the plan and run it again, since the widths and positions fitted without them have absorbed part of it".
-  It now reads "take S/L from a standard's calibration, or add a stage freeing S/L to the plan and run it again, since the widths and positions fitted without it have absorbed part of it". The skill row says the same. This wording postdates the
-  2026-11-03 approval, so it is the maintainer's to confirm. After the merge:
+  It now reads "take S/L from a standard's calibration, or add a stage freeing S/L to the plan and run it again, since the widths and positions fitted without it have absorbed part of it". The skill row says the same. S/L wording approved by Yue
+  2026-11-03. After the merge:
   `tests.reader_output` unchanged, `tests.audit_delta` 1 added, ruff clean.
 
   *Open for the maintainer.* (2) The reply on #1106: drafted, unposted, at
