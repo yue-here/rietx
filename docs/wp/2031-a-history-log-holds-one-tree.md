@@ -1,6 +1,6 @@
 # WP-2031 — a history log holds one tree, and a stage is timed in one place
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by ghostshift runner
 Track: Render what the fit already knows
 Depends on: — (1322 soft, closed: the event log's run header is the precedent)
 Priority: P3 2026-10-23 — a wrong node count and a doubled node on a reused path, with a documented workaround (load the log and continue with `Refinement.from_node`)
