@@ -2931,6 +2931,97 @@ def test_the_hexagonal_phase_is_not_touched_and_says_nothing(tmp_path):
     assert not [d for d in found if "RHOMBOHEDRAL" in d.code]
 
 
+# The tests above read the written file back through rietx's reader, whose
+# metric rule picks `:R` for a rhombohedral cell. FullProf has no such rule.
+# This oracle reads the symbol and the cell the way FullProf was measured to
+# (issue #716) and shares nothing with the reader.
+
+def _fullprof_r_cell(symbol, cell):
+    """The cell FullProf reads beside the space-group line ``symbol``, or
+    ``None`` where it stops ("illegal" space group).
+
+    Measured (#716, FullProf.2k 8.50 as a black box, from the ``.out``): a
+    bare R symbol is hexagonal axes whatever the cell line says. The three
+    edges are kept and α = β = 90°, γ = 120° are imposed. Any axis suffix
+    after an R symbol (``R``, ``H``, ``:R``, ``:H``) stops the run. A
+    symbol of another lattice is read with the cell as written.
+    """
+    tokens = symbol.split()
+    if tokens[0].upper() != "R":
+        return tuple(cell)
+    if tokens[-1].upper().lstrip(":") in {"R", "H"} or ":" in symbol:
+        return None
+    a, b, c = cell[:3]
+    return (a, b, c, 90.0, 90.0, 120.0)
+
+
+#: Issue #716's measured rows: the space-group line, the cell line beside it,
+#: and what FullProf read (``None`` is "illegal").
+_RH_CELL = (5.4226, 5.4226, 5.4226, 55.2757, 55.2757, 55.2757)
+_MEASURED_R_SYMBOLS = {
+    "R -3 c": (5.4226, 5.4226, 5.4226, 90.0, 90.0, 120.0),
+    "R -3 c R": None, "R -3 c :R": None, "R -3 c :H": None, "R -3 c H": None,
+}
+
+
+def _volume(a, b, c, alpha, beta, gamma):
+    import math
+
+    ca, cb, cg = (math.cos(math.radians(t)) for t in (alpha, beta, gamma))
+    return a * b * c * math.sqrt(1 - ca * ca - cb * cb - cg * cg
+                                 + 2 * ca * cb * cg)
+
+
+def test_the_fullprof_r_symbol_oracle_reproduces_the_measured_reading():
+    """Held to every row of #716's table first, so it is FullProf's rule
+    rather than a second copy of the writer's. The reported volume, 138.087
+    Å³, is the hexagonal metric on the rhombohedral edges."""
+    assert ({s: _fullprof_r_cell(s, _RH_CELL) for s in _MEASURED_R_SYMBOLS}
+            == _MEASURED_R_SYMBOLS)
+    assert _volume(*_fullprof_r_cell("R -3 c", _RH_CELL)) == pytest.approx(
+        138.087, abs=1e-3)
+
+
+def _symbol_and_cell(text, phase_name):
+    """A one-phase file's space-group line and LINE 11's cell: the symbol
+    sits two lines below the phase name, and the cell is the first later
+    line of six numbers whose three edges are positive."""
+    lines = _lines(text)
+    at = lines.index(phase_name) + 2
+    for line in lines[at + 1:]:
+        fields = line.split()
+        if len(fields) == 6 and all(float(v) > 0 for v in fields[:3]):
+            return lines[at], tuple(float(v) for v in fields)
+    raise AssertionError("no cell line")
+
+
+@pytest.mark.parametrize("symbol, a, alpha", [
+    ("R -3 c:R", 5.4226, 55.2757), ("R -3 c:H", 4.9542, None)])
+def test_fullprof_reads_the_written_r_phase_as_the_crystal_rietx_fitted(
+        symbol, a, alpha):
+    """The written file read FullProf's way states a lattice of the
+    original's volume per lattice point. The rhombohedral cell holds one
+    lattice point and the hexagonal three. The writer before #733 wrote the
+    rhombohedral cell beside ``R -3 c``, which FullProf read as 138.087 Å³,
+    and this test fails on it."""
+    if alpha is None:
+        phase = _corundum_type(symbol, a, 90.0).model_copy(update={
+            "cell": rx.Cell(a=rx.Parameter(value=a), b=rx.Parameter(value=a),
+                            c=rx.Parameter(value=13.4213),
+                            alpha=rx.Parameter(value=90.0),
+                            beta=rx.Parameter(value=90.0),
+                            gamma=rx.Parameter(value=120.0))})
+        per_point = _volume(a, a, 13.4213, 90.0, 90.0, 120.0) / 3.0
+    else:
+        phase = _corundum_type(symbol, a, alpha)
+        per_point = _volume(a, a, a, alpha, alpha, alpha)
+    text = from_structure(rx.Structure(phases=[phase]))
+    line, cell = _symbol_and_cell(text, phase.name)
+    read = _fullprof_r_cell(line, cell)
+    assert read is not None, f"FullProf stops on {line!r}"
+    assert _volume(*read) / 3.0 == pytest.approx(per_point, rel=1e-9)
+
+
 # --- write_zero_shift: #723's first item, opt-in -----------------------------
 
 

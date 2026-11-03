@@ -421,11 +421,13 @@ land alone before the transform exists.
       equivalent. Recommended: refuse now, restate once the transform lands.
       *Decided 2026-10-06: restate, through PR #733, which brings the
       transform.*
-- [ ] A: `.pcr` writer refuses (or restates) an `R … :R` phase; the `:R` arm
+- [x] A: `.pcr` writer refuses (or restates) an `R … :R` phase; the `:R` arm
       of `test_write_fullprof_pcr_round_trips_both_r_lattice_axis_choices`
       inverted; an oracle test with FullProf's measured rule (a bare R symbol
       is hexagonal axes with α = β = 90°, γ = 120° imposed; a suffix is
-      illegal), held first to the reporter's table
+      illegal), held first to the reporter's table.
+      *Restated by PR #733, arm inverted there; the oracle is
+      `_fullprof_r_cell` (2026-11-03), and it fails on the pre-#733 writer.*
 - [ ] A: GSAS-II phase CIF: read GSAS-II's `SpcGroup` grammar (spec only) for
       a rhombohedral-axes spelling, measure it by black box, or refuse; fix
       `GSAS2_CIF_SETTING_IN_OPERATORS`' message, which calls an axis choice an
