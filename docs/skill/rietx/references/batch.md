@@ -340,3 +340,12 @@ against the 2-4 band the docstring then gave for lab data and the ≈1.51
 white-residual expectation the package then verified in its own tests; three independent readings of that number
 in one session inverted its direction, one while quoting the docstring that
 states it.)*
+
+**9c.34 Keep the best stage by reading the stage records, never the event log.**
+Each `StageResult` carries its own `rwp` and `termination`, so a batch driver
+keeping the best stage of a fit picks from `result.stages` alone. Compare `rwp`
+only between stages that fit the same range and mode, and read a stage whose
+`status` is `max_iter` as unfinished whatever its `rwp` says, since its
+`termination` tells you whether the budget ran out (`max_nfev`) or the
+slow-descent rule cut it (`slow_descent`). *(Hypothesis: the fields are new in
+WP-1334, and no batch has used them yet.)*

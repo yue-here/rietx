@@ -220,13 +220,15 @@ stop-rule task's.
       it rather than the budget running out. Default chosen against the
       measured p90, not invented. `optimize.lm.SLOW_DESCENT_ESD`; its two
       tier-3 audit rows wait for the maintainer's dated approval.
-- [ ] Re-measure the #222 tranche shape on a suite fixture and record the
+- [x] Re-measure the #222 tranche shape on a suite fixture and record the
       recovered fraction, so the rule's effect is a number and not a claim.
+      The 2026-11-03 handover entry.
 - [x] Tests: a stage that would exhaust its budget for nothing now stops and
       reports; a stage that would rescue the fit still runs.
       `tests/test_slow_descent.py`.
-- [ ] Skill: `references/batch.md` — the keep-the-best row, now expressible
+- [x] Skill: `references/batch.md` — the keep-the-best row, now expressible
       from `StageResult` alone; and the row saying what the new finding means.
+      9c.34, and the `STAGE_MAX_ITER` row in `references/diagnostics.md`.
 
 ## Acceptance
 
