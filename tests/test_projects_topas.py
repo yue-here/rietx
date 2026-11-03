@@ -4264,6 +4264,20 @@ def test_the_family_group_refusal_says_when_no_orbit_is_split():
     assert "'P 1 21/c 1'" in message
 
 
+def test_the_family_group_refusal_names_gained_positions_under_a_smaller_group():
+    """The refusal is a groups inequality, so the nuclear group can be the
+    smaller one. Under P 1 each site is one position and P2₁/c's magnetic
+    operators make four, so the message names positions gained, never an
+    orbit lost."""
+    phase = _magnetic_phase("monoclinic").model_copy(update={"space_group": "P 1"})
+    with pytest.raises(ValueError) as refused:
+        from_structure(rx.Structure(phases=[phase]))
+    message = str(refused.value)
+    assert "only part of their orbit" not in message
+    assert re.search(r"positions the fitted model does not hold .*'Fe1' "
+                     r"\(4 against 1\), 'O1' \(4 against 1\)", message)
+
+
 def test_the_family_group_refusal_does_not_name_a_remedy_that_loops(tmp_path):
     """The refusal used to say "Restate the phase under 'P 1 21/c 1' (a magCIF
     read with nuclear_group='file' does this)".  Followed literally, it does

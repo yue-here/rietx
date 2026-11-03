@@ -2989,9 +2989,12 @@ def _symbol_and_cell(text, phase_name):
     lines = _lines(text)
     at = lines.index(phase_name) + 2
     for line in lines[at + 1:]:
-        fields = line.split()
-        if len(fields) == 6 and all(float(v) > 0 for v in fields[:3]):
-            return lines[at], tuple(float(v) for v in fields)
+        try:
+            fields = [float(v) for v in line.split()]
+        except ValueError:      # a site or comment line, not a row of numbers
+            continue
+        if len(fields) == 6 and all(v > 0 for v in fields[:3]):
+            return lines[at], tuple(fields)
     raise AssertionError("no cell line")
 
 

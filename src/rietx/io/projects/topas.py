@@ -4801,21 +4801,33 @@ def _magnetic_group_line(phase, *, ion_species_ok: bool = False) -> str | None:
 
         nuclear_ops = list(nuclear.operations())
         family_ops = list(family.operations())
-        split = []
+        # The family group need not be the smaller one: a phase under P 1
+        # with a P2₁/c magnetic group gains positions rather than losing them.
+        split, grown = [], []
         for atom in phase.atoms:
             xyz = (atom.x.value, atom.y.value, atom.z.value)
             n_nuclear = _orbit_size(nuclear_ops, xyz)
             n_family = _orbit_size(family_ops, xyz)
-            if n_family != n_nuclear:
+            if n_family < n_nuclear:
                 split.append(f"{atom.label!r} ({n_family} of {n_nuclear})")
+            elif n_family > n_nuclear:
+                grown.append(f"{atom.label!r} ({n_family} against {n_nuclear})")
+        under = (f"(positions under the magnetic operators, against those "
+                 f"under {phase.space_group!r})")
+        clauses = []
+        if split:
+            clauses.append(f"these sites would each generate only part of "
+                           f"their orbit {under}: {', '.join(split)}")
+        if grown:
+            clauses.append(f"these sites would each generate positions the "
+                           f"fitted model does not hold {under}: "
+                           f"{', '.join(grown)}")
         cost = (
-            f", so these sites would each generate only part of their orbit "
-            f"(positions under the magnetic operators, of those under "
-            f"{phase.space_group!r}): {', '.join(split)}. List the sites of "
-            f"each orbit the magnetic group splits and"
-            if split else
+            f", so {'; and '.join(clauses)}. List one site for each orbit of "
+            f"the magnetic group and"
+            if clauses else
             ". Every listed site keeps its orbit, but TOPAS would refine the "
-            "positions under the smaller group's site symmetry, a different "
+            "positions under the magnetic group's site symmetry, a different "
             "model from the one fitted. To accept that,")
         raise _GroupIdentityRefusal(
             f"{where}: its positions refine under {phase.space_group!r} and "
