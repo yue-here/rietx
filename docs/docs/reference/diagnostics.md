@@ -11,6 +11,7 @@ The codes are filed by the part of the package that raises them:
 
 - [Refinement, A to L](diagnostics-refinement.md) and [refinement, M to Z](diagnostics-refinement-m-z.md): the stages, the guards, the corrections and the report, split by the first letter of the code.
 - [Series and joint fits](diagnostics-series.md): a chain of fits, or one fit over several patterns.
+- [Background selection](diagnostics-background.md): the scans that choose a background's flexibility.
 - [Peaks and indexing](diagnostics-indexing.md): peak picking, the indexing search and the extinction screen.
 - [Reading files](diagnostics-files.md): patterns, instrument files and recipes.
 - [Other programs' projects](diagnostics-projects.md): GSAS-II, GSAS, FullProf and TOPAS files.
@@ -22,6 +23,7 @@ The codes are filed by the part of the package that raises them:
 diagnostics-refinement
 diagnostics-refinement-m-z
 diagnostics-series
+diagnostics-background
 diagnostics-indexing
 diagnostics-files
 diagnostics-projects

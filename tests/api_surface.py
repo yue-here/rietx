@@ -124,6 +124,26 @@ EXCLUDED_TYPES: dict[str, str] = {
 
 # Individual names, where the *type* is on the surface but one member is not.
 EXCLUSIONS: dict[str, str] = {
+    "QPATrajectory.phase": (
+        "inherited from Trajectory, whose table in reference/series.md "
+        "describes it, and read the same way on this subclass (WP-1991)."
+    ),
+    "QPATrajectory.atom": (
+        "inherited from Trajectory, whose table in reference/series.md "
+        "describes it, and read the same way on this subclass (WP-1991)."
+    ),
+    "QPATrajectory.pattern_paths": (
+        "inherited from Trajectory, whose table in reference/series.md "
+        "describes it, and read the same way on this subclass (WP-1991)."
+    ),
+    "MagneticTrajectory.phase": (
+        "inherited from Trajectory, whose table in reference/series.md "
+        "describes it, and read the same way on this subclass (WP-1991)."
+    ),
+    "MagneticTrajectory.pattern_paths": (
+        "inherited from Trajectory, whose table in reference/series.md "
+        "describes it, and read the same way on this subclass (WP-1991)."
+    ),
     "GuardFinding.detail": (
         "a rendering fragment, not a fact about the fit (WP-1434): the "
         "already-formatted clause the BOUND_HIT or FLOOR_HIT diagnostic "

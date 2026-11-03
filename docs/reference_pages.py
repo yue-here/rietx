@@ -555,6 +555,9 @@ DIAGNOSTIC_GROUPS = (
       "rietx/report/magnetic"), _ANY_LETTER),
     ("diagnostics-series", "Series and joint fits", ("rietx/sequential", "rietx/multi"),
      _ANY_LETTER),
+    # out of the catch-all, whose page reached the cap with its second code (WP-1931)
+    ("diagnostics-background", "Background selection", ("rietx/background/",),
+     _ANY_LETTER),
     ("diagnostics-refinement", "Refinement, A to L", ("",), "A-L"),
     ("diagnostics-refinement-m-z", "Refinement, M to Z", ("",), "M-Z"),
 )

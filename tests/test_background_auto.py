@@ -946,6 +946,26 @@ def test_arpls_lambda_selection_returns_evidence():
     assert sel.scores and all(s.durbin_watson >= 0 for s in sel.scores)
 
 
+def test_an_arpls_scan_that_falls_back_says_so():
+    """WP-1931, the cap code's sibling.  On the synthetic hump the default grid
+    reaches the floor at 1e7 (d 1.86) and says nothing.  Cut to its two
+    stiffest candidates no strength gets there (d 0.03 and 0.04), and the
+    return is the grid's flexible end by the fallback line: the code names the
+    strength returned and carries the best d as ``value``."""
+    humpy = _peaky_pattern(background=_hump_bkg)
+    chosen = select_arpls_lambda(humpy)
+    assert chosen.selected == 1e7
+    assert chosen.stopped_by_whiteness and not chosen.diagnostics
+
+    fell_back = select_arpls_lambda(humpy, candidates=(1e10, 1e9))
+    assert fell_back.selected == 1e9 and not fell_back.stopped_by_whiteness
+    (hit,) = fell_back.diagnostics
+    d_best = max(s.durbin_watson for s in fell_back.scores)
+    assert hit.code == "BACKGROUND_SMOOTHING_AT_FLEXIBLE_END" and hit.level == "info"
+    assert hit.value == d_best and d_best < 1.2
+    assert "1e+09" in hit.message and f"{d_best:.3f}" in hit.message
+
+
 def test_auto_background_shapes_to_pattern():
     flat = auto_background(_peaky_pattern(background=_flat_bkg), wavelength=WAVELENGTH).background
     assert isinstance(flat, BackgroundPSpline)

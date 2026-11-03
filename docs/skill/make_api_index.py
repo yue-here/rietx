@@ -401,8 +401,8 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "nobody can rebuild from a CIF plus a pattern (Measured: WP-1118 — six "
                 "agents handed a hand-transcribed series all named the transcription as "
                 "the hardest part of the work). Read `.format.reports_at` to know which "
-                "call takes your `diagnostics=` list: a `.inp` reports at read, a `.pcr` "
-                "at `to_structure`, a `.EXP` at both. A GSAS `.EXP` carries the whole "
+                "call takes your `diagnostics=` list: a `.pcr` reports at `to_structure`, "
+                "a `.inp`, `.EXP` and `.gpx` at both. A GSAS `.EXP` carries the whole "
                 "experiment rather than one phase, so read the wavelengths, excluded "
                 "regions and refined profile terms off `model.stated` — a `Structure` "
                 "cannot hold them. **A blank field there "
@@ -773,13 +773,17 @@ def model_field_parts(cls, skip: frozenset[str] = frozenset()) -> list[tuple[str
     from pydantic_core import PydanticUndefined
 
     out = []
+    # a factory a caller cannot reach (HumpComponent.position) prints as required
+    required = set(getattr(cls, "_required_of_a_caller", ()))
     for name, info in cls.model_fields.items():
         if name in skip:
             continue
         ann = _ann(info.annotation)
         for member in TECHNIQUE_MEMBERS:
             ann = ann.replace(f" | {member}", "")
-        if info.default_factory is not None:
+        if name in required:
+            default = None
+        elif info.default_factory is not None:
             default = _default(info.default_factory())
         elif info.default is not PydanticUndefined:
             default = _default(info.default)

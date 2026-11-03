@@ -410,9 +410,12 @@ def assess_peak_list(peaks: PeakList, *,
     bar, because at 4.9° 2θ a 0.02° assumed σ is 0.8 % of the angle.  That set has
     a published M(20) of **197**.  The package would have abstained on the whole
     benchmark every indexing program in the field is graded against, on the
-    strength of a number nobody measured.  ``PEAK_SIGMA_ASSUMED`` still fires and
-    ``relative_sigma_q_median`` is still reported, so the caller sees the figure —
-    it simply does not get a vote.
+    strength of a number nobody measured.  ``relative_sigma_q_median`` is still
+    reported, so the caller sees the figure — it simply does not get a vote.
+    ``PEAK_SIGMA_ASSUMED`` names the assumed σ only where a caller runs
+    :func:`~rietx.indexing.diagnostics.peak_diagnostics` on the list, as the
+    GUI's peak editor does.  Neither this function, ``PeakList.from_positions``
+    nor ``index_pattern`` emits it.
     """
     from .diagnostics import quality_diagnostics
 

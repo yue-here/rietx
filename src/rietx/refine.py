@@ -57,6 +57,7 @@ from .crystallography.twins import (
     coordinate_snapshot,
     merge_site_twins,
     numbering_moves,
+    site_of,
 )
 from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
@@ -2337,13 +2338,10 @@ def _answer_significance(model: CompiledModel, table: ParameterTable,
 class NoPhasesError(ValueError):
     """A refining verb was handed a model with no phases (WP-1207).
 
-    ``code`` is ``"NO_PHASES"``, and it is the same string on every surface: the
-    agent envelope's fourth error code, and the GUI's reason for a disabled Run
-    button.  A code rather than a sentence because the consumer's next action is
-    specific and not the one any other refusal implies — index the pattern, or
-    type a cell — where ``INVALID_REQUEST`` would send an agent back to check
-    its field spelling and ``REFINEMENT_FAILED`` would suggest the fit is worth
-    retrying.
+    ``code`` is ``"NO_PHASES"``, and the GUI server sends it on as its error
+    code (``GuiError``), beside the Run button it disables.  It is a code rather
+    than a sentence because the consumer's next action is specific: index the
+    pattern, or type a cell.  No other refusal implies that action.
 
     A :class:`~rietx.schemas.structure.Structure` with no phases is legal on
     purpose (that class says why), so this is a refusal by the **verb**: holding
@@ -2718,6 +2716,13 @@ class Refinement:
 
     def _require_history(self) -> RefinementTree:
         if self.history is None:
+            # the tree is built at the first fit (``_ensure_history``), so a
+            # ``history=True`` refinement lands here too until it has run one
+            if self._history_spec:
+                raise RuntimeError(
+                    "this Refinement has no history yet; the tree is built "
+                    "when the first fit runs, so call fit() or run_stage() "
+                    "first")
             raise RuntimeError(
                 "this Refinement has no history; construct it with "
                 "history=True (the default) or history='path.jsonl' to enable "
@@ -2820,10 +2825,9 @@ class Refinement:
         if isinstance(moves, NumberingMoves) and moves.atoms:
             self._renumber_atoms(moves)
             moves = moves.in_new_numbering()
-        sites = sorted({path.rsplit(".dof.", 1)[0] for path in moves})
+        sites = sorted({site_of(path) for path in moves})
         for site in sites:
-            site_moves = {p: m for p, m in moves.items()
-                          if p.rsplit(".dof.", 1)[0] == site}
+            site_moves = {p: m for p, m in moves.items() if site_of(p) == site}
             holds, ties, free, notes = carry_constraints(
                 site_moves, holds=sorted(self._user_holds), ties=self._ties,
                 free_paths=self._free_paths)
@@ -2843,13 +2847,16 @@ class Refinement:
                         + "; ".join(notes) + "."})
                     break
             else:
+                what = ("coordinate directions and anisotropic ADP patterns"
+                        if any(".adp." in n for n in notes) else "coordinate directions")
                 found.append(Diagnostic(
                     level="warning", code="SITE_DOFS_RENUMBERED", where=[site],
-                    message=(f"site {site} changed its site symmetry, so its coordinate "
-                             f"directions were renumbered: " + "; ".join(notes)
+                    message=(f"site {site} changed its site symmetry, so its {what} "
+                             f"were renumbered: " + "; ".join(notes)
                              + "."),
-                    suggestion="check the holds and ties on this site's "
-                               "coordinates against parameters()."))
+                    suggestion=f"check the holds and ties on this site's "
+                               f"{what.replace(' directions', 's')} against "
+                               f"parameters()."))
 
     def _renumber_atoms(self, moves: NumberingMoves) -> None:
         """Read every constraint register into ``moves``' new atom numbering.
@@ -5402,8 +5409,9 @@ class Refinement:
                                 plan: RefinementPlan, **kw) -> RefinementResult:
         """Run the plan up to ``plan.lebail_passes`` times and keep the best pass.
 
-        The extracted intensities are frozen inside a run (the
-        frozen-per-stage invariant), so they and the profile converge only by
+        The extracted intensities are frozen inside each stage's solve (the
+        frozen-per-stage invariant) and re-extracted before and after it
+        (:meth:`_run_stage`).  So they and the profile converge only by
         alternating, and the alternation is no descent on one objective: from
         a poor start Rwp rose monotonically over 15-20 passes, from a good one
         it fell to a fixed point (#210, WP-1323's baseline table).  Hence the

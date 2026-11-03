@@ -500,13 +500,14 @@ RECIPE_TYPES: dict[str, str] = {
 _REFUSED_TYPES: dict[str, str] = {
     "PNT": ("time-of-flight neutron: its histogram axis is flight time in "
             "microseconds and its peak shape a different profile function, "
-            "and PatternData holds 2θ in degrees"),
+            "and this reader builds a 2θ pattern only"),
     "PNB": ("pink-beam neutron: its peak shape is a different profile "
             "function from the constant-wavelength one ProfileTCHZ fits"),
     "PXB": ("pink-beam X-ray: its peak shape is a different profile function "
             "from the constant-wavelength one ProfileTCHZ fits"),
     "PXE": ("energy-dispersive X-ray: its histogram axis is photon energy, "
-            "and PatternData holds 2θ in degrees"),
+            "and PatternData holds 2θ in degrees or a flight time, never an "
+            "energy"),
 }
 
 
@@ -675,10 +676,14 @@ def _decline_dispersion_off_table(instrument: Instrument, structure: Structure,
     ``Source.dispersion`` is on by default since v1.0 because species and λ are
     all it needs — but the bundled Cromer-Liberman tabulation covers the 3-70
     keV powder band, and a PDF-beamline recipe is outside it: λ = 0.1665 Å is
-    74.5 keV.  Declining it there is not a loss.  f′ and f″ are edge effects and
-    every edge of every element in these recipes is more than an order of
-    magnitude below 74 keV, so f → f₀ is the correct limit rather than a
-    concession; what would be wrong is extrapolating a table past its band.
+    74.5 keV.  f′ and f″ are edge effects.  For a light element every edge sits
+    more than an order of magnitude below 74 keV (a K edge reaches 7.4 keV only
+    past Fe), so f → f₀ is the correct limit there.  The closer an element's K
+    edge climbs towards the beam, the worse the approximation: La's is 38.9
+    keV, and W's is 69.5 keV, 5 keV below the beam, where f′ and f″ are not
+    small.
+    Extrapolating the table past its band would still be wrong, so the reader
+    declines and says so.
 
     Declined **only** on the exception the table itself raises, and only for the
     species this structure actually has — a recipe inside the band keeps
@@ -1307,12 +1312,17 @@ def _report_engine_default(base: str, magnitude_key: str, mag_vary: bool,
 
 def _read_plan(payload: dict, structure: Structure, instrument: Instrument,
                diags: list[Diagnostic]) -> RefinementPlan:
-    """One stage freeing every flagged path — the recipe's own semantics.
+    """The flagged paths, freed stage by stage in the McCusker order.
 
-    PowderLine runs a single refinement pass over everything flagged, so the
-    faithful translation is a one-stage plan.  It carries the package's
-    closing stage like any plan a caller runs (WP-2002), which recompiles at
-    the answer and solves once more with the same globs.
+    PowderLine runs a single refinement pass over everything flagged.  This
+    plan frees the same set, but stage by stage in :data:`_RECIPE_STAGE_ORDER`:
+    one stage for each of its nine groups the recipe flags, plus a ``rest``
+    stage for a path no group claims.  Staging is cumulative, so the last stage
+    frees exactly the recipe's set.  Where there is more than one stage,
+    ``RECIPE_PLAN_STAGED`` names them.  A recipe that flags nothing gets one
+    stage that frees nothing.  The plan carries the
+    package's closing stage like any plan a caller runs (WP-2002), which
+    recompiles at the answer and solves once more with the same globs.
 
     ``refinement_cycles`` is **not** translated.  It is GSAS-II's cycle count,
     and this package's :attr:`Stage.max_iter` is a runaway guard rather than a
@@ -1377,8 +1387,10 @@ def _read_plan(payload: dict, structure: Structure, instrument: Instrument,
 #: Nothing here is a *selection* — every flagged path is freed by the end and
 #: staging is cumulative, so the final free set is exactly the recipe's.  The
 #: order is `RefinementPlan.mccusker_structural`'s, minus the corrections no
-#: recipe carries; keeping it in one table rather than in the function body is
-#: so the two can be read against each other.
+#: recipe carries.  It adds one stage the preset does not have:
+#: ``sample_broadening``, for the size and strain a recipe can flag, placed
+#: before the coordinates.  Keeping the order in one table rather than in the
+#: function body is so the two can be read against each other.
 _RECIPE_STAGE_ORDER: tuple[tuple[str, frozenset[str]], ...] = (
     ("scale_bkg", frozenset({"scale", "background"})),
     ("zero", frozenset({"zero"})),

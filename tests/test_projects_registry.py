@@ -357,7 +357,7 @@ def _stub_format(**overrides) -> ProjectFormat:
     fields = dict(
         name="stub", title="Stub Format", extensions=(".stub",),
         sniff="claims any file, for this module only", carries=("nothing",),
-        reports_at="read", matches=lambda _p: True,
+        reports_at="both", matches=lambda _p: True,
         read=lambda _p, **_kw: None, to_structure=lambda _m, **_kw: None)
     return ProjectFormat(**(fields | overrides))
 

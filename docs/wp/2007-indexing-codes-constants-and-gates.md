@@ -46,6 +46,16 @@ ranking over one population and is the regression gate, not a family.
   fit a measured density at Z ≳ 50. The cited 1.5 % tolerance gives two from Z ≈ 33 up
   (WP-2033's 2026-10-31 entry). Correct the number when this WP tiers that constant.
 
+- **2026-11-02, from [2013](2013-stale-text-in-the-code-the-manual-move-found.md) (closed).**
+  Two follow-ups to the WP-1986 entry below. (1) WP-2013 rewrote the *capping* comments in
+  `indexing/consensus.py`, `indexing/workflow.py` and `src/rietx/indexing/CLAUDE.md` to say what
+  the code does: an unenumerated ambiguity writes `geometric_ambiguity`, which refutes, so every
+  streamed `consensus:<system>` grade is `low`. If the ruling here is to cap instead, those words
+  change back with the code. (2) `index_pattern` emits no `PEAK_SIGMA_ASSUMED` for a
+  `PeakList.from_positions` list. Only `indexing.diagnostics.peak_diagnostics` emits it, and only
+  the GUI's peak editor and `pick_peaks` call that, on lists that are not positions. Whether
+  `index_pattern` should name the assumed σ is a code question for this WP.
+
 - **2026-10-27, from WP-2011: the indexer's validation fit is Pawley, and no row
   records its mode.** `rietx.indexing.workflow.VALIDATION_MODE` (`"pawley"`) is a
   module string, so the walk cannot see it; `LeBailValidation.mode` records it per

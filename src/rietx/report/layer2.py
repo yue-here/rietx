@@ -1048,8 +1048,9 @@ def suggest_actions(attributions: list[RegionAttribution],
             kind="refine_axial_asymmetry", confidence=0.5,
             rationale=(f"axial-divergence shape term is significant in "
                        f"{len(asym)} low-angle region(s)"),
-            parameter_paths=["instrument.geometry.axial_sl",
-                             "instrument.geometry.axial_hl"],
+            # S/L alone: the FCJ weight is symmetric under S/L <-> H/L, so
+            # freeing both reaches one of two mirrored minima (WP-2012).
+            parameter_paths=["instrument.geometry.axial_sl"],
             two_theta_range=(min(a.two_theta_lo for a in low),
                              max(a.two_theta_hi for a in low))))
 
@@ -1278,10 +1279,10 @@ def estimate_delta_chi2(result: RefinementResult,
     and the corrections mutually compatible.  It is **not** a bound on what
     applying an action achieves: a refinement also improves regions that failed a
     gate and stretches of pattern no region entry covers, and WP-1012 measured the
-    observed reduction exceeding this estimate by 0.8 % on a cell correction
-    (16.19 predicted, 16.33 observed).  It is also one number for the whole
-    report, which ``build_report`` stamps on every action, so it ranks nothing —
-    see :class:`~rietx.report.schemas.SuggestedAction`.
+    observed reduction exceeding this estimate by 0.9 % on a cell correction
+    (16.16 predicted, 16.30 observed, re-measured 2026-11-02).  It is also one
+    number for the whole report, which ``build_report`` stamps on every action,
+    so it ranks nothing — see :class:`~rietx.report.schemas.SuggestedAction`.
     """
     usable = [a for a in attributions if a.gates_passed]
     if not usable:
