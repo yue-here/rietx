@@ -1,6 +1,6 @@
 # WP-1542 — a Le Bail background left at its seed
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — fixture, skill protocol and tests landed (PR #1357); tasks 2-3 and the seed default wait on the maintainer
+Milestone: unscheduled · Status: 🔄 2026-11-03 — fixture, skill protocol and tests landed (PR #1357); Q1 and Q2 ruled (no finding; seed default stays False); next: the held SNIP and a declared background peak on PbSO₄ and #726's pattern
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-01 — was P2: WP-2062 moves every site where rietx picks a structure-free fit to Pawley (decided 2026-11-01), so no default path will run Le Bail; a caller who picks `mode="lebail"` still meets this
@@ -189,17 +189,21 @@ here (2026-10-03, at the maintainer's request).
       broad hump under the peaks, Le Bail from a low-percentile seed. Record
       the background's movement from its seed and the width terms per pass.
       `tests/test_lebail_background_hump.py`; numbers in the 2026-11-03 entry.
-- [ ] Name the test for "the background never left its seed while a width
+- [x] Name the test for "the background never left its seed while a width
       grew", with where its threshold comes from (measured here or quoted).
       *2026-11-03: the named test did not reproduce, and no statistic measured
-      separates the hump from the benign pedestal. Waits on the maintainer's
-      answer to Q1 of the 2026-11-03 entry.*
-- [ ] A finding that names it, on the Le Bail path at least. *Waits on Q1.*
+      separates the hump from the benign pedestal.* **Closed without a test,
+      2026-11-03, by the maintainer's ruling on Q1** (no finding; second
+      2026-11-03 entry).
+- [x] A finding that names it, on the Le Bail path at least. **Closed
+      without a finding, 2026-11-03, by the maintainer's ruling on Q1.** The
+      skill's held-SNIP rule and the starting-model plot carry it.
 - [x] The protocol: whether the Le Bail call should start from a SNIP estimate
       held under a low-order Chebyshev, as a default or as the skill's rule.
       Measure both on the fixture before choosing. *The skill's rule, settled
-      by Claude under the measurement (2026-11-03 entry). Whether
-      `auto_background`'s `seed` default moves is Q2, the maintainer's.*
+      by Claude under the measurement (2026-11-03 entry).* **Q2 ruled
+      2026-11-03 by the maintainer: `auto_background`'s `seed` default stays
+      `False`**, under DESIGN.md § Rules, Rule 4. `seed=True` stays an opt-in.
 - [x] Skill: SKILL.md §2 rule 5 and `references/judging.md` name
       `rietx.background.snip` and this failure.
 - [x] Tests, with obs/calc/diff PNGs to `tests/output/`.
@@ -211,9 +215,9 @@ here (2026-10-03, at the maintainer's request).
 .venv/bin/python -m ruff check src tests examples
 ```
 
-On the hump fixture, the low-seed Le Bail fit reports the finding, and the
-protocol's fit leaves the hump in the background, with the width terms
-within their no-hump values.
+On the hump fixture, the protocol's fit leaves the hump in the background,
+with the width terms within their no-hump values. The low-seed fit reports
+no finding, by the maintainer's ruling of 2026-11-03 on Q1.
 
 ## References
 
@@ -223,6 +227,50 @@ within their no-hump values.
   `rietx.background.estimators` cites it.
 
 ## Handover log
+
+- **2026-11-03** — The maintainer ruled both questions of the entry below, in
+  chat (recorded by a ghostshift runner). The Le Bail path gets no finding for
+  a background left at its seed. `auto_background` keeps `seed=False` as its
+  default. WP-1542 has no maintainer question left open. Tasks 2 and 3 are
+  closed by the Q1 ruling, and task 4's note states the Q2 ruling.
+
+  *Q1, ruled: no finding.* The skill's held-SNIP rule carries the failure
+  (SKILL.md §2 rule 5, `references/judging.md`). So does the starting-model
+  plot, `data.plot(model=ref)` (WP-2039). Grounds: none of the three fit-based
+  tests measured below separates the hump fit from the benign pedestal fit.
+  The one data test that does separate them is `amorphous_hump_score`. On 30
+  real patterns it tracks lab against synchrotron data (its `_audit.py` row,
+  `HUMP_TRIGGER`). A finding keyed on it would rest on one synthetic fixture.
+  What would reopen Q1: a statistic that separates the two cases on real
+  patterns (PbSO₄ neutron, #726's lab pattern). WP-2062 putting Le Bail back
+  on a default path would reopen it too.
+
+  *Q2, ruled: the `seed` default stays `False`.* Grounds: DESIGN.md § Rules,
+  Rule 4's test for a new default. A data-derived start is not Rule 1's
+  kind 1, because a competent dissent is named. All seven surveyed programs
+  start the background from zero, a constant or the user's numbers
+  (`docs/practice.md`, the `auto_background:seed` row). Rule 4 also excludes
+  Rwp comparisons as evidence. That leaves #744's width number alone: the
+  Lorentzian X at 0.0565 unseeded against a true 0.001. `seed=True` stays an
+  opt-in. The #1286 ruling already seeds the held extinction screen.
+
+  *#725 and #833.* The 2026-10-08 entry says "#725 stays open on whether it
+  moves". That question is now answered: the default stays. #833's third
+  item asked the same and has the same answer. Closing or commenting on
+  either issue is for the lead's batch.
+
+  *For whoever next touches DESIGN.md.* § Background subsystem describes a
+  two-stage default. A robust estimate comes first. Then either the estimate
+  is held under a Chebyshev, or a P-spline is co-refined. The section does
+  not say whether the P-spline starts from the estimate. In the code it starts
+  at zero. This ruling reads "start from the estimate" as the v0.1 path only.
+  DESIGN.md is not edited here.
+
+  *Next:* the held SNIP and a declared background peak
+  (`instrument.extra_components`) on the PbSO₄ neutron histogram and #726's
+  lab pattern (Inherited), scored against a reference over the whole range.
+  That is what would lift SKILL.md rule 5 off tier 3. No task is open
+  beside it.
 
 - **2026-11-03** — PR #1357 (ghostshift runner). The failure now has a
   fixture in the tree, and the skill has a protocol that fixes it on that
