@@ -352,6 +352,17 @@ within their no-hump values.
   scored against a reference over the whole range, and a declared background
   peak (`instrument.extra_components`) tried on the same fixture.
 
+  *Gates* (macOS arm64, `[dev]`, another shift sharing the machine). Fast
+  selection, on the tree before the review fixes: 13603 passed, 319 skipped,
+  34 xfailed, 1 failed in 14:59. The failure is
+  `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`,
+  whose Jupyter kernel spec points at a deleted venv on this Mac (environment,
+  not this branch). The four added tests cost 5.1 s there, all in the shared
+  fixture. After the fixes: the touched files and the skill suites, 235
+  passed; `test_docs_consistency.py` 25 passed; ruff clean;
+  `tests.reader_output` unchanged. Full suite not run: the change moves no
+  package number.
+
   *Gotchas.* `judging.md` and the skill body both sit at their budgets, so
   the next skill edit in this section pays with a cut. `run_stage` after a
   Le Bail `fit` re-partitions at its start, and its Rwp can come back above
