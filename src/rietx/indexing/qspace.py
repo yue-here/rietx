@@ -418,6 +418,11 @@ def refine_candidate(q: np.ndarray, q_esd: np.ndarray, hkl: np.ndarray, *,
     # above (measured on h0l-only assignments of a monoclinic cell).  The
     # infinite variance is the direct test, so it is asked here as well; let
     # through, it gave the candidate NaN esds, which reached spglib as symprec.
+    # A dead *cross* term is refused too, though the metric is sound and only
+    # an angle looks unmeasured: G = (G*)⁻¹ puts every cross term into every
+    # length, so the lines' Q stay bit-identical while a, b and c move, and no
+    # direct-cell esd is honest.  Only the first-order one at the minimum-norm
+    # solution is finite (WP-1915).
     if not np.all(np.isfinite(np.diag(cov)[:n_free])):
         raise ValueError(
             f"no assigned line constrains every metric direction of this "

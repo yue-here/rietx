@@ -11,6 +11,15 @@ A candidate cell whose lines leave some A..F direction unconstrained reports
 that direction as unmeasured and every other esd exactly. Today all of them
 come back NaN.
 
+**Superseded in part, 2026-11-03.** Since #1232 (`940e8f950`, 2026-10-29)
+`refine_candidate` refuses any fit whose free metric variance is not finite, so
+no candidate carries NaN esds and the four sites below never see an infinity.
+Measured on the triclinic fixture (handover log, 2026-11-03): the lines' Q are
+bit-identical along the dead D direction while a, b, c and α all move (b by 5 %),
+so a, b and c are *not* measured by those lines. Only their reciprocal
+counterparts are. The goal's "every other esd exactly" would have been a finite
+esd on an unbounded length. The refusal stands, and the work below pins why.
+
 ## Context
 
 `indexing/qspace.refine_candidate` gets its covariance from
@@ -40,6 +49,9 @@ direction is dead in an orthorhombic search, its A..F term is zero and
 before forming the covariance (15 such fits in notebook 03's search, unit
 digests bit-identical on corundum and synthetic monoclinic). A *surviving*
 candidate, a lower-symmetry cell with a dead cross term, still gets NaN.
+*(Superseded 2026-11-03: since #1232 such a candidate does not survive. The
+fixture's fit raises "not a lattice", and "a, b and c are measured" above holds
+only to first order at the minimum-norm D = F = 0.)*
 
 **Consumers to read before choosing the marker.** `cell_esd` sets the spglib
 `symprec` sweep in `reduce.bravais_screen` through `np.max(...)[:3]`, so one NaN
@@ -50,14 +62,28 @@ clamp" (root CLAUDE.md, the equilibration invariant).
 
 ## Tasks
 
-- [ ] One propagation helper for the indexing side, on `_cov_free`'s pattern:
+- [🛑] One propagation helper for the indexing side, on `_cov_free`'s pattern:
   zero the infinite entries, propagate the rest exactly, and return which
   outputs use an unmeasured input. Use it at all four sites.
-- [ ] Decide what an unmeasured cell esd is in `CandidateFit.cell_esd`, `inf` or
+  *Withdrawn 2026-11-03: since #1232 `refine_candidate` is the only producer of
+  a `cov_af` and refuses a non-finite free variance, so no site sees an
+  infinity, and a helper there would have no input.*
+- [x] Decide what an unmeasured cell esd is in `CandidateFit.cell_esd`, `inf` or
   NaN, and what `bravais_screen` and the dedup do with it. Measure both on the
   triclinic fixture above before choosing.
-- [ ] A test: the triclinic fixture's a, b and c esds are finite and match the
+  *Decided 2026-11-03: neither, because the candidate is refused. Measured: with
+  the infinities zeroed, a, b, c, β agree with the monoclinic fit and α, γ read
+  0, but those are first-order numbers. On the refinement side's own rule
+  (`ParameterTable._reach`, WP-1804: a nonlinear output reaches an input
+  "anywhere in the map's domain") every cell quantity reaches D and F, so all
+  six would be marked, which is the refusal by another name.*
+- [x] A test: the triclinic fixture's a, b and c esds are finite and match the
   same fit with D and F held out of the basis.
+  *Replaced 2026-11-03 by its inverse:
+  `test_a_dead_cross_term_leaves_no_direct_length_measured` asserts the
+  triclinic fit raises, that the held-out (monoclinic) fit gives finite esds,
+  and that the lines' Q stay bit-identical along D while each length moves by
+  more than 10× its esd. Fails as "DID NOT RAISE" with the refusal removed.*
 - [ ] `python -m tests.unit_replay` digests unchanged on corundum and
   `synthmono_ip`, and `tests/test_acceptance_indexing.py` green (the indexing
   CLAUDE.md's rule for anything an engine calls).
