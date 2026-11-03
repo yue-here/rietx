@@ -263,6 +263,10 @@ from today. The synthetic controls hold.
     is this machine's Jupyter kernel spec pointing at a deleted venv. Nine fast cases
     added, 1.40 s in all (`tests.added_test_times`, local junit). No baseline was run
     for the passed+skipped delta; CI's counts are the comparison.
+  - The full suite did not run: two other sessions' suites held the machine lock.
+    In its place, the slow suites whose fits reach a Layer-1 report: magnetic,
+    LaMnO₃, Stephens and FAP (15 passed), and SRM 660c with SRM 676a (5 passed,
+    the new row included). The nightly's full job is the full-suite check.
 
   *Settled by Claude* (each could have gone the other way).
   - (b) over (a) and (c), on the grounds in the first task above.
