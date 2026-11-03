@@ -537,6 +537,8 @@ DIAGNOSTIC_GROUPS = (
      ("rietx/crystallography/", "rietx/strategy/magnetic",
       "rietx/report/magnetic")),
     ("diagnostics-series", "Series and joint fits", ("rietx/sequential", "rietx/multi")),
+    # out of the catch-all, whose page reached the cap with its second code (WP-1931)
+    ("diagnostics-background", "Background selection", ("rietx/background/",)),
     # no area: STAGE_CODE_PREFIXES files its codes
     ("diagnostics-stages", "Stages and plans", ()),
     ("diagnostics-refinement", "Refinement", ("",)),

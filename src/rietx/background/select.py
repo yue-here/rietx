@@ -18,7 +18,9 @@ fixed estimated baseline.  Both use the same two ingredients:
 
 The selected order is the BIC minimiser among the scanned candidates.  A scan
 that returns its own cap without the whiteness stop has not chosen an order,
-and says so: ``BACKGROUND_ORDER_AT_CAP`` (issue #833).
+and says so: ``BACKGROUND_ORDER_AT_CAP`` (issue #833).  The arPLS scan's twin
+is ``BACKGROUND_SMOOTHING_AT_FLEXIBLE_END``: no candidate reached its floor,
+and it returned the grid's most flexible end (WP-1931).
 
 A declared fixed curve (a measured blank, an estimated baseline) is passed to
 :func:`select_chebyshev_order` as ``fixed``, because the order worth choosing is
@@ -73,8 +75,9 @@ class BackgroundSelection(Base):
     n_masked_channels: int
     scores: list[CandidateScore] = Field(default_factory=list)
     stopped_by_whiteness: bool = False
-    #: what the scan has to say about its own answer; today only
-    #: ``BACKGROUND_ORDER_AT_CAP`` from :func:`select_chebyshev_order`
+    #: what the scan has to say about its own answer:
+    #: ``BACKGROUND_ORDER_AT_CAP`` from :func:`select_chebyshev_order`, and
+    #: ``BACKGROUND_SMOOTHING_AT_FLEXIBLE_END`` from :func:`select_arpls_lambda`
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 
 
@@ -204,6 +207,14 @@ def select_arpls_lambda(data: PatternData, *,
     d ≥ ``dw_floor`` wins.  BIC (with k ∝ effective flexibility ~ −log₁₀λ)
     is reported for the evidence table but whiteness decides, because the
     baseline is not a parametric fit with a countable k.
+
+    **A scan in which no candidate reaches ``dw_floor`` returns the grid's most
+    flexible end, and that is a fallback, not a choice.**  ``diagnostics`` then
+    carries ``BACKGROUND_SMOOTHING_AT_FLEXIBLE_END``, naming the strength
+    returned and the largest d any candidate reached (``value``).  None of the
+    20 patterns under ``tests/data`` (FAP.XRA, the three 11-BM files and the 16
+    ``qarr`` round-robin patterns) falls back; FAP.XRA comes nearest, reaching
+    the floor only at the last candidate, 1e4, with d = 1.26 (WP-1931).
     """
     from ..schemas.pattern import require_two_theta
 
@@ -228,8 +239,22 @@ def select_arpls_lambda(data: PatternData, *,
             selected = lam
             stopped = True
             break
+    diagnostics: list[Diagnostic] = []
     if selected is None:
         selected = min(candidates)
+        d_best = max(s.durbin_watson for s in scores)
+        diagnostics.append(Diagnostic(
+            level="info", code="BACKGROUND_SMOOTHING_AT_FLEXIBLE_END",
+            message=(f"The arPLS smoothing-strength scan reached its most flexible "
+                     f"candidate, {selected:g}, without the masked residuals "
+                     f"looking white. The largest Durbin-Watson d on the {m} "
+                     f"masked channels was {d_best:.3f}, short of the "
+                     f"{dw_floor:g} floor. The strength returned is the grid's "
+                     f"end, not a choice."),
+            suggestion=("Pass a strength of your own, co-refine the background "
+                        "(auto_background), or hold a measured blank."),
+            value=d_best))
     return BackgroundSelection(method="arpls_lambda", selected=float(selected),
                                n_masked_channels=m, scores=scores,
-                               stopped_by_whiteness=stopped)
+                               stopped_by_whiteness=stopped,
+                               diagnostics=diagnostics)
