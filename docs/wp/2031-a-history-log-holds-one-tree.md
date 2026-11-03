@@ -79,9 +79,15 @@ call.
       (`…reused_history_path_is_refused…`, `…empty_history_file…`,
       `…two_trees_refuses_to_load…`) and `test_sequential.py`
       (`…rerun_into_a_used_history_directory…`).
-- [ ] One stage-timing helper, called by `history.aggregate` and
+- [x] One stage-timing helper, called by `history.aggregate` and
       `events.progress_writer`. A test whose stage starts and never ends
       shows that the next same-named stage is timed from its own start.
+      `history.events.StageClock`: first `stage_start` of a name to its
+      `stage_end`, forgotten at each `fit_start`. The aggregator's test
+      (`test_a_stage_that_raised_does_not_lend_its_start_to_the_next_fit`) now
+      feeds the same log to `progress_writer` and asserts `2s` from both. The
+      pre-WP writer printed `102s` on that log, timed from the dead start
+      (checked by running the old function on it).
 - [ ] `docs/docs/reference/history.md`: replace the workaround with the rule.
 - [ ] Skill: a row only if the refusal raises something an agent meets;
       otherwise "none" and why.

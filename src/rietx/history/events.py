@@ -299,6 +299,41 @@ def read_events(path: str | Path) -> list[EventRecord]:
     return out
 
 
+class StageClock:
+    """A named stage's elapsed time, from the event stream (WP-2031).
+
+    The one rule both readers of a stage's wall clock call:
+    :func:`~rietx.history.aggregate.summarize_events` and
+    :func:`progress_writer`.  A stage is timed from the **first**
+    ``stage_start`` of its name to its ``stage_end``, since a WP-1301 phase
+    release emits a second ``stage_start`` before re-solving and the stage's
+    time includes both solves.  Every ``fit_start`` forgets the open starts:
+    a stage that raised or was abandoned emitted no ``stage_end``, and its
+    start must not time the next fit's stage of the same name.  One progress
+    writer serves a whole series, so without that the stale start crossed
+    patterns.
+    """
+
+    def __init__(self) -> None:
+        self._open: dict[str, float] = {}
+
+    def observe(self, kind: str | None, stage: str | None,
+                t: float | None) -> float | None:
+        """Feed one event; a ``stage_end`` returns its stage's seconds."""
+        if kind == "fit_start":
+            self._open.clear()
+        elif stage is None:
+            return None
+        elif kind == "stage_start":
+            if t is not None:
+                self._open.setdefault(stage, t)
+        elif kind == "stage_end":
+            start = self._open.pop(stage, None)
+            if start is not None and t is not None:
+                return t - start
+        return None
+
+
 def progress_writer(sink) -> Any:
     """Turn ``progress=`` into an ``events=`` callback (WP-1302): one text
     line per ``stage_end``, and per pattern under a series (the ``series_*``
@@ -325,24 +360,17 @@ def progress_writer(sink) -> Any:
     # own stream owns its newline translation, as they own its encoding.
     fh = (open(sink, "a", encoding="utf-8", newline="\n")
           if owns_fh else sink)
-    #: the *first* stage_start seen for a name, not the most recent — a
-    #: WP-1301 phase release emits a second stage_start before re-solving,
-    #: and the elapsed time a caller reads on the stage_end wants the whole
-    #: named stage's wall clock, both solves included, not just the second's
-    #: (unlike ``values``, which does want the most recent alignment; see
-    #: this module's docstring — a different question, a different answer).
-    first_start: dict[str, float] = {}
+    #: the first stage_start of a name, forgotten at each fit_start (unlike
+    #: ``values``, which wants the most recent alignment; see this module's
+    #: docstring — a different question, a different answer)
+    clock = StageClock()
 
     def _write(event: dict) -> None:
         kind = event.get("kind")
         data = event.get("data", {})
         stage = data.get("stage")
-        if stage is None:
-            return
-        if kind == "stage_start":
-            first_start.setdefault(stage, event["t"])
-            return
-        if kind != "stage_end":
+        elapsed = clock.observe(kind, stage, event.get("t"))
+        if stage is None or kind != "stage_end":
             return
         parts = []
         if "series_index" in data and "series_n" in data:
@@ -353,9 +381,8 @@ def progress_writer(sink) -> Any:
         parts.append(str(data.get("status", "?")))
         if data.get("rwp") is not None:
             parts.append(f"Rwp {data['rwp']:.4f}")
-        start_t = first_start.pop(stage, None)
-        if start_t is not None:
-            parts.append(f"{event['t'] - start_t:.0f}s")
+        if elapsed is not None:
+            parts.append(f"{elapsed:.0f}s")
         fh.write(" ".join(parts) + "\n")
         fh.flush()
 
