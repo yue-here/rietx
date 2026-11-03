@@ -38,7 +38,7 @@ from pathlib import Path
 from typing import Any
 
 from . import _about
-from .history.store import fingerprint
+from .history.store import fingerprint, holds_a_log
 from .history.tree import RefinementTree
 from .io.formats.gsas import _first_bank_number
 from .io.readers import identify_format, read_pattern, reader_options_for
@@ -157,6 +157,14 @@ class Project:
             raise FileExistsError(
                 f"{root} already holds a {PROJECT_JSON}; open it instead of "
                 "creating over it")
+        if holds_a_log(root / HISTORY_FILE):
+            # a create that raised part-way wrote the log's header and no
+            # project.json; a log holds one tree (WP-2031), so it is refused
+            # here, before the pattern is copied, with what left it there
+            raise FileExistsError(
+                f"{root} holds a {HISTORY_FILE} but no {PROJECT_JSON}, so an "
+                "earlier create stopped part-way. Remove that directory, or "
+                "create the project at another path")
         if not src.is_file():
             raise FileNotFoundError(f"pattern file not found: {src}")
         root.mkdir(parents=True, exist_ok=True)

@@ -63,7 +63,7 @@ from .structure import Atom
 #:   reader here.
 READ_POINTS: tuple[str, ...] = (
     "rietx.project.Project.open",
-    "rietx.history.store.read_records",
+    "rietx.history.store.read_numbered_records",
     "rietx.gui.textdoc.parse",
 )
 
