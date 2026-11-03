@@ -259,8 +259,7 @@ def read_ras(path: str | Path, *, scan: int | None = None,
     count_time = _count_time_s(header)
     sigma = sigma_by_arithmetic(rows[:, 1], count_time,
                                 header.get("MEAS_SCAN_UNIT_Y", "").strip(),
-                                path=p, keep=np.isfinite(rows[:, 0]),
-                                diagnostics=diagnostics)
+                                path=p, diagnostics=diagnostics)
     tt, y, sig = ascending(rows[:, 0], rows[:, 1], sigma, path=p, fmt=RAS,
                            diagnostics=diagnostics)
     return pattern_data(

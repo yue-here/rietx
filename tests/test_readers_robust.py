@@ -801,9 +801,10 @@ def test_a_non_finite_absorber_drops_its_row_rather_than_the_file(tmp_path):
     assert [d.code for d in found] == ["PATTERN_ROWS_DROPPED"]
 
 
-def test_a_row_with_no_finite_2theta_does_not_vote_on_the_unit(tmp_path):
-    """The counts test decides σ on the rows the pattern keeps, so a dropped
-    row's non-integral count cannot withhold σ from the rest of the scan."""
+def test_a_finite_count_on_a_dropped_row_still_votes_on_the_unit(tmp_path):
+    """Only a non-finite *value* is left out of the counts test.  A finite
+    count is evidence about its column's unit whatever its 2θ, and 84.3047 is
+    the rate a real ``.ras`` stored under a "counts" label."""
     from tests.test_readers import write_ras
 
     y = [100.0, 101.0, 84.3047, 103.0, 104.0, 105.0]
@@ -812,4 +813,5 @@ def test_a_row_with_no_finite_2theta_does_not_vote_on_the_unit(tmp_path):
     rx.read_pattern(write_ras(tmp_path / "a.ras",
                               [(a, b, 1.0) for a, b in zip(tt, y)]),
                     diagnostics=found)
-    assert [d.code for d in found] == ["PATTERN_ROWS_DROPPED"]
+    assert [d.code for d in found] == ["PATTERN_INTENSITY_SCALED",
+                                       "PATTERN_ROWS_DROPPED"]

@@ -408,9 +408,9 @@ def _rows_dropped(name: str, x: np.ndarray, y: np.ndarray,
                  f"{' or '.join(columns)} and {was} not read as data"
                  f"{where_text}."),
         where=[f"{lo:.3f}-{hi:.3f}" for lo, hi in spans] or [axis],
-        suggestion=("If these points were measured, check the reduction that "
-                    "wrote the file. A division by a zero monitor or detector "
-                    "efficiency writes NaN."),
+        suggestion=("If these points were measured, check the software that "
+                    "wrote the file. A reduction that divides by a zero monitor "
+                    "or detector efficiency writes NaN or infinity."),
         value=float(n))
 
 
@@ -667,8 +667,8 @@ INTEGRAL_TOL = 1e-3
 def integral(values: Any) -> bool:
     """Whether every value is a whole number — the counts test.
 
-    A NaN or infinite value is left out of the test: :func:`ascending` drops its
-    row, so the unit is decided on the rows the pattern keeps (WP-2079)."""
+    A NaN or infinite value is left out of the test: it carries no evidence of
+    a unit, and :func:`ascending` drops its row (WP-2079)."""
     y = np.asarray(values, dtype=np.float64)
     y = y[np.isfinite(y)]
     return bool(y.size) and bool(np.all(np.abs(y - np.round(y)) < INTEGRAL_TOL))
@@ -676,7 +676,6 @@ def integral(values: Any) -> bool:
 
 def sigma_by_arithmetic(intensity: Any, count_time_s: float | None,
                         declared: str, *, path: str | Path,
-                        keep: Any = None,
                         diagnostics: list[Diagnostic] | None = None,
                         ) -> np.ndarray | None:
     """σ where the file's own word on its intensity unit cannot be trusted.
@@ -701,16 +700,14 @@ def sigma_by_arithmetic(intensity: Any, count_time_s: float | None,
     *structurally* — in the token that opens the data block, in an attribute on
     the data element — where it cannot disagree with itself, and are trusted.
 
-    ``keep`` masks the rows the unit is decided on.  A reader whose abscissa is
-    a column passes its finite rows, so a row :func:`ascending` will drop for a
-    NaN 2θ does not vote on the unit of the rows it keeps (WP-2079).
+    A NaN or infinite count is left out of the vote (:func:`integral`).  A
+    finite count on a row :func:`ascending` drops for its 2θ still votes: it is
+    evidence about its column's unit whatever its position (WP-2079).
     """
     y = np.asarray(intensity, dtype=np.float64)
-    voters = y if keep is None else y[np.asarray(keep, dtype=bool)]
-    if integral(voters):
+    if integral(y):
         return None
-    if (count_time_s is not None and count_time_s > 0
-            and integral(voters * count_time_s)):
+    if count_time_s is not None and count_time_s > 0 and integral(y * count_time_s):
         return sigma_from_cps(y, count_time_s)
     if diagnostics is not None:
         derived = ("the header gives no scan speed with a unit to derive a "
