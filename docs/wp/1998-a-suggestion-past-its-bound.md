@@ -77,7 +77,13 @@ template line):
       method and its docstring say one thing.
 - [x] Update `examples/guides/next.py`'s assertions and
       `docs/docs/guides/next.md`'s sentence on `best_or_none` if either moves.
-- [ ] Skill: the row on reading `suggest`, or "none" and why.
+- [x] Skill: the row on reading `suggest`, or "none" and why. **None**
+      (2026-11-03): the trap this WP found — a bounded candidate scored as if
+      free — is fixed in the package, and the one ΔBIC reading a caller needs
+      is now in `best_or_none` and the summary itself; a skill row is API
+      vocabulary or a trap sourced outside rietx's own runs, and this is
+      neither. The API index (`references/api.md`, three copies) is
+      regenerated for `SuggestionResult.bound_limited`.
 
 ## Acceptance
 
