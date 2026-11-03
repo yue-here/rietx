@@ -179,7 +179,9 @@ and alert lists are in 1319's Context.
   and C-g's registry. Checked against the tree at 7d9be3cb: nothing under
   `io/cif` or `crystallography/cif.py` writes a superspace number.
 - **2026-10-13, from the issue triage (#913): an operator loop that
-  contradicts the H-M symbol is obeyed in silence.** Checked against the tree
+  contradicts the H-M symbol is obeyed in silence.** Ruled 2026-11-02
+  ("minimum"): three tasks under § Tasks, and the reconciling function below
+  is declined there. Checked against the tree
   at c3d0367 on gemmi 0.7.5, every case in the issue's table reproduces.
   `structure_from_cif` builds whichever group gemmi resolves
   (`crystallography/cif.py:694-698`) and names no contradiction. A P6₁ loop
@@ -229,6 +231,23 @@ and alert lists are in 1319's Context.
       (COD is CC0), else a synthetic one.
 - [ ] Skill: a reference row for any new diagnostic code, or "none" and why.
 
+#913, ruled by the maintainer 2026-11-02: "minimum". Three items, each able to
+land before C-e:
+
+- [ ] #913 (1): a coordinate written `.` or `?` is refused, naming the file,
+      the site and the tag. An occupancy written `.` or `?` reads by the
+      `cif_core` default, checked against the dictionary before it is written.
+- [ ] #913 (2): `pyproject.toml`'s `gemmi` floor raised to a version under which
+      `structure_from_cif` works (0.6.5 raises on `SmallStructure.spacegroup`).
+- [ ] #913 (3): an operator loop that generates a different group from the
+      H-M symbol, beyond a setting or origin choice, is refused, naming both
+      groups. No keyword overrides it.
+
+Declined for rarity (about 1 in 70 000 files): a diagnostic for a loop that is
+no group, the setting information, a multiplicity tie-break, a
+`symmetry_source` keyword, and one shared reconciling function in
+`symmetry.py`. Revisit if #813 comes to read database CIFs in bulk.
+
 ## Acceptance
 
 ```sh
@@ -247,6 +266,17 @@ the NAC + CaF₂ file reads back with its su.
 - Toby, B. H. (2006), ITC Vol. G ch. 3.3 and 4.2 — the pdCIF block layout and items.
 
 ## Handover log
+
+- **2026-11-03** — the maintainer's ruling on #913, recorded for a later build.
+  The answer to the operator-loop question is "minimum": refuse what reads
+  wrong in silence, and build nothing for the rare cases. That is three
+  checklist items under § Tasks. The declined list and the condition that
+  reopens it are written beside them. Nothing was built and no code moved.
+  The reply on the issue was already posted. Recorded in PR #PRNUM, a
+  ghostshift runner's branch carrying the 2026-11-02 rulings for four WPs.
+
+  *Next.* Any of the three #913 items can land alone and before C-e; item (2)
+  is the cheapest. C-e itself is unchanged.
 
 ### 2026-10-09 (2nd session) — C-d landed: the pattern block, checked by checkCIF
 
