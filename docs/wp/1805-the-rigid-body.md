@@ -105,7 +105,7 @@ round trips, the hold-on-a-body-atom test and the inertia-rank DOF count.
 - [x] Cross-backend `bodies` config
 - [x] Tests: the acceptance below + obs/calc/diff PNGs to `tests/output/`
 - [x] Skill: a reference row for each new diagnostic code (`test_every_engine_diagnostic_code_has_a_protocol_row`)
-- [ ] Read a body's rotation paths off its `RigidBodyBlock` and delete `_anchored_rotations`
+- [x] Read a body's rotation paths off its `RigidBodyBlock` and delete `_anchored_rotations`
       (answer a; the block already builds them and holds the anchor)
 - [ ] Refuse two free turn directions on a three-direction body at stage start, naming
       the remedies (free all, hold all, or tie to one axis). Delete `_chart_matrix`'s
