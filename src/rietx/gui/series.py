@@ -419,9 +419,14 @@ def trace(series: SeriesResult,
         names.setdefault(failure.label or str(failure.index), failure.index)
     for d in series.diagnostics:
         if d.where and d.where[0] in names:
-            marks = points[names[d.where[0]]]["marks"]
-            if d.code not in marks:
-                marks.append(d.code)
+            point = points[names[d.where[0]]]
+            # ``direction="both"`` adds the backward chain's failures here too,
+            # naming a pattern whose reported (forward) fit stands: that one
+            # has a point on every trajectory, so "failed" would be false of it
+            if d.code == "SERIES_PATTERN_FAILED" and point["status"] != "failed":
+                continue
+            if d.code not in point["marks"]:
+                point["marks"].append(d.code)
     largest: dict[str, dict] = {}
     for s in series.steps or []:
         if s.size_esd is not None and s.path not in largest:

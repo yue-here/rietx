@@ -400,8 +400,10 @@
    * replacing the whole series (`session.series_curves`), so a second look
    * is free and the only server cost of scrubbing is each pattern's first fetch.
    */
-  let curveCache = new Map<number, any>();
+  let curveCache = new Map<number, Promise<any>>();
   let cacheFor: any = null;
+  /** whether the member on show has σ from its file, for the residual's title */
+  let memberWeighted = false;
   /** Which figure `fig` is, so a scrub can update a member's in place. */
   let figKind: "member" | "trajectory" | null = null;
 
@@ -485,14 +487,19 @@
     };
   }
 
-  /** One member's curves, from the cache when this answer has fetched them. */
-  async function memberCurves(chart: any, index: number) {
+  /** One member's curves, from the cache when this answer has fetched them.
+   *  The *request* is kept, not its answer, so a drag that crosses a pattern
+   *  again before its first fetch lands waits on that fetch rather than
+   *  starting a second; a fetch that fails leaves the cache, to be retried. */
+  function memberCurves(chart: any, index: number): Promise<any> {
     if (cacheFor !== answer) { curveCache = new Map(); cacheFor = answer; }
     const held = curveCache.get(index);
     if (held) return held;
-    const curves = chart.unpack(await api.seriesCurves(index));
-    if (cacheFor === answer) curveCache.set(index, curves);
-    return curves;
+    const cache = curveCache;
+    const pending = api.seriesCurves(index).then((packed: any) => chart.unpack(packed));
+    cache.set(index, pending);
+    pending.catch(() => { if (cache.get(index) === pending) cache.delete(index); });
+    return pending;
   }
 
   async function draw() {
@@ -518,7 +525,11 @@
       // reader's zoom and hidden curves: watching a peak split across the
       // series is the point, and a rebuilt figure would reset the view at
       // every step (`rxplot.pattern`'s `setCurves(…, keep)`).
+      // read by the axis title at every paint: one member's σ can be measured
+      // and the next one's Poisson, and a kept figure must say which is drawn
+      memberWeighted = Boolean(header.weighted);
       if (fig && figKind === "member" && drawnFrom === answer) {
+        tip = null;
         legend = memberLegend(masked, background);
         fig.setCurves(curves, true);
         return;
@@ -534,7 +545,7 @@
         colors: () => ({ ...colors, masked: colors.edge }),
         residual: "weighted",
         labels: { y: () => "counts",
-                  resid: () => (header.weighted ? "Δ/σ" : "Δ/σ (Poisson)") },
+                  resid: () => (memberWeighted ? "Δ/σ" : "Δ/σ (Poisson)") },
       });
       return;
     }
@@ -1123,6 +1134,11 @@ different starting point could not fix">hard</span>
   .trace {
     height: 128px;
     overflow: hidden;
+  }
+
+  /* on the plot area, where a press scrubs, never on the axis margins
+     (gui/CLAUDE.md: an armed gesture says so under the pointer) */
+  .trace :global(.u-over) {
     cursor: col-resize;
   }
 

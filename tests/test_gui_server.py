@@ -2833,6 +2833,32 @@ def test_a_series_member_has_curves_of_its_own(series):
     assert status == 404 and payload["error"]["where"] == ["index"]
 
 
+def test_a_failed_pattern_does_not_shift_the_members_after_it(series, monkeypatch):
+    """``results_``/``trees_`` skip a failed pattern and the staged members do
+    not, so the routes find a member through its entry's ``SeriesEntry.index``
+    (#1396). Simulated by dropping member 1's entry, result and tree, which is
+    what a failure leaves: position 1 is then member 2."""
+    from types import SimpleNamespace
+
+    session, client, _ = series
+    entry = session._series_run
+    runner, result = entry["runner"], entry["result"]
+    keep = [0, 2]
+    monkeypatch.setattr(session, "_series_run", {
+        **entry,
+        "runner": SimpleNamespace(results_=[runner.results_[i] for i in keep],
+                                  trees_=[runner.trees_[i] for i in keep]),
+        "result": result.model_copy(update={
+            "entries": [result.entries[i] for i in keep]}),
+    })
+    got = _packed(client, "/api/series/curves?index=1")
+    member = entry["members"][2]
+    assert (got.header["index"], got.header["label"]) == (2, member["label"])
+    np.testing.assert_array_equal(got.arrays["two_theta"], entry["data"][2].tt())
+    status, tree = client.get("/api/series/history?index=1")
+    assert status == 200 and (tree["index"], tree["label"]) == (2, member["label"])
+
+
 def test_the_series_answer_carries_the_trace_it_is_scrubbed_along(series):
     """WP-1317: the trace rides the answer, built by ``series.trace`` from the
     run's own result and its staged members' coordinates, so the panel draws

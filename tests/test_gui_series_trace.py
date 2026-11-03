@@ -111,6 +111,15 @@ def test_a_verdict_on_an_unlabelled_pattern_is_found_by_its_index():
     assert [p["marks"] for p in trace(series)["points"]] == [[], ["SEQUENTIAL_RESEED"]]
 
 
+def test_a_backward_chain_failure_does_not_mark_a_fitted_pattern_failed():
+    """``direction="both"`` puts the backward chain's ``SERIES_PATTERN_FAILED``
+    in the reported diagnostics, naming a pattern whose forward fit stands."""
+    series = SeriesResult(
+        entries=[_entry(0), _entry(1)],
+        diagnostics=[_verdict("SERIES_PATTERN_FAILED", ["T310"])])
+    assert [p["marks"] for p in trace(series)["points"]] == [[], []]
+
+
 def test_a_patterns_findings_are_its_own_codes_at_their_worst_level():
     findings = trace(_series())["points"][1]["findings"]
     assert findings == [{"code": "BOUND_HIT", "level": "warning"},

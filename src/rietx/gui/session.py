@@ -2588,15 +2588,21 @@ class GuiSession:
         the curves beside it, because a series member cannot be refitted under
         a new protocol without re-running the chain, which replaces the whole
         answer.
+
+        ``index`` is the entry's position, as ``runner.results_`` is kept, and
+        the staged member is found by the entry's own ``SeriesEntry.index``:
+        a failed pattern has no entry, so past one the two positions differ
+        and pairing them would draw one pattern's fit over another's data.
         """
         from ..project import fitted_mask
 
         entry, res = self._series_member_result(index)
-        data, member = entry["data"][index], entry["members"][index]
+        at = entry["result"].entries[index].index
+        data, member = entry["data"][at], entry["members"][at]
         return curve_arrays(
             data.tt(), data.y(), fitted_mask(data, entry["limits"]), res,
             weighted=bool(member["has_sigma"]),
-            header={"index": index, "label": member["label"], "x": member["x"]})
+            header={"index": at, "label": member["label"], "x": member["x"]})
 
     def series_history(self, index: int) -> dict:
         """One series member's own history tree — read-only, and that is the point.
@@ -2621,8 +2627,11 @@ class GuiSession:
         if tree is None:  # pragma: no cover - the GUI always runs with history
             raise GuiError("this series was run without history",
                            code="NO_HISTORY", status=409)
-        member = entry["members"][index]
-        return {"index": index, "label": member["label"],
+        # by the entry's own index, as ``series_curves`` finds its member:
+        # ``trees_`` skips a failed pattern and the staged members do not
+        at = entry["result"].entries[index].index
+        member = entry["members"][at]
+        return {"index": at, "label": member["label"],
                 "checkout": False, **tree_payload(tree)}
 
     def _series_entry(self) -> dict:

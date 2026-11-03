@@ -1538,6 +1538,9 @@ export function trace(uPlot, host, data, spec) {
     if (!u.over.contains(e.target)) return;
     e.stopPropagation();
     e.preventDefault();
+    // the default a press would have done, and preventDefault cancels: a
+    // focusable host takes focus, so the keys step on from where the drag ended
+    if (host.tabIndex >= 0) host.focus({ preventScroll: true });
     let last = -1;
     const scrub = (ev) => {
       const i = under(ev.clientX);
