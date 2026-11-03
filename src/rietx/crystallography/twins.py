@@ -24,7 +24,7 @@ import numpy as np
 from ..schemas.common import Diagnostic
 from ..schemas.params import TieSpec
 from ..schemas.structure import Structure
-from .adp import tensor_from_voigt, voigt_from_tensor
+from .adp import U_NAMES, tensor_from_voigt, voigt_from_tensor
 from .symmetry import (
     TWIN_COORD_TOL,
     TwinMerge,
@@ -34,7 +34,7 @@ from .symmetry import (
     site_stabilizer_indices,
     site_twin_merge,
 )
-from .wyckoff import coordinate_basis, stabilizer_rotations
+from .wyckoff import adp_basis, coordinate_basis, stabilizer_rotations
 
 
 def _num(v: float) -> str:
@@ -152,7 +152,14 @@ def _kept_message(atom, phase_name: str | None, source: str | None, xyz, merge: 
 
 
 class DofMove(NamedTuple):
-    """Where one coordinate DOF of a site goes when the site's symmetry changes.
+    """Where one DOF of a site goes when the site's symmetry changes.
+
+    A coordinate DOF (``…dof.k``) is a direction in (x, y, z).  An anisotropic
+    ADP DOF (``…adp.k``, :func:`~.wyckoff.adp_basis`) is a pattern in
+    (U11, U22, U33, U12, U13, U23), and every sentence below reads the same
+    with "pattern" for "direction".  The ADP DOF is absolute rather than a
+    displacement, but both are coefficients on a basis vector, so θ on the old
+    one is s·θ on the new one either way.
 
     ``path`` is the new DOF whose direction is parallel to the old one, with
     ``scale`` = s such that old direction = s × new, so a value θ on the old
@@ -211,7 +218,7 @@ def _linked(old_basis: np.ndarray, new_basis: np.ndarray) -> set[tuple[int, int]
 
 
 def _dof_moves(old_basis: np.ndarray, new_basis: np.ndarray, prefix: str,
-               new_prefix: str | None = None) -> dict[str, DofMove]:
+               new_prefix: str | None = None, kind: str = "dof") -> dict[str, DofMove]:
     """Where each coordinate DOF of a site goes when the site's symmetry changes.
 
     ``phases.i.atoms.j.dof.k`` is the k-th direction the site symmetry allows,
@@ -219,7 +226,8 @@ def _dof_moves(old_basis: np.ndarray, new_basis: np.ndarray, prefix: str,
     x, y, z as DOFs 0-2 on the general position and x, z as DOFs 0-1 on the
     y = ¼ mirror, where ``dof.1`` is z (#1014, round 4).  Each old DOF's
     :class:`DofMove` names its parallel new DOF, if any, and every new DOF it
-    is linked to (:func:`_linked`).
+    is linked to (:func:`_linked`).  ``kind`` is ``"adp"`` for the
+    anisotropic ADP patterns, which a site's symmetry renumbers the same way.
     """
     pairs = _linked(old_basis, new_basis)
     new_site = new_prefix or prefix
@@ -231,11 +239,11 @@ def _dof_moves(old_basis: np.ndarray, new_basis: np.ndarray, prefix: str,
             new = np.asarray(new, dtype=np.float64)
             s = float(old @ new) / float(new @ new)
             if np.allclose(old, s * new, atol=1e-9):
-                target, scale = f"{new_site}.dof.{j}", s
+                target, scale = f"{new_site}.{kind}.{j}", s
                 break
-        linked = tuple((f"{new_site}.dof.{j}", tuple(int(v) for v in new_basis[j]))
+        linked = tuple((f"{new_site}.{kind}.{j}", tuple(int(v) for v in new_basis[j]))
                        for j in range(len(new_basis)) if (k, j) in pairs)
-        moves[f"{prefix}.dof.{k}"] = DofMove(target, scale, linked,
+        moves[f"{prefix}.{kind}.{k}"] = DofMove(target, scale, linked,
                                              tuple(int(v) for v in old_basis[k]))
     return moves
 
@@ -285,15 +293,22 @@ class NumberingMoves(dict):
         always the new structure's.
         """
         out = NumberingMoves({
-            f"{self.new_site(site)}.dof.{k}": m
-            for path, m in self.items()
-            for site, k in [path.rsplit(".dof.", 1)]})
+            f"{self.new_site(site)}{path[len(site):]}": m
+            for path, m in self.items() for site in [site_of(path)]})
         out.sites = {new: new for new in self.sites.values()}
         return out
 
 
 #: An atom's own path at the start of a dot-path: ``phases.i.atoms.j``.
 _ATOM_PATH = re.compile(r"^(phases\.\d+\.atoms\.\d+)(?=\.|$)")
+
+#: A site-symmetry DOF a renumbering moves: a coordinate's or an anisotropic ADP's.
+_SITE_DOF = re.compile(r"\.(?:dof|adp)\.\d+$")
+
+
+def site_of(path: str) -> str:
+    """The site a :class:`DofMove` key belongs to: ``…atoms.4.adp.3`` → ``…atoms.4``."""
+    return _SITE_DOF.sub("", path)
 
 
 def renumber_path(path: str, atoms: dict[str, str | None]) -> str | None:
@@ -368,6 +383,12 @@ def numbering_moves(old: Structure | CoordinateSnapshot,
     changed is a different model and is left to the caller's own
     reconciliation.
 
+    An anisotropic ADP DOF (``…adp.k``) is numbered by the same site symmetry
+    (:func:`~.wyckoff.adp_basis`), so it renumbers with the coordinates: on
+    PbSO₄'s y = ¼ mirror ``adp.3`` is U13, and on the general position it is
+    U12.  Its moves are listed whether or not the atom carries a tensor, since
+    a path on a DOF the model does not have is carried by nobody.
+
     An atom whose coordinates did not move is not looked at, and one that did
     costs the site's stabiliser (:func:`~.symmetry.site_stabilizer_indices`,
     no orbit) at the two positions: the same operations fixing both is the
@@ -394,15 +415,17 @@ def numbering_moves(old: Structure | CoordinateSnapshot,
             if site_stabilizer_indices(sg, xo) == site_stabilizer_indices(sg, xn):
                 continue
             try:
-                bo = coordinate_basis(stabilizer_rotations(sg, xo))
-                bn = coordinate_basis(stabilizer_rotations(sg, xn))
+                ro, rn = stabilizer_rotations(sg, xo), stabilizer_rotations(sg, xn)
+                bases = (("dof", coordinate_basis(ro), coordinate_basis(rn)),
+                         ("adp", adp_basis(ro), adp_basis(rn)))
             except ValueError:
                 continue
-            if len(bo) == len(bn) and np.array_equal(np.asarray(bo), np.asarray(bn)):
-                continue
-            moves.update(_dof_moves(bo, bn, f"phases.{i}.atoms.{jo}",
-                                    f"phases.{i}.atoms.{jn}"))
-            moves.sites[f"phases.{i}.atoms.{jo}"] = f"phases.{i}.atoms.{jn}"
+            for kind, bo, bn in bases:
+                if len(bo) == len(bn) and np.array_equal(np.asarray(bo), np.asarray(bn)):
+                    continue
+                moves.update(_dof_moves(bo, bn, f"phases.{i}.atoms.{jo}",
+                                        f"phases.{i}.atoms.{jn}", kind))
+                moves.sites[f"phases.{i}.atoms.{jo}"] = f"phases.{i}.atoms.{jn}"
     return moves
 
 
@@ -467,14 +490,19 @@ def _move(m) -> DofMove:
     return DofMove(path, scale, ((path, ()),) if path is not None else ())
 
 
+def _axes(v: Sequence[int]) -> Sequence[str]:
+    """What a direction's components are: the coordinates, or the six U^ij of a pattern."""
+    return "xyz" if len(v) == 3 else [n.upper() for n in U_NAMES]
+
+
 def _along(linked) -> str:
-    return " and ".join(f"{p} (along {list(v)} in x, y, z)" if v else p
+    return " and ".join(f"{p} (along {list(v)} in {', '.join(_axes(v))})" if v else p
                         for p, v in linked)
 
 
 def _coords(v: Sequence[int]) -> str:
     """The coordinates a direction moves, as words: ``[1, 2, 0]`` → ``"x and y"``."""
-    names = ["xyz"[i] for i, c in enumerate(v) if c]
+    names = [_axes(v)[i] for i, c in enumerate(v) if c]
     return ", ".join(names[:-1]) + " and " + names[-1] if len(names) > 1 else "".join(names)
 
 
@@ -611,9 +639,8 @@ def carry_constraints(moves: dict[str, DofMove], *,
 
 def _site_moves(moves: dict) -> Iterable[tuple[str, dict]]:
     """``moves`` split by site, as ``(old site path, its moves)``."""
-    for site in sorted({path.rsplit(".dof.", 1)[0] for path in moves}):
-        yield site, {p: m for p, m in moves.items()
-                     if p.rsplit(".dof.", 1)[0] == site}
+    for site in sorted({site_of(path) for path in moves}):
+        yield site, {p: m for p, m in moves.items() if site_of(p) == site}
 
 
 def carry_action_constraints(action, moves: dict[str, DofMove]) -> dict[str, list[str]]:

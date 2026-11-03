@@ -1731,3 +1731,92 @@ def test_atom_moves_names_every_atom_whose_number_changes(old, new, expected):
     assert renumber_path("phases.0.atoms.*.biso", moves) == "phases.0.atoms.*.biso"
     assert renumber_path("phases.0.atoms.11.biso", {"phases.0.atoms.1": None}) \
         == "phases.0.atoms.11.biso"
+
+
+# ------------------------------------------------ WP-1991: ADP DOFs renumber with the site
+#
+# ``phases.i.atoms.j.adp.k`` is the k-th U^ij pattern ``wyckoff.adp_basis`` allows,
+# so a site that changes its symmetry renumbers its ADP DOFs as it renumbers its
+# coordinates.  International Tables vol. A: on Pnma's 4c mirror (y = ¼) U12 and U23
+# are zero, so the six patterns U11 … U23 of 8d become U11, U22, U33, U13 there.
+
+
+def _with_tensor(phase: Phase, label: str) -> Phase:
+    doc = phase.model_dump()
+    for atom in doc["atoms"]:
+        if atom["label"] == label:
+            atom["biso"]["vary"] = False
+            atom["aniso"] = {n: {"value": v, "vary": True} for n, v in zip(
+                ("u11", "u22", "u33", "u12", "u13", "u23"),
+                (0.010, 0.012, 0.011, 3e-4, 1e-3, 2e-4), strict=True)}
+    return Phase.model_validate(doc)
+
+
+def _tied_to(ref, path: str) -> list[str]:
+    """The DOFs the U^ij component ``path`` is written in, in the table as built now."""
+    table = ref._working_table()
+    (entry,) = [e for e in table.entries if e.path == path]
+    return [p for p, _ in entry.tie.terms] if entry.tie is not None else []
+
+
+def test_a_hold_and_a_tie_on_an_adp_pattern_follow_it_onto_the_mirror(pbso4):
+    """The WP's probe.  Held U12 and U13 on 8d: on the mirror U12 is zero, so its hold
+    is dropped and said, and U13's hold follows U13 to ``adp.3``.  Before, the hold on
+    ``adp.3`` stayed put and held U13 while U13's own hold named a DOF that no longer
+    exists; a tie from U11 to U13 was dropped as "no longer exists"."""
+    phase = _with_tensor(pbso4, "O5")
+    j = _o5(phase)
+    site = f"phases.0.atoms.{j}"
+    ref = rx.Refinement(Structure(phases=[phase]), INSTRUMENT, history=False)
+    assert _tied_to(ref, f"{site}.u12") == [f"{site}.adp.3"]
+    assert _tied_to(ref, f"{site}.u13") == [f"{site}.adp.4"]
+    ref.hold([f"{site}.adp.3", f"{site}.adp.4"])             # U12 and U13 on 8d
+    ref.tie(f"{site}.adp.0", f"{site}.adp.4")                # U11 follows U13
+    ref.set_values({f"{site}.dof.1": 0.2501 - phase.atoms[j].y.value})
+    assert _y(ref.structure, "O5") == 0.25
+    (u13,) = _tied_to(ref, f"{site}.u13")
+    assert _tied_to(ref, f"{site}.u12") == []                # zero on the mirror
+    assert ref._user_holds == {u13}
+    assert [s for s, _ in ref._ties[f"{site}.adp.0"].terms] == [u13]
+    rows = {r.path: r for r in ref.parameters()}
+    assert [p for p in rows if ".adp." in p and "hold()" in (rows[p].held_because or "")] \
+        == [u13]
+    (d,) = [d for d in ref._twin_findings if d.code == "SITE_TWINS_MERGED"]
+    assert f"the hold on {site}.adp.3 was dropped" in d.message
+    assert f"the hold on {site}.adp.4 now reads {u13}" in d.message
+
+
+def test_a_hold_on_u22_holds_the_adp_pattern_a_position_couples_it_into():
+    """On P 6₃/mmc 12k (x, 2x, z) the site symmetry ties U22 = 2·U12 and U23 = 2·U13
+    (ITA vol. A; Peterse & Palm, 1966), so no pattern moves U22 alone.  A hold on
+    8d's U22 then holds every pattern on 12k that moves U22, and the message names the
+    components in U^ij rather than in x, y, z."""
+    group, cell, y_of_x, mult = _COUPLED[0]
+    x, z = 0.17, 0.0705
+    phase = _with_tensor(_phase(group, cell, (x, 0.29, z)), "X")
+    ref = rx.Refinement(Structure(phases=[phase]), INSTRUMENT, history=False)
+    site = "phases.0.atoms.0"
+    assert _tied_to(ref, f"{site}.u22") == [f"{site}.adp.1"]
+    ref.hold([f"{site}.adp.1"])                              # U22 on the general position
+    ref.set_values({f"{site}.dof.1": (y_of_x(x) % 1.0) + 2e-4 - 0.29})
+    assert _multiplicity(ref.structure.phases[0], "X") == mult
+    want = set(_tied_to(ref, f"{site}.u22"))
+    assert want and ref._user_holds == want
+    (d,) = [d for d in ref._twin_findings if d.code == "SITE_TWINS_MERGED"]
+    assert "in U11, U22, U33, U12, U13, U23" in d.message
+    assert "x, y, z" not in d.message.split("Constraints:")[1]
+
+
+def test_numbering_moves_lists_the_adp_patterns_of_a_site_that_moved(pbso4):
+    """``twins.numbering_moves`` names the ``adp.k`` keys beside the ``dof.k`` ones, so
+    every carrier that splits a move by site (holds, ties, free paths, a stored node's
+    recorded action) reaches them through the one reading."""
+    from rietx.crystallography.twins import numbering_moves, site_of
+    j = _o5(pbso4)
+    site = f"phases.0.atoms.{j}"
+    moved = _moved(pbso4, "O5", y=0.25 - pbso4.atoms[j].y.value)
+    moves = numbering_moves(Structure(phases=[pbso4]), Structure(phases=[moved]))
+    assert {p for p in moves if ".adp." in p} == {f"{site}.adp.{k}" for k in range(6)}
+    assert [moves[f"{site}.adp.{k}"].path for k in range(6)] == [
+        f"{site}.adp.0", f"{site}.adp.1", f"{site}.adp.2", None, f"{site}.adp.3", None]
+    assert {site_of(p) for p in moves} == {site}

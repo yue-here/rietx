@@ -134,10 +134,13 @@ level up, and the two should share one matcher.
 - [x] #1264: every path read across a changed atom list follows its atom by
   label (`twins.atom_moves`, `renumber_path`): the series carry, the
   displaced paths, the re-anchor, and `Refinement.edit`'s registers.
-- [ ] Anisotropic ADP DOFs (`phases.i.atoms.j.adp.k`) are not renumbered by
+- [x] Anisotropic ADP DOFs (`phases.i.atoms.j.adp.k`) are not renumbered by
   `numbering_moves`, so a hold or tie on `adp.k` of a site that merges is not
   carried. Read off the code in PR #1223's review, never probed: probe it,
-  then fix or fence.
+  then fix or fence. (Probed 2026-11-03: true, and worse than "not carried".
+  On PbSO₄ O5 moved onto its mirror, a hold on 8d's `adp.3` (U12) stayed on
+  `adp.3`, which is U13 there. Fixed: `numbering_moves` lists `adp.k` moves
+  beside `dof.k`, through `twins.site_of`.)
 - [ ] A series trajectory follows its atom, as ruled 2026-11-01 (see
   § Ruling above). `SeriesResult.trajectory(path)` and the fences built on it
   join patterns by path, so a `prepare` that changes the atom list per pattern
