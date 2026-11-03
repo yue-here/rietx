@@ -40,7 +40,7 @@ _COUNT_SCALE = 60.0
 
 
 def _truth(lo=18.0, hi=125.0, step=0.02, seed=17, disp=0.0,
-           count_scale=_COUNT_SCALE):
+           count_scale=_COUNT_SCALE, axial=0.02):
     """A model and the noisy pattern it generates — i.e. a *converged* state.
 
     The background lives in the instrument (a flat Chebyshev term), not added
@@ -59,6 +59,9 @@ def _truth(lo=18.0, hi=125.0, step=0.02, seed=17, disp=0.0,
     ``count_scale`` multiplies the counts.  Raised, it makes a model misfit
     dominate the counting noise, which is how ``test_compare_freed.py`` gets a
     serially correlated residual.
+
+    ``axial`` is both apertures, in the specimen and the returned model; 0
+    gives a symmetric pattern (WP-2054's controls).
     """
     from rietx.schemas.instrument import BackgroundChebyshev
 
@@ -68,8 +71,8 @@ def _truth(lo=18.0, hi=125.0, step=0.02, seed=17, disp=0.0,
     ins.profile.w.value = 4e-3
     ins.profile.u.value = 3e-3
     ins.profile.x.value = 6e-3
-    ins.geometry.axial_sl.value = 0.02
-    ins.geometry.axial_hl.value = 0.02
+    ins.geometry.axial_sl.value = axial
+    ins.geometry.axial_hl.value = axial
     ins.geometry.sample_displacement.value = disp
     ins.background = BackgroundChebyshev(coefficients=[
         rx.Parameter(value=80.0), rx.Parameter(value=0.0),
@@ -294,6 +297,69 @@ def test_a_model_broader_than_the_data_gets_no_size_clause():
     size = [a for a in actions if a.kind == "refine_sample_size_broadening"]
     assert len(size) == 1
     assert "L ≈" not in size[0].rationale
+
+
+# ----------------------------------------------------------------------
+# WP-2054: asymmetry the model cannot draw, with both apertures at zero
+# ----------------------------------------------------------------------
+def _zeroed(structure, ins):
+    ins = ins.model_copy(deep=True)
+    ins.geometry.axial_sl.value = ins.geometry.axial_hl.value = 0.0
+    return structure, ins
+
+
+def _asymmetry_action(report):
+    return next((a for a in report.suggested_actions
+                 if a.kind == "refine_axial_asymmetry" and a.active), None)
+
+
+def test_asymmetry_at_zero_apertures_is_named(truth):
+    """Data with S/L = H/L = 0.02, a model declaring both 0 (#1106).
+
+    The model draws no asymmetry and its own ∂Ω/∂(S/L) is zero, so the column
+    comes from the nominal-aperture twin.  Every low-angle coefficient reads
+    positive, more asymmetry than none, and the action says why it cannot
+    simply be refined from where it is.
+    """
+    structure, ins, data = truth
+    report = _report_for(*_zeroed(structure, ins), data)
+    low = [c for a in report.attribution if a.gates_passed
+           and a.mean_two_theta < 40.0 for c in a.coefficients
+           if c.kind == "asymmetry" and c.significant]
+    assert len(low) >= 2 and all(c.value > 0 for c in low)
+    action = _asymmetry_action(report)
+    assert action is not None
+    assert "axial apertures are 0" in action.rationale
+
+
+def test_declared_apertures_borrow_no_nominal_column(truth):
+    """The twin exists only at both apertures zero, so a fit declaring them
+    reads its own column and its report is the one it was before WP-2054."""
+    from rietx.report import _nominal_axial
+
+    structure, ins, data = truth
+    result, model, values = _result_for(structure, ins, data)
+    assert _nominal_axial(model, structure, ins, values) is None
+    report = _report_for(structure, ins, data)
+    assert _asymmetry_action(report) is None
+
+
+@pytest.mark.parametrize("knob, factor", [
+    ("ka2", 0.8), ("ka2", 1.2), ("w", 0.7), ("w", 1.4), ("none", 1.0)])
+def test_symmetric_misfits_do_not_read_as_axial_asymmetry(knob, factor):
+    """The three things WP-2054 names that could fool the column, two of them
+    here: a Kα2 weight error is one-sided about Kα1 by construction (#1166),
+    and a width error puts lobes on both flanks.  On a symmetric pattern with
+    the apertures 0 in data and model, neither fires the action, and nor does
+    the unperturbed model.  (Measured at ±20 % and ×0.7/×1.4: every low-angle
+    asymmetry coefficient insignificant.)"""
+    structure, ins, data = _truth(axial=0.0)
+    if knob == "ka2":
+        ins.source.lines[1].weight.value *= factor
+    elif knob == "w":
+        ins.profile.w.value *= factor
+    report = _report_for(structure, ins, data)
+    assert _asymmetry_action(report) is None
 
 
 def test_injected_scale_error_is_recovered(truth):
