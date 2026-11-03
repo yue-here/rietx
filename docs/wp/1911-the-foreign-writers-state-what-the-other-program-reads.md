@@ -438,7 +438,10 @@ land alone before the transform exists.
       So an R phase no longer raises the setting note, which now fires only
       for an origin choice.*
 - [ ] A: `.EXP`: measure what GSAS-I reads for `R -3 c:R` and `F d -3 m:2`;
-      refuse what it does not, and correct `gsas.py:1852`'s claim
+      refuse what it does not, and correct `gsas.py:1852`'s claim.
+      *2026-11-03: the claim is corrected (now `gsas.py:1868`, "not
+      measured"). The measurement waits on a GSAS-I run, which this machine
+      has no binary for, so the task stays open.*
 - [ ] A: `.pcr` reader: a bare R symbol beside a = b = c, α = β = γ ≠ 90 is
       refused as a contradiction (root CLAUDE.md's angle rule), or kept with
       a written reason
