@@ -111,7 +111,7 @@ round trips, the hold-on-a-body-atom test and the inertia-rank DOF count.
       the remedies (free all, hold all, or tie to one axis). Delete `_chart_matrix`'s
       `pinv` projection. Reword `RIGID_BODY_UNSUPPORTED`'s suggestion so it cannot
       steer a caller into the refused hold (answer c)
-- [ ] Tests: the re-chart against a fresh solve for every allowed shape; the refusal
+- [x] Tests: the re-chart against a fresh solve for every allowed shape; the refusal
 
 ## Acceptance
 

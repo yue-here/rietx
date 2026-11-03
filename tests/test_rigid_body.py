@@ -995,3 +995,149 @@ def test_an_antiparallel_carry_turns_the_linear_body_half_way():
     for a, b in zip(target.phases[0].atoms, source.phases[0].atoms, strict=True):
         for c in "xyz":
             assert abs(getattr(a, c).value - getattr(b, c).value) < 1e-12
+
+
+# ------------------------------------- a turn free in 0, 1 or all directions
+ROT = "phases.0.rigid_bodies.0.rotation"
+ORIGIN_GLOBS = BODY_GLOBS[:3]
+
+
+def _tie_to_the_truth_axis(table: ParameterTable) -> None:
+    """δω = t·(0.3, 0.8, −0.5): one free column turning about ``_turned``'s
+    axis, so the one-axis family holds the truth."""
+    for k, scale in ((1, 0.8 / 0.3), (2, -0.5 / 0.3)):
+        table.set_tie(f"{ROT}.{k}", AffineTie(terms=((f"{ROT}.0", scale),)))
+
+
+def _recharted_and_fresh(build, globs, tie=None, *, refuse=True):
+    """A body stage solved, committed and re-charted, beside a fresh solve
+    started at δω = 0 on the committed values: (re-charted, fresh, rotation
+    columns)."""
+    from rietx.optimize.least_squares import rechart_outcome, run_least_squares
+
+    pattern = synthesize(build(Q_TRUE))
+    start = build(_turned(Q_TRUE, 10.0), origin=(0.33, 0.41, 0.26))
+    model = compile_model(start, INS, pattern, mode="rietveld")
+
+    def table_for(structure):
+        table = ParameterTable(structure, INS)
+        table.set_vary(globs, True)
+        if tie is not None:
+            tie(table)
+        if refuse:
+            table.refuse_partial_turns()
+        return table
+
+    table = table_for(start)
+    outcome = run_least_squares(model, table, max_iter=200)
+    recharted = rechart_outcome(outcome, table.x0(), table.commit(outcome.theta))
+    s = start.model_copy(deep=True)
+    table.apply_to_models(s, INS)
+    fresh_table = table_for(s)
+    assert fresh_table.free_paths == table.free_paths
+    fresh = run_least_squares(model, fresh_table, max_iter=200)
+    rot = [c for c, p in enumerate(table.free_paths) if p.startswith(ROT)]
+    return recharted, fresh, rot
+
+
+@pytest.mark.parametrize(("build", "globs", "tie", "n_rot"), [
+    (body_structure, ORIGIN_GLOBS, None, 0),
+    (body_structure, [*ORIGIN_GLOBS, f"{ROT}.0"], None, 1),
+    (body_structure, [*ORIGIN_GLOBS, f"{ROT}.*"], None, 3),
+    (body_structure, [*ORIGIN_GLOBS, f"{ROT}.*"], _tie_to_the_truth_axis, 1),
+    (linear_structure, [*ORIGIN_GLOBS, f"{ROT}.0"], None, 1),
+    (linear_structure, [*ORIGIN_GLOBS, f"{ROT}.*"], None, 2),
+], ids=["none", "one", "three", "tied-to-one-axis", "linear-one", "linear-both"])
+def test_every_allowed_turn_shape_is_recharted_to_a_fresh_solve(build, globs, tie, n_rot):
+    """WP-1805's acceptance row: for none, one or three free turn
+    directions, a rotation tied to one axis and the linear body, the
+    re-charted esds and correlations match a solve started at δω = 0 on the
+    committed values, to 1e-5.  With one direction the chart is the
+    identity (a turn about one fixed axis composes by addition), so this is
+    also the check that leaving that column alone is exact."""
+    recharted, fresh, rot = _recharted_and_fresh(build, globs, tie)
+    assert len(rot) == n_rot
+    np.testing.assert_allclose(recharted.correlation, fresh.correlation, atol=1e-5)
+    np.testing.assert_allclose(recharted.stderr_internal, fresh.stderr_internal,
+                               rtol=1e-5)
+
+
+def test_the_refused_shape_has_no_re_chart_to_give():
+    """The positive arm of the refusal: two free directions of three, built
+    by hand past the stage-start check, re-chart far outside the 1e-5 every
+    allowed shape meets — the 2026-10-08 probe's 2.4 % esd gap at 10°, which
+    the deleted pinv projection did not close."""
+    recharted, fresh, rot = _recharted_and_fresh(
+        body_structure, [*ORIGIN_GLOBS, f"{ROT}.0", f"{ROT}.1"], refuse=False)
+    assert len(rot) == 2
+    gap = np.abs(recharted.stderr_internal[rot] / fresh.stderr_internal[rot] - 1.0).max()
+    assert gap > 1e-3, gap
+
+
+@pytest.mark.parametrize("how", ["hold", "tie", "glob"])
+def test_two_free_turn_directions_of_three_are_refused_at_stage_start(how):
+    """Answer (c) on #801: a hold, a tie and a plan glob reach the refusal
+    alike, before the stage writes anything, naming the body, each rotation
+    DOF's state and the three remedies."""
+    pattern = synthesize(body_structure(Q_TRUE))
+    ref = Refinement(body_structure(_turned(Q_TRUE, 2.0)), INS, history=False)
+    globs = BODY_GLOBS
+    if how == "hold":
+        ref.hold(f"{ROT}.2")
+    elif how == "tie":
+        ref.tie_equal([f"{ROT}.0", f"{ROT}.1"])
+    else:
+        globs = [*ORIGIN_GLOBS, f"{ROT}.0", f"{ROT}.1"]
+    before = ref.structure.model_dump()
+    with pytest.raises(ValueError, match=r"^RIGID_BODY_PARTIAL_TURN: rigid body 'c6br' "
+                                         r"has 2 free turn directions of its 3") as err:
+        ref.fit(pattern, plan=RefinementPlan(stages=[Stage("body", globs)]))
+    message = str(err.value)
+    state = {"hold": "0 free, 1 free, 2 held", "tie": "0 free, 1 tied, 2 free",
+             "glob": "0 free, 1 free, 2 held"}[how]
+    assert f"({ROT}: {state})" in message
+    for remedy in ("Free all 3", "hold all 3", "tie the turn to one axis",
+                   f"Refinement.tie_equal('{ROT}.*')"):
+        assert remedy in message
+    assert ref.structure.model_dump() == before
+
+
+def test_the_remedies_the_refusal_names_each_run():
+    """Every remedy the message names is a shape a stage accepts: the whole
+    turn free (the other tests' plans), held, or tied to one axis."""
+    pattern = synthesize(body_structure(Q_TRUE))
+    for remedy in ("hold", "tie_equal"):
+        ref = Refinement(body_structure(_turned(Q_TRUE, 2.0)), INS, history=False)
+        getattr(ref, remedy)(f"{ROT}.*")
+        result = ref.fit(pattern, plan=RefinementPlan(stages=[Stage("body", BODY_GLOBS)]))
+        assert result.status == "converged", remedy
+
+
+def test_the_joint_runner_refuses_a_partial_turn_too():
+    from rietx.multi import MultiHistogramRefinement
+
+    structure = body_structure(Q_TRUE)
+    data = [synthesize(structure), synthesize(structure, seed=4)]
+    ins2 = INS.model_copy(deep=True)
+    joint = MultiHistogramRefinement(body_structure(_turned(Q_TRUE, 2.0)), [INS, ins2])
+    plan = RefinementPlan(stages=[Stage("body", [*ORIGIN_GLOBS, f"{ROT}.0", f"{ROT}.1"])])
+    with pytest.raises(ValueError, match="RIGID_BODY_PARTIAL_TURN: rigid body 'c6br'"):
+        joint.fit(data, plan=plan)
+
+
+def test_unsupported_advice_never_names_the_refused_hold():
+    """``RIGID_BODY_UNSUPPORTED``'s suggestion (answer (c)): holding one blind
+    turn DOF of three would leave two free, so it names the whole turn; two
+    blind leave one, and a blind origin leaves the turn alone, so it names
+    just them.  Whatever it names, holding it passes the stage-start check."""
+    from rietx.refine import _unsupported_body_advice
+
+    bbase = "phases.0.rigid_bodies.0"
+    for blind, whole in (([f"{ROT}.0"], True), ([f"{ROT}.0", f"{ROT}.1"], False),
+                         ([f"{bbase}.origin.dof.0"], False)):
+        table = ParameterTable(body_structure(Q_TRUE), INS)
+        table.set_vary(BODY_GLOBS, True)
+        advice = _unsupported_body_advice(table, bbase, blind)
+        assert (f"({ROT}.*)" in advice) is whole, advice
+        table.set_vary([f"{ROT}.*"] if whole else blind, False)
+        table.refuse_partial_turns()
