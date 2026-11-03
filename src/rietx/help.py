@@ -342,10 +342,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "specimen length divided by the goniometer radius. It sets how strongly "
             "low-angle peaks lean toward low 2θ. Fit it on a standard together with "
             "`axial_hl`. The two are strongly correlated and are usually reported as a "
-            "pair. With both at zero and either refined, the peaks are computed with "
-            "windows and integration points sized for a ratio of 0.02 (see `axial_hl`). "
-            "A stage that refines it from zero starts it at 0.02, because at zero the "
-            "fit cannot tell which way to move it."
+            "pair. Refined from zero, it starts at 0.02, where the fit can see which way "
+            "to move it (see `axial_hl`)."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -361,8 +359,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "alone still smears the peaks. Only both at zero switch the asymmetry off. "
             "With both at zero and either refined, the peaks are computed with windows "
             "and integration points sized for a ratio of 0.02, so the curve differs from the same model with "
-            "both held by up to about 5e-5 of the strongest peak. A stage that refines it "
-            "from zero starts it at 0.02, as for `axial_sl`."
+            "both held by up to about 5e-5 of the strongest peak. Refined from zero, it "
+            "starts at 0.02."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
