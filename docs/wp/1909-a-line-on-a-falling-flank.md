@@ -1,9 +1,8 @@
 # WP-1909 — a line on a falling flank, at a third of its own esd
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: ✅ 2026-11-03 — PR #1380; the 1σ floor (#741) is the repair, the census rules out the envelope, leftovers in issue #1382
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-05 — a defect that fires wrongly: three unflagged false lines cost the indexer the true cell, and cropping the range is the workaround; indexing is a path few fits run
 
 ## Goal
 
@@ -183,6 +182,55 @@ round-robin table shows which real lines, if any, the repair removed.
   WP-1110 item 14 (`no_intensity`); WP-1510 (`duplicate_line`).
 
 ## Handover log
+
+- **2026-11-03** — closed, PR #1380 (a ghostshift runner, one session).
+  The repair this WP asked for had already shipped in #741. What this session
+  adds is the evidence for it. Measured on today's tree, the 1σ floor takes
+  out four components across 18 real patterns, each under I/σ_I 0.9. The
+  other repair, an envelope that follows the flank, would have changed dozens
+  of real lines on the round-robin lists and taken 15 net off NAC, so it is
+  ruled out. The steep pattern now indexes to cubic F first, and the test
+  asserts that and draws it. What is left belongs to other consumers and is
+  in issue #1382.
+  - *Done.* § The census (task 2). The dossier line on the zero-bound
+    bullet of `src/rietx/indexing/CLAUDE.md`, cap 361 → 366.
+    `PEAK_NO_INTENSITY_SIGMA`'s docstring re-measured under 1.12. The flank
+    test draws `silicon_steep_peaks` and `silicon_steep` through
+    `tests/indexing_gallery.py` (new `synthetic` tier, kept off the
+    scoreboard), asserts cubic F first, and asserts `no_intensity` on
+    *every* flank component. Tasks 1, 3 and 6 were ticked as #741's work,
+    and task 4 as moot. `### Inherited` was deleted: #880, #947 and #948
+    are all merged and the census says so, and the aragonite fixture was
+    not needed once the silicon's truth was exact.
+  - *Measured.* The census probe is a scratch script patching
+    `pick.PEAK_NO_INTENSITY_SIGMA` and `peaks._debiased_envelope`, outside
+    the repo. Fast suite (`-m "not slow"`, `[dev]` venv, macOS arm64,
+    alone through ghostshift's serial queue, main unmoved at `5d7622d6`):
+    13717 passed, 318 skipped, 34 xfailed, in 8:11. In that run's junit the
+    flank file costs about 4.5 s, of which 3.9 s is the index row with its
+    Le Bail refit and its PNGs. Slow rows run:
+    `test_magnetites_correct_cell_is_ranked_first_and_graded_below_its_rival`
+    and `test_the_phantom_lines_are_what_had_blocked_it`, 2 passed. The rest
+    of `tests/test_acceptance_indexing.py` was not run, because no engine
+    or picker code changed: in `src/` the diff is a docstring and a
+    CLAUDE.md line. `python -m tests.reader_output` exited 0. No test was
+    added, so passed+skipped should not move.
+  - *Review.* `/code-review high --fix`, with seven fixes applied in
+    `c29501402`. The dossier line had named the background diagnostics as
+    a consumer of `_debiased_envelope`; they read `background_envelope`,
+    and the real co-consumers are the width census, `screen.py` and
+    `extinction.py`. Declined: dropping the gallery's Le Bail refit (it is
+    the obs/calc/diff panel task 5 asked for), and sharing one
+    `pick_peaks` across the flank tests (about 0.2 s).
+  - *Generality.* Not dispatched: `_audit.py` is untouched, and no
+    threshold, flag or action was added.
+  - *Gotchas.* On the steep pattern the floor is now one of two flags. Since
+    #948 all four flank components are `width_capped` as well, so a test
+    of the floor alone has to check `no_intensity` itself, which this one
+    now does.
+  - *Next:* none here. Issue #1382: Layer 0 reads the Pawley validation's
+    background misfit on the flank as 72 unmatched observed peaks, and the
+    gentle control ranks trigonal R above cubic F.
 
 - **2026-10-12** — PR #880 merged from outside as `f47c728e` and closed #878.
   This WP's census baseline has moved under it. `pick_peaks` now drops a
