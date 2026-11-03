@@ -255,6 +255,15 @@ from today. The synthetic controls hold.
   - Freeing the axial term in the QPA protocol on cpd-1c moves Rwp 0.1076 → 0.1052
     (S/L 0.040), so the three cpd samples do carry the asymmetry the action names.
 
+  - Fast suite (`[dev]`, darwin/arm64, 2026-11-03, beside another session's suites):
+    13611 passed, 319 skipped, 34 xfailed, 2 failed. One failure was this branch's
+    (the new acceptance test had no `tests/validation_matrix.py` row; added, and
+    `test_validation_matrix.py` then 745 passed). The other,
+    `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`,
+    is this machine's Jupyter kernel spec pointing at a deleted venv. Nine fast cases
+    added, 1.40 s in all (`tests.added_test_times`, local junit). No baseline was run
+    for the passed+skipped delta; CI's counts are the comparison.
+
   *Settled by Claude* (each could have gone the other way).
   - (b) over (a) and (c), on the grounds in the first task above.
   - The tangent at the nominal aperture over the secant from 0: the twin's existing
