@@ -5585,11 +5585,13 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "Which test ended the stage's solve, where `status` says only whether it "
             "converged. The default solver writes `ftol_runs`, `no_descent` or "
-            "`exhausted_fp64` when it converged, `slow_descent` when the rest of the "
-            "budget, at the rate the cost was falling, would have lowered chi-squared "
-            "by less than one esd of travel buys, and `max_nfev` when the budget ran "
+            "`exhausted_fp64` when it converged, `slow_descent` when another 300 "
+            "evaluations, at the rate the cost was falling, would have lowered "
+            "chi-squared by less than one esd of travel buys, and `max_nfev` when the budget ran "
             "out. The last two have `status` `max_iter`. `solver=\"trf\"` writes "
-            "scipy's `ftol`, `xtol`, `gtol`, `ftol+xtol` and `max_nfev`. `None` means "
+            "scipy's `ftol`, `xtol`, `gtol`, `ftol+xtol` and `max_nfev`. A model "
+            "that stopped being finite writes `non_finite_residual` or "
+            "`non_finite_jacobian`, with `status` `diverged`. `None` means "
             "a result stored before the field, or a stage with nothing free."
         ),
         anchor="theory/estimation.html#convergence",

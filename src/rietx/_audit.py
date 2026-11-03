@@ -2898,7 +2898,7 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-20"),
     Row("rietx.optimize.lm.SLOW_DESCENT_ESD", "constant", tier=3, value=1.0,
         evidence=("WP-1334 (issue #222): a stage stops once the rest of its budget, at the "
-                  "rate the last quarter lowered the cost, would lower chi2 by less than "
+                  "rate the last 100 evaluations lowered the cost, would lower chi2 over the next 300 by less than "
                   "SLOW_DESCENT_ESD^2 x chi2_red, the decrease one esd of joint travel buys at "
                   "a quadratic minimum (Press et al. 2007 §15.6; McCusker et al. 1999 §7 states "
                   "convergence as shift/esd). GSAS-II 5.8.4 stops on a per-cycle relative chi2 "
@@ -2911,12 +2911,19 @@ ROWS: tuple[Row, ...] = (
                  "three families on either side give one answer, as the solver's other "
                  "stopping constants (B10)."),
         approved=None),
-    Row("rietx.optimize.lm._SLOW_DESCENT_WINDOW", "constant", tier=3, value=4,
-        evidence=("WP-1334: the slow-descent window is a quarter of the stage's evaluation "
-                  "budget and the rule is first read once a whole window has passed, so no "
-                  "stage converging inside test_budget_and_tolerance_invariance's asserted "
-                  "4x margin (largest measured use 49 of 400 on the shipped schedule) can "
-                  "reach it; such fits are bit-identical with the rule on"),
+    Row("rietx.optimize.lm._SLOW_DESCENT_HORIZON", "constant", tier=3, value=300,
+        evidence=("WP-1334: the evaluations the slow-descent rule projects over, the rest of "
+                  "a default 400-evaluation stage after its first window; a count so the "
+                  "rule does not depend on max_iter"),
+        grounds=("Sets where the slow-descent rule can act; rietx's own, tier 3 with "
+                 "SLOW_DESCENT_ESD."),
+        approved=None),
+    Row("rietx.optimize.lm._SLOW_DESCENT_WINDOW", "constant", tier=3, value=100,
+        evidence=("WP-1334: the slow-descent window in evaluations, a quarter of a default "
+                  "stage's 400, and the first point the rule is read, so no stage converging "
+                  "inside test_budget_and_tolerance_invariance's asserted 4x margin (largest "
+                  "measured use 49 of 400 on the shipped schedule) can reach it; such fits "
+                  "are bit-identical with the rule on"),
         grounds=("Sets where the slow-descent rule can act; rietx's own, tier 3 with "
                  "SLOW_DESCENT_ESD."),
         approved=None),

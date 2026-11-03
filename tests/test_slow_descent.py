@@ -1,5 +1,5 @@
-"""The slow-descent rule (WP-1334, issue #222): a stage stops once the rest of
-its budget would buy less than one esd of travel, and says so.
+"""The slow-descent rule (WP-1334, issue #222): a stage stops once another
+300 evaluations would buy less than one esd of travel, and says so.
 
 The rule is ``optimize.lm.SLOW_DESCENT_ESD``'s.  A stage the rule stops ends
 ``slow_descent`` with status ``max_iter``, and ``STAGE_MAX_ITER`` names it as
@@ -10,9 +10,10 @@ large, so every Gauss-Newton step is ``1/f`` of the true one and the cost
 falls at a steady, slow rate.  A floor of 1000 constant residual rows sets
 χ²_red near 1, so the rule's threshold is about one unit of S.  Two shapes:
 
-- **for nothing**: a gap of 10 above the floor at ``f`` = 1e4.  Run to its
-  budget, it ends 1040.2 and is still crawling; the rule stops it at 281
-  evaluations, 1041.2, giving up 0.97 against a χ²_red of 1.04.
+- **for nothing**: a gap of 10 above the floor at ``f`` = 3e4.  Run to its
+  budget, it ends at S = 1042.4 and is still crawling; the rule stops it at
+  its first reading, 101 evaluations, at 1043.2, giving up 0.85 against a
+  χ²_red of 1.04.
 - **a rescue**: a gap of 1e4 at ``f`` = 1e3.  It halves S over its
   budget, so every window lowers S by far more than χ²_red, and it runs to
   the budget as before.
@@ -58,15 +59,16 @@ def _solve(f, gap, esd, monkeypatch, max_nfev=400):
 
 
 def test_a_crawl_for_nothing_stops_and_gives_up_less_than_an_esd(monkeypatch):
-    spent = _solve(1e4, 10.0, None, monkeypatch)
+    spent = _solve(3e4, 10.0, None, monkeypatch)
     assert spent.termination == "max_nfev" and spent.nfev == 400
 
-    cut = _solve(1e4, 10.0, 1.0, monkeypatch)
+    cut = _solve(3e4, 10.0, 1.0, monkeypatch)
     assert cut.termination == "slow_descent"
     assert cut.status == 0, "a stop the rule makes is never convergence"
-    # past the first whole window and well short of the budget
-    assert 400 // lm._SLOW_DESCENT_WINDOW < cut.nfev < 400
-    # the claim: what the rest of the budget bought is under chi2_red
+    # at or past the first whole window and well short of the budget
+    assert lm._SLOW_DESCENT_WINDOW < cut.nfev < 400
+    # the claim: what the rest of the budget bought is under chi2_red,
+    # since the projection over 300 evaluations covers the 299 left
     s_cut, s_spent = 2.0 * cut.cost, 2.0 * spent.cost
     chi2_red = s_spent / (FLOOR_ROWS + 50 - 2)
     assert 0.0 < s_cut - s_spent < chi2_red

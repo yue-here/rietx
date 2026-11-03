@@ -1188,7 +1188,7 @@ class StageResult(Base):
     #: driver writes ``ftol_runs`` (three small relative decreases),
     #: ``no_descent`` or ``exhausted_fp64`` (nothing downhill the cost can
     #: resolve), ``slow_descent`` (``optimize.lm.SLOW_DESCENT_ESD``: at its
-    #: last rate the rest of the budget would have lowered χ² by less than
+    #: last rate another 300 evaluations would have lowered χ² by less than
     #: one esd's worth) and ``max_nfev`` (the budget ran out).  ``solver="trf"``
     #: writes scipy's ``ftol``, ``xtol``, ``gtol``, ``ftol+xtol`` and
     #: ``max_nfev``.  A model that stopped being finite writes

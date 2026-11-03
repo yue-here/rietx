@@ -150,33 +150,43 @@ FTOL = 1e-9
 #: small step is a small step; three running is convergence (Coelho's rule).
 _CONVERGED_RUNS = 3
 #: **The slow-descent rule** (WP-1334, issue #222).  A stage stops, with
-#: termination ``slow_descent``, once the rest of its budget would lower S by
-#: less than ``SLOW_DESCENT_ESD²`` times χ²_red = S/(N − P), at the rate the
-#: last quarter of the budget lowered it (:data:`_SLOW_DESCENT_WINDOW`).  At a
-#: quadratic minimum that is the decrease bought by moving the parameters
-#: jointly by ``SLOW_DESCENT_ESD`` of their esds, since the esds are
-#: χ²_red·(JᵀJ)⁻¹ (Press et al. 2007, *Numerical Recipes* 3rd ed., §15.6,
-#: Δχ² = 1 per standard deviation, scaled here by χ²_red).  McCusker et al.
-#: (1999), *J. Appl. Cryst.* 32, 36-50, §7, states convergence in the same
+#: termination ``slow_descent``, once the next :data:`_SLOW_DESCENT_HORIZON`
+#: evaluations would lower S by less than ``SLOW_DESCENT_ESD²`` times
+#: χ²_red = S/(N − P), at the rate the last :data:`_SLOW_DESCENT_WINDOW`
+#: lowered it.  At a quadratic minimum that is the decrease bought by moving
+#: the parameters jointly by ``SLOW_DESCENT_ESD`` of their esds, since the
+#: esds are χ²_red·(JᵀJ)⁻¹ (Press et al. 2007, *Numerical Recipes* 3rd ed.,
+#: §15.6, Δχ² = 1 per standard deviation, scaled here by χ²_red).  McCusker et
+#: al. (1999), *J. Appl. Cryst.* 32, 36-50, §7, states convergence in the same
 #: unit, the shift over its esd.  So the stop gives up less than one esd of
 #: travel at that rate, and a stage still descending faster runs on.  Where
 #: the decrease per evaluation does not grow, the linear projection overstates
-#: what the budget would buy, so the bound holds.  A stage that speeds up late
-#: is the case it misses, measured in the WP.
+#: what the next evaluations would buy, so the bound holds.  A stage that
+#: speeds up late is the case it misses.  The stop says nothing about how far
+#: the minimum is: a crawl along a flat or constrained direction can sit well
+#: above it (``tests/test_lm_solver.py``'s face crawl).
 #:
-#: Its status is ``max_iter``, never ``converged``, because no test of a
-#: minimum was met.  ``None`` switches the rule off and restores the driver
-#: before WP-1334 bit for bit.  The TRF driver has no such rule, since scipy
-#: owns its loop.
+#: N counts every row the driver sees, penalty and restraint rows included,
+#: so this χ²_red differs from the data-only one the reported esds use by
+#: those rows' share.  Its status is ``max_iter``, never ``converged``,
+#: because no test of a minimum was met.  ``None`` switches the rule off and
+#: restores the driver before WP-1334 bit for bit.  The TRF driver has no such
+#: rule, since scipy owns its loop.
 SLOW_DESCENT_ESD: float | None = 1.0
-#: The slow-descent rule's window, as a divisor of the stage's evaluation
-#: budget: a quarter, 100 of a default stage's 400, and the rule is first read
-#: once a whole window has passed.  A quarter is the margin
+#: The slow-descent rule's window in residual evaluations, never steps, and
+#: the earliest point the rule is read: a quarter of a default stage's 400.
 #: ``tests/test_budget_and_tolerance_invariance.py`` asserts every converging
-#: acceptance stage stays inside (the largest measured use is 49 of 400).  So
-#: no stage that converges on the shipped schedule reaches the first reading,
-#: and those fits are unchanged bit for bit.
-_SLOW_DESCENT_WINDOW = 4
+#: acceptance stage stays inside it (the largest measured use is 49 of 400),
+#: so no stage that converges on the shipped schedule reaches the first
+#: reading, and those fits are unchanged bit for bit.  It is a count, not a
+#: fraction of the budget, so a stage given a smaller budget (a series'
+#: bounded first rung, WP-1127) is read at the same points as the unbounded
+#: one and cut, if at all, where that one would be.
+_SLOW_DESCENT_WINDOW = 100
+#: How far ahead the rule projects, in evaluations: the rest of a default
+#: stage's budget after its first window, 400 − 100.  A count for the same
+#: reason as the window, so the rule does not depend on ``max_iter``.
+_SLOW_DESCENT_HORIZON = 300
 #: relative floor on the *predicted* decrease −Δθᵀb.  Below this the step
 #: cannot be measured against S in fp64 (S is a sum of ~10⁴ squares, so its
 #: own resolution is ~1e-16·S), and a "failed" step is then a measurement
@@ -734,12 +744,12 @@ def _descent_too_slow(accepted_at: list[int], accepted_s: list[float],
     """
     if SLOW_DESCENT_ESD is None or n_dof <= 0:
         return False
-    window = max_nfev // _SLOW_DESCENT_WINDOW
-    if window < 1 or n_fev - window < 1 or n_fev >= max_nfev:
+    window = _SLOW_DESCENT_WINDOW
+    if n_fev - window < 1 or n_fev >= max_nfev:
         return False
     i = bisect.bisect_right(accepted_at, n_fev - window) - 1
     s_now = accepted_s[-1]
-    projected = (accepted_s[i] - s_now) * (max_nfev - n_fev) / window
+    projected = (accepted_s[i] - s_now) * _SLOW_DESCENT_HORIZON / window
     return projected < SLOW_DESCENT_ESD ** 2 * s_now / n_dof
 
 

@@ -10638,24 +10638,30 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
     stages it cut, from ``StageResult.termination``, so a reader can tell "ran
     out" from "stopped because the rest would have bought less than an esd".
     """
+    from .optimize import lm
+
     hit = [s for s in stage_results if s.status == "max_iter"]
     if not hit:
         return []
     slow = [s.name for s in hit if s.termination == "slow_descent"]
     spent = [s.name for s in hit if s.termination != "slow_descent"]
+
+    def _stages(names: list[str], one: str, many: str) -> str:
+        return (("Stage " if len(names) == 1 else "Stages ")
+                + ", ".join(repr(n) for n in names)
+                + (one if len(names) == 1 else many))
+
+    esd = lm.SLOW_DESCENT_ESD
+    esds = "one esd" if esd in (None, 1.0) else f"{esd:g} esd"
     parts = []
     if spent:
-        parts.append(("Stage " if len(spent) == 1 else "Stages ")
-                     + ", ".join(repr(n) for n in spent)
-                     + (" stopped on its iteration budget."
-                        if len(spent) == 1 else
-                        " stopped on their iteration budgets."))
+        parts.append(_stages(spent, " stopped on its iteration budget.",
+                             " stopped on their iteration budgets."))
     if slow:
-        parts.append(("Stage " if len(slow) == 1 else "Stages ")
-                     + ", ".join(repr(n) for n in slow)
-                     + " stopped early: at the rate the cost was falling, the "
-                       "rest of the budget would have lowered χ² by less than "
-                       "one esd of travel buys.")
+        tail = (" stopped early: at the rate the cost was falling, another "
+                f"{lm._SLOW_DESCENT_HORIZON} evaluations would have lowered χ² "
+                f"by less than {esds} of travel buys.")
+        parts.append(_stages(slow, tail, tail))
     return [Diagnostic(
         level="warning", code="STAGE_MAX_ITER",
         message=" ".join(parts),
