@@ -1057,15 +1057,16 @@ def suggest_actions(attributions: list[RegionAttribution],
         if axial_off:
             rationale += (
                 " while both axial apertures are 0, so the model draws no "
-                "asymmetry: take them from a standard's calibration, or add a "
-                "stage freeing them to the plan and run it again, since the "
-                "widths and positions fitted without them have absorbed part "
+                "asymmetry: take S/L from a standard's calibration, or add a "
+                "stage freeing S/L to the plan and run it again, since the "
+                "widths and positions fitted without it have absorbed part "
                 "of it")
         actions.append(SuggestedAction(
             kind="refine_axial_asymmetry", confidence=0.5,
             rationale=rationale,
-            parameter_paths=["instrument.geometry.axial_sl",
-                             "instrument.geometry.axial_hl"],
+            # S/L alone: the FCJ weight is symmetric under S/L <-> H/L, so
+            # freeing both reaches one of two mirrored minima (WP-2012).
+            parameter_paths=["instrument.geometry.axial_sl"],
             two_theta_range=(min(a.two_theta_lo for a in low),
                              max(a.two_theta_hi for a in low))))
 

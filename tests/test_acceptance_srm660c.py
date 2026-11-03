@@ -93,9 +93,9 @@ def _nist_calibrated_plan() -> rx.RefinementPlan:
         rx.Stage("profile_w", ["instrument.profile.w"]),
         rx.Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                              "instrument.profile.x", "instrument.profile.y"]),
+        # S/L alone, H/L held at its declared 0.025, as the preset (WP-2012).
         rx.Stage("lines_axial", ["instrument.source.lines.*.weight",
-                                 "instrument.geometry.axial_sl",
-                                 "instrument.geometry.axial_hl"]),
+                                 "instrument.geometry.axial_sl"]),
         rx.Stage("biso", ["phases.*.atoms.*.biso"]),
     ])
     # WP-1123: the shipped convergence schedule, named rather than inherited.
@@ -134,7 +134,8 @@ def test_srm660c_lab6_rietveld(srm660c_baseline):
     assert 0.45 < ins.source.lines[1].weight.value < 0.56
     # axial ratios in the physically plausible window for the DBD
     assert 0.005 < ins.geometry.axial_sl.value < 0.1
-    assert 0.005 < ins.geometry.axial_hl.value < 0.1
+    # H/L is held at its declared value: the plan frees S/L alone (WP-2012)
+    assert ins.geometry.axial_hl.value == 0.025
 
     # FitReport must digest stitched-region lab data
     report = rx.build_report(result)
