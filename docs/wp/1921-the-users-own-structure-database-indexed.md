@@ -70,6 +70,25 @@ cell 0.2 s. Phase keys at 0.5 % cell tolerance: 149 373 for 136 727
 
 ### Inherited
 
+- **2026-11-03, from the issue triage (#1330): S3 of the standardization
+  proposal lands here, as `analogues()`'s identity test.** #1330 proposes two
+  levels for "is this the same entry?". First an invariant key: space-group
+  number, the Wyckoff sequence with the species on each position, the reduced
+  formula and the Pearson symbol. Then a normaliser-aware `compare(a, b)` inside
+  each bucket, returning the transform and the largest displacement in Å. The
+  tolerance verdict is a heuristic and needs an `_audit` row. Exact equality of
+  standardized coordinates is not enough, because Γ-minimal coordinates are
+  discontinuous (Parthé & Gelato 1984, Tables 7–8). Checked against the tree at
+  62724a30f: `compare` exists in substance. `rietx.solve.cluster.equivalences`
+  builds the Euclidean normaliser on a metric, and `align(eq, xa, xb, species)`
+  returns `Alignment(rmsd, max_dev, element)`. Its `max_dev` is the largest
+  displacement in Å and `element` indexes the transform. It pairs atoms one to
+  one per species, so two entries with different atom counts need the key's
+  bucket first. Build on it rather than writing a second comparer. The
+  standardization itself (S0 in PR #1332, S1 and S2 in
+  [2085](2085-a-phase-in-its-standardized-description.md)) is a soft
+  prerequisite: the key's Wyckoff sequence reads off a standardized phase.
+
 - **Decided 2026-10-16 (maintainer, from the issue triage, #990): search-match
   stays behind the v2+ fence.** #990's request to unfence it is declined for
   now, and this WP stays at lookup (stages 1a and 1b). Task 1's question (1)
