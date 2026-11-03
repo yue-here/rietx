@@ -1081,9 +1081,9 @@ ROWS: tuple[Row, ...] = (
                   "(2003-batch/batch.md, C1)"),
         grounds=("Says out loud that the chain restarted, the package's own act, as "
                  "CELL_RUNAWAY does (B8); the ladder's trigger is tiered with C2's ladder. "
-                 "Settled by Claude 2026-10-26 under the maintainer's delegation; "
-                 "the maintainer's own approval is owed (2003-batch/batch.md, C1)."),
-        approved="2026-10-26", response="warning",
+                 "Settled by Claude 2026-10-26; ruled by the maintainer 2026-11-03 "
+                 "(2003-batch/batch.md, C1)."),
+        approved="2026-11-03", response="warning",
         responds=("read the named pattern's step from its neighbour as a cold fit's, not the "
                   "chain's, before quoting a trajectory's cell or fraction across it")),
     Row("SEQUENTIAL_UNRECOVERED", "code", tier=3, ambiguity=1,
@@ -1450,15 +1450,15 @@ ROWS: tuple[Row, ...] = (
                   "the status-only trigger, CPD 0 (2003-batch/batch.md, C1)"),
         grounds=("The record of the escalation, tiered with it: trying a colder start on a "
                  "diverged fit and keeping the better is what a refiner does by hand. "
-                 "Settled by Claude 2026-10-26 under the maintainer's delegation; "
-                 "the maintainer's own approval is owed (2003-batch/batch.md, C1)."),
-        approved="2026-10-26"),
+                 "Settled by Claude 2026-10-26; ruled by the maintainer 2026-11-03 "
+                 "(2003-batch/batch.md, C1)."),
+        approved="2026-11-03"),
     Row("rietx.schemas.sequential.SeriesEntry.rwp_over_median", "action", tier=1, ambiguity=3,
         evidence=("arithmetic: the kept attempt's Rwp over the median Rwp of the patterns "
                   "accepted before it in walk order (sequential.py _rwp_over_median), a record "
                   "with no threshold; it replaces SeriesEntry.rwp_fence, reseed_factor x the "
                   "same median, whose default fence was removed (WP-2003, 2003-batch/batch.md, "
-                  "C1, settled by Claude 2026-10-26). Its help entry says the first patterns are compared "
+                  "C1, ruled by the maintainer 2026-11-03). Its help entry says the first patterns are compared "
                   "against a median of one or two values (X8) and that Rwp tracks Rexp "
                   "(WP-1469's GoF and Rexp readings)")),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
@@ -4287,10 +4287,9 @@ ROWS: tuple[Row, ...] = (
                   "nothing in 3 111 evaluations (2026-11-02, macOS arm64)"),
         grounds=("Trying a colder start on a diverged or unfinished fit and keeping the "
                  "better is what a refiner does by hand; the escalation never keeps a worse "
-                 "attempt (_prefer); tiered with C2's ladder. Settled by Claude 2026-10-26 "
-                 "under the maintainer's delegation; the maintainer's own approval is owed "
+                 "attempt (_prefer); tiered with C2's ladder. Settled by Claude 2026-10-26; ruled by the maintainer 2026-11-03 "
                  "(2003-batch/batch.md, C1)."),
-        approved="2026-10-26"),
+        approved="2026-11-03"),
     Row("rietx.sequential.SequentialRefinement.fit:reseed_factor", "default", tier="caller",
         ambiguity=1, value=None,
         evidence=("opt-in: reseed_factor=None sets no Rwp fence, and a factor is asked by "
@@ -4299,8 +4298,8 @@ ROWS: tuple[Row, ...] = (
                   "it carried until WP-2003 (RESEED_FACTOR) was removed: its 116 escalations "
                   "on main moved no value past 7.2e-4 esd, planted from T134 paid 4.1x the "
                   "evaluations for nothing, and an Rwp comparison is no default action's "
-                  "evidence (DESIGN.md § Rules, 4; 2003-batch/batch.md, C1, settled by "
-                  "Claude 2026-10-26)")),
+                  "evidence (DESIGN.md § Rules, 4; 2003-batch/batch.md, C1, ruled by "
+                  "the maintainer 2026-11-03)")),
     Row("rietx.sequential.SequentialRefinement.fit:first_rung_factor", "default", tier="caller",
         ambiguity=1, value=None,
         evidence=("opt-in: first_rung_factor=None bounds no first rung, and a factor is asked "

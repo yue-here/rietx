@@ -121,6 +121,22 @@ the maintainer's answer. PR #1310 does not merge before briefs 1 and 2 are answe
 Seen 2026-11-02: PR #1331 (WP-2010's reconstructed entry) duplicates `d568e0b`/`02cad1b`
 on this branch, so whichever merges second conflicts in WP-2010's log.
 
+**Re-sent one at a time 2026-11-03, after WP-2080's settlement.** WP-2080's trigger (option B
+at 1.25) was settled by Claude under the maintainer's 2026-11-02 delegation ("use your best
+judgement on 2080"), which answers brief 1's second half. Brief 1 went back as C1 alone, with
+a measurement: WP-2081's held-zero-shift case (`2081-batch/measure_cold_rung.py` run on this
+branch, macOS arm64, worktree venv `[dev]`, 2.3 s) keeps pattern 3's cell 547 ppm off at GoF
+9.76 against about 1.06. On `main` the fence sends pattern 3 up all three rungs with no change
+in value, and `SEQUENTIAL_RWP_OUTLIER` names patterns 2 and 3. On this branch no diagnostic
+names pattern 3, so brief 2 decides whether anything does.
+
+**Ruled by the maintainer 2026-11-03: C1 1 (b) and 2 (i).** The Rwp fence is no default
+trigger, and `reseed_factor` stays the caller's. A warm pattern escalates when it diverged,
+raised or carries an error-level code (C2 q5), or on WP-2080's GoF step. The three tier-3 rows
+of the escalation (`SEQUENTIAL_RESEED`, `SeriesEntry.reseeded`, `fit:reseed`) carry this
+date as their approval. Open: briefs 2-5 and the consent lines, with WP-2080's tier-3 row,
+approved under the 2026-11-02 delegation, added to the approval dates the maintainer confirms.
+
 ---
 
 ## C1. What sends a warm fit up the ladder

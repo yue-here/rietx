@@ -15,7 +15,7 @@
   "response": "warning",
   "responds": "read the named pattern's step from its neighbour as a cold fit's, not the chain's, before quoting a trajectory's cell or fraction across it",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_RESEED.suggestion",
@@ -30,7 +30,7 @@
   "applied": false,
   "decision": null,
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_RWP_OUTLIER",
@@ -48,7 +48,7 @@
   "response": "warning",
   "responds": "open the named pattern's own fit before quoting its cell, fraction or width: its best rung is still above the chain's fence",
   "scope": null,
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step; what reports a misfit in the fence's place is the maintainer's decision 2, open. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_RWP_OUTLIER.suggestion",
@@ -63,7 +63,7 @@
   "applied": false,
   "decision": "with its code (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step; what reports a misfit in the fence's place is the maintainer's decision 2, open. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "SEQUENTIAL_UNRECOVERED",
@@ -578,7 +578,7 @@
   "applied": false,
   "decision": "C1 2 (i): tier 3, the record of the kept action (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.schemas.sequential.SeriesEntry.rwp_fence",
@@ -593,7 +593,7 @@
   "applied": false,
   "decision": "C1 1 (b) (pick): demoted to the ratio field (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step; what reports a misfit in the fence's place is the maintainer's decision 2, open. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.schemas.sequential.SeriesEntry.rungs_tried",
@@ -638,7 +638,7 @@
   "applied": false,
   "decision": "C1 1 (b) and 2 (i) (pick): no default fence; escalate on diverged or raised only; (ii) max_iter and (iii) CELL_RUNAWAY measured on main and not adopted; lands in C3's order (X16) (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.FIRST_RUNG_SAMPLES",
@@ -1014,7 +1014,7 @@
   "applied": false,
   "decision": "tier 3, the ladder's switch, approved with C2; under C1 2 (i) it escalates a diverged or raised rung only; the forced-escalation breach (X2) is fixed after X16 (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:reseed_factor",
@@ -1029,7 +1029,7 @@
   "applied": false,
   "decision": "C1 1 (b) (pick): caller, no default; refused unless finite and positive (inf is accepted unchecked today, sequential.py:1028-1030, and also switches off the discontinuity scan's above-fence drop) (revised 2026-10-25, batch.md)",
   "class": "C1",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.SequentialRefinement.fit:first_rung_factor",
@@ -1231,7 +1231,7 @@
   "decision": "C1 2 (i) (pick): diverged only (a raised rung escalates at its own site); tier 3, kind 1, approved with C2's ladder; C2 question 5 asks whether an error-level kept attempt counts as diverged (revised 2026-10-25, batch.md)",
   "class": "C1",
   "row_note": "no row of its own: what it decides is recorded by SeriesEntry.reseeded, rungs_tried and rwp_fence, whose rows carry its tier",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._ladder",
@@ -1295,7 +1295,7 @@
   "decision": "lapses under C1 1 (b) (pick), with no default fence to carve out of; under 1 (a), confirm; the scan half is ruled in C4 (revised 2026-10-25, batch.md)",
   "class": "C1",
   "row_note": "no row of its own: SeriesEntry.rwp_fence and the above_fence property record it, and SEQUENTIAL_RWP_OUTLIER names it; the scan half leaves with SEQUENTIAL_DISCONTINUITY",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C1 (decision 1 of the 2026-11-03 batch): the Rwp fence is no default trigger, and a warm pattern escalates when it diverged, raised or carries an error-level code, or on WP-2080's GoF step. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._floor_unsupported_moments",
