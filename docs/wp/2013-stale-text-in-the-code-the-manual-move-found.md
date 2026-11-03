@@ -1,6 +1,6 @@
 # WP-2013 — Stale text in the code that the manual move found
 
-Milestone: unscheduled · Status: ✅ 2026-11-02 — every line corrected or struck; five behaviour questions left for the maintainer
+Milestone: unscheduled · Status: ✅ 2026-11-03 — every line corrected or struck; of the five behaviour questions, 1 and 2 ruled and built, 5 ruled and folded into WP-1925, 3 and 4 WP-2007's
 Track: The repo's own process
 Depends on: —
 
@@ -58,6 +58,60 @@ finding goes stale (memory `queued-wp-findings-go-stale`).
 ```
 
 ## Handover log
+
+- **2026-11-03** — the maintainer's answers to the questions this WP left,
+  and the two small changes they asked for. A hump declared in code must now
+  say where it is: `HumpComponent()` with no position raises, where it used to
+  put the hump at 0° 2θ, below any measured range. A stored document that
+  omits the position still opens at that old 0.0, so no file a user holds
+  stops opening. The project-format registry no longer declares a "repairs
+  reported at read" value that no format uses. The high-energy dispersion
+  question became a ruling on WP-1925, which already owned it. Recorded in
+  PR #PRNUM, a ghostshift runner's branch carrying the 2026-11-02 rulings
+  for WP-2013, 2045, 1933 and 1925. This WP stays closed: the entry records
+  how its owed questions ended.
+
+  *Rulings* (maintainer, 2026-11-02), against the five owed questions below:
+  1. `HumpComponent.position` becomes required. The read-time fill of the
+     old 0.0 is **settled by Claude under the old-files-open rule** (memory
+     `rietx-few-users-in-direct-contact`).
+  2. Drop `"read"` from `ProjectFormat.reports_at`. **Settled by Claude
+     under the WP-1076 rule** (a declared member no code produces), no
+     objection from the maintainer 2026-11-02.
+  3. and 4. Unchanged, WP-2007's.
+  5. File a WP to extend the f′/f″ table past 70 keV from a permissively
+     licensed source, the recipe reader's message unchanged meanwhile.
+     WP-1925 is that WP (filed 2026-10-08 from #792), so the ruling went
+     into its task 2 rather than into a second file.
+
+  *Done.* `reports_at` is `Literal["build", "both"]`. The read channel in
+  `read_project_model` tests for `"both"`, and `ProjectModel.to_structure`
+  always hands a list on, since both remaining values have a build channel.
+  The capabilities comment, the two manual tables and the test stub follow.
+  For the hump, a `mode="before"` validator refuses a missing `position`
+  unless the validation runs under `schemas.common.STORED_DOCUMENT`, a
+  pydantic context. A vanished field's validator cannot tell a document from
+  a constructor call, and the context is how a reader says which it is. The
+  readers that pass it are `migrate.STORED_DOCUMENT_READ_POINTS`:
+  `history.store.read_records`, where a project's models live, and
+  `load_instrument_profile`. `project.json` holds no model and an `.rxt`
+  builds no component, so neither needs it. The field keeps its factory,
+  because the factory declares the `deg` unit a caller's own `Parameter`
+  inherits (`_InheritsDeclaredDefaults`). `help.py` quotes no default for it
+  now, as for `PeakComponent.center`. The reference table says "required",
+  schema 0.60's comment names the change, and the 1.11.0 notes stage the
+  break and the dropped member. Three tests: a bare hump and a hump dict
+  without `position` raise (fails on the old tree), a history line without
+  it opens at 0.0 and stays editable, and each read point named passes the
+  context.
+
+  *Routed.* WP-2006's Inherited note on undeclared writers loses its
+  `reports_at` half, marked there. WP-1925 gets the ruling and the findings.
+
+  *Gates* are in the PR body and the next actions there; see the WP-2045
+  entry for the ruling's other half.
+
+  Next: none on this WP.
 
 - **2026-11-02** — closed by a ghostshift runner. Every line the manual move flagged now says what
   the code does today, or is struck with its reason. No behaviour moved: what a standard fit prints
