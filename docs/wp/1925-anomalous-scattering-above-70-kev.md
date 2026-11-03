@@ -56,6 +56,8 @@ short of 130 keV, so it is a partial answer.
 
 ### Inherited
 
+- **2026-11-03, from [2013](2013-stale-text-in-the-code-the-manual-move-found.md) (its owed question 5) and the maintainer's ruling of 2026-11-02.** The ruling is in § Tasks (task 2). The case that raised it is the PowderLine recipe reader at 74.5 keV (λ 0.16642 Å). There the table refuses every element, and `io/recipe.py` (`_decline_dispersion_off_table`) declines dispersion for the whole model with `RECIPE_DISPERSION_DECLINED` at `info`. For W, whose K edge is 69.5 keV, that drops an f″ of about 3 e at 5 keV above the edge. That figure is the lead's estimate from W's photoabsorption cross-section, not a measurement; this tree's table gives W f′ −4.06 e and f″ 0.64 e at 69 keV, below the edge. Many high-energy beamlines run at 60-100 keV, so the band matters well below #792's 130 keV. Two facts measured 2026-11-03 (macOS arm64, worktree venv `[dev]`, tree `27a58e102`), by a probe outside the tree. (1) **`Dispersion.overrides` already carries a fit above the band, but only when every element is overridden.** On LaB6 at 74.5 keV, `compile_model` refuses with no overrides (naming La), refuses with La alone overridden (naming B, whose f′ and f″ are near zero there), and compiles and fits with both. An override skips the lookup per element in `dispersion.resolve`, and one element left to the table refuses the whole model. (2) **Licences, checked 2026-11-03.** NIST's FFAST page states SRD 66 is "© 1995, 1996, 2001 copyright by the U.S. Secretary of Commerce … All rights reserved", so the Chantler tables are not a public-domain US-government work. xraydb's LICENSE places "the database files, data sources, and documentation files" under CC0 "unless otherwise stated", and also says "some of the datasets here do not have clear statements of copyright or license". So xraydb's CC0 does not clear the Chantler data it repackages. Not checked: xraylib (BSD-3) and the provenance of its anomalous factors, and the Elam, Ravel and Sieber (2002) tables. Until this WP lands, the recipe reader's decline and its message stay as they are (the ruling).
+
 ## Non-goals
 
 - A Chantler table taken from DABAX or NIST (licence, above).
@@ -72,10 +74,14 @@ short of 130 keV, so it is a partial answer.
       80, 100 and 130 keV, for Si, Fe, Pb and U. At 60 keV Si the maximum
       intensity moves by 0.04 % between the default and `None` (2026-10-08,
       Debye-Scherrer, 5d1f5f67); the heavy elements are the question.
-- [ ] Decide the source: xraydb's Chantler extract (licence and a bundled-size
-      check), the optical-theorem f″ from McMaster plus an analytic f′, or
-      declining above 70 keV with a better message. Record the decision with
-      the numbers from task 1.
+- [ ] Decide the source. **Ruled by the maintainer 2026-11-02: extend the
+      table past 70 keV from a permissively licensed source**, so declining
+      above 70 keV with a better message is no longer an option. The choice
+      left is which source, recorded with task 1's numbers and a licence
+      checked per file: the optical-theorem f″ from McMaster (to 120 keV)
+      plus an analytic f′, xraylib, the Elam tables, or another. xraydb's
+      Chantler extract is out unless NIST's terms are cleared (Inherited,
+      2026-11-03).
 - [ ] If a table is added: bundle it with an ATTRIBUTION.md entry and a header
       stating its status (the wheel rule in root CLAUDE.md § Licensing), extend
       the band, keep the 3-70 keV rows bit-identical, and keep the edge guard.
@@ -109,6 +115,19 @@ names the workaround, and the 3-70 keV tests are unchanged.
 - WP-0504 (the table decision), WP-0305 (McMaster), WP-1532 (skill wording).
 
 ## Handover log
+
+- **2026-11-03** — the maintainer ruled the direction: the table is extended
+  past 70 keV from a permissively licensed source, and the recipe reader's
+  decline stays unchanged until then. WP-2013 asked for a new WP, and this
+  one already owns the work, so the ruling was folded here rather than filed
+  twice. Task 2 now carries the ruling. The Inherited note carries the
+  74.5 keV recipe case and two findings: `Dispersion.overrides` already gets
+  a fit past the band when every element is overridden, and NIST's Chantler
+  tables are copyrighted, so xraydb's CC0 does not clear them. Recorded in
+  PR #PRNUM, a ghostshift runner's branch carrying the 2026-11-02 rulings.
+
+  *Next.* Task 1 is unchanged and comes first: measure what the correction is
+  worth at 80, 100 and 130 keV. Then pick a source among the permissive ones.
 
 - **2026-10-08** — created, from the 2026-10-08 issue triage (issue #792).
   Checked against the tree at 5d1f5f67: a Si model at 71 and 130 keV
