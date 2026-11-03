@@ -2215,6 +2215,12 @@ class ParameterTable:
         """Every derived row a rigid body writes → that body's name (WP-1805)."""
         return {q: name for _, name, block in self._bodies for q in block.outputs}
 
+    def body_row_bases(self) -> dict[str, str]:
+        """Every derived row a rigid body writes → that body's base path,
+        ``phases.<i>.rigid_bodies.<k>``: advice naming the owning body's own
+        DOFs, where :meth:`body_rows`' name is unique only in its phase."""
+        return {q: bbase for bbase, _, block in self._bodies for q in block.outputs}
+
     def body_dofs(self) -> dict[str, str]:
         """Every rigid body's own DOF → that body's name (WP-1805).
 

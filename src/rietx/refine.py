@@ -4216,9 +4216,7 @@ class Refinement:
                 + (f" and {len(blocked) - 1} more" if len(blocked) > 1 else "")
                 + f": placed by rigid body {names[0]!r}; hold the body's own "
                 "origin, rotation and torsions instead "
-                "(phases.*.rigid_bodies.*.origin.dof.*, "
-                "phases.*.rigid_bodies.*.rotation.*, "
-                "phases.*.rigid_bodies.*.torsions.*.twist)")
+                f"({_body_dof_globs(table.body_row_bases()[blocked[0]])})")
         new = [p for p in hits if p not in self._user_holds]
         if not new:
             return []
@@ -8645,9 +8643,7 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
         if reaches and f"{site}.x" in owned:
             why = f" Rigid body {owned[f'{site}.x']!r} places {site}."
             fix = ("Free the body's own origin, rotation and torsions instead "
-                   "(phases.*.rigid_bodies.*.origin.dof.*, "
-                   "phases.*.rigid_bodies.*.rotation.*, "
-                   "phases.*.rigid_bodies.*.torsions.*.twist).")
+                   f"({_body_dof_globs(table.body_row_bases()[f'{site}.x'])}).")
         elif (reaches and not dofs
               and all(e is not None and e.locked for e in coords)):
             why = (f" Every coordinate of {site} is fixed by its site symmetry, "
@@ -11960,6 +11956,13 @@ def _rigid_body_unsupported(table: ParameterTable,
                  f"freedom measured nothing ({', '.join(paths)})."),
         suggestion=_unsupported_body_advice(table, bbase, paths))
         for bbase, paths in blind.items()]
+
+
+def _body_dof_globs(bbase: str) -> str:
+    """One body's own DOFs as the globs advice names, for the body at ``bbase``
+    alone rather than every body in every phase (WP-1951's follow-up)."""
+    return (f"{bbase}.origin.dof.*, {bbase}.rotation.*, "
+            f"{bbase}.torsions.*.twist")
 
 
 def _unsupported_body_advice(table: ParameterTable, bbase: str,
