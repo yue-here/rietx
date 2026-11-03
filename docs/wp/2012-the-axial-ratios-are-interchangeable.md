@@ -134,6 +134,45 @@ choosing a fix.
 
 ## Handover log
 
+- **2026-11-03 (second ghostshift runner, the nightly)** — The 2026-11-03 nightly's one
+  failure was this WP's. Since #1356 the lab plan no longer refines H/L, so H/L is not a row
+  of the result. The skill-placement episode's colleague script still asked the result for
+  it and stopped with a `KeyError`. The script now prints S/L alone, and the eval protocol
+  records the changed episode. The episode loses its two findings on the S/L ~ H/L pair and
+  keeps all five scored codes. Nothing the library returns or prints changed. PR #1387.
+
+  *Done.* Bisected over `main`'s first parents: `fa7ec8599` passes, and the first bad merge
+  is `01ef7b61a` (#1356). The row is `@pytest.mark.slow`, so #1356's fast gates could not
+  reach it. `tests/eval_skill_placement/colleague_fit.py` drops `axial_hl` from its printed
+  paths and keeps setting it to 0.02. `tests/eval_skill_placement/PROTOCOL.md` gains
+  § Amendment, 2026-11-03. Siblings: nothing else in `tests/`, `examples/`, `docs/docs/` or the
+  skill reads `axial_hl` off a result, and the nightly ran every executed reader green. The
+  eval harnesses' other scripts read no result rows.
+
+  *Measured* (darwin/arm64, worktree venv `[dev]`, compiled tier on). The episode before and
+  after: S/L 0.020126 ± 1.168 → 0.020237(890), cell a 9.369048 → 9.369045 Å (0.3 ppm), c
+  6.883869 → 6.883866, each Biso within 0.0001 Å². The `HIGH_CORRELATION` and
+  `FLAT_DIRECTION` on S/L ~ H/L (ρ = −1.000) are gone. `FLAT_DIRECTION` still fires on zero ~
+  displacement. That 0.3 ppm also answers a review question on `tests/eval_skill`'s `fap-fit`
+  envelope (measured with both ratios free): an envelope 255 ppm wide is not moved by it.
+
+  *Review.* `/code-review high --fix` found six and fixed two in `b59449776` (the amendment's
+  wording on which codes still fire; the script's docstring cites both amendments).
+  Declined: a fast guard that every printed path is freed by the plan, since it would copy
+  the script's path list and the nightly is the slow rows' guard; `PROTOCOL.md` § The
+  episode still says six codes, a registered section the amendments correct; a pooling note
+  in `tests/eval_skill/PROTOCOL.md`, since the placement amendment names `fap-judge` and
+  `build_episode` is the placement round's. One sibling went to WP-2084's `### Inherited`:
+  the manual's SRM 660c ftol row still quotes the both-free 8.82 esd.
+
+  *Gates.* The placement row passes, and with the touched files 169 passed on the tree
+  merged with `origin/main` `cd2596f43`. The fast selection (`-m "not slow"`, at
+  `ffcfd79aa`, before that merge) gave 13720 passed, 319 skipped, 34 xfailed; this branch
+  adds no test. `tests.reader_output`: exit 0, unchanged. The full suite did not run: a
+  test-only change (`tests/CLAUDE.md` § Running).
+
+  *Next:* as the entry below says. The maintainer's recipe task is the one open item.
+
 - **2026-11-03 (ghostshift runner, started 2026-11-02)** — `lab_calibrate` and `lab_bragg_brentano`
   now refine the axial-divergence ratio S/L and hold H/L at the value the user sets, as the
   maintainer ruled on 2026-11-01. A calibration no longer reports two interchangeable numbers
