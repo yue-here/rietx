@@ -100,16 +100,35 @@ finding goes stale (memory `queued-wp-findings-go-stale`).
   inherits (`_InheritsDeclaredDefaults`). `help.py` quotes no default for it
   now, as for `PeakComponent.center`. The reference table says "required",
   schema 0.60's comment names the change, and the 1.11.0 notes stage the
-  break and the dropped member. Three tests: a bare hump and a hump dict
+  break and the dropped member. Four tests: a bare hump and a hump dict
   without `position` raise (fails on the old tree), a history line without
-  it opens at 0.0 and stays editable, and each read point named passes the
-  context.
+  it opens at 0.0 and stays editable, a hand-written instrument profile
+  without it opens too, and each read point named passes the context.
 
   *Routed.* WP-2006's Inherited note on undeclared writers loses its
   `reports_at` half, marked there. WP-1925 gets the ruling and the findings.
+  The recipe reader's `0.0` for a background peak with no position, a
+  sibling of question 1, goes to WP-2006's Inherited, because changing it
+  changes what `read_recipe` returns.
 
-  *Gates* are in the PR body and the next actions there; see the WP-2045
-  entry for the ruling's other half.
+  *Review.* `/code-review high --fix` raised seven points. Four landed:
+  `reading_stored_document` checks for a mapping, the read-point resolver
+  fails by name, the API reference generator reads
+  `HumpComponent._required_of_a_caller` so the manual no longer prints a
+  0.0 default, and the profile read point has a behavioural test. Three were
+  declined. The 0.0 fill records no `Diagnostic`, since `read_records` has no
+  channel and only a hand-written file reaches the fill. The recipe sibling
+  is routed as above. `ProjectFormatCapability.reports_at` stays typed `str`,
+  because narrowing it changes the published schema type.
+
+  *Generality.* Judge not dispatched: the branch leaves `_audit.py` alone,
+  and the 0.0 fill migrates a stored value without adding a heuristic.
+
+  *Closed-WP writes.* `closed_wp_writes.py` flags this entry. It is this
+  WP's own record of how its owed questions ended, and every follow-up it
+  names sits in an open WP (2006, 1925).
+
+  *Gates* GATES-PENDING
 
   Next: none on this WP.
 
