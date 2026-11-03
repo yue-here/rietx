@@ -327,13 +327,6 @@ shared `EventStream` instead (present on **637 of 637** payloads in one run).
 `SeriesEntry` carries no `stages`; `SequentialRefinement.results_` holds each
 fit's `StageResult.rwp`.
 
-A `prepare` that adds or removes a phase or an atom keeps every trajectory on
-one atom. Each path of a `SeriesResult` reads the series' own structure's
-numbering, matched by phase name and atom label, and `Trajectory.pattern_paths`
-gives each point's path in its own pattern's model. A phase name or atom label
-used twice is refused with `ValueError`. *(Measured: WP-1991, PbSO₄ with O3
-removed from the second pattern.)*
-
 Where `stage_reports=True` *does* apply — the single `Refinement.fit()` calls of a batch — it
 is expensive.  On the bundled NAC fixture it cost **4.7-5.7×** the same fit without it, with
 Rwp identical.  It was 7.1-8.3× on the same machine before WP-1335 cut the per-rung cost by
