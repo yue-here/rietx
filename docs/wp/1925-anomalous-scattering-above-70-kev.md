@@ -124,7 +124,7 @@ names the workaround, and the 3-70 keV tests are unchanged.
   74.5 keV recipe case and two findings: `Dispersion.overrides` already gets
   a fit past the band when every element is overridden, and NIST's Chantler
   tables are copyrighted, so xraydb's CC0 does not clear them. Recorded in
-  PR #PRNUM, a ghostshift runner's branch carrying the 2026-11-02 rulings.
+  PR #1369, a ghostshift runner's branch carrying the 2026-11-02 rulings.
 
   *Next.* Task 1 is unchanged and comes first: measure what the correction is
   worth at 80, 100 and 130 keV. Then pick a source among the permissive ones.

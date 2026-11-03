@@ -67,7 +67,7 @@ finding goes stale (memory `queued-wp-findings-go-stale`).
   stops opening. The project-format registry no longer declares a "repairs
   reported at read" value that no format uses. The high-energy dispersion
   question became a ruling on WP-1925, which already owned it. Recorded in
-  PR #PRNUM, a ghostshift runner's branch carrying the 2026-11-02 rulings
+  PR #1369, a ghostshift runner's branch carrying the 2026-11-02 rulings
   for WP-2013, 2045, 1933 and 1925. This WP stays closed: the entry records
   how its owed questions ended.
 

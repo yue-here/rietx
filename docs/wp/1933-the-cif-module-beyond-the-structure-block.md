@@ -272,7 +272,7 @@ the NAC + CaF₂ file reads back with its su.
   wrong in silence, and build nothing for the rare cases. That is three
   checklist items under § Tasks. The declined list and the condition that
   reopens it are written beside them. Nothing was built and no code moved.
-  The reply on the issue was already posted. Recorded in PR #PRNUM, a
+  The reply on the issue was already posted. Recorded in PR #1369, a
   ghostshift runner's branch carrying the 2026-11-02 rulings for four WPs.
 
   *Next.* Any of the three #913 items can land alone and before C-e; item (2)

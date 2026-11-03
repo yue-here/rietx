@@ -343,7 +343,7 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
   (2.2× in seconds) on cpd-1a with an absent zircon. What a warm series
   answers on this schedule is still unmeasured, and the ruling does not
   rest on it. This answers item (1) of the 2026-11-02 entry below. Recorded
-  in PR #PRNUM, a ghostshift runner's branch that carries the 2026-11-02
+  in PR #1369, a ghostshift runner's branch that carries the 2026-11-02
   rulings for four WPs; nothing in this WP's code or rows moved.
 
   *Next.* Item (3) below is open now: #1309 merged on 2026-11-02, so the
