@@ -40,7 +40,7 @@ from rietx.io.projects.gsas2 import read_gsas2_gpx, to_structure
 from rietx.io.readers import read_pattern
 from rietx.model.forward import compile_model
 from rietx.optimize.qpa import phase_zmv
-from rietx.params.bodies import RigidBodyBlock
+from rietx.params.bodies import RigidBodyBlock, site_reach
 from rietx.params.derived import cartesian_frame
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
@@ -288,7 +288,7 @@ def test_the_polar_law_would_take_diacetylene_out_of_its_mirror():
     assert abs(wrong @ u) < 1e-9 and abs(wrong[1]) < 1e-12   # in the mirror plane
     good = RigidBodyBlock(phase_base="p", body_base="b", atom_bases=["a"] * 6,
                           template=block.template, q0=block.q0,
-                          site_axes=wrong.reshape(3, 1))
+                          site_axes=wrong.reshape(3, 1), site_reach=site_reach(m))
     x[9] = math.radians(1.0)
     moved = good.evaluate(x).reshape(-1, 3)
     out = float(np.abs(moved[:, 1] - 0.75).max() * phase.cell.b.value)

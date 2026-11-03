@@ -193,7 +193,8 @@ class RigidBodyBlock(DerivedBlock):
         self.labels = ([str(a) for a in labels]
                        or [str(i) for i in range(len(self.template))])
         #: the most (rad) a linear body's axis tilts off its site's plane or
-        #: line with every atom within ``site_reach`` Å of it (:func:`site_reach`)
+        #: line with every atom within ``site_reach`` Å of it (:func:`site_reach`);
+        #: the default 0 holds the axis to the bit
         self.axis_tol = self._axis_tilt_bound(float(site_reach))
         self._set_anchor(np.asarray(q0, dtype=np.float64))
         #: (axis_a, axis_b, moves) index triples into the template (WP-1808)
