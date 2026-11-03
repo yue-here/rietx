@@ -555,6 +555,18 @@ ROWS: tuple[Row, ...] = (
     Row("AIR_SCATTER_UNDECLARED", "code"),
     Row("BACKGROUND_ABSORPTION", "code"),
     Row("BACKGROUND_ORDER_AT_CAP", "code"),
+    Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END", "code", tier=1, ambiguity=1,
+        evidence=("a reading of the scan's own record: fires exactly when no candidate of "
+                  "select_arpls_lambda's grid reached its Durbin-Watson floor, so the "
+                  "returned strength is the grid's flexible end by the fallback line and not "
+                  "by the criterion; decides nothing (WP-1931: none of the 20 patterns under "
+                  "tests/data falls back, FAP.XRA nearest at the last candidate, d = 1.26)"),
+        grounds=("Arithmetic: the scan says which of its two return lines produced the "
+                 "answer, so a fallback is not read as a choice."),
+        response="info",
+        responds=("note that the baseline's smoothing strength is the grid's end and not "
+                  "the scan's choice, before holding that baseline fixed"),
+        scope=("all",)),
     Row("BISO_NEGATIVE", "code"),
     Row("BISO_UNUSUALLY_LARGE", "code"),
     Row("BOUND_HIT", "code"),
@@ -1720,9 +1732,10 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: exp[-4 ln2 (x/Gamma)^2] has half height at x = Gamma/2"),
     Row("rietx.background.select.ARPLS_DW_FLOOR", "constant", tier=3, value=1.2,
         evidence=("v0.2: the largest lambda whose masked residuals look white; no source for "
-                  "1.2, no measurement recorded; feeds only PatternDiagnostics.baseline_lambda, "
-                  "which nothing in src reads; select_arpls_lambda's signature default until "
-                  "the B14 lift"),
+                  "1.2; feeds PatternDiagnostics.baseline_lambda, which nothing in src reads, "
+                  "and whether BACKGROUND_SMOOTHING_AT_FLEXIBLE_END fires (WP-1931: none of "
+                  "the 20 patterns under tests/data falls short of it, FAP.XRA nearest at "
+                  "d = 1.26); select_arpls_lambda's signature default until the B14 lift"),
         grounds=("Reached through diagnose(), which auto_background calls on the default path; "
                  "its answer is reported on PatternDiagnostics.baseline_lambda and read by "
                  "nothing (B12, ruled 2026-10-19)."),
@@ -4470,6 +4483,11 @@ ROWS: tuple[Row, ...] = (
     Row("AIR_SCATTER_UNDECLARED.suggestion", "suggestion", value=1),
     Row("BACKGROUND_ABSORPTION.suggestion", "suggestion", value=1),
     Row("BACKGROUND_ORDER_AT_CAP.suggestion", "suggestion", value=1),
+    Row("BACKGROUND_SMOOTHING_AT_FLEXIBLE_END.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: names the argument that overrides the fallback and the "
+                  "package's other background forms, and ranks none of them, so no dissenter is "
+                  "left (a held SNIP under a broad hump is one, references/judging.md)")),
     Row("BISO_NEGATIVE.suggestion", "suggestion", value=1),
     Row("BISO_UNUSUALLY_LARGE.suggestion", "suggestion", value=1),
     Row("BOUND_HIT.suggestion", "suggestion", value=1),
