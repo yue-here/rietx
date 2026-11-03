@@ -234,8 +234,6 @@ a `tests/data/README.md` row.
   whether it writes. The other half of 1328's note stays a standing choice
   and is not forwarded: `fullprof.to_structure` drops a nuclear phase's `Nvk`,
   because FullProf's nuclear k and rietx's are not the same model.
-- **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: a tied TOPAS write its own reader refuses.** `write_topas_inp(structure, path, free=ref)` with a structure whose values break one of `ref`'s `tie_equal` groups writes one shared name at two values, and rietx's `.inp` reader then refuses the file (`TopasInpError ... is stated at two values`, `io/projects/topas_ties.py:345`; writer `topas_input.py` through `from_structure_refined`). Reproduced by a WP-1986 lane and not re-run by its parent. `src/rietx/io/CLAUDE.md` asks a writer to refuse what its reader refuses. `docs/docs/reference/foreign-writers.md`'s example sidesteps it by passing `ref.fitted_structure`.
-
 - **2026-10-17, from [1996](1996-the-switching-tab-says-only-what-its-tests-show.md):
   FullProf applies the Laue-class cell constraints itself, and it runs on this
   machine.** `~/Code/rietx-bench/tools/fullprof/files/fp2k` (FullProf.2k 8.20,
@@ -494,8 +492,15 @@ land alone before the transform exists.
       transform, so `mag_space_group N` can be written
 - [ ] D: ties in the TOPAS writer (`prm` per tied group), and the reader
       keeping the forms the writer emits, if decided
-- [ ] `src/rietx/io/CLAUDE.md` § Project writers: the oracle rule, stated as
-      a rule (no findings)
+- [x] `src/rietx/io/CLAUDE.md` § Project writers: the oracle rule, stated as
+      a rule (no findings) *(2026-11-03)*
+- [ ] #732 step 2: the Chebyshev fit domain stored on `BackgroundChebyshev`,
+      so a coefficient list read or written without its pattern can be
+      evaluated (a stored-format change, so the maintainer's)
+- [ ] #732 step 4: the GSAS-I `ZERO` unit, once a GSAS-I run can measure it
+      (`write_gsas_prm` refuses a non-zero `zero_shift` until then)
+- [ ] #732 items 7 and 9: the TOPAS writer's hkl-table output, and a
+      March-Dollase preferred orientation, which it names and does not write
 - [ ] Tests: per writer and per fact, an oracle reading the written file the
       target's way, held to its measurement table first
 - [ ] Skill: `references/api.md`'s "All four formats write back" passage

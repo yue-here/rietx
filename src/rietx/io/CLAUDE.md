@@ -509,7 +509,7 @@ black box, never its source, recorded with its version.
 A writer is its own reader's inverse and its acceptance is the **round trip**:
 export, re-import, compare field by field. No fixture is needed and none is
 added, which is what made this the cheapest adversarial test the readers have.
-Four rules the readers do not need (WP-1118, four formats: `.inp`, `.pcr`,
+Rules the readers do not need (WP-1118, four formats: `.inp`, `.pcr`,
 `.EXP`, `.prm`).
 
 - **Refuse on the way out whatever the reader refuses on the way in**, and
@@ -543,6 +543,13 @@ Four rules the readers do not need (WP-1118, four formats: `.inp`, `.pcr`,
   too: a line break splits a card in two under keys nothing wrote, and a
   character the file's encoding cannot spell must be refused at the field
   rather than at the encode, which names a byte offset into the finished file.
+- **A fact two programs can read differently is tested the target's way**
+  (WP-1527, WP-1911). The round trip passes whatever the target makes of the
+  file, so each such fact (a species, a setting, a scale) gets an *oracle*: a
+  test function that reads the written file by the target program's measured
+  rule and shares nothing with this package's reader. The oracle is held to
+  the measurement table it implements before it judges a writer, so it is the
+  program's rule rather than a second copy of the writer's.
 - **A flag narrower than the model merges free, and the group is named.** GSAS
   states one refine flag for a whole cell and one for a site's three
   coordinates, both meaning "as symmetry permits". Freeing keeps more of the
