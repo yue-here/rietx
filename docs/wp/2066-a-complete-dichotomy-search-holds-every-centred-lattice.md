@@ -243,10 +243,13 @@ No code changed. No re-measure was possible here: the data is not on this
 machine, and by the reporter's statement it will not be.
 
 **Gates** (macOS arm64, this worktree's `[dev]` venv, compiled tier on,
-branch at `origin/main` 62724a30f plus docs): see the PR for the counts of
-`tests/test_indexing_engines.py`, `tests/test_acceptance_indexing.py` and
-the fast selection. `python -m tests.reader_output`: exit 0, unchanged
-against the merge-base.
+branch at `origin/main` 62724a30f plus docs).
+`tests/test_indexing_engines.py`: 96 passed, 1 skipped.
+`tests/test_acceptance_indexing.py`: 45 passed, so every row holds on
+current `main`. `tests/test_docs_consistency.py`: 25 passed. Ruff clean.
+`python -m tests.reader_output`: exit 0, unchanged against the merge-base.
+The fast selection was not run locally. The branch is docs only and adds
+no test, and CI runs it on the PR.
 
 **Next.** None for this WP. The F list's ranking belongs to WP-2078 if its
 dichotomy rows still show it after a re-run on `main`.
