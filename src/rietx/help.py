@@ -2890,7 +2890,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "where it predicts no reflection. A handful of such lines points to a second "
             "phase. Many of them point to a wrong cell. To look for the second phase, "
             "pass the result to `rietx.indexing.index_residue`, which subtracts the "
-            "first cell and indexes the remainder."
+            "first cell and indexes the remainder. It found the second phase on "
+            "synthetic Si + MgO and Si + NaCl, but none in the eight IUCr CPD lab "
+            "mixtures."
         ),
     ),
     "INDEX_INLIER_RETRY": HelpEntry(

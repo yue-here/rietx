@@ -142,6 +142,7 @@ A pick standing on more of the subtracted profile than its own height is flagged
 On a single-phase pattern the residue holds no pick (synthetic Si) or only such lines (SRM 660c), so the second result abstains.
 A cell whose fit needs widths more than three times the list's own does not describe the pattern: nothing is picked from its residue and the result says why (skipped for a list passed in as positions, whose widths are assumed).
 On synthetic Si with MgO at 0.05 to 0.3 of its scale, the second result holds MgO's cell first.
+On the eight IUCr CPD lab mixtures, with the largest phase subtracted, it finds no second phase.
 Each cell was validated alone: refine both phases together before quoting either.
 
 The evidence flags leave a line in because one pattern cannot say what the line is.
