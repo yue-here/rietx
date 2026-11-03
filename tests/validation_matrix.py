@@ -508,6 +508,21 @@ CLAIMS: tuple[Claim, ...] = (
                  "reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %",
     ),
     Claim(
+        "test_acceptance_srm660c",
+        "test_srm660c_zero_apertures_report_names_axial_asymmetry",
+        "srm660c", ("characterisation",),
+        "with both axial apertures at 0 the report names the one-sided "
+        "low-angle residual as axial asymmetry, and no impurity phase leads",
+        reference="the shape of a known systematic: the certification data "
+                  "carry axial divergence (the apertures refine to about "
+                  "0.025 and 0.037 when declared), so the action must fire "
+                  "and its rationale name the zero apertures; no accuracy "
+                  "is asserted",
+        measured="three gated regions below 40 deg read asymmetry +0.020 to "
+                 "+0.025 at 7-9 esd; refine_axial_asymmetry 0.50 first, "
+                 "increase_background_flexibility 0.49 (WP-2054)",
+    ),
+    Claim(
         "test_acceptance_srm660c", "test_srm660c_extinction_does_no_harm",
         "srm660c", ("characterisation", "ceiling"),
         "primary extinction freed on a specimen that has none refines to "
