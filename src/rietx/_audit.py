@@ -1032,7 +1032,8 @@ ROWS: tuple[Row, ...] = (
     Row("PHASE_HELD_IN_PATTERNS", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: an info record of the holds the answer's stage already made "
                   "(StageResult.held): a structure row held by phase_support_sigma on the "
-                  "joint screen (tier 3, WP-1325), and a scale row held where the pattern "
+                  "joint significance (StageResult.held's row, WP-1325, WP-2003 C10), and a "
+                  "scale row held where the pattern "
                   "has no reflection of the phase in range (WP-1958); counts the patterns, "
                   "inherits neither threshold, gates nothing (WP-2028)"),
         response="info",
@@ -1370,7 +1371,13 @@ ROWS: tuple[Row, ...] = (
                   "WP-1534's fixture; WP-2049: with every phase unseen, an instrument "
                   "column reaching the pattern only through phase peaks is held too, "
                   "free a blank frame's zero shift read -0.0129 +/- 0.0015 deg (8.7 "
-                  "sigma, truth 0.006)"),
+                  "sigma, truth 0.006); the joint runner writes this field from the same "
+                  "statistic, read off the joint normal matrix (multi."
+                  "_joint_answer_significance, WP-2003 C10): on two copies of #481's "
+                  "seed-107 blank frame the screen alone released the shared cell at "
+                  "3.25 sigma (marginal 2.61) and reported it 4.1517 +/- 0.0168 A with no "
+                  "finding, and aligned it is held from the cell stage on, every stage's "
+                  "evaluation count the single fit's"),
         grounds=("No competent refiner lets a phase the data cannot see refine its cell, nor "
                  "lets a frame no phase is seen in refine the instrument terms that reach the "
                  "pattern only through phase peaks (zero shift, displacement, U..Y, the axial "
@@ -1378,7 +1385,9 @@ ROWS: tuple[Row, ...] = (
                  "which no program does (B1, ruled 2026-10-19; the instrument widening, "
                  "WP-2049, ruled 2026-11-01). The lineless branch, which holds the "
                  "scale, is tier-1 arithmetic (a zero column) inside a row tiered on its "
-                 "contested part."),
+                 "contested part. The joint hold reads the single fit's statistic and is "
+                 "covered here, ruled by the maintainer 2026-11-03 (2003-batch/batch.md, "
+                 "C10 q2 (a))."),
         approved="2026-11-01"),
     Row("rietx.schemas.results.StageResult.scale_b_held", "action", tier=1, ambiguity=1,
         evidence=("numerical floor: under 2*sqrt(PINV_RCOND) the covariance's pinv cut cannot see "
@@ -1426,9 +1435,13 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.results.StageResult.released", "action", tier=3, ambiguity=1,
         evidence=("WP-1301/1523: a held phase reading >= 3 sigma at the answer is released and the "
                   "stage re-solved once; one that fell under it is restored to its stage start and "
-                  "held; the ramp's worst cell error fell from 11.96 A (start-only hold) to 0"),
+                  "held; the ramp's worst cell error fell from 11.96 A (start-only hold) to 0; the "
+                  "joint runner releases on the same statistic (multi._joint_answer_significance, "
+                  "WP-2003 C10)"),
         grounds=("A phase the data now see is one the plan asked to refine, and a cell chased "
-                 "into noise is no measurement; kept with the hold (B1, ruled 2026-10-19)."),
+                 "into noise is no measurement; kept with the hold (B1, ruled 2026-10-19). The "
+                 "joint release is covered here, ruled by the maintainer 2026-11-03 "
+                 "(2003-batch/batch.md, C10 q2 (a))."),
         approved="2026-10-19"),
     Row("rietx.schemas.results.StageResult.cell_reset", "action", tier=3, ambiguity=1,
         evidence=("WP-1110's trigger: a visible phase sharing its cell with a 2 % trace copy ran "
@@ -1446,7 +1459,9 @@ ROWS: tuple[Row, ...] = (
                   "walked to 1.73-20.34 A unheld and -6.49 A under the start-only hold, and the "
                   "restore leaves it exactly at its stage-start value "
                   "(tests/test_held_phase.py collapsed_fit); until B14 the restore joined "
-                  "StageResult.held unmarked"),
+                  "StageResult.held unmarked; the joint runner restores on the same statistic "
+                  "(multi._joint_answer_significance, WP-2003 C10, ruled by the maintainer "
+                  "2026-11-03, 2003-batch/batch.md C10 q2 (a))"),
         grounds=("A cell chased into noise is no measurement, so a refiner puts it back where "
                  "the data last constrained it; kept with the hold and the release (B1, ruled "
                  "2026-10-19), the moment direction's with the moment actions (B2, ruled "
