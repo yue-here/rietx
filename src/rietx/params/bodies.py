@@ -28,9 +28,11 @@ W ∩ span(R₀·A), A the template's inertia axes.  dim W is 0, 1 or 3, never 2
 (a nontrivial proper rotation fixes one line), so the cases are: dim W = 3,
 today's E; dim W = 1, W = span{n}, E = n for a body that is not linear, and
 for a linear one n when the axis is perpendicular to it and nothing when it
-is parallel; dim W = 0, no rotation DOF at all.  ``site_axes`` carries W in
-the Cartesian frame; it is cell-independent in every setting but
-rhombohedral axes, which the table refuses for a site body.
+is parallel, each to within the tilt that atoms typed within the site
+tolerance can give it (:meth:`RigidBodyBlock._axis_tilt_bound`, in radians,
+from :func:`site_reach` in Å); dim W = 0, no rotation DOF at all.
+``site_axes`` carries W in the Cartesian frame; it is cell-independent in
+every setting but rhombohedral axes, which the table refuses for a site body.
 
 Its Jacobian is closed-form, block by block (the design report's § 2.2):
 
@@ -69,13 +71,32 @@ import numpy as np
 from ..backend import get_backend
 from ..crystallography import rotation
 from ..crystallography.fragments import Fragment
-from ..crystallography.symmetry import SITE_TOL
+from ..crystallography.symmetry import _SITE_TOL_SLACK, SITE_TOL
 from .derived import DerivedBlock, d_cartesian_frame_d_cell, fractional_frame
 
 CELL_NAMES = ("a", "b", "c", "alpha", "beta", "gamma")
 _DEG = np.pi / 180.0
 #: a moved atom nearer its torsion's axis line than this (Å) does not move
 TORSION_STILL_TOL = 1e-6
+#: How far ``site_orbit``'s snap can move a typed site, per fractional
+#: coordinate: the snapped position is the mean of images each within
+#: ``SITE_TOL`` × (1 + its slack) of the site, so the mean is too.  The
+#: linear-body axis test's tilt bound is built on it (:func:`site_reach`).
+_SNAP_REACH = SITE_TOL * (1.0 + _SITE_TOL_SLACK)
+
+
+def site_reach(frame) -> float:
+    """The farthest (Å) a typed atom on a site can sit from its symmetry element.
+
+    The snapped position lies on the element, and the snap moves the atom by
+    at most :data:`_SNAP_REACH` in each fractional coordinate.  |M·δ| is
+    convex in δ, so over that box it peaks at a corner: the reach is
+    :data:`_SNAP_REACH` × the longest of the cell's four body diagonals
+    |M·(±1, ±1, ±1)|, with ``frame`` the Cartesian frame M.
+    """
+    m = np.asarray(frame, dtype=np.float64)
+    corners = np.array([[1, 1, 1], [1, 1, -1], [1, -1, 1], [-1, 1, 1]], dtype=np.float64)
+    return _SNAP_REACH * float(np.linalg.norm(corners @ m.T, axis=1).max())
 
 
 def wrap_degrees(angle: float) -> float:
@@ -160,7 +181,7 @@ class RigidBodyBlock(DerivedBlock):
 
     def __init__(self, *, phase_base: str, body_base: str, atom_bases: list[str],
                  template: np.ndarray, q0, torsions=(), angles=(), names=(),
-                 site_axes=None):
+                 site_axes=None, site_reach: float = 0.0, labels=()):
         self.template = np.asarray(template, dtype=np.float64)
         #: the template-frame axes the rotation DOFs turn about, (3, k)
         self.body_axes = rotation_axes(self.template)
@@ -168,6 +189,12 @@ class RigidBodyBlock(DerivedBlock):
         #: orthonormal with d ∈ {0, 1, 3}; ``None`` for a general origin
         self.site_axes = (None if site_axes is None or np.shape(site_axes)[1] == 3
                           else np.asarray(site_axes, dtype=np.float64).reshape(3, -1))
+        #: the member atoms' labels, in template order, for the refusals
+        self.labels = ([str(a) for a in labels]
+                       or [str(i) for i in range(len(self.template))])
+        #: the most (rad) a linear body's axis tilts off its site's plane or
+        #: line with every atom within ``site_reach`` Å of it (:func:`site_reach`)
+        self.axis_tol = self._axis_tilt_bound(float(site_reach))
         self._set_anchor(np.asarray(q0, dtype=np.float64))
         #: (axis_a, axis_b, moves) index triples into the template (WP-1808)
         self.torsions = [(int(a), int(b), np.asarray(m, dtype=np.intp))
@@ -226,6 +253,24 @@ class RigidBodyBlock(DerivedBlock):
         (2 or 3) at a general origin, 0 or 1 on a site that fixes a direction."""
         return int(self.axes.shape[1])
 
+    def _axis_tilt_bound(self, reach: float) -> float:
+        """The most (rad) a linear body's axis tilts off its site's plane or line.
+
+        Exact, from the template alone.  Let u be the template's axis, the
+        principal axis of its points about their centroid, s_i each point's
+        offset along u, and h_i its offset from the site's plane (normal n)
+        or from its line (along n).  Σ s_i = 0, and the points' offsets across
+        u are orthogonal to s because u is an eigenvector of their scatter, so
+        n·u = Σ s_i h_i / Σ s_i² (and u − (n·u)n likewise).  With |h_i| at most
+        ``reach``, the sine of the tilt is at most reach × Σ|s_i| / Σ s_i².
+        A point at the centroid adds nothing, so no radius threshold enters.
+        """
+        if self.body_axes.shape[1] == 3:
+            return 0.0
+        u = np.cross(self.body_axes[:, 0], self.body_axes[:, 1])
+        s = (self.template - self.template.mean(axis=0)) @ u
+        return reach * float(np.abs(s).sum() / (s @ s))
+
     def _increment_basis(self, r0: np.ndarray) -> np.ndarray:
         """E at anchor ``r0``: the module docstring's cases, (3, k)."""
         if self.site_axes is None:
@@ -236,18 +281,29 @@ class RigidBodyBlock(DerivedBlock):
         if self.body_axes.shape[1] == 3:
             return n.reshape(3, 1)
         u = r0 @ np.cross(self.body_axes[:, 0], self.body_axes[:, 1])
-        # |n·R₀u| < SITE_TOL: u perpendicular to n; |u − (n·u)n| < SITE_TOL: along it.
-        # The axis is held to ``site_orbit``'s own snap tolerance, since a tighter one
-        # refuses a body typed at CIF precision that passed the site check
+        # the sines of the axis's tilt off the plane perpendicular to n and off
+        # n itself; the nearer case holds within the tilt its atoms' snap can
+        # leave (:meth:`_axis_tilt_bound`), in radians like the tilt
         c = abs(float(n @ u))
-        if c < SITE_TOL:
+        off = float(np.linalg.norm(u - (n @ u) * n))
+        perpendicular = c <= off
+        if perpendicular and c <= self.axis_tol:
             return n.reshape(3, 1)
-        if float(np.linalg.norm(u - (n @ u) * n)) < SITE_TOL:
+        if not perpendicular and off <= self.axis_tol:
             return np.zeros((3, 0))
+        # each atom's offset from the origin, which sits on the site's element
+        pts = self.template @ r0.T
+        along = np.outer(pts @ n, n)
+        far = self.labels[int(np.argmax(np.linalg.norm(
+            along if perpendicular else pts - along, axis=1)))]
         raise ValueError(
             "RIGID_BODY_NOT_INVARIANT: a linear body on this site must lie "
-            "along its one allowed turn axis or perpendicular to it; its axis "
-            f"makes {float(np.degrees(np.arccos(min(c, 1.0)))):.3g}° with it")
+            "along its one allowed turn axis or perpendicular to it; its axis is "
+            "tilted "
+            f"{float(np.degrees(np.arcsin(min(c if perpendicular else off, 1.0)))):.3g}° "
+            f"from {'perpendicular' if perpendicular else 'the turn axis'}, more than "
+            f"the {float(np.degrees(self.axis_tol)):.3g}° that atoms within the site "
+            f"tolerance allow, and its atom {far!r} lies furthest off")
 
     def rotation_paths(self, body_base: str) -> tuple[str, ...]:
         return tuple(f"{body_base}.rotation.{k}" for k in range(self.n_rot))
