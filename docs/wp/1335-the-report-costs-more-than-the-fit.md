@@ -1,6 +1,6 @@
 # WP-1335 — the report costs more than the fit
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — PR #1346 cut a stage report's cost by a third, bit-identically; no further cut (2026-11-02 rulings entry); a joint fit's `stage_reports=` remains
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @mustachefeeling (ghostshift runner): closing; the joint fit's `stage_reports=` has no owner
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-09-23 — cost only: a report at 26× the fit it reports on
