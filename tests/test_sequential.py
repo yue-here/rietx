@@ -3432,3 +3432,86 @@ def test_the_trajectory_plot_quotes_the_largest_gap_as_a_number():
         e.x = float(k)
     assert one_way.plot("phases.0.cell.a").axes[0].get_title(loc="left") == (
         "phases.0.cell.a")
+
+
+# --------------------------------------------------------------------------- #
+# The kept attempt's order (WP-2003, C2 q2 and q3)
+# --------------------------------------------------------------------------- #
+
+def _attempt(rwp: float, cost: float, *, status: str = "converged",
+             sigma=(1.0, 1.0, 2.0), mode: str = "rietveld", restraints=None):
+    """``_fake_result`` with a last stage's cost and the result's σ."""
+    from rietx.schemas.results import StageResult
+
+    result = _fake_result(rwp, status=status)
+    result.mode = mode
+    result.sigma = list(sigma)
+    result.stages = [StageResult(name="closing", status=status, n_iterations=4,
+                                 cost_initial=2 * cost, cost_final=cost)]
+    result.restraints = restraints
+    return result
+
+
+def test_a_diverged_attempt_loses_to_a_truncated_finite_one():
+    """C2 q2, ruled 2026-11-03: rejected is asked before truncated.
+
+    Asked the other way round, a diverged ``warm_staged`` rung that ran to
+    completion beat a first rung the bound cut, and the pattern was
+    quarantined with a usable fit discarded.
+    """
+    from rietx.sequential import _prefer
+
+    cut = _fake_result(0.12, status="max_iter")
+    diverged = _fake_result(0.05, status="diverged")
+    assert _prefer(diverged, False, cut, True) is False
+    assert _prefer(cut, True, diverged, False) is True
+    # an error-level code is rejected the same way (C2 q5)
+    flagged = _fake_result(0.05)
+    flagged.diagnostics = [Diagnostic(level="error", code="MODEL_FAR_FROM_DATA",
+                                      message="far")]
+    assert _prefer(cut, True, flagged, False) is True
+
+
+def test_the_full_cost_ranks_two_attempts_of_one_objective():
+    """C2 q3: the lower S wins where Rwp would pick the other attempt.
+
+    Rwp sees the data rows alone, and S adds the penalty and restraint rows
+    the solver minimised beside them.  So the two disagree only where such
+    rows exist, which these numbers stand in for.
+    """
+    from rietx.sequential import _better, _prefer
+
+    low_s = _attempt(rwp=0.101, cost=50.0)
+    low_rwp = _attempt(rwp=0.100, cost=51.0)
+    assert _better(low_s, low_rwp) is True
+    assert _better(low_rwp, low_s) is False
+    # max_iter ties converged and the cost decides
+    assert _prefer(_attempt(0.101, 50.0, status="max_iter"), False,
+                   low_rwp, False) is True
+
+
+@pytest.mark.parametrize("change", ["sigma", "pawley", "restraints", "no_curves"])
+def test_two_attempts_of_different_objectives_fall_back_to_rwp(change):
+    """S compares nothing across two objectives, so Rwp decides there."""
+    from rietx.schemas.results import RestraintReport
+    from rietx.sequential import _better, _same_objective
+
+    low_s = _attempt(rwp=0.101, cost=50.0)
+    low_rwp = _attempt(rwp=0.100, cost=51.0)
+    assert _same_objective(low_s, low_rwp)
+    if change == "sigma":
+        # a measured background widens σ by its own scale at compile
+        low_s.sigma = [1.0, 1.0, 2.5]
+    elif change == "pawley":
+        low_s.mode = low_rwp.mode = "pawley"
+    elif change == "restraints":
+        # the collapsed warm rung runs its restraints at c_w = 1
+        low_s.restraints = RestraintReport(rows=[], restraint_chi2=0.0,
+                                           n_restraints=2, weight_scale=1.0)
+        low_rwp.restraints = RestraintReport(rows=[], restraint_chi2=0.0,
+                                             n_restraints=2, weight_scale=0.5)
+    else:
+        low_s.sigma = []
+    assert not _same_objective(low_s, low_rwp)
+    assert _better(low_s, low_rwp) is False
+    assert _better(low_rwp, low_s) is True

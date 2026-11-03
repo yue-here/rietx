@@ -1555,7 +1555,29 @@ ROWS: tuple[Row, ...] = (
                  "from the result passes it to compile_model (the sixth round's Q1 and Q2, "
                  "ruled 2026-10-21)."),
         approved="2026-10-21"),
-    Row("rietx.schemas.sequential.SeriesEntry.rung", "action"),
+    Row("rietx.schemas.sequential.SeriesEntry.rung", "action", tier=3, ambiguity=1,
+        evidence=("records the attempt the ladder kept (sequential.py _prefer, _better): an "
+                  "accepted attempt over a rejected one (diverged, or an error-level code, "
+                  "C2 q5), then an untruncated one over one the first-rung bound cut, then "
+                  "the lower full least-squares cost S, the last stage's cost_final, where "
+                  "both attempts minimised one objective (_same_objective: one mode other "
+                  "than Pawley, identical sigma, the same restraint count and c_w), and Rwp "
+                  "where they did not; max_iter ties converged. Measured on the CPD "
+                  "sample-1 chain with every rung forced (2026-11-03, macOS arm64): 22 "
+                  "attempts over 8 patterns, all 7 251 data rows, sigma identical across "
+                  "a pattern's rungs, no penalty or restraint rows, every last stage the "
+                  "closing one at window tol 1e-3, 2 x cost_final within 6.1e-5 relative of the "
+                  "data chi2, and S and Rwp choosing the same rung on every pattern"),
+        grounds=("Keeping the best attempt is one of Rule 1's four protections. Rejected "
+                 "before truncated was ruled by the maintainer 2026-11-03 (2003-batch/"
+                 "batch.md, C2 q2, the consent list): a diverged fit is no measurement and "
+                 "a truncated one has a finite answer. Ranking the rest by S, with max_iter "
+                 "tying converged, settled by Claude under the objective's definition and "
+                 "the CPD measurement (C2 q3, left Claude's to settle 2026-11-02): S is "
+                 "what the solver minimised and Rwp sees the data rows alone; the "
+                 "alternative was Rwp throughout, which agrees wherever no penalty or "
+                 "restraint row exists."),
+        approved="2026-11-03"),
     Row("rietx.schemas.sequential.SeriesEntry.reseeded", "action", tier=3, ambiguity=1,
         evidence=("records that the kept attempt is the cold rung on a warm-startable pattern "
                   "(sequential.py _chain); since WP-2003 the escalation it records fires on a "
@@ -5791,7 +5813,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.schemas.plan.PlanSpec:correlation_guard",
     "rietx.schemas.results.HIGH_CORRELATION_MAX",
     "rietx.schemas.results._cap_one_code.suggestion",
-    "rietx.schemas.sequential.SeriesEntry.rung",
     "rietx.schemas.sequential.SeriesEntry.rungs_raised",
     "rietx.schemas.sequential.SeriesEntry.rungs_tried",
     "rietx.schemas.suggest.SUGGEST_ABSORPTION_MAX",

@@ -5879,7 +5879,11 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "Which attempt produced this entry's values: `warm`, a one-stage refit from "
             "the neighbour; `warm_staged`, the full plan from the warm state; or "
             "`cold`, the full plan from the initial models. The first pattern is always "
-            "`cold`, having no neighbour to start from."
+            "`cold`, having no neighbour to start from. Of several attempts the entry "
+            "keeps one that neither diverged nor carries an `error` code, then one the "
+            "first-rung bound did not cut, then the one with the lower least-squares "
+            "cost, which Rwp replaces where the two attempts minimised different "
+            "objectives."
         ),
     ),
     "SeriesEntry.rungs_tried": HelpEntry(

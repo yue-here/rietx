@@ -526,12 +526,13 @@ A path whose value is a step from where its fit began, in `SeriesResult.relative
 A rejected warm fit escalates one attempt at a time: the collapsed warm refit, then the full staged plan from the warm state, then the full staged plan from the starting models.
 Under `refit="stages"` the first attempt already is the staged warm fit, so the ladder has two attempts, `"warm_staged"` and `"cold"`, and `"warm"` never appears.
 Each attempt runs only when the trigger still fires on the best attempt so far, and the entry keeps the best.
+Best is an accepted attempt over a rejected one, then one that finished over one the bound cut, then the lower least-squares cost.
 `SeriesEntry.rungs_tried` names the attempts, and `SeriesEntry.n_iterations` sums those that returned a fit.
 The middle attempt matters most, because throwing a warm start away roughly triples the work.
 
 What triggers the ladder is a warm attempt that raised or was rejected: it diverged, or carries an `error` diagnostic such as `MODEL_FAR_FROM_DATA`.
 A `max_iter` attempt is not rejected.
-Each trigger is a property of this pattern's own fit, readable the moment it finishes, and something a different start could plausibly fix.
+Each trigger is a property of this pattern's own fit, readable once it finishes, that a different start could fix.
 An Rwp comparison is not a default trigger.
 `reseed_factor` sets one if you want it: a warm attempt above that multiple of the median Rwp of the accepted patterns climbs the ladder.
 The 1.25 fence that was the default before 1.11 escalated 116 patterns across eight measured series and moved no value by more than 7.2e-4 of its esd.
@@ -540,7 +541,7 @@ A guard finding such as `HIGH_CORRELATION` is neither, since it fires on converg
 
 The first attempt is unbounded unless you pass `first_rung_factor`.
 Each stage of it, the closing one included, may then spend that multiple of the dearest stage of the first attempts this chain has converged, once three have.
-An attempt with any stage stopped there escalates, even if its closing stage converged, and never beats one that finished.
+An attempt with any stage stopped there escalates, even if its closing stage converged.
 The bound does nothing under `refit="stages"` or `reseed=False`.
 It is not the default because it can move an answer: at 3.0 on the planted ramp it cut a winning first attempt, 9.8 times the dearest before it, moving a zero shift 6.06 esd, to save 49 evaluations of 13 083.
 

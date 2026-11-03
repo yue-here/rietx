@@ -72,7 +72,8 @@ What an operator must know, all measured:
   stages conditioned from a *poor* starting model; a converged neighbour is not
   one.  A pattern whose Rwp jumps past the median trips the reseed fence,
   which **escalates one rung at a time** — the full staged plan from the
-  warm state, then the full staged plan cold — and keeps the best attempt.
+  warm state, then the full staged plan cold — and keeps the best attempt
+  (not rejected, then not cut by the bound, then the lower full cost).
   `entry.rung` says which one produced the values and `entry.rungs_tried` says
   what else was tried; `entry.reseeded` still means only the cold rung won, so
   a `"warm_staged"` point is one whose chain is unbroken.  **A collapse every

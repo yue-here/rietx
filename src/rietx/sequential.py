@@ -2300,17 +2300,52 @@ def _link_history(ref: Refinement, position: int, label: str,
     tree.annotate(tree.root.id, notes=notes)
 
 
+def _same_objective(a: RefinementResult, b: RefinementResult) -> bool:
+    """Did two attempts' last stages minimise one objective, row for row?
+
+    The full cost S is the data rows plus the background-penalty,
+    Pawley-restraint and soft-restraint rows (``model/rows.py``), and it ranks
+    two attempts only where those rows and their weights are the same.  σ is
+    the data rows' weighting and is fixed at compile, widened by a measured
+    background's own scale (WP-1309), so two σ arrays that differ are two
+    objectives.  A soft restraint's rows carry the stage's c_w, and the
+    collapsed warm rung runs at 1.0 whatever the plan's last stage declares.
+    A Pawley block's restraint rows are counted on the overlaps at compile,
+    which the result does not record, so a Pawley pair is never compared on S.
+    """
+    if not (a.stages and b.stages and a.sigma and b.sigma):
+        return False
+    if a.mode == "pawley" or a.mode != b.mode or a.sigma != b.sigma:
+        return False
+    ra, rb = a.restraints, b.restraints
+    if (ra is None) != (rb is None):
+        return False
+    return ra is None or (ra.n_restraints, ra.weight_scale) == (
+        rb.n_restraints, rb.weight_scale)
+
+
 def _better(a: RefinementResult, b: RefinementResult) -> bool:
-    """Is ``a`` the fit to keep?  Not rejected first, then Rwp.
+    """Is ``a`` the fit to keep?  Not rejected first, then the full cost.
 
     *Rejected* is :func:`~rietx.schemas.sequential._rejected`, the test the
     quarantine applies to the kept attempt (WP-2003, C2 q5): ranked by
     ``"diverged"`` alone, an attempt under an ``error``-level code with the
     lower Rwp beat a clean later rung, and the pattern was quarantined with
     a usable fit discarded.
+
+    Between two attempts in the same state the lower full least-squares cost
+    S wins, the last stage's ``StageResult.cost_final`` (WP-2003, C2 q3).  S
+    is what the solver minimised, and Rwp sees the data rows alone, so of two
+    minima of one objective the lower S is the better fit by that
+    objective's definition.  Where the two did not minimise one objective
+    (:func:`_same_objective`) S compares nothing, and Rwp decides.  A
+    ``max_iter`` attempt ties a ``converged`` one: the status can mean the
+    closing stage's last iterations at a good answer.
     """
     if _rejected(a) != _rejected(b):
         return _rejected(b)
+    if _same_objective(a, b):
+        return a.stages[-1].cost_final < b.stages[-1].cost_final
     return a.statistics.rwp < b.statistics.rwp
 
 
@@ -2318,8 +2353,8 @@ def _prefer(result: RefinementResult, truncated: bool,
             best: RefinementResult | None, best_truncated: bool) -> bool:
     """Is ``result`` the attempt to keep, given which of the two was cut short?
 
-    :func:`_better` ranks a diverged fit below a finished one and then goes on
-    Rwp, and that is the whole rule while every attempt spent what its own plan
+    :func:`_better` ranks a rejected fit below an accepted one and then goes on
+    the full cost, and that is the whole rule while every attempt spent what its own plan
     allowed.  A first rung the WP-1127 bound truncated did not: a stage of it
     ended ``"max_iter"`` because *this ladder* stopped it early
     (:func:`_cut_by_bound`, whatever the closing stage reported), so at equal Rwp
@@ -2332,9 +2367,17 @@ def _prefer(result: RefinementResult, truncated: bool,
     :func:`_better` decides only between two attempts in the same state.  A
     first rung that hit the *plan's* own budget is untouched by this and is
     still kept if nothing beats it, which is what the ladder has always done.
+
+    A rejected attempt is asked about first (WP-2003, C2 q2, ruled by the
+    maintainer 2026-11-03): a truncated fit with a finite answer beats a
+    diverged one that ran to completion.  Asked the other way round, a
+    forced escalation kept a diverged ``warm_staged`` rung over a truncated
+    first rung, and the pattern was quarantined with a usable fit discarded.
     """
     if best is None:
         return True
+    if _rejected(result) != _rejected(best):
+        return _rejected(best)
     if truncated != best_truncated:
         return best_truncated
     return _better(result, best)
