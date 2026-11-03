@@ -183,7 +183,8 @@ nothing.
 
 ## Handover log
 
-- **2026-11-03** — created, from the 2026-11-03 issue triage (issue #1330).
+- **2026-11-03** — created, from the 2026-11-03 issue triage (issue #1330;
+  PR #1362).
   Checked against the tree at 62724a30f: the Euclidean normaliser the issue
   calls new exists as `solve.cluster.equivalences`, and spglib's letters are
   recorded as normaliser-ambiguous in `site_classes.py`. No open WP owns S1 or
