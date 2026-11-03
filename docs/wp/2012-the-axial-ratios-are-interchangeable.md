@@ -1,6 +1,6 @@
 # WP-2012 — The two axial-divergence ratios are interchangeable, and a fit reports one branch
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @yue-here (ghostshift runner: the nightly placement episode); the recipe sibling is open
+Milestone: unscheduled · Status: 🔄 2026-11-03 — both lab presets free S/L alone (PR #1356, merged); the placement episode followed (PR #1387); the recipe sibling is open
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-02 — was P2: both presets fixed (PR #1356); what is left is an imported GSAS-II recipe freeing both ratios from one SH/L flag
@@ -121,6 +121,10 @@ choosing a fix.
       faithful mirror is a tie S/L = H/L, which `Recipe` has no field to carry; freeing
       S/L alone is the other option. Either changes what an import refines, and the
       reader's `RECIPE_CONVENTION_ASSUMED` text follows it.
+- [x] The skill-placement episode's colleague script reads H/L as a result row, which the
+      2026-11-03 nightly found raising `KeyError` (a slow row, so #1356's fast gates could not
+      see it). **Done 2026-11-03 (PR #1387).** The script prints S/L alone, and
+      `tests/eval_skill_placement/PROTOCOL.md` records the changed episode as a dated amendment.
 
 ## Acceptance
 
