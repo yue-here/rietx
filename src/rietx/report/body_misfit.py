@@ -156,7 +156,13 @@ def _body_at(structure: Structure, body: str, phase: int | None):
 
 def _rider_ties(phase, ip: int, rider: int, parent: int) -> dict[str, dict[str, float]]:
     """The rider's DOF rows as its parent's: B_Hᵀ·θ_H = B_Pᵀ·θ_P, so both
-    atoms take one fractional shift."""
+    atoms take one fractional shift (the riding model, Sheldrick 2015,
+    *Acta Cryst.* C71, 3–8, in the constant-vector form of the fractional
+    coordinates).
+
+    A rider DOF that no parent DOF drives gets no row: the parent cannot move
+    that way, so the rider is held there, which is what riding means.
+    """
     from ..crystallography.symmetry import resolve_group
     from ..crystallography.wyckoff import coordinate_basis, stabilizer_rotations
     from ..optimize import lapack
@@ -176,11 +182,12 @@ def _rider_ties(phase, ip: int, rider: int, parent: int) -> dict[str, dict[str, 
         raise ValueError(
             f"{phase.atoms[rider].label!r} cannot take every shift of its parent "
             f"{phase.atoms[parent].label!r}: its site symmetry allows fewer "
-            "directions; free it with freed=")
+            "directions; list it in freed= of Refinement.released_arm and fit that arm "
+            "by hand (check_rigid_bodies takes no freed=)")
     return {f"phases.{ip}.atoms.{rider}.dof.{k}": {
         f"phases.{ip}.atoms.{parent}.dof.{m}": float(c[k, m])
         for m in range(len(bp)) if c[k, m] != 0.0}
-        for k in range(len(bh))}
+        for k in range(len(bh)) if np.any(c[k] != 0.0)}
 
 
 def released_arm(structure: Structure, body: str, *, phase: int | None = None,

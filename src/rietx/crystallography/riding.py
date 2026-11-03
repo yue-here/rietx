@@ -78,6 +78,14 @@ def riding_length(bond_class: str, radiation: str) -> float:
     return float(value)
 
 
+def _nearest_parent(pts, heavy, i) -> int:
+    """The index in ``heavy`` of the non-riding atom nearest to atom ``i``: the
+    one rule both :func:`riding_parents` and :func:`set_riding_lengths` find a
+    parent by."""
+    d = np.linalg.norm(pts[heavy] - pts[i], axis=1)
+    return heavy[int(np.argmin(d))]
+
+
 def riding_parents(body) -> dict[str, str]:
     """Each riding H of ``body`` and its parent atom, by label.
 
@@ -92,9 +100,7 @@ def riding_parents(body) -> dict[str, str]:
         raise ValueError(f"rigid body {body.name!r} has no parent atom for its H")
     out = {}
     for h in body.riding:
-        i = labels.index(h)
-        d = np.linalg.norm(pts[heavy] - pts[i], axis=1)
-        out[h] = labels[heavy[int(np.argmin(d))]]
+        out[h] = labels[_nearest_parent(pts, heavy, labels.index(h))]
     return out
 
 
@@ -125,8 +131,7 @@ def set_riding_lengths(body, classes: Mapping[str, str], radiation: str):
     for h, cls in classes.items():
         length = riding_length(cls, radiation)
         i = labels.index(h)
-        d = np.linalg.norm(pts[heavy] - pts[i], axis=1)
-        parent = heavy[int(np.argmin(d))]
+        parent = _nearest_parent(pts, heavy, i)
         v = pts[i] - pts[parent]
         norm = float(np.linalg.norm(v))
         if not norm > RIDING_MIN_SEPARATION:

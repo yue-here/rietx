@@ -336,3 +336,33 @@ def test_the_builder_refuses_what_it_cannot_build(acridine):
         ref.released_arm("benzene")
     with pytest.raises(ValueError, match="not members"):
         ref.released_arm("acridine", freed=["C1", "Q7"])
+
+
+# ---------------------------- a rider and its parent on different sites (review)
+def _mirror_phase(parent_y: float, rider_y: float):
+    """P 1 m 1 (the mirror at y = 0): a C and an H that may sit on it or off."""
+    P = trb.Parameter
+    cell = trb.Cell(a=P(value=7.0), b=P(value=8.0), c=P(value=9.0),
+                    alpha=P(value=90.0), beta=P(value=100.0), gamma=P(value=90.0))
+    return trb.Phase(name="m", space_group="P 1 m 1", cell=cell, atoms=[
+        trb.Atom(label=lab, species=sp, x=P(value=x), y=P(value=y), z=P(value=z))
+        for lab, sp, x, y, z in (("C1", "C", 0.1, parent_y, 0.2),
+                                 ("H1", "H", 0.15, rider_y, 0.25))])
+
+
+def test_a_parent_on_a_mirror_leaves_the_rider_held_in_the_direction_it_cannot_follow():
+    from rietx.report.body_misfit import _rider_ties
+
+    ties = _rider_ties(_mirror_phase(0.0, 0.1), 0, 1, 0)
+    assert ties and all(src for src in ties.values()), ties     # no empty source
+    ref = Refinement(trb.Structure(phases=[_mirror_phase(0.0, 0.1)]), trb.INS, history=False)
+    for path, source in ties.items():
+        ref.tie(path, source)           # the verb refuses an empty source
+
+
+def test_a_rider_that_cannot_follow_its_parent_names_a_call_that_can_act():
+    from rietx.report.body_misfit import _rider_ties
+
+    with pytest.raises(ValueError, match="released_arm") as e:
+        _rider_ties(_mirror_phase(0.1, 0.0), 0, 1, 0)
+    assert "check_rigid_bodies takes no freed=" in str(e.value)
