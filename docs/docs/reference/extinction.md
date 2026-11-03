@@ -106,11 +106,14 @@ When both name a class and the classes differ, `ExtinctionScreen.screens_disagre
 A held screen that names no class changes nothing.
 On SRM 676a corundum, the GSAS-II fluorapatite and the synthetic P 2₁/c, each cell scaled by ×0.97 to ×1.03, the default named a wrong class at eight offsets: the check caught six and fired at none where the default was right.
 At the other two (corundum ×0.985, P 2₁/c ×0.9975) the prefit's own cell is off, both screens name the same wrong class, and nothing here can see it.
-On the PbSO₄ X-ray histogram the held screen names no class at eleven offsets where the default names the true `P c - n`, and nothing fires; at ×0.99 and ×1.0125 the default names `P c - -` and the held screen nothing, so this check cannot see those two either.
-From the preset's all-zero background the held screen is weaker, because nothing seeds its background as the cell-free fit's is seeded, and its poorer reference fit can leave the class that forbids nothing winning by elimination.
-On the same three patterns with the background declared all-zero, the check still caught corundum ×0.995 and FAP ×1.0075, but it fired needlessly at two offsets of the synthetic P 2₁/c (×1.0005 and ×1.001, where the default names the true class) and caught one fewer of the monoclinic offsets than with the true background.
-Seeding the held screen's background removes those, and costs the eleven PbSO₄ offsets above, where the seeded held screen names `P c - -` against the default's true `P c - n`.
-A gate on the held reference fit does not separate them either: the caught corundum row's held fit is the poorer one, and the needless rows' held fits are within 7 % of the default's in χ².
+When the instrument's background is the preset's all-zero start, which is what the GUI passes, the held screen seeds its background as the cell-free fit does.
+Unseeded, its reference fit is poor and the class that forbids nothing wins by elimination, so the check fires on right answers.
+On a synthetic sweep from the all-zero background (41 space groups, three cell offsets, four arms, 492 rows), `best_or_none()` names the true class, a wrong class or no class on 322, 141 and 29 rows with no second screen, 224, 117 and 151 with an unseeded held screen, and 315, 69 and 108 with the seeded one.
+On 17 committed real patterns (51 rows, from the all-zero preset) the unseeded held screen gave 19, 18 and 14, and the seeded one 28, 16 and 7.
+The seeding costs right answers on one real pattern, the GSAS-II PbSO₄ X-ray histogram: at ×0.9995, ×1.0, ×1.002, ×1.005 and ×1.0075 the default names the true `P c - n`, the seeded held screen names `P c - -`, and the check abstains.
+At ×1.0125 the default names `P c - -` and the held screen nothing, so this check cannot see that row.
+A gate on the held reference fit does not separate these cases: the caught corundum row's held fit is the poorer one.
+Where both screens name the same wrong class at a well-refined cell (P6₃/mmc, P6/mcc, Pn-3n, P4/nmm and Fm-3m in the synthetic sweep, and magnetite, Nd₂Ru₂O₇ and SRM 1976a corundum in the real one), nothing here can see it; that is the first screen's behaviour and WP-2076's.
 The second screen costs about a third to a half again of the screen's time.
 
 ### The reference fit is gated

@@ -31,8 +31,9 @@ screen at the prefit's cell, held, from the declared instrument checks every
 class the default names, and two different classes make the screen name neither
 (``EXTINCTION_SCREENS_DISAGREE``).  Re-measured on ``main`` 3defa3b6 plus this
 check (pearl, ``ws_jobs/m1910i1``): it catches six of the eight (``CAUGHT``) and
-fires on none of the 51 rows where the default is right
-(these three patterns, PbSO₄ X-ray and 11-BM NAC, 121 rows).  The other two are
+fires on none of the rows where the default is right on these three patterns
+and 11-BM NAC, and on five PbSO₄ X-ray rows from the all-zero preset background
+(#1286 round 2: the held screen's background is seeded, which costs those).  The other two are
 strict ``xfail`` rows: the prefit's own cell is off there (corundum ×0.985 lands
 1611 ppm short, the monoclinic ×0.9975 586 ppm on a), and both screens name the
 same wrong class.
@@ -240,25 +241,16 @@ def _zero_background(patterns, name):
     return {name: (data, cell, system, centring, zero, limits)}
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "#1286 round 1: from the preset's all-zero declared background the held "
-    "reference fit is poor and the class forbidding nothing wins by elimination, "
-    "so the check fires needlessly (synthetic P 2_1/c at x1.0005 and x1.001). "
-    "Seeding the held background removes it and fires on eleven right PbSO4 rows "
-    "instead; a gate on the held fit's chi2 does not separate them (measured)"))
-def test_a_held_screen_with_a_poor_reference_fit_does_not_veto_a_right_default(
+def test_a_held_screen_from_a_zero_background_does_not_veto_a_right_default(
         patterns):
-    """Round 1 of #1286 (Yue's zero-background sweep), pinned as a known failure.
-    From the all-zero declared background the held reference fit is poor and the
-    class forbidding nothing wins it by elimination: here it names ``P 1 - 1`` at
-    ×1.001 where the default names the true ``P 1 21/c 1``, and the screens
-    disagree.  A pass here is a fix."""
+    """Round 1 of #1286 (Yue's zero-background sweep): from the all-zero declared
+    background the unseeded held reference fit was poor and the class forbidding
+    nothing won it by elimination (``P 1 - 1`` at ×1.001), so the check fired
+    needlessly.  The held screen's background is seeded as the prefit's is
+    (round 2), and the outcome is what counts: the screens agree and
+    ``best_or_none`` names the true class."""
     zero = _zero_background(patterns, "mono")
     screen, _ = _screen(zero, "mono", 1.001)
-    held = screen.held_screen
-    assert held is not None and held.best_or_none() is not None, _says(held)
-    assert TRUE["mono"][0] not in held.best_or_none().space_groups
-    assert held.reference_chi2 > screen.reference_chi2 + 10.0
     assert not screen.screens_disagree()
     best = screen.best_or_none()
     assert best is not None and TRUE["mono"][0] in best.space_groups, _says(screen)

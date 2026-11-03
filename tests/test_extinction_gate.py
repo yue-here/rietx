@@ -313,29 +313,43 @@ def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
     Measured (M-C7-3): held, the screen abstains with ``P 21 21 21`` on top; the
     default prefit gives ``P c - n`` (P n m a in this setting) at ΔBIC −564;
     the same prefit from the preset's all-zero background returns ``P - - n``,
-    confidently and wrongly, which is why the prefit seeds it.
+    confidently and wrongly, which is why the prefit seeds it.  The second
+    screen's own verdict is the next test's.
     """
     data, instrument, limits, peaks, candidate = _pbso4_inputs()
 
     screen = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
                                          two_theta_limits=limits)
-    best = screen.best_or_none()
+    best = screen._own_best()
     assert best is not None, [(c.symbol, c.delta_bic) for c in screen.candidates[:4]]
     assert best.symbol == "P c - n"
     assert "P c m n" in best.space_groups
     assert screen.status == "converged"
-    # the second screen at the prefit's cell, held from the preset instrument,
-    # names no class (the all-zero background loses P c - n): recorded, never
-    # flagged (WP-1910, ruled on #1178)
+    # the second screen at the prefit's cell, held, runs from the preset
+    # instrument with its all-zero background seeded (#1286 round 2)
     assert screen.held_screen is not None
-    assert screen.held_screen.best_or_none() is None
-    assert not screen.screens_disagree()
-    assert "EXTINCTION_SCREENS_DISAGREE" not in {d.code for d in screen.diagnostics}
 
     held = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
                                        two_theta_limits=limits, refine_cell=False)
     held_best = held.best_or_none()
     assert held_best is None or held_best.symbol != "P c - n"
+
+
+@pytest.mark.slow
+@pytest.mark.xfail(strict=True, reason=(
+    "#1286 round 2, the cost of seeding the held screen's background (chosen by "
+    "the maintainer): on PbSO4 X-ray the seeded held screen names `P c - -` where "
+    "the default names the true `P c - n`, so the screens disagree and "
+    "best_or_none abstains (x0.9995, 1.0, 1.002, 1.005, 1.0075)"))
+def test_pbso4_xray_default_is_not_vetoed_by_the_seeded_held_screen():
+    """The known cost, pinned strict so a fix shows as a pass: the answer
+    ``best_or_none`` hands back at the issue's reproducer is the true class."""
+    data, instrument, limits, peaks, candidate = _pbso4_inputs()
+    screen = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
+                                         two_theta_limits=limits)
+    best = screen.best_or_none()
+    assert best is not None and best.symbol == "P c - n"
+    assert not screen.screens_disagree()
 
 
 # ----------------------------------------------------------------------
