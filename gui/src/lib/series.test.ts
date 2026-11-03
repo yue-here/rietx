@@ -364,6 +364,15 @@ describe("matching the reseed flags to a trajectory", () => {
     expect(unrecoveredFlags(partial, rows, [true, false, true])).toEqual([false, true]);
   });
 
+  it("reads `rejected` by position when a pattern that raised left no entry", () => {
+    // pattern 1 raised, so the entries are indices 0 and 2 and the server's
+    // `rejected` has two rows; reading it by index would look past the end
+    const rows = entries([{ label: "p0" }, { label: "p2" }]);
+    rows[1].index = 2;
+    expect(unrecoveredFlags(traj({ labels: ["p0", "p2"] }), rows, [false, true]))
+      .toEqual([false, true]);
+  });
+
   it("names what made the library reject a fit, from the entry's own fields", () => {
     const error = (code: string) => ({ level: "error", code, message: "m" });
     const warn = { level: "warning", code: "BOUND_HIT", message: "m" };

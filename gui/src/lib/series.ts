@@ -426,14 +426,17 @@ export function reseededFlags(traj: Trajectory, entries: SeriesEntry[]): boolean
 
 /** Which entries the library quarantined (`SEQUENTIAL_UNRECOVERED`, WP-1051).
  *
- * `rejected` is the server's, one boolean per entry in series order, computed by
- * the test the chain itself applies (`schemas.sequential._rejected`): the solver
- * diverged, or the fit carries an `error`-level code. It is more than
- * `status === "diverged"`, a fit can converge and still be rejected, and a
- * display reads the field and never re-derives the test (WP-2003, C2 q5). */
+ * `rejected` is the server's, one boolean per entry **by position** in
+ * `entries`, computed by the test the chain itself applies
+ * (`schemas.sequential._rejected`): the solver diverged, or the fit carries an
+ * `error`-level code. It is more than `status === "diverged"`, a fit can
+ * converge and still be rejected, and a display reads the field and never
+ * re-derives the test (WP-2003, C2 q5). A pattern that raised has no entry, so
+ * an entry's `index` is not its position. */
 export function unrecoveredFlags(traj: Trajectory, entries: SeriesEntry[],
                                  rejected: boolean[]): boolean[] {
-  return flagsFor(traj, entries, (e) => rejected[e.index] === true);
+  const at = new Map(entries.map((e, i) => [e, i]));
+  return flagsFor(traj, entries, (e) => rejected[at.get(e) ?? -1] === true);
 }
 
 /** Why the library rejected an entry, in the entry's own fields: the solver
