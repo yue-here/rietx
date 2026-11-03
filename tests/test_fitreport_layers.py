@@ -366,6 +366,22 @@ def test_symmetric_misfits_do_not_read_as_axial_asymmetry(knob, factor):
     assert _asymmetry_action(report) is None
 
 
+@pytest.mark.parametrize("shift", [0.02, -0.02])
+def test_a_position_error_keeps_its_reading_at_zero_apertures(shift):
+    """The borrowed column is an FCJ tangent, and at low angle most of it is
+    the centroid shift the position column already carries.  Before Layer 1
+    took that part out, a zero error of +0.02° on a symmetric pattern put
+    ``refine_axial_asymmetry`` first and dropped ``refine_zero_shift`` from
+    0.999 to 0.30 (WP-2054's review).  Now the position reading is the one it
+    is without the column, and the right cause still leads."""
+    structure, ins, data = _truth(axial=0.0)
+    ins.zero_shift.value += shift
+    report = _report_for(structure, ins, data)
+    active = [a for a in report.suggested_actions if a.active]
+    assert active and active[0].kind == "refine_zero_shift"
+    assert active[0].confidence > 0.9
+
+
 def test_injected_scale_error_is_recovered(truth):
     structure, ins, data = truth
     perturbed = structure.model_copy(deep=True)

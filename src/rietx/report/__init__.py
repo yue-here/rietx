@@ -295,13 +295,12 @@ def _nominal_axial(shapes, structure, instrument, values):
     ``None``, for the reason :func:`_reading_models` gives.
 
     The value decides the reading, and it is the floor's value, not a value
-    of its own.  A small aperture's smear is a shift (the FCJ offset goes as
-    the square of the aperture), so at 0.01 the column runs into the position
-    column, and 11 of SRM 660c's 12 gated regions and 3 of cpd-1c's 5 stopped
-    passing their gates.  A tangent taken above the data's own aperture points
-    elsewhere, so at 0.05 the low-angle coefficients fell insignificant on
-    both.  At 0.02 the gated count did not drop on SRM 660c, cpd-1a, -1c or
-    -1f, and every one fired the action (WP-2054's handover has the sweep).
+    of its own.  Layer 1 keeps only the part of the column the fit's own four
+    cannot draw, and a tangent taken above the data's own aperture points
+    elsewhere: at 0.05 the low-angle coefficients fell insignificant on SRM
+    660c and cpd-1c, whose apertures refine to about 0.03 and 0.04.  At 0.005,
+    0.01 and 0.02 on SRM 660c, and 0.01 to 0.03 on cpd-1c, the action fired
+    (WP-2054's handover has the sweep).
     """
     from ..model.forward import AXIAL_SIZING_FLOOR
     from ..model.profiles.fcj import fcj_live

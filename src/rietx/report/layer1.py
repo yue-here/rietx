@@ -175,6 +175,26 @@ def attribute_region(model: CompiledModel, bases: DerivativeBases,
     if len(live) == 0 or len(idx) <= len(live):
         return None
     a = a[:, live]
+    if axial is not None and 4 in live:
+        # The borrowed column is a tangent at an aperture the model does not
+        # have, and at low angle most of it is the FCJ centroid shift and
+        # breadth the position and width columns already carry.  Left as it
+        # is it took a plain zero error's reading off ``position`` (zero shift
+        # 0.02° on the synthetic LaB6: refine_zero_shift 0.999 -> 0.30, the
+        # asymmetry action first).  So it keeps only what the fit's own four
+        # columns cannot draw.  By the Frisch-Waugh-Lovell theorem (Frisch &
+        # Waugh 1933, Econometrica 1, 387; Lovell 1963, JASA 58, 993) its own
+        # coefficient and esd are unchanged by that, and the four keep the
+        # coefficients they have without it (WP-2054).
+        j = int(np.nonzero(live == 4)[0][0])
+        own = np.delete(a, j, axis=1)
+        if own.shape[1]:
+            proj, *_ = lapack.lstsq(own, a[:, j], rcond=None)
+            rest = a[:, j] - own @ proj
+            if np.linalg.norm(rest) > 1e-8 * np.linalg.norm(a[:, j]):
+                a[:, j] = rest
+            else:                       # nothing the four cannot draw
+                live, a = np.delete(live, j), own
 
     gram = a.T @ a
     # Resolvability is about the *angles* between the basis columns, not their

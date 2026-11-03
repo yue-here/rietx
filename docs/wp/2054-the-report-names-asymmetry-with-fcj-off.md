@@ -194,7 +194,10 @@ from today. The synthetic controls hold.
   *Done.* `report._nominal_axial` compiles the shapes model again with
   S/L = H/L = `AXIAL_SIZING_FLOOR` when `fcj_live` is false at the fit's values, and
   Layer 1 (`layer1.nominal_axial_columns`) takes that twin's ∂Ω/∂(S/L) for each peak
-  that has none of its own. The misfit and the other four columns stay the fit's own.
+  that has none of its own. The misfit and the other four columns stay the fit's own,
+  and the borrowed column is projected off their span in each region before the solve,
+  so the four keep the coefficients they have without it (Frisch-Waugh-Lovell) and the
+  asymmetry coefficient is the joint one.
   `suggest_actions(axial_off=True)` counts only a positive coefficient, since a
   negative one asks for less asymmetry than a model that draws none, and appends the
   zero-aperture clause to the rationale. Pawley and hand-built models get no twin,
@@ -208,11 +211,18 @@ from today. The synthetic controls hold.
 
   *Measured* (`[dev]`, darwin/arm64, at d0c4bded0 + this branch).
   - #1106's script, apertures 0: Layer-1 columns 4 → 5; regions 21.4°, 30.4°, 37.5°
-    read asymmetry +0.0205, +0.0204, +0.0247 (7-9 esd), shares 0.74, 0.79, 0.53; the
-    37.5° region now passes its gates. Active actions: `refine_axial_asymmetry` 0.50,
-    `increase_background_flexibility` 0.47 (unchanged), and two width actions that
-    newly pass because more regions pass the gates (`refine_sample_size_broadening`
-    0.26, `…strain…` 0.13). Apertures declared and refined: report identical.
+    read asymmetry +0.0205, +0.0204, +0.0247 (7-9 esd), shares 0.15, 0.27, 0.36;
+    gated regions 12/15 → 15/15. Active actions: `refine_axial_asymmetry` 0.50 and
+    `increase_background_flexibility` 0.47 (unchanged), nothing else. Apertures
+    declared and refined: report identical.
+  - Before the projection (the first commit), the borrowed column took the position
+    reading: a zero error of +0.02° put the asymmetry action first and
+    `refine_zero_shift` at 0.30 (found by `/code-review`, confirmed here by switching
+    the projection off: both new position tests fail). With it, zero error ±0.02°
+    and displacement ±0.03 mm leave every position action at its pre-WP confidence
+    (top 1.0, runners-up 0.5). For the positive sign the asymmetry action also fires
+    at 0.5, ranked with the runners-up: a 0.02° shift is a third of the FWHM, and its
+    nonlinear part is one-sided. Not fixed; it never leads.
   - Synthetic LaB6 (`_truth`), apertures 0 in the model: S/L = H/L = 0.02 in the data
     fires the action (coefficients +0.0078 to +0.0092, the tangent at 0.02 against a
     secant from 0, so about half the aperture). No action on: the unperturbed
@@ -228,19 +238,20 @@ from today. The synthetic controls hold.
   - `python -m tests.reader_output`: unchanged (exit 0), because the standard fit
     declares its apertures. Every zero-aperture fit's printed report does change.
   - The nominal value decides the reading (asked by the generality judge). Gated
-    regions and the action, by nominal aperture, tangent column:
-    | fit (apertures 0) | before | 0.01 | 0.02 | 0.03 | 0.05 |
-    |---|---|---|---|---|---|
-    | SRM 660c | 12/15, no action | 1/15, none | 12/15, fires | — | 12/15, none |
-    | cpd-1c | 5/14 | 2/14, none | 5/14, fires | 8/14, fires | 6/14, none |
-    | cpd-1a | 4/14 | — | 5/14, fires | — | — |
-    | cpd-1f | 3/14 | — | 10/14, fires | — | — |
-    Below 0.02 the smear is a shift and the column runs into position; above the
-    data's own aperture (SRM 660c refines to about 0.025/0.037, cpd-1c to S/L 0.040
-    with H/L held 0) the tangent points elsewhere and the low-angle coefficients
-    fall insignificant. The secant from 0 was tried as an alternative and is
-    sensitive the other way (3/15 gated on SRM 660c at 0.02, 14/15 at 0.05), so
-    the tangent stays. At 0.02 no fit lost a gated region.
+    regions and whether the action fires, by nominal aperture, with the projection:
+    | fit (apertures 0) | before WP | 0.005 | 0.01 | 0.02 | 0.03 | 0.05 |
+    |---|---|---|---|---|---|---|
+    | SRM 660c | 12/15, no | 14/15, fires | 15/15, fires | 15/15, fires | — | 14/15, no |
+    | cpd-1c | 5/14, no | — | 5/14, fires | 9/14, fires | 9/14, fires | 7/14, no |
+    | cpd-1a | 4/14, no | — | — | 6/14, fires | — | — |
+    | cpd-1f | 3/14, no | — | — | 11/14, fires | — | — |
+    Above the data's own aperture (SRM 660c refines to about 0.025/0.037, cpd-1c to
+    S/L 0.040 with H/L held 0) the tangent points elsewhere and the low-angle
+    coefficients fall insignificant: the failure is silence, never a wrong call.
+    Without the projection, 0.01 also collapsed the gates (1/15 and 2/14), because a
+    small aperture's smear is a shift. The secant from 0 was tried and was no less
+    sensitive (3/15 gated at 0.02 on SRM 660c before the projection), so the tangent
+    stays. 0.02 sits inside the working range on both real families.
   - Freeing the axial term in the QPA protocol on cpd-1c moves Rwp 0.1076 → 0.1052
     (S/L 0.040), so the three cpd samples do carry the asymmetry the action names.
 
@@ -253,7 +264,8 @@ from today. The synthetic controls hold.
     not a tuned threshold, so no audit row.
   - No new audit row and no `THRESHOLDS_VERSION` bump: no threshold moved.
     `AXIAL_SIZING_FLOOR` gains a second consumer, the report's nominal aperture,
-    and the sweep shows the value matters there. Its row is approved (2026-10-22),
+    and the sweep shows the value matters there, though only above the data's
+    aperture. Its row is approved (2026-10-22),
     so its evidence was not edited, and a row of its own at tier 3 needs an
     `approved` date. Both are the maintainer's (open item 4).
   - The skill row carries the description only: the generality judge read its
@@ -274,9 +286,10 @@ from today. The synthetic controls hold.
   with the answers).
   - `AXIAL_SIZING_FLOOR` as the report's nominal: **weak**. The value decides which
     reflections get a column and so which regions pass the gates; GSAS-II floors
-    at 0.002; one real family. *Answer:* measured at 0.01/0.02/0.03/0.05 on SRM
-    660c and cpd-1c, and at 0.02 on cpd-1a and -1f (table above). It moves, so per
-    the judge it needs its own constant and row; that row's `approved` is open item 4.
+    at 0.002; one real family. *Answer:* measured from 0.005 to 0.05 on SRM 660c
+    and cpd-1c, and at 0.02 on cpd-1a and -1f (table above). It moves above the
+    data's aperture, so per the judge it needs its own constant and row; that row's
+    `approved` is open item 4. The judge read the tree before the projection.
   - Sign rule at zero apertures: **holds** (tier 1, a physical bound). Minor gap:
     nothing records that a negative coefficient was left out of the action.
   - Rationale clause **holds**; skill row's measured parenthesis **weak** (an Rwp
