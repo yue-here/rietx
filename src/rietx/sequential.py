@@ -539,8 +539,8 @@ def _ladder(base_plan: RefinementPlan, warm_plan: RefinementPlan, *,
     that had not been shown to be the problem.  A rung is reached only when the
     trigger still fires on the *best attempt so far* (:func:`_reseed_needed`),
     which is what makes the escalation stop at the first one that works:
-    :func:`_better` prefers a converged fit and then the lower Rwp, so once any
-    attempt clears the trigger the best one does too.
+    :func:`_prefer` ranks an attempt the quarantine accepts above a rejected
+    one, so once any attempt clears the trigger the best one does too.
     """
     first = "warm_staged" if staged else "warm"
     rungs: list[tuple[str, RefinementPlan, bool]] = [(first, warm_plan, True)]
@@ -1745,7 +1745,7 @@ class SequentialRefinement:
         one's.
 
         Each pattern climbs ``ladder`` (:func:`_ladder`) until an attempt clears
-        :func:`_reseed_needed`, and keeps the best attempt by :func:`_better` whichever
+        :func:`_reseed_needed`, and keeps the best attempt by :func:`_prefer` whichever
         rung produced it; ``previous`` is the last **accepted** pattern, which is
         not always the last one walked (see the quarantine below).
 
