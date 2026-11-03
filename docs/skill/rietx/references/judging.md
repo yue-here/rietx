@@ -414,7 +414,7 @@ is resolution-limited changes numbers it cannot justify.
 Four codes on `SeriesResult.summary(deliverable="series")` carry the chain's
 own rows. `SEQUENTIAL_PATH_DEPENDENT` is an ordering artefact — only a
 `direction="both"` chain can produce one, so a one-way chain has not looked.
-`SEQUENTIAL_PERSISTENT_FINDING` states a persistent count no per-pattern code
+`series.code_counts` states a count across the chain no per-pattern code
 can, measured at **42 of 68** patterns on this ramp (`BOUND_HIT` on one cell, original run). A large entry in
 `series.steps` is either the science or a chain failure, and `verify_steps=k`
 tells them apart (below). `PHASE_UNCONSTRAINED` says the value is held, so its trajectory is the one you handed in. Apply the QPA background check **at every point** too: an absent phase took **40–96 wt %** at equal Rwp.

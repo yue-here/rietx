@@ -119,7 +119,7 @@ The staged order keeps early stages well conditioned from a poor starting model,
 When the neighbour is not a good start either and the warm fit diverges, the ladder refits it.
 A collapse every pattern shares converges, so nothing refits it, and no Rwp fence would either, because the median rises with it.
 With a plan that frees U, V and W, `"single"` settled 1.04-1.29 times above `"stages"` in Rwp on every round-robin mixture after the first, and no pattern was refitted.
-What named it was [`SEQUENTIAL_PERSISTENT_FINDING`](diagnostics-series.md#sequential_persistent_finding) on `RESOLUTION_UNCONSTRAINED` for U, V and W, in six or seven of the eight patterns and in none under `"stages"`.
+What named it was `RESOLUTION_UNCONSTRAINED` on U, V and W in six or seven of the eight patterns, and in none under `"stages"` ([Per-pattern codes counted](#per-pattern-codes-counted)).
 
 ## Carried parameters
 
@@ -197,6 +197,7 @@ The curves stay on `SequentialRefinement.results_`.
 | `SeriesResult.backward` | under `"both"`, the reverse chain's own `SeriesResult`; else `None` |
 | `SeriesResult.x_label` | the axis name |
 | `SeriesResult.diagnostics` | the series diagnostics ([Series diagnostics](#series-diagnostics)) |
+| `SeriesResult.code_counts` | one `SeriesCodeCount` per per-pattern code and parameter, largest count first ([Per-pattern codes counted](#per-pattern-codes-counted)); `None` in a document written before the field existed |
 | `SeriesResult.steps` | one `SeriesStep` per step of every refined path between consecutive patterns, largest in esds first ([Steps between patterns](#steps-between-patterns)); `None` in a document written before the field existed |
 | `SeriesResult.relative_paths`, `SeriesResult.angle_paths` | the paths whose value is a step from where each fit began, and the angle paths ([Paths to plot](#paths-to-plot)) |
 | `SeriesResult.phase_names`, `SeriesResult.atom_labels` | the series numbering ([below](#phases-and-atoms-added-or-removed)) |
@@ -251,7 +252,7 @@ A series is where one unread warning multiplies: in the in-situ run this diagnos
 Both indices are biased towards the model being tested, and a trace phase's index is not comparable with the major phase's ([Structure agreement indices](result.md#structure-agreement-indices)).
 In a series the field serves the trajectory: one pattern's R<sub>Bragg</sub> is a value, and sixty of them are a shape.
 Whether the data can see a phase at all is measured by [`PHASE_UNCONSTRAINED`](diagnostics-refinement.md#phase_unconstrained), from each phase scale's value over its counting-noise esd.
-It reaches an entry through `SeriesEntry.diagnostics`, and aggregates over the chain as `SEQUENTIAL_PERSISTENT_FINDING`, which says what no per-pattern diagnostic can: 42 of 68.
+It reaches an entry through `SeriesEntry.diagnostics`, and `SeriesResult.code_counts` counts it over the chain, which says what no per-pattern diagnostic can: 42 of 68.
 Read R<sub>Bragg</sub> beside that, and beside the weight fraction with its esd.
 
 ### A phase that appears part-way
@@ -468,15 +469,19 @@ These diagnostics fence that, and none of them alters a fitted value.
 | `SEQUENTIAL_WIDTH_GROWTH` | a phase width reached 3× the first value the series measured above three esds, by more than three combined esds, while GoF reached 2× its own at the same pattern; a width that grows at a flat GoF is real broadening and fires nothing |
 | `SEQUENTIAL_MOMENT_HOLD` | how many patterns' moment came back unsupported, and which successors' modulus was reseeded to its floor |
 | `SEQUENTIAL_MOMENT_ONSET` | where along the axis the moment stops being supported, as a bracket |
-| `SEQUENTIAL_PERSISTENT_FINDING` | a per-pattern code fired in more than half the patterns, so it describes the model |
 | `SEQUENTIAL_CANCELLED` | the series stopped before its last pattern ([Events, history and cancellation](#events-history-and-cancellation)) |
 | `SERIES_PATTERN_FAILED` | every attempt on a pattern raised ([Restart ladder](#restart-ladder)) |
 
+### Per-pattern codes counted
+
 A per-pattern diagnostic can only say "this pattern", so in a run of 68 it cannot say "42 of 68".
 One `BOUND_HIT` is a pattern that hit a bound, while a `BOUND_HIT` in most patterns is a bound that is wrong.
-`SEQUENTIAL_PERSISTENT_FINDING` counts each pair of code and parameter over the entries and states the fraction once, in `value`, while the entries still carry every occurrence.
-Its threshold is half the series: above it the finding describes the series, and below it the per-pattern diagnostics say everything there is.
-It needs a series of `rietx.sequential.MIN_POINTS_FOR_PERSISTENCE` patterns, five, and takes the worst level among the occurrences it counts.
+`SeriesResult.code_counts` counts each pair of code and parameter over the entries, one `SeriesCodeCount` each, largest count first.
+`SeriesCodeCount.code` and `SeriesCodeCount.path` name the pair, and `path` is `None` for a code that named no parameter.
+`SeriesCodeCount.count` is the patterns it fired on, `SeriesCodeCount.n_patterns` the patterns in the series, and `SeriesCodeCount.level` the worst level among them.
+The summary prints the three largest in its trajectory block, and the entries still carry every occurrence.
+No count is called persistent, and no diagnostic fires on one.
+Until 1.11 `SEQUENTIAL_PERSISTENT_FINDING` reported a pair only above half of a series of five or more, and no measurement set either number.
 A code about how a pattern was measured, listed in `rietx.sequential.NOT_A_SERIES_FINDING`, is never counted.
 
 ### Steps between patterns

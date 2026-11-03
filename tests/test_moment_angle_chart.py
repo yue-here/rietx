@@ -455,14 +455,11 @@ def test_a_series_on_the_cut_gives_no_finding_from_the_cut_and_every_angle_in_th
     moment = [d for d in series.diagnostics
               if d.code.startswith("SEQUENTIAL_") and any(".moment." in w
                                                            for w in d.where)]
-    # allowed: the twin path dependence, and since WP-1929 the series-level
-    # count of the azimuth sitting at the stationary direction, which is a
-    # fact about the symmetry and not about the cut
-    assert all(d.where == [AZIMUTH_2D] and (
-        d.code == "SEQUENTIAL_PATH_DEPENDENT"
-        or (d.code == "SEQUENTIAL_PERSISTENT_FINDING"
-            and d.message.startswith("MOMENT_ANGLE_STATIONARY")))
-        for d in moment), [d.message for d in moment]
+    # allowed: the twin path dependence (the azimuth sitting at the stationary
+    # direction, counted on `series.code_counts` since WP-2003, is a fact
+    # about the symmetry and not about the cut)
+    assert all(d.where == [AZIMUTH_2D] and d.code == "SEQUENTIAL_PATH_DEPENDENT"
+               for d in moment), [d.message for d in moment]
     back = {e.label: e for e in series.backward.entries}
     for entry in series.entries:
         f = next(p for p in entry.parameters if p.path == AZIMUTH_2D)

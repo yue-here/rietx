@@ -190,6 +190,7 @@ from .schemas.pattern import PatternData, require_two_theta
 from .schemas.results import RefinementResult
 from .schemas.sequential import (
     _NAMED_PATH,
+    SeriesCodeCount,
     SeriesEntry,
     SeriesFailure,
     SeriesResult,
@@ -208,8 +209,7 @@ from .strategy.staged import CLOSING_STAGE_NAME, RefinementPlan, Stage, resolve_
 #: anything (WP-1127); read only once a factor is passed, the bound being off
 #: by default (WP-2003, batch C3).  One sample is not a spread, and the
 #: running maximum of a *short* sample is set by whichever pattern happened to
-#: be cheapest.  The same reasoning as :data:`MIN_POINTS_FOR_PERSISTENCE`, and
-#: it was measured the expensive way: at one sample the bound went 2 × 8 = 16
+#: be cheapest.  It was measured the expensive way: at one sample the bound went 2 × 8 = 16
 #: evaluations on the thermal-ramp chain and its third pattern legitimately
 #: wanted **17**, a one-evaluation margin that darwin cleared and Linux did not.
 FIRST_RUNG_SAMPLES = 3
@@ -232,15 +232,9 @@ NOISE_FLOOR_REL = 1e-9
 #: Forward and backward chains are called to disagree at this many combined σ.
 PATH_DEPENDENCE_SIGMA = 3.0
 
-#: A series needs at least this many patterns before "in most of them" is a
-#: statement about the series rather than about two or three fits: below it
-#: the per-entry diagnostics are the whole story and a summary of three things
-#: is not a summary.
-MIN_POINTS_FOR_PERSISTENCE = 5
-
-#: Per-pattern codes :func:`_persistent_diagnostics` never aggregates, because
-#: they are about how the package *measured* a pattern rather than about the
-#: model, so "in most of the series" changes no subject.  The rule for a
+#: Per-pattern codes :func:`_code_counts` never counts, because they are about
+#: how the package *measured* a pattern rather than about the model, so a count
+#: of them across the series says nothing about the series.  The rule for a
 #: member: the code would read the same on a series whose model is right.
 #: ``FROZEN_COMPILE_STALE`` (#272) says a result was measured on a fresh
 #: compile whose χ² sits a fraction from the frozen one; a chain whose every
@@ -1297,8 +1291,8 @@ class SequentialRefinement:
             and would not be by an Rwp fence either, since the median rises
             with it: under a plan freeing U, V and W the round-robin chain sat
             1.04-1.29× above ``"stages"`` with no reseed, and what named it was
-            ``SEQUENTIAL_PERSISTENT_FINDING`` on ``RESOLUTION_UNCONSTRAINED``
-            for U, V and W (issue #475, WP-1469).
+            ``RESOLUTION_UNCONSTRAINED`` on U, V and W in most patterns, now
+            counted on ``SeriesResult.code_counts`` (issue #475, WP-1469).
         direction:
             ``"forward"``, ``"backward"`` (chain from the last pattern), or
             ``"both"``, which runs it each way and reports where the two
@@ -1626,8 +1620,9 @@ class SequentialRefinement:
                 series.steps[:verify_steps], patterns, names, mode, base_plan,
                 two_theta_limits, prepare, constrain, stream=stream,
                 cancel=cancel)
-        # what the per-pattern diagnostics could not say: "42 of 68" (WP-1110)
-        diagnostics += _persistent_diagnostics(series)
+        # what the per-pattern diagnostics could not say: "42 of 68" (WP-1110),
+        # every count and no threshold (WP-2003, C6)
+        series.code_counts = _code_counts(series)
         # and a width that grew while the fit got worse (WP-1465)
         diagnostics += _width_growth_diagnostics(series)
         # the moment along the chain: the hold, and the onset it locates.
@@ -1687,6 +1682,7 @@ class SequentialRefinement:
             # the reverse chain's own steps, measured as the reported chain's
             # are; never verified, as the reverse chain is itself the check
             back.steps = _series_steps(back, relative, angles)
+            back.code_counts = _code_counts(back)
             if cancel is not None and bool(cancel):
                 diagnostics.append(
                     _cancelled_diagnostic(len(back_entries), len(patterns),
@@ -2831,39 +2827,38 @@ def _where_in_series_numbering(entry: SeriesEntry, path: str) -> str:
     return prefixes[key] + path[len(key):] if key in prefixes else path
 
 
-def _persistent_diagnostics(series: SeriesResult) -> list[Diagnostic]:
-    """``SEQUENTIAL_PERSISTENT_FINDING`` — a per-pattern code that is really
-    about the series (WP-1110 item 8).
+def _code_counts(series: SeriesResult) -> list[SeriesCodeCount]:
+    """Every per-pattern code and path with the patterns it fired on.
 
-    A per-pattern diagnostic can only ever say "this pattern". Nothing in a run
-    of 68 says **"42 of 68"**, and that is the sentence a caller acts on: one
-    `BOUND_HIT` is a pattern that hit a bound, a `BOUND_HIT` in most of them is
-    a model whose bound is wrong. The trigger episode is exactly this — 425
-    `BOUND_HIT` diagnostics went unread for two hours while
-    ``phases.3.cell.c`` was pinned in 42 of 68 patterns and
-    ``phases.3.lor_size`` in 44 of 68. The package said so from pattern 1, and
-    per-pattern was the only place it said it.
+    The one writer of ``SeriesResult.code_counts`` (WP-2003, C6, ruled by the
+    maintainer 2026-11-03).  A per-pattern diagnostic can only ever say "this
+    pattern".  Nothing in a run of 68 says **"42 of 68"**, and that is the
+    sentence a caller acts on: one ``BOUND_HIT`` is a pattern that hit a
+    bound, and a ``BOUND_HIT`` in most of them is a model whose bound is
+    wrong.  The trigger episode was this.  425 ``BOUND_HIT`` diagnostics went
+    unread for two hours while ``phases.3.cell.c`` was pinned in 42 of 68
+    patterns (WP-1110 item 8).
 
-    **The threshold is a change of subject, not a sensitivity.** Above half the
-    patterns a finding describes the series rather than some of its members, so
-    that is where the series-level line is drawn; below it the per-entry
-    diagnostics already say what there is to say, and repeating them here would
-    be a second authority on the same fact. Counted per (code, path) so the
-    message can name the parameter, and the codes are an open vocabulary — this
-    aggregates whatever fired, and needs no edit when a new one lands, with one
-    declared exception: a code about how a pattern was measured rather than
-    about the model (:data:`NOT_A_SERIES_FINDING`) is never aggregated.
+    It is arithmetic and nothing more.  The removed
+    ``SEQUENTIAL_PERSISTENT_FINDING`` wrote a row only above half the series
+    and only from five patterns on.  Neither number had a measurement behind
+    it.  On the planted ramp (``tests/planted_series.py``) ``FLOOR_HIT`` fired
+    on 63 of 248 patterns, 62 of them after the unmodelled phase appears, and
+    the half kept it silent.  So every (code, path) pair is a row, counted once per pattern,
+    largest count first, ties in code then path order.
+
+    The codes are an open vocabulary, so this counts whatever fired and needs
+    no edit when a new code lands.  The one declared exception is a code about
+    how a pattern was measured rather than about the model
+    (:data:`NOT_A_SERIES_FINDING`).  A path is read into the series numbering
+    (:func:`_where_in_series_numbering`), so one atom's code is one count
+    whatever each pattern's model numbers it.  The level is the worst any
+    occurrence carried, in both directions: an error is not reported as a
+    warning because most occurrences were warnings, and a declared ``info``
+    choice (``DISPERSION_NEGLECTED`` on every pattern) is not promoted.
     """
     n = len(series.entries)
-    if n < MIN_POINTS_FOR_PERSISTENCE:
-        return []
     counts: dict[tuple[str, str], int] = {}
-    # The worst level any occurrence carried, and it travels in *both*
-    # directions.  A summary must not report an error as a warning because most
-    # occurrences were warnings — and it must not promote an `info` either: a
-    # deliberate `dispersion=None` fires `DISPERSION_NEGLECTED` on every pattern
-    # of a series, and "68 of 68" is worth saying without calling a declared
-    # choice a warning.
     levels: dict[tuple[str, str], str] = {}
     for entry in series.entries:
         # once per pattern per (code, path): a code that fires twice in one
@@ -2883,21 +2878,10 @@ def _persistent_diagnostics(series: SeriesResult) -> list[Diagnostic]:
                 worst = levels.get(key)
                 if worst is None or _LEVEL_RANK[d.level] > _LEVEL_RANK[worst]:
                     levels[key] = d.level
-
-    out: list[Diagnostic] = []
-    for (code, path), count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])):
-        if count * 2 <= n:
-            continue
-        where = [path] if path else []
-        subject = path or "the fit"
-        out.append(Diagnostic(
-            level=levels[(code, path)], code="SEQUENTIAL_PERSISTENT_FINDING",
-            where=where, value=count / n,
-            message=(f"{code} fired on {subject} in {count} of {n} patterns "
-                     f"({count / n:.0%} of the series)."),
-            suggestion="Change the model or the plan.",
-        ))
-    return out
+    return [SeriesCodeCount(code=code, path=path or None, count=count,
+                            n_patterns=n, level=levels[(code, path)])
+            for (code, path), count in sorted(counts.items(),
+                                              key=lambda kv: (-kv[1], kv[0]))]
 
 
 def _width_growth_diagnostics(series: SeriesResult) -> list[Diagnostic]:

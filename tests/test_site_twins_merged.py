@@ -2001,12 +2001,12 @@ def test_a_persistent_finding_counts_one_atom_across_a_renumbering():
 
     Half the patterns removed an atom ahead of it, so their diagnostics name it
     ``atoms.1`` and the rest ``atoms.2``.  Counted as written, each half is 3 of
-    6 and nothing reaches the series line.  The ``uiso`` path is in no row,
+    6 and the one atom reads as two.  The ``uiso`` path is in no row,
     so it follows the atom's prefix rather than a row of its own.
     """
     from rietx.schemas.common import Diagnostic
     from rietx.schemas.sequential import SeriesEntry, SeriesResult
-    from rietx.sequential import _persistent_diagnostics
+    from rietx.sequential import _code_counts
 
     def entry(k):
         moved = k % 2 == 0
@@ -2017,5 +2017,5 @@ def test_a_persistent_finding_counts_one_atom_across_a_renumbering():
             diagnostics=[Diagnostic(level="warning", code="BOUND_HIT",
                                     where=[f"{own}.uiso"], message="...")])
 
-    out = _persistent_diagnostics(SeriesResult(entries=[entry(k) for k in range(6)]))
-    assert [(d.where, d.value) for d in out] == [(["phases.0.atoms.2.uiso"], 1.0)]
+    out = _code_counts(SeriesResult(entries=[entry(k) for k in range(6)]))
+    assert [(c.path, c.count) for c in out] == [("phases.0.atoms.2.uiso", 6)]

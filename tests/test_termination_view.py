@@ -354,7 +354,7 @@ def _series_result(**kw) -> rx.SeriesResult:
 def test_series_deliverable_prints_every_deciding_row():
     text = _series_result().summary(deliverable="series")
     assert "deliverable: series" in text
-    for row in ("ordering artefact:", "persistent findings:",
+    for row in ("ordering artefact:",
                 "widths grown with a worsening fit:", "steps:",
                 "phase support:", "2θ-scale anchor:", "precision vs accuracy:",
                 "good enough:"):

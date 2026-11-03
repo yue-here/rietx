@@ -227,6 +227,7 @@ DEFAULT_SEATS: dict[str, int] = {
 RECORD_SCHEMAS: tuple[str, ...] = (
     "rietx.schemas.results.StageResult",
     "rietx.schemas.sequential.SeriesEntry",
+    "rietx.schemas.sequential.SeriesResult",
     "rietx.schemas.results.RefinementResult",
     "rietx.schemas.results.Statistics",
     "rietx.report.schemas.DistortionBlockTests",
@@ -543,6 +544,19 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.sequential.SeriesEntry.status",
     "rietx.schemas.sequential.SeriesEntry.tree_id",
     "rietx.schemas.sequential.SeriesEntry.x",
+    "rietx.schemas.sequential.SeriesResult.angle_paths",
+    "rietx.schemas.sequential.SeriesResult.atom_labels",
+    "rietx.schemas.sequential.SeriesResult.backward",
+    "rietx.schemas.sequential.SeriesResult.diagnostics",
+    "rietx.schemas.sequential.SeriesResult.direction",
+    "rietx.schemas.sequential.SeriesResult.entries",
+    "rietx.schemas.sequential.SeriesResult.failures",
+    "rietx.schemas.sequential.SeriesResult.mode",
+    "rietx.schemas.sequential.SeriesResult.n_failed",
+    "rietx.schemas.sequential.SeriesResult.phase_names",
+    "rietx.schemas.sequential.SeriesResult.provenance",
+    "rietx.schemas.sequential.SeriesResult.relative_paths",
+    "rietx.schemas.sequential.SeriesResult.x_label",
 })
 
 ROWS: tuple[Row, ...] = (
@@ -1110,7 +1124,6 @@ ROWS: tuple[Row, ...] = (
                   "No response yet: its sites raise at warning (did not run) and info (ran on "
                   "less), two consequences in one code (WP-2003 batch)")),
     Row("SEQUENTIAL_PATH_DEPENDENT", "code"),
-    Row("SEQUENTIAL_PERSISTENT_FINDING", "code"),
     Row("SEQUENTIAL_RESEED", "code", tier=3, ambiguity=1,
         evidence=("warning at its one site (sequential.py _reseed_diagnostics, where = the "
                   "label); fires when the kept rung is cold on a warm-startable pattern, its "
@@ -1548,6 +1561,23 @@ ROWS: tuple[Row, ...] = (
                   "ruled by the maintainer 2026-11-03: inspecting each pattern's metrics "
                   "is part of reading any series, so a ranked line would be noise "
                   "(2003-batch/batch.md, decision 2)")),
+    Row("rietx.schemas.sequential.SeriesResult.code_counts", "action", tier=1, ambiguity=3,
+        evidence=("arithmetic: every per-pattern (code, where path) pair counted once per "
+                  "pattern, with the series length and the worst level, largest count "
+                  "first and no threshold (sequential.py _code_counts), the codes of "
+                  "NOT_A_SERIES_FINDING left out (a fact about two codes that report how a "
+                  "pattern was measured). It replaces SEQUENTIAL_PERSISTENT_FINDING, whose "
+                  "half cut and five-pattern minimum had no measurement behind them and kept "
+                  "planted's FLOOR_HIT, 63 of 248, silent. The summary prints one line naming "
+                  "the three largest counts and the field; the reading is its help entry "
+                  "(2003-batch/batch.md, C6, ruled by the maintainer 2026-11-03)")),
+    Row("rietx.schemas.sequential.SeriesResult.steps", "action", tier=1, ambiguity=3,
+        evidence=("arithmetic: every refined path's step between consecutive accepted "
+                  "patterns over the later fit's esd, largest first and no threshold "
+                  "(sequential.py _series_steps); it replaced SEQUENTIAL_DISCONTINUITY and its "
+                  "5x-median-and-3-sigma threshold. The summary prints one line naming the "
+                  "largest and the field (2003-batch/batch.md, C4, settled by Claude "
+                  "2026-10-26; its row written with C6's, ruled by the maintainer 2026-11-03)")),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_raised", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.seeded_from", "action", tier=3, ambiguity=1,
@@ -3753,7 +3783,6 @@ ROWS: tuple[Row, ...] = (
                  "Settled by Claude 2026-10-26 under the maintainer's delegation, pick (a); "
                  "the maintainer's own approval is owed (2003-batch/batch.md, C3)."),
         approved="2026-10-26"),
-    Row("rietx.sequential.MIN_POINTS_FOR_PERSISTENCE", "constant", value=5),
     Row("rietx.sequential.NOISE_FLOOR_REL", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: a step or a between-chain gap under 1e-9 of the parameter's "
                   "magnitude (never under 1e-9 absolute, sequential.py:2290) is about 4.5e6 "
@@ -4823,7 +4852,6 @@ ROWS: tuple[Row, ...] = (
                   "(sequential.py:2187-2239); each restates what the requested check left "
                   "undone")),
     Row("SEQUENTIAL_PATH_DEPENDENT.suggestion", "suggestion", value=1),
-    Row("SEQUENTIAL_PERSISTENT_FINDING.suggestion", "suggestion", value=1),
     Row("SEQUENTIAL_RESEED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: points at the code that already says why "
                   "(SEQUENTIAL_UNRECOVERED on a rejected cold fit) or at a specimen or model "
@@ -5265,8 +5293,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "SEQUENTIAL_MOMENT_ONSET.suggestion",
     "SEQUENTIAL_PATH_DEPENDENT",
     "SEQUENTIAL_PATH_DEPENDENT.suggestion",
-    "SEQUENTIAL_PERSISTENT_FINDING",
-    "SEQUENTIAL_PERSISTENT_FINDING.suggestion",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SEQUENTIAL_WIDTH_GROWTH.suggestion",
     "SITE_SNAPPED_TO_SPECIAL_POSITION",
@@ -5742,7 +5768,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.schemas.suggest.SUGGEST_ABSORPTION_MAX",
     "rietx.schemas.suggest.SUGGEST_GROUP_R2",
     "rietx.schemas.suggest.SUGGEST_MIN_GAIN",
-    "rietx.sequential.MIN_POINTS_FOR_PERSISTENCE",
     "rietx.sequential.PATH_DEPENDENCE_SIGMA",
     "rietx.sequential.SequentialRefinement.fit:labels",
     "rietx.sequential.SequentialRefinement.fit:refit",
@@ -5977,7 +6002,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "SEQUENTIAL_MOMENT_ONSET",
     "SEQUENTIAL_PATH_CHECK_INCOMPLETE",
     "SEQUENTIAL_PATH_DEPENDENT",
-    "SEQUENTIAL_PERSISTENT_FINDING",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",

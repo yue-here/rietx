@@ -19,7 +19,7 @@ This fits the seven synthetic LaB6 patterns of [How to fit a temperature series]
 
 <!-- output of examples/guides/path.py -->
 ```text
-['SEQUENTIAL_PERSISTENT_FINDING', 'SEQUENTIAL_PERSISTENT_FINDING']
+[]
 largest forward-backward gap: 0.00 esd
 ```
 

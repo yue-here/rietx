@@ -591,6 +591,12 @@ from .._nearmiss import did_you_mean
 #: limit is not on the entry, so an entry's ``rwp_fence`` key is dropped at
 #: read (``SeriesEntry``'s ``mode="before"`` validator) and its
 #: ``rwp_over_median`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2003, C6): ``SeriesResult.code_counts``, a
+#: ``SeriesCodeCount`` per per-pattern code and path with its count, the
+#: series length and the worst level.  Additive and defaulted to ``None``,
+#: "not recorded", the 0.25 → 0.26 rule; ``SequentialRefinement.fit`` writes
+#: it on every series.  ``SEQUENTIAL_PERSISTENT_FINDING``, the threshold it
+#: replaces, is gone, so a document carrying one still reads.
 #: Also in 0.60 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
 #: formula and temperature read, and ``PeakList.instrument_undeclared``,
 #: the instrument blocks the picker found at default on a lab source.  Additive

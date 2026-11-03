@@ -193,9 +193,9 @@ series = rx.refine_sequential(
 series
 
 # %% [markdown]
-# Every pattern converged.
-# Both diagnostics are [`SEQUENTIAL_PERSISTENT_FINDING`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-persistent-finding), a per-pattern finding that fired on every pattern of the series.
-# Such a finding describes the model rather than any one fit.
+# Every pattern converged, and the series reports no finding of its own.
+# [`series.code_counts`](https://rietx.org/docs/stable/reference/series.html#per-pattern-codes-counted) counts each per-pattern diagnostic over the series, and the summary names the largest counts.
+# Both codes here fired on every pattern, so they describe the model rather than any one fit.
 # [Read the diagnostics first](https://rietx.org/docs/stable/guides/series.html#read-the-diagnostics-first) explains these two.
 #
 # Each entry records [which attempt](https://rietx.org/docs/stable/reference/series.html#restart-ladder) gave its values.

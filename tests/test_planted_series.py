@@ -58,8 +58,7 @@ SEED = 0
 EVENT_AT = default_events(LENGTH)
 #: the committed full-length output (``python -m tests.planted_series``)
 DATA = Path(__file__).parent / "data" / "planted_series"
-#: series-level codes that mark an event; ``SEQUENTIAL_PERSISTENT_FINDING``
-#: describes the model rather than a point of the series and is not one
+#: series-level codes that mark an event
 EVENT_CODES = {"SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED",
                "SEQUENTIAL_WIDTH_GROWTH"}
 

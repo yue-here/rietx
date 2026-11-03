@@ -4092,16 +4092,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "spread between the two directions."
         ),
     ),
-    "SEQUENTIAL_PERSISTENT_FINDING": HelpEntry(
-        title="A per-pattern finding recurs across the series",
-        description=(
-            "The same diagnostic fired in most of the patterns. One occurrence says a "
-            "pattern has a problem. Most of the series says the model or the plan has "
-            "it. Refitting the individual patterns reproduces the finding. Change the "
-            "model or the plan instead. The per-pattern diagnostics carry each "
-            "occurrence."
-        ),
-    ),
     "SEQUENTIAL_RESEED": HelpEntry(
         title="A pattern was refitted from the initial model",
         description=(
@@ -6033,6 +6023,19 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`cold_ratio`: near 1 the step is in the data, near 0 the chain made it. "
             "Steps into or out of a rejected pattern are left out; `None` means a "
             "document written before the field."
+        ),
+    ),
+    "SeriesResult.code_counts": HelpEntry(
+        title="Per-pattern codes counted",
+        description=(
+            "Every per-pattern diagnostic code and path, with the number of patterns "
+            "it fired on and the worst level it carried, largest count first. One "
+            "occurrence says a pattern has a problem. The same code on most of the "
+            "series says the model or the plan has it, and refitting single patterns "
+            "reproduces it. rietx sets no threshold on the count. Read the top rows "
+            "against the series: a count that starts at one pattern and holds to the "
+            "end can mark where the sample changed. Each occurrence stays on its "
+            "entry. `None` means a document written before the field."
         ),
     ),
     "SeriesResult.relative_paths": HelpEntry(

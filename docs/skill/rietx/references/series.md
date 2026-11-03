@@ -80,9 +80,9 @@ What an operator must know, all measured:
   frees U, V and W (`lab_bragg_brentano`), `"single"` settled 1.04-1.29× above
   `"stages"` in Rwp on every round-robin mixture after the first with no
   reseed, from both a direct and a Le Bail first fit; what named it was
-  `SEQUENTIAL_PERSISTENT_FINDING` on `RESOLUTION_UNCONSTRAINED` for U, V and W
+  `RESOLUTION_UNCONSTRAINED` on U, V and W in `series.code_counts`
   (6-7 of 8, none under `"stages"`), while the U/V correlation row appeared
-  from one start only (Measured: WP-1469, issue #475).  Read that code, and
+  from one start only (Measured: WP-1469, issue #475).  Read those counts, and
   refit two or three patterns cold; with a width-freeing plan `"stages"` cost
   1.2-1.6× the collapsed chain's wall clock.
 - **A pattern that no rung recovers is quarantined, not merely flagged**
@@ -425,12 +425,13 @@ These nine arrive on a `SeriesResult` — the series' own `diagnostics`, or a
 pattern's entry — and a single `fit()` never emits one, so their rows live
 here rather than in §7's table, which carries what a fit is likely to say.
 Branch on the code, as §7 says; the manual's *Refining many patterns* chapter explains each.
-The twelfth series code, `SEQUENTIAL_PERSISTENT_FINDING`, is an abstention, so its row is in §6, [`abstention.md`](abstention.md). The two moment codes, `SEQUENTIAL_MOMENT_HOLD` and `SEQUENTIAL_MOMENT_ONSET`, are the magnetic family's, so their rows are in §7j, [magnetic](magnetic.md) (maintainer ruling, issue #286: one order-parameter question, one file).
+The two moment codes, `SEQUENTIAL_MOMENT_HOLD` and `SEQUENTIAL_MOMENT_ONSET`, are the magnetic family's, so their rows are in §7j, [magnetic](magnetic.md) (maintainer ruling, issue #286: one order-parameter question, one file).
 
 | Code | What it means you must not do |
 |---|---|
 | `SEQUENTIAL_RESEED` | Read this point of a series as evidence that the trajectory is continuous. With `SEQUENTIAL_UNRECOVERED` on the same pattern the cold rung was only the least bad attempt, not a good fit |
 | `entry.rwp_over_median` | Read a high ratio as a measurement before opening its fit, or a low one on the first patterns as clean (a median of one or two). No threshold reads it unless you pass `reseed_factor`. Compare GoF and Rexp with an accepted neighbour: GoF up is a model the pattern outgrew, GoF level with Rexp up is fewer counts. (Measured: #481, a blank frame fitted perfectly, GoF 1.00 against 1.06, Rexp 0.159 against 0.040.) Not quarantined (WP-1469) |
+| `series.code_counts` | Read a per-pattern code as one pattern's problem before reading its count here: each `SeriesCodeCount` gives `code`, `path`, `count` of `n_patterns` and the worst `level`, largest first. On most of the series it is the model or the plan, and refitting single patterns reproduces it. No threshold reads it. (Measured: WP-1110, 425 unread `BOUND_HIT`s were one cell edge pinned in 42 of 68 patterns.) |
 | `series.steps` | Report a large step as physics without opening that pattern's own fit; it is equally the signature of a chain failure, and no threshold says which. `fit(verify_steps=k)` opens the *k* largest for you: both patterns refitted cold and independently, and `cold_ratio` is what that pair reproduces (1.0 in the data, 0 the chain's own); measured cost 5 % of a 68-pattern chain. Each `SeriesStep` carries `path`, `indices` and `size_esd`. Steps into or out of an unrecovered pattern are not listed |
 | `SEQUENTIAL_PATH_DEPENDENT` | Quote that parameter's per-pattern esd as its uncertainty; the between-chain spread is larger and is the honest one |
 | `SEQUENTIAL_CANCELLED` | Read the shortened `entries` list as the series |

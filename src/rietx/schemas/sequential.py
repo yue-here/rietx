@@ -116,7 +116,7 @@ class SeriesEntry(Base):
     #: The nearer measurement is ``PHASE_UNCONSTRAINED`` — the phase scale's
     #: significance, its value over its esd against counting noise (WP-1523),
     #: reaching an entry through :attr:`diagnostics` and aggregating over the
-    #: chain as ``SEQUENTIAL_PERSISTENT_FINDING``.  It answers "is this phase
+    #: chain on :attr:`SeriesResult.code_counts`.  It answers "is this phase
     #: real" only while no other phase in the model can produce the same
     #: intensity: with a parent and its subgroup both refined on a one-phase
     #: synthetic Cu pattern, it read low on whichever of the two the start
@@ -491,6 +491,32 @@ class SeriesStep(Base):
     cold_ratio: float | None = None
 
 
+class SeriesCodeCount(Base):
+    """How many patterns one per-pattern code fired on, at one path (WP-2003).
+
+    A row of :attr:`SeriesResult.code_counts`, written by
+    ``sequential._code_counts``.  It counts and judges nothing.  One
+    ``BOUND_HIT`` is a pattern that hit a bound.  The same code on most of a
+    series is a model whose bound is wrong, and only a count across the
+    patterns shows that (WP-1110: 425 unread ``BOUND_HIT`` findings were one
+    cell edge pinned in 42 of 68 patterns).  Until WP-2003 a row existed only
+    above half the series, as the removed ``SEQUENTIAL_PERSISTENT_FINDING``.
+    """
+
+    #: the per-pattern diagnostic code
+    code: str
+    #: one ``where`` path of it, read into the series numbering
+    #: (:attr:`SeriesResult.phase_names`); ``None`` where the code named no
+    #: path, so a row about the whole fit is never keyed on an empty string
+    path: str | None = None
+    #: the patterns it fired on at this path, each pattern counted once
+    count: int
+    #: the patterns in the series (``len(entries)``), so a row reads alone
+    n_patterns: int
+    #: the worst level any occurrence carried
+    level: Literal["info", "warning", "error"]
+
+
 class SeriesFailure(Base):
     """One pattern the chain could not fit at all.
 
@@ -862,6 +888,16 @@ class SeriesResult(Base):
     #: :attr:`backward`; ``None`` in a document written before the field —
     #: "not recorded", never "no step"; ``[]`` on a series of one pattern.
     steps: list[SeriesStep] | None = None
+    #: Every per-pattern code and ``where`` path the series' entries carry,
+    #: with the number of patterns it fired on and its worst level, as a
+    #: :class:`SeriesCodeCount`, largest count first (WP-2003, ruled by the
+    #: maintainer 2026-11-03).  No threshold and no diagnostic: the help entry
+    #: carries the reading.  ``sequential.NOT_A_SERIES_FINDING``'s codes are
+    #: not counted.  Written by ``SequentialRefinement.fit`` on the reported
+    #: chain and on :attr:`backward`; ``None`` in a document written before
+    #: the field, "not recorded", never "nothing recurred"; ``[]`` on a series
+    #: whose entries carry no counted code.
+    code_counts: list[SeriesCodeCount] | None = None
     #: The paths whose values are **steps, not positions** (WP-1317): a
     #: coordinate DOF measured from where its fit began, a rigid body's
     #: rotation DOF (``sequential._relative_paths``, WP-1333).  Nothing in an
@@ -1450,6 +1486,15 @@ class SeriesResult(Base):
             lines.append(f"    largest step {largest.path} {largest.size_esd:.1f}σ "
                          f"at {largest.labels[0]}→{largest.labels[1]} "
                          f"(series.steps)")
+        # and the counts' one line (WP-2003, C6): the three largest, read
+        # off the field, which is sorted largest first
+        if self.code_counts:
+            top = ", ".join(
+                f"{c.code}{'' if c.path is None else ' on ' + c.path} "
+                f"{c.count} of {c.n_patterns}" for c in self.code_counts[:3])
+            lines.append(f"    most frequent per-pattern codes: {top}"
+                         f"{', …' if len(self.code_counts) > 3 else ''} "
+                         f"(series.code_counts)")
         shown = (list(range(n)) if n <= 2 * max_entries else
                 [*range(max_entries), None, *range(n - max_entries, n)])
         for i in shown:
@@ -1537,11 +1582,6 @@ class SeriesResult(Base):
                          f"{self.direction} only, and direction='both' is the "
                          f"one check that separates a trajectory from the order "
                          f"it was refined in")
-
-        persistent = by_code.get("SEQUENTIAL_PERSISTENT_FINDING", [])
-        lines.append(f"    persistent findings: {len(persistent)}")
-        for d in persistent[:5]:
-            lines.append(f"      {d.message}")
 
         # a width that grew while the fit got worse (WP-1465): the one reading
         # of a trajectory that says a phase stood in for something missing

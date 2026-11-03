@@ -334,8 +334,8 @@ Anything else a series mode decides by itself:
   moment the pattern does not support is floored before it seeds the next
   (`SEQUENTIAL_MOMENT_HOLD`); the wavelength-calibration diagnostic measures from the series
   root's declared λ, not the carried one; a cancelled
-  series returns what completed (`SEQUENTIAL_CANCELLED`); a finding on most patterns is
-  summarised once (`SEQUENTIAL_PERSISTENT_FINDING`) (checked).
+  series returns what completed (`SEQUENTIAL_CANCELLED`); every per-pattern code is
+  counted over the series (`SeriesResult.code_counts`, no threshold since WP-2003) (checked).
 - GSAS-II refuses to start a sequential refinement that refines a phase's lattice parameters
   or texture coefficients, and says to use the per-histogram Dij and C(L,N) instead. With
   `Copy2Next` on it prints the variables added or removed when a histogram's vary list
@@ -373,8 +373,8 @@ during the chain. The behaviours with no program default behind them are rietx's
 restart ladder (its Rwp fence and first-rung budget the caller's opt-ins since WP-2003, the
 median, `_prefer`); the quarantine's exclusion from the median; `direction="both"` and
 `SEQUENTIAL_PATH_DEPENDENT`; the discontinuity scan and its cold verification; and the moment
-floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the persistent-finding
-summary and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
+floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the per-pattern code
+counts and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
 
 Parameters the setup fixes. Surveyed 2026-11-02 for WP-2081, one session. GSAS-II 5.8.4 is
 read in its source (`GSASIIstrMain.SeqRefine`, `GSASIIstrIO.ReadConstraints`,
