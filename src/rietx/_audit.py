@@ -1163,7 +1163,9 @@ ROWS: tuple[Row, ...] = (
                   "error-level diagnostic since C2 q5, settled by Claude 2026-10-26; or the caller's own "
                   "reseed_factor) or a raised warm rung; on main under the removed 1.25 fence "
                   "it fired on planted 35 and tut05-broken 1, none on the other six families "
-                  "(2003-batch/batch.md, C1)"),
+                  "(2003-batch/batch.md, C1); on this tree it fires on the path guide's 800 K "
+                  "pattern (warm Rwp 0.917, cold 0.040), the magnetic blank frame beside the "
+                  "onset and tut05-broken scan12 (WP-2003 fifth-session handover)"),
         grounds=("Says out loud that the chain restarted, the package's own act, as "
                  "CELL_RUNAWAY does (B8); the ladder's trigger is tiered with C2's ladder. "
                  "Settled by Claude 2026-10-26; ruled by the maintainer 2026-11-03 "
@@ -4607,9 +4609,11 @@ ROWS: tuple[Row, ...] = (
                   "planted; the Le Bail difference falls on patterns at GoF > 8, the Pawley "
                   "one mostly on T009 at GoF 1.0 (+268)"),
         grounds=("Carrying the intensities is the warm start's own reading for a mode whose "
-                 "intensities are outside the models, and it moved no measured value; "
-                 "GSAS-II's Copy2Next is opt-in, the dissent, kept as "
-                 "carry_hkl_intensities=False. Ruled by the maintainer 2026-11-03 "
+                 "intensities are outside the models, and it moved no measured value. It "
+                 "costs evaluations on planted (+10 % Le Bail, +30 % Pawley) and none on "
+                 "thermal. No program of the seven carries them by default (practice.md); "
+                 "GSAS-II's Copy2Next is opt-in, kept as carry_hkl_intensities=False. Ruled "
+                 "by the maintainer 2026-11-03 with those numbers in front of them "
                  "(2003-batch/batch.md, C9 q2)."),
         approved="2026-11-03"),
     Row("rietx.sequential.refine_sequential:backend", "default", tier="caller", ambiguity=1,
@@ -4676,8 +4680,11 @@ ROWS: tuple[Row, ...] = (
                   "and every other family not at all (2003-batch/batch.md, C1; clashes.md "
                   "X16); on this tree with no bound, the default since C3, planted escalates "
                   "nothing in 3 111 evaluations (2026-11-02, macOS arm64)"),
-        grounds=("Trying a colder start on a diverged or unfinished fit and keeping the "
-                 "better is what a refiner does by hand; the escalation never keeps a worse "
+        grounds=("Trying a colder start on a rejected fit and keeping the better is what a "
+                 "refiner does by hand, though none of the seven programs restarts a pattern "
+                 "by itself (practice.md); a max_iter fit is not a trigger (C1). It rescues "
+                 "the path guide's 800 K pattern (warm Rwp 0.917, cold 0.040) and the "
+                 "magnetic blank frame on this tree. The escalation never keeps a worse "
                  "attempt (_prefer); tiered with C2's ladder. Settled by Claude 2026-10-26; ruled by the maintainer 2026-11-03 "
                  "(2003-batch/batch.md, C1)."),
         approved="2026-11-03"),
@@ -4697,11 +4704,14 @@ ROWS: tuple[Row, ...] = (
                   "by name, refused unless finite and positive (_check_factor), "
                   "and inert under reseed=False; no default path passes one, the GUI included "
                   "(searched 2026-11-02). The 3.0 default it carried from WP-1127 "
-                  "(FIRST_RUNG_FACTOR) was removed: an efficiency bet that moved an accepted "
-                  "value (planted T087, 6.06 esd, its winning first rung 9.8x the running "
-                  "maximum), no program truncates a first rung, and its saving on main was 49 "
-                  "evaluations of 13 083 on planted and none on CPD, the null twin or trigger "
-                  "(2003-batch/batch.md, C3, settled by Claude 2026-10-26)")),
+                  "(FIRST_RUNG_FACTOR) was removed. On main it moved an accepted value: with "
+                  "it planted T087 (the blank frame) held its neighbour's zero shift 0.00597 "
+                  "(truth 0.006), without it the shift sat at -0.0231(48), 6.06 esd off; on "
+                  "this tree, after C3's two fixes, T087 is identical with "
+                  "and without it, 161 planted patterns move by at most 4.8e-7 esd and CPD is "
+                  "bit-identical. No program truncates a first rung, and its saving on main "
+                  "was 49 evaluations of 13 083 on planted and none on CPD, the null twin or "
+                  "trigger (2003-batch/batch.md, C3, settled by Claude 2026-10-26)")),
     Row("rietx.sequential.SequentialRefinement.fit:verify_steps", "default", tier="caller", ambiguity=1,
         value=0,
         evidence=("opt-in: verify_steps=0 refits nothing, and a count is asked by name; no "

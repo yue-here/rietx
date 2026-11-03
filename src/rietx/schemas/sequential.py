@@ -57,9 +57,11 @@ def _rejected(fit) -> bool:
     ``converged`` warm fit at Rwp 0.917 under ``MODEL_FAR_FROM_DATA`` once the
     Rwp fence had gone (C1), and seeded the 900 K pattern into the same
     collapse.
-    Ruled 2026-10-26: the ladder climbs past such an attempt, and one still
-    rejected after its last rung is quarantined, by this one test in both
-    places.
+    Settled by Claude 2026-10-26 and ruled by the maintainer 2026-11-03: the
+    ladder climbs past such an attempt, and one still rejected after its last
+    rung is quarantined, by this one test in both places.  Any ``error``-level
+    code a later change adds becomes a ladder and a quarantine trigger the
+    day it lands.
 
     An expression over the level, never a list of codes, for ``usable``'s
     reason: an error-level code written later counts the day it lands.  It is

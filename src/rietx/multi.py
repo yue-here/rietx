@@ -571,8 +571,10 @@ def _joint_answer_significance(models, mtable, outcome, held: list[str],
     ``refine._significance_columns`` names, read off the **joint** normal
     matrix at unit weights (:func:`_joint_unit_jacobian`).  So a shared cell
     that another histogram pins costs the scale little, and one no pattern
-    pins costs it what it costs a single fit.  The joint matrix is the one
-    the solve inverts, so the reading is the fit's own.
+    pins costs it what it costs a single fit.  It is the solve's matrix with
+    the caller's histogram weights set to one, so a phase is judged against
+    each pattern's counting noise, as the single fit judges it, whatever
+    weight the caller gave its histogram.
 
     The screen comes first and bounds the result from above, as there: a
     phase under it keeps the screen value with no Jacobian built, and the
