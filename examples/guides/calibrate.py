@@ -23,7 +23,7 @@ instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 instrument.background = rx.BackgroundChebyshev.with_terms(4)
 instrument.geometry.axial_hl.value = 3 / 200  # receiving slit height / goniometer radius
 calibration = rx.Refinement(lab6(), instrument)
-calibration.hold(["phases.0.cell.*", "instrument.geometry.axial_hl"])
+calibration.hold("phases.0.cell.*")
 calibrated = calibration.fit(standard("first"), plan="lab_calibrate")
 
 for name in "uvwxy":
@@ -61,7 +61,7 @@ show("first profile, first sample", matched)
 
 # guide: mismatch start
 second = rx.Refinement(lab6(), instrument)
-second.hold(["phases.0.cell.*", "instrument.geometry.axial_hl"])
+second.hold("phases.0.cell.*")
 second.fit(standard("second"), plan="lab_calibrate")
 rx.save_instrument_profile(second.instrument, work / "second.json")
 
@@ -84,9 +84,14 @@ for inst, (sl, hl) in zip(pair, [(AXIAL_SL, AXIAL_HL), (AXIAL_HL, AXIAL_SL)]):
 first_standard = standard("first")
 patterns = [rx.Refinement(lab6(), inst).predict(first_standard.two_theta) for inst in pair]
 assert (patterns[0] == patterns[1]).all()
+# lab_calibrate frees S/L alone (WP-2012); this plan frees H/L beside it.
+both_plan = rx.RefinementPlan.lab_calibrate()
+axial = next(i for i, s in enumerate(both_plan.stages) if s.name == "lines_axial")
+both_plan.stages[axial] = rx.Stage(
+    "lines_axial", [*both_plan.stages[axial].turn_on, "instrument.geometry.axial_hl"])
 both = rx.Refinement(lab6(), instrument)
 both.hold("phases.0.cell.*")
-both_result = both.fit(first_standard, plan="lab_calibrate")
+both_result = both.fit(first_standard, plan=both_plan)
 ratios = [both_result.parameter(f"instrument.geometry.axial_{n}") for n in ("sl", "hl")]
 # 2026-11-03: since WP-1955 lifts S/L off zero to 0.02, the fit lands on the
 # exchanged pair; on 2026-10-21 it came back in the made order.
@@ -98,7 +103,9 @@ assert [rx.format_su(p.value, p.stderr) for p in widths] == [
     "0.00399(17)", "-0.00293(25)", "0.002957(83)", "0.01483(37)", "0.02018(88)"]
 # The page: each lies within one esd of the instrument that made the data.
 assert all(abs(p.value - true) < p.stderr for p, true in zip(widths, SETUPS["first"]))
-assert [d.code for d in calibrated.diagnostics] == ["HIGH_CORRELATION", "HOLD_BLOCKED_PLAN"]
+assert [d.code for d in calibrated.diagnostics] == ["HIGH_CORRELATION"]
+# The page: H/L is where the script set it, because the plan never frees it.
+assert calibration.instrument.geometry.axial_hl.value == AXIAL_HL
 zero = calibrated.parameter("instrument.zero_shift")
 displacement = calibrated.parameter("instrument.geometry.sample_displacement")
 assert rx.format_su(zero.value, zero.stderr) == "0.01976(61)"

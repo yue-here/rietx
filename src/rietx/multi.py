@@ -3092,8 +3092,8 @@ def _unreached_histogram_diagnostics(stage_results: list[StageResult],
                      f"nothing in histogram {h} ({label}): "
                      f"{', '.join(where)} matched rows of another histogram "
                      "and none of this one."),
-            suggestion=("List this histogram's parameters with "
-                        f"[e.path for e in ref.mtable.tables[{h}].entries] "
+            suggestion=("List this histogram's own parameters with "
+                        f"[r.path for r in ref.parameters() if r.path.startswith('hist.{h}.')] "
                         "and add a glob that reaches them. Scope the stage "
                         "(hist.<k>.…) if one histogram was the intent."),
         ))
