@@ -1,6 +1,6 @@
 # WP-1931 — the background order scan runs to its cap
 
-Milestone: unscheduled · Status: 🔄 2026-10-12 — task 1 landed from outside (PR #871); the REML selector and the rest remain
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @yue-here (ghostshift runner); task 1 landed in PR #871, the REML selector is parked, tasks 7-8 in progress
 Track: What fires, and what stays silent
 Depends on: — (1542 soft: the same `auto_background` call and its seed default)
 Priority: P3 2026-10-08 — the selector returns its cap on both shipped 11-BM standards and says nothing; measured harmless there (bias ≤ 0.7 % of a background ≤ 0.4 % of the peak), so the cost is a choice that reads as made and was not
