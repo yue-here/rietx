@@ -367,6 +367,9 @@ repo.
   those anchors moved with them (the tutorial notebook's link edited in
   place, its outputs untouched). `test_manual`, `test_manual_api`,
   `test_gui_manual`, `test_docs_consistency` and `test_help` then pass.
+  Re-run on the tree merged with main again (WP-2012's presets landed),
+  same venv and route: 13646 passed, 319 skipped, 34 xfailed, none failed.
+  The LaB6 hump acceptance row passes there too.
   Targeted rows, run alone: the LaB6 hump acceptance test, the `next` and
   `stage` guide rows, the indexing Le Bail validation rows,
   `test_validation_matrix`, `test_slow_descent`, `test_lm_solver`,
