@@ -4161,7 +4161,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "holds the coupled direction, the one direction that moves x; a free path "
             "follows only where every coordinate that direction moves was free; a tie, "
             "which needs a single direction, is dropped. One on a direction the position "
-            "fixes is dropped. The message names every one that followed and every one "
+            "fixes is dropped. "
+            "The message names every one that followed and every one "
             "that was dropped. Nothing was moved: "
             "this is the bookkeeping of a site whose symmetry changed without a merge, "
             "for instance onto a mirror within 5e-5, after a fit wrote the coordinate "
@@ -5926,6 +5927,16 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`SEQUENTIAL_MOMENT_HOLD` names these patterns."
         ),
     ),
+    "SeriesEntry.pattern_paths": HelpEntry(
+        title="This pattern's own paths",
+        description=(
+            "This pattern's own dot-path for each path of the entry that its model numbers "
+            "differently, keyed by the entry's path. Every path of a series reads one "
+            "numbering, so a trajectory follows one phase by name and one atom by label "
+            "where a `prepare` hook added or removed either. `{}` where the two agree; "
+            "`None` in a series saved before 1.11, whose paths are each pattern's own."
+        ),
+    ),
     "SeriesEntry.node_id": HelpEntry(
         title="Pattern history node",
         description=(
@@ -6020,6 +6031,23 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The moment angle DOFs, whose differences across patterns are taken modulo "
             "a full turn. Recorded as `relative_paths` is, and `None` means the same."
+        ),
+    ),
+    "SeriesResult.phase_names": HelpEntry(
+        title="Series phase names",
+        description=(
+            "The phase each path of the series names by number: phase `i` is "
+            "`phase_names[i]`. The series' own structure's phases, then each phase a "
+            "`prepare` hook added, in the order the walk met it. `None` in a series "
+            "saved before 1.11."
+        ),
+    ),
+    "SeriesResult.atom_labels": HelpEntry(
+        title="Series atom labels",
+        description=(
+            "The atom each path of the series names by number: atom `j` of phase `i` is "
+            "`atom_labels[i][j]`, numbered as `phase_names` is. `None` in a series saved "
+            "before 1.11."
         ),
     ),
     "SeriesResult.failures": HelpEntry(

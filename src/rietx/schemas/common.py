@@ -631,6 +631,13 @@ from .._nearmiss import did_you_mean
 #: its own frozen compile, the number ``stage_end`` already emitted.  Additive
 #: and defaulted to ``None``, "a result stored before the field", the 0.25 →
 #: 0.26 rule; all three runners write it on every stage.
+#: Also in 0.60 (WP-1991, Yue's ruling of 2026-11-01): a ``SeriesResult``'s
+#: paths read one series numbering, matched by phase name and atom label
+#: (``SeriesResult.phase_names``/``.atom_labels``), and
+#: ``SeriesEntry.pattern_paths`` names each pattern's own path where it
+#: differs.  Additive and defaulted to ``None``: a document written before the
+#: fields stores each pattern's own paths, and nothing stored the names to
+#: translate them, so it opens as written.
 #: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
 #: where it defaulted to 0.0.  A stored document that omits it still opens, at
 #: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
