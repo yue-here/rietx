@@ -1182,6 +1182,25 @@ class StageResult(Base):
     #: ``None`` means a result stored before the field.  Writers: the three
     #: runners that build a ``StageResult``, on every stage.
     rwp: float | None = None
+    #: *which* test ended the solve, where :attr:`status` says only whether it
+    #: converged: the ``stage_end`` event's ``termination``, copied from the
+    #: driver's outcome (``LSQOutcome.termination``, WP-1334).  The default LM
+    #: driver writes ``ftol_runs`` (three small relative decreases),
+    #: ``no_descent`` or ``exhausted_fp64`` (nothing downhill the cost can
+    #: resolve), ``slow_descent`` (``optimize.lm.SLOW_DESCENT_ESD``: at its
+    #: last rate the rest of the budget would have lowered χ² by less than
+    #: one esd's worth) and ``max_nfev`` (the budget ran out).  ``solver="trf"``
+    #: writes scipy's ``ftol``, ``xtol``, ``gtol``, ``ftol+xtol`` and
+    #: ``max_nfev``.  A model that stopped being finite writes
+    #: ``non_finite_residual`` or ``non_finite_jacobian`` (WP-2048).  The
+    #: status follows from it: ``slow_descent`` and ``max_nfev`` are
+    #: ``"max_iter"``, a non-finite stop ``"diverged"``, the rest
+    #: ``"converged"``.  An open vocabulary, like a guard's ``code``.
+    #:
+    #: ``None`` means a result stored before the field, or a stage with no
+    #: free parameter, where no test was consulted.  Writers: the three
+    #: runners that build a ``StageResult``.
+    termination: str | None = None
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
     #: Stephens strain cone, or the Γ_G² floor of WP-1938 D7) during this
     #: stage: the step for the box alone crossed a row, and the step solved

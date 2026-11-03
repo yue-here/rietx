@@ -519,6 +519,7 @@
   "result_fields:StageResult.scale_b_held",
   "result_fields:StageResult.seeded",
   "result_fields:StageResult.status",
+  "result_fields:StageResult.termination",
   "result_fields:StageResult.unknown_paths",
   "result_fields:StageResult.unreached_histograms",
   "result_fields:StageResult.width_twins_held",

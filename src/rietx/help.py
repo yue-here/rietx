@@ -5580,6 +5580,20 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "means a result stored before the field."
         ),
     ),
+    "StageResult.termination": HelpEntry(
+        title="Stage stopping test",
+        description=(
+            "Which test ended the stage's solve, where `status` says only whether it "
+            "converged. The default solver writes `ftol_runs`, `no_descent` or "
+            "`exhausted_fp64` when it converged, `slow_descent` when the rest of the "
+            "budget, at the rate the cost was falling, would have lowered chi-squared "
+            "by less than one esd of travel buys, and `max_nfev` when the budget ran "
+            "out. The last two have `status` `max_iter`. `solver=\"trf\"` writes "
+            "scipy's `ftol`, `xtol`, `gtol`, `ftol+xtol` and `max_nfev`. `None` means "
+            "a result stored before the field, or a stage with nothing free."
+        ),
+        anchor="theory/estimation.html#convergence",
+    ),
     "StageResult.n_constraint_truncations": HelpEntry(
         title="Steps held on a constraint",
         description=(

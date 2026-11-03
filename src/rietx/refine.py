@@ -5961,6 +5961,7 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths,
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                termination=outcome.termination or None,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
                 # checked, trivially: one histogram has no elsewhere
@@ -6281,6 +6282,7 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, unreached_histograms={},
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                termination=outcome.termination or None,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
                 moment_angle_tests=outcome.moment_angle_tests)
@@ -10629,17 +10631,34 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
     is now ``max_iter ×`` :data:`~rietx.optimize.least_squares.NFEV_PER_ITERATION`,
     sized from the measured worst-case rejection rate, so a stage that stalls
     reports it roughly 30x sooner with its answer unchanged.
+
+    The slow-descent rule (WP-1334, ``optimize.lm.SLOW_DESCENT_ESD``) is the
+    budget's sibling and shares the code, because the advice is the same and
+    every consumer keyed on the code keeps working.  The message says which
+    stages it cut, from ``StageResult.termination``, so a reader can tell "ran
+    out" from "stopped because the rest would have bought less than an esd".
     """
-    hit = [s.name for s in stage_results if s.status == "max_iter"]
+    hit = [s for s in stage_results if s.status == "max_iter"]
     if not hit:
         return []
+    slow = [s.name for s in hit if s.termination == "slow_descent"]
+    spent = [s.name for s in hit if s.termination != "slow_descent"]
+    parts = []
+    if spent:
+        parts.append(("Stage " if len(spent) == 1 else "Stages ")
+                     + ", ".join(repr(n) for n in spent)
+                     + (" stopped on its iteration budget."
+                        if len(spent) == 1 else
+                        " stopped on their iteration budgets."))
+    if slow:
+        parts.append(("Stage " if len(slow) == 1 else "Stages ")
+                     + ", ".join(repr(n) for n in slow)
+                     + " stopped early: at the rate the cost was falling, the "
+                       "rest of the budget would have lowered χ² by less than "
+                       "one esd of travel buys.")
     return [Diagnostic(
         level="warning", code="STAGE_MAX_ITER",
-        message=(("Stage " if len(hit) == 1 else "Stages ")
-                 + ", ".join(repr(n) for n in hit)
-                 + (" stopped on its iteration budget."
-                    if len(hit) == 1 else
-                    " stopped on their iteration budgets.")),
+        message=" ".join(parts),
         where=[],
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",

@@ -1950,7 +1950,8 @@ class MultiHistogramRefinement:
                     seeded=seeded, blocked_by_hold=blocked_by_hold,
                     moment_angle_tests=outcome.moment_angle_tests,
                     cell_reset=cell_reset, collapsed=restored,
-                    window_loss=max(losses) if losses else None, rwp=rwp))
+                    window_loss=max(losses) if losses else None, rwp=rwp,
+                    termination=outcome.termination or None))
                 if stream is not None:
                     stream.emit("stage_end", stage=stage.name, status=outcome.status,
                                 n_iterations=outcome.n_iterations,

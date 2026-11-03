@@ -515,6 +515,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.StageResult.name",
     "rietx.schemas.results.StageResult.rwp",
     "rietx.schemas.results.StageResult.status",
+    "rietx.schemas.results.StageResult.termination",
     "rietx.schemas.results.StageResult.unknown_paths",
     "rietx.schemas.results.StageResult.unreached_histograms",
     "rietx.schemas.results.StageResult.window_loss",
@@ -2895,6 +2896,30 @@ ROWS: tuple[Row, ...] = (
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."),
         approved="2026-10-20"),
+    Row("rietx.optimize.lm.SLOW_DESCENT_ESD", "constant", tier=3, value=1.0,
+        evidence=("WP-1334 (issue #222): a stage stops once the rest of its budget, at the "
+                  "rate the last quarter lowered the cost, would lower chi2 by less than "
+                  "SLOW_DESCENT_ESD^2 x chi2_red, the decrease one esd of joint travel buys at "
+                  "a quadratic minimum (Press et al. 2007 §15.6; McCusker et al. 1999 §7 states "
+                  "convergence as shift/esd). GSAS-II 5.8.4 stops on a per-cycle relative chi2 "
+                  "decrease under 1e-3 after at most 3 cycles by default (GSASIIobj.py:20, "
+                  "checked), looser than this. Measured on the WP's fixtures (powderline LaB6, "
+                  "cpd-1a with zircon at 1e-6 and 1e-9, the 1e-9 acceptance protocols): "
+                  "budget-stopped solve time 63.6 s -> 19.4 s on LaB6, worst shift 0.109 plain "
+                  "esd, on the degenerate hump's fwhm; see the WP's handover for every row"),
+        grounds=("A constant that decides where a solve stops, rietx's own; tier 3 until "
+                 "three families on either side give one answer, as the solver's other "
+                 "stopping constants (B10)."),
+        approved=None),
+    Row("rietx.optimize.lm._SLOW_DESCENT_WINDOW", "constant", tier=3, value=4,
+        evidence=("WP-1334: the slow-descent window is a quarter of the stage's evaluation "
+                  "budget and the rule is first read once a whole window has passed, so no "
+                  "stage converging inside test_budget_and_tolerance_invariance's asserted "
+                  "4x margin (largest measured use 49 of 400 on the shipped schedule) can "
+                  "reach it; such fits are bit-identical with the rule on"),
+        grounds=("Sets where the slow-descent rule can act; rietx's own, tier 3 with "
+                 "SLOW_DESCENT_ESD."),
+        approved=None),
     Row("rietx.optimize.lm._CURVATURE_GATE", "constant", tier=3, value=100.0,
         evidence=("WP-1953: 3762 of 3831 LM solves never raise lambda past 10, and the crawls it "
                   "catches pass 1e8; no measurement chose 100 over 30 or 1000; second pass owed "

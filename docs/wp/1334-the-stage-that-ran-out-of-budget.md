@@ -211,17 +211,20 @@ stop-rule task's.
 - [x] `StageResult.rwp` — the number `stage_end` already emits, on the object
       that was standing next to it. Name its writer at review (WP-1076: a
       declared field with no writer fails no test).
-- [ ] The finer termination reason on `StageResult`, or a written statement
+- [x] The finer termination reason on `StageResult`, or a written statement
       that `status == "max_iter"` is the whole answer and the log's split is
-      deliberately log-only.
-- [ ] A stop rule: a stage exhausting its budget below a stated relative-cost
+      deliberately log-only. `StageResult.termination`, the `stage_end`
+      token; writers the three runners.
+- [x] A stop rule: a stage exhausting its budget below a stated relative-cost
       improvement stops, and `STAGE_MAX_ITER` (or a sibling) says the rule cut
       it rather than the budget running out. Default chosen against the
-      measured p90, not invented.
+      measured p90, not invented. `optimize.lm.SLOW_DESCENT_ESD`; its two
+      tier-3 audit rows wait for the maintainer's dated approval.
 - [ ] Re-measure the #222 tranche shape on a suite fixture and record the
       recovered fraction, so the rule's effect is a number and not a claim.
-- [ ] Tests: a stage that would exhaust its budget for nothing now stops and
+- [x] Tests: a stage that would exhaust its budget for nothing now stops and
       reports; a stage that would rescue the fit still runs.
+      `tests/test_slow_descent.py`.
 - [ ] Skill: `references/batch.md` — the keep-the-best row, now expressible
       from `StageResult` alone; and the row saying what the new finding means.
 
