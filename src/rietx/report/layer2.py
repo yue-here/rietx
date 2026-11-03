@@ -1048,8 +1048,9 @@ def suggest_actions(attributions: list[RegionAttribution],
             kind="refine_axial_asymmetry", confidence=0.5,
             rationale=(f"axial-divergence shape term is significant in "
                        f"{len(asym)} low-angle region(s)"),
-            parameter_paths=["instrument.geometry.axial_sl",
-                             "instrument.geometry.axial_hl"],
+            # S/L alone: the FCJ weight is symmetric under S/L <-> H/L, so
+            # freeing both reaches one of two mirrored minima (WP-2012).
+            parameter_paths=["instrument.geometry.axial_sl"],
             two_theta_range=(min(a.two_theta_lo for a in low),
                              max(a.two_theta_hi for a in low))))
 

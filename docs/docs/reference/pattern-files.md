@@ -84,6 +84,8 @@ assert [opt.name for opt in caps.reader_options] == ["axis", "bank", "block", "s
 
 ### Format notes
 
+Every reader drops a point whose 2θ, count or σ is NaN or infinite, and reports it with [`PATTERN_ROWS_DROPPED`](diagnostics-files.md#pattern_rows_dropped), naming the dropped points by their 2θ. A file with no finite point is refused. Two readers differ. `bruker_raw` refuses a non-finite count or 2θ, because in that binary format it means the file was read wrongly. `pdcif` keeps σ = ∞, which it writes for a point of zero weight and then excludes.
+
 - `bruker_raw` reads versions 2 (`RAW2`), 3 (`RAW1.01`) and 4 (`RAW4.00`). Version 1 is refused by name, because no description of it exists. A version 2 file is read when it holds one range and its header and counts account for its size exactly; a version 2 file with more than one range is refused by name. A version 3 file whose declared ranges leave non-zero bytes over is refused, naming the offset. A trailing run of zeros is accepted.
 - `philips_rd` stores each intensity √-compressed, and the reader decodes it as counts = v²//100. The header states the file's length twice and its maximum intensity once, and a disagreement is refused.
 - `rasx` and `ras` read an attenuator column and never apply it. [`RAS_ATTENUATOR_PRESENT`](diagnostics-files.md#ras_attenuator_present) names the 2θ range it covers.

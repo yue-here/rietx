@@ -421,6 +421,23 @@ No program surveyed uses a pdCIF weight column at all. rietx's whole-column fall
 therefore never trusts the file less than practice does. GSAS-II's unused code shows one
 intent: a null weight means an excluded point.
 
+## A NaN or infinite value in a pattern file
+
+Surveyed 2026-11-01 for WP-2079 (issue #1187), and its GSAS-II row re-read 2026-11-03. The
+question: a pattern file whose count, σ or 2θ is NaN or ±inf on some rows, as a reduction writes
+where it divided by a zero monitor. Does a reader drop the row, keep it at zero weight, or refuse
+the file?
+
+| Program | What it does with the row |
+|---|---|
+| rietx | Every reader drops a row whose 2θ, count or σ is NaN or ±inf and reports `PATTERN_ROWS_DROPPED` with the 2θ of the dropped rows; a file with no finite row is refused. Bruker RAW refuses the file instead, since a non-finite float32 there means a wrong stride (checked, `io/formats/base.py` `finite_rows`) |
+| GSAS-II 5.8.4 | `imports/G2pwd_xye.py:170-201` passes the columns through `nan_to_num`: a NaN count or σ becomes y = 0 at weight 0, so the point stays in the pattern and leaves the fit, silently. A +inf count with a finite σ becomes y ≈ 1.8e308 at weight 1/σ², and a NaN 2θ passes through (checked by reading, not run). One importer only |
+| FullProf, TOPAS, RIETAN-FP, BGMN, MAUD, EasyDiffraction | Not checked |
+
+Dropping and zero weight give the same χ². The two differ in what the pattern holds afterwards:
+GSAS-II keeps the point to plot, and rietx's pdCIF reader likewise keeps a zero-weight point as an
+excluded region.
+
 ## A magCIF in a non-standard orientation
 
 Surveyed 2026-11-01 for WP-1918's decision on the 91 untabulated orientations, by a research

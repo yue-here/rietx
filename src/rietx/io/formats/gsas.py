@@ -605,9 +605,11 @@ def _read_bank(p: Path, lines: list[str],
     if sig is not None:
         sig = sig[:n]
         sigma = sig.tolist() if np.any(sig > 0) else None
-    # drop zero-esd leading/trailing channels (detector gaps)
+    # drop zero-esd leading/trailing channels (detector gaps); a non-finite
+    # esd is kept for ``ascending``, which drops it and says so (WP-2079)
     if sigma is not None:
-        good = np.asarray(sigma) > 0
+        s = np.asarray(sigma)
+        good = (s > 0) | ~np.isfinite(s)
         x, y = x[good], y[good]
         sigma = np.asarray(sigma)[good].tolist()
     x, y, sig = ascending(x, y, sigma, path=p, fmt=GSAS, axis=axis,

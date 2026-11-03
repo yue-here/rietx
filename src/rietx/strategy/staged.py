@@ -589,10 +589,14 @@ class RefinementPlan:
     @classmethod
     def lab_bragg_brentano(cls) -> "RefinementPlan":
         """Lab flat-plate plan: adds sample displacement (with zero), then the
-        Kα2/Kα1 intensity ratio and FCJ axial-divergence parameters last —
-        the McCusker ordering extended by the v0.2 lab-instrument physics.
+        Kα2/Kα1 intensity ratio and the FCJ axial ratio S/L last — the
+        McCusker ordering extended by the v0.2 lab-instrument physics.
         Sample transparency stays fixed (free it explicitly for low-absorbing
-        samples)."""
+        samples).
+
+        **H/L stays at its declared value** (WP-2012): the FCJ weight is
+        symmetric under S/L ↔ H/L, so two free ratios have two mirrored
+        minima and a fit reports whichever it reached as two measurements."""
         return cls(stages=[
             Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
             Stage("zero_disp", ["instrument.zero_shift",
@@ -602,8 +606,7 @@ class RefinementPlan:
             Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                               "instrument.profile.x", "instrument.profile.y"]),
             Stage("lines_axial", ["instrument.source.lines.*.weight",
-                                  "instrument.geometry.axial_sl",
-                                  "instrument.geometry.axial_hl"]),
+                                  "instrument.geometry.axial_sl"]),
             *_ROUGHNESS_STAGE,
         ])
 
@@ -614,8 +617,14 @@ class RefinementPlan:
         what pins the dispersion axis and decorrelates the otherwise-sloppy
         {zero (const), displacement (cosθ), cell (tanθ)} triple — while zero,
         displacement, the resolution function, the Kα2 ratio and the axial
-        ratios refine.  Export the result with ``save_instrument_profile``;
+        ratio S/L refine.  Export the result with ``save_instrument_profile``;
         refine unknowns against it with the ``lab_sample_refine`` plan.
+
+        **H/L stays at its declared value**, the receiving slit's height over
+        the goniometer radius (WP-2012, the maintainer's ruling of
+        2026-11-01).  The FCJ weight is symmetric under S/L ↔ H/L, so a
+        pattern cannot tell the two apart; left at 0 it gives a one-ratio
+        model, close to GSAS-II's single SH/L.
 
         **No roughness stage here, deliberately.**  A certified line-profile
         standard is a carefully prepared specimen, and this plan's job is to
@@ -631,8 +640,7 @@ class RefinementPlan:
             Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                               "instrument.profile.x", "instrument.profile.y"]),
             Stage("lines_axial", ["instrument.source.lines.*.weight",
-                                  "instrument.geometry.axial_sl",
-                                  "instrument.geometry.axial_hl"]),
+                                  "instrument.geometry.axial_sl"]),
             Stage("biso", list(_DISPLACEMENT_GLOBS)),
         ])
 
@@ -898,9 +906,11 @@ PLAN_INFO: dict[str, PlanInfo] = {
     "lab_bragg_brentano": PlanInfo(
         title="Lab diffractometer (one pass)",
         description=(
-            "Bragg-Brentano flat-plate order. The specimen displacement and "
-            "transparency corrections join the zero shift. The axial "
-            "(Finger-Cox-Jephcoat) apertures refine with the widths."),
+            "Bragg-Brentano flat-plate order. The specimen displacement joins "
+            "the zero shift. The transparency stays fixed. The axial "
+            "(Finger-Cox-Jephcoat) ratio S/L refines with the emission-line "
+            "weights. H/L stays at the value you set, because swapping the two "
+            "ratios leaves the pattern unchanged."),
         modes=("rietveld",),
         when_to_use=(
             "A lab pattern where something outside the fit pins the zero shift "
@@ -919,7 +929,10 @@ PLAN_INFO: dict[str, PlanInfo] = {
             "profile and the position corrections on a line-position standard "
             "with its certified lattice parameters held fixed. Holding them "
             "fixed decorrelates the zero shift, the specimen displacement and "
-            "the lattice parameters from one another."),
+            "the lattice parameters from one another. Of the two axial ratios "
+            "only S/L refines. Set H/L to the receiving slit's height over the "
+            "goniometer radius first, because swapping the two ratios leaves "
+            "the pattern unchanged."),
         modes=("rietveld",),
         when_to_use=(
             "A standard (LaB6, Si or corundum), once per instrument "
