@@ -1,6 +1,6 @@
 # WP-2045 — A runaway fit ends without an expensive closing stage
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — built and measured, merged as PR #1161 on 2026-10-25; the four audit rows re-approved on cost-only grounds (2026-11-01), their net saving measured on today's schedule (1.06-1.58×, 2026-11-02); open for a nightly `full` job that completes on `main`, red every night since 2026-10-24 for reasons WP-2036 owns
+Milestone: unscheduled · Status: 🔄 2026-11-03 — built and measured, merged as PR #1161 on 2026-10-25; the four audit rows re-approved on cost-only grounds (2026-11-01), their net saving measured on today's schedule (1.06-1.58×), and the maintainer ruled the cost-only grounds stand on it (2026-11-02); open for a nightly `full` job that completes on `main`, red every night since 2026-10-24 for reasons WP-2036 owns
 Track: A long run is not one fit
 Depends on: —
 Priority: P2 2026-11-02 — the fix shipped to `main` in #1161; what stays open is one nightly reading, and the `full` job's other failures are WP-2036's
@@ -334,6 +334,22 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
 `stage_start`/`stage_end` events.
 
 ## Handover log
+
+- **2026-11-03** — the maintainer ruled on 2026-11-02 that the cost-only
+  ruling on `intermediate_ftol` stands on the re-measured saving. The loose
+  intermediate tolerance stays the default because it is cheaper, and the
+  saving that justifies it is today's: 1.06-1.58× fewer evaluations on FAP,
+  11-BM NAC and cpd-1a, at 0.0004 plain esd or less, and 3.9× in evaluations
+  (2.2× in seconds) on cpd-1a with an absent zircon. What a warm series
+  answers on this schedule is still unmeasured, and the ruling does not
+  rest on it. This answers item (1) of the 2026-11-02 entry below. Recorded
+  in PR #PRNUM, a ghostshift runner's branch that carries the 2026-11-02
+  rulings for four WPs; nothing in this WP's code or rows moved.
+
+  *Next.* Item (3) below is open now: #1309 merged on 2026-11-02, so the
+  "non-strict xfail" clause can leave the four `_audit.py` rows. This branch
+  left them alone, its brief being the ruling's record only. Item (4): the
+  first nightly `full` job that completes on `main` closes this WP.
 
 - **2026-11-02** — the three places that still quoted the intermediate
   tolerance's old saving now quote probe 7's. The root `CLAUDE.md`
