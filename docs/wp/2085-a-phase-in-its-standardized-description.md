@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: Data and metadata in, a structure out
 Depends on: #1332 (S0, the setting and the cell)
-Priority: P3 2026-11-03 — a workaround covers it (STRUCTURE TIDY or spglib outside the package), and no fit's number depends on it; the public name waits on the maintainer
+Priority: P3 2026-11-03 — a workaround covers it (STRUCTURE TIDY or spglib outside the package), and no fit's number depends on it
 
 ## Goal
 
@@ -116,7 +116,7 @@ the repository (CLAUDE.md § Licensing, and the unpublished-data rule).
 
 ## Tasks
 
-- [ ] **Decision (maintainer): the public name.** Trigger: it names something
+- [x] **Decision (maintainer): the public name.** Trigger: it names something
       on the main user surface. The issue proposes `standardize(phase)`. Two
       questions. (a) Does it join the top-level `rx.` namespace, or stay at
       `rietx.crystallography.setting` beside S0's `standard_setting`? (b)
@@ -127,7 +127,14 @@ the repository (CLAUDE.md § Licensing, and the unpublished-data rule).
       package's own identifiers mix the two spellings: `normalize_species`
       and `summarize_events` beside `subgroups._standardise` and
       `superspace.generation.standardised`. The top-level namespace has no
-      word ending in -ise or -ize yet. Ask before the first commit names it.
+      word ending in -ise or -ize yet. **Settled 2026-11-03 by Claude under
+      the package's practice, unopposed by Yue:** the function is
+      `standardize`, in `rietx.crystallography.setting` beside
+      `standard_setting`. Grounds: the public names spell -ize
+      (`normalize_species`, `summarize_events`), as spglib's
+      `standardize_cell` does. The top-level `rx.` namespace holds workflow
+      verbs (`read_pattern`, `index_pattern`, `solve_magnetic`) and no
+      structure utility.
 - [ ] **Decision (maintainer): whether the first-printed-triplet table may ship
       in the wheel.** Trigger: its crux is a licensing judgement nothing
       written settles. CLAUDE.md § Licensing requires a wheel file to state
@@ -137,7 +144,8 @@ the repository (CLAUDE.md § Licensing, and the unpublished-data rule).
       checked). The alternative is to derive the forms at run time from
       `wyckoff_positions` plus a short list of the cases the algebra cannot
       fix. Measure that list's length first, because a short one may make the
-      question moot.
+      question moot. It waits on S1a's count of those cases (answered on
+      #1330, comment of 2026-11-03).
 - [ ] S1a: the first-triplet forms, as data or as rules per the decision
       above, checked against `wyckoff_positions` on all 230 groups.
 - [ ] S1b: Γ and σ_Γ over `solve.cluster.equivalences`, with the hydrogen
