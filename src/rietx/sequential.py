@@ -141,6 +141,7 @@ import numpy as np
 from . import runs
 from .backend.api import backend_dtype_note
 from .crystallography.twins import (
+    CoordinateSnapshot,
     atom_moves,
     merge_site_twins,
     numbering_moves,
@@ -168,7 +169,13 @@ from .schemas.history import ReflectionState
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.results import RefinementResult
-from .schemas.sequential import SeriesEntry, SeriesFailure, SeriesResult, SeriesStep
+from .schemas.sequential import (
+    _NAMED_PATH,
+    SeriesEntry,
+    SeriesFailure,
+    SeriesResult,
+    SeriesStep,
+)
 from .schemas.structure import (
     MOMENT_COMPONENTS,
     MOMENT_FLOOR_MU_B,
@@ -648,6 +655,87 @@ def _rung_stamp(rung: str, *, escalation: bool) -> dict[str, Any]:
     return stamp
 
 
+def _refuse_duplicate_names(structure: Structure, where: str) -> None:
+    """Refuse a structure a series could not follow by name (Yue's ruling, 2026-11-01).
+
+    A series keys each trajectory by phase name, atom label and parameter
+    (:class:`_SeriesNumbering`), so a phase name used twice, or an atom label
+    used twice within a phase, names two things with one key.  It is refused
+    here rather than guessed at.
+    """
+    names = [ph.name for ph in structure.phases]
+    twice = sorted({n for n in names if names.count(n) > 1})
+    if twice:
+        raise ValueError(
+            f"{where}: the phase name(s) {twice} are used more than once. A series "
+            f"follows each phase by its name, so give every phase its own name.")
+    for ph in structure.phases:
+        labels = [a.label for a in ph.atoms]
+        twice = sorted({n for n in labels if labels.count(n) > 1})
+        if twice:
+            raise ValueError(
+                f"{where}: phase {ph.name!r} uses the atom label(s) {twice} more than "
+                f"once. A series follows each atom by its label, so give every atom "
+                f"of a phase its own label.")
+
+
+class _SeriesNumbering:
+    """The one numbering of phases and atoms a series reports in (WP-1991).
+
+    A dot-path names a phase and an atom by index, and a ``prepare`` hook may
+    add or remove either part-way through a series, so ``phases.0.atoms.2``
+    can name two atoms in two patterns.  Yue ruled on 2026-11-01 that a
+    trajectory is keyed by phase name, atom label and parameter.  This is that
+    key written as a path: the declared structure's own numbering, which is
+    the one a caller's script and ``constrain`` hook already name, extended
+    by each phase or atom no earlier pattern held, in the order the walk meets
+    them.  One object serves both chains of ``direction="both"``, so the
+    reverse chain reads the forward chain's numbering.  Matching is by name
+    alone, since :func:`_refuse_duplicate_names` has refused a repeat and every
+    name of a pattern is in the reference it is matched against
+    (:func:`~.crystallography.twins.atom_moves`).
+    """
+
+    def __init__(self, structure: Structure) -> None:
+        self.phases: list[tuple[str, list[str]]] = [
+            (ph.name, [a.label for a in ph.atoms]) for ph in structure.phases]
+
+    def moves(self, built: Structure) -> dict[str, str | None]:
+        """``atom_moves`` from ``built`` into this numbering, first adding what it lacks."""
+        at = {name: i for i, (name, _) in enumerate(self.phases)}
+        for ph in built.phases:
+            if ph.name not in at:
+                at[ph.name] = len(self.phases)
+                self.phases.append((ph.name, []))
+            labels = self.phases[at[ph.name]][1]
+            labels.extend(a.label for a in ph.atoms if a.label not in labels)
+        reference = CoordinateSnapshot(
+            tuple(("", None, tuple(labels), np.zeros((len(labels), 3)))
+                  for _, labels in self.phases),
+            tuple(name for name, _ in self.phases))
+        return atom_moves(built, reference)
+
+
+def _into_series_numbering(entry: SeriesEntry, moves: dict[str, str | None]) -> None:
+    """Rewrite ``entry``'s paths into the series numbering, in place (WP-1991).
+
+    The parameter rows and the moment rows take the series path, and
+    :attr:`SeriesEntry.pattern_paths` records the pattern's own path for each
+    that changed.  Every reader of the entries (trajectories, steps, fences,
+    the table) then joins patterns by phase name and atom label without
+    knowing that it does.  :attr:`SeriesEntry.floored` is left alone: the
+    chain writes it in the series numbering already, from the pattern the
+    floor was taken on.
+    """
+    mapping: dict[str, str] = {}
+    for row in [*entry.parameters, *entry.magnetic]:
+        new = renumber_path(row.path, moves) or row.path
+        if new != row.path:
+            mapping[new] = row.path
+            row.path = new
+    entry.pattern_paths = mapping
+
+
 def _values_onto(source: tuple[Structure, Instrument],
                  structure: Structure) -> dict[str, float]:
     """Every entry value of ``source``'s table, keyed in ``structure``'s atom numbering.
@@ -782,9 +870,9 @@ def _constrain_in_declared_numbering(ref: Refinement, declared: Structure,
     warm = ref.structure
     swapped: dict[tuple[int, str], tuple[dict, dict]] = {}
     for old_site, new_site in moves.sites.items():
-        _, i, _, jo = old_site.split(".")
-        jn = new_site.split(".")[3]
-        d_atom = declared.phases[int(i)].atoms[int(jo)]
+        _, io, _, jo = old_site.split(".")
+        _, i, _, jn = new_site.split(".")
+        d_atom = declared.phases[int(io)].atoms[int(jo)]
         w_atom = warm.phases[int(i)].atoms[int(jn)]
         swapped[(int(i), w_atom.label)] = (
             {f: getattr(d_atom, f) for f in _SITE_FIELDS},
@@ -1113,6 +1201,8 @@ class SequentialRefinement:
         self.trees_: list[RefinementTree | None] = []
         self.result_: SeriesResult | None = None
         self.backward_: SeriesResult | None = None
+        # the series numbering, rebuilt by each run from ``structure`` (WP-1991)
+        self._numbering = _SeriesNumbering(self.structure)
         #: the forward chain's ``SeriesResult`` under ``direction="both"``,
         #: published once that chain is complete and **before** the backward
         #: walk starts (issue #218, WP-1317), so a caller watching the run — an
@@ -1437,6 +1527,8 @@ class SequentialRefinement:
         self.result_ = None
         self.backward_ = None
         self.forward_ = None
+        _refuse_duplicate_names(self.structure, "the series' structure")
+        self._numbering = _SeriesNumbering(self.structure)
         entries, results, trees, models, failures, _ = self._chain(
             order, patterns, names, xs, mode, base_plan, ladder,
             two_theta_limits, reseed, reseed_factor, prepare, constrain,
@@ -1514,6 +1606,7 @@ class SequentialRefinement:
             # The halfway point (#218), on WP-1333's early-publication point:
             # the forward chain is final, and everything the backward walk
             # adds goes onto ``series``, never onto this copy.
+            self._stamp_numbering(series)
             self.forward_ = series.model_copy(update={
                 "direction": "forward", "diagnostics": list(diagnostics)})
             try:
@@ -1575,6 +1668,11 @@ class SequentialRefinement:
             series.backward = back
 
         series.diagnostics = diagnostics
+        # the numbering every path above reads, complete only now: the reverse
+        # chain may have met a name the forward chain did not (WP-1991)
+        for result in (series, series.backward):
+            if result is not None:
+                self._stamp_numbering(result)
         self.result_ = series
         if recorder is not None:
             # a series has no single ``RefinementResult``; its termination view
@@ -1582,6 +1680,11 @@ class SequentialRefinement:
             # rule ``fit`` follows — never ``summary()``, which builds reports
             recorder.write_summary(series)
         return series
+
+    def _stamp_numbering(self, result: SeriesResult) -> None:
+        """Write the series numbering as it stands onto ``result`` (WP-1991)."""
+        result.phase_names = [name for name, _ in self._numbering.phases]
+        result.atom_labels = [list(labels) for _, labels in self._numbering.phases]
 
     # ------------------------------------------------------------------
     def _chain(self, order, patterns, names, xs, mode, base_plan, ladder,
@@ -1825,6 +1928,10 @@ class SequentialRefinement:
             entry.seeded_from = previous_index if warm else None
             # the floor reached the kept attempt only if that attempt was warm
             entry.floored = start_floor if best_rung != "cold" else []
+            # every path now in the series numbering, so a pattern whose
+            # ``prepare`` added or removed a phase or an atom joins each
+            # trajectory by name (WP-1991)
+            _into_series_numbering(entry, self._numbering.moves(best_ref.structure))
             if len(tried) > 1:
                 entry.rwp_warm = rwp_of.get(tried[0])
                 # only the *cold* rung breaks the chain — a staged refit from
@@ -1859,8 +1966,16 @@ class SequentialRefinement:
                 # caller reads back as ``fitted_structures()`` — keeps the
                 # fitted value; only the *carry source* is floored, and on a
                 # chain with no unsupported moment it is the same object.
-                carried, pending_floor = _floor_unsupported_moments(
-                    models[k][0], entry.magnetic)
+                # the floor is applied to this pattern's own model, so it reads
+                # the moment rows in that model's numbering, and the paths it
+                # floored are recorded in the series' (WP-1991)
+                own = entry.pattern_paths or {}
+                to_series = {p: s for s, p in own.items()}
+                carried, floored_own = _floor_unsupported_moments(
+                    models[k][0],
+                    [r.model_copy(update={"path": own.get(r.path, r.path)})
+                     for r in entry.magnetic])
+                pending_floor = [to_series.get(p, p) for p in floored_own]
                 previous = (carried, models[k][1])
                 previous_index = k
                 previous_hkl = _extract_reflections(best_ref._model)
@@ -1919,6 +2034,8 @@ class SequentialRefinement:
             displaced = _carry_into(structure, instrument, previous, self.carry)
         if prepare is not None:
             prepare(index, data, structure, instrument)
+            _refuse_duplicate_names(
+                structure, f"pattern {index} ({label!r}), after prepare")
         with _refined_state():
             ref = Refinement(structure, instrument, backend=self._backend,
                              solver=self._solver,
@@ -2014,6 +2131,8 @@ class SequentialRefinement:
         about a step rather than a half-measured something.
         """
         cold: dict[int, RefinementResult | _PatternRaised] = {}
+        result_structures: dict[int, Structure | None] = {}
+        series_paths: dict[int, dict[str, float]] = {}
 
         def refit(k: int) -> RefinementResult:
             if k not in cold:
@@ -2025,11 +2144,24 @@ class SequentialRefinement:
                         stamp={"series_index": k, "series_label": names[k],
                                "series_n": len(patterns),
                                "series_pass": "verify"})
+                    # a stand-in fit (a test's) may hand back no ``Refinement``
+                    result_structures[k] = getattr(_ref, "structure", None)
                 except _PatternRaised as exc:
                     cold[k] = exc      # once per pattern, like a result
             if isinstance(cold[k], _PatternRaised):
                 raise cold[k]
             return cold[k]
+
+        def value(k: int, path: str) -> float | None:
+            # the refit's paths read its own model's numbering, the step's the
+            # series' (WP-1991)
+            result = refit(k)
+            if k not in series_paths:
+                built = result_structures[k]
+                moves = {} if built is None else self._numbering.moves(built)
+                series_paths[k] = {renumber_path(q.path, moves) or q.path: q.value
+                                   for q in result.parameters}
+            return series_paths[k].get(path)
 
         angles = _angle_paths(self.structure, self.instrument)
         for s in steps:
@@ -2039,8 +2171,8 @@ class SequentialRefinement:
             # ``patterns`` — rather than looked up again from its labels
             (a, b), path = s.indices, s.path
             try:
-                va = _value_of(refit(a), path)
-                vb = _value_of(refit(b), path)
+                va = value(a, path)
+                vb = value(b, path)
             except RefinementCancelled:
                 return
             except _PatternRaised:
@@ -2659,6 +2791,31 @@ def _series_steps(series: SeriesResult,
     return out
 
 
+def _where_in_series_numbering(entry: SeriesEntry, path: str) -> str:
+    """A diagnostic's ``where`` path read into the series numbering (WP-1991).
+
+    A pattern's diagnostics name its own model, so a ``prepare`` hook that
+    removed an atom ahead of this one gives the same atom another number here.
+    Counted as written, one atom's finding would split into two counts that
+    each miss half the series.  The atom (or phase) prefix is read off
+    :attr:`SeriesEntry.pattern_paths`, so a path that is not itself a
+    parameter row still follows.  An atom none of whose rows was reported
+    keeps its own number, there being nothing to read the move off.
+    """
+    own = entry.pattern_paths
+    m = _NAMED_PATH.match(path)
+    if not own or m is None:
+        return path
+    prefixes: dict[str, str] = {}
+    for series_path, own_path in own.items():
+        ms, mo = _NAMED_PATH.match(series_path), _NAMED_PATH.match(own_path)
+        if ms is not None and mo is not None:
+            prefixes[mo.group(0)] = ms.group(0)
+            prefixes.setdefault(f"phases.{mo.group(1)}", f"phases.{ms.group(1)}")
+    key = m.group(0)
+    return prefixes[key] + path[len(key):] if key in prefixes else path
+
+
 def _persistent_diagnostics(series: SeriesResult) -> list[Diagnostic]:
     """``SEQUENTIAL_PERSISTENT_FINDING`` — a per-pattern code that is really
     about the series (WP-1110 item 8).
@@ -2701,7 +2858,7 @@ def _persistent_diagnostics(series: SeriesResult) -> list[Diagnostic]:
             if d.code in NOT_A_SERIES_FINDING:
                 continue
             for p in (d.where or [""]):
-                key = (d.code, p)
+                key = (d.code, _where_in_series_numbering(entry, p))
                 if key not in seen:
                     seen.add(key)
                     counts[key] = counts.get(key, 0) + 1
@@ -2873,8 +3030,10 @@ def _moment_diagnostics(series: SeriesResult) -> list[Diagnostic]:
         # WP-1418: a pattern whose plan freed no moment says so itself
         # (``PLAN_FREES_NO_MOMENT``, keyed on this modulus path), and that is
         # the cause of its missing esd, so the sentence names it there
+        # (a pattern's own diagnostics name its own path, WP-1991)
         unfreed = {e.label for e in series.entries
-                   if any(d.code == "PLAN_FREES_NO_MOMENT" and site in d.where
+                   if any(d.code == "PLAN_FREES_NO_MOMENT"
+                          and (e.pattern_paths or {}).get(site, site) in d.where
                           for d in e.diagnostics)}
         if n_held or blind:
             message = (

@@ -57,6 +57,7 @@ from .crystallography.twins import (
     coordinate_snapshot,
     merge_site_twins,
     numbering_moves,
+    site_of,
 )
 from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
@@ -2821,10 +2822,9 @@ class Refinement:
         if isinstance(moves, NumberingMoves) and moves.atoms:
             self._renumber_atoms(moves)
             moves = moves.in_new_numbering()
-        sites = sorted({path.rsplit(".dof.", 1)[0] for path in moves})
+        sites = sorted({site_of(path) for path in moves})
         for site in sites:
-            site_moves = {p: m for p, m in moves.items()
-                          if p.rsplit(".dof.", 1)[0] == site}
+            site_moves = {p: m for p, m in moves.items() if site_of(p) == site}
             holds, ties, free, notes = carry_constraints(
                 site_moves, holds=sorted(self._user_holds), ties=self._ties,
                 free_paths=self._free_paths)
@@ -2844,13 +2844,16 @@ class Refinement:
                         + "; ".join(notes) + "."})
                     break
             else:
+                what = ("coordinate directions and anisotropic ADP patterns"
+                        if any(".adp." in n for n in notes) else "coordinate directions")
                 found.append(Diagnostic(
                     level="warning", code="SITE_DOFS_RENUMBERED", where=[site],
-                    message=(f"site {site} changed its site symmetry, so its coordinate "
-                             f"directions were renumbered: " + "; ".join(notes)
+                    message=(f"site {site} changed its site symmetry, so its {what} "
+                             f"were renumbered: " + "; ".join(notes)
                              + "."),
-                    suggestion="check the holds and ties on this site's "
-                               "coordinates against parameters()."))
+                    suggestion=f"check the holds and ties on this site's "
+                               f"{what.replace(' directions', 's')} against "
+                               f"parameters()."))
 
     def _renumber_atoms(self, moves: NumberingMoves) -> None:
         """Read every constraint register into ``moves``' new atom numbering.
