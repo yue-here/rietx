@@ -1,6 +1,6 @@
 # WP-1317 — scrub the series along its own trace
 
-Milestone: unscheduled · Status: 🔄 2026-10-21 — #218's `forward_` and `moved_paths` merged from outside as #903, and the planted-events series fixture as #1011; the scrubber is unstarted
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @mustachefeeling
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-09-23 — a view over what the series already knows
