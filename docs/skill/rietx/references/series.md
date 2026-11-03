@@ -70,8 +70,8 @@ What an operator must know, all measured:
 - **The default `refit="single"` collapses the plan into one stage** for every
   pattern after the first.  The staged turn-on order exists to keep early
   stages conditioned from a *poor* starting model; a converged neighbour is not
-  one.  A pattern whose Rwp jumps past the median trips the reseed fence,
-  which **escalates one rung at a time** — the full staged plan from the
+  one.  A warm fit that diverged, raised or carries an `error` code
+  **escalates one rung at a time** — the full staged plan from the
   warm state, then the full staged plan cold — and keeps the best attempt
   (not rejected, then not cut by the bound, then the lower full cost).
   `entry.rung` says which one produced the values and `entry.rungs_tried` says
@@ -217,7 +217,7 @@ What an operator must know, all measured:
   rather than concluding the step was real.
 
 - **The check that covers both blind spots is a cold-refit sample, and it is
-  affordable.**  Neither `SEQUENTIAL_RESEED` (needs a ~25 % Rwp jump) nor
+  affordable.**  Neither `SEQUENTIAL_RESEED` (needs a fit that failed) nor
   `direction="both"` (agrees in a degenerate band) sees a wrong basin at
   negligible Rwp cost, and the audited job that did see it refitted **380
   patterns cold against the chain and found 316 material disagreements, 29 of
