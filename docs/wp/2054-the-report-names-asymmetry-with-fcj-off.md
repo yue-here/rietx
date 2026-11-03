@@ -282,6 +282,17 @@ from today. The synthetic controls hold.
   an evidence line for the report's use), or give the report its own constant at
   0.02 with a tier-3 row, which needs an `approved` date.
 
+  *Review* (`/code-review high --fix`). Seven findings. Fixed: the position-error
+  takeover (the projection above), the controls now assert Layer 1 ran and carried
+  the column, and the twin's bases kwarg has its own name (`axial_bases`). Declined:
+  the action's `two_theta_range` spans every gated low-angle region, counted or not;
+  narrowing it would change the report of a fit that declares its apertures, which
+  the Acceptance holds unchanged (a class for WP-2004 or a follow-up). The twin's
+  bases also compute the ∂Ω/∂(H/L) planes nothing reads (part of the +45-65 ms);
+  skipping them needs a `derivative_bases` option, outside this diff. The column
+  reaching regions above 40° is kept: with the projection it moves no other
+  coefficient, and those regions' gates now pass more often, not less.
+
   *Generality* (the judge's sections, condensed by this session to the verdicts,
   with the answers).
   - `AXIAL_SIZING_FLOOR` as the report's nominal: **weak**. The value decides which
