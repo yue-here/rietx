@@ -5970,6 +5970,7 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths,
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                termination=outcome.termination or None,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
                 # checked, trivially: one histogram has no elsewhere
@@ -6290,6 +6291,7 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, unreached_histograms={},
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                termination=outcome.termination or None,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
                 moment_angle_tests=outcome.moment_angle_tests)
@@ -9045,7 +9047,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # solver and false of the answer (WP-1028 §§(c),(d)).
     diagnostics = (diagnostics
                    + _far_from_data_diagnostics(model, y_calc, y_bkg, stats)
-                   + _max_iter_diagnostics(stage_results))
+                   + _max_iter_diagnostics(stage_results)
+                   + _slow_descent_diagnostics(stage_results))
 
     # Does the data support it (WP-1071): the observation/parameter ratio and
     # the step size, both reported and neither gating.  Built before the
@@ -10638,6 +10641,9 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
     is now ``max_iter ×`` :data:`~rietx.optimize.least_squares.NFEV_PER_ITERATION`,
     sized from the measured worst-case rejection rate, so a stage that stalls
     reports it roughly 30x sooner with its answer unchanged.
+
+    A stage the slow-descent rule stopped (WP-1334) is ``converged`` and
+    never reaches this code: :func:`_slow_descent_diagnostics` names it.
     """
     hit = [s.name for s in stage_results if s.status == "max_iter"]
     if not hit:
@@ -10652,6 +10658,46 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
         where=[],
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",
+    )]
+
+
+def _slow_descent_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``STAGE_SLOW_DESCENT``: the stages the slow-descent rule stopped.
+
+    The rule (WP-1334, ``optimize.lm.SLOW_DESCENT_ESD``) ends a stage whose
+    cost is still falling, but so slowly that the next
+    :data:`~rietx.optimize.lm._SLOW_DESCENT_HORIZON` evaluations would move
+    its parameters by less than one esd.  Such a stage reports ``converged``
+    (Yue's ruling of 2026-11-03), since more iterations would not change the
+    answer by an esd, which is McCusker et al. (1999) §7's test.  So this
+    code is ``info`` and only names the stages, read off
+    ``StageResult.termination``, so a reader can tell a slow crawl from a
+    stage that met the solver's own tests.  It states and gates nothing.
+    """
+    from .optimize import lm
+
+    slow = [s.name for s in stage_results if s.termination == "slow_descent"]
+    if not slow:
+        return []
+    esd = lm.SLOW_DESCENT_ESD
+    esds = "one esd" if esd in (None, 1.0) else f"{esd:g} esd"
+    one = len(slow) == 1
+    return [Diagnostic(
+        level="info", code="STAGE_SLOW_DESCENT",
+        message=(("Stage " if one else "Stages ")
+                 + ", ".join(repr(n) for n in slow)
+                 + " stopped while " + ("its" if one else "their")
+                 + " χ² was still falling slowly. At that rate, another "
+                 f"{lm._SLOW_DESCENT_HORIZON} evaluations would have moved "
+                 + ("its" if one else "their")
+                 + f" parameters by less than {esds}, so the "
+                 + ("stage counts" if one else "stages count")
+                 + " as converged."),
+        where=[],
+        suggestion="Quote the stage's answer as converged. A high correlation "
+                   "or a bound hit reported for the same parameters names a "
+                   "shallow direction the descent may have crawled along, "
+                   "and its own suggestion names the remedies.",
     )]
 
 

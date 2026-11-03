@@ -119,6 +119,10 @@ The esds come from the last stage, where every freed parameter refines together.
 `RefinementResult.stages` holds one `StageResult` a stage, and `StageResult.rwp` is that stage's Rwp at the values it ended on.
 It is measured on the stage's own frozen peak windows, so the last stage's can differ slightly from the result's own Rwp.
 It is `None` on a result stored before the field existed.
+`StageResult.termination` names the test that ended the stage's solve.
+A stage the slow-descent rule stopped reads `slow_descent`: at the rate its cost was falling, another 300 evaluations would have moved the answer by less than one esd.
+Its status is `converged`, and the result carries a `STAGE_SLOW_DESCENT` diagnostic naming the stage.
+The rule reads how fast the cost was falling, not how far the minimum is.
 [About correlations and esds](correlations.md) explains what an esd here does and does not measure.
 
 `Refinement.report()` builds a `FitReport` from the last fit.
