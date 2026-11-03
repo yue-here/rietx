@@ -1,6 +1,6 @@
 # WP-1998 — A suggestion whose gain lies past its bound
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-17 — the top suggestion, and `summary()`'s `next:` line, name a parameter that freeing cannot move; a refit shows it, at the cost of a wasted stage
