@@ -10688,10 +10688,10 @@ def _slow_descent_diagnostics(stage_results: list[StageResult]) -> list[Diagnost
                  + ("stage counts" if one else "stages count")
                  + " as converged."),
         where=[],
-        suggestion="Quote the answer as converged. Where the same stage "
-                   "reports a high correlation, the slow descent ran along "
-                   "that pair, and freeing fewer parameters at once lets the "
-                   "stage meet the solver's own convergence test.",
+        suggestion="Quote the stage's answer as converged. A high correlation "
+                   "or a bound hit reported for the same parameters names a "
+                   "shallow direction the descent may have crawled along, "
+                   "and its own suggestion names the remedies.",
     )]
 
 

@@ -1237,8 +1237,8 @@ ROWS: tuple[Row, ...] = (
                   "beside the status and gates nothing; its 300 and 'one esd' are read off "
                   "_SLOW_DESCENT_HORIZON and SLOW_DESCENT_ESD"),
         response="info",
-        responds=("nothing: quote the stage as converged; where the same stage reports "
-                  "HIGH_CORRELATION, read the slow descent as running along that pair"),
+        responds=("nothing: quote the stage as converged, and read a correlation or "
+                  "bound finding on the same parameters for the direction it was slow along"),
         scope=("all",)),
     Row("STAGE_WINDOWS_STALE", "code", tier=3, ambiguity=3,
         evidence=("warning; fires when StageResult.window_loss, the Bragg intensity a "
@@ -1304,8 +1304,14 @@ ROWS: tuple[Row, ...] = (
                   "solver's own tests; the stop is SLOW_DESCENT_ESD's row. Dissent measured "
                   "under the first form, status max_iter: on cpd-1a with an absent zircon at "
                   "intermediate_ftol=None a stage that would have converged was cut, so the "
-                  "result read max_iter, and the guides stage and next read max_iter at an "
-                  "unchanged Rwp; the converged status removes those labels"),
+                  "result read max_iter, the guides stage and next and an indexing Le Bail "
+                  "validation fit read max_iter at an unchanged Rwp, and on Cr2WO6 150 K "
+                  "solve_magnetic class 3 ran out of continuations and went unranked. "
+                  "Re-measured under the converged form: those labels read converged, and "
+                  "class 3 converges after one continuation (cut at 102) and is ranked, Rwp "
+                  "0.0978985 against 0.0979014 with the rule off, 913 against 2540 "
+                  "evaluations, verdict unchanged. Not measured: sequential's rung "
+                  "escalation and first-rung budget, which now read a cut rung as converged"),
         grounds=("Every refiner stops a refinement that has stopped paying (GSAS-II's default "
                  "3 cycles and 1e-3 per-cycle dM/M), but rietx's form of the stop is its own; "
                  "tier 3 with SLOW_DESCENT_ESD."),
@@ -2962,8 +2968,8 @@ ROWS: tuple[Row, ...] = (
                   "decrease under 1e-3 after at most 3 cycles by default (GSASIIobj.py:20, "
                   "checked), looser than this. Measured on the WP's fixtures (powderline LaB6, "
                   "cpd-1a with zircon at 1e-6 and 1e-9, the 1e-9 acceptance protocols): "
-                  "budget-stopped solve time 63.6 s -> 19.4 s on LaB6, worst shift 0.109 plain "
-                  "esd, on the degenerate hump's fwhm; see the WP's handover for every row"),
+                  "816 -> 539 evaluations on LaB6, worst shift 0.064 plain esd, on background "
+                  "c5 beside the degenerate hump; see the WP's handover for every row"),
         grounds=("A constant that decides where a solve stops, rietx's own; tier 3 until "
                  "three families on either side give one answer, as the solver's other "
                  "stopping constants (B10)."),
@@ -4773,10 +4779,11 @@ ROWS: tuple[Row, ...] = (
                   "has no vocabulary for")),
     Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=2),
     Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
-    Row("STAGE_SLOW_DESCENT.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
-        evidence=("arithmetic: points at the correlation finding the same stage carries "
-                  "and names the plan change, freeing fewer parameters at once, that lets "
-                  "the solver's own test end the stage; picks nothing")),
+    Row("STAGE_SLOW_DESCENT.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: points at the findings that name a shallow direction, "
+                  "HIGH_CORRELATION and a bound hit, and defers the remedy to their own "
+                  "suggestions; picks no lever and claims no outcome, as "
+                  "STAGE_NOT_FINITE.suggestion")),
     Row("STAGE_WINDOWS_STALE.suggestion", "suggestion", value=1, tier=3, ambiguity=3,
         evidence=("WP-2045's re-solve from the runaway went from axial_sl 558 to 4114, "
                   "behind the warning against polishing; both runaway steps were the "

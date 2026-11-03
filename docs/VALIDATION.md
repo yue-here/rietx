@@ -419,9 +419,9 @@ The only fixtures carrying **two** reference engines, and they disagree: 2668 pp
 
 **Referenced to:** the two engines' own answers for the same peak, from opposite ends: GSAS-II let it run to 8.77e10 deg 2theta at esd 0 (off the pattern, unmeasured) and TOPAS kept it at 1.63 deg with an esd 188x its own value.  Here it correlates with the low-order background at |rho| = 1 and its stage spends its budget.  A measured failure recorded as a result: the recipe is over-parameterised and no fit of it can say otherwise
 
-**Measured:** HIGH_CORRELATION on the peak against the background, and the last stage freeing it at max_iter: since WP-2002 that is the closing stage, and the declared extra_components stage converges at the intermediate tolerance (1.9.0: the extra_components stage at max_iter); GSAS-II's own committed position 8.77e10 with esd exactly 0
+**Measured:** HIGH_CORRELATION on the peak against the background, and the last stage freeing it, the closing stage since WP-2002, never meeting the solver's own convergence test: since WP-1334 the slow-descent rule stops it at 123 evaluations (STAGE_SLOW_DESCENT), the declared extra_components stage spending its 400 (STAGE_MAX_ITER); GSAS-II's own committed position 8.77e10 with esd exactly 0
 
-**Diagnostics:** `HIGH_CORRELATION`, `STAGE_MAX_ITER`
+**Diagnostics:** `HIGH_CORRELATION`, `STAGE_MAX_ITER`, `STAGE_SLOW_DESCENT`
 
 #### `test_the_written_tables_reproduce_the_answer_they_came_from`
 

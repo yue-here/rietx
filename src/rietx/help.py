@@ -4348,9 +4348,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "another 300 evaluations would have moved its parameters by less than one "
             "esd. The stage counts as converged. The stop says how fast the cost was "
             "falling, not how far the minimum is, so a crawl along a shallow or "
-            "constrained direction can stop well above it. Where the same stage "
-            "reports a high correlation, the crawl ran along that pair. Freeing fewer "
-            "parameters at once lets the stage converge on the solver's own test."
+            "constrained direction can stop well above it. A high correlation or a "
+            "bound hit reported for the same parameters names such a direction, and "
+            "its own entry gives the remedies."
         ),
     ),
     "STAGE_WINDOWS_STALE": HelpEntry(

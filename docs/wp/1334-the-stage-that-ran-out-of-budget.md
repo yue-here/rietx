@@ -1,6 +1,6 @@
 # WP-1334 — the stage that ran out of budget
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — tasks 3-7 landed (PR #1366, draft); waits on the maintainer: the status of a slow-descent stop, four tier-3 approvals
+Milestone: unscheduled · Status: 🔄 2026-11-03 — tasks 3-7 landed and ruled (PR #1366); waits on the maintainer: the new diagnostic's reader text, then merge
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-09-23 — cost only: 46.6 % of stage time for a 1.23 % median gain
@@ -171,8 +171,9 @@ stop-rule task's.
 - [x] A stop rule: a stage exhausting its budget below a stated relative-cost
       improvement stops, and `STAGE_MAX_ITER` (or a sibling) says the rule cut
       it rather than the budget running out. Default chosen against the
-      measured p90, not invented. `optimize.lm.SLOW_DESCENT_ESD`; its two
-      tier-3 audit rows wait for the maintainer's dated approval.
+      measured p90, not invented. `optimize.lm.SLOW_DESCENT_ESD`; its stop
+      reads `converged` and the info code `STAGE_SLOW_DESCENT` names it
+      (ruled by Yue 2026-11-03), its tier-3 rows approved the same day.
 - [x] Re-measure the #222 tranche shape on a suite fixture and record the
       recovered fraction, so the rule's effect is a number and not a claim.
       The 2026-11-03 handover entry.
@@ -181,7 +182,7 @@ stop-rule task's.
       `tests/test_slow_descent.py`.
 - [x] Skill: `references/batch.md` — the keep-the-best row, now expressible
       from `StageResult` alone; and the row saying what the new finding means.
-      9c.34, and the `STAGE_MAX_ITER` row in `references/diagnostics.md`.
+      9c.34, and the `STAGE_SLOW_DESCENT` row in `references/diagnostics.md`.
 
 ## Acceptance
 
@@ -216,11 +217,11 @@ repo.
   says so. Every stage record also names the test that ended its solve. On the
   suite fixture with the #222 shape (the GSAS-II LaB6 recipe, whose background
   hump is a degenerate direction) the fit spends 539 evaluations instead of
-  816, and no parameter moves by more than 0.064 of its esd. **Not mergeable
-  yet**: as shipped, a stage the rule stops reads `max_iter`, and the fast
-  suite shows that this mislabels stages that were converging slowly. One
-  question is open for the maintainer: whether such a stop should read
-  `max_iter` or `converged`. The evidence below favours `converged`.
+  816, and no parameter moves by more than 0.064 of its esd. A stage the rule
+  stops reads `converged`, and an info diagnostic, `STAGE_SLOW_DESCENT`, names
+  it (ruled by Yue 2026-11-03, the second runner implementing it). Its message
+  and suggestion are reader output the maintainer has not yet seen. They are
+  quoted in the PR body's "What a reader receives".
 
   *Done.* Task 3: `StageResult.termination`, the `stage_end` token, written by
   the three runners; `None` on a record stored before it. Task 4: the
@@ -228,15 +229,17 @@ repo.
   Once at least 100 residual evaluations have passed, it projects the decrease
   of the last 100 over the next 300. It stops the stage when that projection
   is below `SLOW_DESCENT_ESD`² × S/(N − P), the χ² one esd of joint travel
-  buys. Termination `slow_descent`, status `max_iter`. `STAGE_MAX_ITER` lists
-  the cut stages as "stopped early". The TRF driver has no rule (scipy owns
+  buys. Termination `slow_descent`, status `converged`, and the info code
+  `STAGE_SLOW_DESCENT` (`refine._slow_descent_diagnostics`, also called by
+  the joint fit) names the cut stages. `STAGE_MAX_ITER` is the budget's alone
+  again, its message byte for byte as on main. The TRF driver has no rule (scipy owns
   the loop). `SLOW_DESCENT_ESD = None` is the old driver bit for bit. Task 5:
   *Measured* below. Task 6: `tests/test_slow_descent.py` (a crawl for nothing
   stops and gives up 0.85 S against χ²_red 1.04; a crawl that halves S runs
   to its budget unchanged; a stage converging inside the window is
-  untouched; the message). `test_lm_solver.py`'s face crawl now also ends
-  `slow_descent`. Task 7: batch row 9c.34 and the `STAGE_MAX_ITER` row in
-  `references/diagnostics.md`. Inherited pruned: the #538 entries (task 1,
+  untouched; the two codes' messages). `test_lm_solver.py`'s face crawl may
+  now also end `slow_descent`. Task 7: batch row 9c.34 and the
+  `STAGE_SLOW_DESCENT` row in `references/diagnostics.md`. Inherited pruned: the #538 entries (task 1,
   done), the 09-28 skill sentence (done in #1343) and both "`diverged` has
   no writer" entries (stale since WP-2048: `STAGE_NOT_FINITE` writes it).
 
@@ -251,7 +254,23 @@ repo.
   | GSAS-II LaB6 recipe (powderline) | 816 → 539 | 2 → 1 (closing cut at 123) | 0.064 esd, background c5 | 0.084093 → 0.084098 |
   | cpd-1a + absent zircon, every stage at 1e-9 | 1221 → 935 | 2 → 1, plus `cell` (converging at 127) cut at 123 | 0.009 esd, profile v | 0.163049 → 0.163050 |
   | cpd-1a + zircon, shipped 1e-6; GSAS-II DRX_33; LaB6, FAP, cpd-1a, NAC protocols at 1e-9 | unchanged | none | 0 | bit-identical |
-  | Cr₂WO₆ 150 K `solve_magnetic`, unnudged start | 2540 → 1824 | class 3: 5 continuations of 400, then converged → 10 continuations cut at ~101, ends `max_iter` | — | class 3 0.0979014 → 0.0979015 |
+  | Cr₂WO₆ 150 K `solve_magnetic`, unnudged start, stop read as `max_iter` (first form) | 2540 → 1824 | class 3: 5 continuations of 400, then converged → 10 continuations cut at ~101, ends `max_iter`, unranked | — | class 3 0.0979014 → 0.0979015 |
+  | the same, stop read as `converged` (ruled form) | 2540 → 913 | class 3: 5 continuations → 1 continuation, cut at 102, converged and ranked; verdict "nothing to solve" either way | — | class 3 0.0979014 → 0.0978985 |
+
+  After the ruling, rule on (same machine and venv; `probe4.py`,
+  `next_probe.py`, `cr_on3.log` in the scratch directory). A single fit stops
+  where it did before the ruling, so the evaluations and shifts above hold;
+  only the labels move. LaB6: the closing stage reads `converged
+  slow_descent` at 123 and carries `STAGE_SLOW_DESCENT`; `extra_components`
+  still spends 400 and carries `STAGE_MAX_ITER`. cpd-1a + zircon at 1e-9:
+  `cell` (123) and `profile_w` (113) read `converged slow_descent`,
+  `lines_axial` spends its budget, and the result reads `converged`.
+  `guides/next.py`: the `cell` stage is cut, so the five suggestion gains at
+  that pause move by 3 to 14 of 39 000-322 000 (322283 → 322280, 189147 →
+  189145, 156429 → 156424, 129119 → 129105, 39436 → 39429). Every other
+  number it quotes is unchanged, and the page and script now quote the new
+  gains. `guides/stage.py` and the indexing Le Bail validation row pass
+  unedited.
 
   So the recovered fraction on the #222-shaped fixture is 277 of the 800
   evaluations its two budget stops spent (35 %). The extra-component stage
@@ -278,35 +297,37 @@ repo.
   switch, or `solve_magnetic` continuations exempt. Both are in the decision
   below.
 
-  *Decision for the maintainer* (a value judgement on the main result
-  surface, and four approval fields).
-  1. **What should a stage the rule stopped report as its status?** Shipped:
-     `max_iter`, because no test of a minimum was met, and it keeps
-     `STAGE_MAX_ITER`'s advice (free fewer) in front of the reader. The
-     alternative is `converged` with `termination = "slow_descent"`. That is
-     the McCusker §7 reading: further iterations would not move the answer by
-     an esd, which is how GSAS-II and TOPAS call a refinement converged. What
-     each choice costs: under `max_iter`, `solve_magnetic` continues a cut
-     trial with fresh budgets. On Cr₂WO₆ class 3 ran out of its 10 continuations and dropped out of the ranking, where without the rule it converged after 5 and was ranked. The verdict, "nothing to solve", is the same either way. Also under
-     `max_iter`, a stage converging slowly past 100 evaluations at 1e-9 reads
-     unfinished (cpd-1a's `cell`, cut 4 evaluations before its convergence).
-     The fast suite adds two guides and an indexing validation fit that read
-     `max_iter` at an unchanged Rwp. Under `converged`, a degenerate crawl
-     reads converged. The LaB6 hump stage's walk then carries only
-     `HIGH_CORRELATION`, never `STAGE_MAX_ITER`. Recommendation:
-     `converged`, with an info-level diagnostic naming the cut stages, a clear
-     call now that the suite has measured it. The crux is whether `status`
-     means "met a minimum's test" or "more iterations would not change the
-     answer". Every consumer measured reads it the second way. What would
-     flip it: a fixture where a `slow_descent` stop sits far from its minimum
-     and nothing but `STAGE_MAX_ITER` says so.
-  2. **Approve the four tier-3 rows**: `SLOW_DESCENT_ESD` (1.0),
+  *Rulings.* The previous runner brought three decisions. Ruled by Yue
+  2026-11-03, taking the entry's recommendation:
+  1. A stage the slow-descent rule stops reports `status="converged"` with
+     `termination="slow_descent"`, plus an info-level diagnostic naming the
+     cut stages. Implemented as `STAGE_SLOW_DESCENT` (name settled by Claude:
+     it is the termination token in the house `STAGE_*` form, as
+     `STAGE_MAX_ITER` is the status's). A rule-cut stage no longer reads as
+     out of budget, so `STAGE_MAX_ITER` lists only `max_iter` stages.
+  2. The four tier-3 rows are approved: `SLOW_DESCENT_ESD` (1.0),
      `_SLOW_DESCENT_WINDOW` (100), `_SLOW_DESCENT_HORIZON` (300) and the
-     `StageResult.termination` action row. Until they carry a dated
-     `approved`, `test_an_audited_row_carries_its_evidence` is red on CI.
-  3. **Reader output**: `tests.reader_output` reports its corpus unchanged,
-     since none of its fits reaches the rule. The added field and the new
-     `STAGE_MAX_ITER` sentence are in the PR's "What a reader receives".
+     `StageResult.termination` action row, each `approved="2026-11-03"`.
+  3. Reader output: `STAGE_SLOW_DESCENT`'s code, message and suggestion are
+     new text, quoted in the PR body for the maintainer.
+
+  *Generality, second pass* (the `generality-review` judge on the ruled
+  form, condensed). `STAGE_SLOW_DESCENT` code row, tier 1: **holds**. It
+  reports a recorded fact and gates nothing. Like `STAGE_MAX_ITER` it is not
+  in `sequential.NOT_A_SERIES_FINDING`, so a series counts it. Its
+  suggestion, as first filed (tier 1, ambiguity 1): **weak**. It promised
+  that freeing fewer parameters would let the stage converge, which nothing
+  measures, and named one lever where `HIGH_CORRELATION` names two. Author's
+  answer: reworded to point at the correlation and bound findings and defer
+  the remedy to their own suggestions, ambiguity 3, as
+  `STAGE_NOT_FINITE.suggestion`. The `termination` row's rewritten evidence:
+  **weak** without the Cr₂WO₆ rerun. Author's answer: rerun (table above),
+  and the evidence now quotes it and names the sequential consumers as not
+  measured. `SLOW_DESCENT_ESD`'s corrected numbers: **holds**. The
+  `STAGE_SLOW_DESCENT` skill row: **weak** for a unitless "0.5" and a
+  correlation claim from one fixture. Author's answer: the number is gone,
+  the claim tagged `(Hypothesis: …)`, the correlation clause cut. 9c.34 and
+  the reverted `STAGE_MAX_ITER` row: **hold**.
 
   *Gotchas.* The rule reads N as every row the driver sees, penalty and
   restraint rows included, so its χ²_red is not quite the esds'. That is
@@ -314,8 +335,11 @@ repo.
   `strategy/staged.py`'s presets, and this branch does not touch them.
 
   *Not done.* The moment guide's 800-evaluation crawl (Inherited, 10-25) was
-  not re-run. A per-stage off switch was not added (decision 1 may remove the
-  need).
+  not re-run. A per-stage off switch was not added: under the converged
+  status the cases that wanted it (the guides, the `solve_magnetic`
+  continuations) no longer mislabel. Not measured: a series, where
+  `sequential.py` now reads a cut first rung as converged, so it escalates
+  no rung and feeds the first-rung budget (WP-1127).
 
   Fast suite (`-m "not slow"`, `[dev]`, macOS arm64, through `serial.py`,
   another shift's suites running): 5 failed, 13608 passed, 319 skipped,
