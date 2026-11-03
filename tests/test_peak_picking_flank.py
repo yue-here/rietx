@@ -21,6 +21,7 @@ import pytest
 
 import rietx as rx
 from rietx.schemas.indexing import PEAK_UNUSABLE_FLAGS
+from tests import indexing_gallery as gallery
 from tests._synthetic_silicon import A_SI, silicon_pattern
 
 FIRST_SI_LINE = 28.0      # Si 111 is at 28.44°; nothing real lies below this
@@ -66,6 +67,9 @@ def test_a_steep_flank_gives_no_usable_false_line(steep):
     assert flagged and "no_intensity" in PEAK_UNUSABLE_FLAGS
     for p in flagged:
         assert p.intensity < PEAK_NO_INTENSITY_SIGMA * p.intensity_esd
+    gallery.draw("silicon_steep_peaks", peaks=peaks, data=steep,
+                 note="only usable lines are drawn, so the flank components "
+                      "below 28\u00b0, all unusable, are absent from the ticks")
 
 
 #: Si Kα1 positions in 10–110° 2θ (hkl all odd or all even, and h+k+l ≠ 4n+2).
@@ -98,7 +102,13 @@ def test_index_pattern_finds_the_cubic_cell_on_the_steep_flank(steep):
     peaks = rx.pick_peaks(steep, INSTRUMENT, two_theta_range=(10.0, 110.0))
     result = rx.index_pattern(peaks, data=steep, instrument=INSTRUMENT,
                               two_theta_limits=(10.0, 110.0), preset="quick")
-    cubic = [c for c in result.candidates if c.system == "cubic"
-             and abs(c.cell[0] - A_SI) < 0.01]
-    assert cubic, [(round(c.cell[0], 3), c.system, c.centring)
-                   for c in result.candidates[:5]]
+    gallery.draw("silicon_steep", peaks=peaks, data=steep, result=result,
+                 instrument=INSTRUMENT)
+    # ranked first, as the issue's cropped run had it: the cubic search
+    # finishes in ~6 s of the quick preset's 120 s ceiling, so the order is
+    # not a load sensor (tests/CLAUDE.md § Budgets in tests)
+    best = result.candidates[0]
+    assert (best.system, best.centring) == ("cubic", "F") and abs(
+        best.cell[0] - A_SI) < 0.01, [
+        (round(c.cell[0], 3), c.system, c.centring)
+        for c in result.candidates[:5]]
