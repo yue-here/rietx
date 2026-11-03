@@ -367,12 +367,25 @@ _NOT_MAPPED = [
      "ties cell b to cell a", ["phases.0.cell.b"]),
     # A background point builds no entry.
     (_limit(9, 900.0, 1000.0), {}, "builds no entry", []),
+    # A cell length of 0 has no metric (Yue's review of #1285, item 2): a low
+    # end at 0 and one below it.
+    (_limit(5, 0.0, 6.0), {}, "cell length of 0", ["phases.0.cell.a"]),
+    (_limit(5, -1.0, 6.0), {}, "cell length of 0", ["phases.0.cell.a"]),
+    # An angle at 0 or 180 degrees has a singular metric; the interval ends are
+    # checked whatever the space group, before it ties or fixes the angle.
+    (_limit(5, 80.0, 180.0), {"phase": _phase(
+        cell_codes="    0.00000    0.00000    0.00000   51.00000    0.00000    0.00000")},
+     "cell angle of 180", ["phases.0.cell.alpha"]),
+    (_limit(5, 0.0, 100.0), {"phase": _phase(
+        cell_codes="    0.00000    0.00000    0.00000   51.00000    0.00000    0.00000")},
+     "cell angle of 0", ["phases.0.cell.alpha"]),
 ]
 
 
 @pytest.mark.parametrize("limit, changes, why, where", _NOT_MAPPED, ids=[
     "r-at-0", "w-at-0", "occ", "coordinate", "multiplier", "ibound-1",
-    "symmetry-tied-b", "background-point"])
+    "symmetry-tied-b", "background-point", "length-at-0", "length-below-0",
+    "angle-to-180", "angle-from-0"])
 def test_a_limit_that_does_not_map_is_reported_with_its_reason(
         tmp_path, limit, changes, why, where):
     """Not applied, the Structure is its twin's, and the limit is said once at
@@ -397,6 +410,11 @@ _BINDING = [
     (_limit(5, 5.1, 5.2), {}, "lies outside it", 5.0),
 ]
 
+#: the sentence each case's value earns: on the limit, or past it.
+_BINDING_TAIL = ["sits on that limit", "sits on that limit",
+                 "lies outside the limit. FullProf, rerun on this file, would "
+                 "hold it at the limit"]
+
 
 @pytest.mark.parametrize("limit, changes, why, value", _BINDING,
                          ids=["scale", "w", "outside"])
@@ -412,7 +430,10 @@ def test_a_limit_the_file_s_value_sits_on_is_a_warning(
     [d] = found
     assert (d.code, d.level, d.value) == (
         "FULLPROF_BINDING_LIMIT_NOT_APPLIED", "warning", value)
-    assert why in d.message and "sits on that limit" in d.message
+    tail = _BINDING_TAIL[[b[2] for b in _BINDING].index(why)]
+    assert why in d.message and tail in d.message
+    other = _BINDING_TAIL[2 if "sits" in tail else 0]
+    assert other not in d.message
 
 
 @pytest.mark.parametrize("nre, trailing, match", [

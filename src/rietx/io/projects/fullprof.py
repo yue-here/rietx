@@ -3274,6 +3274,17 @@ class LimitReading:
             return False
         return not self.limit.low < self.value.value < self.limit.high
 
+    @property
+    def past(self) -> bool:
+        """The file's own value lies strictly outside its limit.
+
+        :attr:`binding` also holds on the limit itself, where the refinement
+        the file records ended against it. Past it, the file's value is not
+        one that FullProf's least squares could have returned under the limit.
+        """
+        return self.binding and not (
+            self.limit.low <= self.value.value <= self.limit.high)
+
 
 def _column_label(key: str) -> str:
     """A profile column as the file's comment line spells it: ``W``, ``Pref1``."""
@@ -3387,6 +3398,19 @@ def _undefined_at(entry: tuple, model: FullProfModel,
     from ...model.profiles.caglioti import _MIN_GAMMA_G2
     from ...schemas.structure import MARCH_R_MIN
 
+    if entry[0] == "cell":
+        # a cell length of 0 has no metric; an angle at 0 or 180 degrees has a
+        # singular one (volume zero), so neither end may reach them
+        if entry[1] in ("a", "b", "c"):
+            if limit.low <= 0.0:
+                return (f"its low end {limit.low:g} reaches a cell length of 0, "
+                        f"where the metric is undefined")
+        elif limit.low <= 0.0 or limit.high >= 180.0:
+            end = limit.low if limit.low <= 0.0 else limit.high
+            return (f"its interval end {end:g} reaches a cell angle of "
+                    f"{0 if limit.low <= 0.0 else 180} degrees, where the "
+                    f"metric is singular")
+        return None
     if entry[0] != "profile":
         return None
     if (entry[1] == "pref1" and model.control.get("nor", 0) == 1
@@ -3472,7 +3496,7 @@ def limit_readings(model: FullProfModel, built=None) -> list[LimitReading]:
                       "unmeasured")
         if reason is None and not limit.low <= value.value <= limit.high:
             reason = (f"the file's own value {value.value:g} lies outside it, "
-                      f"so the file was not refined under this limit")
+                      f"and a bound there would refuse the value")
         if reason is None and entry[0] == "cell":
             reason = _cell_entry_tied(nuclear[si], entry[1],
                                       None if built is None else built[si])
@@ -3641,7 +3665,8 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
     them onto a built entry: each becomes that entry's ``min`` and ``max``
     (:func:`limit_readings`). Each limit not applied is reported with its
     reason, once: ``FULLPROF_BINDING_LIMIT_NOT_APPLIED`` (warning) where the
-    file's own value sits on it, since FullProf's answer then rested on it,
+    file's own value sits on it or past it (FullProf's answer rested on it,
+    or FullProf rerun on the file would hold it there),
     and ``FULLPROF_LIMITS_NOT_APPLIED`` (info) otherwise.
 
     Five refusals, each naming what it would otherwise have dropped:
@@ -4135,12 +4160,18 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
                       f"{reading.reason}.")
             where = [reading.path] if reading.path else []
             if reading.binding:
+                if reading.past:
+                    tail = (" The file's value lies outside the limit. FullProf, "
+                            "rerun on this file, would hold it at the limit, and "
+                            "the built parameter is free to leave it.")
+                else:
+                    tail = (" The file's value sits on that limit, so the "
+                            "refinement it records rested on it, and the built "
+                            "parameter is free to leave it.")
                 diagnostics.append(Diagnostic(
                     level="warning", code="FULLPROF_BINDING_LIMIT_NOT_APPLIED",
                     where=where, value=reading.value.value,
-                    message=(stated + " The file's value sits on that limit, "
-                             "so the refinement it records rested on it, and "
-                             "the built parameter is free to leave it.")))
+                    message=stated + tail))
             else:
                 diagnostics.append(Diagnostic(
                     level="info", code="FULLPROF_LIMITS_NOT_APPLIED",
