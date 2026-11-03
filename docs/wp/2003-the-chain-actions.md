@@ -1,6 +1,6 @@
 # WP-2003 — The chain actions: what a series decides between patterns
 
-Milestone: generality · Status: 🔄 2026-11-03 — C1, C2 q5 and C3 landed (no default Rwp fence or first-rung budget; an error-level fit is quarantined); the batch ruled by the maintainer 2026-11-03 (five briefs and the consent list); implementation, two measurements and the agent run owed
+Milestone: generality · Status: 🔄 2026-11-03 — the batch ruled by the maintainer 2026-11-03 and landed but for C8, C11, C2's rung fields and C10 q1; the demoted codes are record fields, the joint hold reads the single fit's significance; the GUI wording and the joint moves await the maintainer's review; the agent run owed
 Track: The audits
 Depends on: 2002, 2037
 Priority: P2 2026-10-24 — 2037 closed, so its clause 1 and the response column this WP's first demotion takes are in place; the maintainer's next after 2037; the seam the maintainer's own example (a series discontinuity) lives in
@@ -252,7 +252,7 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
       docstring); the closing stage × the fence (cpd-1b escalates with it, not without it).
       Done 2026-10-25: `2003-batch/clashes.md` (`5212338`), fifteen clashes X1-X15, eleven
       measured on synthetic chains or read off the reseed JSONs.
-- [ ] The batch to the maintainer, each brief opening with its stakes line (the record
+- [x] The batch to the maintainer, each brief opening with its stakes line (the record
       § The rule, 2026-10-20); rulings dated into the table. Drafted 2026-10-25
       (`2003-batch/batch.md`, `86ffb9a`), not yet put to the maintainer: four picks are
       revised against DESIGN.md § Rules first (the 2026-10-25 handover's *Next*). Revised on
@@ -262,7 +262,9 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
       maintainer's standing instructions those were Claude's settlements, not rulings
       (`batch.md` § Rulings, its relabel paragraph). The open picks go to the maintainer
       as briefs in the house decision format, one at a time; the seven tier-3 `approved`
-      dates stand until each is approved or reversed.
+      dates stand until each is approved or reversed. Ruled by the maintainer 2026-11-03,
+      five briefs one at a time and a consent list (`batch.md`, the 2026-11-03 paragraphs;
+      every entry's `ruling` in `rows.json`).
 - [ ] Approved demotions, each its own commit; `SEQUENTIAL_DISCONTINUITY` replaced by the
       `SeriesResult.steps` field and its help entry (no diagnostic), if the batch agrees; the
       release notes staged. C4 landed 2026-10-26 (fourth session, a lane): the code, its
@@ -275,6 +277,13 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
       the handover entry): no default Rwp fence (`SeriesEntry.rwp_over_median`), an
       `error`-level kept attempt escalates and is quarantined (`schemas.sequential._rejected`),
       no default first-rung budget. C2's questions 2-3 (the ranking), C5, C6, C9, C10 owed.
+      Landed 2026-11-03 (sixth session, three lanes): C6 (`SeriesResult.code_counts`), C5
+      (`SeriesResult.direction_gaps`, the path check split into `…_NOT_RUN` and
+      `…_INCOMPLETE`), C2 q2-q3 (the ranking), C9 q1-q2 approved with the carry invariance
+      test, C10 q2 (the joint hold on `_answer_significance`), and the GUI series panel on
+      the new fields (`steps` plotted). Owed: C8 (split the onset code), C11's three
+      invariant arms, the tiers of `SeriesEntry.rungs_tried`/`.rungs_raised` and
+      `fit:refit` (C2), C10 q1's hand rows, and the rows waiting on X14.
 - [ ] Goldens re-pinned only if no further from reference. A series golden's first
       reference is the cold-fit chain, rietx's own result on the same data, so it
       verifies and does not validate (DESIGN.md § Rules, 2). Where a series member has a
@@ -306,6 +315,116 @@ summary).
 - Root CLAUDE.md § Series.
 
 ## Handover log
+
+### 2026-11-03 (sixth session) — the batch ruled and landed but for C8, C11, C2's rung tiers and C10 q1
+
+The maintainer ruled the whole batch today, and most of it is now in the code. A series no
+longer raises a warning when a code repeats down the chain, or when the two walk directions
+disagree. Each fact is a record field instead: a count per code, and every gap with its size in
+esds, ranked and unthresholded. A pattern's attempts are ranked by the fit's full cost wherever
+two costs are comparable, and a rejected attempt never beats a usable one. In a joint fit, a phase
+the data cannot see is now held by the same test the single fit uses. Before, the joint fit
+released a blank frame's cell and reported it at 4.1517 ± 0.0168 Å. The series panel shows what
+the library rejected and lists the steps down the series. What is not done: C8, C11's three
+invariant arms, the tiers of two rung fields, and C10 q1's hand rows.
+
+*Done.* Three lanes worked in parallel (series schema and ranking, the GUI, the joint fit), then
+the rulings landed on the main checkout's tree.
+- **C6** (`0a6af94`). `SEQUENTIAL_PERSISTENT_FINDING` is gone. `SeriesResult.code_counts` counts
+  every per-pattern code with no threshold.
+- **C5** (`3fc09ea`). `SEQUENTIAL_PATH_DEPENDENT` is gone. `SeriesResult.direction_gaps` holds
+  every gap, signed, largest |gap_esd| first. The path check splits into
+  `SEQUENTIAL_PATH_CHECK_NOT_RUN` (warning, a silence pair added in `8bc4a3a`) and
+  `SEQUENTIAL_PATH_CHECK_INCOMPLETE` (info).
+- **C2 q2, q3** (`c3b14c9`, `8bc4a3a`). `_same_objective` says when two attempts' costs compare
+  (same σ, mode and restraints, never Pawley). `_better` ranks by `cost_final` there. `_prefer`
+  tests `_rejected` first, so a truncated finite attempt beats a rejected one.
+- **C9 q1** (`6bc30d1`). Carrying every entry is pinned equal to carrying only the refined ones,
+  on the thermal series (25 of 41 entries lie outside the narrow globs).
+- **C9 q2 and C3's sample count** (`6ad5e79`). `carry_hkl_intensities` approved at tier 3;
+  `FIRST_RUNG_SAMPLES` approved on a consent line. Both rows re-grounded on the m1 and m2 data.
+- **The skill and help** (`0176191`). The ladder prose loses the Rwp fence. The misfit ratio's
+  help says to read it down the series.
+- **The GUI** (`80a25bd`, `99a9799`, `a4edebe`, `8610658`). The panel ranks by the served gap and
+  calls no parameter path-dependent. It marks what `_rejected` marked, and lists
+  `SeriesResult.steps` largest first.
+- **C10 q2 (a)** (`5ac0a8a`, `d8f0da7`). `multi.py` measures each phase's significance off the
+  joint fit (pinv of the equilibrated joint normal matrix at unit weights), and each histogram
+  takes the smaller of the screen and that z. The prior, the seeded phases and the tried instrument
+  prior follow the single runner. `test_joint_xray_neutron.py` now pins the flat pair's background
+  at the data level.
+- Main merged (`281bbef`, origin/main `d7b62a3`).
+- **Code review** (`/code-review high --fix 6244fa9..d8f0da7`): six findings, three fixed.
+  - Fixed (`d35d1d6`): the server withheld a trajectory's largest gap when the two walks differed
+    in length. The record pairs walks by label, so only the drawn backward curve needs equal length.
+  - Fixed (`30f70a9`): the panel read the positional `rejected` array by series index. A pattern
+    that raised leaves no entry, so the two differ.
+  - Fixed (`afe69ba`): the trajectory chart's `dashed` option had no caller left. It is removed,
+    with its comment.
+  - Skipped, and sent to the maintainer: on a clean series the panel opens on whichever path has
+    the largest noise-level gap. Measured on the seven-pattern thermal ramp walked both ways: 84 of
+    91 gaps are exactly 0, the background terms keep about 1e-3 esd, so the panel opens on
+    `instrument.background.c1` and `phases.0.cell.a` ranks sixth. That contradicts
+    `gui/CLAUDE.md`'s "Ranking stops where the fence stops" rule, which the GUI lane's change
+    broke. The docstring's false claim that the floor zeroes those ties is corrected (`09a2180`),
+    and the rulebook's banner sentence now reads `direction_gaps`.
+  - Skipped: the payload carries every `DirectionGap` row. That is the record, by C5's ruling.
+  - Skipped: `_better` repeats `_prefer`'s rejection test. Harmless, and it keeps `_better`'s
+    docstring true on its own. Reading it turned up two docstrings in `sequential.py` that still
+    said `_better` ranks by status and Rwp; they now name `_prefer` (`be1c74a`).
+
+*Measured* (darwin arm64, worktree venv `[dev]`).
+- Fast selection, main-merged tree before the review fixes: 13785 passed, 326 skipped, 36
+  xfailed, 0 failed. After the review fixes (`afe69ba`): 13786 passed, 326 skipped, 36 xfailed,
+  0 failed. Passed+skipped moved by +1, the one Python test the review added. The three commits
+  after it change text only; `test_audit_table.py`, `test_joint_phase_significance.py`,
+  `test_docs_consistency.py` and `test_gui_dist.py` were re-run on them, green.
+- The tests this branch added (40 in the fast selection, one run on this Mac): 21 s in all, the
+  slowest 3.5 s (`test_a_cut_warm_stage_under_a_converged_closing_stage_is_truncated`). Per file:
+  `test_sequential.py` 14.9 s for 22, `test_joint_phase_significance.py` 6.3 s for 3, the rest
+  under 0.1 s. None joins the slow tail.
+- Lane A's fast run on its own tree, before the joint and GUI lanes: 13746 passed, 326 skipped.
+- Vitest: 592 → 603 (lane G's ten, plus one from the review).
+- The joint fit on two copies of #481's seed-107 blank frame. Before, the cell was released at
+  `profile_w` (screen 3.25, joint marginal 2.61) and reported 4.1517 ± 0.0168 Å. After, it is held
+  from the cell stage on, `PHASE_UNCONSTRAINED` fires at z = 2.24, and the stage iteration counts
+  equal the single fit's (2, 10, 1, 16, 19, 2). Over 139 recorded joint-fit test records, 10 moved
+  and no test's expectation changed.
+- Flat corundum's background walked before C10 too: c0 reached −2467 and −13175 on main
+  (`6bc30d1`, measured on a snapshot). After C10 it sits at 1.0. The pin in `d8f0da7` holds that.
+
+*Generality.* The `generality-review` judge weighed every row of the audit delta and three
+heuristics the table cannot see. None `fails`. Its verdicts, condensed, with the author's answer
+under each `weak`, are in `docs/wp/2003-batch/generality-2026-11-03.md`. The weak ones:
+- the joint support hold (moved records not listed; weights dropped; one family);
+- `_better`'s Rwp fallback, which fires exactly where σ differs and so compares two weightings;
+- `SeriesEntry.rung`, whose approval covers the q2 order but not the S criterion;
+- `FIRST_RUNG_SAMPLES`, whose sweep cannot tell 1, 2 and 3 apart;
+- `carry_hkl_intensities`, outside all seven programs and dearer on planted;
+- `relative_paths` and `angle_paths`, which belong as tier-1 action rows.
+Its stale-evidence findings are corrected in `b6e73fd`.
+
+*In flight.* Nothing uncommitted. The GUI's new strings and the joint fit's moved records wait on
+the maintainer's review in PR #1310.
+
+*Gotchas.*
+- Node is absent on this Mac. Lane G ran the GUI toolchain under the `nodejs-wheel-binaries`
+  node 24 in a scratch venv.
+- The joint fit's other screen readers still read the screen alone: `_parametric_unseen`, the
+  form test and `_freeze_cell_windows_multi`. Lane J did not generalise them, by choice: each
+  needs its own measurement.
+
+*Next*, in order:
+1. C8: split the onset code.
+2. C11's three invariant arms.
+3. Tier `SeriesEntry.rungs_tried` and `.rungs_raised`, and `fit:refit` (C2). Bring the ranking
+   criterion with them: `_better`'s Rwp fallback compares two weightings where σ differs, and the
+   S criterion and the `max_iter` tie are Claude's settlement. Move `SeriesResult.relative_paths`
+   and `.angle_paths` from `OTHER_RECORD_FIELDS` to tier-1 action rows.
+4. C10 q1's hand rows, then the rows waiting on X14.
+5. Re-capture any golden the demotions moved, and hand WP-2008 the list of skill rows that cite a
+   removed code.
+6. The agent run, once the maintainer picks from its cost menu.
 
 ### 2026-11-02 (fifth session) — C1, C2 q5 and C3 landed: no default Rwp fence or first-rung budget, an error-level fit is quarantined
 
