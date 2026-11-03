@@ -3989,6 +3989,27 @@ def test_the_gap_names_its_pattern_and_the_rung_each_chain_kept():
     assert "discontinuous" not in row
 
 
+def test_the_gap_is_served_when_one_chain_lacks_the_path_at_a_pattern():
+    """The record pairs the two walks by label, so its gap stands where the
+    drawn curves cannot be paired point for point.
+
+    The backward chain is missing the path at one pattern, so its trajectory
+    is one point shorter.  The backward curve is withheld (it would be drawn
+    against the wrong x), and the largest gap is still served.
+    """
+    from rietx.gui import series as series_mod
+
+    forward, backward = _series_pair([4.1560, 4.1580, 4.1600],
+                                     [4.1560, 4.1580, 4.1607])
+    forward = _with_gaps(forward, backward)
+    top = forward.direction_gaps[0]
+    backward.entries[0].parameters = []
+    row, = series_mod.trajectories(forward, backward)
+    assert row["backward"] is None
+    assert row["n_sigma"] == abs(top.gap_esd)
+    assert row["gap_at"]["label"] == "T500"
+
+
 def test_rejected_is_the_librarys_quarantine_test_not_a_status_read():
     """The panel marks what the chain quarantined, and that is more than
     ``status == "diverged"``.

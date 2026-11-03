@@ -364,14 +364,16 @@ def trajectories(series: SeriesResult,
         # different question wearing the same answer's shape.
         if backward is not None and not series.is_derived_path(path):
             other = backward.trajectory(path)
+            # the drawn curve needs the two walks point for point; the gap
+            # does not, the record having paired them by label
             if len(other) == len(traj):
                 row["backward"] = list(other.value)
-                top = largest.get(path)
-                if path not in relative and top is not None:
-                    row["n_sigma"] = abs(top.gap_esd)
-                    row["gap_at"] = {"label": top.label, "index": top.index,
-                                     "forward_rung": top.forward_rung,
-                                     "backward_rung": top.backward_rung}
+            top = largest.get(path)
+            if path not in relative and top is not None:
+                row["n_sigma"] = abs(top.gap_esd)
+                row["gap_at"] = {"label": top.label, "index": top.index,
+                                 "forward_rung": top.forward_rung,
+                                 "backward_rung": top.backward_rung}
         out.append(row)
     return out
 
