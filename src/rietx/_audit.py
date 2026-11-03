@@ -4484,7 +4484,10 @@ ROWS: tuple[Row, ...] = (
                   "the ladder and direction='both'; on CPD 1a-1h the chain's mean |dW| is "
                   "1.82 wt %, the independent fits' too, its worst path "
                   "instrument.profile.v 2.87-5.62 esd from them (2003-batch/batch.md, C9). "
-                  "Every entry against only the varied ones is not yet tested"),
+                  "Every entry against only the refined ones is an invariant: bit-identical "
+                  "on the thermal ramp, 25 of 41 entries outside the narrow globs "
+                  "(test_sequential.py::test_carrying_every_entry_equals_carrying_the_"
+                  "refined_ones)"),
         grounds=("The warm start is what a refiner of an in-situ ramp does, and it keeps a "
                  "held setup value from pattern to pattern (WP-2081); GSAS-II's default "
                  "restarts each histogram unless Copy2Next is ticked, the dissent, kept as "

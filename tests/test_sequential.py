@@ -287,6 +287,27 @@ def test_carry_globs_move_only_matching_paths():
     assert cell.c.value == pytest.approx(cell.a.value)
 
 
+def test_carrying_every_entry_equals_carrying_the_refined_ones(thermal_patterns,
+                                                               thermal_series):
+    """``carry=("*",)`` against the plan's own globs, value for value.
+
+    An entry no stage frees comes back from every fit at the value it went in
+    with, which is the start model's, so carrying it moves nothing. This pins
+    that, because the warm start was ruled tier 3 on the condition that the
+    two agree (WP-2003, C9 q1, ruled by the maintainer 2026-11-03). A path
+    that ever differs goes back to the maintainer rather than into a
+    tolerance.
+    """
+    plan = staged.RefinementPlan.mccusker_default()
+    refined = sorted({g for stage in plan.stages for g in stage.turn_on})
+    narrow = _thermal_series(thermal_patterns, carry=refined)
+    assert len(narrow) == len(thermal_series)
+    for wide_entry, narrow_entry in zip(thermal_series, narrow):
+        assert narrow_entry.rung == wide_entry.rung
+        assert ([(p.path, p.value) for p in narrow_entry.parameters]
+                == [(p.path, p.value) for p in wide_entry.parameters])
+
+
 # -- a refined coordinate crosses the boundary (WP-1333) ------------------
 
 B_X = "phases.0.atoms.1.x"
