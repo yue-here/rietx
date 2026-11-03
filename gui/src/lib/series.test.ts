@@ -13,6 +13,8 @@ import {
   reseededFlags,
   rungNote,
   sortByX,
+  stepCells,
+  stepRows,
   topGapPath,
   trajectoryLegend,
   trajectoryNote,
@@ -21,6 +23,7 @@ import {
   type GapAt,
   type LegendEntry,
   type SeriesEntry,
+  type SeriesStep,
   type SeriesPattern,
   type Trajectory,
 } from "./series";
@@ -178,6 +181,46 @@ describe("the gap in words", () => {
     expect(topGapPath([gap({ gap_esd: null })])).toBeNull();
   });
 
+});
+
+describe("the steps between neighbouring patterns", () => {
+  const step = (over: Partial<SeriesStep> = {}): SeriesStep => ({
+    path: "phases.0.cell.a", labels: ["T300", "T400"], indices: [0, 1],
+    step: 0.0021, size_esd: 21, cold_ratio: null, ...over,
+  });
+  // the record's order: largest |size_esd| first, no size last
+  const record = [
+    step({ size_esd: -40, step: -0.004 }),
+    step({ path: "phases.0.scale", size_esd: 9 }),
+    step({ labels: ["T400", "T500"], indices: [1, 2], size_esd: 2 }),
+    step({ labels: ["T500", "T600"], indices: [2, 3], size_esd: null }),
+  ];
+
+  it("keeps the record's order and filters to a parameter", () => {
+    // largest first is the record's own order; a second sort here could disagree
+    expect(stepRows(record, "phases.0.cell.a").rows.map((s) => s.size_esd))
+      .toEqual([-40, 2, null]);
+    expect(stepRows(record, null).rows.map((s) => s.path))
+      .toEqual(["phases.0.cell.a", "phases.0.scale", "phases.0.cell.a", "phases.0.cell.a"]);
+  });
+
+  it("caps the rows and says how many there were", () => {
+    const { rows, total } = stepRows(record, null, 2);
+    expect(rows.length).toBe(2);
+    expect(total).toBe(4);
+    expect(stepRows(null, null)).toEqual({ rows: [], total: 0 });
+    expect(stepRows(undefined, "x")).toEqual({ rows: [], total: 0 });
+  });
+
+  it("prints a signed step and size, and a dash where there is no esd", () => {
+    expect(stepCells(record[0])).toEqual({
+      between: "T300 → T400", step: "−0.004", esd: "−40.0", cold: "—" });
+    expect(stepCells(record[1]).esd).toBe("+9.0");
+    // no esd, no size: 0 would read as one
+    expect(stepCells(record[3]).esd).toBe("—");
+    expect(stepCells(step({ cold_ratio: 0.9876 })).cold).toBe("0.99");
+    expect(stepCells(step({ cold_ratio: -0.3 })).cold).toBe("-0.30");
+  });
 });
 
 describe("a trajectory's axis title", () => {

@@ -3732,6 +3732,28 @@ def test_the_backward_chain_travels_as_a_number_not_a_footnote(series):
         assert row["n_sigma"] == largest.get(path), path
 
 
+def test_the_steps_travel_in_the_result_as_the_record_wrote_them(series):
+    """``SeriesResult.steps`` reaches the panel whole and in the record's order.
+
+    The panel lists them without a sort of its own (largest ``|size_esd|``
+    first, the rows with no size last), so the order on the wire has to be the
+    record's, and every row carries the pair of patterns it is between
+    (WP-2003, C4).  A route that filtered or re-ordered them would make the
+    panel's "largest first" a claim about this layer.
+    """
+    session, client, _ = series
+    payload = client.get("/api/series/result")[1]
+    served = payload["result"]["steps"]
+    record = session._series_run["result"].steps
+    assert record, "the ramp has three patterns, so it has steps"
+    assert served == [s.model_dump(mode="json") for s in record]
+    sizes = [abs(s["size_esd"]) if s["size_esd"] is not None else None for s in served]
+    numbers = [v for v in sizes if v is not None]
+    assert numbers == sorted(numbers, reverse=True)
+    assert sizes[len(numbers):] == [None] * (len(sizes) - len(numbers))
+    assert all(len(s["labels"]) == 2 and len(s["indices"]) == 2 for s in served)
+
+
 def test_the_series_events_say_which_pattern_they_came_from(series):
     """Per-pattern telemetry on the one stream, and no new ``EventKind``.
 

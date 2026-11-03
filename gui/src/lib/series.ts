@@ -78,6 +78,20 @@ export interface DirectionGap {
   backward_rung: Rung;
 }
 
+/** One row of `SeriesResult.steps`: a path's change between two neighbours. */
+export interface SeriesStep {
+  path: string;
+  /** the two patterns' labels, earlier first */
+  labels: [string, string];
+  indices: [number, number];
+  /** later minus earlier, signed, in the path's own unit */
+  step: number;
+  /** `step` over the later pattern's esd, signed; `null` where that esd is missing */
+  size_esd: number | null;
+  /** the same pair refitted cold over `step`; `null` where it was not re-measured */
+  cold_ratio: number | null;
+}
+
 export interface Trajectory {
   path: string;
   x: number[];
@@ -327,6 +341,39 @@ export function trajectoryLegend(traj: Trajectory, reseeded: boolean[] = [],
 
 /** `v` to `n` significant figures, with no trailing zeros. */
 const sig = (v: number, n: number) => String(Number(v.toPrecision(n)));
+
+/** The most step rows the table draws. The record holds one per refined path
+ *  per neighbouring pair, so thousands on a long series; the panel says how
+ *  many it left off. */
+export const STEP_ROWS_CAP = 60;
+
+/**
+ * The step rows to draw, in the record's order.
+ *
+ * `SeriesResult.steps` is already largest |size_esd| first with the rows that
+ * have no size last (WP-2003), so this filters and caps and sorts nothing:
+ * the order is the record's, and a second sort here could disagree with it.
+ * `path` limits the rows to one parameter, `null` takes every parameter.
+ * `total` is the rows there are before the cap.
+ */
+export function stepRows(steps: SeriesStep[] | null | undefined, path: string | null,
+                         cap: number = STEP_ROWS_CAP): { rows: SeriesStep[]; total: number } {
+  const all = (steps ?? []).filter((s) => path === null || s.path === path);
+  return { rows: all.slice(0, cap), total: all.length };
+}
+
+/** A step's cells as the table prints them. */
+export function stepCells(s: SeriesStep): { between: string; step: string;
+                                            esd: string; cold: string } {
+  const sign = (v: number) => (v < 0 ? "−" : v > 0 ? "+" : "");
+  return {
+    between: `${s.labels[0]} → ${s.labels[1]}`,
+    step: `${sign(s.step)}${sig(Math.abs(s.step), 3)}`,
+    // no esd, no size: a step against none has no size in esds, and 0 would read as one
+    esd: s.size_esd === null ? "—" : `${sign(s.size_esd)}${esdText(s.size_esd)}`,
+    cold: s.cold_ratio === null ? "—" : s.cold_ratio.toFixed(2),
+  };
+}
 
 /**
  * What the pointer on one point says: the pattern, its coordinate, and the

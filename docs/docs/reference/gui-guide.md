@@ -478,6 +478,16 @@ plot's four export buttons, between its legend and the plot. On the trajectory,
 `copy data` gives each pattern in view with its x, its value and its esd, and
 the backward chain's value when there is one.
 
+Under the plot, Steps lists the change in each parameter between neighbouring
+patterns, later minus earlier, with its size in the later pattern's esds. It is
+the series' `steps` field, largest first. It shows the selected parameter, or
+every parameter with the switch beside it, capped at the largest 60 rows. No
+step is called a jump, because what a jump is (a transition, a sample shift, a
+beam dump, a wrong model) depends on the sample's history, which no pattern
+records. When the series ran with `verify_steps`, a column gives the cold ratio
+of the largest steps: the same two patterns refitted cold and independently,
+over the step. Near 1 the step is in the data, and near 0 the chain made it.
+
 A series does not persist. Its patterns are staged uploads and its answer lives
 in the session, so closing the window loses the staged list. Say what you need
 from it before you close it.

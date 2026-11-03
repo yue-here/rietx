@@ -521,6 +521,12 @@ const SERIES_ANSWER = {
         diagnostics: [], n_iterations: 12, reseeded: true, rwp_warm: 0.31,
         node_id: "n0002", tree_id: "t2" },
     ],
+    steps: [
+      { path: "phases.0.cell.a", labels: ["T300", "T400"], indices: [0, 1],
+        step: 0.0021, size_esd: 21, cold_ratio: 0.93 },
+      { path: "instrument.zero_shift", labels: ["T300", "T400"], indices: [0, 1],
+        step: 0.0001, size_esd: 0.8, cold_ratio: null },
+    ],
     direction_gaps: [
       { path: "phases.0.cell.a", label: "T400", index: 1, forward: 4.1587,
         backward: 4.1592, gap: -0.0005, gap_esd: -5.2,
@@ -5125,6 +5131,38 @@ describe("the series panel", () => {
     expect(curves?.url).toContain("index=1");
     expect([...seriesPane("main").data[0]]).toEqual([9, 9.4]);
     expect(() => seriesPane("traj")).toThrow();
+  });
+
+  it("lists the steps between neighbouring patterns, largest first, and calls none a jump", async () => {
+    await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: SERIES_ANSWER }),
+    });
+    const stepRowsOf = () => {
+      const heading = [...host.querySelectorAll("h2")].find((h) => h.textContent?.trim() === "Steps")!;
+      expect(heading).toBeTruthy();
+      // the Steps table is the first `.scroll` after its heading
+      let node: Element | null = heading;
+      while (node && !node.matches(".scroll")) node = node.nextElementSibling;
+      expect(node).toBeTruthy();
+      return [...node!.querySelectorAll("tbody tr")]
+        .map((r) => [...r.querySelectorAll("td")].map((c) => c.textContent?.trim()));
+    };
+    // the selected parameter's steps: the cell edge, 21 esd, re-measured cold
+    expect(stepRowsOf()).toEqual([["T300 → T400", "+0.0021", "+21.0", "0.93"]]);
+    expect(host.textContent).toContain("1 step");
+    // markup wraps its prose across lines, so compare on single spaces
+    const text = host.textContent!.replace(/\s+/g, " ");
+    expect(text).toContain("later minus earlier");
+    expect(text).not.toMatch(/\bjump|discontinu/i);
+
+    // every parameter, with the record's order and a way into each trajectory
+    button("all parameters")!.click();
+    await flush();
+    expect(stepRowsOf()).toEqual([
+      ["phases.0.cell.a", "T300 → T400", "+0.0021", "+21.0", "0.93"],
+      ["instrument.zero_shift", "T300 → T400", "+0.0001", "+0.8", "—"],
+    ]);
   });
 
   it("marks a pattern the library quarantined even when the solver converged", async () => {

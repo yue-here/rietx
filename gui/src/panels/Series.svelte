@@ -29,6 +29,7 @@
   import { onDestroy } from "svelte";
 
   import { api } from "../api";
+  import Help from "../Help.svelte";
   import Exports from "./Exports.svelte";
   import { seriesCompact } from "../lib/resize";
   import { curveColors, toggleCurve } from "../lib/plot";
@@ -44,6 +45,8 @@
     rejectedBecause,
     reseededFlags,
     sortByX,
+    stepCells,
+    stepRows,
     topGapPath,
     trajectoryLegend,
     trajectoryNote,
@@ -52,6 +55,7 @@
     type SeriesEntry,
     type SeriesPattern,
     type SeriesSetup,
+    type SeriesStep,
     type Trajectory,
   } from "../lib/series";
   import type { RunState } from "../lib/stream";
@@ -100,6 +104,10 @@
   /** per entry, whether the library quarantined it: the server's answer from the
    *  chain's own test, so this panel re-derives nothing from `status` */
   const rejected = $derived<boolean[]>(answer?.rejected ?? []);
+  /** `SeriesResult.steps`, in the record's order: largest |esd| first */
+  const allSteps = $derived<SeriesStep[]>(answer?.result?.steps ?? []);
+  let stepScope = $state<"path" | "all">("path");
+  const hasCold = $derived(allSteps.some((s) => s.cold_ratio !== null));
   const diagnostics = $derived<any[]>(answer?.result?.diagnostics ?? []);
   /** the comparison of the two chains as one line, `""` where it did not run */
   const gaps = $derived(gapLine(answer?.result?.direction_gaps));
@@ -107,6 +115,8 @@
   const current = $derived<Trajectory | null>(
     trajectories.find((t) => t.path === selectedPath)
       ?? ranked[0] ?? null);
+  const shownSteps = $derived(
+    stepRows(allSteps, stepScope === "path" ? current?.path ?? "" : null));
   const running = $derived(busy && run?.run?.kind === "series");
   const settings = $derived(setup?.settings ?? null);
   const canRun = $derived(!busy && patterns.length >= 2);
@@ -427,6 +437,7 @@
   {#if gaps}
     <p class="banner">
       {gaps}
+      <Help for="result_fields:SeriesResult.direction_gaps">How to read it</Help>
       {#if gapPath}
         <button class="ghost" onclick={() => showTrajectory(gapPath)}>{gapPath}</button>
       {/if}
@@ -639,6 +650,61 @@ plot's x-axis title, and the column above">
         <div class="tip" style:left={`${tip.left}px`} style:top={`${tip.top}px`}>{tip.text}</div>
       {/if}
     </div>
+
+    {#if selectedPattern === null && allSteps.length}
+      <!-- the record's steps, beside the trajectory they are steps of: every
+           change between neighbouring patterns in the later pattern's esds,
+           largest first, and none of them called a jump (WP-2003, C4) -->
+      <h2><Help for="result_fields:SeriesResult.steps">Steps</Help></h2>
+      <div class="controls">
+        <div class="segmented" role="group" aria-label="which steps the table lists">
+          <button class:on={stepScope === "path"} aria-pressed={stepScope === "path"}
+            onclick={() => (stepScope = "path")}>this parameter</button>
+          <button class:on={stepScope === "all"} aria-pressed={stepScope === "all"}
+            onclick={() => (stepScope = "all")}>all parameters</button>
+        </div>
+        <span class="muted tabular">
+          {shownSteps.rows.length === shownSteps.total
+            ? `${shownSteps.total} step${shownSteps.total === 1 ? "" : "s"}`
+            : `largest ${shownSteps.rows.length} of ${shownSteps.total}`}
+        </span>
+      </div>
+      <p class="muted">
+        The change in each parameter between neighbouring patterns, later minus
+        earlier, with its size in the later pattern's esds. Largest first.
+        {#if hasCold}
+          The cold ratio is the same pair refitted cold and independently over
+          the step. Near 1 the step is in the data, near 0 the chain made it.
+        {/if}
+      </p>
+      {#if shownSteps.rows.length}
+        <div class="scroll">
+          <table class="tabular">
+            <thead>
+              <tr>
+                {#if stepScope === "all"}<th>parameter</th>{/if}
+                <th>between</th><th>step</th><th>esd</th>
+                {#if hasCold}<th>cold ratio</th>{/if}
+              </tr>
+            </thead>
+            <tbody>
+              {#each shownSteps.rows as s (s.path + s.indices.join("-"))}
+                {@const c = stepCells(s)}
+                <tr>
+                  {#if stepScope === "all"}
+                    <td><button class="link" onclick={() => showTrajectory(s.path)}>{s.path}</button></td>
+                  {/if}
+                  <td>{c.between}</td><td>{c.step}</td><td>{c.esd}</td>
+                  {#if hasCold}<td>{c.cold}</td>{/if}
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <p class="muted">The record holds no steps for {current?.path ?? "this curve"}.</p>
+      {/if}
+    {/if}
 
     <h2>Per pattern</h2>
     <div class="scroll">
