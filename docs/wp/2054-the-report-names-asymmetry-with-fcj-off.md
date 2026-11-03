@@ -1,6 +1,6 @@
 # WP-2054 — the report names an asymmetric residual the model cannot draw
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-03 — direction (b) landed in PR #PRNUM; waits on the maintainer's reader-output approval and the reply on #1106
 Track: What fires, and what stays silent
 Depends on: 1977 soft (the flank-lobe half of the same symptom); 2004 soft (a new template's thresholds take audit rows there)
 Priority: P2 2026-10-26 — a report that names the wrong cause: on a lab Bragg–Brentano fit with the apertures at their default 0, Layer 2 suggests an impurity phase at 0.50 and nothing mentions asymmetry (#1106, NIST SRM 660c)
@@ -134,21 +134,31 @@ nothing ported.
 
 ## Tasks
 
-- [ ] Maintainer decision: (a), (b), (c) or a combination, recorded here as
+- [x] Maintainer decision: (a), (b), (c) or a combination, recorded here as
       `Decided YYYY-MM-DD:` and answered on #1106.
-- [ ] A failing test: SRM 660c with the apertures at 0 reports no asymmetry and suggests
+      Settled 2026-11-03 by Claude under measurement and practice: (b), the FCJ
+      column of a twin drawn at `AXIAL_SIZING_FLOOR`, read only while both apertures
+      are 0. The label was a triage session's, so it was assessed against the
+      triggers first. (c) moves a preset default, which is the maintainer's, and
+      was not taken. Between (a) and (b) the measurement chose: the reporter's own
+      survey has an always-present odd column reading far above noise on most lab
+      fits with FCJ refined, while (b) leaves every fit that declares an aperture
+      untouched and passes all five controls below. GSAS-II's practice is the same
+      move: it evaluates its one aperture at a floor, never at zero. The reply on
+      #1106 is the maintainer's to post.
+- [x] A failing test: SRM 660c with the apertures at 0 reports no asymmetry and suggests
       `add_impurity_phase` (the issue's script, trimmed).
-- [ ] Land the chosen direction. If (a): the column joins Layer 1's basis, passes the four
+- [x] Land the chosen direction. If (a): the column joins Layer 1's basis, passes the four
       gates, and its correlation with `position` and `mixing` on SRM 660c and two other
       families (cpd-1c, FAP) is recorded.
-- [ ] The action: `refine_axial_asymmetry` fires from the new column when FCJ is off, and
+- [x] The action: `refine_axial_asymmetry` fires from the new column when FCJ is off, and
       its rationale says the apertures are 0 and must be declared or calibrated first.
-- [ ] Controls: a synthetic symmetric pattern with a Kα2 weight error and one with a width
+- [x] Controls: a synthetic symmetric pattern with a Kα2 weight error and one with a width
       error do not fire the action; a synthetic with known S/L does.
-- [ ] Audit rows for any new threshold or action site (`rietx._audit`), and a
+- [x] Audit rows for any new threshold or action site (`rietx._audit`), and a
       `THRESHOLDS_VERSION` bump if one moves (coordinate with WP-2004).
-- [ ] Tests + obs/calc/diff PNGs of SRM 660c at both settings to `tests/output/`.
-- [ ] Skill: the `refine_axial_asymmetry` reference row says it can now fire with the
+- [x] Tests + obs/calc/diff PNGs of SRM 660c at both settings to `tests/output/`.
+- [x] Skill: the `refine_axial_asymmetry` reference row says it can now fire with the
       apertures at 0, and what to do then; `help.py` if the action text changes.
 
 ## Acceptance
@@ -171,6 +181,70 @@ from today. The synthetic controls hold.
 - Issues #1106, #1075 (repro 1), #1090 (the related model proposal), #1166.
 
 ## Handover log
+
+- **2026-11-03** — direction (b) landed (PR #PRNUM). A lab fit that leaves both axial
+  apertures at 0 now gets a report that names the one-sided low-angle residual as axial
+  asymmetry and says the apertures are 0, where before it named nothing. The report
+  draws the asymmetry column from a copy of the model with both apertures at 0.02 and
+  leaves every fit that declares an aperture exactly as it was. On SRM 660c the
+  three regions below 40° now read asymmetry first, and freeing the apertures from 0
+  inside the plan takes Rwp from 0.129 to 0.087. Next: the maintainer approves the
+  reader-output change and answers #1106.
+
+  *Done.* `report._nominal_axial` compiles the shapes model again with
+  S/L = H/L = `AXIAL_SIZING_FLOOR` when `fcj_live` is false at the fit's values, and
+  Layer 1 (`layer1.nominal_axial_columns`) takes that twin's ∂Ω/∂(S/L) for each peak
+  that has none of its own. The misfit and the other four columns stay the fit's own.
+  `suggest_actions(axial_off=True)` counts only a positive coefficient, since a
+  negative one asks for less asymmetry than a model that draws none, and appends the
+  zero-aperture clause to the rationale. Pawley and hand-built models get no twin,
+  for `_reading_models`' reason. Tests: four new cases in
+  `tests/test_fitreport_layers.py` (seven with the parametrised controls) and
+  `test_srm660c_zero_apertures_report_names_axial_asymmetry` (slow), which writes
+  `tests/output/srm660c_zero_apertures_{fit,lowangle}.png`. The declared-aperture
+  PNGs are the baseline row's `srm660c_fit*.png`. The low-angle PNG shows the
+  classic axial tail on (100). Skill row in `references/numbers.md` updated;
+  `help.py` carries no action text, so it is unchanged.
+
+  *Measured* (`[dev]`, darwin/arm64, at d0c4bded0 + this branch).
+  - #1106's script, apertures 0: Layer-1 columns 4 → 5; regions 21.4°, 30.4°, 37.5°
+    read asymmetry +0.0205, +0.0204, +0.0247 (7-9 esd), shares 0.74, 0.79, 0.53; the
+    37.5° region now passes its gates. Active actions: `refine_axial_asymmetry` 0.50,
+    `increase_background_flexibility` 0.47 (unchanged), and two width actions that
+    newly pass because more regions pass the gates (`refine_sample_size_broadening`
+    0.26, `…strain…` 0.13). Apertures declared and refined: report identical.
+  - Synthetic LaB6 (`_truth`), apertures 0 in the model: S/L = H/L = 0.02 in the data
+    fires the action (coefficients +0.0078 to +0.0092, the tangent at 0.02 against a
+    secant from 0, so about half the aperture). No action on: the unperturbed
+    symmetric pattern, Kα2 weight ×0.8 and ×1.2, W ×0.7 and ×1.4 (every low-angle
+    coefficient insignificant). A position error inside a region was not run as a
+    control; the four-column position term absorbs it first.
+  - Apertures freed from 0 on SRM 660c: inside the plan, before or after the profile
+    stages, both reach Rwp 0.0867 (the same as starting at 0.025); one stage appended
+    to the converged zero-aperture fit reaches 0.012 and Rwp 0.1251, because the
+    widths and positions are not refitted. The rationale says to re-run the plan.
+  - `report()` on SRM 660c: +45-65 ms with the twin (about 11 %), with a fast suite
+    running beside it.
+  - `python -m tests.reader_output`: unchanged (exit 0), because the standard fit
+    declares its apertures. Every zero-aperture fit's printed report does change.
+
+  *Settled by Claude* (each could have gone the other way).
+  - (b) over (a) and (c), on the grounds in the first task above.
+  - The tangent at the nominal aperture over the secant from 0: the twin's existing
+    bases give it with no new arithmetic, and only its direction and sign are read.
+  - The sign rule at zero apertures: a physical bound (an aperture cannot go below 0),
+    not a tuned threshold, so no audit row.
+  - No new audit row and no `THRESHOLDS_VERSION` bump: no threshold moved.
+    `AXIAL_SIZING_FLOOR` gains a second consumer, the report's nominal aperture. Its
+    row is approved (2026-10-22), so its evidence text was not edited; the
+    generality judge's reading is below.
+
+  *Open for the maintainer.* (1) Approve the reader-output change: every fit with
+  both apertures at 0 gains an asymmetry coefficient per region and, where the
+  residual is one-sided, the action with its new clause. (2) Reply on #1106. (3) The
+  reporter's further ask, a `t_noise` field on `BasisCoefficient` and ungated
+  per-term roll-ups, is not done: it adds a public report field, which is reader
+  output and a schema change, and nothing in this WP needed it.
 
 - **2026-10-26** — created, from the 2026-10-26 issue triage (issue #1106). Checked against
   the tree at c0e32ab29: the issue's script reproduces (Rwp 0.1288 → 0.0867 with the

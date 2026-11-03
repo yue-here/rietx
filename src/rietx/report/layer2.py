@@ -1057,9 +1057,10 @@ def suggest_actions(attributions: list[RegionAttribution],
         if axial_off:
             rationale += (
                 " while both axial apertures are 0, so the model draws no "
-                "asymmetry: declare them, from a standard's calibration or by "
-                "freeing them in the plan before the profile widths, which "
-                "otherwise absorb part of it")
+                "asymmetry: take them from a standard's calibration, or add a "
+                "stage freeing them to the plan and run it again, since the "
+                "widths and positions fitted without them have absorbed part "
+                "of it")
         actions.append(SuggestedAction(
             kind="refine_axial_asymmetry", confidence=0.5,
             rationale=rationale,
