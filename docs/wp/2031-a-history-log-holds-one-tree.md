@@ -167,7 +167,7 @@ sentence on the series refusal, under the same cap (main's growth put the
 page 84 over); `reference/history.md` already states it. (4) The code's
 name follows `CIF_EMPTY_BLOCK_SKIPPED` and `TOPAS_BLOCK_SKIPPED`.
 
-*What a reader receives* (new text, not yet seen by the maintainer). On a
+*What a reader receives* (text approved by Yue 2026-11-03). On a
 real doubled log of two four-node fits:
 
 ```text

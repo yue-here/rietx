@@ -340,7 +340,8 @@ def _absorber(absorption: np.ndarray | None, two_theta: np.ndarray, *, path: Pat
     """Say so when the absorber engaged — it did not change y, but it changed σ."""
     if absorption is None or diagnostics is None:
         return
-    off = absorption != 1.0
+    # a row with no finite value is ``ascending``'s to drop and report (WP-2079)
+    off = (absorption != 1.0) & np.isfinite(absorption) & np.isfinite(two_theta)
     if not off.any():
         return
     affected = two_theta[off]
@@ -348,7 +349,7 @@ def _absorber(absorption: np.ndarray | None, two_theta: np.ndarray, *, path: Pat
         level="info", code="BRML_ABSORBER_ENGAGED",
         message=(f"{Path(path).name} used an automatic absorber over "
                  f"{int(off.sum())} point(s) at 2θ = {affected.min():.4g}–"
-                 f"{affected.max():.4g}°, up to {absorption.max():.6g}×. The "
+                 f"{affected.max():.4g}°, up to {absorption[off].max():.6g}×. The "
                  "stored intensities already include the correction, and σ was "
                  "derived through it."),
         where=["sigma"],
@@ -462,9 +463,9 @@ def list_brml_scans(path: str | Path) -> list[ScanInfo]:
             x = _data(route, columns, path=p, member=member)[:, columns.two_theta]
             name = _scan_name(route) or ", ".join(columns.stepped)
             out.append(ScanInfo(index=i,
-                                label=f"{name} {x.min():.4g}–{x.max():.4g}°",
+                                label=f"{name} {np.nanmin(x):.4g}–{np.nanmax(x):.4g}°",
                                 n_points=int(x.size),
-                                two_theta_range=(float(x.min()), float(x.max()))))
+                                two_theta_range=(float(np.nanmin(x)), float(np.nanmax(x)))))
     return out
 
 

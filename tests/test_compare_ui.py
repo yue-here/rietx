@@ -43,7 +43,7 @@ from .test_acceptance_qpa_roundrobin import (
     qpa_plan,
     zincite_phase,
 )
-from .test_acceptance_srm660c import build_srm_inputs
+from .test_acceptance_srm660c import _nist_calibrated_plan, build_srm_inputs
 
 DATA_DIR = QARR_DATA.parent
 
@@ -90,6 +90,10 @@ def test_srm660c_standard_matches_the_acceptance_builder():
     assert _dump(inputs.structure) == _dump(structure)
     assert _dump(inputs.instrument) == _dump(instrument)
     assert np.allclose(inputs.data.two_theta, data.two_theta)
+    assert [(s.name, list(s.turn_on), s.seed, s.strain_seed)
+            for s in inputs.plan.stages] == \
+           [(s.name, list(s.turn_on), s.seed, s.strain_seed)
+            for s in _nist_calibrated_plan().stages]
     # the calibrated-goniometer plan: zero_shift must never be freed
     freed = {g for s in inputs.plan.stages for g in s.turn_on}
     assert "instrument.zero_shift" not in freed

@@ -22,6 +22,7 @@ from typing import IO
 
 import numpy as np
 
+from ..schemas.common import STORED_DOCUMENT
 from ..schemas.history import HistoryRecord
 from ..schemas.migrate import migrate_document_text
 
@@ -117,7 +118,9 @@ def read_numbered_records(path: str | Path) -> Iterator[tuple[int, HistoryRecord
                 # in ``free_paths`` and in the stage globs it recorded; repaired
                 # here rather than per-field (schemas/migrate.py's docstring)
                 line, _ = migrate_document_text(line)
-                record = HistoryRecord.model_validate_json(line)
+                # and a field a release made required reads at its old
+                # placeholder (``STORED_DOCUMENT_READ_POINTS``)
+                record = HistoryRecord.model_validate_json(line, context=STORED_DOCUMENT)
             except ValueError as exc:
                 raise ValueError(f"{path}:{lineno}: malformed history record") from exc
             yield lineno, record
