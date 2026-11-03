@@ -1820,3 +1820,54 @@ def test_numbering_moves_lists_the_adp_patterns_of_a_site_that_moved(pbso4):
     assert [moves[f"{site}.adp.{k}"].path for k in range(6)] == [
         f"{site}.adp.0", f"{site}.adp.1", f"{site}.adp.2", None, f"{site}.adp.3", None]
     assert {site_of(p) for p in moves} == {site}
+
+
+# ------------------------------------------------ WP-1991: phases are matched by name
+
+
+def _two_phases() -> Structure:
+    a = _phase("P m -3 m", (4.0, 4.0, 4.0, 90, 90, 90), (0.0, 0.0, 0.0))
+    b = _phase("P m -3 m", (5.0, 5.0, 5.0, 90, 90, 90), (0.0, 0.0, 0.0))
+    return Structure(phases=[a.model_copy(update={"name": "A"}),
+                             b.model_copy(update={"name": "B"})])
+
+
+def test_atom_moves_matches_phases_by_name():
+    """Removing phase A ahead of B renumbers every ``phases.1`` path onto ``phases.0``;
+    A's own paths name nothing, since B now has its number.  A phase renamed where it
+    stands keeps its number, as an atom renamed in place does."""
+    from rietx.crystallography.twins import atom_moves, renumber_path
+    both = _two_phases()
+    only_b = Structure(phases=[both.phases[1]])
+    moves = atom_moves(both, only_b)
+    assert moves == {"phases.0": None, "phases.1": "phases.0"}
+    assert renumber_path("phases.1.cell.a", moves) == "phases.0.cell.a"
+    assert renumber_path("phases.1.atoms.0.biso", moves) == "phases.0.atoms.0.biso"
+    assert renumber_path("phases.0.scale", moves) is None
+    assert renumber_path("phases.*.scale", moves) == "phases.*.scale"
+    renamed = Structure(phases=[both.phases[0].model_copy(update={"name": "A2"}),
+                                both.phases[1]])
+    assert atom_moves(both, renamed) == {}
+    swapped = Structure(phases=[both.phases[1], both.phases[0]])
+    assert atom_moves(both, swapped) == {"phases.0": "phases.1", "phases.1": "phases.0"}
+
+
+def test_an_edit_that_removes_a_phase_keeps_the_hold_on_the_phase_behind_it():
+    """``Refinement.edit`` with phase A removed: a hold on B's cell follows B to
+    ``phases.0``, and a hold on A's is dropped and said, where before both stayed on
+    their numbers and B's cell refined."""
+    ref = rx.Refinement(_two_phases(), INSTRUMENT, history=False)
+    ref.hold(["phases.0.cell.a", "phases.1.cell.a"])
+    with pytest.warns(UserWarning, match="the hold on phases.0.cell.a"):
+        ref.edit(structure=Structure(phases=[ref.structure.phases[1]]))
+    assert ref._user_holds == {"phases.0.cell.a"}
+    assert ref.structure.phases[0].name == "B"
+
+
+def test_a_series_carry_reads_a_value_onto_its_phase_by_name():
+    """``sequential._values_onto``: a ``prepare`` that removed phase A hands pattern
+    n + 1 a model in which B is ``phases.0``, and B's fitted cell lands on B."""
+    from rietx.sequential import _values_onto
+    both = _two_phases()
+    values = _values_onto((both, INSTRUMENT), Structure(phases=[both.phases[1]]))
+    assert values["phases.0.cell.a"] == 5.0

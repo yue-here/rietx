@@ -781,9 +781,9 @@ def _constrain_in_declared_numbering(ref: Refinement, declared: Structure,
     warm = ref.structure
     swapped: dict[tuple[int, str], tuple[dict, dict]] = {}
     for old_site, new_site in moves.sites.items():
-        _, i, _, jo = old_site.split(".")
-        jn = new_site.split(".")[3]
-        d_atom = declared.phases[int(i)].atoms[int(jo)]
+        _, io, _, jo = old_site.split(".")
+        _, i, _, jn = new_site.split(".")
+        d_atom = declared.phases[int(io)].atoms[int(jo)]
         w_atom = warm.phases[int(i)].atoms[int(jn)]
         swapped[(int(i), w_atom.label)] = (
             {f: getattr(d_atom, f) for f in _SITE_FIELDS},

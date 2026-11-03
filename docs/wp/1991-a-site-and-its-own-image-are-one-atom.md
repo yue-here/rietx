@@ -151,10 +151,13 @@ level up, and the two should share one matcher.
   a stored-format and reader-output change, so its PR goes to Yue before merge
   (`python -m tests.reader_output`, WP-2010's rule), and the manual's series
   chapter and the skill's series reference change in the same PR.
-- [ ] Phases are matched by name where unique, as atoms are by label.
+- [x] Phases are matched by name where unique, as atoms are by label.
   `atom_moves` and `numbering_moves` match phases by position, so removing a
   phase ahead of another renumbers every `phases.N` path the way #1264 did
-  for atoms (PR #1274's `/code-review`).
+  for atoms (PR #1274's `/code-review`). (2026-11-03: `twins._phase_pairs`
+  runs `_matched_atoms` over the phase names, which `CoordinateSnapshot.names`
+  now carries; a phase whose number changes is its own key, `phases.i`, read
+  by `renumber_path` for a path on no atom.)
 
 ## Acceptance
 

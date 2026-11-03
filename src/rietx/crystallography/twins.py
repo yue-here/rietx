@@ -255,9 +255,12 @@ class CoordinateSnapshot:
     A caller that must look at the structure *before* a write (``_write_back``,
     once per stage) takes this instead of deep-copying the whole structure,
     which cost more than the carry it served (#1014 round 6, item 4).
+    ``names`` are the phases' names, which match phases across two snapshots
+    (WP-1991); a snapshot without them matches its phases by position.
     """
 
     phases: tuple[tuple[str, object, tuple[str, ...], np.ndarray], ...]
+    names: tuple[str, ...] = ()
 
 
 class NumberingMoves(dict):
@@ -279,7 +282,8 @@ class NumberingMoves(dict):
 
     def new_site(self, old_site: str) -> str:
         """The new structure's path of the site that was ``old_site``."""
-        return self.sites.get(old_site) or self.atoms.get(old_site) or old_site
+        return (self.sites.get(old_site) or renumber_path(old_site, self.atoms)
+                or old_site)
 
     def renumber(self, path: str) -> str | None:
         """``path`` in the new structure's atom numbering (:func:`renumber_path`)."""
@@ -302,6 +306,9 @@ class NumberingMoves(dict):
 #: An atom's own path at the start of a dot-path: ``phases.i.atoms.j``.
 _ATOM_PATH = re.compile(r"^(phases\.\d+\.atoms\.\d+)(?=\.|$)")
 
+#: A phase's own path at the start of a dot-path: ``phases.i``.
+_PHASE_PATH = re.compile(r"^(phases\.\d+)(?=\.|$)")
+
 #: A site-symmetry DOF a renumbering moves: a coordinate's or an anisotropic ADP's.
 _SITE_DOF = re.compile(r"\.(?:dof|adp)\.\d+$")
 
@@ -312,17 +319,31 @@ def site_of(path: str) -> str:
 
 
 def renumber_path(path: str, atoms: dict[str, str | None]) -> str | None:
-    """``path`` with its atom (``phases.i.atoms.j``) read through ``atoms``.
+    """``path`` with its atom (``phases.i.atoms.j``), else its phase, read through ``atoms``.
 
-    ``atoms`` is what :func:`atom_moves` returns.  A path on an atom it does
-    not name, a glob, and a path on no atom pass unchanged; a path on an atom
-    the new structure no longer has is ``None``.
+    ``atoms`` is what :func:`atom_moves` returns.  A path on an atom or phase
+    it does not name, a glob, and a path on no phase pass unchanged; a path on
+    an atom or a phase the new structure no longer has is ``None``.
     """
-    m = _ATOM_PATH.match(path)
-    if m is None or m.group(1) not in atoms:
-        return path
-    new = atoms[m.group(1)]
-    return None if new is None else new + path[m.end(1):]
+    for pattern in (_ATOM_PATH, _PHASE_PATH):
+        m = pattern.match(path)
+        if m is not None and m.group(1) in atoms:
+            new = atoms[m.group(1)]
+            return None if new is None else new + path[m.end(1):]
+    return path
+
+
+def _phase_pairs(old: CoordinateSnapshot, new: CoordinateSnapshot) -> list[tuple[int, int]]:
+    """(old index, new index) of the phases two snapshots both hold.
+
+    By name, as :func:`_matched_atoms` matches atoms by label, where both
+    snapshots carry names (WP-1991): removing a phase ahead of another
+    renumbers every ``phases.N`` path, as removing an atom did (#1264).  By
+    position where either has none.
+    """
+    if len(old.names) == len(old.phases) and len(new.names) == len(new.phases):
+        return _matched_atoms(old.names, new.names)
+    return [(i, i) for i in range(min(len(old.phases), len(new.phases)))]
 
 
 def atom_moves(old: Structure | CoordinateSnapshot,
@@ -336,14 +357,24 @@ def atom_moves(old: Structure | CoordinateSnapshot,
     partner maps to ``None`` where another atom now has its number, and is left
     out where its number names no atom: its paths then name nothing, as they
     always did, so a hold on it is kept as ``Refinement.edit`` keeps one
-    (WP-1435).  Phases are matched by position.  Empty when every atom keeps
-    its number, which is the common case.
+    (WP-1435).  Phases are matched by name the same way (:func:`_phase_pairs`),
+    and a phase whose number changes is a key of its own (``phases.i``), which
+    :func:`renumber_path` reads for a path on no atom (``phases.1.scale``).
+    Empty when every atom keeps its number, which is the common case.
     """
     old = old if isinstance(old, CoordinateSnapshot) else coordinate_snapshot(old)
     new = new if isinstance(new, CoordinateSnapshot) else coordinate_snapshot(new)
     out: dict[str, str | None] = {}
-    for i, (po, pn) in enumerate(zip(old.phases, new.phases, strict=False)):
-        lo, ln = po[2], pn[2]
+    phase_partner = dict(_phase_pairs(old, new))
+    for io in range(len(old.phases)):
+        pn = phase_partner.get(io)
+        if pn is None:
+            if io < len(new.phases):          # another phase took its number
+                out[f"phases.{io}"] = None
+            continue
+        if pn != io:
+            out[f"phases.{io}"] = f"phases.{pn}"
+        lo, ln = old.phases[io][2], new.phases[pn][2]
         if list(lo) == list(ln):
             continue
         partner = dict(_matched_atoms(lo, ln))
@@ -352,8 +383,8 @@ def atom_moves(old: Structure | CoordinateSnapshot,
             if jn is None and jo >= len(ln):
                 continue                      # its number names no atom here
             if jn != jo:
-                out[f"phases.{i}.atoms.{jo}"] = (None if jn is None
-                                                 else f"phases.{i}.atoms.{jn}")
+                out[f"phases.{io}.atoms.{jo}"] = (None if jn is None
+                                                  else f"phases.{pn}.atoms.{jn}")
     return out
 
 
@@ -363,7 +394,7 @@ def coordinate_snapshot(structure: Structure) -> CoordinateSnapshot:
         (p.space_group, p.symmetry_operations, tuple(a.label for a in p.atoms),
          np.array([[a.x.value, a.y.value, a.z.value] for a in p.atoms],
                   dtype=np.float64).reshape(-1, 3))
-        for p in structure.phases))
+        for p in structure.phases), tuple(p.name for p in structure.phases))
 
 
 def numbering_moves(old: Structure | CoordinateSnapshot,
@@ -377,11 +408,11 @@ def numbering_moves(old: Structure | CoordinateSnapshot,
     merge fires), a value ``set_values`` wrote, an edit that moved a site off
     its position.  A holder of a hold, tie, free path or stored path applies it
     with :func:`carry_constraints`, so the carry does not depend on which route
-    moved the site (#1014 round 5, items 2-6).  Phases are matched by position
-    and atoms by label (see :func:`_matched_atoms`), so a structure edited to
-    add or rename an atom keeps the carry for the others; a phase whose group
-    changed is a different model and is left to the caller's own
-    reconciliation.
+    moved the site (#1014 round 5, items 2-6).  Phases are matched by name
+    (:func:`_phase_pairs`) and atoms by label (see :func:`_matched_atoms`), so
+    a structure edited to add or rename an atom or a phase keeps the carry for
+    the others; a phase whose group changed is a different model and is left
+    to the caller's own reconciliation.
 
     An anisotropic ADP DOF (``…adp.k``) is numbered by the same site symmetry
     (:func:`~.wyckoff.adp_basis`), so it renumbers with the coordinates: on
@@ -398,8 +429,8 @@ def numbering_moves(old: Structure | CoordinateSnapshot,
     new = new if isinstance(new, CoordinateSnapshot) else coordinate_snapshot(new)
     moves = NumberingMoves()
     moves.atoms = atom_moves(old, new)
-    for i, (po, pn) in enumerate(zip(old.phases, new.phases, strict=False)):
-        (go, _, lo, xo_all), (gn, ops_n, ln, xn_all) = po, pn
+    for io, i in _phase_pairs(old, new):
+        (go, _, lo, xo_all), (gn, ops_n, ln, xn_all) = old.phases[io], new.phases[i]
         if go != gn:
             continue
         pairs = [(jo, jn) for jo, jn in _matched_atoms(lo, ln)
@@ -423,9 +454,9 @@ def numbering_moves(old: Structure | CoordinateSnapshot,
             for kind, bo, bn in bases:
                 if len(bo) == len(bn) and np.array_equal(np.asarray(bo), np.asarray(bn)):
                     continue
-                moves.update(_dof_moves(bo, bn, f"phases.{i}.atoms.{jo}",
+                moves.update(_dof_moves(bo, bn, f"phases.{io}.atoms.{jo}",
                                         f"phases.{i}.atoms.{jn}", kind))
-                moves.sites[f"phases.{i}.atoms.{jo}"] = f"phases.{i}.atoms.{jn}"
+                moves.sites[f"phases.{io}.atoms.{jo}"] = f"phases.{i}.atoms.{jn}"
     return moves
 
 
