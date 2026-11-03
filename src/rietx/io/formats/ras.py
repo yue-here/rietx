@@ -198,7 +198,8 @@ def rigaku_attenuator(two_theta: np.ndarray, factors: np.ndarray | None, *,
     """
     if factors is None or diagnostics is None:
         return
-    off = factors != 1.0
+    # a row with no finite value is ``ascending``'s to drop and report (WP-2079)
+    off = (factors != 1.0) & np.isfinite(factors) & np.isfinite(two_theta)
     if not off.any():
         return
     affected = two_theta[off]
@@ -258,7 +259,8 @@ def read_ras(path: str | Path, *, scan: int | None = None,
     count_time = _count_time_s(header)
     sigma = sigma_by_arithmetic(rows[:, 1], count_time,
                                 header.get("MEAS_SCAN_UNIT_Y", "").strip(),
-                                path=p, diagnostics=diagnostics)
+                                path=p, keep=np.isfinite(rows[:, 0]),
+                                diagnostics=diagnostics)
     tt, y, sig = ascending(rows[:, 0], rows[:, 1], sigma, path=p, fmt=RAS,
                            diagnostics=diagnostics)
     return pattern_data(
@@ -276,7 +278,7 @@ def read_ras(path: str | Path, *, scan: int | None = None,
 def list_ras_scans(path: str | Path) -> list[ScanInfo]:
     p = Path(path)
     return [ScanInfo(index=i, label=_label(h, i, d), n_points=len(d),
-                     two_theta_range=((float(d[:, 0].min()), float(d[:, 0].max()))
+                     two_theta_range=((float(np.nanmin(d[:, 0])), float(np.nanmax(d[:, 0])))
                                       if d.size else (0.0, 0.0)))
             for i, (h, d) in enumerate(_blocks(p))]
 

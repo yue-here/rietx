@@ -691,13 +691,31 @@ def test_a_non_finite_value_drops_its_row_and_says_where(kind, column, bad,
     # CIF has no infinity, and gemmi reads ``inf`` as a null, which is NaN
     what = "a NaN" if math.isnan(bad) or kind == "pdcif" else "an infinite"
     name = {"x": "2θ", "y": "count", "s": "σ"}[column]
-    assert f"1 of {_NF_N} points have {what} {name} " in d.message
+    assert f"1 of {_NF_N} points has {what} {name} " in d.message
     if column == "x":
         # a row with no finite 2θ has no position to name
         assert d.where == ["two_theta"]
-        assert "1 with no finite 2θ" in d.message
+        assert d.message.endswith(f"{name} and was not read as data.")
     else:
         assert d.where == [f"{_NF_TT[_NF_AT]:.3f}-{_NF_TT[_NF_AT]:.3f}"]
+        assert d.message.endswith(f"was not read as data, at 2θ {_NF_TT[_NF_AT]:g}°.")
+
+
+def test_a_row_with_no_finite_2theta_is_counted_beside_the_named_ones(tmp_path):
+    from tests.test_readers import write_xy
+
+    nan = float("nan")
+    found = []
+    pat = rx.read_pattern(write_xy(tmp_path / "mixed.xy",
+                                   [10.0, 10.1, nan, 10.3, 10.4],
+                                   [1.0, nan, 3.0, 4.0, 5.0]),
+                          diagnostics=found)
+    assert pat.two_theta == [10.0, 10.3, 10.4]
+    (d,) = found
+    assert d.where == ["10.100-10.100"]
+    assert d.message == (
+        "mixed.xy: 2 of 5 points have a NaN 2θ or count and were not read as "
+        "data, at 2θ 10.1°, and 1 with no finite 2θ.")
 
 
 @pytest.mark.parametrize("kind", sorted(_NF_REFUSED))
@@ -767,3 +785,31 @@ def test_a_reader_that_skips_the_check_is_refused_at_the_schema(tmp_path):
     with pytest.raises(ValueError, match="skipped.cif: a NaN or infinite"):
         pattern_data(tmp_path / "skipped.cif", [10.0, 10.1, 10.2],
                      [1.0, float("nan"), 3.0])
+
+
+def test_a_non_finite_absorber_drops_its_row_rather_than_the_file(tmp_path):
+    """A NaN in a column a reader reads *before* ``ascending`` (here the
+    ``.brml`` absorber that σ is derived through) drops its row like any other."""
+    from tests.test_readers import write_brml
+
+    rows = [(1, float("nan") if i == 2 else 1.0, a, 5.0, b)
+            for i, (a, b) in enumerate(zip(_NF_TT[:6], _NF_Y[:6]))]
+    found = []
+    pat = rx.read_pattern(write_brml(tmp_path / "a.brml", [dict(rows=rows)]),
+                          diagnostics=found)
+    assert len(pat.intensity) == 5
+    assert [d.code for d in found] == ["PATTERN_ROWS_DROPPED"]
+
+
+def test_a_row_with_no_finite_2theta_does_not_vote_on_the_unit(tmp_path):
+    """The counts test decides σ on the rows the pattern keeps, so a dropped
+    row's non-integral count cannot withhold σ from the rest of the scan."""
+    from tests.test_readers import write_ras
+
+    y = [100.0, 101.0, 84.3047, 103.0, 104.0, 105.0]
+    tt = [float("nan") if i == 2 else a for i, a in enumerate(_NF_TT[:6])]
+    found = []
+    rx.read_pattern(write_ras(tmp_path / "a.ras",
+                              [(a, b, 1.0) for a, b in zip(tt, y)]),
+                    diagnostics=found)
+    assert [d.code for d in found] == ["PATTERN_ROWS_DROPPED"]

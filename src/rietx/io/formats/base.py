@@ -367,21 +367,22 @@ def finite_rows(x: np.ndarray, y: np.ndarray, sig: np.ndarray | None, *,
             f"{name}: every one of its {x.size} points has a NaN or infinite "
             f"{label}, count or σ, so there is no pattern to read")
     if diagnostics is not None:
-        diagnostics.append(_rows_dropped(
-            name, x, y, sig, bad, bad_x, bad_y, bad_s, axis))
+        diagnostics.append(_rows_dropped(name, x, y, sig, bad_x, bad_y, bad_s,
+                                         axis))
     keep = ~bad
     return x[keep], y[keep], None if sig is None else sig[keep]
 
 
 def _rows_dropped(name: str, x: np.ndarray, y: np.ndarray,
-                  sig: np.ndarray | None, bad: np.ndarray, bad_x: np.ndarray,
+                  sig: np.ndarray | None, bad_x: np.ndarray,
                   bad_y: np.ndarray, bad_s: np.ndarray,
                   axis: AxisKind) -> Diagnostic:
     """The ``PATTERN_ROWS_DROPPED`` that :func:`finite_rows` reports."""
+    bad = bad_x | bad_y | bad_s
     label = "2θ" if axis == "two_theta" else "flight time"
     unit = "°" if axis == "two_theta" else " µs"
     columns = [c for c, m in ((label, bad_x), ("count", bad_y), ("σ", bad_s))
-               if (m & bad).any()]
+               if m.any()]
     values = np.concatenate([x[bad_x], y[bad_y],
                              np.empty(0) if sig is None else sig[bad_s]])
     nan, inf = bool(np.isnan(values).any()), bool(np.isinf(values).any())
@@ -395,16 +396,16 @@ def _rows_dropped(name: str, x: np.ndarray, y: np.ndarray,
     shown = ", ".join(f"{lo:g}-{hi:g}{unit}" if lo != hi else f"{lo:g}{unit}"
                       for lo, hi in spans[:3])
     more = f", and {len(spans) - 3} more range(s)" if len(spans) > 3 else ""
-    where_text = f"at {label} {shown}{more}" if spans else ""
+    # a row with no finite abscissa has no position, so it is only counted
     unplaced = int(bad_x.sum())
-    if unplaced:
-        where_text += (" and " if spans else "") + (
-            f"{unplaced} with no finite {label}")
+    where_text = (f", at {label} {shown}{more}" if spans else "") + (
+        f", and {unplaced} with no finite {label}" if spans and unplaced else "")
     n = int(bad.sum())
+    has, was = ("has", "was") if n == 1 else ("have", "were")
     return Diagnostic(
         level="warning", code="PATTERN_ROWS_DROPPED",
-        message=(f"{name}: {n} of {x.size} points have {what} "
-                 f"{' or '.join(columns)} and were not read as data, "
+        message=(f"{name}: {n} of {x.size} points {has} {what} "
+                 f"{' or '.join(columns)} and {was} not read as data"
                  f"{where_text}."),
         where=[f"{lo:.3f}-{hi:.3f}" for lo, hi in spans] or [axis],
         suggestion=("If these points were measured, check the reduction that "
@@ -595,20 +596,20 @@ def pattern_data(path: str | Path, x: Any, intensity: Any,
     reports them, so one arriving here is a reader that skipped it, and it is
     refused rather than handed to a fit whose every statistic it would make NaN.
     """
-    columns = [np.asarray(c, dtype=np.float64)
-               for c in (x, intensity, sigma) if c is not None]
-    if not all(np.isfinite(c).all() for c in columns):
+    xs = np.asarray(x, dtype=np.float64)
+    ys = np.asarray(intensity, dtype=np.float64)
+    ss = None if sigma is None else np.asarray(sigma, dtype=np.float64)
+    if not all(np.isfinite(c).all() for c in (xs, ys, ss) if c is not None):
         raise ValueError(
             f"{Path(path).name}: a NaN or infinite value reached the pattern "
             f"without passing the readers' finite-row check (base.ascending)")
-    values = np.asarray(x, dtype=np.float64).tolist()
+    values = xs.tolist()
     try:
         return PatternData(
             two_theta=values if axis == "two_theta" else None,
             tof=values if axis == "tof" else None,
-            intensity=np.asarray(intensity, dtype=np.float64).tolist(),
-            sigma=None if sigma is None else np.asarray(sigma,
-                                                        dtype=np.float64).tolist(),
+            intensity=ys.tolist(),
+            sigma=None if ss is None else ss.tolist(),
             metadata=metadata(**meta))
     except PydanticValidationError as exc:
         why = "; ".join(str(e.get("msg", "")).removeprefix("Value error, ")
@@ -632,12 +633,17 @@ def sigma_from_scaled(intensity: Any, scale: Any) -> np.ndarray:
     the scan at 1.  Written through the counts rather than as √(y·s) so a channel
     that counted **zero** gets the same floor a counts channel gets instead of a
     zero σ and an infinite weight.
+
+    A NaN or infinite scale is not refused: its σ comes back NaN, and
+    :func:`ascending` drops that row and reports it (WP-2079).
     """
     y = np.asarray(intensity, dtype=np.float64)
     s = np.asarray(scale, dtype=np.float64)
-    if not np.all(s > 0):
+    if not np.all((s > 0) | ~np.isfinite(s)):
         raise ValueError(f"an intensity scale must be positive, got {scale!r}")
-    return np.sqrt(np.maximum(y / s, POISSON_FLOOR_COUNTS)) * s
+    with np.errstate(invalid="ignore"):
+        out = np.sqrt(np.maximum(y / s, POISSON_FLOOR_COUNTS)) * s
+    return np.where(np.isfinite(s), out, np.nan)
 
 
 def sigma_from_cps(intensity: Any, count_time_s: float) -> np.ndarray:
@@ -670,6 +676,7 @@ def integral(values: Any) -> bool:
 
 def sigma_by_arithmetic(intensity: Any, count_time_s: float | None,
                         declared: str, *, path: str | Path,
+                        keep: Any = None,
                         diagnostics: list[Diagnostic] | None = None,
                         ) -> np.ndarray | None:
     """σ where the file's own word on its intensity unit cannot be trusted.
@@ -693,11 +700,17 @@ def sigma_by_arithmetic(intensity: Any, count_time_s: float | None,
     Contrast the ``.uxd`` and ``.xrdml`` side of this: those declare the unit
     *structurally* — in the token that opens the data block, in an attribute on
     the data element — where it cannot disagree with itself, and are trusted.
+
+    ``keep`` masks the rows the unit is decided on.  A reader whose abscissa is
+    a column passes its finite rows, so a row :func:`ascending` will drop for a
+    NaN 2θ does not vote on the unit of the rows it keeps (WP-2079).
     """
     y = np.asarray(intensity, dtype=np.float64)
-    if integral(y):
+    voters = y if keep is None else y[np.asarray(keep, dtype=bool)]
+    if integral(voters):
         return None
-    if count_time_s is not None and count_time_s > 0 and integral(y * count_time_s):
+    if (count_time_s is not None and count_time_s > 0
+            and integral(voters * count_time_s)):
         return sigma_from_cps(y, count_time_s)
     if diagnostics is not None:
         derived = ("the header gives no scan speed with a unit to derive a "
