@@ -16,13 +16,13 @@ reported beside it.
 
 Issue #833 (mustachefeeling, 2026-10-08).
 
-**The selector** (`background/select.py:75`). It fits Chebyshev orders 2 to
+**The selector** (`background/select.py:96`; line numbers re-read 2026-11-03). It fits Chebyshev orders 2 to
 `max_order` on peak-masked channels (`peak_mask`, net ≤ 3σ over an arPLS
 baseline) and keeps the BIC minimum, stopping early once the Durbin-Watson d
 reaches `dw_stop` = 1.8. `auto_background(kind="chebyshev")` calls it with the
-default `max_order` = 16 (`background/auto.py:87`). The P-spline branch never
+default `max_order` = 16 (`background/auto.py:155`). The P-spline branch never
 calls a selector: it builds `BackgroundPSpline.for_range(…, lambda_smooth=1.0)`
-(`auto.py:106`), λ weighed against the data at compile (root CLAUDE.md, the
+(`auto.py:179`), λ weighed against the data at compile (root CLAUDE.md, the
 background clause; WP-1454).
 
 **What was measured** (#833, `main` at `a3f9140a`, macOS arm64):
@@ -81,7 +81,13 @@ table on the acceptance suites is read before and after. Choosing λ at the Le
 Bail stage and then holding it through the Rietveld stages is a protocol
 claim the proposal makes and has not measured.
 
-### Inherited
+### The REML selector, parked (pruned from Inherited 2026-11-03)
+
+The three entries below arrived as `### Inherited` and all still hold. The
+second records the maintainer's ruling of 2026-10-11 (commit `24850ea95`):
+tasks 2-6 wait for a criterion that does not read profile misfit as
+background. Tasks 7 and 8 are outside that ruling.
+
 
 - **2026-10-11, from the issue triage (#833): task 1 is in PR #871, and the
   reporter measured task 2, which undercuts the selector and this WP's
@@ -155,7 +161,7 @@ claim the proposal makes and has not measured.
 - [x] `BACKGROUND_ORDER_AT_CAP` from `select_chebyshev_order` (and through
       `auto_background(kind="chebyshev")`), naming the cap and the last d.
       Independently landable.
-- [ ] Measure REML's λ on Si640c, LaB₆ 660a and WP-1055's fixture before
+- [ ] *(Parked, ruling of 2026-10-11, tasks 2-6.)* Measure REML's λ on Si640c, LaB₆ 660a and WP-1055's fixture before
       building the selector: interior or not, tr(H), and Biso on the fixture.
 - [ ] `select_pspline_lambda`, with its reference in the docstring, and the
       decision whether `auto_background` calls it by default (the
