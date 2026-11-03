@@ -199,7 +199,7 @@ The curves stay on `SequentialRefinement.results_`.
 | `SeriesResult.diagnostics` | the series diagnostics ([Series diagnostics](#series-diagnostics)) |
 | `SeriesResult.steps` | one `SeriesStep` per step of every refined path between consecutive patterns, largest in esds first ([Steps between patterns](#steps-between-patterns)); `None` in a document written before the field existed |
 | `SeriesResult.relative_paths`, `SeriesResult.angle_paths` | the paths whose value is a step from where each fit began, and the angle paths ([Paths to plot](#paths-to-plot)) |
-| `SeriesResult.phase_names`, `SeriesResult.atom_labels` | the names every path of the entries reads: phase `i` is `phase_names[i]`, and its atom `j` is `atom_labels[i][j]` ([Phases and atoms added or removed](#phases-and-atoms-added-or-removed)); `None` in a document written before the fields existed |
+| `SeriesResult.phase_names`, `SeriesResult.atom_labels` | the series numbering ([below](#phases-and-atoms-added-or-removed)) |
 | `SeriesResult.failures`, `SeriesResult.n_failed` | the patterns on which every attempt raised, and how many ([Restart ladder](#restart-ladder)) |
 | `SeriesResult.provenance` | package version, timestamp and settings, as for a single fit |
 | `SeriesResult.x` | the axis: the coordinate given, or the pattern index |
@@ -238,7 +238,7 @@ A series is where one unread warning multiplies: in the in-situ run this diagnos
 | `SeriesEntry.above_fence` | the kept attempt is still above `rwp_fence`, so `SEQUENTIAL_RWP_OUTLIER` names it |
 | `SeriesEntry.seeded_from` | the index of the pattern whose fitted state seeded this pattern's warm rungs: the last one accepted before it in the walk, which skips a quarantined pattern; `None` where there was no warm start |
 | `SeriesEntry.floored` | the moment modulus paths that reached the kept attempt at their floor, because the pattern it warm-started from did not support them; empty when the kept attempt started cold |
-| `SeriesEntry.pattern_paths` | this pattern's own path for each path of the entry that its model numbers differently; `{}` where the two agree, `None` in a document written before the field |
+| `SeriesEntry.pattern_paths` | this pattern's own path, where it differs |
 | `SeriesEntry.node_id`, `SeriesEntry.tree_id` | where this pattern's history lives |
 
 `SeriesEntry.value` and `SeriesEntry.stderr` look a path up in the entry's parameters and return `None` when it is absent.
@@ -283,7 +283,7 @@ If the phase appears while a stage is still solving, that stage lifts the hold a
 | `Trajectory.stderr` | its esd, `None` wherever that pattern estimated none |
 | `Trajectory.labels` | the pattern label at each point |
 | `Trajectory.positions` | which entry of `SeriesResult.entries` each point came from |
-| `Trajectory.phase`, `Trajectory.atom` | the phase name and atom label the path follows; `None` for a path on no phase or no atom |
+| `Trajectory.phase`, `Trajectory.atom` | the phase name and atom label it follows |
 | `Trajectory.pattern_paths` | each point's path in its own pattern's model |
 | `Trajectory.arrays` | `(x, value, stderr)` as float arrays, a missing esd as NaN |
 
@@ -293,7 +293,6 @@ The gap is a real thing, such as a phase not yet in the model or a stage that di
 
 `SeriesResult.qpa_trajectory` gives a phase's weight fraction as a percentage, as a `QPATrajectory`.
 Its `QPATrajectory.path`, `QPATrajectory.x`, `QPATrajectory.x_label`, `QPATrajectory.value`, `QPATrajectory.stderr`, `QPATrajectory.labels` and `QPATrajectory.positions` read as a `Trajectory`'s.
-`QPATrajectory.phase` names the phase, and `QPATrajectory.atom` and `QPATrajectory.pattern_paths` stay empty, because a weight fraction is keyed by its phase's name and has no dot-path.
 `QPATrajectory.unmeasured` lists, per point, the phases that pattern quoted no fraction for, and `QPATrajectory.basis_changes` says whether the points are fractions of different sets of phases, as when a reflection crosses the range edge part-way through the series (WP-1958).
 `SeriesResult.agreement_trajectory` gives a phase's structure agreement index, with `metric="r_bragg"` (the default) or `"r_f"`.
 `SeriesResult.agreement_phases` lists the phases that carry one.
@@ -313,28 +312,9 @@ It rings a point refitted from the starting models, crosses a `SEQUENTIAL_UNRECO
 
 ### Phases and atoms added or removed
 
-A `prepare` hook may add or remove a phase or an atom part-way through a series.
-A dot-path names a phase and an atom by number, so `phases.0.atoms.3.biso` can then name two atoms in two patterns.
-A series therefore follows each phase by its name and each atom by its label.
-
-Every path in the entries is written in one numbering, the series numbering.
-It is the numbering of the structure you gave `SequentialRefinement`.
-A phase or an atom that only a later pattern holds takes the next free number, in the order the walk meets it.
-`SeriesResult.phase_names` and `SeriesResult.atom_labels` record the numbering.
-
-In this example `prepare` removes O3 from the second pattern of a PbSO₄ series, so O4 is atom 3 as declared and atom 2 in that pattern's model:
-
-<!-- api-doc: no-exec — it reads a series the reader has fitted -->
-```python
-o4 = result.trajectory("phases.0.atoms.3.biso")
-o4.atom              # 'O4'
-o4.pattern_paths     # ['phases.0.atoms.3.biso', 'phases.0.atoms.2.biso']
-result.trajectory("phases.0.atoms.2.biso").positions   # [0]: O3 is absent from the second pattern
-```
-
-`Trajectory.pattern_paths` gives the path to look up in each pattern's own model, such as `SequentialRefinement.results_`.
-A phase name used twice, or an atom label used twice in one phase, is refused with a `ValueError`, in the structure you give and after each `prepare`.
-A document saved before this numbering existed opens as written, and joins its patterns by path.
+A `prepare` hook may add or remove a phase or an atom.
+Every path of a series reads the numbering of the structure you gave it, so a trajectory follows one atom by name.
+A repeated phase name, or atom label within a phase, raises `ValueError`.
 
 ### Paths to plot
 
@@ -406,8 +386,8 @@ It returns a `MagneticTrajectory`, which is a `Trajectory` with more columns, so
 | `MagneticTrajectory.measured` | per point, whether the pattern gave a verdict at all; `False` where the modulus has no esd (it was stated and held, or the pattern could not see the phase) or the fit diverged |
 | `MagneticTrajectory.status` | that pattern's fit status, because `supported` is a ratio against a covariance |
 | `MagneticTrajectory.labels`, `MagneticTrajectory.positions` | the pattern label at each point, and its index in the series |
-| `MagneticTrajectory.phase`, `MagneticTrajectory.atom`, `MagneticTrajectory.ion` | the site's phase, the site and its form-factor key |
-| `MagneticTrajectory.path`, `MagneticTrajectory.pattern_paths` | the modulus dot-path, and each point's path in its own pattern's model |
+| `MagneticTrajectory.atom`, `MagneticTrajectory.ion` | the site and its form-factor key |
+| `MagneticTrajectory.path` | the modulus dot-path |
 | `MagneticTrajectory.onset` | where the moment stops being supported, as a `MagneticOnset` |
 
 A held point keeps its value and loses its esd.
