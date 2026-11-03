@@ -1826,15 +1826,24 @@ also have a 100 K or 300 K scan:
   33.49, 44.80 and 48.10° 2θ index as a garnet's (211), (220), (321) and (400) on
   a cell of 12.37 Å at the nominal λ = 2.52 Å (our reading of the peak positions,
   zero not refined), which is YIG's; YAG's smaller cell puts them 0.9–1.6° higher.
-  Calibrating λ against YAG's cell with this file would give a wavelength about
-  3 % short. It is renamed `standard_YIG_300K_1.dat`, and the group's instructions
-  file was corrected to say YIG on 29 October 2026. YIG is a ferrimagnet, Fe on
-  16(a) antiparallel to Fe on 24(d) with k = 0 (Izyumov, Naish & Ozerov 1991,
-  Table 42, p. 315), and it is ordered at 300 K, so its magnetic scattering falls
-  on the nuclear reflections, most strongly the low-angle ones: a calibration on
-  this file refines that magnetic structure too, or uses the higher-angle lines
-  only. It is vendored because it comes from the same experiment (run 130058,
-  15 November 2011, same user heading).
+  Two checks rule out a wrong nominal λ, which would move every line together. The
+  Co₃O₄ 300 K patterns of the same experiment index at λ = 2.524 Å with zero near
+  0 on Co₃O₄'s room-temperature cell (8.084 Å, Smith & Hobson, *Acta Cryst.* B,
+  1973); at that λ and zero the garnet's cell is 12.378 Å, against YIG's 12.376 Å
+  (Geller & Gilleo, *J. Phys. Chem. Solids*, 1957), and YAG's would need
+  λ = 2.44 Å. Independent of λ, with each structure scaled to the whole pattern,
+  (220) is about 24 times stronger than YIG's nuclear structure factors give and
+  about 270 times YAG's, and (321) about 5 and 50 times: the excess is magnetic
+  scattering from Fe, and YAG has no magnetic ion. Calibrating λ against YAG's
+  cell with this file would give a wavelength about 3 % short. It is renamed
+  `standard_YIG_300K_1.dat`, and the group's instructions file was corrected to
+  say YIG on 29 October 2026. YIG is a ferrimagnet, Fe on 16(a) antiparallel to Fe
+  on 24(d) with k = 0 (Izyumov, Naish & Ozerov 1991, Table 42, p. 315), and it is
+  ordered at 300 K, so its magnetic scattering falls on the nuclear reflections,
+  most strongly the low-angle ones: a calibration on this file refines that
+  magnetic structure too, or uses the higher-angle lines only. It is vendored
+  because it comes from the same experiment (run 130058, 15 November 2011, same
+  user heading).
 - **The vanadium can** (run 129947, 14 November 2011, heading `empty cryostat`) is
   the empty can in the cryostat. Its strongest line is V(110) at 72.2° 2θ. It is
   vendored as the background and V-line reference for the series.
