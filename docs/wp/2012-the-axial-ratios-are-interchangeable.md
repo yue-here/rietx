@@ -1,6 +1,6 @@
 # WP-2012 — The two axial-divergence ratios are interchangeable, and a fit reports one branch
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — both lab presets free S/L alone with H/L held; SRM 660c numbers moved, PR #1356 waits on the maintainer; the recipe sibling is open
+Milestone: unscheduled · Status: 🔄 2026-11-03 — both lab presets free S/L alone with H/L held; SRM 660c numbers moved, PR #1356 waits on the maintainer; the recipe sibling is open
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-02 — was P2: both presets fixed (PR #1356); what is left is an imported GSAS-II recipe freeing both ratios from one SH/L flag
@@ -130,7 +130,7 @@ choosing a fix.
 
 ## Handover log
 
-- **2026-11-02 (ghostshift runner)** — `lab_calibrate` and `lab_bragg_brentano`
+- **2026-11-03 (ghostshift runner, started 2026-11-02)** — `lab_calibrate` and `lab_bragg_brentano`
   now refine the axial-divergence ratio S/L and hold H/L at the value the user sets, as the
   maintainer ruled on 2026-11-01. A calibration no longer reports two interchangeable numbers
   as two measurements. The same change reached the report's axial suggestion and the NIST
