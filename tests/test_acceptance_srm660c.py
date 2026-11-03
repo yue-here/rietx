@@ -167,6 +167,41 @@ def test_srm660c_lab6_rietveld(srm660c_baseline):
     plot_for_vlm(result, full, path=str(out / "srm660c_vlm.png"))
 
 
+def test_srm660c_zero_apertures_report_names_axial_asymmetry():
+    """#1106 (WP-2054): the NIST protocol with both axial apertures at 0.
+
+    The model then draws no asymmetry, and until WP-2054 the report could not
+    name it: four Layer-1 columns, no asymmetry action, and the low-angle
+    flank residual read as unmatched peaks.  Measured on this protocol: the
+    three gated regions below 40° each read a positive asymmetry coefficient
+    (about +0.02 at the nominal aperture, 7-9 esd), and the action is active.
+    """
+    data, structure, instrument = build_srm_inputs()
+    instrument.geometry.axial_sl.value = 0.0
+    instrument.geometry.axial_hl.value = 0.0
+    plan = _nist_calibrated_plan()
+    for stage in plan.stages:
+        stage.turn_on = [g for g in stage.turn_on if "axial" not in g]
+    ref = rx.Refinement(structure, instrument)
+    result = ref.fit(data, plan=plan)
+    report = ref.report(plan=plan)
+
+    action = next((a for a in report.suggested_actions
+                   if a.kind == "refine_axial_asymmetry"), None)
+    assert action is not None and action.active
+    assert "axial apertures are 0" in action.rationale
+    top = max((a for a in report.suggested_actions if a.active),
+              key=lambda a: a.confidence)
+    assert top.kind != "add_impurity_phase"
+
+    from rietx.viz.plots import plot_result
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    plot_result(result, path=str(out / "srm660c_zero_apertures_fit.png"))
+    plot_result(result, path=str(out / "srm660c_zero_apertures_lowangle.png"),
+                two_theta_range=(20.6, 22.2))
+
+
 def test_srm660c_extinction_does_no_harm(srm660c_baseline):
     """WP-0506 does-no-harm: freeing primary extinction on a fine-powder
     standard must refine it small and must not degrade the fit or bias the

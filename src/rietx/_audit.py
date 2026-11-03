@@ -3266,6 +3266,23 @@ ROWS: tuple[Row, ...] = (
                   "substitution is reported; the maintainer's choice on issue #202")),
     Row("rietx.refine.STRAIN_FLAG_WIDTH", "constant", value=1.5),
     Row("rietx.refine._CENTROID_SITES_NAMED", "constant", value=12),
+    Row("rietx.report.NOMINAL_AXIAL_APERTURE", "constant", tier=3, value=0.02,
+        evidence=("the S/L = H/L at which the report borrows its asymmetry column when a fit "
+                  "declares both apertures 0; it shapes only that borrowed dOmega/d(S/L) column, "
+                  "never the misfit, the fit's own four columns or a fitted value; 0.02 is a "
+                  "typical lab axial ratio; fails above the data's own aperture: on SRM 660c "
+                  "(refines to about 0.025/0.037) the action fires at 0.005, 0.01 and 0.02 "
+                  "(gated regions 14/15, 15/15, 15/15, against 12/15 before WP-2054) and falls "
+                  "silent at 0.05 (14/15, low-angle coefficients insignificant); on cpd-1c "
+                  "(S/L about 0.040) it fires at 0.01, 0.02 and 0.03 (5/14, 9/14, 9/14) and falls "
+                  "silent at 0.05 (7/14); at 0.02 it fires on cpd-1a (6/14) and cpd-1f (11/14); "
+                  "the failure above the aperture is silence, never a wrong call (WP-2054's "
+                  "nominal sweep, 2026-11-03)"),
+        grounds=("A reading setting whose domain test fails over part of its domain, above the "
+                 "data's own aperture; tier 3 like AXIAL_SIZING_FLOOR, whose number it shares.  "
+                 "Kept a constant of its own by the maintainer's ruling (2026-11-03), so that a "
+                 "change to the FCJ quadrature floor cannot move the report."),
+        approved="2026-11-03"),
     Row("rietx.report.body_misfit.MISFIT_ALPHA", "constant", value=0.001),
     Row("rietx.report.body_misfit.MISFIT_BIC", "constant", value=10.0),
     Row("rietx.report.distortion.EVEN_EXPONENT", "constant", tier=1, value=4,
