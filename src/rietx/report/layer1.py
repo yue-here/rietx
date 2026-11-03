@@ -251,14 +251,14 @@ def attribute_region(model: CompiledModel, bases: DerivativeBases,
 def attribute_regions(model: CompiledModel, values: dict[str, float],
                       regions: list[Region], *,
                       shapes: CompiledModel | None = None,
-                      axial: DerivativeBases | None = None
+                      axial_bases: DerivativeBases | None = None
                       ) -> list[RegionAttribution]:
     """Layer-1 attribution for every region (gates evaluated per region).
 
     The misfit is read off ``model`` and the shape basis off ``shapes``
     (``model`` when not given), which must share its grid: the report hands in
     a model at the closing precision and one at the declared stages' precision
-    (``report._reading_models``).  ``axial`` is the bases of a twin at the
+    (``report._reading_models``).  ``axial_bases`` is the bases of a twin at the
     nominal aperture, which the report hands in when the model's apertures are
     both zero (:func:`nominal_axial_columns`).
     """
@@ -266,7 +266,8 @@ def attribute_regions(model: CompiledModel, values: dict[str, float],
     delta = model.y_obs - y_calc
     sqrt_w = 1.0 / model.sigma
     bases = (model if shapes is None else shapes).derivative_bases(values)
-    lookup = None if axial is None else nominal_axial_columns(axial)
+    lookup = (None if axial_bases is None
+              else nominal_axial_columns(axial_bases))
     out = []
     for region in regions:
         att = attribute_region(model, bases, region, delta, sqrt_w, lookup)

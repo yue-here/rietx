@@ -359,6 +359,10 @@ def test_symmetric_misfits_do_not_read_as_axial_asymmetry(knob, factor):
     elif knob == "w":
         ins.profile.w.value *= factor
     report = _report_for(structure, ins, data)
+    # the control reads the nominal column, never an abstained Layer 1
+    assert report.layer1_available, report.abstained_reason
+    assert any(c.kind == "asymmetry" for a in report.attribution
+               if a.mean_two_theta < 40.0 for c in a.coefficients)
     assert _asymmetry_action(report) is None
 
 

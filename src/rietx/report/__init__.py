@@ -468,7 +468,7 @@ def build_report(result: RefinementResult, *, model=None, values=None,
     misfit, shapes = _reading_models(model, structure, instrument)
     nominal_axial = _nominal_axial(shapes, structure, instrument, values)
     attributions = attribute_regions(misfit, values, report.regions,
-                                     shapes=shapes, axial=nominal_axial)
+                                     shapes=shapes, axial_bases=nominal_axial)
     report.attribution = attributions
     # March-Dollase texture and Stephens anisotropic strain are computed before
     # the maturity gate: an uncorrected intensity or width *direction* is a
