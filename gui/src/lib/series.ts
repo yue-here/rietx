@@ -183,9 +183,12 @@ export function sortByX(patterns: SeriesPattern[]): SeriesPattern[] {
  * The first version ranked only the flagged group, because on a clean ramp
  * the unflagged distances were noise (under 5e-4 σ) and ordering fifteen
  * parameters by it put `phases.0.cell.a` eighth. The record now sets a gap
- * under the trajectory's noise floor to exactly 0
- * (`sequential.NOISE_FLOOR_REL`), so those ties keep the first-seen order
- * without a threshold here.
+ * under the trajectory's noise floor (`sequential.NOISE_FLOOR_REL`) to
+ * exactly 0, and those ties keep the first-seen order. The floor does not
+ * reach every noise gap: on the seven-pattern thermal ramp of
+ * `test_sequential.py`, 84 of 91 gaps are 0 and the background terms keep
+ * 1e-3 esd, so the panel opens on `instrument.background.c1` and
+ * `phases.0.cell.a` ranks sixth (measured 2026-11-03).
  */
 export function rankTrajectories(trajectories: Trajectory[]): Trajectory[] {
   return [...trajectories].sort((a, b) => {

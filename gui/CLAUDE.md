@@ -642,11 +642,10 @@ needs a document, which is WP-1003's to decide. **The order is the series**, so
 every edit is a whole-list `PUT` and every file is read *there* (WP-1014's
 two-phase property at N files) — with a member already described not re-read,
 since a staged upload is immutable and re-reading forty patterns per keystroke
-proves nothing. **`SEQUENTIAL_PATH_DEPENDENT` is a banner, and its magnitude is
-computed rather than carried**: a `Diagnostic` has `where` and no number (the
-wall WP-1012 hit), and both chains' trajectories are in hand, so
-`series.trajectories` recomputes the fence's own combined-σ distance and serves
-it — a panel ranks by disagreement with no schema change. **Ranking stops where
+proves nothing. **The walks' disagreement is the record's number, read and never
+recomputed** (WP-2003, C5): `SeriesResult.direction_gaps` holds every gap in
+esds, unthresholded, and `series.trajectories` serves each path's largest, so no
+path is called path-dependent. **Ranking stops where
 the fence stops**: on a clean ramp nothing is flagged and every distance is under
 5e-4 σ, so sorting the unflagged ones by it ordered fifteen parameters by noise
 and put `phases.0.cell.a` eighth. And **a per-pattern tree is read-only here** —
