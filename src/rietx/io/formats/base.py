@@ -341,12 +341,102 @@ class Head:
     bom: bool
 
 
+def finite_rows(x: np.ndarray, y: np.ndarray, sig: np.ndarray | None, *,
+                path: str | Path, axis: AxisKind = "two_theta",
+                keep_infinite_sigma: bool = False,
+                diagnostics: list[Diagnostic] | None = None,
+                ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+    """Drop every row whose abscissa, count or σ is NaN or ±inf, and say so.
+
+    A NaN states that the file has no value there.  It is what a reduction
+    writes where it divided by a zero monitor or efficiency, so a real file can
+    carry one: ILL D1B's ``XYDATA`` export is the case behind issue #1187.
+    Dropping the row invents nothing, which makes it a reader's repair under
+    the root CLAUDE.md rule, reported as ``PATTERN_ROWS_DROPPED``.  Passed
+    through, one NaN made every statistic of a fit NaN and left every
+    parameter where it started, with no exception and no warning (WP-2079).
+
+    The message names the dropped rows by their position on the axis, as
+    contiguous runs in file order.  A row whose abscissa is itself not finite
+    has no position, so it is counted apart.  A file with no finite row left
+    is refused, naming the file.
+
+    ``keep_infinite_sigma`` exempts σ = +∞ alone, for the pdCIF reader, which
+    writes it as the marker of a zero weight and turns it into an excluded
+    region after the columns are ordered.  Every other reader drops it.
+    """
+    bad_x = ~np.isfinite(x)
+    bad_y = ~np.isfinite(y)
+    bad_s = (np.zeros(x.size, dtype=bool) if sig is None else
+             ~np.isfinite(sig) & ~(keep_infinite_sigma & (sig == np.inf)))
+    bad = bad_x | bad_y | bad_s
+    if not bad.any():
+        return x, y, sig
+    name = Path(path).name
+    label = "2θ" if axis == "two_theta" else "flight time"
+    if bad.all():
+        raise ValueError(
+            f"{name}: every one of its {x.size} points has a NaN or infinite "
+            f"{label}, count or σ, so there is no pattern to read")
+    if diagnostics is not None:
+        diagnostics.append(_rows_dropped(name, x, y, sig, bad_x, bad_y, bad_s,
+                                         axis))
+    keep = ~bad
+    return x[keep], y[keep], None if sig is None else sig[keep]
+
+
+def _rows_dropped(name: str, x: np.ndarray, y: np.ndarray,
+                  sig: np.ndarray | None, bad_x: np.ndarray,
+                  bad_y: np.ndarray, bad_s: np.ndarray,
+                  axis: AxisKind) -> Diagnostic:
+    """The ``PATTERN_ROWS_DROPPED`` that :func:`finite_rows` reports."""
+    bad = bad_x | bad_y | bad_s
+    label = "2θ" if axis == "two_theta" else "flight time"
+    unit = "°" if axis == "two_theta" else " µs"
+    columns = [c for c, m in ((label, bad_x), ("count", bad_y), ("σ", bad_s))
+               if m.any()]
+    values = np.concatenate([x[bad_x], y[bad_y],
+                             np.empty(0) if sig is None else sig[bad_s]])
+    nan, inf = bool(np.isnan(values).any()), bool(np.isinf(values).any())
+    what = ("a NaN or infinite" if nan and inf else
+            ("a NaN" if nan else "an infinite"))
+    placed = np.flatnonzero(bad & ~bad_x)
+    runs = (np.split(placed, np.flatnonzero(np.diff(placed) > 1) + 1)
+            if placed.size else [])
+    spans = [(float(min(x[r[0]], x[r[-1]])), float(max(x[r[0]], x[r[-1]])))
+             for r in runs]
+    shown = ", ".join(f"{lo:g}-{hi:g}{unit}" if lo != hi else f"{lo:g}{unit}"
+                      for lo, hi in spans[:3])
+    more = f", and {len(spans) - 3} more range(s)" if len(spans) > 3 else ""
+    # a row with no finite abscissa has no position, so it is only counted
+    unplaced = int(bad_x.sum())
+    where_text = (f", at {label} {shown}{more}" if spans else "") + (
+        f", and {unplaced} with no finite {label}" if spans and unplaced else "")
+    n = int(bad.sum())
+    has, was = ("has", "was") if n == 1 else ("have", "were")
+    return Diagnostic(
+        level="warning", code="PATTERN_ROWS_DROPPED",
+        message=(f"{name}: {n} of {x.size} points {has} {what} "
+                 f"{' or '.join(columns)} and {was} not read as data"
+                 f"{where_text}."),
+        where=[f"{lo:.3f}-{hi:.3f}" for lo, hi in spans] or [axis],
+        suggestion=("If these points were measured, check the software that "
+                    "wrote the file. A reduction that divides by a zero monitor "
+                    "or detector efficiency writes NaN or infinity."),
+        value=float(n))
+
+
 def ascending(x: Any, intensity: Any, sigma: Any = None, *,
               path: str | Path, fmt: PatternFormat | None = None,
               axis: AxisKind = "two_theta",
+              keep_infinite_sigma: bool = False,
               diagnostics: list[Diagnostic] | None = None,
               ) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
     """``PatternData``'s strictly-increasing abscissa, or a refusal — never a guess.
+
+    Every reader calls this, so it first drops the rows that hold no finite
+    value (:func:`finite_rows`, which ``keep_infinite_sigma`` is passed to).
+    The order rules below then see only numbers.
 
     Several formats store a scan measured high→low, and the root CLAUDE.md rule
     fixes what to do about it: a silent correction is a reader's to make, and
@@ -385,6 +475,9 @@ def ascending(x: Any, intensity: Any, sigma: Any = None, *,
     tt = np.asarray(x, dtype=np.float64)
     y = np.asarray(intensity, dtype=np.float64)
     sig = None if sigma is None else np.asarray(sigma, dtype=np.float64)
+    tt, y, sig = finite_rows(tt, y, sig, path=path, axis=axis,
+                             keep_infinite_sigma=keep_infinite_sigma,
+                             diagnostics=diagnostics)
     name = Path(path).name
     label = "2θ" if axis == "two_theta" else "the flight time"
     unit = "°" if axis == "two_theta" else " µs"
@@ -510,15 +603,25 @@ def pattern_data(path: str | Path, x: Any, intensity: Any,
     only because pydantic happened to *echo* the metadata dict — which contained
     the filename — in its report.  Adding one more metadata key pushed the name
     past the echo's truncation and the invariant failed, having never held.
+
+    No non-finite value passes, either.  :func:`ascending` drops such rows and
+    reports them, so one arriving here is a reader that skipped it, and it is
+    refused rather than handed to a fit whose every statistic it would make NaN.
     """
-    values = np.asarray(x, dtype=np.float64).tolist()
+    xs = np.asarray(x, dtype=np.float64)
+    ys = np.asarray(intensity, dtype=np.float64)
+    ss = None if sigma is None else np.asarray(sigma, dtype=np.float64)
+    if not all(np.isfinite(c).all() for c in (xs, ys, ss) if c is not None):
+        raise ValueError(
+            f"{Path(path).name}: a NaN or infinite value reached the pattern "
+            f"without passing the readers' finite-row check (base.ascending)")
+    values = xs.tolist()
     try:
         return PatternData(
             two_theta=values if axis == "two_theta" else None,
             tof=values if axis == "tof" else None,
-            intensity=np.asarray(intensity, dtype=np.float64).tolist(),
-            sigma=None if sigma is None else np.asarray(sigma,
-                                                        dtype=np.float64).tolist(),
+            intensity=ys.tolist(),
+            sigma=None if ss is None else ss.tolist(),
             metadata=metadata(**meta))
     except PydanticValidationError as exc:
         why = "; ".join(str(e.get("msg", "")).removeprefix("Value error, ")
@@ -542,12 +645,17 @@ def sigma_from_scaled(intensity: Any, scale: Any) -> np.ndarray:
     the scan at 1.  Written through the counts rather than as √(y·s) so a channel
     that counted **zero** gets the same floor a counts channel gets instead of a
     zero σ and an infinite weight.
+
+    A NaN or infinite scale is not refused: its σ comes back NaN, and
+    :func:`ascending` drops that row and reports it (WP-2079).
     """
     y = np.asarray(intensity, dtype=np.float64)
     s = np.asarray(scale, dtype=np.float64)
-    if not np.all(s > 0):
+    if not np.all((s > 0) | ~np.isfinite(s)):
         raise ValueError(f"an intensity scale must be positive, got {scale!r}")
-    return np.sqrt(np.maximum(y / s, POISSON_FLOOR_COUNTS)) * s
+    with np.errstate(invalid="ignore"):
+        out = np.sqrt(np.maximum(y / s, POISSON_FLOOR_COUNTS)) * s
+    return np.where(np.isfinite(s), out, np.nan)
 
 
 def sigma_from_cps(intensity: Any, count_time_s: float) -> np.ndarray:
@@ -569,8 +677,12 @@ INTEGRAL_TOL = 1e-3
 
 
 def integral(values: Any) -> bool:
-    """Whether every value is a whole number — the counts test."""
+    """Whether every value is a whole number — the counts test.
+
+    A NaN or infinite value is left out of the test: it carries no evidence of
+    a unit, and :func:`ascending` drops its row (WP-2079)."""
     y = np.asarray(values, dtype=np.float64)
+    y = y[np.isfinite(y)]
     return bool(y.size) and bool(np.all(np.abs(y - np.round(y)) < INTEGRAL_TOL))
 
 
@@ -599,6 +711,10 @@ def sigma_by_arithmetic(intensity: Any, count_time_s: float | None,
     Contrast the ``.uxd`` and ``.xrdml`` side of this: those declare the unit
     *structurally* — in the token that opens the data block, in an attribute on
     the data element — where it cannot disagree with itself, and are trusted.
+
+    A NaN or infinite count is left out of the vote (:func:`integral`).  A
+    finite count on a row :func:`ascending` drops for its 2θ still votes: it is
+    evidence about its column's unit whatever its position (WP-2079).
     """
     y = np.asarray(intensity, dtype=np.float64)
     if integral(y):

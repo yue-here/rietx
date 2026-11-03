@@ -1,6 +1,6 @@
 # WP-1918 — a magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — FullProf's `_parent_space_group.name_H-M` spelling read, from outside as PR #1193 (`cd1c39ff`); an empty second block skipped and the draft magnetic tags refused, as PR #1257 (`1c55eda6`, #1063 items 1 and 3); the six decisions recorded; I-a onwards open, I-d waiting on PR #1108
+Milestone: unscheduled · Status: 🔄 2026-11-03 — FullProf's `_parent_space_group.name_H-M` spelling read, from outside as PR #1193 (`cd1c39ff`); an empty second block skipped and the draft magnetic tags refused, as PR #1257 (`1c55eda6`, #1063 items 1 and 3); its review follow-ups (text fields skipped by every raw-text scan, the draft k tag reaching the supercell refusal) as PR #1284 (`fd5c0bf5`); the six decisions recorded; I-a onwards open, I-d waiting on PR #1108
 Track: Coming from another code
 Depends on: 1419 soft (I-d reads through its `Phase.parent_cell`, PR #1108)
 Priority: P2 2026-10-08 — a refusal that fires on readable files: 615 of the 900 supercell refusals name a double count the file does not have
@@ -285,6 +285,8 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   the CIF writer.
 
 ## Handover log
+
+- **2026-11-03** (`/pr-review`) — the two review follow-ups of PR #1257 merged from outside as PR #1284 (`fd5c0bf5`). Every raw-text scan of a magCIF now skips the content of semicolon text fields. The four scans are `refuse_draft_tags`, `refuse_modulation`, the k reader `propagation_vectors` and `cif._magnetic_content`. So prose that quotes a tag no longer refuses a file, supplies a k, or sends a nuclear CIF to the magnetic reader. A k ≠ 0 stated only under the draft tag `_magnetic_propagation_vector_kxkykz` now reaches `refuse_a_magnetic_supercell`. The refusal names only the k tag the file used. No task of this WP is ticked by it. Follow-ups, not blocking: a commented-out k line (`# _parent_propagation_vector.kxkykz [1/2 0 0]`) still reads as a k, as it did on `main` before the PR. Text on a field's opening `;` line is not blanked, so a k there still reads. A loop that lists `kxkykz` before its id column reads no k. The draft reader's four-token fallback has no test. What ran, on the review's merge of head `06909a34` into `main` `62724a30` (Mac arm64, Python 3.12; the slow selection under `[dev,jax]`): fast 13 605 passed, 319 skipped, 34 xfailed, 1 failed; full `-m slow` 921 passed, 16 skipped, 17 xfailed, 1 failed in 46:36. The fast failure is `test_display`'s kernel row, whose Jupyter kernel spec points at a deleted venv on this Mac. The slow failure is `test_watch_app`'s GUI-boot socket timeout, which passed alone. Targeted magCIF rows 505 passed; ruff, the audit delta and the reader output were clean. The PR's later head `81fa6bb3` only merged `main` in.
 
 - **2026-11-02** — the six decisions are recorded, so I-a, I-b and V-a can
   start. One was the maintainer's: the parent record is one nested `parent`

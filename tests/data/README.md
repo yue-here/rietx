@@ -1874,8 +1874,11 @@ rejects on sight:
 - **a wrong sample in the series** (`PLANTED_wrong_sample_garnet_titled_co3o4.dat`): the garnet standard titled as a Co₃O₄ pattern;
 - **a block of NaN counts** (`PLANTED_nan_block_from_1023q_1p5K.dat`): no number exists there to fit.
 
-`read_pattern` reads all three, the NaN rows included, so each can reach a series.
-That matters for `on_error`: a series takes `PatternData`, so a file the reader
+`read_pattern` reads all three, so each can reach a series. Since WP-2079 the
+NaN file reads as 1 220 points: the reader drops the 60 NaN rows and reports them
+as `PATTERN_ROWS_DROPPED` at 2θ 30.79–36.69°. Before that change the NaN rows
+reached the fit, and every stage of a fit on this file ended `diverged` with Rwp
+NaN and no parameter moved. That matters for `on_error`: a series takes `PatternData`, so a file the reader
 refuses fails before the series starts and never reaches `on_error`. What the
 series code does with them is a measurement for WP-2003's tiering session. Neither
 these rows nor the tests assert it.
