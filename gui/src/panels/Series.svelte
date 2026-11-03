@@ -6,8 +6,8 @@
    * is built around the one thing that makes that dangerous: a sequential fit is
    * path-dependent by construction, so **a smooth curve is exactly what a
    * poisoned chain produces** (WP-0505). Hence the shape of the panel. The
-   * `direction="both"` verification pass has its own control and its answer —
-   * `SeriesResult.direction_gaps` — is one line at the top stating the largest
+   * `direction="both"` verification pass has its own control. Its answer,
+   * `SeriesResult.direction_gaps`, is one line at the top stating the largest
    * gap in esds, with every trajectory ranked by its own and the other chain
    * drawn beside it, because the disagreement is the evidence. No parameter is
    * called path-dependent: the record holds no threshold (WP-2003, C5).

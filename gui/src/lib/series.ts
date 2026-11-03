@@ -263,7 +263,7 @@ export function axisTitle(traj: Trajectory | null): string {
 }
 
 /**
- * What the record says about a trajectory's two chains — the panel's caption.
+ * What the record says about a trajectory's two chains, as the panel's caption.
  *
  * The number and where it sits, then the rung clause where the two chains kept
  * different attempts, and no verdict: the size that matters is the reader's
