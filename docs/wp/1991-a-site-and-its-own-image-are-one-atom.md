@@ -141,7 +141,7 @@ level up, and the two should share one matcher.
   On PbSO₄ O5 moved onto its mirror, a hold on 8d's `adp.3` (U12) stayed on
   `adp.3`, which is U13 there. Fixed: `numbering_moves` lists `adp.k` moves
   beside `dof.k`, through `twins.site_of`.)
-- [ ] A series trajectory follows its atom, as ruled 2026-11-01 (see
+- [x] A series trajectory follows its atom, as ruled 2026-11-01 (see
   § Ruling above). `SeriesResult.trajectory(path)` and the fences built on it
   join patterns by path, so a `prepare` that changes the atom list per pattern
   joins two atoms into one trajectory (PR #1274's handover). Key trajectories by
@@ -151,6 +151,11 @@ level up, and the two should share one matcher.
   a stored-format and reader-output change, so its PR goes to Yue before merge
   (`python -m tests.reader_output`, WP-2010's rule), and the manual's series
   chapter and the skill's series reference change in the same PR.
+  (2026-11-03: `sequential._SeriesNumbering` writes every entry path in the
+  series' own structure's numbering, extended by first appearance;
+  `SeriesEntry.pattern_paths`, `Trajectory.pattern_paths`, `.phase`, `.atom`,
+  `SeriesResult.phase_names`, `.atom_labels`. An old file has no names to
+  convert by, so it opens as written; see the handover entry.)
 - [x] Phases are matched by name where unique, as atoms are by label.
   `atom_moves` and `numbering_moves` match phases by position, so removing a
   phase ahead of another renumbers every `phases.N` path the way #1264 did

@@ -1871,3 +1871,110 @@ def test_a_series_carry_reads_a_value_onto_its_phase_by_name():
     both = _two_phases()
     values = _values_onto((both, INSTRUMENT), Structure(phases=[both.phases[1]]))
     assert values["phases.0.cell.a"] == 5.0
+
+
+# ------------------------------------------------ WP-1991: a series trajectory follows its atom
+#
+# Yue's ruling of 2026-11-01: a trajectory is keyed by phase name, atom label and
+# parameter, a pattern without the phase or the atom leaves a gap, and each point
+# carries its own pattern's path.
+
+
+def _series_biso(structure: Structure, prepare,
+                 free=("phases.*.scale", "phases.*.atoms.*.biso")):
+    from rietx.sequential import SequentialRefinement
+    from rietx.strategy.staged import RefinementPlan
+    data = _pattern(Structure(phases=[structure.phases[0]]))
+    plan = RefinementPlan(stages=[Stage("b", list(free), max_iter=6)])
+    chain = SequentialRefinement(structure, INSTRUMENT)
+    series = chain.fit([data, data], plan=plan, prepare=prepare)
+    return chain, series
+
+
+def _biso_of(structure: Structure, label: str) -> float:
+    (a,) = [a for a in structure.phases[0].atoms if a.label == label]
+    return a.biso.value
+
+
+def test_a_trajectory_follows_its_atom_by_label_when_prepare_removes_one_ahead(pbso4):
+    """``prepare`` removes O3 from the second pattern, so O4 and O5 are atoms 3 and 4
+    as declared and 2 and 3 there.  Joined by path, ``atoms.3.biso`` read O4 and then
+    O5.  Each trajectory now follows one atom, O3's has a gap, and each point names
+    its own pattern's path."""
+    def prepare(index, data, structure, instrument):
+        if index == 1:
+            structure.phases[0].atoms = [a for a in structure.phases[0].atoms
+                                         if a.label != "O3"]
+
+    chain, series = _series_biso(Structure(phases=[pbso4]), prepare)
+    o4 = series.trajectory("phases.0.atoms.3.biso")
+    assert (o4.phase, o4.atom) == (pbso4.name, "O4")
+    assert o4.pattern_paths == ["phases.0.atoms.3.biso", "phases.0.atoms.2.biso"]
+    assert o4.value == [_biso_of(s, "O4") for s in chain.fitted_structures]
+    o5 = series.trajectory("phases.0.atoms.4.biso")
+    assert o5.value == [_biso_of(s, "O5") for s in chain.fitted_structures]
+    o3 = series.trajectory("phases.0.atoms.2.biso")
+    assert o3.atom == "O3" and o3.positions == [0]                     # a gap, not O4
+    assert series[1].pattern_paths["phases.0.atoms.4.biso"] == "phases.0.atoms.3.biso"
+    assert series[0].pattern_paths == {}
+    assert series.atom_labels == [[a.label for a in pbso4.atoms]]
+    assert "phases.0.atoms.4.biso" in series.paths()
+    reread = type(series).model_validate_json(series.model_dump_json())
+    assert reread.trajectory("phases.0.atoms.3.biso") == o4
+
+
+def test_a_phase_a_prepare_adds_takes_the_next_number_and_a_gap_before_it(pbso4):
+    """A phase that only the second pattern holds is ``phases.1`` in the series
+    numbering, whatever number that pattern gives it, and its trajectory starts there."""
+    extra = pbso4.model_copy(update={"name": "second"}, deep=True)
+
+    def prepare(index, data, structure, instrument):
+        if index == 1:
+            structure.phases.insert(0, extra.model_copy(deep=True))
+
+    _, series = _series_biso(Structure(phases=[pbso4]), prepare, free=["phases.*.scale"])
+    assert series.phase_names == [pbso4.name, "second"]
+    first = series.trajectory("phases.0.scale")
+    assert first.phase == pbso4.name and first.pattern_paths == [
+        "phases.0.scale", "phases.1.scale"]
+    added = series.trajectory("phases.1.scale")
+    assert added.phase == "second" and added.positions == [1]
+    assert added.pattern_paths == ["phases.0.scale"]
+
+
+@pytest.mark.parametrize("where", ["declared", "prepare"])
+def test_a_series_refuses_an_atom_label_used_twice_in_a_phase(pbso4, where):
+    """The key is the label, so a repeat is refused rather than guessed at."""
+    from rietx.sequential import SequentialRefinement
+    doubled = pbso4.model_copy(deep=True)
+    doubled.atoms[3] = doubled.atoms[3].model_copy(update={"label": "O5"})
+
+    def prepare(index, data, structure, instrument):
+        structure.phases[0] = doubled.model_copy(deep=True)
+
+    data = _pattern(Structure(phases=[pbso4]))
+    start = doubled if where == "declared" else pbso4
+    with pytest.raises(ValueError, match=r"atom label\(s\) \['O5'\] more than once"):
+        SequentialRefinement(Structure(phases=[start]), INSTRUMENT).fit(
+            [data], prepare=None if where == "declared" else prepare)
+
+
+def test_a_series_refuses_a_phase_name_used_twice(pbso4):
+    from rietx.sequential import SequentialRefinement
+    data = _pattern(Structure(phases=[pbso4]))
+    with pytest.raises(ValueError, match="phase name"):
+        SequentialRefinement(Structure(phases=[pbso4, pbso4]), INSTRUMENT).fit([data])
+
+
+def test_a_series_written_before_the_numbering_opens_as_written(pbso4):
+    """A document without the WP-1991 fields reads its paths as stored, each point's
+    pattern path being the path itself, and names no phase or atom."""
+    from rietx.schemas.sequential import SeriesResult
+    doc = {"entries": [{"index": k, "parameters": [
+        {"path": "phases.0.atoms.3.biso", "value": 0.5 + k}]} for k in range(2)]}
+    old = SeriesResult.model_validate(doc)
+    assert old.phase_names is None and old[0].pattern_paths is None
+    traj = old.trajectory("phases.0.atoms.3.biso")
+    assert traj.value == [0.5, 1.5]
+    assert traj.pattern_paths == ["phases.0.atoms.3.biso"] * 2
+    assert (traj.phase, traj.atom) == (None, None)
