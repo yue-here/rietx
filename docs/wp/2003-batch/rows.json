@@ -817,7 +817,7 @@
   "applied": false,
   "decision": "C9 question 1 (pick): the warm start the caller's, the '*' default invariant once the every-entry-against-varied test lands; where it differs, tier 3 on those paths, the two programs its dissent; and the carry x width-twin-hold clash (X11) measured on QPA before the twin hold is touched (revised 2026-10-25, batch.md)",
   "class": "C9",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C9 q1 (brief 5): the warm start is a tier-3 default, approved, GSAS-II's carry-nothing default the dissent; carrying every entry rather than the varied ones becomes invariant once a test shows the two bit-identical, and a path that differs comes back to the maintainer at tier 3. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential.refine_sequential:carry_hkl_intensities",
@@ -1327,7 +1327,7 @@
   "decision": "with carry (C9 question 1) (revised 2026-10-25, batch.md)",
   "class": "C9",
   "row_note": "no row of its own: keyed on SeriesEntry.seeded_from once task 3 adds it (the quarantine's row), with carry's tier",
-  "ruling": "2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
+  "ruling": "2026-11-03: the maintainer ruled C9 q1 (brief 5): the warm start is a tier-3 default, approved, GSAS-II's carry-nothing default the dissent; carrying every entry rather than the varied ones becomes invariant once a test shows the two bit-identical, and a path that differs comes back to the maintainer at tier 3. Before it: 2026-10-26: the batch's pick, settled by Claude under the maintainer's delegation against DESIGN.md § Rules. Relabelled 2026-11-02: evidence, not the maintainer's ruling; a tier-3 approval and any change to what a reader receives go to the maintainer"
  },
  {
   "name": "rietx.sequential._reanchor_carried",

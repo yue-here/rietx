@@ -4230,7 +4230,21 @@ ROWS: tuple[Row, ...] = (
                   "(GSASIIdataGUI.py:2207, inventory check); seed=True is the opt-in, and #725 "
                   "is open on flipping it"
                   "; seven programs, 2026-10-21 (docs/practice.md): none of the seven seeds a background from the data by default")),
-    Row("rietx.sequential.refine_sequential:carry", "default", value=("*",)),
+    Row("rietx.sequential.refine_sequential:carry", "default", tier=3, ambiguity=1,
+        value=("*",),
+        evidence=("each pattern after the first starts from its neighbour's answer, every "
+                  "entry carried; the GUI's series route defaults to the same (gui/series.py "
+                  "DEFAULTS), so a default path reaches it; chaining buys about 3x in "
+                  "iterations and nothing in accuracy, and its path dependence is checked by "
+                  "the ladder and direction='both'; on CPD 1a-1h the chain's mean |dW| is "
+                  "1.82 wt %, the independent fits' too, its worst path "
+                  "instrument.profile.v 2.87-5.62 esd from them (2003-batch/batch.md, C9). "
+                  "Every entry against only the varied ones is not yet tested"),
+        grounds=("The warm start is what a refiner of an in-situ ramp does, and it keeps a "
+                 "held setup value from pattern to pattern (WP-2081); GSAS-II's default "
+                 "restarts each histogram unless Copy2Next is ticked, the dissent, kept as "
+                 "carry=(). Ruled by the maintainer 2026-11-03 (2003-batch/batch.md, C9 q1)."),
+        approved="2026-11-03"),
     Row("rietx.sequential.refine_sequential:carry_hkl_intensities", "default", value=True),
     Row("rietx.sequential.refine_sequential:backend", "default", tier="caller", ambiguity=1,
         value="numpy",
@@ -5561,7 +5575,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.sequential.WIDTH_GROWTH_FACTOR",
     "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
     "rietx.sequential.WIDTH_GROWTH_SIGMA",
-    "rietx.sequential.refine_sequential:carry",
     "rietx.sequential.refine_sequential:carry_hkl_intensities",
     "rietx.solve.cost.NAMED_REFLECTIONS",
     "rietx.solve.cost.NUISANCE_RCOND",

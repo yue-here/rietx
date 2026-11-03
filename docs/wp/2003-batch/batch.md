@@ -169,6 +169,16 @@ single pattern shows (WP-1110's 425 unread `BOUND_HIT`s, "42 of 68"). The agent-
 § "A contested demotion is measured on agents" asks for checks the wording and gates nothing
 (ruled 2026-10-19). Its spend waits on the maintainer's OK.
 
+**Ruled by the maintainer 2026-11-03: brief 5 (C9 q1), the warm start is a tier-3 default,
+approved.** Correction to C9's question 1: a default path does reach it. The GUI's series route
+defaults to `carry=["*"]` (`gui/series.py` `DEFAULTS`), so the warm start fails the caller
+class's first condition (generality.md § The rule), and the `best_or_none` analogy covers a pick
+from a ranking, not an action. Re-briefed on that check as a tier-3 default with GSAS-II's
+carry-nothing default as the dissent, kept as `carry=()`. Carrying every entry rather than the
+varied ones becomes `invariant` once the test C9 names shows the two bit-identical; a path that
+differs comes back to the maintainer at tier 3. `refine_sequential:carry` leaves
+`UNAUDITED_BASELINE`. WP-2081's questions on the cold rung stay open there.
+
 ---
 
 ## C1. What sends a warm fit up the ladder
