@@ -4241,6 +4241,27 @@ def test_write_topas_inp_refuses_a_nuclear_group_above_the_family_group():
         "space_group": "P n m a",
         "cell": _magnetic_phase("orthorhombic").cell})
     _refused(phase, r"family group .* is 'P 1 21/c 1'")
+    # the message names the orbits the groups' difference costs (#715)
+    _refused(phase, r"only part of their orbit .*'Fe1' \(4 of 8\), 'O1' \(4 of 8\)")
+
+
+def test_the_family_group_refusal_says_when_no_orbit_is_split():
+    """The refusal tests the groups, and its message used to claim lost
+    orbits whatever the sites. On Pnma's mirror (y = 1/4) each site has four
+    positions under both groups, so nothing would vanish, and the message
+    says what would differ instead: the site symmetry TOPAS refines under."""
+    base = _magnetic_phase("monoclinic")
+    phase = base.model_copy(update={
+        "space_group": "P n m a",
+        "cell": _magnetic_phase("orthorhombic").cell,
+        "atoms": [a.model_copy(update={"y": a.y.model_copy(update={"value": 0.25})})
+                  for a in base.atoms]})
+    with pytest.raises(ValueError) as refused:
+        from_structure(rx.Structure(phases=[phase]))
+    message = str(refused.value)
+    assert "Every listed site keeps its orbit" in message
+    assert "only part of their orbit" not in message
+    assert "'P 1 21/c 1'" in message
 
 
 def test_the_family_group_refusal_does_not_name_a_remedy_that_loops(tmp_path):

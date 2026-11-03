@@ -4795,15 +4795,35 @@ def _magnetic_group_line(phase, *, ion_species_ok: bool = False) -> str | None:
         raise ValueError(f"{where}: {exc}") from exc
     nuclear = resolve_group(phase.space_group, phase.symmetry_operations)
     if _operation_set(family) != _operation_set(nuclear):
+        # The test is the groups; the message names the orbits it costs,
+        # since a phase read from a magCIF lists every orbit whole (#715).
+        from ...crystallography.magcif import _orbit_size
+
+        nuclear_ops = list(nuclear.operations())
+        family_ops = list(family.operations())
+        split = []
+        for atom in phase.atoms:
+            xyz = (atom.x.value, atom.y.value, atom.z.value)
+            n_nuclear = _orbit_size(nuclear_ops, xyz)
+            n_family = _orbit_size(family_ops, xyz)
+            if n_family != n_nuclear:
+                split.append(f"{atom.label!r} ({n_family} of {n_nuclear})")
+        cost = (
+            f", so these sites would each generate only part of their orbit "
+            f"(positions under the magnetic operators, of those under "
+            f"{phase.space_group!r}): {', '.join(split)}. List the sites of "
+            f"each orbit the magnetic group splits and"
+            if split else
+            ". Every listed site keeps its orbit, but TOPAS would refine the "
+            "positions under the smaller group's site symmetry, a different "
+            "model from the one fitted. To accept that,")
         raise _GroupIdentityRefusal(
             f"{where}: its positions refine under {phase.space_group!r} and "
             f"its moments under BNS {number}, whose family group (its "
             f"operations with time reversal dropped) is {family.xhm()!r}. A "
             f"TOPAS magnetic `str` generates its atoms with the magnetic "
-            f"operators alone, so the sites listed for the larger group would "
-            f"each generate only part of their orbit. List the sites of each "
-            f"parent orbit the magnetic group splits and state the phase "
-            f"under {family.xhm()!r} yourself (a CIF round trip with "
+            f"operators alone{cost} state the phase under "
+            f"{family.xhm()!r} yourself (a CIF round trip with "
             f"nuclear_group='file' keeps the parent's sites and does not "
             f"restate them), or export a magCIF (Structure.to_cif)")
     for atom in moments:

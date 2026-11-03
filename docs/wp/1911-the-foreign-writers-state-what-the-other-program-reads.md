@@ -482,8 +482,14 @@ land alone before the transform exists.
       `_parent_space_group.name_H-M_alt` for a magnetic phase, or
       `structure_from_cif` says when the option cannot act (`"parent"` raises
       or reports)
-- [ ] D: the family-group refusal tests what its message claims (orbits), or
-      the message says groups
+- [x] D: the family-group refusal tests what its message claims (orbits), or
+      the message says groups.
+      *2026-11-03: the test stays the groups. The message now counts each
+      site's positions under both groups and names the sites the magnetic
+      operators split ("'Fe1' (4 of 8)"). Where none is split it says so,
+      and names the site symmetry as what would differ. Lifting the refusal
+      where no orbit splits would change the model TOPAS refines, so it is
+      not done.*
 - [ ] D: a non-standard BNS setting restated at its standard one through the
       transform, so `mag_space_group N` can be written
 - [ ] D: ties in the TOPAS writer (`prm` per tied group), and the reader
