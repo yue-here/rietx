@@ -1111,18 +1111,68 @@ def test_the_joint_matrix_tables_reach_the_result_and_every_report(screened):
         def spelt(p, own=own):
             return p[len(own):] if p.startswith(own) else p
 
-        # every view keeps the whole table, its own rows unscoped
+        # a view keeps each entry touching its own rows or a shared one, its
+        # own rows unscoped; an entry of another pattern's own rows alone goes
+        def other(p, h=h):
+            return p.startswith("hist.") and not p.startswith(f"hist.{h}.")
+
         assert [(c.path_a, c.path_b, c.rho) for c in view.top_correlations] == [
             (spelt(c.path_a), spelt(c.path_b), c.rho)
-            for c in ident.top_correlations]
+            for c in ident.top_correlations
+            if not (other(c.path_a) and other(c.path_b))]
         assert [m.loadings for m in view.soft_modes] == [
             {spelt(k): v for k, v in m.loadings.items()}
-            for m in ident.soft_modes]
+            for m in ident.soft_modes if not all(other(k) for k in m.loadings)]
         assert not any(p.startswith(own) for c in view.top_correlations
                        for p in (c.path_a, c.path_b))
         evidence = ref.report(h).identifiability
         assert evidence.top_correlations == view.top_correlations
         assert evidence.soft_modes == view.soft_modes
+
+
+def test_a_view_drops_another_patterns_own_modes_and_pairs(screened):
+    """Yue's round 2 on #1272: pattern 1's report quoted the Caglioti
+    degeneracy of pattern 0's instrument.  A pair or mode whose every row is
+    another pattern's own is dropped; one that joins a shared row to a
+    pattern's own is kept in that pattern's view."""
+    _, result = screened
+    ident = result.identifiability
+    pair, mode = ident.top_correlations[0], ident.soft_modes[0]
+    crafted = ident.model_copy(update={
+        "top_correlations": [
+            pair.model_copy(update={"path_a": "hist.0.instrument.profile.u",
+                                    "path_b": "hist.0.instrument.profile.v"}),
+            pair.model_copy(update={"path_a": "phases.0.cell.a",
+                                    "path_b": "hist.0.instrument.zero"}),
+            pair.model_copy(update={"path_a": "hist.0.instrument.zero",
+                                    "path_b": "hist.1.instrument.zero"})],
+        "soft_modes": [
+            mode.model_copy(update={"loadings": {
+                "hist.0.instrument.profile.u": 0.8,
+                "hist.0.instrument.profile.v": 0.6}}),
+            mode.model_copy(update={"loadings": {
+                "phases.0.cell.a": 0.7, "hist.0.instrument.zero": 0.7}}),
+            mode.model_copy(update={"loadings": {
+                "hist.0.instrument.profile.u": 0.8,
+                "hist.1.instrument.profile.u": 0.6}})]})
+    joint = result.model_copy(update={"identifiability": crafted})
+    v0, v1 = (joint.for_histogram(h).identifiability for h in (0, 1))
+    assert [(c.path_a, c.path_b) for c in v0.top_correlations] == [
+        ("instrument.profile.u", "instrument.profile.v"),
+        ("phases.0.cell.a", "instrument.zero"),
+        ("instrument.zero", "hist.1.instrument.zero")]
+    assert [list(m.loadings) for m in v0.soft_modes] == [
+        ["instrument.profile.u", "instrument.profile.v"],
+        ["phases.0.cell.a", "instrument.zero"],
+        ["instrument.profile.u", "hist.1.instrument.profile.u"]]
+    # pattern 1 sees the shared-and-pattern-0 pair (the shared row is its own
+    # concern) and the cross-pattern one, but not pattern 0's Caglioti pair
+    assert [(c.path_a, c.path_b) for c in v1.top_correlations] == [
+        ("phases.0.cell.a", "hist.0.instrument.zero"),
+        ("hist.0.instrument.zero", "instrument.zero")]
+    assert [list(m.loadings) for m in v1.soft_modes] == [
+        ["phases.0.cell.a", "hist.0.instrument.zero"],
+        ["hist.0.instrument.profile.u", "instrument.profile.u"]]
 
 
 def test_a_declared_peak_is_screened_on_its_own_histogram_only(screened):

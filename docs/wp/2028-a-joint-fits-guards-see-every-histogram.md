@@ -299,7 +299,8 @@ shows the findings that name histogram h.
   both named by the joint paths, beside each histogram's background screen
   and, new, its declared-peak screen (`extra_peak_absorption`, on that
   histogram's rows, keys `hist.<h>.`). `for_histogram(h)` hands a view its
-  own screen rows unscoped and keeps the joint tables whole, its own rows
+  own screen rows unscoped and keeps the joint tables' entries that touch its
+  own rows or a shared one (round 2: not another pattern's alone), its own rows
   unscoped and another histogram's still scoped, so `report(h)` quotes them.
   `soft_modes` reads a WP-1325 `BlockJacobian` block by block (it raised
   `TypeError` there before); on random blocks it matches the dense matrix to

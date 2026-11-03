@@ -409,8 +409,9 @@ class Identifiability(Base):
     rows, unscoped: a declared peak is one instrument's (WP-2028).
     ``top_correlations`` and ``soft_modes`` are measured on the joint matrix,
     the one that was solved, and named by the joint paths (shared bare, a
-    histogram's own ``hist.<h>.``); every view keeps them whole, its own rows
-    unscoped.  ``exchangeability`` stays empty on a joint fit: not measured,
+    histogram's own ``hist.<h>.``); a view keeps each entry that touches its
+    own rows or a shared one, whole, its own rows unscoped, and drops one made
+    only of other histograms' own rows.  ``exchangeability`` stays empty on a joint fit: not measured,
     the same reading as ``None``.
     """
 
@@ -2533,23 +2534,35 @@ class RefinementResult(Base):
             def spelt(path: str) -> str:
                 return path[len(prefix):] if path.startswith(prefix) else path
 
+            def seen(paths) -> bool:
+                # a row of the parameter-space tables belongs to this view
+                # unless it is another histogram's own: a mode or pair that
+                # touches this pattern's rows or a shared one is its to quote,
+                # one whose every loading is another pattern's own row is not
+                return any(path.startswith(prefix) or not path.startswith("hist.")
+                           for path in paths)
+
             # this histogram's background and declared-peak screens, as a
             # single fit spells them (WP-1341, WP-2028): the joint result
-            # scopes every row ``hist.<h>.``.  The joint matrix's tables are
-            # the fit's, one measurement of what was solved, so every view
-            # keeps all of them; its own rows lose their scope as in
-            # ``parameters``, another histogram's keep theirs.
+            # scopes every row hist.<h>..  The joint matrix's tables are
+            # the fit's, one measurement of what was solved, so a view keeps
+            # each entry that touches its own rows or a shared one, whole, its
+            # own rows losing their scope as in parameters and another
+            # histogram's keeping theirs.  An entry made only of other
+            # histograms' own rows is theirs and is dropped (a Caglioti trade-
+            # off in pattern 0's instrument is no part of pattern 1's report).
             view.identifiability = ident.model_copy(update={
                 "background_absorption": mine(ident.background_absorption),
                 "extra_peak_absorption": mine(ident.extra_peak_absorption),
                 "top_correlations": [
                     c.model_copy(update={"path_a": spelt(c.path_a),
                                          "path_b": spelt(c.path_b)})
-                    for c in ident.top_correlations],
+                    for c in ident.top_correlations
+                    if seen((c.path_a, c.path_b))],
                 "soft_modes": [
                     m.model_copy(update={"loadings": {
                         spelt(k): v for k, v in m.loadings.items()}})
-                    for m in ident.soft_modes]})
+                    for m in ident.soft_modes if seen(m.loadings)]})
         view.histograms = []
         return view
 
