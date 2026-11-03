@@ -63,12 +63,14 @@ def test_a_free_row_is_measured_and_a_tied_row_is_not(lebail):
     """Three states, and the split is free-vs-tied, not fit-vs-no-fit.
 
     ``ParameterTable._free_idx`` is ``e.vary and e.tie is None`` while the row
-    filter is ``e.vary or e.tie is not None``, so a tied row is *in*
-    ``parameters`` and was never in the free vector the guard tested.  Its
+    filter is ``moving_paths`` (WP-1999), so a tied row whose source is free is
+    *in* ``parameters`` and was never in the free vector the guard tested.  Its
     value follows its sources and can sit on its own declared bound while every
     source is interior, so ``False`` there would be the original defect wearing
-    a different cause.  Measured on this fit: 31 rows, 13 free and 13 measured,
-    18 symmetry-tied and 18 unmeasured.
+    a different cause.  Measured on this fit: 15 rows, 13 free and 13 measured,
+    2 symmetry-tied (the cubic ``b`` and ``c``) and 2 unmeasured.  Before
+    WP-1999 the filter was "varied or tied", and 16 more tied rows were
+    reported: the coordinates of sites whose DOFs no Le Bail stage frees.
 
     A free row on its floor of 0 is measured like any other (WP-1938).  From
     WP-1463 until then it read ``None``, a softplus floor having no finite
@@ -87,18 +89,18 @@ def test_a_free_row_is_measured_and_a_tied_row_is_not(lebail):
     assert unmeasured == tied & rows
     assert measured == free & rows
     # not a vacuous partition in either direction
-    assert len(tied & rows) == 18 and len(free & rows) == 13
+    assert len(tied & rows) == 2 and len(free & rows) == 13
 
 
 def test_at_bound_names_exactly_the_paths_bound_hit_names():
     """The flag is the guard's finding list, projected — not a second opinion.
 
-    The cell edge is capped 0.0013 Å below the value the free fit wants, so the
-    trust region rides the upper bound: Rwp goes 0.1457 → 0.2194 and ``a`` lands
-    on 10.250000 exactly.  Set equality against the ``BOUND_HIT`` diagnostics is
-    the assertion; "is it really at its bound" is deliberately *not* asserted,
-    because a re-derivation here would pass against the duplicate this WP
-    removed.
+    The cell edge is capped 0.0012 Å below the value the free fit wants, so the
+    trust region rides the upper bound: Rwp goes 0.1436 → 0.2169 (measured
+    2026-11-02) and ``a`` lands on 10.250000 exactly.  Set equality against
+    the ``BOUND_HIT`` diagnostics is the assertion; "is it really at its
+    bound" is deliberately *not* asserted, because a re-derivation here would
+    pass against the duplicate this WP removed.
     """
     data, structure, instrument = _nac()
     ref = rx.Refinement(structure, instrument)

@@ -228,6 +228,27 @@ def test_best_or_none_is_none_under_every_gate_failure(break_it, expect):
     assert (result.best_or_none() is not None) is (expect == "high")
 
 
+@pytest.mark.parametrize("found_by,engines_run,expect", [
+    # #1308: one engine plus the caller's statement is one engine
+    (["prior", "svd"], ["svd"], "low"),
+    (["dichotomy", "prior"], sorted(engine_names()), "low"),
+    # two engines are agreement with or without the prior; the third's
+    # absence caps (``engines_disagree``)
+    (["dichotomy", "prior", "svd"], sorted(engine_names()), "medium"),
+    (["dichotomy", "svd"], sorted(engine_names()), "medium"),
+    # the prior adds nothing to ``high`` either way
+    (sorted([*engine_names(), "prior"]), sorted(engine_names()), "high"),
+])
+def test_a_prior_corroborates_and_never_counts_as_an_engine(
+        found_by, engines_run, expect):
+    """WP-1003 § E's rule, ruled and deferred until WP-2082: the gate's
+    two-engine floor counts independent searches, and a stated cell is not
+    one.  Every other row of this table is an otherwise clean candidate."""
+    cand = _candidate(TRUE_A, found_by=found_by)
+    caveats, verdict = _gate(cand, engines_run=engines_run)
+    assert verdict == expect, caveats
+
+
 def _fractions(by_line: float, by_intensity: float) -> list[FigureOfMerit]:
     return [FigureOfMerit(name="indexed_fraction", value=by_line, n_lines=53,
                           n_possible=40, k_sigma=3.0),

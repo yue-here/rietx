@@ -2,7 +2,7 @@
 
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
-Depends on: 1938 (LM the default driver, and the measurement below); 1467 soft (the clamp's messages)
+Depends on: 1938 (LM the default driver, and the measurement below); 1467 (the clamp's messages; closed 2026-11-02)
 Priority: P3 2026-10-11 — no quoted number rests on the scatter it removes, since brucite's S_HKL are declared unquotable; 1938 landed (#883), so nothing hard blocks it
 
 ## Goal
@@ -87,6 +87,23 @@ S = ε²·[M²] is rank one in this form. M = vᵀg with g = (G\*₁₁, G\*₂�
   since WP-1938; whether the split survives is unmeasured. This WP re-fits
   brucite's Stephens block, so it is the cheapest place to check both
   platforms.
+
+- **2026-11-02, from WP-1467 (closing): its messages landed, and a joint fit
+  still starts a block at S ≡ 0.** 1467 made a block replace the
+  `lor_strain` it locks, and `STEPHENS_STRAIN_NOT_POSITIVE` now names the
+  intensity share the clamp left at zero strain width (19-52 % over the four
+  phases 1467 probed under TRF on three CPD patterns). So the soft
+  dependency is discharged. Two findings bear on a formulation that cannot
+  leave the cone. (1) Carried from WP-2002 (PR #1113, 2026-10-23):
+  `MultiHistogramRefinement.fit`'s stage loop calls only `seed_floored`
+  (`multi.py` ~1619), never `seed_stephens`, so a joint fit through
+  `lab_sample_refine` starts a freed all-zero block at S ≡ 0, where the
+  width's square root has unbounded slope, and nothing says so. A joint fit
+  also holds no cone under either driver. Fixing the seed moves joint fits
+  that seed a block. (2) Measured on brucite (`[dev]`, macOS arm64), the start
+  barely matters under LM (χ²_red 7.8939-7.8945 from 1000 ppm, 800 ppm and the
+  isotropic fit's 29 ppm, all 0 of 43 reflections outside the cone) and
+  matters under TRF (7.7965-7.9267, 19-23 of 43 outside).
 
 ## Non-goals
 

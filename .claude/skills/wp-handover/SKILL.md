@@ -13,8 +13,14 @@ the missing entry from `git log --stat` over that WP's commits and the
 current state of its checklist, date it with the commits' own date (never
 today's), and mark it "(reconstructed post hoc)". A reconstruction records
 what the commits show, not what the session might have known — where the
-diff does not say why, say so rather than inventing a rationale. All other
-steps below run unchanged.
+diff does not say why, say so rather than inventing a rationale. **A repair
+on a later day than the work also writes its own entry, dated today**, above
+the reconstruction: a paragraph saying it is a repair and what it changed.
+The repair commit carries the `WP-NNNN:` prefix and today's date, and the
+hook's date rule wants an entry no older than that commit. Without the second
+entry the flag comes back the moment the repair is committed, and step 10's
+scan sees it only if it runs after the commit (measured on WP-2010,
+2026-11-02). All other steps below run unchanged.
 
 **The handover runs at the session's largest context, so every request and
 every read costs the most here** (`docs/milestones/process.md` § What a
@@ -127,7 +133,7 @@ re-reading its own diff.
    `gh run download <id> -p 'junit-py3.14-*' -D <scratchpad>/ci` on the
    newest run that has the artifacts, and name the sha it ran on. A draft's
    run and a cancelled one have none. Pass the directory, since the leg runs
-   as two shards with a file each. Read the py3.14 leg because it alone
+   as several shards with a file each. Read the py3.14 leg because it alone
    executes the tutorials. Otherwise pass the local file. The entry quotes the rows and
    the per-file totals as one run's figures on the named machine. They rank a
    test or a file against the tail and do not time it. A test or a file that
@@ -285,7 +291,10 @@ re-reading its own diff.
       `gh pr view N --json closingIssuesReferences`, and clear a stray link by
       taking the **number** out, since editing the words around it does not.
     - **Never merge, and never wait on CI to decide.** Whether green is
-      enough, and when to merge, is the maintainer's call.
+      enough, and when to merge, is the maintainer's call. A ghostshift
+      shift lead may also merge a PR its checks find clear-cut, under the
+      user's standing permission of 2026-10-31
+      (`~/Code/claude-config/skills/ghostshift/SKILL.md` §4).
     - **Then subscribe to it**, where `subscribe_pr_activity` exists (a cloud
       session; `ToolSearch` loads it). `.claude/hooks/pr_subscribe.py` puts
       the call, number filled in, in front of you after `gh pr ready`. From

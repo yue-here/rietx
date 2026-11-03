@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-19 — a silent wrong pair of numbers on `lab_calibrate`, the one preset that frees both ratios; the profile it fits is right, so only a reader of S/L and H/L is misled
+Priority: P2 2026-11-01 — a silent wrong pair of numbers on `lab_calibrate` and `lab_bragg_brentano`, the presets that free both ratios; the profile it fits is right, so only a reader of S/L and H/L is misled; the fix is decided
 
 ## Goal
 
@@ -51,6 +51,7 @@ choosing a fix.
 
 ### Inherited
 
+- **From WP-2036 (2026-11-02, PR #1309): the start rows now compare the axial pair ordered, so two of the three LaB6 rows pass and carry no mark.** `tests/test_staged_start_invariance.py::_axial_pair_ordered` reports the smaller of S/L and H/L first, each with its esd, before the 0.1-esd comparison, as `test_seed_invariance._answer` already did. On an arm64 Mac (`[dev]`) at 1e-14 nudges of `w`, 49 arm pairs each: the axial-floor row crossed 24 times unordered (8.822 esd) and reads 0.0068 at most ordered; the intermediate-tolerance row crossed 23 times and reads 0.0000 ordered. Both rows' marks are gone. The Biso row is two distinct minima and still fails ordered, 1.156 plain esd on `u`, under its strict xfail. When your fix holds H/L, that row may XPASS(strict): drop its mark then. The ordering becomes a no-op once only S/L is free, and can stay.
 - **From WP-2036 (2026-10-25, PR #1165): rounding picks each arm's minimum, so the lab6 intermediate-tolerance row is no longer a strict xfail.** On `deff4c301` Linux passed the row (XPASS(strict)) while the Mac failed it. Under 1e-14 nudges to cell `a` on an arm64 Mac (`[dev]`), the two minima are (`axial_sl`, `axial_hl`) = (0.025461, 0.036669) and its swap, at Rwp 0.087428899057 and …058. Of 49 nudged arm pairs, 23 crossed minima (8.82 plain esd) and 26 agreed (7.4e-6). WP-2036 made the mark `strict=False`, citing you. When your fix lands, make it strict again or drop it. Two siblings were not re-measured. The Biso row's strict mark may flip the same way. The axial-floor row (`test_the_axial_sizing_floor_does_not_change_the_answer[lab6]`) carries no mark: it failed on Linux on `c9dde14` at 8.820 plain esd on `axial_hl` and passed on `deff4c301`, so rounding picks it too.
 - **From WP-2002 (2026-10-23, 9th session, PR #1113): the floor removal makes LaB6's intermediate tolerance reach the mirrored minima too.** With the U, V and Y floors gone (the maintainer's ruling), `tests/test_staged_start_invariance.py`'s `intermediate_tolerance[lab6]` row lands its two schedules 8.82 plain esd apart on `axial_sl` (0.000 before) and is a strict xfail citing this WP. The Biso row on LaB6 now differs by 1.16 esd on `u` (9.36 on `axial_sl` before), still a strict xfail.
 
@@ -64,9 +65,20 @@ choosing a fix.
 
 - [ ] Read Finger, Cox and Jephcoat (1994) on the S ↔ H symmetry, and check `profiles/fcj.py`
       against it.
-- [ ] Decide the fix with the maintainer: `lab_calibrate` frees S/L alone with H/L held at
+- [x] Decide the fix with the maintainer: `lab_calibrate` frees S/L alone with H/L held at
       its declared value; or one combined parameter, as GSAS-II has; or a finding when both
-      are free.
+      are free. **Decided 2026-11-01 (maintainer): option 1.** `lab_calibrate` frees S/L
+      alone and holds H/L at its declared value, the receiving slit's height over the
+      goniometer radius (the calibration guide's 3 mm / 200 mm). H/L left at its default 0
+      gives a one-ratio model, close to GSAS-II's single SH/L. Its fit-quality cost on a
+      real instrument is not measured.
+- [ ] Build option 1: the `lines_axial` stage of `lab_calibrate` drops
+      `instrument.geometry.axial_hl` (`strategy/staged.py:628-630`). A sibling found while
+      recording the decision: `lab_bragg_brentano`'s `lines_axial` stage frees both ratios
+      too (`:599-601`), so the same symmetry reaches it. Apply the same change there, and
+      say so in the handover, since the ruling named `lab_calibrate` alone. Then drop the
+      Biso start row's strict xfail if it XPASSes; the other lab6 start rows carry no mark
+      since WP-2036 ordered the pair (§ Inherited, WP-2036).
 - [ ] Rewrite the two `help.py` entries to say the pair is interchangeable, and follow a
       changed preset into the skill's `lab_calibrate` row (`docs/skill/rietx/SKILL.md`, the
       presets table) and the calibration guide's axial paragraph.
@@ -82,6 +94,13 @@ choosing a fix.
 ```
 
 ## Handover log
+
+- **2026-11-02** — the fix is decided. The maintainer chose option 1 on 2026-11-01:
+  `lab_calibrate` frees S/L alone, with H/L held at its declared value. A calibration then
+  reports S/L as a measurement whenever the user declares the slit height, and the two
+  mirrored minima disappear. Recorded only; nothing is built or run. While recording it,
+  `lab_bragg_brentano` turned out to free both ratios as well, so the build task covers
+  both presets. PR #1317. *Next:* task 1 (FCJ 1994 on the symmetry), then the build.
 
 - **2026-10-19, filed by WP-1986's sixth session.** No open WP owns the axial ratios: a
   `git grep` for `axial_sl`/`axial_hl` over `docs/wp/` on `origin/main` finds only closed WPs

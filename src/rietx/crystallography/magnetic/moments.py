@@ -474,3 +474,35 @@ def d_moment_d_dofs(frame, dofs) -> np.ndarray:
             [-mu * st * sp, mu * st * cp, 0.0],
         ])
     return dc @ e
+
+
+def d2_moment_d_dofs(frame, dofs) -> np.ndarray:
+    """``(n, n, 3)`` — ∂²(crystal-axis components)/∂DOF_a∂DOF_b, analytic (WP-2068).
+
+    :func:`d_moment_d_dofs` one order further, for the stationary-angle test's
+    curvature block.  The coefficients on the frame are μ·(cos φ, sin φ) or
+    μ·(sin θ cos φ, sin θ sin φ, cos θ), so the modulus enters linearly
+    (∂²/∂μ² = 0) and each angle through one sine or cosine, whose second
+    derivative is minus itself.  Symmetric in its first two axes.
+    """
+    e = np.asarray(frame, dtype=np.float64).reshape(-1, 3)
+    n = len(e)
+    d = np.asarray(dofs, dtype=np.float64).reshape(-1)
+    if n == 0:
+        return np.zeros((0, 0, 3), dtype=np.float64)
+    mu = d[0]
+    dc = np.zeros((n, n, n), dtype=np.float64)
+    if n == 2:
+        phi = d[1]
+        cp, sp = np.cos(phi), np.sin(phi)
+        dc[0, 1] = dc[1, 0] = [-sp, cp]
+        dc[1, 1] = [-mu * cp, -mu * sp]
+    elif n == 3:
+        theta, phi = d[1], d[2]
+        st, ct, sp, cp = np.sin(theta), np.cos(theta), np.sin(phi), np.cos(phi)
+        dc[0, 1] = dc[1, 0] = [ct * cp, ct * sp, -st]
+        dc[0, 2] = dc[2, 0] = [-st * sp, st * cp, 0.0]
+        dc[1, 1] = [-mu * st * cp, -mu * st * sp, -mu * ct]
+        dc[1, 2] = dc[2, 1] = [-mu * ct * sp, mu * ct * cp, 0.0]
+        dc[2, 2] = [-mu * st * cp, -mu * st * sp, 0.0]
+    return dc @ e

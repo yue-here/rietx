@@ -165,6 +165,21 @@ same arrays and no new diagnostic.
 
 ## Handover log
 
+### 2026-11-03 — PR #1279 merged (from outside, @mustachefeeling)
+
+PR #1279 (merge sha: 3f10c88f8) lands the two #1064 parts this WP inherited on 2026-10-26 and 2026-10-31. None of the WP's own six tasks is ticked by it.
+
+- `INTER` multipliers are applied: x × `fac_x`, y and σ × `fac_y`, as the FullProf 2000 manual defines them (PDF p. 74, `Ins = 10`). A non-unit factor raises the info code `XYDATA_INTER_APPLIED`. Unit factors are silent. `Interpol = 1` stays refused, and a non-positive or non-finite factor is refused by name. With no σ column the reader takes σ = √(fac_y·w), w the written intensity, which FullProf 8.20 was measured to compute (black box, synthetic files).
+- `read_pattern(path, axis="two_theta" | "tof")`: only `xy` honours it. The declaration is stored as `metadata["declared_axis"]`. A recognised unit that contradicts it is refused with both quoted. Other formats report `READER_OPTION_IGNORED`.
+- Audit row `XYDATA_INTER_APPLIED` sits at tier 2, not the tier 1 the 2026-10-26 triage note proposed. The σ fallback rests on one program's measured behaviour, and `_audit.py` tiers each part of a heuristic on its own (settled by Claude under that docstring rule, review round 2).
+- Still open here: the second `TEMP` value (#1064 stays open on it), the σ ≤ 0 rule and its record field, the decimal-comma refusal, line-numbered skip reports.
+
+Gate on the merged tree (main 625b33678, arm64 Mac, `[dev,jax]`): fast 13 714 passed, 231 skipped, 34 xfailed, 1 failed (environmental Jupyter kernel spec); `-m slow` 922 passed, 16 skipped, 17 xfailed.
+
+This entry lands in PR #1367.
+
+*Next:* task 1, unchanged by this merge.
+
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issue #897).
   Checked against the tree at `d80ca5f4`: headers, comments, commas and an
   esd column already read, and the decimal-comma misread, the silent

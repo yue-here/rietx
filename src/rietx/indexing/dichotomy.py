@@ -58,6 +58,8 @@ of the driven lines with the strongest of them anchored
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 
 from ..model import compiled
@@ -71,6 +73,7 @@ from .engines import (
     SearchSpec,
     TrialIndex,
     assign_lines,
+    conventional_fit,
     dedup_candidates,
     effective_shift_allowance,
     incomplete_diagnostic,
@@ -225,6 +228,56 @@ def _preserves_subspace(basis: np.ndarray, order: list[int]) -> bool:
         if not np.allclose(basis.T @ coef, moved, atol=1e-9):
             return False
     return True
+
+
+#: The axis each face-centring letter's centred face is normal to
+_FACE_LETTERS = {"A": 0, "B": 1, "C": 2}
+
+
+def _swap_images(centrings: tuple[str, ...] | list[str],
+                swaps: list[tuple[int, int]]) -> dict[str, str]:
+    """The centring letters the axis-swap prune maps the admitted ones onto,
+    each with the admitted letter it is an image of (WP-2066).
+
+    A swap is a setting change of the *metric*, and the prune in
+    :func:`_test_box` searches one of each pair of swapped halves.  It is not
+    a setting change of the *centring*: a↔c maps C to A, and the orthorhombic
+    permutations map C to A or B.  A C lattice whose every C description lies
+    in the pruned half therefore appears in the kept half only as A or B, and
+    a leaf that replays only the admitted letters reports it as P at twice
+    its volume (#1258).  Replaying these images at the leaf asks, in the kept
+    half, exactly what the C search would have asked in the pruned one, so it
+    restores the completeness the prune promised without searching a single
+    extra box.
+
+    **Derived, not tabulated**: each face letter is moved by the swaps
+    :func:`axis_swaps` returns, to closure.  P, I, F and R name no face and
+    map to themselves.  Monoclinic C gives A; orthorhombic C gives A and B;
+    every other system gives nothing.  Only C is moved, because C is the one
+    face letter ``engines.CENTRINGS`` admits and the one
+    ``reduce.conventional_setting`` re-sets an image to; a python caller
+    admitting A itself would otherwise get its images labelled A in the C
+    setting.
+    """
+    by_axis = {v: k for k, v in _FACE_LETTERS.items()}
+    out: dict[str, str] = {}
+    for letter in centrings:
+        if letter != "C":
+            continue
+        orbit = {_FACE_LETTERS[letter]}
+        grew = True
+        while grew:
+            grew = False
+            for i, j in swaps:
+                for a, b in ((i, j), (j, i)):
+                    if a in orbit and b not in orbit:
+                        orbit.add(b)
+                        grew = True
+        for axis in sorted(orbit):
+            image = by_axis[axis]
+            if image not in centrings and image not in out:
+                out[image] = letter
+    return out
 
 
 def _initial_box(basis: np.ndarray, spec: SearchSpec
@@ -1015,6 +1068,18 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
     if not order:
         return [], (0, 0), False
     masks = {c: masks[c] for c in order}
+    # **the swap images of the admitted centrings are replayed at the leaf**
+    # (``_swap_images``, WP-2066).  With "P" kept, P's set is every hkl, so
+    # the union, the search set and every box test stay what they were.
+    # Without P (a caller's centrings, or the cap) the images widen the union,
+    # as the recursion must see their rows too, and an image that does not fit
+    # the cap is dropped and reported like any other.
+    images = _swap_images(order, axis_swaps(basis))
+    for letter in list(images):
+        masks[letter] = centring_allows(hkl_all, letter)
+        if int(np.logical_or.reduce(list(masks.values())).sum()) > MAX_TRIAL_HKL:
+            del masks[letter], images[letter]
+            complete_union = False
     union = np.logical_or.reduce(list(masks.values()))
     hkl_all = hkl_all[union]
     dm_all = design_matrix(hkl_all)
@@ -1048,7 +1113,9 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
     # depth 60 in monoclinic, the cap — so the leftmost branch never terminates
     # and **zero** leaves were reached in 445 000 boxes.  The right scale is the
     # gap between neighbouring observed lines: below a quarter of it a line cannot
-    # be confused with its neighbour, which is all the refinement needs.
+    # be confused with its neighbour, which is all the refinement needs.  That
+    # holds on the driven lines only, so the refinement anneals on the lines up
+    # to ``q_hi_search`` and takes the rest at σ (``_accept``, WP-2066).
     spacing = (float(np.median(np.diff(np.sort(q_search))))
                if len(q_search) > 1 else 0.0)
     tol_accept = max(float(np.min(tol_search)), ACCEPT_SPACING_FRAC * spacing)
@@ -1102,7 +1169,9 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
         """A converged box: dedup it, replay the centred passes, refine.
 
         ``rows`` are the box's surviving trial rows, as indices into
-        ``m_full``.
+        ``m_full``.  The replay covers the swap images too
+        (:func:`_swap_images`), and a cell accepted under one is reported in
+        the letter it images (:func:`_relabel`).
         """
         theta = 0.5 * (lo + hi)
         key = _box_key(basis.T @ theta)
@@ -1131,7 +1200,10 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
             cand = _accept(basis, system, centring, spec, theta,
                            hkl_c, dm_c, indices[centring], q_all, sigma,
                            wavelength, tt_max, vol_min, vol_max, width,
-                           search_lines, tt_all, n_miss, anchors)
+                           search_lines, tt_all, n_miss, anchors,
+                           q_drive=q_hi_search)
+            if cand is not None and centring in images:
+                cand = _relabel(cand, images[centring])
             if cand is not None:
                 found.append(cand)
 
@@ -1320,6 +1392,26 @@ def _inside_domain(af: np.ndarray, spec: SearchSpec) -> bool:
     return True
 
 
+def _relabel(cand: EngineCandidate, target: str) -> EngineCandidate:
+    """A candidate accepted under a swap image, re-set to the letter it images.
+
+    ``engines.conventional_fit`` carries A..F, its covariance, the cell and
+    its esds through one exact map, and the assigned hkl follow the same
+    change (h' = M·h).  The result is one lattice under one name, so
+    ``dedup_candidates`` merges it with any leaf that found the same lattice
+    as C, and the report holds one candidate where it would hold two.
+    Where the fit has no setting to choose (``conventional_setting`` returns
+    ``None``), the candidate is kept as found, in its own letter: an A or B
+    description is still the lattice, and an accepted cell is never dropped.
+    """
+    fit, change = conventional_fit(cand.fit, cand.system, cand.centring)
+    if change is None:
+        return cand
+    m = np.asarray(change, dtype=np.int64)
+    hkl = np.asarray(cand.hkl, dtype=np.int64) @ m.T
+    return replace(cand, fit=fit, centring=target, hkl=hkl)
+
+
 def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
             theta: np.ndarray, hkl: np.ndarray, dm: np.ndarray,
             index: TrialIndex | None,
@@ -1327,7 +1419,8 @@ def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
             tt_max: float, vol_min: float, vol_max: float,
             width: float, search_lines: np.ndarray,
             two_theta: np.ndarray, n_miss: int,
-            anchors: np.ndarray | None = None) -> EngineCandidate | None:
+            anchors: np.ndarray | None = None,
+            q_drive: float | None = None) -> EngineCandidate | None:
     """Turn a converged box into a refined candidate, or reject it.
 
     Assign, refine, repeat — with the match window **annealed** from the box's own
@@ -1347,6 +1440,18 @@ def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
       lost the ranking to an exact supercell indexing all 88.  Tightening by 4× a
       pass lets each refinement correct the assignment before the window closes on
       it — the same reason a staged refinement plan exists one rank up.
+    * *annealing on the lines the box resolves* (WP-2066).  The stopping rule
+      measures a box's width on the driven lines only, so on a dense list a
+      leaf fine enough there is many σ coarse far above them, and the first
+      wide pass assigns wrong hkl up there.  On #1258's 381-line list the leaf
+      holding the truth refined onto cells indexing 288 and 273 lines, and the
+      truth, which indexes all 381, was not returned.  So the annealed passes
+      assign only lines up to ``q_drive``, the search window's own top
+      (highest driven Q plus its k·σ), and the closing passes at σ assign
+      every line, running until the assignment repeats (at most
+      :data:`MAX_ASSIGN_PASSES`) since the lines above the cut meet the cell
+      only there.  Where every line lies below the cut nothing changes: two
+      closing passes, as before.
 
     The χ² bar is ``k_sigma²`` and it is not arbitrary: every assigned line is
     within k·σ by construction, so k² is the largest reduced χ² an honest
@@ -1362,12 +1467,28 @@ def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
     previous: bytes | None = None
     boot = 0.5 * width / max(spec.k_sigma, 1e-12)
     schedule = [boot * ANNEAL_FACTOR ** -i for i in range(MAX_ASSIGN_PASSES)]
-    for extra, floor in enumerate(schedule + [0.0, 0.0]):
+    near = (np.flatnonzero(q_all <= q_drive) if q_drive is not None
+            else np.arange(len(q_all)))
+    if len(near) == len(q_all):
+        near = None                                # every line is resolved
+    # **the lines above the cut meet the cell first at σ, so the closing
+    # passes run until the assignment repeats**, up to MAX_ASSIGN_PASSES.
+    # Two passes were enough while the annealed ones had seen every line; on
+    # the GSAS-II fluorapatite list searched alone they stopped the true cell
+    # at 128 of 135 lines where a settled assignment reaches 131 (WP-2066).
+    closing = [0.0] * (2 if near is None else MAX_ASSIGN_PASSES)
+    for extra, floor in enumerate(schedule + closing):
         if not reflection_ceiling_ok(cell, wavelength, tt_max):
             return None
-        line_index, assigned = assign_lines(
-            q_all, np.maximum(sigma, floor), hkl, af, k_sigma=spec.k_sigma,
-            design=dm, index=index)
+        if near is not None and extra < len(schedule):
+            sub, assigned = assign_lines(
+                q_all[near], np.maximum(sigma[near], floor), hkl, af,
+                k_sigma=spec.k_sigma, design=dm, index=index)
+            line_index = near[sub]
+        else:
+            line_index, assigned = assign_lines(
+                q_all, np.maximum(sigma, floor), hkl, af,
+                k_sigma=spec.k_sigma, design=dm, index=index)
         if len(line_index) < basis.shape[0] + 1:
             return None
         key = line_index.tobytes()

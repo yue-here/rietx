@@ -57,6 +57,7 @@ from ..crystallography.symmetry import (
 )
 from ..crystallography.wyckoff import (
     adp_basis,
+    adp_projection,
     axial_basis,
     coordinate_basis,
     floating_origin_basis,
@@ -1340,7 +1341,8 @@ class ParameterTable:
             self._add(f"{base}.lor_size", phase.lor_size)
             # a Stephens block owns the tanθ Lorentzian channel outright: its
             # isotropic direction is the same column, so lor_strain is locked
-            # (the Atom.aniso ⇒ biso bargain, one level up)
+            # and the width law reads zero for it (the Atom.aniso ⇒ biso
+            # bargain, one level up; CompiledModel.lor_strain_term, WP-1467)
             self._add(f"{base}.lor_strain", phase.lor_strain,
                       force_fixed=phase.microstrain is not None)
             self._add(f"{base}.gauss_size", phase.gauss_size)
@@ -2091,15 +2093,16 @@ class ParameterTable:
         xyz = np.array([atom.x.value, atom.y.value, atom.z.value])
         basis = adp_basis(stabilizer_rotations(sg, xyz))  # (n_free, 6)
         u0 = np.array(atom.aniso.values(), dtype=np.float64)
-        coef, *_ = lapack.lstsq(basis.T.astype(np.float64), u0, rcond=None)
-        residual = basis.T @ coef - u0
-        scale = max(float(np.abs(u0).max()), 1e-6)
-        if float(np.abs(residual).max()) > 1e-6 * scale:
+        coef, nearest, compatible = adp_projection(basis, u0)
+        if not compatible:
+            worst = int(np.argmax(np.abs(nearest - u0)))
             raise ValueError(
-                f"{base}: the anisotropic tensor {u0.tolist()} is not "
-                f"compatible with the site symmetry, which allows only "
+                f"{base}: the anisotropic tensor of {atom.label!r}, {u0.tolist()}, "
+                f"is not compatible with the site symmetry, which allows only "
                 f"{basis.tolist()} in (U11, U22, U33, U12, U13, U23); the "
-                f"nearest allowed tensor is {(basis.T @ coef).tolist()}")
+                f"nearest allowed tensor is {nearest.tolist()}, "
+                f"{U_NAMES[worst]} furthest from it by "
+                f"{abs(float(nearest[worst] - u0[worst])):.3g} A^2")
         dof_paths = [f"{base}.adp.{k}" for k in range(len(basis))]
         want_vary = any(getattr(atom.aniso, n).vary for n in U_NAMES)
         for v, name in enumerate(U_NAMES):
@@ -2637,8 +2640,9 @@ class ParameterTable:
         writes: the block is that row's only writer, as the space group is a
         locked coordinate's.  Every input must exist and must not be written
         by this block or a later one, so the blocks apply in one pass in
-        declaration order.  The outputs' values are written from the map at
-        once, so the table never holds a derived row that disagrees with it.
+        declaration order.  Every frame input must be an input.  The outputs'
+        values are written from the map at once, so the table never holds a
+        derived row that disagrees with it.
         """
         for q in (*block.inputs, *block.outputs):
             if q not in self._paths:
@@ -2665,6 +2669,13 @@ class ParameterTable:
         for q in block.inputs:
             if q in own:
                 raise ValueError(f"derived block reads its own output {q!r}")
+        # the data-support count drops a frame input from the atoms it reaches
+        # (statistics.structural_free_paths); a name outside the inputs would
+        # drop nothing and read as declared (WP-2067)
+        for q in block.frame_inputs:
+            if q not in block.inputs:
+                raise ValueError(
+                    f"derived block's frame input {q!r} is not one of its inputs")
         # an earlier block has already been evaluated on its inputs, so a later
         # block may not write one of them: the earlier block would hold a value
         # computed from the input's state before this write

@@ -579,3 +579,41 @@ def test_add_derived_refuses_an_output_an_earlier_block_reads():
     ok = scratch_table()
     ok.add_derived(_Copy("phases.0.cell.a", "phases.0.scratch.a"))
     ok.add_derived(_Copy("phases.0.scratch.a", "phases.0.scratch.b"))
+
+
+def test_add_derived_refuses_a_frame_input_that_is_not_an_input():
+    """``frame_inputs`` is a subset of ``inputs`` (WP-2067): the data-support
+    count drops a frame input from the atoms it reaches, so a name outside the
+    inputs would drop nothing while reading as declared."""
+
+    class _Framed(DerivedBlock):
+        inputs = ("phases.0.cell.a",)
+        outputs = ("phases.0.scratch.a",)
+
+        def __init__(self, frame):
+            self.frame_inputs = frame
+
+        def evaluate(self, x):
+            return np.asarray(x, dtype=float)
+
+        def jacobian(self, x):
+            return np.eye(1)
+
+        def evaluate_traced(self, x):
+            return list(x)
+
+        def reach_pattern(self):
+            return np.ones((1, 1), dtype=bool)
+
+    def scratch_table():
+        table = ParameterTable(_structure(2), LAB)
+        table.add_parameter("phases.0.scratch.a", 0.0)
+        table.entries[table._paths["phases.0.scratch.a"]].locked = True
+        table._rebuild()
+        return table
+
+    table = scratch_table()
+    with pytest.raises(ValueError, match="frame input 'phases.0.cell.b'"):
+        table.add_derived(_Framed(("phases.0.cell.b",)))
+    assert not table.derived
+    scratch_table().add_derived(_Framed(("phases.0.cell.a",)))

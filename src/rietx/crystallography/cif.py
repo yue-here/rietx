@@ -698,7 +698,8 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     the schema field is: reading a file must not silently change which
     parameters a refinement plan will free.  Sites without an aniso loop keep
     their isotropic value either way, so a mixed file yields a mixed
-    structure.
+    structure.  Without it, ``diagnostics=`` receives one ``CIF_ANISO_COLLAPSED``
+    (info) counting the sites whose U_ij were read as U_eq.
 
     Species are passed through :func:`normalize_cif_species`, so the two wild
     type-symbol forms (``"O1"``, ``"O-2"``) arrive refinable instead of
@@ -876,8 +877,11 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     # the writer chooses its U against this very arithmetic (io/cif/blocks)
     from ..io.cif.blocks import b_from_u
 
+    collapsed: list[str] = []
     for site in small.sites:
         has_aniso = site.aniso.nonzero()
+        if has_aniso and not aniso:
+            collapsed.append(site.label)
         u_iso = site.u_iso
         said = site_statements.get(site.label, {})
         # a displacement parameter the file states is the file's, zero included:
@@ -1057,6 +1061,13 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
                 {a.label: (j, a) for j, a in enumerate(atoms)}, cell6,
                 assumed_ions=assumed_ions, assumed_g=assumed_g))
 
+    if aniso:
+        # after the last site is merged, dropped or snapped: the stabiliser
+        # that sets the allowed tensors is the final position's
+        projected = _project_printed_adps(sg, atoms, _aniso_statements(source))
+        if projected and diagnostics is not None:
+            diagnostics.append(_adp_projected_diagnostic(path, projected))
+
     if diagnostics is not None:
         # after the last site is merged or dropped, so every path below names
         # the site it is about
@@ -1075,6 +1086,17 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
         diagnostics.extend(snap_diagnostics(
             sg, [(a.label, (a.x.value, a.y.value, a.z.value)) for a in atoms],
             source=path, prefix="phases.0"))
+        # the loop's tensors are dropped here, so the reader says how many
+        # (WP-1468, #1056): an ellipsoid figure of this structure is spheres
+        collapsed_labels = set(collapsed)
+        kept = [k for k, a in enumerate(atoms) if a.label in collapsed_labels]
+        if kept:
+            diagnostics.append(Diagnostic(
+                level="info", code="CIF_ANISO_COLLAPSED",
+                message=(f"{path}: {_sites(len(kept))} in the file and "
+                         f"{'was' if len(kept) == 1 else 'were'} read as U_eq; "
+                         f"pass aniso=True to keep {'it' if len(kept) == 1 else 'them'}."),
+                where=[f"phases.0.atoms.{k}.biso" for k in kept]))
 
     phase = Phase(
         # gemmi names a bare `data_` block " ", which is no name
@@ -1100,6 +1122,10 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     check_group_is_structure_symmetry(phase)
     structure = Structure(phases=[phase])
     return structure
+
+
+def _sites(n: int) -> str:
+    return f"{n} site carries U_ij" if n == 1 else f"{n} sites carry U_ij"
 
 
 def format_su(value: float, esd: float | None, *, decimals: int = 6) -> str:
@@ -1197,6 +1223,12 @@ def _printed_decimal(token: str) -> Decimal | None:
     return value if value.is_finite() else None
 
 
+def _printed_half(token: Decimal) -> Decimal:
+    """Half a unit in ``token``'s last printed digit
+    (:data:`CIF_PRINTED_ROUNDING` scaled by its exponent): ``0.0123`` → 5e-5."""
+    return Decimal(repr(CIF_PRINTED_ROUNDING)).scaleb(token.as_tuple().exponent)
+
+
 def _within_printed_rounding(position, printed) -> bool:
     """Whether moving a site to ``position`` changes no coordinate by more than
     the file's own rounding of it (:data:`CIF_PRINTED_ROUNDING` of its last
@@ -1209,10 +1241,123 @@ def _within_printed_rounding(position, printed) -> bool:
     for value, token in zip(position, printed, strict=True):
         diff = Decimal(float(value)) - token
         diff -= diff.to_integral_value(rounding=ROUND_HALF_EVEN)
-        half = Decimal(repr(CIF_PRINTED_ROUNDING)).scaleb(token.as_tuple().exponent)
-        if abs(diff) > half:
+        if abs(diff) > _printed_half(token):
             return False
     return True
+
+
+def _aniso_statements(block) -> dict[str, tuple[Decimal, ...]]:
+    """Each aniso row's six U^ij as the file prints them, esd dropped.
+
+    Keyed by ``_atom_site_aniso_label`` in (U11, U22, U33, U12, U13, U23)
+    order; a row with any component null or not a plain decimal is left out,
+    since its precision is not a box on the six components.  Only the U form
+    is read: gemmi carries no ``_atom_site_aniso_B_ij`` tensor onto a site, so
+    a B loop never reaches :func:`_project_printed_adps`.
+    """
+    table = block.find("_atom_site_aniso_", [
+        "label", "U_11", "U_22", "U_33", "U_12", "U_13", "U_23"])
+    out: dict[str, tuple[Decimal, ...]] = {}
+    for row in table:
+        printed = tuple(
+            None if gemmi.cif.is_null(row[k])
+            else _printed_decimal(gemmi.cif.as_string(row[k]))
+            for k in range(1, 7))
+        if None not in printed:
+            out.setdefault(gemmi.cif.as_string(row[0]), printed)
+    return out
+
+
+def _adp_within_print(basis: np.ndarray, u: np.ndarray,
+                      printed: tuple[Decimal, ...]) -> np.ndarray | None:
+    """The allowed tensor nearest the printed one inside the file's rounding.
+
+    Each component printed to d decimals stands for any value within
+    :data:`CIF_PRINTED_ROUNDING` of its last digit, so the tensor the file
+    rounded lies in that box around the print.  Returns the point of the
+    allowed subspace (rows of ``basis``) nearest the print in the box's own
+    units, a Chebyshev fit solved as a linear programme like
+    :func:`~rietx.crystallography.magcif.moment_within_print`, or ``None``
+    where no allowed tensor lies inside the box.
+
+    A component printed as **zero**, at any number of decimals, or as a whole
+    number is held **exact**.  A zero is how a writer states a component the
+    symmetry zeroes, and the one error this repair must not absorb is a
+    writer's zero where the site needs a value: U12 written ``0`` or ``0.0``
+    on a hexagonal three-fold axis, where U12 = U11/2.  Read as a rounding,
+    ``0.0`` is ±0.05 Å² and would take U12 to 0.00615 Å² as a repair.  And no
+    crystal's U^ij is quoted to a whole Å², so a whole-number token is the
+    writer's exact value too.  The cost: a 2:1 tie between components small
+    enough that one prints as zero stays refused, as it was before.
+    """
+    from .wyckoff import nearest_allowed_within_print
+
+    half = np.array([float(_printed_half(token))
+                     if token.as_tuple().exponent < 0 and token != 0 else 0.0
+                     for token in printed])
+    return nearest_allowed_within_print(
+        np.asarray(basis, dtype=np.float64).T, u, half)
+
+
+def _project_printed_adps(sg, atoms: list[Atom],
+                          printed: dict[str, tuple[Decimal, ...]],
+                          ) -> list[tuple[int, str, list[str], float]]:
+    """Put a printed U^ij on its site's allowed subspace where the print admits it.
+
+    ``ParameterTable`` refuses a tensor off the subspace
+    (:func:`~rietx.crystallography.wyckoff.adp_projection`), and rightly, since
+    it has no channel to say it moved one.  But a file printing U11 = 0.0123
+    and U12 = 0.0062 on ZnO's 3m site, which needs U12 = U11/2, is that
+    relation rounded to four decimals, not a contradiction of it (WP-2016).
+    So a tensor with an allowed point inside the box of its own rounding
+    (:func:`_adp_within_print`) is stored at that point, in place; one without
+    is left as printed, for the table to refuse.  Returns
+    ``(index, label, components moved, largest move in Å²)`` per site moved.
+    """
+    from .adp import U_NAMES
+    from .wyckoff import adp_basis, adp_projection, stabilizer_rotations
+
+    moved: list[tuple[int, str, list[str], float]] = []
+    for j, atom in enumerate(atoms):
+        if atom.aniso is None or atom.label not in printed:
+            continue
+        u = np.array(atom.aniso.values(), dtype=np.float64)
+        try:
+            basis = adp_basis(stabilizer_rotations(
+                sg, (atom.x.value, atom.y.value, atom.z.value)))
+        except ValueError:
+            continue                      # the table names an unbuildable orbit
+        if adp_projection(basis, u)[2]:
+            continue
+        target = _adp_within_print(basis, u, printed[atom.label])
+        # the table's own test, so a point the solver left off the subspace
+        # by its tolerance is left for the table to refuse, never reported moved
+        if target is None or not adp_projection(basis, target)[2]:
+            continue
+        names = [n for n, a, t in zip(U_NAMES, u, target, strict=True) if a != t]
+        atoms[j] = atom.model_copy(update={"aniso": atom.aniso.model_copy(update={
+            n: getattr(atom.aniso, n).model_copy(update={"value": float(t)})
+            for n, t in zip(U_NAMES, target, strict=True)})})
+        moved.append((j, atom.label, names, float(np.max(np.abs(target - u)))))
+    return moved
+
+
+def _adp_projected_diagnostic(path: str, moved: list[tuple[int, str, list[str], float]]
+                              ) -> Diagnostic:
+    named = ", ".join(f"{label} ({', '.join(n.upper() for n in names)})"
+                      for _, label, names, _ in moved[:4])
+    if len(moved) > 4:
+        named += f", and {len(moved) - 4} more"
+    largest = max(shift for *_, shift in moved)
+    return Diagnostic(
+        level="info", code="CIF_ADP_SYMMETRY_PROJECTED",
+        where=[f"phases.0.atoms.{j}.{n}" for j, _, names, _ in moved for n in names],
+        value=largest,
+        message=(f"{path}: {len(moved)} site(s) print U^ij that miss the form "
+                 f"their site symmetry allows by no more than the file's own "
+                 f"rounding, and were read on it: {named}. The largest "
+                 f"component moved {largest:.2g} A^2, inside half a unit of its "
+                 f"last printed digit."))
 
 
 def _read_rounded_sites_on_position(sg, atoms: list[Atom], stated: dict[str, dict]) -> None:

@@ -1,6 +1,6 @@
 # WP-1986 — Guides and Theory move over, and the old tree retires
 
-Milestone: unscheduled · Status: 🔄 2026-10-22 — the old tree retired (one manual; its 47 URLs redirect); open for guides 18 and 24, and the README and landing feature links at the 1.10 cut
+Milestone: unscheduled · Status: 🔄 2026-11-02 — the old tree retired (one manual; its 47 URLs redirect); guide 24 and the README and landing links on `/docs/stable/` landed (PR #1347); open for guide 18, which waits on WP-1910 and WP-2030
 Track: The repo's own process
 Depends on: 1978 (the new tree); 1985 (the report text the guides show); 1979 (redirect stubs)
 Priority: P2 2026-10-16 — unblocked: WP-1979 built the redirect stubs (PR #1023)
@@ -127,10 +127,14 @@ the tree that day.
   `using/files.md`: 10 `calibrate.md`, on a synthetic LaB₆ and CeO₂ pair on two setups
   (`_calibration_pair.py`); from `using/series.md`: 17 `joint.md`, on a synthetic corundum
   X-ray and neutron pair whose neutron wavelength is 300 ppm off (`_corundum_pair.py`).
-  Left: 18, 24.
-  Item 18 waits on WP-1910 and WP-1510, whose findings on the shipped
-  fluorapatite pattern it would otherwise document; item 24 on the magnetic WPs in flight
-  (1327, 1418; 1326 closed 2026-10-23). Item 10 has the spike's page to start from, but no
+  From `using/refining.md` (2026-11-02): 24 `magnetic.md`, a moment refined under a known
+  magnetic space group, on the GSAS-II *Magnetic-I* LaMnO₃ pattern (`_lamno3.py`).
+  `moment.md`, from WP-1418, is the second guide under Magnetic structures. Left: 18.
+  Item 18 waits on WP-1910 and WP-1510 (now WP-2030, § Inherited), whose findings on the shipped
+  fluorapatite pattern it would otherwise document. Item 24 waited on the magnetic WPs
+  (1327, 1418) and was written on 2026-11-02 against what they had shipped: the remaining
+  1327 task is an analytic Jacobian branch for the moment and 1418's the k-search (M-8).
+  Neither changes a call the guide makes. Item 10 has the spike's page to start from, but no
   LaB6 pattern ships in `rietx.examples`. The maintainer chose (2026-10-17) to fetch data a
   guide needs rather than ship it: `rietx.examples.fetch` downloads a `REMOTE_FILES` entry from
   `tests/data/` at a pinned commit, and `test_examples.py`'s `fetched_state` fixture fills the
@@ -319,8 +323,8 @@ the tree that day.
       1's 79 references into Part 2 still resolve; those 14 pages take their `RETIRED` rows
       when the old tree goes.)
 - [ ] Guides: one page per task, mined chapter by chapter. The old chapter stays up until
-      the whole old tree retires (task 4); see Context, 2026-10-17. Twenty-three of 25 written
-      (2026-10-17, map under Notes by task).
+      the whole old tree retires (task 4); see Context, 2026-10-17. Twenty-four of 25 written
+      (2026-10-17, map under Notes by task; 24 on 2026-11-02). Guide 18 is left.
 - [x] GUI chapters moved with `test_gui_manual.py`. (2026-10-19; the old copies stay up,
       unguarded, until the tree retires. Notes under GUI chapters.)
 - [x] Each chapter's reference and explanation re-homed (survey and retirement map under
@@ -344,6 +348,68 @@ the tree that day.
 ```
 
 ## Handover log
+
+### 2026-11-02 (12th session) — guide 24, and the README and landing links name their page (PR #1347)
+
+The README, the landing page and the agent skill now link each feature to the page of the
+released manual that holds it, under `/docs/stable/`. Before, they used the retired tree's
+addresses, whose stubs opened a chapter's successor, so seven features (magnetic, joint,
+foreign readers and writers, peaks, humps, figures, plans) opened the wrong page. Two tests
+now keep it that way. A new guide shows how to refine a magnetic moment when the magnetic
+space group is known, on the GSAS-II LaMnO₃ tutorial pattern: 3.56 ± 0.04 μB along a, with
+the moment's angle carrying a profile interval in place of an esd. Guide 18, indexing end to
+end, is the one guide left, and it still waits on WP-1910 and WP-2030.
+
+*Done.* Links: 26 README feature links, 21 in `docs/landing/src/index.html`, two in
+`why.html`, the landing page's tutorial Read links (`build.py`) and the skill's compatibility
+link (`references/diagnostics-indexing.md`, both committed copies re-synced) name their page
+under `/docs/stable/`, with an anchor where the section sits partway down a page. The map is
+in the first commit's diff. All 33 distinct links, anchors included, were fetched from the
+live 1.10 tree on 2026-11-02 and resolve. `docs/landing/README.md` § How it is built states the
+new rule. `tests/test_manual.py::test_every_link_from_outside_the_manual_is_on_its_page`
+(manual-build group) fails a retired address in the README, the landing sources or the skill,
+and a page or anchor the built manual lacks; it was made to fail once on a misspelt anchor.
+`test_landing.py`'s two link tests now refuse a stub and require `/docs/stable/`.
+Guide 24: `docs/docs/guides/magnetic.md`, `examples/guides/magnetic.py`, `_lamno3.py` (the
+acceptance suite's reading of the tutorial files, which an example cannot import from
+`tests/`). It follows the tutorial: Pn′ma′ (BNS 62.448), seed (1, 0, 1), the azimuth held so
+the b component stays zero. The page quotes `MOMENT_ANGLE_STATIONARY` and the interval rather
+than restating them. Index and toctree entries added.
+
+*Measured* (`[dev]`, darwin/arm64). `magnetic.py` runs in 48-54 s, most of it the angle's
+profile interval (28 refits). Its printed output is identical under 1e-14 nudges to the moment
+seed (two ways) and to the Caglioti u, and on the numpy path (`RIETX_COMPILED=0`): the modulus
+moved by 1e-11. A prototype with all three moment parameters free, not shipped, gave
+3.62 ± 0.04 μB with 0.6 μB along b; its angles ended in a different place in the frame and this session
+did not work out why, so the page shows only the tutorial's protocol. Fast selection on main merged in (`9b8de9919`), beside two other runners'
+suites: 13 530 passed, 319 skipped, 34 xfailed, 2 failed, in 25:37. Neither failure is this
+branch's. `test_display.py::test_a_plot_in_a_kernel_shows_once…` starts a Jupyter kernel whose
+user-level spec points at a deleted venv on this machine. `test_the_wp_index_is_the_generators_output`
+failed on this entry's Status edit before `wp_index.py` ran. Added tests (`tests.added_test_times`,
+local junit): the outside-link test, 0.01 s on the shared build; the new guide case
+`test_every_guide_script_prints_what_its_page_quotes[magnetic]` took 128 s under that load,
+beside `[moment]`'s 104 s. It stays unmarked as the guide cases do: they run on CI's newest
+leg alone (`tests/documentation.py`).
+
+*Review* (`/code-review high --fix`): ten findings, six acted on. Fixed: the Mn site's
+index derived from its label for every path; the interval level and the parts of the
+stationary-angle message the page names asserted; `_lamno3.py`'s stages from a table; the
+outside-link test's docstring now says what it cannot see; the landing test requires
+`/docs/stable/`. Declined: the landing Read links (the rows are the newest tag's notebooks,
+which the stable tree carries, so a notebook added on `main` never reaches the page before its
+release); `_lamno3.py` duplicating the acceptance suite's instrument reading (an example cannot
+import from `tests/`; `_cr2wo6_pair.py` does the same); a `None` interval end raising
+`TypeError` rather than an assertion; a missing page reported twice by the new test.
+
+*Gotchas.* The new guard checks `main`'s build, while `/docs/stable/` is the last release's.
+A link to a page or heading that `main` added passes and 404s until the next release, and CI's
+shallow checkout has no tags to check against. Link a page only once it is released.
+
+Next: (1) guide 18 when WP-1910 and WP-2030 close: WP-2030 is held by another runner (the GUI
+formula field), and WP-1910's second extinction screen changes what an indexing run prints.
+Write it straight into the new tree from `git show 1661895:docs/manual/using/indexing.md`.
+(2) The three findings the 9th session declined stay open for the maintainer (Notes by task,
+Retirement).
 
 ### 2026-10-22 (11th session) — the old manual retires: one tree, and every old address redirects
 

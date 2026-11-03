@@ -84,6 +84,19 @@ this closes 🛑 with the numbers, as WP-1508's gate did for the 2-D traversal.
 
 ### Inherited
 
+- **2026-11-03, from WP-2066 (its closing entry).** The reporter measured
+  #1301 on a private orthorhombic-F lab list (#1258, 2026-11-02): 19 % more
+  time per box than its merge-base, so within 60 s of wall clock the search
+  no longer reaches the truth. At an equal box count the accepted
+  candidates went 172 → 531. A real-data fixture of that shape is not in the
+  tree, so measure the leaf share on `tests/repro_780.py` instead.
+- **2026-11-01, from WP-2066 (PR #1301).** A dichotomy leaf now does more
+  `_accept` work. It replays the swap images of C (monoclinic A, orthorhombic A
+  and B) and refines each one that survives, and V3's annealing accepts more
+  leaves. On #1258's synthetic lists the harvest of accepted leaves went
+  64 → 174 (orthorhombic C control), 646 → 948 and 1315 → 1447 (the two
+  monoclinic C lists), with box counts unchanged. Re-measure the leaf share
+  before ranking this lever.
 - **2026-10-14, from WP-1959 (PR #964).** The box test runs compiled again
   from `rietx-kernels` 1.3, so the entry below reverses where 1.3 is installed.
   On #780's monoclinic case (`tests/repro_780.py`) phase 2 is now 82 % `_accept`:

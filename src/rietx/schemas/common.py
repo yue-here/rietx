@@ -622,6 +622,20 @@ from .._nearmiss import did_you_mean
 #: ``.predicted_but_absent_excess_in_window``, the windowed count's density and
 #: its excess over the run's cleanest candidate.  Additive and defaulted to
 #: ``None``, the 0.25 → 0.26 rule.
+#: Also in 0.60 (#1263): ``SupercellCheck.p0_power``, the floored chance rate
+#: the power check read, beside a ``p0`` that is now the seen test's own.
+#: Additive and defaulted to ``None``.
+#: Also in 0.60 (WP-1334): ``StageResult.rwp``, the stage's Rwp at its answer on
+#: its own frozen compile, the number ``stage_end`` already emitted.  Additive
+#: and defaulted to ``None``, "a result stored before the field", the 0.25 →
+#: 0.26 rule; all three runners write it on every stage.
+#: Also in 0.60 (WP-1991, Yue's ruling of 2026-11-01): a ``SeriesResult``'s
+#: paths read one series numbering, matched by phase name and atom label
+#: (``SeriesResult.phase_names``/``.atom_labels``), and
+#: ``SeriesEntry.pattern_paths`` names each pattern's own path where it
+#: differs.  Additive and defaulted to ``None``: a document written before the
+#: fields stores each pattern's own paths, and nothing stored the names to
+#: translate them, so it opens as written.
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

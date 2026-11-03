@@ -27,10 +27,14 @@ class RefinedParameter(Base):
     """One row of :attr:`RefinementResult.parameters`.
 
     The membership filter **is the contract** (WP-1003, ratifying 1053): a row
-    appears iff the entry varied or was tied — a fixed parameter is *absent*,
-    not present with ``vary=False``.  The full table, held rows and their
-    reasons included, is :meth:`rietx.Refinement.parameters`, which also
-    merges these esds back in.
+    appears iff the fit could move it — a fixed parameter is *absent*, not
+    present with ``vary=False``.  "Could move" is
+    ``ParameterTable.moving_paths`` (WP-1999): the free entries, and every
+    tied or derived row a free one reaches.  So a tied row whose every source
+    is fixed, or held for the stage (WP-1301), is absent with its sources; a
+    ``vary=False`` row is always a follower of a free one.  The full table,
+    held rows and their reasons included, is
+    :meth:`rietx.Refinement.parameters`, which also merges these esds back in.
 
     **``at_bound`` has three states, and one of them is "nobody looked"**
     (WP-1076).  ``True``/``False`` are answers about a *measured* row;
@@ -283,8 +287,10 @@ class CorrelationPair(Base):
     """One entry of the worst-|ρ| list (WP-1056).
 
     ``rho`` is the signed correlation from the solver's final undamped
-    Jacobian (the same matrix the ``HIGH_CORRELATION`` guard read, so the
-    two can never disagree); the list is ordered worst first.
+    Jacobian, with any direction the Jacobian cannot resolve projected out
+    (WP-2050, :func:`~rietx.optimize.statistics.resolved_correlation`).  It is
+    the same matrix the ``HIGH_CORRELATION`` guard read, so the two can never
+    disagree; the list is ordered worst first.
     """
 
     path_a: str
@@ -1164,6 +1170,18 @@ class StageResult(Base):
     #: stage with no Bragg intensity to compare.  Writers: the three runners
     #: that build a ``StageResult``.
     window_loss: float | None = None
+    #: the stage's Rwp at the values it ended on, measured on its own frozen
+    #: compile: the number the ``stage_end`` event carries, so a caller keeping
+    #: the best stage reads it here rather than from the event log (WP-1334).
+    #: A joint fit's is pooled over its histograms; the event carries each
+    #: histogram's beside it.  The result's own ``statistics.rwp`` is measured
+    #: on a compile at the answer, so the last stage's differs from it by the
+    #: frozen windows alone.  Not comparable across stages that fit different
+    #: ranges or modes.
+    #:
+    #: ``None`` means a result stored before the field.  Writers: the three
+    #: runners that build a ``StageResult``, on every stage.
+    rwp: float | None = None
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
     #: Stephens strain cone, or the Γ_G² floor of WP-1938 D7) during this
     #: stage: the step for the box alone crossed a row, and the step solved

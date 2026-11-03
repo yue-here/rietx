@@ -1,9 +1,9 @@
 # WP-2045 — A runaway fit ends without an expensive closing stage
 
-Milestone: unscheduled · Status: 🔄 2026-10-25 — built and measured (PR #1161); open for the first nightly `full` job after merge and the maintainer's call on four audit rows' grounds
+Milestone: unscheduled · Status: 🔄 2026-11-02 — built and measured, merged as PR #1161 on 2026-10-25; the four audit rows re-approved on cost-only grounds (2026-11-01), their net saving measured on today's schedule (1.06-1.58×, 2026-11-02); open for a nightly `full` job that completes on `main`, red every night since 2026-10-24 for reasons WP-2036 owns
 Track: A long run is not one fit
 Depends on: —
-Priority: P2 2026-10-25 — the fix is built in #1161 and 1.10.1 waits on its merge; what stays open is one nightly reading and a ruling on four rows' grounds
+Priority: P2 2026-11-02 — the fix shipped to `main` in #1161; what stays open is one nightly reading, and the `full` job's other failures are WP-2036's
 
 ## Goal
 
@@ -334,6 +334,146 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
 `stage_start`/`stage_end` events.
 
 ## Handover log
+
+- **2026-11-02** — the three places that still quoted the intermediate
+  tolerance's old saving now quote probe 7's. The root `CLAUDE.md`
+  invariant, skill item 8.20 and the manual's "Cost of the loose schedule"
+  table had figures measured before the closing stage existed. A reader of
+  any of them now sees 1.06-1.58× fewer evaluations on FAP, 11-BM NAC and
+  cpd-1a at 0.0004 esd or less, and 3.93× on cpd-1a with an absent zircon.
+  No number was measured for this change, and none is quoted that the entry
+  below does not hold. Recorded in PR #1352.
+
+  *Done.* The `CLAUDE.md` invariant now reads "1.06-1.58× fewer
+  evaluations cost ≤ 0.0004 esd on one fit (FAP, NAC, cpd-1a behind the
+  closing stage; WP-2045 probe 7)". Item 8.20 gives the evaluations, the
+  0.0004 esd and the absent-phase 3.9×. It drops the old QPA figure, which
+  probe 7 did not measure. The two committed skill copies were re-synced.
+  The manual's table is probe 7's five rows with evaluations, wall clock
+  and largest shift. Its cpd-1a paragraph on `x` against `lor_size` went,
+  since cpd-1a now shifts 0.0004 esd. Three sentences on the LaB6 mirror
+  and the absent zircon replace it. The `trigger` series sentence went too:
+  it was measured before the closing stage, and the manual now says a chain
+  on this schedule is unmeasured.
+
+  *Gotchas.* Both places are at a size cap. A first draft grew
+  `references/surprises.md` 231 B past its budget (`tests/skill_caps.py`),
+  so 8.20 left out the wall clock and the LaB6 sentence. The manual page's
+  plain-text twin went 287 characters over its 50 000 cap
+  (`tests/test_manual.py`), so the table took main's arrow form and the
+  background-row figure was cut. The page now ends a little smaller than on
+  `main`.
+
+  *Other quotes found* by grepping for "1.2-1.6" and "1.00-2.15". Left as
+  they are: the `INTERMEDIATE_FTOL` comment in `schemas/plan.py`, which
+  credits the old figure to WP-1113/1123 and carries probe 7's re-measure
+  after it; the four `_audit.py` rows, which credit WP-2002 B7 the same way;
+  `docs/releases/1.1.0.md`, a shipped release's notes; and the WP files,
+  which are records. `references/series.md`'s "1.2-1.6× the collapsed
+  chain's wall clock" is a different measurement (WP-1469's refit modes).
+
+  *Verified.* The branch is prose only, so `/code-review` did not run.
+  On macOS arm64, worktree venv `[dev]`: `test_manual.py`,
+  `test_manual_api.py`, `test_skill.py`, `test_skill_cli.py` and
+  `test_docs_consistency.py` together, 294 passed. Ruff is clean.
+  `tests.reader_output` exits 0. No count can move, so neither the fast
+  nor the full selection ran.
+
+  *Next.* Unchanged from the entry below, items (1), (3) and (4). Item (2)
+  is done.
+
+- **2026-11-02** — the intermediate tolerance's saving, measured on
+  today's schedule. The four audit rows that keep it on cost grounds quoted
+  1.00-2.15× fewer evaluations. That figure came from WP-2002's run, before
+  the closing stage existed and before the last declared stage converged.
+  Measured now with both in place, the loose schedule costs 1.06-1.58× fewer
+  evaluations on FAP, 11-BM NAC and cpd-1a. No answer moves by more than
+  0.0004 plain esd. In median wall clock the saving is 1.02-1.14×, under
+  0.3 s a fit. On cpd-1a with an absent zircon it is 3.9× in evaluations
+  and 2.2× in seconds, because two stages at 1e-9 run to their budget. The
+  rows, the `INTERMEDIATE_FTOL` docstring and `PlanSpec`'s field description
+  now say so. No default changed. Recorded in PR #1348.
+
+  *Done.* `docs/wp/2045-batch/probe7.py` runs each protocol twice, shipped
+  and `intermediate_ftol=None`, with the closing stage in both, three
+  interleaved rounds an arm. The protocols are
+  `tests/test_window_domain._protocol`'s, the ones
+  `tests/test_staged_start_invariance.py` fits; the zircon fit is that
+  file's. The four rows' evidence and grounds carry the measured net, the
+  wall clock and the zircon case. The old figure is now credited to
+  WP-2002 B7 (2026-10-21), where it was measured.
+
+  *Measured* (macOS arm64, worktree venv `[dev]`, compiled tier on, tree
+  `4e08411e5`, under the ghostshift suite lock, so no other suite ran).
+  Evaluations were identical across the three rounds. Wall clock is the
+  range over three rounds, in seconds.
+
+  | Protocol | Evaluations, shipped / all 1e-9 | Ratio | Wall clock, shipped / all 1e-9 | Largest shift, plain esd |
+  |---|---|---|---|---|
+  | FAP | 49 / 52 | 1.06× | 1.30-1.35 / 1.34-1.62 | 0.000 |
+  | 11-BM NAC | 46 / 51 | 1.11× | 0.50-0.60 / 0.52-0.55 | 0.000 |
+  | cpd-1a | 175 / 277 | 1.58× | 1.89-1.97 / 2.18-2.28 | 0.0004 (`profile.v`) |
+  | SRM 660c LaB6 | 90 / 116 | 1.29× | 0.48-1.26 / 0.55-0.57 | 8.82 (`axial_sl`, the WP-2012 mirror) |
+  | cpd-1a, absent zircon | 311 / 1221 | 3.93× | 9.6-11.0 / 21.5-22.4 | 0.0092 (`profile.v`) |
+
+  Background rows moved by at most 0.0005 esd. Rwp agreed to 1e-6 in every
+  case. In the all-1e-9 arm the zircon fit's `profile_w` and `lines_axial`
+  stages end at `max_iter` (400 evaluations each). LaB6's first shipped run,
+  1.26 s, is the process's warm-up. The fast selection on this branch: 13532 passed, 319 skipped, 34 xfailed, no tests added (same venv; 20:50 beside other sessions' work).
+
+  *Not changed, and why.* The brief's stop rule was a net saving under
+  about 1.05× on any standard. The smallest is FAP's 1.06×, so no question
+  went to the maintainer and no default moved. The LaB6 evidence sentence
+  still calls its intermediate-tolerance test a non-strict xfail. PR #1309,
+  which removes that mark, was open on 2026-11-02.
+
+  *Review.* `/code-review medium --fix` found eight points and fixed five:
+  the old figure's source, SRM 660c in the docstring, the field
+  description naming its three protocols, and the probe's data check and
+  README. It left three. The root `CLAUDE.md` invariant still quotes
+  WP-1123's 1.2-1.6× at 0.03 esd. A runner may not edit a `CLAUDE.md`.
+  Skill item 8.20 (`references/surprises.md`) and the manual's "Cost of
+  the loose schedule" table (`reference/refinement.md`, 2026-10-20) both
+  predate the closing stage, and each needs its own re-measure.
+
+  *Generality.* The `generality-review` judge read the four changed rows.
+  All four hold. Its points: the grounds quoted evaluations alone, and in
+  seconds the saving is smaller (answered: the grounds now give the median
+  wall clock); the approval date, 2026-11-01, predates the figures the rows
+  now rest on, and whether a 1.06-1.58× saving still carries a cost-only
+  ruling is the maintainer's call; a warm chain on today's schedule is
+  unmeasured, and the docstring says the chain effect is unbounded; the row
+  does not say its reference is rietx's own all-1e-9 run on development
+  data. It would change its verdict on a warm chain shifting past 0.1 esd,
+  or a fourth family where 1e-6 moves an answer past the bar.
+
+  *Next.* (1) The maintainer reads the net figure and says whether the
+  cost-only ruling stands on it. (2) Re-measure the skill's item 8.20 and
+  the manual's tolerance table behind the closing stage, and bring the root
+  `CLAUDE.md` invariant's figure in line. (3) Once #1309 merges, drop the
+  "non-strict xfail" clause from the four rows. (4) The first nightly
+  `full` job that completes on `main` still closes this WP.
+
+- **2026-11-02** — the four audit rows for the intermediate tolerance now
+  rest on cost alone. **Decided 2026-11-01 (maintainer), by consent:**
+  `INTERMEDIATE_FTOL`, `PlanSpec:intermediate_ftol`, `StageSpec:ftol` and
+  `StageResult.ftol` carry cost-only grounds and `approved="2026-11-01"` in
+  `src/rietx/_audit.py`. The 2026-10-21 approval was weighed against an
+  absent zircon running to the iteration limit at the tight tolerance, and
+  that case passes at 0.009 esd since this WP. What remains is 1.00-2.15×
+  fewer evaluations for answers within 0.1 plain esd on FAP, cpd-1a and
+  11-BM NAC. LaB6's 8.82 esd is WP-2012's S/L and H/L mirror, not the
+  tolerance. The rows' shared evidence also called the LaB6 row a strict
+  xfail. WP-2036 made it non-strict on 2026-10-25, and the evidence now says
+  so. The 2026-11-01 brief's other item on this WP needs no action: the
+  calibration path guide's extra cold fit after the planted jump is
+  answer-neutral (Rwp 0.0395 against 0.0402, the jump still flagged) and the
+  guide already says so. The Status line was stale: #1161 merged on
+  2026-10-25, and the nightly `full` job has failed or been cancelled every
+  night from 2026-10-24 to 2026-11-01 while every other leg passed. Those
+  failures are WP-2036's (PR #1309). Recorded in PR #1317. *Next:* the
+  first nightly `full` job
+  that completes on `main` closes this WP.
 
 ### 2026-10-25 — option 5 measured and built: the last declared stage converges, and the hostile series finishes in 92 s
 

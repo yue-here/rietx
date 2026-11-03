@@ -38,7 +38,10 @@ Six things live here, in the order they have to happen:
    its two-core runner gives no more workers to add (WP-1547).  Each job keeps
    shard K of the collected files, split by recorded seconds with every file
    and every ``xdist_group`` whole (``tests/shards.py``).  It runs after
-   ``-m``'s own deselection, so the split is of the tier being run.
+   ``-m``'s own deselection, so the split is of the tier being run.  The
+   seconds are the record's profile for this process's documentation switch
+   (``tests/documentation.py``), since a leg skipping the documentation spends
+   less on the files holding it.
 
 Shared expensive results (``sample1_results``, ``srm660c_baseline``,
 ``cr2wo6_nuclear``, ``lamno3_nuclear``) are
@@ -227,7 +230,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     spec = getattr(config.option, "shard", None)
     if spec is None:
         return
-    from tests import shards
+    from tests import documentation, shards
 
     try:
         k, n = shards.parse(spec)
@@ -246,7 +249,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         names = [m.args[0] if m.args else m.kwargs.get("name", "default")
                  for m in item.iter_markers("xdist_group")]
         pairs += [(file, str(name)) for name in names] or [(file, None)]
-    mine, _ = shards.assign(shards.units(pairs), shards.recorded_seconds(), n)[k - 1]
+    seconds = shards.recorded_seconds(docs_skipped=documentation.skipped())
+    mine, _ = shards.assign(shards.units(pairs), seconds, n)[k - 1]
     selected: list[pytest.Item] = []
     deselected: list[pytest.Item] = []
     for item, file in zip(items, files, strict=True):
