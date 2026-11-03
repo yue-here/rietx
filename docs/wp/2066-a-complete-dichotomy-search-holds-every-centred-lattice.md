@@ -237,7 +237,7 @@ agrees with both. The alternative was to send V3 back to the maintainer
 on this list. Against it: the user-visible answer is unchanged, and V3
 gains the truth on the B repro and on 3 #780 units while losing it nowhere.
 
-**Done.** Task 5 ticked. Priority line removed. Narrative moved to
+**Done** (PR #1361). Task 5 ticked. Priority line removed. Narrative moved to
 `docs/milestones/v1.11.md`. `### Inherited` notes in WP-2078 and WP-1520.
 No code changed. No re-measure was possible here: the data is not on this
 machine, and by the reporter's statement it will not be.
