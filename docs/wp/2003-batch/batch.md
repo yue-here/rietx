@@ -196,6 +196,16 @@ it lands. Held back for measurement in the check, approval still owed: C9 q2
 `FIRST_RUNG_SAMPLES` (re-measured at 1, 2 and 3 samples on the dearest-stage quantity, the
 judge's ask). The agent-harness run for the wording of (2) and brief 4 awaits a costed menu.
 
+**The two held back, ruled 2026-11-03.** C9 q2: "Approve the carry".
+`carry_hkl_intensities=True` is tier 3. Carried and not, on the planted and thermal-ramp
+chains (`measure-2026-11-03/m1_*.json`), the median cell error was equal in all four arms.
+Evaluations were equal on thermal. On planted they were 1278 against 1163 (Le Bail) and 958
+against 738 (Pawley). The Le Bail difference falls on patterns at GoF > 8. The Pawley one falls
+mostly on T009 at GoF 1.0 (+268 evaluations, the cell unchanged). `FIRST_RUNG_SAMPLES = 3`:
+consent line sent, no objection, approved. At factor 1.0 the bound cut patterns at every
+sample size; at 1.5 it cut none and every value was bit-identical at 1, 2 and 3 samples
+(`m2_*_sweep.json`).
+
 ---
 
 ## C1. What sends a warm fit up the ladder

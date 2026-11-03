@@ -3828,13 +3828,17 @@ ROWS: tuple[Row, ...] = (
                   "evaluations on the thermal-ramp chain and its third pattern legitimately "
                   "wanted 17, a one-evaluation margin darwin cleared and Linux did not; one "
                   "sample is no spread, the running maximum of a short one is set by the "
-                  "cheapest pattern"),
+                  "cheapest pattern; re-measured on the dearest-stage quantity at 1, 2 and 3 "
+                  "samples (2003-batch/measure-2026-11-03/m2_*.json): at factor 1.0 the bound "
+                  "cut 1 of 20-22 planted and every armed thermal pattern, at 1.5 it cut none "
+                  "and every value was bit-identical to the unbounded chain at all three sizes"),
         grounds=("Inside the caller's opt-in bound and on no default path; three is the "
                  "smallest sample past the one-sample failure measured, and the budget it "
                  "arms is reported per pattern by STAGE_MAX_ITER and the rungs tried. "
                  "Settled by Claude 2026-10-26 under the maintainer's delegation, pick (a); "
-                 "the maintainer's own approval is owed (2003-batch/batch.md, C3)."),
-        approved="2026-10-26"),
+                 "approved by the maintainer 2026-11-03 on a consent line "
+                 "(2003-batch/batch.md, C3)."),
+        approved="2026-11-03"),
     Row("rietx.sequential.NOISE_FLOOR_REL", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: a step or a between-chain gap under 1e-9 of the parameter's "
                   "magnitude (never under 1e-9 absolute, sequential.py:2290) is about 4.5e6 "
@@ -4486,7 +4490,21 @@ ROWS: tuple[Row, ...] = (
                  "restarts each histogram unless Copy2Next is ticked, the dissent, kept as "
                  "carry=(). Ruled by the maintainer 2026-11-03 (2003-batch/batch.md, C9 q1)."),
         approved="2026-11-03"),
-    Row("rietx.sequential.refine_sequential:carry_hkl_intensities", "default", value=True),
+    Row("rietx.sequential.refine_sequential:carry_hkl_intensities", "default", tier=3,
+        ambiguity=1, value=True,
+        evidence=("a Le Bail or Pawley pattern after the first starts from its neighbour's "
+                  "extracted intensities; carried and not, on the planted and thermal-ramp "
+                  "chains (2003-batch/measure-2026-11-03/m1_*.json): median |a error| equal "
+                  "in all four arms (1.41/2.26 ppm planted, 1.13 thermal), evaluations equal "
+                  "on thermal and 1278 against 1163 (Le Bail), 958 against 738 (Pawley) on "
+                  "planted; the Le Bail difference falls on patterns at GoF > 8, the Pawley "
+                  "one mostly on T009 at GoF 1.0 (+268)"),
+        grounds=("Carrying the intensities is the warm start's own reading for a mode whose "
+                 "intensities are outside the models, and it moved no measured value; "
+                 "GSAS-II's Copy2Next is opt-in, the dissent, kept as "
+                 "carry_hkl_intensities=False. Ruled by the maintainer 2026-11-03 "
+                 "(2003-batch/batch.md, C9 q2)."),
+        approved="2026-11-03"),
     Row("rietx.sequential.refine_sequential:backend", "default", tier="caller", ambiguity=1,
         value="numpy",
         evidence=("opt-in, as rietx.refine.refine:backend: each pattern's Refinement gets it "
@@ -5825,7 +5843,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.sequential.WIDTH_GROWTH_FACTOR",
     "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
     "rietx.sequential.WIDTH_GROWTH_SIGMA",
-    "rietx.sequential.refine_sequential:carry_hkl_intensities",
     "rietx.solve.cost.NAMED_REFLECTIONS",
     "rietx.solve.cost.NUISANCE_RCOND",
     "rietx.strategy.magnetic.SOLVE_D_MIN",
