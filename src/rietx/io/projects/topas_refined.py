@@ -476,13 +476,13 @@ def render_slots(items: Iterable[Any], refined: RefinedSet) -> list[str]:
     # refuses a name stated at two values (`topas_ties`, its own `_close`
     # test). So the writer refuses it here, where the values are in hand: a
     # structure whose values break the ties `free=` states (found by WP-1986).
-    from .topas_ties import _close
+    from .topas_ties import SHARED_NAME_RTOL, _close
     stated: dict[str, float] = {}
 
     def check_one_value(path: str, value: float) -> None:
         if path not in stated:
             stated[path] = value
-        elif not _close(value, stated[path], 1e-6, floor=0.0):
+        elif not _close(value, stated[path], SHARED_NAME_RTOL, floor=0.0):
             raise ValueError(
                 f"{path} is tied as an equality, so the file names it once "
                 f"at every quantity the tie reaches, and the structure states "

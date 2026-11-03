@@ -60,6 +60,13 @@ class TopasConstraints:
     skipped: list[str] = field(default_factory=list)
 
 
+#: How far two values stated for one TOPAS name may differ, relative to the
+#: larger, before the name counts as stated twice. The reader refuses such a
+#: name and the writer refuses to write one, at this one bar (the comment in
+#: the reader's check gives its sizing).
+SHARED_NAME_RTOL = 1e-6
+
+
 # ------------------------------------------------------------- magnetic part
 
 def _close(a, b, rel=1e-9, floor=1.0) -> bool:
@@ -371,7 +378,7 @@ def derive_ties(model, phases_in, structure) -> TopasConstraints:
             seen[name] = (v, st.path)
             continue
         v0, where0 = seen[name]
-        if not _close(v, v0, 1e-6, floor=0.0):
+        if not _close(v, v0, SHARED_NAME_RTOL, floor=0.0):
             raise TopasInpError(
                 f"{getattr(model, 'path', None) or '<model>'}: the name {name!r} "
                 f"is stated at two values, {v0!r} at {where0} and {v!r} at "
