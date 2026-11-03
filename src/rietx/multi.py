@@ -2029,7 +2029,7 @@ class MultiHistogramRefinement:
                 # the single runner's refusal (``_run_stage``, WP-1805): a body
                 # turn free in two directions of three, in any histogram's table
                 for tab in self.mtable.tables:
-                    tab.refuse_partial_turns()
+                    tab.refuse_partial_turns(joint=True)
                 seeded: dict[str, float] = {}
                 if stage.seed:
                     seeded = dict.fromkeys(

@@ -4210,13 +4210,20 @@ class Refinement:
         # since holding half of what it names would be a silent partial hold
         owned = table.body_rows()
         if blocked := [p for p in hits if p in owned]:
-            names = sorted({owned[p] for p in blocked})
+            # every body the sweep reached, in the order it reached them, so
+            # the name and the globs are the same bodies' (a glob over several
+            # bodies' atoms names each one's DOFs, not only the first's)
+            bases = table.body_row_bases()
+            owners = list(dict.fromkeys(bases[p] for p in blocked))
+            names = list(dict.fromkeys(owned[p] for p in blocked))
             raise ValueError(
                 f"cannot hold {blocked[0]!r}"
                 + (f" and {len(blocked) - 1} more" if len(blocked) > 1 else "")
-                + f": placed by rigid body {names[0]!r}; hold the body's own "
+                + (f": placed by rigid body {names[0]!r}" if len(names) == 1 else
+                   f": placed by rigid bodies {', '.join(map(repr, names))}")
+                + f"; hold {'the' if len(owners) == 1 else 'each'} body's own "
                 "origin, rotation and torsions instead "
-                f"({_body_dof_globs(table.body_row_bases()[blocked[0]])})")
+                f"({', '.join(_body_dof_globs(b) for b in owners)})")
         new = [p for p in hits if p not in self._user_holds]
         if not new:
             return []
@@ -8610,6 +8617,7 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
                 names.append(stage.name)
     by_path = {e.path: e for e in entries}
     owned = table.body_rows()
+    owned_bases = table.body_row_bases()
     out = []
     for glob, names in asked.items():
         which = subject or _stage_list(names)
@@ -8643,7 +8651,7 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
         if reaches and f"{site}.x" in owned:
             why = f" Rigid body {owned[f'{site}.x']!r} places {site}."
             fix = ("Free the body's own origin, rotation and torsions instead "
-                   f"({_body_dof_globs(table.body_row_bases()[f'{site}.x'])}).")
+                   f"({_body_dof_globs(owned_bases[f'{site}.x'])}).")
         elif (reaches and not dofs
               and all(e is not None and e.locked for e in coords)):
             why = (f" Every coordinate of {site} is fixed by its site symmetry, "
@@ -11942,14 +11950,16 @@ def _rigid_body_unsupported(table: ParameterTable,
     hold would leave.
     """
     owner = table.body_dofs()
+    # keyed by the body's base path, phases.<i>.rigid_bodies.<k>: a body's
+    # name is unique in its phase, not across phases
+    bases = table.body_dof_bases()
     free = set(table.free_paths)
     blind: dict[str, list[str]] = {}
+    names: dict[str, str] = {}
     for row in params:
         if row.path in owner and row.path in free and row.stderr is None:
-            # keyed by the body's base path, phases.<i>.rigid_bodies.<k>: a
-            # body's name is unique in its phase, not across phases
-            blind.setdefault(".".join(row.path.split(".")[:4]), []).append(row.path)
-    names = {bbase: name for bbase, (name, _, _) in table.free_turn_directions().items()}
+            names[bases[row.path]] = owner[row.path]
+            blind.setdefault(bases[row.path], []).append(row.path)
     return [Diagnostic(
         level="warning", code="RIGID_BODY_UNSUPPORTED", where=paths,
         message=(f"Rigid body {names[bbase]!r}: {len(paths)} free degree(s) of "

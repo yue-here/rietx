@@ -28,7 +28,7 @@ matrix — no pydantic objects are touched per iteration.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Literal
 
@@ -123,6 +123,17 @@ DISTORTION_DRIFT_TOL = 1e-9
 #: the vectors are averages of permutation-times-rotation matrices, so a true
 #: zero sits at 1e-15 and a vector the site forbids is O(1) off.
 DISTORTION_SITE_TOL = 1e-8
+
+
+def _matrix_rank(a: np.ndarray) -> int:
+    """``np.linalg.matrix_rank`` at its default tolerance, through
+    :func:`~rietx.optimize.lapack.svd`, so the decomposition takes the
+    second driver where the first does not converge (that module's rule for
+    every decomposition on the fit path)."""
+    if not a.size:
+        return 0
+    s = lapack.svd(a, compute_uv=False)
+    return int(np.count_nonzero(s > s.max() * max(a.shape) * np.finfo(np.float64).eps))
 
 
 def _is_wavelength(path: str) -> bool:
@@ -1933,9 +1944,9 @@ class ParameterTable:
         if any(getattr(atom, c).vary for c in ("x", "y", "z")):
             raise ValueError(
                 f"{base} ({atom.label!r}) is placed by rigid body {body!r}; its "
-                "coordinates are the body's — refine the body's origin and "
-                f"rotation ({bbase}.origin.dof.*, {bbase}.rotation.*) and set "
-                "vary=False here")
+                "coordinates are the body's — refine the body's origin, "
+                f"rotation and torsions ({bbase}.origin.dof.*, {bbase}.rotation.*, "
+                f"{bbase}.torsions.*.twist) and set vary=False here")
         for c in ("x", "y", "z"):
             self._add(f"{base}.{c}", getattr(atom, c), force_fixed=True)
 
@@ -2229,12 +2240,20 @@ class ParameterTable:
         Its origin's displacement DOFs, its rotation DOFs and its torsions'
         twists, read off the data :meth:`_collect_body` built.
         """
-        out: dict[str, str] = {}
+        return {p: name for p, _, name in self._body_dof_owners()}
+
+    def body_dof_bases(self) -> dict[str, str]:
+        """Every rigid body's own DOF → that body's base path,
+        ``phases.<i>.rigid_bodies.<k>``: :meth:`body_dofs` keyed where a
+        body's name is unique only in its phase, read off the same data."""
+        return {p: bbase for p, bbase, _ in self._body_dof_owners()}
+
+    def _body_dof_owners(self) -> Iterator[tuple[str, str, str]]:
+        """(DOF path, body base path, body name) for every body's own DOF."""
         for bbase, name, block in self._bodies:
-            out.update(dict.fromkeys(block.rotation_paths(bbase), name))
-            out.update(dict.fromkeys(self._anchored_torsions[bbase], name))
-            out.update(dict.fromkeys(self._body_origin_dofs[bbase], name))
-        return out
+            for p in (*block.rotation_paths(bbase), *self._anchored_torsions[bbase],
+                      *self._body_origin_dofs[bbase]):
+                yield p, bbase, name
 
     def body_bond_errors(self) -> dict[str, float]:
         """Per body, the largest |d_ij − d_ij(template)| over its atoms (Å).
@@ -4672,7 +4691,7 @@ class ParameterTable:
             a = self._C[[self._paths[q] for q in block.rotation_paths(bbase)]].toarray()
             cols = np.flatnonzero(np.abs(a).sum(axis=0) > 0.0)
             a = a[:, cols]
-            if len(cols) == len(a) and np.linalg.matrix_rank(a) == len(cols):
+            if len(cols) == len(a) and _matrix_rank(a) == len(cols):
                 out[np.ix_(cols, cols)] = np.linalg.solve(a, chart @ a)
         return out
 
@@ -4693,10 +4712,10 @@ class ParameterTable:
         for bbase, name, block in self._bodies:
             rows = [self._paths[q] for q in block.rotation_paths(bbase)]
             a = self._C[rows][:, keep].toarray() if rows and keep else np.zeros((0, 0))
-            out[bbase] = (name, int(np.linalg.matrix_rank(a)) if a.size else 0, len(rows))
+            out[bbase] = (name, _matrix_rank(a), len(rows))
         return out
 
-    def refuse_partial_turns(self) -> None:
+    def refuse_partial_turns(self, *, joint: bool = False) -> None:
         """``RIGID_BODY_PARTIAL_TURN``: a body's turn is free in some directions only.
 
         Raised at stage start (``Refinement._run_stage`` and the joint runner),
@@ -4709,25 +4728,40 @@ class ParameterTable:
         not this one's and :meth:`_chart_matrix` has no exact re-chart to give
         (the maintainer's answer (c) on #801).  A linear body has two
         directions, and one of them free is a turn about a fixed axis.
+
+        ``joint`` words the remedies for ``MultiHistogramRefinement``, which
+        has no hold or tie verb, so the stage's globs are the only lever.
         """
-        for bbase, (name, free, k) in self.free_turn_directions().items():
+        turns = self.free_turn_directions()
+        for bbase, _, block in self._bodies:
+            name, free, k = turns[bbase]
             if free in (0, 1, k):
                 continue
-            state = []
-            for q in (f"{bbase}.rotation.{j}" for j in range(k)):
+            state, pinned = [], False
+            for q in block.rotation_paths(bbase):
                 e = self.entries[self._paths[q]]
+                pinned |= e.tie is not None or e.held
                 state.append(f"{q.rsplit('.', 1)[1]} "
                              + ("tied" if e.tie is not None
                                 else "free" if e.vary else "held"))
+            glob = f"{bbase}.rotation.*"
+            if joint:
+                remedy = (f"Free all {k} ({glob}) or none of them in the stage's "
+                          "turn_on: a joint fit has no hold or tie verb")
+            else:
+                remedy = (f"Free all {k} ({glob}), hold all {k} "
+                          f"(Refinement.hold({glob!r})), or tie the turn to one axis "
+                          f"(Refinement.tie_equal({glob!r}), or Refinement.tie with "
+                          "scales for another axis)")
+                if pinned:
+                    remedy += ("; a held or tied DOF first needs Refinement.unhold "
+                               "or Refinement.untie")
             raise ValueError(
                 f"RIGID_BODY_PARTIAL_TURN: rigid body {name!r} has {free} free turn "
                 f"directions of its {k} ({bbase}.rotation: {', '.join(state)}). "
                 "A commit composes the turn into the body's orientation, and two "
                 "turns compose into the third, so the stage cannot keep the "
-                f"directions it was given. Free all {k} ({bbase}.rotation.*), hold "
-                f"all {k} (Refinement.hold({bbase + '.rotation.*'!r})), or tie the "
-                f"turn to one axis (Refinement.tie_equal({bbase + '.rotation.*'!r}), "
-                "or Refinement.tie with scales for another axis)")
+                f"directions it was given. {remedy}")
 
     def restore_body_anchors(self, paths: Iterable[str]) -> list[str]:
         """Put back the anchor the last commit replaced, for bodies in ``paths``.

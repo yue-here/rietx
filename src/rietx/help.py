@@ -4215,10 +4215,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "A free rotation or shift of a rigid body has no effect on the pattern. The "
             "usual cause is a turn that moves only zero-occupancy atoms, or a turn about "
             "an axis the template is symmetric under. The value and the esds of the body "
-            "atoms are not measurements. Hold those parameters and refit. Hold a turn "
-            "whole or in all but one direction: a stage refuses a body whose turn is "
-            "free in two directions of three, and the suggestion then names the whole "
-            "turn to hold."
+            "atoms are not measurements. Hold what the suggestion names and refit."
         ),
     ),
     "ROUGHNESS_ABSORPTION": HelpEntry(
