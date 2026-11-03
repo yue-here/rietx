@@ -39,7 +39,7 @@ With the cell fixed, the peak positions measure the zero shift and the specimen 
 
 Refine one of the two axial-divergence ratios, S/L, and hold the other, H/L.
 In rietx's profile the two are interchangeable: swapping their values gives the same pattern to the last bit.
-Refined together on this standard, they came back as S/L 0.02476(78) and H/L 0.01542(87), against 0.025 and 0.015.
+Refined together on this standard, they came back as S/L 0.01542(87) and H/L 0.02476(78), the pattern's 0.025 and 0.015 exchanged.
 The exchanged pair gives the same pattern, so nothing in the data chose this order, and no finding names the pair.
 H/L is the receiving slit's height over the goniometer radius, 3 mm over 200 mm here, so take it from the instrument's dimensions.
 

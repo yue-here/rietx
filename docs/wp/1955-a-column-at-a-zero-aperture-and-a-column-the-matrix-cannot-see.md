@@ -126,7 +126,7 @@ when U and V are both zero beside W on its floor. It is the only other
       zero aperture against the one-sided difference, and find the line in
       `model/forward.py` where the node differencing departs from it. A test
       that fails on `main`.
-- [ ] Fix it, and re-measure the fits that free one aperture from 0:
+- [x] Fix it, and re-measure the fits that free one aperture from 0:
       `test_e8`, QPA cpd-1a's `lines_axial` stage, the Stephens brucite
       protocol. Record the esds of S/L before and after.
       Reverted in PR #1321. The fix (a second-order node difference, measured
@@ -136,6 +136,8 @@ when U and V are both zero beside W on its floor. It is the only other
       reader-output change with numbers. Until then the numpy rows of the
       zero-aperture test are a strict xfail naming task 5, and the matrix
       leaves out that one column (`KNOWN_DEFECT_COLUMNS`).
+      Landed 2026-11-03 with task 5 (the reverts reverted); the re-measures
+      are in that day's handover entry.
 - [x] The dead-column cut: count the configs whose columns fall under
       `DEAD_COL_FRAC`, and decide whether the matrix checks such a column
       against its own difference at its own scale, as the zero-aperture test
@@ -153,13 +155,23 @@ when U and V are both zero beside W on its floor. It is the only other
       is not a backend row.
 - [x] Probe the Caglioti tie: U = V = 0 with W on its floor, traced against
       numpy.
-- [ ] Both apertures at 0: reproduce WP-2003's warm CPD collapse (X17) and
+- [x] Both apertures at 0: reproduce WP-2003's warm CPD collapse (X17) and
       #1075's LM stop on `lab_bragg_brentano`, and say whether one remedy (a
       floor or a lift where the column is live, WP-1938's rule) serves both.
       Land task 2's exact column with that remedy, in one change: the
       calibrate guide's second calibration (S/L freed from 0, H/L held) is
       the case the column alone breaks. Remove the strict xfail and the
       `KNOWN_DEFECT_COLUMNS` entry in `tests/test_cross_backend.py` then.
+      Decided 2026-11-03: one remedy serves all three, a lift. A stage that
+      frees an aperture sitting on zero starts it at `AXIAL_SIZING_FLOOR`
+      (0.02), the value its windows and nodes are already sized for
+      (`forward.apertures_to_lift`, both runners, recorded in
+      `StageResult.seeded`). A floor cannot serve: the column at a small
+      positive floor is as small as at zero. #1075 repro 1: Rwp 0.0834 on
+      zero → 0.0453; X17's warm 1c: Rwp 10.73 → 0.10881; the calibrate
+      guide's second calibration leaves zero again. Settled by Claude on
+      those measurements; the start value reuses an approved constant, and
+      the PR asks Yue to confirm its row covers the second use.
 
 ## Acceptance
 

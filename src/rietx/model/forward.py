@@ -305,8 +305,40 @@ def window_fwhm_mult_interp(eta: np.ndarray, tol: float | None = None) -> np.nda
 #: ``predict()`` at given values does not depend on which parameters are free
 #: (#774); and, for the optimiser, when either is about to be *refined* from
 #: zero, so the finite-difference Jacobian sees a live parameter instead of a
-#: frozen zero-node profile
+#: frozen zero-node profile.  Also where such a ratio *starts*
+#: (:func:`apertures_to_lift`, WP-1955): a stage that frees one sitting on
+#: zero lifts it here before solving, so the start is the value the stage's
+#: windows and nodes are sized for.
 AXIAL_SIZING_FLOOR = 0.02
+
+#: The two FCJ axial ratios, S/L and H/L.
+AXIAL_PATHS = ("instrument.geometry.axial_sl", "instrument.geometry.axial_hl")
+
+
+def apertures_to_lift(freed: list[str]) -> list[str]:
+    """The paths in ``freed`` that are an FCJ axial ratio, the rows a stage
+    lifts to :data:`AXIAL_SIZING_FLOOR` when they sit on zero (WP-1955).
+
+    A path may carry a multi-histogram scope (``hist.{h}.``); the runner's own
+    ``seed_floored`` writes only a row exactly on its floor of 0, so a start a
+    caller chose is never moved.
+
+    Why a lift and not a floor.  The FCJ profile is quadratic in an aperture
+    at zero, so the exact column there is nearly zero: 0.047 against a
+    largest of 1.8e6 with the other aperture live, and smaller still with
+    both at zero.  Gauss-Newton sees no way off the bound, and a step taken
+    from it is tens to thousands of units long.  Measured on this branch
+    (WP-1955's handover entry): #1075's repro 1 ends ``converged`` at S/L =
+    H/L = 0 and Rwp 0.0834, lifted at 0.0453 beside TRF's 0.0454; WP-2003
+    X17's warm CPD 1c collapses to Rwp 10.7, lifted converges at 0.10881 in
+    43 evaluations against the independent fit's 0.10901; and the calibrate
+    guide's second calibration stays on zero.  A positive floor would not
+    help, since the column at a small floor is just as small.  From the lift
+    the fit can still walk back to zero: CPD 1b does, ending on its floor.
+    """
+    return [p for p in freed
+            if (p.split(".", 2)[2] if p.startswith("hist.") else p)
+            in AXIAL_PATHS]
 
 #: How far outside the fitted range, in °2θ, a reflection is still generated
 #: (``compile_model``, and the satellite report arm, through

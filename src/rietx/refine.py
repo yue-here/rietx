@@ -71,9 +71,12 @@ from .model.absorption import (
 )
 from .model.components import EXTRA_TICK_KEY
 from .model.forward import (
+    AXIAL_PATHS,
+    AXIAL_SIZING_FLOOR,
     PHASE_SUPPORT_SIGMA,
     CompiledModel,
     Mode,
+    apertures_to_lift,
     compile_model,
     orbit_split_of,
     recorded_window_tol,
@@ -1571,7 +1574,7 @@ def _only_moves(reached: list[str], prefixes: tuple[str, ...],
 #: phase peaks alone.  Named here because ``scalar_chain_supported`` leaves
 #: them out for a different reason: they move the quadrature nodes, so their
 #: Jacobian column is not the per-peak chain's.
-_AXIAL_PATHS = ("instrument.geometry.axial_sl", "instrument.geometry.axial_hl")
+_AXIAL_PATHS = AXIAL_PATHS
 
 
 def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
@@ -4766,13 +4769,18 @@ class Refinement:
                 if mode_fixed_column(reach.get(path, [path]), mode):
                     table.set_vary([path], False)
                     freed.remove(path)
-        seeded: dict[str, float] = {}
+        # an FCJ aperture freed on zero starts where the stage's windows are
+        # sized, since its column there is nearly zero; before the plan's own
+        # seed, which then finds it off its floor (WP-1955)
+        seeded: dict[str, float] = dict.fromkeys(
+            table.seed_floored(apertures_to_lift(freed), AXIAL_SIZING_FLOOR),
+            AXIAL_SIZING_FLOOR)
         if stage.seed:
             # start a freed row sitting on its floor where the plan says:
             # roughness at b = 0 is the identity, and its stage starts b in
             # the band the data can see (WP-1938)
-            seeded = dict.fromkeys(table.seed_floored(freed, stage.seed),
-                                   stage.seed)
+            seeded.update(dict.fromkeys(
+                table.seed_floored(freed, stage.seed), stage.seed))
         strain_seeded: list[str] = []
         if stage.strain_seed:
             # the Stephens DOFs are unbounded below, so the seed above never

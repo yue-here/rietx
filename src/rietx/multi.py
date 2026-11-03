@@ -31,7 +31,9 @@ from .crystallography.structure_factor import phase_orbit_split
 from .crystallography.twins import merge_site_twins
 from .history.events import _attach_progress, as_event_stream
 from .model.forward import (
+    AXIAL_SIZING_FLOOR,
     PHASE_SUPPORT_SIGMA,
+    apertures_to_lift,
     compile_model,
     orbit_split_of,
     recorded_window_tol,
@@ -1702,10 +1704,16 @@ class MultiHistogramRefinement:
                     # and a cumulative plan need not name its cell again
                     self.mtable.set_vary(carried_hold, True)
                     carried_hold = []
-                seeded: dict[str, float] = {}
+                # the single-histogram runner's lift (``_run_stage``,
+                # WP-1955): an FCJ aperture freed on zero starts where the
+                # stage's windows are sized, before the plan's own seed
+                seeded: dict[str, float] = dict.fromkeys(
+                    self.mtable.seed_floored(apertures_to_lift(freed),
+                                             AXIAL_SIZING_FLOOR),
+                    AXIAL_SIZING_FLOOR)
                 if stage.seed:
-                    seeded = dict.fromkeys(
-                        self.mtable.seed_floored(freed, stage.seed), stage.seed)
+                    seeded.update(dict.fromkeys(
+                        self.mtable.seed_floored(freed, stage.seed), stage.seed))
                 self.mtable.apply_to_models()
                 # the single-histogram runner's rule (``_run_stage``, #598): the
                 # moment frames follow the cell this stage starts from, and the

@@ -473,6 +473,42 @@ def test_axial_free_at_zero_nodes_do_not_change_the_pattern(monkeypatch):
     assert np.max(np.abs(y_free - y_fixed)) <= 1e-14 * np.max(y_fixed)
 
 
+@pytest.mark.parametrize("start", [(0.0, 0.0), (0.0, 0.015), (0.01, 0.0)])
+def test_a_stage_lifts_an_aperture_freed_on_zero(start):
+    """WP-1955: a stage starts an aperture it frees on zero at
+    ``AXIAL_SIZING_FLOOR``, records it in ``StageResult.seeded``, and touches
+    neither a positive aperture nor a held one.
+
+    The FCJ profile is quadratic in an aperture at zero, so its exact column
+    there is nearly zero and Gauss-Newton stays put: before the lift, #1075's
+    repro 1 ended ``converged`` with both on zero at Rwp 0.0834, where one
+    TRF stage reached 0.0454 (``forward.apertures_to_lift``).  Here the data
+    carry 0.03 on both, and from every start the stage leaves zero.
+    """
+    from rietx.model.forward import AXIAL_PATHS, AXIAL_SIZING_FLOOR
+    tt = np.arange(15.0, 80.0, 0.02)
+    truth = _rutile_axial(0.03, False)
+    y = np.asarray(truth.predict(tt)) * 1e4 + 50.0
+    data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist(),
+                          sigma=np.sqrt(y).tolist())
+    ref = _rutile_axial(0.0, False)
+    g = ref.instrument.geometry
+    g.axial_sl.value, g.axial_hl.value = start
+    ref.structure.phases[0].scale.value *= 1e4
+    ref.instrument.background.coefficients[0].value = 50.0
+    stage = rx.Stage("axial", list(AXIAL_PATHS), max_iter=3)
+    res = ref.run_stage(data, stage, telemetry=False)
+    assert res.stages[-1].seeded == {p: AXIAL_SIZING_FLOOR
+                                    for p, v in zip(AXIAL_PATHS, start) if v == 0.0}
+    assert all(ref.instrument.geometry.model_dump()[p.rsplit(".", 1)[1]]["value"] > 0.0
+               for p in AXIAL_PATHS)
+    held = _rutile_axial(0.0, False)
+    held.hold("instrument.geometry.axial_hl")
+    res = held.run_stage(data, stage, telemetry=False)
+    assert res.stages[-1].seeded == {AXIAL_PATHS[0]: AXIAL_SIZING_FLOOR}
+    assert held.instrument.geometry.axial_hl.value == 0.0
+
+
 # ---------------------------------------------------------------------------
 # FCJ quadrature error over the claimed domain (WP-2002, B10)
 # ---------------------------------------------------------------------------
