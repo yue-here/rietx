@@ -1,9 +1,8 @@
 # WP-2066 — a complete dichotomy search holds every centred lattice and polishes its truth leaf
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by ghostshift runner (the orthorhombic-F re-measure, then the close)
+Milestone: unscheduled · Status: ✅ 2026-11-03 — option 1 + V3 in PR #1301; the orthorhombic-F lab list re-measured by its owner, its wrong cells above the truth not refuted
 Track: What fires, and what stays silent
 Depends on: — (1924 soft: the same engine, the same #780 units)
-Priority: P2 2026-10-31 — a defect that fires wrongly: `search_complete=True` while the true cell is absent, on 22-32 % of C-centred monoclinic lattices by the reporter's draw; end to end the gate abstains rather than promoting the supercell (all `low`, `INDEX_ABSTAINED`), so a clean pattern returns no cell rather than a wrong one
 
 ## Goal
 
@@ -150,8 +149,13 @@ papers only.
       Moves named in the handover log; the fluorapatite row restated on its
       Kα2 lines (settled by Claude under Yue's V3 ruling and the line-by-line
       measurement; the 95 % bar was Claude-written).
-- [ ] Re-measure the orthorhombic-F lab list the reporter saw move (truth
+- [x] Re-measure the orthorhombic-F lab list the reporter saw move (truth
       5 → 7/8), and say whether the A/B cells above it are refuted.
+      Not refuted. The list is a collaborator's private data, so its owner
+      re-measured #1301 against its merge-base (#1258, 2026-11-02; handover
+      log). The truth drops 5 → 6 on its own grid cells and leaves the
+      60-candidate pool on the whole frontier. `index_pattern` returns no
+      truth on either tree.
 - [x] Skill: none expected (engine internals; no code or verb changes).
       Confirmed: no diagnostic code, verb or output field changed
       (`reader_output` unchanged).
@@ -176,6 +180,76 @@ with `search_complete=True`; acceptance rows keep their rankings.
   WP-1924, WP-1959 (the compiled box test).
 
 ## Handover log
+
+### 2026-11-03 — the orthorhombic-F list, measured by its owner; the WP closes
+
+The last open question has an answer, and the answer is against V3 on
+that one list. The reporter's orthorhombic-F lab list is a collaborator's
+private data set, so the reporter re-measured #1301 on it and posted counts
+only. On the grid cells that hold the true lattice, the truth drops from
+5th to 6th. The A/B images do not cause that drop. V3's change to the leaf
+polish does. Over the whole frontier at an equal box count, the truth falls
+out of the 60 candidates the engine hands on. To a user nothing changes:
+`index_pattern` returns no true cell on this list before or after #1301.
+The WP closes on the maintainer's 2026-11-01 ruling, which was made with
+this list's drop already in the brief.
+
+**Measured, by the reporter** (#1258 comment of 2026-11-02; #1301 at
+`07219df85` against its merge-base `e5d2d0350`, macOS, one thread; nothing
+under `src/rietx/indexing` changed between `07219df85` and the merge).
+"Truth" is the same lattice indexing at least 95 % of the lines the truth
+itself indexes. Phase 2 was capped at the 2026-10-31 box coverage, so both
+trees did the same work. At that cap the merge-base reproduces the
+2026-10-31 run exactly (172 accepted, truth 50th).
+
+| | merge-base | #1301 |
+|---|---|---|
+| truth grid cells: truth rank | 5 of 10 | 6 of 23 |
+| wrong cells above it | 4 (3 C, 1 P) | 5 (3 C, 2 P), none from the A/B images |
+| whole frontier: truth leaves accepted | 6 | 14 |
+| whole frontier: candidates accepted | 172 | 531 (141 from the images) |
+| truth rank in the 60-candidate pool | 50 | not in the pool |
+| truth rank over all accepted | 50 of 148 | 113 of 341 |
+| wrong cells above it | 49 (47 P, 2 I) | 112 (92 P, 17 C, 3 I); 16 of the C are A/B images re-set to C |
+| whole frontier, 60 s wall | truth 48th | truth not reached; 19 % more time per box |
+
+Neither tree finishes the whole frontier in 3000 s. Through
+`index_pattern(preset="full")`, dichotomy and orthorhombic only, the truth
+is absent from all 12 candidates on both trees, all graded `low`, about
+830 s each. The default call abstains on both. The reporter's synthetic
+orthorhombic-F unit keeps its truth first on both trees, which checks the
+harness.
+
+**What this answers.** The task asked whether the wrong A/B cells above
+the truth are refuted. They are not. On the truth's own grid cells no image
+ranks above it, and the one-rank drop comes from V3. On the whole frontier
+112 wrong cells rank above it, against 49 on the merge-base. Sixteen of
+them are re-set images. The other 96 are 92 P, 1 C and 3 I cells. The
+search there was capped, so no completeness claim is involved. The
+question left is how a harvest ranks a truth that indexes only 34 lines
+(the reporter's 2026-10-31 count). This WP's Goal does not cover it. WP-2078 inherits the numbers, since
+its dichotomy rows predate #1301. WP-1520 inherits the per-box cost.
+
+**Settled here, by Claude under the maintainer's V3 ruling of 2026-11-01:
+V3 stands and the WP closes.** That ruling's brief quoted this list's
+5 → 7, and the WP's Context quoted its exit from the pool. The re-measure
+agrees with both. The alternative was to send V3 back to the maintainer
+on this list. Against it: the user-visible answer is unchanged, and V3
+gains the truth on the B repro and on 3 #780 units while losing it nowhere.
+
+**Done.** Task 5 ticked. Priority line removed. Narrative moved to
+`docs/milestones/v1.11.md`. `### Inherited` notes in WP-2078 and WP-1520.
+No code changed. No re-measure was possible here: the data is not on this
+machine, and by the reporter's statement it will not be.
+
+**Gates** (macOS arm64, this worktree's `[dev]` venv, compiled tier on,
+branch at `origin/main` 62724a30f plus docs): see the PR for the counts of
+`tests/test_indexing_engines.py`, `tests/test_acceptance_indexing.py` and
+the fast selection. `python -m tests.reader_output`: exit 0, unchanged
+against the merge-base.
+
+**Next.** None for this WP. The F list's ranking belongs to WP-2078 if its
+dichotomy rows still show it after a re-run on `main`.
 
 ### 2026-11-01 (2nd session) — option 1 and V3 built; the F list waits on its owner
 
