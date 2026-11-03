@@ -254,7 +254,7 @@ A reader keyword means the same in every format that takes it, so `Capabilities.
 | `ProjectFormatCapability.extensions` | the file extensions |
 | `ProjectFormatCapability.sniff` | how a file is recognised as this format |
 | `ProjectFormatCapability.carries` | what the file holds beyond a structure, in words |
-| `ProjectFormatCapability.reports_at` | where the reader reports its repairs: `"read"`, `"build"` or `"both"` |
+| `ProjectFormatCapability.reports_at` | where the reader reports its repairs: `"build"` or `"both"` |
 | `ProjectFormatCapability.writes` | the function that writes this format, or `None` where this build writes none |
 | `ProjectFormatCapability.refuses` | why the format is declined, or `None` for a format that is read |
 

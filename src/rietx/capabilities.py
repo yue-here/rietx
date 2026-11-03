@@ -229,7 +229,7 @@ class ProjectFormatCapability(Base):
     sniff: str
     #: what the file carries beyond a structure, in words
     carries: list[str]
-    #: ``"read"``, ``"build"`` or ``"both"`` — where this format's repairs are
+    #: ``"build"`` or ``"both"`` — where this format's repairs are
     #: reported, so a caller knows which call to hand its diagnostics list to.
     #: A real per-format difference: a ``.pcr``'s repairs happen while
     #: converting codewords, a ``.inp``'s both while parsing and while building
