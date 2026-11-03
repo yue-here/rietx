@@ -935,3 +935,60 @@ def test_naming_the_strain_silences_it_and_so_does_a_stage_with_no_edges():
     assert _held_findings(["phases.*.scale", "phases.*.cell.*",
                            "phases.*.parent_cell.strain.*"]) == []
     assert _held_findings(["phases.*.scale"]) == []
+
+
+def _cell_glob_findings(phase, glob):
+    from rietx.refine import _site_glob_diagnostics
+
+    ref = rx.Refinement(Structure(phases=[phase.model_copy(deep=True)]),
+                        INSTRUMENT.model_copy(deep=True))
+    table = ParameterTable(ref.structure, ref.instrument)
+    return _site_glob_diagnostics([rx.Stage(name="cell", turn_on=[glob])],
+                                  table, {})
+
+
+def test_a_cell_glob_that_frees_nothing_is_reported_on_a_parent_cell_phase():
+    """``phases.0.cell.*`` reaches only derived rows here, and says so (#1108).
+
+    The literal and the site glob were reported already; the cell glob was the
+    one spelling that froze the run silently.  The suggestion names the glob
+    that works.
+    """
+    phase = _child((0.5, 0.5, 0), "S1", "(rank 2)#3").phase
+    (found,) = _cell_glob_findings(phase, "phases.0.cell.*")
+    assert found.code == "STAGE_PATH_NOT_FREE" and found.where == ["phases.0.cell.*"]
+    assert "phases.0.parent_cell.cell.*" in found.suggestion
+    # a glob over every phase stays unchecked, as it is for sites
+    assert not _cell_glob_findings(phase, "phases.*.cell.*")
+
+
+def test_a_cell_glob_on_an_ordinary_phase_is_silent_unless_it_reaches_only_fixed_rows():
+    """The rule is the phase's, not the parent cell's: ``cell.*`` frees ``a``;
+    ``cell.al*`` on an orthorhombic phase reaches only symmetry-fixed angles."""
+    phase = _lamno3()
+    assert not _cell_glob_findings(phase, "phases.0.cell.*")
+    (found,) = _cell_glob_findings(phase, "phases.0.cell.al*")
+    assert found.code == "STAGE_PATH_NOT_FREE"
+    assert "parent_cell" not in found.suggestion
+
+
+def test_zero_is_stationary_only_while_the_atoms_keep_the_parents_symmetry():
+    """The strain's odd part is rounding on the parent's positions and ~1e-3 of
+    the peak once one coordinate sits off them (measured 8.4e-14 and 2.0e-3 at
+    h = 1e-4), which the ``PARENT_STRAIN_HELD`` text states."""
+    phase = _child((0.5, 0.5, 0), "S1", "(rank 2)#3").phase
+    tt = np.arange(10.0, 110.0, 0.01)
+
+    def pattern(s, extra):
+        ref = rx.Refinement(Structure(phases=[phase.model_copy(deep=True)]),
+                            INSTRUMENT.model_copy(deep=True))
+        ref.set_values({"phases.0.parent_cell.strain.0": s, **extra})
+        return np.asarray(ref.predict(tt))
+
+    def odd(extra):
+        h = 1e-4
+        return (np.abs(pattern(h, extra) - pattern(-h, extra)).max()
+                / pattern(0.0, extra).max())
+
+    assert odd({}) < 1e-10
+    assert odd({"phases.0.atoms.2.dof.2": 0.01}) > 1e-4

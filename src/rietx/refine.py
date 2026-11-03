@@ -7916,8 +7916,11 @@ def _parent_strain_held_diagnostics(stage_results: list[StageResult],
     """``PARENT_STRAIN_HELD`` — a parent cell's edges refined with a Γ strain held.
 
     ``phases.*.cell.*`` reaches the parent's cell edges of a
-    ``Phase.parent_cell`` phase and never a strain (WP-1419): a strain at zero
-    has no gradient to leave it by, and a plan written for an ordinary phase
+    ``Phase.parent_cell`` phase and never a strain (WP-1419): while the
+    child's atoms and moments keep the parent's symmetry a strain at zero is a
+    stationary point, and a distortion gives it only a small gradient there
+    (measured 2e-3 of the peak at a 0.01 coordinate; 8e-14 on the parent's
+    positions), so a plan written for an ordinary phase
     should refine the cell the way a user expects.  A competent refiner can
     still want the strain freed, so the hold is said aloud, as a hold is
     (:func:`_hold_diagnostics`, DESIGN.md § Rules, 1): one finding per phase
@@ -7961,7 +7964,9 @@ def _parent_strain_held_diagnostics(stage_results: list[StageResult],
                      f"shear beyond the held value."),
             where=held, value=float(n),
             suggestion=("To test for a strain, seed it off zero with set_values "
-                        "(its gradient vanishes at exactly zero), then free "
+                        "(zero is a stationary point while the atoms keep the "
+                        "parent's symmetry, and a distortion gives it only a "
+                        "small gradient there), then free "
                         "'phases.*.parent_cell.strain.*' in a stage's turn_on."),
         ))
     return out
@@ -8107,7 +8112,7 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
 
 
 #: the fixed leading segments of a glob that names one site
-_SITE_GLOB = re.compile(r"^(phases\.\d+\.atoms\.\d+)\.")
+_SITE_GLOB = re.compile(r"^(phases\.\d+\.(?:atoms\.\d+|cell))\.")
 
 
 def _frees_for_request(entry, turn_on, user_ties) -> bool:
@@ -8143,7 +8148,10 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
     was already reported by :func:`_fixed_literal_diagnostics`.
 
     **Only a glob whose fixed leading segments name one existing site**
-    (``phases.<i>.atoms.<j>.``).  WP-1414 kept every other pattern that matches
+    (``phases.<i>.atoms.<j>.``) **or one existing phase's cell**
+    (``phases.<i>.cell.``, #1108: a parent-cell phase's cell glob reaches only
+    derived rows, and ``phases.0.cell.al*`` on a cubic phase only
+    symmetry-fixed ones, while the literal was already reported).  WP-1414 kept every other pattern that matches
     nothing silent, because the shipped plans free families some models lack
     (``phases.*.microstrain.dof.*``), and no preset names a concrete index.
     A glob with a concrete site is the caller's claim about that site, so it
@@ -8196,6 +8204,24 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
         which = subject or _stage_list(names)
         site = _SITE_GLOB.match(glob).group(1)
         matched = [e.path for e in entries if fnmatch.fnmatchcase(e.path, glob)]
+        if site.endswith(".cell"):
+            ip = int(site.split(".")[1])
+            what = (f"matches only rows the model fixes or ties "
+                    f"({', '.join(matched)})" if matched
+                    else "matches no parameter")
+            parent = any(e.path.startswith(f"phases.{ip}.parent_cell.cell.")
+                         for e in entries)
+            why = (f" Phase {ip}'s cell is stated through its parent, so its "
+                   "own cell rows are derived and never free." if parent else "")
+            fix = (f"Free phases.{ip}.parent_cell.cell.* (the parent's edges) "
+                   "instead." if parent else
+                   "Read held_because for these rows in ref.parameters().")
+            out.append(Diagnostic(
+                level="warning", code="STAGE_PATH_NOT_FREE",
+                message=(f"{which[:1].upper()}{which[1:]} asked for {glob}, "
+                         f"which {what}, so nothing was freed for it.{why}"),
+                where=[glob], suggestion=fix))
+            continue
         dofs = [e.path for e in entries if e.path.startswith(f"{site}.dof.")]
         coords = [by_path.get(f"{site}.{axis}") for axis in "xyz"]
         reaches = any(fnmatch.fnmatchcase(f"{site}.{tail}", glob)

@@ -1231,6 +1231,7 @@ ROWS: tuple[Row, ...] = (
                   "symmetry-tied row whose sources the same stage does not free "
                   "(refine._fixed_literal_diagnostics, WP-1414), or a glob whose fixed "
                   "leading segments name one existing site (phases.<i>.atoms.<j>.) "
+                  "or one existing phase's cell (phases.<i>.cell., #1108) "
                   "matches no row the stage can free (refine._site_glob_diagnostics, "
                   "issue #896, WP-1951; single fits, the joint fit asking the literal "
                   "branch alone until WP-2028); no threshold, and no shipped preset "
@@ -4715,7 +4716,7 @@ ROWS: tuple[Row, ...] = (
                   "driver's Gaussian and Lorentzian width floors "
                   "(gaussian_width_inequalities, lorentzian_width_inequalities) that TRF "
                   "has no vocabulary for")),
-    Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=2),
+    Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=3),
     Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
     Row("STAGE_WINDOWS_STALE.suggestion", "suggestion", value=1, tier=3, ambiguity=3,
         evidence=("WP-2045's re-solve from the runaway went from axial_sl 558 to 4114, "

@@ -3330,8 +3330,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A stage freed the cell edges of a phase whose cell is stated through its "
             "parent (`Phase.parent_cell`) while one of its lattice strains stayed held. "
-            "The cell glob frees the parent's edges and never a strain, because a strain "
-            "at exactly zero has no gradient to leave it by. The child's cell is then the "
+            "The cell glob frees the parent's edges and never a strain, because while "
+            "the child's atoms and moments keep the parent's symmetry a strain at zero is a "
+            "stationary point, and a distortion gives it only a small gradient there. The child's cell is then the "
             "parent's carried through the transform with no shear beyond the held value. "
             "To test for a shear, seed the strain off zero with `set_values` and free "
             "`phases.*.parent_cell.strain.*` in a stage's `turn_on`."
