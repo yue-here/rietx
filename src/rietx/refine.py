@@ -61,7 +61,7 @@ from .crystallography.twins import (
 )
 from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
-from .history.store import fingerprint
+from .history.store import fingerprint, refuse_existing_log
 from .history.tree import RefinementTree
 from .model.absorption import (
     CYLINDER_MU_R_MAX,
@@ -2431,7 +2431,9 @@ class Refinement:
     down a different branch with :meth:`run_stage`.
 
     Pass ``history=False`` for the light path: no snapshots, no per-stage
-    statistics, no serialisation.
+    statistics, no serialisation.  A ``history`` path that already holds a log
+    raises ``FileExistsError`` here, because a log holds one tree (WP-2031);
+    continue one with :meth:`from_node` on the loaded tree.
     """
 
     def __init__(self, structure: Structure, instrument: Instrument, *,
@@ -2557,6 +2559,10 @@ class Refinement:
         if isinstance(history, RefinementTree):
             self.history = history
             self._head_id = history.head
+        elif isinstance(history, str | Path):
+            # before any fit is paid for; ``RefinementTree.for_data`` asks
+            # again when the tree is made, for a file written in between
+            refuse_existing_log(history)
 
         # carried across calls so a checkout can be continued
         self._mode: Mode = "rietveld"
