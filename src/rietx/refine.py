@@ -1569,14 +1569,6 @@ def _only_moves(reached: list[str], prefixes: tuple[str, ...],
         for p in moved)
 
 
-#: The FCJ axial ratios.  They shape every phase reflection and nothing else
-#: (``extra_peak_curve`` applies no FCJ), so they reach the pattern through
-#: phase peaks alone.  Named here because ``scalar_chain_supported`` leaves
-#: them out for a different reason: they move the quadrature nodes, so their
-#: Jacobian column is not the per-peak chain's.
-_AXIAL_PATHS = AXIAL_PATHS
-
-
 def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
     """Whether instrument entry ``path`` reaches the pattern only through the
     phases' reflections (WP-2049).
@@ -1591,8 +1583,14 @@ def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
     chain does not claim (a TOF bank's calibration, say) stays free: the
     conservative answer, since a wrong hold freezes a measurement.
     """
+    # The FCJ axial ratios (``forward.AXIAL_PATHS``) shape every phase
+    # reflection and nothing else (``extra_peak_curve`` applies no FCJ), so
+    # they reach the pattern through phase peaks alone.  Named here because
+    # ``scalar_chain_supported`` leaves them out for a different reason: they
+    # move the quadrature nodes, so their Jacobian column is not the per-peak
+    # chain's.
     return path.startswith("instrument.") and (
-        path in _AXIAL_PATHS or model.scalar_chain_supported(path))
+        path in AXIAL_PATHS or model.scalar_chain_supported(path))
 
 
 def _every_phase_unseen(model: CompiledModel, absent: set[int]) -> bool:
@@ -4726,6 +4724,11 @@ class Refinement:
         # the threshold the answer's significance is read against: the hold's
         # own, or the default where there is no hold and only the report reads
         report_sigma = _reported_support_sigma(phase_support_sigma)
+        # what was already refining before this stage: the aperture lift below
+        # starts only a row this stage newly frees, so a closing stage (or any
+        # later stage naming it again) leaves an aperture an earlier stage
+        # walked back to zero where the data put it (WP-1955)
+        free_before = set(table.free_paths)
         freed = table.set_vary(stage.turn_on, True)
         # What the glob matched and the hold refused (WP-1435).  Read off the
         # table rather than re-globbing the register, so it names the paths
@@ -4769,11 +4772,13 @@ class Refinement:
                 if mode_fixed_column(reach.get(path, [path]), mode):
                     table.set_vary([path], False)
                     freed.remove(path)
-        # an FCJ aperture freed on zero starts where the stage's windows are
-        # sized, since its column there is nearly zero; before the plan's own
-        # seed, which then finds it off its floor (WP-1955)
+        # an FCJ aperture this stage frees on zero starts where the stage's
+        # windows are sized, since its column there is nearly zero; before the
+        # plan's own seed, which then finds it off its floor (WP-1955)
         seeded: dict[str, float] = dict.fromkeys(
-            table.seed_floored(apertures_to_lift(freed), AXIAL_SIZING_FLOOR),
+            table.seed_floored(
+                apertures_to_lift([p for p in freed if p not in free_before]),
+                AXIAL_SIZING_FLOOR),
             AXIAL_SIZING_FLOOR)
         if stage.seed:
             # start a freed row sitting on its floor where the plan says:

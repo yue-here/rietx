@@ -1686,6 +1686,9 @@ class MultiHistogramRefinement:
                 zip(stages, plan.stage_ftols(), plan.stage_window_tols(),
                     strict=True), start=1):
             with self._abandon_on_cancel(cancel, stage.name, stage_results, stream):
+                # the aperture lift starts only a row this stage newly frees
+                # (``_run_stage``'s rule, WP-1955)
+                free_before = set(self.mtable.free_paths)
                 freed = self.mtable.set_vary(stage.turn_on, True)
                 # what the glob matched and a hold refused (WP-1435): here only
                 # the floating-origin hold (WP-1912), which the origin
@@ -1705,11 +1708,13 @@ class MultiHistogramRefinement:
                     self.mtable.set_vary(carried_hold, True)
                     carried_hold = []
                 # the single-histogram runner's lift (``_run_stage``,
-                # WP-1955): an FCJ aperture freed on zero starts where the
-                # stage's windows are sized, before the plan's own seed
+                # WP-1955): an FCJ aperture this stage frees on zero starts
+                # where the stage's windows are sized, before the plan's seed
                 seeded: dict[str, float] = dict.fromkeys(
-                    self.mtable.seed_floored(apertures_to_lift(freed),
-                                             AXIAL_SIZING_FLOOR),
+                    self.mtable.seed_floored(
+                        apertures_to_lift([p for p in freed
+                                           if p not in free_before]),
+                        AXIAL_SIZING_FLOOR),
                     AXIAL_SIZING_FLOOR)
                 if stage.seed:
                     seeded.update(dict.fromkeys(

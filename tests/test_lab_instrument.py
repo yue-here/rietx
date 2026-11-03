@@ -509,6 +509,26 @@ def test_a_stage_lifts_an_aperture_freed_on_zero(start):
     assert held.instrument.geometry.axial_hl.value == 0.0
 
 
+def test_an_aperture_already_refining_on_zero_is_not_lifted_again():
+    """WP-1955: the lift starts only an aperture the stage newly frees.  One
+    already refining on zero is where an earlier stage's data put it, and a
+    later stage naming it again (a plan's closing stage does) leaves it there.
+    """
+    from rietx.model.forward import AXIAL_PATHS
+    tt = np.arange(15.0, 80.0, 0.02)
+    y = np.asarray(_rutile_axial(0.03, False).predict(tt)) * 1e4 + 50.0
+    data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist(),
+                          sigma=np.sqrt(y).tolist())
+    ref = _rutile_axial(0.0, False)
+    ref.structure.phases[0].scale.value *= 1e4
+    ref.instrument.background.coefficients[0].value = 50.0
+    stage = rx.Stage("axial", list(AXIAL_PATHS), max_iter=2)
+    assert ref.run_stage(data, stage, telemetry=False).stages[-1].seeded
+    ref.set_values({p: 0.0 for p in AXIAL_PATHS})
+    res = ref.run_stage(data, stage, telemetry=False)
+    assert res.stages[-1].seeded == {}
+
+
 # ---------------------------------------------------------------------------
 # FCJ quadrature error over the claimed domain (WP-2002, B10)
 # ---------------------------------------------------------------------------
