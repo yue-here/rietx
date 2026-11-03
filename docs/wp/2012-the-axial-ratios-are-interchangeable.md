@@ -204,7 +204,18 @@ choosing a fix.
   the acceptance command `tests/test_examples.py -k calibrate` (1), `-k srm660c` (2),
   `tests/test_tutorials.py` (35), and the touched-area fast files (help, skill, report-apply,
   roughness, audit, manual, reported-rows, FitReport layers: 475 after two fixes). The full
-  suite did not run, by the runner brief: targeted LaB6 rows instead.
+  suite did not run, by the runner brief: targeted LaB6 rows instead. The fast selection
+  (`-m "not slow"`, on `01e22d1ab`, `origin/main` unmoved) gave 13597 passed, 319 skipped,
+  34 xfailed, 3 failed; this branch adds no test. Two failures were this branch's and are
+  fixed in `f9bc40e3b`, the 29 guide and glob rows re-run green: the hold guide (below) and
+  `tests/data/gui/fnmatch_cases.json`, regenerated because a preset glob left. The third,
+  `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`, is
+  this machine's Jupyter kernel spec pointing at a deleted venv, unrelated.
+
+  *A third moved number.* `docs/docs/guides/hold.md` fits FAP under `lab_bragg_brentano`
+  with the cell free, and its a now moves 215.6 ppm from the held cell on both macOS paths,
+  against 281 (compiled) and 324 (numpy) on 2026-10-21. The page's printed floor drops from
+  "more than 250 ppm" to "more than 150 ppm"; Linux, at 351.9 before, was not re-measured.
 
   *Review.* `/code-review high --fix` found seven; four fixed in `01e22d1ab` (the
   `rietx compare` srm660c standard still freed H/L, and its anti-drift test never compared
