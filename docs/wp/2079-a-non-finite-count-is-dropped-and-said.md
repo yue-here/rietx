@@ -1,6 +1,6 @@
 # WP-2079 — a non-finite count or σ in a pattern file is dropped, and the reader says so
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-03 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-02 — a real file's dead channels reach the fit with no word from the reader; what a fit then does with them is not measured, and task 1 measures it
