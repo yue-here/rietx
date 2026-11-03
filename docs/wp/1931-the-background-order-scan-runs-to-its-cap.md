@@ -265,7 +265,16 @@ emits `BACKGROUND_ORDER_AT_CAP`.
     FAP.XRA only at the last candidate, 1e4, d = 1.26. Task 7's table is
     under the task. Both probes: this branch's `[dev]` venv, macOS arm64,
     scripts outside the tree.
-  - *Gates.* COUNTS
+  - *Gates.* Fast selection on the final code tree (`2e6c63ff5`), this
+    branch's `[dev]` venv, macOS arm64: 13616 passed, 319 skipped, 34
+    xfailed, 0 failed, in 8.4 min of wall clock. The earlier run on
+    `c6117b672` gave the same counts. The branch adds one test, and it
+    passes: `test_an_arpls_scan_that_falls_back_says_so`, 0.16 s in that
+    run's junit, nowhere near the slow tail. The full selection did not run,
+    because nothing here moves a measured number. `tests.reader_output`
+    exit 0, `test_docs_consistency.py` 25 passed, ruff clean. Main had moved
+    42 commits and was not merged in; a trial merge is clean and main adds
+    no diagnostic code.
   - *Review.* `/code-review high --fix` found no correctness bug. Three fixes
     taken in `0c5412472`: the floor's audit evidence now says it decides when the
     new code fires; `PatternDiagnostics.baseline_lambda`'s docstring says a
