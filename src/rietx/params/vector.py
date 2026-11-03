@@ -4641,28 +4641,85 @@ class ParameterTable:
 
         The moment signs on the diagonal and each composed body's block on
         its rotation columns (disjoint sets).  A rotation entry's free column
-        is its value or an affine image of another's; the block is carried
-        through C's rows as pinv(A)·chart·A, A the rows of the body's rotation
-        entries over the columns that reach them.  That is exact when each
-        rotation entry is its own free column; a body with some rotation DOFs
-        held or tied gets the projection, because composing then changes which
-        orientations the held components leave reachable, and no matrix maps
-        one family onto the other.
+        is its value or an affine image of another's, so with A the rows of
+        the body's rotation entries over the columns that reach them, δω = A·θ
+        and the block is A⁻¹·chart·A.  Exact in the three shapes a stage
+        allows (:meth:`refuse_partial_turns`): no free direction, nothing to
+        carry; every direction free, A square and invertible; one, a turn
+        about one fixed axis a, where composing is addition — J_l(t·a)·a = a,
+        so the chart is the identity on that column and the block is left so.
+
+        Two free directions of three are refused at stage start rather than
+        approximated: two turns compose into the third, so no matrix maps the
+        old family onto the new one (the maintainer's answer (c) on #801,
+        replacing a pinv(A)·chart·A projection the 2026-10-08 probe measured
+        no closer to a fresh solve than no re-chart at all).  A caller driving
+        the table by hand into that shape gets no re-chart for the body.
         """
         n = len(self._free_idx)
         out = np.diag(np.ones(n) if signs is None else np.asarray(signs, dtype=np.float64))
-        C = self._C.toarray()
         for bbase, _, block in self._bodies:
             if (chart := charts.get(bbase)) is None:
                 continue
-            rows = [self._paths[q] for q in block.rotation_paths(bbase)]
-            a = C[rows]
+            a = self._C[[self._paths[q] for q in block.rotation_paths(bbase)]].toarray()
             cols = np.flatnonzero(np.abs(a).sum(axis=0) > 0.0)
-            if not len(cols):
-                continue
             a = a[:, cols]
-            out[np.ix_(cols, cols)] = lapack.pinv(a) @ chart @ a
+            if len(cols) == len(a) and np.linalg.matrix_rank(a) == len(cols):
+                out[np.ix_(cols, cols)] = np.linalg.solve(a, chart @ a)
         return out
+
+    def free_turn_directions(self, without: Iterable[str] = ()
+                             ) -> dict[str, tuple[str, int, int]]:
+        """Each body's free turn directions: base path → (name, free, of).
+
+        ``free`` is the rank of the body's rotation rows of C over the free
+        columns, so it counts what holds and ties leave: three rotation DOFs
+        tied to one free column are one direction, a turn about one fixed
+        axis.  ``of`` is the block's k, the directions the body has.  A free
+        path in ``without`` is counted as held, so advice can ask what a hold
+        would leave before recommending it (``RIGID_BODY_UNSUPPORTED``).
+        """
+        drop = set(without)
+        keep = [c for c, p in enumerate(self.free_paths) if p not in drop]
+        out: dict[str, tuple[str, int, int]] = {}
+        for bbase, name, block in self._bodies:
+            rows = [self._paths[q] for q in block.rotation_paths(bbase)]
+            a = self._C[rows][:, keep].toarray() if rows and keep else np.zeros((0, 0))
+            out[bbase] = (name, int(np.linalg.matrix_rank(a)) if a.size else 0, len(rows))
+        return out
+
+    def refuse_partial_turns(self) -> None:
+        """``RIGID_BODY_PARTIAL_TURN``: a body's turn is free in some directions only.
+
+        Raised at stage start (``Refinement._run_stage`` and the joint runner),
+        once the stage's globs, the caller's holds and ties and the mode's
+        force-fix have settled the free set, so a hold, a tie and a plan glob
+        reach it alike.  A body's free turn directions
+        (:meth:`free_turn_directions`) must number 0, 1 or all of them:
+        a commit composes R₀ ← Exp(δω)·R₀, and two turns of a three-direction
+        body compose into the third, so the next stage's two directions are
+        not this one's and :meth:`_chart_matrix` has no exact re-chart to give
+        (the maintainer's answer (c) on #801).  A linear body has two
+        directions, and one of them free is a turn about a fixed axis.
+        """
+        for bbase, (name, free, k) in self.free_turn_directions().items():
+            if free in (0, 1, k):
+                continue
+            state = []
+            for q in (f"{bbase}.rotation.{j}" for j in range(k)):
+                e = self.entries[self._paths[q]]
+                state.append(f"{q.rsplit('.', 1)[1]} "
+                             + ("tied" if e.tie is not None
+                                else "free" if e.vary else "held"))
+            raise ValueError(
+                f"RIGID_BODY_PARTIAL_TURN: rigid body {name!r} has {free} free turn "
+                f"directions of its {k} ({bbase}.rotation: {', '.join(state)}). "
+                "A commit composes the turn into the body's orientation, and two "
+                "turns compose into the third, so the stage cannot keep the "
+                f"directions it was given. Free all {k} ({bbase}.rotation.*), hold "
+                f"all {k} (Refinement.hold({bbase + '.rotation.*'!r})), or tie the "
+                f"turn to one axis (Refinement.tie_equal({bbase + '.rotation.*'!r}), "
+                "or Refinement.tie with scales for another axis)")
 
     def restore_body_anchors(self, paths: Iterable[str]) -> list[str]:
         """Put back the anchor the last commit replaced, for bodies in ``paths``.

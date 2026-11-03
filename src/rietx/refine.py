@@ -5099,6 +5099,11 @@ class Refinement:
                 if mode_fixed_column(reach.get(path, [path]), mode):
                     table.set_vary([path], False)
                     freed.remove(path)
+        # a body's turn free in two directions of three has no exact re-chart
+        # at the commit, so it is refused here, where the stage's globs, the
+        # caller's holds and ties and the mode's force-fix have all settled
+        # the free set and before anything is written (WP-1805, answer (c))
+        table.refuse_partial_turns()
         seeded: dict[str, float] = {}
         if stage.seed:
             # start a freed row sitting on its floor where the plan says:
@@ -11933,19 +11938,45 @@ def _rigid_body_unsupported(table: ParameterTable,
     carries no esd either, which the rows already say; this says which DOF
     did it.  A body a stage *held* (an absent phase, WP-1301) is
     ``PHASE_UNCONSTRAINED``'s, never this.
+
+    The suggestion never steers into ``RIGID_BODY_PARTIAL_TURN`` (WP-1805):
+    where holding just the blind DOFs would leave two free turn directions of
+    three, it names the body's whole rotation to hold with them, asking
+    :meth:`~rietx.params.vector.ParameterTable.free_turn_directions` what the
+    hold would leave.
     """
     owner = table.body_dofs()
     free = set(table.free_paths)
     blind: dict[str, list[str]] = {}
     for row in params:
         if row.path in owner and row.path in free and row.stderr is None:
-            blind.setdefault(owner[row.path], []).append(row.path)
+            # keyed by the body's base path, phases.<i>.rigid_bodies.<k>: a
+            # body's name is unique in its phase, not across phases
+            blind.setdefault(".".join(row.path.split(".")[:4]), []).append(row.path)
+    names = {bbase: name for bbase, (name, _, _) in table.free_turn_directions().items()}
     return [Diagnostic(
         level="warning", code="RIGID_BODY_UNSUPPORTED", where=paths,
-        message=(f"Rigid body {name!r}: {len(paths)} free degree(s) of freedom "
-                 f"measured nothing ({', '.join(paths)})."),
-        suggestion="Hold them (Refinement.hold) and refit.")
-        for name, paths in blind.items()]
+        message=(f"Rigid body {names[bbase]!r}: {len(paths)} free degree(s) of "
+                 f"freedom measured nothing ({', '.join(paths)})."),
+        suggestion=_unsupported_body_advice(table, bbase, paths))
+        for bbase, paths in blind.items()]
+
+
+def _unsupported_body_advice(table: ParameterTable, bbase: str,
+                             paths: list[str]) -> str:
+    """``RIGID_BODY_UNSUPPORTED``'s suggestion: hold what a stage will accept.
+
+    Holding the blind DOFs alone, unless that leaves the body's turn free in
+    some of its directions but neither one nor all, the shape a stage refuses
+    (``ParameterTable.refuse_partial_turns``); then the whole turn with them.
+    """
+    _, free, k = table.free_turn_directions(without=paths)[bbase]
+    if free in (0, 1, k):
+        return "Hold them (Refinement.hold) and refit."
+    return (f"Hold them and the body's whole turn ({bbase}.rotation.*) with "
+            f"Refinement.hold, and refit: holding them alone would leave {free} "
+            f"free turn directions of {k}, which a stage refuses "
+            "(RIGID_BODY_PARTIAL_TURN).")
 
 
 def _size_flag_diagnostics(model: CompiledModel, values: dict[str, float],

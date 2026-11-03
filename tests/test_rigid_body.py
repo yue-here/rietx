@@ -895,19 +895,21 @@ def _fake_outcome(theta, se, corr):
                       correlation=corr)
 
 
-def test_a_held_rotation_dof_beside_a_turn_is_recharted():
-    """``rotation.2`` held, ω along x: the chart on the free (x, y) block is
-    diag(1, 1 − c·|ω|²), nothing off the diagonal (#801).  Read as a sign
-    flip, the y column's esd stayed 4.1104 against T⁻¹·Cov·T⁻ᵀ's 4.1415,
-    and its correlation diagonal came out 0.985.  A column is touched
+def test_a_chart_that_is_no_signed_identity_is_recharted_through_its_inverse():
+    """The linear body turned along its first axis: the chart on its (x, y)
+    block is diag(1, c), c = 1.0152 at 0.3 rad, its off-diagonal at rounding
+    (#801).  Read as a sign flip, the y column's esd stayed put against
+    T⁻¹·Cov·T⁻ᵀ, and its correlation diagonal left 1.  A column is touched
     wherever T differs from a signed identity, and the non-finite branch
-    takes only the sign of a diagonal scale."""
+    takes only the sign of a diagonal scale.  The chart is run as committed
+    and as its exact diagonal, the shape #801 found.  (#801 built it from a
+    three-direction body with ``rotation.2`` held, a shape a stage now
+    refuses, WP-1805.)"""
     from rietx.optimize.least_squares import rechart_outcome
 
-    table = ParameterTable(body_structure(Q_TRUE), INS)
+    table = ParameterTable(linear_structure(Q_TRUE), INS)
     table.set_vary(["phases.*.scale", "phases.*.rigid_bodies.*.origin.dof.*",
-                    "phases.0.rigid_bodies.0.rotation.0",
-                    "phases.0.rigid_bodies.0.rotation.1"], True)
+                    "phases.*.rigid_bodies.*.rotation.*"], True)
     free = table.free_paths
     x, y = (free.index(f"phases.0.rigid_bodies.0.rotation.{k}") for k in (0, 1))
     theta = table.x0()
@@ -917,20 +919,24 @@ def test_a_held_rotation_dof_beside_a_turn_is_recharted():
     cov = a @ a.T + n * np.eye(n)
     se = np.sqrt(np.diag(cov))
     corr = cov / np.outer(se, se)
-    t = table.commit(theta)
-    assert t[y, y] != pytest.approx(1.0) and t[x, y] == t[y, x] == 0.0
-    out = rechart_outcome(_fake_outcome(theta, se, corr), table.x0(), t)
-    tinv = np.linalg.inv(t)
-    new = tinv @ cov @ tinv.T
-    se_true = np.sqrt(np.diag(new))
-    np.testing.assert_allclose(out.stderr_internal, se_true, rtol=1e-12)
-    np.testing.assert_allclose(out.correlation, new / np.outer(se_true, se_true),
-                               atol=1e-12)
-    for c in (out.correlation,
-              rechart_outcome(_fake_outcome(theta, np.where(np.arange(n) == y, np.inf, se),
-                                            corr), table.x0(), t).correlation):
-        assert np.abs(np.diag(c) - 1.0).max() < 1e-12
-        assert np.linalg.eigvalsh(c).min() > 0.0
+    committed = table.commit(theta)
+    assert committed[y, y] == pytest.approx(1.0152, abs=1e-4)
+    assert committed[x, x] == pytest.approx(1.0, abs=1e-15)
+    assert max(abs(committed[x, y]), abs(committed[y, x])) < 1e-15
+    for t in (committed, np.diag(np.diag(committed))):
+        out = rechart_outcome(_fake_outcome(theta, se, corr), table.x0(), t)
+        tinv = np.linalg.inv(t)
+        new = tinv @ cov @ tinv.T
+        se_true = np.sqrt(np.diag(new))
+        np.testing.assert_allclose(out.stderr_internal, se_true, rtol=1e-12)
+        np.testing.assert_allclose(out.correlation, new / np.outer(se_true, se_true),
+                                   atol=1e-12)
+        for c in (out.correlation,
+                  rechart_outcome(_fake_outcome(theta, np.where(np.arange(n) == y,
+                                                                np.inf, se), corr),
+                                  table.x0(), t).correlation):
+            assert np.abs(np.diag(c) - 1.0).max() < 1e-12
+            assert np.linalg.eigvalsh(c).min() > 0.0
 
 
 def test_a_nan_orientation_is_refused():
