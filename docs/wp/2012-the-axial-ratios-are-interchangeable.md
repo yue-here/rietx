@@ -92,9 +92,16 @@ choosing a fix.
       alone. The Biso row XPASSed and lost its mark. The axial-floor row turned red at
       0.582 plain esd on u: the protocol has two minima in the widths that the axial
       mirror did not make. It is a non-strict xfail citing WP-2084, filed for it.
-- [ ] Rewrite the two `help.py` entries to say the pair is interchangeable, and follow a
+- [x] Rewrite the two `help.py` entries to say the pair is interchangeable, and follow a
       changed preset into the skill's `lab_calibrate` row (`docs/skill/rietx/SKILL.md`, the
-      presets table) and the calibration guide's axial paragraph.
+      presets table) and the calibration guide's axial paragraph. **Done 2026-11-02.** The
+      skill's `lab_calibrate` row stays as it was: the body sits 32 B over its budget with
+      any added clause (`tests/skill_caps.py`), and `help.py` is the cheaper place for it
+      (root CLAUDE.md, WP-1338). The `lab_bragg_brentano` row and the
+      `refine_axial_asymmetry` row in `references/numbers.md` name S/L. The guide drops
+      its now-redundant hold on H/L and the `HOLD_BLOCKED_PLAN` it printed; its both-free
+      demonstration builds its own plan. Tutorial 04, the theory chapter's FCJ section and
+      the concepts plans table follow.
 - [ ] Look for the class's siblings: any other pair of parameters the model treats
       symmetrically, where a fit can land on either assignment.
 - [ ] Reproduce the esd difference between the compiled and numpy paths in a test, or show

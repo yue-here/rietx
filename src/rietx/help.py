@@ -340,10 +340,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Finger-Cox-Jephcoat axial-divergence ratio S/L. It is the illuminated "
             "specimen length divided by the goniometer radius. It sets how strongly "
-            "low-angle peaks lean toward low 2θ. Fit it on a standard together with "
-            "`axial_hl`. The two are strongly correlated and are usually reported as a "
-            "pair. With both at zero and either refined, the peaks are computed with "
-            "windows and integration points sized for a ratio of 0.02 (see `axial_hl`)."
+            "low-angle peaks lean toward low 2θ. Refine it on a standard and hold "
+            "`axial_hl`: swapping the two gives the same pattern. With both at zero and "
+            "either refined, the peaks are computed with windows and integration points "
+            "sized for a ratio of 0.02 (see `axial_hl`)."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -354,9 +354,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Finger-Cox-Jephcoat axial-divergence ratio H/L. It is the "
             "receiving-slit height divided by the goniometer radius. It is the second "
-            "half of the axial asymmetry. It is so strongly correlated with `axial_sl` "
-            "that refining one and holding the other is a common protocol. One ratio "
-            "alone still smears the peaks. Only both at zero switch the asymmetry off. "
+            "half of the axial asymmetry. Swapping it with `axial_sl` gives the same "
+            "pattern, so set it from the instrument and hold it, as the lab plans do. "
+            "One ratio alone still smears the peaks. Only both at zero switch the "
+            "asymmetry off. "
             "With both at zero and either refined, the peaks are computed with windows "
             "and integration points sized for a ratio of 0.02, so the curve differs from the same model with "
             "both held by up to about 5e-5 of the strongest peak."
