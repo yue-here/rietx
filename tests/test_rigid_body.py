@@ -762,10 +762,32 @@ def test_a_hold_on_a_body_atom_row_raises_and_on_a_body_dof_holds():
         ref.hold("phases.0.atoms.2.x")
     with pytest.raises(ValueError, match="hold the body's own"):
         ref.hold("phases.0.atoms.*.y")
-    # a twist is a body DOF too (WP-1808): the refusal names its glob
-    with pytest.raises(ValueError, match=r"rigid_bodies\.\*\.torsions\.\*\.twist"):
+    # a twist is a body DOF too (WP-1808): the refusal names its glob, for
+    # the owning body alone rather than every body in every phase (WP-1951's
+    # follow-up)
+    with pytest.raises(ValueError) as err:
         ref.hold("phases.0.atoms.*.y")
+    assert ("(phases.0.rigid_bodies.0.origin.dof.*, phases.0.rigid_bodies.0.rotation.*, "
+            "phases.0.rigid_bodies.0.torsions.*.twist)") in str(err.value)
+    assert "phases.*" not in str(err.value)
     assert ref.hold("phases.0.rigid_bodies.0.origin.dof.*")
+
+
+def test_a_site_glob_on_a_body_atom_names_the_owning_body_dofs():
+    """``STAGE_PATH_NOT_FREE``'s body arm (WP-1951): a glob naming a body
+    atom's ``dof`` rows frees nothing, and the suggestion names that body's
+    own DOFs, never every body's."""
+    pattern = synthesize(body_structure(Q_TRUE))
+    ref = Refinement(body_structure(_turned(Q_TRUE, 2.0)), INS, history=False)
+    result = ref.fit(pattern, plan=RefinementPlan(stages=[
+        Stage("body", [*BODY_GLOBS, "phases.0.atoms.2.dof.*"])]))
+    found = [d for d in result.diagnostics if d.code == "STAGE_PATH_NOT_FREE"]
+    assert [d.where for d in found] == [["phases.0.atoms.2.dof.*"]]
+    assert "Rigid body 'c6br' places phases.0.atoms.2." in found[0].message
+    assert found[0].suggestion == (
+        "Free the body's own origin, rotation and torsions instead "
+        "(phases.0.rigid_bodies.0.origin.dof.*, phases.0.rigid_bodies.0.rotation.*, "
+        "phases.0.rigid_bodies.0.torsions.*.twist).")
 
 
 def test_the_public_tie_verb_refuses_a_body_row_and_a_rotation_source():
