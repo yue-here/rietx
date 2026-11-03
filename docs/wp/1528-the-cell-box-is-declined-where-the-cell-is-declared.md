@@ -68,8 +68,8 @@ not a bound.
 
 ## Tasks
 
-- [ ] `Cell`'s docstring (`schemas/structure.py:136-145`) states the reason above in a few sentences
-- [ ] Skill: none
+- [x] `Cell`'s docstring (`schemas/structure.py:136-145`) states the reason above in a few sentences
+- [x] Skill: none
 
 ## Acceptance
 
