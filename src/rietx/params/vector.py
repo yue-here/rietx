@@ -1403,13 +1403,14 @@ class ParameterTable:
                 self._add(f"{base}.magnetic_lor_strain",
                           phase.magnetic_lor_strain, force_fixed=off)
             self._collect_microstrain(base, sg, phase)
-            owner = {label: body.name for body in phase.rigid_bodies
+            owner = {label: (body.name, f"{base}.rigid_bodies.{b}")
+                     for b, body in enumerate(phase.rigid_bodies)
                      for label in body.atoms}
             moved = self._collect_distortion_modes(base, phase)
             for j, atom in enumerate(phase.atoms):
                 if atom.label in owner:
                     self._collect_body_atom_coords(f"{base}.atoms.{j}", atom,
-                                                   owner[atom.label])
+                                                   *owner[atom.label])
                 elif j in moved:
                     self._collect_mode_atom_coords(f"{base}.atoms.{j}", sg, phase, j)
                 else:
@@ -1919,7 +1920,8 @@ class ParameterTable:
             candidates=candidates, labels=labels, coords=coords,
             mode=phase.floating_origin, sites=site_info)
 
-    def _collect_body_atom_coords(self, base: str, atom, body: str) -> None:
+    def _collect_body_atom_coords(self, base: str, atom, body: str,
+                                  bbase: str) -> None:
         """A body atom's x, y, z: locked rows its body's block writes (WP-1805).
 
         No displacement DOF, no affine row: the coordinates are outputs of a
@@ -1932,8 +1934,8 @@ class ParameterTable:
             raise ValueError(
                 f"{base} ({atom.label!r}) is placed by rigid body {body!r}; its "
                 "coordinates are the body's — refine the body's origin and "
-                "rotation (phases.*.rigid_bodies.*.origin.dof.*, "
-                "phases.*.rigid_bodies.*.rotation.*) and set vary=False here")
+                f"rotation ({bbase}.origin.dof.*, {bbase}.rotation.*) and set "
+                "vary=False here")
         for c in ("x", "y", "z"):
             self._add(f"{base}.{c}", getattr(atom, c), force_fixed=True)
 

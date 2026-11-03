@@ -115,8 +115,11 @@ def test_a_body_over_placed_atoms_decodes_them_back():
 def test_a_body_atom_refuses_vary_and_shared_membership():
     s = body_structure(Q_TRUE)
     s.phases[0].atoms[2].x.vary = True
-    with pytest.raises(ValueError, match="placed by rigid body 'c6br'"):
+    with pytest.raises(ValueError, match="placed by rigid body 'c6br'") as err:
         ParameterTable(s, INS)
+    # the owning body's own DOFs, never every body's (WP-1951's follow-up)
+    assert ("(phases.0.rigid_bodies.0.origin.dof.*, phases.0.rigid_bodies.0.rotation.*)"
+            in str(err.value))
     s = body_structure(Q_TRUE)
     phase = s.phases[0]
     twin = RigidBody(name="twin", atoms=["C0", "C1"], template=[(0, 0, 0), (1.39, 0, 0)],
