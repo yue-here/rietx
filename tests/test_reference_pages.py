@@ -190,6 +190,21 @@ def test_the_mode_substitutions_are_what_resolve_plan_runs():
         assert f"Under `{mode}`, `{name}` runs as `{twin}`." in text
 
 
+def test_the_geometry_additions_are_what_resolve_plan_runs():
+    """WP-2015: the page states each addition, and resolve_plan makes it."""
+    from rietx.strategy.staged import _GEOMETRY_ADDITIONS, resolve_plan
+
+    text = reference_pages.plan_ladder()
+    for (name, kind), globs in _GEOMETRY_ADDITIONS.items():
+        freed = ", ".join(f"`{g}`" for g in globs)
+        assert (f"On a `{kind}` geometry, `{name}` also frees {freed} in the "
+                "stage that frees the zero, under every mode.") in text
+        for mode in ("rietveld", "lebail", "pawley"):
+            zero = [s for s in resolve_plan(name, mode, kind).stages
+                    if "instrument.zero_shift" in s.turn_on]
+            assert len(zero) == 1 and set(globs) <= set(zero[0].turn_on)
+
+
 # ----------------------------------------------------------------------
 # The diagnostic index
 # ----------------------------------------------------------------------
