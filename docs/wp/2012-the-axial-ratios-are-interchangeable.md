@@ -49,6 +49,16 @@ not these ratios. Finger, Cox and Jephcoat (1994, *J. Appl. Cryst.* **27**, 892)
 Read the paper for whether the symmetry is the model's or this implementation's before
 choosing a fix.
 
+### Inherited
+
+- **2026-11-04, from [2036](2036-main-is-green-on-every-nightly-leg.md): four audit rows
+  still call the lab6 intermediate-tolerance row a non-strict xfail.** Since PR #1309 that
+  row orders the S/L and H/L pair, carries no mark and passes. The evidence sentence in
+  `src/rietx/_audit.py` at lines 1616, 3844, 4297 and 4367 (each "an xfail made non-strict
+  because rounding picks the minimum") is stale. WP-2036 closed without editing them,
+  because an evidence edit goes through the `generality-review` judge. The next change to
+  those rows corrects the sentence.
+
 ## Tasks
 
 - [x] Read Finger, Cox and Jephcoat (1994) on the S ↔ H symmetry, and check `profiles/fcj.py`

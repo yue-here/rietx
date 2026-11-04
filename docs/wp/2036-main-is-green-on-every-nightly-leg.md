@@ -1,9 +1,8 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — the 11-01 nightly's three red rows and two cancelled nights answered (PR #1309); WP-2050 merged, so a green nightly waits on #1309 alone
+Milestone: unscheduled · Status: ✅ 2026-11-04 — both 11-04 nightlies green on all six jobs, and the full suite green on an arm64 Mac; PR #PRNUM
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
-Priority: P3 2026-11-02 — every task here is done; a green nightly waits on PR #1309 merging
 
 ## Goal
 
@@ -133,8 +132,6 @@ and 2045 on 2026-10-25):
 - **An indexing answer's axis order moves with the platform** (WP-2043):
   notebook 03's orthorhombic P cell printed a and c swapped on Linux. No prose
   quotes the order, so nothing fails.
-
-### Inherited
 
 ## Non-goals
 
@@ -289,6 +286,48 @@ gh run list --workflow nightly.yml --branch main --limit 1
   (the two degeneracies); WP-1930 (the 1e-14 nudge).
 
 ## Handover log
+
+- **2026-11-04** — Main's nightly is green on every leg, so this WP closes.
+  Two runs on 4 November passed all six jobs: the scheduled one and one
+  started by hand. The full Linux suite failed no row in either. The full
+  suite also passes on an arm64 Mac. No code changed in this close. It
+  records the acceptance the 11-02 entry was waiting on.
+
+  *Done* (ghostshift runner, close only, PR #PRNUM). Status ✅. The
+  `Priority:` line and the empty `### Inherited` heading are deleted. The
+  narrative went to `docs/milestones/v1.12.md`. One note moved to WP-2012's
+  `### Inherited`: the four stale `_audit.py` evidence sentences the 11-02
+  entry left for "the next change to those rows", since no session reads a
+  closed WP again.
+
+  *Measured.*
+  - Nightly 41837816600 (schedule, `ba3719f06`, started 13:24Z): six jobs
+    `success`. `full` (Linux, Python 3.13, `[dev,jax]`): 14 815 passed, 252
+    skipped, 53 xfailed, 0 failed in 1:35:41.
+  - Nightly 41874118202 (`workflow_dispatch` with `full_macos` false,
+    `b1741da64`, started 17:05Z): six jobs `success`. `full`: 14 839
+    passed, 252 skipped, 53 xfailed, 0 failed in 2:47:18. The macOS job ran
+    the fast selection: 13 920 passed, 231 skipped, 36 xfailed.
+  - The two `full` runs took 1:35:41 and 2:47:18 on one day, 1.75× apart,
+    so runner speed alone still spans most of the limit's margin. The
+    slower is 1.8× under the 300-minute limit. The limit was not touched.
+  - Between the 11-02 entry and these runs: 11-02's nightly (41458112365,
+    `1a648d3a9`) was cancelled at 2:30:42, on the old 150-minute cap, before
+    #1309 merged. 11-03's (41641923622, `9b888120c`) failed one row, the
+    skill tests' placement episode, on `KeyError:
+    'instrument.geometry.axial_hl'` after WP-2012 held H/L. WP-2012's
+    `ffcfd79aa` fixed it, and it passed on both 11-04 runs.
+  - The `moment` guide, which the 10-25 task note left to "the next green
+    nightly", failed on no leg of either run.
+  - Full suite on this branch (= `origin/main` `da5e7aa36` plus docs),
+    macOS arm64, worktree venv `[dev]`: LOCALCOUNTS.
+
+  *Review.* `/code-review` not run: the branch touches only `docs/`.
+  *Generality.* Not dispatched: `_audit.py` untouched, no heuristic added.
+  *Reader output.* Nothing a fit prints changed: the branch has no code.
+
+  Next: none here. The audit-row sentences are WP-2012's. The crawl in the
+  150 K solve and in the `moment` guide is WP-1334's.
 
 - **2026-11-02** — The Linux full suite was red or cancelled every night from
   10-24 to 11-01, and none of what was left is a defect this WP owns. One red
