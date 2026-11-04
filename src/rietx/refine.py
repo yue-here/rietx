@@ -151,7 +151,12 @@ from .report.schemas import (
 )
 from .schemas.common import Diagnostic, Parameter, Provenance
 from .schemas.history import NodeAction, NodeMetrics, RefinementState, ReflectionState
-from .schemas.instrument import CAPILLARY_OFFSETS, Instrument
+from .schemas.instrument import (
+    CAPILLARY_OFFSETS,
+    DEBYE_SCHERRER_POLARIZATION,
+    KA2_RATIO,
+    Instrument,
+)
 from .schemas.interval import PARAMETER_INTERVAL_LEVEL, PARAMETER_INTERVAL_MAX_REFITS
 from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
@@ -8536,6 +8541,61 @@ def _capillary_offset_diagnostics(model: CompiledModel,
                     "know the diffractometer's."))]
 
 
+def _geometry_unstated_diagnostics(model: CompiledModel) -> list[Diagnostic]:
+    """Ask for the geometry when the instrument states none (WP-2015, B9).
+
+    Under ``"unstated"`` the package applies no geometry-specific correction
+    and the default plan frees none, which is the maintainer's B7 ruling: a
+    specimen displacement left out on a Bragg-Brentano pattern moves the
+    cell (about 45 ppm on NIST SRM 660c, issue #1233) with nothing else in
+    the result saying why.  A warning, because the cell is what it costs.
+    """
+    if model.geometry_kind != "unstated":
+        return []
+    return [Diagnostic(
+        level="warning", code="GEOMETRY_UNSTATED",
+        where=["instrument.geometry.kind"],
+        message=("The instrument states no geometry, so no displacement, "
+                 "transparency, capillary offset or absorption correction "
+                 "was applied or refined."),
+        suggestion=("Set instrument.geometry.kind, or build the instrument "
+                    "with Instrument.bragg_brentano, "
+                    "Instrument.debye_scherrer or "
+                    "Instrument.flat_plate_transmission."))]
+
+
+#: The values the package supplies for the instrument facts
+#: ``RefinementResult.assumed_instrument`` lists (WP-2015).  Imported
+#: constants, so a preset that changes its number changes this with it.
+_SUPPLIED_POLARIZATION = (0.5, DEBYE_SCHERRER_POLARIZATION)
+
+
+def _assumed_instrument(model: CompiledModel,
+                        table: ParameterTable) -> dict[str, float | str]:
+    """The instrument facts a fit rests on at the package's value.
+
+    Read off the table's entries rather than off the instrument, so a value
+    the plan refined is not listed (it was measured), and a locked entry (a
+    neutron source's polarisation, force-fixed at 1) is not either.
+    """
+    out: dict[str, float | str] = {}
+    if model.geometry_kind == "unstated":
+        out["instrument.geometry.kind"] = "unstated"
+    free = set(table.free_paths)
+    for e in table.entries:
+        if e.locked or e.path in free:
+            continue
+        if (e.path == "instrument.polarization"
+                and e.value in _SUPPLIED_POLARIZATION):
+            out[e.path] = float(e.value)
+        elif (e.path.startswith("instrument.source.lines.")
+              and e.path.endswith(".weight")
+              and e.path != "instrument.source.lines.0.weight"
+              and e.value == KA2_RATIO):
+            out[e.path] = float(e.value)
+    return out
+
+
 def _absorption_diagnostics(record) -> list[Diagnostic]:
     """Surface the ways a specimen absorption correction can mislead."""
     out: list[Diagnostic] = []
@@ -8965,6 +9025,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # same reason as above: nothing else in the result says it was unavailable
     # rather than measured at zero.
     diagnostics = diagnostics + _capillary_offset_diagnostics(model, table)
+    # WP-2015: no geometry stated, so none of its corrections was available
+    diagnostics = diagnostics + _geometry_unstated_diagnostics(model)
 
     # Surface-roughness regime fences (WP-0502): whether the fitted range can
     # see the correction at all, and whether it left its derivation's domain.
@@ -9114,6 +9176,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         texture=_phase_texture(model, values, structure),
         data_support=support,
         absorption=absorption, identifiability=identifiability,
+        assumed_instrument=_assumed_instrument(model, table),
         # Declared, not measured, so it is written here rather than behind the
         # guard above: every caller of this function has a compiled model, which
         # is the whole authority for the count, so ``replay`` reports it too.

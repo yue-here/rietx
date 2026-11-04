@@ -664,6 +664,13 @@ from .._nearmiss import did_you_mean
 #: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
 #: where it defaulted to 0.0.  A stored document that omits it still opens, at
 #: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
+#: Also in 0.60 (WP-2015): ``Geometry.kind`` gains ``"unstated"``, the new
+#: default, where a hand-built geometry was ``"debye_scherrer"``.  A stored
+#: document that omits the key (or the whole geometry) reads at the old
+#: ``"debye_scherrer"`` through the same readers.  Every writer here writes
+#: the key, so only a hand-written file meets this.  The new field
+#: ``RefinementResult.assumed_instrument`` is additive and defaults to
+#: ``None``, "a result stored before the field".
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

@@ -958,6 +958,20 @@ def _cell_systematic(instrument, have_candidates: bool) -> Diagnostic | None:
                         "Bragg-Brentano diffractometer the goniometer radius "
                         f"alone carries about ±{BRAGG_BRENTANO_CELL_PPM:.0f} "
                         "ppm onto the cell."))
+    if instrument.geometry.kind == "unstated":
+        # WP-2015: a stated instrument with no geometry knows no more about
+        # the systematic error than no instrument does
+        return Diagnostic(
+            level="info", code="INDEX_CELL_SYSTEMATIC_UNQUANTIFIED",
+            message=("The instrument states no geometry, so the geometry that "
+                     "sets the cell's systematic error is unknown. The "
+                     "reported cell_esd is a precision from the line "
+                     "positions and says nothing about accuracy."),
+            where=["geometry unknown"],
+            suggestion=("Set instrument.geometry.kind. On a Bragg-Brentano "
+                        "diffractometer the goniometer radius alone carries "
+                        f"about ±{BRAGG_BRENTANO_CELL_PPM:.0f} ppm onto the "
+                        "cell."))
     if instrument.geometry.kind != "bragg_brentano":
         return None
     return Diagnostic(

@@ -275,7 +275,7 @@ export function applyFields(model: any, fields: readonly Field[],
 // ----------------------------------------------------------------------
 // the instrument form
 // ----------------------------------------------------------------------
-export const GEOMETRIES = ["debye_scherrer", "bragg_brentano",
+export const GEOMETRIES = ["unstated", "debye_scherrer", "bragg_brentano",
                            "flat_plate_transmission"] as const;
 
 /** The instrument's fields, for the instrument this project actually has.
@@ -286,10 +286,11 @@ export const GEOMETRIES = ["debye_scherrer", "bragg_brentano",
  * absorption fields are not the same kind of "off": µR = 0 is no capillary
  * absorption, while `mu_t` **absent** is the thick-specimen case and `mu_t = 0`
  * is a specimen of zero thickness, which raises (CLAUDE.md).  Hence `optnumber`
- * rather than a number defaulting to 0.
+ * rather than a number defaulting to 0.  An `unstated` geometry (WP-2015)
+ * offers neither: it has no specimen correction to set until one is chosen.
  */
 export function instrumentFields(instrument: any): InstrumentField[] {
-  const geometry = instrument?.geometry?.kind ?? "debye_scherrer";
+  const geometry = instrument?.geometry?.kind ?? "unstated";
   const fields: InstrumentField[] = [];
   const lines = instrument?.source?.lines ?? [];
   lines.forEach((_: unknown, i: number) => {
@@ -339,7 +340,7 @@ export function instrumentFields(instrument: any): InstrumentField[] {
         advanced: true, group: "geometry",
         help: "instrument_fields:packing_fraction" },
     );
-  } else {
+  } else if (geometry === "debye_scherrer") {
     fields.push(
       { path: "geometry.mu_r", label: "µR", kind: "optnumber",
         group: "geometry", help: "instrument_fields:mu_r" },
