@@ -822,6 +822,20 @@ def test_a_fit_without_peaks_keeps_its_stage_rwp_to_the_bit(compiled_path):
     assert stage_end["rwp"] == pytest.approx(PRE_FIX_NO_PEAK_RWP, rel=1e-12)
 
 
+def test_stage_result_carries_the_stage_end_termination():
+    """``StageResult.termination`` is the token ``stage_end`` emits, which test
+    ended the solve (WP-1334), and ``None`` on a record stored before it."""
+    from rietx.schemas.results import StageResult
+
+    _, result, of = _one_stage_fit(peak=True)
+    [stage_end] = of("stage_end")
+    assert stage_end["termination"]
+    assert result.stages[0].termination == stage_end["termination"]
+    old = result.stages[0].model_dump(mode="json")
+    del old["termination"]
+    assert StageResult.model_validate(old).termination is None
+
+
 def test_stage_result_carries_the_stage_end_rwp_with_or_without_events():
     """``StageResult.rwp`` is the number ``stage_end`` emits, and it is
     written whether or not a caller asked for events (WP-1334): a caller

@@ -195,6 +195,33 @@ def _instprm_geometry_silent() -> list:
     return found
 
 
+# ------------------------------------------------------------- the history reader
+
+
+def _load_log(n_trees: int) -> list:
+    """``RefinementTree.load``'s diagnostics for a log of ``n_trees`` headers."""
+    from rietx.history.tree import RefinementTree
+    from rietx.schemas.history import HistoryRecord, TreeHeader
+
+    line = HistoryRecord(record="header", header=TreeHeader(tree_id="t0")).model_dump_json()
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / "fit.jsonl"
+        path.write_text((line + "\n") * n_trees, encoding="utf-8")
+        RefinementTree.load(path, diagnostics=found)
+    return found
+
+
+def _earlier_tree_fires() -> list:
+    """A log an older release doubled: two headers, as a rerun appended them."""
+    return _load_log(2)
+
+
+def _earlier_tree_silent() -> list:
+    """The same log holding one tree."""
+    return _load_log(1)
+
+
 # ------------------------------------------------------- the data-support check
 
 
@@ -785,6 +812,8 @@ SILENCE: dict[str, Pair] = {
         _instprm_geometry_fires, _instprm_geometry_silent, "tests/test_gsas2_instprm.py"),
     "GSAS_PRM_PROFILE_SET_DEFAULTED": Pair(
         _profile_set_fires, _profile_set_silent, "tests/test_gsas_prm.py"),
+    "HISTORY_EARLIER_TREE_SKIPPED": Pair(
+        _earlier_tree_fires, _earlier_tree_silent, "tests/test_history.py"),
     "MOMENT_UNSUPPORTED": Pair(
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
