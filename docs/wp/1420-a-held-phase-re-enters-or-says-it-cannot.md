@@ -122,6 +122,31 @@ died reading as passed); this one is a pattern that converged to the wrong
 basin reading as right. 1342 is the hold's blind tie, the freeze one rank
 down.
 
+**Superseded in part, 2026-11-04: the hold no longer takes part.** The
+issue's construction re-run at `origin/main` `dd55ec4f` (`[dev]`, darwin
+arm64), at its own noise draw and six more, three fractions, both
+directions: 42 chains. In **none** was the subgroup held at or after its
+onset, so the table above, taken under the 1σ rule, no longer describes the
+tree, and neither the deadlock nor the 1.03×/1.11×/1.26× fence readings
+reproduce. What survives is the saddle, and it is worse than the table says.
+A cold single fit of a present pattern (p004 or p007) started at the
+identity point ended on the wrong side (c/(a√2) − 1 ≈ −6.6e-3) in **42 of 42**
+fits; the chains ended on the wrong side in 17 of 21 forward and 21 of 21
+backward, and both directions agreed on it in 17 of 21 series, so
+`SEQUENTIAL_PATH_DEPENDENT` named nothing on the subgroup cell there. At the
+issue's own draw the forward chain is right (+6.2e-3 at p004, 9.2σ), so the
+Acceptance line's "f = 0.15 forward ends in the right basin" holds on that
+draw and fails on six others. Two cold fits started ±2e-3 off the identity
+point (the construction's `tet`) kept their sides in 42 of 42 pairs, and the
+lower Rwp was the true side in 42 of 42, the wrong side's Rwp 1.021-1.031×,
+1.058-1.076× and 1.151-1.170× the right one at 0.15, 0.25 and 0.40. The same
+two starts handed to a forward chain's first pattern kept both sides in only
+10 of 21 series, because the subgroup is refined in some absent patterns and
+its cell drifts there. In the absent patterns of the issue's draw the
+subgroup carried no `PHASE_UNCONSTRAINED`; `HIGH_CORRELATION` and
+`FLAT_DIRECTION` on the two scales (ρ = −1.000) were what named it. The
+probe scripts are in the 2026-11-04 handover entry.
+
 ### Inherited
 
 - **2026-10-13 (2nd), from WP-1523's close: a subgroup at its parent's
@@ -298,9 +323,14 @@ respect that split, because lifting a user hold is not this WP's to do.
 
 ## Tasks
 
-- [ ] Docs: the collinear-seed paragraph in `using/series.md` and the
+- [x] Docs: the collinear-seed paragraph in `using/series.md` and the
       `references/series.md` row (Measured: issue #267's three fractions),
-      paid for by a cut if the reference is at its cap.
+      paid for by a cut if the reference is at its cap. *2026-11-04: landed
+      as `guides/series.md` § Start a subgroup off its parent's cell, since
+      `reference/series.md` sat 45 characters under its 50 000 page cap; the
+      skill row paid for itself by rewriting the stale "`fit()` is
+      all-or-nothing" paragraph (WP-1333 made `on_error="carry"` the
+      default). Pinned by `tests/test_identity_point_seed.py`.*
 - [ ] The series-level finding: a phase held over a run of patterns with the
       chain's Rwp rising across the run, naming the pattern where the hold
       stopped being right; `GuardFinding` constructor, `help.py` entry,

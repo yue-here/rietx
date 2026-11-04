@@ -164,6 +164,14 @@ What an operator must know, all measured:
   all keeping the chain out of the disagreement set.  A wrong basin at
   negligible Rwp cost is the case for `direction="both"` and for cold refits,
   not for the reseed ladder.
+- **A subgroup started at its parent's cell is a bet on a sign.**  At the
+  group–subgroup identity point every subgroup line sits under a parent line,
+  so the start is a stationary point of the distortion and the fit leaves it
+  by a side the data do not choose; both directions can agree on the wrong
+  side, silencing `SEQUENTIAL_PATH_DEPENDENT`.  Fit one pattern where the
+  subgroup is present twice, once from each side of the identity point, keep
+  the lower Rwp, and chain from it.  *(Measured: issue #267's synthetic
+  fcc→bct series; the counts are in the manual's series guide.)*
 - **The `SEQUENTIAL_*` codes live on `SeriesResult.diagnostics`, one level up
   from the entries.**  Reading `entry.diagnostics` for them returns zero on
   every series, which presents as a clean run rather than as a lookup in the
@@ -263,22 +271,14 @@ What an operator must know, all measured:
   middle two: corundum read 71.55, 72.94, 72.94, 71.55 % with no change in the
   specimen.)*
 
-Driving one: **`fit()` is all-or-nothing, so wire `on_result=` before starting
-anything long.**  The per-pattern loop catches `RefinementCancelled` and nothing
-else and returns its `SeriesResult` only at the very end, so one exception
-discards every pattern already fitted — measured as a `LinAlgError: SVD did not
-converge` at pattern 217 of 531 taking all 216 with it, and a deterministic
-`LinAlgError: Eigenvalues did not converge` at index 78 destroying **103
-already-fitted patterns whose values were fine, because the fit had converged
-and only the error bars failed**.  Cell lengths carry no physical upper bound,
-so a pattern reaching `a = −347.644 Å` raises out of the reflection enumerator
-and takes the chain with it (**3 of 9 chains** on one tranche, one losing 20 of
-24 patterns).  The failure mode is reassuringly narrow — across **1846
-`fit_start`/`fit_end` pairs the only exceptions raised anywhere were those
-reflection-enumeration guards**, no hangs, no NaNs, no silent wrong-shape
-results — so a driver only has to survive that one.  `on_result=(index,
-result)` fires as each pattern lands; persisting there is what saved the 103
-above, and it is the single highest-value line in a series driver.
+Driving one: **wire `on_result=` before starting anything long.**  A
+pattern every rung of which raised costs that pattern under the default
+`on_error="carry"` (above), but `on_error="raise"` still ends the chain, and
+before WP-1333 one `LinAlgError` at pattern 217 of 531 took all 216 with it.
+Across **1846 `fit_start`/`fit_end` pairs the only exceptions raised were
+reflection-enumeration guards** on a runaway cell (`a = −347.644 Å`).
+`on_result=(index, result)` fires as each pattern lands; persisting there is
+the single highest-value line in a series driver.
 
 **`on_result` fires on the forward pass only, and so does `results_`.**  With
 `direction="both"` the backward chain is passed `None` for the callback, so
