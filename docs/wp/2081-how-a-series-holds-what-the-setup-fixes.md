@@ -489,7 +489,7 @@ flag reprints the saved numbers without fitting.
   (`measure_real_ramp.py`, `real_ramp.json`) because the synthetic ramp's constant
   instrument could not say which route is right. Holding every width put the CuCr2O4
   transition near 60 K, near 230 K or nowhere, against about 130 K. The default and
-  `lab_sample_refine` from the `.prm` both closed between 111 and 123 K.
+  `lab_sample_refine` from the `.prm` both closed between 111 and 123 K. Filed in PR #1399.
 
   *Gotchas.* `measure_routes.py` patches `_fit_one` on the same positional signature as
   `measure_cold_rung.py`. Its `prepare` hook copies a cubic phase's released values by
