@@ -48,6 +48,13 @@ measured. Task 1 measures it.
 plan where extinction is rarely significant favours the opt-in, and one
 where it often is favours correcting the texts.
 
+**Decided 2026-11-03:** option A, the opt-in (the maintainer, on task 1's
+count). `Phase.extinction` defaults to `None`, and the structural plan frees
+it only on a phase that declares it. The ruling approves the stored-format
+change. The PR still goes to the maintainer before merge, because it changes
+the stored format. A second ruling the same evening widened the WP: opt-in
+physics must be findable from a fit's output (§ Handover log, 2026-11-04).
+
 **The sibling class, not generalised here.** A freed parameter the data do
 not determine, reported with no diagnostic. WP-1523 settled it for a phase
 scale (significance under 3σ, `refine._answer_significance`). WP-1914 owns
@@ -80,7 +87,7 @@ it.
       `mccusker_structural`, with the extinction value and esd each ends at.
       Count those where extinction is significant (over 3σ) and those where
       it is not.
-- [ ] Decide on that count, and record it here as `Decided YYYY-MM-DD:`. One
+- [x] Decide on that count, and record it here as `Decided YYYY-MM-DD:`. One
       option corrects the description and the schema comment to say every
       phase. The other makes the stage free only declared phases: an opt-in
       `Phase.extinction` defaulting to `None` like PO, with old files that
@@ -112,6 +119,78 @@ with one phase declared and one not.
   (`model/extinction.py` carries the full list).
 
 ## Handover log
+
+- **2026-11-04** — the maintainer's two rulings, recorded as given:
+
+  > RULING 1 (Yue, 2026-11-03 ~21Z): "we shouldn't have extinction as a
+  > default in the most popular plan. opt-in only."
+
+  > RULING 2 (Yue, same evening): opt-in physics must be FINDABLE — "check
+  > this for extinction and any other opt-in features."
+
+  Ruling 1 chose option A and approved its stored-format change, with the PR
+  still going to the maintainer before merge. Ruling 2 added three parts:
+  an evidence-gated pointer for extinction, a sweep of every opt-in
+  correction for a discovery path, and a test that no preset frees a
+  correction the model does not declare.
+
+  *Option A, as built.* `Phase.extinction: Parameter | None = None`. A number
+  declares it (`phase.extinction = 0.0` becomes a parameter bounded at 0 in
+  µm²). A stored value from an older file opens unchanged, as a declaration.
+  An undeclared phase has no table entry, so no glob can free it, and the
+  forward model skips the factor at compile. The writers (CIF, TOPAS `.inp`,
+  FullProf `.pcr`) treat an undeclared phase as extinction off.
+
+  *The pointer.* `EXTINCTION_UNDECLARED` (warning) is the air-scatter
+  screen's one-column score test on the extinction column at 0. The column
+  is projected off the background, every phase's scale and the free Biso,
+  ADP, occupancy and texture columns. The score is in reduced-χ² units with
+  the esd inflation included, so it reads as the squared significance a
+  declared coefficient would be reported at. It fires at the air-scatter
+  screen's level, 25 (5σ), reused rather than a new number. Measured with the
+  gate off:
+
+  | fit | score | |
+  |---|---|---|
+  | LaB6 synthetic, ext 2.5 planted | 230 | fires |
+  | LaB6 synthetic, 0 or 0.5 planted | leans negative | silent |
+  | 11-BM NAC + CaF₂ (QPA guide) | NAC 4.4, CaF₂ 14.6 | silent |
+  | Si 640c (hump guide) | 0.13 | silent |
+  | FAP (interval guide) | leans negative | silent |
+
+  Two earlier forms were measured and dropped. Projected off the phase's own
+  scale and the background alone, NAC scored 277 and CaF₂ 1945, against
+  refit significances of 2.8σ and 0.5σ. Adding the phase's Biso columns, then
+  the other phase's columns, and dividing by the esd inflation (8.2 on that
+  fit) brought both to the table's values.
+
+  *The sweep* (ruling 2, part 2). For each opt-in correction: the
+  declaration, what points at it, on what evidence, and whether the pointer
+  names the declaration.
+
+  | correction | declaration | pointer | evidence | names it? | gap |
+  |---|---|---|---|---|---|
+  | extinction | `phase.extinction = 0.0` | `EXTINCTION_UNDECLARED` (new) | score test, strong lines over-calculated | yes | fixed here |
+  | March-Dollase PO | `Phase.preferred_orientation = PreferredOrientation(axis=...)` | action `refine_preferred_orientation` (`report/layer2.texture_actions`) | per-reflection obs/calc corrections fit a March model, R² gate | yes | none |
+  | spherical-harmonics texture | `Phase.texture = SphericalHarmonicTexture(order=4)` | the same action, when its axis is ambiguous | runner-up axis fits nearly as well | yes, added here | fixed here |
+  | hump (`extra_components`) | `instrument.extra_components = [HumpComponent(...)]` | action `increase_background_flexibility` | between-peak residual systematic (Durbin-Watson, χ² share) | yes, added here | fixed here |
+  | sharp extra peak | `instrument.extra_components = [PeakComponent(...)]` | Layer 0 unindexed-peak regions, `add_impurity_phase` | an unexplained line | no | WP-2086 territory, not listed there: a peak usually wants a phase |
+  | Stephens microstrain | `Phase.microstrain = StephensStrain.isotropic(...)` | none; `FitReport.strain` is computed and read by nothing | width anisotropy by hkl | no | needs design, WP-2086 |
+  | anisotropic ADPs | `Atom.aniso = AnisoU(...)` | none | none exists | no | needs design, WP-2086 |
+  | surface roughness | `instrument.geometry.surface_roughness = RoughnessSuortti()` | `BISO_NEGATIVE` prose only | negative Biso | no | needs the geometry at the raise site, WP-2086 |
+  | absorption µR / µt | `geometry.capillary_radius_mm` or `thickness_mm` (or `mu_r`/`mu_t`) | `BISO_NEGATIVE`, `BISO_UNUSUALLY_LARGE` prose only | Biso anomaly | no | needs the geometry at the raise site, WP-2086 |
+  | air scatter | `instrument.background.air_scatter = Parameter(value=1e-3, min=0.0)` | `AIR_SCATTER_UNDECLARED` | score test on a 1/(2θ) column | yes | none (the model this WP copied) |
+  | magnetic moments | `Phase.magnetic_symmetry`, `Atom.moment` | `report/satellites.py` | unindexed satellite lines | yes | none |
+
+  `parent_cell` turned out to be indexing evidence (`SupercellCheck`), not a
+  correction. `distortion_modes`, `floating_origin` and `particle_radius_um`
+  declare a description, not an intensity correction, so they are out of
+  the sweep.
+
+  *The preset test* (ruling 2, part 3).
+  `test_no_preset_frees_a_correction_the_model_does_not_declare` runs every
+  stage of every preset against a model declaring no opt-in correction, and
+  asserts that no opt-in path is freed.
 
 - **2026-11-03** — task 1 measured. Nothing in `src/` changed. A ghostshift
   runner did the work. The decision brief below waits on the maintainer.

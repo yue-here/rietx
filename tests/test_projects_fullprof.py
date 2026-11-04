@@ -2709,7 +2709,7 @@ def test_preferred_orientation_and_extinction_away_from_identity_are_refused():
     with pytest.raises(ValueError, match=r"March-Dollase .*r = 0\.8"):
         from_structure(st)
     st = _cubic("Mn")
-    st.phases[0].extinction.value = 500.0
+    st.phases[0].extinction = 500.0
     with pytest.raises(ValueError, match="extinction = 500.0"):
         from_structure(st)
 

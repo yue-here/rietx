@@ -514,7 +514,9 @@ class RefinementPlan:
             Stage("preferred_orientation", ["phases.*.preferred_orientation.r",
                                             "phases.*.texture.*"]),
             # primary extinction (WP-0506, named secondary until WP-1451)
-            # comes *after* the displacement stage on purpose: ext, Biso and
+            # frees only a phase that declares it (``Phase.extinction``,
+            # opt-in since WP-1944, as PO and roughness are).  It comes
+            # *after* the displacement stage on purpose: ext, Biso and
             # the ADPs all attenuate high-Q intensity, so letting the
             # structure/ADPs settle first leaves extinction with only its
             # (different, low-angle-weighted) signature to fit.  The

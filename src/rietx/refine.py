@@ -9060,6 +9060,11 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     diagnostics = diagnostics + _air_scatter_undeclared_diagnostics(
         model, values, y_calc, stats)
 
+    # The extinction a structure did not declare (WP-1944): opt-in, so a plan
+    # cannot free it, and this is what keeps it findable from the residual.
+    diagnostics = diagnostics + _extinction_undeclared_diagnostics(
+        model, table, values, y_calc, stats, structure)
+
     # What a declared sharp peak did, once the fit has an answer about it
     # (WP-1103).  Built after ``ticks`` because "is this component sitting on a
     # reflection" is asked against the same predicted positions Layer 0 uses,
@@ -10475,6 +10480,120 @@ def _air_scatter_undeclared_diagnostics(model: CompiledModel,
             "air scatter, raise the pattern's lower limit instead."),
         value=fraction,
     )]
+
+
+#: the free paths the score test re-fits beside the phase's scale: those
+#: that change a phase's intensities without moving its lines, which is where
+#: extinction's correlations sit (ρ 0.97 with the scale, 0.87 with Biso on
+#: LaB6, ``test_extinction_correlates_with_scale_and_biso_and_the_guard_fires``).
+_EXTINCTION_PARTNER = re.compile(
+    r"phases\.\d+\.(atoms\.\d+\.(biso|adp\.\d+|occupancy)"
+    r"|preferred_orientation\.r|texture\..*)$")
+
+#: the coefficient (µm²) the score test's column is differenced at.  x stays
+#: far below 1 for any |F|² a fit meets, so E is linear in it to fp64.
+_EXTINCTION_PROBE = 1e-3
+
+
+def _extinction_undeclared_diagnostics(model: CompiledModel, table: ParameterTable,
+                                       values: dict[str, float], y_calc, stats,
+                                       structure: Structure) -> list[Diagnostic]:
+    """``EXTINCTION_UNDECLARED``: a phase with no extinction declared, whose
+    strongest reflections the fit calculates stronger than it observes (WP-1944).
+
+    Extinction is opt-in, so no plan frees it on a phase that does not declare
+    it, and its row is absent from every listing.  This is the evidence-gated
+    pointer that keeps it findable.  It is the air-scatter screen's one-column
+    score test (``_air_scatter_undeclared_diagnostics``) on the extinction
+    column at 0: a = ∂y/∂ext, differenced at :data:`_EXTINCTION_PROBE` with
+    the extinction factor switched on for that phase alone, weighted and
+    projected off the background block, the phase's own scale column and its
+    free intensity parameters (:data:`_EXTINCTION_PARTNER`: Biso, the ADPs,
+    occupancies, preferred orientation).  Extinction and those all change the
+    strong lines, so the projection is what leaves only the part of the
+    signature none of them can draw.  It removes (a⊥·r)²/(a⊥·a⊥) of χ², a
+    Gauss-Newton step with those re-fitted and the positions held, which in
+    reduced-χ² units is the square of the significance the coefficient would
+    have if declared.  Measured (WP-1944): projected off the scale and the
+    background alone, the 11-BM NAC + CaF₂ fit scored 277 and 1945, where the
+    refit's own significances were 2.8σ and 0.5σ, the Biso absorbing the rest.
+    **One-sided**: the coefficient is bounded at 0, so a lean toward a negative
+    one does not fire.  Fires at :data:`AIR_SCATTER_UNDECLARED_SCORE` (5σ),
+    the level of the one test this is, in reduced-χ² units with the esd
+    inflation included.  Measured (WP-1944, gate off): a LaB6 synthetic with
+    ext 2.5 planted scores 230, and 0 or 0.5 planted leans the other way; the
+    11-BM NAC + CaF₂ fit scores 4.4 and 14.6, Si 640c 0.13, and FAP leans the
+    other way.  Over WP-1944's 69 structural-plan fits a freed extinction
+    without one planted reached at most 3.1σ, a score near 10.  Rietveld mode only, since Le Bail and Pawley fit the intensities.
+    """
+    if model.mode != "rietveld" or not (stats.chi2 > 0.0):
+        return []
+    declared = {e.path for e in table.entries}
+    w = 1.0 / model.sigma
+    r = (model.y_obs - np.asarray(y_calc)) * w
+    out = []
+    block = None
+
+    def partners():
+        # every phase's scale column and the free intensity parameters each
+        # trades against (a forward-difference column each, positions held):
+        # in a mixture the fraction moves too, so one phase's scale is a
+        # partner of the other's extinction
+        cols = list(model.bkg_design * w)
+        for jp in range(len(structure.phases)):
+            at = np.asarray(model.phase_component(jp, values))
+            cols.append(at * w)
+            for other in table.free_paths:
+                if (other.startswith(f"phases.{jp}.")
+                        and _EXTINCTION_PARTNER.match(other)):
+                    step = 1e-6 * max(abs(values[other]), 1.0)
+                    moved = np.asarray(model.phase_component(
+                        jp, {**values, other: values[other] + step}))
+                    cols.append((moved - at) / step * w)
+        return np.vstack(cols).T
+    for ip, phase in enumerate(structure.phases):
+        path = f"phases.{ip}.extinction"
+        if phase.extinction is not None or path in declared or not phase.atoms:
+            continue
+        cp = model.phases[ip]
+        held = cp.skip_extinction
+        try:
+            cp.skip_extinction = False
+            base = np.asarray(model.phase_component(ip, {**values, path: 0.0}))
+            probe = np.asarray(model.phase_component(
+                ip, {**values, path: _EXTINCTION_PROBE}))
+        finally:
+            cp.skip_extinction = held
+        a = (probe - base) / _EXTINCTION_PROBE * w
+        block = partners() if block is None else block
+        beta, *_ = lapack.lstsq(block, a, rcond=None)
+        perp = a - block @ beta
+        norm = float(perp @ perp)
+        lean = float(perp @ r)
+        if not (norm > 0.0 and lean > 0.0):
+            continue
+        # in units of the reduced χ² the esds are quoted in, inflation
+        # included, so the score is the squared significance a declared
+        # coefficient would be reported at
+        score = lean * lean / norm / stats.chi2 / (stats.esd_inflation or 1.0) ** 2
+        if score < AIR_SCATTER_UNDECLARED_SCORE:
+            continue
+        out.append(Diagnostic(
+            level="warning", code="EXTINCTION_UNDECLARED", where=[path],
+            message=(
+                f"Phase {phase.name!r} declares no extinction, and its strongest "
+                "reflections are calculated stronger than observed. Freeing "
+                "extinction, with the phase's scale and the background re-fitted "
+                f"and the structure held, would remove {score:.0f}× this fit's "
+                "reduced χ² (a score test on the fit's own residual)."),
+            suggestion=(
+                f"Declare it with structure.phases[{ip}].extinction = 0.0 and "
+                "refit with the structural plan. Read its esd and its correlation "
+                "with the scale before quoting it: preferred orientation and a "
+                "wrong Biso also change the strong lines."),
+            value=score,
+        ))
+    return out
 
 
 def _quantify_phases(table: ParameterTable, theta: np.ndarray,

@@ -660,6 +660,15 @@ ROWS: tuple[Row, ...] = (
                   "scored against does not model the allowed lines; refine the cell or the "
                   "profile and screen again before quoting a symbol")),
     Row("EXTINCTION_SYMBOL_AMBIGUOUS", "code"),
+    Row("EXTINCTION_UNDECLARED", "code", tier=1, ambiguity=1, response="warning",
+        evidence=("warning; a one-column score test on the fit's own residual: the extinction "
+                  "column at 0 for a phase that declares none, projected off the background, "
+                  "every phase's scale and the free Biso, ADP, occupancy and texture columns; "
+                  "fires at AIR_SCATTER_UNDECLARED_SCORE, the same test's level, in reduced "
+                  "chi2 units with the esd inflation included (WP-1944: planted LaB6 230, "
+                  "11-BM NAC 4.4 and CaF2 14.6, Si 640c 0.13, FAP no lean)"),
+        responds=("declare extinction on the named phase and refit, then read its esd and its "
+                  "correlation with the scale before quoting it or the phase fraction")),
     Row("EXTRA_PEAK_NO_INTENSITY", "code"),
     Row("EXTRA_PEAK_ON_REFLECTION", "code"),
     Row("FLAT_DIRECTION", "code"),
@@ -3201,6 +3210,10 @@ ROWS: tuple[Row, ...] = (
                  "measured value, one family (B11, ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("rietx.refine.LOW_ANGLE_MIN_CHANNELS", "constant", value=10),
+    Row("rietx.refine._EXTINCTION_PROBE", "constant", tier=1, value=0.001,
+        evidence=("numerical: the differencing step of EXTINCTION_UNDECLARED's column; x stays "
+                  "far below 1 at 1e-3 um^2, where E = 1 - x/2 to first order, so the forward "
+                  "difference is the derivative at 0 to fp64")),
     Row("rietx.refine.LOW_ANGLE_UNMODELLED_RATIO", "constant", value=3.0),
     Row("rietx.refine.MAGNETIC_TICK_PURITY", "constant", value=0.05),
     Row("rietx.refine.MODEL_FAR_FROM_DATA_RWP", "constant", tier=3, value=0.8,
@@ -4554,6 +4567,9 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
+    Row("EXTINCTION_UNDECLARED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the declaration that lets a plan free the term, and the "
+                  "esd and scale correlation HIGH_CORRELATION and the esd already report")),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),

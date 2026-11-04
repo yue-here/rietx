@@ -276,7 +276,7 @@ def _state_toy_rich():
     structure = make_aniso_rutile()
     phase = structure.phases[0]
     phase.scale.value = 8.0e-3
-    phase.extinction.value = 3e-4
+    phase.extinction = 3e-4
     phase.preferred_orientation = PreferredOrientation(axis=(0, 0, 1))
     phase.preferred_orientation.r.value = 0.85
     instrument = Instrument.bragg_brentano(monochromator_two_theta=26.6)

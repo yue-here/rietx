@@ -1284,12 +1284,15 @@ class Phase(_InheritsDeclaredDefaults):
     # low-angle reflections of a well-crystallised sample: each reflection's
     # integrated intensity is multiplied by
     # E(hkl) = E_B·sin²θ + E_L·cos²θ with a dimensionless x ∝ ext·|F|²·(λ/V)².
-    # ext = 0 ⇒ E ≡ 1 exactly (off by default), so it is opt-in and never
-    # perturbs a structure that does not free it.  Bounded at zero, and the
-    # staged plan seeds it off zero.
-    extinction: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, vary=False, min=0.0, unit="um^2")
-    )
+    # Opt-in (WP-1944): None ⇒ no extinction and no table entry, so no plan
+    # can free it.  Declare it with a number, ``phase.extinction = 0.0``,
+    # which the validator below turns into the bounded parameter; a stored
+    # value from an older file opens unchanged, as a declaration.  The
+    # structural plan's extinction stage frees only a declared phase, as its
+    # preferred-orientation and roughness stages do.  Measured over 69 fits
+    # before the change, the plan freeing it on every phase put one value
+    # past 3σ, on a synthetic pattern with none planted.
+    extinction: Parameter | None = None
     # Optional single-axis March-Dollase preferred-orientation correction
     # (model/preferred_orientation.py).  None ⇒ no correction; a block with the
     # default r = 1 is also exactly the identity, so it is opt-in and never
@@ -1497,6 +1500,22 @@ class Phase(_InheritsDeclaredDefaults):
                         "bodies by a restraint across them instead")
                 owner[label] = body.name
         return self
+
+    @field_validator("extinction", mode="before")
+    @classmethod
+    def _declare_extinction(cls, value):
+        """A number declares extinction at that value, bounded at its floor of 0.
+
+        ``phase.extinction = 0.0`` is the declaration a user writes, so it
+        must not need the unit and the bound spelled out.  A ``Parameter`` or
+        a stored dict passes through unchanged.
+        """
+        if isinstance(value, bool):
+            raise ValueError("extinction takes a number (µm²) or a Parameter; "
+                             "declare it with phase.extinction = 0.0")
+        if isinstance(value, (int, float)):
+            return Parameter(value=float(value), min=0.0, unit="um^2")
+        return value
 
     @field_validator("symmetry_operations", mode="before")
     @classmethod
