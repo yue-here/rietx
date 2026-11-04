@@ -1374,42 +1374,44 @@ CLAIMS: tuple[Claim, ...] = (
         "test_acceptance_sequential",
         "test_the_hostile_series_exercises_the_reseed_fence", "qarr",
         ("identity", "characterisation"),
-        "the reseed fence's accounting is exact, the escalation ladder is "
+        "the reseed ladder's accounting is exact, the escalation ladder is "
         "only ever climbed as a prefix, and a reseed never leaves the fit "
         "worse than the warm start it rejected",
         reference="internal consistency: the SEQUENTIAL_RESEED diagnostic "
                   "count must equal the number of entries flagged reseeded, "
                   "exactly; every entry's rungs_tried must be a prefix of the "
-                  "ladder and contain the rung it kept.  The fence never fired "
+                  "ladder and contain the rung it kept.  The ladder never climbed "
                   "on the hostile series — the collapsed refit recovers a bad "
                   "warm start within the fit — so it is insurance, pinned by "
                   "unit tests rather than by this suite",
         measured="exact accounting; zero reseeds on the hostile series, "
                  "every pattern after the first kept on its warm rung, and no "
-                 "kept rung above the Rwp fence (2026-10-25, macOS arm64, "
-                 "after WP-2045; 1.9.0 the same).  1.10.0's hostile series did "
+                 "kept rung above the 1.25× Rwp fence the default then carried "
+                 "(2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same; the "
+                 "fence left the default in WP-2003).  1.10.0's hostile series did "
                  "not finish, spending over 50 CPU minutes in the closing "
                  "stage that follows cpd-1b's warm rung (Rwp 0.760)",
-        diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED",
-                     "SEQUENTIAL_RWP_OUTLIER"),
+        diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED"),
         features=("sequential_series",),
     ),
     Claim(
         "test_acceptance_sequential",
         "test_the_first_rung_bound_moves_no_accepted_value", "qarr",
         ("identity",),
-        "FIRST_RUNG_FACTOR is answer-invariant on the hostile series: the "
-        "chain with WP-1127's first-rung bound and the chain without it "
-        "report the same values, esds, rungs, fences and codes, and no kept "
-        "first rung reaches the budget the bound would set",
-        reference="the same chain with first_rung_factor=None, to the bit; "
-                  "the margin against FIRST_RUNG_FACTOR itself (WP-2003). "
+        "A first-rung bound at 3.0 (WP-1127's factor, the default until "
+        "WP-2003 C3 made it the caller's) is answer-invariant on the hostile "
+        "series: the chain with it and the default chain without it report "
+        "the same values, esds, rungs, fences and codes, and no kept first "
+        "rung reaches the budget the bound sets",
+        reference="the default chain, first_rung_factor=None, to the bit; "
+                  "the margin against the factor itself (WP-2003). "
                   "It verifies the bound and validates nothing, the "
                   "reference being rietx's own unbounded chain",
         measured="bit-identical; kept first rungs past the armed point "
-                 "0.064-0.080x the running maximum against a factor of 3.0 "
-                 "(2026-10-25, macOS arm64, after WP-2045; 0.34-0.39x on "
-                 "2026-10-24, Linux x86-64, with cpd-1b's runaway in the chain)",
+                 "0.045-0.062x the running maximum of a converged rung's "
+                 "dearest stage, the quantity capped since C3, against a "
+                 "factor of 3.0 (2026-11-02, macOS arm64; 0.064-0.080x of the "
+                 "rung's summed stages on 2026-10-25)",
         features=("sequential_series",),
     ),
     Claim(

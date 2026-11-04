@@ -1865,8 +1865,11 @@ def from_structure(structure: Structure, *, title: str = "",
     Space groups are written ``get_spacegroup(phase.space_group).xhm()``, never
     the phase's stored spelling, so a setting a reader *resolved* is not
     laundered back into an ambiguous symbol ([1324] and both sibling writers).
-    Unlike a ``.pcr``, a ``.EXP`` can spell every setting: ``SG SYM`` takes the
-    whole payload, so the ``:2``/``:R`` suffix travels and no refusal is owed.
+    ``SG SYM`` takes the whole payload, so the ``:2``/``:R`` suffix reaches
+    this package's reader intact. Whether GSAS itself reads ``R -3 c:R`` or
+    ``F d -3 m:2`` as that setting is not measured: no GSAS run has checked
+    it, and FullProf, measured, stops on an axis suffix
+    (WP-1911 Part A).
 
     **What does not carry**, because :func:`to_structure` never builds it: the
     instrument, the histograms and everything on them — wavelengths, the
