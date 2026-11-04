@@ -1207,8 +1207,6 @@ const REACH = 8;
  * - `colors()`: `{ tone, warn, muted }`, read at every draw. `tone` is the
  *   forward chain's, `warn` the rings' and crosses', `muted` the backward
  *   chain's.
- * - `dashed`: the forward chain is drawn dashed, as a path-dependent
- *   parameter's is.
  * - `rings`, `crosses`: one boolean per point. A ring marks a point the
  *   chain reseeded, and a cross a point no rung recovered. Both points stay
  *   in the chain: a gap reads as data nobody collected.
@@ -1310,7 +1308,7 @@ export function trajectory(uPlot, host, traj, spec) {
       }, "stroke");
     }
     if (shown("forward")) {
-      chain(u, value, c.tone, 1.4 * r, spec.dashed ? [6 * r, 4 * r] : []);
+      chain(u, value, c.tone, 1.4 * r, []);
       ctx.fillStyle = c.tone;
       each(u, value, all, (g, X, Y) => { g.moveTo(X + 3 * r, Y); g.arc(X, Y, 3 * r, 0, 2 * Math.PI); }, "fill");
     }
