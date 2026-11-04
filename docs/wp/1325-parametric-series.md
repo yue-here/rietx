@@ -1682,6 +1682,13 @@ Their numbers are as reported and were not re-measured here.
 
 The maintainer opened the milestone. This WP's status, § Direction, two tasks and its
 non-goals changed, and the moved task went to 1964 with its detail. No code changed.
+
+One correction to the record above. § Measured: the form test out of sample holds θ at
+125.37 K, the value in the 11-pattern `parametric_05.inp`, on the 100-pattern ramp, and
+quotes TOPAS's 12.81 % from `parametric_06.inp`, which stores θ = 71.47 K. That run was
+a form test and needed no agreement with TOPAS, so its conclusions stand. Any comparison
+with TOPAS on that ramp should use 71.47 K. 1964 records why the difference matters.
+
 Next: in-step bounds.
 
 ### 2026-10-15 (eighth session) — two real ramps settle the form test's divisor, a verdict beside a rejected law is provisional, and a declaration is a parametric equation

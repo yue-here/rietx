@@ -291,10 +291,28 @@ and the same form written as an expression agree to 0.01 esd.
 
 ## Handover log
 
-- **2026-11-04** — The maintainer opened the `parametric` milestone and this WP moved
-  into it. Reading `parametric_06.inp` for its acceptance row showed the two WO₃ inputs
-  disagree on θ (§ A weakly determined θ). WP-2105 now owns reading a TOPAS input, and
-  this WP's real-data runs write their protocols by hand.
+- **2026-11-04** — The parametric work now has one stated goal: an experienced TOPAS
+  or GSAS-II user ports their own refinement to rietx from the manual alone. The
+  maintainer opened the `parametric` milestone on it, and this WP is its centre. No code
+  changed. Nothing is measured here beyond reading two TOPAS inputs, and that reading
+  found the WO₃ inputs disagree on θ by a factor of 1.75.
+  - *Done.* The milestone record with nine acceptance rows, WPs 2101-2105 filed in the
+    new 21xx block, and 1325, 1964, 1965 and 1995 moved in. 1325's peak-chain task moved
+    here with its detail. 1325's next-term test and the replicate reading are parked.
+    1965 lost the Wilkinson formula to this grammar and was renamed. 1995 gained a
+    penalty and went to P2.
+  - *Measured.* `parametric_05.inp` stores θ = 125.37 K, Rwp 12.87 %, over 11 patterns.
+    `parametric_06.inp` stores θ = 71.47 K, Rwp 12.81 %, over 100. No esd in either.
+    WP-1325 held the first while quoting the second's Rwp (§ A weakly determined θ).
+    The `#list` inputs store no per-pattern cell, so the milestone's WO₃ row compares
+    each equation on the two sets of coefficients.
+  - *Gotchas.* WO₃'s `scale_pks` is one overall B per pattern and ZrP₂O₇'s `th2_offset`
+    is a curve in `Xo`. Neither needs this WP, and § Non-goals says how each protocol
+    treats it. WP-2105 owns reading a TOPAS input, so this WP's real-data runs write
+    their protocols by hand. The numbers in 2101's Context came from session scripts
+    that are not in the repo.
+  - *Next.* The grammar, with its names brought to the maintainer as a consent list.
+    2101 and 2102 can land first and need nothing from this WP.
 - **2026-11-03** — Rescoped by the maintainer from a closed list of named forms to
   equations the user writes, after a survey across fields
   (`docs/practice.md`). The file and title were renamed to drop "law". No code
