@@ -1835,7 +1835,8 @@ def test_an_integer_model_selector_still_reads(tmp_path):
 # a_rh = sqrt(a^2/3 + c^2/9) = 5.206833 and
 # sin(alpha/2) = 3 / (2*sqrt(3 + (c/a)^2)) => alpha = 57.388870 — so the pair
 # describes one lattice in two settings, which is what the test needs.
-# This closes a gap; it is not a wrong answer any file here produced.
+# FullProf itself reads the rhombohedral pair's bare symbol on hexagonal axes,
+# so that file is read on the cell's axes and reported (ruled 2026-11-03).
 _R_PHASE_RHOMBOHEDRAL_CELL = (
     "   5.206833   5.206833   5.206833  57.388870  57.388870  57.388870")
 _R_PHASE_HEXAGONAL_CELL = (
@@ -1882,6 +1883,53 @@ def test_a_hexagonal_r_cell_is_left_on_the_default_setting(tmp_path):
                _phase(sg="R -3 c", cell=_R_PHASE_HEXAGONAL_CELL,
                       cell_codes=_PHASE_CELL_CODES))
     assert read_fullprof_pcr(pcr).phases[0].space_group == "R -3 c"
+
+
+# One site at the origin, which is a position in both R settings, so the
+# phase builds under either and only the setting differs.
+_R_PHASE_ORIGIN_SITE = (
+    "Fe1    FE      0.00000  0.00000  0.00000  0.35000   0.16667"
+    "   0   0   0    1\n"
+    "                  0.00     0.00     0.00     0.00      0.00")
+
+
+def test_a_bare_r_symbol_over_a_rhombohedral_cell_is_read_and_reported(
+        tmp_path):
+    """FullProf reads a bare R symbol on hexagonal axes whatever the cell says
+    (#716, FullProf.2k 8.50), so this file means a different crystal to the
+    program it is for. rietx's writer wrote such files before PR #733. Ruled
+    2026-11-03: read it on the axes the cell states, and say so."""
+    pcr = _pcr(tmp_path, "rhombo.pcr",
+               _phase(nat=1, sg="R -3 c", atoms=_R_PHASE_ORIGIN_SITE,
+                      cell=_R_PHASE_RHOMBOHEDRAL_CELL,
+                      cell_codes=_PHASE_CELL_CODES))
+    diagnostics: list = []
+    structure = to_structure(read_fullprof_pcr(pcr), diagnostics=diagnostics)
+    assert structure.phases[0].space_group == "R -3 c:R"
+    axes = [d for d in diagnostics
+            if d.code == "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED"]
+    assert len(axes) == 1
+    assert axes[0].level == "warning"
+    assert axes[0].where == ["phases.0.space_group"]
+    assert "'R -3 c'" in axes[0].message
+    assert "'R -3 c:R'" in axes[0].message
+    assert "hexagonal axes" in axes[0].message
+    # One fact, one code: the axes arm is not also an origin choice.
+    assert [d for d in diagnostics if d.code == "FULLPROF_ORIGIN_CHOICE"] == []
+
+
+def test_a_bare_r_symbol_over_a_hexagonal_cell_reports_nothing(tmp_path):
+    """The reading FullProf and rietx share needs no word."""
+    pcr = _pcr(tmp_path, "hex.pcr",
+               _phase(nat=1, sg="R -3 c", atoms=_R_PHASE_ORIGIN_SITE,
+                      cell=_R_PHASE_HEXAGONAL_CELL,
+                      cell_codes=_PHASE_CELL_CODES))
+    diagnostics: list = []
+    structure = to_structure(read_fullprof_pcr(pcr), diagnostics=diagnostics)
+    assert structure.phases[0].space_group == "R -3 c"
+    assert [d.code for d in diagnostics
+            if d.code in ("FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED",
+                          "FULLPROF_ORIGIN_CHOICE")] == []
 
 
 # The two lower-confidence items the review raised, both surfaced rather than
@@ -2929,6 +2977,100 @@ def test_the_hexagonal_phase_is_not_touched_and_says_nothing(tmp_path):
     write_fullprof_pcr(rx.Structure(phases=[phase]), tmp_path / "h.pcr",
                        diagnostics=found)
     assert not [d for d in found if "RHOMBOHEDRAL" in d.code]
+
+
+# The tests above read the written file back through rietx's reader, whose
+# metric rule picks `:R` for a rhombohedral cell. FullProf has no such rule.
+# This oracle reads the symbol and the cell the way FullProf was measured to
+# (issue #716) and shares nothing with the reader.
+
+def _fullprof_r_cell(symbol, cell):
+    """The cell FullProf reads beside the space-group line ``symbol``, or
+    ``None`` where it stops ("illegal" space group).
+
+    Measured (#716, FullProf.2k 8.50 as a black box, from the ``.out``): a
+    bare R symbol is hexagonal axes whatever the cell line says. The three
+    edges are kept and α = β = 90°, γ = 120° are imposed. Any axis suffix
+    after an R symbol (``R``, ``H``, ``:R``, ``:H``) stops the run. A
+    symbol of another lattice is read with the cell as written.
+    """
+    tokens = symbol.split()
+    if tokens[0].upper() != "R":
+        return tuple(cell)
+    if tokens[-1].upper().lstrip(":") in {"R", "H"} or ":" in symbol:
+        return None
+    a, b, c = cell[:3]
+    return (a, b, c, 90.0, 90.0, 120.0)
+
+
+#: Issue #716's measured rows: the space-group line, the cell line beside it,
+#: and what FullProf read (``None`` is "illegal").
+_RH_CELL = (5.4226, 5.4226, 5.4226, 55.2757, 55.2757, 55.2757)
+_MEASURED_R_SYMBOLS = {
+    "R -3 c": (5.4226, 5.4226, 5.4226, 90.0, 90.0, 120.0),
+    "R -3 c R": None, "R -3 c :R": None, "R -3 c :H": None, "R -3 c H": None,
+}
+
+
+def _volume(a, b, c, alpha, beta, gamma):
+    import math
+
+    ca, cb, cg = (math.cos(math.radians(t)) for t in (alpha, beta, gamma))
+    return a * b * c * math.sqrt(1 - ca * ca - cb * cb - cg * cg
+                                 + 2 * ca * cb * cg)
+
+
+def test_the_fullprof_r_symbol_oracle_reproduces_the_measured_reading():
+    """Held to every row of #716's table first, so it is FullProf's rule
+    rather than a second copy of the writer's. The reported volume, 138.087
+    Å³, is the hexagonal metric on the rhombohedral edges."""
+    assert ({s: _fullprof_r_cell(s, _RH_CELL) for s in _MEASURED_R_SYMBOLS}
+            == _MEASURED_R_SYMBOLS)
+    assert _volume(*_fullprof_r_cell("R -3 c", _RH_CELL)) == pytest.approx(
+        138.087, abs=1e-3)
+
+
+def _symbol_and_cell(text, phase_name):
+    """A one-phase file's space-group line and LINE 11's cell: the symbol
+    sits two lines below the phase name, and the cell is the first later
+    line of six numbers whose three edges are positive."""
+    lines = _lines(text)
+    at = lines.index(phase_name) + 2
+    for line in lines[at + 1:]:
+        try:
+            fields = [float(v) for v in line.split()]
+        except ValueError:      # a site or comment line, not a row of numbers
+            continue
+        if len(fields) == 6 and all(v > 0 for v in fields[:3]):
+            return lines[at], tuple(fields)
+    raise AssertionError("no cell line")
+
+
+@pytest.mark.parametrize("symbol, a, alpha", [
+    ("R -3 c:R", 5.4226, 55.2757), ("R -3 c:H", 4.9542, None)])
+def test_fullprof_reads_the_written_r_phase_as_the_crystal_rietx_fitted(
+        symbol, a, alpha):
+    """The written file read FullProf's way states a lattice of the
+    original's volume per lattice point. The rhombohedral cell holds one
+    lattice point and the hexagonal three. The writer before #733 wrote the
+    rhombohedral cell beside ``R -3 c``, which FullProf read as 138.087 Å³,
+    and this test fails on it."""
+    if alpha is None:
+        phase = _corundum_type(symbol, a, 90.0).model_copy(update={
+            "cell": rx.Cell(a=rx.Parameter(value=a), b=rx.Parameter(value=a),
+                            c=rx.Parameter(value=13.4213),
+                            alpha=rx.Parameter(value=90.0),
+                            beta=rx.Parameter(value=90.0),
+                            gamma=rx.Parameter(value=120.0))})
+        per_point = _volume(a, a, 13.4213, 90.0, 90.0, 120.0) / 3.0
+    else:
+        phase = _corundum_type(symbol, a, alpha)
+        per_point = _volume(a, a, a, alpha, alpha, alpha)
+    text = from_structure(rx.Structure(phases=[phase]))
+    line, cell = _symbol_and_cell(text, phase.name)
+    read = _fullprof_r_cell(line, cell)
+    assert read is not None, f"FullProf stops on {line!r}"
+    assert _volume(*read) / 3.0 == pytest.approx(per_point, rel=1e-9)
 
 
 # --- write_zero_shift: #723's first item, opt-in -----------------------------

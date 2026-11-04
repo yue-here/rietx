@@ -1070,6 +1070,27 @@ def test_a_hexagonal_phase_gets_no_restatement_note(tmp_path):
     assert not [d for d in found if "RHOMBOHEDRAL" in d.code]
 
 
+@pytest.mark.parametrize("symbol", ["R -3 c:R", "R -3 c:H"])
+def test_an_r_phase_is_not_reported_as_read_two_ways(tmp_path, symbol):
+    """GSAS-II 5.8.4's ``SpcGroup("R -3 c")`` gives the R-centred trigonal
+    group on hexagonal axes, three centring vectors (black box), and gemmi
+    reads the bare symbol as ``:H`` too. A ``:R`` phase is restated first, so
+    the bare symbol the CIF writes is read one way by both programs. The
+    setting note is for origin choices, and it said nothing true of an axis
+    choice (#716)."""
+    found: list = []
+    phase = _corundum_type_rhombohedral()
+    if symbol.endswith(":H"):
+        phase = phase.model_copy(update={
+            "space_group": symbol, "cell": rx.Cell(
+                a=rx.Parameter(value=5.0309), b=rx.Parameter(value=5.0309),
+                c=rx.Parameter(value=13.7372), alpha=rx.Parameter(value=90.0),
+                beta=rx.Parameter(value=90.0), gamma=rx.Parameter(value=120.0))})
+    rx.write_gsas2_phase_cif(rx.Structure(phases=[phase]), tmp_path / "r.cif",
+                             diagnostics=found)
+    assert not [d for d in found if d.code == "GSAS2_CIF_SETTING_IN_OPERATORS"]
+
+
 # ------------------- a spherical-harmonics texture, through GSAS-II's own P (WP-1960)
 #
 # ``Pref.Ori.`` is [kind, MD ratio, flag, MD axis, SH order, {C(l,n): value},
