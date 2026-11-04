@@ -27,6 +27,10 @@ discards both, so:
 - `DECLARED_RANGE_NOT_RESTORED` (warning): a parameter left unbounded because
   a stored value lies outside its declared range. The person should give it a
   range before fitting, and cannot learn that it needs one.
+- `HISTORY_EARLIER_TREE_SKIPPED` (warning, WP-2031): a `history.jsonl` a
+  release before 1.11 doubled loads its last tree and skips each earlier one.
+  The GUI then resumes from the last run, and nothing on screen says the file
+  holds another.
 - The pattern reader's own repairs (`PATTERN_SCAN_REVERSED`,
   `PATTERN_ROWS_DROPPED`, `PATTERN_INTENSITY_SCALED`, …) have never reached
   the GUI either.
