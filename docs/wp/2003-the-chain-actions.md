@@ -1,6 +1,6 @@
 # WP-2003 — The chain actions: what a series decides between patterns
 
-Milestone: generality · Status: 🔄 2026-11-03 — the batch ruled by the maintainer 2026-11-03 and landed but for C8, C11, C2's rung fields and C10 q1; the demoted codes are record fields, the joint hold reads the single fit's significance; the GUI wording and the joint moves await the maintainer's review; the agent run owed
+Milestone: generality · Status: 🔄 2026-11-04 — claimed by @mustachefeeling (ghostshift runner): C8's onset split, C11's three invariant arms; the batch ruled by the maintainer 2026-11-03 and landed but for C8, C11, C2's rung fields and C10 q1
 Track: The audits
 Depends on: 2002, 2037
 Priority: P2 2026-10-24 — 2037 closed, so its clause 1 and the response column this WP's first demotion takes are in place; the maintainer's next after 2037; the seam the maintainer's own example (a series discontinuity) lives in
