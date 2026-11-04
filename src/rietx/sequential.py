@@ -1467,7 +1467,7 @@ class SequentialRefinement:
         xs = [None] * len(patterns) if x is None else [float(v) for v in x]
         if x is not None and x_label == "index":
             x_label = "x"
-        base_plan = resolve_plan(plan, mode)
+        base_plan = resolve_plan(plan, mode, self.instrument.geometry.kind)
         warm_plan = (_unseeded(base_plan) if refit == "stages"
                      else _collapse(base_plan))
         ladder = _ladder(base_plan, warm_plan, staged=refit == "stages")
