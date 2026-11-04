@@ -1,4 +1,4 @@
-# WP-2086 — An opt-in correction the residual asks for names its declaration
+# WP-2087 — An opt-in correction the residual asks for names its declaration
 
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent

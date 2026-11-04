@@ -611,7 +611,7 @@ The order scan is a `BackgroundSelection`, the same object `rietx.background.sel
 | `BackgroundSelection.n_masked_channels` | the background channels the scan scored, after the peaks were masked |
 | `BackgroundSelection.scores` | one `CandidateScore` per order tried: `CandidateScore.complexity` (the order), `CandidateScore.bic` and `CandidateScore.durbin_watson` |
 | `BackgroundSelection.stopped_by_whiteness` | whether Durbin-Watson d reached the stop, 1.8, and ended the scan |
-| `BackgroundSelection.diagnostics` | `BACKGROUND_ORDER_AT_CAP` when the order is the scan's cap rather than a choice |
+| `BackgroundSelection.diagnostics` | `BACKGROUND_ORDER_AT_CAP` when the order is the scan's cap rather than a choice; on an arPLS scan, `BACKGROUND_SMOOTHING_AT_FLEXIBLE_END` when no strength reached the floor and the grid's most flexible end came back |
 
 ### Fixed curve plus Chebyshev
 
@@ -681,7 +681,7 @@ No expression member exists yet.
 
 | Field | Default | Bounds | Meaning |
 |---|---|---|---|
-| `HumpComponent.position` | 0.0 deg | none | the hump's apparent 2θ |
+| `HumpComponent.position` | required | none | the hump's apparent 2θ |
 | `HumpComponent.height` | 0.0 counts | ≥ 0 | its peak value; 0 is off |
 | `HumpComponent.fwhm` | 5.0 deg | ≥ `HUMP_FWHM_MIN` (0.1°) | its width in 2θ |
 | `HumpComponent.label` | `None` | | free text, never part of a parameter's name |
@@ -693,6 +693,7 @@ No expression member exists yet.
 | `PeakComponent.label` | `None` | | free text, never part of a parameter's name |
 
 A hump's position has no bound, because it is not a Bragg position and the fitted range belongs to the pattern rather than the instrument.
+A stored document that omits a hump's position opens with it at 0.0°, the default it had before 1.11.
 A peak's `center` and `fwhm` need finite bounds, because they size the window the peak is evaluated over, frozen when a stage compiles.
 The window spans the centre's bounds and reaches out by a multiple of `fwhm.max` that grows with `eta.max`, about 16 at η = 1.
 At the default `fwhm.max` of 0.5° that is about ±8°, so state the bounds you believe.

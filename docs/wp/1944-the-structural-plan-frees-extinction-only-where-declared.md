@@ -128,7 +128,7 @@ with one phase declared and one not.
   that a real extinction now needs a declaration, and the pointer that names
   it misses a weak one (0.5 µm² planted on LaB6 scores 14 against a gate of
   25). Every other opt-in correction was checked for a pointer; three lack
-  one and are filed as WP-2086.
+  one and are filed as WP-2087.
 
   The maintainer's two rulings, recorded as given:
 
@@ -189,11 +189,11 @@ with one phase declared and one not.
   | March-Dollase PO | `Phase.preferred_orientation = PreferredOrientation(axis=...)` | action `refine_preferred_orientation` (`report/layer2.texture_actions`) | per-reflection obs/calc corrections fit a March model, R² gate | yes | none |
   | spherical-harmonics texture | `Phase.texture = SphericalHarmonicTexture(order=4)` | the same action, when its axis is ambiguous | runner-up axis fits nearly as well | yes, added here | fixed here |
   | hump (`extra_components`) | `instrument.extra_components = [HumpComponent(...)]` | action `increase_background_flexibility` | between-peak residual systematic (Durbin-Watson, χ² share) | yes, added here | fixed here |
-  | sharp extra peak | `instrument.extra_components = [PeakComponent(...)]` | Layer 0 unindexed-peak regions, `add_impurity_phase` | an unexplained line | no | WP-2086 territory, not listed there: a peak usually wants a phase |
-  | Stephens microstrain | `Phase.microstrain = StephensStrain.isotropic(...)` | none; `FitReport.strain` is computed and read by nothing | width anisotropy by hkl | no | needs design, WP-2086 |
-  | anisotropic ADPs | `Atom.aniso = AnisoU(...)` | none | none exists | no | needs design, WP-2086 |
-  | surface roughness | `instrument.geometry.surface_roughness = RoughnessSuortti()` | `BISO_NEGATIVE` prose only | negative Biso | no | needs the geometry at the raise site, WP-2086 |
-  | absorption µR / µt | `geometry.capillary_radius_mm` or `thickness_mm` (or `mu_r`/`mu_t`) | `BISO_NEGATIVE`, `BISO_UNUSUALLY_LARGE` prose only | Biso anomaly | no | needs the geometry at the raise site, WP-2086 |
+  | sharp extra peak | `instrument.extra_components = [PeakComponent(...)]` | Layer 0 unindexed-peak regions, `add_impurity_phase` | an unexplained line | no | WP-2087 territory, not listed there: a peak usually wants a phase |
+  | Stephens microstrain | `Phase.microstrain = StephensStrain.isotropic(...)` | none; `FitReport.strain` is computed and read by nothing | width anisotropy by hkl | no | needs design, WP-2087 |
+  | anisotropic ADPs | `Atom.aniso = AnisoU(...)` | none | none exists | no | needs design, WP-2087 |
+  | surface roughness | `instrument.geometry.surface_roughness = RoughnessSuortti()` | `BISO_NEGATIVE` prose only | negative Biso | no | needs the geometry at the raise site, WP-2087 |
+  | absorption µR / µt | `geometry.capillary_radius_mm` or `thickness_mm` (or `mu_r`/`mu_t`) | `BISO_NEGATIVE`, `BISO_UNUSUALLY_LARGE` prose only | Biso anomaly | no | needs the geometry at the raise site, WP-2087 |
   | air scatter | `instrument.background.air_scatter = Parameter(value=1e-3, min=0.0)` | `AIR_SCATTER_UNDECLARED` | score test on a 1/(2θ) column | yes | none (the model this WP copied) |
   | magnetic moments | `Phase.magnetic_symmetry`, `Atom.moment` | `report/satellites.py` | unindexed satellite lines | yes | none |
 
@@ -337,7 +337,7 @@ with one phase declared and one not.
   receives" section, and decides two things it asks: whether
   `EXTINCTION_UNDECLARED` moves to tier 3 with grounds and an approval,
   and whether it gets a threshold of its own rather than the air-scatter
-  screen's. Either answer is a row edit in `_audit.py`. Then WP-2086,
+  screen's. Either answer is a row edit in `_audit.py`. Then WP-2087,
   starting with the Stephens action.
 
 - **2026-11-03** — task 1 measured. Nothing in `src/` changed. A ghostshift

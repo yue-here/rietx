@@ -269,7 +269,7 @@ The preset continues from a converged nuclear fit and frees no cell, coordinate 
 result = ref.fit(data, plan="magnetic_width")
 ```
 
-A plan that frees a magnetic width in the stage that first frees the moment is reported as [`STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT`](diagnostics-refinement.md#stage_frees_magnetic_width_with_moment) before the first stage runs, by `Refinement.fit` and `Refinement.run_stage` alike.
+A plan that frees a magnetic width in the stage that first frees the moment is reported as [`STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT`](diagnostics-stages.md#stage_frees_magnetic_width_with_moment) before the first stage runs, by `Refinement.fit` and `Refinement.run_stage` alike.
 
 While the terms are held at zero, [`MAGNETIC_WIDTH_UNMODELLED`](diagnostics-structures.md#magnetic_width_unmodelled) says whether they are needed.
 It reads the shape of the converged residual, since the package measures no observed width.

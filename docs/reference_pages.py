@@ -529,7 +529,8 @@ def diagnostic_index(root: _Path = SOURCE_ROOT) -> dict[str, dict[str, set]]:
 #: The first area prefix a code's first file matches decides; "" takes the rest.
 DIAGNOSTIC_GROUPS = (
     ("diagnostics-projects", "Other programs' projects", ("rietx/io/projects/",)),
-    ("diagnostics-files", "Reading files", ("rietx/io/",)),
+    # the history log's reader too: a file read, not a fit (WP-2031)
+    ("diagnostics-files", "Reading files", ("rietx/io/", "rietx/history/")),
     ("diagnostics-indexing", "Peaks and indexing", ("rietx/indexing/",)),
     # not `rietx/schemas/`: the codes raised there are a result's capped
     # correlation counts and a stored file's migrated ranges, not structure
@@ -537,9 +538,20 @@ DIAGNOSTIC_GROUPS = (
      ("rietx/crystallography/", "rietx/strategy/magnetic",
       "rietx/report/magnetic")),
     ("diagnostics-series", "Series and joint fits", ("rietx/sequential", "rietx/multi")),
+    # out of the catch-all, whose page reached the cap with its second code (WP-1931)
+    ("diagnostics-background", "Background selection", ("rietx/background/",)),
+    # no area: STAGE_CODE_PREFIXES files its codes
+    ("diagnostics-stages", "Stages and plans", ()),
+    # no area: CORRECTION_CODE_PREFIXES files its codes
     ("diagnostics-corrections", "Corrections", ()),
     ("diagnostics-refinement", "Refinement", ("",)),
 )
+
+#: The refinement page passed the 50 000-character cap too (WP-1334), and
+#: most of its codes are raised in one file, ``refine.py``, so the area rule
+#: cannot split it.  Its codes about how a stage or a plan ran are filed by
+#: their code's prefix instead, on ``diagnostics-stages``.
+STAGE_CODE_PREFIXES = ("STAGE_", "PLAN_", "HOLD_")
 
 #: The codes the Refinement page hands to the Corrections page, by name prefix.
 #: Nearly every refinement code is raised in ``refine.py``, so no file prefix
@@ -560,6 +572,8 @@ def diagnostic_group(files: set[str], code: str = "") -> str:
     first = sorted(files)[0]
     stem = next(stem for stem, _title, areas in DIAGNOSTIC_GROUPS
                 if any(first.startswith(area) for area in areas))
+    if stem == "diagnostics-refinement" and code.startswith(STAGE_CODE_PREFIXES):
+        return "diagnostics-stages"
     if stem == "diagnostics-refinement" and code.startswith(CORRECTION_CODE_PREFIXES):
         return "diagnostics-corrections"
     return stem

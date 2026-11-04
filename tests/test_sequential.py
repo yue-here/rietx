@@ -25,22 +25,23 @@ import rietx as rx
 from rietx.model.forward import compile_model
 from rietx.optimize.cancel import CancelToken
 from rietx.params.vector import AffineTie, ParameterTable
-from rietx.schemas.common import Parameter
+from rietx.schemas.common import Diagnostic, Parameter
 from rietx.schemas.instrument import BackgroundChebyshev
 from rietx.schemas.results import RefinedParameter, Statistics
-from rietx.schemas.sequential import SeriesEntry, SeriesResult, SeriesStep
+from rietx.schemas.sequential import SeriesEntry, SeriesResult, SeriesStep, _rejected
 from rietx.schemas.structure import Atom
 from rietx.sequential import (
-    FIRST_RUNG_FACTOR,
     SequentialRefinement,
     _better,
     _carry_into,
     _collapse,
+    _direction_gaps,
     _entry_from_result,
     _labels_for,
-    _path_dependence_diagnostics,
+    _reseed_diagnostics,
     _reseed_needed,
     _series_steps,
+    _unrecovered_diagnostics,
     _width_growth_diagnostics,
     refine_sequential,
 )
@@ -284,6 +285,27 @@ def test_carry_globs_move_only_matching_paths():
     assert cell.a.value == pytest.approx(A0 * 1.02)
     assert cell.b.value == pytest.approx(cell.a.value)
     assert cell.c.value == pytest.approx(cell.a.value)
+
+
+def test_carrying_every_entry_equals_carrying_the_refined_ones(thermal_patterns,
+                                                               thermal_series):
+    """``carry=("*",)`` against the plan's own globs, value for value.
+
+    An entry no stage frees comes back from every fit at the value it went in
+    with, which is the start model's, so carrying it moves nothing. This pins
+    that, because the warm start was ruled tier 3 on the condition that the
+    two agree (WP-2003, C9 q1, ruled by the maintainer 2026-11-03). A path
+    that ever differs goes back to the maintainer rather than into a
+    tolerance.
+    """
+    plan = staged.RefinementPlan.mccusker_default()
+    refined = sorted({g for stage in plan.stages for g in stage.turn_on})
+    narrow = _thermal_series(thermal_patterns, carry=refined)
+    assert len(narrow) == len(thermal_series)
+    for wide_entry, narrow_entry in zip(thermal_series, narrow):
+        assert narrow_entry.rung == wide_entry.rung
+        assert ([(p.path, p.value) for p in narrow_entry.parameters]
+                == [(p.path, p.value) for p in wide_entry.parameters])
 
 
 # -- a refined coordinate crosses the boundary (WP-1333) ------------------
@@ -780,6 +802,21 @@ def test_reseed_decision_uses_the_median_not_the_previous():
     assert _reseed_needed(_fake_result(0.30), [0.09, 0.10, 0.11, 0.90], 1.25)
     # divergence always reseeds, whatever the Rwp
     assert _reseed_needed(_fake_result(0.01, status="diverged"), [0.10], 1.25)
+    # …and is the only default trigger: no factor, no Rwp fence (WP-2003, C1)
+    assert not _reseed_needed(_fake_result(0.90), [0.10], None)
+    assert _reseed_needed(_fake_result(0.01, status="diverged"), [0.10], None)
+
+
+@pytest.mark.parametrize("factor", [True, 0.0, -1.25, float("inf"), float("nan")])
+def test_a_reseed_factor_is_finite_and_positive_or_refused(factor):
+    """The caller's own fence (WP-2003, C1): ``None`` is none, and a bool, a
+    non-finite or a non-positive factor is refused by name before any fit."""
+    with pytest.raises(ValueError, match="reseed_factor"):
+        SequentialRefinement(*_start_models()).fit(
+            [_simulate(A0, seed=1)], reseed_factor=factor)
+    with pytest.raises(TypeError, match="reseed_factor"):
+        SequentialRefinement(*_start_models()).fit(
+            [_simulate(A0, seed=1)], reseed_factor="1.25")
 
 
 def test_better_prefers_convergence_then_rwp():
@@ -814,12 +851,10 @@ def test_a_well_behaved_series_reseeds_nothing(thermal_series):
     assert not any(e.reseeded for e in thermal_series)
     codes = [d.code for d in thermal_series.diagnostics]
     assert "SEQUENTIAL_RESEED" not in codes
-    # WP-1469's new half fires nothing on it: every fence recorded, none left
-    # a pattern above it, and the steps are written, none re-measured cold
-    assert "SEQUENTIAL_RWP_OUTLIER" not in codes
-    assert thermal_series[0].rwp_fence is None
-    assert all(e.rwp_fence is not None and not e.above_fence
-               for e in thermal_series.entries[1:])
+    # every ratio recorded but the first walked, which has no median, all near
+    # 1 on a clean ramp; and the steps are written, none re-measured cold
+    assert thermal_series[0].rwp_over_median is None
+    assert all(0.5 < e.rwp_over_median < 2.0 for e in thermal_series.entries[1:])
     assert thermal_series.steps
     assert all(s.cold_ratio is None for s in thermal_series.steps)
     # ... and no pattern climbed past its first rung: the first is cold because
@@ -882,12 +917,17 @@ def test_a_warm_rung_seeds_nothing_and_the_cold_one_keeps_the_plans_seeds():
     assert _unseeded(unseeded) is unseeded
 
 
-def _dictate(runner, script):
+def _dictate(runner, script, stages=None):
     """Force what each attempt *reports*, leaving the fits themselves real.
 
     ``script`` maps a pattern label to the ``(status, rwp)`` its successive
-    rungs will come back with; the last pair repeats if the ladder climbs
-    further.  Every model, tree and node in the series is still the real one —
+    rungs will come back with, or ``(status, rwp, code)`` to have the rung
+    also carry ``code`` at level ``error``; the last entry repeats if the
+    ladder climbs further.  ``stages`` maps a label to one ``{stage name:
+    status}`` per rung, the same way, for a verdict read off a rung's own
+    stages (the first-rung bound's, WP-2003 C3).  A dictated rung's own
+    error-level diagnostics are dropped: since WP-2003 C2 q5 they are part of
+    the verdict too.  Every model, tree and node in the series is still the real one —
     what is stubbed is the verdict the chain reasons about, which is the only
     way to make "which rung ran" a deterministic assertion: with real Rwps two
     patterns of the same material differ by Poisson noise, so whether the fence
@@ -895,15 +935,33 @@ def _dictate(runner, script):
     """
     real = runner._fit_one
     seen: dict[str, int] = {}
+    stages = stages or {}
 
     def dictated(*args, **kw):
         ref, result = real(*args, **kw)
         label = args[1]
+        n = seen.get(label, 0)
+        seen[label] = n + 1
+        if label in stages:
+            told = stages[label][min(n, len(stages[label]) - 1)]
+            for stage in result.stages:
+                stage.status = told.get(stage.name, stage.status)
         if label in script:
             attempts = script[label]
-            k = min(seen.get(label, 0), len(attempts) - 1)
-            seen[label] = seen.get(label, 0) + 1
-            result.status, result.statistics.rwp = attempts[k]
+            status, rwp, *code = attempts[min(n, len(attempts) - 1)]
+            result.status, result.statistics.rwp = status, rwp
+            # the full cost the ladder ranks by (WP-2003, C2 q3), dictated to
+            # agree with the Rwp: on one objective with no penalty or
+            # restraint rows S = Rwp² · Σ(y/σ)² / 2
+            if result.stages and result.y_obs:
+                y, sig = np.asarray(result.y_obs), np.asarray(result.sigma)
+                result.stages[-1].cost_final = 0.5 * rwp ** 2 * float(
+                    np.sum((y / sig) ** 2))
+            result.diagnostics = [d for d in result.diagnostics
+                                  if d.level != "error"]
+            result.diagnostics += [Diagnostic(
+                level="error", code=c, where=[], message=f"dictated {c}")
+                for c in code]
         return ref, result
 
     runner._fit_one = dictated
@@ -1030,46 +1088,176 @@ def test_the_bound_caps_evaluations_and_never_raises_a_stage():
     assert _bounded_plan(plan, 1).stages[0].max_iter == 1
 
 
+#: the bound's default before WP-2003 C3 made it the caller's; every test
+#: that bounds a first rung names its factor, this one
+_FACTOR = 3.0
+
+#: ``_CHEAP`` with room for the bound to cut: at ``max_iter=5`` a budget of
+#: 3 × a converged rung's dearest stage is already wider than the stage, so
+#: ``_bounded_plan`` lowers nothing and no ``max_iter`` is the bound's
+_CHEAP_WIDE = staged.RefinementPlan(stages=[
+    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=100)])
+
+#: five patterns, because the bound needs `FIRST_RUNG_SAMPLES` converged
+#: first rungs before it exists at all: p001-p003 supply them, p004 is cut
+_SAMPLED = {"p000": [("converged", 0.10)], "p001": [("converged", 0.10)],
+            "p002": [("converged", 0.10)], "p003": [("converged", 0.10)]}
+
+
+def _record_plans(runner):
+    """Each ``_fit_one`` call's plan, by label: the plans the ladder ran."""
+    real, plans = runner._fit_one, {}
+
+    def recording(*args, **kw):
+        plans.setdefault(args[1], []).append(args[4])
+        return real(*args, **kw)
+
+    runner._fit_one = recording
+    return plans
+
+
 def test_a_bounded_first_rung_that_spends_its_bound_escalates(thermal_patterns):
     """The clause the bound makes necessary, and the default that does not.
 
-    A rung that hits its evaluation cap comes back ``"max_iter"``, which
-    :func:`_better` reads as merely not-diverged and :func:`_reseed_needed`
-    does not test at all — so the fence, asked about a *good* Rwp, would keep
-    it. Without forcing the escalation the bound would not make a failing rung
-    cheap, it would make a **truncated fit acceptable**, which is the one way
-    this could reach an answer.
+    A rung the cap stopped has a stage at ``"max_iter"``, which ``_rejected``
+    leaves out — so without forcing the escalation the bound would not make a
+    failing rung cheap, it would make a **truncated fit acceptable**, which
+    is the one way this could reach an answer.
 
-    The second half is what pins the escalation to the bound rather than to a
-    change of policy on ``max_iter``: the identical script with the bound
-    switched off keeps the truncated rung, because a rung that spends the
-    *plan's* own budget is not this WP's business and the ladder's behaviour
-    there is what it always was.  ``first_rung_factor=None`` is that way back,
-    and what a test pinning a pre-WP-1127 number declares.
-
-    Five patterns, because the bound needs `FIRST_RUNG_SAMPLES` converged first
-    rungs before it exists at all: p001-p003 supply them and p004 is the one
-    that hits it.
+    The second half pins the escalation to the bound rather than to a change
+    of policy on ``max_iter``: the identical script with no factor (the
+    default since WP-2003 C3) keeps the rung, because a rung that spends the
+    *plan's* own budget is not this WP's business.
     """
-    script = {"p000": [("converged", 0.10)],
-              "p001": [("converged", 0.10)],
-              "p002": [("converged", 0.10)],
-              "p003": [("converged", 0.10)],
-              "p004": [("max_iter", 0.10), ("converged", 0.10)]}
+    script = {**_SAMPLED, "p004": [("max_iter", 0.10), ("converged", 0.10)]}
+    cut = {"p004": [{"warm_refit": "max_iter", "closing": "max_iter"}, {}]}
 
     structure, ins = _start_models()
-    runner = _dictate(SequentialRefinement(structure, ins), dict(script))
-    bounded = runner.fit(thermal_patterns[:5], plan=_CHEAP,
-                         first_rung_factor=FIRST_RUNG_FACTOR)
+    runner = _dictate(SequentialRefinement(structure, ins), dict(script), cut)
+    bounded = runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE,
+                         first_rung_factor=_FACTOR)
     assert bounded[4].rungs_tried == ["warm", "warm_staged"]
     assert bounded[4].status == "converged"
 
     structure, ins = _start_models()
-    runner = _dictate(SequentialRefinement(structure, ins), dict(script))
-    unbounded = runner.fit(thermal_patterns[:5], plan=_CHEAP,
-                           first_rung_factor=None)
+    runner = _dictate(SequentialRefinement(structure, ins), dict(script), cut)
+    unbounded = runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE)
     assert unbounded[4].rungs_tried == ["warm"]
     assert unbounded[4].status == "max_iter"
+
+
+def test_a_cut_warm_stage_under_a_converged_closing_stage_is_truncated(
+        thermal_patterns):
+    """WP-2003 C3's first defect: the truncation is read off the rung's stages.
+
+    ``RefinementResult.status`` is the closing stage's verdict, so a warm stage
+    the cap stopped and a closing stage that then converged read
+    ``"converged"`` and the bitten rung was kept unescalated (clash X1, outcome
+    1: three patterns at a factor of 0.5 on the thermal ramp).  Here p004's
+    first rung reports ``"converged"`` with its warm stage at ``max_iter``, and
+    it escalates; with the warm stage converged too it is kept.
+    """
+    def run(warm_status):
+        structure, ins = _start_models()
+        runner = _dictate(
+            SequentialRefinement(structure, ins), dict(_SAMPLED),
+            {"p004": [{"warm_refit": warm_status, "closing": "converged"}, {}]})
+        return runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE,
+                          first_rung_factor=_FACTOR)
+
+    cut = run("max_iter")
+    assert cut[4].rungs_tried == ["warm", "warm_staged"]
+    assert cut[4].rung == "warm_staged"
+    assert run("converged")[4].rungs_tried == ["warm"]
+
+
+def test_the_truncation_counts_only_a_stage_the_bound_capped():
+    """``_cut_by_bound``'s cases, on stage records alone.
+
+    The closing stage takes the last declared stage's ``max_iter``, so it is
+    capped with it; a stage the bound left at its own declaration ran out of
+    the *plan's* budget, which is no truncation of the ladder's.
+    """
+    from rietx.schemas.results import StageResult
+    from rietx.sequential import _bounded_plan, _cut_by_bound
+
+    def result(**statuses):
+        fit = _fake_result(0.10)
+        fit.stages = [StageResult(name=n, status=v, n_iterations=8,
+                                  cost_initial=1.0, cost_final=1.0)
+                      for n, v in statuses.items()]
+        return fit
+
+    plan = staged.RefinementPlan(stages=[
+        staged.Stage("warm_refit", ["phases.*.scale"], max_iter=100)])
+    bounded = _bounded_plan(plan, 32)
+    # the whole rung reads converged, its warm stage was cut: truncated
+    assert _cut_by_bound(result(warm_refit="max_iter", closing="converged"),
+                         plan, bounded)
+    # the closing stage carries the cap too
+    assert _cut_by_bound(result(warm_refit="converged", closing="max_iter"),
+                         plan, bounded)
+    assert not _cut_by_bound(result(warm_refit="converged", closing="converged"),
+                             plan, bounded)
+    # nothing was lowered, so a max_iter is the plan's own
+    assert not _cut_by_bound(result(warm_refit="max_iter"), plan, plan)
+    two = staged.RefinementPlan(stages=[
+        staged.Stage("tight", ["phases.*.scale"], max_iter=2),
+        staged.Stage("wide", ["phases.*.cell.*"], max_iter=100)])
+    two_bounded = _bounded_plan(two, 32)
+    assert two_bounded.stages[0].max_iter == 2
+    assert not _cut_by_bound(result(tight="max_iter", wide="converged"),
+                             two, two_bounded)
+    assert _cut_by_bound(result(tight="converged", wide="max_iter"),
+                         two, two_bounded)
+
+
+def test_no_first_rung_is_capped_unless_a_factor_is_asked_for(thermal_patterns):
+    """WP-2003 C3: ``first_rung_factor=None`` is the default and bounds nothing.
+
+    Read off the plans the ladder hands each fit: by default every warm first
+    rung runs at the plan's own ``max_iter``; with a factor, the first rung of
+    the pattern past the sample runs capped.
+    """
+    def plans(**kw):
+        structure, ins = _start_models()
+        runner = SequentialRefinement(structure, ins)
+        seen = _record_plans(runner)
+        runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE, **kw)
+        return seen
+
+    default = plans()
+    assert all(p.stages[0].max_iter == 100
+               for label in default for p in default[label])
+    bounded = plans(first_rung_factor=_FACTOR)
+    assert bounded["p004"][0].stages[0].max_iter < 100
+
+
+def test_reseed_false_bounds_no_first_rung(thermal_patterns):
+    """WP-2003 clash X2: with the ladder off, a factor is inert.
+
+    A bitten first rung could then only escalate against the switch or be kept
+    truncated, so no budget is computed: p004's first rung runs uncapped, and
+    a ``max_iter`` warm stage forces nothing.
+    """
+    structure, ins = _start_models()
+    runner = _dictate(
+        SequentialRefinement(structure, ins), dict(_SAMPLED),
+        {"p004": [{"warm_refit": "max_iter", "closing": "converged"}]})
+    seen = _record_plans(runner)
+    series = runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE, reseed=False,
+                        first_rung_factor=_FACTOR)
+    assert all(p.stages[0].max_iter == 100
+               for label in seen for p in seen[label])
+    assert series[4].rungs_tried == ["warm"]
+
+
+@pytest.mark.parametrize("bad", [True, 0.0, -1.0, float("inf"), float("nan")])
+def test_a_first_rung_factor_is_finite_and_positive(thermal_patterns, bad):
+    structure, ins = _start_models()
+    with pytest.raises(ValueError, match="first_rung_factor"):
+        SequentialRefinement(structure, ins).fit(
+            thermal_patterns[:2], plan=_CHEAP, first_rung_factor=bad)
 
 
 def test_a_truncated_attempt_loses_to_one_that_ran_to_completion():
@@ -1105,13 +1293,11 @@ def test_the_bound_is_inert_under_refit_stages(thermal_patterns):
     """
     structure, ins = _start_models()
     runner = _dictate(SequentialRefinement(structure, ins),
-                      {"p000": [("converged", 0.10)],
-                       "p001": [("converged", 0.10)],
-                       "p002": [("converged", 0.10)],
-                       "p003": [("converged", 0.10)],
-                       "p004": [("max_iter", 0.10), ("converged", 0.10)]})
-    series = runner.fit(thermal_patterns[:5], plan=_CHEAP, refit="stages",
-                        first_rung_factor=FIRST_RUNG_FACTOR)
+                      {**_SAMPLED,
+                       "p004": [("max_iter", 0.10), ("converged", 0.10)]},
+                      {"p004": [{"quick": "max_iter"}, {}]})
+    series = runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE, refit="stages",
+                        first_rung_factor=_FACTOR)
     assert series[4].rungs_tried == ["warm_staged"]
 
 
@@ -1134,9 +1320,10 @@ def test_only_a_converged_first_rung_becomes_evidence(thermal_patterns):
                            "p001": [("converged", 0.10)],
                            "p002": [("converged", 0.10)],
                            "p003": [(p003_status, 0.10), ("converged", 0.10)],
-                           "p004": [("max_iter", 0.10), ("converged", 0.10)]})
-        return runner.fit(thermal_patterns[:5], plan=_CHEAP,
-                          first_rung_factor=FIRST_RUNG_FACTOR)
+                           "p004": [("max_iter", 0.10), ("converged", 0.10)]},
+                          {"p004": [{"warm_refit": "max_iter"}, {}]})
+        return runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE,
+                          first_rung_factor=_FACTOR)
 
     # p003 converged on its first rung, so the sample is complete and p004's
     # truncated rung escalates
@@ -1159,32 +1346,35 @@ def chain_answer(series):
     codes and steps.  The tree and node ids a history writes are names, not
     answers, and are left out."""
     entries = [(e.label, e.status, e.rung, tuple(e.rungs_tried), e.reseeded,
-                e.rwp_warm, e.rwp_fence, e.statistics.rwp,
+                e.rwp_warm, e.rwp_over_median, e.statistics.rwp,
                 [(p.path, p.value, p.stderr) for p in e.parameters],
                 [d.code for d in e.diagnostics])
                for e in series.entries]
     return entries, [d.code for d in series.diagnostics], series.steps
 
 
-def first_rung_ratios(series):
-    """Each kept first rung's cost over the most expensive one before it.
+def first_rung_ratios(series, results):
+    """Each kept first rung's dearest stage over the dearest one before it.
 
     Replays :func:`~rietx.sequential._first_rung_budget`'s sample from the
-    record: a warm pattern that kept its first rung reports that rung's
-    evaluations as ``n_iterations``, and only a *converged* one joins the
-    sample.  Once the sample holds :data:`~rietx.sequential.FIRST_RUNG_SAMPLES`
-    (the point the bound arms) every kept first rung gets a ratio, a
-    ``max_iter`` one included: that is the rung a bound would cut.
+    chain's own results (``results``, series index → the kept fit, as
+    ``on_result`` hands them): the quantity is a rung's dearest *stage*, what
+    the cap bounds (WP-2003 C3), and only a warm pattern that kept a first rung
+    whose every stage converged joins the sample.  Once the sample holds
+    :data:`~rietx.sequential.FIRST_RUNG_SAMPLES` (the point the bound arms)
+    every kept first rung gets a ratio, a ``max_iter`` one included: that is
+    the rung a bound would cut.
     """
-    from rietx.sequential import FIRST_RUNG_SAMPLES
+    from rietx.sequential import FIRST_RUNG_SAMPLES, _stage_peak
 
     sample, ratios = [], []
     for e in series.entries[1:]:
         if e.rungs_tried == ["warm"]:
+            fit = results[e.index]
             if len(sample) >= FIRST_RUNG_SAMPLES:
-                ratios.append(e.n_iterations / max(sample))
-            if e.status == "converged":
-                sample.append(e.n_iterations)
+                ratios.append(_stage_peak(fit) / max(sample))
+            if all(s.status == "converged" for s in fit.stages):
+                sample.append(_stage_peak(fit))
     return ratios
 
 
@@ -1197,28 +1387,34 @@ def _thermal_series(patterns, **kw):
 
 
 @pytest.fixture(scope="module")
-def thermal_series_unbounded(thermal_patterns):
-    return _thermal_series(thermal_patterns, first_rung_factor=None)
+def thermal_series_bounded(thermal_patterns):
+    """``thermal_series`` with the first-rung bound at ``_FACTOR``, and the
+    kept fits by series index."""
+    results = {}
+    series = _thermal_series(thermal_patterns, first_rung_factor=_FACTOR,
+                             on_result=results.__setitem__)
+    return series, results
 
 
 def test_the_first_rung_bound_moves_no_accepted_value(thermal_series,
-                                                      thermal_series_unbounded):
-    """`FIRST_RUNG_FACTOR` is answer-invariant here, and by how much (WP-2003).
+                                                      thermal_series_bounded):
+    """A bound at 3.0 is answer-invariant here, and by how much (WP-2003).
 
     Invariance is a measured margin, not a construction: a bound that cut a
-    *winning* first rung would keep the next rung's answer instead.  So two
-    things are asserted on the default plan's chain, the bound on and off:
-    every accepted value, esd, rung and code is equal, and every first rung
-    the unbounded chain kept cost less than the budget the bound would have
-    set at that point.  Measured 2026-10-24: three armed patterns, each at
-    1.0× the running maximum (15 evaluations against 15), so the bound sits
-    3× above every rung it could have cut.  The CPD chain's twin is in
-    `test_acceptance_sequential.py`.
+    *winning* first rung would keep the next rung's answer instead, which is
+    why the bound is the caller's since WP-2003 C3 (planted T087 moved 6.06
+    esd).  So two things are asserted on the default plan's chain, the bound
+    on and off (the default): every accepted value, esd, rung and code is
+    equal, and every first rung kept cost less than the budget the bound set
+    at that point.  The equality makes the two chains' kept first rungs the
+    same fits, so the margin is read off the bounded one's.  The CPD chain's
+    twin is in `test_acceptance_sequential.py`.
     """
-    assert chain_answer(thermal_series) == chain_answer(thermal_series_unbounded)
-    ratios = first_rung_ratios(thermal_series_unbounded)
+    series, results = thermal_series_bounded
+    assert chain_answer(series) == chain_answer(thermal_series)
+    ratios = first_rung_ratios(series, results)
     assert ratios, "the bound armed on no pattern, so nothing was tested"
-    assert max(ratios) < FIRST_RUNG_FACTOR
+    assert max(ratios) < _FACTOR
 
 
 def test_an_unrecovered_pattern_seeds_nothing_and_joins_no_median(
@@ -1267,50 +1463,137 @@ def test_an_unrecovered_pattern_seeds_nothing_and_joins_no_median(
     assert len(series) == 3 and failed.statistics is not None
 
 
-# -- a kept rung still above the fence (WP-1469, issue #481) ---------------
+# -- an error-level code rejects a fit like a divergence (WP-2003, C2 q5) ---
 
-def test_a_pattern_every_rung_left_above_the_fence_says_so(thermal_patterns,
-                                                           tmp_path):
-    """Gap 1: the Rwp leg of the fence was a trigger and never a verdict.
-
-    Pattern 1 is dictated above the fence on every rung, the cold one least
-    so, which is issue #481's blank frame: kept cold, reseeded, and until
-    WP-1469 reported only by a ``SEQUENTIAL_RESEED`` calling it a good fit.
-    """
+def test_an_error_level_kept_attempt_climbs_and_is_quarantined(
+        thermal_patterns, tmp_path):
+    """Pattern 1 converges on every rung, at an Rwp *below* the series, under
+    an error-level ``MODEL_FAR_FROM_DATA``: the path guide's 800 K warm fit
+    once C1 removed the Rwp fence.  The code says not to read the values for
+    any purpose, and a warm start reads them, so the ladder climbs at the
+    default (no ``reseed_factor``) and the kept attempt is quarantined exactly
+    as a diverged one: it seeds no successor, joins no median and no step
+    starts or ends on it, and ``SEQUENTIAL_UNRECOVERED`` says it converged
+    and names the code.  The low Rwp makes the median half testable, as in
+    the divergence case above: joined, the median would fall to 0.075."""
     structure, ins = _start_models()
     runner = _dictate(
         SequentialRefinement(structure, ins, history=tmp_path / "h"),
         {"p000": [("converged", 0.10)],
-         "p001": [("converged", 0.30), ("converged", 0.29), ("converged", 0.28)],
-         "p002": [("converged", 0.10)]})
+         "p001": [("converged", 0.05, "MODEL_FAR_FROM_DATA")],
+         "p002": [("converged", 0.10)],
+         "p003": [("converged", 0.10)]})
+    series = runner.fit(thermal_patterns[:4], plan=_CHEAP)
+
+    rejected = series[1]
+    assert rejected.status == "converged"
+    assert rejected.rungs_tried == ["warm", "warm_staged", "cold"]
+    assert _rejected(rejected) and not _rejected(series[0])
+    unrecovered = [d for d in series.diagnostics
+                   if d.code == "SEQUENTIAL_UNRECOVERED"]
+    assert [d.where for d in unrecovered] == [["p001"]]
+    message = unrecovered[0].message
+    assert "after every rung of the ladder (warm, warm_staged, cold)" in message
+    assert "converged but carries MODEL_FAR_FROM_DATA at level error" in message
+    assert "Pattern 2 (p002) warm-started from pattern 0 (p000) instead." in message
+
+    # seeds no successor ...
+    assert [e.seeded_from for e in series] == [None, 0, 0, 2]
+    roots = [t.root for t in runner.trees_]
+    assert roots[2].notes["series_warm_start_node"] == series[0].node_id
+    # ... joins no median ...
+    assert series[2].rwp_over_median == pytest.approx(1.0)
+    assert series[2].rungs_tried == ["warm"]
+    # ... and no step starts or ends on it: p002 → p003 is the only pair left
+    assert series.steps
+    assert {tuple(s.labels) for s in series.steps} == {("p002", "p003")}
+
+    # derived from the entry, so a series read back reports the same
+    back = SeriesResult.model_validate_json(series.model_dump_json())
+    assert _rejected(back[1])
+    walk = sorted(back.entries, key=lambda e: e.index)
+    assert [d.message for d in _unrecovered_diagnostics(back[1], walk)] == [message]
+    assert _series_steps(back, frozenset(back.relative_paths),
+                         frozenset(back.angle_paths)) == series.steps
+
+
+def test_a_rung_that_clears_the_error_is_kept_and_seeds(thermal_patterns):
+    """The ladder stops at the first rung with no error-level code, and that
+    rung is an ordinary accepted pattern.  ``max_iter`` is not a rejection
+    (C2 question 3): a plan's own budget can stop a closing stage at a good
+    answer, so pattern 2 keeps its warm rung."""
+    structure, ins = _start_models()
+    runner = _dictate(
+        SequentialRefinement(structure, ins),
+        {"p000": [("converged", 0.10)],
+         "p001": [("converged", 0.95, "MODEL_FAR_FROM_DATA"), ("converged", 0.10)],
+         "p002": [("max_iter", 0.10)]})
+    series = runner.fit(thermal_patterns[:3], plan=_CHEAP)
+
+    assert series[1].rungs_tried == ["warm", "warm_staged"]
+    assert series[1].rung == "warm_staged" and not series[1].reseeded
+    assert not any(d.level == "error" for d in series[1].diagnostics)
+    assert series[2].seeded_from == 1
+    assert series[2].rungs_tried == ["warm"] and series[2].status == "max_iter"
+    assert "SEQUENTIAL_UNRECOVERED" not in [d.code for d in series.diagnostics]
+
+
+def test_both_series_codes_say_why_a_kept_cold_rung_was_rejected():
+    """A cold rung kept as the least bad of three rejected attempts is called
+    a failed fit, and each code's clause names the error code it carries."""
+    entry = SeriesEntry(index=3, label="p3", status="converged", reseeded=True,
+                        rung="cold", rungs_tried=["warm", "warm_staged", "cold"],
+                        rwp_warm=0.97,
+                        statistics=Statistics(rwp=0.96, rp=0.96, rexp=0.04, chi2=1.0,
+                                              gof=24.0, n_points=100,
+                                              n_free_parameters=3),
+                        diagnostics=[Diagnostic(level="error",
+                                                code="MODEL_FAR_FROM_DATA",
+                                                where=[], message="")])
+    (reseed,) = _reseed_diagnostics(entry)
+    assert ("rejected too (converged but carries MODEL_FAR_FROM_DATA"
+            in reseed.message)
+    assert "SEQUENTIAL_UNRECOVERED" in reseed.suggestion
+    (unrecovered,) = _unrecovered_diagnostics(entry)
+    assert ("the attempt kept, the cold rung, converged but carries "
+            "MODEL_FAR_FROM_DATA" in unrecovered.message)
+
+
+# -- a high Rwp is a recorded ratio, never a trigger (WP-2003, C1) ----------
+
+def test_a_high_rwp_is_recorded_and_climbs_no_rung(thermal_patterns, tmp_path):
+    """Pattern 1 is dictated at three times the median on every rung, issue
+    #481's blank frame.  Under the default it keeps its warm rung, fires no
+    code and says how high it sat; only a caller's factor climbs the ladder."""
+    structure, ins = _start_models()
+    script = {"p000": [("converged", 0.10)],
+              "p001": [("converged", 0.30), ("converged", 0.29), ("converged", 0.28)],
+              "p002": [("converged", 0.10)]}
+    runner = _dictate(SequentialRefinement(structure, ins, history=tmp_path / "h"),
+                      script)
     series = runner.fit(thermal_patterns[:3], plan=_CHEAP)
 
     kept = series[1]
-    assert kept.rungs_tried == ["warm", "warm_staged", "cold"]
-    assert kept.rung == "cold" and kept.reseeded
-    assert series[0].rwp_fence is None               # no median yet
-    assert kept.rwp_fence == pytest.approx(1.25 * 0.10)
-    assert kept.above_fence
-    (outlier,) = [d for d in series.diagnostics
-                  if d.code == "SEQUENTIAL_RWP_OUTLIER"]
-    assert outlier.level == "warning" and outlier.where == ["p001"]
-    assert outlier.value == pytest.approx(0.28 / 0.125)
-    # the evidence that separates the causes, against the pattern before it
-    assert "Against p000, the last pattern before it inside the fence: GoF " in \
-        outlier.message
-    assert "Rexp" in outlier.message
-    # …and the reseed text stops calling it a good fit
-    (reseed,) = [d for d in series.diagnostics if d.code == "SEQUENTIAL_RESEED"]
-    assert "good fit" not in reseed.suggestion
-    assert "SEQUENTIAL_RWP_OUTLIER" in reseed.suggestion
-    assert "SEQUENTIAL_UNRECOVERED" not in [d.code for d in series.diagnostics]
-
+    assert kept.rungs_tried == ["warm"] and not kept.reseeded
+    assert series[0].rwp_over_median is None               # no median yet
+    assert kept.rwp_over_median == pytest.approx(0.30 / 0.10)
+    assert {d.code for d in series.diagnostics}.isdisjoint(
+        {"SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED"})
     # not quarantined: it seeds its successor and joins the median, so a
-    # lasting change can become the chain's new normal (the WP's measurement)
+    # lasting change can become the chain's new normal (WP-1469's measurement)
     roots = [t.root for t in runner.trees_]
     assert roots[2].notes["series_warm_start_node"] == kept.node_id
-    assert series[2].rwp_fence == pytest.approx(1.25 * np.median([0.10, 0.28]))
-    assert not series[2].above_fence
+    assert series[2].rwp_over_median == pytest.approx(
+        0.10 / np.median([0.10, 0.30]))
+
+    # the caller's own fence climbs it, on the same ratio
+    fenced = _dictate(SequentialRefinement(structure, ins), script).fit(
+        thermal_patterns[:3], plan=_CHEAP, reseed_factor=1.25)
+    assert fenced[1].rungs_tried == ["warm", "warm_staged", "cold"]
+    assert fenced[1].rung == "cold" and fenced[1].reseeded
+    assert fenced[1].rwp_over_median == pytest.approx(0.28 / 0.10)
+    (reseed,) = [d for d in fenced.diagnostics if d.code == "SEQUENTIAL_RESEED"]
+    assert "specimen or the model changed" in reseed.suggestion
 
 
 @pytest.mark.slow
@@ -1336,60 +1619,51 @@ def test_a_blank_frame_no_longer_reads_as_a_point_or_hides_a_step():
         plan="mccusker_default", refit="stages", on_error="carry",
         verify_steps=3)
 
-    # gap 1: the blank carries a warning that does not call it a good fit,
-    # and it is the only pattern that does
-    outliers = [d for d in series.diagnostics
-                if d.code == "SEQUENTIAL_RWP_OUTLIER"]
-    assert [d.where for d in outliers] == [["ramp_007"]]
-    assert outliers[0].level == "warning"
+    # gap 1: the blank's Rwp is the chain's highest over its median, a record
+    # with no threshold and no code (WP-2003, C1), and it climbed no rung
+    blank_entry = series[blank]
+    assert blank_entry.rwp_over_median == max(
+        e.rwp_over_median for e in series.entries[1:])
+    assert blank_entry.rungs_tried == ["warm_staged"]
     assert all("good fit" not in d.suggestion for d in series.diagnostics
                if d.where == ["ramp_007"])
     # gap 2: the planted step is the cell's largest, re-measured cold, and no
-    # step touches the blank (WP-2003: a row of SeriesResult.steps, no flag)
+    # cell step touches the blank, whose unseen phase held its cell
+    # (WP-1301; WP-2003: a row of SeriesResult.steps, no flag)
     cell = [s for s in series.steps if s.path == "phases.0.cell.a"]
     assert cell[0].labels == ("ramp_011", "ramp_012")
     assert cell[0].cold_ratio == pytest.approx(1.0, abs=0.05)
     # gap 3: …and the pair is read from a field
-    assert not [s for s in series.steps if "ramp_007" in s.labels]
+    assert not [s for s in cell if "ramp_007" in s.labels]
 
 
-def test_the_outlier_verdict_is_read_off_the_entry():
-    """Derived, like every fence here, so a reloaded series says the same."""
-    from rietx.sequential import _inside_before, _rwp_outlier_diagnostics
+def test_the_rwp_ratio_is_over_the_accepted_median():
+    """``rwp_over_median`` against the patterns accepted before it, ``None``
+    until one was; a document written before WP-2003 carries ``rwp_fence`` on
+    each entry and still opens, the old limit dropped as "not recorded"."""
+    from rietx.sequential import _rwp_over_median
 
-    def entry(k, rwp, fence, status="converged"):
-        return SeriesEntry(index=k, label=f"p{k}", status=status, rwp_fence=fence,
-                           statistics=Statistics(rwp=rwp, rp=rwp, rexp=0.04,
-                                                 chi2=1.0, gof=rwp / 0.04,
-                                                 n_points=100,
-                                                 n_free_parameters=3))
+    assert _rwp_over_median(_fake_result(0.30), []) is None
+    assert _rwp_over_median(_fake_result(0.30), [0.10]) == pytest.approx(3.0)
+    # a median of one or two for the first patterns (batch X8)
+    assert _rwp_over_median(_fake_result(0.30), [0.30, 0.10]) == pytest.approx(1.5)
+    assert _rwp_over_median(_fake_result(0.30), [0.09, 0.10, 0.11, 0.90]) == \
+        pytest.approx(0.30 / 0.105)
 
-    assert not entry(0, 0.30, None).above_fence          # no fence applied
-    assert not entry(0, 0.05, 0.0625).above_fence        # inside it
-    assert not entry(0, 0.30, 0.0625, "diverged").above_fence   # UNRECOVERED's
-    assert entry(0, 0.30, 0.0625).above_fence
-    assert _rwp_outlier_diagnostics(entry(0, 0.05, 0.0625), None) == []
-
-    # "before" is in walk order: a backward chain reached p1 from p2
-    chain = [entry(0, 0.04, None), entry(1, 0.30, 0.05), entry(2, 0.04, 0.05)]
-    assert _inside_before(chain, "forward")[1].label == "p0"
-    assert _inside_before(chain, "backward")[1].label == "p2"
-    reloaded = SeriesEntry.model_validate_json(chain[1].model_dump_json())
-    assert reloaded.above_fence and reloaded.rwp_fence == 0.05
-
-    # a ladder stopped short of its cold rung (reseed=False, or a cancel)
-    # does not claim every start was tried
-    climbed = entry(1, 0.30, 0.05)
-    climbed.rungs_tried, climbed.rung = ["warm", "warm_staged", "cold"], "cold"
-    (d,) = _rwp_outlier_diagnostics(climbed, None)
-    assert "every rung the chain tried" in d.message
-    assert "No starting point" in d.message
-    short = entry(1, 0.30, 0.05)
-    short.rungs_tried, short.rung = ["warm"], "warm"
-    (d,) = _rwp_outlier_diagnostics(short, None)
-    assert "every rung" not in d.message and "cold rung" in d.message
-    assert "No starting point" not in d.message
-    assert d.value == pytest.approx(6.0) and "6.00× the fence" in d.message
+    entry = SeriesEntry(index=1, label="p1", rwp_over_median=3.0,
+                        statistics=Statistics(rwp=0.30, rp=0.30, rexp=0.04, chi2=1.0,
+                                              gof=7.5, n_points=100,
+                                              n_free_parameters=3))
+    assert SeriesEntry.model_validate_json(
+        entry.model_dump_json()).rwp_over_median == 3.0
+    old = json.loads(entry.model_dump_json())
+    del old["rwp_over_median"]
+    old["rwp_fence"] = 0.125
+    opened = SeriesEntry.model_validate(old)
+    assert opened.rwp_over_median is None
+    assert "rwp_fence" not in opened.model_dump()
+    reloaded = SeriesResult.model_validate({"entries": [old]})
+    assert reloaded.entries[0].rwp_over_median is None
 
 
 def test_a_diverged_cold_rung_is_not_called_a_good_fit():
@@ -1400,7 +1674,7 @@ def test_a_diverged_cold_rung_is_not_called_a_good_fit():
 
     e = SeriesEntry(index=1, label="p1", status="diverged", reseeded=True,
                     rung="cold", rungs_tried=["warm", "warm_staged", "cold"],
-                    rwp_warm=0.5, rwp_fence=0.05,
+                    rwp_warm=0.5,
                     statistics=Statistics(rwp=0.3, rp=0.3, rexp=0.04, chi2=1.0,
                                           gof=7.5, n_points=100,
                                           n_free_parameters=3))
@@ -1765,8 +2039,8 @@ def test_steps_sort_largest_first_and_an_unmeasured_size_last():
 
 
 def _fenced_series(path: str, values, stderr, *, above=(), diverged=()):
-    """A hand-built chain whose ``above`` patterns sit over a fence of 0.05
-    and whose ``diverged`` ones diverged; every other one is inside it."""
+    """A hand-built chain whose ``above`` patterns sit at four times the median
+    Rwp and whose ``diverged`` ones diverged; every other one is at it."""
     def stats(rwp):
         return Statistics(rwp=rwp, rp=rwp, rexp=0.04, chi2=1.0, gof=rwp / 0.04,
                           n_points=100, n_free_parameters=3)
@@ -1774,7 +2048,7 @@ def _fenced_series(path: str, values, stderr, *, above=(), diverged=()):
     return SeriesResult(entries=[
         SeriesEntry(index=k, label=f"p{k}",
                     status="diverged" if k in diverged else "converged",
-                    rwp_fence=None if k == 0 else 0.05,
+                    rwp_over_median=None if k == 0 else (4.0 if k in above else 1.0),
                     statistics=stats(0.16 if k in above else 0.04),
                     parameters=[RefinedParameter(path=path, value=v, stderr=s)])
         for k, (v, s) in enumerate(zip(values, stderr, strict=True))])
@@ -1788,20 +2062,21 @@ _RAMP_SD = [6.6e-6] * 10
 _RAMP_SD[3] = 1.6e-3
 
 
-def test_a_rejected_frame_has_no_step():
-    """Gap 2: the blank's steps were the largest, so the argmax kept them and
-    the planted step behind it went unreported.  Above the fence or diverged,
-    its two steps are not rows, and the planted one ranks first."""
+def test_a_quarantined_frame_has_no_step():
+    """A diverged pattern's two steps are not rows, and the planted one behind
+    it ranks first.  A high Rwp alone drops nothing since WP-2003 removed the
+    fence it was keyed on: the blank's steps lead, to be read beside its GoF
+    and Rexp."""
     path = "phases.0.cell.a"
-    # as a measurement (the pre-WP-1469 reading), the blank's steps lead
-    assert "p3" in _series_steps(_fenced_series(path, _RAMP_A, _RAMP_SD))[0].labels
-    for rejected in ({"above": {3}}, {"diverged": {3}}):
-        steps = _series_steps(_fenced_series(path, _RAMP_A, _RAMP_SD, **rejected))
-        assert not [s for s in steps if "p3" in s.labels]
-        assert len(steps) == 7
-        assert steps[0].labels == ("p5", "p6")
-        assert steps[0].indices == (5, 6)
-        assert steps[0].step == pytest.approx(2.27e-3)
+    for kept in ({}, {"above": {3}}):
+        steps = _series_steps(_fenced_series(path, _RAMP_A, _RAMP_SD, **kept))
+        assert "p3" in steps[0].labels
+    steps = _series_steps(_fenced_series(path, _RAMP_A, _RAMP_SD, diverged={3}))
+    assert not [s for s in steps if "p3" in s.labels]
+    assert len(steps) == 7
+    assert steps[0].labels == ("p5", "p6")
+    assert steps[0].indices == (5, 6)
+    assert steps[0].step == pytest.approx(2.27e-3)
 
 
 def test_a_non_finite_rejected_value_has_no_step():
@@ -1815,13 +2090,13 @@ def test_a_non_finite_rejected_value_has_no_step():
     assert all(np.isfinite(s.step) for s in steps)
 
 
-def test_a_run_of_rejected_patterns_is_never_bridged():
-    """A clean ramp whose counts fell for four patterns: those four sit over
-    the fence with good values.  Bridged, the step from p1 to p6 spans five of
-    the ramp's steps; dropped, only the pairs either side remain."""
+def test_a_run_of_quarantined_patterns_is_never_bridged():
+    """A clean ramp with four diverged patterns in a row.  Bridged, the step
+    from p1 to p6 spans five of the ramp's steps; dropped, only the pairs
+    either side remain."""
     ramp = [4.1566 + 2.7e-4 * k for k in range(10)]
     steps = _series_steps(_fenced_series(
-        "phases.0.cell.a", ramp, [6.6e-6] * 10, above={2, 3, 4, 5}))
+        "phases.0.cell.a", ramp, [6.6e-6] * 10, diverged={2, 3, 4, 5}))
     assert sorted(s.indices for s in steps) == [(0, 1), (6, 7), (7, 8), (8, 9)]
 
 
@@ -1829,8 +2104,8 @@ def test_a_run_of_rejected_patterns_is_never_bridged():
 def test_a_pattern_the_path_is_absent_from_is_not_bridged(above):
     """A pattern whose phase was held carries no row for its cell, so the
     trajectory skips it; the pair either side of it is two steps apart and is
-    not a row, whether the pattern sits above the fence (tutorial 05's 5 %
-    jump read 600 K → 800 K before) or inside it (the planted blank frame)."""
+    not a row, whether the pattern's Rwp sits high (tutorial 05's 5 % jump
+    read 600 K → 800 K before) or at the median (the planted blank frame)."""
     series = _fenced_series("phases.0.cell.a", _RAMP_A, _RAMP_SD, above=above)
     series.entries[3].parameters = []
     steps = _series_steps(series)
@@ -1841,7 +2116,7 @@ def test_a_pattern_the_path_is_absent_from_is_not_bridged(above):
 def test_the_steps_are_a_field_that_survives_json():
     """Gap 3: the pair is fields, not prose, and survives JSON; a document
     written before WP-2003 carries ``discontinuities`` and still opens."""
-    series = _fenced_series("phases.0.cell.a", _RAMP_A, _RAMP_SD, above={3})
+    series = _fenced_series("phases.0.cell.a", _RAMP_A, _RAMP_SD, diverged={3})
     series.steps = _series_steps(series)
     series.steps[0].cold_ratio = 0.98
     reloaded = SeriesResult.model_validate_json(series.model_dump_json())
@@ -1867,7 +2142,7 @@ def test_the_plot_shades_only_a_step_re_measured_cold():
     from rietx.viz.plots import plot_trajectory
 
     path = "phases.0.cell.a"
-    series = _fenced_series(path, _RAMP_A, _RAMP_SD, above={3})
+    series = _fenced_series(path, _RAMP_A, _RAMP_SD, above={1}, diverged={3})
     series.steps = _series_steps(series)
     fig = plot_trajectory(series, [path])
     (ax,) = fig.get_axes()
@@ -1881,10 +2156,20 @@ def test_the_plot_shades_only_a_step_re_measured_cold():
     xs = ax.transData.inverted().transform(
         span.get_transform().transform(span.get_path().vertices))[:, 0]
     assert (xs.min(), xs.max()) == pytest.approx((5.0, 6.0))
-    # …and the pattern above the fence is boxed, the one mark it carries
-    boxed = [line for line in ax.get_lines() if line.get_marker() == "s"]
-    assert [tuple(line.get_xdata()) for line in boxed] == [(3.0,)]
+    # …and a high Rwp is not marked, there being no threshold to draw
+    # (WP-2003), while the diverged pattern is crossed out
+    assert not [line for line in ax.get_lines() if line.get_marker() == "s"]
+    crossed = [line for line in ax.get_lines() if line.get_marker() == "x"]
+    assert [tuple(line.get_xdata()) for line in crossed] == [(3.0,)]
     plt.close(fig)
+
+
+def _largest_gap(forward, backward, relative=frozenset(), angles=frozenset()):
+    """The comparison's largest gap in combined esds, signed, and the coverage
+    diagnostics beside it: ``(None, [...])`` where no gap has a size."""
+    gaps, coverage = _direction_gaps(forward, backward, relative, angles)
+    sized = [g for g in gaps if g.gap_esd is not None]
+    return (sized[0] if sized else None), coverage
 
 
 def test_a_relative_dof_is_judged_by_neither_fence_nor_stepped():
@@ -1902,12 +2187,12 @@ def test_a_relative_dof_is_judged_by_neither_fence_nor_stepped():
     forward = _synthetic_series(B_DOF, steps, [4e-4] * 6)
     backward = _synthetic_series(B_DOF, [-s for s in steps], [4e-4] * 6)
     assert _series_steps(forward)[0].indices == (0, 1)
-    assert [d.code for d in _path_dependence_diagnostics(forward, backward)] == [
-        "SEQUENTIAL_PATH_DEPENDENT"]
+    top, _ = _largest_gap(forward, backward)
+    assert abs(top.gap_esd) > 30, top     # 0.0192 over 5.7e-4
 
     relative = frozenset({B_DOF})
     assert _series_steps(forward, relative) == []
-    assert _path_dependence_diagnostics(forward, backward, relative) == []
+    assert _direction_gaps(forward, backward, relative) == ([], [])
 
 
 def test_a_chained_coordinate_is_judged_on_its_coordinate(thermal_patterns):
@@ -1924,8 +2209,8 @@ def test_a_chained_coordinate_is_judged_on_its_coordinate(thermal_patterns):
         thermal_patterns[:5], structure, instrument, direction="both",
         plan=_coordinate_plan("phases.*.atoms.*.dof.*"))
     assert {B_X, B_DOF} <= set(series.paths(varied_only=False))
-    assert [d.where for d in series.diagnostics
-            if d.code == "SEQUENTIAL_PATH_DEPENDENT"] == []
+    gapped = {g.path for g in series.direction_gaps}
+    assert B_X in gapped and B_DOF not in gapped
     stepped = {s.path for s in series.steps}
     assert B_X in stepped and B_DOF not in stepped
     assert {s.path for s in series.backward.steps} == stepped
@@ -1937,14 +2222,16 @@ def test_path_dependence_ignores_numerically_identical_chains():
                                 [2.2e-74, 1e-60, 1e-60], [1e-70] * 3)
     backward = _synthetic_series("instrument.profile.y",
                                  [2.1e-60, 1e-60, 1e-60], [1e-70] * 3)
-    assert _path_dependence_diagnostics(forward, backward) == []
+    top, coverage = _largest_gap(forward, backward)
+    assert (top.gap_esd, coverage) == (0.0, [])
 
     moved = _synthetic_series("phases.0.cell.a", [4.1566, 4.1570, 4.1574],
                               [1e-5] * 3)
     shifted = _synthetic_series("phases.0.cell.a", [4.1576, 4.1570, 4.1574],
                                 [1e-5] * 3)
-    assert [d.code for d in _path_dependence_diagnostics(moved, shifted)] == [
-        "SEQUENTIAL_PATH_DEPENDENT"]
+    top, _ = _largest_gap(moved, shifted)
+    assert top.gap_esd == pytest.approx(-1e-3 / (2 ** 0.5 * 1e-5))
+    assert (top.label, top.forward, top.backward) == ("p0", 4.1566, 4.1576)
 
 
 def test_path_dependence_needs_an_esd_from_both_chains():
@@ -1970,17 +2257,19 @@ def test_path_dependence_needs_an_esd_from_both_chains():
         [None, None, None, None, esd, esd, esd, esd])
     # nothing is judged — and since WP-1333 that is said, rather than being
     # the same empty list an agreed path returns (issue #269)
-    assert _unjudged(_path_dependence_diagnostics(held_late, held_early)) == [
+    assert _unjudged(_direction_gaps(held_late, held_early)) == [
         ["phases.1.cell.b"]]
 
 
-def _unjudged(diagnostics) -> list[list[str]]:
+def _unjudged(compared) -> list[list[str]]:
     """Every diagnostic must be the #269 finding; return what each names.
 
-    The shape these tests pin is that the comparison judged nothing: no
-    ``SEQUENTIAL_PATH_DEPENDENT`` at all, and one ``info``
-    ``SEQUENTIAL_PATH_CHECK_INCOMPLETE`` naming the paths it could not reach.
+    The shape these tests pin is that the comparison judged nothing: no gap
+    with a size at all, and one ``info`` ``SEQUENTIAL_PATH_CHECK_INCOMPLETE``
+    naming the paths it could not reach.
     """
+    gaps, diagnostics = compared
+    assert all(g.gap_esd is None for g in gaps), gaps
     assert all(d.code == "SEQUENTIAL_PATH_CHECK_INCOMPLETE" and d.level == "info"
                for d in diagnostics), [d.code for d in diagnostics]
     return [d.where for d in diagnostics]
@@ -2001,14 +2290,18 @@ def test_path_dependence_keeps_the_patterns_both_chains_measured():
         "phases.1.cell.b",
         [5.4001, 5.4011, 5.4019, 5.4031, 5.4039, 5.4051, 5.4130, 5.4140],
         [esd] * 6 + [None, None])
-    assert _path_dependence_diagnostics(forward, backward) == []
+    gaps, coverage = _direction_gaps(forward, backward)
+    assert coverage == []
+    assert [g.label for g in gaps if g.gap_esd is None] == ["p6", "p7"]
+    top, _ = _largest_gap(forward, backward)
+    assert abs(top.gap_esd) == pytest.approx(1e-4 / (2 ** 0.5 * esd))
 
-    # …and a real disagreement inside the comparable patterns still fires,
-    # with the one-sided pair present and ignored: the two channels are
+    # …and a real disagreement inside the comparable patterns leads the list,
+    # with the one-sided pair present and unsized: the two channels are
     # separable, and only one of them is an artefact.
     backward.entries[5].parameters[0].value = 5.4060
-    assert [d.code for d in _path_dependence_diagnostics(forward, backward)] == [
-        "SEQUENTIAL_PATH_DEPENDENT"]
+    top, _ = _largest_gap(forward, backward)
+    assert (top.label, round(top.gap_esd, 2)) == ("p5", -7.07)
 
 
 def test_path_dependence_pairs_the_two_chains_by_pattern():
@@ -2033,16 +2326,16 @@ def test_path_dependence_pairs_the_two_chains_by_pattern():
     assert len(f) == len(b) == 7          # the length gate lets this through
     assert f.labels != b.labels           # and they are not the same patterns
 
-    assert _path_dependence_diagnostics(forward, backward) == []
+    gaps, coverage = _direction_gaps(forward, backward)
+    assert coverage == [] and {g.gap_esd for g in gaps} == {0.0}
+    assert [g.label for g in gaps] == [f"p{k}" for k in range(1, 7)]
 
     # The positive arm: a real disagreement on a pattern both chains *did*
-    # measure still fires, and the label in the message is the pattern the
-    # two values actually come from.
+    # measure leads the list, and its label is the pattern the two values
+    # actually come from.
     backward.entries[3].parameters[0].value = 4.1600
-    fired = _path_dependence_diagnostics(forward, backward)
-    assert [d.code for d in fired] == ["SEQUENTIAL_PATH_DEPENDENT"]
-    assert "at p3:" in fired[0].message
-    assert "4.153 vs 4.16" in fired[0].message
+    top, _ = _largest_gap(forward, backward)
+    assert (top.label, top.forward, top.backward) == ("p3", pytest.approx(4.153), 4.16)
 
 
 def test_path_dependence_judges_the_overlap_of_unequal_chains():
@@ -2060,15 +2353,14 @@ def test_path_dependence_judges_the_overlap_of_unequal_chains():
 
     assert len(forward.trajectory("phases.1.cell.a")) == 7
     assert len(backward.trajectory("phases.1.cell.a")) == 8
-    fired = _path_dependence_diagnostics(forward, backward)
-    assert [d.code for d in fired] == ["SEQUENTIAL_PATH_DEPENDENT"]
-    assert "at p4:" in fired[0].message
+    top, _ = _largest_gap(forward, backward)
+    assert top.label == "p4" and abs(top.gap_esd) > 100
 
 
 def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
     """The skill row's own remedy, run on the two shapes it exists to catch.
 
-    ``abstention.md``'s ``SEQUENTIAL_PATH_DEPENDENT`` row told an agent to
+    ``abstention.md``'s path-dependence row told an agent to
     compare ``len(series.trajectory(path))`` against the backward chain's
     before reading silence as clearance.  @yue-here measured both states in
     which that returns "fine": two chains whose held stretches sit at opposite
@@ -2103,7 +2395,7 @@ def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
     fa, ba = a.trajectory(path), a.backward.trajectory(path)
     assert len(fa) == len(ba) == 4          # the old check: EQUAL -> clearance
     assert set(fa.labels) & set(ba.labels) == set()
-    assert _unjudged(_path_dependence_diagnostics(a, a.backward)) == [[path]]
+    assert _unjudged(_direction_gaps(a, a.backward)) == [[path]]
     assert patterns_judged(a, path) == 0
 
     # B — the esd half.  Identical labels, identical lengths, and the
@@ -2116,7 +2408,8 @@ def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
     # the two chains' values are *identical*, which the comparison's noise
     # floor calls agreement whatever the esds say, so there is nothing an esd
     # could have changed and nothing to name (WP-1333)
-    assert _path_dependence_diagnostics(b, b.backward) == []
+    gaps, coverage = _direction_gaps(b, b.backward)
+    assert coverage == [] and all(g.gap_esd is None for g in gaps)
     assert patterns_judged(b, path) == 0
 
     # B' — the same esd pattern over values that differ: now the silence
@@ -2124,7 +2417,7 @@ def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
     shifted = [v + 2e-3 for v in ramp]
     b2 = both(_series_missing(path, ramp, [None] * 8, absent=set()),
               _series_missing(path, shifted, [esd] * 8, absent=set()))
-    assert _unjudged(_path_dependence_diagnostics(b2, b2.backward)) == [[path]]
+    assert _unjudged(_direction_gaps(b2, b2.backward)) == [[path]]
     assert patterns_judged(b2, path) == 0
 
     # The positive arm, because a count that only ever answers 0 is not
@@ -2162,13 +2455,17 @@ def test_forward_and_backward_chains_agree_on_a_clean_series(thermal_patterns):
     series = refine_sequential(thermal_patterns[:5], structure, ins,
                                direction="both")
     assert series.direction == "both"
-    assert [d.code for d in series.diagnostics
-            if d.code == "SEQUENTIAL_PATH_DEPENDENT"] == []
+    # every gap is recorded, the cell's under the 3 esds the removed code read
+    cell = [g for g in series.direction_gaps if g.path == "phases.0.cell.a"]
+    assert len(cell) == 5 and all(abs(g.gap_esd) < 3 for g in cell), cell
+    assert {(g.forward_rung, g.backward_rung) for g in cell} <= {
+        ("warm", "warm"), ("cold", "warm"), ("warm", "cold")}
+    assert series.backward.direction_gaps is None
     # the backward chain is kept, and reported in series order
     assert [e.index for e in series.entries] == [0, 1, 2, 3, 4]
 
-    # …and the one-shot API hands it back, so the trajectory the
-    # path-dependence diagnostics are about is reachable (WP-1076).  Before
+    # …and the one-shot API hands it back, so the trajectory the gaps are
+    # about is reachable (WP-1076).  Before
     # that WP it lived only on `SequentialRefinement.backward_`, which
     # `refine_sequential` never returns.
     assert series.backward is not None
@@ -2298,17 +2595,17 @@ def test_plot_trajectory_draws_every_mark_in_its_styles_role(style):
 
     series = SeriesResult(entries=[
         entry(0, 4.00), entry(1, 4.01, reseeded=True, rung="cold"),
-        entry(2, 4.02, status="diverged"), entry(3, 4.03, rwp_fence=0.05)])
+        entry(2, 4.02, status="diverged"), entry(3, 4.03, rwp_over_median=4.0)])
     hue = PALETTES[style]
     fig = series.plot(["phases.0.cell.a"], style=style)
     lines = fig.axes[0].lines
     by_marker = {line.get_marker(): line for line in lines if line.get_marker() in "xs"}
+    assert "s" not in by_marker   # a high Rwp carries no mark (WP-2003)
     rings = [line for line in lines
              if line.get_marker() == "o" and line.get_markerfacecolor() == "none"]
     assert lines[0].get_color() == hue["series"]
     assert [ring.get_markeredgecolor() for ring in rings] == [hue["reseeded"]]
     assert by_marker["x"].get_color() == hue["unrecovered"]
-    assert by_marker["s"].get_markeredgecolor() == hue["outlier"]
     from matplotlib.colors import to_hex
     assert to_hex(fig.get_facecolor()) == hue["ground"]
     plt.close("all")
@@ -2371,6 +2668,23 @@ def test_the_backward_pass_writes_its_own_logs(thermal_patterns, tmp_path):
         assert rx.RefinementTree.load(forward).header.tree_id
 
 
+def test_a_rerun_into_a_used_history_directory_is_refused_before_any_fit(
+        thermal_patterns, tmp_path):
+    """A log holds one tree (WP-2031), and a rung's log exists only where a
+    run escalated, so a rerun is refused up front rather than mid-chain."""
+    structure, ins = _start_models()
+    hist = tmp_path / "h"
+    hist.mkdir()
+    (hist / "b.cold.jsonl").write_text('{"record": "header"}\n', encoding="utf-8")
+    (hist / "bb.jsonl").write_text('{"record": "header"}\n', encoding="utf-8")  # not ours
+    (hist / "a.jsonl").write_text("\n", encoding="utf-8")       # empty: holds no tree
+    series = SequentialRefinement(structure, ins, history=hist)
+    with pytest.raises(FileExistsError, match=r"\(b\.cold\.jsonl\)") as caught:
+        series.fit(thermal_patterns[:2], labels=["a", "b"])
+    assert str(hist) in str(caught.value)
+    assert sorted(f.name for f in hist.iterdir()) == ["a.jsonl", "b.cold.jsonl", "bb.jsonl"]
+
+
 # -- Le Bail --------------------------------------------------------------
 
 @pytest.mark.slow
@@ -2429,11 +2743,15 @@ def test_series_entry_lookup_helpers():
 # ----------------------------------------------------------------------
 # telemetry and cancellation (WP-1016)
 # ----------------------------------------------------------------------
-#: A one-stage plan freeing the one parameter these tests care about.  The
+#: A one-stage plan freeing the parameters these tests care about.  The
 #: chain's *answers* are the tests above; what is under test here is the stream
-#: and the token, so the fits are as cheap as they can be.
+#: and the token, so the fits are as cheap as they can be — but no cheaper
+#: than reaching the data: a scale alone came back at Rwp 0.85-0.99 under an
+#: error-level ``MODEL_FAR_FROM_DATA``, which the chain quarantines (WP-2003,
+#: C2 q5), so every pattern started cold.  The cell with it lands near 0.54
+#: in the same evaluations, the forward-pass suite's choice.
 _CHEAP = staged.RefinementPlan(stages=[
-    staged.Stage("quick", ["phases.*.scale"], max_iter=5)])
+    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=5)])
 
 
 def test_unique_labels_disambiguates_by_position():
@@ -2554,16 +2872,14 @@ def test_a_cancelled_chain_does_not_run_the_verification_pass():
 
     assert set(passes) == {"forward"}
     assert runner.backward_ is None
-    # the comparison that never ran says so (WP-1333): zero
-    # SEQUENTIAL_PATH_DEPENDENT findings is what a clean series reports too
+    # the comparison that never ran says so (WP-1333), and records no gap
     assert [d.code for d in series.diagnostics] == [
-        "SEQUENTIAL_CANCELLED", "SEQUENTIAL_PATH_CHECK_INCOMPLETE"]
+        "SEQUENTIAL_CANCELLED", "SEQUENTIAL_PATH_CHECK_NOT_RUN"]
     not_run = series.diagnostics[1]
     assert not_run.level == "warning"
     assert "did not run" in not_run.message
     assert "forward chain was cancelled" in not_run.message
-    assert not any(d.code == "SEQUENTIAL_PATH_DEPENDENT"
-                   for d in series.diagnostics)
+    assert series.direction_gaps is None
 
 
 # ------------------------------------------------ agreement trajectories ---
@@ -2916,16 +3232,16 @@ def test_a_quarantined_pattern_neither_references_nor_fires():
     assert "from p1 to p3" in d.message
 
 
-def test_a_pattern_above_the_rwp_fence_is_still_read():
-    """WP-1465's handover asked for such a pattern to join the quarantine skip.
-    Declined, measured: every soaked pattern of the chain below is over the
-    fence, since a phase standing in for a missing one is what lifts it there,
-    so the skip would leave the finding nothing to fire on (WP-1469)."""
+def test_a_pattern_at_a_high_rwp_is_still_read():
+    """WP-1465's handover asked for a pattern over the old Rwp fence to join
+    the quarantine skip.  Declined, measured: every soaked pattern of the chain
+    below sat over it, since a phase standing in for a missing one is what
+    lifts the Rwp, so the skip would leave the finding nothing to fire on
+    (WP-1469).  WP-2003 removed the fence; the ratio is recorded and read."""
     series = _width_series("phases.0.lor_strain", _GROWING, [1e-3] * 5,
                            _WORSENING)
     for entry in series.entries[1:]:
-        entry.rwp_fence = 0.0125
-    assert [e.above_fence for e in series.entries][2:] == [True] * 3
+        entry.rwp_over_median = 4.0
     (d,) = _width_growth_diagnostics(series)
     assert "from p0 to p2" in d.message
 
@@ -3077,3 +3393,171 @@ def test_a_width_that_grows_for_real_is_not_named():
     assert not [d for d in series.diagnostics
                 if d.code == "SEQUENTIAL_WIDTH_GROWTH"]
     _soak_pngs(runner, "wp1465_real_growth")
+
+
+# --------------------------------------------------------------------------- #
+# SeriesResult.direction_gaps (WP-2003, C5): the gaps recorded, no threshold
+# --------------------------------------------------------------------------- #
+
+def _gapped_pair():
+    """A hand-built pair whose chains part at p2, with different kept rungs."""
+    forward = _synthetic_series("phases.0.cell.a", [4.1560, 4.1570, 4.1580],
+                                [1e-4] * 3)
+    backward = _synthetic_series("phases.0.cell.a", [4.1560, 4.1570, 4.1600],
+                                 [1e-4] * 3)
+    forward.entries[2].rung = "cold"
+    backward.entries[2].rung = "warm_staged"
+    forward.direction, forward.backward = "both", backward
+    forward.direction_gaps, coverage = _direction_gaps(forward, backward)
+    assert coverage == []
+    return forward
+
+
+def test_a_gap_carries_each_chains_kept_rung_and_no_verdict():
+    series = _gapped_pair()
+    top = series.direction_gaps[0]
+    assert (top.label, top.forward_rung, top.backward_rung) == (
+        "p2", "cold", "warm_staged")
+    assert top.gap == pytest.approx(-0.002)
+    assert top.gap_esd == pytest.approx(-0.002 / (2 ** 0.5 * 1e-4))
+    # rows past 3 esds and under it sit in one list, and nothing fires
+    assert [abs(g.gap_esd) > 3 for g in series.direction_gaps] == [
+        True, False, False]
+    assert series.diagnostics == []
+
+
+def test_the_summary_names_the_largest_gap_and_the_field():
+    series = _gapped_pair()
+    text = series.summary()
+    line = [ln for ln in text.splitlines() if "forward-backward gaps" in ln]
+    assert line == ["    largest forward-backward gaps: phases.0.cell.a 14.1σ "
+                    "at p2 (cold/warm_staged) (series.direction_gaps)"], text
+    row = [ln for ln in series.summary(deliverable="series").splitlines()
+           if "ordering artefact" in ln]
+    assert row == ["    ordering artefact: measured both ways, largest gap "
+                   "phases.0.cell.a 14.1σ at p2 (series.direction_gaps)"]
+
+
+def test_a_one_way_or_old_series_has_no_gaps_rather_than_an_empty_list():
+    """``None`` is "not compared" and ``[]`` is "compared, nothing to size";
+    a document written before the field reads ``None`` and keeps its
+    removed verdicts as written."""
+    one_way = _synthetic_series("phases.0.cell.a", [4.156, 4.157], [1e-4] * 2)
+    assert one_way.direction_gaps is None
+    assert "forward-backward" not in one_way.summary()
+
+    stored = _gapped_pair().model_dump(mode="json")
+    del stored["direction_gaps"]
+    stored["diagnostics"] = [{"level": "warning", "code": "SEQUENTIAL_PATH_DEPENDENT",
+                              "message": "phases.0.cell.a: 14.1σ at p2",
+                              "where": ["phases.0.cell.a"]}]
+    old = SeriesResult.model_validate(stored)
+    assert old.direction_gaps is None
+    row = [ln for ln in old.summary(deliverable="series").splitlines()
+           if "ordering artefact" in ln]
+    assert row == ["    ordering artefact: measured both ways, before "
+                   "SeriesResult.direction_gaps; 1 parameter(s) past the "
+                   "removed 3σ test"]
+
+
+def test_the_trajectory_plot_quotes_the_largest_gap_as_a_number():
+    pytest.importorskip("matplotlib")
+    from pathlib import Path
+
+    series = _gapped_pair()
+    series.x_label = "pattern"
+    for k, e in enumerate(series.entries):
+        e.x = float(k)
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    fig = series.plot("phases.0.cell.a", path=str(out / "wp2003_direction_gap.png"))
+    title = fig.axes[0].get_title(loc="left")
+    assert title == "phases.0.cell.a  [largest forward-backward gap 14.1σ]"
+    one_way = _synthetic_series("phases.0.cell.a", [4.156, 4.157], [1e-4] * 2)
+    for k, e in enumerate(one_way.entries):
+        e.x = float(k)
+    assert one_way.plot("phases.0.cell.a").axes[0].get_title(loc="left") == (
+        "phases.0.cell.a")
+
+
+# --------------------------------------------------------------------------- #
+# The kept attempt's order (WP-2003, C2 q2 and q3)
+# --------------------------------------------------------------------------- #
+
+def _attempt(rwp: float, cost: float, *, status: str = "converged",
+             sigma=(1.0, 1.0, 2.0), mode: str = "rietveld", restraints=None):
+    """``_fake_result`` with a last stage's cost and the result's σ."""
+    from rietx.schemas.results import StageResult
+
+    result = _fake_result(rwp, status=status)
+    result.mode = mode
+    result.sigma = list(sigma)
+    result.stages = [StageResult(name="closing", status=status, n_iterations=4,
+                                 cost_initial=2 * cost, cost_final=cost)]
+    result.restraints = restraints
+    return result
+
+
+def test_a_diverged_attempt_loses_to_a_truncated_finite_one():
+    """C2 q2, ruled 2026-11-03: rejected is asked before truncated.
+
+    Asked the other way round, a diverged ``warm_staged`` rung that ran to
+    completion beat a first rung the bound cut, and the pattern was
+    quarantined with a usable fit discarded.
+    """
+    from rietx.sequential import _prefer
+
+    cut = _fake_result(0.12, status="max_iter")
+    diverged = _fake_result(0.05, status="diverged")
+    assert _prefer(diverged, False, cut, True) is False
+    assert _prefer(cut, True, diverged, False) is True
+    # an error-level code is rejected the same way (C2 q5)
+    flagged = _fake_result(0.05)
+    flagged.diagnostics = [Diagnostic(level="error", code="MODEL_FAR_FROM_DATA",
+                                      message="far")]
+    assert _prefer(cut, True, flagged, False) is True
+
+
+def test_the_full_cost_ranks_two_attempts_of_one_objective():
+    """C2 q3: the lower S wins where Rwp would pick the other attempt.
+
+    Rwp sees the data rows alone, and S adds the penalty and restraint rows
+    the solver minimised beside them.  So the two disagree only where such
+    rows exist, which these numbers stand in for.
+    """
+    from rietx.sequential import _better, _prefer
+
+    low_s = _attempt(rwp=0.101, cost=50.0)
+    low_rwp = _attempt(rwp=0.100, cost=51.0)
+    assert _better(low_s, low_rwp) is True
+    assert _better(low_rwp, low_s) is False
+    # max_iter ties converged and the cost decides
+    assert _prefer(_attempt(0.101, 50.0, status="max_iter"), False,
+                   low_rwp, False) is True
+
+
+@pytest.mark.parametrize("change", ["sigma", "pawley", "restraints", "no_curves"])
+def test_two_attempts_of_different_objectives_fall_back_to_rwp(change):
+    """S compares nothing across two objectives, so Rwp decides there."""
+    from rietx.schemas.results import RestraintReport
+    from rietx.sequential import _better, _same_objective
+
+    low_s = _attempt(rwp=0.101, cost=50.0)
+    low_rwp = _attempt(rwp=0.100, cost=51.0)
+    assert _same_objective(low_s, low_rwp)
+    if change == "sigma":
+        # a measured background widens σ by its own scale at compile
+        low_s.sigma = [1.0, 1.0, 2.5]
+    elif change == "pawley":
+        low_s.mode = low_rwp.mode = "pawley"
+    elif change == "restraints":
+        # the collapsed warm rung runs its restraints at c_w = 1
+        low_s.restraints = RestraintReport(rows=[], restraint_chi2=0.0,
+                                           n_restraints=2, weight_scale=1.0)
+        low_rwp.restraints = RestraintReport(rows=[], restraint_chi2=0.0,
+                                             n_restraints=2, weight_scale=0.5)
+    else:
+        low_s.sigma = []
+    assert not _same_objective(low_s, low_rwp)
+    assert _better(low_s, low_rwp) is False
+    assert _better(low_rwp, low_s) is True

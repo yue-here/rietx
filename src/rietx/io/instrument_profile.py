@@ -45,7 +45,7 @@ from ..model.profiles.caglioti import (
     GAUSSIAN_VARIANCE_TO_FWHM_SQUARED,
     lorentzian_negative_above,
 )
-from ..schemas.common import SCHEMA_VERSION, Diagnostic
+from ..schemas.common import SCHEMA_VERSION, STORED_DOCUMENT, Diagnostic
 from ..schemas.instrument import (
     DEBYE_SCHERRER_POLARIZATION,
     PACKING_FRACTION,
@@ -179,7 +179,8 @@ def load_instrument_profile(path: str | Path, *,
             f"{path}: not a rietx instrument-profile file "
             f"(missing/unknown {FORMAT_KEY!r} tag)")
     ins = Instrument.model_validate({**doc["instrument"],
-                                     "background": BackgroundChebyshev().model_dump(mode="json")})
+                                     "background": BackgroundChebyshev().model_dump(mode="json")},
+                                    context=STORED_DOCUMENT)
     written = doc.get("schema_version", UNSTAMPED_SCHEMA)
     if schema_key(written) < newest_declared_since():
         where = f"the profile {Path(path).name}"
