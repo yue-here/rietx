@@ -127,6 +127,17 @@ def test_create_refuses_to_write_over_a_project(tmp_path, pattern_file):
         _create(tmp_path / "s.rex", pattern_file)
 
 
+def test_create_refuses_a_directory_a_failed_create_left_a_log_in(tmp_path, pattern_file):
+    """A log holds one tree (WP-2031); before, the retry appended a second."""
+    root = tmp_path / "s.rex"
+    _create(root, pattern_file)
+    (root / "project.json").unlink()            # as a create that raised part-way
+    log = (root / "history.jsonl").read_bytes()
+    with pytest.raises(FileExistsError, match="earlier create stopped part-way"):
+        _create(root, pattern_file)
+    assert (root / "history.jsonl").read_bytes() == log
+
+
 def test_missing_pattern_file_is_named(tmp_path):
     structure, ins = perturbed_models()
     with pytest.raises(FileNotFoundError, match="pattern file not found"):

@@ -106,6 +106,15 @@ and goes through the harness.
 
 ### Inherited
 
+- **From WP-2003 (2026-11-02, fifth session, PR #1310): three more series verdicts gone from
+  the default, their skill lines renamed and owed a read.** `SEQUENTIAL_RWP_OUTLIER` and the
+  default Rwp fence are gone (batch C1): `reseed_factor` is the caller's (`None`), and the ratio
+  is the record `SeriesEntry.rwp_over_median`. The first-rung budget is the caller's too (C3,
+  `first_rung_factor=None`). A kept attempt under an `error`-level code now escalates and is
+  quarantined (C2 q5). The lanes renamed the lines naming them in `references/series.md`,
+  `references/abstention.md` and `references/batch-operating.md` 9c.5, net shorter; whether a
+  row reading `rwp_over_median` with a threshold of its own belongs in the skill is this WP's
+  sweep.
 - **From WP-2003 (2026-10-26, fourth session): skill rows that named a demoted verdict, renamed and owed a read.** `SEQUENTIAL_DISCONTINUITY` is gone (no threshold, batch C4), its statistic is the record field `SeriesResult.steps`, and `verify_discontinuities=True` is `verify_steps=k` (the caller's count of the largest steps, refitted cold, `SeriesStep.cold_ratio`). 2003 renamed the seven skill lines naming either, because the keyword now raises `TypeError` (`SKILL.md:139`; `references/series.md:108`, `:185`, `:203-206`, the `SEQUENTIAL_DISCONTINUITY` row at `:424` rekeyed to `series.steps`; `references/judging.md:421-423`, `:439-441`). They were renamed, not re-read against the table: whether a stopping rule on a field with no threshold belongs in the skill at all is this WP's sweep.
 - **From WP-2037 (2026-10-24, second session, PR #1145): three verbs and a routing change.** New: `RefinementResult.summary(deliverable=, levels=)`, `RefinementResult.usable_under(levels)` and `rx.diagnostics_summary`. The last renders to a new `references/api-batch.md`; the body's §9c routing row links it, paid for by shortening that row's `[batch-operating]` label to `[operating]` (body 16 999 of 17 000 B). `references/batch.md` 9c.18 names the verb in one sentence. Every `summary()` takes `levels={code: allow|warn|deny}`; `usable` itself reads the result alone (Decision 6 there).
 - **From WP-2002 (2026-10-20, PR #1050): skill rows that changed with a ruled verdict.** `CELL_RUNAWAY` (diagnostics.md, the cell now reset and held), `MOMENT_ANGLE_STATIONARY` (magnetic.md, the angle's profile interval), `QPA_FRACTION_UNDETERMINED` renamed `QPA_FRACTION_RANGE` (an info record, no threshold), `K_VECTOR_UNSEPARATED` and `MAGNETIC_SUBGROUP_PREFERRED` (N/f² and no R tie-break), `SIZE_UNUSUALLY_SMALL`, `STRAIN_UNUSUALLY_LARGE` and `PHASE_UNCONSTRAINED` (abstention.md), the new `OCCUPANCY_ABOVE_ONE`, and `auto_background`'s `.background` in SKILL.md. Read each against the table's row.

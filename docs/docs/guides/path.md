@@ -1,7 +1,7 @@
 (guide-path)=
 # How to check a series for path dependence
 
-Fit the series with `direction="both"` and look for `SEQUENTIAL_PATH_DEPENDENT`, and pass `verify_steps=k` so that the k largest steps in `series.steps` are refitted from cold on their two patterns alone.
+Fit the series with `direction="both"` and read `series.direction_gaps`, and pass `verify_steps=k` so that the k largest steps in `series.steps` are refitted from cold on their two patterns alone.
 
 Each fit in a series starts from its neighbour's answer.
 An error in one pattern can therefore pass to every pattern after it and still draw a smooth curve.
@@ -19,18 +19,24 @@ This fits the seven synthetic LaB6 patterns of [How to fit a temperature series]
 
 <!-- output of examples/guides/path.py -->
 ```text
-['SEQUENTIAL_PERSISTENT_FINDING', 'SEQUENTIAL_PERSISTENT_FINDING']
-largest forward-backward gap: 0.00 esd
+[]
+91 gaps, the largest 0.00 esd
+cell.a at p004: 4.16491 vs 4.16491 (warm/warm)
 ```
 
 `series.backward` is the downward chain's own `SeriesResult`, and the entries of `series` are the upward one's.
-A `SEQUENTIAL_PATH_DEPENDENT` diagnostic names each parameter whose two values differ by more than their esds allow, and its message quotes both values.
-Read the two values rather than the multiple of σ, because a parameter near zero with an esd near zero can report a gap of thousands of σ that has no physical size.
+`series.direction_gaps` lists every parameter's gap at every pattern, largest first.
+Each row holds the two values, the gap in combined esds and the attempt each chain kept, here at 700 K.
+rietx calls no gap a verdict, because how many esds is far depends on the parameter.
+Read the two values beside the multiple of σ, because a parameter near zero with an esd near zero can show thousands of σ with no physical size.
 
-No such diagnostic fired here, and the largest gap in the cell edge is under 0.01 esd.
-`SEQUENTIAL_PATH_CHECK_INCOMPLETE` is absent too, so the comparison ran on every pattern.
-The two checks together mean the comparison was made and found nothing.
-Without the second, an empty list can also mean the downward chain was stopped or raised before it finished.
+Here the largest gap is under 0.01 esd, so the two directions agree on every parameter.
+No `SEQUENTIAL_PATH_CHECK_NOT_RUN` or `SEQUENTIAL_PATH_CHECK_INCOMPLETE` fired, so the comparison ran on every pattern.
+`direction_gaps` is `None` when the downward chain was stopped or raised before it finished.
+
+A large gap means the data alone do not fix that parameter, and the order of the chain decides it.
+Hold the parameter, restrain it, or quote the spread between the two directions as its uncertainty.
+A gap whose two chains kept different attempts measures the restart ladder as well as the order.
 
 The downward chain repeats the work of the upward one, so `direction="both"` takes about twice as long.
 
@@ -50,16 +56,16 @@ This replaces the 700 K pattern with one whose cell is 1.5 % larger:
 
 <!-- output of examples/guides/path.py -->
 ```text
-phases.0.cell.a p003->p004  +0.06454  15,790 esd  cold pair 1.00x
-phases.0.cell.b p003->p004  +0.06454  15,790 esd  cold pair 1.00x
-phases.0.cell.c p003->p004  +0.06454  15,790 esd  cold pair 1.00x
-phases.0.cell.a p004->p005  -0.06040  -14,110 esd  not refitted
+phases.0.cell.a p003->p004  +0.06454  15,810 esd  cold pair 1.00x
+phases.0.cell.b p003->p004  +0.06454  15,810 esd  cold pair 1.00x
+phases.0.cell.c p003->p004  +0.06454  15,810 esd  cold pair 1.00x
+phases.0.cell.a p004->p005  -0.06040  -14,062 esd  not refitted
 p000  cold
 p001  warm
 p002  warm
 p003  warm
-p004  warm_staged
-p005  cold
+p004  warm
+p005  warm
 p006  warm
 ```
 
@@ -75,13 +81,10 @@ Here `cell.b` and `cell.c` step with `cell.a`, because the cubic cell ties them 
 
 ## Read where each fit started
 
-The jump also broke two warm starts, one on each side of the step.
-The 700 K fit, started from the 600 K answer, was rejected and fitted again with the whole plan, still from the 600 K answer, and reached 0.04.
-The 800 K fit, started from the 700 K answer, met the step back down and reached an Rwp over 0.9 on both warm attempts.
-`entry.rwp_warm` keeps the Rwp the first attempt reached.
-
-The 800 K entry is `cold`: no warm start could be rescued, so the pattern was fitted from your starting model, and it reached 0.04 too.
-Its values do not continue the chain, so read them as a separate measurement.
+`entry.rung` says which attempt each fit kept.
+Here every warm start held, on both sides of the step: the 700 K fit started from the 600 K answer and the 800 K fit from the 700 K answer, and each reached 0.04.
+A warm start that diverged or carried an `error` diagnostic would have been fitted again, with the whole plan and then from your starting model, and `entry.rwp_warm` would keep the Rwp its first attempt reached.
+A `cold` entry's values do not continue the chain, so read them as a separate measurement.
 
 The full script is `examples/guides/path.py`.
 

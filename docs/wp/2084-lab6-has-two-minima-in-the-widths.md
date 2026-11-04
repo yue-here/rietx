@@ -45,6 +45,15 @@ so the mirror rode along and does not cause it.
 WP, non-strict because only one platform was measured and rounding has picked these
 minima differently on Linux before (WP-2036).
 
+### Inherited
+
+- **From WP-2012, 2026-11-03 (found by `/code-review` on PR #1387).** The manual quotes the
+  same both-free LaB6 number as the `_audit.py` strings of the last task.
+  `docs/docs/reference/refinement.md` (the intermediate-ftol table, SRM 660c row) reads "8.82
+  esd, between two minima", and the text under it says the 8.82 esd is `axial_sl` against
+  `axial_hl`. Under today's presets H/L is held, so that mirror no longer exists. Re-measure
+  the row with the last task and re-word both sentences.
+
 ## Tasks
 
 - [ ] Find what separates the two minima: the Γ_G² cone's active rows, the FCJ node
