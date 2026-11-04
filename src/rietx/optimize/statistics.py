@@ -1085,6 +1085,65 @@ def roughness_absorption(jac: np.ndarray, free_paths: list[str],
     return out
 
 
+def durbin_watson(delta: np.ndarray) -> float | None:
+    """d = Σ(Δᵢ−Δᵢ₋₁)²/ΣΔᵢ² over weighted residuals ``delta`` (Hill & Flack,
+    1987, J. Appl. Cryst. 20, 356, eq. 1), with ``None`` for a residual of
+    nothing, where the ratio is 0/0.
+
+    ``delta`` holds the fitted channels in pattern order, so a channel an
+    excluded region removed never enters.  The two channels either side of
+    that region do form a pair: one pair per gap, and on counting noise such a
+    pair is drawn from the same distribution as any other.  This is the d on
+    :class:`Statistics`.  :func:`~rietx.report.background._pooled_durbin_watson`
+    is the variant for a mask with a gap at every peak, where the bridged
+    pairs would be a large share of the sum.
+    """
+    delta = np.asarray(delta, dtype=np.float64)
+    denom = float(np.sum(delta ** 2))
+    if delta.size < 2 or denom <= 0.0:
+        return None
+    return float(np.sum(np.diff(delta) ** 2) / denom)
+
+
+#: The 0.1 % point of the standard normal, as Hill & Flack (1987) print it in
+#: Q's eq. 2.  Φ⁻¹(0.999) = 3.09023: the paper's own number, never tuned.
+HILL_FLACK_Z = 3.0902
+
+
+def durbin_watson_q(n: int, n_free: int) -> float:
+    """Q = 2[(N−1)/(N−P) − 3.0902/(N+2)^½], Hill & Flack (1987), J. Appl.
+    Cryst. 20, 356, eq. 2, after Theil & Nagar (1961), J. Am. Stat. Assoc. 56,
+    793.
+
+    The 0.1 % significance point of d for residuals with no serial correlation
+    beyond what least squares itself leaves.  Under that null d has mean near
+    2(N−1)/(N−P) and variance near 4/(N+2), and d < Q puts it :data:`HILL_FLACK_Z`
+    standard deviations under the mean.  Requires N > P.
+    """
+    return 2.0 * ((n - 1) / (n - n_free) - HILL_FLACK_Z / float(np.sqrt(n + 2)))
+
+
+def residual_is_noise(delta: np.ndarray, n_free: int) -> bool:
+    """Whether the weighted residuals ``delta`` carry no run of same-sign
+    neighbours: d ≥ Q (:func:`durbin_watson`, :func:`durbin_watson_q`).
+
+    One-sided on purpose.  Hill & Flack also read d > 4 − Q, as neighbours of
+    opposite sign, but the question here is whether peaks are left in the
+    residual, and a peak is a run of one sign.  d depends on neither σ's scale
+    nor the counts, so a pattern's esd convention cannot move this reading,
+    which is why χ² is not used.
+
+    With nothing to test (N ≤ P + 1, or a residual of zero) the answer is
+    ``True``: a residual that cannot show structure shows none.
+    """
+    delta = np.asarray(delta, dtype=np.float64)
+    n = delta.size
+    d = durbin_watson(delta)
+    if d is None or n <= n_free + 1:
+        return True
+    return d >= durbin_watson_q(n, n_free)
+
+
 def compute_statistics(y_obs: np.ndarray, y_calc: np.ndarray, sigma: np.ndarray,
                        n_free: int, y_background: np.ndarray | None = None) -> Statistics:
     y_obs = np.asarray(y_obs, dtype=np.float64)
@@ -1108,7 +1167,7 @@ def compute_statistics(y_obs: np.ndarray, y_calc: np.ndarray, sigma: np.ndarray,
             rwp_bs = float(np.sqrt(swd2 / denom))
 
     delta = np.sqrt(w) * diff
-    dw = float(np.sum(np.diff(delta) ** 2) / np.sum(delta ** 2)) if n > 2 else None
+    dw = durbin_watson(delta) if n > 2 else None
 
     return Statistics(
         rwp=rwp, rp=rp, rexp=rexp, chi2=chi2, gof=rwp / rexp,
