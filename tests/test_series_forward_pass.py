@@ -61,9 +61,10 @@ def test_the_forward_result_is_readable_while_the_backward_pass_runs(ramp):
     mid = seen["forward"]
     assert isinstance(mid, SeriesResult)
     # the forward chain alone: it claims no comparison, so a reader cannot take
-    # "no SEQUENTIAL_PATH_DEPENDENT" on it for a check that ran and passed
+    # an empty gap list on it for a check that ran and found nothing
     assert mid.direction == "forward"
     assert mid.backward is None
+    assert mid.direction_gaps is None
     assert mid.labels == ["a", "b", "c"]
     assert not any(d.code.startswith("SEQUENTIAL_PATH_")
                    for d in mid.diagnostics)

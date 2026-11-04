@@ -2234,7 +2234,7 @@ def _correlation_findings(corr, free: list[str], threshold: float
                 # correlation, and saying so in the same vocabulary as
                 # ρ = 0.96 undersells it.  Reported *beside* the
                 # correlation rather than instead of it: the
-                # SEQUENTIAL_PERSISTENT_FINDING precedent, where the
+                # series code-count precedent (WP-1110), where the
                 # sharper finding rides alongside the ones it sharpens,
                 # so no existing consumer loses a row it counts on.
                 if abs(corr[i, j]) >= FLAT_DIRECTION_RHO:
