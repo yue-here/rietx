@@ -1,6 +1,6 @@
 # WP-1420 — a held phase re-enters, or the chain says it cannot
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-04 — claimed by @mustachefeeling
 Track: A long run is not one fit
 Depends on: — (1301 shipped, the hold this is about; 1333 soft, the same
 chain's other silent shape; 1342 soft, the freeze's blind tie; 1419 soft,
