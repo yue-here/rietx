@@ -6856,7 +6856,8 @@ class Refinement:
         so Layers 1-2 (misfit attribution and typed suggested actions) are
         computed — subject to their gates.  ``plan`` supplies the Layer-2
         strategy veto; pass the plan you ran, its ``PlanSpec`` or its preset
-        name.  A name is read for the result's mode, as the fit read it, so
+        name.  A name is read for the result's mode and this instrument's
+        geometry, as the fit read it (``resolve_plan``, WP-2015), so
         ``"mccusker_default"`` on a Le Bail result is ``profile_only``.
         """
         from .report import build_report
@@ -6867,7 +6868,8 @@ class Refinement:
             # read as the fit that made the result read it: a preset name
             # through the mode's substitution, a ``PlanSpec`` converted
             # (WP-2102)
-            plan = resolve_plan(plan, self.result_.mode)
+            plan = resolve_plan(plan, self.result_.mode,
+                                self.instrument.geometry.kind)
         # the answer frozen with the result, never the live models: a later
         # cancelled fit keeps its completed stages and this result (WP-1421)
         answer = self._answer

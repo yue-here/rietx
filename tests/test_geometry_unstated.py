@@ -76,10 +76,10 @@ def test_an_instrument_profile_written_without_a_kind_opens_as_a_capillary(tmp_p
 
     path = tmp_path / "old_profile.json"
     save_instrument_profile(Instrument.debye_scherrer(0.4139), path)
-    document = json.loads(path.read_text())
+    document = json.loads(path.read_text(encoding="utf-8"))
     holder = document.get("instrument", document)
     holder["geometry"].pop("kind")
-    path.write_text(json.dumps(document))
+    path.write_text(json.dumps(document), encoding="utf-8")
     assert load_instrument_profile(path).geometry.kind == "debye_scherrer"
 
 
@@ -196,6 +196,37 @@ def test_the_cif_writes_an_unstated_geometry_as_unknown(lab, tmp_path):
         rx.Stage("scale", ["phases.*.scale"])]))
     path = tmp_path / "unstated.cif"
     write_refinement_cif(result, ref.fitted_structure, ref.fitted_instrument, path)
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     line = next(ln for ln in text.splitlines() if ln.startswith("_pd_instr_geometry"))
     assert line.split()[-1] == "?"
+
+
+# ------------------------------------------------- every reader of the name
+def test_the_report_resolves_the_name_as_the_fit_did(lab, monkeypatch):
+    """``Refinement.report(plan=name)`` feeds the strategy veto the stages that
+    ran, the geometry's displacement included, not the bare preset's."""
+    import rietx.report
+
+    structure, ins, data = lab
+    ref = rx.Refinement(structure, ins.model_copy(deep=True))
+    ref.fit(data, plan=rx.RefinementPlan(stages=[
+        rx.Stage("scale", ["phases.*.scale"])]))
+    seen = {}
+    monkeypatch.setattr(rietx.report, "build_report",
+                        lambda result, *, plan, **kw: seen.setdefault("plan", plan))
+    ref.report(plan="mccusker_default")
+    assert _DISPLACEMENT in _turn_on(seen["plan"])
+
+
+@pytest.mark.parametrize(("preset", "frees"), [("bragg_brentano", True),
+                                               ("unstated", False)])
+def test_a_project_stores_the_name_as_the_fit_would_run_it(tmp_path, preset, frees):
+    """A project stores the expanded plan and runs it as an object, which no
+    longer resolves, so the geometry is read when the name is stored."""
+    from rietx.examples import examples_dir
+
+    bb = Instrument.bragg_brentano(radiation="CuKa")
+    ins = bb if preset == "bragg_brentano" else Instrument(source=bb.source)
+    project = rx.Project.create(tmp_path / "p.rex", pattern=examples_dir() / "FAP.XRA",
+                                instrument=ins, plan="mccusker_default")
+    assert (_DISPLACEMENT in _turn_on(project.doc.plan.to_plan())) is frees

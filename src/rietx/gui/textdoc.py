@@ -1311,7 +1311,8 @@ def apply(project, delta: Delta, peak_editor=None) -> list[str]:
         # in, as the GUI's preset route stores it, because a project's plan
         # runs verbatim (WP-2102); a mode edited in the same delta is that mode
         mode = delta.settings.get("mode", project.doc.mode)
-        spec = (PlanSpec.from_plan(resolve_plan(delta.plan["preset"], mode))
+        spec = (PlanSpec.from_plan(resolve_plan(delta.plan["preset"], mode,
+                                       project.refinement.instrument.geometry.kind))
                 if "preset" in delta.plan
                 else PlanSpec.model_validate(delta.plan["plan"]))
         project.doc.plan = spec
