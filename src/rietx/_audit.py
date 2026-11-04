@@ -1433,7 +1433,16 @@ ROWS: tuple[Row, ...] = (
                   "WP-1534's fixture; WP-2049: with every phase unseen, an instrument "
                   "column reaching the pattern only through phase peaks is held too, "
                   "free a blank frame's zero shift read -0.0129 +/- 0.0015 deg (8.7 "
-                  "sigma, truth 0.006); the joint runner writes this field from the same "
+                  "sigma, truth 0.006); WP-2086: that instrument hold at an answer "
+                  "also needs d >= Q (HILL_FLACK_Z's row), since a zero scale reads the "
+                  "same on a phase whose peaks missed: held there, LaB6 2 % off ended "
+                  "at Rwp 0.93 and 19 600 ppm, free at 0.0405 on its cell, and 20 "
+                  "noise frames stayed bit-identical; its costs: three real FAP fits from "
+                  "a start 1.5-3 % off go back to Rwp 0.69 reading converged as on 1.10.0, "
+                  "and a blank frame with a hump or rebinned noise (d 0.43-1.04) keeps its "
+                  "instrument free, 4 of 14 refining a zero shift on nothing, and no real blank "
+                  "frame has been seen to pass; "
+                  "the joint runner writes this field from the same "
                   "statistic, read off the joint normal matrix (multi."
                   "_joint_answer_significance, WP-2003 C10): on two copies of #481's "
                   "seed-107 blank frame the screen alone released the shared cell at "
@@ -1441,13 +1450,15 @@ ROWS: tuple[Row, ...] = (
                   "finding, and aligned it is held from the cell stage on, every stage's "
                   "evaluation count the single fit's"),
         grounds=("No competent refiner lets a phase the data cannot see refine its cell, nor "
-                 "lets a frame no phase is seen in refine the instrument terms that reach the "
+                 "lets a frame of pure noise refine the instrument terms that reach the "
                  "pattern only through phase peaks (zero shift, displacement, U..Y, the axial "
                  "terms); the hold touches only what the data cannot determine; on by default, "
                  "which no program does (B1, ruled 2026-10-19; the instrument widening, "
                  "WP-2049, ruled 2026-11-01). The lineless branch, which holds the "
                  "scale, is tier-1 arithmetic (a zero column) inside a row tiered on its "
-                 "contested part. The joint hold reads the single fit's statistic and is "
+                 "contested part. Under Q the hold declines and the instrument stays free, as "
+                 "on 1.10.0, because a misplaced phase reads the same as an unseen one: "
+                 "ruled by the maintainer 2026-11-04 (WP-2086). The joint hold reads the single fit's statistic and is "
                  "covered here, ruled by the maintainer 2026-11-03 (2003-batch/batch.md, "
                  "C10 q2 (a))."),
         approved="2026-11-01"),
@@ -3317,6 +3328,13 @@ ROWS: tuple[Row, ...] = (
                  "unresolved mask nightly; the cut n*FD_STEP^2 approved by Yue, 2026-11-01 "
                  "(PR #1306)."),
         approved="2026-11-01"),
+    Row("rietx.optimize.statistics.HILL_FLACK_Z", "constant", tier=2, value=3.0902,
+        evidence=("Hill & Flack 1987 eq. 2 after Theil & Nagar 1961, read in the paper: Q is "
+                  "the 0.1 % significance point of d, tested there on real X-ray and neutron "
+                  "Rietveld residuals; norm.ppf(0.999) = 3.09023; RIETAN-FP's manual eq. 4.32 "
+                  "and FullProf 8.20's default output print the same Q (docs/practice.md, ran on a "
+                  ".sum file); gates only the instrument half of "
+                  "StageResult.held, whose row carries the rule's own tier")),
     Row("rietx.optimize.statistics.MAX_SHIFT_CONVERGED", "constant", value=0.1),
     Row("rietx.optimize.statistics.OBS_PER_PARAMETER_MIN", "constant", value=3.0),
     Row("rietx.optimize.statistics.OBS_PER_PARAMETER_PREFERRED", "constant", value=5.0),

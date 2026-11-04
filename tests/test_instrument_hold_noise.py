@@ -29,6 +29,7 @@ from rietx.optimize.statistics import (
     durbin_watson_q,
     residual_is_noise,
 )
+from rietx.schemas.instrument import Dispersion
 from rietx.viz.plots import plot_result
 
 pytestmark = pytest.mark.xdist_group("instrument-hold-noise")
@@ -71,6 +72,7 @@ def lab6(tmp_path_factory):
 
 def _true_instrument():
     ins = rx.Instrument.debye_scherrer(wavelength=0.4139)
+    ins.source.dispersion = Dispersion()  # declared: these tests pin Rwp
     ins.zero_shift.value = 0.008
     ins.profile.w.value = 2.5e-4
     ins.background = rx.BackgroundChebyshev.with_terms(3)
@@ -81,6 +83,7 @@ def _true_instrument():
 
 def _start_instrument():
     ins = rx.Instrument.debye_scherrer(wavelength=0.4139)
+    ins.source.dispersion = Dispersion()
     ins.profile.w.value = 2.5e-4 * 1.5
     ins.background = rx.BackgroundChebyshev.with_terms(3)
     return ins
@@ -208,6 +211,7 @@ def test_the_test_is_one_sided():
     (np.zeros(100), 3),                   # a residual of nothing
     (np.array([1.0, 2.0, 3.0]), 2),       # N = P + 1
     (np.array([1.0, 2.0, 3.0]), 5),       # P > N: Q would divide by a negative
+    (np.arange(30.0), 25),                # Q above 4, which no d can reach
     (np.array([1.0]), 0),
 ])
 def test_with_nothing_to_test_there_is_no_structure(delta, n_free):
@@ -342,6 +346,7 @@ def test_a_real_line_in_an_excluded_region_does_not_decline_the_hold(lab6):
                           excluded_regions=[(11.5, 12.5)])
     ref = rx.Refinement(_with_cell(lab6, A_TRUE), _start_instrument(), history=False)
     result = ref.fit(data, plan="mccusker_default")
+    _draw(result, "hold_noise_excluded_line")
     assert PEAK_ONLY <= set(result.stages[-1].held)
     assert result.statistics.durbin_watson >= durbin_watson_q(
         result.statistics.n_points, result.statistics.n_free_parameters)
@@ -378,6 +383,7 @@ def test_a_fit_that_recovers_leaves_the_declining_d_on_its_history_node(lab6, mo
     data = _pattern(lab6, A_TRUE, seed=14)
     ref = rx.Refinement(_with_cell(lab6, A_TRUE / 1.02), _start_instrument())
     result = ref.fit(data, plan="mccusker_default")
+    _draw(result, "hold_noise_recovered")
     declined = [d for d, _, _, answer in read if not answer]
     assert declined
     assert result.statistics.durbin_watson > 1.9

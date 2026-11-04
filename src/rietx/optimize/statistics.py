@@ -1133,15 +1133,17 @@ def residual_is_noise(delta: np.ndarray, n_free: int) -> bool:
     nor the counts, so a pattern's esd convention cannot move this reading,
     which is why χ² is not used.
 
-    With nothing to test (N ≤ P + 1, or a residual of zero) the answer is
-    ``True``: a residual that cannot show structure shows none.
+    With nothing to test (N ≤ P + 1, a residual of zero, or Q ≥ 4, which no d
+    can reach) the answer is ``True``: a residual that cannot show structure
+    shows none.
     """
     delta = np.asarray(delta, dtype=np.float64)
     n = delta.size
     d = durbin_watson(delta)
     if d is None or n <= n_free + 1:
         return True
-    return d >= durbin_watson_q(n, n_free)
+    q = durbin_watson_q(n, n_free)
+    return q >= 4.0 or d >= q
 
 
 def compute_statistics(y_obs: np.ndarray, y_calc: np.ndarray, sigma: np.ndarray,

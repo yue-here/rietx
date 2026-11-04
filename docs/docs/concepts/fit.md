@@ -91,6 +91,12 @@ A phase whose scale is under {{ PHASE_SUPPORT_SIGMA }} esds is too weak for the 
 The plan sets that number (`RefinementPlan.phase_support_sigma`), and `None` turns off the significance test only: a phase with no reflection in the fitted range is still held, scale included, because its column is zero whatever the value.
 A magnetic moment direction the powder average cannot determine is fixed the same way.
 So is a phase's displacement parameter when its reflections in range cannot separate it from the scale.
+When no phase is seen at a stage's answer, the zero shift, the displacement and the profile terms are fixed too, provided the residual is noise: Durbin-Watson $d \geq Q$, {eq}`est-dw-q`.
+With no phase line in the fitted range they are fixed whatever $d$ reads, because their columns are zero.
+A blank frame whose background the model follows passes that test. A phase whose peaks missed does not, because its scale went to zero and left every real peak in the residual, so those terms stay free to find them.
+The test reads any structure, so a background the model cannot follow, such as an empty capillary's hump, also leaves those terms free.
+The test reads the fitted channels, and neither side depends on the scale of σ, which is why χ² is not used.
+`Statistics.durbin_watson` is the $d$ tested, printed as `DW`. `Statistics.n_points` and `Statistics.n_free_parameters` give $N$ and $P$. A stage's own $d$ is on its history node.
 `StageResult.held` lists what was fixed.
 The diagnostic `PHASE_UNCONSTRAINED` reports a held phase, and `SCALE_B_INSEPARABLE` a held displacement parameter.
 This is separate from `Refinement.hold`, which you set and which lasts until you lift it.
