@@ -2207,7 +2207,7 @@ class MultiHistogramRefinement:
             diags.extend(_air_scatter_undeclared_diagnostics(model, values,
                                                              y_calc, stats))
             diags.extend(_extinction_undeclared_diagnostics(
-                model, table, values, y_calc, stats, struct))
+                model, table, thetas[h], values, y_calc, stats, struct))
 
             histograms.append(HistogramResult(
                 label=model.meta.get("label", "") or f"hist{h}",

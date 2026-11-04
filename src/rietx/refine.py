@@ -9063,7 +9063,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # The extinction a structure did not declare (WP-1944): opt-in, so a plan
     # cannot free it, and this is what keeps it findable from the residual.
     diagnostics = diagnostics + _extinction_undeclared_diagnostics(
-        model, table, values, y_calc, stats, structure)
+        model, table, theta, values, y_calc, stats, structure)
 
     # What a declared sharp peak did, once the fit has an answer about it
     # (WP-1103).  Built after ``ticks`` because "is this component sitting on a
@@ -10489,10 +10489,11 @@ def _air_scatter_undeclared_diagnostics(model: CompiledModel,
 #: ``test_extinction_correlates_with_scale_and_biso_and_the_guard_fires``).
 #: Matched against what each free column *reaches* (``column_reach``), so a
 #: Biso tied across sites or driven by a ``vars.X`` is one column moving all
-#: of them.
+#: of them.  Every atom parameter is one, as in ``least_squares._INTENSITY_ONLY``:
+#: a distortion mode or a rigid body reaches the coordinates themselves rather
+#: than a site DOF, and a moment changes the magnetic intensities.
 _EXTINCTION_PARTNER = re.compile(
-    r"phases\.\d+\.(atoms\.\d+\.(biso|adp\.\d+|occ|dof\.\d+)"
-    r"|preferred_orientation\.r|texture\..*)$")
+    r"phases\.\d+\.(atoms\.\d+\..+|preferred_orientation\.r|texture\..+)$")
 
 #: the coefficient (µm²) the score test's column is differenced at.  The
 #: forward difference's relative error is about x/2 at the probe, under 1e-4
@@ -10502,6 +10503,7 @@ _EXTINCTION_PROBE = 1e-3
 
 
 def _extinction_undeclared_diagnostics(model: CompiledModel, table: ParameterTable,
+                                       theta: np.ndarray,
                                        values: dict[str, float], y_calc, stats,
                                        structure: Structure) -> list[Diagnostic]:
     """``EXTINCTION_UNDECLARED``: a phase with no extinction declared, whose
@@ -10513,10 +10515,10 @@ def _extinction_undeclared_diagnostics(model: CompiledModel, table: ParameterTab
     score test (``_air_scatter_undeclared_diagnostics``) on the extinction
     column at 0: a = ∂y/∂ext, differenced at :data:`_EXTINCTION_PROBE` with
     the extinction factor switched on for that phase alone, weighted and
-    projected off the background block, the phase's own scale column and its
-    free intensity parameters (:data:`_EXTINCTION_PARTNER`: Biso, the ADPs,
-    occupancies, coordinates, preferred orientation and texture, each free
-    column of θ that reaches one, through C).  Extinction and those all change the
+    projected off the background block, every phase's scale column and the
+    free intensity parameters (:data:`_EXTINCTION_PARTNER`: every atom
+    parameter, preferred orientation and texture, each free column of θ that
+    reaches one, through ``table.decode``).  Extinction and those all change the
     strong lines, so the projection is what leaves only the part of the
     signature none of them can draw.  It removes (a⊥·r)²/(a⊥·a⊥) of χ², a
     Gauss-Newton step with those re-fitted and the positions held, which in
@@ -10529,47 +10531,52 @@ def _extinction_undeclared_diagnostics(model: CompiledModel, table: ParameterTab
     the level of the one test this is, in reduced-χ² units with the esd
     inflation included.  Measured (WP-1944, gate off): a LaB6 synthetic with
     ext 2.5 planted scores 230, and 0 or 0.5 planted leans the other way; the
-    11-BM NAC + CaF₂ fit scores 4.4 and 14.6, Si 640c 0.13, and FAP leans the
+    11-BM NAC + CaF₂ fit scores 8.1 and 14.6, Si 640c 0.13, and FAP leans the
     other way.  Over WP-1944's 69 structural-plan fits a freed extinction
     without one planted reached at most 3.1σ, a score near 10.  Rietveld mode only, since Le Bail and Pawley fit the intensities.
     """
     if model.mode != "rietveld" or not (stats.chi2 > 0.0):
         return []
-    declared = {e.path for e in table.entries}
     w = 1.0 / model.sigma
     r = (model.y_obs - np.asarray(y_calc)) * w
+    theta = np.asarray(theta[:len(table.free_paths)], dtype=np.float64)
+    n_phases = len(structure.phases)
     out = []
     block = None
+    at: list[np.ndarray] = []
 
     def partners():
         # every phase's scale column, and a forward-difference column for each
         # free column of θ that reaches an intensity parameter (positions
         # held).  In a mixture the fraction moves too, so one phase's scale is
-        # a partner of the other's extinction.  A column moves every entry it
-        # reaches by its coefficient in C, the residual's own map, so a tie or
-        # a variable is one column, never one site's share of it.
+        # a partner of the other's extinction.  A column is moved through
+        # ``table.decode``, the residual's own map (C, then any derived
+        # block), so a tie, a variable or a rigid body is one column, never
+        # one site's share of it.  Only the phases it reaches are re-evaluated.
         cols = list(model.bkg_design * w)
-        at = [np.asarray(model.phase_component(jp, values))
-              for jp in range(len(structure.phases))]
+        at.extend(np.asarray(model.phase_component(jp, values))
+                  for jp in range(n_phases))
         cols += [a_jp * w for a_jp in at]
         reach = table.column_reach()
-        C = table._C.tocsc()
         for j, free in enumerate(table.free_paths):
             if not any(_EXTINCTION_PARTNER.match(p) for p in reach[free]):
                 continue
-            step = 1e-6 * max(abs(values.get(free, 0.0)), 1.0)
-            moved = dict(values)
-            sl = slice(C.indptr[j], C.indptr[j + 1])
-            for i, c in zip(C.indices[sl], C.data[sl]):
-                path = table.entries[i].path
-                moved[path] = moved[path] + step * c
+            touched = {m.group(1) for p in reach[free]
+                       if (m := re.match(r"phases\.(\d+)\.", p))}
+            phases = (sorted(int(i) for i in touched)
+                      if all(p.startswith("phases.") for p in reach[free])
+                      else range(n_phases))
+            step = 1e-6 * max(abs(float(theta[j])), 1.0)
+            nudged = theta.copy()
+            nudged[j] += step
+            moved = table.decode(nudged)
             delta = sum(np.asarray(model.phase_component(jp, moved)) - at[jp]
-                        for jp in range(len(structure.phases)))
+                        for jp in phases)
             cols.append(delta / step * w)
         return np.vstack(cols).T
     for ip, phase in enumerate(structure.phases):
         path = f"phases.{ip}.extinction"
-        if phase.extinction is not None or path in declared or not phase.atoms:
+        if phase.extinction is not None:
             continue
         cp = model.phases[ip]
         held = cp.skip_extinction
