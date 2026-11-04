@@ -21,9 +21,9 @@ spec outbound. `Refinement.fit` (`refine.py:5374`) and the series path
 (`sequential.py:1470`) call it. Three call sites instead test `isinstance(plan, str)`
 and look the preset up by hand:
 
-- `multi.py:1433`, `MultiHistogramRefinement.fit`.
-- `multi.py:1551`, `MultiHistogramRefinement.report`.
-- `refine.py:6494`, `Refinement.report`.
+- `multi.py:1431`, `MultiHistogramRefinement.fit`.
+- `multi.py:1550`, `MultiHistogramRefinement.report`.
+- `refine.py:6493`, `Refinement.report`.
 
 Both signatures in `multi.py` are annotated `RefinementPlan | str`.
 

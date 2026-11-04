@@ -42,10 +42,17 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - [ ] `switching/topas.md`: a section mapping TOPAS's parametric vocabulary to rietx's
   (`prm`, `local`, `#list`, an equation on a `prm`, `!` for fixed). Say what is
   expressible now and what waits on 1964, by that name.
+- [ ] The inventory, moved from the parked 2105. Every parametric construct in the two
+  Durham inputs, each with its rietx spelling, its WP or a named non-goal, and each
+  input's free-parameter and channel counts. The milestone's agent row is judged against
+  it.
 - [ ] `switching/topas.md` § Porting what does not read: the recipe an agent follows.
-  Read with `read_project_model`, take the list `TOPAS_FEATURES_NOT_IMPORTED` gives, write
-  each item by hand from the keyword table, then compare a stated value such as a cell
-  or an Rwp with the input's own. Include how to expand `#list` and `#define` by hand and
+  Try `read_project_model`. A parametric input usually raises `TopasInpError` naming the
+  first construct it cannot read, and `parametric_05.inp` and ZrP₂O₇'s input both do, so
+  there is no list to work from. A simple input returns a model and a
+  `TOPAS_FEATURES_NOT_IMPORTED` list. Either way, port from the input's text with the
+  keyword table, then compare a stated value such as a cell or an Rwp with the input's
+  own. Include how to expand `#list` and `#define` by hand and
   where `topas.log` holds the expansion.
 - [ ] Skill: decide whether porting is a task shape of its own (a `references/` file behind
   a situation row) or a row in the foreign-inputs line, under the skill's placement rule.

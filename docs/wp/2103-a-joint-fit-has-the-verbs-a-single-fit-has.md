@@ -1,7 +1,7 @@
 # WP-2103 — a joint fit has the verbs a single fit has
 
 Milestone: parametric · Status: ⬜
-Depends on: 2102 soft; 2081 soft (how a series holds what the setup fixes); 1964 soft (its interval measurement)
+Depends on: 2102 soft; 2081 soft (how a series holds what the setup fixes)
 Priority: P2 2026-11-04 — a feature the open milestone was opened for: an expert steers a fit by hand, and a joint fit offers them almost nothing to steer with
 
 ## Goal
@@ -24,8 +24,11 @@ holds it through the series. On a joint fit today that hold has no verb.
 The tie has a named customer. WP-1325 had to hold WO₃'s one B per pattern at the chain's
 value because a joint fit has no tie verb (`1325-measure/wo3_ramp.py`), where the chain
 writes `tie_equal(...biso, "vars.B")`. The milestone's WO₃ row needs that B refined.
+`SharingMap.is_shared` treats a `vars.` path as shared, so that line would give one B
+across every pattern. WO₃ wants one per pattern. So its tie takes one atom's biso as the
+source in each pattern, or 1964's variable per pattern once that lands.
 
-TOPAS's habits set the bar. An expert edits a `prm` flag and reruns from the stored
+An expert's habits set the bar. In TOPAS they edit a `prm` flag and reruns from the stored
 values. `load_save_locals` (v8 onwards, formerly `use_stored_values`) writes each
 pattern's local values to a file and reads them back on a restart (Durham tutorial 9.4).
 A 100-pattern refinement is rarely right on the first run, so a restart that loses the
@@ -57,13 +60,13 @@ the chain, and its answer on what "held" means should govern here. Read it first
   TOPAS and GSAS-II sequential docs. Write the keep and decline list here, each decline
   with its reason.
 - [ ] `hold`/`unhold`, reported through `blocked_by_hold` as a single fit is.
-- [ ] `tie`/`tie_equal`/`untie` across histograms, or a refusal naming `sharing=`.
+- [ ] `tie`/`tie_equal`/`untie` across histograms, or a refusal naming `sharing=`. A
+  source atom in each pattern works, as WO₃'s protocol needs.
+- [ ] `add_variable` on a joint fit, or a refusal naming `variables=`.
 - [ ] `set_values` by canonical path.
 - [ ] A restart: refit from the last answer, per-pattern values and coefficients both,
   in process and from a saved result. The bar: a converged fit restarted stops in one
   stage and moves nothing by more than 0.01 esd.
-- [ ] `profile_interval` for a shared coefficient, or a documented script. WP-1964's
-  interval measurement decides which.
 - [ ] Manual: `reference/joint.md`, and the partition in `tests/api_surface.py`.
 - [ ] Skill: the series reference's joint row.
 

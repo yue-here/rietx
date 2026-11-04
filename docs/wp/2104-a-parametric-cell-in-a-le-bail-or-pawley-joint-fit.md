@@ -1,7 +1,7 @@
 # WP-2104 — a parametric cell in a Le Bail or Pawley joint fit
 
 Milestone: parametric · Status: ⬜
-Depends on: 1325 (the joint path); 1964 soft (an equation on the cell)
+Depends on: 1325 soft (the joint path has landed, and its open tasks are separate); 1964 soft (an equation on the cell)
 Priority: P2 2026-11-04 — a feature the open milestone was opened for: a cell series is often fitted before a structure is known or trusted
 
 ## Goal
@@ -51,8 +51,9 @@ table (`ABSENT`, "a joint fit is Rietveld-only"). Those rows change with this WP
 
 ## Acceptance
 
-A Pawley or Le Bail joint fit sharing a parametric cell over a synthetic ramp, on one
-pinned seed, recovers the known a(T) within 2 esd of the slope.
+A Pawley or Le Bail joint fit shares a parametric cell over a synthetic ramp. Over 12
+pinned seeds, the coefficients of a(T) have a mean z-score under 0.5 in size. If only one
+mode lands, this file says so, and 2108's second route waits on the Pawley arm.
 
 ```sh
 .venv/bin/python -m pytest tests/test_multi_histogram.py tests/test_parametric_series.py tests/test_cross_backend.py

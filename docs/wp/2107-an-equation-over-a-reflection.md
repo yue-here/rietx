@@ -101,7 +101,10 @@ Cu Kα1:
 
 So a port of an hkl equation can change its numbers silently on any group above
 orthorhombic. Compile evaluates the equation on every image and refuses a disagreement,
-naming the first hkl. `orbit_mean(...)` is the way out. TOPAS's choice of image is not
+naming the first hkl. The test uses random trial coefficients beside the stored ones,
+because `If(l==0,a,b)` with a equal to b passes at the start and splits during the fit.
+A family has a symmetric spelling: in a cubic group `h==0` is refused and `h*k*l==0`
+reads Stinton & Evans's 0kl family. `orbit_mean(...)` is the way out. TOPAS's choice of image is not
 established and does not matter here: the refusal holds on physics, since a peak holds
 every image. A port meets the refusal and takes the exit knowingly.
 
@@ -125,7 +128,11 @@ every image. A port meets the refusal and takes the exit knowingly.
   is line-independent and cannot hold it. `_shift_key` and the width key must carry the
   coefficients.
 - **Widths compose as they do now.** A Gaussian term adds in variance and a Lorentzian
-  term in FWHM. That is the package's rule, and TOPAS happens to agree at zero cycles
+  term in FWHM. So the Gaussian target is a signed variance as well as a FWHM. ZrP₂O₇
+  gives each phase its own six TCHZ terms, shared across patterns, as Stinton & Evans
+  §§ 4.1 and 4.2 do, and its stored v and w are negative for two of the three phases.
+  `Phase` has no V or W, and a FWHM cannot carry a negative term. The guard below reads
+  the total. That is the package's rule, and TOPAS happens to agree at zero cycles
   (`test_topas_convolves_the_written_width_lines`).
 - **The total width stays positive.** `Max(x, 0)` is legal and has the kink Stephens'
   clamp has. A total width at or below zero at the answer is a guard finding, and it
@@ -170,10 +177,15 @@ every image. A port meets the refusal and takes the exit knowingly.
 - [ ] **Compile.** Freeze `h`, `k`, `l`, `m` on `CompiledPhase`. Evaluate on every orbit
   image and refuse a disagreement, with `orbit_mean` as the exit. Refuse a moving
   condition. Teach `_shift_est` and `_size_family` the equation, and pin the windows with
-  the probe's number.
+  the probe's number. `generation_window` runs before reflections exist
+  (`forward.py:4133`), so a phase-level position in hkl needs a bound over the expression
+  that takes no reflection list, or a margin stated and tested.
 - [ ] **Forward.** Width in `_width_block`, position in `apparent_two_theta` with its
   phase index, and every memo key. Check `reflection_positions`, the ticks and the
-  exporters' reflection table read the same answer.
+  exporters' reflection table read the same answer. `apparent_two_theta` also takes arrays
+  that are no reflection list (`report/satellites.py`, `refine.py:11552`), so those callers
+  read the pattern level or refuse. Width readers outside `_width_block` follow too
+  (`refine.py:11342`, `report/strain.py:120`, `io/exporters.py:362`).
 - [ ] **Derivatives.** An exact branch for a coefficient, reached through
   `scalar_chain_supported` and the extras gate. `test_cross_backend.py` gains a row, and
   the oracle follows the invariant on exactness.
@@ -183,22 +195,24 @@ every image. A port meets the refusal and takes the exit knowingly.
 - [ ] **Intensity.** The third target, the two hand-folded builders, the Le Bail and Pawley
   refusal, and the QPA diagnostic with its row in `rietx._audit`.
 - [ ] **The harmonic.** A symmetric function of hkl in the grammar, with its derivative.
-- [ ] **An independent check.** A width, position and intensity equation against a
-  hand-built oracle: a forward model given the same per-reflection arrays directly, with
-  no equation in the path. TOPAS at zero cycles is a welcome extra if a run is cheap, and
-  no gate.
+- [ ] **An independent check.** Each target against a built-in with the same physics,
+  so no code is shared with what it certifies: `y*tan(th)` against `lor_strain`, a cosθ
+  position against sample displacement, an exponential in s² (sinθ/λ squared) against
+  Biso. A variance term against the instrument's U, V and W. TOPAS at zero cycles is a
+  welcome extra if a run is cheap, and no gate.
 - [ ] **Manual and skill.** A guide page, `reference/parametric.md`, the Theory tab's
   equation, a keyword-to-target table in `switching/topas.md`, the skill's row.
 
 ## Acceptance
 
 Over 12 pinned seeds on a synthetic phase, every coefficient of a width, a position and
-an intensity equation has a mean z-score under 0.5 in size. Each equation's Y_calc
-matches the hand-built oracle to the bit-identity bar of the forward model. The
-milestone's ZrP₂O₇ row runs with the input's `th2_offset` curve free.
+an intensity equation has a mean z-score under 0.5 in size. Each equation's Y_calc matches
+its built-in twin to 1e-12 relative. On a synthetic ramp with ZrP₂O₇'s curve and a
+per-phase TCHZ, each coefficient is recovered within 2 esd. The milestone's ZrP₂O₇ row
+then adds both to its protocol.
 
 ```sh
-.venv/bin/python -m pytest tests/test_parametric_series.py tests/test_cross_backend.py
+.venv/bin/python -m pytest tests/test_parametric_series.py tests/test_cross_backend.py   # in [dev,jax,torch]: the torch rows skip themselves in [dev]
 .venv/bin/python -m ruff check src tests examples
 ```
 

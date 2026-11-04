@@ -36,8 +36,8 @@ The seams are small. The grammar gives the value and its exact derivative, so th
 is a few lines of weighted least squares over one equation, and a quarantined pattern
 stays out as it does from a median.
 
-GPL applies to GSAS-II's code: concepts only, and any reader takes the stored format
-from a file's contents.
+GSAS-II's licence is its own (`ATTRIBUTION.md`), and this package takes concepts only from
+its code. Any reader takes the stored format from a file's contents.
 
 ## Non-goals
 

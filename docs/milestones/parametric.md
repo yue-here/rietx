@@ -51,8 +51,9 @@ the user writes, surveyed across fields on 2026-11-03.
 - An equation over a data point (TOPAS's `fit_obj`). It adds to the pattern, so it is an
   expression member of `extra_components`, and no input read needs it.
 - A TOPAS parametric reader ([2105](../wp/2105-a-topas-parametric-input-reads-in.md)),
-  moved out under the ruling above. `read_project_model` stays as it is and says what it
-  did not carry, and the agent ports the rest.
+  moved out under the ruling above. `read_project_model` stays as it is. It reports what
+  it dropped or raises naming the construct, and the agent ports from there and from the
+  input's text.
 - Parity with TOPAS's keyword list.
 - New built-in checks. 1325's next-term test and the replicate reading from #1218 are
   parked in that WP.
@@ -66,7 +67,7 @@ The documentation comes first because it needs no machinery and tells a user tod
 what they can already do. 2102 is small and removes a crash on the way in. 2103 needs
 nothing else for its verbs, and it gives 1964 the tie that the WO₃ protocol needs. 1964
 is the piece the rest stands on. 1995's penalty, 2104's equation on a cell, 2106 and 2107
-all use its grammar. 2108 stands beside 2104. 1325's two tasks stand alone and can land at any point, and the
+all use its grammar. 2108's first task needs 1964 too. 1325's two tasks stand alone and can land at any point, and the
 joint path they harden already exists. 1965 is sugar and comes last. Each WP's
 `Priority:` line outranks this paragraph.
 
@@ -94,10 +95,13 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   Al₂O₃ cell polynomials are written as text, and the cubic temperature calibration feeds
   all three. The exact gate: a preview with no fit reproduces the cells stored in the
   input at all 37 patterns to 1e-6 Å. The input's own coefficients do this to 6.6e-7 Å,
-  the printed digits. The input fixes the calibration coefficients at 0, so a second run
-  frees them. It converges and each coefficient carries an esd. TOPAS stores nothing for
-  that run, so it has no reference. The 2θ curve in `Xo` (0.0105° at 15°, zero at 54°,
-  0.0059° at 90°) joins the protocol once 2107 lands.
+  the printed digits. The input fixes the calibration coefficients at 0, so at the stored
+  values the calibration moves nothing and that gate cannot test its feed. So a second
+  preview sets them nonzero, and every cell matches a hand evaluation of the same text to
+  1e-6 Å. A synthetic ramp with known coefficients then recovers each within 2 esd. A
+  run on the real data frees them and reports the answer, with no gate, since TOPAS stores
+  nothing for it. The 2θ curve in `Xo` (0.0105° at 15°, zero at 54°, 0.0059° at 90°) and
+  each phase's six TCHZ terms join the protocol once 2107 lands.
 - **Every evaluator answers one conformance table** (1964). Each row of (expression,
   bindings, expected value or error) passes on numpy, jax and torch. A `polynomial` and
   the same form written as an expression agree to 0.01 esd.
@@ -117,15 +121,21 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
 - **An equation over a reflection is correct and safe** (2107). On a synthetic phase,
   over 12 pinned seeds, every coefficient of a width, a position and an intensity equation
   has a mean z-score under 0.5 in size, in a single fit and a joint fit. An equation that
-  is not single-valued over a Laue orbit is refused by name. Windows follow the equation,
-  and every analytic column agrees with its oracle.
-- **A structure-free phase sits beside a structural one** (2108). On a synthetic
-  two-phase pattern with one phase's intensities scrambled, the other's structure and both
-  cells are recovered within 2 esd on one pinned seed.
+  is not single-valued over a Laue orbit is refused by name, at trial coefficients as well
+  as the stored ones. Windows follow the equation, and every analytic column agrees with
+  its oracle. A term written as an equation equals its built-in twin: `y*tan(th)` against
+  `lor_strain`, a cosθ position against sample displacement, an exponential in s² (sinθ/λ
+  squared) against Biso.
+- **A sample holder fits beside the sample** (2108). On a synthetic series with a second
+  phase of scrambled intensities, over 12 pinned seeds, the first phase's structure, both
+  cells and a constant height offset between the two have a mean z-score under 0.5 in size.
+  The same fit with the second phase treated as a structure misses the truth, and the
+  fixture is built so that it does. A height offset is what the holder is there to give.
 - **GSAS-II's practice has a home** (2106). An equation in the grammar fits a
   `SeriesResult` trajectory with its esds, the coefficients carry esds, and on a synthetic
-  ramp the result agrees with the joint fit's coefficients within their combined esds. A
-  stored GSAS-II sequential equation reads in, or is refused by name.
+  ramp the result agrees with the joint fit's coefficients within their combined esds. On a
+  `.gpx` made for the test with GSAS-II, a stored sequential equation reads in, and one
+  outside the grammar is refused by name. Each arm has its test.
 - **A joint fit takes a `PlanSpec`** (2102). A spec and the `RefinementPlan` it comes from
   give bit-identical answers on `refine_multi`.
 - **An equation's target stays inside its bounds, and starts agree** (1325). The two
@@ -135,6 +145,11 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
 - **An agent ports an input from the documentation** (2101, 1964, 2103, 2107). Every
   parametric construct in the Durham inputs has a line in `switching/topas.md` or a named
   non-goal, and `switching/gsas2.md` says where GSAS-II's practice lands. A fresh agent
-  session given the manual, the skill and an input ports it, for WO₃ and for ZrP₂O₇. Its
-  answers are judged against the hand-written protocols of the rows above. That run is
-  costed and offered to the maintainer when the milestone is ready to close.
+  session given the manual, the skill and an input ports it, for WO₃ and for ZrP₂O₇. A
+  script written before the first run judges each port. The channel count and the
+  free-parameter count equal 2101's inventory of the input. A preview at the input's stored
+  values reproduces its stored cells to the bars above. Three deliberately wrong ports must
+  fail that script: a dropped per-pattern B, a term moved to the wrong phase, and a
+  calibration that never reaches the cells. The offer to the maintainer names the model
+  and the number of runs, and a pass is every run. That run is costed and offered when
+  the milestone is ready to close.

@@ -1,7 +1,7 @@
 # WP-1964 — a parametric equation the user writes
 
 Milestone: parametric · Status: ⬜
-Depends on: 1325 (the joint path, its parametric equations and its form test); 1804 (the derived block); 2103 soft (the tie the WO₃ protocol needs)
+Depends on: 1804 (the derived block); 1325 soft (the joint path, its equations and its form test have landed, and its open tasks are separate); 2103 soft (the tie the WO₃ protocol needs)
 Priority: P2 2026-11-03 — the maintainer's direction: the machinery an experienced TOPAS or GSAS-II user needs comes first, and this is the piece they cannot work around
 
 ## Goal
@@ -98,6 +98,10 @@ ships a torch module. The rejection stands on other grounds, since `parse_expr` 
 - TOPAS's functions are capitalised and case-sensitive, GSAS-II's are python's.
   Decide in the first task, on rietx's own terms. TOPAS's spellings are not accepted as
   aliases, and an agent rewrites them from the manual's table (the ruling of 2026-11-04).
+- `backend/api.py`'s `_OP_NAMES` has no `expm1` or `log1p`, and the Einstein form wants
+  the first near θ/T small. A grammar function that lands on a new op adds it to every
+  backend (root CLAUDE.md, Conventions). A frozen numpy array stays out of the left of an
+  operator against a θ-derived value.
 - A trig function's unit differs between programs. TOPAS and python use
   radians, and GSAS-II adds `sind`.
 
@@ -152,7 +156,7 @@ ships a torch module. The rejection stands on other grounds, since `parse_expr` 
   and 71.47 K over 100, with the same equations. That is a factor of 1.75 on one
   coefficient, with no esd stored in either file. WP-1325 held 125.37 K while quoting
   the 100-pattern Rwp. Well below T the Einstein term is nearly a straight line, so θ
-  and the gradient trade off (their ratios between the inputs are 1.75 and about 1.6).
+  and the gradient trade off (θ's ratio between the inputs is 1.75, and the nine gradients' ratios run 1.34-3.52).
   A proxy fit of one θ to the chain's trajectories (chain esds, no covariance between
   phases, script not in the repo) gave χ² 1370.8 at 30 K, 1372.6 at 71.47 K and 1377.7 at
   125.37 K. It ran to the lower limit on the backward chain and the upper limit on the
@@ -189,7 +193,10 @@ a polynomial. TOPAS spells that `local`. `variables` here are shared and a coord
 fixed number, so nothing can say it. An expression must be able to name a quantity that
 is free and has one value per pattern. The task below decides how it is declared. It
 enters the parameter vector as a column per pattern, and its name in the tree evaluates
-to that pattern's column.
+to that pattern's column. The seam is `SharingMap.per_histogram`, and `params/multi.py`'s
+refusal of a per-histogram coefficient has to tell this case from a mistake. The form
+tests and the equation's `evaluate` read a variable as one number, so each learns that a
+per-pattern one is an array.
 
 ### Seams
 
@@ -265,7 +272,8 @@ to that pattern's column.
   variable. An unused variable is refused.
 - [ ] **An equation feeding an equation.** A named intermediate over variables
   and coordinates, in declaration order, as ZrP₂O₇'s temperature calibration
-  needs. A cycle is refused.
+  needs. A cycle is refused. The bar uses nonzero calibration coefficients: the input
+  stores zero, where a broken feed gives the right cells.
 - [ ] **The chained column** (moved from 1325 on 2026-11-04). The target's column
   once per pattern, then through the exact ∂target/∂coefficient. A tie's coefficient
   columns each re-run `phase_peaks` today, which cost 1.48-1.52× on the Jacobian loop
@@ -298,6 +306,9 @@ to that pattern's column.
 - [ ] **A variable per pattern.** Declare it, carry it as a column per pattern, and let
   an expression read it (§ A variable per pattern). The test is Stinton & Evans's first
   method on a synthetic ramp: a ΔT per pattern through two phases' cell equations.
+- [ ] **A shared coefficient's interval.** `profile_interval`, or a documented script,
+  whichever the measurement above chooses. Moved from 2103 to break a cycle between the
+  two WPs.
 - [ ] **Real data.** The WO₃ Einstein equations and the ZrP₂O₇ calibration, local
   only, each against the TOPAS input's own answer under its protocol. The bars are
   in [the milestone's Acceptance](../milestones/parametric.md#acceptance).
@@ -310,9 +321,12 @@ to that pattern's column.
 ## Acceptance
 
 The bar: on the synthetic order-parameter ramp, the interval the measurement task
-chooses covers the true T_c and β in at least 90 of 100 seeds, and the declared
-equation matches a chain's trajectory. Every conformance row passes on numpy, jax and torch. A `polynomial`
-and the same form written as an expression agree to 0.01 esd.
+chooses covers the true T_c and β in 90 to 99 of 100 seeds. The upper limit fails an
+inflated interval. The declared equation matches a chain's trajectory. Every conformance
+row passes on numpy, jax and torch, in a `[dev,jax,torch]` venv, since the torch rows
+skip themselves in `[dev]`. A `polynomial` and the same form written as an expression
+agree to 0.01 esd. On a synthetic ramp, over 12 pinned seeds, a per-pattern ΔT and the
+shared coefficients it feeds have a mean z-score under 0.5 in size.
 
 ```sh
 .venv/bin/python -m pytest tests/test_parametric_series.py tests/test_derived_block.py tests/test_cross_backend.py
@@ -336,6 +350,11 @@ and the same form written as an expression agree to 0.01 esd.
 
 ## Handover log
 
+- **2026-11-04 (second review)** — A second clean-context review tested the plan against
+  the code and the local inputs. It gave the agent-port row a pass and a fail, fixed a
+  ZrP₂O₇ gate that could not test the calibration feed, and found two constructs with
+  no owner, now in 2107 and 2108. The interval task moved here from 2103 to break a
+  cycle. Next: unchanged, 2101 and 2102, then this WP's first task.
 - **2026-11-04 (the ruling on TOPAS)** — The maintainer ruled that the machinery stands
   on its own terms and an agent ports what does not import. So this grammar takes no
   TOPAS aliases, and 2105 left the milestone. Stinton & Evans (2007) is now read. It

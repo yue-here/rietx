@@ -66,8 +66,8 @@ root (root CLAUDE.md § Licensing).
 ## Tasks
 
 - [ ] Decide how `_arith` and `affine_of` relate to the grammar, and write it here.
-- [ ] Inventory the constructs across both inputs, each marked read, reported or
-  refused. Bring anything a reader cannot say honestly to the handover.
+- [ ] Mark each construct in 2101's inventory read, reported or refused. Bring anything a
+  reader cannot say honestly to the handover.
 - [ ] Macro expansion: decide between a small expander for `#list` and `#define` and
   reading a `topas.log`.
 - [ ] Lower TOPAS's expression spelling to the grammar, with a table of each rewrite.
