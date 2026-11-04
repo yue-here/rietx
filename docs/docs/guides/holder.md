@@ -99,7 +99,7 @@ Each lies within 1.5 esd of the value it was made with.
 
 ## Read what the fit reports
 
-The fit reports [`EXTRA_PEAK_ON_REFLECTION`](../reference/diagnostics-refinement.md#extra_peak_on_reflection) when a declared peak ends within {{ LAYER0_MATCH_TOL_DEG }}° of a reflection the model predicts:
+The fit reports [`EXTRA_PEAK_ON_REFLECTION`](../reference/diagnostics-corrections.md#extra_peak_on_reflection) when a declared peak ends within {{ LAYER0_MATCH_TOL_DEG }}° of a reflection the model predicts:
 
 ```{literalinclude} ../../../examples/guides/holder.py
 :language: python
@@ -167,7 +167,7 @@ The steel line on the other pattern refined inside its bounds, with an area elev
 `EXTRA_PEAK_NO_INTENSITY` stays silent, because the area did not reach zero.
 
 A peak declared over empty background refines to zero area.
-Declared at 60° on this pattern, it reports [`EXTRA_PEAK_NO_INTENSITY`](../reference/diagnostics-refinement.md#extra_peak_no_intensity).
+Declared at 60° on this pattern, it reports [`EXTRA_PEAK_NO_INTENSITY`](../reference/diagnostics-corrections.md#extra_peak_no_intensity).
 At zero area nothing fixes the centre, so the centre and its esd are not measurements.
 
 `result.identifiability.extra_peak_absorption` gives, for each structural parameter, the fraction of its effect on the pattern that the declared peaks could reproduce.

@@ -441,7 +441,7 @@ The block replaces it: the width reads zero for `lor_strain` while a block is de
 
 σ²(M) ≥ 0 couples all fifteen coefficients, so it cannot be a bound.
 The default solver holds it as a linear inequality.
-Under `solver="trf"`, and in a joint fit, [`STEPHENS_STRAIN_NOT_POSITIVE`](diagnostics-refinement.md#stephens_strain_not_positive) reports where it fails.
+Under `solver="trf"`, and in a joint fit, [`STEPHENS_STRAIN_NOT_POSITIVE`](diagnostics-corrections.md#stephens_strain_not_positive) reports where it fails.
 
 ### March-Dollase preferred orientation
 
