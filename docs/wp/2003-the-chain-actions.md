@@ -316,6 +316,12 @@ summary).
 
 ## Handover log
 
+- **2026-11-04** — The sixth session past midnight. CI on Linux x86-64 py3.11 failed the flat
+  X-ray plus neutron pin added in `d8f0da7` (background constant 2931.21 against 1.0, twice), so
+  `223a2f7` withdraws it and corrects the release note. The cause is a phase whose broadened peaks
+  stand in for a flat background; it is recorded under the sixth session's *Measured* and is Next
+  item 4b. No other change.
+
 ### 2026-11-03 (sixth session) — the batch ruled and landed but for C8, C11, C2's rung tiers and C10 q1
 
 The maintainer ruled the whole batch today, and most of it is now in the code. A series no
