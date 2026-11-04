@@ -1,6 +1,6 @@
 # WP-1944 — the structural plan frees extinction only where it says it does
 
-Milestone: unscheduled · Status: 🔄 2026-11-04 — option A built, PR #1391 in review
+Milestone: unscheduled · Status: 🔄 2026-11-04 — option A built; PR #1391 ready for review, two questions for the maintainer
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-11 — a plan frees a parameter its description says it leaves alone, and the esd shows the data cannot see it; nothing fires
@@ -119,6 +119,52 @@ with one phase declared and one not.
   (`model/extinction.py` carries the full list).
 
 ## Handover log
+
+### 2026-11-04 (2nd session) — merged with main, review fixes, PR #1391 ready
+
+The branch now sits on current main and is up for review as PR #1391. The
+code review's fixes move one quoted number: the skill's diagnostics row
+now gives NAC's score as 8.1, the value this file's table already held,
+in place of 4.4. A second defect the
+review found predates this WP and is filed as WP-2088: assigning a
+parameter to a field that declares a range drops the range. This WP's own
+opt-in follow-up is renumbered WP-2087, because PR #1406 claims 2086.
+
+*Done.* `1e50a6f01`: the code review's six accepted fixes (an assigned
+`Parameter` or dict for `extinction` inherits min, max and unit in
+`Phase._declare_extinction`; partner columns move θ through
+`table.decode`, so a rigid body or distortion mode is one column; the
+partner pattern covers every atom parameter; only the phases a column
+reaches are re-evaluated; dead checks removed). Declined: a threshold
+constant of its own, which is the maintainer's question. `4e1ef2dbc`:
+origin/main merged (182 commits). Main had split the refinement
+diagnostics page too (Stages and plans, Background selection); both
+splits are kept, with Corrections beside them. WP-2088 filed.
+
+*Measured.* Fast selection on the merged tree (worktree `.venv` `[dev]`,
+darwin arm64, Python 3.12, `-n auto`, through the ghostshift serial
+lock): 2 failed, 13 809 passed, 319 skipped, 36 xfailed in 715 s. The
+two reds were `test_skill_cli`'s committed-copy drift after the merge,
+re-synced in `b108e1a72`; that file with `test_skill.py` and
+`test_docs_consistency.py` then gave 212 passed. The four added tests
+cost 1.72 s together, all in `test_extinction.py`, 1.64 s of it
+`test_an_undeclared_extinction_the_strong_lines_ask_for_is_named`.
+`tests.reader_output` exits 0 against the merge-base: the standard LaB6
+fit frees no extinction and the new warning stays silent there.
+Plots of the qpa guide (undeclared, Rwp 0.0884; CaF₂ declared, Rwp
+0.0828) and the hump guide's Si fit (Biso 0.4245 ± 0.0116, Rwp 0.1165)
+match the re-pinned numbers. In the qpa zoom the CaF₂ line near 7.5°
+is calculated slightly above observed, the signature the pointer
+scores at 14.6, under its gate. The Si fit's largest residual sits on
+its strongest line with observed above calculated, the opposite sign
+to extinction. The full selection did not run. This session changed a
+diagnostic and merged main, and the acceptance suites run in the
+nightly job once the branch lands.
+
+*Next:* the maintainer reviews PR #1391 and answers its two questions:
+`EXTINCTION_UNDECLARED` at tier 3 with grounds and an approval, and a
+threshold of its own or the air-scatter 25. Either is a row edit in
+`_audit.py`. Then WP-2087, starting with the Stephens action.
 
 - **2026-11-04** — extinction is now off unless a phase declares it, and a fit
   says when a phase's strongest lines ask for it. The structural plan no
