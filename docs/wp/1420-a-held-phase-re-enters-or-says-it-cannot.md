@@ -1,6 +1,6 @@
 # WP-1420 — a held phase re-enters, or the chain says it cannot
 
-Milestone: unscheduled · Status: 🔄 2026-11-04 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-04 — docs landed (#1401); tasks 2-5 wait on #1402
 Track: A long run is not one fit
 Depends on: — (1301 shipped, the hold this is about; 1333 soft, the same
 chain's other silent shape; 1342 soft, the freeze's blind tie; 1419 soft,
@@ -370,6 +370,96 @@ series golden is bit-identical.
   a bet), WP-1043 (never a confident singleton), WP-1333, WP-1342, WP-1419.
 
 ## Handover log
+
+- **2026-11-04** — **The hold no longer takes part; the saddle does, and
+  the docs now say how to beat it.** Re-running the issue's construction on
+  today's tree, across seven noise draws, showed that no chain holds the
+  subgroup once it is present, so the deadlock this WP was written around is
+  gone. What remains is the identity-point start, and it is worse than the
+  WP's table said. A fit started there lands on the wrong side every time,
+  whichever sign the true distortion has, and in most series both chain
+  directions agree on that wrong side, so the path-dependence check is
+  silent. Two fits, started either side of the identity point, with the lower
+  Rwp kept, always chose the true side. That recipe is now in the series
+  guide and the skill, and a test pins it for both signs. The finding and
+  the probe rung were not built: their trigger, a held phase with Rwp
+  rising, fires in none of the 42 chains. What they should be keyed on
+  instead is a question for the maintainer, filed as issue #1402. PR #1401.
+  *Done:* Inherited was pruned. The five ramp-guard notes are discharged,
+  since the guard is now 300 s. The WP-1523 threshold note was shortened, and
+  the skill-cap note was re-measured. § Context gained a dated "superseded in
+  part" paragraph. Task 1 landed as `guides/series.md` § Start a subgroup
+  off its parent's cell. It could not go in `reference/series.md`, which
+  sits 45 characters under its 50 000-character page cap
+  (`tests/test_manual.py`). The skill row sits in `references/series.md` by
+  the `SEQUENTIAL_RESEED` row. It paid for itself by rewriting the
+  "`fit()` is all-or-nothing" paragraph, stale since WP-1333 made
+  `on_error="carry"` the default (34 570 → 34 460 B, budget 34 600). New
+  test: `tests/test_identity_point_seed.py`, 6 items: three tests × two true
+  signs, at the 0.15 case, one draw, two cold fits each, with PNGs written to
+  `tests/output/`. New: `tests/repro_1420.py` (`cold`/`chains`,
+  `--sign`, `--start`), which re-runs every count below from the test's
+  construction. Those counts were re-run from it and reproduced exactly.
+  *Measured* (`[dev]`, darwin arm64, `dd55ec4f` + this branch, draws 20260904
+  and 1–6, fractions 0.15/0.25/0.40, start at the identity point unless
+  stated):
+  - The subgroup was held at or after onset in 0 of 42 chains.
+  - Wrong side at p004–p007: 17 of 21 forward chains and 21 of 21 backward
+    ones.
+  - Both directions agreed on the wrong side in 17 of 21 series, and none
+    of those 17 had a `SEQUENTIAL_PATH_DEPENDENT` on `phases.1.cell.*`.
+  - Cold single fit of p004/p007 from the identity point: wrong side in 42
+    of 42, and in 42 of 42 again with the true sign reversed.
+  - Cold fits from ±2e-3 (the construction's `tet`): each kept its side in
+    42 of 42 per sign, and the lower Rwp was the true side in 84 of 84.
+    The wrong side's Rwp was 1.017–1.034×, 1.053–1.077× and 1.139–1.171× the
+    true side's.
+  - The two starts handed to a forward chain's first pattern: both sides
+    kept in 10 of 21 series, and the lower Rwp was the true side in 13 of 21.
+  - Gates at `24c69cde`: fast suite 13759 passed, 318 skipped, 34 xfailed
+    (`[dev]`, darwin arm64, via serial.py; +6 items from the new test). The
+    docs, skill and manual files: 319 passed. Vale: 0 errors.
+    `tests.reader_output` exit 0 (unchanged). No fit number moves (docs and
+    tests only), so the full suite was not run.
+  *Review* (`/code-review high --fix`): 10 findings, 5 fixed by the review
+  itself. Those five: an `xdist_group` mark, `Dispersion()` declared, dead
+  `vary`/`transform` keywords removed, and a pointer that said "below" when
+  it meant "above". Three more were fixed here: the "data do not choose"
+  claim, contradicted by the sign-reversed run; a `LinAlgError` sentence
+  that read as contradicting the 1846-pair claim, now re-attributed; and a
+  one-draw observation stated for all 21 series, now scoped. The missing
+  probe scripts became `tests/repro_1420.py`. One was declined: sharing
+  `test_phase_significance.RIDGE_PLAN` would tie this test's protocol to
+  another file's constant, and the helpers differ (background, strain).
+  *Generality* (judge, item: the two-start rule as skill and guide prose):
+  verdict **weak** on generality, strong on its one construction. Its
+  conditions: a negative-truth run, which is done (84 of 84); the scripts
+  committed, which is done; and the skill row narrowed to a one-direction
+  distortion with two distinct sides, "untested beyond it", which is done.
+  Still open from it: one family only, a second unrelated parent–subgroup
+  pair or a smaller fraction (0.05) unmeasured, and no outside source for
+  the multi-start remedy beyond generic least-squares practice. Its note
+  that domain-equivalent sides (a↔b) give equal Rwp is now in the guide.
+  *Not done, and why:* tasks 2–5, which are the question in #1402. Its
+  options: (A) retire them as written; (B) key the finding, and then the
+  probe, on a starting cell at a metric symmetry point, which needs
+  WP-1419's `MetricConstraints` (in flight under another runner, so its file
+  was not edited from here); (C) build the held-run finding for real data at
+  a tier-3 threshold. The recommendation is A, then B once 1419 lands. The
+  task-3 run on a real held-phase series was not made, because the series is
+  in the private corpus. The 2026-10-13 Inherited item (`cherry_pick` and
+  `run_stage` replaying a stage without its hold reading) is untouched.
+  *Gotchas:* the manual moved: `using/series.md` is now
+  `docs/docs/{guides,reference}/series.md`, and the reference page is full.
+  Vale reads `R<sub>wp</sub>` as the word "wp" and does not know "fcc" or
+  "bct", so the prose spells those out.
+  *Handover in progress (context limit):* `/wp-handover` was run through
+  step 7. Still to do: steps 10–11 (session_start check, then the PR body
+  written from this entry, `gh pr ready` on #1401). PR #1401 is still a
+  draft.
+  *Next:* the maintainer's ruling on #1402. If it is B, wait for 1419's
+  metric symmetry point, then build the start-state finding with the
+  two-start suggestion, then the probe, keyed on a present pattern.
 
 - **2026-10-03** — **The ramp test's timeout is 300 s.** This WP's own
   commit from 2026-09-30 had widened it and was never pushed; a cleanup
