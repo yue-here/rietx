@@ -118,6 +118,9 @@ def _state_srm660c():
                     biso=rx.Parameter(value=0.276, min=0.0, max=25.0)),
         ],
         scale=rx.Parameter(value=1e-4, min=0.0, transform="softplus"),
+        # declared at its off-value, as the default was before WP-1944 made
+        # it opt-in, so the golden and the freed extinction column stand
+        extinction=0.0,
     )])
     instrument = rx.Instrument.bragg_brentano(monochromator_two_theta=26.6)
     instrument.source.dispersion = None   # declined, not inherited — see _toy_base
