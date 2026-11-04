@@ -9,23 +9,35 @@ import {
   largestStep,
   markedFlags,
   markOf,
+  esdText,
+  gapLine,
   rankTrajectories,
+  rejectedBecause,
+  rungNote,
   sortByX,
   stepTo,
   traceData,
   traceKey,
   traceText,
+  stepCells,
+  stepRows,
+  topGapPath,
   trajectoryLegend,
   trajectoryMarks,
   trajectoryNote,
+  unrecoveredFlags,
+  type DirectionGap,
+  type GapAt,
   type LegendEntry,
+  type SeriesEntry,
+  type SeriesStep,
   type SeriesPattern,
   type Trace,
   type Trajectory,
 } from "./series";
 
 /** A served trace (`rietx.gui.series.trace`): a reseed at 1, a failure at 2,
- *  a pattern above the fence at 3 that also carries a code no row names. */
+ *  a pattern unrecovered at 3 that also carries a code no row names. */
 const trace = (): Trace => ({
   x_label: "T",
   points: [
@@ -37,13 +49,13 @@ const trace = (): Trace => ({
     { index: 2, label: "T320", x: null, status: "failed", rwp: null,
       marks: ["SERIES_PATTERN_FAILED"], findings: [] },
     { index: 3, label: "T330", x: 330, status: "converged", rwp: 0.2,
-      marks: ["SEQUENTIAL_RWP_OUTLIER", "SOME_FUTURE_CODE"],
+      marks: ["SEQUENTIAL_UNRECOVERED", "SOME_FUTURE_CODE"],
       findings: [{ code: "PHASE_UNCONSTRAINED", level: "warning" }] },
   ],
   largest_steps: { "phases.0.cell.a": { indices: [2, 3], size_esd: 40, cold_ratio: null } },
   vocabulary: [
     ["SERIES_PATTERN_FAILED", "bar", "failed"], ["SEQUENTIAL_UNRECOVERED", "cross", "unrecovered"],
-    ["SEQUENTIAL_RWP_OUTLIER", "square", "above the fence"], ["SEQUENTIAL_RESEED", "ring", "reseeded"],
+    ["SEQUENTIAL_RESEED", "ring", "reseeded"],
     ["findings", "count", "findings"], ["largest_step", "band", "largest step"],
   ].map(([key, mark, label]) => ({ key, mark, label, source: "", means: "" })),
   other_mark: "tick",
@@ -57,8 +69,12 @@ const member = (over: Partial<SeriesPattern> = {}): SeriesPattern => ({
 const traj = (over: Partial<Trajectory> = {}): Trajectory => ({
   path: "phases.0.cell.a", x: [300, 400, 500], x_label: "T",
   value: [4.1, 4.2, 4.3], stderr: [1e-4, null, 1e-4],
-  labels: ["a", "b", "c"], path_dependent: false, discontinuous: false,
-  backward: null, n_sigma: null, ...over,
+  labels: ["a", "b", "c"], backward: null, n_sigma: null, gap_at: null, ...over,
+});
+
+/** A gap's place, with both chains on the same rung unless the test says not. */
+const at = (over: Partial<GapAt> = {}): GapAt => ({
+  label: "b", index: 1, forward_rung: "warm", backward_rung: "warm", ...over,
 });
 
 
@@ -95,71 +111,152 @@ describe("the staged list", () => {
 });
 
 describe("ranking trajectories", () => {
-  it("puts the path-dependent first, then the discontinuous, then by σ", () => {
+  it("ranks by the gap, largest first, with no threshold", () => {
+    // a 0.4 esd gap is listed in its place and a 5.2 esd one is not "flagged":
+    // the record states the number for every parameter (WP-2003, C5)
     const rows = [
-      traj({ path: "quiet" }),
-      traj({ path: "jump", discontinuous: true }),
-      traj({ path: "unstable.small", path_dependent: true, n_sigma: 3.4 }),
-      traj({ path: "unstable.big", path_dependent: true, n_sigma: 11.2 }),
+      traj({ path: "small", n_sigma: 0.4 }),
+      traj({ path: "big", n_sigma: 11.2 }),
+      traj({ path: "middle", n_sigma: 3.4 }),
     ];
-    expect(rankTrajectories(rows).map((t) => t.path)).toEqual([
-      "unstable.big", "unstable.small", "jump", "quiet"]);
+    expect(rankTrajectories(rows).map((t) => t.path)).toEqual(
+      ["big", "middle", "small"]);
     // the input is untouched: the panel's select and its plot read the same list
-    expect(rows.map((t) => t.path)).toEqual(
-      ["quiet", "jump", "unstable.small", "unstable.big"]);
+    expect(rows.map((t) => t.path)).toEqual(["small", "big", "middle"]);
   });
 
-  it("does not rank a null σ as agreement", () => {
-    // `n_sigma: null` is where the fence itself abstains (no esd in either
-    // chain), so it must not outrank a measured small disagreement *or* be
-    // treated as a large one
-    const rows = [traj({ path: "unknown", path_dependent: true, n_sigma: null }),
-                  traj({ path: "measured", path_dependent: true, n_sigma: 4 })];
+  it("does not rank a null gap as agreement", () => {
+    // `n_sigma: null` is where the record has no gap in esds (a chain gave no
+    // esd, or the path is relative), so it must neither outrank a measured
+    // small gap nor be taken for a large one
+    const rows = [traj({ path: "unknown", n_sigma: null }),
+                  traj({ path: "measured", n_sigma: 0.2 }),
+                  traj({ path: "agrees", n_sigma: 0 })];
     expect(rankTrajectories(rows).map((t) => t.path)).toEqual(
-      ["measured", "unknown"]);
+      ["measured", "agrees", "unknown"]);
   });
 
-  it("leaves the unflagged in the series' own order", () => {
-    // Found in a browser: on a clean ramp nothing is flagged and every distance
-    // is under 5e-4 σ, so ranking the unflagged ones by σ too ordered fifteen
-    // parameters by noise and put the cell edge eighth.
+  it("keeps the series' own order among equal gaps and among the absent", () => {
+    // The record writes a gap under the trajectory's noise floor as exactly 0,
+    // so a clean ramp's parameters tie and the cell edge stays where the
+    // series put it, which ranking by noise did not (found in a browser).
     const rows = [
-      traj({ path: "phases.0.cell.a", n_sigma: 4.3e-4 }),
+      traj({ path: "phases.0.cell.a", n_sigma: 0 }),
       traj({ path: "phases.0.scale", n_sigma: 0 }),
-      traj({ path: "instrument.zero_shift", n_sigma: 3.2e-4 }),
+      traj({ path: "instrument.zero_shift", n_sigma: 0 }),
       traj({ path: "qpa.LaB6", n_sigma: null }),
+      traj({ path: "qpa.CaF2", n_sigma: null }),
     ];
     expect(rankTrajectories(rows).map((t) => t.path)).toEqual(
-      ["phases.0.cell.a", "phases.0.scale", "instrument.zero_shift", "qpa.LaB6"]);
-    // …and a flagged one still jumps the queue from wherever it was
-    const flagged = [...rows];
-    flagged[2] = traj({ path: "instrument.zero_shift", path_dependent: true,
-                        n_sigma: 5.2 });
-    expect(rankTrajectories(flagged)[0].path).toBe("instrument.zero_shift");
+      ["phases.0.cell.a", "phases.0.scale", "instrument.zero_shift",
+       "qpa.LaB6", "qpa.CaF2"]);
+    // …and one with a size comes ahead of the ties from wherever it was
+    rows[2] = traj({ path: "instrument.zero_shift", n_sigma: 5.2 });
+    expect(rankTrajectories(rows)[0].path).toBe("instrument.zero_shift");
   });
 });
 
-describe("what a trajectory says about itself", () => {
-  it("names the order-dependence, with the magnitude, when it is flagged", () => {
-    const note = trajectoryNote(
-      traj({ path_dependent: true, n_sigma: 5.2 }), 3);
-    expect(note).toContain("5.2σ");
-    expect(note).toContain("over 3σ");
-    expect(note).toContain("not\n    determined by the data alone".replace(/\s+/g, " "));
+describe("the gap in words", () => {
+  const gap = (over: Partial<DirectionGap> = {}): DirectionGap => ({
+    path: "phases.0.cell.a", label: "T500", index: 2, forward: 4.16,
+    backward: 4.161, gap: -0.001, gap_esd: -4.2, forward_rung: "warm",
+    backward_rung: "warm", ...over,
   });
 
-  it("says the chains agree only when both were run", () => {
-    expect(trajectoryNote(traj(), 3)).toBe("");
-    expect(trajectoryNote(traj({ backward: [1, 2, 3] }), 3))
-      .toContain("agree within their esds");
+  it("prints a size in esds without rounding a real gap to nothing", () => {
+    expect(esdText(4.23)).toBe("4.2");
+    expect(esdText(-4.23)).toBe("4.2");
+    expect(esdText(0)).toBe("0");
+    expect(esdText(0.04)).toBe("<0.1");
   });
 
-  it("names a discontinuity as two possibilities, never one", () => {
-    const note = trajectoryNote(traj({ discontinuous: true }), 3);
-    expect(note).toContain("specimen changed");
-    expect(note).toContain("chain failed");
+  it("states the gap as a number with its place and asserts no verdict", () => {
+    const note = trajectoryNote(traj({ backward: [1, 2, 3], n_sigma: 4.2,
+                                       gap_at: at({ label: "c" }) }));
+    expect(note).toContain("differ by 4.2 esd at c");
+    expect(note).not.toMatch(/path-dependent|artefact|agree/i);
   });
 
+  it("says nothing where no chain ran, and says what is missing where one did", () => {
+    expect(trajectoryNote(traj())).toBe("");
+    expect(trajectoryNote(traj({ backward: [1, 2, 3] })))
+      .toContain("no gap in esds for this parameter");
+  });
+
+  it("says the gap measures the ladder where the two chains kept different rungs", () => {
+    expect(rungNote(at())).toBe("");
+    expect(rungNote(null)).toBe("");
+    const differ = at({ label: "T500", forward_rung: "warm", backward_rung: "cold" });
+    expect(rungNote(differ)).toContain("forward chain kept the warm attempt");
+    expect(rungNote(differ)).toContain("backward chain the cold one");
+    expect(rungNote(differ)).toContain("escalation ladder");
+    // and it reaches the caption and the panel's line, not only the helper
+    const note = trajectoryNote(traj({ backward: [1, 2, 3], n_sigma: 4.2, gap_at: differ }));
+    expect(note).toContain("escalation ladder");
+    expect(gapLine([gap({ forward_rung: "warm_staged", backward_rung: "cold" })]))
+      .toContain("escalation ladder");
+    expect(gapLine([gap()])).not.toContain("ladder");
+  });
+
+  it("opens the panel's line with the largest gap in the record", () => {
+    // the record lists the largest first; `None` sorts after every number
+    const rows = [gap({ path: "phases.0.scale", gap_esd: null }),
+                  gap({ gap_esd: -4.2 }), gap({ path: "x", gap_esd: 1 })];
+    expect(gapLine(rows)).toContain("differ by 4.2 esd at most, in phases.0.cell.a at T500");
+    expect(topGapPath(rows)).toBe("phases.0.cell.a");
+  });
+
+  it("is silent where the comparison did not run, and explains where it ran blind", () => {
+    expect(gapLine(null)).toBe("");
+    expect(gapLine(undefined)).toBe("");
+    expect(topGapPath(null)).toBeNull();
+    expect(gapLine([gap({ gap_esd: null })])).toContain("no gap could be put in esds");
+    expect(topGapPath([gap({ gap_esd: null })])).toBeNull();
+  });
+
+});
+
+describe("the steps between neighbouring patterns", () => {
+  const step = (over: Partial<SeriesStep> = {}): SeriesStep => ({
+    path: "phases.0.cell.a", labels: ["T300", "T400"], indices: [0, 1],
+    step: 0.0021, size_esd: 21, cold_ratio: null, ...over,
+  });
+  // the record's order: largest |size_esd| first, no size last
+  const record = [
+    step({ size_esd: -40, step: -0.004 }),
+    step({ path: "phases.0.scale", size_esd: 9 }),
+    step({ labels: ["T400", "T500"], indices: [1, 2], size_esd: 2 }),
+    step({ labels: ["T500", "T600"], indices: [2, 3], size_esd: null }),
+  ];
+
+  it("keeps the record's order and filters to a parameter", () => {
+    // largest first is the record's own order; a second sort here could disagree
+    expect(stepRows(record, "phases.0.cell.a").rows.map((s) => s.size_esd))
+      .toEqual([-40, 2, null]);
+    expect(stepRows(record, null).rows.map((s) => s.path))
+      .toEqual(["phases.0.cell.a", "phases.0.scale", "phases.0.cell.a", "phases.0.cell.a"]);
+  });
+
+  it("caps the rows and says how many there were", () => {
+    const { rows, total } = stepRows(record, null, 2);
+    expect(rows.length).toBe(2);
+    expect(total).toBe(4);
+    expect(stepRows(null, null)).toEqual({ rows: [], total: 0 });
+    expect(stepRows(undefined, "x")).toEqual({ rows: [], total: 0 });
+  });
+
+  it("prints a signed step and size, and a dash where there is no esd", () => {
+    expect(stepCells(record[0])).toEqual({
+      between: "T300 → T400", step: "−0.004", esd: "−40.0", cold: "—" });
+    expect(stepCells(record[1]).esd).toBe("+9.0");
+    // no esd, no size: 0 would read as one
+    expect(stepCells(record[3]).esd).toBe("—");
+    expect(stepCells(step({ cold_ratio: 0.9876 })).cold).toBe("0.99");
+    expect(stepCells(step({ cold_ratio: -0.3 })).cold).toBe("-0.30");
+  });
+});
+
+describe("a trajectory's axis title", () => {
   it("titles a QPA trajectory as a weight percentage", () => {
     expect(axisTitle(traj({ path: "qpa.corundum" }))).toBe("corundum (wt %)");
   });
@@ -196,14 +293,13 @@ describe("the legend", () => {
       .toEqual(["forward"]);
   });
 
-  it("names the flagged trajectory, in the warning ink and dashed", () => {
-    const [forward] = trajectoryLegend(traj({ path_dependent: true }));
-    expect(forward).toEqual({ id: "forward", label: "forward (path-dependent)",
-                              ink: "--warn", mark: "dash" });
-    // …and the plain one is not shouting
-    const [plain] = trajectoryLegend(traj());
-    expect(plain).toEqual({ id: "forward", label: "forward", ink: "--plot-diff",
-                            mark: "line" });
+  it("draws the forward chain in one ink whatever its gap is", () => {
+    // no parameter is called path-dependent, so none wears a warning ink
+    for (const n_sigma of [null, 0, 40]) {
+      const [forward] = trajectoryLegend(traj({ n_sigma }));
+      expect(forward).toEqual({ id: "forward", label: "forward", ink: "--plot-diff",
+                                mark: "line" });
+    }
   });
 
   it("offers the backward chain only when there is one", () => {
@@ -222,17 +318,6 @@ describe("the legend", () => {
     expect(ids(trajectoryLegend(traj(), { rings: [false, false, false],
                                           crosses: [false, false, false] })))
       .toEqual(["forward", "esd"]);
-  });
-
-  it("boxes a point above the fence, named as the trace's vocabulary names it", () => {
-    // WP-1469: `plot_trajectory` boxes such a point, and the panel drew only
-    // rings and crosses, so one series read two ways in the two renderers
-    const t = trace();
-    t.vocabulary = t.vocabulary.map((r) => (r.key === "SEQUENTIAL_RWP_OUTLIER"
-      ? { ...r, label: "over the fence" } : r));
-    const rows = trajectoryLegend(traj(), { squares: [false, false, true] }, t);
-    expect(rows.at(-1)).toEqual({ id: "squares", label: "over the fence",
-                                  ink: "--warn", mark: "square" });
   });
 
   it("offers a member's masked points only when the protocol masked any", () => {
@@ -273,7 +358,7 @@ describe("the trace", () => {
     // the codes are an open vocabulary: a new fence is drawn, never dropped
     const d = traceData(trace());
     expect(d.index).toEqual([0, 1, 2, 3]);
-    expect(d.marks).toEqual([[], ["ring"], ["bar"], ["square", "tick"]]);
+    expect(d.marks).toEqual([[], ["ring"], ["bar"], ["cross", "tick"]]);
     expect(d.findings).toEqual([0, 2, 0, 1]);
     expect(d.y).toEqual([300, 310, null, 330]);
     expect(markOf(trace(), "SOME_FUTURE_CODE")).toBe("tick");
@@ -287,7 +372,7 @@ describe("the trace", () => {
 
   it("keys only what this series uses, an unknown code named by itself", () => {
     const keys = (path: string | null) => traceKey(trace(), path).map((r) => r.key);
-    expect(keys(null)).toEqual(["SERIES_PATTERN_FAILED", "SEQUENTIAL_RWP_OUTLIER",
+    expect(keys(null)).toEqual(["SERIES_PATTERN_FAILED", "SEQUENTIAL_UNRECOVERED",
                                 "SEQUENTIAL_RESEED", "findings", "SOME_FUTURE_CODE"]);
     // the band belongs to the parameter on show, so it is keyed only with one
     expect(keys("phases.0.cell.a")).toContain("largest_step");
@@ -322,8 +407,71 @@ describe("the trace", () => {
     // alignment would ring the wrong point
     const partial = traj({ labels: ["T310", "T330"], x: [310, 330],
                            value: [4.2, 4.3], stderr: [null, null] });
-    expect(trajectoryMarks(partial, trace())).toEqual({
-      rings: [true, false], crosses: [false, false], squares: [false, true] });
+    const row = (label: string, index: number): SeriesEntry => ({
+      index, label, x: null, status: "converged", statistics: { rwp: 0.1, gof: 1 },
+      n_iterations: 1, reseeded: false, rwp_warm: null, rung: "warm",
+      rungs_tried: ["warm"], node_id: null, tree_id: null, diagnostics: [] });
+    // rings come from the trace's verdicts, crosses from the server's `rejected`
+    // by position (T300, T310, T330 have entries; T320 failed)
+    const rows = [row("T300", 0), row("T310", 1), row("T330", 3)];
+    expect(trajectoryMarks(partial, trace(), rows, [false, false, true])).toEqual({
+      rings: [true, false], crosses: [false, true] });
     expect(markedFlags(partial, null, "SEQUENTIAL_RESEED")).toEqual([false, false]);
+  });
+});
+
+describe("matching the rejection flags to a trajectory", () => {
+  const entries = (over: Array<Partial<SeriesEntry>>): SeriesEntry[] =>
+    over.map((o, i) => ({
+      index: i, label: `p${i}`, x: null, status: "converged",
+      statistics: { rwp: 0.1, gof: 1 }, n_iterations: 1, reseeded: false,
+      rwp_warm: null, rung: "warm", rungs_tried: ["warm"], node_id: null,
+      tree_id: null, diagnostics: [], ...o,
+    }));
+
+  it("marks what the library rejected, not only what diverged", () => {
+    // `rejected` is the server's answer from the chain's own quarantine test:
+    // diverged, or carrying an error-level code. A fit that converged under
+    // MODEL_FAR_FROM_DATA is quarantined and must be marked, and a status read
+    // would have missed it (WP-2003, C2 q5).
+    const error = { level: "error", code: "MODEL_FAR_FROM_DATA", message: "far" };
+    const rows = entries([{}, { status: "diverged" },
+                          { status: "converged", diagnostics: [error] }]);
+    const rejected = [false, true, true];
+    expect(unrecoveredFlags(traj({ labels: ["p0", "p1", "p2"] }), rows, rejected))
+      .toEqual([false, true, true]);
+    // the panel derives nothing: a diverged status the server did not reject
+    // (no `rejected` row) is not marked here
+    expect(unrecoveredFlags(traj({ labels: ["p0", "p1", "p2"] }), rows, []))
+      .toEqual([false, false, false]);
+  });
+
+  it("matches the rejection on the entry's index when a trajectory skips patterns", () => {
+    const rows = entries([{ label: "p0" }, { label: "p1" }, { label: "p2" }]);
+    const partial = traj({ labels: ["p1", "p2"], x: [400, 500], value: [4.2, 4.3],
+                           stderr: [null, null] });
+    expect(unrecoveredFlags(partial, rows, [true, false, true])).toEqual([false, true]);
+  });
+
+  it("reads `rejected` by position when a pattern that raised left no entry", () => {
+    // pattern 1 raised, so the entries are indices 0 and 2 and the server's
+    // `rejected` has two rows; reading it by index would look past the end
+    const rows = entries([{ label: "p0" }, { label: "p2" }]);
+    rows[1].index = 2;
+    expect(unrecoveredFlags(traj({ labels: ["p0", "p2"] }), rows, [false, true]))
+      .toEqual([false, true]);
+  });
+
+  it("names what made the library reject a fit, from the entry's own fields", () => {
+    const error = (code: string) => ({ level: "error", code, message: "m" });
+    const warn = { level: "warning", code: "BOUND_HIT", message: "m" };
+    expect(rejectedBecause(entries([{ status: "diverged" }])[0]))
+      .toBe("the solver diverged");
+    expect(rejectedBecause(entries([{ diagnostics: [warn, error("MODEL_FAR_FROM_DATA")] }])[0]))
+      .toBe("it carries the error-level code MODEL_FAR_FROM_DATA");
+    expect(rejectedBecause(entries([{ status: "diverged",
+      diagnostics: [error("A"), error("B"), error("A")] }])[0]))
+      .toBe("the solver diverged and it carries the error-level codes A, B");
+    expect(rejectedBecause(entries([{}])[0])).toBe("");
   });
 });

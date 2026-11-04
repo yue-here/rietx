@@ -6,10 +6,14 @@
    * is built around the one thing that makes that dangerous: a sequential fit is
    * path-dependent by construction, so **a smooth curve is exactly what a
    * poisoned chain produces** (WP-0505). Hence the shape of the panel. The
-   * `direction="both"` verification pass has its own control and its answer —
-   * `SEQUENTIAL_PATH_DEPENDENT` — is a banner at the top, not a diagnostic in a
-   * strip; a flagged trajectory is *drawn* differently and has the other chain
-   * drawn beside it, because the disagreement is the evidence.
+   * `direction="both"` verification pass has its own control. Its answer,
+   * `SeriesResult.direction_gaps`, is one line at the top stating the largest
+   * gap in esds, with the other chain drawn beside every trajectory, because
+   * the disagreement is the evidence. No parameter is called path-dependent:
+   * the record holds no threshold (WP-2003, C5). The list keeps the series'
+   * first-seen order and opens on its first parameter; ranking it by gap is
+   * the reader's choice, since on a clean series that order is noise (ruled
+   * by the maintainer 2026-11-04).
    *
    * Two structural facts about where a series lives. Its patterns are staged
    * uploads and its answer is session-scoped (`ProjectDoc.patterns` stays length
@@ -28,6 +32,7 @@
   import { onDestroy } from "svelte";
 
   import { api } from "../api";
+  import Help from "../Help.svelte";
   import Exports from "./Exports.svelte";
   import { seriesCompact } from "../lib/resize";
   import { curveColors, toggleCurve } from "../lib/plot";
@@ -35,12 +40,18 @@
     asRequest,
     axisTitle,
     largestStep,
+    esdText,
+    gapLine,
     memberLegend,
     moveBy,
     pointText,
     rankTrajectories,
+    rejectedBecause,
     sortByX,
+    stepCells,
+    stepRows,
     stepTo,
+    topGapPath,
     traceData,
     traceKey,
     traceText,
@@ -51,6 +62,7 @@
     type SeriesEntry,
     type SeriesPattern,
     type SeriesSetup,
+    type SeriesStep,
     type Trace,
     type Trajectory,
   } from "../lib/series";
@@ -96,16 +108,27 @@
 
   const entries = $derived<SeriesEntry[]>(answer?.result?.entries ?? []);
   const trajectories = $derived<Trajectory[]>(answer?.trajectories ?? []);
-  const ranked = $derived(rankTrajectories(trajectories));
-  const flagged = $derived<string[]>(answer?.path_dependent ?? []);
-  const sigmaBar = $derived<number>(answer?.path_dependence_sigma ?? 3);
+  /** the list's order: the series' own, or by the largest gap (two-way only) */
+  let order = $state<"series" | "gap">("series");
+  const hasGaps = $derived(trajectories.some((t) => t.n_sigma !== null));
+  const listed = $derived(
+    order === "gap" && hasGaps ? rankTrajectories(trajectories) : trajectories);
+  /** per entry, whether the library quarantined it: the server's answer from the
+   *  chain's own test, so this panel re-derives nothing from `status` */
+  const rejected = $derived<boolean[]>(answer?.rejected ?? []);
+  /** `SeriesResult.steps`, in the record's order: largest |esd| first */
+  const allSteps = $derived<SeriesStep[]>(answer?.result?.steps ?? []);
+  let stepScope = $state<"path" | "all">("path");
+  const hasCold = $derived(allSteps.some((s) => s.cold_ratio !== null));
   const diagnostics = $derived<any[]>(answer?.result?.diagnostics ?? []);
-  /** every fence except the headline one, which has its own banner */
-  const otherDiagnostics = $derived(
-    diagnostics.filter((d) => d.code !== "SEQUENTIAL_PATH_DEPENDENT"));
+  /** the comparison of the two chains as one line, `""` where it did not run */
+  const gaps = $derived(gapLine(answer?.result?.direction_gaps));
+  const gapPath = $derived(topGapPath(answer?.result?.direction_gaps));
   const current = $derived<Trajectory | null>(
     trajectories.find((t) => t.path === selectedPath)
-      ?? ranked[0] ?? null);
+      ?? trajectories[0] ?? null);
+  const shownSteps = $derived(
+    stepRows(allSteps, stepScope === "path" ? current?.path ?? "" : null));
   /** the series on its own axis, with its marks (WP-1317, `series.trace`) */
   const trace = $derived<Trace | null>(answer?.trace ?? null);
   /** the trace position of the pattern on show, or null on the trajectory */
@@ -172,7 +195,7 @@
     try {
       answer = await api.seriesResult();
       if (!selectedPath && answer.trajectories?.length) {
-        selectedPath = rankTrajectories(answer.trajectories)[0].path;
+        selectedPath = answer.trajectories[0].path;
       }
       draw();
     } catch {
@@ -558,13 +581,11 @@
     colors = readColors();
     if (!current) return;
     const traj = current;
-    const marks = trajectoryMarks(traj, trace);
+    const marks = trajectoryMarks(traj, trace, entries, rejected);
     legend = trajectoryLegend(traj, marks, trace);
     figKind = "trajectory";
     fig = chart.mountTrajectory(plotNode, traj, {
-      colors: () => ({ tone: traj.path_dependent ? colors.warn : colors.diff,
-                       warn: colors.warn, muted: colors.edge }),
-      dashed: traj.path_dependent,
+      colors: () => ({ tone: colors.diff, warn: colors.warn, muted: colors.edge }),
       ...marks,
       xLabel: traj.x_label,
       yLabel: axisTitle(traj),
@@ -580,24 +601,16 @@
 </script>
 
 <section bind:clientWidth={panelWidth}>
-  <!-- the headline, not a footnote: the one check that separates a measured
-       trajectory from an ordering artefact (WP-0505) -->
-  {#if flagged.length}
-    <p class="banner bad">
-      <strong>{flagged.length} parameter{flagged.length === 1 ? "" : "s"}
-        path-dependent</strong> — the forward and backward chains disagree by more
-      than {sigmaBar}σ, so {flagged.length === 1 ? "its" : "their"} trajector{flagged.length === 1 ? "y is" : "ies are"}
-      an artefact of the order the series was refined in, not a measurement.
-      {#each flagged.slice(0, 6) as path (path)}
-        <button class="ghost" onclick={() => showTrajectory(path)}
-          title="show this trajectory with the backward chain beside it">{path}</button>
-      {/each}
-      {#if flagged.length > 6}<span class="muted">+{flagged.length - 6}</span>{/if}
-    </p>
-  {:else if answer?.has_backward}
-    <p class="banner ok">
-      Both chain directions agree within their esds — the trajectories below are
-      measurements rather than ordering artefacts.
+  <!-- the comparison of the two chains, stated as a number and not a verdict:
+       the record holds no threshold, so the size that matters is the reader's
+       (WP-2003, C5) -->
+  {#if gaps}
+    <p class="banner">
+      {gaps}
+      <Help for="result_fields:SeriesResult.direction_gaps">How to read it</Help>
+      {#if gapPath}
+        <button class="ghost" onclick={() => showTrajectory(gapPath)}>{gapPath}</button>
+      {/if}
     </p>
   {/if}
 
@@ -795,13 +808,21 @@ plot's x-axis title, and the column above">
     <div class="controls">
       <select value={current?.path ?? ""} disabled={busy}
         onchange={(ev) => showTrajectory((ev.currentTarget as HTMLSelectElement).value)}>
-        {#each ranked as t (t.path)}
+        {#each listed as t (t.path)}
           <option value={t.path}>
-            {t.path_dependent ? "⚠ " : t.discontinuous ? "↕ " : ""}{t.path}
-            {#if t.n_sigma !== null && t.path_dependent}({t.n_sigma.toFixed(1)}σ){/if}
+            {t.path}
+            {#if t.n_sigma !== null}({esdText(t.n_sigma)} esd){/if}
           </option>
         {/each}
       </select>
+      {#if hasGaps}
+        <div class="segmented" role="group" aria-label="the list's order">
+          <button class:on={order === "series"} aria-pressed={order === "series"}
+            onclick={() => (order = "series")}>series order</button>
+          <button class:on={order === "gap"} aria-pressed={order === "gap"}
+            onclick={() => (order = "gap")}>largest gap first</button>
+        </div>
+      {/if}
       {#if selectedPattern !== null}
         <button class="ghost" onclick={() => showTrajectory(current?.path ?? "")}
           title="back to the trajectory across the series">Show trajectory</button>
@@ -813,9 +834,8 @@ plot's x-axis title, and the column above">
       {/if}
     </div>
     {#if selectedPattern === null && current}
-      <p class:warn={current.path_dependent}>
-        {trajectoryNote(current, sigmaBar)}
-      </p>
+      {@const note = trajectoryNote(current)}
+      {#if note}<p class="muted">{note}</p>{/if}
     {/if}
     <!-- the legend is the pattern panel's curve toggles with a swatch in each,
          in the flow above the figure: this panel scrolls, so a row it gains
@@ -838,6 +858,61 @@ plot's x-axis title, and the column above">
       {/if}
     </div>
 
+    {#if selectedPattern === null && allSteps.length}
+      <!-- the record's steps, beside the trajectory they are steps of: every
+           change between neighbouring patterns in the later pattern's esds,
+           largest first, and none of them called a jump (WP-2003, C4) -->
+      <h2><Help for="result_fields:SeriesResult.steps">Steps</Help></h2>
+      <div class="controls">
+        <div class="segmented" role="group" aria-label="which steps the table lists">
+          <button class:on={stepScope === "path"} aria-pressed={stepScope === "path"}
+            onclick={() => (stepScope = "path")}>this parameter</button>
+          <button class:on={stepScope === "all"} aria-pressed={stepScope === "all"}
+            onclick={() => (stepScope = "all")}>all parameters</button>
+        </div>
+        <span class="muted tabular">
+          {shownSteps.rows.length === shownSteps.total
+            ? `${shownSteps.total} step${shownSteps.total === 1 ? "" : "s"}`
+            : `largest ${shownSteps.rows.length} of ${shownSteps.total}`}
+        </span>
+      </div>
+      <p class="muted">
+        The change in each parameter between neighbouring patterns, later minus
+        earlier, with its size in the later pattern's esds. Largest first.
+        {#if hasCold}
+          The cold ratio is the same pair refitted cold and independently over
+          the step. Near 1 the step is in the data, near 0 the chain made it.
+        {/if}
+      </p>
+      {#if shownSteps.rows.length}
+        <div class="scroll">
+          <table class="tabular">
+            <thead>
+              <tr>
+                {#if stepScope === "all"}<th>parameter</th>{/if}
+                <th>between</th><th>step</th><th>esd</th>
+                {#if hasCold}<th>cold ratio</th>{/if}
+              </tr>
+            </thead>
+            <tbody>
+              {#each shownSteps.rows as s (s.path + s.indices.join("-"))}
+                {@const c = stepCells(s)}
+                <tr>
+                  {#if stepScope === "all"}
+                    <td><button class="link" onclick={() => showTrajectory(s.path)}>{s.path}</button></td>
+                  {/if}
+                  <td>{c.between}</td><td>{c.step}</td><td>{c.esd}</td>
+                  {#if hasCold}<td>{c.cold}</td>{/if}
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <p class="muted">The record holds no steps for {current?.path ?? "this curve"}.</p>
+      {/if}
+    {/if}
+
     <h2>Per pattern</h2>
     <div class="scroll">
       <table class="tabular">
@@ -856,15 +931,16 @@ every rung of the escalation ladder included — what the warm start actually bu
         </thead>
         <tbody>
           {#each entries as e, i (e.index)}
-            <tr class:lit={selectedPattern === i} class:out={e.status === "diverged"}>
+            <tr class:lit={selectedPattern === i} class:out={rejected[i]}>
               <td class="muted">{e.index}</td>
               <td>{e.label}</td>
               <td>{e.x === null ? e.index : e.x}</td>
               <td>
                 {e.status}
-                {#if e.status === "diverged"}
-                  <span class="chip warn" title="no rung of the escalation ladder
-recovered this pattern (tried: {e.rungs_tried.join(" → ")}). It is reported because it
+                {#if rejected[i]}
+                  <span class="chip warn" title="the chain rejected this fit
+({rejectedBecause(e) || "see its diagnostics"}) and no rung of the escalation ladder
+recovered it (tried: {e.rungs_tried.join(" → ")}). It is reported because it
 was measured, but the chain stepped over it: it seeded no successor and its Rwp was
 left out of the series median. Read it as a failed fit, not as a datum.">unrecovered</span>
                 {:else if e.reseeded}
@@ -933,10 +1009,10 @@ different starting point could not fix">hard</span>
       </ul>
     {/if}
 
-    {#if otherDiagnostics.length}
+    {#if diagnostics.length}
       <h2>Fences</h2>
       <ul class="strip">
-        {#each otherDiagnostics as d (d.code + d.message)}
+        {#each diagnostics as d (d.code + d.message)}
           <li class={d.level}>
             <span class="mono">{d.code}</span> {d.message}
             {#if d.suggestion}<span class="muted"> — {d.suggestion}</span>{/if}
@@ -993,16 +1069,6 @@ different starting point could not fix">hard</span>
     border-radius: 3px;
     font-size: var(--text-sm);
     flex: 0 0 auto;
-  }
-
-  .banner.bad {
-    border-left-color: var(--warn);
-    color: var(--fg);
-  }
-
-  .banner.ok {
-    border-left-color: var(--ok);
-    color: var(--muted);
   }
 
   /* Bounded like the peak panel's tables and for the same measured reason: as

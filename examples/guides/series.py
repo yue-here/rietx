@@ -39,12 +39,11 @@ assert max(abs(v - t) / e for v, t, e in zip(a.value, TRUE_A, a.stderr)) < 2
 assert [f"{v:.6f}" for v in a.value] == [
     "4.156594", "4.158673", "4.160762", "4.162839", "4.164911", "4.166985", "4.169066"]
 assert [round(e * 1e6) for e in a.stderr] == [4] * 7
-assert [d.code for d in series.diagnostics] == ["SEQUENTIAL_PERSISTENT_FINDING"] * 2
+assert series.diagnostics == []
+assert [(c.code, c.path, c.count, c.level) for c in series.code_counts] == [
+    ("CAPILLARY_OFFSET_UNAVAILABLE", "instrument.geometry.goniometer_radius_mm", 7, "info"),
+    ("PATTERN_UNDERSAMPLED", None, 7, "warning")]
 assert [f"{r:.4f}" for r in series.rwp] == [
     "0.0409", "0.0409", "0.0399", "0.0405", "0.0406", "0.0402", "0.0404"]
 assert [e.rung for e in series] == ["cold"] + ["warm"] * 6
 assert [e.n_iterations for e in series] == [38] + [15] * 6
-# The page says a persistent finding needs five patterns or more.
-from rietx.sequential import MIN_POINTS_FOR_PERSISTENCE  # noqa: E402
-
-assert MIN_POINTS_FOR_PERSISTENCE == 5

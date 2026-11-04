@@ -80,14 +80,13 @@ declare module "rxplot" {
     backward?: readonly (number | null)[] | null;
   }
 
-  export type TrajectoryMark = "forward" | "esd" | "backward" | "rings" | "crosses" | "squares";
+  export type TrajectoryMark = "forward" | "esd" | "backward" | "rings" | "crosses";
 
   export interface TrajectorySpec {
     colors: () => { tone: string; warn: string; muted: string };
     dashed?: boolean;
     rings?: readonly boolean[];
     crosses?: readonly boolean[];
-    squares?: readonly boolean[];
     hidden?: readonly TrajectoryMark[];
     xLabel?: string;
     yLabel?: string;

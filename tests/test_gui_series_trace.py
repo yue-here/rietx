@@ -63,11 +63,11 @@ def _series() -> SeriesResult:
         diagnostics=[
             _verdict("SEQUENTIAL_RESEED", ["T310"]),
             _verdict("SERIES_PATTERN_FAILED", ["T320"]),
-            _verdict("SEQUENTIAL_RWP_OUTLIER", ["T330"]),
-            _verdict("SEQUENTIAL_RWP_OUTLIER", ["T340"]),
+            _verdict("SEQUENTIAL_UNRECOVERED", ["T330"]),
+            _verdict("SEQUENTIAL_UNRECOVERED", ["T340"]),
             _verdict("SOME_FUTURE_CODE", ["T340"]),
             # series-level: a path, and nothing — neither marks a pattern
-            _verdict("SEQUENTIAL_PATH_DEPENDENT", ["phases.0.cell.a"]),
+            _verdict("SEQUENTIAL_PERSISTENT_FINDING", ["phases.0.cell.a"]),
             _verdict("SEQUENTIAL_CANCELLED", []),
         ],
         steps=[
@@ -97,9 +97,9 @@ def test_every_pattern_is_a_point_in_index_order_a_failure_included():
 def test_a_series_verdict_marks_the_pattern_its_where_names():
     marks = {p["index"]: p["marks"] for p in trace(_series())["points"]}
     assert marks == {0: [], 1: ["SEQUENTIAL_RESEED"], 2: ["SERIES_PATTERN_FAILED"],
-                     3: ["SEQUENTIAL_RWP_OUTLIER"],
+                     3: ["SEQUENTIAL_UNRECOVERED"],
                      # an unknown code is drawn, not dropped: the codes are open
-                     4: ["SEQUENTIAL_RWP_OUTLIER", "SOME_FUTURE_CODE"]}
+                     4: ["SEQUENTIAL_UNRECOVERED", "SOME_FUTURE_CODE"]}
     assert OTHER_MARK not in {row["mark"] for row in TRACE_VOCABULARY}
 
 

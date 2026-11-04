@@ -1185,7 +1185,7 @@ export function overlay(uPlot, host, data, spec) {
 const finite = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
 /** The marks a trajectory can hide by id, as `setHidden` takes them. */
-const TRAJECTORY_MARKS = ["forward", "esd", "backward", "rings", "crosses", "squares"];
+const TRAJECTORY_MARKS = ["forward", "esd", "backward", "rings", "crosses"];
 
 /** The distance, in CSS pixels, within which the pointer names a point. */
 const REACH = 8;
@@ -1205,17 +1205,13 @@ const REACH = 8;
  * `spec`:
  *
  * - `colors()`: `{ tone, warn, muted }`, read at every draw. `tone` is the
- *   forward chain's, `warn` the rings', crosses' and squares', `muted` the backward
+ *   forward chain's, `warn` the rings' and crosses', `muted` the backward
  *   chain's.
- * - `dashed`: the forward chain is drawn dashed, as a path-dependent
- *   parameter's is.
- * - `rings`, `crosses`, `squares`: one boolean per point. A ring marks a
- *   point the chain reseeded, a cross a point no rung recovered, and a
- *   hollow square a point every rung left above the Rwp fence, as
- *   `plot_trajectory` boxes it. Every such point stays in the chain: a gap
- *   reads as data nobody collected.
+ * - `rings`, `crosses`: one boolean per point. A ring marks a point the
+ *   chain reseeded, and a cross a point no rung recovered. Both points stay
+ *   in the chain: a gap reads as data nobody collected.
  * - `hidden`: the marks not drawn, from "forward", "esd", "backward",
- *   "rings", "crosses" and "squares".
+ *   "rings" and "crosses".
  * - `xLabel`, `yLabel`: the axis titles.
  *
  * A point with no esd has no whisker at all. A whisker of zero length would
@@ -1312,7 +1308,7 @@ export function trajectory(uPlot, host, traj, spec) {
       }, "stroke");
     }
     if (shown("forward")) {
-      chain(u, value, c.tone, 1.4 * r, spec.dashed ? [6 * r, 4 * r] : []);
+      chain(u, value, c.tone, 1.4 * r, []);
       ctx.fillStyle = c.tone;
       each(u, value, all, (g, X, Y) => { g.moveTo(X + 3 * r, Y); g.arc(X, Y, 3 * r, 0, 2 * Math.PI); }, "fill");
     }
@@ -1328,13 +1324,6 @@ export function trajectory(uPlot, host, traj, spec) {
       const d = 5 * r;
       each(u, value, (i) => spec.crosses[i], (g, X, Y) => {
         g.moveTo(X - d, Y - d); g.lineTo(X + d, Y + d); g.moveTo(X - d, Y + d); g.lineTo(X + d, Y - d);
-      }, "stroke");
-    }
-    if (spec.squares && shown("squares")) {
-      ctx.lineWidth = 1.4 * r;
-      const d = 6 * r;
-      each(u, value, (i) => spec.squares[i], (g, X, Y) => {
-        g.moveTo(X - d, Y - d); g.rect(X - d, Y - d, 2 * d, 2 * d);
       }, "stroke");
     }
     ctx.restore();
