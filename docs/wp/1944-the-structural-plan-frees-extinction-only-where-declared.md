@@ -1,6 +1,6 @@
 # WP-1944 — the structural plan frees extinction only where it says it does
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-04 — option A built, PR #1391 in review
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-11 — a plan frees a parameter its description says it leaves alone, and the esd shows the data cannot see it; nothing fires
@@ -120,7 +120,17 @@ with one phase declared and one not.
 
 ## Handover log
 
-- **2026-11-04** — the maintainer's two rulings, recorded as given:
+- **2026-11-04** — extinction is now off unless a phase declares it, and a fit
+  says when a phase's strongest lines ask for it. The structural plan no
+  longer frees a coefficient the data almost never determine (1 value in 98
+  passed 3σ over 69 fits, a false positive), and that pulled a 1.3 wt %
+  impurity to 3.6 ± 3.5 wt %. The cost is
+  that a real extinction now needs a declaration, and the pointer that names
+  it misses a weak one (0.5 µm² planted on LaB6 scores 14 against a gate of
+  25). Every other opt-in correction was checked for a pointer; three lack
+  one and are filed as WP-2086.
+
+  The maintainer's two rulings, recorded as given:
 
   > RULING 1 (Yue, 2026-11-03 ~21Z): "we shouldn't have extinction as a
   > default in the most popular plan. opt-in only."
@@ -143,18 +153,21 @@ with one phase declared and one not.
 
   *The pointer.* `EXTINCTION_UNDECLARED` (warning) is the air-scatter
   screen's one-column score test on the extinction column at 0. The column
-  is projected off the background, every phase's scale and the free Biso,
-  ADP, occupancy and texture columns. The score is in reduced-χ² units with
-  the esd inflation included, so it reads as the squared significance a
-  declared coefficient would be reported at. It fires at the air-scatter
-  screen's level, 25 (5σ), reused rather than a new number. Measured with the
-  gate off:
+  is projected off the background, every phase's scale, and each free column
+  of θ that reaches a Biso, ADP, occupancy, coordinate, PO or texture entry,
+  moved through C. The score is in reduced-χ² units with the esd inflation
+  included, so it reads as the squared significance a declared coefficient
+  would be reported at. It fires at the air-scatter screen's level, 25 (5σ),
+  reused rather than a new number. Measured with the gate off, after the
+  generality review's fixes (all development data):
 
   | fit | score | |
   |---|---|---|
   | LaB6 synthetic, ext 2.5 planted | 230 | fires |
-  | LaB6 synthetic, 0 or 0.5 planted | leans negative | silent |
-  | 11-BM NAC + CaF₂ (QPA guide) | NAC 4.4, CaF₂ 14.6 | silent |
+  | the same, Biso and B coordinate free | 78 | fires |
+  | LaB6 synthetic, 0.5 planted | 14 (9 with Biso free) | silent: a miss |
+  | LaB6 synthetic, none planted | 0.17 (1.8 with Biso free) | silent |
+  | 11-BM NAC + CaF₂ (QPA guide) | NAC 8.1, CaF₂ 14.6 | silent |
   | Si 640c (hump guide) | 0.13 | silent |
   | FAP (interval guide) | leans negative | silent |
 
@@ -162,7 +175,9 @@ with one phase declared and one not.
   scale and the background alone, NAC scored 277 and CaF₂ 1945, against
   refit significances of 2.8σ and 0.5σ. Adding the phase's Biso columns, then
   the other phase's columns, and dividing by the esd inflation (8.2 on that
-  fit) brought both to the table's values.
+  fit) brought both down to 4.4 and 14.6. Adding the coordinate and
+  occupancy columns (the first form's `occupancy` pattern matched no path)
+  took NAC to 8.1.
 
   *The sweep* (ruling 2, part 2). For each opt-in correction: the
   declaration, what points at it, on what evidence, and whether the pointer
@@ -221,6 +236,109 @@ with one phase declared and one not.
   `refine.py`, so no file prefix separates them. Codes naming a physical
   correction moved to a new Corrections page
   (`reference_pages.CORRECTION_CODE_PREFIXES`), and 18 links followed.
+
+  *Generality* (`generality-review`, run on the branch at `efc450c90`;
+  sections pasted unedited, each author answer under a `fails` marked
+  **Answer**, applied in `c7ee226b1`).
+
+  > **`EXTINCTION_UNDECLARED` (code, tier 1, ambiguity 1, warning): fails.**
+  > The row should not stand at tier 1. The case for having a pointer is
+  > strong, since the maintainer's second ruling asks for one and the code
+  > changes no fitted value. But the row as written does not hold: its
+  > threshold is an unaudited number, its firing side is one synthetic
+  > fixture, and its evidence names a partner column the code never builds.
+  > Keep the code, re-tier it and fix the evidence.
+  > (1) It decides when to speak (score ≥ 25), that the leftover strong-line
+  > deficit reads as extinction, and that this is a `warning`. (2) The
+  > attribution is kind 2: preferred orientation, opt-in and so not
+  > projected in a default fit, draws the same deficit; detector count-rate
+  > non-linearity is kind 3. Fails. (3) Strong case against: a lab refiner
+  > with platy crystals refines PO first; TOPAS, RIETAN-FP and BGMN have no
+  > powder extinction parameter; `_EXTINCTION_PARTNER` matches `occupancy`
+  > where the path is `.occ`; coordinates excluded with no reason; a tied
+  > Biso gets one site's column; the firing test frees no Biso. (4) Moderate
+  > case for: without a pointer real extinction is never named; a false fire
+  > costs one refit; the 0.5 µm² plant is a miss the table called silence.
+  > (5) Tier fails: the threshold `AIR_SCATTER_UNDECLARED_SCORE` is itself
+  > unaudited, and the borrowing divides by the squared inflation; with one
+  > firing family the rare-feature clause gives tier 3 with `grounds` and
+  > `approved`. (6) Weak: one synthetic firing family, three development
+  > families silent, the projection reworked on NAC. (7) Record holds.
+  > *What would change the verdict:* the screen run under
+  > `mccusker_structural` (Biso free) on a planted case and on one real
+  > specimen with a known extinction, the occupancy regex fixed, and the
+  > threshold row audited.
+
+  **Answer:** fixed the occupancy pattern, added coordinates, built every
+  partner column through C, set ambiguity 2, added the structural-plan
+  firing case (78) and recorded the 0.5 µm² miss. Tier 3 needs the
+  maintainer's approval, so the row stays at tier 1 and the PR asks for it.
+  No real specimen with a known extinction is in the test data.
+
+  > **`EXTINCTION_UNDECLARED.suggestion`: weak.** Naming the declaration is
+  > arithmetic; the rest steers toward one hypothesis and one plan. It names
+  > PO as a rival but not PO's declaration, and tells a caller on another
+  > plan to switch. *What would change the verdict:* a plan-neutral step and
+  > the PO declaration.
+
+  (Applied: the suggestion now says "free phases.N.extinction and refit"
+  and names `structure.phases[N].preferred_orientation`.)
+
+  > **`rietx.refine._EXTINCTION_PROBE`: weak.** The number is fine for a
+  > threshold of 25, but "to fp64" is wrong: the forward difference carries a
+  > relative error of about x/2, roughly 1e-4 on the LaB6 fixture (scaled,
+  > not measured). Tier 1 for a numerical setting needs a test holding its
+  > error under a stated bar. *What would change the verdict:* that test, and
+  > evidence saying "~1e-4 relative".
+
+  (Applied: the evidence says so, and
+  `test_the_extinction_probe_column_is_the_derivative_at_zero` holds it to
+  1e-3 against a finer forward difference. A central difference cannot be
+  the reference: the Laue factor is 1 for every x < 0.)
+
+  > **`refine._EXTINCTION_PARTNER`: fails.** It decides which explanations
+  > the score has already ruled out, and it does not do what its docstring
+  > says: `occupancy` never matches `.occ`; coordinates are left out; it reads
+  > `free_paths` and perturbs values directly, bypassing C, so a tied or
+  > variable-driven Biso gets one site's column (the root rule: "can this
+  > parameter move?" is `moving_paths` and `column_reach`, never
+  > `free_paths`). *What would change the verdict:* the regex matching `occ`
+  > and the coordinate DOFs, partner columns built through C, and the NAC
+  > score re-measured.
+
+  **Answer:** all three done; NAC re-measured at 8.1, CaF₂ 14.6.
+
+  > **Reuse of `AIR_SCATTER_UNDECLARED_SCORE` (25): weak.** Five sigma is
+  > defensible, but the borrowed number is unaudited and used differently
+  > (air scatter also gates on a 0.5 % χ² share and divides by no
+  > inflation), so a retune of either test moves the other. *What would
+  > change the verdict:* a constant of its own, audited with the 69 fits
+  > named as development data.
+
+  (Not applied: a new constant would enter the table needing its own tier,
+  and tier 3 is the maintainer's. The PR asks.)
+
+  > **`docs/reference_pages.CORRECTION_CODE_PREFIXES`: holds.** Not a
+  > heuristic; it decides which manual page lists a code.
+
+  > **Default change (`Phase.extinction` now `None`): holds.** Weak case for
+  > the old default, a measured case against it, practice (GSAS-II off by
+  > default; TOPAS, RIETAN-FP, BGMN have no such parameter) and the ruling.
+  > Loose ends: `test_acceptance_nac.py` and `test_acceptance_srm660c.py`
+  > still freed an undeclared extinction, and `help.py` gives
+  > `default="0.0"`.
+
+  (Applied: both guards declare extinction and pass. The help entry's
+  `default` stays `0.0`: it is the value a declaration takes, as for the
+  optional blocks' parameters, and `test_help` reads it off a declared
+  fixture.)
+
+  *Next:* the maintainer reviews PR #1391, with its "What a reader
+  receives" section, and decides two things it asks: whether
+  `EXTINCTION_UNDECLARED` moves to tier 3 with grounds and an approval,
+  and whether it gets a threshold of its own rather than the air-scatter
+  screen's. Either answer is a row edit in `_audit.py`. Then WP-2086,
+  starting with the Stephens action.
 
 - **2026-11-03** — task 1 measured. Nothing in `src/` changed. A ghostshift
   runner did the work. The decision brief below waits on the maintainer.
