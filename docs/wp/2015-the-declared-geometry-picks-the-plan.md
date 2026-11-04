@@ -1,6 +1,6 @@
 # WP-2015 — The declared geometry picks the plan, and a geometry can be unstated
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-04 — claimed by @mustachefeeling
 Track: The audits
 Depends on: —
 Priority: P2 2026-10-19 — a generality-audit ruling (WP-2002 B7, B9) waits on it; a Bragg-Brentano pattern on the default plan leaves specimen displacement unrefined and nothing says so, and an instrument built without a geometry is read as a capillary
