@@ -94,6 +94,7 @@ from .refine import (
     _displacement_columns,
     _escaped_cell_paths,
     _every_phase_unseen,
+    _extinction_undeclared_diagnostics,
     _extra_peak_diagnostics,
     _far_from_data_diagnostics,
     _fixed_literal_diagnostics,
@@ -266,6 +267,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (HISTOGRAM,), "the region below one pattern's first reflection"),
     "_air_scatter_undeclared_diagnostics": (
         (HISTOGRAM,), "one histogram's residual against its own background"),
+    "_extinction_undeclared_diagnostics": (
+        (HISTOGRAM,), "one histogram's residual against its own partner "
+                      "columns; an undeclared extinction is the specimen's, "
+                      "but the evidence is each pattern's strong lines"),
     "_qpa_esd_unavailable_diagnostics": (
         (HISTOGRAM,), "through _quantify_phases, which partitions one "
                       "histogram's scales"),
@@ -2201,6 +2206,8 @@ class MultiHistogramRefinement:
                                                 ticks, tick_support))
             diags.extend(_air_scatter_undeclared_diagnostics(model, values,
                                                              y_calc, stats))
+            diags.extend(_extinction_undeclared_diagnostics(
+                model, table, values, y_calc, stats, struct))
 
             histograms.append(HistogramResult(
                 label=model.meta.get("label", "") or f"hist{h}",

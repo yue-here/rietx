@@ -465,7 +465,10 @@ def test_a_unit_declared_later_is_no_range_to_restore(tmp_path, pattern_file):
     no unit: nothing is unbounded, so nothing is restored and no note blames
     issue #204 for a label no release before it could write."""
     def unitless_extinction(state):
-        state["structure"]["phases"][0]["extinction"]["unit"] = None
+        # every log before WP-1944 stored extinction; this tree writes None
+        state["structure"]["phases"][0]["extinction"] = {
+            "value": 0.0, "vary": False, "min": 0.0, "max": "Infinity",
+            "expr": None, "unit": None, "stderr": None}
     project = _create(tmp_path / "s.rex", pattern_file)
     _age_log(project, "0.34", unitless_extinction)
     reopened = rx.Project.open(project.path)

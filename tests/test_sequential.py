@@ -743,6 +743,7 @@ def test_a_warm_refit_lifts_no_carried_floor_value():
     # and the table: a converged zero stays where the neighbour left it,
     # where the plan's own largest seed would have lifted it
     structure, ins = _start_models()
+    structure.phases[0].extinction = 0.0  # opt-in since WP-1944
     table = ParameterTable(structure, ins)
     table.set_vary(["*"], False)
     freed = table.set_vary(_collapse(plan).stages[0].turn_on, True)

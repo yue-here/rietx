@@ -29,6 +29,11 @@ from pydantic import Field, field_validator, model_validator
 
 from .common import Base, Parameter, _InheritsDeclaredDefaults
 
+
+def _declared_extinction() -> Parameter:
+    """The range and unit a declared extinction coefficient takes (WP-1944)."""
+    return Parameter(value=0.0, min=0.0, unit="um^2")
+
 #: A lower bound at or under this is a bound at zero to
 #: :meth:`PreferredOrientation._r_bound_is_reachable`.  It is the value under
 #: which a stored ``min`` meant no bound at all before schema 0.46 (WP-1938),
@@ -1236,6 +1241,8 @@ class DistortionModes(Base):
 class Phase(_InheritsDeclaredDefaults):
     """A crystalline phase: symmetry, cell, atoms, scale, sample broadening."""
 
+    _declared_optional: ClassVar[dict] = {"extinction": _declared_extinction}
+
     name: str
     space_group: str  # Hermann-Mauguin symbol or number-as-string, resolved via gemmi
     # The phase's symmetry operations as ``x,y,z`` triplets, when the phase
@@ -1508,13 +1515,15 @@ class Phase(_InheritsDeclaredDefaults):
 
         ``phase.extinction = 0.0`` is the declaration a user writes, so it
         must not need the unit and the bound spelled out.  A ``Parameter`` or
-        a stored dict passes through unchanged.
+        a dict that leaves ``min``, ``max`` or ``unit`` unset inherits them
+        from ``_declared_optional``, the rule every declared field follows
+        (issue #204).
         """
         if isinstance(value, bool):
             raise ValueError("extinction takes a number (µm²) or a Parameter; "
                              "declare it with phase.extinction = 0.0")
         if isinstance(value, (int, float)):
-            return Parameter(value=float(value), min=0.0, unit="um^2")
+            return _declared_extinction().model_copy(update={"value": float(value)})
         return value
 
     @field_validator("symmetry_operations", mode="before")

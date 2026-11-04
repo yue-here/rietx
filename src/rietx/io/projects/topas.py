@@ -5275,7 +5275,8 @@ def _not_written_diagnostics(structure: Structure, *,
     for i, phase in enumerate(structure.phases):
         here = []
         for name, what in () if whole else _PHASE_TERMS_NOT_WRITTEN:
-            if getattr(phase, name).value != 0.0:
+            term = getattr(phase, name)  # extinction is opt-in: None
+            if term is not None and term.value != 0.0:
                 here.append((name, what))
         po = phase.preferred_orientation
         if po is not None and po.r.value != 1.0:

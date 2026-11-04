@@ -80,6 +80,7 @@ def _problem(n_sites: int, *, claim_moving: bool = True):
     instrument = T.neutron()
     data = T.simulate(_phase(n_sites, offset=0.0, vary=False), instrument)
     structure = rx.Structure(phases=[_phase(n_sites, offset=0.03, vary=True)])
+    structure.phases[0].extinction = 0.0  # declared (WP-1944), so the claim decides
     table = ParameterTable(structure, instrument)
     table.set_vary(["phases.*.scale"], True)
     model = compile_model(structure, instrument, data,

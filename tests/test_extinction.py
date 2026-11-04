@@ -803,6 +803,45 @@ def test_injected_extinction_is_recovered_within_esds():
     plot_result(result, path=str(OUT / "extinct_lab6_fit.png"))
 
 
+def _undeclared_fit(ext_true: float, *, declare: bool = False) -> list:
+    """The diagnostics of a short fit to ``_synthesize_extinct_lab6(ext_true)``
+    with no extinction stage, the phase declaring extinction only if
+    ``declare``.  Shared with ``tests/silence.py``."""
+    from rietx import Instrument, Refinement
+    from rietx.strategy.staged import RefinementPlan, Stage
+    from tests.test_schemas import make_lab6
+
+    structure = make_lab6()
+    structure.phases[0].scale.value = 4e-3
+    if declare:
+        structure.phases[0].extinction = 0.0
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 1.1e-2
+    plan = RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("cell", ["phases.*.cell.*"]),
+        Stage("profile_w", ["instrument.profile.w"]),
+    ])
+    result = Refinement(structure, ins, history=False).fit(
+        _synthesize_extinct_lab6(ext_true), plan=plan)
+    return result.diagnostics
+
+
+def test_an_undeclared_extinction_the_strong_lines_ask_for_is_named():
+    """WP-1944's pointer: extinction is opt-in, so the residual has to say when
+    a phase that did not declare it wanted it.  Planted at 2.5 µm² it scores
+    about 230 against the gate of 25 and names the declaration; with none
+    planted it leans the other way and says nothing; and a phase that declares
+    extinction is never pointed at it, whatever its residual."""
+    fired = [d for d in _undeclared_fit(2.5) if d.code == "EXTINCTION_UNDECLARED"]
+    assert [d.where for d in fired] == [["phases.0.extinction"]]
+    assert fired[0].value > 100
+    assert "structure.phases[0].extinction = 0.0" in fired[0].suggestion
+    assert not [d for d in _undeclared_fit(0.0) if d.code == "EXTINCTION_UNDECLARED"]
+    assert not [d for d in _undeclared_fit(2.5, declare=True)
+                if d.code == "EXTINCTION_UNDECLARED"]
+
+
 def test_extinction_correlates_with_scale_and_biso_and_the_guard_fires():
     """Co-freeing extinction, scale and the atom Biso on a *single* powder
     pattern is a genuine degeneracy — all three attenuate the strong low-angle
