@@ -6489,14 +6489,18 @@ class Refinement:
         Unlike ``build_report(result)``, this has the compiled model in hand,
         so Layers 1-2 (misfit attribution and typed suggested actions) are
         computed — subject to their gates.  ``plan`` supplies the Layer-2
-        strategy veto; pass the plan you ran (or its preset name).
+        strategy veto; pass the plan you ran (or its preset name).  A name
+        resolves as :meth:`fit` resolved it, under the fit's mode and this
+        instrument's geometry (``resolve_plan``, WP-2015), so the veto sees
+        the stages that ran.
         """
         from .report import build_report
 
         if self._model is None or self.result_ is None:
             raise RuntimeError("call fit() first")
         if isinstance(plan, str):
-            plan = PLAN_PRESETS[plan]()
+            plan = resolve_plan(plan, self.result_.mode,
+                                self.instrument.geometry.kind)
         # the answer frozen with the result, never the live models: a later
         # cancelled fit keeps its completed stages and this result (WP-1421)
         answer = self._answer

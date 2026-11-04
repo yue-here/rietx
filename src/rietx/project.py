@@ -189,7 +189,7 @@ class Project:
                 tuple(r) for r in excluded_regions
                 if tuple(r) not in data.excluded_regions]
 
-        plan_spec = _as_plan_spec(plan)
+        plan_spec = _as_plan_spec(plan, mode, instrument.geometry.kind)
         doc = ProjectDoc(
             package_version=_VERSION,
             created_utc=_utcnow(),
@@ -470,18 +470,21 @@ def fitted_mask(data: PatternData,
     return np.asarray(mask, dtype=bool)
 
 
-def _as_plan_spec(plan: Any) -> PlanSpec | None:
-    """A ``PlanSpec`` from a preset name, a ``RefinementPlan`` or a spec."""
+def _as_plan_spec(plan: Any, mode: Mode, geometry: str) -> PlanSpec | None:
+    """A ``PlanSpec`` from a preset name, a ``RefinementPlan`` or a spec.
+
+    A name resolves as ``Refinement.fit`` resolves it, under the project's
+    mode and its instrument's geometry (``resolve_plan``, WP-2015): the spec
+    is stored and later run as an object, which no longer resolves, so a
+    Bragg-Brentano project's ``"mccusker_default"`` must carry its
+    displacement from here.
+    """
     if plan is None or isinstance(plan, PlanSpec):
         return plan
     if isinstance(plan, str):
-        from .strategy.staged import PLAN_PRESETS
+        from .strategy.staged import resolve_plan
 
-        try:
-            plan = PLAN_PRESETS[plan]()
-        except KeyError:
-            raise ValueError(f"unknown plan preset {plan!r}; available: "
-                             f"{sorted(PLAN_PRESETS)}") from None
+        plan = resolve_plan(plan, mode, geometry)
     return PlanSpec.from_plan(plan)
 
 
