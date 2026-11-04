@@ -1,6 +1,6 @@
 # WP-1327 — a magnetic structure: state it, refine it, report what the powder cannot see
 
-Milestone: magnetic · Status: 🔄 2026-10-07 — the k = 0 moment (PR #433), the operation-list phase (PR #448), k ≠ 0's magnetic supercell (PR #477), the LaMnO₃ second dataset and #612's refusals (PR #787) have landed; the analytic moment branch remains
+Milestone: magnetic · Status: 🔄 2026-11-04 — claimed by @mustachefeeling (ghostshift runner): the analytic moment-angle Jacobian branch
 Depends on: 1326 (the satellite reflection list)
 Priority: P2 2026-09-23 — the open milestone's core; the moment and its hold start without 1326's list
 
