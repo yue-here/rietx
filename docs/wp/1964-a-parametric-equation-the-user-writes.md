@@ -96,7 +96,8 @@ ships a torch module. The rejection stands on other grounds, since `parse_expr` 
 - TOPAS allows an implied multiplication (`x y`). Refuse it, since `Tc` and
   `T c` then differ by a space.
 - TOPAS's functions are capitalised and case-sensitive, GSAS-II's are python's.
-  Decide in the first task.
+  Decide in the first task, on rietx's own terms. TOPAS's spellings are not accepted as
+  aliases, and an agent rewrites them from the manual's table (the ruling of 2026-11-04).
 - A trig function's unit differs between programs. TOPAS and python use
   radians, and GSAS-II adds `sind`.
 
@@ -169,15 +170,26 @@ ships a torch module. The rejection stands on other grounds, since `parse_expr` 
 WP-1119 declined an expression parser for linear ties on four grounds. WP-1965 carried
 them until its formula left on 2026-11-04, and they now sit here.
 
-1. **A second parser for one language.** This grammar becomes the only one: 2105 and
-   2106 lower onto it, and `Parameter.expr`, reserved for this language by 1119, is
+1. **A second parser for one language.** This grammar becomes the only one: 2106 lowers
+   onto it, 2107 evaluates it on arrays, and `Parameter.expr`, reserved for this language by 1119, is
    either wired to it or removed. Say which.
 2. **A stored string joins the format contracts.** It does. `basis="expression"`, the
    expression text and any stored variables change `SCHEMA_VERSION` and may change
    `PROJECT_FORMAT_VERSION`. A stored-format change goes to the maintainer, with the
    grammar's version alongside. Old files must still open.
 3. **A silent failure mode.** The traps below and the conformance table are the answer.
-4. **Pre-empting the TOPAS boundary** (WP-1118). 2105 owns that boundary.
+4. **Pre-empting the TOPAS boundary** (WP-1118). The grammar is rietx's and reads no
+   TOPAS file. A reader, if one is ever wanted, is parked in 2105.
+
+### A variable per pattern
+
+Stinton & Evans (2007) § 4.2 refine one temperature offset per data set and feed it to
+every phase's cell equation, with ΔT free in each of 50 patterns before they replace it by
+a polynomial. TOPAS spells that `local`. `variables` here are shared and a coordinate is a
+fixed number, so nothing can say it. An expression must be able to name a quantity that
+is free and has one value per pattern. The task below decides how it is declared. It
+enters the parameter vector as a column per pattern, and its name in the tree evaluates
+to that pattern's column.
 
 ### Seams
 
@@ -222,13 +234,11 @@ them until its formula left on 2026-11-04, and they now sit here.
 - Presets for beginners. A named form is later a stored expression with
   metadata, on this grammar.
 - Implicit smoothing, a scale transform, a complex value, a loop, recursion.
-- An equation that depends on a reflection or a data point (TOPAS's `scale_pks`
-  and `lor_fwhm` over hkl, `th2_offset` in `Xo`, and `fit_obj`). The fence is provisional
-  (the milestone's § Scope), and [2107](2107-an-equation-over-a-reflection.md) holds the
-  scope. It needs this grammar to evaluate on arrays, so keep every operator
-  element-wise. WO₃'s
+- An equation over a reflection: [2107](2107-an-equation-over-a-reflection.md), which
+  needs this grammar to evaluate on arrays, so keep every operator element-wise. WO₃'s
   `scale_pks` is one overall B per pattern, so a tie expresses it and it needs no such
-  seam. ZrP₂O₇'s `th2_offset` curve stays out of the protocol until the fence is ruled on.
+  seam. ZrP₂O₇'s `th2_offset` curve joins that protocol when 2107 lands.
+- An equation over a data point (`fit_obj`), and a reader for TOPAS's spelling.
 - A kernel prior over the coordinates:
   [1963](1963-a-kernel-over-the-pattern-coordinates.md).
 - New built-in checks beyond carrying the form test through.
@@ -285,6 +295,9 @@ them until its formula left on 2026-11-04, and they now sit here.
   `tests/output/`.
 - [ ] **The result.** Variable rows in `result.parametric`, an equation evaluated
   anywhere through the block's Jacobian, and the three inherited readers.
+- [ ] **A variable per pattern.** Declare it, carry it as a column per pattern, and let
+  an expression read it (§ A variable per pattern). The test is Stinton & Evans's first
+  method on a synthetic ramp: a ΔT per pattern through two phases' cell equations.
 - [ ] **Real data.** The WO₃ Einstein equations and the ZrP₂O₇ calibration, local
   only, each against the TOPAS input's own answer under its protocol. The bars are
   in [the milestone's Acceptance](../milestones/parametric.md#acceptance).
@@ -323,14 +336,19 @@ and the same form written as an expression agree to 0.01 esd.
 
 ## Handover log
 
+- **2026-11-04 (the ruling on TOPAS)** — The maintainer ruled that the machinery stands
+  on its own terms and an agent ports what does not import. So this grammar takes no
+  TOPAS aliases, and 2105 left the milestone. Stinton & Evans (2007) is now read. It
+  confirms the design and adds one gap: a free quantity with one value per pattern, which
+  § A variable per pattern takes in. Next: 2101 and 2102, then this WP's first task.
+
 - **2026-11-04 (scoping hkl equations)** — An equation in 2θ and an equation in hkl turn
   out to be one piece of work, so the earlier split between them was false. An earlier
   statement here and in the PR, that nothing in hand needs an hkl equation, was wrong:
   ZrMo₂O₈'s tutorial scales a width by a spherical harmonic of hkl. WP-2107 holds the
   scope and the probe's numbers, and nothing was built. Coelho (2018) was read and changes
   nothing here. It reports computer algebra at 5-10 % of a Rietveld run and gives no
-  grammar detail. Stinton & Evans (2007) is in neither local library. Next: the
-  maintainer's ruling on 2107's slices.
+  grammar detail. Next: the maintainer's ruling on 2107's slices, which came the same day.
 
 - **2026-11-04** — The parametric work now has one stated goal: an experienced TOPAS
   or GSAS-II user ports their own refinement to rietx from the manual alone. The

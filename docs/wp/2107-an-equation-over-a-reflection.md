@@ -1,21 +1,26 @@
 # WP-2107 — an equation over a reflection
 
-Milestone: unscheduled · Status: ⬜
-Track: Coming from another code
+Milestone: parametric · Status: ⬜
 Depends on: 1964 (the grammar, evaluated on arrays)
-Priority: P2 2026-11-04 — a feature the open milestone may take: ZrP₂O₇'s calibration curve and ZrMo₂O₈'s width need it, and the maintainer has not ruled on the fence
+Priority: P2 2026-11-04 — a feature the open milestone was opened for: the method's founding paper uses both a 2θ calibration curve and a width on a family of hkl
 
 ## Goal
 
-A user writes a peak's width or position as an equation in its hkl and its angle, as a
-TOPAS user writes `lor_fwhm` or `th2_offset`. Its coefficients refine with exact
-derivatives, and it fits in a joint fit like any other parameter.
+A user writes a peak's width, position or intensity as an equation in its hkl and its
+angle. Its coefficients refine with exact derivatives, and it works in a joint fit like
+any other parameter.
 
 ## Context
 
-The `parametric` milestone fences equations over a reflection or a data point, and the
-fence is provisional. This WP is the scope for lifting it, written so the maintainer can
-rule on measured numbers. It sits unscheduled until that ruling.
+The maintainer ruled on 2026-11-04: build robust machinery, and do not overfit to TOPAS.
+So this is general machinery on rietx's own terms. Its names are rietx's, and its tests
+are a known truth and an analytic oracle. TOPAS is one source of use cases, and an agent
+rewrites a TOPAS line into this form from the manual. The incidence of these keywords in
+the private archive no longer decides anything.
+
+**Why it belongs in the method.** Stinton & Evans (2007) use both shapes. Examples 1 and 2
+apply a second-order 2θ calibration polynomial, refined from all the data in example 1.
+Example 3 carries "2 terms to describe additional broadening of 0kl reflections".
 
 **The fence named two different things.** An equation in `Xo` and an equation in `H`
 are the same machinery: one array of per-reflection values, evaluated where a peak's
@@ -32,17 +37,13 @@ archive states it at the start of a line twice (`io/projects/topas.py`).
 | WO₃ | `scale_pks = Exp(-2 b/(2 D_spacing)^2)` | nothing: one overall B per pattern, a tie |
 | WO₃ | `th2_offset = -2 Rad (height) Cos(Th) / Rs` | nothing: `sample_displacement` |
 | ZrP₂O₇ | `th2_offset = (Xo-mid)^2 (square/1000) + ...` | **this WP**: a two-coefficient curve |
-| ZrMo₂O₈ (9.2) | `spherical_harmonics_hkl ahkl`, then `lor_fwhm = zeta Max(ee_2Th,0)^.5` | **this WP plus `sh`**: a tanθ width scaled by √ahkl |
+| ZrMo₂O₈ (9.2) | `spherical_harmonics_hkl ahkl`, then `lor_fwhm = zeta Max(ee_2Th,0)^.5` | **this WP's harmonic**: a tanθ width scaled by √ahkl |
 | Published TOF template | Stephens macros | nothing: `Phase.microstrain` |
 
 ZrMo₂O₈'s harmonic coefficients are fixed (`!ahkl_c00` and so on) and one number per
 pattern refines. It runs 68 patterns through `num_runs`, so it is a series and no joint
 fit. The first scoping read only WO₃ and ZrP₂O₇, and its statement that nothing in hand
 needs an hkl equation was wrong.
-
-The private archive of 606 inputs would settle how common these are, and it is not on
-this machine (`mdfind` for a mapped file name: nothing). Its incidence has not been
-measured for these keywords.
 
 **Practice.** `docs/practice.md` § An equation over a reflection. TOPAS takes an equation
 in `H`, `K`, `L`, `M`, `Xo`, `Th` and `D_spacing` on `lor_fwhm`, `gauss_fwhm`,
@@ -101,48 +102,54 @@ Cu Kα1:
 So a port of an hkl equation can change its numbers silently on any group above
 orthorhombic. Compile evaluates the equation on every image and refuses a disagreement,
 naming the first hkl. `orbit_mean(...)` is the way out. TOPAS's choice of image is not
-established, and the oracle task finds it.
+established and does not matter here: the refusal holds on physics, since a peak holds
+every image. A port meets the refusal and takes the exit knowingly.
 
 ### Rules this WP inherits
 
 - **A condition reads frozen integers only.** `h`, `k`, `l` and `m` do not move in a
   stage. A comparison on `th`, `d`, `xo` or a coefficient changes which branch a
   reflection takes during a solve, which breaks frozen-per-stage discreteness and makes
-  the residual jump. It is refused, with TOPAS's spelling named in the message.
+  the residual jump. It is refused, and the message names the frozen integers it may read.
 - **A coefficient is a table entry.** The forward model never reads a `vars.*` path, and
   `column_reach`, the flatness tests and the holds all rest on that (root CLAUDE.md,
   WP-1342). So an equation's coefficient is an entry under its phase. Sharing it is a tie
   to a variable or a `sharing=` entry, and the probe's direct read of `vars.*` was a
   shortcut. `Entry` bounds and `at_bound` then work unchanged.
-- **Per line, never per phase.** `Th` and `Xo` differ between Kα1 and Kα2, so the
+- **An equation has a level.** ZrP₂O₇'s curve sits in a macro at the pattern level, so it
+  moves every phase's peaks. So a position equation attaches to the instrument and reads
+  only the angle, or attaches to a phase and may read hkl. The first is
+  `_position_shift_deg`'s seam as it stands. Only the second needs a phase index.
+- **Per line, never per phase.** θ and the position differ between Kα1 and Kα2, so the
   equation is evaluated inside `_width_block` and `apparent_two_theta`. The `aniso` memo
-  is line-independent and cannot hold it. `apparent_two_theta` takes no phase index today,
-  and `_shift_key` and the width key must carry the coefficients.
+  is line-independent and cannot hold it. `_shift_key` and the width key must carry the
+  coefficients.
 - **Widths compose as they do now.** A Gaussian term adds in variance and a Lorentzian
-  term in FWHM. `test_topas_convolves_the_written_width_lines` already holds that against
-  TOPAS at zero cycles, for the width lines `write_topas_inp` writes.
+  term in FWHM. That is the package's rule, and TOPAS happens to agree at zero cycles
+  (`test_topas_convolves_the_written_width_lines`).
 - **The total width stays positive.** `Max(x, 0)` is legal and has the kink Stephens'
   clamp has. A total width at or below zero at the answer is a guard finding, and it
   cannot be a box bound since it couples the coefficients.
 
-### Slices
+### What it builds, in order
 
-1. **Width and position**, this WP. `lor_fwhm`, `gauss_fwhm` and `th2_offset` in `h`, `k`,
-   `l`, `m`, `d`, `th`, `xo`, plus `orbit_mean`. It serves ZrP₂O₇ and TOPAS's own examples.
-2. **The harmonic `sh`**, gated. A real spherical harmonic of the hkl direction in the
-   grammar, needed by ZrMo₂O₈ alone among the inputs read.
-   `crystallography/spherical_harmonics.py` holds the machinery. TOPAS's `sh_Cij_prm`
-   normalisation is not established, so this needs the oracle.
-3. **Intensity**, gated. The `scale_pks` analogue needs the two hand-folded builders, a
-   refusal under Le Bail and Pawley, and an answer for phase fractions: a factor that is
-   not normalised changes scale × ZMV (cell mass and volume) and so the QPA, with nothing
-   to say so. None of the inputs read needs it, and rietx has texture natively.
+1. **Width and position.** A Lorentzian width, a Gaussian width and a position, in `h`,
+   `k`, `l`, `m`, `d`, `th` and the position before the equation acts, plus `orbit_mean`.
+2. **Intensity.** The same mechanism on a third target. It needs the two hand-folded
+   builders, a refusal under Le Bail and Pawley, and an answer for phase fractions. A
+   factor that is not normalised changes scale × ZMV (cell mass and volume) and so the
+   QPA, so such a fit carries a diagnostic that says so and quotes the factor's range.
+3. **A symmetric function of hkl.** A real spherical harmonic of the hkl direction, so a
+   user can write an anisotropy that is invariant by construction instead of meeting the
+   orbit refusal. `crystallography/spherical_harmonics.py` holds the machinery, and
+   rietx's own normalisation is stated in the manual. A port converts its coefficients.
 
 ## Non-goals
 
 - A convolution by equation: `hat`, `one_on_x_conv`, `exp_conv_const`, `circles_conv`,
   `stacked_hats_conv`, `user_defined_convolution`.
-- `pk_xo`, `modify_peak_eqn`, `h1`, `h2`, `m1`, `m2`, `la`, `lo`.
+- TOPAS's remaining peak keywords (`pk_xo`, `modify_peak_eqn`, `h1`, `h2`, `m1`, `m2`,
+  `la`, `lo`), and any keyword-by-keyword parity.
 - An equation reading a structure factor (`A01`, `B01`) or an intensity.
 - `fit_obj`: an expression member of `extra_components`, and not this seam.
 - A time-of-flight bank. `th` and `xo` mean nothing there, so a peak equation is refused
@@ -153,9 +160,10 @@ established, and the oracle task finds it.
 
 ## Tasks
 
-- [ ] **The surface.** A consent item for the maintainer, since it names a field on
-  `Phase` and a top-level type. `rx.PeakEquation(target=..., expression=...)` is a
-  placeholder. The target names need the field's words. TOPAS's are the candidates.
+- [ ] **The surface.** A consent item for the maintainer, since it names a field and a
+  top-level type. `rx.PeakEquation(target=..., expression=...)` is a placeholder. The
+  target names follow the package's own words (`lor_`, `gauss_`, position), and the
+  manual's table maps TOPAS's onto them.
 - [ ] **Stored format.** A `Phase` field is a stored-format change, so it goes to the
   maintainer with the version it bumps. `.rxt` rendering, `help.py`, `capabilities()` and
   the `rietx._audit` rows follow.
@@ -172,30 +180,31 @@ established, and the oracle task finds it.
 - [ ] **The guard.** A total width at or below zero at the answer.
 - [ ] **A joint fit.** An equation on each table, a coefficient shared across patterns,
   and a pattern's coordinate readable in the expression.
-- [ ] **TOPAS as an oracle.** Synthetic inputs at zero cycles on the licensed VM, the way
-  `topas_export_widths_str_ycalc.txt` was made. Cover `If(L==0)` on a width, the ZrP₂O₇
-  curve on a doublet source, and a non-invariant condition with and without
-  `Multiplicities_Sum`. That settles the image TOPAS holds and whether `Xo` is per line.
-- [ ] **The reader.** 2105's dropped-with-its-size rows for these lines become readings.
+- [ ] **Intensity.** The third target, the two hand-folded builders, the Le Bail and Pawley
+  refusal, and the QPA diagnostic with its row in `rietx._audit`.
+- [ ] **The harmonic.** A symmetric function of hkl in the grammar, with its derivative.
+- [ ] **An independent check.** A width, position and intensity equation against a
+  hand-built oracle: a forward model given the same per-reflection arrays directly, with
+  no equation in the path. TOPAS at zero cycles is a welcome extra if a run is cheap, and
+  no gate.
 - [ ] **Manual and skill.** A guide page, `reference/parametric.md`, the Theory tab's
-  equation, the skill's row.
-- [ ] **Decide slices 2 and 3** from the archive's incidence, if it can be reached, and
-  file them or fence them.
+  equation, a keyword-to-target table in `switching/topas.md`, the skill's row.
 
 ## Acceptance
 
-Over 12 pinned seeds on a synthetic phase, every coefficient of a width and a position
-equation has a mean z-score under 0.5 in size. Each equation's Y_calc matches TOPAS's
-zero-cycle output within the bar `test_topas_convolves_the_written_width_lines` uses. The
+Over 12 pinned seeds on a synthetic phase, every coefficient of a width, a position and
+an intensity equation has a mean z-score under 0.5 in size. Each equation's Y_calc
+matches the hand-built oracle to the bit-identity bar of the forward model. The
 milestone's ZrP₂O₇ row runs with the input's `th2_offset` curve free.
 
 ```sh
-.venv/bin/python -m pytest tests/test_parametric_series.py tests/test_cross_backend.py tests/test_projects_topas.py
+.venv/bin/python -m pytest tests/test_parametric_series.py tests/test_cross_backend.py
 .venv/bin/python -m ruff check src tests examples
 ```
 
 ## References
 
+- Stinton, G. W. & Evans, J. S. O. (2007). *J. Appl. Cryst.* 40, 87-95, §§ 4.1-4.3.
 - Coelho, A. A. (2018). *J. Appl. Cryst.* 51, 210-218 — TOPAS and TOPAS-Academic.
 - Stephens, P. W. (1999). *J. Appl. Cryst.* 32, 281-289 — the template for a width in hkl.
 - TOPAS Technical Reference v8, Table 2-3 and § 20.17; FullProf manual § Selective size
@@ -204,6 +213,11 @@ milestone's ZrP₂O₇ row runs with the input's `th2_offset` curve free.
 
 ## Handover log
 
+- **2026-11-04 (the ruling)** — The maintainer ruled for robust machinery with no
+  overfitting to TOPAS, so this WP joined the milestone with all three targets, and the
+  TOPAS oracle and the archive stopped being gates. Stinton & Evans (2007) showed a
+  position curve belongs at the pattern level, which changed the design. Next: 1964's
+  grammar, then the surface.
 - **2026-11-04** — Filed as the scope the maintainer asked for. No open WP owned it: 2061
   owns a named anisotropic size block, 1964 and 2105 fence these equations, and 1963 is a
   kernel. Nothing is built. A scratch probe showed the seams carry such an equation, found

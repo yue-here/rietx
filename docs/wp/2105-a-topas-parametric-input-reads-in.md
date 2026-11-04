@@ -1,8 +1,9 @@
 # WP-2105 — a TOPAS parametric input reads in
 
-Milestone: parametric · Status: ⬜
+Milestone: unscheduled · Status: ⬜
+Track: Coming from another code
 Depends on: 1964 (the grammar an equation lowers onto)
-Priority: P2 2026-11-04 — a feature the open milestone was opened for: a user's first act is to bring the input they already have
+Priority: P3 2026-11-04 — moved out of the parametric milestone by the maintainer's ruling: an agent ports an input from the documentation, so this waits for a failure a reader would fix
 
 ## Goal
 
@@ -10,6 +11,11 @@ Priority: P2 2026-11-04 — a feature the open milestone was opened for: a user'
 equations, and refuses by name what it cannot carry.
 
 ## Context
+
+**Parked by ruling, 2026-11-04.** The maintainer: build robust machinery, do not overfit
+to TOPAS, and in the first instance a user with a decent agent ports what does not import.
+So this reader is no part of the milestone. Reopen it if a real agent port fails for a
+reason a reader would fix, or if porting the same construct by hand keeps recurring.
 
 `.inp` readers build no `ParametricEquation` today. WP-1325's real-data runs wrote each
 protocol by hand, and `read_topas_inp` refused ZrP₂O₇'s `B1` macros outright, so that
@@ -40,11 +46,10 @@ outcome:
   depends on the reflection, but its effect is an added Biso, so the reader can say so.
 - WO₃'s `th2_offset = -2 57.29... (height) Cos(Th) / Rs` is a sample height, which maps
   to `sample_displacement`.
-- ZrP₂O₇'s `th2_offset` is a curve in `Xo`, under the milestone's provisional fence.
-  Until that is ruled on, the reader reports it as dropped, with its size.
+- ZrP₂O₇'s `th2_offset` is a curve in `Xo`, which
+  [2107](2107-an-equation-over-a-reflection.md) can carry.
 - ZrMo₂O₈'s tutorial (9.2) writes `lor_fwhm` and `gauss_fwhm` through
-  `spherical_harmonics_hkl`, under the same fence ([2107](2107-an-equation-over-a-reflection.md)).
-  The reader reports it as dropped too.
+  `spherical_harmonics_hkl`, which 2107's harmonic can carry.
 
 Rules that apply: `src/rietx/io/CLAUDE.md`, and a reader may repair a file only where it
 can say that it did. **Corpus files are private**: a committed fixture carries synthetic
@@ -56,7 +61,7 @@ root (root CLAUDE.md § Licensing).
 - GSAS-II's stored sequential equations (`SeqParFitEqList`):
   [2106](2106-an-equation-fitted-to-a-series-trajectory.md).
 - Writing parametric `.inp` out.
-- Reflection-level or point-level equations.
+- Point-level equations.
 
 ## Tasks
 
@@ -86,5 +91,8 @@ root (root CLAUDE.md § Licensing).
 
 ## Handover log
 
+- **2026-11-04 (parked)** — Moved to unscheduled at P3 by the maintainer's ruling. Nothing
+  here had started. The inventory above stays useful to the port guide in 2101. Next:
+  nothing until the trigger under § Context fires.
 - **2026-11-04** — Filed on the opening of the milestone. No open WP owned it: 1455 and
   1973 each read one profile or texture construct. Next: the inventory.

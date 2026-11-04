@@ -16,9 +16,15 @@ an accessible and well-documented surface. Built-in heuristics matter less, beca
 these users will write their own. Presets for beginners can follow later, and they
 will expand into the same grammar.
 
+The maintainer's ruling of 2026-11-04: build robust machinery, and do not overfit to
+TOPAS. A primitive is designed on rietx's own terms and tested against a known truth,
+never against matching a TOPAS keyword. Where an input does not import directly, a user
+with a decent agent ports it from the documentation.
+
 The aim the milestone tests: such a user ports their own refinement to rietx with the
-manual alone. A missing primitive blocks them, and a missing check does not. So the
-milestone ranks what an expert cannot express above any new correctness test.
+manual, the skill and their agent. A missing primitive blocks them, and a missing check
+does not. So the milestone ranks what an expert cannot express above any new correctness
+test.
 
 The practice behind the design is `docs/practice.md` § A parameter set by an equation
 the user writes, surveyed across fields on 2026-11-03.
@@ -31,7 +37,8 @@ the user writes, surveyed across fields on 2026-11-03.
 | [2103](../wp/2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | hold, tie, set values, a restart from a result, a profile interval, on a joint fit |
 | [1995](../wp/1995-soft-restraints-in-a-joint-fit.md) | restraints in a joint fit, and a penalty written in the grammar |
 | [2104](../wp/2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) | a shared cell across Le Bail or Pawley patterns |
-| [2105](../wp/2105-a-topas-parametric-input-reads-in.md) | a TOPAS parametric input read into equations |
+| [2107](../wp/2107-an-equation-over-a-reflection.md) | a width, position or intensity set by an equation over a reflection |
+| [2108](../wp/2108-a-pawley-phase-beside-a-rietveld-phase.md) | a structure-free phase beside a structural one |
 | [2106](../wp/2106-an-equation-fitted-to-a-series-trajectory.md) | GSAS-II's practice: an equation fitted to a sequential trajectory |
 | [1965](../wp/1965-a-parametric-equation-declared-by-condition-and-glob.md) | a subset by condition and a target by glob, cut on 2026-11-04 from a formula as well |
 | [1325](../wp/1325-parametric-series.md) | what remains of it: bounds held inside the step, and starting structures that agree |
@@ -41,12 +48,12 @@ the user writes, surveyed across fields on 2026-11-03.
 - Presets for beginners.
 - A kernel over the coordinates ([1963](../wp/1963-a-kernel-over-the-pattern-coordinates.md)).
 - XRD-CT ([1962](../wp/1962-xrd-ct-a-pattern-summed-over-the-voxels-its-beam-crosses.md)).
-- An equation over a reflection or a data point (TOPAS's `scale_pks` over hkl,
-  `lor_fwhm` over hkl, `fit_obj`, and `th2_offset` in `Xo`). **This fence is
-  provisional.** The aim says a missing primitive blocks these users, ZrP₂O₇'s input
-  refines such a curve (`square`, `step_error`), and ZrMo₂O₈'s writes a width in hkl.
-  [2107](../wp/2107-an-equation-over-a-reflection.md) holds the measured scope. The
-  maintainer has not ruled on it.
+- An equation over a data point (TOPAS's `fit_obj`). It adds to the pattern, so it is an
+  expression member of `extra_components`, and no input read needs it.
+- A TOPAS parametric reader ([2105](../wp/2105-a-topas-parametric-input-reads-in.md)),
+  moved out under the ruling above. `read_project_model` stays as it is and says what it
+  did not carry, and the agent ports the rest.
+- Parity with TOPAS's keyword list.
 - New built-in checks. 1325's next-term test and the replicate reading from #1218 are
   parked in that WP.
 
@@ -58,8 +65,8 @@ for the parser, tree and rules, which is recall.
 The documentation comes first because it needs no machinery and tells a user today
 what they can already do. 2102 is small and removes a crash on the way in. 2103 needs
 nothing else for its verbs, and it gives 1964 the tie that the WO₃ protocol needs. 1964
-is the piece the rest stands on. 1995's penalty, 2104's equation on a cell, 2105 and 2106
-all use its grammar. 1325's two tasks stand alone and can land at any point, and the
+is the piece the rest stands on. 1995's penalty, 2104's equation on a cell, 2106 and 2107
+all use its grammar. 2108 stands beside 2104. 1325's two tasks stand alone and can land at any point, and the
 joint path they harden already exists. 1965 is sugar and comes last. Each WP's
 `Priority:` line outranks this paragraph.
 
@@ -90,7 +97,7 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   the printed digits. The input fixes the calibration coefficients at 0, so a second run
   frees them. It converges and each coefficient carries an esd. TOPAS stores nothing for
   that run, so it has no reference. The 2θ curve in `Xo` (0.0105° at 15°, zero at 54°,
-  0.0059° at 90°) waits on the fence ruling under § Scope.
+  0.0059° at 90°) joins the protocol once 2107 lands.
 - **Every evaluator answers one conformance table** (1964). Each row of (expression,
   bindings, expected value or error) passes on numpy, jax and torch. A `polynomial` and
   the same form written as an expression agree to 0.01 esd.
@@ -107,9 +114,14 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
 - **A shared cell works without a structure** (2104). A Pawley or Le Bail joint fit
   sharing a parametric cell over a synthetic ramp, on one pinned seed, recovers the known
   a(T) within 2 esd of the slope.
-- **A TOPAS parametric input reads in, or says why not** (2105). The WO₃ input and a
-  committed synthetic fixture read into equations and variables. Every construct the
-  reader cannot carry raises or reports by name.
+- **An equation over a reflection is correct and safe** (2107). On a synthetic phase,
+  over 12 pinned seeds, every coefficient of a width, a position and an intensity equation
+  has a mean z-score under 0.5 in size, in a single fit and a joint fit. An equation that
+  is not single-valued over a Laue orbit is refused by name. Windows follow the equation,
+  and every analytic column agrees with its oracle.
+- **A structure-free phase sits beside a structural one** (2108). On a synthetic
+  two-phase pattern with one phase's intensities scrambled, the other's structure and both
+  cells are recovered within 2 esd on one pinned seed.
 - **GSAS-II's practice has a home** (2106). An equation in the grammar fits a
   `SeriesResult` trajectory with its esds, the coefficients carry esds, and on a synthetic
   ramp the result agrees with the joint fit's coefficients within their combined esds. A
@@ -120,8 +132,9 @@ a WP sharpens its row here, because a bar set before reading a WP is a bar set t
   tasks that WP keeps are ticked, each under its own test.
 - **A condition and a glob resolve** (1965). A dropped pattern leaves an equation
   covering the same specimens, and a glob's skipped paths are reported.
-- **The manual stands alone** (2101, 1964, 2103, 2105). Every parametric construct in the
-  two inputs has a line in `switching/topas.md` or a named non-goal, and
-  `switching/gsas2.md` says where GSAS-II's practice lands. A fresh agent session given
-  only the manual and the WO₃ input ports it. That run is costed and offered to the
-  maintainer when the milestone is ready to close.
+- **An agent ports an input from the documentation** (2101, 1964, 2103, 2107). Every
+  parametric construct in the Durham inputs has a line in `switching/topas.md` or a named
+  non-goal, and `switching/gsas2.md` says where GSAS-II's practice lands. A fresh agent
+  session given the manual, the skill and an input ports it, for WO₃ and for ZrP₂O₇. Its
+  answers are judged against the hand-written protocols of the rows above. That run is
+  costed and offered to the maintainer when the milestone is ready to close.

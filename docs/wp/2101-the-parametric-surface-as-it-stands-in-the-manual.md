@@ -8,7 +8,8 @@ Priority: P2 2026-11-04 — a feature the open milestone was opened for, and it 
 
 Someone arriving from TOPAS or GSAS-II can find out, from the pages they read first,
 what rietx's parametric refinement does today, how to spell it, and what it cannot
-do yet.
+do yet. An agent can port an input that does not import directly from those pages and
+the skill alone, as the maintainer ruled on 2026-11-04.
 
 ## Context
 
@@ -41,6 +42,13 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
 - [ ] `switching/topas.md`: a section mapping TOPAS's parametric vocabulary to rietx's
   (`prm`, `local`, `#list`, an equation on a `prm`, `!` for fixed). Say what is
   expressible now and what waits on 1964, by that name.
+- [ ] `switching/topas.md` § Porting what does not read: the recipe an agent follows.
+  Read with `read_project_model`, take the list `TOPAS_FEATURES_NOT_IMPORTED` gives, write
+  each item by hand from the keyword table, then compare a stated value such as a cell
+  or an Rwp with the input's own. Include how to expand `#list` and `#define` by hand and
+  where `topas.log` holds the expansion.
+- [ ] Skill: decide whether porting is a task shape of its own (a `references/` file behind
+  a situation row) or a row in the foreign-inputs line, under the skill's placement rule.
 - [ ] `switching/gsas2.md`: the same for GSAS-II's sequential refinement and its
   parametric fit afterwards. Read that program's docs before writing.
 - [ ] `reference/parametric.md`: one table of the target kinds accepted.

@@ -156,7 +156,7 @@ covers (1119 § Gotchas).
 | rigid-bodies | Rigid bodies (was v1.8): a fragment refined as one body, its atoms reported with esds — [WPs](wp/README.md#rigid-bodies): 1801-1813, the seam decided by 1803 and the rest cut from its record | ⬜ **queued 2026-09-30** | written at the open |
 | structure-solution | Structure solution (was v1.9): a difference-Fourier map, a cost from the Pawley intensities, direct-space search — [WPs](wp/README.md#structure-solution): 1901-1902, the map then the cost; #197 and #198 left the fence 2026-09-30 | ⬜ **queued 2026-09-30** | written at the open |
 | generality | Every decision rietx makes holds beyond the data it was tuned on: every verdict, action and threshold tiered, the unproven demoted, a guard against the next one — [§ generality](#generality--every-decision-rietx-makes-holds-beyond-the-data-it-was-tuned-on) | 🔄 **opened 2026-10-18** ([record](milestones/generality.md)) | eight rows written at the open, the record's § Acceptance |
-| parametric | A parametric refinement written by hand ports to rietx: equations as text, shared variables, a joint fit with a single fit's verbs, a TOPAS input read in, and the manual to do it from — [§ parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx) | 🔄 **opened 2026-11-04** ([record](milestones/parametric.md)) | thirteen rows written at the open, the record's § Acceptance |
+| parametric | A parametric refinement written by hand ports to rietx: equations as text, shared variables, a joint fit with a single fit's verbs, equations over a reflection, and the documentation an agent ports an input from — [§ parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx) | 🔄 **opened 2026-11-04** ([record](milestones/parametric.md)) | fourteen rows, the first thirteen written at the open, the record's § Acceptance |
 | v2+ | FPA (with the peaks buffer), neutron TOF, modulated structures, PDF — [§ v2+](#v2--fenced) | ⬜ fenced | — |
 
 ## Work packages
@@ -437,7 +437,7 @@ One seam each, the same task shape: lanes read and tier, the lead tables, the ma
 
 ### parametric — a parametric refinement written by hand ports to rietx
 
-Opened 2026-11-04 by the maintainer ([record](milestones/parametric.md)). The reader is an experienced TOPAS or GSAS-II user, so a missing primitive ranks above a missing check, and presets for beginners wait. The block 21xx is claimed. The manual for what exists today and a crash on the way in come first (2101, 2102), then the grammar (1964), and the rest stands on those. [The WPs](wp/README.md#parametric).
+Opened 2026-11-04 by the maintainer ([record](milestones/parametric.md)). The reader is an experienced TOPAS or GSAS-II user, so a missing primitive ranks above a missing check, and presets for beginners wait. The machinery stands on its own terms, and an agent ports what does not import. The block 21xx is claimed. The manual for what exists today and a crash on the way in come first (2101, 2102), then the grammar (1964), and the rest stands on those. [The WPs](wp/README.md#parametric).
 
 ### Unscheduled
 
