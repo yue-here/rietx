@@ -5371,7 +5371,7 @@ class Refinement:
         McCusker turn-on order *is* the bootstrap ladder — so prepending one
         reproduced stage 1's report to three decimals.)
         """
-        plan = resolve_plan(plan, mode)
+        plan = resolve_plan(plan, mode, self.instrument.geometry.kind)
         owns_split = self._decide_orbit_split()
         try:
             if mode == "lebail" and plan.lebail_passes > 1 and plan.stages:
