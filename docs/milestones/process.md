@@ -642,6 +642,10 @@ one line in Current focus.  Prose, so the WP-1507 rule applies; the rule,
 the measurements and the decisions are in `generality.md`, and the section
 here carries one paragraph.  Landed 614, no headroom.
 
+614 -> 618 for the parametric milestone (2026-11-04, WP-1964): one table row,
+a `###` section of one paragraph and one line in Current focus.  The scope,
+order and acceptance are in `parametric.md`.  Landed 618, no headroom.
+
 ### `gui/CLAUDE.md`
 
 580 -> 612 for WP-1201 (2026-08-25): the house style — one token layer

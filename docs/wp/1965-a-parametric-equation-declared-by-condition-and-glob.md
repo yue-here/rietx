@@ -1,54 +1,31 @@
-# WP-1965 — a parametric equation declared by formula, condition and glob
+# WP-1965 — a parametric equation declared by condition and glob
 
-Milestone: unscheduled · Status: ⬜
-Track: Candidates — named on a use case, not yet on a measurement
-Depends on: 1325 (the declaration this lowers onto)
-Priority: P3 2026-10-14 — writing the lists by hand is the workaround, and no user has asked yet
+Milestone: parametric · Status: ⬜
+Depends on: 1325 (the declaration this lowers onto); 1964 soft (an expression as what a glob expands)
+Priority: P3 2026-11-04 — writing the lists by hand is the workaround, and no user has asked yet; last in the milestone's order
 
 ## Goal
 
-A parametric equation can be declared in the notation statisticians already use.
-Its terms come from a formula string, its subset from a condition on the
-coordinates, and its target from a glob. Each form is lowered to today's
-`ParametricEquation` when the declaration is resolved, so the stored declaration
-keeps its current data form.
+A parametric equation can name its subset by a condition on the coordinates and its
+target by a glob. Each form is lowered to today's `ParametricEquation` when the
+declaration is resolved, so the stored declaration keeps its current data form.
 
 ## Context
 
-Filed as a stub on 2026-10-14, from a review of WP-1325's API against prior
-art, at the maintainer's request to fold the review's findings into 1325 or
-follow-up WPs. These three share one seam (`schemas/parametric.py` and
-`params.parametric.resolve_parametric`), one decision (how a declaration is
-spelled) and a lower priority than 1325's correctness tasks. So they are one
-WP, apart from 1325.
+Filed as a stub on 2026-10-14, from a review of WP-1325's API against prior art. The
+two items share one seam (`schemas/parametric.py` and
+`params.parametric.resolve_parametric`) and one decision (how a declaration is
+spelled).
 
-### A formula for the terms
+### Why a formula left this WP
 
-Today a polynomial's terms are nested lists: `[[], ["T"], ["T", "T"]]` is
-a + b·T + c·T². R, patsy, formulaic and statsmodels all spell a basis as a
-Wilkinson formula (Wilkinson & Rogers 1973). WP-1325 § The shape already
-allowed a formula as input sugar, "parsed to that form by a closed grammar,
-never `I()`", and nobody built it.
-
-WP-1119 declined an expression parser for linear ties, on four grounds. Each
-needs an answer here.
-
-1. **A second parser for one language.** `Parameter.expr` is reserved for an
-   arithmetic language. A Wilkinson formula names basis terms and does no
-   arithmetic, so it is a different language. The overlap is `^` and `*`,
-   below.
-2. **A stored string joins `PROJECT_FORMAT_VERSION`.** Lower the formula at
-   construction and never store it. The resolved declaration stores `terms`,
-   as it does now.
-3. **A silent failure mode.** This one binds. In R and patsy, `x*y` means
-   `x + y + x:y`. Inside a formula, `x^2` (R) or `x**2` (patsy) is crossing
-   to degree 2, and for one numeric column it is just `x`. A power needs
-   `I(x^2)` or `poly(x, 2)`. A grammar that reads `x*y` as the product term
-   alone, or `T^2` as a square, means something else to every statistician
-   who types it. So either follow Wilkinson exactly, with a closed construct
-   for powers, or refuse `*` and `^` and say why. Decide in the first task.
-4. **Pre-empting the TOPAS boundary** that WP-1118 parked. A Wilkinson
-   formula is not TOPAS syntax, so the risk is small.
+This WP also held a Wilkinson formula for a polynomial's terms, the notation of R and
+patsy. The maintainer's track ruling of 2026-11-04 dropped it. WP-1964's grammar
+replaces it: a user writes `a0 + a1*T + a2*T^2`, and a term list stays the data form.
+Keeping both would have given one package two meanings for `*` and `^`, since in a
+Wilkinson formula `x*y` is `x + y + x:y` and `x^2` is crossing. Check that an expression
+linear in its coefficients keeps `polynomial`'s closed-form start, which is 1964's to
+settle.
 
 ### A subset by condition
 
@@ -127,30 +104,22 @@ one declaration per matched path, each with its own coefficients.
 - **2026-10-14, from [1325](1325-parametric-series.md) (seventh session,
   PR #977): a result now carries each equation as resolved.**
   `RefinementResult.parametric_laws[k].tie` is the declaration with its
-  reference and scale filled in, the form a refit passes back. A formula,
-  condition or glob spelling should resolve to that same `ParametricTie`,
+  reference and scale filled in, the form a refit passes back. A condition
+  or glob spelling should resolve to that same `ParametricTie`,
   so a result read back can be refitted whichever spelling declared it.
 
 ## Non-goals
 
-- Storing a formula string. It is lowered at construction.
-- Arithmetic inside a formula (`I()` beyond a closed power construct), and
-  equations nonlinear in their coefficients:
+- A Wilkinson formula, and any other way to write a function:
   [1964](1964-a-parametric-equation-the-user-writes.md).
 - A pandas dependency. A condition reads `CoordinateTable` columns.
 
 ## Tasks
 
-- [ ] Decide the formula grammar: Wilkinson exactly, with a closed power
-  construct, or a refusal of `*` and `^`. Write the decision and its reason
-  here.
-- [ ] The parser, lowering to `terms`. Tests: every formula in
-  `using/series.md` lowers to the hand-written terms, and every refusal
-  names its fix.
 - [ ] A subset by condition, or by label. Decide what is stored, and pin a
   dropped pattern by test: the equation covers the same specimens afterwards.
 - [ ] A glob target, expanded at resolution, with skipped paths reported.
-- [ ] Manual: `using/series.md` § Declaring one shows the new forms beside
+- [ ] Manual: `reference/parametric.md` § Declaration shows the new forms beside
   the data form.
 - [ ] Skill: the series reference's parametric row, or "none" and why.
 
@@ -163,15 +132,15 @@ one declaration per matched path, each with its own coefficients.
 
 ## References
 
-- Wilkinson, G. N. & Rogers, C. E. (1973). *Appl. Stat.* 22, 392-399 —
-  symbolic description of factorial models.
 - Kusne, A. G. et al. (2020). *Nat. Commun.* 11, 5966 — CAMEO.
-- WP-1119 § Decisions taken, 2026-09-04, item 4 (no expression parser for
-  linear ties); WP-1325 § Prior art and § The shape.
+- WP-1325 § Prior art and § The shape.
 
 ## Handover log
 
+- **2026-11-04** — The maintainer's track ruling moved this WP into the `parametric`
+  milestone and dropped the formula, so the file and title were renamed. Next: the
+  condition's stored form.
 - **2026-10-14** — Filed as a stub from a review of 1325's API against prior
   art. No open WP owned declaration syntax: 1325 owns the declaration and
   its correctness, and these three items are sugar over it at a lower
-  priority. Next: the grammar decision.
+  priority.

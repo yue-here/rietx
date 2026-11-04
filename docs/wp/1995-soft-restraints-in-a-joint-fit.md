@@ -1,9 +1,8 @@
 # WP-1995 — Soft restraints in a joint fit
 
-Milestone: unscheduled · Status: ⬜
-Track: Candidates — named on a use case, not yet on a measurement
-Depends on: —
-Priority: P3 2026-10-16 — a raise, not a wrong number, and refining each restrained pattern alone is the workaround; three open WPs name the refusal as their first seam
+Milestone: parametric · Status: ⬜
+Depends on: 1964 soft (the grammar a penalty is written in)
+Priority: P2 2026-11-04 — was P3: the parametric milestone takes it, since an expert's restraints stop at the joint fit, and a penalty is how a bound on a nonlinear target can hold
 
 ## Goal
 
@@ -82,6 +81,15 @@ restraint rows on the penalty side of it.
 
 ### Inherited
 
+- **2026-11-04, from the opening of the [parametric](../milestones/parametric.md)
+  milestone: a penalty written as an expression.** TOPAS has `penalty = expr;`, which
+  adds to χ² (forum 700), and Artemis has a `restrain` parameter type. A joint fit
+  needs one for a second reason. [1964](1964-a-parametric-equation-the-user-writes.md)
+  cannot hold a bound on an equation's target as a box, because the target is not a
+  linear function of the coefficients. TOPAS ignores such a bound silently (forum 767).
+  A hinge written in the grammar is the soft answer. Decide how its weight relates to
+  the data's (root CLAUDE.md: a penalty's λ is weighed against the data's), and whether
+  its rows are one per pattern.
 - **2026-10-23, from [1912](1912-a-polar-axis-has-no-origin.md) (closed): lifting the centroid's joint-fit refusal now belongs to WP-2029.** This WP's Non-goals and References name `multi._refuse_centroid_origin` as "WP-1912's refusal". 1912 closed with the refusal still in place. [WP-2029](2029-whether-the-centroid-fixes-a-polar-origin-by-default.md) task 1 lifts it, either with one origin row block per shared structure or with a fallback to `"hold"`. It reuses this WP's once-per-structure placement if that lands first. Nothing in this WP's scope changes.
 - **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: `HistogramResult.restraints` has no writer.** It is always `None`: `multi.py:1740` never sets it (`schemas/results.py:1178`). `docs/docs/reference/joint.md` documents it so. This WP's restraint reporting for a joint fit is its natural writer.
 
@@ -101,6 +109,10 @@ restraint rows on the penalty side of it.
       blocked layouts agree.
 - [ ] Remove the refusal line from 1325's, 1962's and 1963's seams (forward
       references).
+- [ ] A penalty written in 1964's grammar, as a row block in the same seam, with an
+      exact derivative from the grammar's rules (§ Inherited, 2026-11-04). Tests: a
+      hinge on a target holds it near its bound on a synthetic ramp, and the block joins
+      the cross-backend matrix.
 - [ ] Skill: the series/joint reference's restraint row, or "none" and why.
 
 ## Acceptance
@@ -119,6 +131,8 @@ restraint rows on the penalty side of it.
 
 ## Handover log
 
+- **2026-11-04** — Moved into the `parametric` milestone and re-rated P2 on the
+  maintainer's opening of it, with the expression penalty added. Next: the first task.
 - **2026-10-16** — Renumbered twice as this branch merged main, which took
   1988 and then 1990 for other WPs the same day: filed as 1988, then 1990,
   now 1995. No commit naming 1988 or 1990 is this WP's.
