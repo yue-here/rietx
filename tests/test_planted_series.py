@@ -201,10 +201,10 @@ def test_the_gui_trace_marks_each_event_the_result_carries(planted,
     def marked(result, code):
         return [p["index"] for p in trace(result)["points"] if code in p["marks"]]
 
-    at = EVENT_AT["transition"]
-    assert marked(transition_alone, "SEQUENTIAL_RWP_OUTLIER") == list(range(at, LENGTH))
+    # the Rwp fence's code is gone (WP-2003, C1): the trace marks only what the
+    # result carries as a series verdict, so no pattern is marked by it
+    assert marked(transition_alone, "SEQUENTIAL_RWP_OUTLIER") == []
     got = trace(planted)
-    assert marked(planted, "SEQUENTIAL_RWP_OUTLIER") == signals(planted)["above_fence"]
     bg = EVENT_AT["background"]
     assert got["largest_steps"]["instrument.background.c0"]["indices"] == [bg - 1, bg]
     held = [p["index"] for p in got["points"]
