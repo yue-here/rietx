@@ -99,7 +99,7 @@ run).
 Python 3.12.10, rietx 1.11.0.dev0, compiled tier on, 3-8 s for the script). Seven synthetic
 LaB6 frames from `tests/test_sequential.py`, capillary, cell growing 0.05 % a step, true
 zero shift 0.008°. The instrument is constant by construction, so this shows what each
-route does. It cannot show which route is right on real data, and no real series was run.
+route does. It cannot show which route is right on real data. The real ramp below does that.
 
 | route | setup paths free per frame | rows refined per frame | cell error, mean (ppm) | cell error, sd over frames (ppm) | mean cell esd (ppm) | evaluations, frames only |
 |---|---|---|---|---|---|---|
@@ -119,6 +119,59 @@ default arm's frame 0 again, 37 evaluations. Three readings:
   frame, gives 0.007983(12)° against 0.00797(2)° from frame 0 alone. Calibrating across
   chosen frames, as Yue's step 2 does, is closer to the truth here.
 
+**The same question on a real ramp** (`real_ramp.json`, from `measure_real_ramp.py`; macOS
+arm64, worktree venv `[dev]`, Python 3.12.10, rietx 1.11.0.dev0, about 15 minutes). Seventeen
+CuCr2O4 + CuO patterns from APS 11-BM, 6.8 to 288.7 K (`tests/data/seqrefine_cucr2o4/`,
+development data of WP-2003, unsealed). The instrument is the file's own `.prm`, with an
+8-term Chebyshev background. The model is `Fddd` on every frame. The spinel distorts below
+about 130 K, so b and c are equal in truth above that temperature and split below it
+(Suchomel et al. 2012, by way of `tests/data/README.md`). That gives a truth no fit statistic
+supplies: where the split closes, and how large it is at 10 K (0.00746 Å in the paper).
+
+Every frame of every route converged. "Closes" means |b − c| under 0.0001 Å.
+
+| route | what can take up a change in peak width | b − c closes between | \|b − c\| at 6.8 K (Å), paper 0.00746 | b − c at 288.7 K (Å) |
+|---|---|---|---|---|
+| default | zero and all five profile terms, free on every frame | 111 and 123 K | 0.00554(113) | closed |
+| `lab_sample_refine`, instrument from the `.prm` | the plan's sample widths | 111 and 123 K | 0.00562(90) | closed |
+| cautious plan (scale, background, cell), instrument from the `.prm` | nothing | never | 0.00882(36) | 0.00270(32) |
+| cautious plan, zero and profile from the default's fit of the 6.8 K frame | nothing | 47 and 75 K | 0.00554(80) | closed |
+| cautious plan, zero and profile from the default's fit of the 288.7 K frame | nothing | 220 and 243 K | 0.00826(33) | closed |
+
+Five readings:
+
+- The transition lands at the right temperature only on the two routes where the width can
+  change between frames. The three routes that hold the width put it near 60 K, near 230 K
+  or nowhere. Which frame calibrates moves the transition by about 170 K.
+- The likely mechanism is width against splitting (inferred; no fit tested it). A held width
+  that is too narrow can be widened only by splitting b from c. A held width that is too wide
+  swallows a real split. The default's U runs from 0.0036 at 6.8 K to 0.00031 at 288.7 K, so
+  this specimen's width changes with temperature and no single frame speaks for the ramp.
+- The false split is confident. On the cautious route the gap at 288.7 K is 8 of its esds.
+  Only the 6.8 K calibration tripped the ladder, on four frames. The other two held routes
+  stayed on warm rungs and each raised one code, `SEQUENTIAL_PERSISTENT_FINDING`.
+- A closed gap is the data's answer under that width, and a warm chain does not create it.
+  Eight frames refitted alone from the CIF's gap of 0.00687 Å landed within 1e-6 Å of the
+  chain (`cold_check` in the JSON). On a closed frame the esd of b − c is 0.03-0.07 Å, so a
+  closed frame reports no measurable gap and its "0.0 esds" in the script's output means
+  nothing.
+- The default and the width-free held route agree on the closure and on the split at 6.8 K.
+  What separates them is smaller. The held route's esd on a is 1.8× tighter (36 against
+  64 ppm), and that esd is conditional on the held values. It also carries the `.prm`'s zero of
+  0 against the default's −0.0009°, which moves all three axes by about +75 ppm. Against the
+  paper's cell the default's three errors average −8 ppm and the held route's +67 ppm. That is
+  one comparison, 6.8 K against 10 K.
+
+This does not show the traditional route failing. Steps 4 and 5 of Yue's account are one
+sequence, and a scientist who reached step 5 would free sample width, as the `lab_sample_refine`
+row does. It shows that the cautious pass read on its own, on a specimen whose width
+changes, gives a false transition with a small esd. No route recovers the paper's split:
+routes whose width was fitted at 6.8 K read 25-26 % low, and the other two held routes read
+11-18 % high. Anisotropic strain was not tried. The ramp is one specimen on development data, the scans need not be the
+paper's, and the model's b is the paper's c (an axis relabelling, compared in the paper's
+order). The frame-0 plot shows a low-angle hump near 1.5° that the Chebyshev leaves in the
+difference curve; its effect on the cell was not measured.
+
 ### The map: Yue's five steps against the tree
 
 Read on `d7b62a3ac`. A row is marked *checked* where the tree was read or searched,
@@ -128,11 +181,11 @@ Read on `d7b62a3ac`. A row is marked *checked* where the tree was read or search
 |---|---|---|---|
 | 1. Look at the raw series | `plot_pattern` draws one pattern. The GUI's Series panel lists each staged file's name, reader, points, range and σ, and draws one frame's fit after the run. `rietx watch` draws a run's snapshots. `plot_trajectory` needs a finished series. `rx.diagnose`, `rx.pick_peaks` and `rx.fit_peaks` work per pattern. | Any view of several patterns before a fit. "Waterfall", "heatmap" and "contour" have no hit in `src/` or `gui/src/`. WP-1444 and WP-1317 each rule it out of scope as later work. Nothing computes a statistic over the raw series, such as a frame-to-frame correlation. `SeriesResult.steps` exists only after a fit. | checked |
 | 2. Fit each phase where its signal is strong | One fit over chosen frames exists: `refine_multi` with one structure per frame and `SharingMap(per_histogram=["phases.*.cell.*"], shared=["instrument.profile.*", "instrument.zero_shift"])`. `list_scans` gives each scan's temperature for Bruker `.raw` v3 only. | Nothing picks or helps pick the frames, so the choice is by hand from a view step 1 lacks. Nothing passes the joint fit's profile into a series except the caller's own code. A phase unseen on one chosen frame was not tried. | checked; joint fit measured on one phase |
-| 2. Calibrate profile and background on one frame, then carry them | Two calls: fit the frame, then pass `ref.fitted_structure` and `ref.fitted_instrument` as the series' start. `save_instrument_profile` and `load_instrument_profile` carry the profile between sessions, and leave out the background and displacement by design. | A way to say this in one call. A series' `plan` runs on frame 0 and, collapsed, on every later frame, so one `fit` cannot free a parameter on frame 0 only without the three hooks of the measurement below. The series guide teaches neither route. | measured |
+| 2. Calibrate profile and background on one frame, then carry them | Two calls: fit the frame, then pass `ref.fitted_structure` and `ref.fitted_instrument` as the series' start. `save_instrument_profile` and `load_instrument_profile` carry the profile between sessions, and leave out the background and displacement by design. | A way to say this in one call. A series' `plan` runs on frame 0 and, collapsed, on every later frame, so one `fit` cannot free a parameter on frame 0 only without the three hooks of the measurement below. The series guide teaches neither route. Nothing says which frame to use, and on the real ramp that choice moved the transition by about 170 K. | measured |
 | 3. An evolving background | Every preset frees `instrument.background.*` on every frame from the neighbour's value. Chebyshev and penalised P-spline backgrounds are available, and the P-spline's penalty acts along 2θ inside one pattern. `prepare` can rewrite the background per frame. `BackgroundFixedPlusChebyshev` holds a measured curve with a refinable scale. A joint fit can target a background coefficient with a `ParametricEquation`, so it can follow a declared function of temperature (docstring; not run). | Any link between frames inside a chain, such as a limit on how far the background moves between neighbours. `report.background.worst_absorption`, which measures a background imitating peaks, is per fit. `SeriesResult` does not carry it, so a chain cannot report the trading Yue calls tricky, and a caller must build each report from `results_`. | checked |
 | 3. Spectator phases | A spectator can be a Rietveld phase, a `PeakComponent` per line (a declared peak with a free centre), or a measured curve in `BackgroundFixedPlusChebyshev`. `prepare` may add or remove a phase on a frame, and trajectories join by name (WP-1991). | A Pawley or Le Bail spectator beside a Rietveld phase. `mode` is one value for a whole fit, `CompiledModel.mode` is one value, and `Phase` has no mode field. A series takes one `mode`. | checked |
 | 3. Exclusion regions across the series | `PatternData.excluded_regions` is per pattern, so a caller may give each frame its own list. `two_theta_limits` is one range for the series. The GUI copies the project's regions onto every frame (`gui/series.read_members`). | A series-level argument in the API. Any warning when a reflection moves into or out of a region: nothing in `report/`, `model/` or `sequential.py` compares the two. The only mention of the regions in a fit's output is the summary line that lists them. | checked |
-| 4. A cautious first pass | A custom `RefinementPlan` or `PlanSpec` freeing scale, background and cell works, and `constrain` can hold more. The ramp's second row above is this. | A preset or a guide. `lab_sample_refine` releases more than this step does, and no other general preset fixes the instrument. | measured |
+| 4. A cautious first pass | A custom `RefinementPlan` or `PlanSpec` freeing scale, background and cell works, and `constrain` can hold more. The ramp's second row above is this. | A preset or a guide. `lab_sample_refine` releases more than this step does, and no other general preset fixes the instrument. On the real ramp this pass with no width freedom invents a split that never closes, so a guide must say what it cannot be read for. | measured |
 | 5. Gradual release across the whole series | Nothing built for it. rietx's stages run inside one frame. `refit="stages"` re-walks the plan on each frame from its neighbour's answer, which is still one pass. A second `fit` starts again from the models the object was built with, and frame 0 runs cold. | A way to run pass 2 from pass 1's trajectory. It can be forced: a `prepare` hook writes each frame's first-pass values over the carried ones (the ramp's last row, about ten lines for a cubic phase, each released parameter by hand). The cold rung then starts from that frame's own answer too (measured). The record does not know: `entry.rung` says `warm` and `seeded_from` names the neighbour. `fitted_structures` holds one model per entry, so its positions shift after a failed frame. Nothing links the two passes or compares them. | measured |
 
 Step 5 is the plainest gap. A human's release stages go over the whole series, and rietx's
@@ -275,8 +328,9 @@ cold rung. Any default for later frames falls under Rule 4 of `docs/DESIGN.md` �
 
 None is ruled. Rwp is inadmissible as evidence for any default here (Rule 4). Admissible
 evidence is a cell or fraction against a known truth or an independent measurement, an esd,
-and the movement of a setup parameter against its own esd. The ramp above is synthetic with
-a constant instrument, so a real series is owed before a default moves.
+and the movement of a setup parameter against its own esd. One real ramp is above. It has a
+known truth for one quantity, so it can veto a route but cannot choose a default alone. A
+series with a real change of setup, such as a heated lab specimen, was not run.
 
 1. **What does a series do on the frames after the first, by default?** It serves whoever
    calls `refine_sequential` with no plan, whoever fills the GUI's Series panel, and an
@@ -293,13 +347,27 @@ a constant instrument, so a real series is owed before a default moves.
    The same gate applies to today's default, because the traditional sequential is a
    named dissent to freeing the setup on every frame. Neither behaviour is unanimous.
 
+   The real ramp bears on three options. Option e is safe there only if the frames keep
+   somewhere for the specimen's width to go: holding the instrument and freeing sample
+   widths matched the default's closure, and holding every width did not. So a notion of
+   "setup" must exclude the width the specimen adds. Option d's statistic needs rethinking.
+   Across the default's chain no setup parameter moved more than 1.9 of its own esds, yet
+   freezing the width at either end of that range moved the transition by tens of kelvin or
+   more. The marginal esds of five correlated profile terms are large (the cause is
+   inferred), so a report in those units would have said nothing moved. A width at a stated
+   2θ, propagated through the covariance, is a candidate and was not measured. Option a's
+   guide must warn that the cautious pass alone cannot be read for a split or a width.
+
 2. **How is "refine once, then freeze" spelled?** It serves a scientist with a script and
    an agent following the skill. Today it takes two calls, or three hooks. A spelling must
    say which frame or frames calibrate, because Yue's step 2 picks them by signal and frame
-   0 need not be the strongest. Candidates: a documented two-call recipe; the declaration of
-   question 1(c); a calibration step over chosen frames built on the joint fit, which
-   measured closer to the truth above. It also has to say which parameters follow a
-   predictable change, since Yue's account allows for that as well as for constants.
+   0 need not be the strongest. On the real ramp neither end frame was a safe calibration,
+   and only an instrument measured apart from the series gave the right closure, with widths
+   free. Candidates: a documented two-call recipe; the declaration of question 1(c); a
+   calibration step over chosen frames built on the joint fit, which measured closer to the
+   truth on the synthetic ramp and was not tried on the real one. It also has to say which
+   parameters follow a predictable change, since Yue's account allows for that as well as
+   for constants.
 
 3. **Do stages run over the whole series?** It serves anyone releasing parameters
    gradually (Yue's step 5). Today a stage is inside one frame. Candidates: a
@@ -382,6 +450,9 @@ The rulings are in this file and the follow-up work is filed.
 .venv/bin/python docs/wp/2081-batch/measure_routes.py
 ```
 
+`measure_real_ramp.py` stays out of this list because it takes about 15 minutes. Its `--report`
+flag reprints the saved numbers without fitting.
+
 ## References
 
 - `src/rietx/sequential.py` (`_fit_one`, `_chain`, `_ladder`, `_collapse`,
@@ -395,6 +466,8 @@ The rulings are in this file and the follow-up work is filed.
 - Stinton, G. W. & Evans, J. S. O. (2007). Parametric Rietveld refinement. *J. Appl.
   Cryst.* 40, 87-95.
 - Issue #224 (a warm rung that raises and a cold rung that does not).
+- Suchomel, M. R. et al. (2012), the CuCr2O4 ramp's reference; the citation is in
+  `tests/data/README.md`.
 
 ## Handover log
 
@@ -412,12 +485,19 @@ The rulings are in this file and the follow-up work is filed.
   with `routes.json`. Re-verified the five-point code reading on `d7b62a3ac`, correcting
   one word: `HOLD_BLOCKED_PLAN` is an `info` diagnostic. `measure_cold_rung.py` still runs
   and reproduces its table. PR #1310's state is written from `gh pr view` and its diff.
-  Practice survey added to `docs/practice.md`.
+  Practice survey added to `docs/practice.md`. Ran one real ramp beyond the brief
+  (`measure_real_ramp.py`, `real_ramp.json`) because the synthetic ramp's constant
+  instrument could not say which route is right. Holding every width put the CuCr2O4
+  transition near 60 K, near 230 K or nowhere, against about 130 K. The default and
+  `lab_sample_refine` from the `.prm` both closed between 111 and 123 K.
 
   *Gotchas.* `measure_routes.py` patches `_fit_one` on the same positional signature as
   `measure_cold_rung.py`. Its `prepare` hook copies a cubic phase's released values by
-  hand, so it is an existence proof and no recipe. The ramp's instrument is constant by
-  construction, and that flatters every held route.
+  hand, so it is an existence proof and no recipe. The synthetic ramp's instrument is
+  constant by construction, and that flatters every held route. `measure_real_ramp.py`
+  takes about 15 minutes, so use `--report`; `--step-two` and `--cold-check` rerun parts.
+  Its printed "combined esds" line means nothing on a closed frame, where the esd of b − c
+  is 0.03-0.07 Å. GoF is in the JSON and was used for nothing.
 
   *Next:* the discussion with Yue (task 1), starting at question 1.
 
