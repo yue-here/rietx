@@ -398,6 +398,27 @@ series honours. And the cold rung restarts a pattern from the initial models, wh
 other program does (the restart table above), so what a held value is on that rung is a
 question only rietx has.
 
+How a person works a series. Surveyed 2026-11-04 for WP-2081, one session, against Yue's
+account of the traditional workflow recorded there. GSAS-II 5.8.4 is read in its source:
+`GSASIIplot.py` (the multi-pattern key commands, `:2067`, `:2213`), `GSASIIpwdplot.py` (`:140`),
+`GSASIIstrMain.py:996-1000`, `GSASIIstrIO.py:3019-3027` and `GSASIIpwdGUI.py:2506-2520`
+(`OnLimitCopy`). FullProf rests on its manual (`FullProf_Manual.pdf` shipped with 8.20: `Jbt`,
+`Nex` and the multi-pattern lines). TOPAS is recall only. MAUD, BGMN with Profex, RIETAN-FP
+and EasyDiffraction were not surveyed for this topic, and the literature was not searched.
+
+| Program | A view of the raw series before any fit | A second pass over the series | Rietveld beside Pawley or Le Bail in one fit | Excluded regions across a series |
+|---|---|---|---|---|
+| rietx | none: `plot_pattern` draws one pattern and the GUI's Series panel draws a frame only after the run (checked) | no verb. A `prepare` hook can start each frame from its own earlier answer, and the record still names the neighbour (measured, WP-2081) | no: `mode` is one value for a fit, and `Phase` has no mode field (checked) | a list on each `PatternData`, and the GUI copies the project's regions to every frame. Nothing reports a reflection crossing a region's edge (checked) |
+| GSAS-II | waterfall and contour plots over several histograms (checked) | with `Copy2Next` off, its default, each histogram starts its phase parameters from its own result in an earlier sequential run (`elif histogram in SeqResult`, checked) | per phase: `doPawley` on the phase, and a `LeBail` flag per phase and histogram (checked) | per histogram under Limits, and "Copy limits" copies them to other histograms (checked). Any warning for a reflection crossing an edge was not checked |
+| FullProf | not checked (WinPLOTR was not read) | the user reruns the cyclic mode on the rewritten PCR (inferred) | per phase: `Jbt` 0 is Rietveld and 2 is profile matching, in one PCR (checked in the manual) | `Nex` regions per pattern in a multi-pattern PCR (checked); cyclic mode reuses one PCR, so one list for every file (inferred) |
+| TOPAS | not checked | the user's script (inferred) | a `str` phase beside an `hkl_Is` phase in one `xdd` (recall) | `exclude` per `xdd` (recall) |
+
+Two of these change the comparison with rietx. A second pass is free in GSAS-II because each
+histogram keeps its own values between runs. rietx's chain starts every later frame from a
+neighbour, so its stages stay inside one frame. And GSAS-II and FullProf (TOPAS by recall)
+let a phase be fitted without a structure beside one fitted with a structure, where rietx
+sets that for the whole fit.
+
 ## A pdCIF weight column with bad entries
 
 Surveyed 2026-10-26 for PR #1173, by the lead. The question: a `_pd_proc_ls_weight` column with
@@ -673,6 +694,29 @@ first at ζ = 0 raised Rwp from 8.22 % to 10.81 % (his Table 2).
 So no program reports a fit that leaned on the clamp, and a TOPAS Stephens fit carries no
 evidence that σ²(M) stayed positive. A protocol that refines ζ cannot be mirrored in rietx
 (WP-0503's fence).
+
+## Testing the residual for serial correlation
+
+Surveyed 2026-11-04 for WP-2086, which reads Hill & Flack's test as a decision. Their paper
+(1987, J. Appl. Cryst. 20, 356, eq. 2, read) sets Q = 2[(N−1)/(N−P) − 3.0902/(N+2)^½], the
+0.1 % point, and reads d < Q as neighbours sharing a sign and d > 4 − Q as neighbours
+alternating.
+
+| Program | d | The threshold it states |
+|---|---|---|
+| rietx | `Statistics.durbin_watson`, printed as `DW` | Q as the paper prints it, used to gate the instrument half of the unseen-phase hold and never printed |
+| FullProf 8.20 | `DW-Stat.` in the `.sum` file (ran) | `DW-exp`, printed by default. The manual's QD (eq. 3.20) and the output are the paper's Q with 3.0901: N − P 5723 and 5275 give the printed 1.9301 and 1.9277 to the digit (ran on `pbso4.sum`, N from N−P+C and P = 34) |
+| RIETAN-FP 3.12 | defined in the manual, § Durbin–Watson statistics | the paper's Q, manual eq. 4.32, and its 4 − Q |
+| GSAS-II 5.8.4 | `Histogram['Residuals']['Durbin-Watson']`, `GSASIIstrMath.py:4995` | none |
+| TOPAS (Tech. Ref. v9) | among the criteria of fit, § 5.19 | none stated |
+| BGMN, MAUD, EasyDiffraction | no match for "durbin" in the BGMN and EasyDiffraction trees or MAUD's java source (searched by file text, not read, and PDFs not searched) | none found |
+
+On white noise of 3000-22 000 points (200 000 draws, 60 000 at the largest, not fitted, P 12-34),
+the one-sided test d < Q fires 0.17-0.41 % of the time.
+
+Every program that has the test reports it. None gates an action on it, and none holds an
+instrument term because no phase is seen (§ Staging and what a stage holds; `StageResult.held`'s
+audit row). So rietx's use of the threshold is its own, and the number is the paper's.
 
 ## Sources
 

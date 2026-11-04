@@ -563,10 +563,6 @@ from .._nearmiss import did_you_mean
 #: ``ExtinctionScreen.reference_rwp_net``, the cell-free Le Bail's Rwp and the
 #: reference fit's background-subtracted Rwp, and ``"unreliable"`` as a
 #: ``status`` value.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule.
-#: Also in 0.60 (WP-1969, #933): ``PeakFlag`` gains ``residue_misfit``, written
-#: only by ``index_residue`` on a pick standing on the subtracted phase's
-#: profile.  Additive: no existing list carries it, and an older build refuses
-#: a list that does.
 #: Also in 0.60 (WP-2033): ``ExtinctionPrior.z``, ``.density``, ``.formula`` and
 #: ``.ordered``, ``ExtinctionCandidate.exclusion_reasons``, ``.special_positions``
 #: and ``.count_notes``, and ``ExtinctionScreen.z``, ``.z_from_density`` and
@@ -668,7 +664,11 @@ from .._nearmiss import did_you_mean
 #: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
 #: where it defaulted to 0.0.  A stored document that omits it still opens, at
 #: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
-SCHEMA_VERSION = "0.60"
+#: 0.60 → 0.61 (WP-1969, #933): ``PeakFlag`` gains ``residue_misfit``, written
+#: only by ``index_residue`` on a pick standing on the subtracted phase's
+#: profile.  Additive: no existing list carries it, and an older build refuses
+#: a list that does.
+SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated

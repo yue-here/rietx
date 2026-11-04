@@ -37,6 +37,7 @@ import numpy as np
 from pydantic import Field
 
 from ..optimize import lapack
+from ..optimize.statistics import durbin_watson
 from ..schemas.common import Base, Diagnostic
 from ..schemas.pattern import PatternData
 from .estimators import arpls
@@ -93,7 +94,8 @@ def _bic(rss: float, m: int, k: int) -> float:
 
 
 def _durbin_watson(r: np.ndarray) -> float:
-    return float(np.sum(np.diff(r) ** 2) / max(np.sum(r * r), 1e-300))
+    # a residual of zero stops nothing: 0.0 keeps the order scan going
+    return durbin_watson(r) or 0.0
 
 
 def select_chebyshev_order(data: PatternData, *, max_order: int = CHEBYSHEV_MAX_ORDER,
