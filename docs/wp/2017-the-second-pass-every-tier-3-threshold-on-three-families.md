@@ -132,6 +132,28 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
       distance, with obs/calc/diff PNGs to `tests/output/` for each refit used.
 - [ ] Each row's evidence line updated; a row a test now bounds moves to tier 1 or
       `invariant` with the test named; a row that fails goes to a batch for the maintainer.
+- [ ] Tell a blank frame with structure from a phase whose peaks missed (from WP-2086,
+      PR #1406). WP-2086 holds the instrument on a frame where every phase reads unseen
+      only when the residual is noise: Durbin-Watson d ≥ Q, Hill & Flack's (1987) 0.1 %
+      point. Q is 1.91 at 4200 channels and 1.96 at 21 001. Fourteen blank frames with
+      structure read under Q, at d 0.34-1.49. The real empty Kapton capillary reads
+      0.43-1.04 (one pattern, at 6 and 12 background terms), six synthetic humps 0.34-1.49
+      and six rebinned-noise frames 0.64-1.02. Strong phases whose peaks missed read
+      0.02-0.12. A weak phase that stayed misplaced reads 0.14-1.85, across the whole blank
+      range. Raw rows: `~/.cache/ghostshift/rietx/wp-2049/step/disc.jsonl` and
+      `blank_fix.jsonl`, not committed; the rebinned and weak-phase figures are from
+      WP-2086's handover.
+      What a user sees today: these frames stay free as on 1.10.0. Four of the 14, all
+      synthetic, refined a zero shift on nothing, each within 2 esd of zero (0.0048 ±
+      0.0255° to −0.0029 ± 0.0016°), with U up to 0.38 deg². Kapton stayed at scale 0 and
+      zero 0. `PHASE_UNCONSTRAINED` fired on the eight frames whose codes were recorded and
+      names the unseen phase. No finding says the instrument stayed free, and the zero
+      carries an esd as a measurement does.
+      A threshold chosen between 0.12 and 0.34 would be tuned to these frames and would read
+      a weak missed phase as blank. So this needs a design, and evidence from more than this
+      one fixture set: no real blank frame has yet been seen to pass the check, and the one
+      real frame here is from 11-BM. The threshold and anything the reader sees are the
+      maintainer's calls.
 - [ ] The batch, in the register of `~/.claude/CLAUDE.md`, if any row failed.
 
 ## Acceptance
@@ -152,5 +174,7 @@ No row this WP lists still names the second pass as owed.
 - PR #1050's second read of the batch (Mike Gaultois, 2026-10-20).
 
 ## Handover log
+
+- **2026-11-04** — Task added from WP-2086's review: tell a blank frame with structure from a phase whose peaks missed. Numbers re-read from the raw rows. With the synthetic humps the 14 frames span d 0.34-1.49, past the 0.43-1.04 quoted for Kapton, and Kapton's Q is 1.96 at its 21 001 channels. Nothing new measured, no code. PR #1408.
 
 - **2026-10-20** — Filed by WP-2002's session at the maintainer's request ("split"): the second pass moves here so that 2002 closes on its owed tests and B14's lifts. Nothing measured yet.
