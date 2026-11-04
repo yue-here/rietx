@@ -674,6 +674,29 @@ So no program reports a fit that leaned on the clamp, and a TOPAS Stephens fit c
 evidence that σ²(M) stayed positive. A protocol that refines ζ cannot be mirrored in rietx
 (WP-0503's fence).
 
+## Testing the residual for serial correlation
+
+Surveyed 2026-11-04 for WP-2086, which reads Hill & Flack's test as a decision. Their paper
+(1987, J. Appl. Cryst. 20, 356, eq. 2, read) sets Q = 2[(N−1)/(N−P) − 3.0902/(N+2)^½], the
+0.1 % point, and reads d < Q as neighbours sharing a sign and d > 4 − Q as neighbours
+alternating.
+
+| Program | d | The threshold it states |
+|---|---|---|
+| rietx | `Statistics.durbin_watson`, printed as `DW` | Q as the paper prints it, used to gate the instrument half of the unseen-phase hold and never printed |
+| FullProf 8.20 | `DW-Stat.` in the `.sum` file (ran) | `DW-exp`, printed by default. The manual's QD (eq. 3.20) and the output are the paper's Q with 3.0901: N − P 5723 and 5275 give the printed 1.9301 and 1.9277 to the digit (ran on `pbso4.sum`, N from N−P+C and P = 34) |
+| RIETAN-FP 3.12 | defined in the manual, § Durbin–Watson statistics | the paper's Q, manual eq. 4.32, and its 4 − Q |
+| GSAS-II 5.8.4 | `Histogram['Residuals']['Durbin-Watson']`, `GSASIIstrMath.py:4995` | none |
+| TOPAS (Tech. Ref. v9) | among the criteria of fit, § 5.19 | none stated |
+| BGMN, MAUD, EasyDiffraction | no match for "durbin" in the BGMN and EasyDiffraction trees or MAUD's java source (searched by file text, not read, and PDFs not searched) | none found |
+
+On white noise of 3000-22 000 points (200 000 draws, 60 000 at the largest, not fitted, P 12-34),
+the one-sided test d < Q fires 0.17-0.41 % of the time.
+
+Every program that has the test reports it. None gates an action on it, and none holds an
+instrument term because no phase is seen (§ Staging and what a stage holds; `StageResult.held`'s
+audit row). So rietx's use of the threshold is its own, and the number is the paper's.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
