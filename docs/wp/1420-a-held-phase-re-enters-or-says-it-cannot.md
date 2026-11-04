@@ -160,66 +160,16 @@ down.
   issue #481's sweep the change moved 1 of 64 weak real fits from refined to
   held (planted 1.2e-7, `mccusker_structural`, 2.46σ), so a re-entry count
   taken before 2026-10-12 can move by that much.
-- **2026-10-04, from WP-1523: the hold's threshold moved, so re-measure
-  before quoting.** A phase is now seen when its scale is 3σ from zero by its
-  marginal esd against counting noise (`refine._answer_significance`). The old
-  test was one point at 1σ. The stage-start hold reads the screen
-  ‖y_p/σ‖₂ ≥ 3, and the release reads the marginal with the held columns freed
-  for the measurement. A weak phase now re-enters later than it did: at scale
-  3e-8 on issue #481's frame, 1 of 8 fits saw it, against 6 of 8 before. Any
-  re-entry count in this file was taken under the old rule.
-- **2026-10-03, from a cleanup session: the guard is 300 s.** This WP's own
-  commit `b333ca09` (2026-09-30) had widened `RAMP_RUNAWAY_GUARD_S` to 300 s
-  and fixed the root CLAUDE.md's count of λ-scaled size terms, but was never
-  pushed from its tree. It is cherry-picked as `6336c65c` (CLAUDE.md rewrapped
-  to hold its line cap) and closes issue #539. The ramp-guard halves of the
-  three entries below are discharged; the iteration bar's name (#538,
-  WP-1334) is not.
-- **2026-10-02, from WP-1534: a fifth trip of the ramp guard.**
-  `test_the_ramp_reproduction_no_longer_runs_away` measured 81.6 s on
-  WP-1534's branch and 81.9 s on its untouched base, against the 60 s guard.
-  Both ran under `-n auto` in a 15-file selection, `[dev]`, Linux x86-64,
-  4 cores. Alone it took 16.6 and 17.2 s. The chain ran the same 1609
-  iterations with WP-1534's new scale–B probe on and off, so the probe adds
-  nothing to this fixture.
-- **2026-09-30, from the issue triage (issue #539, which is this note's
-  fourth trip): the ramp guard fails on every loaded 4-core run.**
-  `RAMP_RUNAWAY_GUARD_S` is still 60 s at `tests/test_held_phase.py:685`
-  (*checked at `e3e6486a`*). The reporter's table: 76.2, 138.3, 96.9 and
-  135.1 s under `-n auto` (load 9-11) against 18.85 s alone, `[dev,jax]`,
-  Linux x86-64, 4 vCPU; every other assertion passed, `iterations <
-  RAMP_MAIN_UNBOUNDED_ITERATIONS` included. That is 3.2× serial, under
-  `tests/CLAUDE.md` § Budgets' "several times". The suggested fix is the one
-  already written below: keep the iteration bar, widen the guard to the
-  runaway (300-600 s, the `REAL_DATA_BUDGET_SECONDS` precedent). **One
-  caution from issue #538:** `n_iterations` holds scipy's `nfev`, so the
-  2164 bar is an evaluation count. It still separates 1609/1659 from a
-  runaway, but the name is wrong until #538 is settled (WP-1334 holds it).
-  Because it is a required-check-shaped flake on merges, consider taking the
-  guard change now rather than with the rest of this WP.
-- **2026-09-29, from [1469](1469-what-the-series-fences-cannot-see.md): a
-  phase fitted to noise can pass the support test, which is this WP's hold.**
-  Issue #481's blank frame, fitted alone, released its held cell after the
-  `cell` stage and reported it with no `PHASE_UNCONSTRAINED`: the phase's
-  support at the answer was 2.14σ on a scale 1.3σ from zero. It needs no
-  chain, so it is filed as
-  [1523](1523-a-phase-fitted-to-noise-passes-the-support-test.md); read it
-  before relying on the hold's release rule here, since a fix there changes
-  which phases this WP sees held. **And the ramp guard below tripped a third
-  time**: 112 s against its 60 s `RAMP_RUNAWAY_GUARD_S` while a second
-  selection ran beside a `-n 4` run on four cores, 17.1 s alone (`[dev]`,
-  Linux x86-64). The runaway it guards ran past 13 minutes, so a guard of
-  300-600 s still separates the two; this WP remains the one to widen it or
-  move the claim to the iteration count, as the WP-1333 note says. (Briefly
-  filed as its own WP from 1469's session, then folded back here.)
-- **2026-09-28, from [1338](1338-the-skills-own-gates.md): `references/diagnostics.md` is closed to growth.**
-  Every skill file now has a ceiling and a budget below it
-  (`tests/skill_caps.py`), and the budget fails a change that grows a file
-  past it. `diagnostics.md` (35 111 B) and `diagnostics-indexing.md`
-  (35 124 B) sit over their 34 600 B budget, so a row this WP adds there
-  comes with an equal cut in the same change, or goes to the file a reader
-  meets the code in (the criterion in the `REFERENCE_MAX_BYTES` comment).
-  CI's lint job reports each changed file's headroom on the draft PR.
+- **2026-10-04, from WP-1523: the hold's threshold moved.** A phase is seen
+  when its scale is 3σ from zero by its marginal esd against counting noise
+  (`refine._answer_significance`); the stage-start hold reads the screen
+  ‖y_p/σ‖₂ ≥ 3. Every count in § Context's table was taken under the old 1σ
+  rule; the 2026-11-04 re-measurement below is the one taken under this one.
+- **2026-09-28, from [1338](1338-the-skills-own-gates.md), re-measured
+  2026-11-04: the skill's series codes live in `references/series.md`, not
+  `diagnostics.md`.** `series.md` stood at 34 570 B against its 34 600 B
+  budget (`tests/skill_caps.py`), so a row this WP adds there comes with an
+  equal cut in the same change.
 
 **From WP-1463 (2026-09-28): the 16-of-48 side effect below is resolved.** A
 leaving phase whose scale ends anywhere down to about 1e-300 now keeps every
@@ -291,19 +241,6 @@ working as designed. Whether the package should find the windows itself stays
 this WP's question. This session shows a caller can, at about 336 fits. One
 side effect belongs elsewhere. On 16 of the 48 results a leaving phase's scale
 at zero withheld every weight-fraction esd, which is WP-1463.
-
-**From WP-1333 (2026-09-23): the ramp reproduction's wall-clock guard is a
-load sensor.** `tests/test_held_phase.py::test_the_ramp_reproduction_no_longer_runs_away`
-failed in WP-1333's full run (`[dev]`, Linux x86-64, 4 cores, 1:24:44). It
-passed alone, and in that session's slow-series run. Measured serially, the
-chain takes 9.1 s compiled and 11.2 s on the numpy path, against its 60 s
-`RAMP_RUNAWAY_GUARD_S`, with 1609 and 1659 iterations against the 2164 bar. So
-every deterministic assertion holds on both paths, and only the guard can
-move with load, on a run whose fixtures were up to 3.4× slower than CI's
-nightly. About 6× margin is under what `tests/CLAUDE.md` § Budgets calls
-several times, and this WP will add rows to that file, so it is the one to
-widen the guard or move the claim to the iteration count, which already
-carries it.
 
 **From WP-1333 (2026-09-22).** The chain now says one of this WP's silences
 out loud. `SEQUENTIAL_PATH_CHECK_INCOMPLETE` at `info` names every path some
