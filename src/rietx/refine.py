@@ -120,6 +120,7 @@ from .optimize.statistics import (
     berar_lelann_factor,
     compute_statistics,
     data_support,
+    residual_is_noise,
     structure_r_factors,
 )
 from .params.multi import _unscoped
@@ -637,6 +638,14 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     leaves their columns identically zero, so with every phase lineless they
     are held from the start.
 
+    **Unseen is not flat until the residual says so.**  A zero scale says these
+    peaks are not in the data, which a blank frame and a phase whose peaks
+    missed both say.  The second leaves every real peak in the residual, and
+    its zero shift and widths are how it reaches them: on tutorial 05's 2 %
+    step, U climbing to 6 deg² took the scale from 2.47σ to 83σ and the cell
+    home.  So the hold at an answer also needs a residual with no structure,
+    :func:`_peak_columns_flat_at_answer`.
+
     ``tried`` is what the previous stage's answer held.  A column there was
     free for that stage's first solve, and the phases were judged unseen with
     it free, so this stage holds it from its start: WP-1523's prior, one
@@ -658,7 +667,8 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     # and with every phase unseen, an instrument column reaching the pattern
     # through phase peaks alone is as flat as their cells (WP-2049)
     tried = set(tried)
-    every = _every_phase_unseen(model, absent if at_answer else lineless)
+    every = (_peak_columns_flat_at_answer(model, table, absent, lineless)
+             if at_answer else _every_phase_unseen(model, lineless))
     prior = not every and bool(tried) and _every_phase_unseen(model, absent)
 
     def flat(p: str) -> bool:
@@ -1596,6 +1606,30 @@ def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
     """
     return path.startswith("instrument.") and (
         path in _AXIAL_PATHS or model.scalar_chain_supported(path))
+
+
+def _residual_is_noise(model: CompiledModel, table: ParameterTable) -> bool:
+    """:func:`~rietx.optimize.statistics.residual_is_noise` of the fitted
+    channels at the table's values.  A channel an excluded region removed is
+    not in ``model.y_obs``, so it cannot read as structure.  One forward
+    evaluation, spent only where every phase is already unseen."""
+    y = np.asarray(model.evaluate(table.decode(table.x0())), dtype=np.float64)
+    delta = (np.asarray(model.y_obs, dtype=np.float64) - y) / np.asarray(
+        model.sigma, dtype=np.float64)
+    return residual_is_noise(delta, len(table.free_paths))
+
+
+def _peak_columns_flat_at_answer(model: CompiledModel, table: ParameterTable,
+                                 absent: set[int], lineless: set[int]) -> bool:
+    """Whether the instrument's peak-only columns are flat at a stage's answer:
+    every phase is unseen, and either none has a line in range, so the columns
+    are identically zero, or the residual is noise and nothing is left for them
+    to find (Hill & Flack's d ≥ Q).  A declined hold leaves d on the record: on
+    ``RefinementResult.statistics`` beside N and P where the fit ended at that
+    answer, and on the stage's history node
+    (``HistoryNode.metrics.statistics``) where it went on to find the peaks."""
+    return _every_phase_unseen(model, absent) and (
+        _every_phase_unseen(model, lineless) or _residual_is_noise(model, table))
 
 
 def _every_phase_unseen(model: CompiledModel, absent: set[int]) -> bool:

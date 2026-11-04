@@ -3745,10 +3745,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the specimen and belongs out of the model, or the range must cover a "
             "reflection of it. With no reflection in range, the scale is held too, the "
             "phase has no weight fraction, and the other fractions are relative to the "
-            "phases seen in range. When no phase is seen at all, the instrument terms "
-            "that act only through the peaks are held as well, for example the zero "
-            "shift, the specimen displacement and the profile widths. The message "
-            "names every one."
+            "phases seen in range. When no phase is seen at all and the residual is "
+            "noise (Durbin-Watson d at or above Hill and Flack's Q), the instrument "
+            "terms that act only through the peaks are held as well, for example the "
+            "zero shift, the specimen displacement and the profile widths. With no line "
+            "of any phase in range they are held whatever d reads. The message names "
+            "every one. A low d says the residual has structure, so they stay free: "
+            "either the model missed the peaks or the background cannot follow the data."
         ),
     ),
     "PLAN_FREES_NO_MOMENT": HelpEntry(
