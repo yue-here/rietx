@@ -182,6 +182,44 @@ that it did not.
 
 ## Handover log
 
+- **2026-11-04** — partial handover (context limit), draft PR #1405. The code
+  for every task but the measurement is written: a hand-built geometry is now
+  `unstated`, the default plan frees the displacement on Bragg-Brentano only,
+  a fit on an unstated geometry warns, and the result lists the instrument
+  values it held at the package's number. It is not yet green, so no task
+  past the reader table is ticked.
+  *Done* (commits `be5d8094e` plan mechanism, `7ffdf4577` reader table,
+  `87e6005f8` the rest): `Geometry.kind` "unstated" + stored-document fill
+  (`Geometry`/`Instrument` before-validators, `STORED_DOCUMENT`); µt refused
+  under unstated; texture refused at compile; layer1/2 "unstated" maps;
+  pdCIF `?`; indexing "geometry unknown" variant; `GEOMETRY_UNSTATED`
+  (warning) and `RefinementResult.assumed_instrument` in `refine.py`; help,
+  audit rows (tier 3, 2026-10-19), plan-row evidence; manual
+  `concepts/plans.md`; skill rows + copies; GUI `model.ts` + dist (vitest 604
+  passed, svelte-check 0 errors); `tests/test_geometry_unstated.py` (25
+  passed, `[dev]`, darwin/arm64).
+  *Measured*: fast suite `[dev]`, darwin/arm64, on a tree before the skill and
+  manual edits: 11 failed, 13796 passed, 318 skipped, 36 xfailed.
+  *Next*, in order: (1) fix the 11 — `test_report_loop.py` e1/e2 (BB fits on
+  the default name now free displacement: pass `PLAN_PRESETS["mccusker_default"]()`
+  as `test_fitreport_layers._fit_and_report` now does), `test_examples.py`
+  [watch]/[stage] (guide output moved; re-run the scripts, update the pages),
+  `test_gui_help.py` help-key fixture (regenerate), `test_multi_diagnostics.py`
+  scope (add `_geometry_unstated_diagnostics` to its table),
+  `test_portability.py` (an encoding on `read_text`/`write_text` in the new
+  test), `test_silence.py` (a silence pair for `GEOMETRY_UNSTATED`),
+  `test_skill.py` budget + api index (regenerate `make_api_index.py`, trim the
+  SKILL.md row); (2) run the scratch `measure.py` (SRM 660c, corundum, NAC;
+  old = plan object, new = name) and write the numbers here; (3) Vale,
+  ruff, full suite via serial.py; (4) file the leftovers issue (draft in the
+  scratch dir: multi.py bypass, importers' assumed geometry, radius 217.5,
+  calibrated profile, QPA minor phase); (5) `/wp-handover` to ready.
+  *Questions for the maintainer* (provisional, kept): the name `unstated`;
+  default + displacement on BB with no new preset; a stored instrument without
+  a key opens as `debye_scherrer`; no schema bump beyond 0.60;
+  `assumed_instrument` reads values, so a typed 0.5/0.99 is listed too;
+  importers keep their stated fallbacks.
+
 - **2026-10-19** — created by WP-2002's third session from the B7 and B9 rulings. No open
   WP owns the geometry default: the WPs that name `geometry.kind` are closed GUI work
   (1203, 1205, 1216) or texture (1960 closed, 1974 open and about the texture order).
