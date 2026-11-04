@@ -223,8 +223,10 @@ them until its formula left on 2026-11-04, and they now sit here.
   metadata, on this grammar.
 - Implicit smoothing, a scale transform, a complex value, a loop, recursion.
 - An equation that depends on a reflection or a data point (TOPAS's `scale_pks`
-  and `lor_fwhm` over hkl, `th2_offset` in `Xo`, and `fit_obj`). That is a different
-  compile-time seam, and the fence is provisional (the milestone's § Scope). WO₃'s
+  and `lor_fwhm` over hkl, `th2_offset` in `Xo`, and `fit_obj`). The fence is provisional
+  (the milestone's § Scope), and [2107](2107-an-equation-over-a-reflection.md) holds the
+  scope. It needs this grammar to evaluate on arrays, so keep every operator
+  element-wise. WO₃'s
   `scale_pks` is one overall B per pattern, so a tie expresses it and it needs no such
   seam. ZrP₂O₇'s `th2_offset` curve stays out of the protocol until the fence is ruled on.
 - A kernel prior over the coordinates:
@@ -320,6 +322,15 @@ and the same form written as an expression agree to 0.01 esd.
   DESIGN.md § Parameter system, `docs/practice.md`.
 
 ## Handover log
+
+- **2026-11-04 (scoping hkl equations)** — An equation in 2θ and an equation in hkl turn
+  out to be one piece of work, so the earlier split between them was false. An earlier
+  statement here and in the PR, that nothing in hand needs an hkl equation, was wrong:
+  ZrMo₂O₈'s tutorial scales a width by a spherical harmonic of hkl. WP-2107 holds the
+  scope and the probe's numbers, and nothing was built. Coelho (2018) was read and changes
+  nothing here. It reports computer algebra at 5-10 % of a Rietveld run and gives no
+  grammar detail. Stinton & Evans (2007) is in neither local library. Next: the
+  maintainer's ruling on 2107's slices.
 
 - **2026-11-04** — The parametric work now has one stated goal: an experienced TOPAS
   or GSAS-II user ports their own refinement to rietx from the manual alone. The

@@ -724,8 +724,23 @@ What they agree on.
   protocol, checked). Evans warns that a wrong form can fit better than the right one, and recommends
   a sequential fit unless there is a good reason (slides and forum 582, checked).
 
-Not reached: `Topas.inc`, the full text of Stinton & Evans (2007) and of Coelho (2018), the Jana2020
+Not reached: `Topas.inc`, the full text of Stinton & Evans (2007) (in neither local library on 2026-11-04), the Jana2020
 and MAUD manuals, the HS3 expression appendix, and MathOptInterface's nonlinear pages.
+
+## An equation over a reflection
+
+Surveyed 2026-11-04 for WP-2107. This is about a value that differs between reflections, set by
+something the user writes. "Checked" means the document or source was read.
+
+| Program | What the user can write | Symmetry | Status |
+|---|---|---|---|
+| TOPAS | an equation in `H`, `K`, `L`, `M`, `Xo`, `Th` and `D_spacing` on `lor_fwhm`, `gauss_fwhm`, `th2_offset`, `scale_pks`, `hat`, the other convolutions and more (Tech. Ref. Table 2-3). `spherical_harmonics_hkl` and `str_hkl_angle` supply values to use in one. A separate peak shape is then calculated for each peak (§ `peak_buffer_step`) | left to the user, with `Multiplicities_Sum` to iterate over the multiplicities (§ 20.17, `scale_occ`). Which image an equation sees otherwise is not stated | checked (Technical Reference); not run |
+| FullProf | closed models chosen by integer: selective size (`IsizeModel`) and selective shift (`ModS`). The user may add rules on the indices, each a linear equality, up to 10 lines for shifts. The shift takes the form 2 SHIFT d² tanθ × 10⁻², and no free expression was found | a rule is applied to the hkl FullProf holds; not established further | checked (manual, § Selective size broadening and § HKL-dependent shifts) |
+| GSAS-II 5.8.4 | none. Size and microstrain take built-in forms (`uniaxial`, ellipsoidal, generalized). `ExpressionCalcObj` reaches restraints, and no reflection-level use was found in `GSASIIstrMath.py` | derived from the Laue class in the built-in forms | checked (grep of the source) |
+
+TOPAS's own examples are `If(L==0, a Tan(Th) + 0.2, b Tan(Th))` on `gauss_fwhm`, `If(L == 0, at Tan(Th), bt Tan(Th))` on `th2_offset`, and a March relation over `str_hkl_angle` on `lor_fwhm`. TOPAS's `occ` stays single-valued for QUANT, so it cannot be a function of hkl, and `scale_occ` exists for that case. Whether its QPA reads a `scale_pks` is not established.
+
+Of the Durham tutorials, ZrP₂O₇ writes a two-coefficient curve in `Xo` on `th2_offset`, and ZrMo₂O₈ writes a tanθ width scaled by `spherical_harmonics_hkl` with fixed coefficients. WO₃'s two lines need neither: one is an overall B and one a sample height. Incidence over a larger set is not measured, since the private archive is not on the machine that ran this.
 
 ## Sources
 

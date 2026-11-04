@@ -33,7 +33,7 @@ The two local inputs show what a real one is made of:
 - Spelling differs from the grammar in known ways: capitalised `Exp` and `Ln`,
   left-associative `^`, and implied multiplication such as `(height) Cos(Th)`.
 
-Three lines in those inputs depend on a reflection or an angle. Each needs a stated
+Four lines in the Durham inputs depend on a reflection or an angle. Each needs a stated
 outcome:
 
 - WO₃'s `scale_pks = Exp(-2 b/(2 D_spacing)^2)` is one overall B per pattern. It
@@ -42,6 +42,9 @@ outcome:
   to `sample_displacement`.
 - ZrP₂O₇'s `th2_offset` is a curve in `Xo`, under the milestone's provisional fence.
   Until that is ruled on, the reader reports it as dropped, with its size.
+- ZrMo₂O₈'s tutorial (9.2) writes `lor_fwhm` and `gauss_fwhm` through
+  `spherical_harmonics_hkl`, under the same fence ([2107](2107-an-equation-over-a-reflection.md)).
+  The reader reports it as dropped too.
 
 Rules that apply: `src/rietx/io/CLAUDE.md`, and a reader may repair a file only where it
 can say that it did. **Corpus files are private**: a committed fixture carries synthetic

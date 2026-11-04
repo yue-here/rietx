@@ -42,10 +42,11 @@ the user writes, surveyed across fields on 2026-11-03.
 - A kernel over the coordinates ([1963](../wp/1963-a-kernel-over-the-pattern-coordinates.md)).
 - XRD-CT ([1962](../wp/1962-xrd-ct-a-pattern-summed-over-the-voxels-its-beam-crosses.md)).
 - An equation over a reflection or a data point (TOPAS's `scale_pks` over hkl,
-  `lor_fwhm` over hkl, `fit_obj`, and `th2_offset` in `Xo`). That is a different
-  compile-time seam. **This fence is provisional.** The aim says a missing primitive
-  blocks these users, and ZrP₂O₇'s input refines such a curve (`square`, `step_error`).
-  The maintainer has not ruled on it.
+  `lor_fwhm` over hkl, `fit_obj`, and `th2_offset` in `Xo`). **This fence is
+  provisional.** The aim says a missing primitive blocks these users, ZrP₂O₇'s input
+  refines such a curve (`square`, `step_error`), and ZrMo₂O₈'s writes a width in hkl.
+  [2107](../wp/2107-an-equation-over-a-reflection.md) holds the measured scope. The
+  maintainer has not ruled on it.
 - New built-in checks. 1325's next-term test and the replicate reading from #1218 are
   parked in that WP.
 
