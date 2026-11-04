@@ -47,6 +47,32 @@ Both are tier 3 on that approval.
 This is the rule the extra-components union taught (root CLAUDE.md): counts and builders
 that were right only while the union had one kind.
 
+**The reader table** (2026-11-04, read against `ba3719f06`). What each reader of
+`Geometry.kind` does with `"unstated"`. "Falls through" means its `else`
+branch already does nothing geometry-specific, which is the reading B7 asks
+for; every other row is a change this WP makes.
+
+| reader | reading of `"unstated"` |
+|---|---|
+| `schemas/instrument.Geometry` | the new default. `mu_r`, `capillary_radius_mm`, the capillary offsets and `surface_roughness` are refused as today (they test `== debye_scherrer` / `== bragg_brentano`); `mu_t`/`thickness_mm`, refused today only under `debye_scherrer`, are refused under `unstated` too, since a flat-specimen correction needs a flat kind. A stored document without the key reads `debye_scherrer` (`STORED_DOCUMENT`) |
+| `model/forward` `_position_shift_deg`, `_shift_key`, `_shift_est`, `_absorption` | falls through: no displacement, transparency or offset term, no absorption |
+| `model/preferred_orientation.TEXTURE_SAMPLE_PSI_DEG` (forward compile) | **refused**: ψ is a property of the geometry and there is none to read; the compile raises naming `Geometry.kind` |
+| `params/vector` displacement/transparency/offset locks | falls through: force-fixed as on every non-BB / non-DS kind |
+| `refine._resolve_specimen_absorption`, `_absorption_record` | falls through (the schema refuses the inputs) |
+| `refine._capillary_offset_diagnostics` | silent (DS only); `GEOMETRY_UNSTATED` speaks instead |
+| `strategy/staged.resolve_plan` | runs the name as it stands (B7: free nothing geometry-specific) |
+| `report/layer1.POSITION_TEMPLATES` | all five position shapes, as evidence: with no geometry every cause is possible |
+| `report/layer2._POSITION_ACTIONS_BY_GEOMETRY` | zero and cell only; a `cos_theta`, `sin_2theta` or `cos_2theta` trend is reported with no action (the flat-plate-transmission precedent, WP-1003). The fallback for a key it lacks stays BB, reachable only from a caller with no instrument |
+| `report/__init__` | passes the kind through to the two maps |
+| `io/exporters._INSTR_GEOMETRY` (pdCIF) | `_pd_instr_geometry ?`, CIF's unknown value |
+| `io/projects/fullprof` writer | falls through (no absorption under it) |
+| `io/instrument_profile` `.instprm` writer | refused, as `flat_plate_transmission` is: GSAS-II has no unstated `Type` |
+| `io/instrument_profile` `.instprm`/`.prm` readers, `io/recipe`, `cli index --geometry`, neutron presets, `gui/imports.suggest_instrument` | unchanged: each states a kind and already says when it assumed one (`GSAS2_INSTPRM_GEOMETRY_ASSUMED`, `GSAS_PRM_GEOMETRY_ASSUMED`). Whether they should read unstated instead is a question for the maintainer, not decided here |
+| `indexing/diagnostics` `INDEX_CELL_SYSTEMATIC_UNQUANTIFIED` | the "geometry unknown" variant, as for no instrument |
+| `indexing/workflow`, `viz/compare` | fall through |
+| `gui/src/lib/model.ts` (geometry select) | lists `unstated` and shows no geometry-specific field under it; dist rebuilt |
+| `multi.py` | **not changed**: it runs `PLAN_PRESETS` directly, with no mode substitution either, so it bypasses this WP's geometry addition; left to an issue |
+
 **Old files.** A stored instrument should keep its stated kind on load (inferred, not
 checked). Check whether `_InheritsDeclaredDefaults` writes a default kind into
 `project.json` and `history.jsonl`, and what a file without the key reads as.
@@ -118,7 +144,7 @@ that it did not.
 
 ## Tasks
 
-- [ ] The reader table: every reader of the geometry kind, with its reading of "unstated",
+- [x] The reader table: every reader of the geometry kind, with its reading of "unstated",
       written into this file before any code.
 - [ ] The unstated value, the default for a hand-built `Geometry`; old projects open with
       their stated kind (a test on a file written before this WP).
