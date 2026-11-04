@@ -732,12 +732,13 @@ ROWS: tuple[Row, ...] = (
     Row("FULLPROF_SPECIES_NORMALISED", "code"),
     Row("FULLPROF_SPECIES_WRITTEN_NEUTRAL", "code"),
     Row("FULLPROF_TIE_DROPPED", "code"),
-    Row("GEOMETRY_UNSTATED", "code", tier=3, ambiguity=1,
+    Row("GEOMETRY_UNSTATED", "code", tier=3, ambiguity=3,
         evidence=("warning; fires on every fit whose Geometry.kind is 'unstated', the default "
                   "of a hand-built Geometry (WP-2015). Under it no displacement, transparency, "
                   "capillary offset or absorption is applied or freed, and on a Bragg-Brentano "
                   "pattern a displacement fitted as a zero leaves a tan-theta remainder the "
-                  "cell absorbs (about 45 ppm on NIST SRM 660c, issue #1233). TOPAS applies "
+                  "cell absorbs (measured, WP-2015: NIST SRM 660c's cell 70 ppm above its reference "
+                  "with the displacement held, 20 ppm below with it freed; issue #1233). TOPAS applies "
                   "no geometry correction unless a macro names it (Technical Reference v9 "
                   "§ 1.3); GSAS-II 5.8.4 always picks a geometry (GSASIIfiles.py:509-519)"),
         grounds=("The geometry is a fact about the caller's instrument, outside the pattern; "
@@ -4452,8 +4453,13 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine.Refinement.fit:plan", "default", tier=3, ambiguity=1, value="mccusker_default",
         evidence=("McCusker et al. (1999) J. Appl. Cryst. 32, 36, the order only (docstring); no "
                   "program ships a default plan; it frees the zero, and on bragg_brentano the "
-                  "specimen displacement with it (staged._GEOMETRY_ADDITIONS, WP-2015; about 45 ppm "
-                  "of cell on NIST SRM 660c, issue #1233), leaving the Ka2 ratio and axial terms held"),
+                  "specimen displacement with it (staged._GEOMETRY_ADDITIONS, WP-2015), leaving the Ka2 "
+                  "ratio and axial terms held. Measured (WP-2015, two Bragg-Brentano families): NIST "
+                  "SRM 660c's cell +70 -> -20 ppm from its reference in Rietveld and Le Bail, the "
+                  "displacement -0.073(14) mm against NIST's -0.079; IUCr CPD corundum unmoved in "
+                  "Rietveld (c/a +32 ppm) and further in Le Bail (c/a -87 -> -90 ppm, axes -311 -> "
+                  "-510 ppm), the zero and displacement trading. Dissent: MAUD's wizard frees the "
+                  "zero and not the displacement (docs/practice.md)"),
         grounds=("A default must be some plan, and the one run is recorded; it frees nothing "
                  "geometry-specific on an unstated, capillary or transmission geometry, and on a "
                  "stated bragg_brentano frees its displacement (B7, ruled 2026-10-19)."),
@@ -4537,8 +4543,13 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine.refine:plan", "default", tier=3, ambiguity=1, value="mccusker_default",
         evidence=("McCusker et al. (1999) J. Appl. Cryst. 32, 36, the order only (docstring); no "
                   "program ships a default plan; it frees the zero, and on bragg_brentano the "
-                  "specimen displacement with it (staged._GEOMETRY_ADDITIONS, WP-2015; about 45 ppm "
-                  "of cell on NIST SRM 660c, issue #1233), leaving the Ka2 ratio and axial terms held"),
+                  "specimen displacement with it (staged._GEOMETRY_ADDITIONS, WP-2015), leaving the Ka2 "
+                  "ratio and axial terms held. Measured (WP-2015, two Bragg-Brentano families): NIST "
+                  "SRM 660c's cell +70 -> -20 ppm from its reference in Rietveld and Le Bail, the "
+                  "displacement -0.073(14) mm against NIST's -0.079; IUCr CPD corundum unmoved in "
+                  "Rietveld (c/a +32 ppm) and further in Le Bail (c/a -87 -> -90 ppm, axes -311 -> "
+                  "-510 ppm), the zero and displacement trading. Dissent: MAUD's wizard frees the "
+                  "zero and not the displacement (docs/practice.md)"),
         grounds=("A default must be some plan, and the one run is recorded; it frees nothing "
                  "geometry-specific on an unstated, capillary or transmission geometry, and on a "
                  "stated bragg_brentano frees its displacement (B7, ruled 2026-10-19)."),

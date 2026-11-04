@@ -805,7 +805,9 @@ _MODE_SUBSTITUTES: dict[tuple[str, str], str] = {
 #: A Bragg-Brentano specimen's displacement moves every peak by −(2s/R)·cos θ
 #: (Wilson 1963), the dominant lab-goniometer error, so the default frees it
 #: with the zero, where the zero alone would carry a cos θ error into the cell
-#: (about 45 ppm on NIST SRM 660c, issue #1233).  Nothing else of
+#: (NIST SRM 660c: 70 ppm above its reference with the zero alone, 20 below
+#: with both; on IUCr CPD corundum the Le Bail cell moved away instead, the
+#: zero and displacement trading — WP-2015's handover).  Nothing else of
 #: ``lab_bragg_brentano`` comes with it: the Kα2 ratio and the axial ratios
 #: stay at the caller's values, which on a calibrated instrument are its
 #: calibration.  An unstated geometry, a capillary and a transmission plate
@@ -972,9 +974,10 @@ PLAN_INFO: dict[str, PlanInfo] = {
             "A lab pattern where something outside the fit pins the zero shift "
             "or the specimen displacement, such as a calibrated goniometer or "
             "an internal standard. This plan frees both in one stage. Unpinned, "
-            "they are collinear with the lattice parameters. On one "
-            "uncalibrated pattern, use `mccusker_default` or "
-            "`mccusker_structural`, which free the zero shift alone. This plan "
+            "they are collinear with the lattice parameters. "
+            "`mccusker_default` frees the zero shift, and on a stated "
+            "Bragg-Brentano geometry the specimen displacement with it, but "
+            "never the emission-line weights or S/L. This plan "
             "refines specimen and instrument effects together, so read the "
             "correlation guards before quoting a width."),
     ),

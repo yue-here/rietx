@@ -170,7 +170,11 @@ def test_an_unstated_fit_frees_nothing_geometric_and_says_so(lab):
     assert not any(_DISPLACEMENT in s.freed for s in result.stages)
     finding = next(d for d in result.diagnostics if d.code == "GEOMETRY_UNSTATED")
     assert finding.level == "warning"
-    assert finding.where == ["instrument.geometry.kind"]
+    assert finding.where == ["instrument.geometry.kind",
+                             "instrument.geometry.sample_displacement"]
+    # a warning for the readers it names: whoever quotes a cell or a phase
+    from rietx.schemas.results import level_under
+    assert {level_under(finding, p) for p in ("cell", "phase_id")} == {"warning"}
     assert result.assumed_instrument["instrument.geometry.kind"] == "unstated"
 
 

@@ -8553,14 +8553,19 @@ def _geometry_unstated_diagnostics(model: CompiledModel) -> list[Diagnostic]:
     Under ``"unstated"`` the package applies no geometry-specific correction
     and the default plan frees none, which is the maintainer's B7 ruling: a
     specimen displacement left out on a Bragg-Brentano pattern moves the
-    cell (about 45 ppm on NIST SRM 660c, issue #1233) with nothing else in
+    cell (on NIST SRM 660c, 70 ppm above its reference against 20 below with
+    the displacement freed; WP-2015, issue #1233) with nothing else in
     the result saying why.  A warning, because the cell is what it costs.
     """
     if model.geometry_kind != "unstated":
         return []
     return [Diagnostic(
         level="warning", code="GEOMETRY_UNSTATED",
-        where=["instrument.geometry.kind"],
+        # the held displacement is what moves the cell, and naming it is
+        # what keeps this a warning under the cell and phase_id purposes
+        # (``purposes.PURPOSES``), not only under calibration
+        where=["instrument.geometry.kind",
+               "instrument.geometry.sample_displacement"],
         message=("The instrument states no geometry, so no displacement, "
                  "transparency, capillary offset or absorption correction "
                  "was applied or refined."),

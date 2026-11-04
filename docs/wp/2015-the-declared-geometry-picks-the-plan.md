@@ -68,6 +68,8 @@ for; every other row is a change this WP makes.
 | `io/projects/fullprof` writer | falls through (no absorption under it) |
 | `io/instrument_profile` `.instprm` writer | refused, as `flat_plate_transmission` is: GSAS-II has no unstated `Type` |
 | `io/instrument_profile` `.instprm`/`.prm` readers, `io/recipe`, `cli index --geometry`, neutron presets, `gui/imports.suggest_instrument` | unchanged: each states a kind and already says when it assumed one (`GSAS2_INSTPRM_GEOMETRY_ASSUMED`, `GSAS_PRM_GEOMETRY_ASSUMED`). Whether they should read unstated instead is a question for the maintainer, not decided here |
+| `io/instrument_tof` GSAS `.iparm` and TOF `.instprm` readers (added at review, 2026-11-04) | state `debye_scherrer`, as `Instrument.tof_neutron_bank` does; they built a bare `Instrument` and would otherwise have fallen to `unstated` |
+| plan-name readers outside `fit` (added 2026-11-04): `Refinement.report(plan=name)`, `Project.create(plan=name)`, the text document's `plan` line, `PlanSpec.preset_name` | resolve the name through `resolve_plan` with the mode and geometry, as `fit` and the GUI preset route do |
 | `indexing/diagnostics` `INDEX_CELL_SYSTEMATIC_UNQUANTIFIED` | the "geometry unknown" variant, as for no instrument |
 | `indexing/workflow`, `viz/compare` | fall through |
 | `gui/src/lib/model.ts` (geometry select) | lists `unstated` and shows no geometry-specific field under it; dist rebuilt |
@@ -146,23 +148,23 @@ that it did not.
 
 - [x] The reader table: every reader of the geometry kind, with its reading of "unstated",
       written into this file before any code.
-- [ ] The unstated value, the default for a hand-built `Geometry`; old projects open with
+- [x] The unstated value, the default for a hand-built `Geometry`; old projects open with
       their stated kind (a test on a file written before this WP).
-- [ ] The default plan picks by geometry: Bragg-Brentano frees displacement with the zero,
+- [x] The default plan picks by geometry: Bragg-Brentano frees displacement with the zero,
       and keeps a calibrated instrument's Kα2 ratio and axial terms fixed; unstated runs
       `mccusker_default`.
-- [ ] The notification asking the user to state the geometry, and the report's position
+- [x] The notification asking the user to state the geometry, and the report's position
       action under the unstated value.
-- [ ] The assumed instrument facts recorded in the result.
+- [x] The assumed instrument facts recorded in the result.
 - [ ] Measured on three families (a lab Bragg-Brentano pattern, a capillary and a third):
       the cell and Rwp under the old default and the new. Goldens re-pinned only if no
       further from their reference.
-- [ ] Audit rows: the plan default and any new code, with tier 3 and approval 2026-10-19
+- [x] Audit rows: the plan default and any new code, with tier 3 and approval 2026-10-19
       (`src/rietx/_audit.py`).
-- [ ] `help.py`, the manual's plan chapter, and a `tests/test_compare_ui.py` row if a
+- [x] `help.py`, the manual's plan chapter, and a `tests/test_compare_ui.py` row if a
       standard exercises the change.
-- [ ] Tests + obs/calc/diff PNGs to `tests/output/`.
-- [ ] Skill: the body or reference row telling an agent to state the geometry, or "none"
+- [x] Tests + obs/calc/diff PNGs to `tests/output/`.
+- [x] Skill: the body or reference row telling an agent to state the geometry, or "none"
       and why.
 
 ## Acceptance
