@@ -1,7 +1,7 @@
 (guide-series)=
 # How to fit a temperature series
 
-Pass the patterns in temperature order to `rietx.refine_sequential` with the temperatures as `x`, read `SeriesResult.diagnostics`, then read each parameter's path across the series with `SeriesResult.trajectory`.
+Pass the patterns in temperature order to `rietx.refine_sequential` with the temperatures as `x`, read `SeriesResult.diagnostics` and `SeriesResult.code_counts`, then read each parameter's path across the series with `SeriesResult.trajectory`.
 
 Each pattern gets its own refinement, and each fit starts from the answer of the pattern before it.
 
@@ -20,12 +20,10 @@ The starting model has the cell 0.1 % too large and the peaks about 20 % too wid
 <!-- output of examples/guides/series.py -->
 ```text
 SeriesResult: 7 pattern(s), rietveld, direction=forward
-  diagnostics: 2 rows, 0 errors; no deliverable given, so none is printed in full
-    SEQUENTIAL_PERSISTENT_FINDING: warning under every purpose
-    SEQUENTIAL_PERSISTENT_FINDING at instrument.geometry.goniometer_radius_mm: info
-    pass deliverable= to summary() for the rows that decide your purpose; every row is in result.diagnostics
+  diagnostics: none
   trajectory (T (K)):
     largest step phases.0.cell.a 504.8σ at p001→p002 (series.steps)
+    most frequent per-pattern codes: CAPILLARY_OFFSET_UNAVAILABLE on instrument.geometry.goniometer_radius_mm 7 of 7, PATTERN_UNDERSAMPLED 7 of 7 (series.code_counts)
     [1/7] p000 x=300 converged Rwp=0.0409
     [2/7] p001 x=400 converged Rwp=0.0409
     [3/7] p002 x=500 converged Rwp=0.0399
@@ -40,10 +38,11 @@ SeriesResult: 7 pattern(s), rietveld, direction=forward
 
 ## Read the diagnostics first
 
-`SEQUENTIAL_PERSISTENT_FINDING` reports a per-pattern diagnostic that fired on more than half the patterns, in a series of five patterns or more.
-Such a finding describes the model, so fix it once for the series.
-Given no deliverable, the summary prints each finding on one line; `SeriesResult.summary(deliverable="series")` prints the warning in full, and its message names the code it counts.
-Both findings here come from the synthetic setup:
+The series itself reports no finding here.
+`SeriesResult.code_counts` counts each per-pattern diagnostic over the series, one row per code and parameter, largest count first.
+The summary names the three largest.
+A code that fired on most of the patterns describes the model, so fix it once for the series.
+Both codes here fired on all seven patterns, and both come from the synthetic setup:
 
 - `CAPILLARY_OFFSET_UNAVAILABLE` says the capillary offsets are held at zero, because the instrument declares no goniometer radius.
   An unmodelled offset moves every cell edge by the same fraction.
