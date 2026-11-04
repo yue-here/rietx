@@ -453,10 +453,6 @@ series golden is bit-identical.
   `docs/docs/{guides,reference}/series.md`, and the reference page is full.
   Vale reads `R<sub>wp</sub>` as the word "wp" and does not know "fcc" or
   "bct", so the prose spells those out.
-  *Handover in progress (context limit):* `/wp-handover` was run through
-  step 7. Still to do: steps 10–11 (session_start check, then the PR body
-  written from this entry, `gh pr ready` on #1401). PR #1401 is still a
-  draft.
   *Next:* the maintainer's ruling on #1402. If it is B, wait for 1419's
   metric symmetry point, then build the start-state finding with the
   two-start suggestion, then the probe, keyed on a present pattern.
