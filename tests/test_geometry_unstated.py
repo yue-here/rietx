@@ -113,6 +113,16 @@ def test_every_other_geometry_runs_the_name_as_it_stands(geometry, mode):
     assert _DISPLACEMENT not in _turn_on(plain)
 
 
+@pytest.mark.parametrize("mode", ["rietveld", "lebail", "pawley"])
+def test_a_stored_bragg_brentano_default_is_still_named_by_its_preset(mode):
+    """The GUI menu and the ``.rxt`` ``plan`` line read the name back off the
+    stored spec, which on Bragg-Brentano carries the displacement the bare
+    preset lacks: given the project's mode and geometry it is still found."""
+    spec = rx.PlanSpec.from_plan(
+        resolve_plan("mccusker_default", mode, "bragg_brentano"))
+    assert spec.preset_name(mode, "bragg_brentano") == "mccusker_default"
+
+
 def test_a_plan_object_is_run_as_given():
     """Only a name is resolved: a caller's plan object, the preset's included,
     is the caller's statement and gains nothing."""

@@ -372,7 +372,8 @@ class PlanSpec(Base):
                               phase_support_sigma=self.phase_support_sigma,
                               closing_window_tol=self.closing_window_tol)
 
-    def preset_name(self) -> str | None:
+    def preset_name(self, mode: str | None = None,
+                    geometry: str | None = None) -> str | None:
         """The registered preset this plan equals, or ``None`` if it was edited.
 
         **Derived, never stored.**  A project records the *expanded* plan (that
@@ -381,10 +382,23 @@ class PlanSpec(Base):
         the stages beside it.  Two consumers already ask: the GUI's plan editor,
         which labels the menu, and the text document, which prints
         ``plan mccusker_default`` instead of eight stage lines.
+
+        ``mode`` and ``geometry`` are the project's: a name stored through
+        ``resolve_plan`` under a declared geometry carries that geometry's
+        additions (WP-2015), so the bare preset alone no longer matches it.
         """
-        from ..strategy.staged import PLAN_PRESETS
+        from ..strategy.staged import PLAN_PRESETS, resolve_plan
 
         for name, build in PLAN_PRESETS.items():
             if PlanSpec.from_plan(build()) == self:
+                return name
+        if geometry is None:
+            return None
+        for name in PLAN_PRESETS:
+            try:
+                plan = resolve_plan(name, mode or "rietveld", geometry)
+            except ValueError:
+                continue
+            if PlanSpec.from_plan(plan) == self:
                 return name
         return None
