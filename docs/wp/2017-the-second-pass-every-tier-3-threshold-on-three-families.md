@@ -70,7 +70,7 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
 
 ### Inherited
 
-- **From WP-2086 (2026-11-04, PR @@PR@@): `MODEL_FAR_FROM_DATA` is silent on a fit that lost
+- **From WP-2086 (2026-11-04, PR #1406): `MODEL_FAR_FROM_DATA` is silent on a fit that lost
   the phase, so test it on background-subtracted Rwp.** This is the B12.13 row's other
   direction: that row fires on a true model at sparse counts, and these rows say nothing on
   a wrong one. On the reach table (WP-2086's handover, 119 fits from displaced starts) 12 fits

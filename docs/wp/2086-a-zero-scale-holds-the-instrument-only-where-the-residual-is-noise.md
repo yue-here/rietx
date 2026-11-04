@@ -111,7 +111,7 @@ passes, and the reach matrix is verdict-identical to 1.10.0 on all 119 fits.
 
   *Gotchas.* Read a manual's equation from the rendered page. pdftotext split the braces of FullProf's eq. 3.20 off its line, and this session first recorded QD as a different formula. The judge caught it against the printed numbers. A 2 % jump's outcome turns on the noise seed, so quote a scan and never one chain.
 
-  @@COUNTS@@
+  *Gates* (macOS arm64, `[dev]`, Python 3.12, `53b231add`, which is `origin/main` plus this branch; main had not moved at the last fetch). ruff clean. Fast selection: 13828 passed, 319 skipped, 36 xfailed in 7:35, one run. This branch adds 24 cases in 16 test functions, 11.44 s together on that run, in `tests/test_instrument_hold_noise.py`, and removes none, with no new skip. None joins the slow tail. Full suite, through the shift's queue, nothing else running: 14744 passed, 332 skipped, 53 xfailed, 1 failed in 32:30. The failure is `tests/test_pair_diagnostic_class.py::test_the_two_site_winner_finds_each_site_its_own_moment`, which is not this WP's. Run alone it fails the same way on this tree and on `origin/main`'s source, to the same digits (0.6994957343907221 against 3.5), so `main` fails it on this Mac. The Linux nightly of 2026-11-03 passed it. `tests.reader_output`: unchanged.
 
   *Generality* (the judge's report, unedited, written while the 119-fit matrix was still running).
 
@@ -172,4 +172,4 @@ passes, and the reach matrix is verdict-identical to 1.10.0 on all 119 fits.
 
   Author's answer: two of those three are measured above, under *Blank frames that decline* and *A weak phase*. Correlated noise does decline the hold, as the judge predicted, and a weak misplaced phase stayed under Q in every case that stayed misplaced. The first is unmeasured. The record's gaps stand, since closing them needs a new field, which is reader output.
 
-  *Next.* PR #1400 owns the release notes and drops the failure note after this merges. `examples/tutorials/05_sequential_fits.ipynb`'s stored outputs still show `SEQUENTIAL_UNRECOVERED` on the jump and need the rebuild #1400 carries. The tutorial's prose stays true. WP-2017 owns the silent failures. A real blank frame passing the test, from a second instrument, is the evidence still owed.
+  *Next.* This is PR #1406. PR #1400 owns the release notes and drops the failure note after this merges. `examples/tutorials/05_sequential_fits.ipynb`'s stored outputs still show `SEQUENTIAL_UNRECOVERED` on the jump and need the rebuild #1400 carries. The tutorial's prose stays true. WP-2017 owns the silent failures. A real blank frame passing the test, from a second instrument, is the evidence still owed.
