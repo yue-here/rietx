@@ -1098,6 +1098,24 @@ def test_a_starved_chain_reports_a_supported_moment_above_the_transition_and_is_
     assert set(_onset_rows(fed.diagnostics)) == {_BRACKET}
 
 
+def test_the_hold_names_every_floored_pattern_off_the_record():
+    """``SEQUENTIAL_MOMENT_HOLD`` reads ``SeriesEntry.floored`` and names every
+    pattern on it (WP-2003 C8, X7): the list used to stop at four labels and
+    an ellipsis, leaving the rest to the record it was read from."""
+    series = _hand_built([(10.0 * i, 4.0 if i == 0 else 0.01,
+                           0.05 if i == 0 else 0.4, i == 0) for i in range(8)])
+    (site,) = series.magnetic_sites()
+    floored = [f"p{i}" for i in range(2, 8)]          # six successors
+    for entry in series.entries:
+        if entry.label in floored:
+            entry.floored = [site]
+    (hold,) = [d for d in _moment_diagnostics(series)
+               if d.code == "SEQUENTIAL_MOMENT_HOLD"]
+    assert f"on {len(floored)} successor pattern(s) ({', '.join(floored)};" in (
+        hold.message)
+    assert "…" not in hold.message
+
+
 def test_an_unsupported_pattern_reseeds_its_successor_to_the_floor():
     """The hold along the series, measured on the chain that exercises it.
 
