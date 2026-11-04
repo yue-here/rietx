@@ -493,7 +493,7 @@ code. The largest step is a rank, never a verdict: every parameter has one, and
 it says only where that parameter moved most.
 
 Drag along the strip to scrub. The plot below follows as one pattern's own fit,
-its obs, calc and residual, and keeps your zoom from pattern to pattern, so a
+its observed and calculated curves and the residual, and keeps your zoom from pattern to pattern, so a
 peak you're watching stays in view while it splits. The arrow keys step one
 pattern at a time when the strip has focus. Each pattern's curves are fetched
 once and kept. The pattern's row in the table below stays one click away, with
