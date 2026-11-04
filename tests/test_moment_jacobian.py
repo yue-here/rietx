@@ -71,7 +71,11 @@ ANY = ("x,y,z,+1",)                     # {1}: any direction, n = 3
 ORACLE_BAR = 3e-13
 #: the bar against the package's own central differences (the cross-backend
 #: matrix's ``fd`` opinion, O(h²) truncation) on an **analytic** column.
-#: Measured worst 1.4e-9 (an angle of ``extinction_live``); ~10× margin.
+#: Measured worst 1.4e-9 on the synthetic states (an angle of
+#: ``extinction_live``), ~10× margin; 4.6e-9 on LaMnO₃ (2026-11-04,
+#: darwin/arm64, the Pnma azimuth), only ~4× — that error is the central
+#: difference's own O(h²) truncation, not the analytic column's, so a real
+#: state failing here first asks whether the reference's step is too coarse.
 CENTRAL_FD_BAR = 2e-8
 #: the exact-oracle bar on the real LaMnO₃ states (``REAL_STATES``).  Measured
 #: 2026-11-04 (darwin/arm64, [dev,jax]) at 1.1e-13 worst, the Pnma azimuth,

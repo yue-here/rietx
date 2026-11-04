@@ -1451,7 +1451,8 @@ def _moment_column(model: CompiledModel, table: ParameterTable,
                    bases: DerivativeBases, values: dict[str, float], c: int,
                    ip: int, reach: list[str],
                    grads: dict[tuple[int, int], np.ndarray]) -> np.ndarray:
-    """∂y/∂θ_c for a column moving moment moduli of phase ip only (WP-1327).
+    """∂y/∂θ_c for a column moving moment DOFs of phase ip only (WP-1327):
+    moduli by default, any DOF where ``_moment_reach_ok``'s ``angles`` asks.
 
     The moment enters only p²⟨|F_⊥|²⟩, so only the intensity scalar moves.
     ``grads`` is :meth:`CompiledModel.moment_f2_grads` for the phase at this
@@ -2214,7 +2215,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
     return jacobian
 
 
-def _jacobian_for(model, table, backend: str):
+def _jacobian_for(model, table, backend: str, *, moment_angles: bool = False):
     """The Jacobian callable for ``backend`` (lazy import keeps numpy pure).
 
     Every autodiff callable produces the same fp64 host array in the same
@@ -2229,6 +2230,10 @@ def _jacobian_for(model, table, backend: str):
     per column if (and only if) a policy asked for it.  With the default fp64
     policy the wrapper is a plain ``np.asarray``, so the numpy path is
     unchanged.
+
+    ``moment_angles`` is :func:`_make_jacobian`'s, passed to the numpy
+    assembly; a traced backend declines every magnetic model by name, so it
+    has no moment angle to claim.
     """
     if backend == "jax":
         from ..backend.jax_backend import make_jax_jacobian
@@ -2239,7 +2244,7 @@ def _jacobian_for(model, table, backend: str):
 
         inner = make_torch_jacobian(model, table, device=TORCH_DEVICES[backend])
     elif backend == "numpy":
-        inner = _make_jacobian(model, table)
+        inner = _make_jacobian(model, table, moment_angles=moment_angles)
     else:
         raise ValueError(f"unknown backend {backend!r}; "
                          f"available: numpy, jax, {', '.join(TORCH_DEVICES)}")

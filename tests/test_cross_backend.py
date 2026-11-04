@@ -91,7 +91,6 @@ from rietx.backend.linalg64 import (
     COLUMN_COSINE_MIN,
     COLUMN_REL_L2_MAX,
     FP32_JACOBIAN,
-    get_precision_policy,
     precision_policy,
 )
 from rietx.model.forward import WINDOW_AREA_TOL, compile_model
@@ -1355,25 +1354,19 @@ _JACOBIAN_CACHE: dict[tuple[str, str], object] = {}
 
 #: configs whose numpy reference lets the analytic moment branch claim the
 #: moment **angle** columns (``_make_jacobian(..., moment_angles=True)``,
-#: WP-1327), so every row of the matrix meets that branch rather than the
-#: default dispatch's forward difference
+#: WP-1327), so every row of ``test_jacobian_matches_analytic`` meets that
+#: branch rather than the default dispatch's forward difference.  The FD-oracle
+#: tests further down build their own default Jacobian and so still read the
+#: forward-difference angle columns here, as on ``magnetic_angles_tied``
 MOMENT_ANGLE_CONFIGS = frozenset({"magnetic_angles_analytic"})
 
 
 def _for_backend(config: str, model, table, name: str):
     key = (config, name)
     if key not in _JACOBIAN_CACHE:
-        if name == "numpy" and config in MOMENT_ANGLE_CONFIGS:
-            inner = _make_jacobian(model, table, moment_angles=True)
-
-            def jac(theta, inner=inner):
-                # the same exit ``_jacobian_for`` applies, so the fp32 rows
-                # layered over this reference still read the policy per call
-                return get_precision_policy().cast_columns(inner(theta))
-
-            _JACOBIAN_CACHE[key] = jac
-        else:
-            _JACOBIAN_CACHE[key] = _jacobian_for(model, table, name)
+        _JACOBIAN_CACHE[key] = _jacobian_for(
+            model, table, name,
+            moment_angles=name == "numpy" and config in MOMENT_ANGLE_CONFIGS)
     return _JACOBIAN_CACHE[key]
 
 
@@ -1595,10 +1588,13 @@ def test_the_angle_config_s_reference_claims_every_moment_column(monkeypatch):
     through ``_moment_column``, the angles and the tied angle included.  A
     reference that silently fell back to the default dispatch would hand the
     matrix the peak chain's angle columns and still agree with the ``fd`` row
-    at its bar, which is the guard going quiet this test exists against."""
+    at its bar, which is the guard going quiet this test exists against — so
+    the spy is asked of the matrix's own reference (``_analytic_jacobian``),
+    never of a ``_make_jacobian`` built here."""
     from rietx.optimize import least_squares as lsq
 
-    model, table = _state("magnetic_angles_analytic")
+    config = "magnetic_angles_analytic"
+    model, table = _state(config)
     taken: list[int] = []
     real = lsq._moment_column
 
@@ -1607,7 +1603,7 @@ def test_the_angle_config_s_reference_claims_every_moment_column(monkeypatch):
         return real(*args, **kwargs)
 
     monkeypatch.setattr(lsq, "_moment_column", spy)
-    _make_jacobian(model, table, moment_angles=True)(_theta(model, table))
+    _analytic_jacobian(config, model, table)(_theta(model, table))
     extras = lsq._column_extras(table)
     moment = [c for c, p in enumerate(table.free_paths)
               if any(lsq._MOMENT_PATH.match(q) for q in [p, *extras[c]])]
