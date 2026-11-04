@@ -92,12 +92,12 @@ it.
       phase. The other makes the stage free only declared phases: an opt-in
       `Phase.extinction` defaulting to `None` like PO, with old files that
       store a value opening unchanged.
-- [ ] Implement the decision. Update `test_extinction.py`, and the skill
+- [x] Implement the decision. Update `test_extinction.py`, and the skill
       table if its text changes. A changed golden says which number moved
       and why.
-- [ ] Tests + obs/calc/diff PNGs to `tests/output/` for any fit whose number
+- [x] Tests + obs/calc/diff PNGs to `tests/output/` for any fit whose number
       moves.
-- [ ] Skill: the plan table row in `SKILL.md` matches the code; nothing else
+- [x] Skill: the plan table row in `SKILL.md` matches the code; nothing else
       expected.
 
 ## Acceptance
@@ -191,6 +191,36 @@ with one phase declared and one not.
   `test_no_preset_frees_a_correction_the_model_does_not_declare` runs every
   stage of every preset against a model declaring no opt-in correction, and
   asserts that no opt-in path is freed.
+
+  *Reaching every reader.* A `Parameter` handed to `extinction` inherits its
+  range and unit, as every declared field does (issue #204). An opt-in field
+  has no default to carry them, so `Phase._declared_optional` names a
+  factory, and both the constructor and the history repair
+  (`schemas.migrate.declared_range_repairs`) read it through
+  `declared_default`. The TOPAS not-written check and the GSAS-II CIF clause
+  skip an undeclared phase. A joint fit asks `EXTINCTION_UNDECLARED` per
+  histogram (`multi.DIAGNOSTIC_SCOPES`). The pointer has a test, a silence
+  pair (`tests/silence.py`) and a row in the skill's diagnostics reference.
+
+  *What moved, and why.* Each guide fit below freed extinction under the old
+  default. None declares it now, except where the page's story needs it.
+
+  | page | before | after | why |
+  |---|---|---|---|
+  | qpa | CaF₂ 3.58 ± 3.53 wt %, Rwp 0.082 | 1.34 ± 0.11 wt %, Rwp 0.088 | the extinction-scale trade (ρ = +0.998) is gone. The page now shows it in its own section, declared on CaF₂: 3.69 ± 3.63 wt % |
+  | qpa, Biso held | 1.37 ± 0.07 | 1.41 ± 0.07 | only the Biso is held now |
+  | tie | 35 / 33 free, tied Biso esd 0.079 | 34 / 32, 0.077 | one parameter fewer; FAP's extinction had ended at 0 |
+  | hump | Si Biso 0.443(100), 0.446(18), 0.448(39) | 0.417(65), 0.425(12), 0.425(26) | extinction no longer trades against Biso. The esd ratios the page quotes (5.6 and 2.5) are unchanged |
+  | joint | z(Al) esd ratio 3.6, x(O) joint ratio 0.67 | 3.4, 0.66 | corundum's extinction no longer free |
+  | next | | unchanged | the guide scores extinction, so its structure declares it |
+  | switching (TOPAS) | free paths end `phases.0.extinction`; `scale_pks` named | end `phases.0.atoms.0.dof.0`; no `scale_pks` | the writer writes no extinction for an undeclared phase |
+  | tutorial 02, landing panel | three warnings, one `FLOOR_HIT` on extinction | two warnings | same Rwp, 0.0898 |
+
+  The refinement diagnostics page passed the manual's 50 000-character
+  twin cap with the new code. Nearly every refinement code is raised in
+  `refine.py`, so no file prefix separates them. Codes naming a physical
+  correction moved to a new Corrections page
+  (`reference_pages.CORRECTION_CODE_PREFIXES`), and 18 links followed.
 
 - **2026-11-03** — task 1 measured. Nothing in `src/` changed. A ghostshift
   runner did the work. The decision brief below waits on the maintainer.
