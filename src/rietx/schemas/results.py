@@ -1182,6 +1182,26 @@ class StageResult(Base):
     #: ``None`` means a result stored before the field.  Writers: the three
     #: runners that build a ``StageResult``, on every stage.
     rwp: float | None = None
+    #: *which* test ended the solve, where :attr:`status` says only whether it
+    #: converged: the ``stage_end`` event's ``termination``, copied from the
+    #: driver's outcome (``LSQOutcome.termination``, WP-1334).  The default LM
+    #: driver writes ``ftol_runs`` (three small relative decreases),
+    #: ``no_descent`` or ``exhausted_fp64`` (nothing downhill the cost can
+    #: resolve), ``slow_descent`` (``optimize.lm.SLOW_DESCENT_ESD``: at its
+    #: last rate another 300 evaluations would have lowered χ² by less than
+    #: one esd's worth) and ``max_nfev`` (the budget ran out).  ``solver="trf"``
+    #: writes scipy's ``ftol``, ``xtol``, ``gtol``, ``ftol+xtol`` and
+    #: ``max_nfev``.  A model that stopped being finite writes
+    #: ``non_finite_residual`` or ``non_finite_jacobian`` (WP-2048).  The
+    #: status follows from it: ``max_nfev`` is ``"max_iter"``, a non-finite
+    #: stop ``"diverged"``, the rest ``"converged"``, ``slow_descent`` included
+    #: (Yue's ruling of 2026-11-03; ``STAGE_SLOW_DESCENT`` names such a stage).
+    #: An open vocabulary, like a guard's ``code``.
+    #:
+    #: ``None`` means a result stored before the field, or a stage with no
+    #: free parameter, where no test was consulted.  Writers: the three
+    #: runners that build a ``StageResult``.
+    termination: str | None = None
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
     #: Stephens strain cone, or the Γ_G² floor of WP-1938 D7) during this
     #: stage: the step for the box alone crossed a row, and the step solved
@@ -1554,7 +1574,7 @@ def _stage_lines(stages: list[StageResult], max_shift_over_esd: float | None) ->
 #: Above this many *distinct* pairs, a printed diagnostics list stops growing
 #: and names the rest as one count instead (WP-1302). Display-only: it caps
 #: what `_diagnostic_lines` renders, never `RefinementResult.diagnostics`
-#: itself — `sequential._persistent_diagnostics` counts `HIGH_CORRELATION`
+#: itself — `sequential._code_counts` counts `HIGH_CORRELATION`
 #: occurrences across a whole series from that stored list, and a pair
 #: ranked just outside the top ten in every pattern must still be countable
 #: as "N of M" there even though no single pattern's *printed* view shows it.

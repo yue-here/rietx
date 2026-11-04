@@ -44,6 +44,15 @@ its tier.
 
 ### Inherited
 
+- **From WP-2003 (2026-11-02, fifth session, PR #1310): every `error`-level code now drives a
+  chain action.** Batch C2 question 5 landed `schemas.sequential._rejected`: a kept attempt
+  that diverged *or carries any diagnostic at level `error`* escalates the series ladder and,
+  still rejected after its last rung, is quarantined (seeds no successor, joins no median, makes
+  no step). So each error-level code's threshold is now a trigger of a default series action,
+  not only a message: `MODEL_FAR_FROM_DATA_RWP` (0.8, `refine.py:9684`, tier 3 on its own row)
+  above all, which is what restored the path guide's 800 K rescue and quarantines tut05-broken's
+  scan12. When this WP tiers a code's level or threshold, say in its row that lowering it to
+  `warning` or moving the threshold changes what a series carries.
 - **From WP-2037 (2026-10-24, second session, PR #1145): this WP's codes are the view's loudest, so their responses decide how quiet it gets.** Over the eight `rietx compare` standards' fits (darwin/arm64), `HIGH_CORRELATION` is 44 % of all warning rows, `FLAT_DIRECTION` takes the running total to 69 % and `FLOOR_HIT` to 87 %. On cpd-1a under `qpa`, 49 of 57 warnings still print in full, 24 of them `HIGH_CORRELATION` and 22 `FLAT_DIRECTION`, because a code still on `_audit.RESPONSE_BASELINE` stays a warning under every purpose. Giving each a response (and its `where`-derived purposes) is what quiets the view; each one given `response="warning"` adds its pair to `tests/silence.py` (`FLOOR_HIT` has one). `rx.diagnostics_summary` and `python -m tests.suite_alarms` re-measure the numbers.
 - **From WP-2002 (2026-10-21, 4th session): tier 2 names seven programs.** `docs/milestones/generality.md` § The rule's tier 2 now reads "by default in an established Rietveld program": GSAS-II, FullProf, TOPAS, RIETAN-FP, BGMN, MAUD and EasyDiffraction, the list rietx-bench runs (the maintainer's instruction). A row resting on a program default names the programs it checked and what each does; a program doing otherwise by default is a dissenter, one without the feature is neither. What each does on peak windows, staging, roughness starts, width limits, dispersion, solver, mode and background seed is in `docs/practice.md`; where each program's manual or source sits is in the maintainer's memory (`foreign-code-sources-on-disk`), and rietx-bench's `tools/` holds BGMN, MAUD, RIETAN-FP and EasyDiffraction's environment beside GSAS-II and FullProf.
 - **From WP-2002 (2026-10-20, PR #1050): `OCCUPANCY_ABOVE_ONE` is new** (`refine._occupancy_flag_diagnostics`, a warning when a refined occupancy exceeds 1, from the B9 ruling). With no significance gate it fires on counting noise about half the time on a freely refined full site (synthetic LaB6, 1.032 ± 0.025). Whether to gate it is with the maintainer; the message quotes the distance above 1 in esds.

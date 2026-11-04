@@ -133,7 +133,7 @@ held = ref.fit(data, plan="lab_bragg_brentano", two_theta_limits=(15, 130))
 # The list starts at the displacement, because a held parameter is not refined and the result has no row for it.
 # The displacement's esd and the cell's are both far smaller than they were with the pair free.
 #
-# The plan still tried to free the zero shift, and the result says so in [`HOLD_BLOCKED_PLAN`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#hold-blocked-plan).
+# The plan still tried to free the zero shift, and the result says so in [`HOLD_BLOCKED_PLAN`](https://rietx.org/docs/stable/reference/diagnostics-stages.html#hold-blocked-plan).
 
 # %%
 [d for d in held.diagnostics if d.code == "HOLD_BLOCKED_PLAN"]

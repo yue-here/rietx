@@ -508,6 +508,21 @@ CLAIMS: tuple[Claim, ...] = (
                  "reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %",
     ),
     Claim(
+        "test_acceptance_srm660c",
+        "test_srm660c_zero_apertures_report_names_axial_asymmetry",
+        "srm660c", ("characterisation",),
+        "with both axial apertures at 0 the report names the one-sided "
+        "low-angle residual as axial asymmetry, and no impurity phase leads",
+        reference="the shape of a known systematic: the certification data "
+                  "carry axial divergence (the apertures refine to about "
+                  "0.025 and 0.037 when declared), so the action must fire "
+                  "and its rationale name the zero apertures; no accuracy "
+                  "is asserted",
+        measured="three gated regions below 40 deg read asymmetry +0.020 to "
+                 "+0.025 at 7-9 esd; refine_axial_asymmetry 0.50 first, "
+                 "increase_background_flexibility 0.49 (WP-2054)",
+    ),
+    Claim(
         "test_acceptance_srm660c", "test_srm660c_extinction_does_no_harm",
         "srm660c", ("characterisation", "ceiling"),
         "primary extinction freed on a specimen that has none refines to "
@@ -712,12 +727,13 @@ CLAIMS: tuple[Claim, ...] = (
                   "as a result: the recipe is over-parameterised and no fit "
                   "of it can say otherwise",
         measured="HIGH_CORRELATION on the peak against the background, and "
-                 "the last stage freeing it at max_iter: since WP-2002 that is "
-                 "the closing stage, and the declared extra_components stage "
-                 "converges at the intermediate tolerance (1.9.0: the "
-                 "extra_components stage at max_iter); GSAS-II's own "
+                 "the last stage freeing it, the closing stage since WP-2002, "
+                 "never meeting the solver's own convergence test: since "
+                 "WP-1334 the slow-descent rule stops it at 123 evaluations "
+                 "(STAGE_SLOW_DESCENT), the declared extra_components stage "
+                 "spending its 400 (STAGE_MAX_ITER); GSAS-II's own "
                  "committed position 8.77e10 with esd exactly 0",
-        diagnostics=("HIGH_CORRELATION", "STAGE_MAX_ITER"),
+        diagnostics=("HIGH_CORRELATION", "STAGE_MAX_ITER", "STAGE_SLOW_DESCENT"),
     ),
     Claim(
         "test_acceptance_powderline", "test_the_written_tables_reproduce_the_answer_they_came_from",
@@ -1211,41 +1227,43 @@ CLAIMS: tuple[Claim, ...] = (
         "test_acceptance_sequential",
         "test_the_hostile_series_exercises_the_reseed_fence", "qarr",
         ("identity", "characterisation"),
-        "the reseed fence's accounting is exact, the escalation ladder is "
+        "the reseed ladder's accounting is exact, the escalation ladder is "
         "only ever climbed as a prefix, and a reseed never leaves the fit "
         "worse than the warm start it rejected",
         reference="internal consistency: the SEQUENTIAL_RESEED diagnostic "
                   "count must equal the number of entries flagged reseeded, "
                   "exactly; every entry's rungs_tried must be a prefix of the "
-                  "ladder and contain the rung it kept.  The fence never fired "
+                  "ladder and contain the rung it kept.  The ladder never climbed "
                   "on the hostile series — the collapsed refit recovers a bad "
                   "warm start within the fit — so it is insurance, pinned by "
                   "unit tests rather than by this suite",
         measured="exact accounting; zero reseeds on the hostile series, "
                  "every pattern after the first kept on its warm rung, and no "
-                 "kept rung above the Rwp fence (2026-10-25, macOS arm64, "
-                 "after WP-2045; 1.9.0 the same).  1.10.0's hostile series did "
+                 "kept rung above the 1.25× Rwp fence the default then carried "
+                 "(2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same; the "
+                 "fence left the default in WP-2003).  1.10.0's hostile series did "
                  "not finish, spending over 50 CPU minutes in the closing "
                  "stage that follows cpd-1b's warm rung (Rwp 0.760)",
-        diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED",
-                     "SEQUENTIAL_RWP_OUTLIER"),
+        diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED"),
     ),
     Claim(
         "test_acceptance_sequential",
         "test_the_first_rung_bound_moves_no_accepted_value", "qarr",
         ("identity",),
-        "FIRST_RUNG_FACTOR is answer-invariant on the hostile series: the "
-        "chain with WP-1127's first-rung bound and the chain without it "
-        "report the same values, esds, rungs, fences and codes, and no kept "
-        "first rung reaches the budget the bound would set",
-        reference="the same chain with first_rung_factor=None, to the bit; "
-                  "the margin against FIRST_RUNG_FACTOR itself (WP-2003). "
+        "A first-rung bound at 3.0 (WP-1127's factor, the default until "
+        "WP-2003 C3 made it the caller's) is answer-invariant on the hostile "
+        "series: the chain with it and the default chain without it report "
+        "the same values, esds, rungs, fences and codes, and no kept first "
+        "rung reaches the budget the bound sets",
+        reference="the default chain, first_rung_factor=None, to the bit; "
+                  "the margin against the factor itself (WP-2003). "
                   "It verifies the bound and validates nothing, the "
                   "reference being rietx's own unbounded chain",
         measured="bit-identical; kept first rungs past the armed point "
-                 "0.064-0.080x the running maximum against a factor of 3.0 "
-                 "(2026-10-25, macOS arm64, after WP-2045; 0.34-0.39x on "
-                 "2026-10-24, Linux x86-64, with cpd-1b's runaway in the chain)",
+                 "0.045-0.062x the running maximum of a converged rung's "
+                 "dearest stage, the quantity capped since C3, against a "
+                 "factor of 3.0 (2026-11-02, macOS arm64; 0.064-0.080x of the "
+                 "rung's summed stages on 2026-10-25)",
     ),
     Claim(
         "test_acceptance_sequential",
