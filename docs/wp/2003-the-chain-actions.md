@@ -351,8 +351,8 @@ the rulings landed on the main checkout's tree.
 - **C10 q2 (a)** (`5ac0a8a`, `d8f0da7`). `multi.py` measures each phase's significance off the
   joint fit (pinv of the equilibrated joint normal matrix at unit weights), and each histogram
   takes the smaller of the screen and that z. The prior, the seeded phases and the tried instrument
-  prior follow the single runner. `test_joint_xray_neutron.py` now pins the flat pair's background
-  at the data level.
+  prior follow the single runner. `d8f0da7` pinned the flat pair's background at the data level;
+  CI showed the pin was a solver stopping point, and it is withdrawn (*Measured*, last item).
 - Main merged (`281bbef`, origin/main `d7b62a3`).
 - **Code review** (`/code-review high --fix 6244fa9..d8f0da7`): six findings, three fixed.
   - Fixed (`d35d1d6`): the server withheld a trajectory's largest gap when the two walks differed
@@ -396,7 +396,14 @@ the rulings landed on the main checkout's tree.
   equal the single fit's (2, 10, 1, 16, 19, 2). Over 139 recorded joint-fit test records, 10 moved
   and no test's expectation changed.
 - Flat corundum's background walked before C10 too: c0 reached −2467 and −13175 on main
-  (`6bc30d1`, measured on a snapshot). After C10 it sits at 1.0. The pin in `d8f0da7` holds that.
+  (`6bc30d1`, measured on a snapshot). After C10 it sits at 1.0 on this Mac and at 2931.21 on
+  Linux x86-64 py3.11 (CI, twice, the same digits), so `d8f0da7`'s pin failed CI and is withdrawn.
+  The mechanism, probed per stage on this Mac: the scale's z stays at 3e7 to 8e5 through
+  `profile_w`, because the broadened peaks stand in for a flat background. The profile stage reads
+  z = 1e-13 and collapses 14 paths. The closing stage starts with them held, then reads z = 7.7e5
+  at its answer and releases all 14. Its second solve runs to `max_iter` with every column free on
+  data with no peaks, so the background lands where the solver stops. This is a phase standing in
+  for the background, older than C10, and the support test cannot see it.
 
 *Generality.* The `generality-review` judge weighed every row of the audit delta and three
 heuristics the table cannot see. None `fails`. Its verdicts, condensed, with the author's answer
@@ -427,6 +434,11 @@ the maintainer's review in PR #1310.
    S criterion and the `max_iter` tie are Claude's settlement. Move `SeriesResult.relative_paths`
    and `.angle_paths` from `OTHER_RECORD_FIELDS` to tier-1 action rows.
 4. C10 q1's hand rows, then the rows waiting on X14.
+4b. The flat-pair defect (*Measured*): a phase whose broadened peaks stand in for a flat
+   background reads as seen, and the closing stage frees every column on data with no peaks. The
+   single X-ray fit releases the same way. Look for an owner among the background-absorption WPs
+   first. The fix needs a support test that the width-as-background trade cannot pass, measured on
+   both runners, and the joint test can then pin a value again.
 5. Re-capture any golden the demotions moved, and hand WP-2008 the list of skill rows that cite a
    removed code.
 6. The agent run, once the maintainer picks from its cost menu.
