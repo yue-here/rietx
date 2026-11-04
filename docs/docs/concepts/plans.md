@@ -34,6 +34,16 @@ Each preset is a constructor on `RefinementPlan`, and `Refinement.fit` also take
 | `RefinementPlan.magnetic_width` | the magnetic moment with the scale and background, then the magnetic peak widths, then both ([Magnetic peak width](../reference/magnetic.md#magnetic-peak-width)) |
 
 `fit` runs `mccusker_default` unless you pass another.
+The name follows the geometry the instrument states.
+On a `bragg_brentano` instrument it frees the specimen displacement in the stage that frees the zero shift, because on a flat plate the displacement is the largest peak-position error and a zero shift fitted in its place moves the cell.
+It frees nothing else of `lab_bragg_brentano`: the Kα2 ratio and the axial-divergence ratios stay where you set them, which on a calibrated instrument is its calibration.
+On a capillary, a transmission plate or an unstated geometry it frees nothing geometry-specific.
+A plan you build yourself, or a preset you call as `RefinementPlan.mccusker_default()`, runs as written.
+
+An instrument built without `Geometry(kind=...)` has an `unstated` geometry, and a fit on it warns with `GEOMETRY_UNSTATED`.
+Under it the package applies no displacement, transparency, capillary offset, absorption or texture correction, because each belongs to one geometry.
+The instrument presets `Instrument.bragg_brentano`, `Instrument.debye_scherrer` and `Instrument.flat_plate_transmission` each state theirs.
+`RefinementResult.assumed_instrument` lists the instrument values a fit held at the package's own number: an unstated geometry, a polarisation of 0.5 or 0.99, a Kα2/Kα1 ratio of 0.5.
 `lab_calibrate` and `lab_sample_refine` are the two halves of separating the instrument's peak width from the specimen's ([Instrument and specimen](parameters.md#instrument-and-specimen)).
 
 ## The order the presets follow

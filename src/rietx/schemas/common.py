@@ -717,6 +717,13 @@ from .._nearmiss import did_you_mean
 #: rule; an older build refuses a document carrying either key.  The default
 #: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
 #: its neighbours and now leaves the fit.
+#: Also in 0.61 (WP-2015): ``Geometry.kind`` gains ``"unstated"``, the new
+#: default, where a hand-built geometry was ``"debye_scherrer"``.  A stored
+#: document that omits the key (or the whole geometry) reads at the old
+#: ``"debye_scherrer"`` through the same readers.  Every writer here writes
+#: the key, so only a hand-written file meets this.  The new field
+#: ``RefinementResult.assumed_instrument`` is additive and defaults to
+#: ``None``, "a result stored before the field".
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

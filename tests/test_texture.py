@@ -124,8 +124,21 @@ def test_an_intensity_model_force_fixes_the_coefficients(mode, fixed):
 
 # ------------------------------------------------------------- the forward model
 def test_the_sample_angle_covers_every_geometry():
+    """Every stated geometry has a ψ; ``unstated`` has none (WP-2015)."""
     kinds = set(typing.get_args(Geometry.model_fields["kind"].annotation))
-    assert set(TEXTURE_SAMPLE_PSI_DEG) == kinds
+    assert set(TEXTURE_SAMPLE_PSI_DEG) == kinds - {"unstated"}
+
+
+def test_texture_under_an_unstated_geometry_is_refused_by_name():
+    """ψ is 0° on a plate and 90° on a capillary, so a texture block needs
+    the geometry stated; the predict names the field rather than guessing."""
+    space_group, cell, truth = _RECOVERY[sorted(_RECOVERY)[0]]
+    ins = Instrument(source=Source(lines=[EmissionLine(wavelength=1.540598)]))
+    assert ins.geometry.kind == "unstated"
+    with pytest.raises(ValueError, match=r"texture needs the specimen geometry"):
+        rx.Refinement(Structure(phases=[_recovery_phase(
+            space_group, cell, truth, vary=False)]), ins).predict(
+                np.arange(10.0, 60.0, 0.05))
 
 
 def _textured_state():

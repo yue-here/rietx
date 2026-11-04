@@ -1734,8 +1734,8 @@ def from_instrument_gsas2(instrument: Instrument, *,
     the same reason: an ``.instprm`` states no refine flags at all, a
     calibration having refined nothing by the time it ships.
 
-    Refused by name: a ``flat_plate_transmission`` geometry, GSAS-II's
-    ``Diff-type`` naming two sample kinds and not that one; more than two
+    Refused by name: a ``flat_plate_transmission`` or ``unstated`` geometry,
+    GSAS-II's ``Diff-type`` naming two sample kinds and neither of those; more than two
     emission lines; a declared λ/n harmonic, which GSAS-II's constant-wavelength
     model has no term for; and a non-finite value, which ``repr`` spells ``inf``
     and no real program parses.

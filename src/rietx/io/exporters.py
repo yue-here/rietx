@@ -541,8 +541,10 @@ def _write_refinement_metadata(block, result: RefinementResult,
         ("_computing_structure_refinement",
          text("_computing_structure_refinement", f"{DIST_NAME} {_VERSION}")),
         ("_pd_calc_method", text("_pd_calc_method", _CALC_METHOD[result.mode])),
+        # an unstated geometry (WP-2015) is CIF's unknown value, never a guess
         ("_pd_instr_geometry",
-         text("_pd_instr_geometry", _INSTR_GEOMETRY[instrument.geometry.kind])),
+         "?" if instrument.geometry.kind not in _INSTR_GEOMETRY
+         else text("_pd_instr_geometry", _INSTR_GEOMETRY[instrument.geometry.kind])),
         ("_diffrn_radiation_probe", "neutron" if instrument.source.kind == "neutron_cw"
          else "x-ray"),
     ]
