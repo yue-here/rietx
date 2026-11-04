@@ -318,7 +318,7 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   measurement is the caller's**: held paths and their ties leave `RefinementResult.parameters` (its
   rows are `moving_paths`, WP-1999), a trajectory starts at the onset. Which phases: a scale under 3σ of its counting-noise esd
   (`refine._answer_significance`, WP-1523), never the fitted curve an absent phase's cell fits to
-  noise; zero limit `phase_line_counts`. **Missed peaks read as unseen too**, so holding the instrument needs Hill & Flack's d ≥ Q (WP-2086). Both feed `PHASE_UNCONSTRAINED`, which says what was done;
+  noise; zero limit `phase_line_counts`. **Missed peaks read as unseen too**, so holding the instrument needs Hill & Flack's d ≥ Q (WP-2086). What a decline leaves free finds the peaks at a rate, so a test pins the decision, never the landing. Both feed `PHASE_UNCONSTRAINED`, which says what was done;
   `SeriesResult.code_counts` what no one pattern can: "42 of 68".
 - **Pydantic knows no crystallography, so a whole-model swap is checked by building its table.**
   Every symmetry refusal is raised in `ParameterTable.__init__`, and the snapshot

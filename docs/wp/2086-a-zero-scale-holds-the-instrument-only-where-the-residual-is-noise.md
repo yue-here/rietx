@@ -17,18 +17,21 @@ its peaks, as it could on 1.10.0, and a blank frame stays held and bit-identical
 (`docs/wp/TEMPLATE.md`: what a closed WP's fix did not cover is a new WP). Ruled
 alternative: ship as is. It lost because main fails on a tutorial's worked example and
 on a plain single fit that 1.10.0 reaches, and it gained only the three FAP fits below.
+The ruling assumed the check restores 1.10.0's reach. The second handover entry measures that
+over 100 noise draws on both platforms, and it holds as a rate.
 
 **The defect.** On a frame where every phase reads as unseen at a stage's answer,
 `refine._unsupported_phase_paths` held the zero shift, the displacement and the widths
 as well as the cell, reasoning that those columns are flat. That reasoning holds on a
 blank frame. It is false when the peaks merely missed: the scale goes to zero and the
-real peaks stay in the residual. On tutorial 05's 2 % step the first warm solve took
+real peaks stay in the residual. On tutorial 05's 2 % step, on its noise draw, the first warm solve took
 the scale to 2.47σ on both 1.10.0 and main. On 1.10.0 a second solve kept the zero
 shift and U..Y free, U climbed to 6 deg², the scale reached 83σ, and the closing stage
 freed the cell to 4.2482 Å. Main held them, had only scale and background left, and
 stayed at 2.09σ. So the warm rung failed and the ladder ended at Rwp 0.998,
-`SEQUENTIAL_UNRECOVERED`. Single fits were not spared: LaB₆ 2 % off went from Rwp
-0.0405 on the true cell to 0.934 with `MODEL_FAR_FROM_DATA`.
+`SEQUENTIAL_UNRECOVERED`. Single fits were not spared: on the same noise draw LaB₆ 2 % off
+went from Rwp 0.0405 on the true cell to 0.934 with `MODEL_FAR_FROM_DATA`. Over 100 draws the
+loss on `main` is a rate, in the second handover entry.
 
 **The discriminator was measured before the fix** (`~/.cache/ghostshift/rietx/wp-2049/`
 `step/disc.jsonl`, not committed). The Durbin-Watson d at the answer: 40 blank draws,
@@ -66,11 +69,14 @@ free, as on 1.10.0. See the handover.
 - [x] A lasting 2 % jump in a series, main against the check.
 - [x] Rule 1: say where the d that declined the hold is read.
 - [x] Fold the silent failures.
+- [x] Measure the rescue under perturbation and over noise draws, on macOS and Linux.
+- [x] Pin what is robust: the decision, and only those outcomes measured at 100 %.
 
 ## Acceptance
 
 `.venv/bin/python -m pytest tests/test_instrument_hold_noise.py tests/test_held_phase.py -n auto --dist loadgroup`
-passes, and the reach matrix is verdict-identical to 1.10.0 on all 119 fits.
+passes on macOS and Linux, and over 100 noise draws the rates of reaching the cell match
+1.10.0's within 3 in 100 and stay at or above `main`'s.
 
 ## References
 
@@ -173,3 +179,34 @@ passes, and the reach matrix is verdict-identical to 1.10.0 on all 119 fits.
   Author's answer: two of those three are measured above, under *Blank frames that decline* and *A weak phase*. Correlated noise does decline the hold, as the judge predicted, and a weak misplaced phase stayed under Q in every case that stayed misplaced. The first is unmeasured. The record's gaps stand, since closing them needs a new field, which is reader output.
 
   *Next.* This is PR #1406. PR #1400 owns the release notes and drops the failure note after this merges. `examples/tutorials/05_sequential_fits.ipynb`'s stored outputs still show `SEQUENTIAL_UNRECOVERED` on the jump and need the rebuild #1400 carries. The tutorial's prose stays true. WP-2017 owns the silent failures. A real blank frame passing the test, from a second instrument, is the evidence still owed.
+
+- **2026-11-04, the Linux failure** — CI run 41839775116 failed three of this file's tests on Linux, so the 2 % rescue was measured properly. The check holds up, and the first entry's claim was too strong. Reach past about 1.5 % is a rate that depends on the noise draw, on every version. The check restores 1.10.0's rate and beats `main`'s where the hold fires. A test may pin the decision and may not pin one fit's landing.
+
+  *What failed.* The fixture's noise draw, seed 14, happens to sit near a basin edge. A perturbation of 1e-14 relative on the start W lands elsewhere on 2-5 % of plain fits and about 40 % of the excluded-region fit. Identical installs flipped between attempts: four attempts on GitHub's Linux runners read Rwp 0.0405, 0.9358, 0.0405 and 0.0405 at no perturbation. So `test_a_single_fit_two_percent_off_reaches_its_cell` was pinning a draw from a distribution. Python's version is not the variable.
+
+  *Recovery over 100 noise draws.* The fixture's pattern redrawn with seeds 101-200, one fit each, on three trees. "Reached" is Rwp under 0.06 with the cell within 100 ppm, or for a chain the jump frame's Rwp under 0.06. Figures are Linux x86-64 on Python 3.11. Python 3.14 and macOS arm64 agree within 2 in 100, so the rates do not depend on the platform.
+
+  | Start error | Single: `main` | Single: here | Single: 1.10.0 | Chain step: `main` | Chain step: here | Chain step: 1.10.0 |
+  |---|---|---|---|---|---|---|
+  | 1.5 % | 98 | 98 | 98 | 100 | 100 | 100 |
+  | 1.75 % | 95 | 95 | 95 | 100 | 100 | 100 |
+  | 2 % | 92 | 93 | 93 | 90 | 99 | 98 |
+  | 2.25 % | 62 | 85 | 85 | 58 | 81 | 80 |
+  | 2.5 % | 24 | 38 | 37 | 16 | 42 | 41 |
+  | 3 % | 3 | 4 | 4 | 17 | 26 | 27 |
+
+  On macOS only: a start 2 % high in the cell reaches it in 59, 74 and 75 of 100 single fits (`main`, here, 1.10.0), and 88, 100 and 100 on a chain. With two excluded regions at 2 %: 85, 90 and 90. Up to 1.25 % every single fit reached its cell, and chains reached it in 98-100 of 100.
+
+  Against `main`, draw by draw, this tree gained 1 to 26 fits per row and lost 0 or 1. Up to 1.5 % the two are bit-identical on every draw, because the hold never fires. So the check buys reach, and 1.10.0 is its measure: rates within 3 in 100 on every row. The gain sits at 2.25-3 % and on a chain's step, and a plain single fit at 2 % gains 1 in 100. The first entry's headline, a plain LaB₆ fit at +2 %, describes seed 14. `main` reaches 92 of 100 other draws.
+
+  *Under perturbation.* 141 groups of one fit repeated with W moved by k·1e-14. A group is one case, start error and noise seed. On Linux 3.11, 7 of the 141 are mixed here, 1 on `main` and 4 on 1.10.0. So most draws are settled and a few sit on an edge. Seed 14 at 2 %: 129 of 132 here, 0 of 132 on `main`, 132 of 132 on 1.10.0. At 1.75 % seed 14 reaches its cell on no version, 0-3 %, where 95 of 100 other draws do. With the excluded regions at 2 % seed 14 reads 56-60 % here, 100 % on `main` and 99-100 % on 1.10.0. That one row is worse here than on `main`, and over 100 draws of the same fixture it is the reverse, 90 against 85.
+
+  *Linux.* 1.10.0 recovers: 132 of 132 on the plain fit and on tutorial 05's step, on Python 3.11 and 3.14. The check's tutorial step reads 132 of 132 on both, and the verbatim tutorial script took the 700 K fit on `warm` at Rwp 0.0390 in 12 of 12 attempts across Python 3.11, 3.13 and 3.14. The 800 K fit that follows it took `warm_staged` in 7 of those 12, so the prose "Every pattern after the first took its values from the plain `warm` attempt" holds for the 700 K pattern and not reliably for the next. `tests/test_tutorials.py` pins no value here. It asserts that the notebook runs clean.
+
+  *The 119 fits.* "Verdict-identical to 1.10.0 on all 119" was a true sentence about one fit per row on this Mac, and it is weak evidence. Each row is one draw, and it says nothing about a rate. The 39 rows at the edge were repeated with W perturbed, at 7 starts on LaB₆ and NAC and 3 on FAP, whose failed walks run for minutes. At no perturbation this tree and 1.10.0 agree on all 39. Whether a row reaches its answer changes with rounding on 2 rows of the 39 on `main` and 2 here, and on none so far on 1.10.0. Here that is LaB₆ `mccusker_default` at +2 % (6 of 7) and FAP `mccusker_default` at +3 % (2 of 3). That second row was listed as a gain over `main`, and it stands as one: `main` reaches it 0 of 3 times and 1.10.0 3 of 3. On `main` the two rows are FAP `lab_bragg_brentano` at −3 % (2 of 3) and LaB₆ `mccusker_structural` at +2 % (1 of 7). The three FAP rows the ruling paid for stay lost: here they reach 0 of 9 starts, and `main` reaches 8 of 9. Four FAP walks here hit this probe's 900 s cap under load and count as failures. The other 33 rows read the same at every start on all three trees.
+
+  *No small fix.* None found, and none tried. The fit stays at scale zero through the first four stages, and the `profile` stage then runs 90-150 iterations until the widths overlap real peaks. The path is sensitive to rounding because the gradient on the cell is proportional to a scale near zero. A fix would have to change how the fit starts from a lost phase, which is a new method and out of scope here. Any other rounding-level difference between machines would still reach it.
+
+  *Tests.* `test_a_phase_whose_peaks_missed_keeps_its_instrument_free` replaces the single-fit outcome: it reads the decision at the `zero`, `cell` and `profile_w` stages, before the walk starts. `test_the_peaks_still_read_as_structure_past_an_excluded_region` drops its Rwp and cell asserts. `test_a_fit_that_goes_on_leaves_the_declining_d_on_its_history_node` drops the assert on the final d. `test_the_tutorials_step_is_reached_warm` and `test_a_joint_fit_with_one_misplaced_and_one_blank_histogram` keep their outcomes, because both recovered 61 of 61 perturbed starts on macOS and on Linux 3.11 and 3.14, and 0 of 61 on `main`. 1.10.0 reads 100 % on the first and 5-11 % on the joint fit. With the check taken out all six tests that move a fit fail, on this tree.
+
+  *Gates* (macOS arm64, `[dev]`, Python 3.12). @@GATES@@ Scripts, logs and the full table: `~/.cache/ghostshift/rietx/wp-2086-split/` (`table.md`, `seedtab.txt`), not committed. The Linux numbers came from throwaway runs 41843278368, 41845319908, 41845440268 and 41847377132 on a deleted branch.

@@ -94,6 +94,8 @@ So is a phase's displacement parameter when its reflections in range cannot sepa
 When no phase is seen at a stage's answer, the zero shift, the displacement and the profile terms are fixed too, provided the residual is noise: Durbin-Watson $d \geq Q$, {eq}`est-dw-q`.
 With no phase line in the fitted range they are fixed whatever $d$ reads, because their columns are zero.
 A blank frame whose background the model follows passes that test. A phase whose peaks missed does not, because its scale went to zero and left every real peak in the residual, so those terms stay free to find them.
+Staying free gives the fit a chance and no more. The peaks have to widen until they overlap the real ones, and where that walk lands depends on the noise.
+On one synthetic LaB₆ pattern redrawn 100 times, a single fit reached its cell from every start up to 1.25 % away, 92 times from 2 %, 85 from 2.25 %, 37 from 2.5 % and 4 from 3 %.
 The test reads any structure, so a background the model cannot follow, such as an empty capillary's hump, also leaves those terms free.
 The test reads the fitted channels, and neither side depends on the scale of σ, which is why χ² is not used.
 `Statistics.durbin_watson` is the $d$ tested, printed as `DW`. `Statistics.n_points` and `Statistics.n_free_parameters` give $N$ and $P$. A stage's own $d$ is on its history node.
