@@ -70,6 +70,7 @@ from rietx.optimize.least_squares import STATIONARY_ANGLE_LEVEL
 from rietx.optimize.qpa import BRINDLEY_MU_R_FENCE
 from rietx.optimize.statistics import (
     EFFECTIVE_OBS_ALPHA,
+    HILL_FLACK_Z,
     MAX_SHIFT_CONVERGED,
     OBS_PER_PARAMETER_MIN,
     OBS_PER_PARAMETER_PREFERRED,
@@ -211,6 +212,7 @@ MYST_SUBSTITUTIONS = {
     "PARAMETER_INTERVAL_MAX_REFITS": PARAMETER_INTERVAL_MAX_REFITS,
     "CYLINDER_MU_R_MAX": CYLINDER_MU_R_MAX,
     "EFFECTIVE_OBS_ALPHA": EFFECTIVE_OBS_ALPHA,
+    "HILL_FLACK_Z": HILL_FLACK_Z,
     "MAX_SHIFT_CONVERGED": MAX_SHIFT_CONVERGED,
     # the Γ_G² clamp, which is also the Caglioti W's floor and the LM rows' bound
     "MIN_GAMMA_G2": f"{_MIN_GAMMA_G2:.0e}",

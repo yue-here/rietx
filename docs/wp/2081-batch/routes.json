@@ -1,0 +1,1106 @@
+{
+ "platform": "Darwin arm64",
+ "python": "3.12.10",
+ "rietx": "1.11.0.dev0",
+ "venv": "worktree .venv, [dev]",
+ "free_sets": [
+  {
+   "preset": "lab_bragg_brentano",
+   "instrument": "bragg_brentano",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.source.lines.1.weight",
+    "instrument.geometry.sample_displacement",
+    "instrument.geometry.axial_sl",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale"
+   ]
+  },
+  {
+   "preset": "lab_bragg_brentano",
+   "instrument": "capillary_with_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.geometry.axial_sl",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale"
+   ]
+  },
+  {
+   "preset": "lab_bragg_brentano",
+   "instrument": "capillary_no_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.geometry.axial_sl",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale"
+   ]
+  },
+  {
+   "preset": "lab_calibrate",
+   "instrument": "bragg_brentano",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.source.lines.1.weight",
+    "instrument.geometry.sample_displacement",
+    "instrument.geometry.axial_sl",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.scale",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "lab_calibrate",
+   "instrument": "capillary_with_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.geometry.axial_sl",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.scale",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "lab_calibrate",
+   "instrument": "capillary_no_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.geometry.axial_sl",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.scale",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "lab_sample_refine",
+   "instrument": "bragg_brentano",
+   "setup": [
+    "instrument.geometry.sample_displacement"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale",
+    "phases.0.lor_size",
+    "phases.0.lor_strain",
+    "phases.0.gauss_size",
+    "phases.0.gauss_strain",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "lab_sample_refine",
+   "instrument": "capillary_with_radius",
+   "setup": [],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale",
+    "phases.0.lor_size",
+    "phases.0.lor_strain",
+    "phases.0.gauss_size",
+    "phases.0.gauss_strain",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "lab_sample_refine",
+   "instrument": "capillary_no_radius",
+   "setup": [],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale",
+    "phases.0.lor_size",
+    "phases.0.lor_strain",
+    "phases.0.gauss_size",
+    "phases.0.gauss_strain",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "magnetic_structural",
+   "instrument": "bragg_brentano",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale",
+    "phases.0.extinction",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.dof.0",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "magnetic_structural",
+   "instrument": "capillary_with_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale",
+    "phases.0.extinction",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.dof.0",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "magnetic_structural",
+   "instrument": "capillary_no_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale",
+    "phases.0.extinction",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.dof.0",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "magnetic_width",
+   "instrument": "bragg_brentano",
+   "setup": [],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.scale"
+   ]
+  },
+  {
+   "preset": "magnetic_width",
+   "instrument": "capillary_with_radius",
+   "setup": [],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.scale"
+   ]
+  },
+  {
+   "preset": "magnetic_width",
+   "instrument": "capillary_no_radius",
+   "setup": [],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.scale"
+   ]
+  },
+  {
+   "preset": "mccusker_default",
+   "instrument": "bragg_brentano",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale"
+   ]
+  },
+  {
+   "preset": "mccusker_default",
+   "instrument": "capillary_with_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale"
+   ]
+  },
+  {
+   "preset": "mccusker_default",
+   "instrument": "capillary_no_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale"
+   ]
+  },
+  {
+   "preset": "mccusker_structural",
+   "instrument": "bragg_brentano",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale",
+    "phases.0.extinction",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.dof.0",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "mccusker_structural",
+   "instrument": "capillary_with_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale",
+    "phases.0.extinction",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.dof.0",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "mccusker_structural",
+   "instrument": "capillary_no_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a",
+    "phases.0.scale",
+    "phases.0.extinction",
+    "phases.0.atoms.0.biso",
+    "phases.0.atoms.1.dof.0",
+    "phases.0.atoms.1.biso"
+   ]
+  },
+  {
+   "preset": "pawley_default",
+   "instrument": "bragg_brentano",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a"
+   ]
+  },
+  {
+   "preset": "pawley_default",
+   "instrument": "capillary_with_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a"
+   ]
+  },
+  {
+   "preset": "pawley_default",
+   "instrument": "capillary_no_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a"
+   ]
+  },
+  {
+   "preset": "profile_only",
+   "instrument": "bragg_brentano",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a"
+   ]
+  },
+  {
+   "preset": "profile_only",
+   "instrument": "capillary_with_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a"
+   ]
+  },
+  {
+   "preset": "profile_only",
+   "instrument": "capillary_no_radius",
+   "setup": [
+    "instrument.zero_shift",
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y"
+   ],
+   "background": [
+    "instrument.background.c0",
+    "instrument.background.c1",
+    "instrument.background.c2",
+    "instrument.background.c3"
+   ],
+   "sample": [
+    "phases.0.cell.a"
+   ]
+  }
+ ],
+ "rows": [
+  {
+   "arm": "default",
+   "frame": 0,
+   "rung": "cold",
+   "evaluations": 37,
+   "n_setup_free": 6,
+   "n_free": 13,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.5,
+   "cell_a_ppm": -1.7470266813125896,
+   "cell_a_esd_ppm": 1.2269349670853542,
+   "gof": 1.068700587208885
+  },
+  {
+   "arm": "default",
+   "frame": 1,
+   "rung": "warm",
+   "evaluations": 15,
+   "n_setup_free": 6,
+   "n_free": 13,
+   "zero_shift": 0.007988711069465713,
+   "w": 0.0002502005758705109,
+   "biso": 0.5,
+   "cell_a_ppm": -1.0614401552398935,
+   "cell_a_esd_ppm": 1.2293636554918332,
+   "gof": 1.0686704542795222
+  },
+  {
+   "arm": "default",
+   "frame": 2,
+   "rung": "warm",
+   "evaluations": 15,
+   "n_setup_free": 6,
+   "n_free": 13,
+   "zero_shift": 0.00800632346907527,
+   "w": 0.000250185507446012,
+   "biso": 0.5,
+   "cell_a_ppm": 0.24372358717365206,
+   "cell_a_esd_ppm": 1.1579367886668512,
+   "gof": 1.037262520694362
+  },
+  {
+   "arm": "default",
+   "frame": 3,
+   "rung": "warm",
+   "evaluations": 15,
+   "n_setup_free": 6,
+   "n_free": 13,
+   "zero_shift": 0.008019325607330966,
+   "w": 0.00025134569018054226,
+   "biso": 0.5,
+   "cell_a_ppm": 1.0807379036588836,
+   "cell_a_esd_ppm": 1.211471946098193,
+   "gof": 1.0615955588177162
+  },
+  {
+   "arm": "default",
+   "frame": 4,
+   "rung": "warm",
+   "evaluations": 15,
+   "n_setup_free": 6,
+   "n_free": 13,
+   "zero_shift": 0.007992240722962306,
+   "w": 0.00024707938332533164,
+   "biso": 0.5,
+   "cell_a_ppm": -1.1511075373280673,
+   "cell_a_esd_ppm": 1.1966959526157215,
+   "gof": 1.0571532743570753
+  },
+  {
+   "arm": "default",
+   "frame": 5,
+   "rung": "warm",
+   "evaluations": 15,
+   "n_setup_free": 6,
+   "n_free": 13,
+   "zero_shift": 0.007974848804968897,
+   "w": 0.0002486548428452273,
+   "biso": 0.5,
+   "cell_a_ppm": -1.723651144028324,
+   "cell_a_esd_ppm": 1.1805614353461706,
+   "gof": 1.0443246396336094
+  },
+  {
+   "arm": "default",
+   "frame": 6,
+   "rung": "warm",
+   "evaluations": 15,
+   "n_setup_free": 6,
+   "n_free": 13,
+   "zero_shift": 0.007991808860811198,
+   "w": 0.0002503609156533834,
+   "biso": 0.5,
+   "cell_a_ppm": 0.20514785944271804,
+   "cell_a_esd_ppm": 1.1894720834521937,
+   "gof": 1.0540874333694132
+  },
+  {
+   "arm": "calibrate_then_cautious",
+   "frame": 0,
+   "rung": "cold",
+   "evaluations": 6,
+   "n_setup_free": 0,
+   "n_free": 7,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.5,
+   "cell_a_ppm": -1.7471324402722157,
+   "cell_a_esd_ppm": 0.4752253609093713,
+   "gof": 1.0679359947924114
+  },
+  {
+   "arm": "calibrate_then_cautious",
+   "frame": 1,
+   "rung": "warm",
+   "evaluations": 9,
+   "n_setup_free": 0,
+   "n_free": 7,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.5,
+   "cell_a_ppm": -2.038533594007474,
+   "cell_a_esd_ppm": 0.48205670826785396,
+   "gof": 1.068858455696356
+  },
+  {
+   "arm": "calibrate_then_cautious",
+   "frame": 2,
+   "rung": "warm",
+   "evaluations": 9,
+   "n_setup_free": 0,
+   "n_free": 7,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.5,
+   "cell_a_ppm": -1.9405172225535379,
+   "cell_a_esd_ppm": 0.461730050131489,
+   "gof": 1.0385637142199093
+  },
+  {
+   "arm": "calibrate_then_cautious",
+   "frame": 3,
+   "rung": "warm",
+   "evaluations": 9,
+   "n_setup_free": 0,
+   "n_free": 7,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.5,
+   "cell_a_ppm": -1.9989971982126606,
+   "cell_a_esd_ppm": 0.4691555349130823,
+   "gof": 1.063546325486448
+  },
+  {
+   "arm": "calibrate_then_cautious",
+   "frame": 4,
+   "rung": "warm",
+   "evaluations": 9,
+   "n_setup_free": 0,
+   "n_free": 7,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.5,
+   "cell_a_ppm": -2.3717096810338543,
+   "cell_a_esd_ppm": 0.46051687004244046,
+   "gof": 1.0576406594823689
+  },
+  {
+   "arm": "calibrate_then_cautious",
+   "frame": 5,
+   "rung": "warm",
+   "evaluations": 9,
+   "n_setup_free": 0,
+   "n_free": 7,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.5,
+   "cell_a_ppm": -1.7505240664267923,
+   "cell_a_esd_ppm": 0.46171061506447614,
+   "gof": 1.0442625829600618
+  },
+  {
+   "arm": "calibrate_then_cautious",
+   "frame": 6,
+   "rung": "warm",
+   "evaluations": 9,
+   "n_setup_free": 0,
+   "n_free": 7,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.5,
+   "cell_a_ppm": -0.9880319100083688,
+   "cell_a_esd_ppm": 0.46669822344690215,
+   "gof": 1.0538121936030713
+  },
+  {
+   "arm": "calibrate_then_sample",
+   "frame": 0,
+   "rung": "cold",
+   "evaluations": 14,
+   "n_setup_free": 0,
+   "n_free": 13,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.39521517264530603,
+   "cell_a_ppm": -1.745744239795791,
+   "cell_a_esd_ppm": 0.3987371941371128,
+   "gof": 1.0203806103826893
+  },
+  {
+   "arm": "calibrate_then_sample",
+   "frame": 1,
+   "rung": "warm",
+   "evaluations": 11,
+   "n_setup_free": 0,
+   "n_free": 13,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.39789255336570367,
+   "cell_a_ppm": -2.0349368878982013,
+   "cell_a_esd_ppm": 0.403362919641024,
+   "gof": 1.0236018129815385
+  },
+  {
+   "arm": "calibrate_then_sample",
+   "frame": 2,
+   "rung": "warm",
+   "evaluations": 11,
+   "n_setup_free": 0,
+   "n_free": 13,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.40868889910378153,
+   "cell_a_ppm": -1.9269265303731027,
+   "cell_a_esd_ppm": 0.3868249145149599,
+   "gof": 1.001181032009496
+  },
+  {
+   "arm": "calibrate_then_sample",
+   "frame": 3,
+   "rung": "warm",
+   "evaluations": 10,
+   "n_setup_free": 0,
+   "n_free": 13,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.39518393819849257,
+   "cell_a_ppm": -1.979650208600893,
+   "cell_a_esd_ppm": 0.3906949626639356,
+   "gof": 1.0153917105954868
+  },
+  {
+   "arm": "calibrate_then_sample",
+   "frame": 4,
+   "rung": "warm",
+   "evaluations": 11,
+   "n_setup_free": 0,
+   "n_free": 13,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.40349183549090917,
+   "cell_a_ppm": -2.361376013029092,
+   "cell_a_esd_ppm": 0.39962290035055326,
+   "gof": 1.017210703993801
+  },
+  {
+   "arm": "calibrate_then_sample",
+   "frame": 5,
+   "rung": "warm",
+   "evaluations": 11,
+   "n_setup_free": 0,
+   "n_free": 13,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.4079156241018299,
+   "cell_a_ppm": -1.7446726353096234,
+   "cell_a_esd_ppm": 0.3989163629950987,
+   "gof": 1.0070661653893411
+  },
+  {
+   "arm": "calibrate_then_sample",
+   "frame": 6,
+   "rung": "warm",
+   "evaluations": 11,
+   "n_setup_free": 0,
+   "n_free": 13,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.40123561863107365,
+   "cell_a_ppm": -0.9699544960606654,
+   "cell_a_esd_ppm": 0.3888200611768982,
+   "gof": 1.0102629147466278
+  },
+  {
+   "arm": "two_pass",
+   "frame": 0,
+   "rung": "cold",
+   "evaluations": 10,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.3954568375776319,
+   "cell_a_ppm": -1.7457539190302747,
+   "cell_a_esd_ppm": 0.39909102691467435,
+   "gof": 1.0200737232879409
+  },
+  {
+   "arm": "two_pass",
+   "frame": 1,
+   "rung": "warm",
+   "evaluations": 5,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.3979072324635301,
+   "cell_a_ppm": -2.034933758423535,
+   "cell_a_esd_ppm": 0.404154900323781,
+   "gof": 1.0231251627718918
+  },
+  {
+   "arm": "two_pass",
+   "frame": 2,
+   "rung": "warm",
+   "evaluations": 7,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.40950571640782757,
+   "cell_a_ppm": -1.925238339140059,
+   "cell_a_esd_ppm": 0.38828509069179207,
+   "gof": 1.0019577767816836
+  },
+  {
+   "arm": "two_pass",
+   "frame": 3,
+   "rung": "warm",
+   "evaluations": 5,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.3951839400761772,
+   "cell_a_ppm": -1.9796500758915758,
+   "cell_a_esd_ppm": 0.3905073424840803,
+   "gof": 1.0149072679579008
+  },
+  {
+   "arm": "two_pass",
+   "frame": 4,
+   "rung": "warm",
+   "evaluations": 6,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.40375200975485737,
+   "cell_a_ppm": -2.361161697827333,
+   "cell_a_esd_ppm": 0.39939343471380345,
+   "gof": 1.0169122692916759
+  },
+  {
+   "arm": "two_pass",
+   "frame": 5,
+   "rung": "warm",
+   "evaluations": 5,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.40820864247875305,
+   "cell_a_ppm": -1.7438287509091184,
+   "cell_a_esd_ppm": 0.39911760066483226,
+   "gof": 1.0067527937729124
+  },
+  {
+   "arm": "two_pass",
+   "frame": 6,
+   "rung": "warm",
+   "evaluations": 5,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.401600987677008,
+   "cell_a_ppm": -0.9707153369234716,
+   "cell_a_esd_ppm": 0.3889732230792707,
+   "gof": 1.010130372933454
+  },
+  {
+   "arm": "two_pass_forced",
+   "frame": 0,
+   "rung": "cold",
+   "evaluations": 10,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.3954568375776319,
+   "cell_a_ppm": -1.7457539190302747,
+   "cell_a_esd_ppm": 0.39909102691467435,
+   "gof": 1.0200737232879409
+  },
+  {
+   "arm": "two_pass_forced",
+   "frame": 1,
+   "rung": "warm",
+   "evaluations": 5,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.3979072324635301,
+   "cell_a_ppm": -2.034933758423535,
+   "cell_a_esd_ppm": 0.404154900323781,
+   "gof": 1.0231251627718918
+  },
+  {
+   "arm": "two_pass_forced",
+   "frame": 2,
+   "rung": "cold",
+   "evaluations": 11,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.4095057164156014,
+   "cell_a_ppm": -1.9252383393535244,
+   "cell_a_esd_ppm": 0.38828509073948425,
+   "gof": 1.0019577767815857
+  },
+  {
+   "arm": "two_pass_forced",
+   "frame": 3,
+   "rung": "warm",
+   "evaluations": 5,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.39518394008920965,
+   "cell_a_ppm": -1.9796500758915758,
+   "cell_a_esd_ppm": 0.39050734248458646,
+   "gof": 1.0149072679579008
+  },
+  {
+   "arm": "two_pass_forced",
+   "frame": 4,
+   "rung": "warm",
+   "evaluations": 6,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.40375200974054876,
+   "cell_a_ppm": -2.361161697827333,
+   "cell_a_esd_ppm": 0.3993934347132539,
+   "gof": 1.016912269291676
+  },
+  {
+   "arm": "two_pass_forced",
+   "frame": 5,
+   "rung": "warm",
+   "evaluations": 5,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.4082086424811791,
+   "cell_a_ppm": -1.7438287509091184,
+   "cell_a_esd_ppm": 0.39911760066454843,
+   "gof": 1.0067527937729124
+  },
+  {
+   "arm": "two_pass_forced",
+   "frame": 6,
+   "rung": "warm",
+   "evaluations": 5,
+   "n_setup_free": 0,
+   "n_free": 9,
+   "zero_shift": 0.007974441079636643,
+   "w": 0.00025175017380460647,
+   "biso": 0.4016009876762472,
+   "cell_a_ppm": -0.9707153369234716,
+   "cell_a_esd_ppm": 0.3889732230791966,
+   "gof": 1.010130372933454
+  }
+ ],
+ "joint_calibration": {
+  "status": "converged",
+  "zero_shift": 0.007983154337303315,
+  "zero_esd": 1.1535791217341083e-05
+ },
+ "seconds": 8.2
+}
