@@ -840,20 +840,19 @@ def test_the_ramp_reproduction_no_longer_runs_away():
 
     # and the aggregation is untouched: it reads `where`, which now carries the
     # held paths, so the chain still says the thing no per-pattern code can
-    persistent = [d for d in series.diagnostics
-                  if d.code == "SEQUENTIAL_PERSISTENT_FINDING"]
-    held = [d for d in persistent if d.message.startswith("PHASE_UNCONSTRAINED")]
-    assert len(held) == 1
-    assert held[0].where == ["phases.1.cell.a"]
-    assert "13 of 13" in held[0].message
-    # The one other persistent finding is the absent phase's scale on its
+    # (on most of the series: `code_counts` lists every count, WP-2003 C6)
+    persistent = [c for c in series.code_counts if 2 * c.count > c.n_patterns]
+    held = [c for c in persistent if c.code == "PHASE_UNCONSTRAINED"]
+    assert [(c.path, c.count, c.n_patterns) for c in held] == [
+        ("phases.1.cell.a", 13, 13)]
+    # The one other code on most of the series is the absent phase's scale on its
     # floor of 0.  Since WP-1938 a floor is an ordinary bound, so the bound
     # test answers it, where a softplus row was set aside as untested (11 of
     # 13 patterns, macOS arm64, `[dev,jax]`), and since WP-1929 a floor's code
     # is FLOOR_HIT.
-    others = [d for d in persistent if d not in held]
-    assert all(d.where == ["phases.1.scale"]
-               and d.message.startswith("FLOOR_HIT") for d in others), others
+    others = [c for c in persistent if c not in held]
+    assert all(c.path == "phases.1.scale" and c.code == "FLOOR_HIT"
+               for c in others), others
 
 
 @pytest.mark.slow
@@ -1328,8 +1327,7 @@ def test_the_hold_reaches_every_pattern_of_a_chain():
     import rietx as rx
     from rietx.sequential import SequentialRefinement
 
-    # five, which is `MIN_POINTS_FOR_PERSISTENCE`: the chain-level sentence is
-    # half of what this arm is for, and below that the aggregation declines
+    # five patterns: the chain-level count is half of what this arm is for
     temperatures = [25.0, 60.0, 95.0, 130.0, 165.0]
     assert max(temperatures) < RAMP_T_TRANSITION, "these are the sub-onset ones"
 
@@ -1358,16 +1356,13 @@ def test_the_hold_reaches_every_pattern_of_a_chain():
         assert "PHASE_UNCONSTRAINED" in [d.code for d in entry.diagnostics]
 
     # and the chain says the thing no per-pattern finding can
-    persistent = [d for d in series.diagnostics
-                  if d.code == "SEQUENTIAL_PERSISTENT_FINDING"]
-    held = [d for d in persistent if d.message.startswith("PHASE_UNCONSTRAINED")]
-    assert len(held) == 1
-    assert held[0].where == ["vars.caf2_a"]
-    assert "5 of 5" in held[0].message
+    persistent = [c for c in series.code_counts if 2 * c.count > c.n_patterns]
+    held = [c for c in persistent if c.code == "PHASE_UNCONSTRAINED"]
+    assert [(c.path, c.count, c.n_patterns) for c in held] == [("vars.caf2_a", 5, 5)]
     # the absent phase's scale on its floor, which is its truth: 4 of 5 since
     # the patterns are drawn at the closing stage's windows (WP-2002)
-    assert all(d.message.startswith("FLOOR_HIT") and d.where == ["phases.1.scale"]
-               for d in persistent if d not in held)
+    assert all(c.code == "FLOOR_HIT" and c.path == "phases.1.scale"
+               for c in persistent if c not in held)
 
 
 def test_a_held_column_is_released_when_its_phase_appears():

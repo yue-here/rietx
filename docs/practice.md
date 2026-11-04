@@ -304,7 +304,7 @@ When a fit goes wrong:
 
 | Program | Restart on a bad fit | A pattern that fails | Does the failure seed the next? |
 |---|---|---|---|
-| rietx | a rung at a time, collapsed warm refit, then the full plan from the warm state, then the full plan cold, when the fit diverges or its Rwp exceeds `RESEED_FACTOR` (1.25) × the median Rwp of the accepted patterns; the best attempt is kept, convergence before Rwp and a truncated rung below any completed one (`reseed=True`, checked) | diverged after every rung: quarantined, `SEQUENTIAL_UNRECOVERED`. Every rung raised: `on_error="carry"` records it (`SERIES_PATTERN_FAILED`) and the chain goes on; `"skip"` starts the successor cold, `"raise"` stops. Converged above the fence: kept, `SEQUENTIAL_RWP_OUTLIER` | no: the successor starts from the last accepted pattern, and a quarantined pattern joins no median (checked) |
+| rietx | a rung at a time, collapsed warm refit, then the full plan from the warm state, then the full plan cold, when the fit diverges, raises or carries an `error`-level code (an Rwp fence only where the caller passes `reseed_factor`, none by default since WP-2003); the best attempt is kept, an unrejected one before Rwp and a truncated rung below any completed one (`reseed=True`, checked) | still rejected after every rung: quarantined, `SEQUENTIAL_UNRECOVERED`. Every rung raised: `on_error="carry"` records it (`SERIES_PATTERN_FAILED`) and the chain goes on; `"skip"` starts the successor cold, `"raise"` stops. A high Rwp is kept and recorded, `SeriesEntry.rwp_over_median` | no: the successor starts from the last accepted pattern, and a quarantined pattern joins no median (checked) |
 | GSAS-II | none | a singular normal matrix ends the chain at that histogram ("Sequential refinement failed at histogram") and the histograms before it are written to the results table; an exception ends the run before that table is written (checked) | not applicable: the chain has stopped |
 | EasyDiffraction | none | an exception is caught and written as a failed row of `results.csv`, and the chain goes on (checked) | no: only a fit whose `fit_result.success` is true moves the start values (checked) |
 | MAUD | none | an exception that reaches the batch loop ends the batch; a fit that finishes, however poor, is saved and the next row runs (checked) | the next row reads whatever file it names (inferred) |
@@ -317,7 +317,7 @@ Order and flags:
 
 | Program | Reverse order | Forward-backward comparison | Test on steps between neighbours |
 |---|---|---|---|
-| rietx | `direction="backward"`; `"forward"` by default | `direction="both"`, off by default, runs the chain each way and flags a parameter whose two trajectories differ by more than `PATH_DEPENDENCE_SIGMA` (3) combined esds, `SEQUENTIAL_PATH_DEPENDENT` | none since WP-2003: `SeriesResult.steps` lists every step in esds of the later fit, largest first, with no threshold and no diagnostic (until then `SEQUENTIAL_DISCONTINUITY`, at 5× the median absolute step and 3 combined esds from 5 points); `verify_steps=k` refits the k largest pairs cold, 0 by default (checked) |
+| rietx | `direction="backward"`; `"forward"` by default | `direction="both"`, off by default, runs the chain each way and lists every path's gap per pattern in combined esds, largest first, with no threshold (`SeriesResult.direction_gaps`; until WP-2003 `SEQUENTIAL_PATH_DEPENDENT` at 3 combined esds) | none since WP-2003: `SeriesResult.steps` lists every step in esds of the later fit, largest first, with no threshold and no diagnostic (until then `SEQUENTIAL_DISCONTINUITY`, at 5× the median absolute step and 3 combined esds from 5 points); `verify_steps=k` refits the k largest pairs cold, 0 by default (checked) |
 | GSAS-II | "Reverse order?" (`Reverse Seq`), off by default | none | none. The results table colours a last-cycle Δχ² above 1 % yellow and above 10 % red, only with `ShowCell` on (off by default); a user-run cluster analysis offers outlier detection on the data (checked) |
 | EasyDiffraction | `reverse`, off by default ("useful when starting values are better matched to the last file") | none | none (checked) |
 | MAUD | the row order of the instruction file | none | none (checked) |
@@ -329,13 +329,13 @@ Order and flags:
 Anything else a series mode decides by itself:
 
 - rietx: stage seeds are zeroed on a warm start, so a neighbour's answer sitting on a floor is
-  not lifted; the collapsed first rung gets an evaluation budget of `first_rung_factor` (3.0) ×
-  the dearest converged first rung, once `FIRST_RUNG_SAMPLES` (3) have converged; a magnetic
+  not lifted; the collapsed first rung gets no evaluation budget unless the caller passes
+  `first_rung_factor` (none by default since WP-2003's C3, 2026-11-02); a magnetic
   moment the pattern does not support is floored before it seeds the next
   (`SEQUENTIAL_MOMENT_HOLD`); the wavelength-calibration diagnostic measures from the series
   root's declared λ, not the carried one; a cancelled
-  series returns what completed (`SEQUENTIAL_CANCELLED`); a finding on most patterns is
-  summarised once (`SEQUENTIAL_PERSISTENT_FINDING`) (checked).
+  series returns what completed (`SEQUENTIAL_CANCELLED`); every per-pattern code is
+  counted over the series (`SeriesResult.code_counts`, no threshold since WP-2003) (checked).
 - GSAS-II refuses to start a sequential refinement that refines a phase's lattice parameters
   or texture coefficients, and says to use the per-histogram Dij and C(L,N) instead. With
   `Copy2Next` on it prints the variables added or removed when a histogram's vary list
@@ -370,11 +370,11 @@ the step between neighbours. The rietx behaviours with a program default behind 
 rietx carries every entry where GSAS-II and EasyDiffraction carry the varied ones. A fixed
 entry holds the same value either way, so the two differ only where a fixed value changes
 during the chain. The behaviours with no program default behind them are rietx's own: the
-restart ladder with its Rwp fence (`RESEED_FACTOR`, the median, `_prefer`) and the first-rung
-budget; the quarantine's exclusion from the median; `direction="both"` and
-`SEQUENTIAL_PATH_DEPENDENT`; the discontinuity scan and its cold verification; and the moment
-floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the persistent-finding
-summary and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
+restart ladder (its Rwp fence and first-rung budget the caller's opt-ins since WP-2003, the
+median, `_prefer`); the quarantine's exclusion from the median; `direction="both"` and
+its gap list; the step list and its cold verification; and the moment
+floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the per-pattern code
+counts and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
 
 Parameters the setup fixes. Surveyed 2026-11-02 for WP-2081, one session. GSAS-II 5.8.4 is
 read in its source (`GSASIIstrMain.SeqRefine`, `GSASIIstrIO.ReadConstraints`,
@@ -693,7 +693,7 @@ Sequential refinement (WP-2003, read 2026-10-24):
 
 | Program | Where |
 |---|---|
-| rietx | `src/rietx/sequential.py`: `SequentialRefinement.fit` and its docstring, `refine_sequential`, `RESEED_FACTOR`, `FIRST_RUNG_FACTOR`, `_series_steps`, `PATH_DEPENDENCE_SIGMA`, `ON_ERROR_POLICIES`, `_ladder`, `_reseed_needed`, `_prefer`, `_carry_into`, `_fit_one` |
+| rietx | `src/rietx/sequential.py`: `SequentialRefinement.fit` and its docstring, `refine_sequential`, `_check_factor`, `_rejected`, `_series_steps`, `PATH_DEPENDENCE_SIGMA`, `ON_ERROR_POLICIES`, `_ladder`, `_reseed_needed`, `_prefer`, `_carry_into`, `_fit_one` |
 | GSAS-II 5.8.4 | `SeqRefine`, `GSASIIstrMain.py:875-1196`: cell and texture refused `:910-918`; reverse `:923-924`; `Copy2Next`, the Le Bail copy and the earlier-run start `:980-1000`; vary-list change `:1038-1058`; stop on failure `:1098-1100`, singular matrix in a sequential fit `:376-391`; carried set `:1146-1162`; exception `:1169-1173`; results table written `:1178-1180`; `dropOOBvars` `:1123, 1198-1230`. Defaults `GSASIIobj.py:22, 27`; checkboxes and the clear button `GSASIIdataGUI.py:8158-8199`; Δχ² colouring `GSASIIseqGUI.py:1491-1499, 1818-1830`; cluster-analysis outliers `GSASIIseqGUI.py:2232-2249`; scripting `seqCopy`/`Reverse Seq` `GSASIIscriptable.py:3144-3152` |
 | EasyDiffraction 0.21.1 | `easydiffraction/analysis/sequential.py`: worker and caught errors `:73-170`, collected values `:330-375`, start values `:591-598`, reverse `:923-924`, resume `:1094-1110`, chunk size `:1146-1147`, one start per chunk `:1229-1233`, propagation `:1251-1262`, `fit_sequential` `:1265-1294`; defaults `easydiffraction/analysis/categories/sequential_fit/default.py:54-95` |
 | MAUD 3.07 | `src/it/unitn/ing/rista/util/batchProcess.java`: exception ends the batch `:111-187`, row loop `:261-514`, analysis read per row `:284-327`, refine and save `:562-575`, GoF loop `:591-613`; dialog defaults `src/it/unitn/ing/rista/awt/BatchFileDialog.java:181, 187, 243, 297, 398-453` |
