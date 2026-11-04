@@ -19,6 +19,8 @@ import pytest
 
 import rietx as rx
 from rietx.report import compare_rivals
+from rietx.schemas.plan import PlanSpec
+from rietx.strategy.staged import PLAN_PRESETS
 from tests.eval_report_agent import build_fixtures as bf
 
 pytestmark = pytest.mark.slow
@@ -44,12 +46,16 @@ def _models(core):
 
 def _fit_default(core, **kw):
     """The lazy path: the episode start under ``mccusker_default``, honouring
-    a protocol-level limits key where the core carries one (W1)."""
+    a protocol-level limits key where the core carries one (W1).
+
+    The preset runs as an object, the path these rows were registered on: by
+    name, a Bragg-Brentano instrument also frees the displacement beside the
+    zero (WP-2015), which is the plant N1, C1 and E8p hold."""
     structure, ins, data = _models(core)
     if "two_theta_limits" in core:
         kw.setdefault("two_theta_limits", tuple(core["two_theta_limits"]))
     ref = rx.Refinement(structure, ins)
-    return ref, ref.fit(data, plan="mccusker_default", **kw), data
+    return ref, ref.fit(data, plan=PLAN_PRESETS["mccusker_default"](), **kw), data
 
 
 def _plot(result, stem):
@@ -368,8 +374,12 @@ def test_e8p_through_the_agent_surface_carries_the_clause():
     """
     from tests.eval_report_agent.run_refine import run_request
 
+    # the preset as a spec, which runs as given: the request's default name
+    # frees the displacement on Bragg-Brentano since WP-2015 (``_fit_default``)
+    plan = PlanSpec.model_validate(PLAN_PRESETS["mccusker_default"]())
     core = bf.build_episodes()["E8p"]["core"]
-    response = run_request(dict(core, include_report=True))
+    response = run_request(dict(core, include_report=True,
+                                plan=plan.model_dump(mode="json")))
     assert response["ok"], response.get("error")
     values = {p["path"] for p in response["result"]["parameters"]}
     assert DISP not in values
