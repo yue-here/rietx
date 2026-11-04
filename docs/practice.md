@@ -718,6 +718,76 @@ Every program that has the test reports it. None gates an action on it, and none
 instrument term because no phase is seen (§ Staging and what a stage holds; `StageResult.held`'s
 audit row). So rietx's use of the threshold is its own, and the number is the paper's.
 
+## A parameter set by an equation the user writes
+
+Surveyed 2026-11-03 for WP-1964, three agents and the lead, across scattering software, global
+fitting in other fields, and expression languages. The lead re-read the TOPAS rows in the Technical
+Reference and in the Durham inputs. Web pages were read through a summarising tool, so wording in
+the non-TOPAS rows is unverified. "Checked" means the page or file was read; "recall" means it was
+not. Every source is a user document or paper, and no closed or GPL code was read.
+
+| Program or format | How the form is written | Parameters, sharing, bounds | Per-dataset values | Derivatives | Status |
+|---|---|---|---|---|---|
+| TOPAS | a string on any parameter, one grammar throughout (Tech. Ref. Table 3-1): `+ - * / ^`, `If`, `And`, `Or`, `Min`, `Max`, `Exp`, `Ln`, `Gamma_P` and more; user `fn` with `def` and `return` (§21.3) | `prm` is global and `local` per `xdd` or `str` (§2.2); sharing is by name; min and max are equations (§2.3) | `#list` of macros, or a generated `prm` per pattern (§2.26.2) | computer algebra carries the chain through equations (§21.3.2, Coelho 2018 abstract); `del` is the step for numerical derivatives of the pattern (§2.3) | checked |
+| GSAS-II | a Python-syntax string, fitted to the sequential table after the refinement and stored with it (`SeqParFitEqList`), never in a joint residual, and also usable as an expression restraint; external functions allowed | a repeated label links equations; a `b` is auto-renamed to stop accidental sharing | the table's columns | not stated | checked, derivatives recall |
+| FullProf | `EQUAL` and `PEQU_pat` link parameters; no equation in a coordinate found | none found | none found | none found | search excerpts |
+| Jana2020, MAUD | no equation across datasets found | | | | not found |
+| Artemis, Larch | strings on path parameters, with roles `guess`, `def`, `set`, `lguess`, `restrain`, and built-in `eins()`, `debye()` | by name | `set` per dataset | finite difference (recall) | checked |
+| Mantid | tie strings, muParser (search excerpt) | `$domains=All`, ties, bound strings | from the workspace | analytic if the function supplies it, else numerical with a named step | checked |
+| Bumps, refnx | operator overloading on `Parameter` objects builds a lazy tree | one shared object | model objects | not stated | checked, refnx syntax recall |
+| lmfit | a Python-syntax string run by asteval | `Parameter(value, min, max, vary, expr)` | caller's own | finite difference (recall) | checked |
+| PEtab (systems biology) | formula strings in tables; v1's page names no grammar | one parameter table holds bounds, start and estimate; v2 removed `parameterScale` as "a constant source of confusion" | a condition table of overrides by id | AMICI: symbolic partials, sparse assembly, threads over conditions | checked |
+| NONMEM, Monolix, nlmixr2 | code lines; the structural model and the covariate model are separate layers | `(low, init, up)` per coefficient; covariates centred on a reference | columns of the dataset | sensitivity equations (recall) | checked |
+| pyhf, HS3 (particle physics) | pyhf: seven closed modifier types; HS3: a graph with a generic-expression escape, its grammar the least specified part | by name, in a flat namespace; bounds sit in a separate measurement block | channels | autodiff (recall) | checked |
+| RooFit | `RooFormulaVar` strings over shared objects | one object, many models | an index category | numerical, or generated code with Clad | checked |
+| JuMP, CasADi, AMPL | the system owns an operator tree or graph with a registered vocabulary, and never evaluates host code | variables apart from data | data apart from the model | exact, on the graph; forward mode for small user operators | checked, AMPL recall |
+| CEL | a written grammar with a version and conformance tests, no side effects, always terminates | | bindings | none | checked |
+
+What they agree on.
+
+- **Form.** Every system with exact derivatives owns a tree with a closed operator list. `asteval`
+  and `simpleeval` evaluate python values, so they expose nothing to differentiate. sympy's
+  `parse_expr` calls `eval` and `lambdify` calls `exec`. sympy 1.14.0's `lambdify` does ship a
+  `torch` module (`MODULES`, checked 2026-11-04), so DESIGN.md's reason has aged and these two
+  grounds carry the rejection. General parser libraries such as lark were not surveyed.
+- **Sharing.** Text formats share a coefficient by name, and python APIs (Bumps, refnx, RooFit)
+  by a shared object. The per-dataset value is an ordinary fixed number. Start, bounds and fixed
+  flag sit beside the equations.
+- **Grammar.** Where a format left its grammar unwritten (PEtab v1, HS3), the first parser became
+  the specification. PEtab's test suite and CEL's conformance tests are the counter-examples: small
+  cases with an expected number.
+- **Presets.** Monolix's library and nlmixr2's `linCmt()` expand into the expert layer. No program
+  found has a second parser for its presets.
+- **Traps.** TOPAS ignores min and max on a parameter defined by an equation, as stated in its forum
+  (threads 767 and 831, checked). The Reference pages read here do not say so. A generated
+  equation's error points at `topas.log` rather than the user's text. `x^y^z` is left-associative in
+  TOPAS (Table 3-1) and right-associative in python and most mathematics. `^` is XOR in python's
+  parser.
+- **Nonlinear fits.** Systems biology treats multi-start with a sorted-objective plot as routine, and
+  profile likelihood as the honest interval, because a Wald interval is symmetric (Villaverde et al.
+  protocol, checked). Evans warns that a wrong form can fit better than the right one, and recommends
+  a sequential fit unless there is a good reason (slides and forum 582, checked).
+
+Not reached: `Topas.inc`, the Jana2020
+and MAUD manuals, the HS3 expression appendix, and MathOptInterface's nonlinear pages.
+
+## An equation over a reflection
+
+Surveyed 2026-11-04 for WP-2107. This is about a value that differs between reflections, set by
+something the user writes. "Checked" means the document or source was read.
+
+| Program | What the user can write | Symmetry | Status |
+|---|---|---|---|
+| TOPAS | an equation in `H`, `K`, `L`, `M`, `Xo`, `Th` and `D_spacing` on `lor_fwhm`, `gauss_fwhm`, `th2_offset`, `scale_pks`, `hat`, the other convolutions and more (Tech. Ref. Table 2-3). `spherical_harmonics_hkl` and `str_hkl_angle` supply values to use in one. A separate peak shape is then calculated for each peak (§ `peak_buffer_step`) | left to the user, with `Multiplicities_Sum` to iterate over the multiplicities (§ 20.17, `scale_occ`). Which image an equation sees otherwise is not stated | checked (Technical Reference); not run |
+| FullProf | closed models chosen by integer: selective size (`IsizeModel`) and selective shift (`ModS`). The user may add rules on the indices, each a linear equality, up to 10 lines for shifts. The shift takes the form 2 SHIFT d² tanθ × 10⁻², and no free expression was found | a rule is applied to the hkl FullProf holds; not established further | checked (manual, § Selective size broadening and § HKL-dependent shifts) |
+| GSAS-II 5.8.4 | none. Size and microstrain take built-in forms (`uniaxial`, ellipsoidal, generalized). `ExpressionCalcObj` reaches restraints, and no reflection-level use was found in `GSASIIstrMath.py` | derived from the Laue class in the built-in forms | checked (grep of the source) |
+
+TOPAS's own examples are `If(L==0, a Tan(Th) + 0.2, b Tan(Th))` on `gauss_fwhm`, `If(L == 0, at Tan(Th), bt Tan(Th))` on `th2_offset`, and a March relation over `str_hkl_angle` on `lor_fwhm`. TOPAS's `occ` stays single-valued for QUANT, so it cannot be a function of hkl, and `scale_occ` exists for that case. Whether its QPA reads a `scale_pks` is not established.
+
+Stinton & Evans (2007) use both shapes: a second-order 2θ calibration polynomial on the whole pattern (§§ 4.1, 4.2) and two terms of extra broadening on 0kl reflections (§ 4.3). They also give each phase its own TCHZ terms, shared across patterns. Their first example fits a sample holder by Pawley beside two Rietveld phases, and their second refines one temperature offset per data set through every phase's cell equation (checked).
+
+Of the Durham tutorials, ZrP₂O₇ writes a two-coefficient curve in `Xo` on `th2_offset`, and ZrMo₂O₈ writes a tanθ width scaled by `spherical_harmonics_hkl` with fixed coefficients. WO₃'s two lines need neither: one is an overall B and one a sample height. Incidence over a larger set is not measured, since the private archive was not on the machine that ran this, and since 2026-11-04 it decides nothing here.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
