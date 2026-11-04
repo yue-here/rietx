@@ -136,7 +136,11 @@ backward, and both directions agreed on it in 17 of 21 series, so
 `SEQUENTIAL_PATH_DEPENDENT` named nothing on the subgroup cell there. At the
 issue's own draw the forward chain is right (+6.2e-3 at p004, 9.2σ), so the
 Acceptance line's "f = 0.15 forward ends in the right basin" holds on that
-draw and fails on six others. Two cold fits started ±2e-3 off the identity
+draw and fails on six others. With the distortion's sign reversed in the
+data (`TET_TRUE = -4e-3`), the identity-point start ended on the wrong side
+(+) in 42 of 42 again, so it is pulled away from the truth, not left to
+chance; the two-start pick was right in 42 of 42 there too (wrong/right Rwp
+1.017-1.034×, 1.053-1.077×, 1.139-1.171×). Two cold fits started ±2e-3 off the identity
 point (the construction's `tet`) kept their sides in 42 of 42 pairs, and the
 lower Rwp was the true side in 42 of 42, the wrong side's Rwp 1.021-1.031×,
 1.058-1.076× and 1.151-1.170× the right one at 0.15, 0.25 and 0.40. The same
@@ -145,7 +149,8 @@ two starts handed to a forward chain's first pattern kept both sides in only
 its cell drifts there. In the absent patterns of the issue's draw the
 subgroup carried no `PHASE_UNCONSTRAINED`; `HIGH_CORRELATION` and
 `FLAT_DIRECTION` on the two scales (ρ = −1.000) were what named it. The
-probe scripts are in the 2026-11-04 handover entry.
+construction is `tests/test_identity_point_seed.py`'s; the 2026-11-04
+handover entry says where the probe scripts are and what each ran.
 
 ### Inherited
 
@@ -189,7 +194,7 @@ probe scripts are in the 2026-11-04 handover entry.
   when its scale is 3σ from zero by its marginal esd against counting noise
   (`refine._answer_significance`); the stage-start hold reads the screen
   ‖y_p/σ‖₂ ≥ 3. Every count in § Context's table was taken under the old 1σ
-  rule; the 2026-11-04 re-measurement below is the one taken under this one.
+  rule; the 2026-11-04 re-measurement above is the one taken under this one.
 - **2026-09-28, from [1338](1338-the-skills-own-gates.md), re-measured
   2026-11-04: the skill's series codes live in `references/series.md`, not
   `diagnostics.md`.** `series.md` stood at 34 570 B against its 34 600 B
