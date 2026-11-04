@@ -422,6 +422,7 @@ A ramp in 50 K steps cannot place T<sub>N</sub> better than ±25 K however good 
 Nothing here fits m ∝ (1 − T/T<sub>N</sub>)<sup>β</sup>.
 That form is nonlinear in its coefficients, and the exponent is yours to fit to the trajectory.
 [`SEQUENTIAL_MOMENT_HOLD`](diagnostics-series.md#sequential_moment_hold) counts the patterns whose moment came back unsupported, and [`SEQUENTIAL_MOMENT_ONSET`](diagnostics-series.md#sequential_moment_onset) gives the bracket.
+[`SEQUENTIAL_MOMENT_ONSET_UNRESOLVED`](diagnostics-series.md#sequential_moment_onset_unresolved) says why the bracket on a site is not to be quoted, when something stops it.
 
 <!-- api-doc: no-exec — it needs a magnetic model and a ramp through an ordering transition -->
 ```python
@@ -445,9 +446,10 @@ A modulus with no verdict is not reseeded, so the next pattern starts from the l
 The reseed cannot protect the first pattern above the transition, which is warm-started from a supported neighbour.
 Whether that pattern comes back unsupported is a measurement.
 Two checks cover it, and you have to ask for both.
-Under `direction="both"`, `SEQUENTIAL_MOMENT_ONSET` carries the other chain's bracket and says whether the two agree.
+Under `direction="both"`, the two chains' brackets are compared.
 They agree when the brackets overlap, both chains read the same `sense`, and neither bracket owes a verdict to a fit that stopped early.
-A bracket only one chain found is a `warning`, and so is one chain supporting every pattern the other holds.
+Then `SEQUENTIAL_MOMENT_ONSET` carries the other chain's bracket too.
+Otherwise `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` says how they differ: a bracket only one chain found, brackets apart or ordered on opposite sides, or one chain supporting every pattern the other holds.
 `MagneticOnset.bracket_verdicts_final` catches a supported verdict from a fit that stopped at its iteration cap.
 On a synthetic ramp starved to `max_iter=1`, the moment above the transition came back supported and the onset moved to a confident, wrong bracket, with Rwp fine and no other fence firing.
 ```
@@ -467,6 +469,7 @@ These diagnostics fence that, and none of them alters a fitted value.
 | `SEQUENTIAL_WIDTH_GROWTH` | a phase width reached 3× its first measured value while GoF reached 2× its own at the same pattern; a width growing at a flat GoF fires nothing |
 | `SEQUENTIAL_MOMENT_HOLD` | how many patterns' moment came back unsupported, and which successors' modulus was reseeded to its floor |
 | `SEQUENTIAL_MOMENT_ONSET` | where along the axis the moment stops being supported, as a bracket |
+| `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` | the onset is not to be quoted: its supported side stopped early, the verdicts switch more than once, or the two chains disagree |
 | `SEQUENTIAL_CANCELLED` | the series stopped before its last pattern ([Events, history and cancellation](#events-history-and-cancellation)) |
 | `SERIES_PATTERN_FAILED` | every attempt on a pattern raised ([Restart ladder](#restart-ladder)) |
 

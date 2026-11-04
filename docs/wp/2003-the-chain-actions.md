@@ -293,9 +293,14 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
       (`SeriesResult.direction_gaps`, the path check split into `…_NOT_RUN` and
       `…_INCOMPLETE`), C2 q2-q3 (the ranking), C9 q1-q2 approved with the carry invariance
       test, C10 q2 (the joint hold on `_answer_significance`), and the GUI series panel on
-      the new fields (`steps` plotted). Owed: C8 (split the onset code), C11's three
-      invariant arms, the tiers of `SeriesEntry.rungs_tried`/`.rungs_raised` and
-      `fit:refit` (C2), C10 q1's hand rows, and the rows waiting on X14.
+      the new fields (`steps` plotted). Landed 2026-11-04 (seventh session): C8's split,
+      `SEQUENTIAL_MOMENT_ONSET` always `info` (the bracket, tier 1) and
+      `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` at `warning` (every reason not to quote it,
+      tier 1 argued against the batch's tier 3, for the maintainer to rule);
+      `SEQUENTIAL_MOMENT_HOLD` names every floored pattern. Owed: C11's three
+      invariant arms, `SEQUENTIAL_MOMENT_HOLD`'s tier (C8 q1, approval owed), the tiers
+      of `SeriesEntry.rungs_tried`/`.rungs_raised` and `fit:refit` (C2), C10 q1's hand
+      rows, and the rows waiting on X14.
 - [ ] Goldens re-pinned only if no further from reference. A series golden's first
       reference is the cold-fit chain, rietx's own result on the same data, so it
       verifies and does not validate (DESIGN.md § Rules, 2). Where a series member has a
