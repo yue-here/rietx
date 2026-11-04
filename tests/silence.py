@@ -143,6 +143,42 @@ def _listed_twice_silent() -> list:
                      .format(extra="Ni2 Ni 0.5 0.5 0.0001 0.481\n"))
 
 
+# ---------------------------------------------------- the FullProf project reader
+
+
+def _pcr_r_phase(cell: str) -> list:
+    """``to_structure``'s diagnostics for a one-site bare ``R -3 c`` phase."""
+    from rietx.io.projects.fullprof import read_fullprof_pcr, to_structure
+    from tests.test_projects_fullprof import (
+        _PHASE_CELL_CODES,
+        _R_PHASE_ORIGIN_SITE,
+        _pcr,
+        _phase,
+    )
+
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _pcr(pathlib.Path(tmp), "r.pcr",
+                    _phase(nat=1, sg="R -3 c", atoms=_R_PHASE_ORIGIN_SITE,
+                           cell=cell, cell_codes=_PHASE_CELL_CODES))
+        to_structure(read_fullprof_pcr(path), diagnostics=found)
+    return found
+
+
+def _rhombohedral_axes_fires() -> list:
+    """A rhombohedral cell beside the bare symbol, which FullProf reads hexagonal."""
+    from tests.test_projects_fullprof import _R_PHASE_RHOMBOHEDRAL_CELL
+
+    return _pcr_r_phase(_R_PHASE_RHOMBOHEDRAL_CELL)
+
+
+def _rhombohedral_axes_silent() -> list:
+    """The same lattice on hexagonal axes, the reading FullProf and rietx share."""
+    from tests.test_projects_fullprof import _R_PHASE_HEXAGONAL_CELL
+
+    return _pcr_r_phase(_R_PHASE_HEXAGONAL_CELL)
+
+
 # --------------------------------------------------- the instrument-file readers
 
 
@@ -808,6 +844,9 @@ SILENCE: dict[str, Pair] = {
         "tests/test_extinction_gate.py (stub screens: the gate's fits are 20 s each)"),
     "FLOOR_HIT": Pair(
         _floor_fires, _floor_silent, "tests/test_bound_hit_at_convergence.py"),
+    "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED": Pair(
+        _rhombohedral_axes_fires, _rhombohedral_axes_silent,
+        "tests/test_projects_fullprof.py"),
     "GSAS2_INSTPRM_GEOMETRY_ASSUMED": Pair(
         _instprm_geometry_fires, _instprm_geometry_silent, "tests/test_gsas2_instprm.py"),
     "GSAS_PRM_PROFILE_SET_DEFAULTED": Pair(
