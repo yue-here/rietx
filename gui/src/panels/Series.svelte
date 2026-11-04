@@ -8,9 +8,12 @@
    * poisoned chain produces** (WP-0505). Hence the shape of the panel. The
    * `direction="both"` verification pass has its own control. Its answer,
    * `SeriesResult.direction_gaps`, is one line at the top stating the largest
-   * gap in esds, with every trajectory ranked by its own and the other chain
-   * drawn beside it, because the disagreement is the evidence. No parameter is
-   * called path-dependent: the record holds no threshold (WP-2003, C5).
+   * gap in esds, with the other chain drawn beside every trajectory, because
+   * the disagreement is the evidence. No parameter is called path-dependent:
+   * the record holds no threshold (WP-2003, C5). The list keeps the series'
+   * first-seen order and opens on its first parameter; ranking it by gap is
+   * the reader's choice, since on a clean series that order is noise (ruled
+   * by the maintainer 2026-11-04).
    *
    * Two structural facts about where a series lives. Its patterns are staged
    * uploads and its answer is session-scoped (`ProjectDoc.patterns` stays length
@@ -100,7 +103,11 @@
 
   const entries = $derived<SeriesEntry[]>(answer?.result?.entries ?? []);
   const trajectories = $derived<Trajectory[]>(answer?.trajectories ?? []);
-  const ranked = $derived(rankTrajectories(trajectories));
+  /** the list's order: the series' own, or by the largest gap (two-way only) */
+  let order = $state<"series" | "gap">("series");
+  const hasGaps = $derived(trajectories.some((t) => t.n_sigma !== null));
+  const listed = $derived(
+    order === "gap" && hasGaps ? rankTrajectories(trajectories) : trajectories);
   /** per entry, whether the library quarantined it: the server's answer from the
    *  chain's own test, so this panel re-derives nothing from `status` */
   const rejected = $derived<boolean[]>(answer?.rejected ?? []);
@@ -114,7 +121,7 @@
   const gapPath = $derived(topGapPath(answer?.result?.direction_gaps));
   const current = $derived<Trajectory | null>(
     trajectories.find((t) => t.path === selectedPath)
-      ?? ranked[0] ?? null);
+      ?? trajectories[0] ?? null);
   const shownSteps = $derived(
     stepRows(allSteps, stepScope === "path" ? current?.path ?? "" : null));
   const running = $derived(busy && run?.run?.kind === "series");
@@ -173,7 +180,7 @@
     try {
       answer = await api.seriesResult();
       if (!selectedPath && answer.trajectories?.length) {
-        selectedPath = rankTrajectories(answer.trajectories)[0].path;
+        selectedPath = answer.trajectories[0].path;
       }
       draw();
     } catch {
@@ -614,13 +621,21 @@ plot's x-axis title, and the column above">
     <div class="controls">
       <select value={current?.path ?? ""} disabled={busy}
         onchange={(ev) => showTrajectory((ev.currentTarget as HTMLSelectElement).value)}>
-        {#each ranked as t (t.path)}
+        {#each listed as t (t.path)}
           <option value={t.path}>
             {t.path}
             {#if t.n_sigma !== null}({esdText(t.n_sigma)} esd){/if}
           </option>
         {/each}
       </select>
+      {#if hasGaps}
+        <div class="segmented" role="group" aria-label="the list's order">
+          <button class:on={order === "series"} aria-pressed={order === "series"}
+            onclick={() => (order = "series")}>series order</button>
+          <button class:on={order === "gap"} aria-pressed={order === "gap"}
+            onclick={() => (order = "gap")}>largest gap first</button>
+        </div>
+      {/if}
       {#if selectedPattern !== null}
         <button class="ghost" onclick={() => showTrajectory(current?.path ?? "")}
           title="back to the trajectory across the series">Show trajectory</button>

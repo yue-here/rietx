@@ -171,7 +171,9 @@ export function sortByX(patterns: SeriesPattern[]): SeriesPattern[] {
 
 /**
  * The trajectories by their forward/backward gap, largest first, with no
- * threshold (WP-2003, C5).
+ * threshold (WP-2003, C5). The panel's **second** order: it lists and opens on
+ * the series' first-seen order, and this one is the reader's to choose
+ * (ruled by the maintainer 2026-11-04, below).
  *
  * `n_sigma` is the record's own number (`DirectionGap.gap_esd`, read by the
  * server), so a parameter that disagrees most comes first and nothing is
@@ -187,8 +189,10 @@ export function sortByX(patterns: SeriesPattern[]): SeriesPattern[] {
  * exactly 0, and those ties keep the first-seen order. The floor does not
  * reach every noise gap: on the seven-pattern thermal ramp of
  * `test_sequential.py`, 84 of 91 gaps are 0 and the background terms keep
- * 1e-3 esd, so the panel opens on `instrument.background.c1` and
- * `phases.0.cell.a` ranks sixth (measured 2026-11-03).
+ * 1e-3 esd, so this order puts `instrument.background.c1` first and
+ * `phases.0.cell.a` sixth (measured 2026-11-03). That is why the panel opens
+ * on the first-seen parameter, usually the cell edge, and leaves the largest
+ * gap one click away on the gap line (ruled by the maintainer 2026-11-04).
  */
 export function rankTrajectories(trajectories: Trajectory[]): Trajectory[] {
   return [...trajectories].sort((a, b) => {
@@ -230,8 +234,7 @@ export function gapLine(gaps: DirectionGap[] | null | undefined): string {
   const at: GapAt = { label: top.label, index: top.index,
                       forward_rung: top.forward_rung, backward_rung: top.backward_rung };
   return `Forward and backward chains differ by ${esdText(top.gap_esd as number)} `
-    + `esd at most, in ${top.path} at ${top.label}. Parameters are listed by `
-    + `their largest gap. ${rungNote(at)}`.trim();
+    + `esd at most, in ${top.path} at ${top.label}. ${rungNote(at)}`.trim();
 }
 
 /** The path with the largest gap, for the line's button. */

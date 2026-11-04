@@ -320,7 +320,14 @@ summary).
   X-ray plus neutron pin added in `d8f0da7` (background constant 2931.21 against 1.0, twice), so
   `223a2f7` withdraws it and corrects the release note. The cause is a phase whose broadened peaks
   stand in for a flat background; it is recorded under the sixth session's *Measured* and is Next
-  item 4b. No other change.
+  item 4b.
+  **Ruled by the maintainer 2026-11-04: the series panel opens on the first-seen parameter.** On
+  the thermal ramp the gap ranking had opened on `instrument.background.c1`, with
+  `phases.0.cell.a` sixth. The list now keeps the series' own order and opens on its first
+  parameter. A "series order" / "largest gap first" control makes the ranking the reader's
+  choice, and the gap line's button still jumps to the largest gap. The gap line loses its
+  sentence "Parameters are listed by their largest gap." `gui/CLAUDE.md`'s ranking rule and the
+  manual's series paragraph follow. Vitest 603 passed.
 
 ### 2026-11-03 (sixth session) — the batch ruled and landed but for C8, C11, C2's rung tiers and C10 q1
 

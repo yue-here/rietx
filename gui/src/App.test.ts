@@ -5086,15 +5086,27 @@ describe("the series panel", () => {
     expect(host.textContent).not.toMatch(/path-dependent|artefact/i);
     expect(host.querySelector(".banner.bad")).toBeNull();
 
-    // the reseed fence rides the row it is about, and the ranking put the
-    // trajectory with the largest gap on the plot first
+    // the reseed fence rides the row it is about. The panel opens on the
+    // series' first-seen parameter, not the largest gap: on a clean series
+    // that order is noise (ruled by the maintainer 2026-11-04)
     expect(host.textContent).toContain("reseeded");
-    expect(host.textContent).toContain("Trajectory — phases.0.cell.a");
+    expect(host.textContent).toContain("Trajectory — instrument.zero_shift");
     expect(host.textContent).toContain("phases.0.cell.a (5.2 esd)");
     expect(host.textContent).toContain("instrument.zero_shift (0.4 esd)");
-    const options = [...host.querySelectorAll<HTMLOptionElement>(".side select option")]
+    const options = () => [...host.querySelectorAll<HTMLOptionElement>(".side select option")]
       .map((o) => o.value).filter((v) => v.includes("."));
-    expect(options.slice(0, 2)).toEqual(["phases.0.cell.a", "instrument.zero_shift"]);
+    expect(options().slice(0, 2)).toEqual(["instrument.zero_shift", "phases.0.cell.a"]);
+    // ranking by gap is the reader's choice, and it moves no selection
+    const order = (label: string) => [...host.querySelectorAll<HTMLButtonElement>(
+      '[aria-label="the list\'s order"] button')].find((b) => b.textContent === label)!;
+    order("largest gap first").click();
+    await flush();
+    expect(options().slice(0, 2)).toEqual(["phases.0.cell.a", "instrument.zero_shift"]);
+    expect(host.textContent).toContain("Trajectory — instrument.zero_shift");
+    // the largest gap is one click away, on the line that names it
+    banner.querySelector<HTMLButtonElement>("button")!.click();
+    await flush();
+    expect(host.textContent).toContain("Trajectory — phases.0.cell.a");
     // the caption states the same number for the trajectory on screen
     expect(host.textContent).toContain("Forward and backward differ by 5.2 esd at T400");
 
@@ -5148,7 +5160,12 @@ describe("the series panel", () => {
       return [...node!.querySelectorAll("tbody tr")]
         .map((r) => [...r.querySelectorAll("td")].map((c) => c.textContent?.trim()));
     };
-    // the selected parameter's steps: the cell edge, 21 esd, re-measured cold
+    // the selected parameter's steps: the panel opens on the first-seen
+    // parameter, the zero shift, and then, from the gap line, on the cell
+    // edge, 21 esd, re-measured cold
+    expect(stepRowsOf()).toEqual([["T300 → T400", "+0.0001", "+0.8", "—"]]);
+    host.querySelector<HTMLButtonElement>(".banner button")!.click();
+    await flush();
     expect(stepRowsOf()).toEqual([["T300 → T400", "+0.0021", "+21.0", "0.93"]]);
     expect(host.textContent).toContain("1 step");
     // markup wraps its prose across lines, so compare on single spaces

@@ -449,8 +449,11 @@ backwards and records how far the two passes differ. It is the only check that
 separates a measured trajectory from an ordering artefact, and a smooth curve is
 exactly what a poisoned chain produces. The panel opens with one line giving the
 largest gap in esds (the two chains' esds combined) and the parameter and
-pattern it sits at. Every trajectory is listed with its own largest gap, largest
-first, and the backward chain is drawn beside the forward one. No parameter is
+pattern it sits at; click the parameter to plot it. Every trajectory is listed
+with its own largest gap, in the series' own order, and the panel opens on the
+first. The "largest gap first" control reorders the list. On a series whose two chains
+agree, the gaps are noise and that order means nothing. The backward chain is
+drawn beside the forward one. No parameter is
 called path-dependent, because no gap size separates a real dependence from
 chance across many parameters and patterns. You decide which size matters for
 your specimen. Where the two chains kept different attempts at that pattern (one
