@@ -918,7 +918,8 @@ class GuiSession:
         effective = PlanSpec.from_plan(self._effective_plan())
         return {"plan": effective.model_dump(mode="json"),
                 "selected": p.doc.plan is not None,
-                "preset": effective.preset_name(),
+                "preset": effective.preset_name(
+                    p.doc.mode, p.refinement.instrument.geometry.kind),
                 "mode": p.doc.mode}
 
     def plan_put(self, body: dict) -> dict:

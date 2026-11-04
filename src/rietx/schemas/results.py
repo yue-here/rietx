@@ -2216,8 +2216,10 @@ class RefinementResult(Base):
     #: Read off the values, so a caller who states one of these numbers is
     #: listed too: the entry says the fit rests on the package's number,
     #: whoever typed it.  A refined value is measured and never listed.  An
-    #: empty dict is "nothing assumed"; ``None`` is a result stored before
-    #: the field.  Written by ``refine._build_result``.
+    #: empty dict is "nothing assumed"; ``None`` is "not recorded": a
+    #: result stored before the field, or a joint fit's, since
+    #: ``MultiHistogramRefinement`` does not write it yet.  Written by
+    #: ``refine._build_result``.
     assumed_instrument: dict[str, float | str] | None = None
 
     # Soft-restraint summary (bond/angle/value deviations, pooled restraint χ²);

@@ -5436,7 +5436,8 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "polarisation held at 0.5 or 0.99, a Kα2/Kα1 ratio held at 0.5. A value "
             "you typed that equals one of these is listed too, since the fit cannot "
             "tell. A refined value is measured and never listed. Empty when nothing was "
-            "assumed; `None` in a result stored before the field."
+            "assumed; `None` when not recorded: a result stored before the field, or a "
+            "joint fit's, which does not record it yet."
         ),
     ),
     "RefinementResult.restraints": HelpEntry(
