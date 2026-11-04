@@ -1462,7 +1462,7 @@ ROWS: tuple[Row, ...] = (
                  "ruled by the maintainer 2026-11-04 (WP-2086). The joint hold reads the single fit's statistic and is "
                  "covered here, ruled by the maintainer 2026-11-03 (2003-batch/batch.md, "
                  "C10 q2 (a))."),
-        approved="2026-11-01"),
+        approved="2026-11-04"),
     Row("rietx.schemas.results.StageResult.scale_b_held", "action", tier=1, ambiguity=1,
         evidence=("numerical floor: under 2*sqrt(PINV_RCOND) the covariance's pinv cut cannot see "
                   "scale and B as two directions (WP-1534 derivation); measured cases read 1e-12 or"
