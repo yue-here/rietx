@@ -197,7 +197,7 @@ with one phase declared and one not.
   has no default to carry them, so `Phase._declared_optional` names a
   factory, and both the constructor and the history repair
   (`schemas.migrate.declared_range_repairs`) read it through
-  `declared_default`. The TOPAS not-written check and the GSAS-II CIF clause
+  `_declared_default`. The TOPAS not-written check and the GSAS-II CIF clause
   skip an undeclared phase. A joint fit asks `EXTINCTION_UNDECLARED` per
   histogram (`multi.DIAGNOSTIC_SCOPES`). The pointer has a test, a silence
   pair (`tests/silence.py`) and a row in the skill's diagnostics reference.

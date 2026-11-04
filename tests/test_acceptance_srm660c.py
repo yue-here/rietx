@@ -186,6 +186,7 @@ def test_srm660c_extinction_does_no_harm(srm660c_baseline):
     data, ref_base, _baseline = srm660c_baseline
 
     ref = ref_base.branch()
+    ref.structure.phases[0].extinction = 0.0  # opt-in since WP-1944
     result = ref.run_stage(
         data, rx.Stage("extinction", ["phases.*.extinction"], seed=1e-3))
 

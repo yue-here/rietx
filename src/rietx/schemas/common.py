@@ -976,7 +976,7 @@ class _InheritsDeclaredDefaults(Base):
     _declared_optional: ClassVar[dict] = {}
 
     @classmethod
-    def declared_default(cls, name: str):
+    def _declared_default(cls, name: str):
         """The factory whose ``Parameter`` carries field ``name``'s declared
         range, or ``None`` where the field declares none.  One answer for
         construction and for the history reader's repair."""
@@ -992,7 +992,7 @@ class _InheritsDeclaredDefaults(Base):
             return data
         data = dict(data)
         for name in cls.model_fields:
-            factory = cls.declared_default(name)
+            factory = cls._declared_default(name)
             if factory is None:
                 continue
             if name not in data:

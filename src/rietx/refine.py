@@ -10482,16 +10482,22 @@ def _air_scatter_undeclared_diagnostics(model: CompiledModel,
     )]
 
 
-#: the free paths the score test re-fits beside the phase's scale: those
-#: that change a phase's intensities without moving its lines, which is where
-#: extinction's correlations sit (ρ 0.97 with the scale, 0.87 with Biso on
-#: LaB6, ``test_extinction_correlates_with_scale_and_biso_and_the_guard_fires``).
+#: the paths whose free columns the score test re-fits beside every phase's
+#: scale: those that change a phase's intensities without moving its lines,
+#: which is where extinction's correlations sit (ρ 0.97 with the scale, 0.87
+#: with Biso on LaB6,
+#: ``test_extinction_correlates_with_scale_and_biso_and_the_guard_fires``).
+#: Matched against what each free column *reaches* (``column_reach``), so a
+#: Biso tied across sites or driven by a ``vars.X`` is one column moving all
+#: of them.
 _EXTINCTION_PARTNER = re.compile(
-    r"phases\.\d+\.(atoms\.\d+\.(biso|adp\.\d+|occupancy)"
+    r"phases\.\d+\.(atoms\.\d+\.(biso|adp\.\d+|occ|dof\.\d+)"
     r"|preferred_orientation\.r|texture\..*)$")
 
-#: the coefficient (µm²) the score test's column is differenced at.  x stays
-#: far below 1 for any |F|² a fit meets, so E is linear in it to fp64.
+#: the coefficient (µm²) the score test's column is differenced at.  The
+#: forward difference's relative error is about x/2 at the probe, under 1e-4
+#: on the fits WP-1944 measured, far below what moves a score of 25
+#: (``test_the_extinction_probe_column_is_the_derivative_at_zero``).
 _EXTINCTION_PROBE = 1e-3
 
 
@@ -10509,7 +10515,8 @@ def _extinction_undeclared_diagnostics(model: CompiledModel, table: ParameterTab
     the extinction factor switched on for that phase alone, weighted and
     projected off the background block, the phase's own scale column and its
     free intensity parameters (:data:`_EXTINCTION_PARTNER`: Biso, the ADPs,
-    occupancies, preferred orientation).  Extinction and those all change the
+    occupancies, coordinates, preferred orientation and texture, each free
+    column of θ that reaches one, through C).  Extinction and those all change the
     strong lines, so the projection is what leaves only the part of the
     signature none of them can draw.  It removes (a⊥·r)²/(a⊥·a⊥) of χ², a
     Gauss-Newton step with those re-fitted and the positions held, which in
@@ -10535,21 +10542,30 @@ def _extinction_undeclared_diagnostics(model: CompiledModel, table: ParameterTab
     block = None
 
     def partners():
-        # every phase's scale column and the free intensity parameters each
-        # trades against (a forward-difference column each, positions held):
-        # in a mixture the fraction moves too, so one phase's scale is a
-        # partner of the other's extinction
+        # every phase's scale column, and a forward-difference column for each
+        # free column of θ that reaches an intensity parameter (positions
+        # held).  In a mixture the fraction moves too, so one phase's scale is
+        # a partner of the other's extinction.  A column moves every entry it
+        # reaches by its coefficient in C, the residual's own map, so a tie or
+        # a variable is one column, never one site's share of it.
         cols = list(model.bkg_design * w)
-        for jp in range(len(structure.phases)):
-            at = np.asarray(model.phase_component(jp, values))
-            cols.append(at * w)
-            for other in table.free_paths:
-                if (other.startswith(f"phases.{jp}.")
-                        and _EXTINCTION_PARTNER.match(other)):
-                    step = 1e-6 * max(abs(values[other]), 1.0)
-                    moved = np.asarray(model.phase_component(
-                        jp, {**values, other: values[other] + step}))
-                    cols.append((moved - at) / step * w)
+        at = [np.asarray(model.phase_component(jp, values))
+              for jp in range(len(structure.phases))]
+        cols += [a_jp * w for a_jp in at]
+        reach = table.column_reach()
+        C = table._C.tocsc()
+        for j, free in enumerate(table.free_paths):
+            if not any(_EXTINCTION_PARTNER.match(p) for p in reach[free]):
+                continue
+            step = 1e-6 * max(abs(values.get(free, 0.0)), 1.0)
+            moved = dict(values)
+            sl = slice(C.indptr[j], C.indptr[j + 1])
+            for i, c in zip(C.indices[sl], C.data[sl]):
+                path = table.entries[i].path
+                moved[path] = moved[path] + step * c
+            delta = sum(np.asarray(model.phase_component(jp, moved)) - at[jp]
+                        for jp in range(len(structure.phases)))
+            cols.append(delta / step * w)
         return np.vstack(cols).T
     for ip, phase in enumerate(structure.phases):
         path = f"phases.{ip}.extinction"
@@ -10583,14 +10599,16 @@ def _extinction_undeclared_diagnostics(model: CompiledModel, table: ParameterTab
             message=(
                 f"Phase {phase.name!r} declares no extinction, and its strongest "
                 "reflections are calculated stronger than observed. Freeing "
-                "extinction, with the phase's scale and the background re-fitted "
-                f"and the structure held, would remove {score:.0f}× this fit's "
+                "extinction, with the scales, the background and the free "
+                "intensity parameters re-fitted and the line positions held, "
+                f"would remove {score:.0f}× this fit's "
                 "reduced χ² (a score test on the fit's own residual)."),
             suggestion=(
-                f"Declare it with structure.phases[{ip}].extinction = 0.0 and "
-                "refit with the structural plan. Read its esd and its correlation "
-                "with the scale before quoting it: preferred orientation and a "
-                "wrong Biso also change the strong lines."),
+                f"Declare it with structure.phases[{ip}].extinction = 0.0, free "
+                f"phases.{ip}.extinction and refit. Preferred orientation "
+                f"(structure.phases[{ip}].preferred_orientation) and a wrong Biso "
+                "also change the strong lines, so read its esd and its "
+                "correlation with the scale before quoting it."),
             value=score,
         ))
     return out

@@ -803,10 +803,12 @@ def test_injected_extinction_is_recovered_within_esds():
     plot_result(result, path=str(OUT / "extinct_lab6_fit.png"))
 
 
-def _undeclared_fit(ext_true: float, *, declare: bool = False) -> list:
+def _undeclared_fit(ext_true: float, *, declare: bool = False,
+                    structural: bool = False) -> list:
     """The diagnostics of a short fit to ``_synthesize_extinct_lab6(ext_true)``
     with no extinction stage, the phase declaring extinction only if
-    ``declare``.  Shared with ``tests/silence.py``."""
+    ``declare``, and Biso and the coordinate freed too if ``structural``.
+    Shared with ``tests/silence.py``."""
     from rietx import Instrument, Refinement
     from rietx.strategy.staged import RefinementPlan, Stage
     from tests.test_schemas import make_lab6
@@ -822,6 +824,9 @@ def _undeclared_fit(ext_true: float, *, declare: bool = False) -> list:
         Stage("cell", ["phases.*.cell.*"]),
         Stage("profile_w", ["instrument.profile.w"]),
     ])
+    if structural:
+        plan.stages.append(Stage("structure", ["phases.*.atoms.*.biso",
+                                               "phases.*.atoms.*.dof.*"]))
     result = Refinement(structure, ins, history=False).fit(
         _synthesize_extinct_lab6(ext_true), plan=plan)
     return result.diagnostics
@@ -840,6 +845,36 @@ def test_an_undeclared_extinction_the_strong_lines_ask_for_is_named():
     assert not [d for d in _undeclared_fit(0.0) if d.code == "EXTINCTION_UNDECLARED"]
     assert not [d for d in _undeclared_fit(2.5, declare=True)
                 if d.code == "EXTINCTION_UNDECLARED"]
+    # with Biso and the B coordinate free, the column is projected off both,
+    # and the planted case still fires (78 against the gate of 25)
+    fired = [d for d in _undeclared_fit(2.5, structural=True)
+             if d.code == "EXTINCTION_UNDECLARED"]
+    assert [d.where for d in fired] == [["phases.0.extinction"]] and fired[0].value > 50
+
+
+def test_the_extinction_probe_column_is_the_derivative_at_zero():
+    """``_EXTINCTION_PROBE`` differences the column forward from 0.  Its
+    relative error is about x/2 at the probe; held here to 1e-3 against a
+    forward difference at a step a thousand times smaller, on the strongest
+    LaB6 reflections (``rietx._audit``'s row for the constant).  Never a
+    central difference: the Laue factor is 1 for every x < 0, so the column is
+    one-sided at 0."""
+    from rietx.refine import _EXTINCTION_PROBE
+
+    model, values = _lab6_model(0.0)
+    cp = model.phases[0]
+    cp.skip_extinction = False
+    path = "phases.0.extinction"
+
+    def at(ext):
+        return np.asarray(model.phase_component(0, {**values, path: ext}))
+
+    forward = (at(_EXTINCTION_PROBE) - at(0.0)) / _EXTINCTION_PROBE
+    h = _EXTINCTION_PROBE * 1e-3
+    fine = (at(h) - at(0.0)) / h
+    scale = np.abs(fine).max()
+    assert scale > 0
+    assert np.abs(forward - fine).max() < 1e-3 * scale
 
 
 def test_extinction_correlates_with_scale_and_biso_and_the_guard_fires():

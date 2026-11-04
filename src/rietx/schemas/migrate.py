@@ -211,7 +211,7 @@ def declared_range_repairs(model: Base, written: str, prefix: str = "") -> list[
                  and written_key < schema_key(cls._declared_since))
         for name in cls.model_fields:
             value = getattr(obj, name)
-            factory = (cls.declared_default(name)
+            factory = (cls._declared_default(name)
                        if issubclass(cls, _InheritsDeclaredDefaults) else None)
             if stale and isinstance(value, Parameter) and factory is not None:
                 found = _candidate(value, factory())
