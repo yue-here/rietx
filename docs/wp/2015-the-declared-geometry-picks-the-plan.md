@@ -231,8 +231,23 @@ that it did not.
   displacement are a near-flat pair there, and the cell leaves the ±300 ppm
   band the FAP acceptance suite holds (that suite runs its own plan object
   and does not move). `HIGH_CORRELATION` fires on every Bragg-Brentano arm
-  under the new default (zero with displacement). FAST
-  FULL
+  under the new default (zero with displacement).
+  Gates, on the branch with origin/main `da5e7aa36` merged in (`[dev]`,
+  darwin/arm64, Mac at `-n 4`; pearl unreachable, so `serial.py` queued
+  them): fast `-m "not slow"` on `77d10607a` **13866 passed, 318 skipped,
+  36 xfailed, 0 failed**. The 17 tests this WP added (33 cases) cost 1.25 s
+  together in that run, so none joins the slow tail. Full on the same tree:
+  5 failed, 14780 passed, 329 skipped, 53 xfailed. Four of the failures were
+  this WP's: the N1, C1 and E8p rows of
+  `tests/eval_report_agent/test_landing_states.py` (two for E8p) pin the
+  episodes' lazy path, which held the displacement and is now freed by
+  name on Bragg-Brentano. They now run the preset object (the request runner
+  gets it as a spec), the path they were registered on, and the file passes
+  (9 passed). The fifth, `test_pair_diagnostic_class.py::
+  test_the_two_site_winner_finds_each_site_its_own_moment`, fails the same
+  way on origin/main `da5e7aa36` in the same venv (m₁ 0.6995 against 3.5),
+  so it predates this WP and is left alone. Whether the eval episodes' lazy
+  path should be re-registered under the new default is question (8).
   Vale 0 errors (241 warnings, as on main); ruff clean.
   *Review* (`/code-review high --fix` over `origin/main..e55422c40`): nine
   findings. The pass fixed three in `b131bdd4f` (`PlanSpec.preset_name` takes
@@ -346,6 +361,11 @@ that it did not.
   cross-code reference with `FLAT_DIRECTION` raised. Does the displacement
   addition stand as the default on that evidence, or should it wait on a
   test that the pair is separable on the pattern in hand?
+  (8) The eval rows N1, C1 and E8p (`tests/eval_report_agent/PROTOCOL.md`)
+  register a lazy path that holds the displacement. By name, that path now
+  frees it on Bragg-Brentano, so a live agent round on those episodes no
+  longer lands where they were registered. The tests now pin the preset
+  object. Should the episodes be re-registered or redesigned?
   *Next*: the maintainer's rulings on the questions above, which decide
   whether the displacement addition stays the Bragg-Brentano default; then
   issue #1409's ten items, item 1 (joint fits) first since items 6 and 7
