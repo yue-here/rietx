@@ -1574,7 +1574,7 @@ def _stage_lines(stages: list[StageResult], max_shift_over_esd: float | None) ->
 #: Above this many *distinct* pairs, a printed diagnostics list stops growing
 #: and names the rest as one count instead (WP-1302). Display-only: it caps
 #: what `_diagnostic_lines` renders, never `RefinementResult.diagnostics`
-#: itself — `sequential._persistent_diagnostics` counts `HIGH_CORRELATION`
+#: itself — `sequential._code_counts` counts `HIGH_CORRELATION`
 #: occurrences across a whole series from that stored list, and a pair
 #: ranked just outside the top ten in every pattern must still be countable
 #: as "N of M" there even though no single pattern's *printed* view shows it.

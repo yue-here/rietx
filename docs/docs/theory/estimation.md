@@ -51,7 +51,23 @@ $\mathrm{GoF} = \sqrt{\chi^2_{\mathrm{red}}} = R_{wp}/R_{\exp}$ and
 the background-subtracted $R_{wp}$ variant Toby recommends when the
 background carries much of the raw intensity. The Durbin-Watson statistic
 on weighted residuals {cite}`hillflack1987` flags serial correlation
-($d \approx 2$ ⇒ uncorrelated).
+($d \approx 2$ ⇒ uncorrelated). Hill and Flack test it against the 0.1 %
+significance point $Q$:
+
+```{math}
+:label: est-dw-q
+
+d = \frac{\sum_{i=2}^{N} (\Delta_i - \Delta_{i-1})^2}{\sum_{i=1}^{N} \Delta_i^2},
+\qquad
+Q = 2\left[\frac{N - 1}{N - P} - \frac{z}{(N + 2)^{1/2}}\right]
+```
+
+{source}`rietx.optimize.statistics.durbin_watson_q`
+
+$\Delta_i$ is the weighted residual at fitted channel $i$ and $z =$
+{{ HILL_FLACK_Z }} the normal 0.1 % point. Below $Q$, neighbours share a sign
+more often than chance allows. rietx reads this once, as a decision, and
+{doc}`../concepts/fit` says which.
 
 Across the shipped corrections, $\Delta R_{wp}$ recurs as a poor judge of a
 physical improvement ({ref}`ch-corrections`, {ref}`ch-method`). These indices

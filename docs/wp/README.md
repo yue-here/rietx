@@ -29,7 +29,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1806](1806-first-public-case-acridine-form-ix.md) | First public case: acridine form IX | 2026-10-25 | P3 | [rigid-bodies](#rigid-bodies) |
 | [1909](1909-a-line-on-a-falling-flank.md) | A line on a falling flank, at a third of its own esd | 2026-10-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1910](1910-the-extinction-screen-at-a-small-cell-error.md) | The extinction screen at a small cell error, and the other centring | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 2026-10-12 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
+| [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 2026-11-03 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1913](1913-what-the-benchmark-agents-wrote-by-hand.md) | What the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd` | 2026-10-08 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 2026-11-03 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 2026-10-31 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
@@ -42,7 +42,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1988](1988-a-pr-put-up-for-review-is-watched.md) | A PR put up for review is watched by the session that opened it | 2026-10-23 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1991](1991-a-site-and-its-own-image-are-one-atom.md) | A site and its own image are one atom on every route | 2026-11-03 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1997](1997-the-direct-space-solver-on-main.md) | The direct-space solver on main: site classes, kernels, chemistry, engine and entry point | 2026-10-24 | P2 | [structure-solution](#structure-solution) |
-| [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 2026-10-26 | P2 | [generality](#generality-the-audits) |
+| [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 2026-11-03 | P2 | [generality](#generality-the-audits) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-10-24 | P3 | [generality](#generality-the-audits) |
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-11-01 | P3 | [generality](#generality-the-audits) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -454,7 +454,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2002](2002-the-single-fit-actions.md) | The single-fit actions: what one stage decides for the caller | ✅ 2026-10-23 | — | [2001](2001-the-rule-the-table-and-the-guard.md) |
-| [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 🔄 2026-10-26 | P2 | [2002](2002-the-single-fit-actions.md), [2037](2037-attention-is-a-cost.md) |
+| [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 🔄 2026-11-03 | P2 | [2002](2002-the-single-fit-actions.md), [2037](2037-attention-is-a-cost.md) |
 | [2004](2004-the-fitreport-reasons-for-the-caller.md) | The FitReport reasons for the caller: its gates, actions and thresholds | ⬜ | P2 | [2002](2002-the-single-fit-actions.md), [2003](2003-the-chain-actions.md) |
 | [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | ⬜ | P3 | [2002](2002-the-single-fit-actions.md) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 🔄 2026-10-24 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) |
@@ -486,7 +486,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1527](1527-foreign-files-spell-a-species-as-the-program-does.md) | Foreign files spell a species as the other program does | ✅ 2026-10-04 | — | — |
 | [1530](1530-the-topas-readers-last-silences.md) | The TOPAS reader's last silences: a macro-opened dataset, a line it does not know, a held background | ✅ 2026-11-02 | — | — ([1433](1433-the-inp-grammar-still-refused.md) soft) |
 | [1543](1543-a-gsas-gaussian-width-is-a-variance.md) | A GSAS Gaussian width is a variance | ✅ 2026-10-10 | — | — |
-| [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 🔄 2026-10-12 | P3 | — (#713 soft) |
+| [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 🔄 2026-11-03 | P3 | — (#713 soft) |
 | [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 🔄 2026-11-03 | P2 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 🔄 2026-10-09 | P2 | [1319](1319-structure-interchange.md) |
 | [1942](1942-a-soft-restraint-on-a-sum-across-phases.md) | A soft restraint on a sum of parameters across phases | ⬜ | P3 | — |
@@ -615,6 +615,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 🔄 2026-11-02 | P2 | [2003](2003-the-chain-actions.md) |
 | [2082](2082-a-stated-prior-is-not-an-engine-in-the-grade.md) | A stated prior is not an engine in the grade | ✅ 2026-11-02 | — | — |
 | [2084](2084-lab6-has-two-minima-in-the-widths.md) | The SRM 660c protocol has two minima in the Gaussian widths, and the shipped start reaches the shallower | ⬜ | P3 | — |
+| [2086](2086-a-zero-scale-holds-the-instrument-only-where-the-residual-is-noise.md) | A zero scale holds the instrument only where the residual is noise | ✅ 2026-11-04 | — | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 

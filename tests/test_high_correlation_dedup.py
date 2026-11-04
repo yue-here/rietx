@@ -108,7 +108,7 @@ def test_cap_leaves_every_other_code_untouched():
 def test_the_cap_is_never_applied_to_a_stored_diagnostics_list():
     """The cap is display-only (WP-1302, moved after code review): a pair
     ranked outside the top ten in every pattern of a series must still be
-    countable by ``sequential._persistent_diagnostics`` as "N of M" — which
+    countable by ``sequential._code_counts`` as "N of M" — which
     reads straight off ``RefinementResult.diagnostics``/``SeriesEntry.diagnostics``,
     never a rendered view. Only ``_diagnostic_lines`` (schemas/results.py,
     what ``str(result)`` calls) applies :func:`_cap_high_correlation`.
