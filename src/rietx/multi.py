@@ -116,6 +116,7 @@ from .refine import (
     _onto_flat_meridian,
     _origin_diagnostics,
     _parameter_row,
+    _peak_columns_flat_at_answer,
     _peak_only_instrument_path,
     _phase_agreement,
     _phase_support_diagnostics,
@@ -854,7 +855,8 @@ def _unsupported_paths_multi(mtable, absent: list[set[int]],
     already holds every ``lineless`` phase.  ``models`` lets an instrument
     column be held where no histogram it reaches sees a phase (WP-2049).
     ``instrument_absent`` replaces ``absent`` for that question alone: the
-    stage-start hold passes ``lineless``, the collapse leaves it ``None``.
+    stage-start hold passes ``lineless``, the collapse passes
+    ``refine._peak_columns_flat_at_answer``'s reading per histogram.
     """
     if not any(absent):
         return []
@@ -1081,8 +1083,15 @@ def _rehold_multi(models, mtable, held: list[str],
     released = [p for p in held
                 if not _only_unseen(mtable, [p, *held_reach.get(p, ())], absent,
                                     flat_scales, models)]
+    # the single runner's test, per histogram: a shared column is then held
+    # only if it is flat in every histogram that carries it, so one histogram
+    # with peaks left in its residual keeps it free (``_unseen``, all, never any)
+    instrument_absent = [
+        a if _peak_columns_flat_at_answer(m, t, a, n) else set()
+        for a, n, m, t in zip(absent, lineless, models, mtable.tables, strict=True)]
     collapsed = [p for p in _unsupported_paths_multi(mtable, absent, reach,
-                                                     flat_scales, models)
+                                                     flat_scales, models,
+                                                     instrument_absent)
                  if p not in held_set]
     if collapsed:
         for h, table in enumerate(mtable.tables):
