@@ -166,6 +166,14 @@ nightly job once the branch lands.
 threshold of its own or the air-scatter 25. Either is a row edit in
 `_audit.py`. Then WP-2087, starting with the Stephens action.
 
+*After CI.* The `fast jax` job failed two `srm660c` rows of
+`test_backend_conformance.py`: that state in `test_backend_shim.py`
+freed `phases.0.extinction` on a phase that no longer declares it. The
+state now declares it at 0.0, the old default, so the golden stands.
+The three backend files with slow rows gave 218 passed, 140 skipped,
+4 xfailed in a worktree `.venv` `[dev,jax]`, darwin arm64. Main merged
+again (release 1.11, WP-2086).
+
 - **2026-11-04** — extinction is now off unless a phase declares it, and a fit
   says when a phase's strongest lines ask for it. The structural plan no
   longer frees a coefficient the data almost never determine (1 value in 98
