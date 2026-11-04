@@ -11,6 +11,12 @@ The fixture is tutorial 05's: seven LaB₆ patterns' worth of synchrotron
 capillary instrument, one specimen, Poisson noise.  Every test below that moves
 a fit also runs it with the check taken out (``no_check``), so the record of
 what the check does is measured in the same test, on the same tree.
+
+**A single fit's rescue is pinned as a decision, never as an outcome.**  Declining
+the hold only leaves the fit free to walk, and the walk runs 90 to 150 solver
+iterations from a scale at zero, so a start value moved by 1e-14 changes where it
+lands.  What is robust is the decision read before the walk starts, at the ``zero``
+stage's answer.  WP-2086's record has the recovery rates on both platforms.
 """
 
 from __future__ import annotations
@@ -221,22 +227,30 @@ def test_with_nothing_to_test_there_is_no_structure(delta, n_free):
 # ---- a phase whose peaks missed ---------------------------------------------
 
 
-def test_a_single_fit_two_percent_off_reaches_its_cell(lab6, no_check):
-    """Without the check: Rwp 0.93, the cell 19 600 ppm off, ``converged``."""
+def test_a_phase_whose_peaks_missed_keeps_its_instrument_free(lab6, monkeypatch, no_check):
+    """Read at the first stages' answers, which come before the walk.  With the
+    check the residual reads as structure and nothing of the instrument is held.
+    Without it the zero shift is held at ``zero`` and W at ``profile_w``."""
     data = _pattern(lab6, A_TRUE, seed=14)
-    ins = _start_instrument
 
-    ref = rx.Refinement(_with_cell(lab6, A_TRUE / 1.02), ins(), history=False)
-    result = ref.fit(data, plan="mccusker_default")
+    def run():
+        ref = rx.Refinement(_with_cell(lab6, A_TRUE / 1.02), _start_instrument(), history=False)
+        return ref.fit(data, plan="mccusker_default")
+
+    read = _spy(monkeypatch)
+    result = run()
     _draw(result, "hold_noise_single_2pct")
-    assert result.statistics.rwp == pytest.approx(0.0405, abs=5e-4)
-    assert ref.fitted_structure.phases[0].cell.a.value == pytest.approx(A_TRUE, rel=2e-5)
+    held = {s.name: set(s.held) for s in result.stages}
+    d, n, p, answer = read[0]
+    assert answer is False
+    assert d < durbin_watson_q(n, p)
+    for stage in ("zero", "cell", "profile_w"):
+        assert not PEAK_ONLY & held[stage], stage
 
     no_check()
-    ref = rx.Refinement(_with_cell(lab6, A_TRUE / 1.02), ins(), history=False)
-    without = ref.fit(data, plan="mccusker_default")
-    assert without.statistics.rwp > 0.9
-    assert abs(ref.fitted_structure.phases[0].cell.a.value / A_TRUE - 1.0) > 0.01
+    held = {s.name: set(s.held) for s in run().stages}
+    assert "instrument.zero_shift" in held["zero"]
+    assert {"instrument.zero_shift", "instrument.profile.w"} <= held["profile_w"]
 
 
 def test_the_tutorials_step_is_reached_warm(lab6, no_check):
@@ -260,22 +274,21 @@ def test_the_tutorials_step_is_reached_warm(lab6, no_check):
     assert run()[1].entries[1].statistics.rwp > 0.9
 
 
-def test_the_peaks_are_still_found_past_an_excluded_region(lab6, monkeypatch):
+def test_the_peaks_still_read_as_structure_past_an_excluded_region(lab6, monkeypatch):
     """Excluding a span leaves one bridged pair in d per span, and a residual
     of peaks still declines the hold.  Worst placed, fifteen such pairs moved d
     by 0.45 with 1.36 still to go to Q (the WP's record), so d stays the
-    number the result carries.  Which basin an unchecked fit lands in moves
-    with the channels, so this asserts the reading rather than the outcome."""
+    number the result carries.  Where the walk lands moves with the channels,
+    so this asserts the reading rather than the outcome."""
     read = _spy(monkeypatch)
     data = _pattern(lab6, A_TRUE, seed=14, excluded_regions=[(9.0, 9.6), (15.0, 15.4)])
     ref = rx.Refinement(_with_cell(lab6, A_TRUE / 1.02), _start_instrument(), history=False)
     result = ref.fit(data, plan="mccusker_default")
     _draw(result, "hold_noise_excluded")
-    assert result.statistics.rwp < 0.05
-    assert ref.fitted_structure.phases[0].cell.a.value == pytest.approx(A_TRUE, rel=2e-5)
     assert read
     assert {n for _, n, _, _ in read} == {result.statistics.n_points}
     assert not any(answer for _, _, _, answer in read)
+    assert not PEAK_ONLY & {p for s in result.stages[:4] for p in s.held}
 
 
 def test_a_joint_fit_with_one_misplaced_and_one_blank_histogram(lab6, no_check):
@@ -375,10 +388,10 @@ def test_a_fit_left_unseen_carries_the_d_that_declined_the_hold(lab6, monkeypatc
     assert f"DW {d:.2f}" in str(result)
 
 
-def test_a_fit_that_recovers_leaves_the_declining_d_on_its_history_node(lab6, monkeypatch):
-    """The phase is seen at the answer, so the result's own d is the good
-    fit's.  Each stage's node keeps the statistics of that stage's answer, so
-    the d that declined the hold is on the stage's node."""
+def test_a_fit_that_goes_on_leaves_the_declining_d_on_its_history_node(lab6, monkeypatch):
+    """A fit that goes on from a declined hold has a later answer, so the
+    result's d need not be the one that declined.  Each stage's node keeps the
+    statistics of that stage's answer, so the d that declined is on the node."""
     read = _spy(monkeypatch)
     data = _pattern(lab6, A_TRUE, seed=14)
     ref = rx.Refinement(_with_cell(lab6, A_TRUE / 1.02), _start_instrument())
@@ -386,7 +399,6 @@ def test_a_fit_that_recovers_leaves_the_declining_d_on_its_history_node(lab6, mo
     _draw(result, "hold_noise_recovered")
     declined = [d for d, _, _, answer in read if not answer]
     assert declined
-    assert result.statistics.durbin_watson > 1.9
     recorded = [n.metrics.statistics.durbin_watson for n in ref.history.nodes.values()
                 if n.metrics is not None and n.metrics.statistics is not None]
     assert any(d == pytest.approx(declined[0], rel=1e-9) for d in recorded), (
