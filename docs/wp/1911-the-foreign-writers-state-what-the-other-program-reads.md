@@ -1,6 +1,6 @@
 # WP-1911 — the foreign writers state what the other program reads: the setting, the scale, the free set
 
-Milestone: unscheduled · Status: 🔄 2026-10-12 — PRs #720, #731, #710, #733, #713, #771, #782, #770 (Part B's TOPAS writer), #755 (C1's `Zero`) and #815 (#732's whole TOPAS input) and #839 (its X-ray extinction) and #912 (#721's item 3 on the P1 route) merged from outside; the decision on the rest of #721 is due
+Milestone: unscheduled · Status: 🔄 2026-11-03 — PR #1370 lands Part A's reader and writer items; Parts B-D wait on the maintainer's decisions
 Track: Coming from another code
 Depends on: — (#713 soft: the P1 restatement Part D builds on)
 Priority: P3 2026-10-06 — was P2 for #716, which PR #733 fixed; the remaining issues cost a user hand edits
@@ -91,7 +91,8 @@ bare R symbol on hexagonal axes and forces the angles, so a `.pcr` stating
 a = b = c, α = β = γ ≠ 90 beside a bare R symbol is, to FullProf, a symbol and
 a cell that contradict. Root CLAUDE.md's rule for that case is refusal (a
 symmetry-fixed angle disagreeing with its symmetry is refused, not
-normalised).
+normalised). The maintainer ruled the other way on 2026-11-03: read on the
+cell's axes and report it (the Tasks list has the ruling).
 
 ### Part B — the scale and the free set (#722)
 
@@ -234,8 +235,6 @@ a `tests/data/README.md` row.
   whether it writes. The other half of 1328's note stays a standing choice
   and is not forwarded: `fullprof.to_structure` drops a nuclear phase's `Nvk`,
   because FullProf's nuclear k and rietx's are not the same model.
-- **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: a tied TOPAS write its own reader refuses.** `write_topas_inp(structure, path, free=ref)` with a structure whose values break one of `ref`'s `tie_equal` groups writes one shared name at two values, and rietx's `.inp` reader then refuses the file (`TopasInpError ... is stated at two values`, `io/projects/topas_ties.py:345`; writer `topas_input.py` through `from_structure_refined`). Reproduced by a WP-1986 lane and not re-run by its parent. `src/rietx/io/CLAUDE.md` asks a writer to refuse what its reader refuses. `docs/docs/reference/foreign-writers.md`'s example sidesteps it by passing `ref.fitted_structure`.
-
 - **2026-10-17, from [1996](1996-the-switching-tab-says-only-what-its-tests-show.md):
   FullProf applies the Laue-class cell constraints itself, and it runs on this
   machine.** `~/Code/rietx-bench/tools/fullprof/files/fp2k` (FullProf.2k 8.20,
@@ -421,20 +420,38 @@ land alone before the transform exists.
       equivalent. Recommended: refuse now, restate once the transform lands.
       *Decided 2026-10-06: restate, through PR #733, which brings the
       transform.*
-- [ ] A: `.pcr` writer refuses (or restates) an `R … :R` phase; the `:R` arm
+- [x] A: `.pcr` writer refuses (or restates) an `R … :R` phase; the `:R` arm
       of `test_write_fullprof_pcr_round_trips_both_r_lattice_axis_choices`
       inverted; an oracle test with FullProf's measured rule (a bare R symbol
       is hexagonal axes with α = β = 90°, γ = 120° imposed; a suffix is
-      illegal), held first to the reporter's table
-- [ ] A: GSAS-II phase CIF: read GSAS-II's `SpcGroup` grammar (spec only) for
+      illegal), held first to the reporter's table.
+      *Restated by PR #733, arm inverted there; the oracle is
+      `_fullprof_r_cell` (2026-11-03), and it fails on the pre-#733 writer.*
+- [x] A: GSAS-II phase CIF: read GSAS-II's `SpcGroup` grammar (spec only) for
       a rhombohedral-axes spelling, measure it by black box, or refuse; fix
       `GSAS2_CIF_SETTING_IN_OPERATORS`' message, which calls an axis choice an
-      origin choice
+      origin choice.
+      *PR #733 restates the phase. 2026-11-03, measured on GSAS-II 5.8.4's
+      `SpcGroup` as a black box: a bare R symbol is hexagonal axes (three
+      centrings), as in gemmi, and `R -3 c R` or `R -3 c:R` is rhombohedral.
+      So an R phase no longer raises the setting note, which now fires only
+      for an origin choice.*
 - [ ] A: `.EXP`: measure what GSAS-I reads for `R -3 c:R` and `F d -3 m:2`;
-      refuse what it does not, and correct `gsas.py:1852`'s claim
-- [ ] A: `.pcr` reader: a bare R symbol beside a = b = c, α = β = γ ≠ 90 is
+      refuse what it does not, and correct `gsas.py:1852`'s claim.
+      *2026-11-03: the claim is corrected (now `gsas.py:1868`, "not
+      measured"). The measurement waits on a GSAS-I run, which this machine
+      has no binary for, so the task stays open.*
+- [x] A: `.pcr` reader: a bare R symbol beside a = b = c, α = β = γ ≠ 90 is
       refused as a contradiction (root CLAUDE.md's angle rule), or kept with
-      a written reason
+      a written reason.
+      *Ruling (Yue, 2026-11-03): "favour correctness. there should be very few
+      if any old rietx .pcr users. I think read but notify makes sense." So
+      the reader keeps building the phase on rhombohedral axes from the cell,
+      as `read_small_structure` does for a CIF, and `to_structure` reports
+      `FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED` (warning). The message names the
+      bare symbol, the setting read, the cell that decided it, and FullProf's
+      hexagonal reading. The axes case left `FULLPROF_ORIGIN_CHOICE`, which
+      now covers the origin choice alone.*
 - [ ] The shared transform: a `Phase` restated by an exact change of basis
       (cell, coordinates, U, moments, operators), refusing a Stephens block or
       restraints; tested by `predict()` agreement, never by a count
@@ -472,14 +489,27 @@ land alone before the transform exists.
       `_parent_space_group.name_H-M_alt` for a magnetic phase, or
       `structure_from_cif` says when the option cannot act (`"parent"` raises
       or reports)
-- [ ] D: the family-group refusal tests what its message claims (orbits), or
-      the message says groups
+- [x] D: the family-group refusal tests what its message claims (orbits), or
+      the message says groups.
+      *2026-11-03: the test stays the groups. The message now counts each
+      site's positions under both groups and names the sites the magnetic
+      operators split ("'Fe1' (4 of 8)"). Where none is split it says so,
+      and names the site symmetry as what would differ. Lifting the refusal
+      where no orbit splits would change the model TOPAS refines, so it is
+      not done.*
 - [ ] D: a non-standard BNS setting restated at its standard one through the
       transform, so `mag_space_group N` can be written
 - [ ] D: ties in the TOPAS writer (`prm` per tied group), and the reader
       keeping the forms the writer emits, if decided
-- [ ] `src/rietx/io/CLAUDE.md` § Project writers: the oracle rule, stated as
-      a rule (no findings)
+- [x] `src/rietx/io/CLAUDE.md` § Project writers: the oracle rule, stated as
+      a rule (no findings) *(2026-11-03)*
+- [ ] #732 step 2: the Chebyshev fit domain stored on `BackgroundChebyshev`,
+      so a coefficient list read or written without its pattern can be
+      evaluated (a stored-format change, so the maintainer's)
+- [ ] #732 step 4: the GSAS-I `ZERO` unit, once a GSAS-I run can measure it
+      (`write_gsas_prm` refuses a non-zero `zero_shift` until then)
+- [ ] #732 items 7 and 9: the TOPAS writer's hkl-table output, and a
+      March-Dollase preferred orientation, which it names and does not write
 - [ ] Tests: per writer and per fact, an oracle reading the written file the
       target's way, held to its measurement table first
 - [ ] Skill: `references/api.md`'s "All four formats write back" passage
@@ -524,6 +554,100 @@ land alone before the transform exists.
   keywords (specification only, per ATTRIBUTION.md).
 
 ## Handover log
+
+- **2026-11-03** — Part A's remaining reader and writer items are done, and
+  the `.pcr` reader now says when it reads a file differently from FullProf.
+  A test now reads a written R phase the way FullProf does, and it fails on
+  the writer before PR #733. A `.pcr` with a bare R symbol beside a
+  rhombohedral cell still reads on rhombohedral axes, and it now carries a
+  warning that FullProf would refine the same file as a hexagonal cell. Yue
+  ruled that direction on 2026-11-03. The TOPAS writer refuses a tie group
+  whose members disagree, which its own reader would refuse. The magnetic
+  family-group refusal now counts what each site loses. Part B, C and D's
+  decisions and the GSAS-I measurement are untouched. PR #1370 (ghostshift
+  runner, one session across a pause).
+  - Done:
+    - FullProf oracle `_fullprof_r_cell` (`tests/test_projects_fullprof.py`),
+      held to the reporter's table first, mutation-checked against the
+      pre-#733 writer.
+    - `GSAS2_CIF_SETTING_IN_OPERATORS` no longer fires for an R axis
+      choice: GSAS-II 5.8.4's `SpcGroup`, run as a black box, reads a bare R
+      symbol on hexagonal axes, as gemmi does.
+    - The TOPAS writer refuses a `tie_equal` group stated at two values
+      (`topas_refined.render_slots`, at the reader's 1e-6 bar);
+      `docs/docs/reference/foreign-writers.md` says so.
+    - The `.EXP` writer's docstring says the setting suffix is not measured
+      (`gsas.py` ~1868); the GSAS-I measurement task stays open.
+    - The family-group refusal counts each site's positions under both
+      groups and names the split sites, or says none is split.
+    - `src/rietx/io/CLAUDE.md` § Project writers states the oracle rule.
+    - Ruling (Yue, 2026-11-03), "read but notify": `to_structure` reports
+      `FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED` (warning) for a bare R symbol read
+      on rhombohedral axes from the cell. `FULLPROF_ORIGIN_CHOICE` now covers
+      the origin choice alone. Audit row tier 3 approved 2026-11-03, help
+      entry, skill row, GUI help-key fixture.
+  - Review: `/code-review high --fix` ran before the pause and landed two
+    fixes (887e996bc). Declined: reusing `cell_volume` in the oracle, since
+    an oracle shares nothing with the package. The fast suite then found two
+    reds this branch caused, both fixed in 9d3b9346f: a warning code needs a
+    silence pair (`tests/silence.py`), and the oracle rule took
+    `src/rietx/io/CLAUDE.md` seven lines over its 565-line cap.
+  - Measured: fast suite on the final tree (macOS arm64, `[dev]`, run alone through
+    the serial lock): 13626 passed, 319 skipped, 34 xfailed. An earlier run
+    on the tree before 9d3b9346f had 2 failed and 13623 passed; the one
+    passed+skipped added since is the new silence pair. The branch adds 11
+    cases (8 functions, 10 cases, plus that pair); no main baseline was
+    measured here.
+    `tests.added_test_times` (local junit, this run): 0.20 s over the 8
+    added functions, none in the slow tail.
+    `python -m tests.reader_output`: unchanged against the merge-base
+    (e7f04f02a). `tests.audit_delta`: 1 added, 0 new at unaudited.
+  - Generality (the judge's sections, condensed; its full tables are in
+    the PR body):
+    - `FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED` (added code row: tier 3,
+      ambiguity 1, response `warning`, approved 2026-11-03). **Verdict:
+      weak.** The evidence for acting is stronger: reading the file on the
+      axes its cell states keeps the crystal the file's author meant, and the
+      maintainer ruled for it. The row's weakness is in what it certifies. It
+      labels the ambiguity kind 1 (every competent refiner would act the same
+      way), yet its own `evidence` names the opposite reading as FullProf's
+      practice. It also never states a mechanical ground (which families of
+      data the firing rule was checked on). Questions 1, 4, 5 and 7 hold;
+      question 2 "disagrees with its own evidence" (one argument could carry
+      kind 1: FullProf's reading is a parser rule, and it produces a different
+      crystal, not an alternative reading of this one; the row does not make
+      that argument); question 3 "real, and partly answered by the warning"
+      (GSAS-II 5.8.4 and gemmi also read a bare R as hexagonal, so no measured
+      program takes the cell's word for a bare symbol); question 6 "missing"
+      (two synthetic `.pcr` phases; the rare-feature clause asks `grounds` and
+      the help text to name the one family). Evidence that would change the
+      verdict: a sentence in `grounds` explaining why FullProf's reading and
+      the refusal rule are not competent dissents, or `ambiguity` changed;
+      plus a stated family count, or the rare-feature wording in `grounds`
+      and the help entry.
+      *Author: `grounds` now says why it is kind 1 (FullProf's rule imposes
+      other angles, and the refusal was ruled against) and that it was tested
+      on two synthetic R -3 c phases only (79f821f79). The help entry is left
+      without test-coverage wording, since it is text a user reads.*
+    - `topas_ties.SHARED_NAME_RTOL = 1e-6` (a module-level number added under
+      `io`, which `NOT_WALKED` declares out of the audit walk). **Verdict:
+      fails**, as a claim that no number there decides anything. The number
+      decides whether rietx's TOPAS reader refuses a file, and now also
+      whether the writer refuses a structure; `NOT_WALKED["io"]`'s reason
+      ("byte offsets, field widths, unit factors and size caps") does not
+      describe a refusal threshold. The value looks sound: unchanged from the
+      two inline literals it replaces, and on the writer side the margin is
+      large. No file has tested the bar. Evidence that would change the
+      verdict: `topas_ties.py` and `topas_refined.py` added to `WALKED` with a
+      row, or a `NOT_WALKED` reason that covers a refusal threshold.
+      *Author: the hoist was an optional tidy, so it is reverted (6d682876c)
+      and the two inline literals are back. The finding stands for whoever
+      next widens the walk: a refusal threshold sits in an unwalked `io`
+      file.*
+  - Next: the maintainer's decision on #722's options (Part B), which the
+    `free=` task and #761 wait on; then #723's package order (Part C); then
+    #721's items 2-4 (Part D). The `.EXP` measurement waits on a GSAS-I
+    binary.
 
 - **2026-10-12** — a P 1 file now refines as the model does. PR #912 (head
   `2c31b2c5`) merged as `a8960f79` after two rounds. It is #721's proposed

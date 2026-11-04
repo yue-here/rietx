@@ -1,0 +1,312 @@
+{
+ "env": {
+  "platform": "Darwin arm64 (macOS-27.2-arm64-arm-64bit)",
+  "python": "3.12.16",
+  "rietx": "1.11.0.dev0",
+  "rietx_file": "/private/tmp/claude-502/-Users-yuewu-Code-rietx/2d6ae8c9-3e42-4d89-bdce-b3f74821ad95/scratchpad/snap/src/rietx/__init__.py",
+  "venv": "worktree .venv, [dev]",
+  "compiled_available": true,
+  "compiled_enabled": true,
+  "numeric_path": "compiled (set_enabled(True))"
+ },
+ "family": "thermal",
+ "path": "compiled",
+ "N": 10,
+ "arms": {
+  "samples1_factor2.0": {
+   "samples": 1,
+   "factor": 2.0,
+   "n_armed": 8,
+   "n_cut": 0,
+   "cut": [],
+   "n_escalated": 0,
+   "escalated": [],
+   "escalated_in_ref": [],
+   "total_evals": 172,
+   "budgets": {
+    "p002": 24,
+    "p003": 24,
+    "p004": 24,
+    "p005": 24,
+    "p006": 24,
+    "p007": 24,
+    "p008": 24,
+    "p009": 24
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 15,
+    "p004": 15,
+    "p005": 15,
+    "p006": 15,
+    "p007": 15,
+    "p008": 15,
+    "p009": 15
+   },
+   "vs_ref": {
+    "bit_identical_values": true,
+    "values_identical": true,
+    "status_rung_changes": [],
+    "max_dvalue_esd": 0.0,
+    "max_dvalue_at": null
+   },
+   "seconds": 3.6
+  },
+  "samples2_factor2.0": {
+   "samples": 2,
+   "factor": 2.0,
+   "n_armed": 7,
+   "n_cut": 0,
+   "cut": [],
+   "n_escalated": 0,
+   "escalated": [],
+   "escalated_in_ref": [],
+   "total_evals": 172,
+   "budgets": {
+    "p003": 24,
+    "p004": 24,
+    "p005": 24,
+    "p006": 24,
+    "p007": 24,
+    "p008": 24,
+    "p009": 24
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 15,
+    "p004": 15,
+    "p005": 15,
+    "p006": 15,
+    "p007": 15,
+    "p008": 15,
+    "p009": 15
+   },
+   "vs_ref": {
+    "bit_identical_values": true,
+    "values_identical": true,
+    "status_rung_changes": [],
+    "max_dvalue_esd": 0.0,
+    "max_dvalue_at": null
+   },
+   "seconds": 4.2
+  },
+  "samples3_factor2.0": {
+   "samples": 3,
+   "factor": 2.0,
+   "n_armed": 6,
+   "n_cut": 0,
+   "cut": [],
+   "n_escalated": 0,
+   "escalated": [],
+   "escalated_in_ref": [],
+   "total_evals": 172,
+   "budgets": {
+    "p004": 24,
+    "p005": 24,
+    "p006": 24,
+    "p007": 24,
+    "p008": 24,
+    "p009": 24
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 15,
+    "p004": 15,
+    "p005": 15,
+    "p006": 15,
+    "p007": 15,
+    "p008": 15,
+    "p009": 15
+   },
+   "vs_ref": {
+    "bit_identical_values": true,
+    "values_identical": true,
+    "status_rung_changes": [],
+    "max_dvalue_esd": 0.0,
+    "max_dvalue_at": null
+   },
+   "seconds": 4.0
+  },
+  "samples1_factor3.0": {
+   "samples": 1,
+   "factor": 3.0,
+   "n_armed": 8,
+   "n_cut": 0,
+   "cut": [],
+   "n_escalated": 0,
+   "escalated": [],
+   "escalated_in_ref": [],
+   "total_evals": 172,
+   "budgets": {
+    "p002": 36,
+    "p003": 36,
+    "p004": 36,
+    "p005": 36,
+    "p006": 36,
+    "p007": 36,
+    "p008": 36,
+    "p009": 36
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 15,
+    "p004": 15,
+    "p005": 15,
+    "p006": 15,
+    "p007": 15,
+    "p008": 15,
+    "p009": 15
+   },
+   "vs_ref": {
+    "bit_identical_values": true,
+    "values_identical": true,
+    "status_rung_changes": [],
+    "max_dvalue_esd": 0.0,
+    "max_dvalue_at": null
+   },
+   "seconds": 3.4
+  },
+  "samples2_factor3.0": {
+   "samples": 2,
+   "factor": 3.0,
+   "n_armed": 7,
+   "n_cut": 0,
+   "cut": [],
+   "n_escalated": 0,
+   "escalated": [],
+   "escalated_in_ref": [],
+   "total_evals": 172,
+   "budgets": {
+    "p003": 36,
+    "p004": 36,
+    "p005": 36,
+    "p006": 36,
+    "p007": 36,
+    "p008": 36,
+    "p009": 36
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 15,
+    "p004": 15,
+    "p005": 15,
+    "p006": 15,
+    "p007": 15,
+    "p008": 15,
+    "p009": 15
+   },
+   "vs_ref": {
+    "bit_identical_values": true,
+    "values_identical": true,
+    "status_rung_changes": [],
+    "max_dvalue_esd": 0.0,
+    "max_dvalue_at": null
+   },
+   "seconds": 3.6
+  },
+  "samples3_factor3.0": {
+   "samples": 3,
+   "factor": 3.0,
+   "n_armed": 6,
+   "n_cut": 0,
+   "cut": [],
+   "n_escalated": 0,
+   "escalated": [],
+   "escalated_in_ref": [],
+   "total_evals": 172,
+   "budgets": {
+    "p004": 36,
+    "p005": 36,
+    "p006": 36,
+    "p007": 36,
+    "p008": 36,
+    "p009": 36
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 15,
+    "p004": 15,
+    "p005": 15,
+    "p006": 15,
+    "p007": 15,
+    "p008": 15,
+    "p009": 15
+   },
+   "vs_ref": {
+    "bit_identical_values": true,
+    "values_identical": true,
+    "status_rung_changes": [],
+    "max_dvalue_esd": 0.0,
+    "max_dvalue_at": null
+   },
+   "seconds": 3.7
+  }
+ },
+ "reference": {
+  "total_evals": 172,
+  "per_pattern_evals": {
+   "p000": 37,
+   "p001": 15,
+   "p002": 15,
+   "p003": 15,
+   "p004": 15,
+   "p005": 15,
+   "p006": 15,
+   "p007": 15,
+   "p008": 15,
+   "p009": 15
+  },
+  "rungs": {
+   "p000": [
+    "cold"
+   ],
+   "p001": [
+    "warm"
+   ],
+   "p002": [
+    "warm"
+   ],
+   "p003": [
+    "warm"
+   ],
+   "p004": [
+    "warm"
+   ],
+   "p005": [
+    "warm"
+   ],
+   "p006": [
+    "warm"
+   ],
+   "p007": [
+    "warm"
+   ],
+   "p008": [
+    "warm"
+   ],
+   "p009": [
+    "warm"
+   ]
+  }
+ },
+ "reference_repeat": {
+  "bit_identical_values": true,
+  "values_identical": true,
+  "status_rung_changes": [],
+  "max_dvalue_esd": 0.0,
+  "max_dvalue_at": null
+ },
+ "seconds": 29.9
+}
