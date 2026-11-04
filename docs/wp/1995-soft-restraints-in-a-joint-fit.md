@@ -1,7 +1,7 @@
 # WP-1995 — Soft restraints in a joint fit
 
 Milestone: parametric · Status: ⬜
-Depends on: 1964 soft (the grammar a penalty is written in)
+Depends on: 1964 (the grammar, for the penalty task alone)
 Priority: P2 2026-11-04 — was P3: the parametric milestone takes it, since an expert's restraints stop at the joint fit, and a penalty is how a bound on a nonlinear target can hold
 
 ## Goal
@@ -83,7 +83,8 @@ restraint rows on the penalty side of it.
 
 - **2026-11-04, from the opening of the [parametric](../milestones/parametric.md)
   milestone: a penalty written as an expression.** TOPAS has `penalty = expr;`, which
-  adds to χ² (forum 700), and Artemis has a `restrain` parameter type. A joint fit
+  adds to χ² (forum 700), Artemis has a `restrain` parameter type, and GSAS-II has
+  expression restraints (`GSASIIrestrGUI.py`, general restraints). A joint fit
   needs one for a second reason. [1964](1964-a-parametric-equation-the-user-writes.md)
   cannot hold a bound on an equation's target as a box, because the target is not a
   linear function of the coefficients. TOPAS ignores such a bound silently (forum 767).

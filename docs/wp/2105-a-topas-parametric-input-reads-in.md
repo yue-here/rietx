@@ -15,6 +15,12 @@ equations, and refuses by name what it cannot carry.
 protocol by hand, and `read_topas_inp` refused ZrP₂O₇'s `B1` macros outright, so that
 run parsed the `str` blocks itself.
 
+The reader already has machinery here. `io/projects/topas.py` has a preprocessor that
+refuses `#list` by name and an `_arith` built on python `ast`, and
+`topas_ties.affine_of` reads equations and reports what it cannot. A new lowering beside
+these would be another TOPAS-expression path, which is WP-1119's first objection. So
+decide whether they route through the grammar.
+
 The two local inputs show what a real one is made of:
 
 - `prm` at top level holds shared coefficients, some fixed with `!`, some with
@@ -27,12 +33,15 @@ The two local inputs show what a real one is made of:
 - Spelling differs from the grammar in known ways: capitalised `Exp` and `Ln`,
   left-associative `^`, and implied multiplication such as `(height) Cos(Th)`.
 
-Two lines in those inputs fall under the milestone's fence. Both need a stated outcome:
+Three lines in those inputs depend on a reflection or an angle. Each needs a stated
+outcome:
 
 - WO₃'s `scale_pks = Exp(-2 b/(2 D_spacing)^2)` is one overall B per pattern. It
   depends on the reflection, but its effect is an added Biso, so the reader can say so.
-- ZrP₂O₇'s `th2_offset` is a curve in `Xo`. It has no rietx form, so the reader reports
-  it as dropped, with its size.
+- WO₃'s `th2_offset = -2 57.29... (height) Cos(Th) / Rs` is a sample height, which maps
+  to `sample_displacement`.
+- ZrP₂O₇'s `th2_offset` is a curve in `Xo`, under the milestone's provisional fence.
+  Until that is ruled on, the reader reports it as dropped, with its size.
 
 Rules that apply: `src/rietx/io/CLAUDE.md`, and a reader may repair a file only where it
 can say that it did. **Corpus files are private**: a committed fixture carries synthetic
@@ -41,12 +50,14 @@ root (root CLAUDE.md § Licensing).
 
 ## Non-goals
 
-- GSAS-II `.gpx` sequential results into equations. They hold no equations to read.
+- GSAS-II's stored sequential equations (`SeqParFitEqList`):
+  [2106](2106-an-equation-fitted-to-a-series-trajectory.md).
 - Writing parametric `.inp` out.
 - Reflection-level or point-level equations.
 
 ## Tasks
 
+- [ ] Decide how `_arith` and `affine_of` relate to the grammar, and write it here.
 - [ ] Inventory the constructs across both inputs, each marked read, reported or
   refused. Bring anything a reader cannot say honestly to the handover.
 - [ ] Macro expansion: decide between a small expander for `#list` and `#define` and

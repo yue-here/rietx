@@ -6,8 +6,8 @@ Priority: P2 2026-11-04 — a raise on a documented input type, and an expert's 
 
 ## Goal
 
-`refine_multi` and `Refinement.report` accept every form of plan that `Refinement.fit`
-accepts.
+`refine_multi` accepts every form of plan that `Refinement.fit` accepts, and each
+`report` reads a plan the way the fit that made the result did.
 
 ## Context
 
@@ -27,16 +27,24 @@ and look the preset up by hand:
 
 Both signatures in `multi.py` are annotated `RefinementPlan | str`.
 
+The two sites differ. `fit` crashes. Both `report` methods accepted a `PlanSpec` in a
+review's probe of 2026-11-04, because `apply_strategy_veto` reads only what the two
+types share. What they skip is `resolve_plan`'s mode substitution, and neither has a
+`mode` argument, so a report passes `result_.mode`. `project._as_plan_spec`
+(`project.py:477`) converts the other way, toward a spec, and is a fourth place to read.
+
 ## Non-goals
 
 - Any other change to what a joint fit accepts: [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md).
 
 ## Tasks
 
-- [ ] Route all three sites through `resolve_plan`, passing `mode`, and widen the
-  annotations.
-- [ ] Tests: a `PlanSpec` and the `RefinementPlan` it converts from give bit-identical
-  answers on `refine_multi`, and each `report` accepts one.
+- [ ] Route `fit` through `resolve_plan`, passing `mode`, and widen the annotations.
+- [ ] Route both `report` sites through it with `result_.mode`. Check whether a report
+  on a Le Bail or Pawley result changes, since the substitution then applies. If it
+  does, that is a reader-output change and goes to the maintainer.
+- [ ] Test: a `PlanSpec` and the `RefinementPlan` it converts from give bit-identical
+  answers on `refine_multi`.
 - [ ] Grep for a fourth site and say in the handover what was checked.
 - [ ] Skill: "none" and why, unless the skill names the limit.
 

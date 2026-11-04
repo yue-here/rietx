@@ -685,7 +685,7 @@ not. Every source is a user document or paper, and no closed or GPL code was rea
 | Program or format | How the form is written | Parameters, sharing, bounds | Per-dataset values | Derivatives | Status |
 |---|---|---|---|---|---|
 | TOPAS | a string on any parameter, one grammar throughout (Tech. Ref. Table 3-1): `+ - * / ^`, `If`, `And`, `Or`, `Min`, `Max`, `Exp`, `Ln`, `Gamma_P` and more; user `fn` with `def` and `return` (§21.3) | `prm` is global and `local` per `xdd` or `str` (§2.2); sharing is by name; min and max are equations (§2.3) | `#list` of macros, or a generated `prm` per pattern (§2.26.2) | computer algebra carries the chain through equations (§21.3.2, Coelho 2018 abstract); `del` is the step for numerical derivatives of the pattern (§2.3) | checked |
-| GSAS-II | a Python-syntax string, fitted to the sequential table after the refinement, never in a joint residual; external functions allowed | a repeated label links equations; a `b` is auto-renamed to stop accidental sharing | the table's columns | not stated | checked, derivatives recall |
+| GSAS-II | a Python-syntax string, fitted to the sequential table after the refinement and stored with it (`SeqParFitEqList`), never in a joint residual, and also usable as an expression restraint; external functions allowed | a repeated label links equations; a `b` is auto-renamed to stop accidental sharing | the table's columns | not stated | checked, derivatives recall |
 | FullProf | `EQUAL` and `PEQU_pat` link parameters; no equation in a coordinate found | none found | none found | none found | search excerpts |
 | Jana2020, MAUD | no equation across datasets found | | | | not found |
 | Artemis, Larch | strings on path parameters, with roles `guess`, `def`, `set`, `lguess`, `restrain`, and built-in `eins()`, `debye()` | by name | `set` per dataset | finite difference (recall) | checked |
@@ -703,10 +703,12 @@ What they agree on.
 
 - **Form.** Every system with exact derivatives owns a tree with a closed operator list. `asteval`
   and `simpleeval` evaluate python values, so they expose nothing to differentiate. sympy's
-  `parse_expr` calls `eval` and `lambdify` calls `exec`. sympy 1.14.0's `lambdify` lists no torch
-  module (checked 2026-11-03), so DESIGN.md's rejection of it still stands.
-- **Sharing.** Every program shares a coefficient by name. The per-dataset value is an ordinary
-  fixed number. Start, bounds and fixed flag sit beside the equations.
+  `parse_expr` calls `eval` and `lambdify` calls `exec`. sympy 1.14.0's `lambdify` does ship a
+  `torch` module (`MODULES`, checked 2026-11-04), so DESIGN.md's reason has aged and these two
+  grounds carry the rejection. General parser libraries such as lark were not surveyed.
+- **Sharing.** Text formats share a coefficient by name, and python APIs (Bumps, refnx, RooFit)
+  by a shared object. The per-dataset value is an ordinary fixed number. Start, bounds and fixed
+  flag sit beside the equations.
 - **Grammar.** Where a format left its grammar unwritten (PEtab v1, HS3), the first parser became
   the specification. PEtab's test suite and CEL's conformance tests are the counter-examples: small
   cases with an expected number.

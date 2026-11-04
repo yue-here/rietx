@@ -29,7 +29,7 @@ settle.
 
 ### A subset by condition
 
-`ParametricTie.patterns` is a list of indices into the patterns as passed,
+`ParametricEquation.patterns` is a list of indices into the patterns as passed,
 and `design` rows follow the subset's order. A library that drops one bad
 pattern shifts every later index, so every subset has to be rewritten by
 hand. A phase field is also a region of composition, which a condition on the
@@ -51,7 +51,7 @@ or needs a key per row.
 ### A glob for the target
 
 1325's design said "targets as globs". The code takes one bare path, and
-`ParametricTie._check` refuses a glob. An orthorhombic cell linear in T is
+`ParametricEquation._check` refuses a glob. An orthorhombic cell linear in T is
 three declarations with three names. A glob would expand at resolution into
 one declaration per matched path, each with its own coefficients.
 
@@ -103,9 +103,9 @@ one declaration per matched path, each with its own coefficients.
 
 - **2026-10-14, from [1325](1325-parametric-series.md) (seventh session,
   PR #977): a result now carries each equation as resolved.**
-  `RefinementResult.parametric_laws[k].tie` is the declaration with its
+  `RefinementResult.parametric`'s resolved equation is the declaration with its
   reference and scale filled in, the form a refit passes back. A condition
-  or glob spelling should resolve to that same `ParametricTie`,
+  or glob spelling should resolve to that same `ParametricEquation`,
   so a result read back can be refitted whichever spelling declared it.
 
 ## Non-goals

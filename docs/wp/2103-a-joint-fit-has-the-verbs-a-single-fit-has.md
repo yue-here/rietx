@@ -1,7 +1,7 @@
 # WP-2103 — a joint fit has the verbs a single fit has
 
 Milestone: parametric · Status: ⬜
-Depends on: 2102 soft; 2081 soft (how a series holds what the setup fixes)
+Depends on: 2102 soft; 2081 soft (how a series holds what the setup fixes); 1964 soft (its interval measurement)
 Priority: P2 2026-11-04 — a feature the open milestone was opened for: an expert steers a fit by hand, and a joint fit offers them almost nothing to steer with
 
 ## Goal
@@ -18,8 +18,12 @@ adds `set_vary`, `set_values`, `add_variable`, `tie`, `tie_equal`, `untie`, `hol
 `unhold`, `run_stage` and `profile_interval`, and a history. So on a joint fit the only
 steering is the `sharing=` map and `parametric=` at construction, and a plan.
 
-The memory rule the maintainer gave on 2026-11-03 bears directly: a series calibrates
-the setup and holds it through the series. On a joint fit today that hold has no verb.
+The maintainer's ruling of 2026-11-03 bears directly: a series calibrates the setup and
+holds it through the series. On a joint fit today that hold has no verb.
+
+The tie has a named customer. WP-1325 had to hold WO₃'s one B per pattern at the chain's
+value because a joint fit has no tie verb (`1325-measure/wo3_ramp.py`), where the chain
+writes `tie_equal(...biso, "vars.B")`. The milestone's WO₃ row needs that B refined.
 
 TOPAS's habits set the bar. An expert edits a `prm` flag and reruns from the stored
 values. `load_save_locals` (v8 onwards, formerly `use_stored_values`) writes each

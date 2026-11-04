@@ -51,8 +51,8 @@ table (`ABSENT`, "a joint fit is Rietveld-only"). Those rows change with this WP
 
 ## Acceptance
 
-A Pawley or Le Bail joint fit sharing a parametric cell over a synthetic ramp recovers
-the known a(T) within 2 esd of the slope.
+A Pawley or Le Bail joint fit sharing a parametric cell over a synthetic ramp, on one
+pinned seed, recovers the known a(T) within 2 esd of the slope.
 
 ```sh
 .venv/bin/python -m pytest tests/test_multi_histogram.py tests/test_parametric_series.py tests/test_cross_backend.py
