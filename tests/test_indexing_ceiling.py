@@ -359,13 +359,14 @@ def test_progress_is_one_flat_ladder_on_the_existing_kinds(cubic_peaks):
     per-engine pair *replaced* (trap 2: two ladders on one kind is what made a
     progress bar jump), and — asserted, per the WP — no
     ``EVENT_SCHEMA_VERSION`` bump: the ladder adds fields and revises
-    ``n_stages``, neither of which is a new kind.  The constant is "3" since
-    WP-1322's run header, a record and not a kind; the ladder never moved it.
+    ``n_stages``, neither of which is a new kind.  The constant was "3" from
+    WP-1322's run header, a record and not a kind, and is "4" since #562 S2b's
+    solve kinds; the indexing ladder never moved it.
 
     Every engine runs, because the claim is that every engine feeds the ladder.
     One candidate is reported: the ambiguity sweep over a full report runs after
     the ladder, emits nothing on it, and was ~12 s of this test (WP-2019)."""
-    assert EVENT_SCHEMA_VERSION == "3"
+    assert EVENT_SCHEMA_VERSION == "4"
 
     peaks, _cell = cubic_peaks
     events = []

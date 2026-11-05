@@ -673,6 +673,10 @@ from .._nearmiss import did_you_mean
 #: ``Phase`` raises a ``ValidationError``, and ``Project.open`` stops at
 #: "malformed history record".  So a structure or a ``.rex`` project written
 #: here does not open there.
+#: Also in 0.61 (#562 S2b, WP-1997): ``Capabilities.solve_engines``, the
+#: structure-solution engines the build registers.  Additive and defaulted to
+#: an empty list, the same rule.  The solver stays unexported, so
+#: ``SolutionResult``'s own schema move waits until it is exported.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

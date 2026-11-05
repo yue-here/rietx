@@ -293,6 +293,9 @@ class Capabilities(Base):
     #: registries so the GUI form, the agent schema and ``SearchSpec`` cannot
     #: disagree about what may be asked for
     indexing_engines: list[EngineCapability] = Field(default_factory=list)
+    #: the structure-solution engines (#562 S2b), quoted from the live
+    #: registry, as the indexing ones are
+    solve_engines: list[EngineCapability] = Field(default_factory=list)
     #: ``SYSTEM_ORDER`` verbatim — the order *is* information (cheapest first)
     crystal_systems: list[str] = Field(default_factory=list)
     #: Bravais centrings each system admits, ``engines.CENTRINGS`` verbatim
@@ -344,6 +347,7 @@ def capabilities() -> Capabilities:
     from .gui.textdoc import FORMAT_VERSION as TEXTDOC_FORMAT_VERSION
     from .model import compiled
     from .skill import skill_path
+    from .solve.engines import engine_descriptions as solve_engine_descriptions
 
     _skill = skill_path()
 
@@ -374,6 +378,8 @@ def capabilities() -> Capabilities:
         indexing_engines=[
             EngineCapability(name=name, description=desc)
             for name, desc in sorted(engine_descriptions().items())],
+        solve_engines=[EngineCapability(name=name, description=desc)
+                       for name, desc in solve_engine_descriptions().items()],
         crystal_systems=list(SYSTEM_ORDER),
         centrings={system: list(letters)
                    for system, letters in CENTRINGS.items()},

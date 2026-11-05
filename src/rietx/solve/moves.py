@@ -1,4 +1,4 @@
-"""What a direct-space search moves, and the |F|² it sees (#562 S2a; WP number pending).
+"""What a direct-space search moves, and the |F|² it sees (#562 S2a; WP-1997).
 
 A search holds, per replica, one flat vector u of free parameters.  Two kinds
 of **unit** own slices of it:

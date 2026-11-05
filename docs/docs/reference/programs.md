@@ -143,6 +143,17 @@ Six more strings version the data contracts, and each moves on its own:
 Store the contract versions beside any answer you store.
 A threshold compared across two `report_thresholds_version` values compares two different tests.
 
+### Events of a structure solution
+
+Event version 4 added three kinds, with the `data` keys below ([Events](refinement.md#events) has the rest of the ladder).
+A solve's units (a race round, a seed, a control seed, a per-group consensus) are `stage_start` and `stage_end` pairs, as indexing's are.
+
+| Kind | `data` keys in this version |
+|---|---|
+| `solve_start` | `engine`, `space_groups`, `n_assignments`, `seeds`, `control_seeds`, `replicas`, `sweeps`, `race_sweeps`, `span`, `step`, `swap_every`, `exchange`, `n_random`, `cluster_tol`, `polish_maxiter`, `heartbeat_sweeps`, `total_budget_seconds`, `n_reflections`, `chi2_floor`, `resumed`, `n_stages` |
+| `solve_step` | `unit`, `unit_kind`, `sweep`, `sweeps`, `moves`, `leader_j`, `leader_chi2_ratio`, `leader_changed`, `sweeps_since_improvement`, `replica_temperatures`, `replica_acceptance`, `swap_acceptance` |
+| `solve_end` | `status`, `partial`, `n_candidates`, `units_not_run` |
+
 ### Arms
 
 | Arm | Holds |
@@ -159,6 +170,7 @@ A threshold compared across two `report_thresholds_version` values compares two 
 | `Capabilities.project_formats` | one `ProjectFormatCapability` per format of another program's refinement this build reads ([How to open a GSAS, TOPAS or FullProf refinement](../guides/foreign.md)) |
 | `Capabilities.search_presets` | one `SearchPresetCapability` per indexing search preset |
 | `Capabilities.indexing_engines` | one `EngineCapability` per indexing engine |
+| `Capabilities.solve_engines` | one `EngineCapability` per structure-solution engine (provisional; the entry point is not exported yet) |
 | `Capabilities.crystal_systems` | the crystal systems in the order an indexing search enters them, from cubic to triclinic. Each system takes longer to search than the one before it |
 | `Capabilities.centrings` | for each crystal system, the Bravais centring letters it admits |
 | `Capabilities.shift_templates` | the systematic-shift models the indexing screen can fit |
