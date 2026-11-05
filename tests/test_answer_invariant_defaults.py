@@ -13,7 +13,10 @@ WP-2003 adds the series seat: ``refine_sequential`` and
 switched on against a three-pattern chain.
 #562 S2b adds the solve seat: ``solve_structure``'s ``events``, ``cancel``,
 ``label`` and ``telemetry``, and ``SolveSpec.heartbeat_sweeps``, each switched
-on against one run with every channel at its default.
+on against one run with every channel at its default.  ``cancel`` and ``label``
+are read only where a recorder exists (``attach_cancel`` hands the token back
+unchanged otherwise), so the recorded run is the test that reaches them.
+``checkpoint_every_s`` has its own test in ``tests/test_solve_entry.py``.
 """
 
 from __future__ import annotations
@@ -224,11 +227,11 @@ def solve_baseline(solver):
     return _solve_answer(_solved(solver))
 
 
-@pytest.mark.parametrize("channel", ["events", "cancel", "label", "heartbeat"])
+@pytest.mark.parametrize("channel", ["events", "heartbeat"])
 def test_a_solve_observed_is_the_solve_unobserved(solver, solve_baseline, channel):
     got: list[dict] = []
-    kw = {"events": {"events": got.append}, "cancel": {"cancel": CancelToken()},
-          "label": {"label": "observed"}, "heartbeat": {"heartbeat": 250, "events": got.append}}
+    kw = {"events": {"events": got.append},
+          "heartbeat": {"heartbeat": 250, "events": got.append}}
     res = _solved(solver, **kw[channel])
     assert _solve_answer(res) == solve_baseline
     if channel in ("events", "heartbeat"):
@@ -240,7 +243,7 @@ def test_a_solve_observed_is_the_solve_unobserved(solver, solve_baseline, channe
 def test_a_recorded_solve_is_the_solve_unrecorded(solver, solve_baseline, tmp_path):
     was = runs.set_enabled(True)
     try:
-        res = _solved(solver, telemetry=tmp_path, label="recorded")
+        res = _solved(solver, telemetry=tmp_path, label="recorded", cancel=CancelToken())
     finally:
         runs.set_enabled(was)
     assert _solve_answer(res) == solve_baseline

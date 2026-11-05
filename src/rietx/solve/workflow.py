@@ -1,4 +1,4 @@
-"""The structure-solution entry point (#562 S2b; WP number pending).
+"""The structure-solution entry point (#562 S2b; WP-1997).
 
 :func:`solve_structure` takes a cost (:class:`~rietx.solve.cost.SolveCost`,
 built from a Pawley or Le Bail fit of the verified cell), the phase that fit
@@ -241,17 +241,11 @@ def _group_phase(phase, group: str):
                             deep=True)
 
 
-#: Assignments one group may carry.  A ladder's generator is seeded by
-#: ``1000·group + assignment`` (problem) and ``500 + that`` (control), so a
-#: group of 500 or more assignments would seed its control ladder a like the
-#: problem ladder a + 500, and one of 1000 or more would meet the next group's.
-#: A guard rather than a wider stride, which would move every converged run's
-#: ladder.
-MAX_ASSIGNMENTS_PER_GROUP = 500
-
-
-def _ladder(problem: tp.SearchProblem, spec: SolveSpec, index: int) -> tp.Ladder:
-    rng = np.random.default_rng(unit_seed(spec, "ladder", index))
+def _ladder(problem: tp.SearchProblem, spec: SolveSpec, kind: str, index: int,
+            group: int) -> tp.Ladder:
+    """The planned ladder of assignment ``index`` in space group ``group``; ``kind`` is
+    ``"ladder"`` (the problem's) or ``"control_ladder"`` (the control's)."""
+    rng = np.random.default_rng(unit_seed(spec, kind, index, group))
     t_top, _ = tp.random_spread(problem, rng, n=spec.n_random)
     return tp.Ladder.planned(t_top, problem.space.n_par, spec.replicas, span=spec.span,
                              step=spec.step)
@@ -270,12 +264,6 @@ def _searches(cost, phase, instrument, priors, groups, composition, units, spec,
             if not assigns:
                 raise SolveRefused(f"the composition has no placement on the site classes of "
                                    f"{g}")
-            if len(assigns) > MAX_ASSIGNMENTS_PER_GROUP:
-                raise SolveRefused(
-                    f"{g} has {len(assigns)} site-class assignments of the composition, "
-                    f"more than the {MAX_ASSIGNMENTS_PER_GROUP} a group may carry (each ladder "
-                    "is seeded by its index, and above that two would share a generator): "
-                    "declare units= or a smaller composition")
             sets = []
             for ai, a in enumerate(assigns):
                 count: dict[str, int] = {}
@@ -291,9 +279,9 @@ def _searches(cost, phase, instrument, priors, groups, composition, units, spec,
                             Radiation.from_instrument(instrument, space.species))
             problem = tp.SearchProblem(space, sc, cost, Clash.build(space, priors))
             control = tp.SearchProblem(space, sc, cost, Clash.build(space, priors.control()))
-            key = 1000 * gi + (ai or 0)
-            out.append(_Search(g, ai, sites, space, problem, control, _ladder(problem, spec, key),
-                               _ladder(control, spec, 500 + key)))
+            out.append(_Search(g, ai, sites, space, problem, control,
+                               _ladder(problem, spec, "ladder", ai or 0, gi),
+                               _ladder(control, spec, "control_ladder", ai or 0, gi)))
     return out
 
 
@@ -774,7 +762,7 @@ def _tempering_engine(*args, **kwargs):
 
 register_engine("tempering", _tempering_engine,
                 "Parallel tempering in direct space over free sites on the Wyckoff classes "
-                "and rigid fragments (S2a): suits a known composition or known fragments.")
+                "and rigid fragments: suits a known composition or known fragments.")
 
 __all__ = ["CHECKPOINT_FORMAT", "CheckpointMismatch", "SolveRefused", "cost_fingerprint",
            "merge_seed_results", "race_assignments", "read_checkpoint", "solve_structure",

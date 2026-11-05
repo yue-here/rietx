@@ -1754,7 +1754,8 @@ ROWS: tuple[Row, ...] = (
                   "Jamieson & Talwalkar 2016, AISTATS"),
         grounds=("Measured: on the NAC composition round 0 was decisive, the deposited "
                  "assignment's J 1.2-1.4 against >= 8.4 for the rest "
-                 "(tests/test_solve_entry.py, the slow race test). Not measured: a "
+                 "(docs/wp/1997-the-direct-space-solver-on-main.md, the 2026-10-31 entry; the "
+                 "slow race test asserts the winner and the RMSD, not J). Not measured: a "
                  "composition-only case where round 0 is close, so that dropping half "
                  "whatever the margin could drop the right assignment, and one seed per "
                  "assignment gives no run-to-run spread to judge a margin against. Racing "
@@ -4055,11 +4056,6 @@ ROWS: tuple[Row, ...] = (
                   "holds that edge on P2_12_12_1: a = b gains isometries beyond the "
                   "general 16, a cell 1e-9 relative from a = b gives the same index, "
                   "and one 5e-3 off gives 16 again")),
-    Row("rietx.solve.workflow.MAX_ASSIGNMENTS_PER_GROUP", "constant", tier=1, value=500,
-        evidence=("arithmetic, not a tuning: a ladder's generator is seeded by 1000*group + "
-                  "assignment and its control ladder by 500 + that (solve/workflow.py "
-                  "_searches), so 500 is the stride's own half-width: above it control ladder "
-                  "a meets problem ladder a + 500")),
     Row("rietx.solve.cost.NAMED_REFLECTIONS", "constant", value=5),
     Row("rietx.solve.cost.NUISANCE_RCOND", "constant", value=1e-12),
     Row("rietx.solve.chemistry.OCCUPANCY_MAX_DENOMINATOR", "constant", tier=3, value=12,
@@ -4897,15 +4893,15 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.solve.workflow.solve_structure:events", "default", tier="invariant", ambiguity=1, value=None,
         evidence=("answer-invariant: an observation channel; tests/test_answer_invariant_defaults.py asserts one solve run's every field but its timings, provenance and spec equal with it on (#562 S2b)")),
     Row("rietx.solve.workflow.solve_structure:cancel", "default", tier="invariant", ambiguity=1, value=None,
-        evidence=("answer-invariant: a cancel token nobody sets; tests/test_answer_invariant_defaults.py asserts one solve run's every field but its timings, provenance and spec equal with it on (#562 S2b)")),
+        evidence=("answer-invariant: a cancel token nobody sets; tests/test_answer_invariant_defaults.py::test_a_recorded_solve_is_the_solve_unrecorded asserts one solve run's every field but its timings, provenance and spec equal with a recorder, a label and a cancel token on, the wrapped token a recorded run hands the engine (#562 S2b)")),
     Row("rietx.solve.workflow.solve_structure:label", "default", tier="invariant", ambiguity=1, value=None,
-        evidence=("answer-invariant: a run's name; tests/test_answer_invariant_defaults.py asserts one solve run's every field but its timings, provenance and spec equal with it on (#562 S2b)")),
+        evidence=("answer-invariant: a run's name; tests/test_answer_invariant_defaults.py::test_a_recorded_solve_is_the_solve_unrecorded asserts one solve run's every field but its timings, provenance and spec equal with a recorder, a label and a cancel token on, the wrapped token a recorded run hands the engine (#562 S2b)")),
     Row("rietx.solve.workflow.solve_structure:telemetry", "default", tier="invariant", ambiguity=1, value=None,
         evidence=("answer-invariant: the run recorder, one run a job; tests/test_answer_invariant_defaults.py asserts one solve run's every field but its timings, provenance and spec equal with it on (#562 S2b)")),
     Row("rietx.solve.engines.SolveSpec:heartbeat_sweeps", "default", tier="invariant", ambiguity=1, value=None,
         evidence=("answer-invariant: the solve_step cadence, an observation read off the running chain and written to the stream; tests/test_answer_invariant_defaults.py asserts one solve run's every field but its timings, provenance and spec equal with it on (#562 S2b)")),
     Row("rietx.solve.engines.SolveSpec:checkpoint_every_s", "default", tier="invariant", ambiguity=1, value=0.0,
-        evidence=("answer-invariant: the shortest interval between two checkpoint writes, read only with checkpoint=; a write is a copy of the engine's state at a rebuild boundary, and tests/test_solve_entry.py asserts an interrupted run resumed from its checkpoint equals the uninterrupted run byte for byte, with the default 0.0 writing at every boundary (#562 S2b)")),
+        evidence=("answer-invariant: the shortest interval between two checkpoint writes, read only with checkpoint=; a write is a copy of the engine's state at a rebuild boundary, and tests/test_solve_entry.py::test_a_throttled_checkpoint_resumes_to_the_same_answer cuts a run at checkpoint_every_s=3600.0, resumes it, and asserts every field but the spec equals the uninterrupted run's, beside the resume tests at the default 0.0, which writes at every boundary (#562 S2b)")),
     Row("rietx.solve.engines.SolveSpec:total_budget_seconds", "default", tier="caller", ambiguity=1, value=None,
         evidence=("off state: None sets no whole-run ceiling; the run ends when its units do. A number is the caller's, a stop it causes is recorded (status 'budget', partial, units_not_run), and no default path passes one")),
     Row("rietx.crystallography.representation.subgroups.maximal:kind", "default", tier=1, ambiguity=1,

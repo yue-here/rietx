@@ -1,4 +1,4 @@
-"""The answer of a structure-solution run (#562 S2b; WP number pending).
+"""The answer of a structure-solution run (#562 S2b; WP-1997).
 
 **A solution is a list.**  :class:`SolutionResult` mirrors
 :class:`~rietx.schemas.indexing.IndexingResult`: ranked

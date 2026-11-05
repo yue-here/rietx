@@ -1,4 +1,4 @@
-"""Parallel tempering over a :class:`~rietx.solve.moves.SearchSpace` (#562 S2a; WP number pending).
+"""Parallel tempering over a :class:`~rietx.solve.moves.SearchSpace` (#562 S2a; WP-1997).
 
 **The energy** of a replica is J = (χ²_data + w·E_clash)/χ²_floor, with χ²_data
 :meth:`~rietx.solve.cost.SolveCost.chi2` at the closed-form scale, E_clash the

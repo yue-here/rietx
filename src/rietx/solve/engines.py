@@ -1,4 +1,4 @@
-"""The solve run's settings and its engine registry (#562 S2b; WP number pending).
+"""The solve run's settings and its engine registry (#562 S2b; WP-1997).
 
 :class:`SolveSpec` is the engine-side settings object, as
 :class:`~rietx.indexing.engines.SearchSpec` is indexing's; its request chair
@@ -44,7 +44,7 @@ import numpy as np
 
 #: Unit kinds in the derived generator seed (:func:`unit_seed`): the position
 #: of each in this tuple is its code, so the tuple is append-only.
-UNIT_KINDS = ("seed", "control", "race", "ladder")
+UNIT_KINDS = ("seed", "control", "race", "ladder", "control_ladder")
 
 
 @dataclass(frozen=True)
@@ -120,9 +120,16 @@ class SolveSpec:
                                 for f in fields(self)})
 
 
-def unit_seed(spec: SolveSpec, kind: str, index: int) -> int:
-    """The generator seed of unit ``index`` of ``kind`` (module docstring)."""
-    ss = np.random.SeedSequence([int(spec.seed), UNIT_KINDS.index(kind), int(index)])
+def unit_seed(spec: SolveSpec, kind: str, index: int, group: int | None = None) -> int:
+    """The generator seed of unit ``index`` of ``kind`` (module docstring).
+
+    ``group`` is the space-group index a ladder belongs to, its own entry in
+    the derived sequence, so ladders of different groups or kinds never share a
+    generator whatever the number of assignments: no stride bounds a group."""
+    entropy = [int(spec.seed), UNIT_KINDS.index(kind), int(index)]
+    if group is not None:
+        entropy.append(int(group))
+    ss = np.random.SeedSequence(entropy)
     return int(ss.generate_state(1, dtype=np.uint32)[0])
 
 

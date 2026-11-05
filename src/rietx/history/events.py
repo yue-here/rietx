@@ -77,7 +77,7 @@ Event kinds (closed set, versioned with the schema):
   evidence shape — added fields and added *units*, no new kind;
 
 * ``solve_start`` / ``solve_step`` / ``solve_end`` — one **structure-solution**
-  run (#562 S2b, WP number pending; ``solve.workflow.solve_structure``).  The
+  run (#562 S2b, WP-1997; ``solve.workflow.solve_structure``).  The
   pair is indexing's for the same reason: a search has no mode, no Rwp and no
   history node.  Its units — a race round of a site-class assignment, a seed,
   a prior-off control seed, and a ``consensus:<space group>`` unit after each

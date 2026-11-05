@@ -20,6 +20,7 @@ import dataclasses
 import inspect
 import json
 import sys
+import types
 import typing
 import urllib.request
 from pathlib import Path
@@ -487,6 +488,25 @@ def test_an_interrupted_run_resumes_byte_identical(acr, acr_run, tmp_path, unit,
     assert again.comparable_json() == whole.comparable_json()
 
 
+def test_a_throttled_checkpoint_resumes_to_the_same_answer(acr, acr_run, tmp_path):
+    """``checkpoint_every_s`` throttles writes and decides nothing a unit computes:
+    cut mid-seed at 3 600 s, resumed, every field but the spec (which holds the
+    throttle) equals the uninterrupted run's.  A throttled run may have no
+    checkpoint of the in-flight seed, which then restarts from sweep 0."""
+    def answer(res):
+        return res.model_dump_json(exclude={"timings", "provenance", "resumed", "spec"})
+    spec = dataclasses.replace(ACR_SPEC, checkpoint_every_s=3600.0)
+    assert spec.checkpoint_every_s != ACR_SPEC.checkpoint_every_s
+    ck = tmp_path / "throttled.ckpt"
+    token = CancelToken()
+    cut = acr.solve(spec, checkpoint=ck, cancel=token,
+                    events=_cancel_at(token, f"seed:{GROUP}:s1", 1500))
+    assert cut.status == "cancelled" and cut.partial
+    again = acr.solve(spec, checkpoint=ck)
+    assert again.resumed and again.status == "done"
+    assert answer(again) == answer(acr_run[0])
+
+
 def test_a_finished_checkpoint_returns_the_run_without_running_it(acr, acr_run, tmp_path):
     ck = tmp_path / "done.ckpt"
     first = acr.solve(_spec(seeds=(0,), control_seeds=(), sweeps=1000, heartbeat_sweeps=250),
@@ -609,15 +629,27 @@ def test_merged_seed_results_equal_the_in_process_run(acr, acr_run, tmp_path):
         wf.merge_seed_results([paths[0], whole.model_copy(update={"chi2_floor": 1.0})])
 
 
-def test_a_group_with_too_many_assignments_is_refused_not_collided(acr, monkeypatch):
-    """Ladder generators are keyed ``1000·group + assignment`` and ``500 +`` that, so
-    the 501st assignment's problem ladder would share a generator with the 1st's control
-    ladder; the run refuses by name before any ladder is built."""
-    monkeypatch.setattr(wf, "site_assignments",
-                        lambda classes, comp: list(range(wf.MAX_ASSIGNMENTS_PER_GROUP + 1)))
-    with pytest.raises(wf.SolveRefused, match="more than the 500 a group may carry"):
-        wf.solve_structure(acr.cost, acr.phase, instrument=acr.ins, priors=_priors(),
-                           composition={"C": 1}, biso=1.0, spec=ACR_SPEC, telemetry=False)
+def test_no_two_ladders_share_a_generator_however_many_assignments(acr, monkeypatch):
+    """A ladder's generator is derived from its kind, its assignment index and its
+    group index, each its own entry of the seed sequence, so a group of 1 584
+    assignments (Ti4 O8 in P-1) or 5 280 (Cu2 S2 O18) cannot meet its control
+    ladders or the next group's.  The old key, 1000·group + assignment and
+    500 + that, put the 501st assignment's problem ladder on the 1st's
+    control ladder."""
+    one = types.SimpleNamespace(sites=[("C", 0)])
+    monkeypatch.setattr(wf, "site_assignments", lambda classes, comp: [one] * 1584)
+    seen: list[tuple[str, int, int, int]] = []
+
+    def spy(problem, spec, kind, index, group):
+        seen.append((kind, index, group, en.unit_seed(spec, kind, index, group)))
+
+    monkeypatch.setattr(wf, "_ladder", spy)
+    out = wf._searches(acr.cost, acr.phase, acr.ins, _priors(), [GROUP, GROUP],
+                       {"C": 1}, None, ACR_SPEC, 1.0)
+    assert len(out) == 2 * 1584 and len(seen) == 2 * len(out)
+    assert {k for k, *_ in seen} == {"ladder", "control_ladder"}
+    assert len({(k, i, g) for k, i, g, _ in seen}) == len(seen)
+    assert len({sd for *_, sd in seen}) == len(seen), "two ladders share a generator"
 
 
 # ===================================================================================
