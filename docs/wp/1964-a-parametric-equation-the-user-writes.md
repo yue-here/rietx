@@ -393,13 +393,21 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
     flag, such as `rx.Parameter(per_pattern=True)` or a TOPAS-like `local`. Decisions (a)
     and (b) and consent items 1-6 of the first entry still stand unanswered. Reader output:
     expression fits now carry `parametric_form` entries and the three warnings above.
+  - *Decided (Yue, 2026-11-05), (c).* A per-pattern variable is declared by naming its
+    `vars.<name>` path in `SharingMap.per_histogram`, matched as an **ordinary glob** like
+    every other path there. The proposal's extra refusal of a glob that reaches `vars.*` is
+    dropped: `vars.*` or `vars.dT_*` makes those variables per-pattern, as written. Grounds:
+    `SharingMap` is the one place a joint fit says what is shared, `rx.Parameter` carries no
+    sharing field, and one matching rule is what an agent calling rietx learns from the docs
+    and error messages; the exception guarded a mistake only a glob starting `*` or `vars.`
+    could make. Task 11 builds on this; the current "a variable is one number" refusal goes.
   - *Task 15, the skill.* The series reference's parametric row now names `basis="expression"`
     and `variables=`. It grew 23 B and sits 16 B under its budget. The synced copies follow.
   - *Fast selection* at 93518e01f, `[dev,jax,torch]`, darwin/arm64, through ghostshift's
     `serial.py`: 14471 passed, 51 skipped, 36 xfailed, 0 failed (18:49). The total is 35 above
     the last entry's at 84fa4cb02, and this session added four tests; the rest is the
     second session's later commits and a different skip set, not reconciled here.
-  - *Next.* Task 11 once (c) is answered, then 13 and 14.
+  - *Next.* Task 11 (decision (c) answered above), then 13 and 14.
 
 - **2026-11-05 (second build session, a ghostshift runner)** — Tasks 7 and 8 landed, and
   the fast selection's three reds from the first session are fixed. Branch
