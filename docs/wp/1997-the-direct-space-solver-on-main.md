@@ -1,6 +1,6 @@
 # WP-1997 — the direct-space solver on main: site classes, kernels, chemistry, engine and entry point
 
-Milestone: structure-solution · Status: 🔄 2026-10-24 — the site classes (PR #1013), the solve kernels' crate source (PR #1015) and the chemistry terms (PR #1016) landed from outside; the `kernels-v1.4.0` tag, the engine and the entry point remain
+Milestone: structure-solution · Status: 🔄 2026-11-05 — the site classes (PR #1013), the solve kernels' crate source (PR #1015) and the chemistry terms (PR #1016) landed from outside; `rietx-kernels` 1.4.0 is published and the floor raised (PR #1419); the engine and the entry point remain
 Depends on: 1902 (shipped, the cost); 1901 soft (the map, needed only by completion); 1940 (shipped, the kernel crate)
 Priority: P2 2026-10-17 — a feature the open milestone was opened for, and three outside PRs (#1013, #1015, #1016) wait on this number
 
@@ -135,7 +135,7 @@ Each item is one PR off `main`. Check off as they land.
 - [x] Site classes (#1013): `crystallography/site_classes.py`, `site_classes()`,
       `site_assignments()`, an exact count and a named refusal past
       `MAX_SITE_ASSIGNMENTS`, checked across all 564 gemmi settings
-- [ ] Solve kernels (#1015): `kernels/src/solve.rs`, rietx-kernels 1.4.0, three
+- [x] Solve kernels (#1015): `kernels/src/solve.rs`, rietx-kernels 1.4.0, three
       entry points in `model/compiled.py`, `tests/test_solve_kernels.py`; after
       merge, the `kernels-v1.4.0` tag
 - [x] Chemistry terms (#1016): `solve/chemistry.py`, `Composition`, the
