@@ -1,6 +1,6 @@
 # WP-1944 — the structural plan frees extinction only where it says it does
 
-Milestone: unscheduled · Status: 🔄 2026-11-04 — option A built; PR #1391 ready for review, two questions for the maintainer
+Milestone: unscheduled · Status: 🔄 2026-11-05 — option A merged in PR #1391, schema 0.61 in PR #1415; PR #1412 applies the 2026-11-04 ruling and closes the WP
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-11 — a plan frees a parameter its description says it leaves alone, and the esd shows the data cannot see it; nothing fires
