@@ -147,7 +147,7 @@ rule above applies to the form factors.
   the forward difference kept for such a start), the evidence that choice owes, and whether a
   solve reaches the branch unconditionally or through a visible option. These are magnetic-path
   decisions, Michael's since #1075 (Yue's offer 2026-11-03, accepted 2026-11-04, which names
-  #1404 as his next ruling). The issue's comment of 2026-11-04 adds a condition: the escape must
+  #1404 as the next ruling). The issue's comment of 2026-11-04 adds a condition: the escape must
   also reach the modulus profile's refits and a start exactly on the direction. The issue's own
   numbers run on the PR's head, so they were not re-run in this triage. On main at `541f0daf7`
   there is no `moment_angles` keyword yet. Nothing here waits on Yue, except a stored-format or
