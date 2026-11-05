@@ -1,6 +1,6 @@
 # WP-2017 — The second pass: every surviving tier-3 threshold measured on three families
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-05 — claimed by @yue-here
 Track: The audits
 Depends on: 2002
 Priority: P2 2026-10-23 — 2002 closed with the width twin hold; the evidence every tier-3 approval in the single-fit audit was granted on the promise of, now with 2002's two owed domain tests
