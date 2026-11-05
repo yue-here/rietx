@@ -3220,9 +3220,7 @@ ROWS: tuple[Row, ...] = (
                   "validate, FAP and NAC verify): 30 and 1000 on the four families and nine hard starts: bit-"
                   "identical everywhere; read on cpd-1a's starts alone, 3 to 14 reads a fit; lambda climbs in "
                   "decades, so 30 and 100 fire on one trial"),
-        grounds=("A solver-path switch no refiner has a view on. The refits B10 asked for measured nothing, "
-                 "since no family met it (ruled 2026-10-20; WP-2017 group A). It stays at tier 3 unproven, and"
-                 " a fit that fires it would test it."),
+        grounds=("A solver-path switch no refiner has a view on. The refits B10 asked for barely met it, on one family at most (ruled 2026-10-20; WP-2017 group A). It stays at tier 3 unproven, and a fit that exercises it on three families would test it."),
         approved="2026-10-19"),
     Row("rietx.optimize.lm._CURVATURE_STEP", "constant", tier=1, value=0.0001220703125,
         evidence=("arithmetic: eps^(1/4) balances the difference's truncation (h^2 S''''/12) "
@@ -3275,8 +3273,7 @@ ROWS: tuple[Row, ...] = (
                   "validate, FAP and NAC verify): 5 and 20: no accepted step on the four families' shipped "
                   "starts reached r_u 5 (largest 1.51). With cell lengths +1 % and +3 % and with zircon "
                   "declared, the only start reaching the answer that met it is cpd-1a with zircon, under its "
-                  "0.0055 esd noise. Fails on NAC +3 %, which misses the answer on every arm: 20 loses NAC, Rwp"
-                  " 0.139 to 0.794, MODEL_FAR_FROM_DATA"),
+                  "0.0055 esd noise. Fails on NAC +3 %, which misses the answer on every arm: 20 loses NAC, Rwp 0.139 to 0.794"),
         grounds=("A constant that decides where a solve stops, taken from the paper that defines the "
                  "algorithm, which did not validate it on rietx's problems. The refits B10 asked for gave one "
                  "answer on every start that reached the answer (ruled 2026-10-20; WP-2017 group A), so it "
@@ -3326,9 +3323,8 @@ ROWS: tuple[Row, ...] = (
                   "once, on FAP (largest Q 4), 3.2e-7 plain esd, 0.98x evaluations; 7 never read past the "
                   "shipped path"),
         grounds=("A constant that decides where a solve stops, taken from the paper that defines the "
-                 "algorithm, which did not validate it on rietx's problems. The refits B10 asked for measured "
-                 "nothing, since no family met it (ruled 2026-10-20; WP-2017 group A). It stays at tier 3 "
-                 "unproven, and a fit that fires it would test it."),
+                 "algorithm, which did not validate it on rietx's problems. The refits B10 asked for barely met it, on one family at most (ruled 2026-10-20; WP-2017 group A). It stays at tier 3 "
+                 "unproven, and a fit that exercises it on three families would test it."),
         approved="2026-10-20"),
     Row("rietx.optimize.lm._Q_WINDOW", "constant", tier=3, value=10,
         evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9) (docstring; WP-0601 restates it; "
@@ -3338,9 +3334,8 @@ ROWS: tuple[Row, ...] = (
                   "identical everywhere, largest Q 4 against the 5 lambda/10 needs; 5 could never pass the "
                   "shipped trigger"),
         grounds=("A constant that decides where a solve stops, taken from the paper that defines the "
-                 "algorithm, which did not validate it on rietx's problems. The refits B10 asked for measured "
-                 "nothing, since no family met it (ruled 2026-10-20; WP-2017 group A). It stays at tier 3 "
-                 "unproven, and a fit that fires it would test it."),
+                 "algorithm, which did not validate it on rietx's problems. The refits B10 asked for barely met it, on one family at most (ruled 2026-10-20; WP-2017 group A). It stays at tier 3 "
+                 "unproven, and a fit that exercises it on three families would test it."),
         approved="2026-10-20"),
     Row("rietx.optimize.lm._ROW_ROUNDING", "constant", tier=1, value=1e-12,
         evidence=("numerical floor: rounding of the row's own evaluation, 4.5e3 eps, seven decades "

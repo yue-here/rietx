@@ -116,6 +116,7 @@ from tests import test_window_domain as w  # noqa: E402
 from tests.test_staged_start_invariance import _axial_pair_ordered  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
+# The two JSONL files are not committed; the 2026-11-05 rows sit in ~/.cache/rietx/wp-2017/.
 JSONL = HERE / "group_a.jsonl"
 SUMMARY = HERE / "group_a_summary.md"
 HARD_JSONL = HERE / "group_a_hard.jsonl"
@@ -603,7 +604,7 @@ def _run(pool, func, tasks, done, read, path: Path = JSONL) -> None:
 
 def _polish_read(row: dict, shipped: dict, base: dict | None) -> dict:
     """A polished row against the shipped arm and the polished shipped arm."""
-    versus = {"to_shipped": w._shift(row["rows"], _axial_pair_ordered(
+    versus = {"to_shipped": w._shift(_axial_pair_ordered(row["rows"]), _axial_pair_ordered(
         shipped["rows"]), background=False)}
     if base is not None and "error" not in base:
         versus["to_shipped_polished"] = w._shift(row["rows"], base["rows"], background=False)
