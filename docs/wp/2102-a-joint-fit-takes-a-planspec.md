@@ -40,10 +40,10 @@ types share. What they skip is `resolve_plan`'s mode substitution, and neither h
 ## Tasks
 
 - [x] Route `fit` through `resolve_plan`, passing `mode`, and widen the annotations.
-- [ ] Route both `report` sites through it with `result_.mode`. Check whether a report
+- [x] Route both `report` sites through it with `result_.mode`. Check whether a report
   on a Le Bail or Pawley result changes, since the substitution then applies. If it
   does, that is a reader-output change and goes to the maintainer.
-- [ ] Test: a `PlanSpec` and the `RefinementPlan` it converts from give bit-identical
+- [x] Test: a `PlanSpec` and the `RefinementPlan` it converts from give bit-identical
   answers on `refine_multi`.
 - [ ] Grep for a fourth site and say in the handover what was checked.
 - [ ] Skill: "none" and why, unless the skill names the limit.

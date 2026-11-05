@@ -1757,7 +1757,8 @@ class MultiHistogramRefinement:
         :meth:`RefinementResult.for_histogram`, its compiled model and values
         for Layers 1-2, exactly as :meth:`Refinement.report
         <rietx.refine.Refinement.report>` asks them of a single fit.  ``plan``
-        supplies the Layer-2 strategy veto.
+        supplies the Layer-2 strategy veto: a plan, its ``PlanSpec`` or a
+        preset name, read as :meth:`fit` reads it.
 
         The specimen has one crystallite size (WP-1131), and the report says
         it once.  Its microstructure block is the joint result's, read off the
