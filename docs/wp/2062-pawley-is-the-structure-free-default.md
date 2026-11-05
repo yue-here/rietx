@@ -159,6 +159,15 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
+- **From WP-1542, 2026-11-05: whether a Le Bail result's final compile should
+  re-partition. Decide it or retire it with this move.** `_final_compile` carries the
+  intensities onto the result's windows without a partition. A one-channel window
+  change then splits a near-overlap differently, which reads 1.6 σ on #740's pattern
+  until the next partition. Re-partitioning closes that gap. It would also change the
+  numbers of every Le Bail fit, and its cost is unmeasured. WP-1542 made no code
+  change, settled by Claude under Yue's delegation of 2026-11-05. The grounds: the
+  change moves every Le Bail fit for a method leaving the default.
+
 - **From WP-1542, 2026-11-05: under TRF a Pawley fit reads its seed on FAP.** With
   `solver="trf"` a 3-cycle seed stops at Rwp 8.17 % and a 300-cycle seed reaches 7.87 %
   (LM 7.86 % from either), 8.8 esd apart. LM reads nothing of the seed on the four

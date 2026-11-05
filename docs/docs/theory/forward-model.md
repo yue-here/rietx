@@ -87,7 +87,7 @@ counts:
 
 {source}`rietx.model.forward._settled_partition`
 
-Here $A_k$ is the counts a unit intensity lays on the pattern, and tol is
+Here $A_k$ is the counts a unit intensity lays on the pattern, and $\mathrm{tol}$ is
 `Stage.lebail_tol`. The weight matters because a reflection falling to its floor
 shrinks by a constant fraction of itself per cycle for as long as it lives. An
 unweighted largest relative change would therefore never end.
@@ -97,9 +97,9 @@ Equation {eq}`fm-lebail` is a Richardson-Lucy step
 Poisson likelihood {cite}`shepp1982`. Such a step slows to a linear rate near 1
 where reflections overlap, so plain repetition needs thousands of cycles on a
 dense pattern. rietx accelerates it with SQUAREM, scheme S3 {cite}`varadhan2008`.
-Two cycles set a steplength, an extrapolation lands near the fixed point, and a
+Two cycles set a step length, an extrapolation lands near the fixed point, and a
 third cycle starts from the landing. A landing below the starting likelihood is
-dropped for the plain second cycle. The steplength is bounded, starting at 1. The
+dropped for the plain second cycle. The step length is bounded, starting at 1. The
 bound grows fourfold after a kept landing that met it and shrinks fourfold after
 a dropped one, which is the rule of the SQUAREM package. The acceleration changes
 the path and leaves the fixed point where it was, and an exact overlap keeps the
@@ -107,7 +107,7 @@ ratio it started with. At $\mathrm{tol} = 0$ the cycles are plain and their numb
 is fixed.
 
 The stop reads how fast the intensities move. It does not read how far they still
-have to go. Two reflections the data barely separate can stand still at tol and
+have to go. Two reflections the data barely separate can stand still at $\mathrm{tol}$ and
 exchange intensity over thousands of further cycles. On fluorapatite one such pair
 lies $10^{-4}$ Å apart, and the exchange moves the curve by 1.2 σ at that peak and
 the refined parameters by 0.001 esd.

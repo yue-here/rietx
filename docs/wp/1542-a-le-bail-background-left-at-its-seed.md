@@ -1,9 +1,8 @@
 # WP-1542 — a Le Bail background left at its seed
 
-Milestone: unscheduled · Status: 🔄 2026-11-05 — tasks 1-7 landed (PRs #1357, #1394, #1434); three questions wait on the maintainer on PR #1434, then this WP closes
+Milestone: unscheduled · Status: ✅ 2026-11-05 — tasks 1-7 landed (PRs #1357, #1394, #1434); PR #1434's three questions settled by Claude under Yue's delegation of 2026-11-05
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-11-01 — was P2: WP-2062 moves every site where rietx picks a structure-free fit to Pawley (decided 2026-11-01), so no default path will run Le Bail; a caller who picks `mode="lebail"` still meets this
 
 ## Goal
 
@@ -46,150 +45,6 @@ ambiguity 1, measured on five families of six patterns (#740 synthetic, corundum
 NAC, FAP, BT-1 LaMnO3) against a 1e-10 reference and #740's true structure, failing on
 FAP. `lebail_cycles` is answer-invariant by a measured 2× margin. SQUAREM S3 and its
 factor are named practice, tier 2 (Varadhan & Roland 2008 and their R package).
-
-### Inherited
-
-- **2026-11-05, from WP-2076: what the Le Bail partition does to weak lines, measured.** A line with no
-  neighbour takes Σ net / Σ Ω over its whole window, with `net` clamped at zero per channel, so a weak or
-  forbidden line takes rectified noise and shows as a false peak. On an F m -3 m row the reference
-  calculates 408 counts where 250 were observed, and the background sits about 10 counts low at high
-  angle (160 against Pawley's 171). A signed net lowers χ² from 9854 to 4117 and does not restore
-  nesting. WP-2076 § Findings.
-
-- **2026-11-02, from WP-2062: no default path will run Le Bail.** The
-  maintainer decided on 2026-11-01 that Pawley replaces Le Bail at the
-  extinction screen, the GUI's Adopt and new-project wizard, and the prose
-  that says "Le Bail before Rietveld", after Pawley's known bugs are fixed.
-  This WP's decision 4 there said this WP drops a rung once that holds, so
-  its Priority line now reads P3. The failure here still reaches a caller
-  who picks `mode="lebail"`, and Pawley's own seed partition
-  (`refine.py:4404-4411`) is one Le Bail pass.
-
-- **2026-10-27, from WP-2011 and WP-2062: every surveyed program re-extracts
-  Le Bail intensities inside the refinement, and rietx does not.** GSAS-II
-  re-extracts once per least-squares iteration (`GSASIIstrMath.py:4808`,
-  checked), FullProf once per cycle (ran), and TOPAS, RIETAN-FP and MAUD
-  likewise (`docs/practice.md` § Structure-free fitting). rietx partitions
-  `lebail_cycles` times before each solve and never inside one. That is a
-  candidate cause beside the background for issue #740's plateau. WP-2062's
-  decision 0 (repair Le Bail by re-extracting per iteration, or use Pawley
-  where rietx picks the method) and its decision 4 may move this WP's
-  priority. The indexer's validation is Pawley since WP-2011, so a Le Bail
-  background no longer reaches `index_pattern`.
-
-- **2026-10-24, from WP-2039: a model's starting background is now drawn before a fit.**
-  `data.plot(model=ref)` draws the background at its starting values, dashed, over the
-  channels a fit would use (`viz.plots._starting_model`). An `auto_background()` model
-  starts its P-spline at zero and its air-scatter term at 0.001, so the figure shows a
-  dashed line along zero: a seed left unset is visible before any fit runs. Usable as the
-  picture this WP's report points to.
-
-- **2026-10-16, from the issue triage (#726): a second case where the seeded
-  `profile_only` prefit was not enough.** The 2026-10-11 PbSO₄ neutron entry
-  below now has a companion: #726's comment of 2026-10-15, on a lab
-  Bragg-Brentano pattern with a steep background. The facts and the reporter's
-  PR offer are in WP-1910's Inherited section. Read it beside the
-  seed-versus-SNIP measurement task.
-
-- **2026-10-11, from the issue triage (#726, the reporter's comment of
-  2026-10-11 09:56Z): the extinction screen's shared fit does not seed the
-  background, and on a neutron pattern it never recovers.** Checked at
-  d80ca5f4: `determine_extinction_symbol` calls `seed_widths(ins, peaks)` and
-  nothing else on the instrument (`indexing/extinction.py:714-716`), so the
-  background stays where the caller's instrument has it. That answers the
-  2026-10-07 entry below for the screen. The indexer's `validate_by_lebail`
-  is a separate path and is still unmeasured. The reporter's case, not
-  re-run here: the PbSO₄ D1A histogram of `tests/data/gsas2_pbso4.gpx` with
-  `constant_wavelength_neutron`'s all-zero Chebyshev, `validation_plan`
-  replayed in `P m m m`. After the `bkg` stage the background sits at 3.6
-  counts (median, 10-30°) where the data sit at 200. Rwp is 0.58 there and
-  0.35 once the widths are freed, with `w` going from 0.21 to 1.37 deg². Le
-  Bail then hands the pedestal to every reflection, including (0,0,1), (1,0,0)
-  and (0,1,0), which Pnma forbids. On the reporter's reading, each class is
-  then scored by how many reflections it has left to carry the background.
-  Task 4 should add this pattern beside the hump and high-pedestal fixtures.
-  On the X-ray histogram, seeding the background flipped the screen to a
-  wrong class (WP-1910's Inherited, reproduced), so a seed alone does not
-  fix this pattern.
-
-- **2026-10-08, from the second issue triage (issue #833): a second voice
-  for #725's default.** #833's third item asks for `auto_background(seed=True)`
-  as the default, beside a REML-chosen P-spline λ and a
-  `BACKGROUND_ORDER_AT_CAP` finding, which are WP-1931's. No new evidence
-  for the seed itself; the 2026-10-05 entry's "whether a default changes is
-  the maintainer's" still stands, now asked by two issues.
-  Decided 2026-10-08: the default stays `seed=False` until task 4 has
-  measured the seed beside the SNIP-held protocol; the choice is made then,
-  from those numbers.
-
-- **2026-10-08, from the issue triage (issue #740): a second case of this
-  WP's failure, with a sharper reading of its mechanism.** The reporter's
-  synthetic LaMnO3-like Pnma pattern (CW neutron, 2.4 Å, background
-  300 + 2·2θ) at the true cell and profile, background free and seeded at the
-  10th percentile of y (SKILL.md §2 rule 5), gives Rwp 1.62 % under one Le Bail
-  stage at 100 or 400 `lebail_cycles`, against 1.09 % for the Rietveld fit
-  of the true structure and 1.06 % for Pawley. The deficit is at 90-150°, where
-  the weak dense reflections sit. The reporter's open question was whether the
-  EM partition or its weights cause it. A probe points away from
-  both: the Le Bail intensities are partitioned at stage start against the
-  *seed* background (the same point as the 2026-10-05 entry above), and
-  re-partitioning on the fitted background closes the gap. The mechanism
-  (intensities absorbing the seed's deficit where reflections are dense) is
-  the reading the numbers fit, not something the probe isolated.
-  Measured: after the one stage the fitted background sits at 0.88 of the
-  true one at 100° and 0.95 at 140° (0.99 at 20° and 60°), and the residual rms
-  by 20° band, starting at 10°, is 0.94 0.89 0.97 1.07 1.85 2.34 1.74. Two
-  stages in a row (100 cycles each, so the second partitions on the background
-  the first fitted) end at 1.18 %, three at 1.10 % with bands 0.94 0.87 0.94
-  1.04 1.01 1.16 1.05. One stage seeded at the Rietveld fit's own background
-  ends at 1.09 %. The seed here is 346 counts against a true background of
-  580 at 140°. This differs from the case 1542 was filed on
-  in one respect: there the free intensities absorbed a hump and Rwp *fell*;
-  here a low pedestal seed leaves Rwp *above* the structure's, so the finding
-  1542 task 3 designs should fire on the background having moved a long way
-  from its seed across stages, not only on a width growing. It also sharpens
-  task 4: the comparison of protocols should include "partition again after
-  the background solve", since a second stage does it for free.
-  Not tested: the reporter's second observation, that a `profile_only` run on
-  the pattern's own passes rises 1.72, 1.81, 1.82, 1.82 %. It is the same
-  seed in the first pass, but the rise across passes was not reproduced.
-  Checked against the tree at 5d1f5f67: reproduced to the digit. Rietveld
-  0.0109; Le Bail 0.0456 / 0.0163 / 0.0162 at 3 / 100 / 400 cycles; Pawley
-  0.0106 (the reporter's script, 5 s on this machine). `lebail_update` runs at
-  stage start (`refine.py:3565`, on `table.x0()`) and after the solve
-  (`refine.py:3864`); the reported Rwp equals the one recomputed from the
-  returned `y_calc` (0.0163 both). No other open WP owns
-  it: 1323 (the stop rule) is shipped, 1511 chooses between cells and 1545 is
-  the notebook that reproduces the 03 case.
-
-- **2026-10-05, from the issue triage (issue #725): a second user asks for
-  §2 rule 5 as `auto_background`'s default, and the proposed default is the
-  start of this WP's own failure.** The proposal: `auto_background(data, …,
-  seed=True)` sets the Chebyshev constant term, or every P-spline
-  coefficient, to a low percentile of y_obs over the fitted range; `seed=False`
-  keeps today's zeros; the skill rule becomes "seed it yourself only for a
-  hand-built background". Not proposed: seeding inside the Le Bail stage.
-  Evidence: a CW neutron showcase run (λ ≈ 2.4 Å, FWHM ≈ 0.5°) whose unseeded
-  first pass sent every TCHZ term to its bound and whose seeded run did not;
-  not reproduced on lab silicon by the reporter. *Checked at `32ef5a6`*:
-  `auto_background` returns all-zero coefficients for both kinds (15 P-spline
-  and 5 Chebyshev on the issue's silicon, 5th percentile 893 counts), and the
-  first `lebail_update` runs at stage compile on `y_obs − 0`. *Superseded in
-  part 2026-11-03: the seed landed as an opt-in (PR #744), and task 4 measured it.* Task 4 should
-  measure this seed beside the SNIP-held protocol, on the hump fixture and a
-  high-pedestal one. Whether a default changes is the maintainer's.
-- **2026-10-13, from the issue triage (#725): the showcase pattern cannot be
-  shared, and the PbSO₄ neutron histogram is offered instead.** Posted
-  2026-10-12: the run where the TCHZ terms went to their bounds is not the
-  reporter's to share, and they offer the CW neutron histogram of
-  `tests/data/gsas2_pbso4.gpx` as task 4's public high-pedestal case, beside
-  #744's synthetic. Checked against the tree at c3d0367: the file holds
-  `PWDR PBSO4.CWN Bank 1` (λ = 1.909 Å, the reporter's "D1A") and
-  `PWDR PBSO4.XRA Bank 1`. It shows the pedestal going to the reflections
-  (the 2026-10-11 entry from #726 above), not TCHZ terms reaching their bounds,
-  so it is a fixture for task 4 and not a reproduction of that run.
-
-- **From WP-2002 (2026-10-19, PR #1050).** Batch class B11. GSAS-II's stand-alone `DoLeBail` runs 10 cycles by default (`GSASIIstrMain.py:761`), and FullProf's manual says "a few cycles (say 10)". On #740's pattern the Le Bail fit plateaus at Rwp 1.62 % from 100 to 400 cycles, against 1.09 % for the true structure (`2002-batch/i740.json`). More cycles close the 4.56 % to 1.62 % gap and not the rest. The batch proposed a converge-with-cap cycle rule inside this WP. *Ruled 2026-10-19: agreed. It is task 7, added 2026-11-05.*
 
 ## Non-goals
 
@@ -249,6 +104,42 @@ no finding, by the maintainer's ruling of 2026-11-03 on Q1.
   `rietx.background.estimators` cites it.
 
 ## Handover log
+
+- **2026-11-05** — ghostshift runner, closing entry on PR #1434. This WP closes. The
+  Le Bail code stands as the entry below describes it. The three questions that entry left open are settled
+  by Claude under Yue's delegation of 2026-11-05 ("use your best judgement. we should be
+  moving away from le bail to pawley as default anyway"). None of them is a ruling of
+  Yue's.
+
+  *Settled by Claude under Yue's delegation of 2026-11-05.*
+  1. `lebail_tol` = 1e-7 stays at tier 3, with FAP as the stated failing case and
+     LaMnO3's 150× cost named. The `approved` dates of `StageSpec:lebail_tol` and
+     `SCREEN_LEBAIL_CYCLES` move to 2026-11-05, because ruling B11 covered neither the
+     number nor the screen's exemption. The alternative was 1e-8, which more than
+     doubles LaMnO3's cycles and leaves FAP at 0.55.
+  2. Every line under the PR's *What a reader receives* stays.
+  3. `_final_compile` does not re-partition, and no code changed. The grounds: it would
+     change every Le Bail fit's numbers for a method leaving the default, and its cost
+     is unmeasured. The question, with the 1.6 σ on #740 and its cause, moved to
+     WP-2062's `### Inherited`, to be decided or retired with that move.
+
+  *Done.* Main merged. The conflict in WP-2017 kept main's rewritten list preamble and
+  folded this WP's entry into its group Q. Main had already moved the WP-2054 entry there
+  into group P, so that bullet was not kept twice. Four Vale spelling errors in
+  `theory/forward-model.md` are reworded, and the term list is unchanged.
+
+  *Closed and moved.* The `### Inherited` section is deleted. Its open remainders have
+  owners: the seed and SNIP on PbSO₄ and #726 in WP-2017 group Q, #726's facts in WP-1910,
+  the partition's weak-line finding in WP-2076 § Findings, and per-iteration
+  re-extraction in WP-2062's decision 0. The narrative is in `docs/milestones/v1.12.md`.
+
+  *Reader output.* `python -m tests.reader_output` exits 0 on the merged tree. The
+  fields and the warning in the PR's section are the ones settled in call 2.
+
+  *Counts.* See the PR's *Gates* section for the merged tree's runs.
+
+  **Next.** None here. WP-2062 retires `SCREEN_LEBAIL_CYCLES` and decides the re-partition
+  question. WP-2017 weighs `lebail_tol` and `LEBAIL_GAP_CYCLES` in group Q.
 
 - **2026-11-05** — ghostshift runner, PR #1434. A Le Bail stage no longer stops
   after three cycles. It repeats its partition until one cycle moves less than

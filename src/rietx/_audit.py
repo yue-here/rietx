@@ -2393,8 +2393,10 @@ ROWS: tuple[Row, ...] = (
                   "test_extinction_gate.py (WP-1542, 2026-11-05); no stated source for the 3"),
         grounds=("Kept until WP-2062 moves the screen to Pawley, as the row it comes from was "
                  "kept until WP-1542 (B11, ruled 2026-10-19); re-measuring the screen's margins "
-                 "for a method it is about to leave buys nothing."),
-        approved="2026-10-19"),
+                 "for a method it is about to leave buys nothing.  B11 did not exempt the "
+                 "screen: the exemption was settled by Claude under the maintainer's delegation "
+                 "of 2026-11-05, and the date is that settlement's."),
+        approved="2026-11-05"),
     Row("rietx.indexing.extinction.REFERENCE_NET_RWP_MAX", "constant", tier=3, value=0.7071,
         evidence=("Statistic: Toby (2006)'s background-subtracted Rwp over the picker's "
                   "envelope (the envelope is rietx's own). Right or nearly right cells read "
@@ -4578,12 +4580,13 @@ ROWS: tuple[Row, ...] = (
                   "1.0-2.1x on six patterns and 150x on LaMnO3 (0.45 s to about a minute); "
                   "tests/test_lebail_cycles.py, WP-1542, 2026-11-05, macOS arm64"),
         grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
-                 "judged against the true structure; the date is that rule's, and the number "
-                 "and its failing case are WP-1542's, put to the maintainer on its PR.  No "
+                 "judged against the true structure.  The number, FAP as its failing case and "
+                 "LaMnO3's 150x cost were settled by Claude under the maintainer's delegation "
+                 "of 2026-11-05, and the date is that settlement's.  No "
                  "surveyed program stops on the intensities at a fixed model, because each "
                  "extracts inside the solve (docs/practice.md); 1e-8 leaves FAP at 0.55 and "
                  "more than doubles LaMnO3's cycles."),
-        approved="2026-10-19"),
+        approved="2026-11-05"),
     Row("rietx.schemas.plan.StageSpec:seed", "default", tier="caller", ambiguity=1, value=0.0,
         evidence=("opt-in: Stage.seed > 0, default 0; the one shipped seed is "
                   "strategy.staged.ROUGHNESS_SEED's 0.3")),
