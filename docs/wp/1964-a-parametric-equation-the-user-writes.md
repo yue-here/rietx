@@ -350,6 +350,38 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
 
 ## Handover log
 
+- **2026-11-05 (second build session, a ghostshift runner)** — Tasks 7 and 8 landed, and
+  the fast selection's three reds from the first session are fixed. Branch
+  `wp1964-equations`, no PR.
+  - *Task 7, the chained column.* `_chained_columns` in `optimize/least_squares.py` groups
+    the peak-chain columns by the physical rows they move. Where a group's block of
+    `local_jacobian` has lower rank than its column count, one directional pass per basis
+    direction serves the group, J_cols = D·X, with the step sized on the moved rows. A
+    group of independent columns, a lone column included, keeps `_peak_chain_column`, so an
+    untied model is bit-identical. The rank cut `_CHAIN_RANK_RTOL` = 1e-10 has an audit row.
+  - *Measured* (`t7_probe.py` in the runner's scratch; joint LaB₆ ramp of
+    `tests/test_parametric_series.library`, `mccusker_default`, `[dev,jax,torch]`,
+    darwin/arm64). At 6 patterns the peak-chain passes fell from 1152 to 804 and the fit
+    from 1.12 s to 0.94 s. At 14 patterns they fell from 2828 to 1988 and the fit from
+    2.44 s to 2.15 s. Every parameter landed within 2.3e-7 esd (6) and 7.4e-7 esd (14) of
+    the per-column answer, against the 0.01 esd bar. Esds moved by 6.3e-6 relative at most.
+    Single runs, so the wall times are indicative.
+  - *Task 8, the preview.* `MultiHistogramRefinement.preview_equations()` returns one
+    `EquationPreview` per equation with a target: values at the start, non-finite and
+    out-of-bounds patterns, and the variables, coordinates and intermediates it resolved
+    to. Linear equations are covered too. The manual has a section in
+    `reference/parametric.md`, so the names are documented, not deferred.
+  - *Reds fixed.* The chained column called `np.linalg.svd`/`lstsq` on the fit path; they
+    go through `optimize.lapack`. `expression.py`'s six constants had no audit rows; they
+    have rows now (four `invariant`, two tier 1), and the `generality-review` agent has not
+    yet read them. The skill's `api.md` was stale from task 5's `variables=`.
+  - *For the maintainer.* `preview_equations` and `EquationPreview` are new reader output
+    (memory rule: reader-output changes go to Yue before merge). Decisions (a) and (b) of
+    the first entry stand unanswered.
+  - *Next.* Task 10, the result: variable rows in `result.parametric`, an expression
+    evaluated through its gradient, and the three inherited readers (§ Inherited, 2026-10-14).
+    Then 9, 11-15.
+
 - **2026-11-05 (first build session, a ghostshift runner)** — Tasks 1-6 landed: the grammar,
   the parser and tree, evaluation and exact derivatives, the block on `ParameterTable`,
   variables on a joint fit, and one equation feeding another. Branch `wp1964-equations`, no
