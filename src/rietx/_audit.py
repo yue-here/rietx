@@ -929,7 +929,9 @@ ROWS: tuple[Row, ...] = (
     Row("PARENT_STRAIN_HELD", "code", tier=3, ambiguity=1,
         evidence=("info; fires when a stage frees a Phase.parent_cell phase's cell edges while a "
                   "strain stays held: phases.*.cell.* reaches the edges and never a strain, since "
-                  "a strain at exactly zero has no gradient to leave it by (test_parent_cell.py)"),
+                  "zero is a stationary point of a strain while the child's atoms and moments keep the "
+                  "parent's symmetry, and a distortion gives it only a small gradient there "
+                  "(test_parent_cell.py)"),
         grounds=("The glob's choice to leave a strain held is the package's own act, so it is said "
                  "out loud with the held paths and the verbs that free them; Yue ruled the hold "
                  "stays and is reported (PR #1108, 2026-10-27), naming a dissenting refiner who "

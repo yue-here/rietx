@@ -511,9 +511,11 @@ def test_esds_reach_the_child_cell_through_the_block():
 # ---------------------------------------------------------------------------
 # a freed strain recovers a planted one
 # ---------------------------------------------------------------------------
-#: the planted shear, and the seed a freed strain starts from: a strain sits on
-#: a stationary point of the pattern at zero (below), so it is moved off it
-#: before it is freed, as ``Stage.strain_seed`` moves a Stephens block
+#: the planted shear, and the seed a freed strain starts from: while the child's
+#: atoms keep the parent's symmetry, as this fixture's do, a strain sits on a
+#: stationary point of the pattern at zero (below), and a distortion gives it only
+#: a small gradient there, so it is moved off zero before it is freed, as
+#: ``Stage.strain_seed`` moves a Stephens block
 PLANTED = 0.004
 SEED = 0.001
 
