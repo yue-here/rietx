@@ -21,6 +21,21 @@ profile (c/χ² ≈ 36) to 3.6e-14·χ² and 2.2e-13·χ².  All four are ≤ 7.
 The bar is 1e-13·c, 13× above the worst of them.  Each test here was
 revert-checked: a dropped projection term, a missed emission line, a wrong
 low-rank factor or a removed gate makes the test aimed at it fail.
+
+**Texture at a stated r (WP-2109) is the same row with Ω·D.**  Ω folded at
+the extraction's March-Dollase (a₀, r₀), times the cost's D = T(a, r)/T₀,
+reproduces ``evaluate`` with ``PreferredOrientation`` at (a, r) to ≤ 1.1e-15
+of max|y| at ten moves, on NAC (cubic) and FAP (axis (100), off its unique
+axis), from an extraction with no block and with r₀ = 0.8 and 1.3, at
+r = 0.6, 1.0, 1.45 (D from 0.31 to 10.2).  Two wrong factors fail it where
+they can: T without ÷T₀ by ≥ 6.6e-2 at r₀ ≠ 1 (≤ 8.2e-16 with no block,
+where T₀ ≡ 1), and the representative's term without the orbit mean by
+≥ 0.33 (≤ 9.1e-16 where it equals the mean: r = 1, and FAP's (001)).  The
+floor of a cost rebuilt at (a, r) agrees to 9.7e-14 relative and its χ² to
+4.0e-16·c; ∂χ²/∂r meets a central difference at h = 1e-5·r to 3.3e-10.
+Revert-checked: no ÷T₀, a representative-only orbit (from the compile or
+the group), G* = 1, the derivative's sign or its s·M·G term, and each of the
+four refusals, every one turning the test aimed at it red.
 """
 
 import sys
@@ -710,3 +725,214 @@ def test_the_harmonic_is_not_refused_under_scale_or_on_the_solved_phase(harmonic
     # Scale 1 to rounding means every line's reflections are in the cost: one
     # dropped λ/2-only reflection leaves its peak unexplained and moves it.
     assert cost.chi2(_f2(model, v))[1] == pytest.approx(1.0, rel=1e-9)
+
+
+# -- texture at a stated March-Dollase r (WP-2109) --------------------------------
+
+#: (dataset, the extraction's (axis, r₀) or None for no block, the axes the
+#: cost is evaluated at).  NAC's solved phase is cubic (I 2₁3), so its axes are
+#: equivalent; FAP's is P 6₃/m, and (100) is off its unique axis.
+TEXTURE_CASES = {
+    "NAC-none": ("NAC", None, [(1, 0, 0)]),
+    "NAC-100-0.8": ("NAC", ((1, 0, 0), 0.8), [(1, 0, 0)]),
+    "FAP-none": ("FAP", None, [(1, 0, 0)]),
+    "FAP-100-0.8": ("FAP", ((1, 0, 0), 0.8), [(1, 0, 0)]),
+    "FAP-001-1.3": ("FAP", ((0, 0, 1), 1.3), [(1, 0, 0), (0, 0, 1)]),
+}
+#: the stated r of the evaluate row, each away from every case's r₀
+TEXTURE_RS = (0.6, 1.0, 1.45)
+
+
+def _with_po(structure, po):
+    s = structure.model_copy(deep=True)
+    s.phases[0].preferred_orientation = (
+        None if po is None else rx.PreferredOrientation(axis=po[0], r=rx.Parameter(value=po[1])))
+    return s
+
+
+def _texture_cost(structure, ins, data, limits, po):
+    """(the cost, Ω summed over lines) from the dummy-atom compile of
+    ``structure`` with ``po``, the group passed as ``from_pawley`` passes it."""
+    from rietx.crystallography.symmetry import resolve_group
+    blind = solve_cost.blind_structure(_with_po(structure, po), 0, "pawley")
+    bmodel = compile_model(blind, ins, data, mode="rietveld", two_theta_limits=limits)
+    bv = _values(blind, ins)
+    ph = blind.phases[0]
+    cost = SolveCost.from_model(bmodel, bv, group=resolve_group(ph.space_group,
+                                                                ph.symmetry_operations))
+    lines = solve_cost.omega_lines(bmodel, 0, bv)
+    return cost, sum(lines[1:], lines[0])
+
+
+@pytest.fixture(scope="module", params=list(TEXTURE_CASES))
+def texture_case(request):
+    """(case, cost, Ω, {axis: (true-structure model with the block at that
+    axis, its values, ten moves)}, the inputs).  No fit: the profile is the
+    input's, as in ``moved_case``."""
+    name, po, axes = TEXTURE_CASES[request.param]
+    if name == "NAC":
+        (data, st, ins), limits = build_nac_inputs(), LIMITS
+    else:
+        (data, st, ins), limits = build_fap_inputs(), (15.0, 130.0)
+    cost, omega = _texture_cost(st, ins, data, limits, po)
+    targets = {}
+    for axis in axes:
+        tst = _with_po(st, (axis, 1.0))
+        model = compile_model(tst, ins, data, mode="rietveld", two_theta_limits=limits)
+        assert np.array_equal(model.phases[0].reflections.index, cost.hkl)
+        v = _values(tst, ins)
+        rng = np.random.default_rng(2109)
+        targets[axis] = (model, v, [_moved(v, tst, rng) for _ in range(10)])
+    return request.param, cost, omega, targets, (st, ins, data, limits, po)
+
+
+def _at_r(moves, r):
+    return [dict(w, **{"phases.0.preferred_orientation.r": r}) for w in moves]
+
+
+def _representative_ratio(cost, axis, r):
+    """The wrong arm: the March term of the representative hkl alone, no
+    orbit mean, over the same at the extraction's texture."""
+    from rietx.model.preferred_orientation import cos2_alpha, march_term
+    num = np.asarray(march_term(cos2_alpha(cost.hkl, np.asarray(axis), cost.gstar), r))
+    if cost.po_axis is None:
+        return num
+    return num / np.asarray(march_term(cos2_alpha(cost.hkl, cost.po_axis, cost.gstar),
+                                       cost.po_r))
+
+
+def test_texture_omega_is_rietveld_evaluate_at_a_stated_r(texture_case):
+    """The oracle: Ω (folded at a₀, r₀) times the cost's D times the moved
+    structure's |F|², against Rietveld-mode ``evaluate`` with
+    ``PreferredOrientation`` at the stated axis and r, at ten moves."""
+    case, cost, omega, targets, _ = texture_case
+    for axis, (model, v, moves) in targets.items():
+        for r in TEXTURE_RS:
+            D, _ = cost.texture_ratio(r, axis)
+            if not (case.endswith("none") and r == 1.0):
+                assert np.max(np.abs(D - 1.0)) > 0.1        # the texture moved
+            assert _omega_residual(model, omega @ _diag(D), v, _at_r(moves, r)) <= OMEGA_BAR
+
+
+def test_a_wrong_texture_factor_fails_the_evaluate_row(texture_case):
+    """The negative arms, each where it can fail.  T without ÷T₀ fails at
+    r₀ ≠ 1 and cannot with no block (T₀ ≡ 1).  The representative alone fails
+    off the unique axis, and on FAP's (001) cannot: every equivalent sits at
+    one angle to it (WP-2109; memory of the probe's 1.3e-16)."""
+    case, cost, omega, targets, _ = texture_case
+    for axis, (model, v, moves) in targets.items():
+        for r in TEXTURE_RS:
+            mv = _at_r(moves, r)
+            D, _ = cost.texture_ratio(r, axis)
+            no_t0 = _omega_residual(model, omega @ _diag(
+                D * (1.0 if cost.po_factors is None else cost.po_factors)), v, mv)
+            rep = _omega_residual(model, omega @ _diag(_representative_ratio(cost, axis, r)),
+                                  v, mv)
+            if cost.po_factors is None:
+                assert no_t0 <= OMEGA_BAR
+            else:
+                assert no_t0 > 1e3 * OMEGA_BAR
+            # the representative's term is the orbit mean at r = 1 (both are
+            # 1) and on FAP's unique axis; the arm is blind where both the
+            # numerator and T₀ are such a term
+            exact = lambda ax, rr: rr == 1.0 or (case.startswith("FAP") and ax == (0, 0, 1))  # noqa: E731
+            blind = exact(axis, r) and (cost.po_axis is None
+                                        or exact(tuple(cost.po_axis), cost.po_r))
+            assert (rep <= OMEGA_BAR) if blind else (rep > 1e3 * OMEGA_BAR)
+
+
+def test_texture_identity_at_the_extraction_s_own_r(texture_case):
+    """At (a₀, r₀) D is exactly 1 and the value is ``chi2``'s bit for bit;
+    with no block the same holds at r = 1 on any axis."""
+    case, cost, _, targets, _ = texture_case
+    model, v, moves = next(iter(targets.values()))
+    # contiguous: ``chi2`` of a strided view and of a contiguous copy of the
+    # same values can differ by an ulp (numpy's dot takes two paths), and D·F
+    # is contiguous; the identity is about the values ``chi2`` is handed
+    F = np.ascontiguousarray(_f2(model, moves[0]))
+    if cost.po_axis is None:
+        assert cost.po_r is None and cost.po_factors is None
+        stated = [(1.0, axis) for axis in [(1, 0, 0), (0, 0, 1), (1, 1, 2)]]
+    else:
+        stated = [(cost.po_r, None), (cost.po_r, tuple(cost.po_axis))]
+    for r, axis in stated:
+        D, _ = cost.texture_ratio(r, axis)
+        assert np.all(D == 1.0) and np.array_equal(D * F, F)
+        chi, s, _ = cost.chi2_at_texture(F, r, axis)
+        assert (chi, s) == cost.chi2(F)
+
+
+def test_texture_derivative_against_central_differences(texture_case):
+    """∂χ²/∂r against (χ²(r+h) − χ²(r−h))/2h: within 1e-7 relative at
+    h = 1e-5·r, and falling with h, the truncation error a nonlinear r has."""
+    case, cost, _, targets, _ = texture_case
+    for axis, (model, v, moves) in targets.items():
+        F = _f2(model, moves[0])
+        for r in (0.6, 1.45):
+            chi, s, grad = cost.chi2_at_texture(F, r, axis)
+            assert s > 0 and grad != 0.0
+            errs = []
+            for k in (1e-3, 1e-4, 1e-5):
+                h = k * r
+                fd = (cost.chi2_at_texture(F, r + h, axis)[0]
+                      - cost.chi2_at_texture(F, r - h, axis)[0]) / (2 * h)
+                errs.append(abs(fd - grad) / abs(grad))
+            assert errs[0] > errs[1] > errs[2], errs
+            assert errs[2] <= 1e-7, errs
+
+
+def test_texture_floor_and_value_against_a_cost_rebuilt_at_r(texture_case):
+    """A cost rebuilt from a compile at (a, r): the same ``chi2_floor`` to
+    1e-12 relative (D is invertible), and χ²(D·F) its ``chi2(F)`` to the
+    identity bar, the scale with it."""
+    case, cost, _, targets, (st, ins, data, limits, _) = texture_case
+    axis = next(iter(targets))
+    model, v, moves = targets[axis]
+    rebuilt, _ = _texture_cost(st, ins, data, limits, (axis, 0.6))
+    assert abs(rebuilt.chi2_floor - cost.chi2_floor) <= 1e-12 * cost.chi2_floor
+    for w in moves[:3]:
+        F = _f2(model, w)
+        chi, s, _ = cost.chi2_at_texture(F, 0.6, axis)
+        chi_r, s_r = rebuilt.chi2(F)
+        assert abs(chi - chi_r) <= IDENTITY_BAR * cost.c
+        assert s == pytest.approx(s_r, rel=1e-12)
+
+
+def test_the_texture_evaluation_refuses_by_name(nac):
+    from rietx.schemas.structure import MARCH_R_MIN
+    from rietx.solve.cost import TextureRefused
+    data, st, ins = nac
+    blind = solve_cost.blind_structure(st, 0, "pawley")
+    model = compile_model(blind, ins, data, mode="rietveld", two_theta_limits=LIMITS)
+    v = _values(blind, ins)
+    bare = SolveCost.from_model(model, v)                    # no block, no group
+    assert bare.po_orbits is None
+    with pytest.raises(TextureRefused, match="without a group") as err:
+        bare.texture_ratio(0.8, (1, 0, 0))
+    assert err.value.reason == "no_group"
+    with pytest.raises(TextureRefused, match="no axis") as err:
+        bare.texture_ratio(0.8)
+    assert err.value.reason == "no_axis"
+    for r in (0.0, 0.5 * MARCH_R_MIN, -1.0, float("nan")):
+        with pytest.raises(TextureRefused, match="MARCH_R_MIN") as err:
+            bare.chi2_at_texture(np.ones(len(bare.b)), r, (1, 0, 0))
+        assert err.value.reason == "r_below_floor"
+    textured = blind.model_copy(deep=True)
+    textured.phases[0].texture = rx.SphericalHarmonicTexture(order=4)
+    tmodel = compile_model(textured, ins, data, mode="rietveld", two_theta_limits=LIMITS)
+    cost = SolveCost.from_model(tmodel, _values(textured, ins))
+    assert cost.sh_texture
+    with pytest.raises(TextureRefused, match="spherical-harmonics") as err:
+        cost.texture_ratio(0.8, (1, 0, 0))
+    assert err.value.reason == "texture_block"
+
+
+def test_from_pawley_passes_the_group(nac_lebail):
+    """A Le Bail extraction with no block: the cost holds the orbits, and
+    r = 1 on any axis is ``chi2`` bit for bit."""
+    ref, data = nac_lebail
+    cost = SolveCost.from_pawley(ref, data)
+    assert cost.po_orbits is not None and cost.po_axis is None
+    F = np.linspace(1.0, 2.0, len(cost.b))
+    assert cost.chi2_at_texture(F, 1.0, (1, 1, 0))[:2] == cost.chi2(F)
+    assert cost.chi2_at_texture(F, 0.7, (1, 1, 0))[0] != cost.chi2(F)[0]
