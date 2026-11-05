@@ -1,6 +1,6 @@
 # WP-2109 — the solve cost at a stated March-Dollase r
 
-Milestone: structure-solution · Status: ⬜
+Milestone: structure-solution · Status: 🔄 2026-11-05 — built: χ², s and ∂χ²/∂r at a stated (r, axis), every Acceptance row green; PR open, waits on review
 Depends on: 1902 (shipped, the cost)
 Priority: P3 2026-11-05 — no user is at the wall: nothing in the package calls this until S9 (#677) is cut, and the contributor's search carries r outside the package today
 
@@ -130,12 +130,12 @@ is owed yet. The form goes in `solve/cost.py`'s docstring.
 
 ## Tasks
 
-- [ ] `SolveCost` keeps a₀, T₀, the orbit layout and G\* from construction. `from_pawley` supplies the group, and `from_model` takes it by keyword
-- [ ] The ratio D and D′ at a stated (r, axis), through `march_dollase_and_dr`; a refusal for r below `MARCH_R_MIN`, for a `texture` block on the solved phase, and for a cost built without a group
-- [ ] χ², s and ∂χ²/∂r at a stated (r, axis), through the existing `chi2`
-- [ ] Tests: the Acceptance rows, each revert-checked as `tests/test_solve_cost.py`'s header says; the header gains the new row's numbers
-- [ ] `solve/cost.py`'s docstring: the form above, and the note that `intensities` belongs to r₀
-- [ ] Skill: none expected, as `rietx.solve` is not public; say why at handover
+- [x] `SolveCost` keeps a₀, T₀, the orbit layout and G\* from construction. `from_pawley` supplies the group, and `from_model` takes it by keyword
+- [x] The ratio D and D′ at a stated (r, axis), through `march_dollase_and_dr`; a refusal for r below `MARCH_R_MIN`, for a `texture` block on the solved phase, and for a cost built without a group
+- [x] χ², s and ∂χ²/∂r at a stated (r, axis), through the existing `chi2`
+- [x] Tests: the Acceptance rows, each revert-checked as `tests/test_solve_cost.py`'s header says; the header gains the new row's numbers
+- [x] `solve/cost.py`'s docstring: the form above, and the note that `intensities` belongs to r₀
+- [x] Skill: none expected, as `rietx.solve` is not public; say why at handover
 
 ## Acceptance
 
@@ -163,6 +163,37 @@ is owed yet. The form goes in `solve/cost.py`'s docstring.
 - WP-1902 (the cost), WP-1515 (the scoping), WP-1997 (the engine).
 
 ## Handover log
+
+- **2026-11-05** — built. `SolveCost` can now say what χ² would be if the solved phase
+  were textured at a March-Dollase r and axis that the caller states, and how fast χ²
+  changes with r. It does this without rebuilding the quadratic form: each reflection's
+  column is rescaled by the ratio of the new texture factor to the one folded in at
+  extraction. Nothing in the package calls it, and nothing chooses r. Searching over r stays
+  with S9 (#677).
+  *Done:* `SolveCost.texture_ratio(r, axis)` → (D, D′); `chi2_at_texture(f2, r, axis)` →
+  (χ², s, ∂χ²/∂r), through the existing `chi2`; new fields `gstar`, `po_axis`, `po_r`,
+  `po_factors` (T₀), `po_orbits`, `sh_texture`; `from_model(..., group=)`, with
+  `from_pawley` passing `resolve_group` of the solved phase. Refusals raise
+  `TextureRefused` (a `ValueError`) with a `.reason` of `r_below_floor` (also NaN),
+  `texture_block`, `no_group` or `no_axis`. `no_axis` is new beside the task list: with no
+  block there is no a₀ to default to. The module docstring carries the form, the floor
+  invariance and the r₀-only reading of `intensities`.
+  *Measured* (arm64 Mac, Python 3.12, worktree venv `[dev]`, tree b282a772a + this
+  branch): Ω·D·F against Rietveld `evaluate` ≤ 1.1e-15 of max|y| over NAC and FAP, five
+  extraction cases, r ∈ {0.6, 1.0, 1.45}, ten moves each, D from 0.31 to 10.2. Wrong arms:
+  no ÷T₀ ≥ 6.6e-2 where it can fail (≤ 8.2e-16 with no block, asserted as such);
+  representative-only ≥ 0.33 (≤ 9.1e-16 at r = 1 and on FAP's (001), where it equals the
+  mean). Floor of a cost rebuilt at r: 9.7e-14 relative; χ² 4.0e-16·c. Derivative at
+  h = 1e-5·r: 3.3e-10 relative, falling with h. Every row was revert-checked (ten mutants,
+  each failing its aimed test). `tests/test_solve_cost.py`: 58 tests (+27). Fast selection
+  on the Mac (pearl offline): 13954 passed, 239 skipped, 36 xfailed in 601.74 s. Ruff clean;
+  `tests.audit_delta`: no row changed; `tests.reader_output`: no change.
+  *Gotchas:* `chi2` of a strided view and of a contiguous copy can differ by an ulp (two
+  numpy dot paths), so the bit-identity test passes `np.ascontiguousarray`. The
+  representative-only arm is exact wherever its numerator and denominator both equal the
+  orbit mean: at r = 1, and on FAP's unique axis.
+  *Skill:* none, since `rietx.solve` is not public.
+  *Next:* review and merge; then nothing until S9 (#677) decides whether a search moves r.
 
 - **2026-11-05** — filed from WP-1515's 2026-10-31 entry, PR #1414. No open WP owns this:
   WP-1997 fences preferred orientation out, WP-1515 builds nothing, and S9 has no WP yet. The
