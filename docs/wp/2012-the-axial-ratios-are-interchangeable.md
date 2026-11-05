@@ -1,6 +1,6 @@
 # WP-2012 — The two axial-divergence ratios are interchangeable, and a fit reports one branch
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — both lab presets free S/L alone (PR #1356, merged); the placement episode followed (PR #1387); the recipe sibling is open
+Milestone: unscheduled · Status: 🔄 2026-11-05 — claimed by @mustachefeeling (ghostshift runner): the recipe sibling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-02 — was P2: both presets fixed (PR #1356); what is left is an imported GSAS-II recipe freeing both ratios from one SH/L flag
