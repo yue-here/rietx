@@ -916,6 +916,30 @@ class Expression:
         """The tree printed canonically (:func:`to_text`)."""
         return to_text(self.tree)
 
+    def inline(self, definitions: Mapping[str, Expression]) -> Expression:
+        """This expression with each name in ``definitions`` replaced by its tree.
+
+        How one equation feeds another: ``T_true`` defined as
+        ``T + c1*T + c2*T^2`` and inlined into ``a0 + k*T_true`` gives one
+        tree over ``T``, ``c1``, ``c2``, ``a0`` and ``k``, so its evaluation and
+        its derivatives need nothing new.  A definition is inlined as it
+        stands, so a caller inlines in declaration order and a definition
+        naming a later one stays a free name, which is how a cycle shows up
+        (as a name with no value).
+        """
+        def walk(n):
+            if isinstance(n, Name):
+                return definitions[n.id].tree if n.id in definitions else n
+            if isinstance(n, Num):
+                return n
+            if isinstance(n, Neg | Not):
+                return type(n)(walk(n.arg))
+            if isinstance(n, Call):
+                return Call(n.func, tuple(walk(x) for x in n.args))
+            return type(n)(n.op, walk(n.left), walk(n.right))
+
+        return Expression(to_text(walk(self.tree)))
+
     def evaluate(self, bindings: Mapping[str, Any], xp=None):
         """The value, element-wise over whatever ``bindings`` hold.
 

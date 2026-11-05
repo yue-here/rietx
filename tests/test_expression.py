@@ -297,3 +297,17 @@ def test_evaluation_is_element_wise_over_arrays():
     for k, t in enumerate(temps):
         one = float(e.evaluate({"zero_a": 7.29, "grad": 1e-5, "theta": 150.0, "T": t}))
         assert v[k] == one
+
+
+def test_one_expression_feeds_another_by_inlining():
+    calib = Expression("T + c1*T + c2*T^2")
+    cell = Expression("a0 + k*T_true").inline({"T_true": calib})
+    assert set(cell.names) == {"a0", "k", "T", "c1", "c2"}
+    b = {"a0": 5.43, "k": 1e-5, "T": 300.0, "c1": 0.01, "c2": -2e-5}
+    t_true = 300.0 + 0.01 * 300.0 - 2e-5 * 300.0 ** 2
+    assert float(cell.evaluate(b)) == pytest.approx(5.43 + 1e-5 * t_true, rel=1e-15)
+    _, (d_c1,) = cell.gradient(b, ["c1"])
+    assert float(d_c1) == pytest.approx(1e-5 * 300.0, rel=1e-13)
+    # a power base or a sign keeps its meaning once the definition is a sum
+    sq = Expression("-u^2").inline({"u": Expression("x + 1")})
+    assert float(sq.evaluate({"x": 1.0})) == -4.0

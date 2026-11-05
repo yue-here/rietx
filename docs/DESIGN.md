@@ -409,9 +409,15 @@ refinable scalar. Compile: tree → partition free/tied/fixed → flat fp64 θ.
 Symmetry and linear ties are one affine map p_phys = C·θ + d (constant
 matmul — exact under autodiff); v0.1 implements the identity-tie subset
 (crystal-system cell constraints), v0.3 generalizes to Wyckoff constraints.
-Nonlinear ties (`expr`) will use a tiny AST-whitelisted DSL emitted as
-backend ops — **asteval and sympy were evaluated and rejected** (asteval
-cannot run on autodiff tracers; sympy's torch lambdify printer is immature).
+A nonlinear form is an expression in rietx's own grammar (WP-1964,
+`params/expression.py`, specified with its conformance table in the manual's
+`reference/expressions.md`): a hand-written Pratt parser over a closed
+vocabulary, one tree evaluated on any `xp`, and one exact derivative rule per
+operator. It enters the table as a derived block (`ExpressionBlock`, below).
+asteval and sympy were rejected: asteval evaluates python values, so it exposes
+nothing to differentiate and cannot run on autodiff tracers, and sympy's
+`parse_expr` calls `eval` and its `lambdify` calls `exec`. The earlier ground,
+an immature torch printer, has aged: sympy 1.14 ships one (checked 2026-11-04).
 Transforms: none since WP-1938 (2026-10-11). Every parameter refines in its
 own units, with its declared `min`/`max` as box bounds the driver holds. v0.1
 used softplus for widths and scales, because hard lower bounds stall TRF, and
