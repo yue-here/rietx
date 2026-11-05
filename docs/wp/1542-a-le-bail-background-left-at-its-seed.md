@@ -1,6 +1,6 @@
 # WP-1542 — a Le Bail background left at its seed
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — fixture, skill protocol and tests landed (PR #1357); Q1 and Q2 ruled (no finding; seed default stays False); next: the held SNIP and a declared background peak on PbSO₄ and #726's pattern
+Milestone: unscheduled · Status: 🔄 2026-11-05 — tasks 1-6 landed and Q1, Q2 ruled (PRs #1357, #1394); not closed by PR #1430, because the ruled cycle rule (task 7) was never built; next: task 7
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-01 — was P2: WP-2062 moves every site where rietx picks a structure-free fit to Pawley (decided 2026-11-01), so no default path will run Le Bail; a caller who picks `mode="lebail"` still meets this
@@ -183,7 +183,7 @@ here (2026-10-03, at the maintainer's request).
   (the 2026-10-11 entry from #726 above), not TCHZ terms reaching their bounds,
   so it is a fixture for task 4 and not a reproduction of that run.
 
-- **From WP-2002 (2026-10-19, PR #1050).** Batch class B11. GSAS-II's stand-alone `DoLeBail` runs 10 cycles by default (`GSASIIstrMain.py:761`), and FullProf's manual says "a few cycles (say 10)". On #740's pattern the Le Bail fit plateaus at Rwp 1.62 % from 100 to 400 cycles, against 1.09 % for the true structure (`2002-batch/i740.json`). More cycles close the 4.56 % to 1.62 % gap and not the rest. The batch proposes a converge-with-cap cycle rule inside this WP, pending the ruling.
+- **From WP-2002 (2026-10-19, PR #1050).** Batch class B11. GSAS-II's stand-alone `DoLeBail` runs 10 cycles by default (`GSASIIstrMain.py:761`), and FullProf's manual says "a few cycles (say 10)". On #740's pattern the Le Bail fit plateaus at Rwp 1.62 % from 100 to 400 cycles, against 1.09 % for the true structure (`2002-batch/i740.json`). More cycles close the 4.56 % to 1.62 % gap and not the rest. The batch proposed a converge-with-cap cycle rule inside this WP. *Ruled 2026-10-19: agreed. It is task 7, added 2026-11-05.*
 
 ## Non-goals
 
@@ -214,6 +214,13 @@ here (2026-10-03, at the maintainer's request).
 - [x] Skill: SKILL.md §2 rule 5 and `references/judging.md` name
       `rietx.background.snip` and this failure.
 - [x] Tests, with obs/calc/diff PNGs to `tests/output/`.
+- [ ] The Le Bail cycle count converges under a cap (WP-2002's class B11, ruled
+      2026-10-19, `docs/wp/2002-batch/rulings.md`). Each stage repeats its
+      partition until the relative change falls under a tolerance, in place of
+      the fixed `lebail_cycles` = 3. Judge it against #740's true-structure Rwp
+      (1.09 %), never against 100 cycles. The `_audit` row
+      `StageSpec:lebail_cycles` cites this WP. It moves Le Bail numbers, so it
+      goes through the reader-output check.
 
 ## Acceptance
 
@@ -234,6 +241,37 @@ no finding, by the maintainer's ruling of 2026-11-03 on Q1.
   `rietx.background.estimators` cites it.
 
 ## Handover log
+
+- **2026-11-05** — close-out runner, PR #1430. This WP stays open. Its six
+  listed tasks are done, but the maintainer ruled on 2026-10-19 that a Le Bail
+  stage's cycle count should converge under a cap "in WP-1542", and that work
+  never became a task. The tree still runs a fixed three cycles. A caller who
+  picks `mode="lebail"` meets the cost: on #740's pattern three cycles end at
+  Rwp 4.56 % and the plateau is 1.62 %. It is now task 7.
+
+  *How it was missed.* The Inherited entry from WP-2002 still read "pending the
+  ruling", though the ruling had come the same day. The 2026-11-03 entry's "no
+  task is open" counted the list as it stood. The audit row is the live claim:
+  `StageSpec:lebail_cycles`'s grounds read "Kept at 3 until WP-1542 replaces
+  it", `approved="2026-10-19"`. `model.lebail_update` still loops `n_cycles`
+  times with no tolerance (read at 541f0daf7).
+
+  *Why it stays open rather than moving.* The ruling names this WP. The
+  2026-11-01 decision that no default path runs Le Bail moved this WP to P3 and
+  reversed nothing, as WP-2062's decision 4 says. Settled by Claude under the
+  job's rule that an unfinished WP stays open. The alternative was to close and
+  forward task 7 to WP-2062, which would have reassigned a ruling.
+
+  *Verified.* The Acceptance rows pass on this branch: 259 passed over
+  `test_lebail_alternation`, `test_background_auto`, `test_skill` and
+  `test_lebail_background_hump` (`[dev]`, macOS arm64, 4 workers, another
+  worktree's tests beside them). Nothing else in this WP changed. Inherited
+  stays as it is while the WP is open.
+
+  Next: task 7. Then, at its close, the held SNIP and a declared background
+  peak on PbSO₄ and #726's pattern go to WP-2017, and #740's mechanism goes to
+  WP-2062, unless a session runs them here first. A withdrawn ruling would
+  close this WP instead, with the audit row's grounds rewritten.
 
 - **2026-11-03** — The maintainer ruled both questions of the entry below, in
   chat (recorded by a ghostshift runner). The Le Bail path gets no finding for
