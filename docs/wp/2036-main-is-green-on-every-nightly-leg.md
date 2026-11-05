@@ -1,6 +1,6 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: ✅ 2026-11-05 — both 11-04 nightlies green on all six jobs; the Mac full suite green but for two rows that fail on `main` too, owned by #1424 (PR #PRNUM)
+Milestone: unscheduled · Status: ✅ 2026-11-05 — both 11-04 nightlies green on all six jobs; the Mac full suite green but for two rows that fail on `main` too, owned by #1424 (PR #1425)
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
 
@@ -295,7 +295,7 @@ gh run list --workflow nightly.yml --branch main --limit 1
   Mac-only defect, owned by issue #1424, and that this WP closes with its
   acceptance recorded as met except for them.
 
-  *Done* (ghostshift runner, PR #PRNUM). The moot `Priority:` line and the
+  *Done* (ghostshift runner, PR #1425). The moot `Priority:` line and the
   empty `### Inherited` section went; the narrative moved to
   `docs/milestones/v1.12.md` § How v1.12 is getting here; the index was
   regenerated. Filed #1424 for the two Mac rows.
