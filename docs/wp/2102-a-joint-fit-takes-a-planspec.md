@@ -45,7 +45,7 @@ types share. What they skip is `resolve_plan`'s mode substitution, and neither h
   does, that is a reader-output change and goes to the maintainer.
 - [x] Test: a `PlanSpec` and the `RefinementPlan` it converts from give bit-identical
   answers on `refine_multi`.
-- [ ] Grep for a fourth site and say in the handover what was checked.
+- [x] Grep for a fourth site and say in the handover what was checked.
 - [ ] Skill: "none" and why, unless the skill names the limit.
 
 ## Acceptance
