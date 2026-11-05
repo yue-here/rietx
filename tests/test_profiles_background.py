@@ -60,6 +60,29 @@ def test_whittaker_smooths():
     assert np.std(np.diff(z, 2)) < np.std(np.diff(y, 2)) / 10
 
 
+def test_the_whittaker_baseline_solves_its_defining_system():
+    """Eilers (2003): z solves (W + λ DᵀD) z = W y, D the second difference.
+
+    The banded solve against the dense system built from its definition, with
+    unequal weights so W is not the identity.  The positive arm: the same z
+    fails the system at λ moved by 1 %, so the bar can see a wrong penalty.
+    """
+    rng = np.random.default_rng(7)
+    n = 200
+    y = 100.0 + 20.0 * np.sin(np.linspace(0, 4, n)) + rng.normal(0, 2, n)
+    w = rng.uniform(0.2, 1.0, n)
+    lam = 3e3
+    d2 = np.diff(np.eye(n), 2, axis=0)
+    z = whittaker_solve(y, w, lam)
+
+    def residual(lam_):
+        a = np.diag(w) + lam_ * d2.T @ d2
+        return np.max(np.abs(a @ z - w * y)) / np.max(np.abs(w * y))
+
+    assert residual(lam) < 1e-9
+    assert residual(lam * 1.01) > 1e-4
+
+
 def test_arpls_recovers_baseline_under_peaks():
     tt = np.linspace(5, 45, 2000)
     true_bkg = 100.0 + 2.0 * tt - 0.02 * tt ** 2

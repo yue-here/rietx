@@ -499,7 +499,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   `LinearInequality` held inside the step (the Stephens cone, Γ_G² ≥ 1e-8), never a box.
 - **Every physics function cites its reference** (author, year, journal) in the docstring, and
   documents conventions by physics not letters (e.g. size↔1/cosθ, strain↔tanθ; GSAS and FullProf
-  swap X/Y labels).
+  swap X/Y labels). Every feature is in `rietx.features`, held to the help vocabulary, the Theory
+  headings and a verifying claim or test by `tests/test_validation_matrix.py` (WP-2010).
 - **The FitReport must never return a confident wrong singleton.** Every Layer-1 statement passes
   four region gates (`GateCode`: local-χ²_red significance, the basis's local R², resolvability on
   the *scale-normalised* Gram, 0.4·FWHM validity radius) and share-based global maturity. Collinear angular templates are compared
