@@ -1,9 +1,8 @@
 # WP-1944 — the structural plan frees extinction only where it says it does
 
-Milestone: unscheduled · Status: 🔄 2026-11-05 — option A merged in PR #1391, schema 0.61 in PR #1415; PR #1412 applies the 2026-11-04 ruling and closes the WP
+Milestone: unscheduled · Status: ✅ 2026-11-05 — extinction is opt-in per phase and findable through its documentation (PRs #1391, #1415, #1412)
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-10-11 — a plan frees a parameter its description says it leaves alone, and the esd shows the data cannot see it; nothing fires
 
 ## Goal
 
@@ -55,26 +54,20 @@ change. The PR still goes to the maintainer before merge, because it changes
 the stored format. A second ruling the same evening widened the WP: opt-in
 physics must be findable from a fit's output (§ Handover log, 2026-11-04).
 
+**Decided 2026-11-04 (late evening):** the maintainer read the pointer that
+second ruling produced and reversed it: "remove EXTINCTION_UNDECLARED from
+the package entirely; keep findability through documentation; the skill row
+as concise as possible." Findable now means documented, never detected from
+the residual. PR #1391 merged before the ruling could be applied, so the
+follow-up PR #1412 applies it and closes issue #877. WP-2087 is rescoped to
+documentation pointers by the same ruling.
+
 **The sibling class, not generalised here.** A freed parameter the data do
 not determine, reported with no diagnostic. WP-1523 settled it for a phase
 scale (significance under 3σ, `refine._answer_significance`). WP-1914 owns
 it for a sample-broadening coefficient at its softplus floor. This WP fixes
 the plan and its texts. A general "esd exceeds value" diagnostic is not in
 it.
-
-### Inherited
-
-- **2026-10-24, from [2044](2044-the-sabine-laue-factor-is-continuous.md):
-  the QPA guide's free fit moved.** With Sabine's Laue factor continuous, the
-  guide's first fit (11-BM NAC + CaF₂, `mccusker_structural`) gives CaF₂
-  3.58 ± 3.53 wt% and extinction 1919 ± 4066 µm², the same on macOS and Linux,
-  where 1.9.0 gave 3.09 ± 2.32. `HIGH_CORRELATION` reads scale ~ extinction at
-  ρ = +0.998. That fit is this WP's worked case: an extinction the data cannot
-  see, freed by the plan on a weak phase. The held fit is unchanged at
-  1.37 ± 0.07 wt%. Re-pin `examples/guides/qpa.py` and its page if this WP
-  changes what the plan frees.
-  The fit moves a quoted weight fraction by more than the fraction itself,
-  which may move this WP's priority row (noted by WP-2043).
 
 ## Non-goals
 
@@ -99,6 +92,9 @@ it.
       moves.
 - [x] Skill: the plan table row in `SKILL.md` matches the code; nothing else
       expected.
+- [x] Under the ruling of 2026-11-04 (late evening): remove
+      `EXTINCTION_UNDECLARED`, and keep extinction findable through its help
+      entry, the theory page and one skill row (PR #1412).
 
 ## Acceptance
 
@@ -120,13 +116,105 @@ with one phase declared and one not.
 
 ## Handover log
 
-- **2026-11-05** — `SCHEMA_VERSION` moves from 0.60 to 0.61, which this WP's
-  merge left out, so optional `Phase.extinction` now has its version note.
-  The field is the only schema change since the `v1.11.0` tag. Measured
-  with the released 1.11.0 wheel: it refuses a stored `null`, so a structure
-  or a `.rex` project written here does not open there. A Rietveld result and
-  an instrument do. A 1.11.0 project opens here with its extinction entry,
-  and the stage's glob still frees it. PR #1415.
+### 2026-11-05 — the warning removed under the maintainer's ruling, PR #1412
+
+Extinction stays opt-in, and a fit no longer warns that a phase might want
+it. The maintainer ruled on 2026-11-04 that findable means documented. So a
+user now finds the declaration in the extinction help entry, on the theory
+page and in one skill row, and nowhere in a fit's output. #1391 had merged
+before the ruling reached it, and this follow-up, PR #1412, applies it and
+closes issue #877. The WP is closed. The ruling, as given to the shift lead:
+
+> RULING 3 (Yue, 2026-11-04 ~22:4xZ): "remove EXTINCTION_UNDECLARED from the
+> package entirely; keep findability through documentation; the skill row
+> as concise as possible." Then (~22:5xZ): the PR should close issue #877.
+
+*Done.* `342daf5ed` removed the warning: the score test in `refine.py`, its
+joint-fit scope in `multi.py`, three audit rows (the code, its suggestion,
+`_EXTINCTION_PROBE`), the help entry and GUI help key, the silence pair, two
+tests, the QPA guide's mention and the skill's diagnostics row.
+`EXTINCTION_` left `reference_pages.CORRECTION_CODE_PREFIXES`, because no
+refinement code carries it now. The Corrections page split stays.
+`d280486ef` made the help entry say when to declare extinction, and the
+theory page say how and which plan then frees it. `fe0cbbdc5` rescoped
+WP-2087 to documentation pointers under the same ruling. `f1caedf95` staged
+the 1.12.0 notes #1391 had not written. Its warning never shipped, so the
+notes say nothing about it. `22ede1d09` recorded the ruling as a `Decided`
+line, closed the WP and moved its story to the v1.12 record.
+
+*Measured.* The generality review held all three deleted rows. It also
+argued that the skill pointer, first placed on `BISO_UNUSUALLY_LARGE`, had
+the sign wrong. A probe settled it, on the LaB6 synthetic of
+`test_extinction.py` with true Biso 0.5 on both sites and Biso and
+coordinates free. With 2.5 µm² planted and extinction undeclared, La's Biso
+came out 0.364 ± 0.009 and B's 0.668 ± 0.071, with the scale 8 % low.
+Declared, both Biso values came back within 1 esd and extinction read
+2.89 ± 0.34. The code review saw La at 0.044 ± 0.013 with 10 µm² planted.
+So `e8a41e20b` moved the pointer to `BISO_NEGATIVE`. The theory page and
+`model/extinction.py` still say "a spuriously large Biso". That claim
+predates this WP and goes to WP-2087 to check against Sabine.
+`python -m tests.reader_output` exits 0: the standard LaB6 fit never fired
+the warning, so its printed text is unchanged.
+Fast selection (worktree `.venv` `[dev]`, darwin arm64, Python 3.12,
+`-n auto`, through the ghostshift serial lock), on the
+tree at `db21b1315`: 1 failed, 13 829 passed, 319 skipped, 36 xfailed in
+690 s. The one red was the manual's twin cap: the longer extinction help
+entry took `reference/parameters` to 50 111 characters against 50 000.
+`c968fdef3` shortened the entry, and that test with `test_help.py` then gave
+27 passed. The branch removes three fast tests (two in `test_extinction.py`,
+one silence case) and adds none, so passed+skipped should sit 3 under main's
+at equal extras. Main was not measured locally. The full selection did not
+run, because removing a warning moves no fitted number.
+
+*Code review* (`/code-review high --fix`, four findings). The skill
+pointer's sign and the theory sentence are the two above. The 1.12.0 note
+now says `set_vary` and `set_values` on an undeclared extinction raise, and a
+custom plan's glob frees nothing (`db21b1315`). Declined here: the
+unknown-path error suggests `phases.0.lor_strain` for `phases.0.extinction`.
+Fixing it changes an error's text, so it is filed in WP-2087's Inherited for
+the maintainer.
+
+*Generality* (`generality-review`, run on the branch at `f1caedf95`;
+sections pasted with their tables trimmed for length, the author's answer
+under the one that is not `holds`).
+
+> **`EXTINCTION_UNDECLARED` (deleted code row: tier 1, ambiguity 2, warning). Verdict: holds.**
+> The case for deleting it is stronger. The row it removes sat at a tier its own evidence disclaimed. Its threshold was borrowed and unaudited, and it fired on one synthetic fixture only. The case for keeping it is theoretical, and no real-data cost of losing it was measured.
+>
+> | Question | Author's answer (where) | What I found | Verdict |
+> |---|---|---|---|
+> | 1. What the caller must now decide | "nothing the package decides replaces the warning" (dispatch). Findability now "means documented, never detected from the residual" (WP-1944 Context) | The caller must now judge, unprompted, whether a phase's strong low-angle lines want extinction. The criterion is in prose only (`help.py` `phases.*.extinction`). The package can no longer free extinction on an undeclared phase (#1391, kept here). So nothing in a fit's output now points at it. | as stated |
+> | 2. Kind of ambiguity | Deleted row: `ambiguity=2`, "preferred orientation, undeclared, draws the same strong-line deficit" | Kind 2 is right. PO is opt-in too, so the score never projected it out in a default fit. A wrong Biso and detector nonlinearity draw the same deficit. The deleted row's **tier 1** contradicted its own evidence: "Tier 3 with grounds and an approval is the maintainer's call". | the deleted row was mis-tiered; deleting it removes the inconsistency |
+> | 3. Case against acting (for deleting) | Maintainer's ruling | Practice: no surveyed program refines powder extinction unasked. GSAS-II, TOPAS, RIETAN-FP and BGMN were checked; FullProf is recall (`docs/practice.md`). Whether any program *warns* about undeclared extinction was not surveyed. The detector was weak by its own record: the gate of 25 was `AIR_SCATTER_UNDECLARED_SCORE`, borrowed and unaudited. It missed a planted 0.5 µm². It had one firing family. | strong |
+> | 4. Case for acting (for keeping the warning) | none given | DESIGN.md § Rules, 1 counts deciding less as a cost, and this deletion removes the statistic (the score) too, not only the verdict. An undeclared real extinction biases scale and Biso, and through the scale the QPA fraction. Measured cost of losing it: none on disk. "No real specimen with a known extinction is in the test data". | moderate in principle, no measurement |
+> | 5. Tier and source | Deleted at tier 1; tier 3 was put to the maintainer | A removal has no tier of its own. The ruling is the maintainer's written decision on exactly the question the row left open. MAUD and EasyDiffraction are absent from the "unasked" table. | holds on the ruling |
+> | 6. Dataset families | Firing: planted LaB6 2.5 µm² 230, and 78 with Biso and coordinates free. Silent: NAC 8.1, CaF₂ 14.6, Si 640c 0.13, FAP no lean | Firing side: one synthetic family. Silent side: three real development families, none with a known extinction. | weak support for the deleted code, which favours deletion |
+> | 7. Record that it fired | The code itself (deleted) | No record field or code remains that says a fit wanted extinction. `HIGH_CORRELATION` speaks only once the phase declares it. | nothing remains; the ruling accepts this |
+>
+> *Evidence that would change the verdict:* a real specimen with an independently known extinction where an undeclared fit quotes a wrong scale or fraction and nothing in the output says so. That would reopen the ruling, not this row.
+
+> **`EXTINCTION_UNDECLARED.suggestion` (deleted suggestion row). Verdict: holds.** It cannot outlive its code. The `suggestion=` site is in the deleted function, and grep outside `docs/wp/` finds no remaining reference. The help entry now carries the declaration; it does not name PO as a rival. *Evidence that would change the verdict:* the parent code kept.
+
+> **`rietx.refine._EXTINCTION_PROBE` (deleted constant, 1e-3 µm²). Verdict: holds.** It was the finite-difference step of the deleted score test's column, and nothing else reads it; its test is deleted with it. *Evidence that would change the verdict:* any other reader of the constant, and grep finds none.
+
+> **Documentation pointers the table cannot see (skill row `BISO_UNUSUALLY_LARGE`, help entry `phases.*.extinction`). Verdict: weak.** The help sentence holds. The skill pointer sits under the wrong code: the repo's own measurements imply that undeclared extinction pulls Biso *down*, not up. Extinction attenuates strong low-angle lines and leaves high-angle ones nearly intact; a fit without it matches that by lowering the scale and lowering B. `test_extinction_correlates_with_scale_and_biso_and_the_guard_fires` measures ρ(extinction, La Biso) ≈ +0.87, and the hump guide's Si Biso went from 0.443(100) with extinction freed to 0.417(65) without it. Against this, `model/extinction.py`'s docstring and the theory page say "spuriously large Biso", with no measurement found behind it. The help sentence names neither rival (PO, a wrong Biso). *Evidence that would change the verdict:* the refined La Biso from `_undeclared_fit(2.5, structural=True)` against the true Biso. Above truth, the placement holds; below, the pointer moves to `BISO_NEGATIVE`, and the "spuriously large Biso" sentences are wrong too.
+
+**Answer:** measured as the review asked: La's Biso 0.364 ± 0.009 against 0.5, so the pointer moved to `BISO_NEGATIVE` (`e8a41e20b`). The two older sentences go to WP-2087. The help sentence is unchanged.
+
+*Next:* the maintainer reviews and merges PR #1412, which changes reader
+output by removing a warning. Then WP-2087, starting with the Biso-sign
+check, since it decides what the theory page says.
+
+### 2026-11-05 — schema 0.61, PR #1415
+
+`SCHEMA_VERSION` moves from 0.60 to 0.61, which this WP's
+merge left out, so optional `Phase.extinction` now has its version note.
+The field is the only schema change since the `v1.11.0` tag. Measured
+with the released 1.11.0 wheel: it refuses a stored `null`, so a structure
+or a `.rex` project written here does not open there. A Rietveld result and
+an instrument do. A 1.11.0 project opens here with its extinction entry,
+and the stage's glob still frees it. PR #1415.
+
 
 ### 2026-11-04 (2nd session) — merged with main, review fixes, PR #1391 ready
 
