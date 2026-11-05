@@ -1040,6 +1040,43 @@ def test_a_blocked_fit_lands_on_the_dense_answer(n):
     assert block.statistics.rwp == pytest.approx(dense.statistics.rwp, rel=1e-9)
 
 
+@pytest.mark.xdist_group("parametric-series")
+def test_a_targets_column_once_serves_every_coefficient(monkeypatch):
+    """WP-1964 task 7: a coefficient's column is the target's column times
+    ∂target/∂coefficient, so one peak-chain pass per pattern serves the line's
+    two coefficients.  The bar is the blocked solver's: every parameter within
+    0.01 esd of the per-column answer (measured 2.3e-7 esd at 6 patterns,
+    7.4e-7 at 14, with 0.70× the peak-chain passes)."""
+    from rietx.optimize import least_squares as lsq
+    from tests.test_sequential import _start_models
+
+    n = 4
+    patterns, coords, equation = library(n, tt_max=10.0)
+    passes = {"n": 0}
+    at = lsq._peak_chain_at
+
+    def counting(*a, **k):
+        passes["n"] += 1
+        return at(*a, **k)
+
+    monkeypatch.setattr(lsq, "_peak_chain_at", counting)
+    results, counts = {}, {}
+    for label, rtol in (("per-column", -1.0), ("chained", lsq._CHAIN_RANK_RTOL)):
+        monkeypatch.setattr(lsq, "_CHAIN_RANK_RTOL", rtol)
+        passes["n"] = 0
+        s, ins = _start_models()
+        ref = _Probe(s, [ins] * n, coordinates=coords, parametric=[equation])
+        results[label] = ref.fit(patterns, plan="mccusker_default")
+        counts[label] = passes["n"]
+    old, new = results["per-column"], results["chained"]
+    assert old.status == new.status == "converged"
+    assert counts["chained"] < counts["per-column"]
+    rows = {p.path: p for p in new.parameters}
+    for p in old.parameters:
+        if p.stderr:
+            assert abs(rows[p.path].value - p.value) <= 0.01 * p.stderr, p.path
+
+
 @pytest.mark.parametrize("case", ["plain", "gradient-free", "far-scaled"])
 def test_the_schur_covariance_is_the_dense_pseudo_inverse(case):
     """Equilibrated first, then the Schur form; a gradient-free column comes

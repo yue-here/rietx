@@ -274,7 +274,7 @@ per-pattern one is an array.
   and coordinates, in declaration order, as ZrP₂O₇'s temperature calibration
   needs. A cycle is refused. The bar uses nonzero calibration coefficients: the input
   stores zero, where a broken feed gives the right cells.
-- [ ] **The chained column** (moved from 1325 on 2026-11-04). The target's column
+- [x] **The chained column** (moved from 1325 on 2026-11-04). The target's column
   once per pattern, then through the exact ∂target/∂coefficient. A tie's coefficient
   columns each re-run `phase_peaks` today, which cost 1.48-1.52× on the Jacobian loop
   (1325 § Measured: where the joint Jacobian's time goes).
