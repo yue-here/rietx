@@ -1291,6 +1291,9 @@ def test_refine_multi_takes_a_spec(two_patterns, plan_and_spec_fits):
     structure, instruments = perturbed_inputs()
     result = refine_multi(two_patterns, structure, instruments, plan=spec,
                           telemetry=False)
+    OUT.mkdir(exist_ok=True)
+    for h in range(2):
+        result.for_histogram(h).plot(OUT / f"multihist_refine_multi_spec_h{h}.png")
     assert _joint_answer(result) == _joint_answer(fits["plan"][1])
 
 
