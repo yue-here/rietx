@@ -63,6 +63,9 @@ differently *because* of it:
     fixtures' ``SH/L = 5e-4`` on 0.027° peaks the two candidate splits are
     indistinguishable in the drawn profile, which ``test_recipe.py`` asserts
     rather than assumes — so the row is honest about being a convention.
+    The recipe's one refine flag frees ``axial_sl`` alone and holds
+    ``axial_hl`` at its half (WP-2012): the profile is symmetric under the
+    swap, so freeing both would let a fit report either assignment.
 
 What is refused, and why each
 -----------------------------
@@ -646,14 +649,6 @@ def _read_instrument(payload: dict, pattern: PatternData,
         half = 0.5 * float(shl)
         geometry.axial_sl = Parameter(value=half, min=0.0)
         geometry.axial_hl = Parameter(value=half, min=0.0)
-        diags.append(Diagnostic(
-            level="info", code="RECIPE_CONVENTION_ASSUMED",
-            message=(
-                f"SH/L = {float(shl):g} is GSAS-II's combined (S+H)/L. It was "
-                f"split evenly into axial_sl = axial_hl = {half:g}."),
-            where=["instrument.geometry.axial_sl",
-                   "instrument.geometry.axial_hl"],
-            value=half))
     axial = (par.get("corrections") or {}).get("axial_divergence")
     if not _is_off(axial):
         _apply(geometry.axial_sl, axial,
@@ -662,6 +657,26 @@ def _read_instrument(payload: dict, pattern: PatternData,
         _apply(geometry.axial_hl, axial,
                "payload.instrument.parameterization.corrections."
                "axial_divergence", diagnostics=diags, scale=0.5)
+        # One flag frees S/L alone (WP-2012).  The FCJ profile is symmetric
+        # under S/L <-> H/L, so freeing both from GSAS-II's single SH/L lets a
+        # fit land on either assignment; the lab presets hold H/L the same way.
+        geometry.axial_hl.vary = False
+    if shl or geometry.axial_sl.vary:
+        half = geometry.axial_sl.value
+        held = (
+            f" The recipe flags it for refinement, and only axial_sl is "
+            f"freed: axial_hl is held at {geometry.axial_hl.value:g}, because "
+            f"swapping the two gives the same pattern, so a fit freeing both "
+            f"could return either assignment."
+            if geometry.axial_sl.vary else "")
+        diags.append(Diagnostic(
+            level="info", code="RECIPE_CONVENTION_ASSUMED",
+            message=(
+                f"SH/L = {2.0 * half:g} is GSAS-II's combined (S+H)/L. It was "
+                f"split evenly into axial_sl = axial_hl = {half:g}.{held}"),
+            where=["instrument.geometry.axial_sl",
+                   "instrument.geometry.axial_hl"],
+            value=half))
 
     instrument = Instrument(source=source, geometry=geometry, profile=profile)
     _read_zero_shift(iparm, par, instrument, diags)

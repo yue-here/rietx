@@ -114,13 +114,18 @@ choosing a fix.
       than disproved; with one ratio free there is no flat pair for the `rcond` cut to
       straddle.
 
-- [ ] An imported GSAS-II recipe frees both ratios from one flag (found by
+- [x] An imported GSAS-II recipe frees both ratios from one flag (found by
       `/code-review` on 2026-11-02). `io/recipe.py` splits `SH/L` into
       `axial_sl = axial_hl = SH/L / 2` and gives both its refine flag, so `_read_plan`
       frees the pair from the swap-symmetric diagonal. GSAS-II refines one `SH/L`, so the
       faithful mirror is a tie S/L = H/L, which `Recipe` has no field to carry; freeing
       S/L alone is the other option. Either changes what an import refines, and the
-      reader's `RECIPE_CONVENTION_ASSUMED` text follows it.
+      reader's `RECIPE_CONVENTION_ASSUMED` text follows it. **Done 2026-11-05: S/L
+      alone**, as the presets do under the 2026-11-01 ruling. The flag frees `axial_sl`
+      and holds `axial_hl` at SH/L / 2, so the read profile is unchanged and only the
+      free set moves; the convention note says so where the flag is set. The tie was not
+      taken: it needs a `Recipe` field. No committed recipe flags `axial_divergence`, so
+      no fixture's fit moves.
 - [x] The skill-placement episode's colleague script reads H/L as a result row, which the
       2026-11-03 nightly found raising `KeyError` (a slow row, so #1356's fast gates could not
       see it). **Done 2026-11-03 (PR #1387).** The script prints S/L alone, and

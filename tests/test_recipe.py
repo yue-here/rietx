@@ -230,6 +230,35 @@ def test_the_sh_l_split_is_declared_not_measured(lab6, lab6_doc):
     assert g.axial_sl.value == pytest.approx(shl / 2.0)
     assert g.axial_hl.value == pytest.approx(shl / 2.0)
     assert "RECIPE_CONVENTION_ASSUMED" in _codes(lab6)
+    # unflagged in the fixture, so neither ratio is freed and the plan has none
+    assert not g.axial_sl.vary and not g.axial_hl.vary
+    note = next(d for d in lab6.diagnostics
+                if d.code == "RECIPE_CONVENTION_ASSUMED")
+    assert "held" not in note.message
+
+
+def test_a_flagged_sh_l_frees_s_l_alone(lab6_doc):
+    """GSAS-II refines one SH/L; the FCJ profile is symmetric under
+    S/L <-> H/L, so freeing both would let the fit report either assignment
+    (WP-2012).  The flag frees S/L and holds H/L at its half, as the lab
+    presets do, and the convention note says so."""
+    doc = _edit(lab6_doc)
+    shl = doc["payload"]["instrument"]["initialization"][0]["SH/L"][1]
+    corrections = doc["payload"]["instrument"]["parameterization"][
+        "corrections"]
+    corrections["axial_divergence"] = [None, True, None, None]
+    recipe = read_recipe(doc)
+    g = recipe.instrument.geometry
+    assert g.axial_sl.vary and not g.axial_hl.vary
+    assert g.axial_sl.value == pytest.approx(shl / 2.0)
+    assert g.axial_hl.value == pytest.approx(shl / 2.0)
+    freed = {p for stage in recipe.plan.stages for p in stage.turn_on}
+    assert "instrument.geometry.axial_sl" in freed
+    assert "instrument.geometry.axial_hl" not in freed
+    note = next(d for d in recipe.diagnostics
+                if d.code == "RECIPE_CONVENTION_ASSUMED")
+    assert "only axial_sl is freed" in note.message
+    assert f"held at {shl / 2.0:g}" in note.message
 
 
 def test_this_pattern_cannot_distinguish_the_sh_l_split(lab6):

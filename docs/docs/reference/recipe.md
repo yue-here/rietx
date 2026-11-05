@@ -140,6 +140,8 @@ The width conversions were measured against the GSAS-II output PowderLine commit
 The peak list's own `sigma_squared` column reproduces U tan²θ + V tan θ + W to six decimals on all 49 reflections.
 The `LG_eta` split follows upstream's own TOPAS engine.
 The `SH/L` halving is adopted rather than measured, because no committed recipe can tell it from an uneven split, and the reader reports it as `RECIPE_CONVENTION_ASSUMED`.
+Where the recipe flags `SH/L` for refinement, the plan frees `instrument.geometry.axial_sl` alone and holds `instrument.geometry.axial_hl` at its half.
+Swapping the two ratios gives the same pattern, so a fit freeing both could return either assignment; the lab presets hold H/L for the same reason.
 `tests/data/README.md` in the repository gives the full table and how each row was established.
 
 GSAS-II carries one magnitude for each broadening effect and a Lorentzian share `LG_eta`.
