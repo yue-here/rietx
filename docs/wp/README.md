@@ -52,7 +52,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2041](2041-a-tutorial-shows-the-indexer-abstain.md) | A tutorial shows the indexer abstain | 2026-10-24 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 2026-11-03 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
-| [2054](2054-the-report-names-asymmetry-with-fcj-off.md) | The report names an asymmetric residual the model cannot draw | 2026-11-03 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 2026-11-01 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -625,7 +624,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2051](2051-compiled-per-evaluation-windows.md) | Windows resized at every evaluation, fast enough to measure | ✅ 2026-10-25 | — | [2047](2047-windows-follow-the-parameters-between-solves.md) |
 | [2052](2052-a-fit-keeps-each-sites-multiplicity.md) | A fit keeps each site's multiplicity from start to answer | ✅ 2026-11-01 | — | — ([1991](1991-a-site-and-its-own-image-are-one-atom.md) soft) |
 | [2053](2053-a-split-site-the-data-cannot-tell-says-so.md) | A split site the data cannot tell from one elongated atom says so | ⬜ | P3 | — ([2052](2052-a-fit-keeps-each-sites-multiplicity.md) soft) |
-| [2054](2054-the-report-names-asymmetry-with-fcj-off.md) | The report names an asymmetric residual the model cannot draw | 🔄 2026-11-03 | P2 | — ([1977](1977-a-flank-lobe-read-as-an-unindexed-peak.md), [2004](2004-the-fitreport-reasons-for-the-caller.md) soft) |
+| [2054](2054-the-report-names-asymmetry-with-fcj-off.md) | The report names an asymmetric residual the model cannot draw | ✅ 2026-11-05 | — | — ([1977](1977-a-flank-lobe-read-as-an-unindexed-peak.md), [2004](2004-the-fitreport-reasons-for-the-caller.md) soft) |
 | [2055](2055-a-picked-line-held-at-its-position-bound.md) | The picker holds a line shape the lab pattern does not have | ⬜ | P3 | — |
 | [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | 🔄 2026-11-02 | P2 | — |
 | [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | ⬜ | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) |
