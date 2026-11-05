@@ -1517,7 +1517,7 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.results.StageResult.lebail_cycles_run", "action", tier=1, ambiguity=1,
         evidence="arithmetic: the count each partition returned, recorded and acting on nothing"),
     Row("rietx.schemas.results.StageResult.lebail_settled", "action", tier=1, ambiguity=1,
-        evidence=("arithmetic: the last partition ended under its cap with a tolerance above 0; "
+        evidence=("arithmetic: every partition of the stage ended under its cap with a tolerance above 0; "
                   "None where no tolerance was asked, so it cannot read as an answer")),
     Row("rietx.schemas.results.StageResult.released", "action", tier=3, ambiguity=1,
         evidence=("WP-1301/1523: a held phase reading >= 3 sigma at the answer is released and the "

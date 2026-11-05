@@ -136,7 +136,15 @@ no finding, by the maintainer's ruling of 2026-11-03 on Q1.
   *Reader output.* `python -m tests.reader_output` exits 0 on the merged tree. The
   fields and the warning in the PR's section are the ones settled in call 2.
 
-  *Counts.* See the PR's *Gates* section for the merged tree's runs.
+  *Counts.* Merged tree, `[dev]`, macOS arm64. `test_lebail_cycles`, `test_acceptance_nac`,
+  `test_acceptance_srm676a`, `test_audit_table`, `test_docs_consistency`, `test_manual` and
+  `test_manual_api` together: 180 passed, 1 xfailed, the strict xfail on FAP. The audit row
+  `StageResult.lebail_settled` said "the last partition" where the code reads every
+  partition, so its text is corrected. `test_audit_table`, `test_cross_backend` and
+  `test_help` after that: 164 passed, 168 skipped, 4 xfailed. Ruff is clean, CI's Vale step
+  reports 0 errors in 146 files, and `tests.audit_delta` exits 0 with 0 new at `unaudited`.
+  The full suite was not rerun. Since the full run this PR and main both touched
+  `src/rietx/_audit.py`, `src/rietx/help.py`, `tests/test_cross_backend.py` and WP-2017.
 
   **Next.** None here. WP-2062 retires `SCREEN_LEBAIL_CYCLES` and decides the re-partition
   question. WP-2017 weighs `lebail_tol` and `LEBAIL_GAP_CYCLES` in group Q.
