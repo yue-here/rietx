@@ -91,6 +91,19 @@ of issue #561, sized M.
   d87c8cc91: the acceptance task is unticked and no acridine acceptance test
   exists. The reporter's figures were not re-run.
 
+- **2026-11-05, settled by Claude under Yue's instruction to action clear
+  calls: the acceptance may land in two parts.** Options B and C of the
+  decision brief on this WP's bar both take the split, so it holds whichever
+  Yue picks. Part 1 lands now. It holds the perturbed-start check, the
+  intra-body and inter-body distance esds, and the simulated known-answer test
+  where a regular-hexagon template must fail. The per-atom table goes to
+  `tests/output/` as a record and asserts nothing. Part 2 stays Yue's and
+  undecided: what the miss along c means for the 16 October bar, and whether
+  the assertion stays. The brief's option C, not ruled, replaces the assertion
+  with a free-atom control fit under the same profile. Acceptance is unchanged
+  because the bar is not ruled. Part 1's items are unticked Tasks below. Filed
+  in PR #1414.
+
 ## Non-goals
 
 - Hydrogens (WP-1810), torsions (WP-1808).
@@ -101,6 +114,10 @@ of issue #561, sized M.
 - [ ] The data file and a provenance row in `tests/data/README.md`
 - [ ] The authors' profile; the template-superposition floor, measured and recorded
 - [ ] The acceptance test + obs/calc/diff PNGs to `tests/output/`
+- [ ] Part 1: a 10° / 0.3 Å perturbed start returns to the same minimum
+- [ ] Part 1: an intra-body distance reports `None`, and an inter-body one reports a full esd
+- [ ] Part 1: a simulated known answer is recovered, and a regular-hexagon template fails
+- [ ] Part 1: the per-atom table goes to `tests/output/` as a record
 - [ ] Skill: none expected; say why at handover
 
 ## Acceptance
@@ -137,3 +154,7 @@ of issue #561, sized M.
   guide's code path is identical to #939's head, which passed it. Skill: the
   three codes have rows in `references/diagnostics-reading.md`. *Next:* the
   data file and its provenance row, then the authors' profile.
+- **2026-11-05** — PR #1414 records that the acceptance may land in two parts
+  (`### Inherited`, same date) and adds Part 1's items to Tasks. No test lands
+  with it, and the Acceptance section is unchanged. *Next:* as above, then
+  Part 1. Part 2 waits on Yue's ruling on the bar.

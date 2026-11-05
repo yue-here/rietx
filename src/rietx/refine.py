@@ -158,6 +158,7 @@ from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.plan import (
     CLOSING_WINDOW_TOL,
+    PlanSpec,
     check_closing_window_tol,
     check_phase_support_sigma,
 )
@@ -5341,7 +5342,7 @@ class Refinement:
             window_loss=loss, rwp=stage_rwp)
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
-            plan: RefinementPlan | str = "mccusker_default",
+            plan: RefinementPlan | PlanSpec | str = "mccusker_default",
             two_theta_limits: tuple[float, float] | None = None,
             events=None, cancel=None, telemetry=None, label: str | None = None,
             stage_reports: bool = False, progress=None) -> RefinementResult:
@@ -6512,20 +6513,25 @@ class Refinement:
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
 
-    def report(self, *, plan: RefinementPlan | str | None = None, **kw):
+    def report(self, *, plan: RefinementPlan | PlanSpec | str | None = None, **kw):
         """The full :class:`~rietx.report.FitReport` for the last fit.
 
         Unlike ``build_report(result)``, this has the compiled model in hand,
         so Layers 1-2 (misfit attribution and typed suggested actions) are
         computed — subject to their gates.  ``plan`` supplies the Layer-2
-        strategy veto; pass the plan you ran (or its preset name).
+        strategy veto; pass the plan you ran, its ``PlanSpec`` or its preset
+        name.  A name is read for the result's mode, as the fit read it, so
+        ``"mccusker_default"`` on a Le Bail result is ``profile_only``.
         """
         from .report import build_report
 
         if self._model is None or self.result_ is None:
             raise RuntimeError("call fit() first")
-        if isinstance(plan, str):
-            plan = PLAN_PRESETS[plan]()
+        if plan is not None:
+            # read as the fit that made the result read it: a preset name
+            # through the mode's substitution, a ``PlanSpec`` converted
+            # (WP-2102)
+            plan = resolve_plan(plan, self.result_.mode)
         # the answer frozen with the result, never the live models: a later
         # cancelled fit keeps its completed stages and this result (WP-1421)
         answer = self._answer
@@ -6552,7 +6558,7 @@ class Refinement:
         return rigid_body_misfit(self, data, **kw)
 
     def summary(self, *, deliverable: str | None = None, plot: str | None = None,
-               plan: RefinementPlan | str | None = None,
+               plan: RefinementPlan | PlanSpec | str | None = None,
                report: FitReport | None = None,
                levels: dict[str, str] | None = None) -> str:
         """The termination view (WP-1302): "done, or not, and why" from one call.
@@ -11897,7 +11903,8 @@ def estimate_mu_r(structure: Structure, instrument: Instrument) -> float | None:
 
 
 def refine(data: PatternData, structure: Structure, instrument: Instrument,
-           *, mode: Mode = "rietveld", plan: RefinementPlan | str = "mccusker_default",
+           *, mode: Mode = "rietveld",
+           plan: RefinementPlan | PlanSpec | str = "mccusker_default",
            two_theta_limits: tuple[float, float] | None = None,
            backend: str = "numpy", solver: str = DEFAULT_SOLVER,
            history: bool | str | Path | RefinementTree = False,
