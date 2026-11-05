@@ -126,7 +126,7 @@ with one phase declared and one not.
   with the released 1.11.0 wheel: it refuses a stored `null`, so a structure
   or a `.rex` project written here does not open there. A Rietveld result and
   an instrument do. A 1.11.0 project opens here with its extinction entry,
-  and the stage's glob still frees it.
+  and the stage's glob still frees it. PR #1415.
 
 ### 2026-11-04 (2nd session) — merged with main, review fixes, PR #1391 ready
 
