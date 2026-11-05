@@ -719,6 +719,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2042](2042-a-result-names-its-radiation.md) | A result names its radiation | ✅ 2026-10-24 | — | — |
 | [2073](2073-the-qpa-record-says-what-its-fraction-rests-on.md) | The QPA record says what its fraction rests on, and QPA at given values has a route | ⬜ | P3 | — ([2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) soft) |
 | [2074](2074-the-report-says-where-the-residual-is-structured.md) | The report says where the residual is structured: a coherent-residual scan, the background's bulge, a replica scan on isolated lines | ⬜ | P3 | — ([2004](2004-the-fitreport-reasons-for-the-caller.md), [1931](1931-the-background-order-scan-runs-to-its-cap.md) soft) |
+| [2111](2111-what-the-structure-figure-still-misleads.md) | What the structure figure still misleads a reader with, and the ORTEP controls asked for | ⬜ | P3 | [1468](1468-what-the-polyhedra-still-miss.md) |
 
 ### <a id="unscheduled-data-and-metadata-in-a-structure-out"></a>Data and metadata in, a structure out
 
