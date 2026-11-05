@@ -686,6 +686,19 @@ ROWS: tuple[Row, ...] = (
                   "scored against does not model the allowed lines; refine the cell or the "
                   "profile and screen again before quoting a symbol")),
     Row("EXTINCTION_SYMBOL_AMBIGUOUS", "code"),
+    Row("EXTINCTION_UNDECLARED", "code", tier=1, ambiguity=2, response="warning",
+        evidence=("warning; a one-column score test on the fit's own residual: the extinction "
+                  "column at 0 for a phase that declares none, projected off the background, "
+                  "every phase's scale and each free column of theta reaching a Biso, ADP, "
+                  "occupancy, coordinate, PO or texture entry, through C; fires at "
+                  "AIR_SCATTER_UNDECLARED_SCORE in reduced chi2 units with the esd inflation "
+                  "included. Development data only (WP-1944): planted LaB6 2.5 um^2 230, and "
+                  "78 with Biso and coordinates free; 0.5 planted 14 and 9 (missed); 11-BM NAC "
+                  "8.1 and CaF2 14.6, Si 640c 0.13, FAP no lean. Ambiguity 2: preferred "
+                  "orientation, undeclared, draws the same strong-line deficit. Tier 3 with "
+                  "grounds and an approval is the maintainer's call (WP-1944 handover)"),
+        responds=("declare extinction on the named phase and refit, then read its esd and its "
+                  "correlation with the scale before quoting it or the phase fraction")),
     Row("EXTRA_PEAK_NO_INTENSITY", "code"),
     Row("EXTRA_PEAK_ON_REFLECTION", "code"),
     Row("FLAT_DIRECTION", "code"),
@@ -3505,6 +3518,11 @@ ROWS: tuple[Row, ...] = (
                  "measured value, one family (B11, ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("rietx.refine.LOW_ANGLE_MIN_CHANNELS", "constant", value=10),
+    Row("rietx.refine._EXTINCTION_PROBE", "constant", tier=1, value=0.001,
+        evidence=("numerical: the differencing step of EXTINCTION_UNDECLARED's column; the "
+                  "forward difference's relative error is about x/2 at the probe, under 1e-4 "
+                  "on the fits WP-1944 measured, held to 1e-3 against a finer forward difference by "
+                  "test_the_extinction_probe_column_is_the_derivative_at_zero")),
     Row("rietx.refine.LOW_ANGLE_UNMODELLED_RATIO", "constant", value=3.0),
     Row("rietx.refine.MAGNETIC_TICK_PURITY", "constant", value=0.05),
     Row("rietx.refine.MODEL_FAR_FROM_DATA_RWP", "constant", tier=3, value=0.8,
@@ -5013,6 +5031,10 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
+    Row("EXTINCTION_UNDECLARED.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
+        evidence=("arithmetic for the declaration it names, the only way to free the term, "
+                  "with no plan chosen; it names the preferred-orientation declaration as the "
+                  "rival, and HIGH_CORRELATION and the esd report a wrong step at the next fit")),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),

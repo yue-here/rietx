@@ -234,11 +234,12 @@ def declared_range_repairs(model: Base, written: str, prefix: str = "") -> list[
             label = obj.label  # the name a person knows the site by
         stale = (issubclass(cls, _InheritsDeclaredDefaults)
                  and written_key < schema_key(cls._declared_since))
-        for name, info in cls.model_fields.items():
+        for name in cls.model_fields:
             value = getattr(obj, name)
-            if (stale and isinstance(value, Parameter)
-                    and info.annotation is Parameter and info.default_factory is not None):
-                found = _candidate(value, info.default_factory())
+            factory = (cls._declared_default(name)
+                       if issubclass(cls, _InheritsDeclaredDefaults) else None)
+            if stale and isinstance(value, Parameter) and factory is not None:
+                found = _candidate(value, factory())
                 if found is not None:
                     out.append({"path": f"{at}{name}", "label": label,
                                 "since": cls._declared_since, **found})

@@ -551,6 +551,8 @@ DIAGNOSTIC_GROUPS = (
     ("diagnostics-background", "Background selection", ("rietx/background/",)),
     # no area: STAGE_CODE_PREFIXES files its codes
     ("diagnostics-stages", "Stages and plans", ()),
+    # no area: CORRECTION_CODE_PREFIXES files its codes
+    ("diagnostics-corrections", "Corrections", ()),
     ("diagnostics-refinement", "Refinement", ("",)),
 )
 
@@ -560,6 +562,19 @@ DIAGNOSTIC_GROUPS = (
 #: their code's prefix instead, on ``diagnostics-stages``.
 STAGE_CODE_PREFIXES = ("STAGE_", "PLAN_", "HOLD_")
 
+#: The codes the Refinement page hands to the Corrections page, by name prefix.
+#: Nearly every refinement code is raised in ``refine.py``, so no file prefix
+#: separates them, and the one page passed the 50 000-character cap again when
+#: WP-1944 added ``EXTINCTION_UNDECLARED``.  These name a physical correction
+#: the model declares or could declare: absorption, roughness, extinction,
+#: dispersion, harmonics, texture, Stephens strain and declared peaks.
+CORRECTION_CODE_PREFIXES = (
+    "ABSORPTION_", "AIR_SCATTER_", "BRINDLEY_", "CAPILLARY_OFFSET_",
+    "DISPERSION_", "EXTINCTION_", "EXTRA_PEAK_", "HARMONIC_", "HUMP_",
+    "MICROABSORPTION_", "NEUTRON_RESONANT_", "ROUGHNESS_", "SPECIES_FALLBACK_",
+    "STEPHENS_", "TEXTURE_",
+)
+
 
 def diagnostic_group(files: set[str], code: str = "") -> str:
     """The page stem a code with these raising files is listed on."""
@@ -568,6 +583,8 @@ def diagnostic_group(files: set[str], code: str = "") -> str:
                 if any(first.startswith(area) for area in areas))
     if stem == "diagnostics-refinement" and code.startswith(STAGE_CODE_PREFIXES):
         return "diagnostics-stages"
+    if stem == "diagnostics-refinement" and code.startswith(CORRECTION_CODE_PREFIXES):
+        return "diagnostics-corrections"
     return stem
 
 

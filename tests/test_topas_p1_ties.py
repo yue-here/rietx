@@ -194,7 +194,7 @@ def test_p1_copy_labels_are_unique(tmp_path):
 def test_a_magnetic_width_with_extinction_is_refused(tmp_path):
     ref, pattern = case_child_magnetic()
     s = ref.fitted_structure.model_copy(deep=True)
-    s.phases[0].extinction.value = 5.0
+    s.phases[0].extinction = 5.0
     with pytest.raises(ValueError, match="extinction"):
         rx.write_topas_inp(s, tmp_path / "x.inp", p1_expand="auto", free=ref,
                            instrument=ref.fitted_instrument, pattern=pattern,

@@ -591,7 +591,7 @@ def _write_extinction(block, phase) -> None:
     written for a phase that neither refined it nor set it off zero.
     """
     ext = phase.extinction
-    if not ext.vary and ext.value == 0.0:
+    if ext is None or (not ext.vary and ext.value == 0.0):
         return
     pairs = [("_refine_ls_extinction_method", text(
                  "_refine_ls_extinction_method",

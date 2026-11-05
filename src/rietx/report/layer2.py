@@ -641,6 +641,12 @@ def texture_actions(texture, *, harmonic_phases=frozenset()
             rationale += (f"; the axis is not cleanly resolved — {runner} "
                           f"fits R²={t.runner_up_r2:.2f}, so refine r but do "
                           "not report the axis as measured")
+            if t.phase_index not in harmonic_phases:
+                # the opt-in that needs no single axis, named where the
+                # evidence says one axis does not fit (WP-1944 ruling 2)
+                rationale += ("; a texture with no single fibre axis takes "
+                              "Phase.texture = SphericalHarmonicTexture(order=4) "
+                              "instead")
         if t.phase_index in harmonic_phases:
             rationale += ("; the phase carries a spherical-harmonics texture, "
                           "which excludes a preferred_orientation block, so "
@@ -745,7 +751,9 @@ def background_actions(background) -> list[SuggestedAction]:
                 f"or an un-modelled broad crystalline phase produces exactly "
                 f"this signature, and a background bent over either *hides* "
                 f"it while improving every statistic — so check the "
-                f"between-peak shape before adding flexibility, and if you "
+                f"between-peak shape before adding flexibility.  A hump is "
+                f"declared as instrument.extra_components = "
+                f"[HumpComponent(...)], which the plans then free; if you "
                 f"add it anyway, read any QPA from the result as fractions of "
                 f"the crystalline content you did model"),
             alternatives=["add_impurity_phase"]))
