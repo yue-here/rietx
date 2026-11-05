@@ -57,9 +57,9 @@ What an operator must know, all measured:
   running step by step rather than once: on that series a different, larger
   jump survived having no chain, so that one was real — chaining artefacts are
   established or refuted transition by transition.
-- **An equation across the patterns (a(T) linear, a cell across a library) is a
-  joint fit, not a line through a chain**:
-  `rx.refine_multi(..., coordinates=, parametric=[rx.ParametricEquation(...)])`,
+- **An equation across the patterns (a(T) linear or a written
+  `basis="expression"`, a cell across a library) is a joint fit, not a line through
+  a chain**: `rx.refine_multi(..., coordinates=, variables=, parametric=[...])`,
   read on `result.parametric`, never the scaled `vars.` rows.  It pays only where a
   pattern cannot see the parameter alone (slope esd 0.72-0.76× the line's for a
   minor phase); elsewhere it equals the line, and a shared instrument cut the

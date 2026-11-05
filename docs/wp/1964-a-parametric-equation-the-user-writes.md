@@ -316,7 +316,7 @@ per-pattern one is an array.
   the Theory tab, a guide on an Einstein cell with a shared θ, and a section in
   `switching/topas.md` and `switching/gsas2.md` translating their spelling line
   by line.
-- [ ] **Skill.** The series reference's parametric row, or "none" and why.
+- [x] **Skill.** The series reference's parametric row, or "none" and why.
 
 ## Acceptance
 
@@ -350,8 +350,8 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
 
 ## Handover log
 
-- **2026-11-05 (third build session, a ghostshift runner)** — Task 10 closed, and tasks 9
-  and 12 landed. Branch `wp1964-equations`, no PR: tasks 11, 13, 14 and 15 are left, and
+- **2026-11-05 (third build session, a ghostshift runner)** — Task 10 closed, and tasks 9, 12
+  and 15 landed. Branch `wp1964-equations`, no PR: tasks 11, 13 and 14 are left, and
   the runner's brief opens the PR only on a finished checklist.
   - *Task 10, the form test.* `params.parametric.expression_target_columns` recovers each
     expression target's own column per pattern as T = J_V·G⁺, G the exact gradient of the
@@ -393,7 +393,9 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
     flag, such as `rx.Parameter(per_pattern=True)` or a TOPAS-like `local`. Decisions (a)
     and (b) and consent items 1-6 of the first entry still stand unanswered. Reader output:
     expression fits now carry `parametric_form` entries and the three warnings above.
-  - *Next.* Task 11 once (c) is answered, then 13, 14 and 15.
+  - *Task 15, the skill.* The series reference's parametric row now names `basis="expression"`
+    and `variables=`. It grew 23 B and sits 16 B under its budget. The synced copies follow.
+  - *Next.* Task 11 once (c) is answered, then 13 and 14.
 
 - **2026-11-05 (second build session, a ghostshift runner)** — Tasks 7 and 8 landed, and
   the fast selection's three reds from the first session are fixed. Branch
