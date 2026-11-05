@@ -16,9 +16,9 @@ beside** ``chi2_data`` **and never folded into it** (the architecture's D8):
   (``tests/test_solve_chemistry.py``).
 * :func:`site_clash` — the clash term Σ w·((r₀ − d)/σ)² over contacts closer
   than r₀, the per-site form a Metropolis move needs.  It is the numpy path
-  and the oracle of the compiled ``solve_clash`` kernel (#562 chunk 1, not on
-  ``main`` yet), and takes that kernel's arguments in its order, so the engine
-  swaps one for the other in one line.
+  and the oracle of the compiled ``solve_clash`` kernel (#562), and takes that
+  kernel's arguments in its order, so the engine swaps one for the other in
+  one line.
 * :class:`CoordinationPrior` — "each A has n_lo to n_hi B within [d_lo, d_hi]",
   a squared hinge outside, and :class:`ExcludedContact` — "A and B never
   within d", which raises r₀ and so is folded into the clash term, listed.
@@ -400,10 +400,10 @@ def site_clash(pos: np.ndarray, site_of: np.ndarray, moved: np.ndarray,
     elsewhere.  With ``w_same`` = ½ the change of this quantity under a move of
     that site is the change of the structure's total (:func:`clash_energy`).
 
-    The numpy path and the oracle of chunk 1's compiled ``solve_clash``, whose
+    The numpy path and the oracle of the compiled ``solve_clash``, whose
     arguments these are, in its order.  Raises ``ValueError`` where the 27
-    cells would miss a contact (:func:`clash_cells_suffice`), a refusal the
-    kernel does not make, and for an index outside the sites.
+    cells would miss a contact (:func:`clash_cells_suffice`), and for an index
+    outside the sites.
     """
     pos = np.asarray(pos, dtype=np.float64)
     site_of = np.asarray(site_of, dtype=np.intp)

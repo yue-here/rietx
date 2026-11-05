@@ -1112,7 +1112,7 @@ def _state_extinction_strong():
 
     structure = make_aniso_rutile()
     structure.phases[0].scale.value = 1e-3
-    structure.phases[0].extinction.value = 30.0
+    structure.phases[0].extinction = 30.0
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.source.dispersion = None    # declined, not inherited
     ins.profile.w.value = 1e-2
