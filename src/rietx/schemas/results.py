@@ -1171,9 +1171,9 @@ class StageResult(Base):
     #: that build a ``StageResult``.
     window_loss: float | None = None
     #: the Le Bail cycles this stage's partitions ran, in order: before the
-    #: solve, then after it (a Pawley seed is the one entry).  Empty where
-    #: none ran: a Rietveld stage, a Pawley stage that carried its
-    #: intensities in, or a stage the solve stopped.
+    #: solve, then after it (a Pawley seed is the one entry).  A stage the
+    #: solve stopped has only the partition before it.  Empty where none ran:
+    #: a Rietveld stage, or a Pawley stage that carried its intensities in.
     lebail_cycles_run: list[int] = Field(default_factory=list)
     #: did this Le Bail stage's last partition meet ``lebail_tol`` under its
     #: cap?  ``None`` where nothing was asked: another mode, or a fixed count.

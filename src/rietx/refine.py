@@ -98,6 +98,7 @@ from .optimize.least_squares import (
     DEFAULT_SOLVER,
     SOLVERS,
     STATIONARY_ANGLE_STEP,
+    _cancel_check,
     _jacobian_for,
     _longest_line_wavelength,
     covariance_estimates,
@@ -4885,16 +4886,19 @@ class Refinement:
         model = new_model
 
         lebail_run: list[int] = []
+        lebail_settled: bool | None = None
+        check = None if cancel is None else _cancel_check(cancel, stage.name)
         if mode == "lebail":
             values = table.decode(table.x0())
-            lebail_run.append(model.lebail_update(
-                values, n_cycles=stage.lebail_cycles, tol=stage.lebail_tol))
+            run, lebail_settled = model.lebail_update(
+                values, n_cycles=stage.lebail_cycles, tol=stage.lebail_tol, check=check)
+            lebail_run.append(run)
         elif mode == "pawley":
             if not carried:
                 # seed the intensity block from one Le Bail partition — a good
                 # warm start for the joint solve; refined values carry onward
                 lebail_run.append(model.lebail_update(
-                    table.decode(table.x0()), n_cycles=_pawley_seed_cycles(stage)))
+                    table.decode(table.x0()), n_cycles=_pawley_seed_cycles(stage))[0])
             # equal-split restraint on overlapped groups, scaled to the current
             # intensities (constant within the coming least-squares run)
             model.build_pawley_restraint()
@@ -5298,13 +5302,10 @@ class Refinement:
 
         if mode == "lebail" and outcome.non_finite is None:
             # a stopped stage changed nothing, its intensities included (WP-2048)
-            lebail_run.append(model.lebail_update(
+            run, lebail_settled = model.lebail_update(
                 table.decode(outcome.theta), n_cycles=stage.lebail_cycles,
-                tol=stage.lebail_tol))
-
-        lebail_settled = None
-        if mode == "lebail" and stage.lebail_tol > 0.0 and stage.lebail_cycles > 0:
-            lebail_settled = lebail_run[-1] < stage.lebail_cycles
+                tol=stage.lebail_tol, check=check)
+            lebail_run.append(run)
 
         guard = check_guards(table, outcome, correlation_guard, model=model,
                              scan_exchangeability=stage_index == n_stages)

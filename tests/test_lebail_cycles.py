@@ -20,6 +20,8 @@ import pytest
 
 import rietx as rx
 from rietx.model.forward import LEBAIL_INTENSITY_FLOOR, _settled_partition, compile_model
+from rietx.optimize.cancel import CancelToken, RefinementCancelled
+from rietx.optimize.least_squares import _cancel_check
 from rietx.params.vector import ParameterTable
 from rietx.refine import PAWLEY_SEED_CYCLES
 from rietx.schemas.plan import StageSpec
@@ -117,12 +119,12 @@ def test_the_loop_stops_once_a_plain_cycle_moves_no_more_than_the_tolerance(patt
     """The share is rebuilt here from the intensities, on one more plain cycle."""
     tol = 1e-3
     model, values = _model(pattern)
-    run = model.lebail_update(values, n_cycles=10_000, tol=tol)
+    run, _ = model.lebail_update(values, n_cycles=10_000, tol=tol)
     area = sum(np.bincount(line.first, weights=line.w_line * line.mass,
                            minlength=model.phases[0].hkl_intensity.size)
                for line in model._partition_terms(values)[0])
     before = model.phases[0].hkl_intensity.copy()
-    assert model.lebail_update(values, n_cycles=1) == 1
+    assert model.lebail_update(values, n_cycles=1) == (1, None)
     after = model.phases[0].hkl_intensity
     assert 1 < run < 10_000
     assert (area * np.abs(after - before)).sum() <= tol * (area * after).sum()
@@ -150,7 +152,8 @@ def test_the_acceleration_changes_the_path_and_never_the_fixed_point():
     while moved > 1e-7:
         plain, moved, _ = cycle(plain)
         n_plain += 1
-    fast, n_fast = _settled_partition(cycle, start, 100_000, 1e-7, mass)
+    fast, n_fast, met = _settled_partition(cycle, start, 100_000, 1e-7, mass)
+    assert met
     assert n_fast * 5 < n_plain
     assert np.abs(mass * (fast - plain)).sum() <= 1e-4 * (mass * plain).sum()
 
@@ -164,8 +167,25 @@ def test_the_loop_never_runs_past_its_cap(cap):
         calls.append(1)
         return cycle(x)
 
-    _, run = _settled_partition(counted, start, cap, 1e-14, mass)
+    _, run, met = _settled_partition(counted, start, cap, 1e-14, mass)
     assert run == len(calls) == cap
+    assert not met
+
+
+@pytest.mark.parametrize("cap", [1, 2])
+def test_a_cycle_on_the_cap_that_meets_the_tolerance_is_settled(pattern, cap):
+    """The count alone cannot say this: a run at the cap may have met the test."""
+    model, values = _model(pattern)
+    assert model.lebail_update(values, n_cycles=cap, tol=1e6) == (1, True)
+    model, values = _model(pattern)
+    assert model.lebail_update(values, n_cycles=cap, tol=1e-30) == (cap, False)
+    _, start, mass = _richardson_lucy()
+    shares = iter([1.0, 0.0])
+
+    def last_meets(x):
+        return x, next(shares), 0.0
+
+    assert _settled_partition(last_meets, start, 2, 1e-3, mass)[1:] == (2, True)
 
 
 def test_the_likelihood_never_falls_across_an_accepted_round():
@@ -177,7 +197,7 @@ def test_the_likelihood_never_falls_across_an_accepted_round():
         seen.append(like)
         return new, share, like
 
-    settled, run = _settled_partition(watched, start, 90, 1e-14, mass)
+    settled, run, _ = _settled_partition(watched, start, 90, 1e-14, mass)
     # a round is three calls, and its first is the likelihood it starts from
     assert np.all(np.diff(seen[::3]) >= 0.0)
     assert run == 90 and cycle(settled)[2] >= seen[0]
@@ -217,7 +237,7 @@ def test_an_exact_overlap_keeps_the_ratio_it_started_with():
     i333, i511 = hkl.index((3, 3, 3)), hkl.index((1, 1, 5))
     cp.hkl_intensity = np.full(len(hkl), 10.0)
     cp.hkl_intensity[i511] = 37.0
-    run = model.lebail_update(table.decode(table.x0()), n_cycles=2000, tol=1e-9)
+    run, _ = model.lebail_update(table.decode(table.x0()), n_cycles=2000, tol=1e-9)
     assert run > 3
     assert cp.hkl_intensity[i511] / cp.hkl_intensity[i333] == pytest.approx(3.7, rel=1e-10)
 
@@ -226,7 +246,7 @@ def test_a_reflection_falling_to_the_floor_does_not_hold_the_loop_open(pattern):
     """Its own relative change stays large long after the pattern has settled,
     so the test weights by the counts a reflection lays on the pattern."""
     model, values = _model(pattern)
-    run = model.lebail_update(values, n_cycles=CAP, tol=TOL)
+    run, _ = model.lebail_update(values, n_cycles=CAP, tol=TOL)
     assert run > 3
     before = model.phases[0].hkl_intensity.copy()
     model.lebail_update(values, n_cycles=1)
@@ -238,7 +258,38 @@ def test_a_reflection_falling_to_the_floor_does_not_hold_the_loop_open(pattern):
 @pytest.mark.parametrize("cycles", [0, 1, 3, 7])
 def test_tolerance_zero_runs_exactly_the_count(pattern, cycles):
     model, values = _model(pattern)
-    assert model.lebail_update(values, n_cycles=cycles, tol=0.0) == cycles
+    assert model.lebail_update(values, n_cycles=cycles, tol=0.0) == (cycles, None)
+
+
+def test_a_cancel_stops_a_partition_between_cycles_and_changes_nothing(pattern):
+    model, values = _model(pattern)
+    before = model.phases[0].hkl_intensity.copy()
+    token = CancelToken()
+    reads = []
+
+    def check():
+        reads.append(1)
+        if len(reads) == 5:
+            token.cancel()
+        _cancel_check(token, "s")()
+
+    with pytest.raises(RefinementCancelled):
+        model.lebail_update(values, n_cycles=CAP, tol=TOL, check=check)
+    assert len(reads) == 5
+    assert np.array_equal(model.phases[0].hkl_intensity, before)
+
+
+def test_a_fit_hands_its_cancel_to_the_partition(pattern, monkeypatch):
+    """The partition runs before the solve, so it is the first thing to read it."""
+    def no_solve(*args, **kwargs):
+        raise AssertionError("the partition ran through a set token")
+
+    monkeypatch.setattr(sys.modules["rietx.refine"], "run_least_squares", no_solve)
+    token = CancelToken()
+    token.cancel()
+    with pytest.raises(RefinementCancelled):
+        _refinement(pattern).fit(pattern, mode="lebail", plan=_plan(), cancel=token,
+                                 telemetry=False)
 
 
 def test_the_stage_records_each_partition_it_ran(settled):
@@ -325,6 +376,16 @@ def test_the_settings_cross_every_copy_of_a_stage():
     assert (warm.lebail_cycles, warm.lebail_tol) == (11, 2e-3)
 
 
+def test_a_collapsed_plan_keeps_a_stop_whichever_stage_held_it():
+    """The collapsed cap is the plan's largest.  Taking the tolerance of a last
+    stage that fixed its count would run that whole cap in plain cycles."""
+    fixed = Stage("fixed", [], lebail_cycles=3, lebail_tol=0.0)
+    warm = _collapse(rx.RefinementPlan(stages=[Stage("a", []), fixed])).stages[0]
+    assert (warm.lebail_cycles, warm.lebail_tol) == (CAP, TOL)
+    warm = _collapse(rx.RefinementPlan(stages=[fixed, fixed])).stages[0]
+    assert (warm.lebail_cycles, warm.lebail_tol) == (3, 0.0)
+
+
 def test_the_two_mirrors_of_a_stage_default_agree():
     spec, stage = StageSpec(name="x", turn_on=[]), Stage("x", [])
     assert (spec.lebail_cycles, spec.lebail_tol) == (stage.lebail_cycles, stage.lebail_tol)
@@ -400,14 +461,21 @@ def _domain_fit(family, tol):
 @pytest.mark.slow
 @pytest.mark.parametrize("family", FAMILIES)
 def test_the_tolerance_meets_its_bar(family):
-    """Bar 1 of ``tests/test_window_domain.py``: at the fit's own answer, the curve
-    its last partition left against one carried on to a tenth of the tolerance,
-    in units of each point's σ.  The cap holds twice the dearest partition."""
+    """Bar 1 of ``tests/test_window_domain.py``: at the fit's own answer, a partition
+    stopped at the tolerance against one carried on to a tenth of it, in units of
+    each point's σ.  The cap holds twice the dearest partition.
+
+    The first partition here is not a formality.  ``ref._model`` is the result's
+    fresh compile, and ``_final_compile`` carries the intensities onto its windows
+    unpartitioned, so a one-channel window change splits a near-overlap differently
+    (1.6 σ on #740's pattern, 2 cycles on the frozen compile and 611 on this one).
+    That gap is the compile's and no tolerance closes it."""
     ref, result, _, _ = _domain_fit(family, TOL)
     _plot(result, f"lebail_cycles_{family}.png")
     model = ref._model
     table = ParameterTable(ref.structure, ref.instrument)
     values = table.decode(table.x0())
+    model.lebail_update(values, n_cycles=CAP, tol=TOL)
     shipped = np.asarray(model.evaluate(values))
     model.lebail_update(values, n_cycles=REFERENCE_CAP, tol=TOL * 0.1)
     assert (np.abs(shipped - np.asarray(model.evaluate(values))) / model.sigma).max() <= 0.1

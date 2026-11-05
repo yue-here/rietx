@@ -108,7 +108,6 @@ from .refine import (
     _judge_magnetic_groups,
     _lineless_phases,
     _low_angle_diagnostics,
-    _lebail_cap_diagnostics,
     _max_iter_diagnostics,
     _merge_unresolved,
     _multiplicity_kept_diagnostics,

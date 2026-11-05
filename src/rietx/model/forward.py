@@ -589,7 +589,7 @@ SQUAREM_STEP_GROWTH = 4.0
 
 def _settled_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float, float]],
                        x: np.ndarray, cap: int, tol: float,
-                       area: np.ndarray) -> tuple[np.ndarray, int]:
+                       area: np.ndarray) -> tuple[np.ndarray, int, bool]:
     """Repeat a Le Bail ``cycle`` until one moves a share ``tol``, at most ``cap``.
 
     The partition is the Richardson-Lucy step (Richardson 1972, *J. Opt. Soc.
@@ -609,7 +609,8 @@ def _settled_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float, fl
 
     It changes the path and never the fixed point, and an exact overlap keeps
     its ratio, because each extrapolation is a sum of terms in that ratio.  The
-    test always reads a plain cycle.  Returns the intensities and the cycles run.
+    test always reads a plain cycle.  Returns the intensities, the cycles run and
+    whether a cycle met ``tol``, which a cycle at the cap may do.
     """
     run, limit = 0, 1.0
     while run < cap:
@@ -617,15 +618,18 @@ def _settled_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float, fl
             x, share, _ = cycle(x)
             run += 1
             if share <= tol:
-                break
+                return x, run, True
             continue
         once, _, start = cycle(x)
         twice, share, _ = cycle(once)
         run += 2
         step, bend = once - x, twice - 2.0 * once + x
         norm = math.sqrt(float((area * bend * bend).sum()))
-        if share <= tol or norm == 0.0:
-            return twice, run
+        if share <= tol:
+            return twice, run, True
+        if norm == 0.0:             # a steady drift gives no steplength
+            x = twice
+            continue
         reach = math.sqrt(float((area * step * step).sum())) / norm
         alpha = -max(1.0, min(reach, limit))
         landed, _, reached = cycle(np.maximum(x - 2.0 * alpha * step + alpha * alpha * bend,
@@ -638,7 +642,7 @@ def _settled_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float, fl
         else:
             x = twice
             limit = max(1.0, limit / SQUAREM_STEP_GROWTH)
-    return x, run
+    return x, run, False
 
 
 @dataclass(frozen=True)
@@ -3209,7 +3213,9 @@ class CompiledModel:
 
     # ------------------------------------------------------------------
     def lebail_update(self, values: dict[str, float], n_cycles: int = 1,
-                      *, tol: float = 0.0) -> int:
+                      *, tol: float = 0.0,
+                      check: Callable[[], None] | None = None
+                      ) -> tuple[int, bool | None]:
         """Refresh per-hkl intensities by observed-intensity partitioning.
 
         Per-hkl intensities are shared across emission lines: reflection k
@@ -3250,18 +3256,24 @@ class CompiledModel:
         profiles are built once.  The adds keep the order the per-reflection
         loop had, so a fixed count is bit-identical to it: ``np.add.at`` on one
         buffer, and each window's own ``sum``, which ``reduceat`` is not bit
-        for bit.
+        for bit.  A partition with a stop has no such loop to match, so it
+        takes ``reduceat``.
+
+        ``check`` runs before every cycle, because a partition can outlast a
+        whole solve and a cancel must not wait for it.  What it raises leaves
+        the at-rest buffers as they were.
 
         Runs *between* least-squares solves, so it may commit to the at-rest
         buffers — but it threads the intensity vectors functionally through its
         own cycles and writes each phase's buffer exactly once at the end.
 
-        Returns the cycles it ran.
+        Returns the cycles it ran, and whether a cycle met ``tol``: ``None`` at
+        ``tol=0``, or where nothing ran, since nothing was asked.
         """
         if self.mode not in ("lebail", "pawley"):
             raise RuntimeError("lebail_update on a Rietveld-mode model")
         if n_cycles < 1:
-            return 0
+            return 0, None
         xp = get_backend()
         # clause 3, and the one thing a peak-landing member costs that a
         # background-landing one does not: a hump is inside ``background``
@@ -3282,6 +3294,8 @@ class CompiledModel:
         def cycle(x: np.ndarray) -> tuple[np.ndarray, float, float]:
             """One partition: the new intensities, the share of the Bragg counts
             that moved, and the Poisson likelihood of ``x`` the step climbs."""
+            if check is not None:
+                check()
             vectors = np.split(x, ends)
             # the total Bragg curve the reflections are shares of
             y_bragg = np.zeros(self.tt.shape, dtype=np.float64)
@@ -3301,7 +3315,9 @@ class CompiledModel:
                     good = denom > 1e-12
                     taken = np.divide(curve, denom, out=np.zeros_like(curve),
                                       where=good) * net[line.channel]
-                    num[line.first] += [taken[i0:i1].sum() for i0, i1 in line.spans]
+                    num[line.first] += (
+                        np.add.reduceat(taken, line.start) if tol > 0.0
+                        else [taken[i0:i1].sum() for i0, i1 in line.spans])
                     den[line.first] += np.where(
                         np.logical_or.reduceat(good, line.start),
                         line.w_line * line.mass, 0.0)
@@ -3316,14 +3332,14 @@ class CompiledModel:
 
         x = np.concatenate(intens)
         if tol > 0.0:
-            x, run = _settled_partition(cycle, x, n_cycles, tol, area)
+            x, run, settled = _settled_partition(cycle, x, n_cycles, tol, area)
         else:
-            run = n_cycles
+            run, settled = n_cycles, None
             for _ in range(n_cycles):
                 x, _, _ = cycle(x)
         for cp, vec in zip(self.phases, np.split(x, ends), strict=True):
             cp.hkl_intensity = vec
-        return run
+        return run, settled
 
     def _partition_terms(self, values: dict[str, float]) -> list[list[_PartitionLine]]:
         """Per phase, per emission line, what a Le Bail cycle does not change."""

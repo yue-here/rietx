@@ -4702,7 +4702,8 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
             "ignored in `rietveld` mode, where the intensities come from the structure."
         ),
         default="25000",
-        typical="leave as it is; set 3 with a tolerance of 0 for the count rietx ran before v1.12",
+        typical="leave as it is; set 3 with a tolerance of 0 for the fixed count of "
+                "earlier releases",
         anchor="theory/forward-model.html#three-intensity-models",
     ),
     "lebail_tol": HelpEntry(
@@ -5594,9 +5595,9 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         title="Le Bail cycles run",
         description=(
             "The cycles each partition of the stage ran, in order: before the solve, "
-            "then after it. A Pawley seed is the one entry. It is empty where none "
-            "ran: a Rietveld stage, a Pawley stage that carried its intensities in, "
-            "or a stage whose solve stopped."
+            "then after it. A Pawley seed is the one entry. A stage whose solve "
+            "stopped has only the partition before it. It is empty where none ran: a "
+            "Rietveld stage, or a Pawley stage that carried its intensities in."
         ),
     ),
     "StageResult.lebail_settled": HelpEntry(
