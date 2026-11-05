@@ -263,7 +263,7 @@ per-pattern one is an array.
 - [x] **Evaluation and derivative rules.** One tree on every `xp`, the rewrites
   and conventions under § Derivatives, and `debye(x)`. Check by random trees
   against complex-step, plus adversarial points (0, 1e-8, T = T_c).
-- [ ] **The block.** One `DerivedBlock` subclass, its declared reach read off the
+- [x] **The block.** One `DerivedBlock` subclass, its declared reach read off the
   tree, the follower paths written, and a cross-backend row. Build it on
   `ParameterTable` so a single fit is one caller away, and record what
   `Parameter.expr` becomes.
