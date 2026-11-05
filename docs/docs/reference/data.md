@@ -236,7 +236,7 @@ Its first five fields describe the crystal, and the rest describe what this spec
 | `Phase.gauss_strain` | `Parameter` | 0.0 deg², ≥ 0 | Gaussian strain broadening, as tan²θ |
 | `Phase.magnetic_lor_size` | `Parameter` | 0.0 deg, ≥ 0 | extra Lorentzian size broadening of the magnetic intensity alone |
 | `Phase.magnetic_lor_strain` | `Parameter` | 0.0 deg, ≥ 0 | extra Lorentzian strain broadening of the magnetic intensity alone |
-| `Phase.extinction` | `Parameter` | 0.0 µm², fixed, ≥ 0 | primary extinction, the squared mosaic-block size D², {eq}`corr-sabine`; 0 is no correction |
+| `Phase.extinction` | `Parameter` or `None` | `None`; a number declares it, in µm², ≥ 0 | primary extinction, the squared mosaic-block size D², {eq}`corr-sabine`; 0 is no correction, and a plan frees it only once declared |
 | `Phase.preferred_orientation` | `PreferredOrientation` or `None` | `None` | March-Dollase preferred orientation, {eq}`corr-md` |
 | `Phase.texture` | `SphericalHarmonicTexture` or `None` | `None` | spherical-harmonics texture, {eq}`corr-sh` |
 | `Phase.microstrain` | `StephensStrain` or `None` | `None` | anisotropic strain, a width per hkl, {eq}`ms-sigma` |
@@ -441,7 +441,7 @@ The block replaces it: the width reads zero for `lor_strain` while a block is de
 
 σ²(M) ≥ 0 couples all fifteen coefficients, so it cannot be a bound.
 The default solver holds it as a linear inequality.
-Under `solver="trf"`, and in a joint fit, [`STEPHENS_STRAIN_NOT_POSITIVE`](diagnostics-refinement.md#stephens_strain_not_positive) reports where it fails.
+Under `solver="trf"`, and in a joint fit, [`STEPHENS_STRAIN_NOT_POSITIVE`](diagnostics-corrections.md#stephens_strain_not_positive) reports where it fails.
 
 ### March-Dollase preferred orientation
 

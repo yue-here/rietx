@@ -26,15 +26,11 @@ carrying everything costs 838 iterations against 904 for a narrower glob, with
 identical Rwp), and :data:`CARRY_HELP` is that sentence where the editor can
 show it.
 
-**The disagreement between the two chains is reported as a number here, not as a
-field on a diagnostic.**  ``SEQUENTIAL_PATH_DEPENDENT`` is a
-:class:`~rietx.schemas.common.Diagnostic`, which carries ``where`` and no
-magnitude — the wall WP-1012 hit displaying guard diagnostics per node, and left
-to WP-1003 as a freeze question.  It does not need answering: the two chains'
-trajectories are both in hand, so :func:`trajectories` recomputes the combined-σ
-distance the same way :func:`sequential._path_dependence_diagnostics` does and
-serves it per path.  A panel can then rank by disagreement without a schema
-change.
+**The disagreement between the two chains is read off the series' record.**
+``SeriesResult.direction_gaps`` holds every path's gap at every pattern in
+combined esds, with no threshold (WP-2003, C5), so :func:`trajectories` serves
+each path's largest as ``n_sigma`` and recomputes nothing.  No path is called
+path-dependent: the 3σ verdict that once set ``path_dependent`` is gone.
 """
 
 from __future__ import annotations
@@ -43,16 +39,11 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 from ..schemas.pattern import PatternData
-from ..schemas.sequential import SeriesResult
+from ..schemas.sequential import SeriesResult, _rejected
 from ..sequential import (
     DIRECTIONS,
-    PATH_DEPENDENCE_SIGMA,
     REFIT_MODES,
-    _angle_difference,
-    _noise_floor,
     unique_labels,
 )
 from .imports import UploadStore, preview_pattern
@@ -325,26 +316,27 @@ def trajectories(series: SeriesResult,
     """Every parameter's path across the series, plus the QPA fractions.
 
     One entry per dot-path in first-seen order, then one ``qpa.<phase>`` per
-    phase a Rietveld fit weighed.  ``path_dependent`` is read off the series'
-    **own** diagnostics rather than recomputed — the fence is the library's
-    judgement — and ``discontinuous`` off its ``steps``: true where a step of
-    that path was re-measured cold (``fit(verify_steps=k)``), the plot's
-    shading rule, since ``steps`` calls no step a jump (WP-2003).  ``n_sigma``
-    is computed here because no diagnostic carries a magnitude (see the module
-    docstring).
+    phase a Rietveld fit weighed.  ``n_sigma`` is the path's largest
+    forward-backward gap in combined esds, read off
+    ``SeriesResult.direction_gaps`` (WP-2003, C5), ``None`` where no row of
+    the path has a size or the comparison did not run.  ``gap_at`` names the
+    pattern that gap sits at and the rung each chain kept there, so a panel
+    can say when the two chains kept different attempts and the gap measures
+    the ladder as well as the order.  It is ``None`` exactly where
+    ``n_sigma`` is.  The steps between neighbouring patterns are not repeated
+    here: they are ``SeriesResult.steps``, served whole in ``result``.
 
     ``relative`` paths keep their backward values and get no ``n_sigma``,
-    because the fence abstains on them (``sequential._relative_paths``): a
-    coordinate DOF is the step from where each fit began, and the two chains
-    begin a pattern from opposite neighbours, so its disagreement would rank
-    top on a series whose coordinates agree (WP-1333).
-
-    ``angles`` paths are compared modulo a turn, as the fence compares them
-    (``sequential._angle_paths``, #604).
+    because the record has no row for them (``sequential._relative_paths``).
+    ``angles`` is kept for the caller's signature; the record already compares
+    those paths modulo a turn (#604).
     """
-    unstable = {d.where[0] for d in series.diagnostics
-                if d.code == "SEQUENTIAL_PATH_DEPENDENT" and d.where}
-    jumps = {s.path for s in series.steps or [] if s.cold_ratio is not None}
+    # the record lists gaps largest |gap_esd| first, so the first row of a
+    # path with a size is its largest
+    largest: dict[str, Any] = {}
+    for g in series.direction_gaps or []:
+        if g.gap_esd is not None:
+            largest.setdefault(g.path, g)
     names = list(series.paths(varied_only=False))
     phases = []
     for entry in series.entries:
@@ -365,51 +357,25 @@ def trajectories(series: SeriesResult,
         row = {"path": path, "x": list(traj.x), "x_label": traj.x_label,
                "value": list(traj.value), "stderr": list(traj.stderr),
                "labels": list(traj.labels),
-               "path_dependent": path in unstable,
-               "discontinuous": path in jumps,
-               "backward": None, "n_sigma": None}
+               "backward": None, "n_sigma": None, "gap_at": None}
         # Only an ordinary parameter path gets a forward/backward comparison.
-        # A prefixed one is derived, not refined: ``_disagreement`` divides by
-        # a combined σ, and a QPA's is a propagated one while an agreement
-        # index has none at all, so both would be a different question wearing
-        # the same answer's shape.  Asked of the resolver via ``is_derived_path``
-        # so a fourth kind cannot be added without this line seeing it.
+        # A prefixed one is derived, not refined: a QPA's esd is a propagated
+        # one while an agreement index has none at all, so a gap would be a
+        # different question wearing the same answer's shape.
         if backward is not None and not series.is_derived_path(path):
             other = backward.trajectory(path)
+            # the drawn curve needs the two walks point for point; the gap
+            # does not, the record having paired them by label
             if len(other) == len(traj):
                 row["backward"] = list(other.value)
-                if path not in relative:
-                    row["n_sigma"] = _disagreement(traj, other,
-                                                   angle=path in angles)
+            top = largest.get(path)
+            if path not in relative and top is not None:
+                row["n_sigma"] = abs(top.gap_esd)
+                row["gap_at"] = {"label": top.label, "index": top.index,
+                                 "forward_rung": top.forward_rung,
+                                 "backward_rung": top.backward_rung}
         out.append(row)
     return out
-
-
-def _disagreement(forward, backward, *, angle: bool = False) -> float | None:
-    """The largest forward/backward difference in combined σ, or ``None``.
-
-    Deliberately the same arithmetic as
-    :func:`sequential._path_dependence_diagnostics` — combined σ, the relative
-    noise floor, ``nanargmax`` — so the number a panel sorts by is the number the
-    fence fired on.  ``None`` where the fence itself abstains: a parameter with
-    no esd in either chain cannot be judged this way, and reporting 0 would read
-    as agreement it has not earned.  ``angle`` takes the difference modulo a
-    turn, the fence's ``_angle_difference``.
-    """
-    _, vf, sf = forward.arrays()
-    _, vb, sb = backward.arrays()
-    # the fence judges a pattern only where both chains measured an esd
-    comparable = np.isfinite(sf) & np.isfinite(sb)
-    combined = np.sqrt(np.nan_to_num(sf) ** 2 + np.nan_to_num(sb) ** 2)
-    if not np.any(comparable & (combined > 0.0)):
-        return None
-    gap = np.abs(_angle_difference(vf - vb) if angle else vf - vb)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        n_sigma = gap / np.where(combined > 0.0, combined, np.nan)
-    n_sigma = np.where(gap > _noise_floor(vf, vb), n_sigma, 0.0)
-    n_sigma = np.where(comparable, n_sigma, 0.0)
-    value = float(np.nanmax(n_sigma))
-    return value if np.isfinite(value) else None
 
 
 def result_payload(series: SeriesResult, backward: SeriesResult | None, *,
@@ -424,11 +390,16 @@ def result_payload(series: SeriesResult, backward: SeriesResult | None, *,
     the per-pattern plot is served from the runner in memory and a panel must
     know which rows it may open.
 
-    ``path_dependent`` is hoisted to the top level because it is the **headline**
-    and not a footnote: a smooth curve is exactly what a poisoned chain produces
-    (WP-0505's measured lesson), so the one check that separates a measured
-    trajectory from an ordering artefact cannot be something a user has to scroll
-    to.
+    No path is hoisted as path-dependent: ``SeriesResult.direction_gaps``, in
+    ``result``, ranks every gap with no threshold (WP-2003, C5), and each
+    trajectory's ``n_sigma`` is its largest.
+
+    ``rejected`` says per entry whether the library quarantined it, by the
+    test the chain itself applies (:func:`~rietx.schemas.sequential._rejected`:
+    the solver diverged, or the fit carries an ``error``-level code), so the
+    panel marks what the library marked and re-derives nothing.  A rejected
+    entry is the one ``SEQUENTIAL_UNRECOVERED`` names: it seeded no successor
+    and joined no median.
 
     ``relative`` is the runner's ``sequential._relative_paths``, and
     ``angles`` its ``sequential._angle_paths``, both passed on to
@@ -437,12 +408,9 @@ def result_payload(series: SeriesResult, backward: SeriesResult | None, *,
     return {
         "result": series.model_dump(mode="json"),
         "trajectories": trajectories(series, backward, relative, angles),
-        "path_dependent": sorted({d.where[0] for d in series.diagnostics
-                                  if d.code == "SEQUENTIAL_PATH_DEPENDENT"
-                                  and d.where}),
-        "path_dependence_sigma": PATH_DEPENDENCE_SIGMA,
         "has_backward": backward is not None,
         "n_iterations": series.n_iterations,
         "curves": list(curves),
+        "rejected": [_rejected(entry) for entry in series.entries],
         "running": running,
     }

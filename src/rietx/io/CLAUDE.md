@@ -48,11 +48,17 @@ order in `base.ascending()`, the one place it lives:
 
 | deviation | verdict | action |
 |---|---|---|
+| NaN or ±inf in 2θ, count or σ | report — the file states no value there; a zero monitor's division writes one | drop the row **first**, `PATTERN_ROWS_DROPPED` naming the 2θ runs; no finite row left → **raise** |
 | strictly descending | report — the same measurement stored backwards; reversal is lossless | reverse, `PATTERN_SCAN_REVERSED` |
 | duplicate 2θ, equal y | report — a format artefact | drop the repeat, `PATTERN_DUPLICATE_POINTS` |
 | duplicate 2θ, **different** y | contradiction — averaging invents a datum, dropping picks one | **raise**, naming the 2θ |
 | non-monotone (stitched, restarts) | contradiction — concatenate, sort or separate are three measurements | **raise**; name `scan=` only where the format has it |
 | non-constant step | neither | nothing — SRM 660c is 24 stitched regions and is legal |
+
+The finite-row drop (`base.finite_rows`, WP-2079): **a reader's decisions before
+`ascending` skip non-finite values and drop none of their rows**, so the report
+sees every one. pdCIF keeps σ = +∞ (its zero-weight marker), Bruker RAW refuses
+(stride evidence), and `pattern_data` refuses whatever non-finite value is left.
 
 `ascending(..., fmt=)` takes the format so the non-monotone refusal names
 `scan=` **only** where the option exists: telling someone to select a scan in a
@@ -206,8 +212,8 @@ three formats that state an axis use the same three-way policy:
 - unrecognisable → read as 2θ **and say so** (`PATTERN_X_AXIS_ASSUMED`).
 
 **The second row is declared, never inferred** (no *value* can decide it: a GSAS
-**bintype** or a stated `xy` unit comment settles it, a bare mention with no
-unit takes the fourth row). `base.pattern_data(..., axis=...)` is the only way one is
+**bintype**, a stated `xy` unit or the caller's `axis=` on `xy` settles it, a bare
+mention with no unit takes the fourth row). `base.pattern_data(..., axis=...)` is the only way one is
 declared (default `"two_theta"`); `gsas` refuses a file whose banks are not
 all one axis kind. **A bank is a detector and picking one is the caller's**:
 `read_gsas(path, bank=n)` selects by the file's own `BANK` number, and
@@ -290,7 +296,7 @@ a convention, which is the one repair a reader may never make.
 | `dif_peaklist` | `.dif` **and** peak-list content | — | refused; matched on evidence not suffix, so a real profile misnamed `.dif` still reaches `xy` |
 | `peak_list` | the `.pks` (Stoe) or `.udi` (PANalytical) suffix, **unless** the file reads as a plain two-column profile | — | refused; matched on the *name*, because no sample of either format could be obtained — and the message says so rather than implying a content test. The negative gate keeps `.dif`'s escape |
 | `total_scattering` | an `#L` line labelling r against G/g or Q against S/F, or a PDFgetX2 (`History written` + `Get_XPDF` banner) or PDFgetX3 (`[DEFAULT]`, bare in 2.1.0 or behind `#` in 1.0, + `qmaxinst`/a version) header, **whatever the suffix**; with neither, the `.gr`/`.sq`/`.fq` suffix alone — directly above `xy`, the one entry these files fell to (#1240) | — | refused with `PATTERN_TOTAL_SCATTERING` at `error`, appended to `diagnostics=` and carried on `TotalScatteringRefused.diagnostic`: the one refusal with a code, so a caller branches on what the file *is*. PDFgetX2's `#L` line sits ~6 kB in, past the window, so its **banner** is the content evidence rather than a bounded escalation; and its lines end `\r\n`, which `$` under `re.M` does not match. A suffix-only match says so and offers the rename escape; an `#L` labelling I against Q is a diffraction pattern and not claimed. Reading these files is #192, fenced. No fixture in `test_readers_robust.py` (§ Adding a format, step 4): a refusal parses nothing, as for `dif_peaklist` and `peak_list` |
-| `xy` | text, not binary — **last of the readers** | third column when written | a NUL in the first 4 kB is refused by name unless behind a BOM: ASCII-range UTF-16LE is valid UTF-8 with interleaved NULs, and Windows vendor software exports it. **A row is data only at the file's most common column count** (a tie goes to the last row's), and the rest are dropped and reported by line (`PATTERN_ROWS_DROPPED`): a numeric header row parsed on its first three tokens was a point at (0, 1) (#266), and a count taken as the *minimum* let one row cut short strip σ from every row. **A comment stating the x-axis unit is read** (Mantid's `' The X-axis unit is: Time-of-flight` → a TOF pattern; `dSpacing`, `MomentumTransfer`, `Wavelength`, `Energy` → refused by name; anything else stated → `PATTERN_X_AXIS_ASSUMED` quoting it). The pattern requires the word `axis` or `unit` and an `x` starting a word, so a comment that merely ends in a colon (`# Max: 90`) does not read as a stated unit of "90". **A FullProf `XYDATA` file's five heading lines are a heading** (manual p. 74): `TEMP tsamp` becomes `temperature_k`, and an `INTER` multiplier other than 1 or `Interpol = 1` is refused by name, since FullProf would scale or interpolate what this reader reads as written |
+| `xy` | text, not binary — **last of the readers** | third column when written | a NUL in the first 4 kB is refused by name unless behind a BOM: ASCII-range UTF-16LE is valid UTF-8 with interleaved NULs, and Windows vendor software exports it. **A row is data only at the file's most common column count** (a tie goes to the last row's), and the rest are dropped and reported by line (`PATTERN_ROWS_DROPPED`): a numeric header row parsed on its first three tokens was a point at (0, 1) (#266), and a count taken as the *minimum* let one row cut short strip σ from every row. **A comment stating the x-axis unit is read** (Mantid's `' The X-axis unit is: Time-of-flight` → a TOF pattern; `dSpacing`, `MomentumTransfer`, `Wavelength`, `Energy` → refused by name; anything else stated → `PATTERN_X_AXIS_ASSUMED` quoting it). The pattern requires the word `axis` or `unit` and an `x` starting a word, so a comment that merely ends in a colon (`# Max: 90`) does not read as a stated unit of "90". **A FullProf `XYDATA` file's five heading lines are a heading** (manual p. 74): `TEMP tsamp` becomes `temperature_k`, and the `INTER` multipliers are **applied** as defined (x × `fac_x`, y and σ × `fac_y`, `XYDATA_INTER_APPLIED`); a file with no σ column takes the fallback on the multiplied y, √(fac_y·y), which the manual leaves open and FullProf 8.20 run as a black box settles. `Interpol = 1` stays refused by name, since interpolating to a constant step makes a different pattern. **`axis=` is the caller's declaration** (`AxisKind`'s spellings, #1064), for a headerless bank that has nothing else to say what x is: recorded as `declared_axis`, never inferred, and a unit the file states that contradicts it is **refused quoting both**, never resolved by picking one; every other format states its own axis and drops the option |
 | `raw_unclaimed` | a binary `.raw` every reader above declined — **last of everything**, so it can shadow nothing | — | refused, **claiming nothing**: it names the six vendors who write `.raw`, says this build reads Bruker v2 (single-range)/v3/v4 and Philips PC-APD, and picks none. This is where a Stoe reader hangs if files ever arrive — the cheap ask is a few `.raw` files paired with the WinXPOW ASCII export of the *same* scans, which is an exact oracle |
 
 ## `recipe.py` — a whole refinement, and **not** a pattern format
@@ -322,28 +328,26 @@ it. Chapter: `docs/docs/reference/recipe.md`; measured convention table:
 ## Adding a format
 
 1. **Check the fixture licence per *file*, before writing the reader.** A repo
-   LICENSE covers the repo's own work, not user-contributed instrument output,
-   and a repo may have none at all. This has already cost the two best fixtures
-   found (`xrd-toolkit`'s real `.ras`; every real `.uxd`). If a file cannot be
-   vendored, that format's whole test strategy changes — and what the real file
-   established goes in `tests/data/README.md` regardless, since that is then the
-   only place the design is checkable.
-2. **Byte offsets, magic strings, tag names and element paths are
-   specification facts** — merger, not expression — so they may be written down
-   from any source, including one whose licence would bar a port. Extract them
-   into a table first, then write the parser **with the source file closed**.
-   `ATTRIBUTION.md` § Format specifications records which source each came from.
-3. One module, exporting a `PatternFormat`; add it to `PATTERN_FORMATS` in
-   dispatch order and say why the position is right.
-4. Add its fixture to `test_readers_robust.py` — `REAL_FIXTURES` if it has one,
-   the synthetic arm if it cannot. A **binary** format's synthesized fixture is
-   written in `tests/writers_xrd.py` and **packs its offsets literally, never
-   from the reader's own table**: a writer that shares constants with the parser
-   can only confirm that the parser agrees with itself. Text formats' writers
-   stay inline in `test_readers.py`, where a line is self-describing and the
-   circularity does not arise.
-5. A new rule lands here; it earns a root CLAUDE.md clause only if it changes
-   behaviour outside `io/`.
+LICENSE covers the repo's own work, not user-contributed instrument output, and
+a repo may have none at all. This has already cost the two best fixtures found
+(`xrd-toolkit`'s real `.ras`; every real `.uxd`). If a file cannot be vendored,
+that format's whole test strategy changes — and what the real file established
+goes in `tests/data/README.md` regardless, since that is then the only place the
+design is checkable. 2. **Byte offsets, magic strings, tag names and element
+paths are specification facts** — merger, not expression — so they may be
+written down from any source, including one whose licence would bar a port.
+Extract them into a table first, then write the parser **with the source file
+closed**. `ATTRIBUTION.md` § Format specifications records which source each
+came from. 3. One module, exporting a `PatternFormat`; add it to
+`PATTERN_FORMATS` in dispatch order and say why the position is right. 4. Add
+its fixture to `test_readers_robust.py` — `REAL_FIXTURES` if it has one, the
+synthetic arm if it cannot. A **binary** format's synthesized fixture is written
+in `tests/writers_xrd.py` and **packs its offsets literally, never from the
+reader's own table**: a writer that shares constants with the parser can only
+confirm that the parser agrees with itself. Text formats' writers stay inline in
+`test_readers.py`, where a line is self-describing and the circularity does not
+arise. 5. A new rule lands here; it earns a root CLAUDE.md clause only if it
+changes behaviour outside `io/`.
 
 ## Project readers (`io/projects/`)
 
@@ -394,14 +398,13 @@ same reason. Six rules the pattern readers do not need:
   WP-1118's six grammar corrections are invisible to any sweep (a parameter's
   *name* is its refine flag; a block comment *nests*; a conditional is a token,
   not a line). Enumerate the keyword space from the spec, classify **every**
-  name read / refused / deliberately ignored, and decide even at zero
-  incidence. Numbers: `tests/data/README.md` and the WP. **That classification is
-  a table, not a habit** — `projects/coverage.py` declares one stance per
-  construct (read / ignored / reported / refused) with the argument for it, and
-  `PHASE_SCOPE` is partitioned against the spec's own phase tree by test, so a
-  keyword without a stance fails rather than being dropped in silence. Support
-  for a construct arrives by moving its row; until then every import that meets
-  it says so.
+  name read / refused / deliberately ignored, and decide even at zero incidence.
+  Numbers: `tests/data/README.md` and the WP. **That classification is a table,
+  not a habit** — `projects/coverage.py` declares one stance per construct (read
+  / ignored / reported / refused) with the argument for it, and `PHASE_SCOPE` is
+  partitioned against the spec's own phase tree by test, so a keyword without a
+  stance fails rather than being dropped in silence. Support for a construct
+  arrives by moving its row; until then every import that meets it says so.
 - **A reader that *runs* what it reads resolves an allow-list, and refuses a
   name rather than a record** (WP-1118). A `.gpx` is a sequence of pickles, so
   loading one calls whatever it names: `projects/gsas2.ALLOWED_GLOBALS` is the
@@ -509,8 +512,7 @@ black box, never its source, recorded with its version.
 A writer is its own reader's inverse and its acceptance is the **round trip**:
 export, re-import, compare field by field. No fixture is needed and none is
 added, which is what made this the cheapest adversarial test the readers have.
-Four rules the readers do not need (WP-1118, four formats: `.inp`, `.pcr`,
-`.EXP`, `.prm`).
+Rules the readers do not need (WP-1118: `.inp`, `.pcr`, `.EXP`, `.prm`).
 
 - **Refuse on the way out whatever the reader refuses on the way in**, and
   refuse it where the value is still in hand rather than leaving the file on
@@ -543,6 +545,10 @@ Four rules the readers do not need (WP-1118, four formats: `.inp`, `.pcr`,
   too: a line break splits a card in two under keys nothing wrote, and a
   character the file's encoding cannot spell must be refused at the field
   rather than at the encode, which names a byte offset into the finished file.
+- **A fact two programs read differently gets an oracle** (WP-1527, WP-1911; a
+  species, a setting, a scale), since a round trip passes whatever the target
+  makes of it: a test that reads the file by the target's measured rule, shares
+  nothing with this reader, and is held first to its measurement table.
 - **A flag narrower than the model merges free, and the group is named.** GSAS
   states one refine flag for a whole cell and one for a site's three
   coordinates, both meaning "as symmetry permits". Freeing keeps more of the

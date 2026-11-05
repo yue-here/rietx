@@ -187,15 +187,12 @@ def _lab6_fit(widths: dict[str, float], tag: str) -> rx.RefinementResult:
 
 
 def _answer(result: rx.RefinementResult) -> dict:
-    """Every refined parameter by path, with the axial pair unordered.
+    """Every refined parameter by path.
 
-    The Finger-Cox-Jephcoat profile is symmetric in S/L and H/L, so one answer
-    can be reported with the two values either way round.
+    The Finger-Cox-Jephcoat profile is symmetric in S/L and H/L, so the
+    protocol frees S/L alone and holds H/L (WP-2012), and no pair is ordered.
     """
-    rows = {p.path: p for p in result.parameters if p.vary}
-    if rows[SL].value > rows[HL].value:
-        rows[SL], rows[HL] = rows[HL], rows[SL]
-    return rows
+    return {p.path: p for p in result.parameters if p.vary}
 
 
 def test_the_peak_width_start_does_not_change_the_answer():
@@ -240,8 +237,11 @@ def test_the_peak_width_start_does_not_change_the_answer():
     an esd, except starts with x at 0.02 or 0.03.  Those land 0.38 esd away in
     u, at χ² 0.25 % lower, for each w tried (1e-3, 2e-2, 3e-2).  Starts with x
     at 0.01 or 0.05 land here again.  The two are distinct minima, 46.7 apart
-    in absolute χ² (N = 5332), the one from x = 0.03 the deeper, and nearly
-    mirror images under the S/L ↔ H/L swap the profile is symmetric in.  Their
+    in absolute χ² (N = 5332), the one from x = 0.03 the deeper.  They were
+    nearly mirror images under the S/L ↔ H/L swap while both ratios were free,
+    but the swap does not make them: with H/L held at 0.025 (WP-2012,
+    2026-11-02) the protocol still has two minima 0.24 % apart in χ², differing
+    in u by 0.6 esd, and the shipped start still reaches the shallower.  Their
     (100) reflections carry 39 and 40 FCJ nodes, but forcing either count at
     fixed parameters moves χ² by 1.4, and a refit at the other count moves u
     by 0.005 esd, so the count follows the widths and does not cause the split
@@ -280,7 +280,8 @@ def test_the_peak_width_start_does_not_change_the_answer():
 
     widths = {f"instrument.profile.{name}" for name in TCHZ_DEFAULTS}
     assert widths | {"phases.0.atoms.0.biso", "phases.0.atoms.1.biso",
-                     "phases.0.scale", "phases.0.cell.a", SL, HL} <= set(reference)
+                     "phases.0.scale", "phases.0.cell.a", SL} <= set(reference)
+    assert HL not in reference, "the protocol holds H/L (WP-2012)"
     for tag in ("narrow", "wide"):
         other = answers[tag]
         assert set(other) == set(reference), tag

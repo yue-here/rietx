@@ -47,15 +47,15 @@ ref = rx.Refinement(lab6, rx.Instrument.debye_scherrer(wavelength=0.4139),
                     history=False)
 
 rows = ref.parameters()
-assert len(rows) == 42                                  # every scalar, held ones included
-assert sum(row.refinable for row in rows) == 25         # what set_vary could free
+assert len(rows) == 41                                  # every scalar, held ones included
+assert sum(row.refinable for row in rows) == 24         # what set_vary could free
 
 held = {row.path: row.held_because for row in rows if not row.refinable}
 assert held["phases.0.cell.b"] == "tied: = 1·phases.0.cell.a"
 assert held["phases.0.cell.alpha"] == "structurally fixed by symmetry or by the model"
 ```
 
-Two atoms and a default instrument make 42 rows, of which 25 could be freed.
+Two atoms and a default instrument make 41 rows, of which 24 could be freed.
 
 | Field | Type | Holds |
 |---|---|---|
@@ -100,7 +100,7 @@ The structural reasons come next, then the mode, then a hold, then the wavelengt
 A Le Bail phase's held atom therefore names the mode, which is the reason that would still hold if the hold went.
 
 The counts of the five do not add up to the number of held rows.
-On the LaB6 table above, the Le Bail listing marks 12 rows `mode_fixed`, while the refinable count falls only from 26 to 20, because 6 of the 12 were already locked or tied.
+On the LaB6 table above, the Le Bail listing marks 12 rows `mode_fixed`, while the refinable count falls only from 25 to 19, because 6 of the 12 were already locked or tied.
 Read `refinable` for the decision, and the five flags only to explain it.
 
 ```python
@@ -118,7 +118,7 @@ ref = rx.Refinement(lab6, rx.Instrument.debye_scherrer(wavelength=0.4139),
 
 lebail = ref.parameters(mode="lebail")
 assert sum(row.mode_fixed for row in lebail) == 12
-assert sum(row.refinable for row in lebail) == 20
+assert sum(row.refinable for row in lebail) == 19
 ```
 
 `Refinement.parameters` takes `mode` because the mode the object carries is the one its last stage ran in, which before the first run is the `rietveld` default.
@@ -444,7 +444,7 @@ Read the diagnostic for the list, and the flag when you are already iterating ro
 ### The table against the result
 
 The two views differ in size.
-A Le Bail fit of the 11-BM NAC pattern over 2-24° gives 73 rows from `Refinement.parameters` and 31 from `RefinementResult.parameters`: 13 free, 18 tied and 42 fixed rows that the result leaves out.
+A Le Bail fit of the 11-BM NAC pattern over 2-24° gives 72 rows from `Refinement.parameters` and 31 from `RefinementResult.parameters`: 13 free, 18 tied and 41 fixed rows that the result leaves out.
 All 13 free rows come back `False`, and all 18 tied rows `None`: `cell.b`, `cell.c` and 16 symmetry-tied coordinates.
 Capping `cell.a` at 10.2500 Å against a free optimum of 10.2512 Å turns that one row `True` and takes Rwp from 0.1435 to 0.2163.
 The other parameters cover for a cell the fit is not allowed to reach.

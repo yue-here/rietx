@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import functools
 import math
+import numbers
 import os
 import re
 from collections.abc import Sequence
@@ -27,7 +28,12 @@ from typing import ClassVar, Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from .common import Base, Parameter, _InheritsDeclaredDefaults
+from .common import Base, Parameter, _InheritsDeclaredDefaults, declared_fills
+
+
+def _declared_extinction() -> Parameter:
+    """The range and unit a declared extinction coefficient takes (WP-1944)."""
+    return Parameter(value=0.0, min=0.0, unit="um^2")
 
 #: A lower bound at or under this is a bound at zero to
 #: :meth:`PreferredOrientation._r_bound_is_reachable`.  It is the value under
@@ -1236,6 +1242,8 @@ class DistortionModes(Base):
 class Phase(_InheritsDeclaredDefaults):
     """A crystalline phase: symmetry, cell, atoms, scale, sample broadening."""
 
+    _declared_optional: ClassVar[dict] = {"extinction": _declared_extinction}
+
     name: str
     space_group: str  # Hermann-Mauguin symbol or number-as-string, resolved via gemmi
     # The phase's symmetry operations as ``x,y,z`` triplets, when the phase
@@ -1284,12 +1292,15 @@ class Phase(_InheritsDeclaredDefaults):
     # low-angle reflections of a well-crystallised sample: each reflection's
     # integrated intensity is multiplied by
     # E(hkl) = E_B·sin²θ + E_L·cos²θ with a dimensionless x ∝ ext·|F|²·(λ/V)².
-    # ext = 0 ⇒ E ≡ 1 exactly (off by default), so it is opt-in and never
-    # perturbs a structure that does not free it.  Bounded at zero, and the
-    # staged plan seeds it off zero.
-    extinction: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, vary=False, min=0.0, unit="um^2")
-    )
+    # Opt-in (WP-1944): None ⇒ no extinction and no table entry, so no plan
+    # can free it.  Declare it with a number, ``phase.extinction = 0.0``,
+    # which the validator below turns into the bounded parameter; a stored
+    # value from an older file opens unchanged, as a declaration.  The
+    # structural plan's extinction stage frees only a declared phase, as its
+    # preferred-orientation and roughness stages do.  Measured over 69 fits
+    # before the change, the plan freeing it on every phase put one value
+    # past 3σ, on a synthetic pattern with none planted.
+    extinction: Parameter | None = None
     # Optional single-axis March-Dollase preferred-orientation correction
     # (model/preferred_orientation.py).  None ⇒ no correction; a block with the
     # default r = 1 is also exactly the identity, so it is opt-in and never
@@ -1497,6 +1508,35 @@ class Phase(_InheritsDeclaredDefaults):
                         "bodies by a restraint across them instead")
                 owner[label] = body.name
         return self
+
+    @field_validator("extinction", mode="before")
+    @classmethod
+    def _declare_extinction(cls, value):
+        """A number declares extinction at that value, bounded at its floor of 0.
+
+        ``phase.extinction = 0.0`` is the declaration a user writes, so it
+        must not need the unit and the bound spelled out.  A ``Parameter`` or
+        a dict that leaves ``min``, ``max`` or ``unit`` unset inherits them
+        from ``_declared_optional``, the rule every declared field follows
+        (issue #204).  The fill is made here as well as in
+        ``_inherit_declared_bounds``, because an assignment
+        (``phase.extinction = Parameter(value=0.0, vary=True)``, the other
+        way to declare it) runs this validator and not that one, and would
+        otherwise leave the coefficient unbounded below.
+        """
+        if isinstance(value, bool):
+            raise ValueError("extinction takes a number (µm²) or a Parameter; "
+                             "declare it with phase.extinction = 0.0")
+        if isinstance(value, numbers.Real):
+            return _declared_extinction().model_copy(update={"value": float(value)})
+        if isinstance(value, Parameter):
+            present, base = value.model_fields_set, value.model_dump()
+        elif isinstance(value, dict):
+            present, base = value.keys(), value
+        else:
+            return value
+        fills = declared_fills(_declared_extinction(), set(present))
+        return Parameter(**{**base, **fills}) if fills else value
 
     @field_validator("symmetry_operations", mode="before")
     @classmethod

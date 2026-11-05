@@ -1,6 +1,6 @@
 # WP-1542 — a Le Bail background left at its seed
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — fixture, skill protocol and tests landed (PR #1357); tasks 2-3 and the seed default wait on the maintainer
+Milestone: unscheduled · Status: 🔄 2026-11-05 — tasks 1-6 landed and Q1, Q2 ruled (PRs #1357, #1394); not closed by PR #1430, because the ruled cycle rule (task 7) was never built; next: task 7
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-01 — was P2: WP-2062 moves every site where rietx picks a structure-free fit to Pawley (decided 2026-11-01), so no default path will run Le Bail; a caller who picks `mode="lebail"` still meets this
@@ -176,7 +176,7 @@ here (2026-10-03, at the maintainer's request).
   (the 2026-10-11 entry from #726 above), not TCHZ terms reaching their bounds,
   so it is a fixture for task 4 and not a reproduction of that run.
 
-- **From WP-2002 (2026-10-19, PR #1050).** Batch class B11. GSAS-II's stand-alone `DoLeBail` runs 10 cycles by default (`GSASIIstrMain.py:761`), and FullProf's manual says "a few cycles (say 10)". On #740's pattern the Le Bail fit plateaus at Rwp 1.62 % from 100 to 400 cycles, against 1.09 % for the true structure (`2002-batch/i740.json`). More cycles close the 4.56 % to 1.62 % gap and not the rest. The batch proposes a converge-with-cap cycle rule inside this WP, pending the ruling.
+- **From WP-2002 (2026-10-19, PR #1050).** Batch class B11. GSAS-II's stand-alone `DoLeBail` runs 10 cycles by default (`GSASIIstrMain.py:761`), and FullProf's manual says "a few cycles (say 10)". On #740's pattern the Le Bail fit plateaus at Rwp 1.62 % from 100 to 400 cycles, against 1.09 % for the true structure (`2002-batch/i740.json`). More cycles close the 4.56 % to 1.62 % gap and not the rest. The batch proposed a converge-with-cap cycle rule inside this WP. *Ruled 2026-10-19: agreed. It is task 7, added 2026-11-05.*
 
 ## Non-goals
 
@@ -189,20 +189,31 @@ here (2026-10-03, at the maintainer's request).
       broad hump under the peaks, Le Bail from a low-percentile seed. Record
       the background's movement from its seed and the width terms per pass.
       `tests/test_lebail_background_hump.py`; numbers in the 2026-11-03 entry.
-- [ ] Name the test for "the background never left its seed while a width
+- [x] Name the test for "the background never left its seed while a width
       grew", with where its threshold comes from (measured here or quoted).
       *2026-11-03: the named test did not reproduce, and no statistic measured
-      separates the hump from the benign pedestal. Waits on the maintainer's
-      answer to Q1 of the 2026-11-03 entry.*
-- [ ] A finding that names it, on the Le Bail path at least. *Waits on Q1.*
+      separates the hump from the benign pedestal.* **Closed without a test,
+      2026-11-03, by the maintainer's ruling on Q1** (no finding; second
+      2026-11-03 entry).
+- [x] A finding that names it, on the Le Bail path at least. **Closed
+      without a finding, 2026-11-03, by the maintainer's ruling on Q1.** The
+      skill's held-SNIP rule and the starting-model plot carry it.
 - [x] The protocol: whether the Le Bail call should start from a SNIP estimate
       held under a low-order Chebyshev, as a default or as the skill's rule.
       Measure both on the fixture before choosing. *The skill's rule, settled
-      by Claude under the measurement (2026-11-03 entry). Whether
-      `auto_background`'s `seed` default moves is Q2, the maintainer's.*
+      by Claude under the measurement (2026-11-03 entry).* **Q2 ruled
+      2026-11-03 by the maintainer: `auto_background`'s `seed` default stays
+      `False`**, under DESIGN.md § Rules, Rule 4. `seed=True` stays an opt-in.
 - [x] Skill: SKILL.md §2 rule 5 and `references/judging.md` name
       `rietx.background.snip` and this failure.
 - [x] Tests, with obs/calc/diff PNGs to `tests/output/`.
+- [ ] The Le Bail cycle count converges under a cap (WP-2002's class B11, ruled
+      2026-10-19, `docs/wp/2002-batch/rulings.md`). Each stage repeats its
+      partition until the relative change falls under a tolerance, in place of
+      the fixed `lebail_cycles` = 3. Judge it against #740's true-structure Rwp
+      (1.09 %), never against 100 cycles. The `_audit` row
+      `StageSpec:lebail_cycles` cites this WP. It moves Le Bail numbers, so it
+      goes through the reader-output check.
 
 ## Acceptance
 
@@ -211,9 +222,9 @@ here (2026-10-03, at the maintainer's request).
 .venv/bin/python -m ruff check src tests examples
 ```
 
-On the hump fixture, the low-seed Le Bail fit reports the finding, and the
-protocol's fit leaves the hump in the background, with the width terms
-within their no-hump values.
+On the hump fixture, the protocol's fit leaves the hump in the background,
+with the width terms within their no-hump values. The low-seed fit reports
+no finding, by the maintainer's ruling of 2026-11-03 on Q1.
 
 ## References
 
@@ -223,6 +234,81 @@ within their no-hump values.
   `rietx.background.estimators` cites it.
 
 ## Handover log
+
+- **2026-11-05** — close-out runner, PR #1430. This WP stays open. Its six
+  listed tasks are done, but the maintainer ruled on 2026-10-19 that a Le Bail
+  stage's cycle count should converge under a cap "in WP-1542", and that work
+  never became a task. The tree still runs a fixed three cycles. A caller who
+  picks `mode="lebail"` meets the cost: on #740's pattern three cycles end at
+  Rwp 4.56 % and the plateau is 1.62 %. It is now task 7.
+
+  *How it was missed.* The Inherited entry from WP-2002 still read "pending the
+  ruling", though the ruling had come the same day. The 2026-11-03 entry's "no
+  task is open" counted the list as it stood. The audit row is the live claim:
+  `StageSpec:lebail_cycles`'s grounds read "Kept at 3 until WP-1542 replaces
+  it", `approved="2026-10-19"`. `model.lebail_update` still loops `n_cycles`
+  times with no tolerance (read at 541f0daf7).
+
+  *Why it stays open rather than moving.* The ruling names this WP. The
+  2026-11-01 decision that no default path runs Le Bail moved this WP to P3 and
+  reversed nothing, as WP-2062's decision 4 says. Settled by Claude under the
+  job's rule that an unfinished WP stays open. The alternative was to close and
+  forward task 7 to WP-2062, which would have reassigned a ruling.
+
+  *Verified.* The Acceptance rows pass on this branch: 259 passed over
+  `test_lebail_alternation`, `test_background_auto`, `test_skill` and
+  `test_lebail_background_hump` (`[dev]`, macOS arm64, 4 workers, another
+  worktree's tests beside them). Nothing else in this WP changed. Inherited
+  stays as it is while the WP is open.
+
+  Next: task 7. Then, at its close, the held SNIP and a declared background
+  peak on PbSO₄ and #726's pattern go to WP-2017, and #740's mechanism goes to
+  WP-2062, unless a session runs them here first. A withdrawn ruling would
+  close this WP instead, with the audit row's grounds rewritten.
+
+- **2026-11-03** — The maintainer ruled both questions of the entry below, in
+  chat (recorded by a ghostshift runner). The Le Bail path gets no finding for
+  a background left at its seed. `auto_background` keeps `seed=False` as its
+  default. WP-1542 has no maintainer question left open. Tasks 2 and 3 are
+  closed by the Q1 ruling, and task 4's note states the Q2 ruling.
+
+  *Q1, ruled: no finding.* The skill's held-SNIP rule carries the failure
+  (SKILL.md §2 rule 5, `references/judging.md`). So does the starting-model
+  plot, `data.plot(model=ref)` (WP-2039). Grounds: none of the three fit-based
+  tests measured below separates the hump fit from the benign pedestal fit.
+  The one data test that does separate them is `amorphous_hump_score`. On 30
+  real patterns it tracks lab against synchrotron data (its `_audit.py` row,
+  `HUMP_TRIGGER`). A finding keyed on it would rest on one synthetic fixture.
+  What would reopen Q1: a statistic that separates the two cases on real
+  patterns (PbSO₄ neutron, #726's lab pattern). WP-2062 putting Le Bail back
+  on a default path would reopen it too.
+
+  *Q2, ruled: the `seed` default stays `False`.* Grounds: DESIGN.md § Rules,
+  Rule 4's test for a new default. A data-derived start is not Rule 1's
+  kind 1, because a competent dissent is named. All seven surveyed programs
+  start the background from zero, a constant or the user's numbers
+  (`docs/practice.md`, the `auto_background:seed` row). Rule 4 also excludes
+  Rwp comparisons as evidence. That leaves #744's width number alone: the
+  Lorentzian X at 0.0565 unseeded against a true 0.001. `seed=True` stays an
+  opt-in. The #1286 ruling already seeds the held extinction screen.
+
+  *#725 and #833.* The 2026-10-08 entry says "#725 stays open on whether it
+  moves". That question is now answered: the default stays. #833's third
+  item asked the same and has the same answer. Closing or commenting on
+  either issue is for the lead's batch.
+
+  *For whoever next touches DESIGN.md.* § Background subsystem describes a
+  two-stage default. A robust estimate comes first. Then either the estimate
+  is held under a Chebyshev, or a P-spline is co-refined. The section does
+  not say whether the P-spline starts from the estimate. In the code it starts
+  at zero. This ruling reads "start from the estimate" as the v0.1 path only.
+  DESIGN.md is not edited here.
+
+  *Next:* the held SNIP and a declared background peak
+  (`instrument.extra_components`) on the PbSO₄ neutron histogram and #726's
+  lab pattern (Inherited), scored against a reference over the whole range.
+  That is what would lift SKILL.md rule 5 off tier 3. No task is open
+  beside it.
 
 - **2026-11-03** — PR #1357 (ghostshift runner). The failure now has a
   fixture in the tree, and the skill has a protocol that fixes it on that

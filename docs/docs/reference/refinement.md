@@ -196,9 +196,9 @@ Freed after the profile and the scale have settled, it gets only the intensity n
 
 Three diagnostics report the outcome.
 
-- [`HARMONIC_FRACTION`](diagnostics-refinement.md#harmonic_fraction) gives the refined weight as a percentage of the fundamental with its esd. The fractions reported for real instruments are a few per cent. Above 15 % it is reported at `warning`, since a fraction that large usually means the line is absorbing something else: an unindexed impurity, a magnetic contribution or a background too stiff to follow.
-- [`HARMONIC_ABSENT`](diagnostics-refinement.md#harmonic_absent) means the weight refined below 0.1 % of the fundamental. The beam carries no measurable order-n component, as a monochromator whose nth order is extinct must give, and the declaration can be dropped.
-- [`HARMONIC_HELD`](diagnostics-refinement.md#harmonic_held) means the weight was never freed, so the reported fraction is the declared value and is not a result.
+- [`HARMONIC_FRACTION`](diagnostics-corrections.md#harmonic_fraction) gives the refined weight as a percentage of the fundamental with its esd. The fractions reported for real instruments are a few per cent. Above 15 % it is reported at `warning`, since a fraction that large usually means the line is absorbing something else: an unindexed impurity, a magnetic contribution or a background too stiff to follow.
+- [`HARMONIC_ABSENT`](diagnostics-corrections.md#harmonic_absent) means the weight refined below 0.1 % of the fundamental. The beam carries no measurable order-n component, as a monochromator whose nth order is extinct must give, and the declaration can be dropped.
+- [`HARMONIC_HELD`](diagnostics-corrections.md#harmonic_held) means the weight was never freed, so the reported fraction is the declared value and is not a result.
 
 `diagnose(data)` runs a related check before any fit ([Contamination](pattern-diagnostics.md#contamination)).
 It asks whether several strong reflections carry a Kβ or tungsten Lα line at one common ratio, and needs no structure.
@@ -362,7 +362,7 @@ assert stage.lebail_cycles == 3
 
 `Stage.max_iter` bounds the solver's work.
 Both drivers count residual evaluations, so the bound is four evaluations per iteration, the measured worst case.
-A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER`](diagnostics-refinement.md#stage_max_iter), a result to read and not an exception.
+A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER`](diagnostics-stages.md#stage_max_iter), a result to read and not an exception.
 
 `Stage.ftol` overrides the plan's schedule for one stage: an early stage whose answer the next is unusually sensitive to, or a one-stage fit that must converge as hard as a last stage.
 
@@ -477,7 +477,7 @@ A pattern that matches no parameter is not an error, because that is how the shi
 
 A literal name, with no `*`, `?` or `[`, names one parameter.
 If the model has no such parameter the plan is wrong, through a typo or a renamed path.
-`StageResult.unknown_paths` lists it, and [`STAGE_PATH_UNKNOWN`](diagnostics-refinement.md#stage_path_unknown) reports it at `warning` with the nearest real name: `instrument.source.lines.0.wavelength` for a stage that names the wavelength without its line index.
+`StageResult.unknown_paths` lists it, and [`STAGE_PATH_UNKNOWN`](diagnostics-stages.md#stage_path_unknown) reports it at `warning` with the nearest real name: `instrument.source.lines.0.wavelength` for a stage that names the wavelength without its line index.
 It is a diagnostic and not an exception, because one plan runs every pattern of a series.
 A wrongly spelt family name inside a pattern looks like one that correctly matched nothing, so no rule can report it, and `freed` is the place to look.
 
@@ -489,7 +489,7 @@ A pattern under the instrument's `background_peaks`, the name up to v1.2, matche
 A literal phase name can also name a parameter the model will not free.
 An atom's coordinates refine along the directions its site symmetry allows, as `phases.0.atoms.2.dof.*`, and its `x`, `y` and `z` are each fixed or follow those directions.
 A cubic cell's `b` follows `a`.
-A stage naming such a parameter frees nothing for it, so [`STAGE_PATH_NOT_FREE`](diagnostics-refinement.md#stage_path_not_free) reports it at `warning` before the first stage runs, with the names that would free it.
+A stage naming such a parameter frees nothing for it, so [`STAGE_PATH_NOT_FREE`](diagnostics-stages.md#stage_path_not_free) reports it at `warning` before the first stage runs, with the names that would free it.
 For an oxygen on 16h in I4<sub>1</sub>/amd, `phases.0.atoms.2.x` is fixed at 0, and `y` and `z` follow `dof.0` and `dof.1`.
 A name you tied yourself is not reported, and neither is an instrument name: the shipped plans name `instrument.geometry.sample_displacement`, which a capillary geometry locks.
 A pattern can reach too far the other way: `phases.0.atoms.2.*` frees the site's `occ` and `biso` beside its directions, so write `phases.0.atoms.2.dof.*` for the position alone.

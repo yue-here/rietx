@@ -90,7 +90,7 @@ from ..schemas.plan import (
     check_phase_support_sigma,
 )
 from ..schemas.project import ProjectDoc, check_interval
-from ..strategy.staged import PLAN_PRESETS
+from ..strategy.staged import PLAN_PRESETS, resolve_plan
 
 #: The ``<magic> N`` header, where the magic is :data:`.._about.TEXTDOC_MAGIC`
 #: — the token is a format contract and lives with the other name-bearing
@@ -1255,7 +1255,11 @@ def apply(project, delta: Delta, peak_editor=None) -> list[str]:
         hits = project.refinement.set_vary(path, flag)
         calls.append(f"ref.set_vary({path!r}, {flag!r})  # {len(hits)} path(s)")
     if delta.plan is not None:
-        spec = (PlanSpec.from_plan(PLAN_PRESETS[delta.plan["preset"]]())
+        # a preset is stored expanded through the mode the project will run
+        # in, as the GUI's preset route stores it, because a project's plan
+        # runs verbatim (WP-2102); a mode edited in the same delta is that mode
+        mode = delta.settings.get("mode", project.doc.mode)
+        spec = (PlanSpec.from_plan(resolve_plan(delta.plan["preset"], mode))
                 if "preset" in delta.plan
                 else PlanSpec.model_validate(delta.plan["plan"]))
         project.doc.plan = spec

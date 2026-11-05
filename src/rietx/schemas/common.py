@@ -8,7 +8,9 @@ interface convention.  See ``ATTRIBUTION.md``.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -328,7 +330,7 @@ from .._nearmiss import did_you_mean
 #: header says 0.35 or later is never walked.
 #: 0.35 → 0.36 (WP-1469, issue #481): ``SeriesEntry.rwp_fence`` — the Rwp
 #: limit the chain's fence set at the pattern, so the verdict on a kept
-#: attempt still above it (``SEQUENTIAL_RWP_OUTLIER``) is read off the entry —
+#: attempt still above it (``SEQUENTIAL_RWP_OUTLIER``, gone in 0.60) is read off the entry —
 #: and ``SeriesResult.discontinuities`` (``list[SeriesStep]``), the pair each
 #: ``SEQUENTIAL_DISCONTINUITY`` names in prose.  Both additive and defaulted to
 #: ``None``, the rule of 0.25 → 0.26: a series from before this may have had
@@ -583,6 +585,25 @@ from .._nearmiss import did_you_mean
 #: cannot be rebuilt as every step, so a document's ``discontinuities`` key is
 #: dropped at read (``SeriesResult``'s ``mode="before"`` validator) and its
 #: ``steps`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2003, C1): ``SeriesEntry.rwp_fence`` replaced by
+#: ``SeriesEntry.rwp_over_median``, the kept attempt's Rwp over the accepted
+#: median with no threshold.  Not additive: the factor that scaled the old
+#: limit is not on the entry, so an entry's ``rwp_fence`` key is dropped at
+#: read (``SeriesEntry``'s ``mode="before"`` validator) and its
+#: ``rwp_over_median`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2003, C6): ``SeriesResult.code_counts``, a
+#: ``SeriesCodeCount`` per per-pattern code and path with its count, the
+#: series length and the worst level.  Additive and defaulted to ``None``,
+#: "not recorded", the 0.25 → 0.26 rule; ``SequentialRefinement.fit`` writes
+#: it on every series.  ``SEQUENTIAL_PERSISTENT_FINDING``, the threshold it
+#: replaces, is gone, so a document carrying one still reads.
+#: Also in 0.60 (WP-2003, C5): ``SeriesResult.direction_gaps``, a
+#: ``DirectionGap`` per path and pattern under ``direction="both"``.  Additive
+#: and defaulted to ``None``, "not compared"; ``SequentialRefinement.fit``
+#: writes it whenever the two chains were compared.
+#: ``SEQUENTIAL_PATH_DEPENDENT`` is gone, and ``SEQUENTIAL_PATH_CHECK_NOT_RUN``
+#: takes the ``warning`` half of ``SEQUENTIAL_PATH_CHECK_INCOMPLETE``; a stored
+#: INCOMPLETE at ``warning`` still reads as not run.
 #: Also in 0.60 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
 #: formula and temperature read, and ``PeakList.instrument_undeclared``,
 #: the instrument blocks the picker found at default on a lab source.  Additive
@@ -629,7 +650,30 @@ from .._nearmiss import did_you_mean
 #: its own frozen compile, the number ``stage_end`` already emitted.  Additive
 #: and defaulted to ``None``, "a result stored before the field", the 0.25 →
 #: 0.26 rule; all three runners write it on every stage.
-SCHEMA_VERSION = "0.60"
+#: Also in 0.60 (WP-1334): ``StageResult.termination``, which test ended the
+#: solve, the token ``stage_end`` already emitted; ``slow_descent`` is the LM
+#: driver's new one (``optimize.lm.SLOW_DESCENT_ESD``).  Additive and
+#: defaulted to ``None``, the same rule.
+#: Also in 0.60 (WP-1991, Yue's ruling of 2026-11-01): a ``SeriesResult``'s
+#: paths read one series numbering, matched by phase name and atom label
+#: (``SeriesResult.phase_names``/``.atom_labels``), and
+#: ``SeriesEntry.pattern_paths`` names each pattern's own path where it
+#: differs.  Additive and defaulted to ``None``: a document written before the
+#: fields stores each pattern's own paths, and nothing stored the names to
+#: translate them, so it opens as written.
+#: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
+#: where it defaulted to 0.0.  A stored document that omits it still opens, at
+#: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
+#: 0.60 → 0.61 (WP-1944): ``Phase.extinction`` is ``Parameter | None`` and
+#: defaults to ``None``, "not declared", where it defaulted to a ``Parameter``
+#: at 0.  ``None`` has no table entry, so no plan can free it.  A file written
+#: before 0.61 opens unchanged: its stored block reads as a declaration, and
+#: the structural plan's extinction stage still frees it.  A phase that
+#: declares none now stores ``null``, which 1.11.0 refuses:
+#: ``Phase`` raises a ``ValidationError``, and ``Project.open`` stops at
+#: "malformed history record".  So a structure or a ``.rex`` project written
+#: here does not open there.
+SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
@@ -894,6 +938,21 @@ BARE_PARAMETER_ATTRS: dict[str, object] = {
     "min": -math.inf, "max": math.inf, "unit": None}
 
 
+#: The pydantic validation context a reader of a **stored document** passes,
+#: at each reader :data:`rietx.schemas.migrate.STORED_DOCUMENT_READ_POINTS`
+#: names.  A field a release made required is filled there with the
+#: placeholder its old default held, and raises everywhere else: old files
+#: open, old code does not (``HumpComponent.position``, WP-2013).  Read only
+#: through :func:`reading_stored_document`.
+STORED_DOCUMENT = MappingProxyType({"stored_document": True})
+
+
+def reading_stored_document(info) -> bool:
+    """Whether this validation is a stored document's read (:data:`STORED_DOCUMENT`)."""
+    context = info.context
+    return isinstance(context, Mapping) and bool(context.get("stored_document"))
+
+
 def declared_fills(declared: Parameter, present) -> dict[str, object]:
     """The attributes a ``Parameter`` inherits from its field's declared default.
 
@@ -963,6 +1022,20 @@ class _InheritsDeclaredDefaults(Base):
     _declared_since: ClassVar[str] = "0.35"
     #: A class-specific way out, appended to the out-of-range refusal.
     _declared_escape: ClassVar[str] = ""
+    #: An opt-in ``Parameter | None`` field has no default to carry its range,
+    #: so it names one here (``Phase.extinction``, WP-1944): field name → a
+    #: factory for the ``Parameter`` whose range and unit a declaration inherits.
+    _declared_optional: ClassVar[dict] = {}
+
+    @classmethod
+    def _declared_default(cls, name: str):
+        """The factory whose ``Parameter`` carries field ``name``'s declared
+        range, or ``None`` where the field declares none.  One answer for
+        construction and for the history reader's repair."""
+        info = cls.model_fields[name]
+        if info.annotation is Parameter and info.default_factory is not None:
+            return info.default_factory
+        return cls._declared_optional.get(name)
 
     @model_validator(mode="before")
     @classmethod
@@ -970,8 +1043,9 @@ class _InheritsDeclaredDefaults(Base):
         if not isinstance(data, dict):
             return data
         data = dict(data)
-        for name, info in cls.model_fields.items():
-            if info.annotation is not Parameter or info.default_factory is None:
+        for name in cls.model_fields:
+            factory = cls._declared_default(name)
+            if factory is None:
                 continue
             if name not in data:
                 continue  # omitted: default_factory already carries the range
@@ -990,7 +1064,7 @@ class _InheritsDeclaredDefaults(Base):
             # write-back leaves the last site's value in all of them (PR #206's
             # behaviour, kept).  Sharing *on purpose* states every attribute —
             # ``Harmonic.weight``'s default does, being its line's by reference
-            fills = declared_fills(info.default_factory(), set(present))
+            fills = declared_fills(factory(), set(present))
             if not fills:
                 continue
             try:
