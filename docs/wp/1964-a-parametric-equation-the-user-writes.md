@@ -257,10 +257,10 @@ per-pattern one is an array.
   as a reference page. Beside it goes a conformance table of (expression,
   bindings, expected value or error), which every evaluator runs. Bring the
   names on the main surface to the maintainer as a consent list.
-- [ ] **The parser and the tree.** Tokens with columns, limits on length and
+- [x] **The parser and the tree.** Tokens with columns, limits on length and
   depth, an error that quotes the expression with a caret and suggests the
   nearest known name, and a printer with `parse(print(t)) == t`.
-- [ ] **Evaluation and derivative rules.** One tree on every `xp`, the rewrites
+- [x] **Evaluation and derivative rules.** One tree on every `xp`, the rewrites
   and conventions under § Derivatives, and `debye(x)`. Check by random trees
   against complex-step, plus adversarial points (0, 1e-8, T = T_c).
 - [ ] **The block.** One `DerivedBlock` subclass, its declared reach read off the
