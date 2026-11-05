@@ -2070,7 +2070,7 @@ def _chained_columns(model: CompiledModel, table: ParameterTable,
                 L = table.local_jacobian(np.asarray(theta, dtype=np.float64)).tocsc()
             idx = [table._paths[q] for q in rows]
             block = L[idx][:, [cols[i] for i in members]].toarray()
-            sv = np.linalg.svd(block, compute_uv=False)
+            sv = lapack.svd(block, compute_uv=False)
             rank = int(np.sum(sv > _CHAIN_RANK_RTOL * sv[0])) if sv[0] > 0 else 0
             if rank == 0 or rank >= len(members):
                 block = None
@@ -2085,7 +2085,7 @@ def _chained_columns(model: CompiledModel, table: ParameterTable,
             continue
         _q, _r, piv = scipy.linalg.qr(block, pivoting=True, mode="economic")
         basis = block[:, piv[:rank]]
-        coeffs = np.linalg.lstsq(basis, block, rcond=None)[0]
+        coeffs = lapack.lstsq(basis, block, rcond=None)[0]
         affected = _affected_phases(model, rows[0], rows[1:])
         sizes = np.array([fd_step(values[q], _row_typical(table, q) or 1.0)
                           for q in rows])

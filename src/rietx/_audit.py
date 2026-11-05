@@ -3066,6 +3066,14 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.optimize.identifiability.SOFT_MODES_K", "constant", value=3),
     Row("rietx.optimize.identifiability.SOFT_MODE_MIN_LOADING", "constant", value=0.1),
     Row("rietx.optimize.identifiability.TOP_CORRELATIONS_K", "constant", value=5),
+    Row("rietx.optimize.least_squares._CHAIN_RANK_RTOL", "constant", tier="invariant",
+        value=1e-10,
+        evidence=("answer-invariant: it chooses between a directional peak-chain column per "
+                  "basis direction and a column per coefficient (WP-1964 task 7), and the two "
+                  "land within 7.4e-7 esd of each other on the joint LaB6 ramp at 6 and 14 "
+                  "patterns; exactly proportional coefficients sit at rounding (1e-16) and "
+                  "independent ones at order 1, so any cut between gives the same grouping; "
+                  "tests/test_parametric_series.py::test_a_targets_column_once_serves_every_coefficient")),
     Row("rietx.optimize.least_squares.FD_STEP", "constant", tier=3, value=1e-06,
         evidence=("finite-difference step (WP-2002, 2026-10-21, tests/test_cross_backend.py): every FD "
                   "column of the 23 configurations within 2.5e-4 of a Richardson oracle (5.0e-4 with "
@@ -3362,6 +3370,34 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: degrees to radians"),
     Row("rietx.params.derived._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
+    Row("rietx.params.expression.MAX_DEPTH", "constant", tier="invariant", value=64,
+        evidence=("answer-invariant: a refusal limit of the expression grammar (WP-1964), never a "
+                  "setting of what an accepted expression means; an expression under it parses to "
+                  "the same tree at any limit, and one over it is refused by name (too_deep), "
+                  "never truncated; tests/test_expression.py::test_limits_on_length_and_depth")),
+    Row("rietx.params.expression.MAX_LENGTH", "constant", tier="invariant", value=4096,
+        evidence=("answer-invariant: as MAX_DEPTH, a refusal limit in characters; an expression "
+                  "under it parses identically at any limit, and a longer one is refused by name "
+                  "(too_long); tests/test_expression.py::test_limits_on_length_and_depth")),
+    Row("rietx.params.expression._DEBYE_TAIL", "constant", tier=1, value=10.0,
+        evidence=("numerical floor: the switch from 32-node Gauss-Legendre to the exponential "
+                  "tail of D1; the quadrature is within 4e-15 of an mpmath quadrature below "
+                  "|x| = 10 (WP-1964 task 3's measurement, the constant's comment) and the tail "
+                  "series is exact to rounding above it (_DEBYE_TAIL_TERMS), so the switch "
+                  "moves no value past rounding")),
+    Row("rietx.params.expression._DEBYE_TAIL_TERMS", "constant", tier=1, value=5,
+        evidence=("arithmetic: at x >= _DEBYE_TAIL the first omitted term of the tail series "
+                  "carries e^-60, about 1e-26 relative to D1, so five terms reach double "
+                  "precision")),
+    Row("rietx.params.expression._NOT_POWER", "constant", tier="invariant", value=3,
+        evidence=("definition: the binding power that places 'not' between 'and' and the "
+                  "comparisons, as the grammar page docs/docs/reference/expressions.md states "
+                  "and tests/test_expression.py's table rows pin; precedence is the grammar's "
+                  "meaning, so any value keeping that order parses identically")),
+    Row("rietx.params.expression._UNARY_POWER", "constant", tier="invariant", value=7,
+        evidence=("definition: the binding power that places unary minus above '*' and '/' and "
+                  "below '^' (-x^2 = -(x^2)), as the grammar page states and the table rows pin; "
+                  "any value keeping that order parses identically")),
     Row("rietx.params.parametric.FORM_TEST_LEVEL", "constant", tier=2, value=0.95,
         evidence=("Venzon & Moolgavkar (1988) Appl. Statist. 37, 87 for the profile-likelihood cut;"
                   " the 95 % level is convention, = PARAMETER_INTERVAL_LEVEL (docstring)")),
