@@ -863,28 +863,14 @@ of $\chi^2_1$, with the same floor-at-one convention as the covariance scale.
 Two gates keep the ranking honest, the Layer-1 discipline one call over. The
 free block absorbs some candidates' columns, and those are reported
 non-separable and carry no score; the same projection caps the $1/(1-R^2)$
-inflation of near-collinear gains. Candidates whose projected columns are
-pairwise indistinguishable come back as one unresolved group carrying a joint
-gain, which is a tie.
+inflation of near-collinear gains. Candidates with indistinguishable projected columns come back as one
+unresolved group carrying a joint gain, a tie.
 
-A gain is what the bounds let the candidate reach: along its step the
-linearised $\chi^2$ is an exact quadratic, so with $d$ the room its box leaves,
-
-```{math}
-:label: est-suggest-bounded
-
-\delta^\ast = -\frac{\tilde{\jmath}^{\top} \tilde{r}}
-                     {\tilde{\jmath}^{\top} \tilde{\jmath}}, \qquad
-\alpha = \min\!\left(1, \frac{d}{|\delta^\ast|}\right), \qquad
-\Delta\chi^2_{j,\mathrm{box}} = \alpha\,(2 - \alpha)\,\Delta\chi^2_j,
-```
-
-{source}`rietx.strategy.suggest._bounded_single`
-
-zero on a bound facing out. A group's is the bounded least-squares optimum.
-As with indexing there is no `.best`, and `best_or_none()` answers `None`
-whenever the evidence does not choose one parameter, including when the
-leader's ΔBIC below refuses it.
+A gain is what the bounds let the candidate reach: with $\delta^\ast$ the free
+step and $d$ the room the box leaves, $\alpha = \min(1, d/|\delta^\ast|)$ scales
+it to $\alpha(2-\alpha)\,\Delta\chi^2_j$, zero on a bound facing out. A group
+is bounded too. `best_or_none()` is `None` when the evidence, or the leader's
+ΔBIC below, does not choose.
 
 A gain that clears the floor is then read as a model-selection answer, ΔBIC
 {cite}`schwarz1978`, and that needs a premise the gain does not: Schwarz's
