@@ -679,7 +679,8 @@ from .._nearmiss import did_you_mean
 #: allows), which makes the child's six cell parameters derived and locked.
 #: Additive and defaulted to ``None``, the 0.25 → 0.26 rule, so every stored
 #: document loads and refines as before; an older build refuses a phase
-#: carrying it.SCHEMA_VERSION = "0.61"
+#: carrying it.
+SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
