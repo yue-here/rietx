@@ -985,6 +985,12 @@ def test_an_overlap_with_one_unquotable_bracket_names_it_and_asks_for_max_iter()
     assert "Do not quote it" in row.message      # the forward pass's reason
     assert "the forward bracket" in row.message
     assert "the onset is the data's" not in row.message
+    # one pass alone: the bracket points at the row saying why, never at the
+    # reverse chain, which cannot finish the stopped fit
+    alone = _onset_rows(_moment_diagnostics(_early(_BRACKETED)))
+    assert set(alone) == {_BRACKET, _UNRESOLVED}
+    assert _UNRESOLVED in alone[_BRACKET].suggestion
+    assert "direction='both'" not in alone[_BRACKET].suggestion
 
 
 _OPEN_THE_SWITCHES = "Open the patterns either side of each switch"
