@@ -301,7 +301,7 @@ per-pattern one is an array.
   coverage at 2 esd over seeds, against a profile interval. Decide what a joint
   fit owes here and what a documented script covers. Plot obs/calc/diff to
   `tests/output/`.
-- [ ] **The result.** Variable rows in `result.parametric`, an equation evaluated
+- [x] **The result.** Variable rows in `result.parametric`, an equation evaluated
   anywhere through the block's Jacobian, and the three inherited readers.
 - [ ] **A variable per pattern.** Declare it, carry it as a column per pattern, and let
   an expression read it (§ A variable per pattern). The test is Stinton & Evans's first

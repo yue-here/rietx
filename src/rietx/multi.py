@@ -3094,7 +3094,8 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
     left its declared range, at the value it took.  ``value`` is how many.
     """
     out: list[Diagnostic] = []
-    for r in mtable.parametric:
+    # an expression's target is as unbounded as a sum of terms (WP-1964)
+    for r in (*mtable.parametric, *mtable.expressions):
         bad = []
         for h in r.patterns:
             table = mtable.tables[h]
@@ -3112,7 +3113,10 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
             message=(f"Parametric equation {r.name!r} puts {r.target} outside its own "
                      f"bounds in {len(bad)} of {len(r.patterns)} patterns: "
                      f"{shown}{more}."),
-            suggestion=("Narrow the subset to where the form holds, lower the "
+            suggestion=("Narrow the subset to where the form holds, or bound the "
+                        "variables so the expression stays inside the range."
+                        if r.equation.basis == "expression" else
+                        "Narrow the subset to where the form holds, lower the "
                         "polynomial's order, or declare a design basis that "
                         "stays inside the range.")))
     return out
@@ -3179,13 +3183,13 @@ def _parametric_unseen(models, mtable, sigma: float = PHASE_SUPPORT_SIGMA
     ``models`` goes to :func:`_unseen` as the hold passes it, so an
     instrument target on a pattern that sees no phase is unseen (WP-2049).
     """
-    if not mtable.parametric:
+    if not (mtable.parametric or mtable.expressions):
         return {}
     absent = _joint_unsupported_phases(models, mtable, sigma)
     return {r.name: frozenset(k for k in r.patterns
                               if _unseen(mtable, f"hist.{k}.{r.target}", absent,
                                          models=models))
-            for r in mtable.parametric}
+            for r in (*mtable.parametric, *mtable.expressions)}
 
 
 def _parametric_unseen_diagnostics(mtable, unseen: dict[str, frozenset[int]]
@@ -3203,7 +3207,7 @@ def _parametric_unseen_diagnostics(mtable, unseen: dict[str, frozenset[int]]
     such pattern; ``where`` names each pattern's row, ``value`` counts them.
     """
     out: list[Diagnostic] = []
-    for r in mtable.parametric:
+    for r in (*mtable.parametric, *mtable.expressions):
         blind = sorted(unseen.get(r.name, ()))
         if not blind:
             continue
@@ -3329,16 +3333,38 @@ def _parametric_form_tests(models, mtable, at_bounds, weights,
     ``unseen`` names it (:func:`_parametric_unseen`), the predicate the
     stage's support hold uses, so the alternative is the untied fit's.  The
     columns ``at_bounds`` names stay on their bounds on both sides.
+
+    An ``expression`` equation is tested too (WP-1964), its target's column
+    recovered through its gradient.  That holds only where each variable
+    moves nothing but the rows an expression writes, so a pattern where one
+    reaches further (a caller's tie onto ``vars.X``) is left out of every
+    expression's alternative: read off each table's ``entry_reach``, the
+    claim checked where it is used.
     """
-    if not mtable.parametric:
+    if not (mtable.parametric or mtable.expressions):
         return None, None
     residual, jacobian, n_data = _multi_closures(models, mtable, weights=weights,
                                                  layout="blocked")
     x = mtable.x0()
     index = {p: i for i, p in enumerate(mtable.free_paths)}
     hold = sorted({index[p] for f in at_bounds for p in f.paths if p in index})
+    t0 = mtable.tables[0]
+    variables = {p for r in mtable.expressions for p in r.paths}
+    values = {p: float(t0.entries[t0._paths[p]].value) for p in variables}
+    usable = []
+    for h, table in enumerate(mtable.tables):
+        targets = {r.target for r in mtable.expressions if h in r.patterns}
+        path_of = {i: p for p, i in table._paths.items()}
+        written = set(variables)
+        for _ins, outs in table._derived_idx:
+            rows = {path_of[int(i)] for i in outs}
+            if rows & targets:
+                written |= rows
+        reach = table.entry_reach()
+        usable.append(all(set(reach.get(p, ())) <= written for p in variables))
     return form_tests(mtable.parametric, jacobian(x), residual(x), n_data,
-                      mtable.free_paths, unseen, hold)
+                      mtable.free_paths, unseen, hold, expressions=mtable.expressions,
+                      values=values, usable=usable)
 
 
 def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
@@ -3357,7 +3383,8 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
     rejection beside another says its verdict is provisional
     (``ParametricFormTest.provisional_on``), and each tells the reader to
     read the other equations again after the refit."""
-    paths = {r.name: r.paths for r in mtable.parametric}
+    paths = {r.name: r.paths for r in (*mtable.parametric, *mtable.expressions)}
+    written = {r.name for r in mtable.expressions}
     out: list[Diagnostic] = []
     for t in tests or []:
         if not t.rejected:
@@ -3390,9 +3417,11 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
                      f"the target in each would remove {r.statistic:.1f} times "
                      f"χ²_red of χ², past the {100 * FORM_TEST_LEVEL:g} % point "
                      f"{r.cut:.1f} of χ² for {r.dof} directions.{also}"),
-            suggestion=("Add the next term to the basis and refit, or narrow the "
-                        "subset to where the form holds. The chain's trajectory "
-                        f"shows where it bends.{others}")))
+            suggestion=(("Revise the expression and refit, or narrow the subset "
+                         "to where it holds." if t.equation in written else
+                         "Add the next term to the basis and refit, or narrow the "
+                         "subset to where the form holds.")
+                        + f" The chain's trajectory shows where it bends.{others}")))
     if joint is not None and joint.rejected and not out:
         # every equation tested at once had its own freed reading
         tested = [t for t in tests or [] if t.others_freed is not None]
@@ -3417,7 +3446,8 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
                       "separate that misfit from the others'.")
         out.append(Diagnostic(
             level="warning", code="PARAMETRIC_FORM_REJECTED",
-            where=[p for t in tested for p in paths[t.equation]], value=joint.statistic,
+            where=list(dict.fromkeys(p for t in tested for p in paths[t.equation])),
+            value=joint.statistic,
             message=(f"Parametric equations {names} together do not describe their "
                      "targets: freeing every target in each pattern would remove "
                      f"{joint.statistic:.1f} times χ²_red of χ², past the "

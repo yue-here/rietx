@@ -291,6 +291,14 @@ def test_an_einstein_cell_with_theta_held_recovers_its_two_variables():
     named ={p.path for p in result.parameters if p.equations}
     assert named == {p.path for p in result.parameters
                      if p.path.startswith("vars.") or ".phases.0.cell." in p.path}
+    # the form test reads the expression through its gradient (§ Inherited,
+    # the second reader): the right form passes in every pattern, and an
+    # evaluated value carries the verdict
+    (form,) = result.parametric_form
+    assert (form.equation, form.n_patterns, form.n_subset) == ("a", 5, 5)
+    assert form.tied.dof == 3 and form.rejected is False
+    v = eq.evaluate(result.parametric, form, coordinates={"T": 600.0})
+    assert v.form_rejected is False
 
 
 @pytest.mark.xdist_group("parametric-expression")
@@ -341,6 +349,87 @@ def test_a_polynomial_and_the_same_form_as_an_expression_agree_to_a_hundredth_es
     for h in range(len(temps)):
         path = f"hist.{h}.phases.0.cell.a"
         assert abs(e[path].value - p[path].value) < 0.01 * p[path].stderr, path
+    # one model, one form test: the gradient reading of the expression and the
+    # Φ reading of the polynomial agree.  Measured (macOS arm64): 6.8e-11
+    # relative on the statistic, where a wrong target column is off by O(1)
+    (fp,), (fe,) = by_poly.parametric_form, by_expr.parametric_form
+    assert (fe.n_patterns, fe.tied.dof) == (fp.n_patterns, fp.tied.dof) == (5, 3)
+    assert fe.tied.statistic == pytest.approx(fp.tied.statistic, rel=1e-6)
+    assert fe.rejected is fp.rejected is False
+
+
+@pytest.mark.xdist_group("parametric-expression")
+def test_a_line_written_over_an_einstein_cell_is_rejected_by_the_form_test():
+    """The Einstein ramp of the test above, declared as ``c0 + c1*T``.  The
+    form test frees the cell in each pattern and finds the bend.  Measured
+    (macOS arm64): 17222 times χ²_red for 3 directions, against the cut 7.8,
+    where the Einstein expression itself reads 1.2."""
+    from tests.test_sequential import A0, _start_models
+
+    temps = [300.0, 525.0, 750.0, 975.0, 1200.0]
+    patterns = _ramp([A0 + 0.02 / np.expm1(400.0 / t) for t in temps], seed=20)
+    structure, ins = _start_models()
+    result = refine_multi(
+        patterns, structure, [ins] * len(temps), plan="mccusker_default",
+        sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
+        coordinates=CoordinateTable(columns={"T": temps}, units={"T": "K"}),
+        variables={"c0": rx.Parameter(value=A0, vary=True),
+                   "c1": rx.Parameter(value=0.0, vary=True)},
+        parametric=[_expression(expression="c0 + c1*T")])
+    _plot(result, "parametric_expression_wrong_form", (0, len(temps) - 1))
+    (form,) = result.parametric_form
+    assert form.rejected is True and form.n_patterns == 5
+    assert form.tied.statistic > 100 * form.tied.cut
+    (d,) = [d for d in result.diagnostics if d.code == "PARAMETRIC_FORM_REJECTED"]
+    assert d.where == ["vars.c0", "vars.c1"]
+    assert d.suggestion.startswith("Revise the expression")
+
+
+def test_targets_sharing_a_variable_are_recovered_together():
+    """``expression_target_columns`` on a Jacobian built as J_V = T·G: two
+    targets reading one shared ``th``, so neither's column is any one
+    variable's.  T comes back to rounding.  A pattern ``usable`` refuses, or
+    whose G has fewer directions than targets (the two intercepts held), gives
+    no column, and an equation with no free variable gives ``None``."""
+    from rietx.optimize.blocked import BlockJacobian
+    from rietx.params.expression import Expression
+    from rietx.params.multi import ResolvedExpression
+    from rietx.params.parametric import expression_target_columns
+
+    def resolved(name, text, variables):
+        return ResolvedExpression(
+            equation=ParametricEquation(name=name, target=f"phases.0.{name}", basis="expression",
+                                        expression=text),
+            patterns=[0, 1], expression=Expression(text), variables=variables,
+            coordinates=["T"], constants={0: {"T": 300.0}, 1: {"T": 900.0}})
+
+    exprs = [resolved("a", "a0 + exp(-th/T)", ["a0", "th"]),
+             resolved("b", "b0 + 2*th*T", ["b0", "th"])]
+    values = {"vars.a0": 1.0, "vars.b0": 2.0, "vars.th": 150.0}
+    rng = np.random.default_rng(7)
+    free = ["vars.a0", "vars.b0", "vars.th"]
+    blocks, truth = [], []
+    for temp in (300.0, 900.0):
+        g = np.array([[1.0, 0.0, -np.exp(-150.0 / temp) / temp],
+                      [0.0, 1.0, 2.0 * temp]])
+        t = rng.standard_normal((40, 2))
+        blocks.append(t @ g)
+        truth.append(t)
+    bj = BlockJacobian(blocks, [[0, 1, 2], [0, 1, 2]], [40, 40], [0, 0], 3)
+    cols = expression_target_columns(exprs, bj, free, values, [True, True], {})
+    for i in range(2):
+        for h in range(2):
+            assert np.max(np.abs(cols[i][h][:, 0] - truth[h][:, i])) < 1e-12
+    cols = expression_target_columns(exprs, bj, free, values, [True, False],
+                                     {"b": frozenset({0})})
+    assert cols[0][1] is None and cols[1][1] is None and cols[1][0] is None
+    assert cols[0][0] is not None
+    # with a0 and b0 held, G's rows are both multiples of th's: one direction
+    held = BlockJacobian([b[:, 2:] for b in blocks], [[0], [0]], [40, 40], [0, 0], 1)
+    cols = expression_target_columns(exprs, held, ["vars.th"], values, [True, True], {})
+    assert cols == [[None, None], [None, None]]
+    assert expression_target_columns(exprs[:1], held, ["vars.b0"], values,
+                                     [True, True], {}) == [None]
 
 
 # -- an equation feeding an equation -----------------------------------------

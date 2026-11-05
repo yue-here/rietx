@@ -389,7 +389,9 @@ class ParametricFormTest(Base):
       the test cannot check it there; ``PARAMETRIC_TARGET_UNSEEN`` names the
       patterns that cannot see it.
     * ``tied`` — the reading with every other equation still tied.  ``None`` when
-      the test did not run: a coefficient was not free at the answer.
+      the test did not run: a coefficient was not free at the answer.  An
+      ``expression`` equation is read through its exact gradient in place of
+      Φ, and untested only when none of its variables was free (WP-1964).
     * ``others_freed`` — the reading with every other tested equation's target
       freed too, so its verdict does not assume the other equations' forms: the
       gain with every equation's targets freed less the gain with only the others'
@@ -543,7 +545,7 @@ class RefinedParametricEquation(Base):
         paths = [c.path for c in coefficients]
         if equation.basis == "expression":
             return self._evaluate_expression(coefficients, coordinates or {},
-                                             row, definitions or [])
+                                             row, definitions or [], form, joint)
         if paths != equation.coefficient_paths():
             raise ValueError(f"equation {equation.name!r} takes its coefficients "
                              f"{equation.coefficient_paths()} in that order, got {paths}")
@@ -594,7 +596,9 @@ class RefinedParametricEquation(Base):
 
     def _evaluate_expression(self, coefficients: list[ParametricCoefficient],
                              coordinates: dict[str, float], row,
-                             definitions: list[RefinedParametricEquation]
+                             definitions: list[RefinedParametricEquation],
+                             form: ParametricFormTest | None = None,
+                             joint: ParametricFormReading | None = None
                              ) -> ParametricValue:
         """:meth:`evaluate` for an ``expression`` equation; see there."""
         from ..params.expression import Expression, ExpressionError
@@ -639,5 +643,8 @@ class RefinedParametricEquation(Base):
         return ParametricValue(
             equation=equation.name, target=equation.target or "",
             coordinates=dict(coordinates), row=None, value=float(value), esd=esd,
-            unit=self.unit, outside=outside, form_rejected=None, provisional_on=[],
-            joint_rejected=None)
+            unit=self.unit, outside=outside,
+            form_rejected=None if form is None else form.rejected,
+            provisional_on=[] if form is None else list(form.provisional_on),
+            joint_rejected=(None if joint is None or form is None
+                            or form.others_freed is None else joint.rejected))
