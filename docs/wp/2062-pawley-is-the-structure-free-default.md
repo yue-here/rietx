@@ -159,6 +159,15 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
+- **2026-11-05, from WP-2076: A2 alone loses corundum.** With Pawley in the screen's class and reference
+  fits, corundum's `R - c -` becomes `R - - -` (+59 to +70), because the reference's four lines at
+  untestable positions absorb neighbouring tails while the BIC charges only the six testable ones. The
+  score must drop only the lines a class is charged for, which is one extra fit per class. WP-2076
+  § Findings has the numbers and `~/.cache/ghostshift/rietx/wp-2076/candidate.diff` the patch. That patch
+  also counts `n_free_parameters` alone, this WP's Hamilton-count task. A Pawley screen read the same
+  on two rows at pattern and σ × 5 × 10⁻⁵, so the unit-dependence task does not reach it there. Whether
+  WP-2076 lands this first is the maintainer's question, in its newest handover entry.
+
 - **From WP-2011, 2026-10-28: Pawley's cost on large patterns, re-measured
   with option (c) built** (WP-2011 § Option (c) probed, commit e39b8c19d on
   its branch). A Pawley stage above the BVLS cut now forms JᵀJ sparse over

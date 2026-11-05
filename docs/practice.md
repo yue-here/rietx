@@ -574,6 +574,26 @@ The paper gives no timings.
 Not determined: TOPAS v9 and its Pawley overlap rule, FullProf's current manual, the Profex
 5.7.2 manual. MAUD, BGMN and RIETAN-FP were not run.
 
+## Ranking extinction symbols: which fit, and how a weak line is judged
+
+Surveyed 2026-11-05 for WP-2076, from the GSAS-II source and a web search. The paper corpus
+holds neither ExtSym paper, so the ExtSym row rests on its abstract and its catalogue records.
+
+| Program | What the ranking reads | How a weak line enters |
+|---|---|---|
+| rietx (main) | a Le Bail χ² per class against an absence-free reference, as ΔBIC | a testable forbidden position counts ln N in the class's favour, and a window test at 3σ refutes |
+| ExtSym (Markvardsen et al. 2001, 2008) | integrated intensities and their errors, from a Pawley-type fit. Validated on TF12LS output, then on DASH, FullProf, GSAS, PRODD and TOPAS output | a probability per symbol. The abstract says the result depends heavily on the accuracy of the error estimates |
+| GSAS-II 5.8.4 | no extinction-symbol ranking found. The Unit Cells tab lists space groups for a cell with M20 and X20 (`GSASIIpwdGUI.py:737-768`) | not applicable |
+| TOPAS, FullProf | not checked | not checked |
+
+**The Le Bail partition clamps in GSAS-II too.** `ComputeFobsSqCW` keeps a channel only where the
+observed-over-calculated ratio is positive (`GSASIImpsubs.py:177`, checked), which is the
+channel clamp `lebail_update` applies through `max(net, 0)`. The bias was not measured in
+GSAS-II, and the two programs' peak windows were not compared.
+
+Not determined: how DASH or TOPAS rank without ExtSym, and what EXPO2014's statistical
+approach reads.
+
 ## A volume window from the formula, in indexing
 
 Checked by the maintainer in the sources on 2026-10-24 (#1121) and entered for WP-2030;

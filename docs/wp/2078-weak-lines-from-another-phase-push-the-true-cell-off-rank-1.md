@@ -137,6 +137,17 @@ each arm's search or cuts trailing systems. That cost is unmeasured.
 
 ### Inherited
 
+- **2026-11-05, from the issue triage (issue #1382, finding 2): the same failure on a pure phase,
+  with lines the picker made from the phase's own Kα1 peak.** On
+  `tests._synthetic_silicon.silicon_pattern("flat")`, `pick_peaks` gives 10 usable lines where the
+  range holds eight, because the 111 line carries extra components at 28.60° and 28.77°. Its Kα2 is at
+  about 28.52°. Reproduced at `541f0daf7` (`[dev]`, arm64 Mac, `preset="quick"`): trigonal R
+  3.841/9.380 ranks first with 9 of 10 lines, and cubic F 5.431 second with 8 of 10. All three engines
+  find both. Their Pawley validations separate them: the R cell at Rwp 0.118, GoF 4.45, and the F cell
+  at Rwp 0.0299, GoF 1.12. The rank does not read that gap. This is a cheap public fixture for this
+  WP's Goal, and it carries no second phase, so "weak lines the host does not own" here means picker
+  artefacts. The issue's finding 1 is WP-2113.
+
 - **2026-11-03, from WP-2066 (closed).** #1301 has merged, so this WP's
   dichotomy rows are pre-#1301 numbers. The reporter's one real-data
   re-measure after it, a private orthorhombic-F lab list (#1258,
@@ -169,7 +180,7 @@ each arm's search or cuts trailing systems. That cost is unmeasured.
       Bergmann et al. (2004) Table 5 for whether the 5 % sets scored better
       than the raw ones. Mark each claim checked or inferred. The section says
       whether a relative floor is practice (tier 2) or new (tier 3).
-- [ ] Synthetic fixtures, built in-test from rietx's forward model (the
+- [x] Synthetic fixtures, built in-test from rietx's forward model (the
       reporter offered to write them). (a) A host with an injected weak
       second phase, where the floor must move the truth to rank 1. (b) A
       superlattice host whose weak lines are structural, where the floor must
@@ -235,3 +246,30 @@ position-only list returns the same candidates as on `main`.
   twenty, is closed. The reporter's numbers are quoted from the issue and
   not reproduced; their data is private. Filed in PR #1315. *Next:* tasks 1
   and 2, which need no decision.
+
+- **2026-11-02** — task 2, by a contributor's PR whose claim covers task 2
+  only. Builders in `tests/_synthetic_weak_lines.py`, rows in
+  `tests/test_indexing_weak_lines.py`. (a) is molybdenum with an α-MoO₃
+  trace (Sitepu, O'Connor & Li 2005) whose strongest line is 0.6 % of the
+  host's, over 12.1-55° (12.1-60° took 51 s alone and 122 s in a full-suite
+  run, cut by the ceiling, so its rows skipped; 55° takes 17-30 s; 12.1-45°
+  left the host four lines, one short of a cubic search's five): 38 lines
+  picked, 6 the host's and 29 at the oxide's positions. (b)
+  is an idealised ordered double perovskite, F m -3 m at 2·a_p, with 10 %
+  antisite disorder, so its twelve ordering lines run 0.1-2.3 % of the
+  strongest. (c) is #933's Si with twelve planted lines. Today's picker finds
+  29 usable lines where #933 had 53. The truth's rank on `main` at the
+  default with `systems=("cubic",)` declared, as picked / 0.5 / 1 / 2 %:
+  - (a): absent / 1 / 1 / 1;
+  - (b): 1 / 1 / 2 / 3, the cubic subcell first from 1 %;
+  - (c): absent at all four.
+
+  Si with nothing planted ranks first. Undeclared, the default binds its
+  120 s ceiling on every as-picked list (`INDEX_BUDGET_EXHAUSTED`, lower
+  systems cut), so its rank there is a load reading (WP-1449); that is why
+  the rows declare the system. Read undeclared on one laptop, (a) over the
+  original 12.1-60° range: absent / 1 / 1 / 1, (b) 1 / 1 / 1 / 12, (c) absent at all four. (a) reproduces the
+  failure and the 1 % floor fixes it; with the system declared, the same
+  floor loses (b)'s supercell. (a)'s acceptance row is
+  `xfail(strict=True)`. *Next:* task 1 (free), task 3, then task 4 on these
+  rows.

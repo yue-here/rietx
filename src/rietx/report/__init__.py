@@ -370,7 +370,9 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         ``Refinement.report()`` fills these in for you.
     plan, free_paths:
         Used by the Layer-2 strategy veto: actions the plan already performs,
-        or parameters already free, are marked inactive.
+        or parameters already free, are marked inactive.  ``plan`` is a plan,
+        its ``PlanSpec`` or a preset name, read for ``result.mode`` as the fit
+        read it (``strategy.staged.resolve_plan``, WP-2102).
     structure:
         The :class:`~rietx.schemas.structure.Structure` the model was compiled
         from.  Optional, and it buys two things the compiled model does not
@@ -403,6 +405,12 @@ def build_report(result: RefinementResult, *, model=None, values=None,
             f"Instrument the model was compiled from, because Layer 1 reads its "
             f"misfit and its shapes from two compiles of them.  "
             f"Refinement.report() passes all three")
+    if plan is not None:
+        # the mirror's one outbound crossing, never a read by shape: a name
+        # reached the veto as a string with no stages and vetoed nothing
+        from ..strategy.staged import resolve_plan
+
+        plan = resolve_plan(plan, result.mode)
     report = build_layer0(result, top_n=top_n, match_tol_deg=match_tol_deg,
                           min_peak_sigma=min_peak_sigma)
     # Soft-restraint deviations are model-free (carried from the result), so they
