@@ -4721,7 +4721,11 @@ ROWS: tuple[Row, ...] = (
         evidence=("answer-invariant: the series axis, the pattern index without one; "
                   "tests/test_answer_invariant_defaults.py asserts a three-pattern chain's "
                   "every kept value, esd, rung, code and step equal with an axis given, and "
-                  "that the axis reached the entries (WP-2003 C11)")),
+                  "that the axis reached the entries (WP-2003 C11). By design the magnetic "
+                  "onset is read along the axis (schemas.sequential.locate_onset sorts the "
+                  "verdicts by x), so where the given x is not monotone in the list order the "
+                  "bracket, and which onset code fires, follow the caller's axis; every "
+                  "fitted value stays invariant")),
     Row("rietx.sequential.SequentialRefinement.fit:x_label", "default", tier="invariant",
         ambiguity=1, value="index",
         evidence=("answer-invariant: the axis's name; tests/test_answer_invariant_defaults.py "
@@ -4733,8 +4737,9 @@ ROWS: tuple[Row, ...] = (
                   "also names its history file and pairs the two chains; "
                   "tests/test_answer_invariant_defaults.py asserts a three-pattern chain's "
                   "every kept value, esd, rung, code and step equal with labels given, "
-                  "compared blind to the names, and that the names reached the record "
-                  "(WP-2003 C11)")),
+                  "compared blind to the names, under direction='forward' and under 'both' "
+                  "(the latter also every direction gap, which pairs the chains by label), "
+                  "and that the names reached the record (WP-2003 C11)")),
     Row("rietx.sequential.SequentialRefinement.fit:mode", "default", tier=2, ambiguity=1,
         value="rietveld",
         evidence=("the single fit's default (rietx.refine.Refinement.fit:mode), handed to each "

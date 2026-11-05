@@ -3212,8 +3212,8 @@ _OPEN_THE_SWITCHES = ("Open the patterns either side of each switch, and check "
 _SEE_UNRESOLVED = ("Read the SEQUENTIAL_MOMENT_ONSET_UNRESOLVED row on this "
                    "site before quoting the bracket.")
 
-_QUOTE_THE_BRACKET = ("Quote the bracket, with the pattern spacing as its "
-                      "uncertainty.")
+_QUOTE_THE_BRACKET = ("Quote the bracket, with half the pattern spacing as "
+                      "its uncertainty.")
 
 
 _RAISE_MAX_ITER = "Raise the moment stage's max_iter and re-run."
