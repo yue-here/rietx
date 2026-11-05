@@ -2151,19 +2151,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "no guide, because it favours the class with more reflections."
         ),
     ),
-    "EXTINCTION_UNDECLARED": HelpEntry(
-        title="Strong reflections calculated too strong",
-        description=(
-            "A phase declares no extinction, and its strongest reflections are "
-            "calculated stronger than observed. Freeing extinction, with the phase "
-            "scales, the displacement parameters and the background re-fitted, would "
-            "remove a significant share of the misfit. Extinction is opt-in, so no plan "
-            "frees it until the phase declares it. Declare it on the named phase with "
-            "`phase.extinction = 0.0` and refit. Then read its esd and its correlation "
-            "with the scale before quoting it or the phase fraction, because preferred "
-            "orientation and a wrong displacement parameter also change the strong lines."
-        ),
-    ),
     "EXTRA_PEAK_NO_INTENSITY": HelpEntry(
         title="A declared peak refined to zero intensity",
         description=(
