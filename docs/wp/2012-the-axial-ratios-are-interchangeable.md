@@ -1,9 +1,8 @@
 # WP-2012 — The two axial-divergence ratios are interchangeable, and a fit reports one branch
 
-Milestone: unscheduled · Status: 🔄 2026-11-05 — the recipe import frees S/L alone on draft PR #1422; holding H/L against tying it to S/L awaits a ruling
+Milestone: unscheduled · Status: ✅ 2026-11-05 — every calibration path frees S/L alone, the recipe import included (PR #1422); the tie S/L = H/L is issue #1426
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-11-05 — was P3 2026-11-02: the recipe sibling is built (PR #1422, draft); one design question decides whether it ships as is
 
 ## Goal
 
@@ -126,7 +125,7 @@ choosing a fix.
       free set moves; the convention note says so where the flag is set. The tie was not
       taken: it needs a `Recipe` field. No committed recipe flags `axial_divergence`, so
       no fixture's fit moves.
-- [ ] Rule between the hold and the tie for the recipe import (2026-11-05, the generality
+- [x] Rule between the hold and the tie for the recipe import (2026-11-05, the generality
       judge's "weak" on the hold). Freeing both is excluded by the exact swap symmetry. The
       choice left is which one-parameter model replaces GSAS-II's: S/L free with H/L held at
       SH/L / 2 (built on PR #1422), or S/L = H/L moving together, which is GSAS-II's own
@@ -135,6 +134,8 @@ choosing a fix.
       the recipe flags. The hold also starts exactly at s = h, where the analytic S/L column
       is one-sided. Nothing measures the two models against each other, because no committed
       recipe flags the term.
+      **Ruled 2026-11-05 (Michael): keep the hold as built.** The tie is "the more proper
+      thing to do" and is left for later: issue #1426, which needs a `Recipe` tie field.
 - [x] The skill-placement episode's colleague script reads H/L as a result row, which the
       2026-11-03 nightly found raising `KeyError` (a slow row, so #1356's fast gates could not
       see it). **Done 2026-11-03 (PR #1387).** The script prints S/L alone, and
@@ -147,6 +148,37 @@ choosing a fix.
 ```
 
 ## Handover log
+
+- **2026-11-05 (ghostshift runner, the ruling; WP closed)** — The maintainer ruled to keep
+  the hold. An imported GSAS-II recipe frees S/L from its one `SH/L` flag and holds H/L at the
+  half the recipe states, as PR #1422 built it. With that, every path that refines axial
+  divergence frees one ratio, and the WP closes. Tying the pair S/L = H/L is GSAS-II's own
+  model and the more proper one, so it is filed as issue #1426. It needs a tie field on
+  `Recipe`, which nothing carries today.
+
+  *Done.* No code changed in this session. The open task is ticked with the ruling. The
+  status is ✅, and the `Priority:` line is gone. The narrative went to
+  `docs/milestones/v1.12.md`. The branch was rebased onto `origin/main` (`541f0daf7`). Issue
+  #1426 says what the hold does, what the tie would do and why it is more proper. It also
+  says what the tie needs: a `Recipe` tie field, a check of the tied column at the FCJ
+  corner, and a recipe that flags the term, to measure the two models against GSAS-II.
+
+  *Correction to the entry below.* That entry says the skill's `RECIPE_CONVENTION_ASSUMED`
+  row ("Treat the split as measured") contradicts `help.py` ("assumed and not measured").
+  It does not. The row sits in the table headed "What it means you must not do", so it says
+  what `help.py` says. Nothing was changed. Issue #1426 quotes both wordings and records the
+  check.
+
+  *Review.* This session made no code change, so `/code-review` had nothing new to read. The
+  previous session's pass, and the generality judge's, cover the code (entry below). No
+  heuristic was added, so the judge was not run again.
+
+  *Gates.* Measured on darwin/arm64, worktree venv `[dev]`, on the rebased tree. See the PR
+  body for the counts. The fast selection was not rerun, because nothing under `src/` changed
+  after its 13931-passed run (entry below). The full suite did not run, for the reason given
+  below.
+
+  *Next:* none on this WP. The tie is issue #1426.
 
 - **2026-11-05 (ghostshift runner, the recipe sibling)** — An imported GSAS-II recipe no
   longer frees both axial-divergence ratios from its one `SH/L` flag. It frees S/L and holds
