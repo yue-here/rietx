@@ -297,8 +297,9 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
       `SEQUENTIAL_MOMENT_ONSET` always `info` (the bracket, tier 1) and
       `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` at `warning` (every reason not to quote it,
       tier 1 argued against the batch's tier 3, for the maintainer to rule);
-      `SEQUENTIAL_MOMENT_HOLD` names every floored pattern. Owed: C11's three
-      invariant arms, `SEQUENTIAL_MOMENT_HOLD`'s tier (C8 q1, approval owed), the tiers
+      `SEQUENTIAL_MOMENT_HOLD` names every floored pattern. C11: `fit:x`, `fit:x_label`
+      and `fit:labels` `invariant`, their arms in `test_answer_invariant_defaults.py`
+      (`labels` compared blind to the names). Owed: `SEQUENTIAL_MOMENT_HOLD`'s tier (C8 q1, approval owed), the tiers
       of `SeriesEntry.rungs_tried`/`.rungs_raised` and `fit:refit` (C2), C10 q1's hand
       rows, and the rows waiting on X14.
 - [ ] Goldens re-pinned only if no further from reference. A series golden's first

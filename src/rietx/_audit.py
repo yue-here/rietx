@@ -4989,9 +4989,25 @@ ROWS: tuple[Row, ...] = (
                   "Gauss-Newton with relaxation factors")),
     Row("rietx.sequential.refine_sequential:history", "default", tier="invariant", ambiguity=1, value=False,
         evidence=("answer-invariant: one history tree per pattern; tests/test_answer_invariant_defaults.py asserts a three-pattern chain's every kept value, esd, rung and code equal with it on (WP-2003)")),
-    Row("rietx.sequential.SequentialRefinement.fit:x", "default", value=None),
-    Row("rietx.sequential.SequentialRefinement.fit:x_label", "default", value="index"),
-    Row("rietx.sequential.SequentialRefinement.fit:labels", "default", value=None),
+    Row("rietx.sequential.SequentialRefinement.fit:x", "default", tier="invariant", ambiguity=1,
+        value=None,
+        evidence=("answer-invariant: the series axis, the pattern index without one; "
+                  "tests/test_answer_invariant_defaults.py asserts a three-pattern chain's "
+                  "every kept value, esd, rung, code and step equal with an axis given, and "
+                  "that the axis reached the entries (WP-2003 C11)")),
+    Row("rietx.sequential.SequentialRefinement.fit:x_label", "default", tier="invariant",
+        ambiguity=1, value="index",
+        evidence=("answer-invariant: the axis's name; tests/test_answer_invariant_defaults.py "
+                  "asserts a three-pattern chain's every kept value, esd, rung, code and step "
+                  "equal with a name given, and that it reached the result (WP-2003 C11)")),
+    Row("rietx.sequential.SequentialRefinement.fit:labels", "default", tier="invariant",
+        ambiguity=1, value=None,
+        evidence=("answer-invariant: each pattern's name, its file's stem else p000.., which "
+                  "also names its history file and pairs the two chains; "
+                  "tests/test_answer_invariant_defaults.py asserts a three-pattern chain's "
+                  "every kept value, esd, rung, code and step equal with labels given, "
+                  "compared blind to the names, and that the names reached the record "
+                  "(WP-2003 C11)")),
     Row("rietx.sequential.SequentialRefinement.fit:mode", "default", tier=2, ambiguity=1,
         value="rietveld",
         evidence=("the single fit's default (rietx.refine.Refinement.fit:mode), handed to each "
@@ -6342,10 +6358,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.schemas.suggest.SUGGEST_ABSORPTION_MAX",
     "rietx.schemas.suggest.SUGGEST_GROUP_R2",
     "rietx.schemas.suggest.SUGGEST_MIN_GAIN",
-    "rietx.sequential.SequentialRefinement.fit:labels",
     "rietx.sequential.SequentialRefinement.fit:refit",
-    "rietx.sequential.SequentialRefinement.fit:x",
-    "rietx.sequential.SequentialRefinement.fit:x_label",
     "rietx.sequential.WIDTH_GROWTH_FACTOR",
     "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
     "rietx.sequential.WIDTH_GROWTH_SIGMA",
