@@ -234,7 +234,8 @@ the whole surface with real agents.
   `solve/cost.py`'s docstring confirms that preferred orientation is folded
   into Ω's columns. `model/preferred_orientation.march_term` and
   `march_term_and_dr` exist. WP-1997 lists preferred orientation (S9, #677) as
-  a non-goal, so this belongs with S9.
+  a non-goal, so this belongs with S9. Filed 2026-11-05 as
+  [WP-2109](2109-the-solve-cost-at-a-stated-march-dollase-r.md), in `SolveCost`.
 
 ## What the scoping decides
 

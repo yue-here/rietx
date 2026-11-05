@@ -922,9 +922,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Sabine primary-extinction coefficient, a squared mosaic-block size. A "
             "powder has no secondary extinction. The coefficient attenuates the strong "
-            "low-angle reflections of a well-crystallised specimen. At 0 there is no "
-            "correction, so a phase that does not free it is unaffected. The calculated "
-            "pattern still responds to it at 0, so the staged plans free it from 0 "
+            "low-angle reflections of a well-crystallised specimen. Opt-in: a plan "
+            "frees it only once `phase.extinction = 0.0` declares it. At 0 there is "
+            "no correction. The "
+            "calculated pattern still responds to it at 0, so the plan frees it from 0 "
             "without a seed."
         ),
         unit="µm²", default="0.0",
@@ -2160,6 +2161,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "be screened at all. Counting longer at the positions where the leading "
             "classes disagree, or widening the range, helps with the first two. Rwp is "
             "no guide, because it favours the class with more reflections."
+        ),
+    ),
+    "EXTINCTION_UNDECLARED": HelpEntry(
+        title="Strong reflections calculated too strong",
+        description=(
+            "A phase declares no extinction, and its strongest reflections are "
+            "calculated stronger than observed. Freeing extinction, with the phase "
+            "scales, the displacement parameters and the background re-fitted, would "
+            "remove a significant share of the misfit. Extinction is opt-in, so no plan "
+            "frees it until the phase declares it. Declare it on the named phase with "
+            "`phase.extinction = 0.0` and refit. Then read its esd and its correlation "
+            "with the scale before quoting it or the phase fraction, because preferred "
+            "orientation and a wrong displacement parameter also change the strong lines."
         ),
     ),
     "EXTRA_PEAK_NO_INTENSITY": HelpEntry(

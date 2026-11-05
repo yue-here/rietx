@@ -1362,7 +1362,8 @@ class ParameterTable:
                 # than leaving c free (WP-1036, symmetry.CellConstraints).
                 self._collect_cell(f"{base}.cell", sg, phase.cell)
             self._add(f"{base}.scale", phase.scale)
-            self._add(f"{base}.extinction", phase.extinction)
+            if phase.extinction is not None:
+                self._add(f"{base}.extinction", phase.extinction)
             if phase.preferred_orientation is not None:
                 self._add(f"{base}.preferred_orientation.r",
                           phase.preferred_orientation.r)
@@ -4819,7 +4820,8 @@ class ParameterTable:
                 for j, p in enumerate(phase.parent_cell.strain):
                     put(p, f"{base}.parent_cell.strain.{j}")
             put(phase.scale, f"{base}.scale")
-            put(phase.extinction, f"{base}.extinction")
+            if phase.extinction is not None:
+                put(phase.extinction, f"{base}.extinction")
             if phase.preferred_orientation is not None:
                 put(phase.preferred_orientation.r, f"{base}.preferred_orientation.r")
             if phase.texture is not None:
