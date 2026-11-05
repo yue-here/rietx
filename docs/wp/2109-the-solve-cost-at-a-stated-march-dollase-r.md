@@ -1,6 +1,6 @@
 # WP-2109 — the solve cost at a stated March-Dollase r
 
-Milestone: structure-solution · Status: 🔄 2026-11-05 — built: χ², s and ∂χ²/∂r at a stated (r, axis), every Acceptance row green; PR open, waits on review
+Milestone: structure-solution · Status: 🔄 2026-11-05 — finished: every task ticked and PR #1420 merged at `c1596ff82`, χ², s and ∂χ²/∂r at a stated (r, axis); waits on Yue to close it, since closing a WP is the maintainer's
 Depends on: 1902 (shipped, the cost)
 Priority: P3 2026-11-05 — no user is at the wall: nothing in the package calls this until S9 (#677) is cut, and the contributor's search carries r outside the package today
 
@@ -163,6 +163,28 @@ is owed yet. The form goes in `solve/cost.py`'s docstring.
 - WP-1902 (the cost), WP-1515 (the scoping), WP-1997 (the engine).
 
 ## Handover log
+
+- **2026-11-05** (post-merge record) — PR #1420 merged at `c1596ff82`. Every task
+  was already ticked, so this entry ticks nothing. The merge makes χ² and ∂χ²/∂r
+  available at a stated March-Dollase r and axis. It does not make a search move
+  r, and nothing in the package calls the new methods.
+  *Status:* `/pr-review` step 9 keeps a close with the maintainer, so the glyph
+  stays 🔄 until Yue sets ✅. The close also deletes the `Priority:` line and moves
+  the narrative to the release record (ROADMAP rule 5).
+  *After the entry below:* commit `115169d4a` landed on the PR.
+  `texture_ratio` now raises a plain `ValueError` on a non-integer axis, which it
+  used to truncate to int64, and on an infinite r, which used to give NaN.
+  `TextureRefused`'s four reasons did not change. `tests/test_solve_cost.py`
+  collects 63 tests on `main` (arm64 Mac, worktree venv), up from the 58 below.
+  *Owed to S9 (#677):* `from_model` builds the orbit layout whenever it gets a
+  `group`, and `from_pawley` always passes one. So every extraction pays for orbits
+  that nothing reads until S9 exists. S9 decides whether to build them at first
+  use instead. The contributor's PR comment of 2026-11-05 left this point to
+  review, with a second one, a redundant `group=`. Neither has a ruling. Neither
+  appears on #677, and no S9 WP exists yet, so this entry holds both until S9 is
+  cut.
+  *Next:* Yue closes this WP. Nothing else, until S9 decides whether a search
+  moves r.
 
 - **2026-11-05** — built. `SolveCost` can now say what χ² would be if the solved phase
   were textured at a March-Dollase r and axis that the caller states, and how fast χ²
