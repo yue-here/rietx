@@ -70,6 +70,21 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
 
 ### Inherited
 
+- **From WP-2086 (2026-11-04, PR #1406): `MODEL_FAR_FROM_DATA` is silent on a fit that lost
+  the phase, so test it on background-subtracted Rwp.** This is the B12.13 row's other
+  direction: that row fires on a true model at sparse counts, and these rows say nothing on
+  a wrong one. On the reach table (WP-2086's handover, 119 fits from displaced starts) 12 fits
+  fail silently, all on the real FAP pattern: `usable=True`, `converged`, no error, Rwp
+  0.44-0.69. Their zero shift reaches −21 821° and −500 446°, and neither fires. Their
+  background-subtracted Rwp reads 0.93-1.00 on 9 rows, 0.575 and 0.467 on two `profile_only`
+  rows and 0.256 on `lab_bragg_brentano` at +3 %. Fits that reached the answer read 0.042 on
+  LaB₆, 0.12-0.14 on FAP and 0.16-0.17 on NAC, so the gap is 0.17 to 0.256 on this table. The
+  sparse-count family runs the opposite way and must be read beside it. Task: test the rule
+  on these families. The threshold and what a reader then sees are the maintainer's calls.
+  Each row ran once. Repeating the edge rows put FAP `mccusker_default` at +3 % among the silent
+  failures on one start in three, so 12 is a lower bound.
+  WP-2005 owns the code's level. Not implemented.
+
 - **From WP-2002 (2026-10-23, 9th session, PR #1113): the twin hold and the floor removal moved three start rows, and give two rows new families.** (1) `BISO_SEED`: cpd-1a's Biso starts now differ by 15.68 plain esd on zincite's `lor_strain` (0.070 before), because the width twin hold keeps the X/Y split `qpa_plan`'s instrument-only stage lands on, a strict xfail (decision 1(a)); FAP and NAC stay at 0.000. The row's evidence now rests on two families. (2) The intermediate-tolerance row on cpd-1a with an absent zircon reads 0.035 (0.185 before) and the axial sizing floor on cpd-1a 0.010 (0.138 before); both strict xfails went. (3) `StageResult.width_twins_held` (tier 2) has one real two-phase family (11-BM LaB6 + cBN) and the synthetic and CPD fits in its row; a second real multi-phase family freeing a twin pair would test it. (4) `ProfileTCHZ:y`'s floor went on a physical argument (a constant Lorentzian projects to Y < 0) with one synthetic cost (`tests/test_v02_core.py`: Y −0.0059 against a truth of 0, sample `lor_size` 55 % low); what real lab calibrations do with Y unfloored is unmeasured; the judge's test is SRM 660c refined with Y free and with Y ≥ 0, read on the certified cell and a sample's size and strain. (5) Under TRF no width row holds, and whether brucite and corundum put a coefficient on the ±180 far bound under the hold is unmeasured. (6) `optimize.least_squares._fd_typicals` still decides a row is a width from a lower bound ≥ 0 and patches Y with a name list (`_SIGNED_WIDTHS`); a caller's X or `lor_strain` with min < 0 takes the offset's step of 1, which put 1.4e-3 to 1.5e-2 errors into width columns (code review, declined as a design change: declare which rows are widths as table data). This entry supersedes the zircon and axial-floor readings in the two entries below.
 
 - **From WP-2002 (2026-10-23, 8th session, PR #1113): the generality judge's owed measurements.** Tier 3 by the maintainer's delegation, each waiting on its three-family evidence here: `optimize.lm.FTOL` (1e-9, never varied: refit the four start-test families at 1e-8 and 1e-10, bar 0.1 plain esd); `schemas.structure.BISO_SEED` and `schemas.instrument.HARMONIC_WEIGHT_SEED` (start-invariant only behind the closing stage, so measure the two starts with `closing_window_tol=None`); `schemas.interval.PARAMETER_INTERVAL_BRACKET_GROWTH` (2.0, lifted by B14; can choose between crossings where window recompiles give several). Four hand rows claimed invariant with no test: the Le Bail/Pawley intensity seed, `refine._FLAT_AXIS_TEST_DIRECTIONS`, `arpls`'s `max_iter`/`tol`, and `params.vector.FLOOR_SEEDS` (a B10 numerical setting); 2002's § The hand rows that stay lists them. The width floors' removal (the maintainer's 2026-10-23 answer) lands under TRF without the per-coefficient guard; its TRF measurement is in 2002's 8th-session entry.
@@ -117,6 +132,28 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
       distance, with obs/calc/diff PNGs to `tests/output/` for each refit used.
 - [ ] Each row's evidence line updated; a row a test now bounds moves to tier 1 or
       `invariant` with the test named; a row that fails goes to a batch for the maintainer.
+- [ ] Tell a blank frame with structure from a phase whose peaks missed (from WP-2086,
+      PR #1406). WP-2086 holds the instrument on a frame where every phase reads unseen
+      only when the residual is noise: Durbin-Watson d ≥ Q, Hill & Flack's (1987) 0.1 %
+      point. Q is 1.91 at 4200 channels and 1.96 at 21 001. Fourteen blank frames with
+      structure read under Q, at d 0.34-1.49. The real empty Kapton capillary reads
+      0.43-1.04 (one pattern, at 6 and 12 background terms), six synthetic humps 0.34-1.49
+      and six rebinned-noise frames 0.64-1.02. Strong phases whose peaks missed read
+      0.02-0.12. A weak phase that stayed misplaced reads 0.14-1.85, across the whole blank
+      range. Raw rows: `~/.cache/ghostshift/rietx/wp-2049/step/disc.jsonl` and
+      `blank_fix.jsonl`, not committed; the rebinned and weak-phase figures are from
+      WP-2086's handover.
+      What a user sees today: these frames stay free as on 1.10.0. Four of the 14, all
+      synthetic, refined a zero shift on nothing, each within 2 esd of zero (0.0048 ±
+      0.0255° to −0.0029 ± 0.0016°), with U up to 0.38 deg². Kapton stayed at scale 0 and
+      zero 0. `PHASE_UNCONSTRAINED` fired on the eight frames whose codes were recorded and
+      names the unseen phase. No finding says the instrument stayed free, and the zero
+      carries an esd as a measurement does.
+      A threshold chosen between 0.12 and 0.34 would be tuned to these frames and would read
+      a weak missed phase as blank. So this needs a design, and evidence from more than this
+      one fixture set: no real blank frame has yet been seen to pass the check, and the one
+      real frame here is from 11-BM. The threshold and anything the reader sees are the
+      maintainer's calls.
 - [ ] The batch, in the register of `~/.claude/CLAUDE.md`, if any row failed.
 
 ## Acceptance
@@ -137,5 +174,7 @@ No row this WP lists still names the second pass as owed.
 - PR #1050's second read of the batch (Mike Gaultois, 2026-10-20).
 
 ## Handover log
+
+- **2026-11-04** — Task added from WP-2086's review: tell a blank frame with structure from a phase whose peaks missed. Numbers re-read from the raw rows. With the synthetic humps the 14 frames span d 0.34-1.49, past the 0.43-1.04 quoted for Kapton, and Kapton's Q is 1.96 at its 21 001 channels. Nothing new measured, no code. PR #1408.
 
 - **2026-10-20** — Filed by WP-2002's session at the maintainer's request ("split"): the second pass moves here so that 2002 closes on its owed tests and B14's lifts. Nothing measured yet.

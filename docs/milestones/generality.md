@@ -6,7 +6,7 @@ general-purpose package. The block 20xx is claimed for it. [`../ROADMAP.md`](../
 § generality carries the short prose, and the WP index lists the rows.
 
 Narrative about the WPs below goes to the record of the release in flight,
-[v1.11](v1.11.md) today, as for every other WP (protocol rule 5).
+[v1.12](v1.12.md) today, as for every other WP (protocol rule 5).
 
 ## Scope
 

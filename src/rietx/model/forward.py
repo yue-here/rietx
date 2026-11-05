@@ -1986,7 +1986,7 @@ class CompiledModel:
             # on θ.  Otherwise it is evaluated unconditionally, and the off
             # state stays bit-identical anyway (purity (b)).
             # V moves with the cell, hence recomputed here rather than cached.
-            ext = values[f"phases.{ip}.extinction"]
+            ext = values.get(f"phases.{ip}.extinction", 0.0)
             vol = cell_volume(*cell)
 
         # anisotropic strain is line-independent (it depends on hkl and the
@@ -2711,7 +2711,7 @@ class CompiledModel:
         # applies it unconditionally.  Only these pure-analytic columns need it
         # explicitly; the scale/occ/biso/cell/extinction columns pick it up
         # from the FD-of-phase_peaks chain.
-        ext = values[f"phases.{ip}.extinction"]
+        ext = values.get(f"phases.{ip}.extinction", 0.0)
         # the extinction variable x is built from the whole reflection, so the
         # magnetic term belongs in it exactly as it does in ``phase_peaks``
         f2 = None
@@ -2808,7 +2808,7 @@ class CompiledModel:
         cp = self.phases[ip]
         # gated exactly like phase_peaks, and unconditional otherwise: E ≡ 1
         # exactly at ext=0 either way (purity (b))
-        ext = values[f"phases.{ip}.extinction"]
+        ext = values.get(f"phases.{ip}.extinction", 0.0)
         vol = cell_volume(*cell)
         out = []
         # λ read through ``line_lambdas``, never off the frozen tuple: a joint
@@ -4335,9 +4335,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             cp.batch_mag = _batch_layout(win_mag, fcj_n_mag, tt)
         # the off-state gate (see the field): ext is exactly its identity and
         # nothing this stage moves can take it off there
-        cp.skip_extinction = (gate_off_states
-                              and phase.extinction.value == 0.0
-                              and f"phases.{ip}.extinction" not in moving_paths)
+        cp.skip_extinction = (phase.extinction is None
+                              or (gate_off_states
+                                  and phase.extinction.value == 0.0
+                                  and f"phases.{ip}.extinction" not in moving_paths))
         # WP-0605 task 0: the FCJ node memo needs no free-path analysis —
         # correctness rests on input equality alone — so it is allocated
         # whenever any peak has quadrature nodes at all.

@@ -13,7 +13,7 @@ description: >-
 license: MIT
 compatibility: Requires the rietx Python package (pip install rietx) and Python 3.11+. Works offline — this file and its references ship in the wheel; the user manual it names is hosted at https://rietx.org.
 metadata:
-  version: "1.11.0.dev0"
+  version: "1.12.0.dev0"
   homepage: "https://rietx.org"
 ---
 
@@ -70,7 +70,7 @@ Free parameters in groups, cumulatively, each group converged before the next (M
 | Plan | When |
 |---|---|
 | `mccusker_default` | a known structure's first fit, and the reset when one goes wrong: scale, background, zero, cell, widths |
-| `mccusker_structural` | the same, then coordinates, Biso and ADPs, PO, extinction, roughness. The worked default (§10) |
+| `mccusker_structural` | the same, then coordinates, Biso and ADPs, declared PO, extinction, roughness. The worked default (§10) |
 | `lab_bragg_brentano` | zero and sample displacement free together (rule 6), with Kα2 ratio and axial S/L. Only where something outside the fit pins one of the two |
 | `lab_calibrate` | a standard, its certified cell held; then `rx.save_instrument_profile` |
 | `lab_sample_refine` | a specimen after `rx.load_instrument_profile`, the only plan whose size and strain are the sample's |

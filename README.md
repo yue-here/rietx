@@ -112,7 +112,7 @@ Validation suites are run in CI against real data. Details here: [docs/VALIDATIO
 ```sh
 git clone https://github.com/yue-here/rietx && cd rietx
 uv venv --python 3.12 && uv pip install -e ".[dev]"
-.venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"   # ~1-3 min
+.venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"   # ~3-5 min
 .venv/bin/python -m pytest -n auto --dist loadgroup                 # + real-data acceptance, ~15-30 min
 .venv/bin/python -m ruff check src tests examples
 ```

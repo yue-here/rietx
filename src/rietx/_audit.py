@@ -686,6 +686,19 @@ ROWS: tuple[Row, ...] = (
                   "scored against does not model the allowed lines; refine the cell or the "
                   "profile and screen again before quoting a symbol")),
     Row("EXTINCTION_SYMBOL_AMBIGUOUS", "code"),
+    Row("EXTINCTION_UNDECLARED", "code", tier=1, ambiguity=2, response="warning",
+        evidence=("warning; a one-column score test on the fit's own residual: the extinction "
+                  "column at 0 for a phase that declares none, projected off the background, "
+                  "every phase's scale and each free column of theta reaching a Biso, ADP, "
+                  "occupancy, coordinate, PO or texture entry, through C; fires at "
+                  "AIR_SCATTER_UNDECLARED_SCORE in reduced chi2 units with the esd inflation "
+                  "included. Development data only (WP-1944): planted LaB6 2.5 um^2 230, and "
+                  "78 with Biso and coordinates free; 0.5 planted 14 and 9 (missed); 11-BM NAC "
+                  "8.1 and CaF2 14.6, Si 640c 0.13, FAP no lean. Ambiguity 2: preferred "
+                  "orientation, undeclared, draws the same strong-line deficit. Tier 3 with "
+                  "grounds and an approval is the maintainer's call (WP-1944 handover)"),
+        responds=("declare extinction on the named phase and refit, then read its esd and its "
+                  "correlation with the scale before quoting it or the phase fraction")),
     Row("EXTRA_PEAK_NO_INTENSITY", "code"),
     Row("EXTRA_PEAK_ON_REFLECTION", "code"),
     Row("FLAT_DIRECTION", "code"),
@@ -1433,7 +1446,17 @@ ROWS: tuple[Row, ...] = (
                   "WP-1534's fixture; WP-2049: with every phase unseen, an instrument "
                   "column reaching the pattern only through phase peaks is held too, "
                   "free a blank frame's zero shift read -0.0129 +/- 0.0015 deg (8.7 "
-                  "sigma, truth 0.006); the joint runner writes this field from the same "
+                  "sigma, truth 0.006); WP-2086: that instrument hold at an answer "
+                  "also needs d >= Q (HILL_FLACK_Z's row), since a zero scale reads the "
+                  "same on a phase whose peaks missed: over 100 noise draws of LaB6 a "
+                  "fit 2.25 % off reached its cell 62 times held and 85 free, 1.10.0's "
+                  "85, a chain's 2 % step 90 and 99, and 20 "
+                  "noise frames stayed bit-identical; its costs: three real FAP fits from "
+                  "a start 1.5-3 % off go back to Rwp 0.69 reading converged as on 1.10.0, "
+                  "and a blank frame with a hump or rebinned noise (d 0.43-1.04) keeps its "
+                  "instrument free, 4 of 14 refining a zero shift on nothing, and no real blank "
+                  "frame has been seen to pass; "
+                  "the joint runner writes this field from the same "
                   "statistic, read off the joint normal matrix (multi."
                   "_joint_answer_significance, WP-2003 C10): on two copies of #481's "
                   "seed-107 blank frame the screen alone released the shared cell at "
@@ -1441,16 +1464,18 @@ ROWS: tuple[Row, ...] = (
                   "finding, and aligned it is held from the cell stage on, every stage's "
                   "evaluation count the single fit's"),
         grounds=("No competent refiner lets a phase the data cannot see refine its cell, nor "
-                 "lets a frame no phase is seen in refine the instrument terms that reach the "
+                 "lets a frame of pure noise refine the instrument terms that reach the "
                  "pattern only through phase peaks (zero shift, displacement, U..Y, the axial "
                  "terms); the hold touches only what the data cannot determine; on by default, "
                  "which no program does (B1, ruled 2026-10-19; the instrument widening, "
                  "WP-2049, ruled 2026-11-01). The lineless branch, which holds the "
                  "scale, is tier-1 arithmetic (a zero column) inside a row tiered on its "
-                 "contested part. The joint hold reads the single fit's statistic and is "
+                 "contested part. Under Q the hold declines and the instrument stays free, as "
+                 "on 1.10.0, because a misplaced phase reads the same as an unseen one: "
+                 "ruled by the maintainer 2026-11-04 (WP-2086). The joint hold reads the single fit's statistic and is "
                  "covered here, ruled by the maintainer 2026-11-03 (2003-batch/batch.md, "
                  "C10 q2 (a))."),
-        approved="2026-11-01"),
+        approved="2026-11-04"),
     Row("rietx.schemas.results.StageResult.scale_b_held", "action", tier=1, ambiguity=1,
         evidence=("numerical floor: under 2*sqrt(PINV_RCOND) the covariance's pinv cut cannot see "
                   "scale and B as two directions (WP-1534 derivation); measured cases read 1e-12 or"
@@ -3317,6 +3342,13 @@ ROWS: tuple[Row, ...] = (
                  "unresolved mask nightly; the cut n*FD_STEP^2 approved by Yue, 2026-11-01 "
                  "(PR #1306)."),
         approved="2026-11-01"),
+    Row("rietx.optimize.statistics.HILL_FLACK_Z", "constant", tier=2, value=3.0902,
+        evidence=("Hill & Flack 1987 eq. 2 after Theil & Nagar 1961, read in the paper: Q is "
+                  "the 0.1 % significance point of d, tested there on real X-ray and neutron "
+                  "Rietveld residuals; norm.ppf(0.999) = 3.09023; RIETAN-FP's manual eq. 4.32 "
+                  "and FullProf 8.20's default output print the same Q (docs/practice.md, ran on a "
+                  ".sum file); gates only the instrument half of "
+                  "StageResult.held, whose row carries the rule's own tier")),
     Row("rietx.optimize.statistics.MAX_SHIFT_CONVERGED", "constant", value=0.1),
     Row("rietx.optimize.statistics.OBS_PER_PARAMETER_MIN", "constant", value=3.0),
     Row("rietx.optimize.statistics.OBS_PER_PARAMETER_PREFERRED", "constant", value=5.0),
@@ -3458,6 +3490,11 @@ ROWS: tuple[Row, ...] = (
                  "measured value, one family (B11, ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("rietx.refine.LOW_ANGLE_MIN_CHANNELS", "constant", value=10),
+    Row("rietx.refine._EXTINCTION_PROBE", "constant", tier=1, value=0.001,
+        evidence=("numerical: the differencing step of EXTINCTION_UNDECLARED's column; the "
+                  "forward difference's relative error is about x/2 at the probe, under 1e-4 "
+                  "on the fits WP-1944 measured, held to 1e-3 against a finer forward difference by "
+                  "test_the_extinction_probe_column_is_the_derivative_at_zero")),
     Row("rietx.refine.LOW_ANGLE_UNMODELLED_RATIO", "constant", value=3.0),
     Row("rietx.refine.MAGNETIC_TICK_PURITY", "constant", value=0.05),
     Row("rietx.refine.MODEL_FAR_FROM_DATA_RWP", "constant", tier=3, value=0.8,
@@ -4944,6 +4981,10 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
+    Row("EXTINCTION_UNDECLARED.suggestion", "suggestion", tier=1, ambiguity=2, value=1,
+        evidence=("arithmetic for the declaration it names, the only way to free the term, "
+                  "with no plan chosen; it names the preferred-orientation declaration as the "
+                  "rival, and HIGH_CORRELATION and the esd report a wrong step at the next fit")),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),

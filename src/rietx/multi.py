@@ -97,6 +97,7 @@ from .refine import (
     _displacement_columns,
     _escaped_cell_paths,
     _every_phase_unseen,
+    _extinction_undeclared_diagnostics,
     _extra_peak_diagnostics,
     _far_from_data_diagnostics,
     _fixed_literal_diagnostics,
@@ -116,6 +117,7 @@ from .refine import (
     _onto_flat_meridian,
     _origin_diagnostics,
     _parameter_row,
+    _peak_columns_flat_at_answer,
     _peak_only_instrument_path,
     _phase_agreement,
     _phase_support_diagnostics,
@@ -271,6 +273,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (HISTOGRAM,), "the region below one pattern's first reflection"),
     "_air_scatter_undeclared_diagnostics": (
         (HISTOGRAM,), "one histogram's residual against its own background"),
+    "_extinction_undeclared_diagnostics": (
+        (HISTOGRAM,), "one histogram's residual against its own partner "
+                      "columns; an undeclared extinction is the specimen's, "
+                      "but the evidence is each pattern's strong lines"),
     "_qpa_esd_unavailable_diagnostics": (
         (HISTOGRAM,), "through _quantify_phases, which partitions one "
                       "histogram's scales"),
@@ -854,7 +860,8 @@ def _unsupported_paths_multi(mtable, absent: list[set[int]],
     already holds every ``lineless`` phase.  ``models`` lets an instrument
     column be held where no histogram it reaches sees a phase (WP-2049).
     ``instrument_absent`` replaces ``absent`` for that question alone: the
-    stage-start hold passes ``lineless``, the collapse leaves it ``None``.
+    stage-start hold passes ``lineless``, the collapse passes
+    ``refine._peak_columns_flat_at_answer``'s reading per histogram.
     """
     if not any(absent):
         return []
@@ -1081,8 +1088,15 @@ def _rehold_multi(models, mtable, held: list[str],
     released = [p for p in held
                 if not _only_unseen(mtable, [p, *held_reach.get(p, ())], absent,
                                     flat_scales, models)]
+    # the single runner's test, per histogram: a shared column is then held
+    # only if it is flat in every histogram that carries it, so one histogram
+    # with peaks left in its residual keeps it free (``_unseen``, all, never any)
+    instrument_absent = [
+        a if _peak_columns_flat_at_answer(m, t, a, n) else set()
+        for a, n, m, t in zip(absent, lineless, models, mtable.tables, strict=True)]
     collapsed = [p for p in _unsupported_paths_multi(mtable, absent, reach,
-                                                     flat_scales, models)
+                                                     flat_scales, models,
+                                                     instrument_absent)
                  if p not in held_set]
     if collapsed:
         for h, table in enumerate(mtable.tables):
@@ -2476,6 +2490,8 @@ class MultiHistogramRefinement:
                                                 ticks, tick_support))
             diags.extend(_air_scatter_undeclared_diagnostics(model, values,
                                                              y_calc, stats))
+            diags.extend(_extinction_undeclared_diagnostics(
+                model, table, thetas[h], values, y_calc, stats, struct))
 
             histograms.append(HistogramResult(
                 label=model.meta.get("label", "") or f"hist{h}",

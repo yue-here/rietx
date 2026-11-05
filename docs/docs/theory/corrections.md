@@ -256,6 +256,9 @@ extinction is the attenuation of the beam by other, similarly oriented blocks
 upstream, and in a powder the corresponding effect is multiple scattering
 {cite}`sabine1988b`. Left uncorrected, the
 refinement compensates with a spuriously large Biso and a small scale.
+On a fine powder the coefficient trades against the scale and the Biso instead,
+so it is opt-in per phase: `phase.extinction = 0.0` declares it, and
+`EXTINCTION_UNDECLARED` names a phase whose strongest reflections ask for it.
 Sabine's polycrystalline model {cite}`sabine1985,sabine1988,sabine1988b`
 interpolates between the two-beam limits with $\sin^2\theta$ and
 $\cos^2\theta$ weights:

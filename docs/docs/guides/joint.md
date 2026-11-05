@@ -82,13 +82,13 @@ Compare each coordinate's esd alone and jointly:
 
 <!-- output of examples/guides/joint.py -->
 ```text
-phases.0.atoms.0.z  X-ray 0.352121(40)  neutron 0.35190(15)  joint 0.352108(39)
-phases.0.atoms.1.x  X-ray 0.30635(19)  neutron 0.30643(18)  joint 0.30634(13)
+phases.0.atoms.0.z  X-ray 0.352124(40)  neutron 0.35190(14)  joint 0.352108(38)
+phases.0.atoms.1.x  X-ray 0.30630(18)  neutron 0.30643(17)  joint 0.30634(12)
 ```
 
 `phases.0.atoms.0.z` is the Al coordinate and `phases.0.atoms.1.x` the O coordinate.
-Alone, the neutron pattern measures z(Al) 3.6 times less precisely than the X-ray pattern, and x(O) about as well.
-Jointly, z(Al) keeps the X-ray pattern's esd, and x(O)'s esd falls to 0.67 of it.
+Alone, the neutron pattern measures z(Al) 3.4 times less precisely than the X-ray pattern, and x(O) about as well.
+Jointly, z(Al) keeps the X-ray pattern's esd, and x(O)'s esd falls to 0.66 of it.
 The neutron pattern adds the oxygen, and the aluminium stays the X-ray pattern's.
 
 ## Choose which parameters are shared
