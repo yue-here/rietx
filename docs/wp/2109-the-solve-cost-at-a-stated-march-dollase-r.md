@@ -164,7 +164,7 @@ is owed yet. The form goes in `solve/cost.py`'s docstring.
 
 ## Handover log
 
-- **2026-11-05** — filed from WP-1515's 2026-10-31 entry, PR #PRNUM. No open WP owns this:
+- **2026-11-05** — filed from WP-1515's 2026-10-31 entry, PR #1414. No open WP owns this:
   WP-1997 fences preferred orientation out, WP-1515 builds nothing, and S9 has no WP yet. The
   block 19xx is full, so the number is the next free one in the newest block. *Next:* the
   first task, whenever someone takes it up. The contributor offered to build it on #562.

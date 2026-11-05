@@ -102,7 +102,7 @@ of issue #561, sized M.
   the assertion stays. The brief's option C, not ruled, replaces the assertion
   with a free-atom control fit under the same profile. Acceptance is unchanged
   because the bar is not ruled. Part 1's items are unticked Tasks below. Filed
-  in PR #PRNUM.
+  in PR #1414.
 
 ## Non-goals
 
@@ -154,7 +154,7 @@ of issue #561, sized M.
   guide's code path is identical to #939's head, which passed it. Skill: the
   three codes have rows in `references/diagnostics-reading.md`. *Next:* the
   data file and its provenance row, then the authors' profile.
-- **2026-11-05** — PR #PRNUM records that the acceptance may land in two parts
+- **2026-11-05** — PR #1414 records that the acceptance may land in two parts
   (`### Inherited`, same date) and adds Part 1's items to Tasks. No test lands
   with it, and the Acceptance section is unchanged. *Next:* as above, then
   Part 1. Part 2 waits on Yue's ruling on the bar.
