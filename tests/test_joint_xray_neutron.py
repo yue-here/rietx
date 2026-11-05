@@ -191,6 +191,12 @@ def test_a_mixed_joint_fit_runs_at_all():
     kinds = [i.source.kind for i in ref.fitted_instruments]
     assert kinds == ["xray_cw", "neutron_cw"], (
         f"the two histograms did not keep their own radiation: {kinds}")
+    # No background value is pinned.  The data are flat at 1, and the
+    # profile_w stage broadens the peaks until the phase stands in for the
+    # background, so its scale reads as measured and the closing stage frees
+    # every column on a fit with no peaks.  Where the background lands is
+    # then where the solver stops: 1.0 on macOS arm64, 2931 on Linux x86-64
+    # (WP-2003 sixth session; the defect is the WP's to fix).
 
     # `HistogramResult` carries no instrument, so the radiation each histogram
     # was fitted under is not readable from the result at all -- only from the

@@ -122,7 +122,7 @@ def test_parameters_lists_the_whole_table(ref):
     assert rows["phases.0.cell.b"].tie is not None
     assert not rows["phases.0.cell.b"].refinable
     assert rows["phases.0.cell.alpha"].locked
-    assert rows["phases.0.extinction"].refinable and not rows["phases.0.extinction"].vary
+    assert rows["phases.0.lor_size"].refinable and not rows["phases.0.lor_size"].vary
     # bounds come through, so a client can build an editor
     assert rows["phases.0.scale"].lo == 0.0
     assert not hasattr(rows["phases.0.scale"], "transform")
@@ -142,7 +142,7 @@ def test_parameters_merges_the_last_fits_esds(ref, pattern):
     # a tied dependent reports the propagated esd, not None
     assert rows["phases.0.cell.b"].esd == pytest.approx(rows["phases.0.cell.a"].esd)
     # something never freed has no esd rather than a stale one
-    assert rows["phases.0.extinction"].esd is None
+    assert rows["phases.0.lor_size"].esd is None
 
 
 def test_parameters_reflects_the_free_set_after_a_stage(ref, pattern):
@@ -179,12 +179,12 @@ def test_set_vary_frees_by_glob_and_refuses_locked(ref):
     assert rows["phases.0.cell.a"].vary
     assert not rows["phases.0.cell.alpha"].vary
     # a string is accepted as a single glob (the GUI passes one row's path)
-    assert ref.set_vary("phases.0.extinction") == ["phases.0.extinction"]
+    assert ref.set_vary("phases.0.lor_size") == ["phases.0.lor_size"]
     assert ref.set_vary(["phases.*.cell.*"], False) == ["phases.0.cell.a"]
 
 
 def test_set_values_writes_through_to_the_models(ref):
-    ref.set_values({"phases.0.cell.a": 4.2, "phases.0.extinction": 1e-4})
+    ref.set_values({"phases.0.cell.a": 4.2, "phases.0.lor_size": 1e-4})
     assert ref.structure.phases[0].cell.a.value == 4.2
     # the tied dependents follow their source — otherwise the cubic symmetry the
     # tie exists to enforce would be silently broken

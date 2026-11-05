@@ -365,7 +365,7 @@ def test_a_strong_correlation_is_not_a_flat_direction():
 
 
 def test_a_flat_direction_is_reported_beside_its_correlation():
-    """Beside, never instead: the SEQUENTIAL_PERSISTENT_FINDING precedent.
+    """Beside, never instead: the series code-count precedent (WP-1110).
 
     Replacing the row would silence a HIGH_CORRELATION that existing consumers
     count, so the sharper finding rides alongside the one it sharpens.

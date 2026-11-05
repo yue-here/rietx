@@ -23,11 +23,16 @@ SPECIMEN_FIELDS = ("lor_size", "lor_strain", "gauss_size", "gauss_strain",
 @pytest.mark.parametrize("field", SPECIMEN_FIELDS)
 def test_a_specimen_field_does_not_survive_a_cif_round_trip(tmp_path, field):
     phase = _mnf2()
+    if getattr(phase, field) is None:
+        setattr(phase, field, 0.0)  # extinction is opt-in (WP-1944): declare it
     getattr(phase, field).value = 0.37
-    default = getattr(_mnf2(), field).value
+    default = getattr(_mnf2(), field)
     rx.Structure(phases=[phase]).to_cif(tmp_path / "m.cif")
-    back = rx.Structure.from_cif(tmp_path / "m.cif").phases[0]
-    assert getattr(back, field).value == default != 0.37
+    back = getattr(rx.Structure.from_cif(tmp_path / "m.cif").phases[0], field)
+    if default is None:
+        assert back is None
+    else:
+        assert back.value == default.value != 0.37
 
 
 def test_the_crystal_does_survive_it(tmp_path):
