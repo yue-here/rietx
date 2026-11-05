@@ -62,7 +62,7 @@ solve at the committed values. Items 1-3 need it before anything changes.
 ## Non-goals
 
 - A body's series trajectory: WP-1811.
-- Where a body's origin sits (issue #1417).
+- Where a body's origin sits: that question is with the maintainer in issue 1417, which has no WP yet.
 
 ## Tasks
 

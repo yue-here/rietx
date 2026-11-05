@@ -42,7 +42,7 @@ known-cell corpus as its family and each row's truth as its reference. Nothing h
 
 ## Non-goals
 
-- How a ceiling shares among units: issue #1374.
+- How a ceiling shares among units: that question is with the maintainer in issue 1374, which has no WP yet.
 - trial_error's memory: WP-2110.
 - Raising the default of 12. That moves what every reader sees for one list's sake.
 
