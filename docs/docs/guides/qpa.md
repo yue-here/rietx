@@ -90,8 +90,6 @@ HIGH_CORRELATION | Correlated pair: phases.1.scale ~ phases.1.extinction (ρ=+0.
 With a few weak peaks, the extinction and the scale can scale the same intensities.
 The fraction moves from 1.34 to 3.69 wt %, and its esd from 0.11 to 3.63 wt %.
 Rwp falls from 0.088 to 0.083, so Rwp would choose the fit with the meaningless fraction.
-When a fit would gain from extinction, `EXTINCTION_UNDECLARED` names the phase.
-Here it does not fire.
 
 ## Check that the fraction has one answer
 
