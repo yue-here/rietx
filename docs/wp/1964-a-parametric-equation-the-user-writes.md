@@ -384,13 +384,19 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
     `RefinedParameter.equations` names an expression's variables and the rows of the block
     that writes its target, cubic b and c included (the third inherited reader). Both
     change what a fit prints and returns.
-  - *Next.* The rest of task 10: an expression evaluated anywhere with its esd,
-    √(g·Σ·gᵀ) through `Expression.gradient`. `RefinedParametricEquation` has no field for
-    the variables' order, and an expression naming an intermediate needs that definition
-    to be evaluated from a stored result. Either needs a stored field, so it waits on
-    decision (b), or a design that derives both from `result.parametric_equations`. The
-    form test (`target_columns`) still covers linear equations only, and an expression
-    reports no form verdict. Then 9, 11-15.
+  - *Evaluate.* `result.parametric_equations` now carries each expression and each
+    intermediate, with its variables' covariance in the order of its rows in
+    `result.parametric`. A held variable has a zero row. `evaluate()` on an expression
+    takes those rows, the coordinates and the intermediates as `definitions`, and returns
+    √(g·Σ·gᵀ) through `Expression.gradient`. At each pattern it reproduces the cell row's
+    value to 1e-13 and its esd to 1e-6, on the Einstein fit and the calibration-fed one.
+    No stored field is new, so decision (b) does not grow.
+  - *Fast selection* at 84fa4cb02, `[dev,jax,torch]`, darwin/arm64: 14003 passed, 484
+    skipped, 36 xfailed, 0 failed. The first session's tree gave 3 failed and 2 errors,
+    the errors from a subprocess that imported mid-edit. The total moved by +3, the three
+    tests added.
+  - *Next.* Task 10's last reader: the form test (`target_columns`) still covers linear
+    equations only, so an expression reports no form verdict. Then 9, 11-15.
 
 - **2026-11-05 (first build session, a ghostshift runner)** — Tasks 1-6 landed: the grammar,
   the parser and tree, evaluation and exact derivatives, the block on `ParameterTable`,
