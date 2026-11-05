@@ -173,4 +173,4 @@ of issue #561, sized M.
   Part 1. Part 2 waits on Yue's ruling on the bar.
 - **2026-11-05** — Yue ruled on the bar: option C, a free-atom control in rietx
   (`### Inherited`). Goal, Context, Acceptance and Tasks now say so, and Part 2 is that
-  control. Filed in PR #PRNUM. *Next:* Part 1 in PR #1416, then the control.
+  control. Filed in PR #1423. *Next:* Part 1 in PR #1416, then the control.
