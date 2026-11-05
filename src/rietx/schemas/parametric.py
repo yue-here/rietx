@@ -17,7 +17,9 @@ round-trip, so a self-driving lab can write one and a result can carry it:
   ``design`` matrix, the escape hatch for splines, Scheffé mixture forms and
   sin²ψ), the pattern subset, and the reference point and scale per
   coordinate.  A form with a coefficient inside a power or an exponential is
-  not linear in it and is not expressible here (``Parameter.expr``, WP-1119).
+  not linear in it, and is written as an ``expression`` (WP-1964): text in
+  the grammar of :mod:`rietx.params.expression` over named variables, which
+  ``refine_multi(variables=…)`` declares, and the coordinate columns.
 * :class:`ParametricCoefficient` — one refined coefficient on
   :attr:`RefinementResult.parametric <rietx.schemas.results.RefinementResult.parametric>`,
   in the caller's units at the reference.
@@ -53,8 +55,10 @@ from .common import Base
 #: The closed basis vocabulary.  ``constant`` is one coefficient, the same in
 #: every pattern of the subset (a shared parameter over a subset);
 #: ``polynomial`` is a sum of monomials in named coordinates; ``design`` is a
-#: caller's own matrix, one row per pattern of the subset.
-ParametricBasis = Literal["constant", "polynomial", "design"]
+#: caller's own matrix, one row per pattern of the subset; ``expression`` is
+#: the caller's own text over named variables and coordinates (WP-1964), the
+#: one basis that may be nonlinear in what it refines.
+ParametricBasis = Literal["constant", "polynomial", "design", "expression"]
 
 #: fnmatch's metacharacters: a target names one path, never a family
 _GLOB_CHARS = frozenset("*?[")
@@ -110,13 +114,21 @@ class CoordinateTable(Base):
 
 
 class ParametricEquation(Base):
-    """One target refined as a declared linear function of the coordinates.
+    """One target refined as a declared function of the coordinates.
 
-    Its coefficients are named variables ``vars.{name}_{j}``, j = 0…m−1, one
-    shared column each in the joint fit, and the target in each pattern of the
-    subset is tied onto Σ_j Φ_kj·``vars.{name}_{j}``.  A plan frees them when a
-    stage's glob reaches the target, so ``mccusker_default``'s cell stage frees
-    a parametric cell as it would a plain one.
+    For the three linear bases, its coefficients are named variables
+    ``vars.{name}_{j}``, j = 0…m−1, one shared column each in the joint fit,
+    and the target in each pattern of the subset is tied onto
+    Σ_j Φ_kj·``vars.{name}_{j}``.  A plan frees them when a stage's glob
+    reaches the target, so ``mccusker_default``'s cell stage frees a
+    parametric cell as it would a plain one.
+
+    For ``basis="expression"`` the target in each pattern of the subset is the
+    ``expression`` evaluated at that pattern's coordinates.  Its free names are
+    variables, ``vars.{name}`` for each name the caller declares with
+    ``refine_multi(variables=…)`` (one shared column, however many equations
+    name it), or coordinate columns.  It has no coefficients of its own, and a
+    stage's glob reaching the target frees the variables it names.
 
     * ``target`` — one model parameter's bare dot-path, no glob and no
       ``hist.`` scope (the subset says which patterns): ``phases.0.cell.a``,
@@ -131,6 +143,9 @@ class ParametricEquation(Base):
     * ``reference``/``scale`` — per coordinate a polynomial uses: terms are
       evaluated on (z − reference)/scale.  Left out, they are the subset's
       mid-range and half-range, computed once at resolution and stored.
+    * ``expression`` — for ``basis="expression"`` alone, and required there:
+      the text, parsed at construction, so a malformed one is refused here
+      (:class:`~rietx.params.expression.ExpressionError`).
     """
 
     name: str
@@ -141,6 +156,7 @@ class ParametricEquation(Base):
     patterns: list[int] | None = None
     reference: dict[str, float] | None = None
     scale: dict[str, float] | None = None
+    expression: str | None = None
 
     @model_validator(mode="after")
     def _check(self) -> "ParametricEquation":
@@ -166,14 +182,27 @@ class ParametricEquation(Base):
                 raise ValueError(f"pattern indices are non-negative: {self.patterns}")
             if len(set(self.patterns)) != len(self.patterns):
                 raise ValueError(f"a pattern appears twice in the subset: {self.patterns}")
+        if self.basis != "expression" and self.expression is not None:
+            raise ValueError(
+                f"a {self.basis} basis takes no expression: an equation written as "
+                "text is basis='expression'")
         if self.basis == "constant":
             self._forbid("constant", "terms", "design", "reference", "scale")
         elif self.basis == "polynomial":
             self._forbid("polynomial", "design")
             self._check_terms()
-        else:
+        elif self.basis == "design":
             self._forbid("design", "terms", "reference", "scale")
             self._check_design()
+        else:
+            self._forbid("expression", "terms", "design", "reference", "scale")
+            if self.expression is None:
+                raise ValueError(
+                    "an expression basis needs expression='…', e.g. "
+                    "'zero_a + grad/(exp(theta/T) - 1)'")
+            from ..params.expression import Expression
+
+            Expression(self.expression)
         return self
 
     def _forbid(self, basis: str, *fields: str) -> None:
@@ -186,7 +215,9 @@ class ParametricEquation(Base):
                    "polynomial": "its rows are built from terms over the "
                                  "coordinate table",
                    "design": "its rows are the caller's own, already in the units "
-                             "the caller wants each coefficient in"}[basis])
+                             "the caller wants each coefficient in",
+                   "expression": "the expression names its own variables and "
+                                 "coordinates"}[basis])
 
     def _check_terms(self) -> None:
         if not self.terms:
@@ -243,7 +274,12 @@ class ParametricEquation(Base):
 
     @property
     def n_coefficients(self) -> int:
-        """m, the number of coefficients this declaration refines."""
+        """m, the number of coefficients this declaration refines.
+
+        0 for an expression, whose freedom is the variables it names.
+        """
+        if self.basis == "expression":
+            return 0
         if self.basis == "constant":
             return 1
         if self.basis == "polynomial":
@@ -251,7 +287,11 @@ class ParametricEquation(Base):
         return len((self.design or [[]])[0])
 
     def coefficient_paths(self) -> list[str]:
-        """``vars.{name}_{j}`` for j = 0…m−1, the coefficients' dot-paths."""
+        """``vars.{name}_{j}`` for j = 0…m−1, the coefficients' dot-paths.
+
+        Empty for an expression: its variables are ``vars.{variable}``, named
+        by the caller rather than by the equation.
+        """
         return [f"vars.{self.name}_{j}" for j in range(self.n_coefficients)]
 
 

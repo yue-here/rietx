@@ -48,7 +48,8 @@ The coordinates need not be compositions or temperatures: a position on the subs
 |---|---|
 | `ParametricEquation.name` | the declaration's name, a single identifier; its coefficients are named variables, `vars.<name>_0`, `vars.<name>_1`, one per term |
 | `ParametricEquation.target` | one bare dot-path under `phases.` or `instrument.`, with no glob and no `hist.` scope |
-| `ParametricEquation.basis` | `"constant"`, `"polynomial"` or `"design"` |
+| `ParametricEquation.basis` | `"constant"`, `"polynomial"`, `"design"` or `"expression"` |
+| `ParametricEquation.expression` | an expression basis's text, in the grammar of [Expressions](expressions.md), over the variables `refine_multi(variables=…)` declares and the coordinate columns |
 | `ParametricEquation.terms` | a polynomial's terms, each a list of coordinate names: `[]` is the intercept, and a repeated name is a power |
 | `ParametricEquation.design` | a design basis's rows, one per pattern of the subset, in subset order |
 | `ParametricEquation.patterns` | the subset the equation holds over, by index into the patterns as passed; `None` is every pattern |

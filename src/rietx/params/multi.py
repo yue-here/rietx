@@ -33,9 +33,11 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from ..schemas.common import Parameter
 from ..schemas.instrument import Instrument
 from ..schemas.parametric import CoordinateTable, ParametricEquation
 from ..schemas.structure import Structure
+from .expression import RESERVED, Expression
 from .parametric import ResolvedParametric, least_squares_start, resolve_parametric
 from .vector import (
     AffineTie,
@@ -242,6 +244,39 @@ def _refuse_clashing_declarations(declared: list[ParametricEquation], n: int) ->
         targets.setdefault(equation.target, []).append((equation.name, mine))
 
 
+@dataclass
+class ResolvedExpression:
+    """An ``expression`` equation resolved against its patterns (WP-1964).
+
+    ``expression`` is the parsed text; ``variables`` the names in it the
+    caller declared with ``variables=``, first use first, each the shared
+    column ``vars.{name}``; ``coordinates`` the names that are coordinate
+    columns; ``constants[h]`` those columns' values at pattern ``h`` of the
+    subset.  Held apart from :class:`~rietx.params.parametric.ResolvedParametric`,
+    whose readers assume a linear Φ.
+    """
+
+    equation: ParametricEquation
+    patterns: list[int]
+    expression: Expression
+    variables: list[str]
+    coordinates: list[str]
+    constants: dict[int, dict[str, float]] = field(default_factory=dict)
+
+    @property
+    def name(self) -> str:
+        return self.equation.name
+
+    @property
+    def target(self) -> str:
+        return self.equation.target
+
+    @property
+    def paths(self) -> list[str]:
+        """The ``vars.{name}`` columns this equation reads."""
+        return [f"vars.{n}" for n in self.variables]
+
+
 def _target_refusal(table: ParameterTable, e) -> str | None:
     """Why ``e`` cannot be a parametric target, in ``held_because``'s order.
 
@@ -330,18 +365,28 @@ class MultiParameterTable:
     table and fold onto one shared column each, and the target in each
     pattern of the subset is tied onto Σ_j Φ_kj·``vars.{name}_{j}``.  Every
     refusal is made here, before any solve.  :attr:`parametric` holds the
-    declarations as resolved.
+    linear declarations as resolved.
+
+    An ``expression`` declaration (WP-1964) is held apart, in
+    :attr:`expressions`: its target in each pattern of the subset becomes a
+    derived row (``ParameterTable.add_expression``) evaluated at that
+    pattern's coordinates.  Its free names are the ``variables``, each
+    ``vars.{name}`` added to every table so it folds onto one shared column,
+    however many equations name it, or coordinate columns.
+    :attr:`declared` lists every declaration, both kinds, in the order given.
     """
 
     def __init__(self, structure: Structure | list[Structure],
                  instruments: list[Instrument], *,
                  sharing: SharingMap | None = None,
                  parametric: list[ParametricEquation] | None = None,
-                 coordinates: CoordinateTable | None = None):
+                 coordinates: CoordinateTable | None = None,
+                 variables: dict[str, Parameter] | None = None):
         if len(instruments) < 1:
             raise ValueError("need at least one instrument")
         starts = _starting_structures(structure, len(instruments))
         declared = list(parametric or [])
+        variables = dict(variables or {})
         self.sharing = sharing or SharingMap()
         if declared:
             _refuse_clashing_declarations(declared, len(instruments))
@@ -356,8 +401,16 @@ class MultiParameterTable:
         #: combined order (:meth:`_rebuild_columns`), empty without a
         #: parametric declaration
         self._column_anchor: dict[str, tuple[str, int]] = {}
-        #: the parametric declarations as resolved (reference and scale frozen)
+        #: the linear parametric declarations as resolved (reference and
+        #: scale frozen)
         self.parametric: list[ResolvedParametric] = []
+        #: the ``expression`` declarations as resolved (WP-1964)
+        self.expressions: list[ResolvedExpression] = []
+        #: every declaration, both kinds, in the order given, as resolved
+        self.declared: list[ParametricEquation] = []
+        #: ``vars.{name}`` of each variable declared ``vary=False``, which a
+        #: glob reaching an equation's target does not free
+        self._fixed_variables: set[str] = set()
         # a private structure copy per histogram: shared parameters are written
         # identically into every copy at each commit; only the per-histogram
         # scale (and any per-histogram override) diverges.
@@ -397,8 +450,8 @@ class MultiParameterTable:
         for table, scale in zip(self.tables, self.value_scales, strict=True):
             if scale:
                 table.apply_value_scale(scale)
-        if declared:
-            self._install_parametric(declared, coordinates)
+        if declared or variables:
+            self._install_parametric(declared, coordinates, variables)
         if len({id(s) for s in starts}) > 1:
             self._check_starts_agree(starts)
         self._check_moment_frames_shared()
@@ -450,8 +503,186 @@ class MultiParameterTable:
                 f"or declare it a ParametricEquation target")
 
     def _install_parametric(self, declared: list[ParametricEquation],
-                            coordinates: CoordinateTable | None) -> None:
-        """Resolve each declaration, refuse what no table can carry, wire the rest.
+                            coordinates: CoordinateTable | None,
+                            variables: dict[str, Parameter] | None = None) -> None:
+        """Both kinds of declaration: every refusal first, then the wiring.
+
+        The ``expression`` declarations and the variables are resolved and
+        refused first (:meth:`_resolve_expressions`), then the linear ones go
+        through :meth:`_install_linear` as they always have, refusing before
+        they wire, and the expressions are wired last.
+        """
+        variables = dict(variables or {})
+        linear = [e for e in declared if e.basis != "expression"]
+        expressions = self._resolve_expressions(
+            [e for e in declared if e.basis == "expression"], coordinates, variables,
+            taken={p for e in linear for p in e.coefficient_paths()})
+        if linear:
+            self._install_linear(linear, coordinates)
+        if expressions:
+            self._install_expressions(expressions, variables)
+        resolved = {r.name: r.equation for r in (*self.parametric, *self.expressions)}
+        self.declared = [resolved[e.name] for e in declared]
+
+    def _resolve_expressions(self, declared: list[ParametricEquation],
+                             coordinates: CoordinateTable | None,
+                             variables: dict[str, Parameter], *,
+                             taken: set[str]) -> list[ResolvedExpression]:
+        """Resolve each ``expression`` declaration and refuse, before any wiring.
+
+        Refused, each naming its fix: a variable that is not a ``Parameter``,
+        whose name is not an identifier or is a reserved word of the grammar,
+        that a coordinate column shadows, whose ``vars.{name}`` already exists
+        (in the model or as a linear equation's coefficient), that the sharing
+        map makes per-histogram, or that no expression names; an expression
+        naming something that is neither a variable nor a coordinate; a
+        coordinate it names with no value at a pattern of its subset; and
+        every target refusal the linear path makes (:meth:`_install_linear`).
+        """
+        n = self.n_histograms
+        if coordinates is not None and coordinates.n_patterns != n:
+            raise ValueError(
+                f"the coordinate table has {coordinates.n_patterns} rows for "
+                f"{n} patterns: one row per pattern, in the order passed")
+        columns = coordinates.columns if coordinates is not None else {}
+        for name, param in variables.items():
+            if not isinstance(param, Parameter):
+                raise ValueError(
+                    f"variable {name!r} is a {type(param).__name__}: declare it as "
+                    f"rx.Parameter(value=…, vary=True)")
+            if not name.isidentifier():
+                raise ValueError(
+                    f"variable name {name!r} must be a single identifier, so an "
+                    "expression can name it")
+            if name in RESERVED:
+                raise ValueError(
+                    f"variable name {name!r} is a reserved word of the expression "
+                    "grammar (a function, a constant or a keyword); rename it")
+            if name in columns:
+                raise ValueError(
+                    f"variable {name!r} is also a coordinate column: a coordinate "
+                    "may not shadow a variable, since an expression naming it "
+                    "would be ambiguous; rename one of the two")
+            path = f"vars.{name}"
+            if path in taken or any(path in t._paths for t in self.tables):
+                raise ValueError(
+                    f"variable {name!r}: {path} already exists (a parametric "
+                    "equation's coefficient or a model parameter); rename the variable")
+            if not self.sharing.is_shared(path):
+                raise ValueError(
+                    f"variable {name!r}: the sharing map makes {path} per-histogram "
+                    "(a per_histogram glob matches it), but a variable is one number "
+                    "across the patterns; narrow the glob so vars.* stays shared")
+        resolved: list[ResolvedExpression] = []
+        used: set[str] = set()
+        for equation in declared:
+            name = equation.name
+            expr = Expression(equation.expression)
+            patterns = (list(range(n)) if equation.patterns is None
+                        else list(equation.patterns))
+            bad = [k for k in patterns if k >= n]
+            if bad:
+                raise ValueError(
+                    f"parametric equation {name!r}: pattern index {bad[0]} is out of "
+                    f"range for {n} patterns (indices 0…{n - 1})")
+            names_v: list[str] = []
+            names_c: list[str] = []
+            for nm in expr.names:
+                if nm in variables:
+                    names_v.append(nm)
+                elif nm in columns:
+                    names_c.append(nm)
+                else:
+                    from .._nearmiss import did_you_mean
+
+                    hint = did_you_mean(nm, [*variables, *columns])
+                    raise ValueError(
+                        f"parametric equation {name!r}: the expression "
+                        f"{equation.expression!r} names {nm!r}, which is neither a "
+                        "variable (variables=…) nor a coordinate column "
+                        "(coordinates=…)" + (f"; {hint}" if hint else ""))
+            constants: dict[int, dict[str, float]] = {}
+            for h in patterns:
+                row: dict[str, float] = {}
+                for c in names_c:
+                    v = columns[c][h]
+                    if v is None:
+                        raise ValueError(
+                            f"parametric equation {name!r}: pattern {h} has no value "
+                            f"for coordinate {c!r}, which the expression uses; give it "
+                            "one, or leave the pattern out of the subset (patterns=…)")
+                    row[c] = float(v)
+                constants[h] = row
+            r = ResolvedExpression(equation=equation, patterns=patterns, expression=expr,
+                                   variables=names_v, coordinates=names_c,
+                                   constants=constants)
+            for h in patterns:
+                table = self.tables[h]
+                i = table._paths.get(r.target)
+                if i is None:
+                    raise ValueError(
+                        f"parametric equation {name!r}: target {r.target!r} is not a "
+                        f"parameter of histogram {h}'s model; list them with "
+                        f"[e.path for e in mtable.tables[{h}].entries]")
+                why = _target_refusal(table, table.entries[i])
+                if why:
+                    raise ValueError(f"parametric equation {name!r}: {r.target} in "
+                                     f"histogram {h} {why}")
+            self._refuse_unanchorable(r)
+            self._refuse_size_across_wavelengths(r)
+            used.update(names_v)
+            resolved.append(r)
+        unused = [v for v in variables if v not in used]
+        if unused:
+            raise ValueError(
+                f"variable {unused[0]!r} is declared but no expression equation names "
+                "it: an unused variable would be a column with no gradient. Use it in "
+                "an equation, or leave it out of variables=")
+        return resolved
+
+    def _install_expressions(self, resolved: list[ResolvedExpression],
+                             variables: dict[str, Parameter]) -> None:
+        """Wire the resolved ``expression`` declarations, every refusal made.
+
+        Each variable is added to **every** table as ``vars.{name}``, fixed
+        until a stage frees it, so it folds onto one shared column
+        (``_rebuild_columns`` asserts the shared free sets agree), with its
+        value, bounds and unit from the ``Parameter``.  What follows each
+        target becomes per-histogram with it, as on the linear path, and the
+        target in each subset histogram becomes the expression's derived row
+        at that pattern's coordinates (``ParameterTable.add_expression``).
+        """
+        for name, param in variables.items():
+            path = f"vars.{name}"
+            for table in self.tables:
+                table.add_parameter(path, float(param.value), vary=False,
+                                    lo=param.min, hi=param.max, unit=param.unit)
+            if not param.vary:
+                self._fixed_variables.add(path)
+        follows: dict[str, None] = {}
+        reach_of: dict[int, dict[str, list[str]]] = {}
+        for r in resolved:
+            for h in r.patterns:
+                if h not in reach_of:
+                    reach_of[h] = self.tables[h].entry_reach()
+                for q in reach_of[h][r.target]:
+                    if q != r.target and self.sharing.is_shared(q):
+                        follows[q] = None
+        self.sharing.per_histogram.extend(follows)
+        for r in resolved:
+            for h in r.patterns:
+                try:
+                    self.tables[h].add_expression(
+                        r.target, r.expression,
+                        variables={v: f"vars.{v}" for v in r.variables},
+                        constants=r.constants[h])
+                except ValueError as exc:
+                    raise ValueError(f"parametric equation {r.name!r}: {exc}") from exc
+        self.expressions = resolved
+
+    def _install_linear(self, declared: list[ParametricEquation],
+                        coordinates: CoordinateTable | None) -> None:
+        """Resolve each linear declaration, refuse what no table can carry, wire the rest.
 
         Refusals first, all of them, so a declaration that cannot be built
         leaves no half-wired table behind: the target must exist in every
@@ -605,22 +836,27 @@ class MultiParameterTable:
             "which converts it per histogram")
 
     def parametric_targets(self, h: int) -> set[str]:
-        """The bare paths histogram ``h``'s parametric equations drive (WP-1325)."""
-        return {r.target for r in self.parametric if h in r.patterns}
+        """The bare paths histogram ``h``'s parametric equations drive (WP-1325),
+        both kinds."""
+        return {r.target for r in (*self.parametric, *self.expressions)
+                if h in r.patterns}
 
     def _parametric_reached(self, path_globs: list[str]) -> set[str]:
-        """The coefficient paths of every declaration a glob reaches.
+        """The coefficient and variable paths of every declaration a glob reaches.
 
         A glob reaches a declaration when it matches the target in a subset
         histogram, bare or scoped (``hist.{h}.<target>``), under
-        :meth:`set_vary`'s matching rule.  The target is a tied row, so the
-        glob alone would free nothing; its coefficients are what carry it.
+        :meth:`set_vary`'s matching rule.  The target is a tied or derived row,
+        so the glob alone would free nothing; its coefficients, or the
+        variables its expression names, are what carry it.  A variable
+        declared ``vary=False`` is left out: reaching a target never frees it,
+        and only a glob naming ``vars.{name}`` itself does.
         """
         out: set[str] = set()
-        for r in self.parametric:
+        for r in (*self.parametric, *self.expressions):
             names = {r.target, *(f"hist.{h}.{r.target}" for h in r.patterns)}
             if any(fnmatch.fnmatchcase(name, g) for name in names for g in path_globs):
-                out.update(r.paths)
+                out.update(p for p in r.paths if p not in self._fixed_variables)
         return out
 
     def _check_moment_frames_shared(self) -> None:
@@ -677,11 +913,15 @@ class MultiParameterTable:
         coefficients too, in every histogram, since they are shared columns
         every table carries: the target is a tied row a glob alone would skip,
         so a plan's ``phases.*.cell.*`` frees a parametric cell as it frees a
-        plain one, and the returned list names the coefficients.
+        plain one, and the returned list names the coefficients.  A glob
+        reaching an ``expression`` target frees the variables it names, bar one
+        declared ``vary=False`` (WP-1964); a glob naming ``vars.{name}`` frees
+        that variable as it would any shared entry.
         """
         freed: list[str] = []
         seen: set[str] = set()
-        coupled = self._parametric_reached(path_globs) if self.parametric else set()
+        coupled = (self._parametric_reached(path_globs)
+                   if self.parametric or self.expressions else set())
         for h, table in enumerate(self.tables):
             matched = []
             for e in table.entries:

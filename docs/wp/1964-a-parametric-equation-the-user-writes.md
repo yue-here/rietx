@@ -267,7 +267,7 @@ per-pattern one is an array.
   tree, the follower paths written, and a cross-backend row. Build it on
   `ParameterTable` so a single fit is one caller away, and record what
   `Parameter.expr` becomes.
-- [ ] **Variables on a joint fit.** `variables=` beside `coordinates=`, one
+- [x] **Variables on a joint fit.** `variables=` beside `coordinates=`, one
   column shared by every equation that names it. A coordinate may not shadow a
   variable. An unused variable is refused.
 - [ ] **An equation feeding an equation.** A named intermediate over variables

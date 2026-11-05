@@ -151,7 +151,7 @@ from .refine import (
 )
 from .report.magnetic import moment_angle_stationary_diagnostics
 from .report.schemas import THRESHOLDS_VERSION
-from .schemas.common import Diagnostic, Provenance
+from .schemas.common import Diagnostic, Parameter, Provenance
 from .schemas.instrument import Instrument
 from .schemas.parametric import (
     CoordinateTable,
@@ -732,6 +732,8 @@ def _constant_link_reach(mtable) -> list[set[str]]:
     blocked = {f"vars.{r.equation.name}_{j}"
                for r in mtable.parametric if r.equation.basis != "constant"
                for j in range(len(r.labels))}
+    # an expression's variable is no constant link either (WP-1964)
+    blocked |= {p for r in mtable.expressions for p in r.paths}
     return [set(moved) for column, moved in _joint_column_reach(mtable).items()
             if column not in blocked]
 
@@ -1427,6 +1429,15 @@ class MultiHistogramRefinement:
     declarations as resolved.  The answer's coefficients are
     :attr:`RefinementResult.parametric
     <rietx.schemas.results.RefinementResult.parametric>`.
+
+    ``variables`` (WP-1964) maps a name to an :class:`~rietx.schemas.common.Parameter`,
+    each the shared column ``vars.{name}`` that ``basis="expression"``
+    equations name in their text beside the coordinate columns.  One variable
+    named by several equations is one column.  A stage whose glob reaches an
+    expression's target frees the variables it names, bar one declared
+    ``vary=False``, which stays where it was put unless a glob names
+    ``vars.{name}`` itself.  A variable no expression names is refused, and
+    so is one a coordinate column shadows.
     """
 
     def __init__(self, structure: Structure | list[Structure],
@@ -1434,6 +1445,7 @@ class MultiHistogramRefinement:
                  sharing: SharingMap | None = None,
                  coordinates: CoordinateTable | None = None,
                  parametric: list[ParametricEquation] | None = None,
+                 variables: dict[str, Parameter] | None = None,
                  backend: str = "numpy", solver: str = DEFAULT_SOLVER):
         if backend != "numpy":
             from .backend import resolve_backend
@@ -1472,7 +1484,8 @@ class MultiHistogramRefinement:
                                     f"{i} of {len(instruments)}", instrument=ins)
         self.mtable = MultiParameterTable(structure, instruments, sharing=sharing,
                                           parametric=parametric,
-                                          coordinates=coordinates)
+                                          coordinates=coordinates,
+                                          variables=variables)
         # Resolve each histogram's specimen absorption (capillary µR or
         # flat-plate µt) from composition, exactly as the single-histogram path
         # does.  Without this a user who set ``capillary_radius_mm`` or
@@ -1517,9 +1530,10 @@ class MultiHistogramRefinement:
         (WP-1325): pass these to a refit, or to a fit of a grown campaign,
         and every coefficient keeps its meaning — Φ is rebuilt from the stored
         reference and scale, never recomputed from whichever patterns are in
-        it.  Empty when nothing was declared.
+        it.  An ``expression`` equation (WP-1964) is listed as declared, in
+        its place in the order given.  Empty when nothing was declared.
         """
-        return [r.equation for r in self.mtable.parametric]
+        return list(self.mtable.declared)
 
     @property
     def fitted_structures(self) -> list[Structure]:
@@ -3472,6 +3486,7 @@ def refine_multi(data: list[PatternData], structure: Structure | list[Structure]
                  sharing: SharingMap | None = None,
                  coordinates: CoordinateTable | None = None,
                  parametric: list[ParametricEquation] | None = None,
+                 variables: dict[str, Parameter] | None = None,
                  two_theta_limits=None,
                  weights: list[float] | None = None,
                  backend: str = "numpy", solver: str = DEFAULT_SOLVER,
@@ -3481,10 +3496,12 @@ def refine_multi(data: list[PatternData], structure: Structure | list[Structure]
     ``instruments`` pairs.  Functional wrapper over
     :class:`MultiHistogramRefinement`; ``structure`` (one, or one per
     pattern), ``coordinates`` and ``parametric`` are its constructor's
-    (WP-1325), and ``events``, ``cancel``, ``telemetry``, ``label`` and
-    ``progress`` its ``fit``'s."""
+    (WP-1325), as is ``variables``, the named quantities a
+    ``basis="expression"`` equation refines (WP-1964), and ``events``,
+    ``cancel``, ``telemetry``, ``label`` and ``progress`` its ``fit``'s."""
     ref = MultiHistogramRefinement(structure, instruments, sharing=sharing,
                                    coordinates=coordinates, parametric=parametric,
+                                   variables=variables,
                                    backend=backend, solver=solver)
     return ref.fit(data, plan=plan, two_theta_limits=two_theta_limits, weights=weights,
                    events=events, cancel=cancel, telemetry=telemetry, label=label,
