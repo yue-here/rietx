@@ -368,7 +368,7 @@ corundum, FAP, NAC and PbSO₄ rows keep their classes.
 
   *Measured.* § Findings carries every number. Main at `29b75345a`, `[dev]`, macOS arm64, cpython 3.12,
   synthetic rows from rietx's forward model. Extinction test files, three of them: main 74 passed, 5
-  xfailed. The candidate 19 failed, 59 passed, 1 xfailed. The acceptance suite under the candidate was still running at this commit.
+  xfailed. The candidate 19 failed, 59 passed, 1 xfailed. `tests/test_acceptance_indexing.py` under the candidate, on `-n 4 --dist loadgroup`: 42 passed, 3 skipped.
   The candidate patch is `~/.cache/ghostshift/rietx/wp-2076/candidate.diff`, switched by
   `WP2076_MODE=shared` and `WP2076_MC=1`. It was never on a branch.
 
