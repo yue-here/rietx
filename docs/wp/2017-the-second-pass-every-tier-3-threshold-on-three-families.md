@@ -25,8 +25,7 @@ pass out on 2026-10-20 so that 2002 could close on its owed tests and B14's lift
 
 **What waits on it.** In `src/rietx/_audit.py`, 18 rows name the second pass in their
 evidence or grounds and 26 say refits are owed "on either side" (2026-10-20 counts; grep
-both phrases for the list). They group by the fits they share, so the work is perhaps
-ten to fifteen fit campaigns, not one per row:
+both phrases for the list). They group by the fits they share (§ The list, 19 groups):
 
 - **The solver path.** Twelve stop constants (Coelho's LM rules `_M_HI`, `_M_LO`,
   `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_*`, `lm._CONVERGED_RUNS`; BCCG's
@@ -68,65 +67,117 @@ set (weighed compositions), 11-BM NAC and SRM 660c, the FAP suite, the Durham tu
 under `~/rietx-local-data` (`python -m tests.local_data`), the magnetic fixtures (Cr₂WO₆,
 LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
 
-### Inherited
+### The list (task 1, 2026-11-05)
 
-- **From WP-2086 (2026-11-04, PR #1406): `MODEL_FAR_FROM_DATA` is silent on a fit that lost
-  the phase, so test it on background-subtracted Rwp.** This is the B12.13 row's other
-  direction: that row fires on a true model at sparse counts, and these rows say nothing on
-  a wrong one. On the reach table (WP-2086's handover, 119 fits from displaced starts) 12 fits
-  fail silently, all on the real FAP pattern: `usable=True`, `converged`, no error, Rwp
-  0.44-0.69. Their zero shift reaches −21 821° and −500 446°, and neither fires. Their
-  background-subtracted Rwp reads 0.93-1.00 on 9 rows, 0.575 and 0.467 on two `profile_only`
-  rows and 0.256 on `lab_bragg_brentano` at +3 %. Fits that reached the answer read 0.042 on
-  LaB₆, 0.12-0.14 on FAP and 0.16-0.17 on NAC, so the gap is 0.17 to 0.256 on this table. The
-  sparse-count family runs the opposite way and must be read beside it. Task: test the rule
-  on these families. The threshold and what a reader then sees are the maintainer's calls.
-  Each row ran once. Repeating the edge rows put FAP `mccusker_default` at +3 % among the silent
-  failures on one start in three, so 12 is a lower bound.
-  WP-2005 owns the code's level. Not implemented.
+Read off `_audit.ROWS` at `541f0daf7`. 37 rows name the pass in their evidence or grounds,
+against the 18 + 26 this file counted on 2026-10-20, which overlapped. The rest come from the
+entries this WP inherited, folded into the groups below on 2026-11-05. All 33 constants those
+entries name still exist.
 
-- **From WP-2002 (2026-10-23, 9th session, PR #1113): the twin hold and the floor removal moved three start rows, and give two rows new families.** (1) `BISO_SEED`: cpd-1a's Biso starts now differ by 15.68 plain esd on zincite's `lor_strain` (0.070 before), because the width twin hold keeps the X/Y split `qpa_plan`'s instrument-only stage lands on, a strict xfail (decision 1(a)); FAP and NAC stay at 0.000. The row's evidence now rests on two families. (2) The intermediate-tolerance row on cpd-1a with an absent zircon reads 0.035 (0.185 before) and the axial sizing floor on cpd-1a 0.010 (0.138 before); both strict xfails went. (3) `StageResult.width_twins_held` (tier 2) has one real two-phase family (11-BM LaB6 + cBN) and the synthetic and CPD fits in its row; a second real multi-phase family freeing a twin pair would test it. (4) `ProfileTCHZ:y`'s floor went on a physical argument (a constant Lorentzian projects to Y < 0) with one synthetic cost (`tests/test_v02_core.py`: Y −0.0059 against a truth of 0, sample `lor_size` 55 % low); what real lab calibrations do with Y unfloored is unmeasured; the judge's test is SRM 660c refined with Y free and with Y ≥ 0, read on the certified cell and a sample's size and strain. (5) Under TRF no width row holds, and whether brucite and corundum put a coefficient on the ±180 far bound under the hold is unmeasured. (6) `optimize.least_squares._fd_typicals` still decides a row is a width from a lower bound ≥ 0 and patches Y with a name list (`_SIGNED_WIDTHS`); a caller's X or `lor_strain` with min < 0 takes the offset's step of 1, which put 1.4e-3 to 1.5e-2 errors into width columns (code review, declined as a design change: declare which rows are widths as table data). This entry supersedes the zircon and axial-floor readings in the two entries below.
+Each group's families and reference were fixed here before any group ran (task 2). A row
+"reaches" a family only if the switched constant is read on that fit, so every arm carries a
+control: it must differ from the shipped arm in evaluations or in the switched path taken, or
+the arm measured nothing. Bar for a number: 0.1 plain esd over the larger of the two arms' esds
+(`tests/test_window_domain._shift`), the bar the earlier domain tests used, on the rows that
+are not background coefficients, and the distance from each family's reference beside it.
 
-- **From WP-2002 (2026-10-23, 8th session, PR #1113): the generality judge's owed measurements.** Tier 3 by the maintainer's delegation, each waiting on its three-family evidence here: `optimize.lm.FTOL` (1e-9, never varied: refit the four start-test families at 1e-8 and 1e-10, bar 0.1 plain esd); `schemas.structure.BISO_SEED` and `schemas.instrument.HARMONIC_WEIGHT_SEED` (start-invariant only behind the closing stage, so measure the two starts with `closing_window_tol=None`); `schemas.interval.PARAMETER_INTERVAL_BRACKET_GROWTH` (2.0, lifted by B14; can choose between crossings where window recompiles give several). Four hand rows claimed invariant with no test: the Le Bail/Pawley intensity seed, `refine._FLAT_AXIS_TEST_DIRECTIONS`, `arpls`'s `max_iter`/`tol`, and `params.vector.FLOOR_SEEDS` (a B10 numerical setting); 2002's § The hand rows that stay lists them. The width floors' removal (the maintainer's 2026-10-23 answer) lands under TRF without the per-coefficient guard; its TRF measurement is in 2002's 8th-session entry.
+**The four protocol families** are the fits `tests/test_window_domain._protocol` builds, each a
+different laboratory, instrument and material:
 
-- **From WP-2002 (2026-10-23, 8th session, PR #1113): two domain tests, handed here by the maintainer at 2002's close.** The profile-interval settings (`PARAMETER_INTERVAL_CHI2_TOL` 0.01, `_MAX_REFITS` 60, `_SETTLE_RUNS` 4, `_XTOL` 1e-3) and the fraction-profile width grid (`FRACTION_PROFILE_FWHM_MIN` 0.01, `_N_FWHM` 11, `_FWHM_MAX_SPAN` 0.5, lifted from an inline literal by B14) sit at tier 3, approved 2026-10-19 on B10 option 2: tier 1 once a test bounds each setting's error over its claimed domain. No domain has been stated for either; the interval runs automatically on every moment angle the stationary test leaves out (B2), 20-32 refits an angle on the two-site Pnma fixtures, and the grid on every `profile_fraction` call, which the skill sends every agent to. The bar the earlier domain tests used was 0.1 of a point's σ at fixed parameters and 0.1 plain esd after a common-start polish (`tests/test_window_domain.py`).
+| Key | Family | Reference | Grade |
+|---|---|---|---|
+| `fap` | lab Bragg-Brentano fluorapatite | GSAS's converged `FAP.EXP`, protocol mirrored | verifies |
+| `nac` | 11-BM capillary NAC with CaF₂ | the acceptance suite's reference values | verifies |
+| `cpd1a` | IUCr CPD round-robin three-phase mixture | weighed fractions | validates |
+| `lab6` | NIST DBD SRM 660c LaB₆ | the certificate | validates |
 
-- **From WP-2002 (2026-10-22, 6th session, PR #1085).** The eighth round kept `REFLECTION_MARGIN_DEG` at 0.5° and `AXIAL_SIZING_FLOOR` at tier 3, both for this pass. The caller-tier ruling moved `GTOL` and `XTOL` (1e-12, defaulted inside the opt-in TRF solver, SciPy's own 1e-8) from caller to tier 3, with their domain test owed: WP-1109's 1e-8 trial is their only evidence (1.22-1.27× faster on cpd-1a, 1.04× slower on cpd-2, corundum's strain anisotropy past the Stephens suite's bar).
+| Group | Rows | Arms | Families | State |
+|---|---|---|---|---|
+| A. LM stop | `lm._M_HI`, `_M_LO`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_CONVERGED_RUNS`, `_CURVATURE_GATE`, `FTOL`, `SLOW_DESCENT_ESD` | one each side of each value, `FTOL` at 1e-8 and 1e-10 | the four | first |
+| B. Bounded step | `lm._POLISH_FEASIBLE`, `_POLISH_STATIONARY`, `BVLS_MAX_COLUMNS` | each side | Stephens fits on qarr brucite and corundum and one more; FAP Pawley for the column cut | open |
+| C. BCCG | `bccg._CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`, `_CAUCHY_ARMIJO`, `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE` | each side | Pawley on `fap`, `nac` and `cpd1a` | open |
+| D. Blocked solve | `blocked.DENSE_JACOBIAN_MAX_BYTES` | forced each way | the four | open |
+| E. TRF | `least_squares.GTOL`, `XTOL`, `staged.BOUND_HIT_COS_MIN`, `BOUND_HIT_ESD_FRAC` | 1e-8 against 1e-12; the 32-case bound table on a third family | `cpd1a`, corundum Stephens, 11-BM Si SRM 640c | open |
+| F. Background pick | `auto.HUMP_TRIGGER`, `AIR_SCATTER_TRIGGER`, `_KNOT_STEP_HUMPY_DEG`, `_KNOT_STEP_SMOOTH_DEG` | near the trigger, each way | the Kapton capillary for a real hump, qarr's weighed mixtures for air | open |
+| G. Absent phase | `plan.PHASE_SUPPORT_SIGMA`, its two defaults | 1σ, 3σ, off | a weighed trace phase (the cpd-1 suite), CuO on the CuCr₂O₄ ramp started one FWHM off, cpd-1a with zircon declared | open |
+| H. Cell window | `vector.CELL_WINDOW_FRACTION`, `_ANGLE_DEG`, `_PAD_A` | count the stages where it binds | every fit of groups A and G | open |
+| I. Position bounds | their removal, 2026-10-20 | free over a narrow range | lab flat plate: `fap`, `lab6`, SRM 1976a | open |
+| J. Refined lines | Le Bail and Pawley Kα2/Kα1 | second standard, tabulated ratio | SRM 660c, SRM 1976a, FAP | open |
+| K. Far from data | `refine.MODEL_FAR_FROM_DATA_RWP` | both directions; Rwp beside background-subtracted Rwp and Rwp/Rexp | WP-2086's reach table; a sparse-count family | open |
+| L. Magnetic solve | `magnetic.SOLVE_MINIMUM_RTOL`, `SOLVE_TOP_K`, `SOLVE_K_TRIALS` | each side | the rare-feature clause: Ba₂FeSbSe₅, Cr₂WO₆, LaMnO₃ | open |
+| M. Starts | `structure.BISO_SEED`, `instrument.HARMONIC_WEIGHT_SEED` | the two starts with `closing_window_tol=None` | the four; the synthetic neutron corundum | open |
+| N. Hand rows | Le Bail and Pawley intensity seed, `refine._FLAT_AXIS_TEST_DIRECTIONS`, `arpls`'s `max_iter` and `tol`, `vector.FLOOR_SEEDS` | a test for each claim of invariance | named by each test | open |
+| O. Domain tests | `interval.PARAMETER_INTERVAL_*` (five), `fraction.FRACTION_PROFILE_FWHM_MIN`, `_N_FWHM`, `_FWHM_MAX_SPAN` | state a domain, then 0.1 σ of a point and 0.1 esd | the two-site Pnma fixtures; `fap`, `cpd1a` | open |
+| P. Window numerics | `forward.AXIAL_SIZING_FLOOR`, `REFLECTION_MARGIN_DEG`, `STAGE_WINDOWS_STALE` | each side | the four; a second and third family that runs away | open |
+| Q. Le Bail passes | `refine.LEBAIL_CONVERGED_REL` | each side | LaB₆ + cBN, `fap`, `cpd1a` | open |
+| R. Width terms | `StageResult.width_twins_held`, `ProfileTCHZ:y` unfloored | see below | a real multi-phase fit freeing a twin pair; SRM 660c | open |
+| S. Tier-2 citations | `SCHERRER_K`, `BOND_SLACK_ANG`, `STEPS_PER_FWHM_*` | read each citation | none: they stay at tier 2 unless a source fails | open |
 
-- **From WP-2002 (2026-10-21, 5th session, PR #1085).** The sixth round landed: the four intermediate-tolerance rows at tier 3 (within 0.042 plain esd on four protocols behind the closing stage, 0.185 on cpd-1a with an absent zircon), `HARMONIC_WEIGHT_SEED` invariant, `CLOSING_WINDOW_TOL` tier 1 on three of four families. At the closing stage's windows `REFLECTION_MARGIN_DEG` errs 0.186σ and 0.124σ at the last points of FAP and cpd-1a (answers 0.026 and 0.043 esd). The sixth round's Q1 proposed the closing stage's rule (tight where the answer is computed) for the six other failing numerical settings (the FCJ node rule, the margin, the axial and magnetic sizing floors, `A5_CLIP`, the texture sampling); not built, and the maintainer has not ruled on it. Ruled and built on 2026-10-21, the seventh round (`2002-batch/rulings.md`, `waiting.md` § B10): the FCJ closing rule, `A5_CLIP` and the texture polish at tier 1, the magnetic floor invariant behind the closing stage on one family; the margin's edge rule at the closing windows was built and reverted (it freed a scale-B ridge on `tests/test_scale_b_ridge.py`'s synthetic narrow scan, `waiting.md` § B10), so the margin still errs 0.186σ and 0.124σ there; the axial floor still misses on cpd-1a (0.138 plain esd behind the closing stage), and the declared stages' FCJ, margin and window constants stay tier 3. This WP's second pass inherits the three-family evidence for each.
-- **From WP-2002 (2026-10-21, PR #1085).** (1) The absent-phase hold flips with the intermediate tolerance: cpd-1a with zircon declared (a phase the sample lacks), LM, the QPA protocol. At `intermediate_ftol` 1e-6 the last stage holds nine zircon structural paths and `PHASE_UNCONSTRAINED` fires; at 1e-9 nothing is held, the zircon cell walks, and `lines_axial` hits its 400-evaluation budget. Zircon's scale sits near 2σ in plain esd, by `PHASE_SUPPORT_SIGMA`'s 3σ, so it is a case for that threshold's three families. (2) The CPD QPA protocol (`qpa_plan`) frees instrument and sample width terms that pair exactly (x with `lor_size`, y with `lor_strain`, zero with displacement), so the start picks the split; read those rows as one sum. (3) A staged plan's answer carries a path-dependent scatter of up to about 0.16 esd (0.5 in a background term) from the last stage's frozen compile, and one extra stage recompiled at the answer removes most of it. A refit on either side of a threshold should polish both arms from one common start, or it measures the scatter. Measurements in `docs/wp/2002-batch/waiting.md` § B7 and § B8 and B9.
+**Taken off the list.** `INTERMEDIATE_FTOL` and its default were re-ruled cost-only on
+2026-11-01, so they owe nothing here. `PAWLEY_SPARSE_DENSITY` chooses which arithmetic forms
+JᵀJ, agrees with the dense build to 2e-15 on each side, and was confirmed on 2026-10-28.
+`_COS_CLAMP`, `SCALE_B_SEPARATION_FLOOR` and the two `*_CAP_RANGE_FRACTION` factors are tier 1
+and have no free factor to measure, so this file's old list named them without cause.
 
-- **From WP-2045 (2026-10-25, PR #1161): `FTOL` now ends two stages of every plan, and the intermediate-tolerance rows were re-measured.** The last declared stage runs at `optimize.lm.FTOL` as well as the closing stage, so refitting the start-test families at 1e-8 and 1e-10 moves both. The four intermediate-tolerance rows' shared evidence now reads 0.000 esd on FAP, cpd-1a and NAC, 0.009 on cpd-1a with zircon declared (your inherited 0.035), and 8.82 on SRM 660c's mirrored axial minima, the one strict xfail (`tests/test_staged_start_invariance.py`, macOS arm64, `[dev]`). Converging the last declared stage costs 1.04-1.07× the evaluations, so the rows' "1.00-2.15x fewer" now nets that out.
+**What each group inherits.**
 
-- **From WP-2047 (2026-10-25, PR #1171): `STAGE_WINDOWS_STALE` is a new tier-3 row on one family.** Each stage records `StageResult.window_loss`, the Bragg intensity its frozen windows drop at its answer against windows sized there (`forward.window_loss`), and the code fires past the stage's own `window_area_tol` on the last stage and the one before a closing stage. The threshold is no new number, but its separation is measured on one family: the four protocols' stages at most 1.73 % against 2 % (2e-5 against the closing 1e-3), and the QPA chain cpd-1a → cpd-1b under the pre-2045 schedule 73.4 %. The which-stages rule is a session judgement resting on one more fit: the calibrate guide's `sample_profile` stage ends at 12.1 % and the stages after it repair it. A second and third family that run away, or that stay stale behind later stages, would test both halves.
-
-- 2026-10-26 issue triage: #1052 (mustachefeeling, 2026-10-19) offers three held-out families for the milestone's close, and says the reporter will run them at the open and the close: Zr₆(BDC)₃(Fum)₃ on Diamond I11 (Tollitt et al. 2021, Angew. Chem. 60, 26939; pattern deposited CC BY 3.0), HfIn on a lab Empyrean, Cu Kα₁/Kα₂, flat plate (Oliynyk et al. 2018, Inorg. Chem. 57, 7966; not deposited, kept local by the reporter), and CrCl₂(pyrimidine) on ILL D1B at 1.5 K and 30 K, k ≠ 0 (Pitcairn et al. 2023, JACS 145, 1783; data doi:10.17639/nott.7257). Checked against the tree at c0e32ab29: none of the three is in `tests/data/README.md`, and the milestone's named held-out family is still only the Nd₂Ru₂O₇ pair (`11a68d96e`, 2026-10-19). Until the maintainer rules on #1052, do not use any of the three as second-pass evidence here: a public download makes the MOF and the magnet easy to reach for, and using one would end its use as held-out evidence.
-
-- Decided 2026-10-26 (maintainer, #1052): all three offered families are adopted as held-out beside Nd₂Ru₂O₇ (`docs/milestones/generality.md` § Acceptance). So none of them is audit evidence in this pass, nor in any pass before the milestone's close, when they are spent into development data (ruled 2026-10-27, replacing the 2026-10-26 "for good").
-
-- 2026-10-31, from the issue triage (issue #1052): the reporter answered the
-  maintainer's two asks of 2026-10-31 on the thread. They posted the SHA-256
-  of the open result table, of the recipe and of each per-case result file, so
-  the close run can be checked against what was fixed before it. They also
-  declared one added arm, run on both the open and the close tree: HfIn with
-  each co-sited pair's occupancies freed and tied to sum to 1, its refined Hf
-  fraction reported beside the EDX value Hf 0.51(2) with the fit's esd. The
-  milestone record (`docs/milestones/generality.md` § Acceptance) does not
-  carry either yet; the close session should quote the hashes from the thread.
-  Checked against the tree at d87c8cc91: nothing to run; the thread is the
-  record.
+- **A.** `FTOL` ends two stages of every plan since WP-2045, the last declared one and the
+  closing one, so a refit at 1e-8 and 1e-10 moves both. GSAS-II 5.8.4's default stop is 1e-3.
+- **B to E.** `GTOL` and `XTOL` have one trial: WP-1109's 1e-8 ran 1.22-1.27× faster on cpd-1a
+  and 1.04× slower on cpd-2, and put corundum's strain anisotropy past the Stephens suite's bar.
+- **G.** cpd-1a with zircon declared flips with the intermediate tolerance: zircon's scale sits
+  near 2σ, nine structural paths held at 1e-6, the cell walking at 1e-9, `lines_axial` at its
+  400-evaluation budget (`2002-batch/waiting.md` § B7).
+- **K.** From WP-2086 (PR #1406), the other direction from B12.13: on 119 fits from displaced
+  starts, 12 fail silently on real FAP, `usable=True`, `converged`, Rwp 0.44-0.69, zero shift
+  to −500 446°. Background-subtracted Rwp reads 0.93-1.00 on nine, 0.575 and 0.467 on two
+  `profile_only` rows, 0.256 on `lab_bragg_brentano` at +3 %. Fits that reached the answer read
+  0.042 on LaB₆, 0.12-0.14 on FAP and 0.16-0.17 on NAC. The gap is 0.17 to 0.256 on this table,
+  each row ran once, and 12 is a lower bound. Sparse counts run the opposite way: a true model
+  reads 0.77-0.83 at 0.5-1 counts a channel. The threshold and what a reader sees are the
+  maintainer's calls. WP-2005 owns the code's level, and the code's row is still `unaudited`.
+- **M.** Since WP-2012 LaB₆'s Biso row passes (`tests/test_staged_start_invariance.py`). cpd-1a's
+  reads 15.68 plain esd on zincite's `lor_strain`, a strict xfail, the twin hold's cost.
+- **N.** 2002's § The hand rows that stay lists them.
+- **O.** Neither set has a stated domain. The interval runs automatically on every moment angle
+  the stationary test leaves out, 20-32 refits an angle, and the grid on every `profile_fraction`
+  call. The bars are in `tests/test_window_domain.py`. `PARAMETER_INTERVAL_BRACKET_GROWTH` can
+  choose between crossings where window recompiles give several.
+- **P.** At the closing stage's windows the margin errs 0.186 σ and 0.124 σ at the last points of
+  FAP and cpd-1a, moving answers 0.026 and 0.043 esd. An edge rule was built and reverted because
+  it freed a scale-B ridge (`waiting.md` § B10). The axial floor reads 0.010 on cpd-1a since the
+  twin hold, and 0.582 on LaB₆'s `u`, the two minima 0.24 % apart in χ² (WP-2084). `STAGE_WINDOWS_STALE`
+  has one family: four protocols at most 1.73 % against 2 %, the chain cpd-1a → cpd-1b at 73.4 %
+  under the pre-2045 schedule, and the which-stages rule rests on the calibrate guide's
+  `sample_profile` stage at 12.1 %.
+- **R.** `width_twins_held` has one real two-phase family, 11-BM LaB₆ + cBN. Y's floor went on a
+  physical argument with one synthetic cost (Y −0.0059 against 0, `lor_size` 55 % low). The test:
+  SRM 660c with Y free and with Y ≥ 0, read on the certified cell and a sample's size and strain.
+  Under TRF no width row holds, and whether brucite and corundum put a coefficient on ±180 is
+  unmeasured. `least_squares._fd_typicals` still reads a width off its lower bound and patches Y
+  with `_SIGNED_WIDTHS`, so a caller's X or `lor_strain` with min < 0 takes the offset's step of
+  1, an error of 1.4e-3 to 1.5e-2 in a width column. A fix declares which rows are widths as table
+  data, a design change.
+- **Every refit.** A staged plan carries a path-dependent scatter of up to about 0.16 esd, and 0.5
+  in a background term, from its last frozen compile. Polish both arms from one common start or
+  the refit measures that scatter. The CPD QPA plan frees exact pairs (X with `lor_size`, Y with
+  `lor_strain`, zero with displacement), so read those rows as one sum.
 
 ## Non-goals
 
 - New actions or new thresholds. A measurement that suggests one goes to the maintainer.
 - The chain actions (WP-2003) and the report's verdicts (WP-2004), which run their own
   second passes.
+- The held-out families. Nd₂Ru₂O₇, Zr₆(BDC)₃(Fum)₃, HfIn and CrCl₂(pyrimidine) are evidence
+  for no audit before the milestone's close (ruled 2026-10-26 and 2026-10-27, #1052). The
+  close session quotes the reporter's hashes and the added HfIn arm from that thread, which
+  `generality.md` § Acceptance does not carry yet.
 
 ## Tasks
 
-- [ ] The list: every row whose evidence or grounds name the second pass or refits on
+- [x] The list: every row whose evidence or grounds name the second pass or refits on
       either side, grouped by the fits they share, written to a table in this file.
-- [ ] Per group, the three families and the reference each is measured against, chosen
+- [x] Per group, the three families and the reference each is measured against, chosen
       before running (a family chosen after seeing its answer is not evidence).
 - [ ] Run each group; per row, the answer either side of the threshold and the reference
       distance, with obs/calc/diff PNGs to `tests/output/` for each refit used.
