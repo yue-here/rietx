@@ -259,6 +259,16 @@ def test_an_einstein_cell_with_theta_held_recovers_its_two_variables():
         assert a == pytest.approx(rows["vars.zero_a"].value
                                   + rows["vars.grad"].value / np.expm1(theta / temp),
                                   rel=1e-13)
+    # the rows the equation sets name it: its variables, and each pattern's
+    # target with the b and c that follow it (§ Inherited, the third reader)
+    for path in ("vars.zero_a", "vars.grad",
+                 *(f"hist.{h}.phases.0.cell.{k}" for h in range(len(temps)) for k in "abc")):
+        if path in rows:
+            assert rows[path].equations == ["a"], path
+    assert rows["hist.0.phases.0.cell.a"].equations == ["a"]
+    named = {p.path for p in result.parameters if p.equations}
+    assert named == {p.path for p in result.parameters
+                     if p.path.startswith("vars.") or ".phases.0.cell." in p.path}
 
 
 @pytest.mark.xdist_group("parametric-expression")

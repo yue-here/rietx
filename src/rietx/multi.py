@@ -3089,16 +3089,38 @@ def _equation_rows(mtable) -> dict[str, list[str]]:
     order.  Empty when nothing was declared (WP-1325).
     """
     out: dict[str, list[str]] = {}
-    if not mtable.parametric:
+    if not (mtable.parametric or mtable.expressions):
         return out
+
+    def mark(h: int, q: str, name: str) -> None:
+        names = out.setdefault(mtable._canonical(h, q), [])
+        if name not in names:
+            names.append(name)
+
     for h, table in enumerate(mtable.tables):
         reach = table.entry_reach()
         for r in mtable.parametric:
             for path in r.paths:
                 for q in reach.get(path, (path,)):
-                    names = out.setdefault(mtable._canonical(h, q), [])
-                    if r.name not in names:
-                        names.append(r.name)
+                    mark(h, q, r.name)
+        # An expression's variable may feed several equations, so its reach
+        # would mark each one's target with every name.  An expression's rows
+        # are its own variables and, in each subset pattern, the rows of the
+        # block that writes its target: the target and what follows it, a
+        # cubic b and c (WP-1964).
+        written = {}
+        if mtable.expressions:
+            path_of = {i: p for p, i in table._paths.items()}
+            for _block, (_ins, outs) in zip(table.derived, table._derived_idx, strict=True):
+                rows = [path_of[int(i)] for i in outs]
+                for q in rows:
+                    written[q] = rows
+        for r in mtable.expressions:
+            for path in r.paths:
+                mark(h, path, r.name)
+            if h in r.patterns:
+                for q in written.get(r.target, (r.target,)):
+                    mark(h, q, r.name)
     return out
 
 
