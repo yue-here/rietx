@@ -70,6 +70,8 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
 
 ### Inherited
 
+- **From WP-2054 (2026-11-05, PR #1430): `rietx.report.NOMINAL_AXIAL_APERTURE` (0.02) needs its third family.** It joined the audit table at tier 3 after this WP's list was written, so the list does not name it. Its evidence is the nominal sweep on two families: on SRM 660c the action fires at 0.005, 0.01 and 0.02 and not at 0.05, and the QPA round-robin patterns cpd-1a, -1c and -1f behave the same way at 0.02. `AXIAL_SIZING_FLOOR` is a separate row, and this one no longer reads it.
+
 - **From WP-2086 (2026-11-04, PR #1406): `MODEL_FAR_FROM_DATA` is silent on a fit that lost
   the phase, so test it on background-subtracted Rwp.** This is the B12.13 row's other
   direction: that row fires on a true model at sparse counts, and these rows say nothing on
