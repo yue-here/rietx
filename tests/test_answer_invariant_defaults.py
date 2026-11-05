@@ -203,15 +203,31 @@ def _label_blind(answer):
             [step.model_copy(update={"labels": ("", "")}) for step in steps])
 
 
-def test_a_series_named_is_the_series_unnamed(ramp, series_baseline):
+def _gaps(series):
+    """Every direction gap with its label taken out, in the record's order."""
+    return [gap.model_copy(update={"label": ""}) for gap in series.direction_gaps]
+
+
+@pytest.mark.parametrize("direction", ["forward", "both"])
+def test_a_series_named_is_the_series_unnamed(ramp, series_baseline, direction):
     """``labels`` names each pattern, its history file and the pairing of the
     two chains (WP-2003 C11), so a compare blind to the names is the
-    invariance claim; the names themselves must still be the ones given."""
+    invariance claim; the names themselves must still be the ones given.
+    Under ``direction="both"`` the gaps, which pair the chains by label, are
+    compared too."""
     labels = ["first", "second", "third"]
-    named = _chain(ramp, labels=labels)
-    assert [entry[0] for entry in named[0]] == labels, "the labels reached the record"
-    assert [entry[0] for entry in series_baseline[0]] != labels
-    assert _label_blind(named) == _label_blind(series_baseline)
+    named, unnamed = [], []
+    answer = _chain(ramp, named, labels=labels, direction=direction)
+    baseline = (series_baseline if direction == "forward" else
+                _chain(ramp, unnamed, direction=direction))
+    assert [entry[0] for entry in answer[0]] == labels, "the labels reached the record"
+    assert [entry[0] for entry in baseline[0]] != labels
+    assert _label_blind(answer) == _label_blind(baseline)
+    if direction == "both":
+        assert named[0].direction_gaps, "the two chains were paired"
+        assert [g.label for g in named[0].direction_gaps if g.label] and all(
+            g.label in labels for g in named[0].direction_gaps)
+        assert _gaps(named[0]) == _gaps(unnamed[0])
 
 
 def test_a_recorded_series_is_the_series_unrecorded(ramp, series_baseline, tmp_path,
