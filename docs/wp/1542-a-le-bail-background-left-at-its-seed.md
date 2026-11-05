@@ -1,6 +1,6 @@
 # WP-1542 — a Le Bail background left at its seed
 
-Milestone: unscheduled · Status: 🔄 2026-11-05 — claimed by @claude (ghostshift runner); tasks 1-6 landed and Q1, Q2 ruled (PRs #1357, #1394); working task 7, the ruled cycle rule
+Milestone: unscheduled · Status: 🔄 2026-11-05 — tasks 1-7 landed (PRs #1357, #1394, #1434); three questions wait on the maintainer on PR #1434, then this WP closes
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-01 — was P2: WP-2062 moves every site where rietx picks a structure-free fit to Pawley (decided 2026-11-01), so no default path will run Le Bail; a caller who picks `mode="lebail"` still meets this
@@ -40,6 +40,12 @@ sits at its seed.
 **Why it is not WP-1323's.** That WP's stop rule watches Rwp across passes, and
 this failure lowers Rwp. WP-1323 shipped in 1.6.0 and closed with this filed
 here (2026-10-03, at the maintainer's request).
+
+Tier of each rule task 7 adds: `lebail_tol` is new judgement, tier 3, a default of
+ambiguity 1, measured on five families of six patterns (#740 synthetic, corundum, 11-BM
+NAC, FAP, BT-1 LaMnO3) against a 1e-10 reference and #740's true structure, failing on
+FAP. `lebail_cycles` is answer-invariant by a measured 2× margin. SQUAREM S3 and its
+factor are named practice, tier 2 (Varadhan & Roland 2008 and their R package).
 
 ### Inherited
 
@@ -214,18 +220,20 @@ here (2026-10-03, at the maintainer's request).
 - [x] Skill: SKILL.md §2 rule 5 and `references/judging.md` name
       `rietx.background.snip` and this failure.
 - [x] Tests, with obs/calc/diff PNGs to `tests/output/`.
-- [ ] The Le Bail cycle count converges under a cap (WP-2002's class B11, ruled
+- [x] The Le Bail cycle count converges under a cap (WP-2002's class B11, ruled
       2026-10-19, `docs/wp/2002-batch/rulings.md`). Each stage repeats its
       partition until the relative change falls under a tolerance, in place of
       the fixed `lebail_cycles` = 3. Judge it against #740's true-structure Rwp
       (1.09 %), never against 100 cycles. The `_audit` row
       `StageSpec:lebail_cycles` cites this WP. It moves Le Bail numbers, so it
-      goes through the reader-output check.
+      goes through the reader-output check. **Landed 2026-11-05 on PR #1434:** a
+      cycle's share of the Bragg counts ≤ `lebail_tol` = 1e-7 under a cap of
+      `lebail_cycles` = 25 000.
 
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_lebail_alternation.py tests/test_background_auto.py tests/test_skill.py tests/test_lebail_background_hump.py
+.venv/bin/python -m pytest tests/test_lebail_alternation.py tests/test_background_auto.py tests/test_skill.py tests/test_lebail_background_hump.py tests/test_lebail_cycles.py
 .venv/bin/python -m ruff check src tests examples
 ```
 
@@ -241,6 +249,267 @@ no finding, by the maintainer's ruling of 2026-11-03 on Q1.
   `rietx.background.estimators` cites it.
 
 ## Handover log
+
+- **2026-11-05** — ghostshift runner, PR #1434. A Le Bail stage no longer stops
+  after three cycles. It repeats its partition until one cycle moves less than
+  1e-7 of the Bragg counts, under a cap of 25 000 cycles. Task 7's yardstick holds:
+  #740's pattern ends at Rwp 1.07 % against 1.09 % for the true structure, where
+  three cycles left 1.61 %, and its cell comes within 4.6 ppm of truth where three
+  cycles left 34.9 ppm. Most patterns pay up to 2.1× in wall clock, and BT-1 LaMnO3
+  pays 150× (0.45 s to about a minute). The stop measures how fast the intensities
+  move, and on FAP that leaves one near-degenerate pair unsettled, 1.23 σ at that
+  peak and 0.001 esd in the answer. So the tolerance sits at tier 3 with FAP as its
+  stated failing case. It waits on the maintainer's approval, with two other
+  questions below.
+
+  *The ruling.* WP-2002 class B11, `docs/wp/2002-batch/rulings.md`: "agreed (Le Bail
+  converge-with-cap in WP-1542; budgets treated as not affecting the answer once a
+  test confirms the margin under both solvers)". Its recommendation: "repeat until
+  the intensities stop changing, with a cap, built in WP-1542". The batch's option 3
+  reads "judged against the true-structure Rwp and not against 100 cycles".
+
+  *Done.* The convergence test is
+  Σ_k A_k|ΔI_k| / Σ_k A_k I_k ≤ `Stage.lebail_tol` (1e-7), where A_k is the counts a
+  unit intensity lays on the pattern. The sum is read off a plain cycle. The cap is
+  `Stage.lebail_cycles` (25 000). A cut partition in the last stage warns
+  `LEBAIL_CYCLES_AT_CAP`. `tol=0` is an exact fixed count, bit-identical to the old
+  loop, and `lebail_cycles=3, lebail_tol=0.0` is the way back. `NodeAction` keeps
+  3 / 0.0 as its defaults, so an old node replays what it ran. Plain cycles need
+  thousands of repeats because the update is a Richardson-Lucy step, so
+  `forward._settled_partition` accelerates it with SQUAREM S3 (Varadhan & Roland
+  2008) under the package's own step bound. Partitions stay between solves, so
+  frozen-per-stage holds, and a cancel is read between cycles. New record fields are
+  `StageResult.lebail_cycles_run` and `.lebail_settled`, and `Stage`, `StageSpec` and
+  `NodeAction` gain `lebail_tol`. `sequential._collapse` takes the plan's tightest
+  positive tolerance.
+
+  *Measured: the tolerance* (`[dev]`, macOS arm64; machine load 50-67 from other
+  runners, so seconds are loaded). Bar 1 of `tests/test_window_domain.py`, max|Δy|/σ
+  at fixed parameters ≤ 0.1, from a flat start against a 1e-10 reference:
+
+  | Pattern | 1e-6 | 1e-7 | 1e-8 | cycles at 1e-7 |
+  |---|---|---|---|---|
+  | #740 | 0.237 | 0.027 | 0.003 | 515 |
+  | #740 at 2 % scale | 0.036 | 0.005 | | 671 |
+  | BT-1 LaMnO3 | 0.147 | 0.015 | 0.000 | 12 293 |
+  | FAP | 0.101 | 0.011 | 0.001 | 350 |
+  | corundum | 0.003 | 0.000 | | 44 |
+  | 11-BM NAC | 0.000 | 0.000 | | 8 |
+  | LaB6+cBN | 0 | 0 | | |
+
+  1e-7 is the largest decade under the bar on all seven from flat. From the fit's own
+  intensities (warm) it reads 0.029 on #740, 0.001 at 2 % scale, 0.000 on corundum and
+  NAC. **FAP fails warm at 1.23**: reflections 5 0 6 and 10 -5 0, d 0.9371 and
+  0.9372 Å, swap over 3044 further cycles (I 0.14 → 56.7 and 46.7 → 1e-10), Rwp
+  10.108 → 10.103 %. At 1e-8 FAP still reads 0.554, and LaMnO3's cycles more than
+  double (28 259). A stop on estimated distance (Aitken, s₂²/(s₁−s₂)) left FAP at
+  1.23, so it was dropped. Bar 2, 0.1 plain esd off the background against 1e-9:
+  #740 0.023, FAP 0.001, corundum 0.000. At 2 % scale the plan alone ends 0.40 apart
+  between two settled tolerances and 0.006 once polished, so that row needs the polish.
+  On that pattern two starts settle 1.38 σ apart, so no tolerance closes such a pair.
+
+  *Measured: the cap.* Dearest partition in a fit: 8495 on LaMnO3, 1088 on #740, 161
+  on FAP. From a flat start: 12 293 on LaMnO3. 25 000 is twice that.
+  `test_the_tolerance_meets_its_bar` asserts 2× on six patterns.
+
+  *Measured: three cycles against the stop* (Rwp old → new, wall old → new, largest
+  and total cycles, worst non-background move from three cycles):
+
+  | Pattern | Rwp % | wall s | cycles | worst move, esd |
+  |---|---|---|---|---|
+  | LaB6+cBN | 13.921 → 13.921 | 0.40-0.50 → 0.44 | 11 / 75 | 0.003 |
+  | 11-BM NAC | 14.358 → 14.358 | 0.53 → 0.45-0.53 | 23 / 117 | 0.004 |
+  | corundum | 15.160 → 15.179 | 0.23-0.26 → 0.33 | 41 / 240 | 1.622 |
+  | #740 at 2 % scale | 4.758 → 4.680 | 0.10 → 0.17 | 182 / 933 | 2.545 (cell b) |
+  | #740 | 1.607 → 1.066 | 0.12 → 0.25 | 1088 / 2448 | 25.2 (cell b) |
+  | FAP | 10.237 → 10.108 | 1.8 → 3.2 | 161 / 732 | 0.783 |
+  | BT-1 LaMnO3 | 19.164 → 17.299 | 0.44 → 63-83 | 8495 / 26 406 | 12.8 (cell b) |
+
+  *Measured: acceptance rows and goldens.* No number was re-pinned, and every
+  assertion holds.
+
+  | File | Row | Old | New | Bar |
+  |---|---|---|---|---|
+  | `tests/test_acceptance_nac.py` | Le Bail Rwp | 14.35836 % | 14.35812 % | < 20 % |
+  | same | Le Bail a | 10.2512133 Å | −2.5e-9 Å | ±5e-4 of the Rietveld a |
+  | same | Rietveld after it, Rwp | 9.28766 % | +7.6e-12 % | < 12 % |
+  | `tests/test_acceptance_srm676a.py` | Le Bail Rwp, either setting | 14.43352 % | 14.43286 % | < 25 % |
+  | same | R setting a | 5.1272494 Å | −2.9e-6 Å | within 1e-5 relative of the H setting |
+  | same | R setting α | 55.2874689° | +6.8e-5° | ±0.02° of certificate |
+  | same | H setting a, c | 4.7578039, 12.9879977 Å | +2.7e-6, −1.3e-5 Å | 1e-3 of certificate |
+  | `tests/test_backend_shim.py` | `toy_lebail` golden | | unchanged | fixed `n_cycles=3`, bit-identical |
+
+  The extinction screen keeps three fixed cycles, so its rows do not move. No
+  ordinary test pin moved either. `tests/test_textdoc.py`'s non-default dictionary
+  gained `lebail_tol`.
+
+  *Measured: the Pawley seed.* It stays 3. Under LM a 300-cycle seed against 3 moves
+  0.000 esd, 0.000 σ and under 2e-8 of the largest intensity on #740, its 2 % scale,
+  corundum and FAP. **Under TRF on FAP it fails**: 3 cycles stop at Rwp 8.17 %, 300
+  reach 7.87 %, 8.8 esd apart. So `PAWLEY_SEED_CYCLES` is tier 3 with that failing
+  case, and the finding went to WP-2062.
+
+  *Measured: the step bound's factor* (total cycles in a fit, at 2 / 4 / 8). #740
+  2127 / 2433 / 5133, its 2 % scale 933 / 930 / 939, corundum 228 / 240 / 225, NAC
+  123 / 117 / 117, FAP 1356 / 732 / 750, LaMnO3 22 974 / 27 945 / 26 913. Only 4, the
+  package's default, stays within 1.25× of the best on all six. The factor picks the
+  path, so at 2 and 8 #740's 2 % scale lands 1.25 esd away (Rwp 4.697 against 4.680 %)
+  and at 2 FAP's pair swaps early. That is the tolerance's failing case seen from
+  another side.
+
+  *Rejected.* Anderson acceleration in log intensity: at most 2×, nothing on
+  corundum. A sparse matrix-vector partition: `add.at` 5.4 ms against `bincount` 6.8 ms
+  on FAP's 1.7 M window points. Unbounded SQUAREM: it dropped every landing for
+  hundreds of rounds on FAP, found when a probe hung.
+
+  *Review.* `/code-review` ran on the mechanism, and its fixes are one commit: an
+  unused import, the silence pair, a false cap warning (now the returned `settled`),
+  `_collapse`'s pairing of tolerance and cap, the cancel check inside partitions, and
+  the docs of `lebail_cycles_run`. It also found FAP, which became the failing case.
+  Declined: none. Not fixed, and put to the maintainer below: `_final_compile` carries
+  intensities onto the result's windows unpartitioned, so a one-channel window change
+  splits a near-overlap differently (1.6 σ on #740 until the next partition).
+
+  *Not generalised.* `report.schemas.LEBAIL_GAP_CYCLES` stays 5 plain cycles from
+  flat, because it measures a gap at a frozen state and is tier-tracked apart. `api_call`
+  renders no `lebail_tol`. `suggest`'s probe uses `Stage` defaults with no cancel token.
+  The `Stage` dataclass does not refuse a negative `lebail_tol`, though `StageSpec` does.
+  An old stored plan with `lebail_cycles: 3` reads as a cap of 3 under the
+  new tolerance and warns.
+
+  *Settled by Claude, for the maintainer to reverse.*
+  - The extinction screen holds at three fixed cycles until WP-2062 retires it, on the
+    grounds in its audit row. A settled partition failed 10 rows of its margin and
+    gate tests. The alternative was to re-measure those margins now, for a method the
+    screen is about to leave.
+  - The Pawley seed holds at 3, on the LM measurement above. The alternative was a
+    longer seed that would cure FAP under TRF and cost every index validation.
+  - The share stop stays over a distance estimate, on the FAP measurement above.
+  - SQUAREM S3 with the package's bound, over plain repetition (355 s on LaMnO3 at
+    1e-6) or Anderson.
+  - `tol=0` is the way back, in place of a mode flag, because a fixed count is then
+    one setting and replays old nodes bit-identically.
+  - This WP stays 🔄 with its tasks ticked until the questions below are ruled,
+    because closing moves the record into the release narrative and a reversal would
+    reopen it.
+
+  *Generality.* the judge's report, unedited, then the author's answers.
+
+  Tables are cut to the questions with findings, to fit the 500-word cap. All findings come from reading; nothing was run.
+
+  ## LEBAIL_CYCLES_AT_CAP
+  **weak.** The case for reporting is strong, but the code can miss a real cut.
+
+  | Q | Author | Found | Verdict |
+  |---|---|---|---|
+  | 1, 7 | "fires exactly when … lebail_settled is False on the last stage" | `/Users/yue/Code/rietx/.claude/worktrees/agent-a28a4f0420048955b/src/rietx/refine.py` overwrites `lebail_settled` after the solve. If the pre-solve partition, which the solve fits against, is cut and a warm restart meets the rate test, it reads True and nothing fires. | gap |
+
+  Flips: a test of that sequence firing the code.
+
+  ## LEBAIL_CYCLES_AT_CAP.suggestion
+  **weak.** The row understates the printed text.
+
+  | Q | Author | Found | Verdict |
+  |---|---|---|---|
+  | 3 | "names the stage setting" | It also prints "The cell is usually the last thing to suffer". None given; the test only checks a suggestion exists. #740 (synthetic pattern) at 3 cycles: cell 34.9 ppm off, against 4.6 settled. | fails |
+
+  Flips: measuring that order, or cutting the sentence.
+
+  ## SCREEN_LEBAIL_CYCLES
+  **weak.** Keeping 3 is reasonable; the record is thin.
+
+  | Q | Author | Found | Verdict |
+  |---|---|---|---|
+  | 5, 6 | "no stated source"; a settled partition "failed 10 rows" | Tier 3 fits. No failing case or family count. `approved` borrows ruling B11, which never exempted the screen. WP-2062 (moves it to Pawley) is unscheduled. | gap |
+
+  Flips: the maintainer's own approval, with a failing case.
+
+  ## LEBAIL_INTENSITY_FLOOR
+  **holds.** A numerical floor, tier 1, and tested. Case against: none found.
+
+  ## SQUAREM_STEP_GROWTH, with the steplength bound
+  **weak.** A bound is earned; 4 and tier 2 are not.
+
+  | Q | Author | Found | Verdict |
+  |---|---|---|---|
+  | 5 | "mstep = 4, the default of … R package SQUAREM" | Tier 2 wants a citation that tested it, or a default of the seven programs. This is neither. No other value measured. CRAN claim not checked here. | weak |
+  | 3 | "never the fixed point" (docstring) | The stop reads rate, so where it lands follows the path: the row's two starts differ by 1.38. | weak |
+
+  Flips: other factors run on the six patterns, then tier 1.
+
+  ## PAWLEY_SEED_CYCLES
+  **weak.** The measurements favour it; the test does not carry them.
+
+  | Q | Author | Found | Verdict |
+  |---|---|---|---|
+  | 5 | Four patterns, "identical evaluations", plus the named test | The test runs #740 at full scale, which is not among the four. It asserts no evaluation count. "Under both solvers" (B11): default only. | weak |
+  | 3 | "the joint solve refines the seed" | `build_pawley_restraint` scales equal-split rows by the seeded group mean. The test never compares off-table intensities. | gap |
+
+  Flips: seed invariance of overlapped intensities across families.
+
+  ## StageSpec:lebail_tol
+  **holds.** Failing case named, alternatives tried. The number is the maintainer's.
+
+  | Q | Author | Found | Verdict |
+  |---|---|---|---|
+  | 3 | FAP (fluorapatite) 1.23σ, answer 0.001 esd | Neither bar measures a near-overlap's split, which `SolveCost.from_pawley` reads. | gap |
+  | 6 | "five families" | Four: #740 counts twice. Development status: none given. LaB6+cBN is not in the test. | gap |
+  | 4 | Cell 4.6 against 34.9 ppm; 150× cost on LaMnO₃ | The cell is the only truth reference; the rest verify against rietx's own tighter runs. | holds |
+
+  Flips: the FAP pair's split measured.
+
+  ## StageSpec:lebail_cycles
+  **weak.** The cap is sensible; "invariant" overclaims.
+
+  | Q | Author | Found | Verdict |
+  |---|---|---|---|
+  | 5 | "asserts 2x on six patterns" | FAP's strict xfail stops before that assert: five. The 12 293 (2.0×) is unasserted. | weak |
+  | 3 | "a cap the stop reaches first" | Largest pattern: 329 reflections. B11 tiered this row 3; its budget clause meant iteration budgets. | weak |
+
+  Flips: a dense pattern inside the cap, or tier 3.
+
+  ## StageResult.lebail_cycles_run
+  **holds.** Arithmetic.
+
+  ## StageResult.lebail_settled
+  **holds.** Its `None` is honest. It covers the last partition only.
+
+  ## Three-cycle guard
+  **holds.** Arithmetic, tested.
+
+  ## sequential._collapse
+  **holds.** Tested. Series cost: none given.
+
+  ## tol=0
+  **holds.** The caller's choice, recorded as `None`, tested.
+
+  *The author's answers, the reader-facing ones first.*
+  - Suggestion (**fails**): the sentence is cut.
+  - `LEBAIL_CYCLES_AT_CAP`: fixed. `lebail_settled` now covers every partition of the
+    stage, and a test runs that sequence.
+  - `SCREEN_LEBAIL_CYCLES`: left so, for a method WP-2062 retires. It is under *Settled*
+    above, and question 1 on the PR covers its `approved` date.
+  - `SQUAREM_STEP_GROWTH`: 2 and 8 measured on six patterns, above. It stays tier 2,
+    because the factor picks the path and so is not tier 1. The row gives the measurement.
+  - `PAWLEY_SEED_CYCLES`: measured under both solvers, which found the TRF failing case.
+    Tier 3 now, and the test asserts the intensities.
+  - `StageSpec:lebail_tol`: both gaps are in the row. The FAP pair's split is measured: it
+    moves (I 0.14 → 56.7), and the answer moves 0.001 esd.
+  - `StageSpec:lebail_cycles`: the assert now runs before the bar and covers the fresh
+    partition. The row states its domain, and past it the warning reports a cut. It stays
+    invariant, because a cut is reported rather than silent. Tier 3 is the alternative,
+    and that is the maintainer's to pick.
+
+  *Counts.* COUNTS
+
+  **Next**, for the maintainer on PR #1434, in order:
+  1. Approve `lebail_tol` = 1e-7 at tier 3 with FAP as its failing case and LaMnO3's
+     cost, or pick 1e-8 and pay more than double on LaMnO3 with FAP still at 0.55.
+     The row's `approved` date is the ruling on the rule, so an approval moves it.
+  2. Rule each reader-output line in the PR's *What a reader receives*.
+  3. Decide whether the result's final compile should re-partition. That closes the
+     1.6 σ gap and changes what every Le Bail fit returns.
+  Then close this WP and move its record to the v1.12 record.
 
 - **2026-11-05** — close-out runner, PR #1430. This WP stays open. Its six
   listed tasks are done, but the maintainer ruled on 2026-10-19 that a Le Bail

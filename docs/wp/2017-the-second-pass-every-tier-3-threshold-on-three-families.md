@@ -72,7 +72,7 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
 
 - **From WP-1542 (2026-11-05, PR #1434): the held SNIP on PbSO₄ and #726 was not
   re-measured with settled partitions.** `StageSpec:lebail_tol` (1e-7) joined the audit
-  table at tier 3 on four families of six patterns, with FAP as its stated failing case
+  table at tier 3 on five families of six patterns, with FAP as its stated failing case
   (a pair 1e-4 Å apart, 1.23 σ at that peak). Neither bar reads the split of such a
   pair. `report.schemas.LEBAIL_GAP_CYCLES` (5 plain cycles from flat) was left alone
   and now sits beside a partition that runs to a tolerance. Both are this WP's to
