@@ -382,22 +382,33 @@ def parametric_equation(resolved: ResolvedParametric, rows: list[ParametricCoeff
     rows' units already.  ``None`` when a coefficient has no esd, or when a
     equation of several coefficients has no correlation to pair them with.
     """
-    esd = [r.esd for r in rows]
-    covariance = None
-    if all(e is not None for e in esd) and all(c is not None for c in columns):
-        m = len(rows)
-        if m == 1:
-            covariance = [[esd[0] * esd[0]]]
-        elif correlation is not None:
-            # ρ read off one triangle: the solve's correlation can differ from its
-            # transpose in the last bit (measured on Linux, Python 3.14), and a
-            # covariance must be symmetric to the bit
-            covariance = [[esd[i] * esd[j] * (
-                1.0 if i == j else
-                float(correlation[columns[min(i, j)], columns[max(i, j)]]))
-                for j in range(m)] for i in range(m)]
-    return RefinedParametricEquation(equation=resolved.equation, unit=resolved.unit,
-                                     span=dict(resolved.span), covariance=covariance)
+    return RefinedParametricEquation(
+        equation=resolved.equation, unit=resolved.unit, span=dict(resolved.span),
+        covariance=expression_covariance([r.esd for r in rows], columns, correlation))
+
+
+def expression_covariance(esd: list[float | None], columns: list[int | None],
+                          correlation: np.ndarray | None) -> list[list[float]] | None:
+    """esd_i·esd_j·ρ_ij over a list of coefficients, ρ_ii taken as 1.
+
+    :func:`parametric_equation`'s covariance, and an ``expression``
+    equation's over its variables (WP-1964).  ``None`` when one has no esd
+    or no column, or several have no correlation to pair them with.
+    """
+    if not all(e is not None for e in esd) or not all(c is not None for c in columns):
+        return None
+    m = len(esd)
+    if m == 1:
+        return [[esd[0] * esd[0]]]
+    if correlation is None:
+        return None
+    # ρ read off one triangle: the solve's correlation can differ from its
+    # transpose in the last bit (measured on Linux, Python 3.14), and a
+    # covariance must be symmetric to the bit
+    return [[esd[i] * esd[j] * (
+        1.0 if i == j else
+        float(correlation[columns[min(i, j)], columns[max(i, j)]]))
+        for j in range(m)] for i in range(m)]
 
 
 def target_columns(resolved: ResolvedParametric, bj, free_paths: list[str],

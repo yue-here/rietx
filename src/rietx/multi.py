@@ -62,6 +62,7 @@ from .params.multi import (
     EquationPreview,
     MultiParameterTable,
     SharingMap,
+    _display_unit,
     _longest_wavelength,
     _unscoped,
     row_shared,
@@ -69,6 +70,7 @@ from .params.multi import (
 from .params.parametric import (
     FORM_TEST_LEVEL,
     coefficient_rows,
+    expression_covariance,
     form_tests,
     parametric_equation,
 )
@@ -160,6 +162,7 @@ from .schemas.parametric import (
     ParametricEquation,
     ParametricFormReading,
     ParametricFormTest,
+    RefinedParametricEquation,
 )
 from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
@@ -2720,12 +2723,39 @@ class MultiHistogramRefinement:
         the matrix those esds were read off (:func:`~rietx.params.parametric.parametric_equation`).
         """
         mt = self.mtable
-        if not mt.parametric:
+        if not (mt.parametric or mt.expressions):
             return None
         index = {p: i for i, p in enumerate(mt.free_paths)}
-        return [parametric_equation(r, [c for c in coefficients if c.equation == r.name],
-                                    [index.get(p) for p in r.paths], corr)
-                for r in mt.parametric]
+        out = [parametric_equation(r, [c for c in coefficients if c.equation == r.name],
+                                   [index.get(p) for p in r.paths], corr)
+               for r in mt.parametric]
+        # An expression and each intermediate it names (WP-1964): the
+        # covariance over its variables in ``r.paths`` order, the order of its
+        # rows in ``coefficients``; an intermediate has no rows of its own, so
+        # its esds are read here.  The span is each coordinate's range over
+        # the subset, which ``evaluate``'s ``outside`` reads.
+        t0 = mt.tables[0]
+        esd = {c.path: c.esd for c in coefficients}
+        for r in (*mt.intermediates, *mt.expressions):
+            # a held variable is a constant of the answer: its row and column
+            # are zero, so the esd is the free variables' alone
+            free = [j for j, p in enumerate(r.paths) if t0.entries[t0._paths[p]].vary]
+            sub = expression_covariance([esd.get(r.paths[j]) for j in free],
+                                        [index.get(r.paths[j]) for j in free], corr)
+            covariance = None
+            if sub is not None or not free:
+                covariance = [[0.0] * len(r.paths) for _ in r.paths]
+                for a, i in enumerate(free):
+                    for b, j in enumerate(free):
+                        covariance[i][j] = sub[a][b]
+            span = {name: (min(v[name] for v in r.constants.values()),
+                           max(v[name] for v in r.constants.values()))
+                    for name in r.coordinates if r.constants}
+            out.append(RefinedParametricEquation(
+                equation=r.equation,
+                unit=None if r.target is None else _display_unit(r.target),
+                span=span, covariance=covariance))
+        return out
 
     def _parametric_rows(self, esd0: dict[str, float]):
         """Every declared coefficient, in user units at the reference.

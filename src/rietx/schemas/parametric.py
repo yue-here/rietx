@@ -519,7 +519,9 @@ class RefinedParametricEquation(Base):
                  form: ParametricFormTest | None = None,
                  coordinates: dict[str, float] | None = None,
                  row: list[float] | None = None,
-                 joint: ParametricFormReading | None = None) -> ParametricValue:
+                 joint: ParametricFormReading | None = None,
+                 definitions: list[RefinedParametricEquation] | None = None
+                 ) -> ParametricValue:
         """The target at ``coordinates`` (or a ``design`` equation's ``row``).
 
         Σ_j x_j·c_j and √(x·Σ·xᵀ), with c the coefficients in the caller's
@@ -529,9 +531,19 @@ class RefinedParametricEquation(Base):
         coordinate set or a row that does not match the basis.  ``joint`` is the
         joint reading of every tested equation, read only where ``form`` took
         part in it.
+
+        An ``expression`` equation (WP-1964) is the expression at the
+        coefficients' values and ``coordinates``, with √(g·Σ·gᵀ) for g its
+        exact gradient in the variables.  Its coefficients are the
+        variables' rows of ``RefinementResult.parametric``, in that order,
+        and ``definitions`` the intermediates it names, as
+        ``RefinementResult.parametric_equations`` lists them.
         """
         equation = self.equation
         paths = [c.path for c in coefficients]
+        if equation.basis == "expression":
+            return self._evaluate_expression(coefficients, coordinates or {},
+                                             row, definitions or [])
         if paths != equation.coefficient_paths():
             raise ValueError(f"equation {equation.name!r} takes its coefficients "
                              f"{equation.coefficient_paths()} in that order, got {paths}")
@@ -579,3 +591,53 @@ class RefinedParametricEquation(Base):
             # an equation took part in the joint reading iff it has a freed one
             joint_rejected=(None if joint is None or form is None
                             or form.others_freed is None else joint.rejected))
+
+    def _evaluate_expression(self, coefficients: list[ParametricCoefficient],
+                             coordinates: dict[str, float], row,
+                             definitions: list[RefinedParametricEquation]
+                             ) -> ParametricValue:
+        """:meth:`evaluate` for an ``expression`` equation; see there."""
+        from ..params.expression import Expression, ExpressionError
+
+        equation = self.equation
+        if row is not None:
+            raise ValueError(f"equation {equation.name!r} is an expression: pass "
+                             "coordinates, never a design row")
+        wrong = [c.path for c in coefficients if c.equation != equation.name]
+        if wrong:
+            raise ValueError(f"equation {equation.name!r} takes its own variables' rows; "
+                             f"{wrong} belong to another equation")
+        if self.covariance is not None and len(self.covariance) != len(coefficients):
+            raise ValueError(f"equation {equation.name!r} takes {len(self.covariance)} "
+                             f"variables' rows, in result.parametric's order; got "
+                             f"{len(coefficients)}")
+        defs: dict[str, Expression] = {}
+        for d in definitions:
+            if d.equation.basis == "expression":
+                defs[d.equation.name] = Expression(d.equation.expression).inline(defs)
+        tree = Expression(equation.expression).inline(defs)
+        for c, v in coordinates.items():
+            _finite(v, f"coordinate {c!r}")
+        bindings = {c.term: c.value for c in coefficients}
+        clash = sorted(set(bindings) & set(coordinates))
+        if clash:
+            raise ValueError(f"equation {equation.name!r}: {clash} are variables, "
+                             "never coordinates")
+        try:
+            value, grads = tree.gradient({**bindings, **coordinates}, list(bindings))
+        except ExpressionError as exc:
+            raise ValueError(f"equation {equation.name!r} cannot be evaluated at "
+                             f"{coordinates}: {exc}") from exc
+        g = [float(d) for d in grads]
+        esd = None
+        if self.covariance is not None:
+            var = sum(g[i] * g[j] * self.covariance[i][j]
+                      for i in range(len(g)) for j in range(len(g)))
+            esd = math.sqrt(max(var, 0.0))
+        outside = [c for c, (lo, hi) in self.span.items()
+                   if c in coordinates and not lo <= coordinates[c] <= hi]
+        return ParametricValue(
+            equation=equation.name, target=equation.target or "",
+            coordinates=dict(coordinates), row=None, value=float(value), esd=esd,
+            unit=self.unit, outside=outside, form_rejected=None, provisional_on=[],
+            joint_rejected=None)

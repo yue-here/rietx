@@ -276,6 +276,16 @@ def test_an_einstein_cell_with_theta_held_recovers_its_two_variables():
         assert c.reference is None
     assert not by_term["theta"].vary and by_term["theta"].esd is None
     assert by_term["theta"].value == theta
+    # evaluated anywhere through its gradient: at a pattern, the row's value
+    # and esd; between two, inside the span; past the last, extrapolating
+    (eq,) = result.parametric_equations
+    for h, temp in enumerate(temps):
+        v = eq.evaluate(result.parametric, coordinates={"T": temp})
+        row = rows[f"hist.{h}.phases.0.cell.a"]
+        assert v.value == pytest.approx(row.value, rel=1e-13)
+        assert v.esd == pytest.approx(row.stderr, rel=1e-6), h
+        assert v.outside == [] and v.unit == "Å"
+    assert eq.evaluate(result.parametric, coordinates={"T": 1500.0}).outside == ["T"]
     printed = str(result)
     assert "[grad]" in printed and "[theta] 400 (not free at the answer)" in printed
     named ={p.path for p in result.parameters if p.equations}
@@ -535,6 +545,19 @@ def test_a_temperature_calibration_feeding_the_cell_recovers_its_coefficients():
     for h, temp in enumerate(temps):
         a = rows[f"hist.{h}.phases.0.cell.a"].value
         assert a == pytest.approx(a0 + k * (temp + got0 + got1 * temp), rel=1e-13)
+    # evaluated from the result alone, the intermediate passed as a definition
+    # (task 10); its own entry reads over its two variables
+    by_name = {e.equation.name: e for e in result.parametric_equations}
+    assert list(by_name) == ["T_true", "a"]
+    mine = [c for c in result.parametric if c.equation == "a"]
+    for h, temp in enumerate(temps):
+        v = by_name["a"].evaluate(mine, coordinates={"T": temp},
+                                  definitions=[by_name["T_true"]])
+        row = rows[f"hist.{h}.phases.0.cell.a"]
+        assert v.value == pytest.approx(row.value, rel=1e-13)
+        assert v.esd == pytest.approx(row.stderr, rel=1e-6), h
+    with pytest.raises(ValueError, match="T_true"):
+        by_name["a"].evaluate(mine, coordinates={"T": temps[0]})
 
 
 # -- a preview without a fit (task 8) ----------------------------------------
