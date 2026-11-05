@@ -176,6 +176,18 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
 
 ### Inherited
 
+- **2026-11-05, from the issue triage (issue #1411): what PR #1410 still owes.** The issue
+  lists ten items, and this file's handover log and `2003-batch/` hold the detail. It is this
+  WP's own list, so nothing moves out except item 9, which WP-2004's Inherited now carries.
+  Two things the issue does not say. First, items 1, 8, 9 and 10 concern
+  `SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` and `MOMENT_SUPPORT_SIGMA`,
+  which act only on magnetic fits, so their tiers and wording are Michael's since #1075. The
+  issue addresses them to the maintainer because the batch predates that split. Item 2, the
+  ladder's rung fields and `_better`'s ranking criterion, reaches non-magnetic fits and stays
+  Yue's. Second, item 4 (the flat-pair defect) asks for an owner among the background-absorption
+  WPs. `grep` over the open WPs at `541f0daf7` finds it in this file alone, so it stays here
+  until a session reads WP-1931 and WP-1542 against it.
+
 - **2026-11-02, from WP-2080 (issue #1214).** C1's reversal condition is met on
   the issue's synthetic chain: a converged warm first rung keeps the minor phase's
   c 0.34 Å off at GoF 2.05, where its seed pattern reached 1.02 and `warm_staged`

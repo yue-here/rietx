@@ -1,9 +1,8 @@
 # WP-2054 — the report names an asymmetric residual the model cannot draw
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — direction (b) in PR #1363, both rulings carried out; waits on merge and the reply on #1106
+Milestone: unscheduled · Status: ✅ 2026-11-05 — direction (b) shipped in PR #1363; closed by PR #1430
 Track: What fires, and what stays silent
 Depends on: 1977 soft (the flank-lobe half of the same symptom); 2004 soft (a new template's thresholds take audit rows there)
-Priority: P2 2026-10-26 — a report that names the wrong cause: on a lab Bragg–Brentano fit with the apertures at their default 0, Layer 2 suggests an impurity phase at 0.50 and nothing mentions asymmetry (#1106, NIST SRM 660c)
 
 ## Goal
 
@@ -77,52 +76,6 @@ ranks anything.
 **Licensing.** Concepts only from the issue and from FCJ (Finger, Cox & Jephcoat 1994);
 nothing ported.
 
-### Inherited
-
-- 2026-11-02, from WP-1977 (PR #1295, reworked to Yue's ruling of
-  2026-11-01): every `unmatched_obs` row stays listed and carries
-  `UnmatchedPeak.flank`. On #1106's script with the apertures at 0, all 11
-  rows say `on_flank`, at 0.9-3.0 FWHM below their LaB₆ line and one 1.0
-  above, and `add_impurity_phase` 0.50 is gone, because Layer 2 no longer
-  counts a row on a flank (rebuilt from the stored fit, `[dev]`,
-  darwin/arm64). The other active action, `increase_background_flexibility`
-  0.47, is untouched. So the failing test this WP plans must assert on the
-  asymmetry action's absence; its "suggests `add_impurity_phase`" half no
-  longer reproduces once WP-1977 merges, and the Acceptance clause
-  "`add_impurity_phase` is not the top action" holds already. The flank rows'
-  offsets and their `lines_with_lobe` counts are evidence an asymmetry test
-  can read.
-
-- 2026-10-31, from the issue triage (issue #1106): the reporter (2026-10-29)
-  brings evidence for direction (a) and one new ask, with no code and no
-  threshold. Per peak region they fit the residual on the model's own net line
-  P and its derivatives P′, P″, P‴ (P‴ the odd direction left once a free
-  position takes P′), each with a counting-noise t not divided by the
-  serial-correlation factor f, rolled up per term as a coherent z, an
-  incoherent χ² and an rms t. Synthetic (rietx's own forward model, so one
-  source): axial asymmetry 0.02 with FCJ off, which Layer 1 reads today as
-  position (rms t 4.6–5.0), shows shift rms 5.9–6.6 and odd rms 3.4–3.8 in 3
-  of 3; a 5 % high-angle second line, silent in Layer 1 today, shows odd rms
-  2.83–3.51; the null over 20 clean fits has the largest per-term rms at 1.32.
-  Dividing by f biases the null low and eats the signal (the second line falls
-  to 1.99–2.17 against 1.18). On four public patterns with FCJ refined every
-  term reads far above N(0,1); the odd term is one-signed on SRM 1976a
-  (coherent z +31.5) and FAP (+16.3) and has no net sign on SRM 660c (+0.5),
-  so an always-present odd column would report something on most lab fits. The
-  ask: a `t_noise` field on `BasisCoefficient` beside `stderr` and
-  `significant`, the per-term rollups printed ungated on both maturity
-  branches, `significant` untouched until WP-2004 rules on the gates; about
-  1.6 ms in `report()`; one extra run per additive fixed component reads a
-  blank mismatch (2e-4 in d gives 3/3, its control 0/3). They recommend the
-  Layer 1 seat over a Layer 0 field and leave it to the maintainer. Tiers as
-  they state them: the statistic tier 2 (Rao 1948 score test, Ramsey 1969,
-  Turin 1960), the null tier 1, the region rule (4 % of peak height, ≥ 6
-  points) tier 3, a BH q per region that never gates. Checked against the tree
-  at d87c8cc91: `BasisCoefficient` (`report/schemas.py:922`) carries `kind`,
-  `value`, `stderr`, `significant`, `share`, and no noise-only t. A new field
-  on the report is a public schema change; the decision belongs with this WP's
-  first task.
-
 ## Non-goals
 
 - The `unmatched_obs` matching window and a flank-lobe filter on `add_impurity_phase` (the
@@ -181,6 +134,32 @@ from today. The synthetic controls hold.
 - Issues #1106, #1075 (repro 1), #1090 (the related model proposal), #1166.
 
 ## Handover log
+
+- **2026-11-05** — close-out runner, PR #1430. This WP closes. A lab fit that
+  leaves both axial apertures at 0 now gets a report that names a one-sided
+  low-angle residual as axial asymmetry, and it says the apertures are 0. All
+  eight tasks landed in PR #1363, which shipped in 1.11.0. Nothing in this PR
+  changes the package for this WP. The reporter's `t_noise` ask was never part
+  of the fix, and WP-2004 now holds it.
+
+  *Verified at 541f0daf7.* The Acceptance rows pass on this branch: 135 passed
+  over `test_fitreport_layers`, `test_report_loop`, `test_audit_table` and
+  `test_help` (`[dev]`, macOS arm64, 4 workers, another worktree's tests beside
+  them). `rietx.report.NOMINAL_AXIAL_APERTURE` is in the tree at 0.02 with its
+  audit row. `suggest_actions(axial_off=True)` counts a positive coefficient
+  only. `test_srm660c_zero_apertures_report_names_axial_asymmetry` is present.
+  It is `slow`, and it was last run on PR #1363's tree, so this entry does not
+  re-claim it. The status line's two open items are both done: the merge on
+  2026-11-03, and the reply on #1106, posted the same day.
+
+  *Forward references.* Issue #1106 stays open for the `t_noise` field. The
+  evidence, the ask and its tiers moved to WP-2004's Inherited, since that WP
+  rules on the `significant` gate the ask leaves alone. The nominal aperture's
+  third family moved to WP-2017's Inherited. The WP-1977 entry was consumed by
+  the task it corrected. `closed_wp_writes.py` reports nothing for this WP.
+
+  Next: none here. WP-2004 answers `t_noise`, and WP-2017 measures the third
+  family.
 
 - **2026-11-03 (second session)** — the maintainer's two rulings are carried out on
   PR #1363. The report's nominal aperture is now a constant of its own,

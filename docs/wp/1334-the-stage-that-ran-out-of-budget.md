@@ -1,9 +1,8 @@
 # WP-1334 — the stage that ran out of budget
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — tasks 3-7 landed and ruled (PR #1366); text approved; waits on the merge
+Milestone: unscheduled · Status: ✅ 2026-11-05 — tasks 1-7 shipped (PRs #1343, #1366); the first-rung route pinned and the WP closed by PR #1430
 Track: A long run is not one fit
 Depends on: —
-Priority: P3 2026-09-23 — cost only: 46.6 % of stage time for a 1.23 % median gain
 
 ## Goal
 
@@ -12,35 +11,6 @@ stops rather than escalating, and says so. A caller holding a `StageResult`
 can apply the keep-the-best-pass discipline the skill asks for without parsing
 the event log for a number the object was standing next to when it was
 computed.
-
-### Inherited
-
-- **2026-11-02, from [2036](2036-main-is-green-on-every-nightly-leg.md): `solve_magnetic`'s continuation guard binds on a crawl, so a class can drop out of the ranking by rounding.** On the Cr₂WO₆ 150 K pattern, class 3's last stage (`all`) runs to `max_iter` and `strategy.magnetic._fit` continues it from where it stopped. Each 400-evaluation continuation lowers χ² by 0.0002-0.008 of about 2177. At six 1e-14 nudges of the reference's `w` on macOS arm64 it needed 3, 4, 4, 5, 10 and more than 10 continuations; the sixth hit `SOLVE_MAX_CONTINUATIONS` (10) and returned `max_iter`, as the 2026-11-01 Linux nightly did. Forward-difference moment columns crawl too (6 at the unnudged start), so the analytic column from #1206 is not the cause. A trial stopped there is listed with a caveat and **not ranked**. Here that changes nothing, since every class sits 36-45 below zero in ΔBIC. On a pattern where the crawling class is the winner, the verdict would depend on rounding. The constant's docstring calls it "a runaway guard, never a timer", and at 10 it is a timer for this fit. `tests/test_magnetic_solve_acceptance.py`'s 150 K test stopped asserting the trial converges (WP-2036); the stop rule this WP designs is what would make the status mean something. Probe: `docs/wp/2036-batch/cr2wo6_150k_continuations.py` (counts and per-continuation costs).
-
-- **2026-10-25, from [2036](2036-main-is-green-on-every-nightly-leg.md): a stage that runs out of budget from one start in many, a last-digits matter.** `examples/guides/moment.py`'s round 1 is one all-free stage. Since #1161 it starts with the moment's `crystalaxis_y` at −1.0191353854626552e-6 μB, read back from the magCIF `solve_magnetic` wrote. From that exact value it runs 800 evaluations to `max_iter` (cost 2464.4 → 1990.3), and a 4000 cap does not converge either. The same start with only that value set to −1.0e-6, 0, +1e-6, −1e-4 or −1e-3 converges in 21-45 evaluations to 1983.6 (arm64 Mac, `[dev]`, compiled tier on and off, 1-4 threads alike). The closing stage repairs it: every route ends at Rwp 0.104747. So the cost is the budget, a `STAGE_MAX_ITER` a reader may act on, and a next fit whose step depends on where this one stopped (the guide's round 2 failed CI 10 of 19 times). Not measured: which direction it crawls along, or whether frozen windows play a part (WP-2047). To reproduce: run the guide up to `ROUNDS = 5`, dump `structure` and `fitted_instrument` with `model_dump(mode="json")`, and refit them with the guide's `everything` plan; edit the one value to see the split.
-
-- **2026-10-11, from the issue triage (#222): the reporter's two comments of
-  2026-09-02 withdraw or sharpen three claims this Context still carries.**
-  (1) "A phase going to zero makes fits faster" is withdrawn. On a third
-  tranche, a 182-pattern variable-temperature synchrotron series, fits ran
-  13.8× slower when `PHASE_UNCONSTRAINED` fired (5.4× more evaluations, 2.2×
-  more cost each), and on that tranche's other system the test was flat
-  (0.94×). The effect is a threshold whose sign depends on whether the
-  unsupported phase leaves a flat direction, so condition on the diagnostic
-  firing and never correlate against the fraction. (2) `s/iter = 4.4 µs ×
-  n_points + 2.9 ms` belongs to the first tranche: 3.35× low on the six-phase
-  lab series and 0.34-0.49× on the variable-T one, so it is not quotable. Cost
-  tracking the evaluation count survives (stratified r = +0.859, +0.988,
-  +0.983). (3) `max_nfev` alone is not the waste signal. Over three tranches
-  it was 3.9 %, 4.4 % and 2.98 % of stages, 46.6 %, 42.9 % and 23.5 % of stage
-  time, and 72×, 53.6× and 18.0× the median `ftol` stage, in a different stage
-  name each time. In the six-phase tranche 15 `max_nfev` `warm_refit` stages
-  still cut cost by a median 2.76 %, while four `max_nfev` `strain` stages
-  spent 129.3 s for 0.19 %. So the stop rule is the pair "budget exhausted and
-  a near-zero relative cost reduction", blind to stage names. Checked against
-  the tree at 7d9be3cb: this file's Context states claims (1) and (2) and
-  keys its rule to `max_nfev` plus ε; `StageResult` has no `rwp` or
-  termination field.
 
 ## Context
 
@@ -211,6 +181,76 @@ repo.
   it, in anything reporting a duration.
 
 ## Handover log
+
+- **2026-11-05** — close-out runner, PR #1430. This WP closes. The one route
+  the series check could not reach now has a test: a bounded first rung whose
+  closing stage the slow-descent rule stops below the bound. That rung counts
+  as complete, nothing escalates, and the chain with the bound answers bit for
+  bit as the chain without it. The two crawls this WP inherited are gone as
+  well. `solve_magnetic` at 150 K needed 3 to more than 10 continuations and
+  now needs at most 1, and the moment guide's 800-evaluation stage no longer
+  occurs.
+
+  *Done.* `tests/test_sequential.py::test_a_slow_descent_stop_below_the_bound_truncates_nothing`.
+  No real fixture stops a crawl reliably across platforms, so the test forges
+  one in the real driver, by `test_slow_descent.py`'s device. On p004 of the
+  thermal ramp the closing stage starts 1e-5 away from its minimum with a
+  Jacobian 100 times too large. The rule stops it at 204 evaluations, under a
+  bound of 360 and a plan budget of 800, at Rwp 0.543699 against 0.543697. The
+  test asserts the stop, `rungs_tried == ["warm"]`, `STAGE_SLOW_DESCENT` on the
+  entry, equality of every value, esd, rung and code with the unbounded chain,
+  and that p005's budget grew from the rung's 204. `/code-review high --fix`
+  stopped the two chains' forgeries stacking on one `monkeypatch`, corrected
+  two docstring claims, dropped one assertion that could not fail, and added
+  the PNG (`tests/output/sequential_slow_descent_p4.png`). One more finding
+  was that the record was not yet written, which this entry answers.
+  `test_magnetic_solve_acceptance.py`'s 150 K docstring now quotes the rule's
+  numbers.
+
+  *The guard fails on purpose* (a pytest plugin, no source edit). A window that
+  reads the budget, the rule's first form, fails on `chain_answer`. A rule stop
+  counted as the bound's cut fails on `rungs_tried`. A rule stop kept out of the
+  sample fails on p005's budget, 90 against 200.
+
+  *Measured* (macOS arm64, worktree `[dev]` venv, compiled tier on).
+  - `docs/wp/2036-batch/cr2wo6_150k_continuations.py` at the six 1e-14 nudges of
+    `w`: class 3 takes 1, 1, 1, 1, 0 and 1 continuations, each converged, verdict
+    "nothing to solve". On 2026-11-02 the same nudges took 3, 4, 4, 5, 10 and
+    more than 10. Its Rwp lands at 0.097878-0.097899 across them. Linux was not
+    measured, so the test still does not assert convergence.
+  - `examples/guides/moment.py`, round 1's all-free stage from the magCIF start:
+    13 evaluations, `exhausted_fp64`, Rwp 0.104747. No stage in the guide ends
+    `slow_descent`. The 10-25 entry's 800 evaluations did not recur, and this
+    run does not say which change removed them.
+  - Acceptance: 379 passed over `test_schemas`, `test_termination_view`,
+    `test_slow_descent` and `test_lm_solver` (4 workers). The #222 fixture's
+    numbers are the 2026-11-03 entry's: 816 → 539 evaluations, worst shift 0.064
+    esd.
+  - Fast selection: 13922 passed, 240 skipped, 36 xfailed, none failed (`-m "not slow"`, through
+    `serial.py`, on 541f0daf7 plus this branch, other sessions' runs beside it).
+    No baseline was measured on that tree, so the +1 is not checked by
+    subtraction. The added test took 11.66 s in that loaded run and about 5 s
+    alone. It stays in the fast tier so that a merge fails on this route, as
+    the bound's other rows in the file do.
+
+  *Settled by Claude.* A first rung the rule stopped joins the bound's sample.
+  Grounds: the ruling of 2026-11-03 makes such a stage `converged`, and "worked
+  is convergence" is `_first_rung_budget`'s written rule. The alternative was to
+  leave it out as a cheap stop that says little about a working rung's cost. The
+  consequence is that one crawl can raise the bound for the rest of a chain, and
+  at a high factor switch it off. Issue #222 closes with this PR, since its ask
+  shipped. Its 638-pattern tranche is the reporter's and was not re-run.
+
+  *Not generalised.* A warm stage the rule stops takes the same code path, and
+  the ba2fesbse5 ramp's p11 stops that way at 107, but no test pins it. Its stop
+  moves with the last digits, and the real ramp under a bound was not run. A
+  bound below the rule's stop still cuts a winning rung and escalates. That is
+  WP-2003's stated risk of `first_rung_factor`, and this test does not change
+  it.
+
+  Inherited: both entries consumed by the two measurements above and removed.
+
+  Next: none here.
 
 - **2026-11-03** — ghostshift runner, PR #1366. A stage whose cost is still
   falling, but too slowly to matter, now stops before its budget runs out and

@@ -108,7 +108,7 @@ different laboratory, instrument and material:
 | M. Starts | `structure.BISO_SEED`, `instrument.HARMONIC_WEIGHT_SEED` | the two starts with `closing_window_tol=None` | the four; the synthetic neutron corundum | open |
 | N. Hand rows | Le Bail and Pawley intensity seed, `refine._FLAT_AXIS_TEST_DIRECTIONS`, `arpls`'s `max_iter` and `tol`, `vector.FLOOR_SEEDS` | a test for each claim of invariance | named by each test | open |
 | O. Domain tests | `interval.PARAMETER_INTERVAL_*` (five), `fraction.FRACTION_PROFILE_FWHM_MIN`, `_N_FWHM`, `_FWHM_MAX_SPAN` | state a domain, then 0.1 σ of a point and 0.1 esd | the two-site Pnma fixtures; `fap`, `cpd1a` | open |
-| P. Window numerics | `forward.AXIAL_SIZING_FLOOR`, `REFLECTION_MARGIN_DEG`, `STAGE_WINDOWS_STALE` | each side | the four; a second and third family that runs away | open |
+| P. Window numerics | `forward.AXIAL_SIZING_FLOOR`, `REFLECTION_MARGIN_DEG`, `STAGE_WINDOWS_STALE`, `report.NOMINAL_AXIAL_APERTURE` | each side | the four; a second and third family that runs away | open |
 | Q. Le Bail passes | `refine.LEBAIL_CONVERGED_REL` | each side | LaB₆ + cBN, `fap`, `cpd1a` | open |
 | R. Width terms | `StageResult.width_twins_held`, `ProfileTCHZ:y` unfloored | see below | a real multi-phase fit freeing a twin pair; SRM 660c | open |
 | S. Tier-2 citations | `SCHERRER_K`, `BOND_SLACK_ANG`, `STEPS_PER_FWHM_*` | read each citation | none: they stay at tier 2 unless a source fails | open |
@@ -165,6 +165,9 @@ and have no free factor to measure, so this file's old list named them without c
   has one family: four protocols at most 1.73 % against 2 %, the chain cpd-1a → cpd-1b at 73.4 %
   under the pre-2045 schedule, and the which-stages rule rests on the calibrate guide's
   `sample_profile` stage at 12.1 %.
+- **P, from WP-2054 (PR #1430).** `NOMINAL_AXIAL_APERTURE` (0.02) needs a third family. On SRM
+  660c the action fires at 0.005, 0.01 and 0.02 and not at 0.05, and cpd-1a, -1c and -1f behave
+  the same way at 0.02. It is a separate row from `AXIAL_SIZING_FLOOR` and no longer reads it.
 - **R.** `width_twins_held` has one real two-phase family, 11-BM LaB₆ + cBN. Y's floor went on a
   physical argument with one synthetic cost (Y −0.0059 against 0, `lor_size` 55 % low). The test:
   SRM 660c with Y free and with Y ≥ 0, read on the certified cell and a sample's size and strain.
