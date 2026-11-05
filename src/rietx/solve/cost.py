@@ -267,7 +267,7 @@ def _design(model, values: dict, phase: int, background: str, nuisance: str):
     """(y, w, Ω, X): the target, the weights, the solved phase's columns and
     the nuisance columns (``None`` when there are none), as the module
     docstring defines them; y already has every held term subtracted."""
-    if not model.phases[phase].skip_extinction and values[f"phases.{phase}.extinction"] != 0:
+    if not model.phases[phase].skip_extinction and values.get(f"phases.{phase}.extinction", 0.0) != 0:
         raise ExtractionRefused(
             "nonlinear", "primary extinction is on for the solved phase: its "
             "intensity is not linear in |F|² (hold extinction at 0)")

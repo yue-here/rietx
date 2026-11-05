@@ -153,7 +153,7 @@ apply_ties(ref, cons)
 >>> model.stated.background_terms, model.stated.background_refined
 (6, True)
 >>> [r.path for r in ref.parameters() if r.vary][:4]
-['phases.0.cell.a', 'phases.0.cell.c', 'phases.0.scale', 'phases.0.extinction']
+['phases.0.cell.a', 'phases.0.cell.c', 'phases.0.scale', 'phases.0.atoms.0.dof.0']
 ```
 
 The reader builds a `Structure` alone.
@@ -161,7 +161,7 @@ The wavelength, the emission lines, the background terms and the data file it fi
 Both calls that read a file take a `diagnostics=` list, and the reader says what it did not carry:
 
 ```text
-TOPAS_FEATURES_NOT_IMPORTED | refined.inp: this import is partial. The file states peak profile (Finger_et_al, peak_type, pv_fwhm, pv_lor) [fluorapatite]; phase scaling (scale_pks) [fluorapatite], and none of it reaches the built structure.
+TOPAS_FEATURES_NOT_IMPORTED | refined.inp: this import is partial. The file states peak profile (Finger_et_al, peak_type, pv_fwhm, pv_lor) [fluorapatite], and none of it reaches the built structure.
 ```
 
 A construct the reader cannot carry without misrepresenting the file is refused by name.

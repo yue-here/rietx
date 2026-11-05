@@ -909,11 +909,11 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         title="Primary extinction",
         description=(
             "The Sabine primary-extinction coefficient, a squared mosaic-block size. A "
-            "powder has no secondary extinction. The coefficient attenuates the strong "
-            "low-angle reflections of a well-crystallised specimen. At 0 there is no "
-            "correction, so a phase that does not free it is unaffected. The calculated "
-            "pattern still responds to it at 0, so the staged plans free it from 0 "
-            "without a seed."
+            "powder has no secondary extinction. It attenuates the strong low-angle "
+            "reflections of a well-crystallised specimen. No plan frees it until "
+            "`phase.extinction = 0.0` declares it. Declare it where those reflections "
+            "stay calculated above observed. At 0 there is no correction, yet the "
+            "pattern responds, so a plan needs no seed to free it."
         ),
         unit="µm²", default="0.0",
         typical="0 for a ground powder; 0.1 to 100 (blocks of 0.3 to 10 µm) "

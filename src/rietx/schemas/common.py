@@ -664,7 +664,16 @@ from .._nearmiss import did_you_mean
 #: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
 #: where it defaulted to 0.0.  A stored document that omits it still opens, at
 #: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
-SCHEMA_VERSION = "0.60"
+#: 0.60 → 0.61 (WP-1944): ``Phase.extinction`` is ``Parameter | None`` and
+#: defaults to ``None``, "not declared", where it defaulted to a ``Parameter``
+#: at 0.  ``None`` has no table entry, so no plan can free it.  A file written
+#: before 0.61 opens unchanged: its stored block reads as a declaration, and
+#: the structural plan's extinction stage still frees it.  A phase that
+#: declares none now stores ``null``, which 1.11.0 refuses:
+#: ``Phase`` raises a ``ValidationError``, and ``Project.open`` stops at
+#: "malformed history record".  So a structure or a ``.rex`` project written
+#: here does not open there.
+SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
@@ -1013,6 +1022,20 @@ class _InheritsDeclaredDefaults(Base):
     _declared_since: ClassVar[str] = "0.35"
     #: A class-specific way out, appended to the out-of-range refusal.
     _declared_escape: ClassVar[str] = ""
+    #: An opt-in ``Parameter | None`` field has no default to carry its range,
+    #: so it names one here (``Phase.extinction``, WP-1944): field name → a
+    #: factory for the ``Parameter`` whose range and unit a declaration inherits.
+    _declared_optional: ClassVar[dict] = {}
+
+    @classmethod
+    def _declared_default(cls, name: str):
+        """The factory whose ``Parameter`` carries field ``name``'s declared
+        range, or ``None`` where the field declares none.  One answer for
+        construction and for the history reader's repair."""
+        info = cls.model_fields[name]
+        if info.annotation is Parameter and info.default_factory is not None:
+            return info.default_factory
+        return cls._declared_optional.get(name)
 
     @model_validator(mode="before")
     @classmethod
@@ -1020,8 +1043,9 @@ class _InheritsDeclaredDefaults(Base):
         if not isinstance(data, dict):
             return data
         data = dict(data)
-        for name, info in cls.model_fields.items():
-            if info.annotation is not Parameter or info.default_factory is None:
+        for name in cls.model_fields:
+            factory = cls._declared_default(name)
+            if factory is None:
                 continue
             if name not in data:
                 continue  # omitted: default_factory already carries the range
@@ -1040,7 +1064,7 @@ class _InheritsDeclaredDefaults(Base):
             # write-back leaves the last site's value in all of them (PR #206's
             # behaviour, kept).  Sharing *on purpose* states every attribute —
             # ``Harmonic.weight``'s default does, being its line's by reference
-            fills = declared_fills(info.default_factory(), set(present))
+            fills = declared_fills(factory(), set(present))
             if not fills:
                 continue
             try:

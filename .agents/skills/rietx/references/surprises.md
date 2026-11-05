@@ -61,7 +61,7 @@ the floor unseeded. A Stephens block has Λ ∝ √Σ with *unbounded* slope at
 `Stage.seed` is a plan's choice of where a solve starts.
 
 **8.7 A default is a decision, in either direction.** Anisotropic ADPs,
-Stephens strain, surface roughness and preferred orientation are opt-in per
+Stephens strain, extinction, surface roughness and preferred orientation are opt-in per
 atom/phase, because each needs a number about *this* specimen that the file
 does not carry. Anomalous dispersion is the exception and is **on by default
 since v1.0**: it needs only the species and the wavelength, both already in the

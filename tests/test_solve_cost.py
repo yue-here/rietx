@@ -388,7 +388,7 @@ def test_does_not_refuse_the_converged_extraction(nac_lebail):
 def test_refuses_extinction_on_the_solved_phase(nac_lebail):
     ref, data = nac_lebail
     S = solve_cost.blind_structure(ref.fitted_structure, 0, "pawley")
-    S.phases[0].extinction.value = 50.0
+    S.phases[0].extinction = 50.0
     model = compile_model(S, ref.fitted_instrument, data, mode="rietveld",
                           two_theta_limits=LIMITS)
     with pytest.raises(ExtractionRefused, match="extinction") as err:
