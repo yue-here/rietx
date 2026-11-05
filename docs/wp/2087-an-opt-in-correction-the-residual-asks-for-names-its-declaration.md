@@ -46,6 +46,20 @@ WP-1944's handover log. Three gaps remain.
   The diagnostic's own `suggestion` stays as it is, because a change to it
   is a reader-output change this rescope does not make.
 
+### Inherited
+
+- **2026-11-05, from [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md):
+  which way an undeclared extinction moves Biso.** `model/extinction.py`'s
+  docstring and the theory page's Primary extinction section say an
+  uncorrected extinction gives "a spuriously large Biso and a small scale".
+  On the LaB6 synthetic of `test_extinction.py` with 2.5 µm² planted, true
+  Biso 0.5 on both sites, Biso and coordinates free and extinction
+  undeclared, La's Biso came out 0.364 ± 0.009 (15 esd low), B's
+  0.668 ± 0.071 (2.4 esd high) and the scale 8 % low. Declared, both came
+  back within 1 esd. So the heavy atom's B goes down. WP-1944's skill pointer
+  sits on `BISO_NEGATIVE` for that reason. Check the claim against Sabine
+  (1988) and one more fixture, then correct both texts if it holds.
+
 ## Non-goals
 
 - Extinction (WP-1944, done in its follow-up).
