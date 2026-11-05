@@ -43,6 +43,13 @@ here (2026-10-03, at the maintainer's request).
 
 ### Inherited
 
+- **2026-11-05, from WP-2076: what the Le Bail partition does to weak lines, measured.** A line with no
+  neighbour takes Σ net / Σ Ω over its whole window, with `net` clamped at zero per channel, so a weak or
+  forbidden line takes rectified noise and shows as a false peak. On an F m -3 m row the reference
+  calculates 408 counts where 250 were observed, and the background sits about 10 counts low at high
+  angle (160 against Pawley's 171). A signed net lowers χ² from 9854 to 4117 and does not restore
+  nesting. WP-2076 § Findings.
+
 - **2026-11-02, from WP-2062: no default path will run Le Bail.** The
   maintainer decided on 2026-11-01 that Pawley replaces Le Bail at the
   extinction screen, the GUI's Adopt and new-project wizard, and the prose
