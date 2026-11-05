@@ -5424,8 +5424,9 @@ ROWS: tuple[Row, ...] = (
     Row("SEQUENTIAL_MOMENT_HOLD.suggestion", "suggestion", value=1),
     Row("SEQUENTIAL_MOMENT_ONSET.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the check that compares the bracket with the reverse "
-                  "chain (direction='both'); folded, it names the unresolved row or says to "
-                  "quote the bracket with its spacing (sequential._moment_diagnostics, "
+                  "chain (direction='both'), or the unresolved row when the bracket's "
+                  "supported side stopped early; folded, it names the unresolved row or says "
+                  "to quote the bracket with its spacing (sequential._moment_diagnostics, "
                   "_with_onset_agreement)")),
     Row("SEQUENTIAL_MOMENT_ONSET_UNRESOLVED.suggestion", "suggestion", tier=1, ambiguity=1,
         value=7,

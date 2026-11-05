@@ -3209,10 +3209,14 @@ def _moment_diagnostics(series: SeriesResult) -> list[Diagnostic]:
             spans = onset.note.partition(". The bracket spans ")[2]
             if spans:
                 message += " The bracket spans " + spans.partition(". ")[0] + "."
+            unquotable = onset.bracket_verdicts_final is False
+            # an unquotable bracket points at the row that says why, as the
+            # fold does; running the reverse chain cannot finish this one's fit
             out.append(Diagnostic(
                 level="info", code="SEQUENTIAL_MOMENT_ONSET", where=[site],
-                value=float(onset.x), message=message, suggestion=_RUN_BOTH))
-            if onset.bracket_verdicts_final is False:
+                value=float(onset.x), message=message,
+                suggestion=_SEE_UNRESOLVED if unquotable else _RUN_BOTH))
+            if unquotable:
                 out.append(Diagnostic(
                     level="warning", code="SEQUENTIAL_MOMENT_ONSET_UNRESOLVED",
                     where=[site],
@@ -3320,20 +3324,18 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
                 {"message": f"{bracket.message} {sentence}",
                  "suggestion": _QUOTE_THE_BRACKET} if agrees else
                 {"suggestion": _SEE_UNRESOLVED})))
-        if agrees:
-            pass                             # the bracket row says it all
-        elif unresolved is not None:
+        # agreement: the bracket row says it all
+        if not agrees and unresolved is not None:
             # its own advice stands: it never asked for the comparison
             out_site.append(unresolved.model_copy(update={
                 "message": f"{unresolved.message} {sentence}"}))
-        else:
+        elif not agrees:
             name = by_site[site].atom or site
             out_site.append(Diagnostic(
                 level="warning", code="SEQUENTIAL_MOMENT_ONSET_UNRESOLVED",
                 where=[site],
                 message=(f"{name}: the forward chain brackets the onset "
-                         f"{mine.bracket[0]:g} → {mine.bracket[1]:g} "
-                         f"({mine.x:g} ± {mine.x_esd:g}). {sentence}"),
+                         f"{_bracket_text(mine)}. {sentence}"),
                 suggestion=advice))
         folded[site] = out_site
     out: list[Diagnostic] = []
@@ -3398,8 +3400,7 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
                     f"climbed out of the floor to one the data does carry."),
                 suggestion=_COMPARE_CHAINS))
             continue
-        found = (f"brackets the onset {other.bracket[0]:g} → "
-                 f"{other.bracket[1]:g} ({other.x:g} ± {other.x_esd:g})"
+        found = (f"brackets the onset {_bracket_text(other)}"
                  if other.x is not None else
                  f"has no single onset ({other.note})")
         if _no_verdict(mine):
@@ -3423,6 +3424,12 @@ def _with_onset_agreement(diagnostics: list[Diagnostic], forward: SeriesResult,
     return out
 
 
+def _bracket_text(onset) -> str:
+    """A located onset as the fold's sentences quote it: ``a → b (x ± esd)``."""
+    return (f"{onset.bracket[0]:g} → {onset.bracket[1]:g} "
+            f"({onset.x:g} ± {onset.x_esd:g})")
+
+
 def _fold_onset(mine, other) -> tuple[bool, str, str]:
     """The backward chain's reading of one forward onset row's site.
 
@@ -3440,8 +3447,7 @@ def _fold_onset(mine, other) -> tuple[bool, str, str]:
                        f"({other.note}), so neither pass has a bracket to "
                        f"quote.", _COMPARE_CHAINS)
     if mine.x is None:
-        return (False, f"The backward chain brackets it {other.bracket[0]:g} → "
-                       f"{other.bracket[1]:g} ({other.x:g} ± {other.x_esd:g}), "
+        return (False, f"The backward chain brackets it {_bracket_text(other)}, "
                        f"so the two passes do not agree on whether there is "
                        f"one onset.", _COMPARE_CHAINS)
     if other.x is None:
@@ -3451,8 +3457,7 @@ def _fold_onset(mine, other) -> tuple[bool, str, str]:
                        f"whether there is one.", _COMPARE_CHAINS)
     overlap = (max(mine.bracket[0], other.bracket[0])
                <= min(mine.bracket[1], other.bracket[1]))
-    text = (f"The backward chain brackets it {other.bracket[0]:g} → "
-            f"{other.bracket[1]:g} ({other.x:g} ± {other.x_esd:g})")
+    text = f"The backward chain brackets it {_bracket_text(other)}"
     # agreement needs both brackets final: two chains agreeing about an
     # unconverged bracket are two readings of the same intermediate state
     early = [chain for chain, o in (("forward", mine), ("backward", other))
