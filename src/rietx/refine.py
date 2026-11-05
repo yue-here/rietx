@@ -73,11 +73,12 @@ from .model.absorption import (
 from .model.components import EXTRA_TICK_KEY
 from .model.forward import (
     AXIAL_PATHS,
-    AXIAL_SIZING_FLOOR,
     PHASE_SUPPORT_SIGMA,
     CompiledModel,
     Mode,
     apertures_to_lift,
+    axial_lift_start,
+    axial_partner,
     compile_model,
     orbit_split_of,
     recorded_window_tol,
@@ -4743,7 +4744,8 @@ class Refinement:
                    ftol: float | None = None,
                    prior_significance: np.ndarray | None = None,
                    phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
-                   window_area_tol: float | None = None):
+                   window_area_tol: float | None = None,
+                   refined_before: frozenset[str] = frozenset()):
         """One stage: free params, recompile, solve, commit, guard.
 
         The recompile is what keeps the residual smooth *within* the stage —
@@ -4763,15 +4765,16 @@ class Refinement:
         release, its collapse and the default cell window.  ``None`` switches all four off, and the answer's
         significance is then read against the default for
         ``PHASE_UNCONSTRAINED`` alone.
+
+        ``refined_before`` is every path an earlier stage of this fit left
+        free (WP-1955): the aperture lift below skips those, since a ratio an
+        earlier stage walked back to zero is where the data put it.  A row the
+        caller freed by hand before the call is *not* in it, so
+        :meth:`run_stage`, which passes none, lifts it.
         """
         # the threshold the answer's significance is read against: the hold's
         # own, or the default where there is no hold and only the report reads
         report_sigma = _reported_support_sigma(phase_support_sigma)
-        # what was already refining before this stage: the aperture lift below
-        # starts only a row this stage newly frees, so a closing stage (or any
-        # later stage naming it again) leaves an aperture an earlier stage
-        # walked back to zero where the data put it (WP-1955)
-        free_before = set(table.free_paths)
         freed = table.set_vary(stage.turn_on, True)
         # What the glob matched and the hold refused (WP-1435).  Read off the
         # table rather than re-globbing the register, so it names the paths
@@ -4815,14 +4818,19 @@ class Refinement:
                 if mode_fixed_column(reach.get(path, [path]), mode):
                     table.set_vary([path], False)
                     freed.remove(path)
-        # an FCJ aperture this stage frees on zero starts where the stage's
-        # windows are sized, since its column there is nearly zero; before the
-        # plan's own seed, which then finds it off its floor (WP-1955)
-        seeded: dict[str, float] = dict.fromkeys(
-            table.seed_floored(
-                apertures_to_lift([p for p in freed if p not in free_before]),
-                AXIAL_SIZING_FLOOR),
-            AXIAL_SIZING_FLOOR)
+        # an FCJ aperture this stage frees on zero starts off it, since its
+        # column there is nearly zero; before the plan's own seed, which then
+        # finds it off its floor.  Not one an earlier stage of this fit
+        # refined, so a closing stage that names it again leaves it where the
+        # data put it, while a row freed by hand and then run is lifted
+        # (WP-1955)
+        lift = apertures_to_lift([p for p in freed if p not in refined_before])
+        seeded: dict[str, float] = {}
+        for path in lift:
+            # the partner's live value, so S/L's lift is already in it
+            start = axial_lift_start(
+                path, table.decode(table.x0())[axial_partner(path)])
+            seeded.update(dict.fromkeys(table.seed_floored([path], start), start))
         if stage.seed:
             # start a freed row sitting on its floor where the plan says:
             # roughness at b = 0 is the identity, and its stage starts b in
@@ -5934,6 +5942,9 @@ class Refinement:
         #: the closing stage does for every finding the last declared stage
         #: made (WP-2002).  Each stage's own list stays on its report and node.
         restated: dict[tuple, Diagnostic] = {}
+        #: what an earlier stage of this fit left free (the aperture lift's
+        #: gate, WP-1955)
+        refined_before: set[str] = set()
         for k, (stage, ftol, window_tol) in enumerate(
                 zip(stages, ftols, window_tols, strict=True), start=1):
             with self._abandon_on_cancel(cancel, stage.name, stage_results, stream):
@@ -5945,7 +5956,9 @@ class Refinement:
                     # starts from that answer as well as the screen (WP-1523)
                     prior_significance=answer_significance,
                     phase_support_sigma=phase_support_sigma,
-                    window_area_tol=window_tol)
+                    window_area_tol=window_tol,
+                    refined_before=frozenset(refined_before))
+            refined_before.update(table.free_paths)
             # WP-1343: the moment's rung at this boundary, and the shift the
             # moment took when the widths were released.  Gated on what the
             # stage actually freed, so an ordinary fit never pays for the

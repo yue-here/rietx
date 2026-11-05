@@ -205,7 +205,12 @@ def test_the_axial_sizing_floor_does_not_change_the_answer(family, monkeypatch):
     passes at (``tests/test_lab_instrument.py``), on the three lab protocols
     that refine the axial ratios.  Made to fail on 2026-10-21 by running both
     arms with ``closing_window_tol=None`` (a scratch probe of this comparison):
-    0.229 esd on LaB6's ``x`` and 0.516 on the fluorapatite ``lor_size``."""
+    0.229 esd on LaB6's ``x`` and 0.516 on the fluorapatite ``lor_size``.
+
+    It moves only ``forward``'s binding of the name, which is the sizing of
+    windows and nodes.  Where a lifted aperture *starts* is
+    ``AXIAL_SL_START`` / ``AXIAL_HL_START``, constants of their own since
+    the review of #1372, so this arm no longer moves the start."""
     import rietx.model.forward as fwd
 
     shipped = _fit(family)

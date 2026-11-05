@@ -170,16 +170,20 @@ when U and V are both zero beside W on its floor. It is the only other
       positive floor is as small as at zero. #1075 repro 1: Rwp 0.0834 on
       zero → 0.0453; X17's warm 1c: Rwp 10.73 → 0.10881; the calibrate
       guide's second calibration leaves zero again. Settled by Claude on
-      those measurements; the start value reuses an approved constant, and
-      the PR asks Yue to confirm its row covers the second use.
+      those measurements. Revised 2026-11-05 under the review of #1372: the
+      start is two constants of its own, `AXIAL_SL_START` 0.02 and
+      `AXIAL_HL_START` 0.01, apart from `AXIAL_SIZING_FLOOR`.
 - [ ] The start value's evidence (added 2026-11-03 from the generality
       judge's "weak"): a start-invariance test for the lift, 0.02 against
       0.002 and 0.005 and against TRF from zero, on three unrelated families,
       one of them synchrotron (`tests/test_seed_invariance.py` is the
       roughness seed's precedent), and the exact column's comparison against
       jax at S/L and H/L from 0.001 to 0.005 and at a low-angle reflection
-      under the ξ cap. Then the `AXIAL_SIZING_FLOOR` and `StageResult.seeded`
-      audit rows amended for the start use, for Yue's approval.
+      under the ξ cap. The start-invariance test now moves the start alone
+      (`AXIAL_SL_START`/`AXIAL_HL_START`, not the sizing floor). The rows for
+      both starts and for `AXIAL_NODE_STEP` (tier 3, written 2026-11-05) and
+      the amended `StageResult.seeded` row wait for Yue's approval; the
+      `AXIAL_SIZING_FLOOR` row is left alone.
 - [ ] The Gaussian-width floor (Context, from WP-1467): the FD width column
       at `caglioti._MIN_GAMMA_G2` and the strict xfails that cite this WP
       (`test_fd_columns_hold_at_every_protocol_answer` on lab6 and cpd1a,
@@ -209,6 +213,58 @@ alone.
   **27**, 892-900.
 
 ## Handover log
+
+- **2026-11-05** — Yue's review of #1372, six items before merge (ghostshift
+  autopilot `ap_1372_1`, Sonnet; Yue's checks quoted below are his).
+
+  1. *Two lifted ratios on the S/L = H/L line.* The pattern is symmetric in
+     the pair, so at equal values the columns are identical and a step keeps
+     them equal. The start is now two constants, S/L 0.02 and H/L 0.01, and
+     `forward.axial_lift_start` gives a ratio the other ratio's number when
+     its own would equal its partner's value (S/L declared 0.02, H/L lifted:
+     H/L 0.01; H/L declared 0.01: H/L 0.02; and so on). Probe (this branch,
+     synthetic rutile at lab counts, strongest line about 68 000, a stage
+     freeing only the two ratios from 0/0, four seeds, truths 0.05/0.01 and
+     0.035/0.025): both started at 0.02, 4 of 8 fits ended on the line
+     (0.0332/0.0332 twice, 0.0303/0.0303 twice); from 0.02/0.01, 0 of 8 did,
+     and each reached the true pair, S/L and H/L exchanged in all eight, as
+     the symmetry allows. The seeds differ from Yue's, so the 4 of 8 is not
+     his 3 of 8. New test `test_two_lifted_apertures_do_not_stop_on_the_equal_line`
+     (unequal truth); it fails with the two starts set equal.
+  2. *A hand-freed aperture.* The gate was "in the free set before the stage",
+     which `set_vary` then `run_stage` satisfies. It is now "an earlier stage
+     of this fit refined it": `_run_stage(refined_before=…)`, filled by the
+     plan loop in `fit` and the joint runner, empty for `run_stage`. Test
+     `test_an_aperture_the_caller_freed_by_hand_is_lifted_too`; the closing-stage
+     test now runs a two-stage plan through `fit`.
+  3. *Audit rows.* `AXIAL_SL_START`, `AXIAL_HL_START` and `AXIAL_NODE_STEP`
+     (was a local `h_ax`) are module constants with tier-3 rows, no `approved`;
+     `AXIAL_SIZING_FLOOR`'s row is untouched and `StageResult.seeded`'s is
+     amended. The sizing-floor invariance test says it moves only forward's
+     binding. The one `approved` test on the three new rows stays red until Yue
+     writes the date (the documented waiting state).
+  4. *Docstrings* of `apertures_to_lift`: a row on its floor is moved (a typed 0
+     and value = min = 0.005), the small-floor sentence now says Yue's
+     measurement (any start 0.001 to 0.05 cured repro 1 with S/L alone), and the
+     0.0834 → 0.0453 figures are marked as the two-ratio route no shipped plan
+     takes since WP-2012 (the shipped one: 0.0831 → 0.0630).
+  5. *Joint runner.* Test `test_the_lift_starts_off_the_partners_value_in_a_joint_fit`
+     covers all four rows; the docstring of `axial_lift_start` says the two
+     histograms may end on opposite orders of the pair.
+  6. *Records.* `docs/practice.md` § Axial divergence at zero carries the
+     start; `docs/releases/1.12.0.md` has a "Numbers that move" note; the
+     `test_e8` row above is marked measured before WP-2012.
+
+  *Reader output.* Yue's follow-up ruled: leave the lift out of the printed
+  output; `StageResult.seeded` records it, which Rule 4 asks. Settled by
+  Claude under Yue's 2026-11-01 reader-output ruling and Rule 4. On LaB6,
+  cutting the pattern from below until S/L could not be seen left no value
+  resting at 0.02 with a small esd (Yue's measurement).
+
+  *Follow-up, not blocking.* The S/L = H/L line trap predates this PR: any
+  two-column stage started at equal values meets it, and `HIGH_CORRELATION`
+  fires with "the data does not separate them", which is wrong for this case.
+  A diagnostic there is worth a WP (Yue's suggestion; `OWED_BY_US.md` row).
 
 - **2026-11-03** — A fit that frees an axial-divergence ratio sitting on zero
   now leaves zero. Each stage that newly frees S/L or H/L at zero starts it at
@@ -250,7 +306,9 @@ alone.
     0.0834, one TRF stage 0.0454. Lifted: S/L 0.030, H/L 0.030, Rwp 0.0453,
     and a further TRF stage moves nothing. Seeds 2-4: Rwp 0.0454, 0.0455,
     0.0459, S/L ≈ H/L ≈ 0.030. A (0.02, 0.01) start gave the same answer as
-    (0.02, 0.02), so an equal start does not trap the fit on the diagonal.
+    (0.02, 0.02) *on this repro*, where transparency flattens the split (esd
+    0.13); the review of #1372 found an equal start does trap a stage that
+    frees only the two ratios on data with unequal ratios (2026-11-05 entry).
     `profile_interval` on S/L: main [0.0, 0.0533] `fit_is_minimum=False`;
     lifted [0.02744, 0.03251], True.
   - X17 (independent CPD 1b under `qpa_plan()`, warm collapsed 1c): closing
@@ -264,7 +322,11 @@ alone.
     iso (LM) 0 ± 363.7 → 0 ± 363.6. Brucite aniso (TRF) 2.6e-26 ± 3915 →
     2.6e-8 ± 7445, Rwp 0.180419 → 0.180453. `test_e8` report loop: main S/L
     0.04132 ± 0.0161, H/L 0 ± 13 232; branch the mirror answer, S/L 0 ± 41 350,
-    H/L 0.04132 ± 0.000307 (as with the column alone).
+    H/L 0.04132 ± 0.000307 (as with the column alone). *Measured before
+    WP-2012*, with the suggestion freeing both ratios: no shipped route frees
+    both now. The shipped report loop frees S/L alone and returns S/L 0.036375
+    ± 0.00056 with H/L held at 0.02, on main and on the branch, 3e-5 esd apart
+    (the review of #1372).
   - Calibrate guide: both calibrations quote main's numbers to every digit;
     the both-free fit returns S/L 0.01542(87), H/L 0.02476(78), the pair
     exchanged.

@@ -305,11 +305,25 @@ def window_fwhm_mult_interp(eta: np.ndarray, tol: float | None = None) -> np.nda
 #: ``predict()`` at given values does not depend on which parameters are free
 #: (#774); and, for the optimiser, when either is about to be *refined* from
 #: zero, so the finite-difference Jacobian sees a live parameter instead of a
-#: frozen zero-node profile.  Also where such a ratio *starts*
-#: (:func:`apertures_to_lift`, WP-1955): a stage that frees one sitting on
-#: zero lifts it here before solving, so the start is the value the stage's
-#: windows and nodes are sized for.
+#: frozen zero-node profile.  It is not where a lifted ratio starts: that is
+#: :data:`AXIAL_SL_START` / :data:`AXIAL_HL_START`, kept apart so that a
+#: change to this floor cannot move a start (WP-1955, the review of #1372).
 AXIAL_SIZING_FLOOR = 0.02
+
+#: Where a stage starts S/L, and H/L, when it frees one sitting on zero
+#: (:func:`axial_lift_start`, WP-1955).  Two numbers and not one, because the
+#: pattern is symmetric in the pair: at S/L = H/L the two columns are
+#: identical and a step keeps them equal, so a fit started on that line can
+#: stop on it, 0.005 to 0.017 from the truth, with an esd that excludes the
+#: truth (the review of #1372, synthetic rutile at lab counts).  No code needs
+#: either to equal :data:`AXIAL_SIZING_FLOOR`; ``compile_model`` reads
+#: ``max(value, AXIAL_SIZING_FLOOR)``.
+AXIAL_SL_START = 0.02
+AXIAL_HL_START = 0.01
+
+#: Step of the forward second-order difference that gives a node's derivative
+#: with respect to an aperture (:func:`_aperture_node_derivs`).
+AXIAL_NODE_STEP = 3e-6
 
 #: The two FCJ axial ratios, S/L and H/L.
 AXIAL_PATHS = ("instrument.geometry.axial_sl", "instrument.geometry.axial_hl")
@@ -317,28 +331,64 @@ AXIAL_PATHS = ("instrument.geometry.axial_sl", "instrument.geometry.axial_hl")
 
 def apertures_to_lift(freed: list[str]) -> list[str]:
     """The paths in ``freed`` that are an FCJ axial ratio, the rows a stage
-    lifts to :data:`AXIAL_SIZING_FLOOR` when they sit on zero (WP-1955).
+    may lift when they sit on zero (WP-1955), S/L's before H/L's.
 
-    A path may carry a multi-histogram scope (``hist.{h}.``); the runner's own
-    ``seed_floored`` writes only a row exactly on its floor of 0, so a start a
-    caller chose is never moved.
+    A path may carry a multi-histogram scope (``hist.{h}.``).  The runner's
+    ``seed_floored`` then writes only a row on its floor: a row whose value
+    equals its lower bound is moved (a typed 0 and a value = min = 0.005 alike),
+    and one above its bound is not.
 
-    Why a lift and not a floor.  The FCJ profile is quadratic in an aperture
-    at zero, so the exact column there is nearly zero: 0.047 against a
-    largest of 1.8e6 with the other aperture live, and smaller still with
-    both at zero.  Gauss-Newton sees no way off the bound, and a step taken
-    from it is tens to thousands of units long.  Measured on this branch
-    (WP-1955's handover entry): #1075's repro 1 ends ``converged`` at S/L =
-    H/L = 0 and Rwp 0.0834, lifted at 0.0453 beside TRF's 0.0454; WP-2003
-    X17's warm CPD 1c collapses to Rwp 10.7, lifted converges at 0.10881 in
-    43 evaluations against the independent fit's 0.10901; and the calibrate
-    guide's second calibration stays on zero.  A positive floor would not
-    help, since the column at a small floor is just as small.  From the lift
-    the fit can still walk back to zero: CPD 1b does, ending on its floor.
+    Why a lift.  The FCJ profile is quadratic in an aperture at zero, so the
+    exact column there is nearly zero: 0.047 against a largest of 1.8e6 with
+    the other aperture live, and smaller still with both at zero.
+    Gauss-Newton sees no way off the bound, and a step taken from it is tens
+    to thousands of units long.  Measured on this branch (WP-1955's handover
+    entry), **on the route that frees both ratios, which no shipped plan takes
+    since WP-2012**: #1075's repro 1 ends ``converged`` at S/L = H/L = 0 and
+    Rwp 0.0834, lifted at 0.0453 beside TRF's 0.0454.  On the shipped
+    ``lab_bragg_brentano`` route (S/L alone) it goes from S/L 0.00008 ± 1.29,
+    Rwp 0.0831, to 0.04531 ± 0.00018, Rwp 0.0630 (the review of #1372).
+    WP-2003 X17's warm CPD 1c collapses to Rwp 10.7, lifted converges at
+    0.10881 in 43 evaluations against the independent fit's 0.10901; and the
+    calibrate guide's second calibration stays on zero.  The review moved the
+    start alone over 0.001 to 0.05 on that one pattern (S/L alone, H/L held at
+    0) and every start returned the same answer: it is leaving zero that
+    cures the stall, not the value left to.  From the lift the fit can still
+    walk back to zero: CPD 1b does, ending on its floor.
     """
-    return [p for p in freed
-            if (p.split(".", 2)[2] if p.startswith("hist.") else p)
-            in AXIAL_PATHS]
+    return sorted((p for p in freed
+                   if (p.split(".", 2)[2] if p.startswith("hist.") else p)
+                   in AXIAL_PATHS),
+                  key=lambda p: p.endswith("axial_hl"))
+
+
+def axial_partner(path: str) -> str:
+    """The other FCJ axial ratio of ``path``'s own instrument or histogram."""
+    scope, name = path.rsplit(".", 1)
+    sl_name, hl_name = (p.rsplit(".", 1)[1] for p in AXIAL_PATHS)
+    return f"{scope}.{hl_name if name == sl_name else sl_name}"
+
+
+def axial_lift_start(path: str, partner_value: float) -> float:
+    """Where ``path`` (one of :func:`apertures_to_lift`'s answer) starts:
+    S/L at :data:`AXIAL_SL_START`, H/L at :data:`AXIAL_HL_START`, but never at
+    ``partner_value``, the value its partner ratio has when it is written
+    (WP-1955).
+
+    Equal values put the pair on the S/L = H/L line, where the two columns are
+    identical and a step keeps them so, and a fit there can end ``converged``
+    0.005 to 0.017 from the truth with an esd that excludes it (the review of
+    #1372).  A start that would meet the partner takes the other ratio's
+    number instead.  Callers write S/L first and read the partner's *live*
+    value, so a partner that was lifted counts at its start and one that
+    could not be (a start the caller chose, above its floor) at its own.  Both
+    lifted: S/L 0.02, H/L 0.01.  By the symmetry of the pair either order is a
+    valid answer, so two histograms of one instrument may land on opposite
+    orders in a joint fit.
+    """
+    own, other = ((AXIAL_SL_START, AXIAL_HL_START) if path.endswith("axial_sl")
+                  else (AXIAL_HL_START, AXIAL_SL_START))
+    return other if partner_value == own else own
 
 #: How far outside the fitted range, in °2θ, a reflection is still generated
 #: (``compile_model``, and the satellite report arm, through
@@ -3056,7 +3106,7 @@ class CompiledModel:
             axial_derivs = False
         sl = values["instrument.geometry.axial_sl"]
         hl = values["instrument.geometry.axial_hl"]
-        h_pos, h_ax = 1e-5, 3e-6
+        h_pos, h_ax = 1e-5, AXIAL_NODE_STEP
         # d_sl/d_hl exist only while the aberration acts; at both apertures
         # zero the axial columns fall back to FD (``axial_ok``)
         build_axial = axial_derivs and fcj_live(sl, hl)

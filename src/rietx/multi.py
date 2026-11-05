@@ -32,9 +32,10 @@ from .crystallography.structure_factor import phase_orbit_split
 from .crystallography.twins import merge_site_twins
 from .history.events import _attach_progress, as_event_stream
 from .model.forward import (
-    AXIAL_SIZING_FLOOR,
     PHASE_SUPPORT_SIGMA,
     apertures_to_lift,
+    axial_lift_start,
+    axial_partner,
     compile_model,
     orbit_split_of,
     recorded_window_tol,
@@ -1931,13 +1932,12 @@ class MultiHistogramRefinement:
         # schedule (WP-2002, the sixth round's Q1 and Q2)
         stages = plan.run_stages()
         n_stages = len(stages)
+        # what an earlier stage left free: the aperture lift's gate (WP-1955)
+        refined_before: set[str] = set()
         for index, (stage, ftol, window_tol) in enumerate(
                 zip(stages, plan.stage_ftols(), plan.stage_window_tols(),
                     strict=True), start=1):
             with self._abandon_on_cancel(cancel, stage.name, stage_results, stream):
-                # the aperture lift starts only a row this stage newly frees
-                # (``_run_stage``'s rule, WP-1955)
-                free_before = set(self.mtable.free_paths)
                 freed = self.mtable.set_vary(stage.turn_on, True)
                 # what the glob matched and a hold refused (WP-1435): here only
                 # the floating-origin hold (WP-1912), which the origin
@@ -1961,13 +1961,20 @@ class MultiHistogramRefinement:
                     carried_hold = []
                 # the single-histogram runner's lift (``_run_stage``,
                 # WP-1955): an FCJ aperture this stage frees on zero starts
-                # where the stage's windows are sized, before the plan's seed
-                seeded: dict[str, float] = dict.fromkeys(
-                    self.mtable.seed_floored(
-                        apertures_to_lift([p for p in freed
-                                           if p not in free_before]),
-                        AXIAL_SIZING_FLOOR),
-                    AXIAL_SIZING_FLOOR)
+                # off it, unless an earlier stage already refined it, before
+                # the plan's seed
+                seeded: dict[str, float] = {}
+                for path in apertures_to_lift([p for p in freed
+                                               if p not in refined_before]):
+                    # the partner's live value, so S/L's lift is already in it
+                    mt = self.mtable
+                    partner = axial_partner(path)
+                    h = mt._owner(partner) or 0
+                    start = axial_lift_start(
+                        path, mt.decode(mt.x0())[h][mt._unscope(h, partner)])
+                    seeded.update(dict.fromkeys(
+                        mt.seed_floored([path], start), start))
+                refined_before.update(self.mtable.free_paths)
                 if stage.seed:
                     seeded.update(dict.fromkeys(
                         self.mtable.seed_floored(freed, stage.seed), stage.seed))
