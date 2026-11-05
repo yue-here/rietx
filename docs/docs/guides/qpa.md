@@ -19,8 +19,8 @@ This refines both phases with `mccusker_structural`:
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-NAC    96.42 ± 3.53 wt%
-CaF2    3.58 ± 3.53 wt%
+NAC    98.66 ± 0.11 wt%
+CaF2    1.34 ± 0.11 wt%
 ```
 
 Each row is a `PhaseQuantity`, with the fraction, its esd, the refined scale and the Z·M and V it was computed from.
@@ -34,8 +34,7 @@ A phase with no reflection in the fitted range has no fraction (`None`), and the
 
 ## Check the minor phase
 
-An esd of 3.53 wt % on a 3.58 wt % phase, measured at a synchrotron, says something is trading against the scale.
-The diagnostics name it:
+A minor phase has few strong peaks, so read its diagnostics before you quote its fraction:
 
 ```{literalinclude} ../../../examples/guides/qpa.py
 :language: python
@@ -45,14 +44,11 @@ The diagnostics name it:
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-FLOOR_HIT | phases.1.atoms.0.biso refined to its floor (ρ=+0.021).
-FLOOR_HIT | phases.1.atoms.1.biso refined to its floor (ρ=+0.091).
-HIGH_CORRELATION | Correlated pair: phases.1.scale ~ phases.1.extinction (ρ=+0.998). Flagged in stages: extinction, roughness, closing.
+FLOOR_HIT | phases.1.atoms.0.biso refined to its floor (ρ=+0.198).
 ```
 
-The plan freed CaF₂'s extinction, and with a few weak peaks the extinction and the scale can scale the same intensities.
-Both CaF₂ Biso values went to 0, which no real crystal has.
-The data cannot fix these three parameters for a phase this weak, so hold them:
+The Ca Biso of CaF₂ went to 0, which no real crystal has.
+The data cannot fix the displacement parameters of a phase this weak, so hold them:
 
 ```{literalinclude} ../../../examples/guides/qpa.py
 :language: python
@@ -62,15 +58,40 @@ The data cannot fix these three parameters for a phase this weak, so hold them:
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-NAC    98.63 ± 0.07 wt%
-CaF2    1.37 ± 0.07 wt%
+NAC    98.59 ± 0.07 wt%
+CaF2    1.41 ± 0.07 wt%
 ```
 
-The esd falls from 3.53 to 0.07 wt %, and `mccusker_default`, which frees no structural parameter, gives 1.38 wt % for CaF₂.
-Rwp rose from 0.082 to 0.089 when the three parameters were held.
-The free extinction lowered Rwp while it moved the fraction, so Rwp cannot choose between the two fits.
+The esd falls from 0.11 to 0.07 wt %, and `mccusker_default`, which frees no structural parameter, gives 1.38 wt % for CaF₂.
+Rwp rose from 0.088 to 0.090 when the two Biso values were held.
+A Biso on its floor lowered Rwp, so Rwp cannot choose between the two fits.
 The fit reports the holds as `HOLD_BLOCKED_PLAN`, because the plan tried to free paths you held.
 [How to keep a parameter fixed whatever the plan frees](hold.md) explains holds.
+
+## Declare extinction only where the data can measure it
+
+Extinction is opt-in, so the plan freed none here.
+A phase declares it with `phase.extinction = 0.0`, and then the plan's extinction stage frees it.
+Declared on the minor phase, it trades against the scale:
+
+```{literalinclude} ../../../examples/guides/qpa.py
+:language: python
+:start-after: "# guide: extinction start"
+:end-before: "# guide: extinction end"
+```
+
+<!-- output of examples/guides/qpa.py -->
+```text
+NAC    96.31 ± 3.63 wt%
+CaF2    3.69 ± 3.63 wt%
+HIGH_CORRELATION | Correlated pair: phases.1.scale ~ phases.1.extinction (ρ=+0.998). Flagged in stages: extinction, roughness, closing.
+```
+
+With a few weak peaks, the extinction and the scale can scale the same intensities.
+The fraction moves from 1.34 to 3.69 wt %, and its esd from 0.11 to 3.63 wt %.
+Rwp falls from 0.088 to 0.083, so Rwp would choose the fit with the meaningless fraction.
+When a fit would gain from extinction, `EXTINCTION_UNDECLARED` names the phase.
+Here it does not fire.
 
 ## Check that the fraction has one answer
 
@@ -85,7 +106,7 @@ A weak phase's scale can also trade against its peak width: broadened far enough
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-admissible 1.37 to 1.37 wt%, 12 refits
+admissible 1.41 to 1.41 wt%, 12 refits
 ```
 
 Here only the fit's own fraction is admissible, so the fraction is determined.
@@ -109,8 +130,8 @@ Set `Phase.particle_radius_um` on every phase before the fit:
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-NAC   µR 0.0021  98.63 -> 98.63 wt%
-CaF2  µR 0.0014  1.37 -> 1.37 wt%
+NAC   µR 0.0021  98.59 -> 98.59 wt%
+CaF2  µR 0.0014  1.41 -> 1.41 wt%
 ```
 
 The radii here are assumed, to show the call.

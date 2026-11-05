@@ -68,7 +68,8 @@ The two occupancies are of sites that are full in fluorapatite.
 
 ## Narrow the question
 
-`include` and `exclude` take dot-path patterns, so `suggest` scores only the parameters you would consider freeing:
+`include` and `exclude` take dot-path patterns, so `suggest` scores only the parameters you would consider freeing.
+The structure declared extinction at the start, so it is among them: an undeclared correction has no parameter to score.
 
 ```{literalinclude} ../../../examples/guides/next.py
 :language: python

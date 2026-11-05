@@ -15,6 +15,7 @@ from rietx.report import compare_freed
 
 data = rx.read_pattern(examples_dir() / "FAP.XRA")
 structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
+structure.phases[0].extinction = 0.0  # declared, so suggest can weigh it
 instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 instrument.background = rx.BackgroundChebyshev.with_terms(6)
 ref = rx.Refinement(structure, instrument)

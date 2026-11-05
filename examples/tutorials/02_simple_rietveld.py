@@ -44,19 +44,18 @@ result = ref.fit(data, plan="mccusker_structural", two_theta_limits=(15, 130))
 print(result)
 
 # %% [markdown]
-# Three warnings came back, one line each.
+# Two warnings came back, one line each.
 # A warning matters for some uses of a fit and not others, so each line ends with the [purposes](https://rietx.org/docs/stable/reference/result.html#printing-a-result) it is a warning under.
 # `structure` is the atoms, `qpa` the phase fractions, `microstructure` the crystallite size and strain, `calibration` an instrument calibrated on a standard, and `magnetic` a magnetic structure's moments.
 #
-# - [`FLOOR_HIT`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#floor-hit): the extinction coefficient ended on its floor of 0, so this specimen shows no extinction to measure.
 # - [`RESOLUTION_UNCONSTRAINED`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#resolution-unconstrained): the peaks are mostly Lorentzian, so do not quote the Gaussian widths U, V and W.
 # - [`PATTERN_UNDERSAMPLED`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#pattern-undersampled): the step count notebook 01 measured.
 #
-# None of them invalidates the structure, but each one limits what you can quote.
-# Two are warnings under `structure`, and the third concerns only the peak widths.
+# Neither invalidates the structure, but each one limits what you can quote.
+# The second is a warning under `structure`, and the first concerns only the peak widths.
 #
 # `print(result)` is not told what the fit is for, so it prints none of them in full.
-# The line after the three says how to read them: pass your purpose to `ref.summary` as `deliverable=`, or look in [`result.diagnostics`](https://rietx.org/docs/stable/reference/result.html#diagnostics), which holds every warning with its message.
+# The line after the two says how to read them: pass your purpose to `ref.summary` as `deliverable=`, or look in [`result.diagnostics`](https://rietx.org/docs/stable/reference/result.html#diagnostics), which holds every warning with its message.
 # Notebook 02b ends by printing the summary for a structure.
 # [Diagnostic codes](https://rietx.org/docs/stable/reference/diagnostics.html) lists every code.
 #
