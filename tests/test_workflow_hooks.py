@@ -16,8 +16,10 @@ import datetime
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -1005,6 +1007,131 @@ def test_a_dormant_row_says_dormant_rather_than_held_by_no_session(
 
 
 # --------------------------------------------------------------------------- #
+# The ghostshift half (WP-2077): a runner works in an ``agent-<id>`` tree whose
+# only process is the shift lead's, in the main checkout, so the process scan
+# reads its tree as dormant.  The shift's claim, a ref on origin, says otherwise.
+# --------------------------------------------------------------------------- #
+
+
+def _out(cwd: Path, *args: str, stdin: str | None = None) -> str:
+    return subprocess.run(
+        ["git", "-c", "user.email=wp@test", "-c", "user.name=wp", *args],
+        cwd=cwd, input=stdin, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+
+def _ghost_claim(repo: Path, item: str, taken: float, pr: int | None = None) -> None:
+    """Push a claim shaped as ghostshift's ``claim.py`` writes one."""
+    record = {"owner": "laptop-ab12-c0ffee", "item": item, "taken": taken, "pr": pr,
+              "at": "2026-11-02T00:00:00+00:00"}
+    empty = _out(repo, "mktree", stdin="")
+    sha = _out(repo, "commit-tree", empty, stdin=json.dumps(record))
+    _out(repo, "push", "-q", "origin", f"{sha}:{claim.GHOST_NS}/{item}")
+
+
+@pytest.fixture
+def ghost_origin(two_trees: tuple[Path, Path, Path], tmp_path: Path):
+    """The two-tree checkout plus a runner's tree and a bare origin to hold claims."""
+    main, _outer, _inner = two_trees
+    origin = tmp_path / "origin.git"
+    _git(tmp_path, "init", "-q", "--bare", str(origin))
+    _git(main, "remote", "add", "origin", str(origin))
+    runner = main / ".claude" / "worktrees" / "agent-a1b2c3"
+    _git(main, "worktree", "add", "-q", "-b", "wp9103-runner", str(runner))
+    return main, runner
+
+
+def test_a_ghostshift_claim_is_read_off_origin(ghost_origin) -> None:
+    main, _runner = ghost_origin
+    _ghost_claim(main, "wp-9103", 1_000.0, pr=77)
+    _ghost_claim(main, "issue-55", 1_000.0)
+    assert claim.read_ghost_claims(main) == []  # nothing until fetched
+    assert claim.fetch_ghost_claims(main)
+    claims = {c.item: c for c in claim.read_ghost_claims(main)}
+    assert claims["wp-9103"] == claim.GhostClaim(
+        "wp-9103", "9103", "laptop-ab12-c0ffee", 1_000.0, 77)
+    assert claims["issue-55"].wp is None  # not a WP, so no WP row
+    # A record this cannot read is skipped: the create hook calls this, and a
+    # raise there would refuse every WP tree.
+    empty = _out(main, "mktree", stdin="")
+    for item, body in (("wp-9104", "[1, 2]"), ("wp-9105", '{"taken": "soon"}')):
+        sha = _out(main, "commit-tree", empty, stdin=body)
+        _out(main, "push", "-q", "origin", f"{sha}:{claim.GHOST_NS}/{item}")
+    assert claim.fetch_ghost_claims(main)
+    assert sorted(c.item for c in claim.read_ghost_claims(main)) == ["issue-55", "wp-9103"]
+    for item in ("wp-9104", "wp-9105"):
+        _out(main, "push", "-q", "origin", f":{claim.GHOST_NS}/{item}")
+    # A released claim leaves the local copy on the next fetch.
+    _out(main, "push", "-q", "origin", f":{claim.GHOST_NS}/issue-55")
+    assert claim.fetch_ghost_claims(main)
+    assert [c.item for c in claim.read_ghost_claims(main)] == ["wp-9103"]
+
+
+@pytest.mark.parametrize(
+    "pr,age_h,pr_state,live",
+    [
+        (None, 1, None, True),  # no PR, inside 24 h
+        (None, 25, None, False),  # no PR, past 24 h: free
+        (77, 99, True, True),  # a PR still open holds it however old
+        (77, 1, False, False),  # merged or closed: free
+        (77, 1, None, None),  # gh could not say
+    ],
+)
+def test_a_ghostshift_claim_frees_as_claim_py_says(pr, age_h, pr_state, live) -> None:
+    c = claim.GhostClaim("wp-9103", "9103", "o", 0.0, pr)
+    assert claim.ghost_live(c, lambda n: pr_state, age_h * 3600.0) is live
+
+
+def test_the_refusal_fires_on_a_live_ghostshift_claim_only(
+    ghost_origin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    main, _runner = ghost_origin
+    _ghost_claim(main, "wp-9103", time.time(), pr=77)
+    state = {"value": "OPEN\n"}
+    monkeypatch.setattr(claim, "_gh", lambda root, *a, **k: state["value"])
+
+    message = claim.ghost_refusal(main, "9103")
+    assert "laptop-ab12-c0ffee" in message and "PR #77" in message
+    assert "claim.py release wp-9103" in message  # the way past it
+    assert f"git push origin :{claim.GHOST_NS}/wp-9103" in message
+    assert claim.ghost_refusal(main, "9101") == ""  # no claim on that WP
+
+    state["value"] = "MERGED\n"
+    assert claim.ghost_refusal(main, "9103") == ""
+    state["value"] = None  # gh offline: an unknown state never refuses
+    assert claim.ghost_refusal(main, "9103") == ""
+
+
+def test_status_calls_a_runner_tree_held_rather_than_dormant(
+    ghost_origin, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """The measured miss: /wp-start offered a live runner's tree to resume."""
+    main, runner = ghost_origin
+    _ghost_claim(main, "wp-9103", time.time())
+    monkeypatch.setattr(claim.sibling("session_start"), "live_sessions", lambda: [])
+    monkeypatch.setattr(claim, "_gh", lambda root, *a, **k: "[]")
+
+    claim._status(main, main)
+    out = capsys.readouterr().out
+    (row,) = [line for line in out.splitlines() if "agent-a1b2c3" in line]
+    assert "held by ghostshift laptop-ab12-c0ffee" in row and "dormant" not in row
+    assert "⚠ WP-9103 held by ghostshift laptop-ab12-c0ffee" in out
+    (outer_row,) = [line for line in out.splitlines() if "WP-9101 " in line]
+    assert "dormant" in outer_row  # an unclaimed tree is untouched
+
+    # Naming another WP narrows the claim list, never the table's answer.
+    claim._status(main, main, "9101")
+    out = capsys.readouterr().out
+    (row,) = [line for line in out.splitlines() if "agent-a1b2c3" in line]
+    assert "held by ghostshift" in row
+    assert "none holds WP-9101" in out
+
+    # From the runner's own tree, its claim is named as possibly its own.
+    claim._status(main, runner, "9103")
+    assert "a runner's own claim" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------- #
 # The contributor half (WP-1422): a clash with someone on another machine, which
 # no local process scan can see.
 # --------------------------------------------------------------------------- #
@@ -1040,7 +1167,7 @@ def test_a_pr_that_names_no_wp_is_still_reached_through_its_issue(
         ]),
     )
     (pr,) = claim.open_prs(repo)
-    assert (pr.wp, pr.issues, pr.author) == (None, (283,), "someone")
+    assert (pr.wps, pr.issues, pr.chain, pr.author) == ((), (283,), (283,), "someone")
 
     (o,) = claim.overlaps([pr], claim.wp_issue_citations(repo))
     assert (o.wp, o.via) == ("9301", "issue #283")
@@ -1049,8 +1176,8 @@ def test_a_pr_that_names_no_wp_is_still_reached_through_its_issue(
 def test_a_pr_that_names_a_wp_outright_does_not_go_through_an_issue(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Title, body or an edited WP file: the direct claim, which beats the
-    issue chain and must not also produce issue rows."""
+    """Title, an edited WP file or the branch: the direct claim, which beats
+    the issue chain and must not also produce issue rows."""
     (repo / "docs" / "wp").mkdir(parents=True, exist_ok=True)
     (repo / "docs" / "wp" / "9301-bounds.md").write_text("Closes #283.\n", encoding="utf-8")
     citations = claim.wp_issue_citations(repo)
@@ -1059,7 +1186,7 @@ def test_a_pr_that_names_a_wp_outright_does_not_go_through_an_issue(
         _pr(330, "WP-9302: something", body="see #283"),
     ]))
     (pr,) = claim.open_prs(repo)
-    assert pr.wp == "9302"
+    assert pr.wps == ("9302",)
     (o,) = claim.overlaps([pr], citations)
     assert (o.wp, o.via) == ("9302", "names it")
 
@@ -1067,7 +1194,7 @@ def test_a_pr_that_names_a_wp_outright_does_not_go_through_an_issue(
         _pr(331, "no wp here", files=["docs/wp/9303-thing.md", "src/x.py"]),
     ]))
     (pr,) = claim.open_prs(repo)
-    assert pr.wp == "9303"  # the WP file it edits
+    assert pr.wps == ("9303",)  # the WP file it edits
 
 
 def test_this_session_s_own_pr_is_not_reported_back_to_it(
@@ -1075,11 +1202,12 @@ def test_this_session_s_own_pr_is_not_reported_back_to_it(
 ) -> None:
     (repo / "docs" / "wp").mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(claim, "_gh", lambda root, *a, **k: json.dumps([
-        _pr(330, "WP-9302: mine"), _pr(331, "WP-9304: someone else's"),
+        _pr(330, "WP-9302: mine", branch="wp9302-mine"),
+        _pr(331, "WP-9304: someone else's", branch="wp9304-theirs"),
     ]))
     prs = claim.open_prs(repo)
     assert [o.wp for o in claim.overlaps(prs, {})] == ["9302", "9304"]
-    assert [o.wp for o in claim.overlaps(prs, {}, mine="9302")] == ["9304"]
+    assert [o.wp for o in claim.overlaps(prs, {}, branch="wp9302-mine")] == ["9304"]
 
 
 def test_gh_declining_is_not_an_empty_table(
@@ -1146,7 +1274,7 @@ def test_a_claim_pr_is_recognised_before_it_says_anything(
         _pr(400, "", body="", branch="wp9601-the-thing"),
     ]))
     (pr,) = claim.open_prs(repo)
-    assert pr.wp == "9601"
+    assert pr.wps == ("9601",)
     (o,) = claim.overlaps([pr], {})
     assert (o.wp, o.via) == ("9601", "names it")
 
@@ -1162,8 +1290,8 @@ def test_the_stronger_sources_still_outrank_the_branch(
         _pr(402, "untitled", branch="wp9601-stale", files=["docs/wp/9603-x.md"]),
     ]))
     titled, filed = claim.open_prs(repo)
-    assert titled.wp == "9602"  # title beats the branch
-    assert filed.wp == "9603"  # the WP file beats the branch
+    assert titled.wps == ("9602",)  # title beats the branch
+    assert filed.wps == ("9603",)  # the WP file beats the branch
 
 
 def test_a_branch_naming_no_wp_claims_nothing(
@@ -1176,7 +1304,7 @@ def test_a_branch_naming_no_wp_claims_nothing(
         _pr(403, "lattice: a degenerate cell (#283)", branch="pr/cell-degenerate-guard"),
     ]))
     (pr,) = claim.open_prs(repo)
-    assert pr.wp is None and pr.issues == (283,)
+    assert pr.wps == () and pr.issues == (283,)
     assert [o.via for o in claim.overlaps([pr], {"9604": {283}})] == ["issue #283"]
 
 
@@ -1193,6 +1321,159 @@ def test_a_draft_claim_reads_as_a_draft(
     assert pr.draft is True
     line = claim.describe_pull_request(pr, [("9605", "names it")])
     assert "(draft)" in line
+
+
+# WP-2046: the check printed "none touching WP-1956" while PR #941 built all of
+# it.  Its body named WP-1325 first, in passing, which was read as the claim and
+# stopped the issue chain; and run from WP-1956's own tree, the own-PR filter
+# dropped every row on WP-1956.
+
+
+def _gh_answering(prs: list, pull_requests: tuple = ()):
+    """A ``gh`` that lists *prs* and says which numbers are pull requests."""
+
+    def gh(root, *args, **kw):
+        if args[:2] == ("api", "graphql"):
+            query = next(a for a in args if a.startswith("query="))
+            asked = [int(n) for n in re.findall(r"issueOrPullRequest\(number: (\d+)\)", query)]
+            kind = {n: "PullRequest" if n in pull_requests else "Issue" for n in asked}
+            return json.dumps({"data": {"repository": {
+                f"n{n}": {"__typename": t} for n, t in kind.items()
+            }}})
+        return json.dumps(prs)
+
+    return gh
+
+
+def test_a_body_mention_is_a_reference_and_the_issue_chain_still_runs(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#941's shape: a body naming another WP first, the issue in the title.
+
+    The issue reaches the WP citing it, and the body's WP stays a row of its
+    own, marked as a mention rather than a claim.
+    """
+    wpdir = repo / "docs" / "wp"
+    (wpdir / "9701-null-window.md").write_text("# WP-9701\n\nFrom #916.\n", encoding="utf-8")
+    (wpdir / "9702-other.md").write_text("# WP-9702\n\nCites #941.\n", encoding="utf-8")
+    monkeypatch.setattr(claim, "_gh", _gh_answering([
+        _pr(941, "containment: the null window (#916)", author="contributor",
+            body="Builds on WP-9325's fixture. Closes the gap.", branch="null-window"),
+    ]))
+    (pr,) = claim.open_prs(repo)
+    assert (pr.wps, pr.mentions, pr.chain) == ((), ("9325",), (916,))
+    found = claim.overlaps([pr], claim.wp_issue_citations(repo))
+    assert [(o.wp, o.via) for o in found] == [("9325", "mentions it"), ("9701", "issue #916")]
+
+
+def test_from_the_wp_s_own_tree_a_contributor_s_pr_still_shows(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The own-PR filter takes the tree's PR by head branch, never its WP.
+
+    A fork may reuse the branch name, so a cross-repository PR is never the
+    session's own.
+    """
+    (repo / "docs" / "wp" / "9701-x.md").write_text("From #916.\n", encoding="utf-8")
+    fork = _pr(941, "containment (#916)", author="contributor", branch="wp9701-x")
+    fork["isCrossRepository"] = True
+    monkeypatch.setattr(claim, "_gh", _gh_answering([
+        _pr(950, "WP-9701: the null window", author="me", branch="wp9701-x"), fork,
+    ]))
+    prs = claim.open_prs(repo)
+    found = claim.overlaps(prs, claim.wp_issue_citations(repo), branch="wp9701-x")
+    assert [(o.wp, o.pr.number) for o in found] == [("9701", 941)]
+
+
+def test_status_from_the_wp_s_tree_lists_the_contributor_s_pr(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    """The acceptance, end to end: `status NNNN` from WP-NNNN's own worktree."""
+    (repo / "docs" / "wp" / "9701-x.md").write_text("From #916.\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "init")
+    tree = tmp_path / "wp9701-x"
+    _git(repo, "worktree", "add", "-q", "-b", "wp9701-x", str(tree))
+    monkeypatch.setattr(claim, "_gh", _gh_answering([
+        _pr(950, "WP-9701: the null window", author="me", branch="wp9701-x"),
+        _pr(941, "containment (#916)", author="contributor", body="See WP-9325.",
+            branch="null-window"),
+    ]))
+    claim._status(tree, tree, "9701")
+    out = capsys.readouterr().out.split("Open pull requests")[1]
+    assert "PR #941 by contributor" in out and "WP-9701 (issue #916)" in out
+    assert "#950" not in out
+
+
+def test_the_chain_follows_title_and_closing_issues_never_a_pull_request(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WP files cite PR numbers too, so a PR followed as an issue linked one
+    contributor PR to five WPs, one of them real (#1284, 2026-11-02).  A body's
+    other numbers are context; a closing keyword is GitHub's own parse."""
+    wpdir = repo / "docs" / "wp"
+    (wpdir / "9801-a.md").write_text("Landed as PR #1257.\n", encoding="utf-8")
+    (wpdir / "9802-b.md").write_text("See #1153.\n", encoding="utf-8")
+    (wpdir / "9803-c.md").write_text("From #998.\n", encoding="utf-8")
+    raw = _pr(1284, "magCIF follow-ups to #1257", body="see #1153; closes #998")
+    raw["closingIssuesReferences"] = [{"number": 998}]
+    monkeypatch.setattr(claim, "_gh", _gh_answering([raw], pull_requests=(1257,)))
+    (pr,) = claim.open_prs(repo)
+    assert pr.chain == (998,) and pr.issues == (998, 1153, 1257)
+    assert [o.wp for o in claim.overlaps([pr], claim.wp_issue_citations(repo))] == ["9803"]
+
+    # gh cannot classify: the title's number stays, an extra row and never a lost one.
+    monkeypatch.setattr(claim, "_gh", lambda root, *a, **k: json.dumps([raw]))
+    (pr,) = claim.open_prs(repo)
+    assert pr.chain == (998, 1257)
+
+
+def test_a_pr_naming_wps_only_by_their_files_names_every_one(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rulings PR edits seven WP files and its title names none; the first
+    file alone would hide the other six."""
+    monkeypatch.setattr(claim, "_gh", _gh_answering([
+        _pr(1317, "Record the rulings", branch="rulings",
+            files=["docs/wp/9901-a.md", "docs/wp/9902-b.md", "docs/wp/README.md"]),
+    ]))
+    (pr,) = claim.open_prs(repo)
+    assert pr.wps == ("9901", "9902")
+    assert [o.wp for o in claim.overlaps([pr], {})] == ["9901", "9902"]
+
+
+def test_one_unresolvable_number_does_not_void_the_classification(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``gh api graphql`` exits 1 when one alias resolves to nothing (a
+    discussion, a typo), and still prints the others' data."""
+    raw = _pr(1284, "follow-ups to #1257 (see discussion #99999)")
+
+    def gh(root, *args, partial=False, **kw):
+        if args[:2] == ("api", "graphql"):
+            return json.dumps({"data": {"repository": {
+                "n1257": {"__typename": "PullRequest"}, "n99999": None,
+            }}, "errors": [{"type": "NOT_FOUND"}]}) if partial else None
+        return json.dumps([raw])
+
+    monkeypatch.setattr(claim, "_gh", gh)
+    (pr,) = claim.open_prs(repo)
+    assert pr.chain == (99999,)
+
+
+def test_a_closing_reference_to_another_repository_is_not_followed(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = _pr(1300, "a fix")
+    raw["url"] = "https://github.com/o/r/pull/1300"
+    raw["closingIssuesReferences"] = [
+        {"number": 998, "url": "https://github.com/o/r/issues/998"},
+        {"number": 5, "url": "https://github.com/elsewhere/lib/issues/5"},
+    ]
+    monkeypatch.setattr(claim, "_gh", _gh_answering([raw]))
+    (pr,) = claim.open_prs(repo)
+    assert pr.chain == (998,)
 
 
 # --------------------------------------------------------------------------- #
@@ -1264,8 +1545,8 @@ def test_the_row_separates_placements_from_landings_and_names_the_untriaged() ->
     text = backlog.table(rows, today=backlog.date(2026, 9, 21))
     assert text.count(backlog.UNTRIAGED) == 1 and "ROADMAP" in text
     pr = backlog.wp_claim.PullRequest
-    prs = (pr(385, "", "them", "", "", False, None, (374,)),
-           pr(386, "", "mustachefeeling", "", "", False, None, ()))
+    prs = (pr(385, "", "them", "", "", False, (), (374,), (), (374,), True),
+           pr(386, "", "mustachefeeling", "", "", False, (), (), (), (), True))
     assert backlog.summary(rows, prs).splitlines() == [
         "4 open; 1 untriaged; 1 with a landed reference; 1 cited by an open PR",
         "untriaged: #407",

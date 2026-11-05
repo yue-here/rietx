@@ -6,7 +6,7 @@
      Guarded by: tests/test_validation_matrix.py (fast suite) -->
 
 Every real-data assertion in this repository, and what its tolerance is
-referenced to. A bar without its referent is not a claim: `abs(a - 4.156780) <
+referenced to. A bar without its reference value is not a claim: `abs(a - 4.156780) <
 2e-4` and `abs(delta_a) < 1e-9` look alike and are not remotely the same
 statement — the first is a certified value the fit does not reach and does not
 claim to, the second is two of our own fits that must agree to floating point.
@@ -291,6 +291,16 @@ The absolute lab anchor. NIST's own SRM 660c certification measurement, refined 
 
 **Measured:** a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
+#### `test_srm660c_zero_apertures_report_names_axial_asymmetry`
+
+`characterisation` · dataset `srm660c`
+
+**Claims:** with both axial apertures at 0 the report names the one-sided low-angle residual as axial asymmetry, and no impurity phase leads
+
+**Referenced to:** the shape of a known systematic: the certification data carry axial divergence (the apertures refine to about 0.025 and 0.037 when declared), so the action must fire and its rationale name the zero apertures; no accuracy is asserted
+
+**Measured:** three gated regions below 40 deg read asymmetry +0.020 to +0.025 at 7-9 esd; refine_axial_asymmetry 0.50 first, increase_background_flexibility 0.49 (WP-2054)
+
 #### `test_srm660c_extinction_does_no_harm`
 
 `characterisation` `ceiling` · dataset `srm660c`
@@ -419,9 +429,9 @@ The only fixtures carrying **two** reference engines, and they disagree: 2668 pp
 
 **Referenced to:** the two engines' own answers for the same peak, from opposite ends: GSAS-II let it run to 8.77e10 deg 2theta at esd 0 (off the pattern, unmeasured) and TOPAS kept it at 1.63 deg with an esd 188x its own value.  Here it correlates with the low-order background at |rho| = 1 and its stage spends its budget.  A measured failure recorded as a result: the recipe is over-parameterised and no fit of it can say otherwise
 
-**Measured:** HIGH_CORRELATION on the peak against the background, and the last stage freeing it at max_iter: since WP-2002 that is the closing stage, and the declared extra_components stage converges at the intermediate tolerance (1.9.0: the extra_components stage at max_iter); GSAS-II's own committed position 8.77e10 with esd exactly 0
+**Measured:** HIGH_CORRELATION on the peak against the background, and the last stage freeing it, the closing stage since WP-2002, never meeting the solver's own convergence test: since WP-1334 the slow-descent rule stops it at 123 evaluations (STAGE_SLOW_DESCENT), the declared extra_components stage spending its 400 (STAGE_MAX_ITER); GSAS-II's own committed position 8.77e10 with esd exactly 0
 
-**Diagnostics:** `HIGH_CORRELATION`, `STAGE_MAX_ITER`
+**Diagnostics:** `HIGH_CORRELATION`, `STAGE_MAX_ITER`, `STAGE_SLOW_DESCENT`
 
 #### `test_the_written_tables_reproduce_the_answer_they_came_from`
 
@@ -463,7 +473,7 @@ The one cross-code comparison. GSAS-II's converged fluorapatite tutorial, with i
 
 **Claims:** a user constraint on three chemically equivalent sites reduces the parameter count and tightens the esd, without moving the values the free refinement measured
 
-**Referenced to:** the same protocol's own free fit on the same 5750 channels, the only difference being the tie.  The esd bar is referenced twice: to the best of the three free esds (0.1078 A^2) and to their inverse-variance combination (0.0769), which is what the constraint has to beat to have recovered the information rather than merely divided by root-N.  The identity half is that the three tied rows carry the *same* value and esd to 1e-12, since they are one parameter.  Rwp is deliberately not a referent: it moves by 0.05 % of itself, so no bar on it could distinguish a good constraint from a bad one
+**Referenced to:** the same protocol's own free fit on the same 5750 channels, the only difference being the tie.  The esd bar is referenced twice: to the best of the three free esds (0.1078 A^2) and to their inverse-variance combination (0.0769), which is what the constraint has to beat to have recovered the information rather than merely divided by root-N.  The identity half is that the three tied rows carry the *same* value and esd to 1e-12, since they are one parameter.  Rwp is deliberately not a reference value: it moves by 0.05 % of itself, so no bar on it could distinguish a good constraint from a bad one
 
 **Measured:** 20 -> 18 free parameters, 287.5 -> 319.4 points per parameter; B(O) 0.3469(1526) / 0.6005(1610) / 0.5137(1086) free against 0.4985(763) tied, the three free values 0.99 / 0.63 / 0.14 of their own esds from the tied value (esds with Berar-Lelann eqs (10)-(12), #674); the four untied Biso sites move by < 0.5 sigma.  1.9.0 read 0.3647(1513) / 0.6016(1590) / 0.5377(1078) against 0.5150(754), 0.99 / 0.54 / 0.21
 
@@ -597,6 +607,16 @@ Quantitative phase analysis against weighed truth, at tolerances referenced to w
 
 **Diagnostics:** `BRINDLEY_OUTSIDE_REGIME`
 
+#### `test_flank_lobes_name_their_peak_and_buy_no_impurity`
+
+`characterisation` · dataset `qarr`
+
+**Claims:** on each of the eight weighed three-phase mixtures, every unmatched observed peak within 0.5° of a strong reflection says it sits unresolved on a drawn peak (UnmatchedPeak.flank), and Layer 2 suggests no impurity phase
+
+**Referenced to:** **no accuracy band is claimed**.  The reference is the weighing: each mixture holds exactly the three modelled phases, so any impurity suggestion is wrong.  0.5° and a strong line's tenth of the tallest are the test's own scope, set by the lobes WP-1977 measured at 0.15-0.38°
+
+**Measured:** 2-6 rows a mixture on a drawn flank, 0.7-1.2 FWHM below the line, none near a strong line off one; no impurity call (main's rule, on the fits of 52cec09a1: cpd-1b suggested add_impurity_phase at 0.50 from two such rows)
+
 ### `tests/test_acceptance_dispersion.py`
 
 The same round robin with anomalous scattering applied — a pre-registered, parameter-free prediction about numbers already recorded in the v0.3 milestone.
@@ -637,7 +657,7 @@ The same round robin with anomalous scattering applied — a pre-registered, par
 
 **Claims:** the sharpest single dispersion result: B(O) comes off its floor once Zn's missing f' stops being absorbed by a displacement parameter, while Rwp barely moves
 
-**Referenced to:** physical plausibility, not a reference value — B(O) below 0.1 A^2 is a parameter pinned on a bound, and 0.2-1.2 is the range an oxide oxygen actually occupies.  Rwp is asserted only one-sided, because this is exactly a case where the fit statistic does not see the fix
+**Referenced to:** physical plausibility, not a measured value — B(O) below 0.1 A^2 is a parameter pinned on a bound, and 0.2-1.2 is the range an oxide oxygen actually occupies.  Rwp is asserted only one-sided, because this is exactly a case where the fit statistic does not see the fix
 
 **Measured:** B(O) 0.018 -> 0.432 A^2; 0.047 -> 0.456 on 1.9.0, before WP-2002's closing stage (#1085) and width twin hold (#1113)
 
@@ -765,23 +785,23 @@ A warm-started chain over the round robin: what changes when only the starting p
 
 `identity` `characterisation` · dataset `qarr`
 
-**Claims:** the reseed fence's accounting is exact, the escalation ladder is only ever climbed as a prefix, and a reseed never leaves the fit worse than the warm start it rejected
+**Claims:** the reseed ladder's accounting is exact, the escalation ladder is only ever climbed as a prefix, and a reseed never leaves the fit worse than the warm start it rejected
 
-**Referenced to:** internal consistency: the SEQUENTIAL_RESEED diagnostic count must equal the number of entries flagged reseeded, exactly; every entry's rungs_tried must be a prefix of the ladder and contain the rung it kept.  The fence never fired on the hostile series — the collapsed refit recovers a bad warm start within the fit — so it is insurance, pinned by unit tests rather than by this suite
+**Referenced to:** internal consistency: the SEQUENTIAL_RESEED diagnostic count must equal the number of entries flagged reseeded, exactly; every entry's rungs_tried must be a prefix of the ladder and contain the rung it kept.  The ladder never climbed on the hostile series — the collapsed refit recovers a bad warm start within the fit — so it is insurance, pinned by unit tests rather than by this suite
 
-**Measured:** exact accounting; zero reseeds on the hostile series, every pattern after the first kept on its warm rung, and no kept rung above the Rwp fence (2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same).  1.10.0's hostile series did not finish, spending over 50 CPU minutes in the closing stage that follows cpd-1b's warm rung (Rwp 0.760)
+**Measured:** exact accounting; zero reseeds on the hostile series, every pattern after the first kept on its warm rung, and no kept rung above the 1.25× Rwp fence the default then carried (2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same; the fence left the default in WP-2003).  1.10.0's hostile series did not finish, spending over 50 CPU minutes in the closing stage that follows cpd-1b's warm rung (Rwp 0.760)
 
-**Diagnostics:** `SEQUENTIAL_RESEED`, `SEQUENTIAL_UNRECOVERED`, `SEQUENTIAL_RWP_OUTLIER`
+**Diagnostics:** `SEQUENTIAL_RESEED`, `SEQUENTIAL_UNRECOVERED`
 
 #### `test_the_first_rung_bound_moves_no_accepted_value`
 
 `identity` · dataset `qarr`
 
-**Claims:** FIRST_RUNG_FACTOR is answer-invariant on the hostile series: the chain with WP-1127's first-rung bound and the chain without it report the same values, esds, rungs, fences and codes, and no kept first rung reaches the budget the bound would set
+**Claims:** A first-rung bound at 3.0 (WP-1127's factor, the default until WP-2003 C3 made it the caller's) is answer-invariant on the hostile series: the chain with it and the default chain without it report the same values, esds, rungs, fences and codes, and no kept first rung reaches the budget the bound sets
 
-**Referenced to:** the same chain with first_rung_factor=None, to the bit; the margin against FIRST_RUNG_FACTOR itself (WP-2003). It verifies the bound and validates nothing, the reference being rietx's own unbounded chain
+**Referenced to:** the default chain, first_rung_factor=None, to the bit; the margin against the factor itself (WP-2003). It verifies the bound and validates nothing, the reference being rietx's own unbounded chain
 
-**Measured:** bit-identical; kept first rungs past the armed point 0.064-0.080x the running maximum against a factor of 3.0 (2026-10-25, macOS arm64, after WP-2045; 0.34-0.39x on 2026-10-24, Linux x86-64, with cpd-1b's runaway in the chain)
+**Measured:** bit-identical; kept first rungs past the armed point 0.045-0.062x the running maximum of a converged rung's dearest stage, the quantity capped since C3, against a factor of 3.0 (2026-11-02, macOS arm64; 0.064-0.080x of the rung's summed stages on 2026-10-25)
 
 #### `test_the_hostile_pairs_warm_stage_stops_short_of_the_runaway`
 
@@ -1225,6 +1245,16 @@ The only externally *graded* feature in the package. Bergmann et al. (2004) publ
 
 **Diagnostics:** `INDEX_SEARCH_INCOMPLETE`, `INDEX_ABSTAINED`
 
+#### `test_the_formula_window_ranks_the_fluorapatite_cell_where_the_search_does`
+
+`own_result` · dataset `fap`
+
+**Claims:** SearchSpec.from_formula('Ca5P3O12F', z=2), a ceiling only since WP-2030 part 2, keeps the fluorapatite cell and ranks it where the same search under the row's hand-set 600 A^3 ceiling does; 1.10.0's window (738-1153 A^3) excluded it
+
+**Referenced to:** the same pattern, systems and budgets searched under fap_index's declared 600 A^3 ceiling, the in-band cell read at that row's 500 ppm band on GSAS's FAP.EXP cell
+
+**Measured:** ranked first in both (pearl, 2026-10-30, WP-2030 part 2)
+
 #### `test_the_cross_code_cell_leads_because_the_engines_agree_on_it`
 
 `cross_code` `characterisation` · dataset `fap`
@@ -1417,9 +1447,9 @@ The single-histogram refinable wavelength, on NIST SRM 640c silicon at APS 11-BM
 
 **Claims:** the held cell IS the certificate value -- the anchor of the whole protocol, asserted as the identity it is rather than measured
 
-**Referenced to:** NIST SRM 640c certificate a = 5.4311946 +- 0.0000092 A at 22.5 C.  Held, not refined: holding a certified cell is what turns a free lambda into a calibration measurement.  The cubic ties (b<-a, c<-a) carry the source's value, so this is an identity bar (exact) and the absent esd shows nothing was refined.  XND held 5.4311948, 0.4 ppm above, negligible against every band here and stated in the docstring
+**Referenced to:** NIST SRM 640c certificate a = 5.4311946 +- 0.0000092 A at 22.5 C.  Held, not refined: holding a certified cell is what turns a free lambda into a calibration measurement.  The answer lists no cell row, since a result carries only what the fit could move (WP-1999); no stage's free set holds a cell path, and the parameter table ties b and c to a, so this is an identity bar (exact).  XND held 5.4311948, 0.4 ppm above, negligible against every band here and stated in the docstring
 
-**Measured:** cell.b and cell.c both exactly 5.4311946 A, esd None
+**Measured:** no cell row in the answer and none in any stage's free set; cell.a, cell.b and cell.c in the parameter table all exactly 5.4311946 A, b and c tied to a
 
 #### `test_the_sample_broadening_is_positive_and_finite`
 

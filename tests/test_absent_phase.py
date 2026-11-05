@@ -373,85 +373,88 @@ def _series_with(n: int, fired_in: int, *, code: str = "BOUND_HIT",
         for i in range(n)])
 
 
-def test_a_finding_in_most_of_a_series_is_stated_once_with_its_count():
+def test_a_finding_across_a_series_is_counted_once_with_its_count():
     """The sentence no per-pattern diagnostic can produce.
 
     The trigger episode's own numbers: ``phases.3.cell.c`` pinned in 42 of 68
     patterns, said 425 times per-pattern and never once as "42 of 68".
     """
-    from rietx.sequential import _persistent_diagnostics
+    from rietx.sequential import _code_counts
 
-    out = _persistent_diagnostics(_series_with(68, 42))
-    assert len(out) == 1
-    finding = out[0]
-    assert finding.code == "SEQUENTIAL_PERSISTENT_FINDING"
-    assert "42 of 68" in finding.message and "BOUND_HIT" in finding.message
-    assert finding.where == ["phases.3.cell.c"]
-    assert finding.value == pytest.approx(42 / 68)
+    out = _code_counts(_series_with(68, 42))
+    assert [(c.code, c.path, c.count, c.n_patterns, c.level) for c in out] == [
+        ("BOUND_HIT", "phases.3.cell.c", 42, 68, "warning")]
 
 
-def test_the_threshold_is_a_change_of_subject_at_half_the_patterns():
-    """Below half, the per-entry diagnostics are the whole story.
+def test_every_count_is_a_row_with_no_threshold():
+    """WP-2003 C6, ruled by the maintainer 2026-11-03: the half cut and the
+    five-pattern minimum went with ``SEQUENTIAL_PERSISTENT_FINDING``, so a
+    code on one pattern of a long series and on every pattern of a short one
+    are each a row."""
+    from rietx.sequential import _code_counts
 
-    Not a tuned sensitivity: above half a finding describes the series rather
-    than some of its members, and a summary that repeated a minority finding
-    would be a second authority on the same fact.
-    """
-    from rietx.sequential import _persistent_diagnostics
-
-    assert _persistent_diagnostics(_series_with(68, 34)) == []   # exactly half
-    assert len(_persistent_diagnostics(_series_with(68, 35))) == 1
-
-
-def test_a_short_series_gets_no_summary_at_all():
-    """A summary of three things is not a summary."""
-    from rietx.sequential import MIN_POINTS_FOR_PERSISTENCE, _persistent_diagnostics
-
-    short = MIN_POINTS_FOR_PERSISTENCE - 1
-    assert _persistent_diagnostics(_series_with(short, short)) == []
+    assert [c.count for c in _code_counts(_series_with(68, 1))] == [1]
+    assert [c.count for c in _code_counts(_series_with(68, 34))] == [34]
+    assert [(c.count, c.n_patterns) for c in _code_counts(_series_with(2, 2))] == [(2, 2)]
+    assert _code_counts(_series_with(5, 0)) == []
 
 
-def test_it_aggregates_whatever_fired_rather_than_a_list_of_codes():
+def test_the_rows_are_largest_count_first():
+    from rietx.schemas.common import Diagnostic
+    from rietx.schemas.sequential import SeriesEntry, SeriesResult
+    from rietx.sequential import _code_counts
+
+    entries = [SeriesEntry(index=i, label=f"p{i}", diagnostics=[
+        Diagnostic(level="warning", code="BOUND_HIT", where=["phases.0.cell.a"],
+                   message="…"),
+        *([Diagnostic(level="info", code="DISPERSION_NEGLECTED", message="…")]
+          if i < 9 else [])]) for i in range(3, 13)]
+    # one code with no `where`: its path is None, never ""
+    out = _code_counts(SeriesResult(entries=entries))
+    assert [(c.code, c.path, c.count) for c in out] == [
+        ("BOUND_HIT", "phases.0.cell.a", 10), ("DISPERSION_NEGLECTED", None, 6)]
+
+
+def test_it_counts_whatever_fired_rather_than_a_list_of_codes():
     """Diagnostic codes are an open vocabulary (root CLAUDE.md).
 
-    A new code must be summarised on the day it lands, with no edit here — so
+    A new code must be counted on the day it lands, with no edit here — so
     this asserts the *mechanism* is code-agnostic, using one that did not exist
     when the aggregation was written.
     """
-    from rietx.sequential import _persistent_diagnostics
+    from rietx.sequential import _code_counts
 
-    out = _persistent_diagnostics(
+    out = _code_counts(
         _series_with(10, 9, code="PHASE_UNCONSTRAINED", path="phases.3.cell.a"))
-    assert len(out) == 1 and "PHASE_UNCONSTRAINED" in out[0].message
+    assert [c.code for c in out] == ["PHASE_UNCONSTRAINED"]
 
 
-def test_the_summary_carries_the_worst_level_and_promotes_nothing():
+def test_the_count_carries_the_worst_level_and_promotes_nothing():
     """It travels in both directions.
 
-    Up, because a summary must not report an error as a warning. Down, because
+    Up, because a count must not report an error as a warning. Down, because
     a deliberate `dispersion=None` fires an **info** `DISPERSION_NEGLECTED` on
     every pattern of a series — "68 of 68" is worth saying, and calling a
     declared choice a warning is not.
     """
-    from rietx.sequential import _persistent_diagnostics
+    from rietx.sequential import _code_counts
 
-    assert _persistent_diagnostics(_series_with(10, 9, level="error"))[0].level \
-        == "error"
-    assert _persistent_diagnostics(
+    assert _code_counts(_series_with(10, 9, level="error"))[0].level == "error"
+    assert _code_counts(
         _series_with(10, 10, code="DISPERSION_NEGLECTED",
                      level="info"))[0].level == "info"
 
 
-def test_a_finding_about_how_a_pattern_was_measured_is_never_aggregated():
+def test_a_finding_about_how_a_pattern_was_measured_is_never_counted():
     """``FROZEN_COMPILE_STALE`` (#272) on every pattern is a chain whose every
     last stage re-sized its windows, not a model that is wrong, so it gains no
-    series finding — while a model-level code beside it still does."""
+    count — while a model-level code beside it still does."""
     from rietx.schemas.common import Diagnostic
     from rietx.schemas.sequential import SeriesEntry, SeriesResult
-    from rietx.sequential import NOT_A_SERIES_FINDING, _persistent_diagnostics
+    from rietx.sequential import NOT_A_SERIES_FINDING, _code_counts
 
     assert "FROZEN_COMPILE_STALE" in NOT_A_SERIES_FINDING
-    assert _persistent_diagnostics(
+    assert _code_counts(
         _series_with(10, 10, code="FROZEN_COMPILE_STALE", path="",
                      level="info")) == []
     entries = [SeriesEntry(index=i, label=f"p{i}", diagnostics=[
@@ -460,14 +463,14 @@ def test_a_finding_about_how_a_pattern_was_measured_is_never_aggregated():
         Diagnostic(level="warning", code="BOUND_HIT",
                    where=["phases.0.cell.a"], message="…")])
         for i in range(10)]
-    out = _persistent_diagnostics(SeriesResult(entries=entries))
-    assert [d.message.split()[0] for d in out] == ["BOUND_HIT"]
+    out = _code_counts(SeriesResult(entries=entries))
+    assert [c.code for c in out] == ["BOUND_HIT"]
 
 
-def test_one_error_among_warnings_sets_the_summary_level():
+def test_one_error_among_warnings_sets_the_count_level():
     from rietx.schemas.common import Diagnostic
     from rietx.schemas.sequential import SeriesEntry, SeriesResult
-    from rietx.sequential import _persistent_diagnostics
+    from rietx.sequential import _code_counts
 
     entries = []
     for i in range(10):
@@ -475,7 +478,7 @@ def test_one_error_among_warnings_sets_the_summary_level():
         entries.append(SeriesEntry(index=i, label=f"p{i}", diagnostics=[
             Diagnostic(level=level, code="BOUND_HIT",
                        where=["phases.0.cell.a"], message="…")]))
-    out = _persistent_diagnostics(SeriesResult(entries=entries))
+    out = _code_counts(SeriesResult(entries=entries))
     assert out[0].level == "error"
 
 
@@ -483,7 +486,7 @@ def test_one_pattern_counts_once_however_many_stages_fired_it():
     """Otherwise the count measures stages, not patterns."""
     from rietx.schemas.common import Diagnostic
     from rietx.schemas.sequential import SeriesEntry, SeriesResult
-    from rietx.sequential import _persistent_diagnostics
+    from rietx.sequential import _code_counts
 
     repeated = [Diagnostic(level="warning", code="BOUND_HIT",
                            where=["phases.0.cell.a"], message=f"stage {s}")
@@ -491,9 +494,27 @@ def test_one_pattern_counts_once_however_many_stages_fired_it():
     series = SeriesResult(entries=[
         SeriesEntry(index=i, label=f"p{i}", diagnostics=list(repeated))
         for i in range(8)])
-    out = _persistent_diagnostics(series)
-    assert len(out) == 1
-    assert "8 of 8" in out[0].message, out[0].message
+    out = _code_counts(series)
+    assert [(c.count, c.n_patterns) for c in out] == [(8, 8)]
+
+
+def test_the_summary_names_the_largest_counts_and_the_field():
+    """One line in the trajectory block, the shape of the steps line; a
+    document written before the field reads ``None`` and prints none."""
+    from rietx.schemas.sequential import SeriesResult
+    from rietx.sequential import _code_counts
+
+    series = _series_with(68, 42)
+    assert series.code_counts is None
+    assert "series.code_counts" not in series.summary()
+    series.code_counts = _code_counts(series)
+    line = [ln for ln in series.summary().splitlines() if "code_counts" in ln]
+    assert line == ["    most frequent per-pattern codes: BOUND_HIT on "
+                    "phases.3.cell.c 42 of 68 (series.code_counts)"]
+    # a stored series without the key reads None, "not recorded"
+    old = series.model_dump(mode="json")
+    del old["code_counts"]
+    assert SeriesResult.model_validate(old).code_counts is None
 
 
 # ----------------------------------------------------------------------
@@ -772,8 +793,8 @@ def test_a_joint_fit_tests_a_scale_on_its_floor_like_the_single_fit():
 def test_a_series_whose_phase_has_no_gradient_says_so_in_every_pattern():
     """Five patterns, the empty phase's scale blind in each.
 
-    Each entry names the phase, and ``SEQUENTIAL_PERSISTENT_FINDING`` counts
-    it across the series with no edit of its own, its codes being an open
+    Each entry names the phase, and ``SeriesResult.code_counts`` counts it
+    across the series with no edit of its own, its codes being an open
     vocabulary.
     """
     from rietx.sequential import refine_sequential
@@ -784,8 +805,6 @@ def test_a_series_whose_phase_has_no_gradient_says_so_in_every_pattern():
     for entry in series.entries:
         fired = [d for d in entry.diagnostics if d.code == "QPA_ESD_UNAVAILABLE"]
         assert [d.where for d in fired] == [["phases.1.scale"]], entry.label
-    persistent = [d for d in series.diagnostics
-                  if d.code == "SEQUENTIAL_PERSISTENT_FINDING"
-                  and d.message.startswith("QPA_ESD_UNAVAILABLE")]
-    assert [d.where for d in persistent] == [["phases.1.scale"]]
-    assert "5 of 5" in persistent[0].message
+    counted = [(c.path, c.count, c.n_patterns) for c in series.code_counts
+               if c.code == "QPA_ESD_UNAVAILABLE"]
+    assert counted == [("phases.1.scale", 5, 5)]

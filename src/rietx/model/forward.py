@@ -72,6 +72,7 @@ from ..crystallography.magnetic.scattering import (
     compile_magnetic_sites,
     d_magnetic_f2_d_dofs,
     magnetic_f2,
+    magnetic_f2_angle_block,
     magnetic_reflections,
     merge_magnetic,
 )
@@ -993,7 +994,8 @@ class CompiledModel:
 
         The tick half of the member contract's clause 2, written once because
         **two** result builders owe it: ``refine._build_result`` and
-        ``multi.MultiHistogramRefinement._ticks``.  A copy in each is how a
+        ``multi.MultiHistogramRefinement._build_result``, through their one
+        tick builder ``refine._tick_rows`` (WP-2028).  A copy in each is how a
         joint fit ends up reporting a declared peak as an unindexed impurity
         while a single-histogram fit does not — the ``ticks`` failure this
         exists to prevent, one surface over.
@@ -1180,8 +1182,9 @@ class CompiledModel:
 
         This is the one place that walks a phase's cell, lines and positions
         for a tick.  ``refine._build_result``, ``multi.MultiHistogramRefinement
-        ._ticks`` and ``viz.snapshot.stage_ticks`` each carried their own copy
-        until WP-1908's review, and a copy is how a builder forgets the shift.
+        ._build_result`` and ``viz.snapshot.stage_ticks`` each carried their
+        own copy until WP-1908's review, and a copy is how a builder forgets
+        the shift.  The first two now share ``refine._tick_rows`` (WP-2028).
         A time-of-flight axis owes a twin here, not a fifth walk.  Positions come
         from :meth:`apparent_two_theta`, so they are where the model draws each
         peak.  The satellite report's lattice enumerates differently and calls
@@ -1306,7 +1309,7 @@ class CompiledModel:
                    + values[f"phases.{ip}.lor_size"]
                    + values[f"phases.{ip}.magnetic_lor_size"])
             y_l = (values["instrument.profile.y"]
-                   + values[f"phases.{ip}.lor_strain"]
+                   + self.lor_strain_term(ip, values)
                    + values[f"phases.{ip}.magnetic_lor_strain"])
         for tt_bragg in tt_bragg_lines:
             theta = 0.5 * tt_bragg  # Bragg angle drives the widths
@@ -1321,7 +1324,7 @@ class CompiledModel:
                 gam_l = lorentzian_fwhm(
                     theta,
                     values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
-                    values["instrument.profile.y"] + values[f"phases.{ip}.lor_strain"],
+                    values["instrument.profile.y"] + self.lor_strain_term(ip, values),
                     aniso)
             out.append(self._peak_widths(gam_g, gam_l))
         return out
@@ -1671,6 +1674,28 @@ class CompiledModel:
         s = xp.stack([values[f"phases.{ip}.microstrain.{n}"] for n in S_NAMES])
         return strain_width_deg(cp.strain_monomials, s, d)
 
+    def lor_strain_term(self, ip: int, values: dict[str, float]):
+        """The isotropic tanθ Lorentzian coefficient phase ip adds to Y.
+
+        ``lor_strain``, or ``0.0`` when the phase carries a Stephens block
+        (WP-1467).  The block *replaces* the isotropic strain: its isotropic
+        direction is the ``lor_strain`` column, which is why declaring one
+        force-fixes that path.  A force-fixed entry keeps its stored value, so
+        a width law that went on reading it stacked Λ(hkl) ≥ 0 on a frozen
+        floor the block could never narrow below.  This is the Stephens half
+        of the ``Atom.aniso`` ⇒ ``biso`` bargain: an anisotropic site's
+        Debye-Waller factor never reads ``biso`` either.
+
+        Every reader of the Lorentzian strain width calls this rather than
+        reading the path: the width block, its memo key, the compile-time
+        window sizing (which spells the same test off the schema), the
+        Lorentzian-width inequality rows and the strain report.  The test is
+        compile-time structural, like :meth:`strain_width`'s.
+        """
+        if self.phases[ip].strain_monomials is not None:
+            return 0.0
+        return values[f"phases.{ip}.lor_strain"]
+
     # ------------------------------------------------------------------
     # peak-shape dispatch — the two width scalars, the unit-area profile and
     # its partials all switch on the frozen ``shape`` (default TCHZ).  Both
@@ -1961,7 +1986,7 @@ class CompiledModel:
             # on θ.  Otherwise it is evaluated unconditionally, and the off
             # state stays bit-identical anyway (purity (b)).
             # V moves with the cell, hence recomputed here rather than cached.
-            ext = values[f"phases.{ip}.extinction"]
+            ext = values.get(f"phases.{ip}.extinction", 0.0)
             vol = cell_volume(*cell)
 
         # anisotropic strain is line-independent (it depends on hkl and the
@@ -1990,7 +2015,7 @@ class CompiledModel:
                     float(values[f"phases.{ip}.gauss_size"]),
                     float(values[f"phases.{ip}.gauss_strain"]),
                     float(values[f"phases.{ip}.lor_size"]),
-                    float(values[f"phases.{ip}.lor_strain"]))
+                    float(self.lor_strain_term(ip, values)))
 
         if component == 0:
             widths = self._memo(cp, "widths", width_key,
@@ -2255,6 +2280,21 @@ class CompiledModel:
             return self.background(values) + self.bragg_component(values, intensities)
         return (self.background(values) + self.extra_peak_curve(values)
                 + self.bragg_component(values, intensities))
+
+    def evaluate_with_background(self, values: dict[str, float]
+                                 ) -> tuple[np.ndarray, np.ndarray]:
+        """``(evaluate(values), background(values))`` for one background pass.
+
+        For an at-rest reader that needs both curves, such as an Rwp with its
+        background-subtracted twin.  The sum is :meth:`evaluate`'s in its own
+        association order, so the curve is bit-identical to it, declared
+        peaks included (#441).
+        """
+        y_bkg = self.background(values)
+        if not self.peak_components:
+            return y_bkg + self.bragg_component(values), y_bkg
+        return (y_bkg + self.extra_peak_curve(values)
+                + self.bragg_component(values)), y_bkg
 
     def phase_support(self, values: dict[str, float]) -> np.ndarray:
         """Each phase's integrated contribution ‖y_p/σ‖₂ over the fitted range.
@@ -2552,6 +2592,40 @@ class CompiledModel:
                                     stol, cp.magnetic, cell, xyz, occ, biso,
                                     self._moment_dofs(ip, values))
 
+    def moment_angle_block_supported(self, ip: int) -> bool:
+        """Whether phase ip's intensity is affine in p²⟨|F_⊥|²⟩ (WP-2068).
+
+        The stationary-angle test's analytic curvature block chains the
+        second derivative of |F_⊥|² through the same factors as the first,
+        which is exact only where nothing between |F|² and the intensity
+        depends on it.  :meth:`moment_grad_supported` plus extinction skipped:
+        evaluated, extinction reads the total |F|² through x, and ∂²I picks up
+        a dG/dx term the first-order chain has no place for.  Such a phase
+        keeps the central differences.
+        """
+        return self.moment_grad_supported(ip) and self.phases[ip].skip_extinction
+
+    def moment_f2_angle_block(self, ip: int, values: dict[str, float],
+                              weights: list[dict[tuple[int, int], float]]
+                              ) -> tuple[np.ndarray, np.ndarray]:
+        """``(g, h)``, (N, k) and (N, k, k): ∂ and ∂² of p²⟨|F_⊥|²⟩ along k
+        directions in phase ip's moment DOFs (WP-2068).
+
+        ``weights[a]`` is ``{(atom, dof): coefficient}`` for direction a.
+        The arithmetic is
+        ``crystallography.magnetic.scattering.magnetic_f2_angle_block``'s, at
+        :meth:`moment_f2_grads`' arguments.
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        xyz, occ, biso, _u, _a = self._site_values(ip, values, cell)
+        stol = 1.0 / (2.0 * np.asarray(d, dtype=np.float64))
+        return magnetic_f2_angle_block(cp.mag_members, cp.mag_seg, cp.mag_counts,
+                                       stol, cp.magnetic, cell, xyz, occ, biso,
+                                       self._moment_dofs(ip, values), weights)
+
     def moment_intensity_grad(self, ip: int, df2: np.ndarray,
                               values: dict[str, float]
                               ) -> list[list[np.ndarray]]:
@@ -2637,7 +2711,7 @@ class CompiledModel:
         # applies it unconditionally.  Only these pure-analytic columns need it
         # explicitly; the scale/occ/biso/cell/extinction columns pick it up
         # from the FD-of-phase_peaks chain.
-        ext = values[f"phases.{ip}.extinction"]
+        ext = values.get(f"phases.{ip}.extinction", 0.0)
         # the extinction variable x is built from the whole reflection, so the
         # magnetic term belongs in it exactly as it does in ``phase_peaks``
         f2 = None
@@ -2734,7 +2808,7 @@ class CompiledModel:
         cp = self.phases[ip]
         # gated exactly like phase_peaks, and unconditional otherwise: E ≡ 1
         # exactly at ext=0 either way (purity (b))
-        ext = values[f"phases.{ip}.extinction"]
+        ext = values.get(f"phases.{ip}.extinction", 0.0)
         vol = cell_volume(*cell)
         out = []
         # λ read through ``line_lambdas``, never off the frozen tuple: a joint
@@ -3877,13 +3951,24 @@ def generation_window(tt_min: float, tt_max: float, zero: float, lambdas,
     return gen_min, hi_eff
 
 
+def orbit_split_of(model: CompiledModel) -> list:
+    """Each phase's per-atom orbit split, as ``model`` froze it.
+
+    The value ``compile_model(..., orbit_split=)`` takes: reusing it compiles
+    every site at the multiplicity ``model`` gave it, whatever the coordinates
+    now read (WP-2052).
+    """
+    return [list(cp.sites.ops) for cp in model.phases]
+
+
 def compile_model(structure: Structure, instrument: Instrument, pattern: PatternData,
                   *, mode: Mode = "rietveld",
                   two_theta_limits: tuple[float, float] | None = None,
                   moving_paths: set[str] | None = None,
                   restraint_weight_scale: float = 1.0,
                   window_slack_deg: float | None = None,
-                  window_area_tol: float | None = None) -> CompiledModel:
+                  window_area_tol: float | None = None,
+                  orbit_split: list | None = None) -> CompiledModel:
     """Freeze reflection lists, orbits, windows and FCJ nodes for one stage.
 
     ``moving_paths`` is every parameter the coming stage can move, or ``None``
@@ -3926,6 +4011,13 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     declared rule it would leave up to 5.6e-3 of a peak's maximum, 7.8x the
     lab bar, whatever its windows.
 
+    ``orbit_split`` is the orbit split a fit decided at its start, one entry
+    per phase as :func:`orbit_split_of` reads it off a model, or ``None`` to
+    decide each atom's split from its current coordinates.  A fit hands its
+    split to every compile it makes, so a stage that drives a half-occupied
+    general atom onto a mirror cannot halve that site at the next compile
+    (WP-2052; GSAS-II reads a site's multiplicity once, at setup).
+
     The pattern must be in 2θ and the instrument a constant-wavelength one:
     this is the backstop for :func:`rietx.schemas.pattern.require_two_theta`,
     below every public entry that calls it, so a caller who assembled a compile
@@ -3936,6 +4028,18 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     if restraint_weight_scale < 0.0:
         raise ValueError(
             f"restraint_weight_scale must be >= 0 (got {restraint_weight_scale})")
+    if orbit_split is not None and len(orbit_split) != len(structure.phases):
+        raise ValueError(
+            f"an orbit split for {len(orbit_split)} phases was handed to a "
+            f"structure of {len(structure.phases)}")
+    if orbit_split is not None:
+        # here, before the species boundary below re-walks every atom's
+        # species for a ValueError that is no species' fault
+        for phase, ops in zip(structure.phases, orbit_split, strict=True):
+            if len(ops) != len(phase.atoms):
+                raise ValueError(
+                    f"phase {phase.name!r}: an orbit split for {len(ops)} atoms "
+                    f"was handed to a phase of {len(phase.atoms)}")
     if window_area_tol is None:
         window_area_tol = CLOSING_WINDOW_TOL
     if not 0.0 < window_area_tol < 1.0:
@@ -4084,7 +4188,9 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             if disp is not None:
                 f_anom = resolve_dispersion([a.species for a in phase.atoms],
                                             lams, disp.overrides)
-            sites = compile_phase_sites(phase, f_anom, neutron=neutron)
+            sites = compile_phase_sites(
+                phase, f_anom, neutron=neutron,
+                ops=None if orbit_split is None else orbit_split[ip])
         except (KeyError, ValueError) as exc:
             _reraise_species_fault(phase, disp, lams, exc, neutron=neutron)
 
@@ -4155,7 +4261,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                                       instrument.profile.v.value, instrument.profile.w.value,
                                       phase.gauss_size.value, phase.gauss_strain.value)
                 x_l = instrument.profile.x.value + phase.lor_size.value
-                y_l = instrument.profile.y.value + phase.lor_strain.value
+                # a Stephens block replaces lor_strain (WP-1467,
+                # CompiledModel.lor_strain_term), so it sizes nothing here
+                y_l = instrument.profile.y.value + (
+                    0.0 if phase.microstrain is not None else phase.lor_strain.value)
                 if extra_size or extra_strain:
                     x_l = x_l + extra_size
                     y_l = y_l + extra_strain
@@ -4226,9 +4335,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             cp.batch_mag = _batch_layout(win_mag, fcj_n_mag, tt)
         # the off-state gate (see the field): ext is exactly its identity and
         # nothing this stage moves can take it off there
-        cp.skip_extinction = (gate_off_states
-                              and phase.extinction.value == 0.0
-                              and f"phases.{ip}.extinction" not in moving_paths)
+        cp.skip_extinction = (phase.extinction is None
+                              or (gate_off_states
+                                  and phase.extinction.value == 0.0
+                                  and f"phases.{ip}.extinction" not in moving_paths))
         # WP-0605 task 0: the FCJ node memo needs no free-path analysis —
         # correctness rests on input equality alone — so it is allocated
         # whenever any peak has quadrature nodes at all.

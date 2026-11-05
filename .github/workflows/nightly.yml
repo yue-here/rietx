@@ -55,8 +55,13 @@ jobs:
     # suite grew, and 77 min of it is indexing-acceptance fixture setup on
     # the 2-core runner (top four --durations rows). The durable lever is
     # narrowing what those fixtures search (the post-1003 indexing work);
-    # this guard stays a runaway guard, calibrated above the measured runtime
-    timeout-minutes: 150
+    # this guard stays a runaway guard, calibrated above the measured runtime.
+    # Raised from 150 (WP-2036, 2026-11-02): from 10-16 to 11-01 the job that
+    # completed took 84-131 min, and one test took 490 s on one night and
+    # 933 s on another. 150 was 1.15x the slowest pass. It cancelled two nights
+    # (10-30, 10-31) at 90 %, on slow runners carrying a 10-13 min subgroup
+    # case that #1239 has since made fast. 300 is 2.3x the slowest pass
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7

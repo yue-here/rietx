@@ -602,7 +602,10 @@ class SupercellEvidence:
     extra_q: tuple[float, ...]
     #: whether each extra line sits inside some observed line's window
     extra_seen: tuple[bool, ...]
-    #: the chance rate, :func:`chance_rate` over the same range and windows
+    #: the chance rate of the seen test: the share of the range inside the
+    #: windows ``extra_seen`` is asked in (:func:`chance_rate` on this route,
+    #: ``PatternScreen.p0`` on containment's).  The null of ``n_seen``, of
+    #: ``n_seen_unexplained`` and of both p-values (#1263).
     p0: float
     #: one-sided binomial P(X ≥ n_seen) for X ~ B(n_extra, p0): the probability
     #: of seeing at least this many extras had the child's extra lines not
@@ -620,10 +623,29 @@ class SupercellEvidence:
     #: line set is the denser; ``index`` 0).  C3's ``screen.containment_evidence``
     #: writes the second; :func:`supercell_chance` always the first.
     relation: str = "sublattice"
+    #: the screen's seen fraction of the child's and of the parent's own merged
+    #: lines at the resolution (``LineScreen.seen_fraction``, the panel's
+    #: ``predicted_seen_fraction``).  ``None`` where not measured, as on
+    #: :func:`supercell_chance`'s route.  A child seen more often than its
+    #: parent is never *refuted* (:attr:`child_seen_more`, #1230).
+    child_seen_fraction: float | None = None
+    parent_seen_fraction: float | None = None
+    #: the chance rate the power check (:attr:`p_floor`) reads, counted in
+    #: windows floored at the assumed shift bound (``PatternScreen.p0_power``,
+    #: #951).  ``None`` means no floor, and the check reads ``p0``.  At least
+    #: ``p0`` wherever set, since the floor only widens a window.
+    p0_power: float | None = None
 
     @property
     def n_extra(self) -> int:
         return len(self.extra_q)
+
+    @property
+    def child_seen_more(self) -> bool:
+        """Whether the child's own lines are seen more often than the parent's."""
+        return (self.child_seen_fraction is not None
+                and self.parent_seen_fraction is not None
+                and self.child_seen_fraction > self.parent_seen_fraction)
 
     @property
     def n_seen(self) -> int:
@@ -637,9 +659,15 @@ class SupercellEvidence:
 
     @property
     def p_floor(self) -> float:
-        """The p-value had **every** extra been seen, p₀ⁿ — the most this test
-        could have said for the child on these data."""
-        return float(self.p0 ** self.n_extra)
+        """The power bound: p₀ⁿ, the p-value had **every** extra been seen.
+        It is the most this test could have said for the child on these data.
+
+        Read at :attr:`p0_power` where one is set, so it is then larger than
+        the p-value the seen count's own null gives for all n seen.  Whether
+        the test had the power to refute is bounded by the assumed shift,
+        which the seen count's own windows do not carry (#951)."""
+        rate = self.p0 if self.p0_power is None else self.p0_power
+        return float(rate ** self.n_extra)
 
     def verdict(self, alpha: float = SUPERCELL_CHANCE_ALPHA) -> str:
         """``"supported"``, ``"refuted"`` or ``"undecided"``.
@@ -650,8 +678,9 @@ class SupercellEvidence:
         more often than chance** — ``n_seen ≤ n_extra · p0``, counting every
         seen one — and the test had the power to say otherwise.  *undecided*:
         everything between, in two forms.  Even every extra seen could not
-        have reached ``alpha`` (:attr:`p_floor` ≥ ``alpha``) — no extra in
-        range, or too few against a high chance rate — which is not measured,
+        have reached ``alpha`` (:attr:`p_floor` ≥ ``alpha``, read at
+        :attr:`p0_power` where one is set) — no extra in range, or too few
+        against a high chance rate — which is not measured,
         so it is not a refutation: a child with no extra line in range is the
         geometrical ambiguity :func:`ambiguity_partners` reports, not a cell
         the data reject.  Or the extras are seen above chance but not
@@ -673,12 +702,41 @@ class SupercellEvidence:
         and all 4 seen extras lie on lines the rival explains.  The same p₀
         is the null for both counts, which is conservative for support, since a
         random position lands on an unexplained line no more often than on any.
+
+        **A child seen more often than its parent is never refuted**
+        (:attr:`child_seen_more`, #1230).  An oversized description adds lines
+        the pattern lacks, so its own seen fraction falls below its parent's.
+        Every child #941's Acceptance table refutes does: 0.08–0.31 against the
+        synthetic Si truth's 0.73, 0.54–0.57 against the tetragonal truth's
+        1.0.  A child seen more often than its parent explains the pattern
+        better in the reverse direction.  The refutation would overturn that
+        reading of the panel's own reversed member at the same resolution.
+        The pair then reads *supported* or *undecided*.  Measured cause: on
+        dense low-symmetry patterns the assumed shift bound floored p₀ at
+        0.63–0.82, at or above a true cell's own seen fraction.  Containment's
+        density order can make the true cell the child of a wrong one, whose
+        lines merge into fewer resolved positions.  So "seen no more often than
+        chance" refuted three synthetic truths, which fell from first to second
+        and to twelfth.  Their seen fractions were 0.63, 0.42 and 0.54 against
+        their refuting parents' 0.37, 0.26–0.29 and 0.38–0.49.
+
+        **p₀ is the seen test's own chance rate, and only the power check reads
+        the floor** (#1263).  ``n_seen`` is counted at the resolution after the
+        candidate's common shift, with no floor, so its null is the share of
+        the range those windows cover.  Read at the floored rate, the null put
+        the expected count of #1230's three truths at 2.3–3.0× the seen
+        test's own (aP1: 112 of 183 seen against 115 at p₀ 0.628, and 37.7 at
+        the 0.206 a Monte Carlo of the seen test gives).  The floor still bounds
+        what the test could claim: #951's 0-of-2 pair has p₀² 1.3e-4 in the
+        seen test's windows and 0.030 in the floored ones, and stays
+        undecided (:attr:`p_floor`).
         """
         p_unexplained = (self.p_value if self.p_value_unexplained is None
                          else self.p_value_unexplained)
         if p_unexplained < alpha:
             return "supported"
-        if self.p_floor < alpha and self.n_seen <= self.n_extra * self.p0:
+        if (self.p_floor < alpha and self.n_seen <= self.n_extra * self.p0
+                and not self.child_seen_more):
             return "refuted"
         return "undecided"
 

@@ -112,6 +112,7 @@ cond(JᵀJ) = cond(J)² makes reduced precision unrecoverable.
 
 from __future__ import annotations
 
+import bisect
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -148,6 +149,47 @@ FTOL = 1e-9
 #: consecutive outer iterations below ``ftol`` that count as converged.  One
 #: small step is a small step; three running is convergence (Coelho's rule).
 _CONVERGED_RUNS = 3
+#: **The slow-descent rule** (WP-1334, issue #222).  A stage stops, with
+#: termination ``slow_descent``, once the next :data:`_SLOW_DESCENT_HORIZON`
+#: evaluations would lower S by less than ``SLOW_DESCENT_ESD²`` times
+#: χ²_red = S/(N − P), at the rate the last :data:`_SLOW_DESCENT_WINDOW`
+#: lowered it.  At a quadratic minimum that is the decrease bought by moving
+#: the parameters jointly by ``SLOW_DESCENT_ESD`` of their esds, since the
+#: esds are χ²_red·(JᵀJ)⁻¹ (Press et al. 2007, *Numerical Recipes* 3rd ed.,
+#: §15.6, Δχ² = 1 per standard deviation, scaled here by χ²_red).  McCusker et
+#: al. (1999), *J. Appl. Cryst.* 32, 36-50, §7, states convergence in the same
+#: unit, the shift over its esd.  So the stop gives up less than one esd of
+#: travel at that rate, and a stage still descending faster runs on.  Where
+#: the decrease per evaluation does not grow, the linear projection overstates
+#: what the next evaluations would buy, so the bound holds.  A stage that
+#: speeds up late is the case it misses.  The stop says nothing about how far
+#: the minimum is: a crawl along a flat or constrained direction can sit well
+#: above it (``tests/test_lm_solver.py``'s face crawl).
+#:
+#: N counts every row the driver sees, penalty and restraint rows included,
+#: so this χ²_red differs from the data-only one the reported esds use by
+#: those rows' share.  Its status is ``converged`` (Yue's ruling of
+#: 2026-11-03): further iterations would not move the answer by an esd, which
+#: is how McCusker §7 and GSAS-II call a refinement converged.  The stop is
+#: named by ``STAGE_SLOW_DESCENT``, an info diagnostic, beside ``termination``,
+#: so a reader can still tell it from the solver's own tests.  ``None`` switches the rule off and
+#: restores the driver before WP-1334 bit for bit.  The TRF driver has no such
+#: rule, since scipy owns its loop.
+SLOW_DESCENT_ESD: float | None = 1.0
+#: The slow-descent rule's window in residual evaluations, never steps, and
+#: the earliest point the rule is read: a quarter of a default stage's 400.
+#: ``tests/test_budget_and_tolerance_invariance.py`` asserts every converging
+#: acceptance stage stays inside it (the largest measured use is 49 of 400),
+#: so no stage that converges on the shipped schedule reaches the first
+#: reading, and those fits are unchanged bit for bit.  It is a count, not a
+#: fraction of the budget, so a stage given a smaller budget (a series'
+#: bounded first rung, WP-1127) is read at the same points as the unbounded
+#: one and cut, if at all, where that one would be.
+_SLOW_DESCENT_WINDOW = 100
+#: How far ahead the rule projects, in evaluations: the rest of a default
+#: stage's budget after its first window, 400 − 100.  A count for the same
+#: reason as the window, so the rule does not depend on ``max_iter``.
+_SLOW_DESCENT_HORIZON = 300
 #: relative floor on the *predicted* decrease −Δθᵀb.  Below this the step
 #: cannot be measured against S in fp64 (S is a sum of ~10⁴ squares, so its
 #: own resolution is ~1e-16·S), and a "failed" step is then a measurement
@@ -343,8 +385,10 @@ class LMOutcome:
     #: iterations — Coelho's rule), ``exhausted_fp64`` (every remaining step
     #: promises less than fp64 can measure against S, a zero step included:
     #: the bounded model's minimum is the current point), ``no_descent`` (the
-    #: inner loop found nothing downhill even at large λ), ``max_nfev`` (the
-    #: evaluation budget, TRF's token for the same stop).
+    #: inner loop found nothing downhill even at large λ), ``slow_descent``
+    #: (the rest of the budget would buy less than :data:`SLOW_DESCENT_ESD`
+    #: esd of travel, WP-1334), ``max_nfev`` (the evaluation budget, TRF's
+    #: token for the same stop).
     termination: str = "max_nfev"
     #: the bounds that hold the returned point, scipy's ``active_mask``
     #: convention (−1 lower, +1 upper, 0 neither) and exact: the variable sits
@@ -393,6 +437,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                                 None] | None = None,
              normal_equations: Callable[[np.ndarray, np.ndarray],
                                         tuple] | None = None,
+             check: Callable[[], None] | None = None,
              ) -> LMOutcome:
     """Minimise ``S(θ) = r(θ)ᵀr(θ)`` subject to ``lo ≤ θ ≤ hi`` (and ``T·θ+c ≥ 0``).
 
@@ -469,6 +514,13 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     projected CG's and a sparse A is what lets it precondition
     (:func:`_solve_step`).  A Pawley stage passes one that knows each
     intensity column's rows (``least_squares._pawley_normal_equations``).
+
+    ``check()``, when given, is called before every trial step and, above
+    :data:`BVLS_MAX_COLUMNS`, inside the step's projected CG before each
+    factorisation attempt and CG product.  It abandons the fit by raising,
+    which is how a cancel reaches a step that outlasts a deadline (one Pawley
+    step refactorised 1099 times in 27 s, WP-2063).  A BVLS step at or below
+    the cut, and a constrained step's one eigendecomposition, run unread.
     """
     if max_nfev < 1:
         # scipy's TRF refuses the same budget in the same words.  Run on, it
@@ -488,6 +540,9 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
         raise ValueError("Residuals are not finite in the initial point.")
     s = float(r @ r)
     n_fev, n_jev = 1, 0
+    # the incumbent's S after each accepted evaluation, the start included,
+    # for the slow-descent rule's window (:func:`_descent_too_slow`)
+    accepted_at, accepted_s = [1], [s]
     lam = 0.0
     signs: list[int] = []
     small_runs = 0
@@ -528,7 +583,10 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
         exhausted = False
         spent = False
         for _inner in range(_INNER_MAX):
-            step, side = _solve_step(A, b, lam, x, lo, hi, n_rows=len(r), scale=scale)
+            if check is not None:
+                check()
+            step, side = _solve_step(A, b, lam, x, lo, hi, n_rows=len(r),
+                                     scale=scale, check=check)
             crossed = [iq.label for iq in ineqs if iq.crossed(x, step)]
             if crossed:
                 # the box-only step leaves the feasible set: solve the same
@@ -594,6 +652,8 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                 rel = -ds / max(abs(s), 1e-300)
                 x, r, s = x_try, r_try, s_try
                 accepted = True
+                accepted_at.append(n_fev)
+                accepted_s.append(s)
                 if callback is not None:
                     callback(x, 0.5 * s)
                 small_runs = small_runs + 1 if rel < ftol else 0
@@ -648,6 +708,11 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
             status = 1
             termination = "ftol_runs"
             break
+        if _descent_too_slow(accepted_at, accepted_s, n_fev, max_nfev,
+                    n_dof=len(r) - len(x)):
+            status = 1
+            termination = "slow_descent"
+            break
 
     # J must be the Jacobian *at the returned point* — covariance_estimates
     # reads it together with ``fun``, and a stale one silently mis-scales
@@ -668,6 +733,28 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                      truncated_by=truncated_by,
                      n_stalled=n_stalled, termination=termination,
                      active_mask=active)
+
+
+def _descent_too_slow(accepted_at: list[int], accepted_s: list[float],
+                      n_fev: int, max_nfev: int, *, n_dof: int) -> bool:
+    """Whether the slow-descent rule stops the stage here.
+
+    The rule is :data:`SLOW_DESCENT_ESD`'s.
+
+    ``accepted_at``/``accepted_s`` are the evaluation count and S after each
+    accepted step, the start first, so the incumbent ``window`` evaluations
+    ago is the last entry at or before ``n_fev − window``.  Every count is in
+    residual evaluations, the unit the budget is in (WP-1937), never steps.
+    """
+    if SLOW_DESCENT_ESD is None or n_dof <= 0:
+        return False
+    window = _SLOW_DESCENT_WINDOW
+    if n_fev - window < 1 or n_fev >= max_nfev:
+        return False
+    i = bisect.bisect_right(accepted_at, n_fev - window) - 1
+    s_now = accepted_s[-1]
+    projected = (accepted_s[i] - s_now) * _SLOW_DESCENT_HORIZON / window
+    return projected < SLOW_DESCENT_ESD ** 2 * s_now / n_dof
 
 
 def _normal_equations(J, r: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -751,7 +838,8 @@ def _measured_curvature(residual: Callable[[np.ndarray], np.ndarray],
 
 def _solve_step(A: np.ndarray, b: np.ndarray, lam: float, x: np.ndarray,
                 lo: np.ndarray, hi: np.ndarray, *, n_rows: int,
-                scale: np.ndarray | None = None
+                scale: np.ndarray | None = None,
+                check: Callable[[], None] | None = None
                 ) -> tuple[np.ndarray, np.ndarray]:
     """One damped Gauss-Newton step, solved exactly inside the box (WP-1937).
 
@@ -838,7 +926,8 @@ def _solve_step(A: np.ndarray, b: np.ndarray, lam: float, x: np.ndarray,
         A_s[np.diag_indices(n)] += lam
     b_s = b * inv_d
     if n > BVLS_MAX_COLUMNS:
-        y, side = bccg.projected_cg(A_s, b_s, (lo - x) * d, (hi - x) * d)
+        y, side = bccg.projected_cg(A_s, b_s, (lo - x) * d, (hi - x) * d,
+                                    check=check)
         return y * inv_d, side
     w, V = lapack.eigh(A_s)
     w_max = float(w[-1]) if n else 0.0

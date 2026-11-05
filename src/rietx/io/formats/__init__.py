@@ -57,6 +57,11 @@ from .philips_rd import PHILIPS_RD, read_philips_rd
 from .ras import RAS, read_ras
 from .rasx import RASX, read_rasx
 from .raw_unknown import RAW_UNKNOWN, read_unknown_raw
+from .total_scattering import (
+    TOTAL_SCATTERING,
+    TotalScatteringRefused,
+    read_total_scattering,
+)
 from .udf import UDF, read_udf
 from .uxd import UXD, read_uxd
 from .xrdml import XRDML, read_xrdml
@@ -78,11 +83,13 @@ from .xy import XY, read_xy
 #: to build an abscissa at all, so a file matching them is a ``.udf`` or is
 #: nothing, and putting it below ``PDCIF``/``GSAS`` would only let a weaker
 #: sniff answer first.  ``PEAK_LIST`` sits beside ``DIF``, the refusal it
-#: copies; ``RAW_UNKNOWN`` sits below ``XY``, for the reason in the module
-#: docstring.
+#: copies; ``TOTAL_SCATTERING`` (issue #1240) beside both and directly above
+#: ``XY``, the one entry its files fell to, so it can shadow no reader;
+#: ``RAW_UNKNOWN`` sits below ``XY``, for the reason in the module docstring.
 PATTERN_FORMATS: tuple[PatternFormat, ...] = (BRUKER_RAW, PHILIPS_RD, RASX, BRML,
                                               RAS, UXD, XRDML, UDF, PDCIF, GSAS,
-                                              CHI, DIF, PEAK_LIST, XY,
+                                              CHI, DIF, PEAK_LIST,
+                                              TOTAL_SCATTERING, XY,
                                               RAW_UNKNOWN)
 
 __all__ = [
@@ -95,6 +102,7 @@ __all__ = [
     "PatternFormat",
     "ReaderOption",
     "ScanInfo",
+    "TotalScatteringRefused",
     "ascending",
     "check_axis",
     "decode",
@@ -114,6 +122,7 @@ __all__ = [
     "read_philips_rd",
     "read_ras",
     "read_rasx",
+    "read_total_scattering",
     "read_udf",
     "read_unknown_raw",
     "read_uxd",

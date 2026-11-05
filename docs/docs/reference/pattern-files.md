@@ -42,7 +42,7 @@ It refuses a format that holds one measurement per file.
 
 The readers are tried in a fixed order, and the first whose test matches reads the file.
 Magic bytes and archive manifests come first, then a required first line or XML root, then a suffix, then a looser text test.
-The two peak-list refusals come next, then the ASCII reader, and the refusal of an unrecognised `.raw` comes last, so it can shadow no reader.
+The two peak-list refusals and the total-scattering refusal come next, then the ASCII reader, and the refusal of an unrecognised `.raw` comes last, so it can shadow no reader.
 `ReaderCapability.sniff` gives each format's test in words, `ReaderCapability.sigma` says where its esds come from, and `ReaderCapability.refuses` says why a refused format is declined.
 
 | Format | `name` | Suffixes | Option | Esds |
@@ -58,15 +58,17 @@ The two peak-list refusals come next, then the ASCII reader, and the refusal of 
 | Powder CIF | `pdcif` | `.cif` | `block` | an `_su` or `_esd` loop, then an uncertainty in parentheses on every intensity, then `_pd_proc_ls_weight` read as 1/σ², else Poisson |
 | GSAS raw powder data | `gsas` | `.fxye`, `.gsas`, `.gda`, `.xra`, `.raw` | `bank` | the third column of an `FXYE` record or the second of an `ESD` record; Poisson for `STD` |
 | FIT2D or pyFAI integrated pattern | `chi` | `.chi` | none | the third column where written, else Poisson |
-| Two- or three-column ASCII | `xy` | `.xy`, `.xye`, `.dat`, `.prn`, `.txt` | none | the third column where present and positive, else Poisson |
+| Two- or three-column ASCII | `xy` | `.xy`, `.xye`, `.dat`, `.prn`, `.txt` | `axis` | the third column where present and positive, else Poisson |
 
 | Refused format | `name` | Suffix | Why |
 |---|---|---|---|
 | Peak list from DIFFRAC-AT or RRUFF | `dif_peaklist` | `.dif` | a table of reflections, recognised by its hkl columns |
 | Peak list from Stoe or PANalytical | `peak_list` | `.pks`, `.udi` | a table of reflections, recognised by the suffix alone because no sample file was available |
+| Total-scattering function, G(r), S(Q) or F(Q), from PDFgetX2, PDFgetX3 or a bare export | `total_scattering` | `.gr`, `.sq`, `.fq` | not a powder pattern: an r or Q axis, recognised by an `#L` line labelling r and G or Q and S/F, or a PDFgetX2 or PDFgetX3 header, whatever the suffix; with neither, by the suffix alone. Refused with [`PATTERN_TOTAL_SCATTERING`](diagnostics-files.md#pattern_total_scattering) until rietx reads total scattering (#192) |
 | Unrecognised binary `.raw` | `raw_unclaimed` | `.raw` | six vendors write `.raw`, and this file matched none of the readers |
 
 A file misnamed `.dif`, `.pks` or `.udi` that reads as a plain profile still reaches the ASCII reader.
+A 2θ scan that only carries a `.gr`, `.sq` or `.fq` suffix opens under any other name.
 `capabilities()` lists the formats in the order they are tried:
 
 ```python
@@ -75,11 +77,14 @@ from rietx import capabilities
 caps = capabilities()
 assert [fmt.name for fmt in caps.reader_formats] == [
     "bruker_raw", "philips_rd", "rasx", "brml", "ras", "uxd", "xrdml", "udf",
-    "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "xy", "raw_unclaimed"]
-assert [opt.name for opt in caps.reader_options] == ["bank", "block", "scan"]
+    "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "total_scattering", "xy",
+    "raw_unclaimed"]
+assert [opt.name for opt in caps.reader_options] == ["axis", "bank", "block", "scan"]
 ```
 
 ### Format notes
+
+Every reader drops a point whose 2θ, count or σ is NaN or infinite, and reports it with [`PATTERN_ROWS_DROPPED`](diagnostics-files.md#pattern_rows_dropped), naming the dropped points by their 2θ. A file with no finite point is refused. Two readers differ. `bruker_raw` refuses a non-finite count or 2θ, because in that binary format it means the file was read wrongly. `pdcif` keeps σ = ∞, which it writes for a point of zero weight and then excludes.
 
 - `bruker_raw` reads versions 2 (`RAW2`), 3 (`RAW1.01`) and 4 (`RAW4.00`). Version 1 is refused by name, because no description of it exists. A version 2 file is read when it holds one range and its header and counts account for its size exactly; a version 2 file with more than one range is refused by name. A version 3 file whose declared ranges leave non-zero bytes over is refused, naming the offset. A trailing run of zeros is accepted.
 - `philips_rd` stores each intensity √-compressed, and the reader decodes it as counts = v²//100. The header states the file's length twice and its maximum intensity once, and a disagreement is refused.
@@ -90,10 +95,14 @@ assert [opt.name for opt in caps.reader_options] == ["bank", "block", "scan"]
 - `gsas` reads `STD`, `ESD` and `FXYE` records and refuses `ALT` and `FXY` by name. A file whose only bank record is behind a `#` is read from that record, with [`GSAS_BANK_COMMENTED`](diagnostics-files.md#gsas_bank_commented).
 - `chi` requires the point count in its four-line header to match the rows.
 - `xy` keeps the rows at the file's most common column count and drops the rest with [`PATTERN_ROWS_DROPPED`](diagnostics-files.md#pattern_rows_dropped). A file with NUL bytes in its first 4 kB is refused unless a byte-order mark says it is UTF-16.
+- `xy` reads a FullProf `XYDATA` heading, the keyword on line 1 and five heading lines (the FullProf manual, 2001, PDF p. 74, `Ins = 10`). `TEMP` becomes `temperature_k`. The `INTER` multipliers are applied as the manual defines them: x times `fac_x`, the intensities and σ times `fac_y`, reported by [`XYDATA_INTER_APPLIED`](diagnostics-files.md#xydata_inter_applied). A file with no σ column gets the Poisson σ of the multiplied intensity, √(fac_y·y), as FullProf 8.20 computes it. `Interpol = 1`, which asks for an interpolation to a constant step, is refused.
 
 ## Reader options
 
-`read_pattern` takes three keyword options, and the Option column under [Formats](#formats) says which format honours which.
+`read_pattern` takes four keyword options, and the Option column under [Formats](#formats) says which format honours which.
+
+`axis`
+: What the x column of a plain two- or three-column file is, `"two_theta"` (2θ in degrees) or `"tof"` (a flight time in µs), the spellings of `PatternData.axis`. A file that states no unit is read as 2θ unless you declare it, because its numbers cannot say which. The declaration is recorded as `PatternData.metadata["declared_axis"]`. A file whose own unit line contradicts it is refused, and the message quotes both.
 
 `scan`
 : Which measurement to read, counting from 0, in a vendor file that holds several. The ranges are selected and never concatenated, because two ranges are usually two counting regimes. A file holding several, read without `scan`, returns scan 0 and reports [`PATTERN_MULTISCAN_DEFAULTED`](diagnostics-files.md#pattern_multiscan_defaulted).
@@ -159,7 +168,7 @@ A non-2θ scan parses cleanly and refines to a wrong cell, so a format that stat
 - any other recognisable axis, such as a q or d axis, a rocking curve or a pole-figure ring, is refused, naming what the file holds;
 - an axis the reader cannot identify is read as 2θ, with [`PATTERN_X_AXIS_ASSUMED`](diagnostics-files.md#pattern_x_axis_assumed) quoting what the file says.
 
-A format that states no axis at all, `.udf` and an `.xy` file with no unit comment, is read as 2θ without a diagnostic.
+A format that states no axis at all, `.udf` and an `.xy` file with no unit comment, is read as 2θ without a diagnostic, unless `axis="tof"` declares an `.xy` file's x column a flight time.
 A flight-time axis is taken only from a statement of the unit, never from the size of the numbers.
 A range of 1000 to 10000 µs passes every check a 10-100° scan passes.
 
@@ -169,13 +178,14 @@ The instrument sets the wavelength.
 ## Time-of-flight patterns
 
 Two readers produce a time-of-flight pattern, with `PatternData.tof` in microseconds in place of `PatternData.two_theta`.
-Both do it because the file states the unit.
+Each does it because the file states the unit, or, for a plain ASCII file, because the caller declares it.
 
 | File | What makes it a flight time |
 |---|---|
 | GSAS bank, `TIME_MAP` bintype | the bintype. The steps are tabulated in a separate `TIME_MAP` record as (first channel, flight time, step) triples in clock ticks, so the axis is exact and all three record layouts (`STD`, `ESD`, `FXYE`) are read. |
 | GSAS bank, `RALF` or `SLOG` bintype | the bintype and an `FXYE` record layout, which writes its own x column. Mantid's `SaveGSS` writes this, `RALF` by default. Under `ESD` or `STD` the axis would have to be rebuilt from the bank's four coefficients, and the bank is refused by name. |
 | `.xy` or `.xye` with a Mantid header | the line `' The X-axis unit is: Time-of-flight`. |
+| `.xy`, `.xye` or `.dat` with no unit line | the caller's `axis="tof"`, recorded as `metadata["declared_axis"]`. |
 
 The GSAS manual says a `RALF` step varies irregularly about a constant Δt/t.
 Rebuilding a real ISIS GEM bank's axis from its own coefficients reproduces the file's explicit column only to about 9 × 10⁻³ µs.
@@ -206,6 +216,7 @@ A reader refuses to write any other key, because the GUI's import wizard and a p
 | `sample` | the sample name the file records |
 | `x_label` | the x-axis label the file states, verbatim |
 | `scan_axis` | the goniometer axis scanned, as the file names it |
+| `declared_axis` | the abscissa the caller declared with the `axis` reader option; a declaration, not a finding |
 | `scan` | which scan was read, counting from 0 |
 | `scan_count` | how many scans the file holds |
 | `anode` | the X-ray target element the file names |
@@ -224,7 +235,7 @@ from rietx.io.formats.base import METADATA_KEYS
 
 assert list(METADATA_KEYS) == [
     "source_file", "format", "block", "title", "sample", "x_label",
-    "scan_axis", "scan", "scan_count", "anode", "wavelength",
+    "scan_axis", "declared_axis", "scan", "scan_count", "anode", "wavelength",
     "wavelength_alpha2", "intensity_item", "intensity_unit", "count_time_s",
     "temperature_k", "goniometer_radius_mm", "beam_optics",
     "diffracted_beam_optics"]

@@ -2,9 +2,9 @@
 
 Three things are pinned.  A formula-unit volume is Hofmann's (2002) sum of
 average atomic volumes, with its esd.  ``SearchSpec.from_formula`` turns it
-into a volume window the caller declares.  And ``index_pattern(formula=...)``
-reports a candidate whose volume holds a fractional number of formula units,
-without removing it.
+into a volume ceiling the caller declares (a ceiling only since WP-2030).  And
+``index_pattern(formula=...)`` records the formula units each candidate holds,
+judging and removing nothing.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from rietx.crystallography.atomic_volume import (
     formula_unit_volume,
 )
 from rietx.indexing import index_pattern
-from rietx.indexing.diagnostics import Z_INTEGER_TOLERANCE, candidate_diagnostics
+from rietx.indexing.diagnostics import candidate_diagnostics
 from rietx.indexing.engines import DEFAULT_MIN_VOLUME, SearchSpec
 from rietx.schemas.indexing import CellCandidate
 from tests.test_indexing_engines import synthetic_peaks
@@ -77,22 +77,39 @@ def test_a_formula_the_table_cannot_read_raises_naming_why(formula, named):
         formula_unit_volume(formula)
 
 
-def test_the_window_holds_z_units_widened_to_hofmanns_bounds():
+def test_the_window_is_a_ceiling_of_z_units_at_hofmanns_upper_bound():
+    # WP-2030, ruled on #1121: a ceiling only, for every formula
     low, high = VOLUME_RATIO_BOUNDS
     assert (low, high) == (0.8, 1.25)
     spec = SearchSpec.from_formula(BENZOIC, z=4, max_d_axis=32.0)
-    assert spec.min_volume == pytest.approx(4 * BENZOIC_V * 0.8)
+    assert spec.min_volume == DEFAULT_MIN_VOLUME
     assert spec.max_volume == pytest.approx(4 * BENZOIC_V * 1.25)
     assert spec.max_d_axis == 32.0
+    # only the largest z sets the ceiling; the smallest narrows nothing
     ranged = SearchSpec.from_formula(BENZOIC, z=(2, 8))
     assert (ranged.min_volume, ranged.max_volume) == pytest.approx(
-        (2 * BENZOIC_V * 0.8, 8 * BENZOIC_V * 1.25))
-    # no Z: the floor of one formula unit, and the envelope keeps the ceiling
-    floor_only = SearchSpec.from_formula(BENZOIC)
-    assert floor_only.min_volume == pytest.approx(BENZOIC_V * 0.8)
-    assert floor_only.max_volume is None
-    # two lower bounds, the larger binds
-    assert SearchSpec.from_formula("H2").min_volume == DEFAULT_MIN_VOLUME
+        (DEFAULT_MIN_VOLUME, 8 * BENZOIC_V * 1.25))
+    # the pair's minimum is validated and then ignored: the same spec for any
+    # minimum, as the docstring says
+    assert SearchSpec.from_formula(BENZOIC, z=(4, 8)) == SearchSpec.from_formula(
+        BENZOIC, z=(1, 8))
+    # no Z: the window narrows nothing
+    bare = SearchSpec.from_formula(BENZOIC)
+    assert (bare.min_volume, bare.max_volume) == (DEFAULT_MIN_VOLUME, None)
+    assert bare == SearchSpec()
+    # a floor is the caller's to declare beside the formula
+    floored = SearchSpec.from_formula(BENZOIC, z=4, min_volume=400.0)
+    assert floored.min_volume == 400.0
+    with pytest.raises(ValueError, match="sets max_volume"):
+        SearchSpec.from_formula(BENZOIC, z=4, max_volume=900.0)
+    # a ceiling under the floor would search nothing, and says so
+    with pytest.raises(ValueError, match="below the 15 Å³ floor"):
+        SearchSpec.from_formula("H2", z=1)
+    with pytest.raises(ValueError, match="below the 800 Å³ floor"):
+        SearchSpec.from_formula(BENZOIC, z=4, min_volume=800.0)
+    # an explicit None names the field, not a bare TypeError from the comparison
+    with pytest.raises(ValueError, match="min_volume"):
+        SearchSpec.from_formula(BENZOIC, z=4, min_volume=None)
 
 
 @pytest.mark.parametrize("z", [0, (4, 2), 2.5])
@@ -107,35 +124,18 @@ def _candidate(volume: float) -> CellCandidate:
                          system="cubic", volume=volume)
 
 
-def _z_checks(volume: float, formula: str | None = BENZOIC):
-    return [d for d in candidate_diagnostics(_candidate(volume), formula=formula)
-            if d.code == "INDEX_Z_NOT_INTEGER"]
+def test_no_diagnostic_judges_the_number_of_formula_units():
+    # WP-2030: INDEX_Z_NOT_INTEGER is withdrawn; candidate_diagnostics reads no
+    # formula, so a cell of 2.5 formula units carries nothing about it
+    diags = candidate_diagnostics(_candidate(2.5 * BENZOIC_V))
+    assert [d.code for d in diags if "Z_NOT" in d.code] == []
+    with pytest.raises(TypeError):
+        candidate_diagnostics(_candidate(2.5 * BENZOIC_V), formula=BENZOIC)
 
 
-@pytest.mark.parametrize("z", [8 / 3, 2.5, 0.6])
-def test_the_z_check_fires_on_a_fractional_cell(z):
-    (diag,) = _z_checks(z * BENZOIC_V)
-    assert diag.level == "warning"
-    assert diag.value == pytest.approx(z)
-    assert f"{z:.2f} formula units of {BENZOIC}" in diag.message
-    assert f"formula {BENZOIC}" in diag.where
-
-
-@pytest.mark.parametrize("z", [4.0, 4.0 * 1.07, 2.8])
-def test_the_z_check_is_silent_within_twice_the_scatter(z):
-    # 2.8 sits 6.7 % from 3, inside the 8 % that twice Hofmann's 4.00 %
-    # scatter of one crystal allows, so it is not evidence of a fractional Z
-    assert Z_INTEGER_TOLERANCE == pytest.approx(0.08)
-    assert _z_checks(z * BENZOIC_V) == []
-
-
-def test_no_formula_no_z_check():
-    assert _z_checks(2.5 * BENZOIC_V, formula=None) == []
-
-
-def test_index_pattern_reports_the_z_and_keeps_the_candidate():
-    # methanol's 45.58 Å³ against the synthetic cubic cell's 71.8 Å³: Z = 1.58,
-    # 21 % from 2, so the true cell is reported and still ranked
+def test_index_pattern_records_the_formula_units_and_keeps_the_candidate():
+    # methanol's 45.58 Å³ against the synthetic cubic cell's 71.8 Å³: 1.58
+    # formula units, recorded on every candidate, the true cell still ranked
     peaks, true_cell = synthetic_peaks("cubic")
     spec = SearchSpec(systems=("cubic",), min_d_axis=2.0, max_d_axis=12.0,
                       max_volume=1500.0, shift_allowance_deg=1e-9)
@@ -143,9 +143,18 @@ def test_index_pattern_reports_the_z_and_keeps_the_candidate():
                         engines=("trial_error",), formula="CH3OH")
     truth = next(c for c in res.candidates
                  if c.cell[0] == pytest.approx(true_cell[0], rel=1e-3))
-    (diag,) = [d for d in truth.diagnostics if d.code == "INDEX_Z_NOT_INTEGER"]
     v_fu, _ = formula_unit_volume("CH3OH")
-    assert diag.value == pytest.approx(truth.volume / v_fu)
+    assert truth.formula_units == pytest.approx(truth.volume / v_fu)
+    assert truth.formula_units == pytest.approx(1.58, abs=0.01)
+    assert all(c.formula_units == pytest.approx(c.volume / v_fu)
+               for c in res.candidates)
+    assert not any("Z_NOT" in d.code for c in res.candidates
+                   for d in c.diagnostics)
+    # no formula: nothing recorded, and nothing claims it was
+    bare = index_pattern(peaks, spec=spec, preset="full",
+                         engines=("trial_error",))
+    assert [c.formula_units for c in bare.candidates] == [None] * len(bare.candidates)
+    assert [c.cell for c in bare.candidates] == [c.cell for c in res.candidates]
 
 
 def test_index_pattern_refuses_a_bad_formula_before_any_work():
@@ -155,7 +164,7 @@ def test_index_pattern_refuses_a_bad_formula_before_any_work():
 
 
 # ----------------------------------------------------------------------
-# WP-2030: the window and the Z check against known cells, measured
+# WP-2030: the window and the formula units against known cells, measured
 # ----------------------------------------------------------------------
 def _volume(a, b, c, al=90.0, be=90.0, ga=90.0):
     import math
@@ -253,71 +262,62 @@ KNOWN_CELLS: dict[str, tuple[str, int, float, float, bool]] = {
     "hybrid iodide": ("C10H36I10N4Pb3", *_cif("cod_4003235.cif"), True),
 }
 
-#: Measured on this tree (WP-2030, 2026-10-23): V_true / (Z × V_est), the
-#: ratio Hofmann (2002, § 3) bounds at 0.8-1.25, and whether the window at the
-#: true Z and the floor at ``z=None`` hold the true cell.  Every inorganic cell
-#: but halite's lies under 0.8, at 0.375-0.649, so the window's floor excludes
-#: it; at ``z=None`` the floor of one formula unit still excludes the three
-#: Z = 1 cells.  HKUST-1 lies above 1.25 the other way: its formula leaves the
-#: pores' contents out, Hofmann's § 3 (ii).  Pinned so that the window rule
-#: WP-2030's part 2 adds moves these numbers visibly.
-MEASURED: dict[str, tuple[float, bool, bool]] = {
-    "LaB6": (0.523, False, False), "Si": (0.537, False, True),
-    "corundum": (0.375, False, True), "NAC": (0.637, False, True),
-    "fluorapatite": (0.568, False, True), "zincite": (0.473, False, True),
-    "zircon": (0.593, False, True), "brucite": (0.591, False, False),
-    "magnetite": (0.541, False, True), "fluorite": (0.605, False, True),
-    "halite": (0.866, True, True), "cBN": (0.472, False, True),
-    "anglesite": (0.649, False, True), "hausmannite": (0.571, False, True),
-    "LCMO": (0.488, False, True), "YBCO": (0.523, False, False),
-    "paracetamol": (1.000, True, True), "benzoic acid": (1.026, True, True),
-    "bethanechol chloride": (1.014, True, True), "HKUST-1": (2.283, False, True),
-    "hybrid iodide": (1.044, True, True),
+#: Measured (WP-2030, 2026-10-23; unchanged by part 2, which moved no volume):
+#: V_true / (Z × V_est), the ratio Hofmann (2002, § 3) marks unusual outside
+#: 0.8-1.25.  Every inorganic cell but halite's lies under 0.8, at 0.375-0.649,
+#: and nine of them under 0.57, the edge of his § 3 (i), "Z entered wrongly".
+#: That is why the shipped window's floor excluded all but halite, and why
+#: part 2 dropped it for every formula (ruled on #1121, 2026-10-24).  HKUST-1
+#: lies above 1.25 the other way: its formula leaves the pores' contents out,
+#: his § 3 (ii).
+MEASURED: dict[str, float] = {
+    "LaB6": 0.523, "Si": 0.537, "corundum": 0.375, "NAC": 0.637,
+    "fluorapatite": 0.568, "zincite": 0.473, "zircon": 0.593, "brucite": 0.591,
+    "magnetite": 0.541, "fluorite": 0.605, "halite": 0.866, "cBN": 0.472,
+    "anglesite": 0.649, "hausmannite": 0.571, "LCMO": 0.488, "YBCO": 0.523,
+    "paracetamol": 1.000, "benzoic acid": 1.026, "bethanechol chloride": 1.014,
+    "HKUST-1": 2.283, "hybrid iodide": 1.044,
 }
+#: The one known cell the ceiling does not hold: a framework written without
+#: what fills its pores.
+ABOVE_THE_CEILING = {"HKUST-1"}
 
 
 @pytest.mark.parametrize("name", sorted(KNOWN_CELLS))
-def test_the_window_against_known_cells_is_measured(name):
+def test_every_known_cell_lies_inside_its_window(name):
+    """WP-2030's acceptance: the true cell inside ``from_formula``'s window at
+    its true Z, for every inorganic and organic cell measured, and nothing
+    narrowed at ``z=None``."""
     formula, z, v_true, t, _organic = KNOWN_CELLS[name]
-    ratio, inside, inside_floor = MEASURED[name]
     v_fu, _ = formula_unit_volume(formula, t)
-    assert v_true / (z * v_fu) == pytest.approx(ratio, abs=5e-4)
+    assert v_true / (z * v_fu) == pytest.approx(MEASURED[name], abs=5e-4)
     spec = SearchSpec.from_formula(formula, z=z, temperature=t)
-    assert (spec.min_volume <= v_true <= spec.max_volume) is inside
-    floor = SearchSpec.from_formula(formula, temperature=t)
-    assert (v_true >= floor.min_volume) is inside_floor
+    inside = spec.min_volume <= v_true <= spec.max_volume
+    assert inside is (name not in ABOVE_THE_CEILING)
+    bare = SearchSpec.from_formula(formula, temperature=t)
+    assert (bare.min_volume, bare.max_volume) == (DEFAULT_MIN_VOLUME, None)
 
 
-def test_a_ceiling_alone_would_hold_every_inorganic_cell_measured():
-    """The first of WP-2030's three candidate rules, as arithmetic: every
-    inorganic cell measured lies under 1.25 × Z × V_est, so a window with no
-    floor holds them all.  The rule itself is part 2's to choose."""
-    high = VOLUME_RATIO_BOUNDS[1]
-    for name, (formula, z, v_true, t, organic) in KNOWN_CELLS.items():
-        if not organic:
-            v_fu, _ = formula_unit_volume(formula, t)
-            assert v_true <= z * v_fu * high, name
+def test_the_fluorapatite_window_holds_its_cell():
+    # the WP's case: 1.10.0's window was 738-1153 Å³ and missed this cell
+    spec = SearchSpec.from_formula("Ca5P3O12F", z=2)
+    v_true = KNOWN_CELLS["fluorapatite"][2]
+    assert 523 < v_true < 524
+    assert spec.min_volume <= v_true <= spec.max_volume
+    assert spec.max_volume == pytest.approx(1153.0, abs=1.0)
 
 
-#: The Z check on the true cells above, measured on this tree (WP-2030): it
-#: fires on twelve of the sixteen inorganic cells, and the four it spares
-#: imply a whole number that is not their Z (silicon reads 4.30 for its 8, cBN
-#: 1.89 for 4, LCMO 1.95 for 4, zincite 0.95 for 2).  Silent on every organic
-#: and metal-organic cell.  Pinned for part 2, whose window rule decides which
-#: formulas the check may read Hofmann's table for.
-Z_CHECK_FIRES = {"LaB6", "corundum", "NAC", "fluorapatite", "zircon", "brucite",
-                 "magnetite", "fluorite", "halite", "anglesite", "hausmannite",
-                 "YBCO"}
-
-
-def test_the_z_check_against_known_cells_is_measured():
-    fired = set()
-    for name, (formula, _z, v_true, t, _organic) in KNOWN_CELLS.items():
-        diags = candidate_diagnostics(_candidate(v_true), formula=formula,
-                                      temperature=t)
-        if any(d.code == "INDEX_Z_NOT_INTEGER" for d in diags):
-            fired.add(name)
-    assert fired == Z_CHECK_FIRES
+@pytest.mark.parametrize("name", sorted(KNOWN_CELLS))
+def test_the_formula_units_of_a_known_cell_bound_its_z_from_below(name):
+    """``formula_units`` is Z × the measured ratio: a correct inorganic cell
+    reads 0.4-0.9 of its Z, which no whole-number test can tell from a wrong
+    Z (the maintainer on #1121).  The ceiling still bounds Z from below,
+    Z ≥ formula_units / 1.25, on every cell it holds."""
+    formula, z, v_true, t, _organic = KNOWN_CELLS[name]
+    v_fu, _ = formula_unit_volume(formula, t)
+    units = _candidate(v_true).volume / v_fu
+    assert units == pytest.approx(z * MEASURED[name], rel=1e-3)
+    assert (z >= units / VOLUME_RATIO_BOUNDS[1]) is (name not in ABOVE_THE_CEILING)
 
 
 # ----------------------------------------------------------------------
@@ -370,7 +370,7 @@ def test_every_full_stop_that_reads_two_ways_is_refused(formula):
 
 
 # ----------------------------------------------------------------------
-# WP-2030: the result records the formula its Z check read
+# WP-2030: the result records the formula it read
 # ----------------------------------------------------------------------
 def test_the_result_records_the_formula_and_temperature_it_checked():
     from rietx.schemas.indexing import IndexingResult

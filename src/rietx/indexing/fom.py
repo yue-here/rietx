@@ -195,14 +195,20 @@ def _laue_rotations(symbol: str) -> np.ndarray:
     ``Rᵀ`` because the action on *hkl* is the transposed rotation (CLAUDE.md,
     and the comment in ``crystallography.symmetry.generate_reflections``), and
     deduplicated because a centred group's operation list repeats every rotation
-    once per centring vector.
+    once per centring vector.  **The set is checked closed under composition**,
+    because :func:`laue_multiplicity` counts an orbit by its stabiliser, which
+    is exact only over a group.
     """
     from ..crystallography.symmetry import get_spacegroup, rotation_matrices
 
     rots = rotation_matrices(get_spacegroup(symbol))
     rot_int = np.rint(np.transpose(rots, (0, 2, 1))).astype(np.int64)
     uniq = {tuple(int(v) for v in r.ravel()) for r in rot_int}
-    return np.array(sorted(uniq), dtype=np.int64).reshape(-1, 3, 3)
+    out = np.array(sorted(uniq), dtype=np.int64).reshape(-1, 3, 3)
+    products = np.einsum("aij,bjk->abik", out, out).reshape(-1, 9)
+    if not {tuple(int(v) for v in p) for p in products} <= uniq:
+        raise ValueError(f"the rotations of {symbol!r} are not a group")
+    return out
 
 
 def laue_multiplicity(hkl: np.ndarray, system: str, centring: str = "P"
@@ -214,25 +220,32 @@ def laue_multiplicity(hkl: np.ndarray, system: str, centring: str = "P"
     of tuples per reflection — the cost profile :func:`predicted_lines` exists to
     escape (683 ms against 1.8 ms on a 17 Å cubic cell), and ``N^cal`` needs one
     multiplicity per reflection over the whole enumeration, per candidate.  So the
-    orbit images are formed for every reflection at once and counted by sorting an
-    integer encoding of each image, which is exact rather than approximate: the
-    encoding is a bijection on the index range in play.
+    orbit is counted for every reflection at once, in integers, which is exact
+    rather than approximate.
+
+    **The orbit is counted by its stabiliser, never by listing it** (WP-2063).
+    The images of ``h`` under the R rotations and their negatives are a list of
+    2R in which every element of ⟨G, −1⟩ appears equally often, so the orbit
+    size is 2R over the number of entries equal to ``h`` itself (R·h = ±h).
+    Each image is compared through an integer encoding that is a bijection on
+    the index range in play, and the encoding is linear, so the images' codes
+    are one product with ``h`` and the −h test is a sign.  It replaced sorting
+    every image's code, which was most of the panel's cost: 6.7 s of 9.1 s
+    over one NAC merge, 0.36 s after.
     """
     h = np.atleast_2d(np.asarray(hkl, dtype=np.int64))
     if not len(h):
         return np.zeros(0, dtype=np.int64)
     rot = _laue_rotations(lattice_group(system, centring))
-    # (N, R, 3) images, then their Friedel mates — a Laue group contains the
-    # inversion, so the mates are usually already present; the stack costs one
-    # concatenation and removes the "usually" from that sentence
-    images = np.einsum("rij,nj->nri", rot, h)
-    images = np.concatenate([images, -images], axis=1)
-    base = 2 * int(np.abs(images).max()) + 1
-    key = ((images[:, :, 0] * base) + images[:, :, 1]) * base + images[:, :, 2]
-    key.sort(axis=1)
-    distinct = np.ones_like(key, dtype=bool)
-    distinct[:, 1:] = np.diff(key, axis=1) != 0
-    return distinct.sum(axis=1).astype(np.int64)
+    # a row sum of |R| times max|h| bounds every component of every image
+    span = int(np.abs(rot).sum(axis=2).max()) * int(np.abs(h).max())
+    base = 2 * span + 1
+    weight = np.array([base * base, base, 1], dtype=np.int64)
+    code = h @ weight
+    image_code = h @ (weight @ rot).T                    # (N, R): code of R·h
+    fixed = (np.count_nonzero(image_code == code[:, None], axis=1)
+             + np.count_nonzero(image_code == -code[:, None], axis=1))
+    return ((2 * len(rot)) // fixed).astype(np.int64)
 
 
 def match_lines(q_obs: np.ndarray, q_esd: np.ndarray, q_pred: np.ndarray, *,
@@ -494,9 +507,17 @@ def predicted_seen_fraction(q_obs: np.ndarray, q_esd: np.ndarray,
 #: at the resolution they read 0.56 and 0.34 against the truth's 0.73.  An
 #: allowance bounds a common offset and belongs to the forward match alone;
 #: the common shift the forward matches imply (:func:`common_shift`) is what
-#: places the reversed question.  A constant that will be tuned again on the
-#: acceptance corpus; floored by ``k_sigma`` × σ(2θ) of the component asked
-#: against, so a position-only list keeps a window.
+#: places the reversed question.  Swept from 0.5 to 1.0 on the acceptance
+#: corpus's real families (#941's follow-ups, 15 runs from 12 sources: the CPD
+#: round robin's seven patterns, NIST SRM 660c, 11-BM NAC, the GSAS-II FAP and
+#: Hill's PbSO4 X-ray and neutron histograms, one of which has no truth to
+#: rank): one true cell's rank moves, PbSO4 X-ray at 0.7, where the truth
+#: ranks 2nd behind a cell within 0.5 % of its metric; every other truth ranks
+#: 1st with the same grade at every value, so the synthetic split above sets
+#: it.  The sweep stops at 1.0: it shows nothing below 1.0 does better and
+#: cannot show that 1.0 beats a larger value.  Floored by
+#: ``k_sigma`` × σ(2θ) of the component asked against, so a position-only
+#: list keeps a window.
 RESOLUTION_FWHM = 1.0
 
 
@@ -529,17 +550,41 @@ def merge_at_resolution(tt_pred: np.ndarray, fwhm_pred: np.ndarray, *,
     times (F1's first pass).
     """
     tt = np.asarray(tt_pred, dtype=np.float64)
-    fw = np.asarray(fwhm_pred, dtype=np.float64)
     if not len(tt):
         return []
-    groups: list[list[int]] = [[0]]
-    for k in range(1, len(tt)):
-        last = groups[-1][-1]
-        if tt[k] - tt[last] < resolution * 0.5 * (fw[k] + fw[last]):
-            groups[-1].append(k)
-        else:
-            groups.append([k])
-    return [np.asarray(g, dtype=np.int64) for g in groups]
+    starts = _line_starts(tt, fwhm_pred, resolution)
+    return np.split(np.arange(len(tt), dtype=np.intp), starts[1:])
+
+
+def _line_starts(tt: np.ndarray, fw: np.ndarray, resolution: float) -> np.ndarray:
+    """Where each of :func:`merge_at_resolution`'s groups starts.  The group's
+    last member is always the previous position, so the test is one
+    comparison per neighbour pair."""
+    tt = np.asarray(tt, dtype=np.float64)
+    fw = np.asarray(fw, dtype=np.float64)
+    joins = tt[1:] - tt[:-1] < resolution * 0.5 * (fw[1:] + fw[:-1])
+    return np.concatenate([[0], np.flatnonzero(~joins) + 1]).astype(np.intp)
+
+
+def line_means(tt: np.ndarray, starts: np.ndarray) -> np.ndarray:
+    """Each merged line's position, the mean of its members, for groups of
+    ascending ``tt`` beginning at ``starts`` (:func:`merge_at_resolution`).
+
+    The one definition of a merged line's position, read by the panel and the
+    line screen.  A lone position is its own mean (x / 1 is exact); a merged
+    line takes ``np.mean`` over its members, batched one row per line of equal
+    size, which sums each row as a per-line call does (checked bit for bit,
+    WP-2063).
+    """
+    tt = np.asarray(tt, dtype=np.float64)
+    starts = np.asarray(starts, dtype=np.intp)
+    size = np.diff(np.append(starts, len(tt)))
+    merged = tt[starts]
+    for s in np.unique(size[size > 1]):
+        at = np.flatnonzero(size == s)
+        rows = starts[at, None] + np.arange(s)
+        merged[at] = np.mean(tt[rows], axis=1)
+    return merged
 
 
 def common_shift(tt_obs: np.ndarray, tt_pred: np.ndarray,
@@ -586,8 +631,13 @@ def predicted_seen_fraction_at_resolution(
 
     The predicted lines are merged at ``resolution`` × the local FWHM, moved by
     the candidate's common ``shift``, and each merged line is *seen* when a
-    picked component lies within :func:`resolution_half_width`.  Same name and
-    blind spot as the windowed member it replaces in the panel: a space-group
+    picked component lies within :func:`resolution_half_width`.  Given the
+    screen's positions and common shift it reads the screen's seen fraction
+    exactly (``test_the_panel_and_the_screen_share_one_definition_of_seen``);
+    the two can still differ by their inputs, since the panel's shift comes from
+    the search window and its positions stop at the last observed line, where
+    the screen's shift reads the absence window over the pattern's range.
+    Same name and blind spot as the windowed member it replaces in the panel: a space-group
     extinction or an undetected weak line still counts against a correct cell,
     which is why it ranks and never refutes.
     """
@@ -600,9 +650,11 @@ def predicted_seen_fraction_at_resolution(
                             blind_spot=_BLIND["predicted_seen_fraction"])
     order = np.argsort(obs)
     fw_at = np.interp(pred, obs[order], np.asarray(fwhm_obs, dtype=np.float64)[order])
-    groups = merge_at_resolution(pred, fw_at, resolution=resolution)
-    merged = np.array([float(np.mean(pred[g])) for g in groups]) + shift
-    fw_m = np.array([float(np.mean(fw_at[g])) for g in groups])
+    merged = line_means(pred, _line_starts(pred, fw_at, resolution)) + shift
+    # the width law read at the shifted merged line, as the line screen reads
+    # it (``screen.screen_candidate``): one definition of seen for both
+    fw_m = np.interp(merged, obs[order],
+                     np.asarray(fwhm_obs, dtype=np.float64)[order])
     seen, _j = seen_at_resolution(merged, fw_m, obs, fwhm_obs, two_theta_esd,
                                   k_sigma=k_sigma, resolution=resolution)
     return FigureOfMerit(

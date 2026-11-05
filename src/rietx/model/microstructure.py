@@ -106,6 +106,11 @@ def microstructure_table(structure: Structure, values: dict[str, float], *,
     case, since none of them is freed by default — it returns four terms each
     saying ``at_zero``, which is the honest empty state and is not the same
     statement as "no microstructure block".
+
+    A phase carrying a Stephens block has no ``lor_strain`` term (WP-1467):
+    the block replaces it and the width law reads zero for it
+    (``CompiledModel.lor_strain_term``), so its stored value is no reading,
+    and ``strain_agreement`` is ``None`` there.
     """
     esds = esds or {}
     out: list[PhaseMicrostructure] = []
@@ -113,6 +118,8 @@ def microstructure_table(structure: Structure, values: dict[str, float], *,
         terms: list[MicrostructureTerm] = []
         for name, (kind, variance) in _TERMS.items():
             path = f"phases.{ip}.{name}"
+            if name == "lor_strain" and phase.microstrain is not None:
+                continue
             coefficient = values.get(path)
             if coefficient is None:
                 continue

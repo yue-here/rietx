@@ -1139,6 +1139,109 @@ def test_a_decimal_k_that_is_exactly_an_integer_is_gamma(tmp_path):
     with pytest.raises(magcif.MagCifError, match="magnetic supercell"):
         _read(tmp_path, "LaMnO3", k="0.0 0.0 1/2")
 
+def test_a_k_given_only_under_the_draft_kvector_tag_still_reaches_the_supercell_refusal(
+        tmp_path):
+    """Review of #1257, follow-up 1: ``refuse_a_magnetic_supercell`` read only
+    ``_parent_propagation_vector.kxkykz``, so a file stating k != 0 under the
+    draft's ``_magnetic_propagation_vector_kxkykz`` alone skipped the refusal.
+    Quoted loop rows, a bracketed value and a single-item spelling all count;
+    k = 0 under that tag still reads (the control beside the dictionary's
+    items, as in the test above)."""
+    for value in ("1 '1/2 0 0'", "1 [1/2 0 0]"):
+        extra = ("\nloop_\n_magnetic_propagation_vector_seq_id\n"
+                 f"_magnetic_propagation_vector_kxkykz\n{value}\n")
+        with pytest.raises(magcif.MagCifError, match="magnetic supercell") as e:
+            _read(tmp_path, "LaMnO3", extra=extra)
+        assert "_magnetic_propagation_vector_kxkykz" in str(e.value)
+    with pytest.raises(magcif.MagCifError, match="magnetic supercell"):
+        _read(tmp_path, "LaMnO3",
+              extra="\n_magnetic_propagation_vector_kxkykz '0 1/2 0'\n")
+    assert magcif.propagation_vectors(
+        "_magnetic_propagation_vector_kxkykz '1/2 0 0'\n") == (
+        ("1/2", "0", "0"),)
+    baseline = _stored(_read(tmp_path, "LaMnO3").phases[0])
+    zero = ("\nloop_\n_magnetic_propagation_vector_seq_id\n"
+            "_magnetic_propagation_vector_kxkykz\n1 '0 0 0'\n")
+    assert _stored(_read(tmp_path, "LaMnO3", extra=zero).phases[0]) == baseline
+
+
+def test_a_draft_tag_inside_a_text_field_is_not_a_draft_tag(tmp_path):
+    """Review of #1257, follow-up 2: ``refuse_draft_tags`` matched
+    ``^\\s*<tag>`` over the raw text, so a line of a semicolon text field that
+    began with a draft tag refused a dictionary-conformant file.  The field's
+    content is prose, not a tag; a real draft tag outside it still refuses."""
+    field = ("\n_publ_section_comment\n;\n"
+             "_magnetic_atom_site_moment_label is the draft's name for it.\n"
+             "  _magnetic_cell_length_a likewise.\n;\n")
+    baseline = _stored(_read(tmp_path, "LaMnO3").phases[0])
+    assert _stored(_read(tmp_path, "LaMnO3", extra=field).phases[0]) == baseline
+    with pytest.raises(magcif.MagCifError,
+                       match="pre-2016 draft magnetic-CIF tags") as e:
+        _read(tmp_path, "LaMnO3",
+              extra=field + "\n_magnetic_cell_length_b  5.0\n")
+    assert "_magnetic_cell_length_b" in str(e.value)
+    assert "_magnetic_cell_length_a" not in str(e.value)
+    # the helper keeps the delimiters and the line count
+    text = "a\n;\n_x\n;\nb"
+    assert magcif._without_text_fields(text) == "a\n;\n\n;\nb"
+
+
+def test_every_raw_text_scan_skips_text_fields(tmp_path):
+    """Review of #1284, item 1 (``refuse_modulation``): ``refuse_draft_tags``
+    was one of four raw-text scans of one shape.  A file whose only matching
+    lines sit in a ``_publ_section_comment`` reads, and the same line outside
+    a field still refuses."""
+    field = ("\n_publ_section_comment\n;\n_atom_site_moment_Fourier_param is "
+             "the modulated moment's name.\n;\n")
+    baseline = _stored(_read(tmp_path, "LaMnO3").phases[0])
+    assert _stored(_read(tmp_path, "LaMnO3", extra=field).phases[0]) == baseline
+    with pytest.raises(magcif.MagCifError, match="modulated"):
+        _read(tmp_path, "LaMnO3",
+              extra="\n_atom_site_moment_Fourier_param_id 1\n")
+
+
+def test_a_k_quoted_in_a_text_field_is_not_a_k(tmp_path):
+    """Review of #1284, item 1 (``propagation_vectors``): a k quoted in prose
+    is not a k, under either spelling, so a nuclear-cell file is not refused."""
+    baseline = _stored(_read(tmp_path, "LaMnO3").phases[0])
+    for tag in ("_parent_propagation_vector.kxkykz [1/2 0 0]",
+                "_magnetic_propagation_vector_kxkykz '1/2 0 0'"):
+        field = f"\n_publ_section_comment\n;\n{tag}\n;\n"
+        assert magcif.propagation_vectors(field) == ()
+        assert _stored(_read(tmp_path, "LaMnO3", extra=field).phases[0]) == baseline
+    assert magcif.propagation_vectors(
+        "_parent_propagation_vector.kxkykz [1/2 0 0]\n") == (("1/2", "0", "0"),)
+
+
+def test_a_moment_tag_in_a_text_field_does_not_make_a_cif_magnetic(tmp_path):
+    """Review of #1284, item 1 (``_magnetic_content``): a nuclear CIF whose
+    prose mentions ``_atom_site_moment.`` stays on the nuclear arm."""
+    from rietx.crystallography import cif
+    prose = "\n_publ_section_comment\n;\n_atom_site_moment.label is a tag.\n;\n"
+    nuclear = (Path(__file__).parent / "data" / "fluorapatite.cif").read_text(encoding="utf-8")
+    assert not cif._magnetic_content(nuclear + prose)
+    assert cif._magnetic_content(nuclear + "\n_atom_site_moment.label x\n")
+    path = tmp_path / "n.cif"
+    path.write_text(nuclear + prose, encoding="utf-8")
+    assert structure_from_cif(str(path)).phases[0].magnetic_symmetry is None
+
+
+def test_the_supercell_refusal_names_the_k_tag_the_file_used(tmp_path):
+    """Review of #1284, item 2: the refusal named both spellings for every
+    file.  It now names the one(s) the file stated, with that tag's k."""
+    with pytest.raises(magcif.MagCifError, match="magnetic supercell") as e:
+        _read(tmp_path, "LaMnO3", k="1/2 0 0")
+    msg = str(e.value)
+    assert "_parent_propagation_vector.kxkykz [1/2 0 0]" in msg
+    assert "_magnetic_propagation_vector_kxkykz" not in msg
+    with pytest.raises(magcif.MagCifError, match="magnetic supercell") as e:
+        _read(tmp_path, "LaMnO3", k="0 0 0",
+              extra="\n_magnetic_propagation_vector_kxkykz '0 1/2 0'\n")
+    msg = str(e.value)
+    assert "_magnetic_propagation_vector_kxkykz [0 1/2 0]" in msg
+    assert "_parent_propagation_vector" not in msg
+
+
 def test_an_incommensurate_k_is_refused_with_its_own_sentence(tmp_path):
     """A k that is not a rational has no commensurate cell to be read in at
     all, which is a different refusal from the supercell one and says so."""
@@ -1838,6 +1941,178 @@ def test_the_dictionary_parent_tag_alone_reads_as_before(tmp_path):
     phase, named = _parent_read(_fixture(tmp_path, "Cr2WO6"))
     assert named == []
     assert phase.space_group.startswith("P 42/m n m")
+
+
+def _beside(tmp_path, *, before: str = "", after: str = "",
+            bare: bool = False) -> Path:
+    """Cr2WO6 with other data blocks written before or after its own, and its
+    block renamed to a bare ``data_`` when ``bare``."""
+    magic, rest = _fixture(tmp_path, "Cr2WO6").read_text(
+        encoding="utf-8").split("\n", 1)
+    assert magic == "#\\#CIF_2.0" and rest.startswith("data_Cr2WO6\n")
+    if bare:
+        rest = rest.replace("data_Cr2WO6\n", "data_\n", 1)
+    path = tmp_path / "blocks.mcif"
+    path.write_text(f"{magic}\n{before}{rest}{after}", encoding="utf-8")
+    return path
+
+
+def _block_read(path):
+    diagnostics: list = []
+    read = structure_from_cif(str(path), moment_ions=_IONS["Cr2WO6"],
+                              diagnostics=diagnostics)
+    return read.phases[0], [d for d in diagnostics
+                            if d.code == "CIF_EMPTY_BLOCK_SKIPPED"]
+
+
+def _sites(phase):
+    return [(a.label, a.species, a.x.value, a.y.value, a.z.value, a.occ.value)
+            for a in phase.atoms]
+
+
+@pytest.mark.parametrize("before, bare, chosen, said", [
+    ("data_global\n\n", False, "data_Cr2WO6", "data_global (no tags)"),
+    ("data_global\n\n", True, "data_,", "data_global (no tags)"),
+    ("data_global\n_audit_creation_method  'synthetic'\n\n", False,
+     "data_Cr2WO6", "data_global (only _audit_creation_method)"),
+    ("data_global\n_audit.creation_method  'synthetic'\n\n", False,
+     "data_Cr2WO6", "data_global (only _audit.creation_method)"),
+], ids=["empty", "bare structure block", "audit only", "audit, DDLm spelling"])
+def test_a_block_that_states_nothing_is_skipped_and_named(
+        tmp_path, before, bare, chosen, said):
+    """Issue #1063, item 1: an empty ``data_global`` ahead of the structure
+    block, or one holding only ``_audit_`` items, made the reader refuse the
+    file as "not a CIF".  AUDIT records how the block was made and states no
+    cell, site or symmetry (``cif_core.dic``), so the one block with atom
+    sites is read, exactly as the file alone reads, and an info diagnostic
+    names each block skipped."""
+    reference, none = _block_read(_fixture(tmp_path, "Cr2WO6"))
+    assert none == []
+    phase, (skipped,) = _block_read(_beside(tmp_path, before=before, bare=bare))
+    assert phase.space_group == reference.space_group
+    assert _sites(phase) == _sites(reference)
+    assert _stored(phase) == _stored(reference)
+    assert phase.name == ("phase_1" if bare else reference.name)
+    assert skipped.level == "info"
+    assert skipped.where == ["phases.0"]
+    assert f"read from {chosen}" in skipped.message
+    assert said in skipped.message
+
+
+@pytest.mark.parametrize("before", ["", "data_global\n\n"],
+                         ids=["two blocks", "three blocks"])
+def test_two_blocks_with_atom_sites_are_refused_with_their_count(
+        tmp_path, before):
+    """The dissent the reading rule leaves standing: two structures in one
+    file are two answers, and nothing in the file says which is meant, so the
+    read is refused.  The message counts the blocks with atom sites (not every
+    block) and names them, and no longer says the file is not a CIF."""
+    second = _fixture(tmp_path, "Cr2WO6").read_text(
+        encoding="utf-8").split("\n", 1)[1].replace(
+            "data_Cr2WO6\n", "data_second\n", 1)
+    path = _beside(tmp_path, before=before, after=f"\n{second}")
+    with pytest.raises(ValueError) as refused:
+        structure_from_cif(str(path), moment_ions=_IONS["Cr2WO6"])
+    message = str(refused.value)
+    blocks = 3 if before else 2
+    assert f"got {blocks}, and 2 of them hold atom sites" in message
+    assert "data_Cr2WO6" in message and "data_second" in message
+    assert "not yet supported" in message
+    assert "does not read as a CIF" not in message
+
+
+_DRAFT_SITES = """\
+loop_
+_magnetic_atom_site_label
+_magnetic_atom_site_type_symbol
+_magnetic_atom_site_fract_x
+_magnetic_atom_site_fract_y
+_magnetic_atom_site_fract_z
+Cr1 Cr 0.00000 0.00000 0.33450
+W1 W 0.00000 0.00000 0.00000
+"""
+
+_DRAFT_CELL = "".join(f"_magnetic_cell_{tag}  {value}\n" for tag, value in (
+    ("length_a", 4.582), ("length_b", 4.582), ("length_c", 8.87),
+    ("angle_alpha", 90), ("angle_beta", 90), ("angle_gamma", 90)))
+
+_DRAFT_OPERATIONS = """\
+loop_
+_magnetic_space_group_symop_id
+_magnetic_space_group_symop_operation_xyz
+1 x,y,z,+1
+2 -x,-y,z,-1
+"""
+
+_DRAFT_MOMENTS = """\
+loop_
+_magnetic_atom_site_moment_label
+_magnetic_atom_site_moment_crystalaxis_mx
+_magnetic_atom_site_moment_crystalaxis_my
+_magnetic_atom_site_moment_crystalaxis_mz
+Cr1 0.0 2.35 0.0
+"""
+
+_ORDINARY_HALF = """\
+_space_group_name_H-M_alt  'P 42/m n m'
+_cell_length_a  4.582
+_cell_length_b  4.582
+_cell_length_c  8.87
+_cell_angle_alpha  90
+_cell_angle_beta   90
+_cell_angle_gamma  90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Cr1 Cr 0.00000 0.00000 0.33450
+W1 W 0.00000 0.00000 0.00000
+"""
+
+
+@pytest.mark.parametrize("body, families, tags", [
+    (_DRAFT_CELL + _DRAFT_OPERATIONS + _DRAFT_SITES + _DRAFT_MOMENTS,
+     ("_magnetic_atom_site_*", "_magnetic_cell_*",
+      "_magnetic_space_group_symop_operation_*"),
+     ("_magnetic_atom_site_fract_x", "_magnetic_atom_site_label")),
+    (_ORDINARY_HALF + _DRAFT_OPERATIONS + _DRAFT_MOMENTS,
+     ("_magnetic_atom_site_*", "_magnetic_space_group_symop_operation_*"),
+     ("_magnetic_atom_site_moment_crystalaxis_mx",
+      "_magnetic_atom_site_moment_label")),
+], ids=["all draft", "draft magnetic half"])
+def test_the_pre_2016_draft_tags_are_refused_by_name(tmp_path, body,
+                                                     families, tags):
+    """Issue #1063, item 3: ``cif_mag.dic`` defines none of the draft's
+    ``_magnetic_atom_site_``, ``_magnetic_cell_`` or
+    ``_magnetic_space_group_symop_operation_`` items, under any name or alias.
+    A file written wholly in them was refused as "no atom sites found", and
+    one whose sites were ordinary read as its nuclear half with the moments
+    dropped in silence.  Both are refused, naming the tags and the families."""
+    path = tmp_path / "draft.mcif"
+    path.write_text(f"data_draft\n{body}", encoding="utf-8")
+    with pytest.raises(magcif.MagCifError) as refused:
+        structure_from_cif(str(path))
+    message = str(refused.value)
+    assert "pre-2016 draft magnetic-CIF tags" in message
+    assert all(family in message for family in families)
+    assert all(tag in message for tag in tags)
+    assert "no atom sites found" not in message
+
+
+def test_other_magnetic_spellings_beside_the_dictionary_items_still_read(
+        tmp_path):
+    """The control on the refusal's reach: ``_magnetic_`` spellings outside
+    the three draft families, written beside the dictionary's own items, are
+    no reason to refuse, and the file reads as it does without them."""
+    reference, _ = _block_read(_fixture(tmp_path, "Cr2WO6"))
+    extra = ("\n_magnetic_space_group_standard_setting  'no'\n"
+             "loop_\n_magnetic_propagation_vector_seq_id\n"
+             "_magnetic_propagation_vector_kxkykz\n1 '0 0 0'\n")
+    phase, _ = _block_read(_fixture(tmp_path, "Cr2WO6", extra=extra))
+    assert _sites(phase) == _sites(reference)
+    assert _stored(phase) == _stored(reference)
 
 
 # ===========================================================================
@@ -2632,6 +2907,7 @@ def _magnetic_vocabulary() -> set[str]:
     tags = set(magcif.READ_TAGS) | set(magcif.PRIVATE_TAGS)
     tags |= {tag for tag, _what in magcif.REFUSED_TAGS}
     tags |= {tag for tag, _why in magcif.IGNORED_TAGS}
+    tags |= {tag for tag, _what in magcif.DRAFT_TAGS}
     keywords = {kw for feat in coverage.FEATURES for kw in feat.keywords
                 if kw.startswith("mag") or kw in ("mlx", "mly", "mlz", "mg")}
     return tags | keywords
@@ -3289,3 +3565,22 @@ def test_a_component_printed_as_a_bare_zero_is_not_moved_by_its_half_width(tmp_p
     moment = structure_from_cif(path).phases[0].atoms[0].moment
     assert moment.values()[0] == pytest.approx(moment.values()[1], abs=1e-9)
     assert moment.values()[1] == pytest.approx(moment.values()[2], abs=1e-9)
+
+
+def test_a_moment_component_the_symmetry_leaves_free_keeps_its_print():
+    """On a site allowing m_y = 2·m_x with m_z free, only x and y have a
+    relation to meet.  A Chebyshev fit alone is degenerate in z, and its
+    solver moved m_z = 1.5 by the whole 0.02 μ_B cap for nothing (WP-2016);
+    the second programme leaves it where the file printed it."""
+    from rietx.crystallography.magcif import moment_within_print
+
+    class _Printed:
+        def values(self):
+            return (2.045, 4.089, 1.5)
+
+    row = {"crystalaxis_x": "2.045", "crystalaxis_y": "4.089", "crystalaxis_z": "1.5"}
+    components, shift = moment_within_print(_Printed(), row, [[1, 2, 0], [0, 0, 1]])
+    assert components == pytest.approx((2.0446666666666667, 4.0893333333333333, 1.5),
+                                       abs=1e-12)
+    assert components[2] == 1.5
+    assert shift == pytest.approx(1 / 3000, abs=1e-12)

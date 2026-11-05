@@ -829,6 +829,41 @@ def test_two_fold_axes_a_lattice_vector_apart_are_refused_on_c2c():
         ParameterTable(_with_body(phase, body), LAB)
 
 
+def _mirror_triangle(y_origin: float, y_atom: float) -> Structure:
+    P = Parameter
+    cell = Cell(a=P(value=8.0), b=P(value=6.0), c=P(value=7.0), alpha=P(value=90.0),
+                beta=P(value=90.0), gamma=P(value=90.0))
+    atoms = [Atom(label=lab, species=sp, x=P(value=x), y=P(value=y), z=P(value=z))
+             for lab, sp, x, y, z in (("A", "C", 0.1, y_origin, 0.2),
+                                      ("B", "O", 0.3, y_atom, 0.4),
+                                      ("C", "N", 0.25, 0.25, 0.05))]
+    phase = Phase(name="pnma", space_group="P n m a", cell=cell, atoms=atoms)
+    return _with_body(phase, body_from_atoms(phase, ["A", "B", "C"], "tri", origin="A"))
+
+
+def test_the_exact_site_test_holds_two_typed_residuals_and_refuses_a_lattice_vector(
+        monkeypatch):
+    """``_BODY_SITE_MISS_FACTOR`` (#1005's follow-up): the origin and an atom
+    on the P n m a mirror, each typed SITE_TOL/2 off it on opposite sides (the
+    most the mirror snaps), miss by exactly 2 × SITE_TOL, the step-1 bound; the
+    factor sits above 6 × SITE_TOL, the bound for an operation the snap added,
+    so the body builds at 8 and is refused at 1.9.  The mirror a
+    lattice vector away (y = 3/4) misses by 1 and is refused."""
+    from rietx.crystallography.symmetry import SITE_TOL
+    from rietx.params import vector
+
+    assert 6.0 < vector._BODY_SITE_MISS_FACTOR < 1.0 / SITE_TOL - 6.0
+    h = SITE_TOL / 2.0
+    corner = _mirror_triangle(0.25 - h, 0.25 + h)
+    assert _dofs(ParameterTable(corner, LAB)) == (2, 1)
+    monkeypatch.setattr(vector, "_BODY_SITE_MISS_FACTOR", 1.9)
+    with pytest.raises(ValueError, match=r"RIGID_BODY_NOT_INVARIANT.*atom 'B'.*lattice"):
+        ParameterTable(corner, LAB)
+    monkeypatch.undo()
+    with pytest.raises(ValueError, match=r"RIGID_BODY_NOT_INVARIANT.*atom 'B'.*lattice"):
+        ParameterTable(_mirror_triangle(0.25, 0.75), LAB)
+
+
 def test_a_linear_body_off_its_site_axis_by_cif_precision_is_accepted():
     """Item 2: the site check snaps within SITE_TOL, so a linear body whose
     end is typed 4e-5 (fractional) off the mirror passes it and must not then

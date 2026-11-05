@@ -88,6 +88,7 @@ class Backend(Protocol):
     tan: Any
     arcsin: Any
     arccos: Any
+    arctan2: Any  # two arguments, (y, x): a torsion's angle (WP-1815)
     radians: Any
     degrees: Any
     abs: Any
@@ -164,6 +165,7 @@ class NumpyBackend:
     tan = staticmethod(np.tan)
     arcsin = staticmethod(np.arcsin)
     arccos = staticmethod(np.arccos)
+    arctan2 = staticmethod(np.arctan2)
     radians = staticmethod(np.radians)
     degrees = staticmethod(np.degrees)
     abs = staticmethod(np.abs)
@@ -219,7 +221,7 @@ class NumpyBackend:
 #: the shared op vocabulary, bound per backend (kept as one tuple so the two
 #: autodiff backends cannot silently drift from the Protocol above)
 _OP_NAMES = (
-    "exp", "sqrt", "log", "sin", "cos", "tan", "arcsin", "arccos",
+    "exp", "sqrt", "log", "sin", "cos", "tan", "arcsin", "arccos", "arctan2",
     "radians", "degrees", "abs", "sign", "power", "clip",
     "maximum", "minimum", "where", "isfinite", "i0e", "i1e",
     "einsum", "matmul", "sum", "cumsum", "diff",
@@ -419,7 +421,8 @@ _TORCH_UNARY = {
     "i0e": "special.i0e", "i1e": "special.i1e",
 }
 #: …and the two-argument ones (torch rejects a bare python scalar for ``other``)
-_TORCH_BINARY = {"power": "pow", "maximum": "maximum", "minimum": "minimum"}
+_TORCH_BINARY = {"power": "pow", "maximum": "maximum", "minimum": "minimum",
+                 "arctan2": "atan2"}
 
 
 class TorchBackend:

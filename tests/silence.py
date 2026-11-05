@@ -143,6 +143,42 @@ def _listed_twice_silent() -> list:
                      .format(extra="Ni2 Ni 0.5 0.5 0.0001 0.481\n"))
 
 
+# ---------------------------------------------------- the FullProf project reader
+
+
+def _pcr_r_phase(cell: str) -> list:
+    """``to_structure``'s diagnostics for a one-site bare ``R -3 c`` phase."""
+    from rietx.io.projects.fullprof import read_fullprof_pcr, to_structure
+    from tests.test_projects_fullprof import (
+        _PHASE_CELL_CODES,
+        _R_PHASE_ORIGIN_SITE,
+        _pcr,
+        _phase,
+    )
+
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _pcr(pathlib.Path(tmp), "r.pcr",
+                    _phase(nat=1, sg="R -3 c", atoms=_R_PHASE_ORIGIN_SITE,
+                           cell=cell, cell_codes=_PHASE_CELL_CODES))
+        to_structure(read_fullprof_pcr(path), diagnostics=found)
+    return found
+
+
+def _rhombohedral_axes_fires() -> list:
+    """A rhombohedral cell beside the bare symbol, which FullProf reads hexagonal."""
+    from tests.test_projects_fullprof import _R_PHASE_RHOMBOHEDRAL_CELL
+
+    return _pcr_r_phase(_R_PHASE_RHOMBOHEDRAL_CELL)
+
+
+def _rhombohedral_axes_silent() -> list:
+    """The same lattice on hexagonal axes, the reading FullProf and rietx share."""
+    from tests.test_projects_fullprof import _R_PHASE_HEXAGONAL_CELL
+
+    return _pcr_r_phase(_R_PHASE_HEXAGONAL_CELL)
+
+
 # --------------------------------------------------- the instrument-file readers
 
 
@@ -193,6 +229,33 @@ def _instprm_geometry_silent() -> list:
                         "Gonio. radius:217.5\n", encoding="utf-8")
         read_gsas2_instprm(path, diagnostics=found)
     return found
+
+
+# ------------------------------------------------------------- the history reader
+
+
+def _load_log(n_trees: int) -> list:
+    """``RefinementTree.load``'s diagnostics for a log of ``n_trees`` headers."""
+    from rietx.history.tree import RefinementTree
+    from rietx.schemas.history import HistoryRecord, TreeHeader
+
+    line = HistoryRecord(record="header", header=TreeHeader(tree_id="t0")).model_dump_json()
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / "fit.jsonl"
+        path.write_text((line + "\n") * n_trees, encoding="utf-8")
+        RefinementTree.load(path, diagnostics=found)
+    return found
+
+
+def _earlier_tree_fires() -> list:
+    """A log an older release doubled: two headers, as a rerun appended them."""
+    return _load_log(2)
+
+
+def _earlier_tree_silent() -> list:
+    """The same log holding one tree."""
+    return _load_log(1)
 
 
 # ------------------------------------------------------- the data-support check
@@ -345,6 +408,17 @@ def _site_kept_silent():
             + _merge_findings(Structure(phases=[_phase(*_PNMA, _ON, occ=0.5)])))
 
 
+def _multiplicity_kept(y_returned: float) -> list:
+    """The #1088 split pair, fitted general at y = 0.27, returned at ``y_returned``."""
+    from rietx.crystallography.structure_factor import phase_orbit_split
+    from rietx.refine import _multiplicity_kept_diagnostics
+    from rietx.schemas import Structure
+    from tests.test_site_multiplicity_kept import _toy
+    split = [phase_orbit_split(_toy(0.27, occ=0.5))]
+    return _multiplicity_kept_diagnostics(
+        Structure(phases=[_toy(y_returned, occ=0.5)]), split)
+
+
 def _renumbered(y: float, *, hold: bool) -> list:
     """O5 (Pnma 8d) set to ``y`` with y and z held, as ``set_values`` writes it."""
     import rietx as rx
@@ -377,7 +451,8 @@ def _screen_diagnostics(status: str, net: float | None) -> list:
     from rietx.indexing.diagnostics import extinction_diagnostics
 
     return extinction_diagnostics(SimpleNamespace(
-        status=status, reference_rwp_net=net, prefit_rwp=None, candidates=[],
+        status=status, reference_rwp_net=net, perfect_fit_rwp_net=None,
+        prefit_rwp=None, candidates=[],
         lattice_group="F m -3 m", system="cubic", centring="F",
         cell=(5.4311, 5.4311, 5.4311, 90.0, 90.0, 90.0), two_theta_range=(12.1, 60.0)))
 
@@ -490,6 +565,104 @@ def _parametric_range_silent() -> list:
     return _parametric_range(0.0) + _parametric_range(-2e-4)
 
 
+def _reseed(**escalation) -> list:
+    """``SEQUENTIAL_RESEED``'s builder on one synthetic converged entry,
+    escalated as ``escalation`` says."""
+    from rietx.schemas.results import Statistics
+    from rietx.schemas.sequential import SeriesEntry
+    from rietx.sequential import _reseed_diagnostics
+
+    entry = SeriesEntry(
+        index=3, label="p3", x=3.0, status="converged",
+        statistics=Statistics(rwp=0.10, rp=0.08, rexp=0.09, chi2=1.2, gof=1.1,
+                              n_points=100, n_free_parameters=5), **escalation)
+    return _reseed_diagnostics(entry)
+
+
+def _reseed_fires() -> list:
+    """The warm rungs diverged and the cold rung was kept."""
+    return _reseed(rung="cold", reseeded=True, rwp_warm=0.6,
+                   rungs_tried=["warm", "warm_staged", "cold"])
+
+
+def _reseed_silent() -> list:
+    """Fitted first time, and escalated to a warm rung that was kept: the chain
+    is unbroken in both."""
+    return (_reseed(rung="warm", rungs_tried=["warm"])
+            + _reseed(rung="warm_staged", rwp_warm=0.6,
+                      rungs_tried=["warm", "warm_staged"]))
+
+
+def _path_chains(missing: int | None = None):
+    """Two one-path chains over three patterns, the backward one lacking the
+    pattern ``missing`` when it is given."""
+    from rietx.schemas.results import RefinedParameter
+    from rietx.schemas.sequential import SeriesEntry, SeriesResult
+
+    def chain(skip):
+        return SeriesResult(entries=[
+            SeriesEntry(index=k, label=f"p{k}", parameters=[RefinedParameter(
+                path="phases.0.cell.a", value=4.156 + 1e-4 * k, stderr=1e-5)])
+            for k in range(3) if k != skip])
+
+    return chain(None), chain(missing)
+
+
+def _path_not_run_fires() -> list:
+    """The comparison never ran: the builder ``fit`` calls for each way it
+    cannot (a cancel on either chain, a backward chain that raised)."""
+    from rietx.sequential import _path_check_not_run
+
+    return [_path_check_not_run("the backward chain was cancelled on pattern 2 (p2)")]
+
+
+def _path_not_run_silent() -> list:
+    """The comparison ran, on the whole series and on part of it: what it
+    reports is coverage at ``info``, never the warning."""
+    from rietx.sequential import _direction_gaps
+
+    whole = _direction_gaps(*_path_chains())[1]
+    part = _direction_gaps(*_path_chains(missing=1))[1]
+    return whole + part
+
+
+def _unrecovered(status: str, *codes: str) -> list:
+    """``SEQUENTIAL_UNRECOVERED``'s builder on one synthetic entry kept after
+    every rung, ending ``status`` and carrying each of ``codes`` at the level
+    ``MODEL_FAR_FROM_DATA`` really has (``error``) or, for a ``code`` spelled
+    ``warning:CODE``, at warning."""
+    from rietx.schemas.common import Diagnostic
+    from rietx.schemas.results import Statistics
+    from rietx.schemas.sequential import SeriesEntry
+    from rietx.sequential import _unrecovered_diagnostics
+
+    rows = []
+    for code in codes:
+        level, _, name = code.rpartition(":")
+        rows.append(Diagnostic(level=level or "error", code=name, where=[],
+                               message=""))
+    entry = SeriesEntry(
+        index=3, label="p3", x=3.0, status=status, rung="warm",
+        rungs_tried=["warm", "warm_staged", "cold"], diagnostics=rows,
+        statistics=Statistics(rwp=0.97, rp=0.9, rexp=0.04, chi2=1.2, gof=24.0,
+                              n_points=100, n_free_parameters=5))
+    return _unrecovered_diagnostics(entry)
+
+
+def _unrecovered_fires() -> list:
+    """Kept after every rung: diverged, or converged under an error-level
+    code (WP-2003, C2 q5)."""
+    return (_unrecovered("diverged")
+            + _unrecovered("converged", "MODEL_FAR_FROM_DATA"))
+
+
+def _unrecovered_silent() -> list:
+    """Converged after the ladder with only warnings, and ``max_iter`` with
+    none: neither is a rejected fit."""
+    return (_unrecovered("converged", "warning:FLOOR_HIT")
+            + _unrecovered("max_iter"))
+
+
 def _short_series(*, cancel_after_first: bool) -> list:
     """Two cheap patterns of ``tests/test_sequential.py``'s ramp, the chain
     cancelled once the first pattern's fit ends where ``cancel_after_first``,
@@ -583,6 +756,28 @@ def _windows_stale(axial_to: float | None) -> list:
         cost_final=1.0, window_loss=loss)])
 
 
+def _held_moment(plan: str, *, moment: bool = True) -> list:
+    """``refine._held_moment_diagnostics`` on the #1081 synthetic child's
+    start (moment 3.6 against 3.0 μ_B), read off the table before any stage,
+    as ``fit`` reads it; ``moment=False`` drops every moment block."""
+    from rietx import Instrument, Structure
+    from rietx.params.vector import ParameterTable
+    from rietx.refine import _held_moment_diagnostics
+    from rietx.strategy.staged import resolve_plan
+    from tests.test_magnetic_structural_preset import _start
+
+    phase = _start()
+    if not moment:
+        for atom in phase.atoms:
+            atom.moment = None
+        phase.magnetic_symmetry = None
+    structure = Structure(phases=[phase])
+    table = ParameterTable(
+        structure, Instrument.constant_wavelength_neutron(1.54, fwhm_deg=0.35))
+    return _held_moment_diagnostics(resolve_plan(plan, "rietveld"), table,
+                                    structure, "rietveld")
+
+
 def _stale_structure(*, drift: bool):
     """The carbons of ``tests/test_planarity_restraints.py`` with the bond
     C1-C2 left out of the pair list, and the phase as the run started.
@@ -617,6 +812,124 @@ def _stale_silent() -> list:
     return _restraint_pairs_stale_diagnostics(*_stale_structure(drift=False))
 
 
+
+def _read_text_pattern(name: str, text: str) -> list:
+    """``read_pattern``'s diagnostics for a text file, whether or not it is
+    refused: the refusal appends its record before it raises."""
+    from rietx.io.formats import TotalScatteringRefused
+    from rietx.io.readers import read_pattern
+
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / name
+        path.write_text(text, encoding="utf-8")
+        try:
+            read_pattern(path, diagnostics=found)
+        except TotalScatteringRefused:
+            pass
+    return found
+
+
+_TS_ROWS = "".join(f"{10.0 + 0.02 * i:.2f} {500 + i % 7}\n" for i in range(60))
+
+
+def _total_scattering_fires() -> list:
+    """Issue #192's case: one ``#L`` line labelling r against G(r)."""
+    return _read_text_pattern("small.dat", "#L r(A) G(r)\n" + _TS_ROWS)
+
+
+def _total_scattering_silent() -> list:
+    """The same rows labelled 2θ by a SPEC ``#L`` line, and a ``.xy`` whose
+    comment only mentions G(r): both are diffraction scans."""
+    return (_read_text_pattern("spec.dat", "#L 2Theta  Detector\n" + _TS_ROWS)
+            + _read_text_pattern("scan.xy", "# compare with the G(r) later\n" + _TS_ROWS))
+
+
+def _stage_solve(*, nan_column: bool) -> list:
+    """``STAGE_NOT_FINITE`` for one solve of the one-column cell of
+    ``tests/test_issue_283_cell_bounds.py``.  ``nan_column`` makes every
+    Jacobian after the first hold a NaN column, the case the nudged P 1 Le
+    Bail fit reached (``tests/test_non_finite_stage.py``); without it the same
+    solve runs to its end."""
+    import numpy as np
+    import pytest
+
+    import rietx.optimize.least_squares as lsq
+    from rietx.refine import _non_finite_diagnostic
+    from tests.test_issue_283_cell_bounds import (
+        _compile_alpha_only,
+        _rhombohedral_boundary_cell,
+    )
+
+    structure = _rhombohedral_boundary_cell()
+    structure.phases[0].cell.alpha.value = 119.0
+    model, table = _compile_alpha_only(structure)
+    real = lsq._jacobian_for
+
+    def factory(*args, **kwargs):
+        inner = real(*args, **kwargs)
+        calls = [0]
+
+        def jac(theta):
+            j = np.array(inner(theta), dtype=np.float64)
+            calls[0] += 1
+            if calls[0] > 1:
+                j[:, 0] = np.nan
+            return j
+        return jac
+
+    with pytest.MonkeyPatch.context() as mp:
+        if nan_column:
+            mp.setattr(lsq, "_jacobian_for", factory)
+        outcome = lsq.run_least_squares(model, table, max_iter=5)
+    found = _non_finite_diagnostic("cell", outcome)
+    return [] if found is None else [found]
+
+
+def _site_glob(*turn_ons: list[str]) -> list:
+    """``STAGE_PATH_NOT_FREE``'s site arm on LaB6 (``perturbed_models``), one
+    stage per ``turn_on``.  La on 1a has no ``dof`` rows, so its ``dof.*``
+    frees nothing (issue #896); B's ``dof.*`` frees its one row, a wildcard
+    index is WP-1414's healthy miss, and a ``biso`` answers the ``adp.*``
+    beside it."""
+    from rietx.params.vector import ParameterTable
+    from rietx.refine import _site_glob_diagnostics
+    from rietx.strategy.staged import Stage
+    from tests.test_refine_synthetic import perturbed_models
+
+    table = ParameterTable(*perturbed_models())
+    stages = [Stage(f"s{i}", ["phases.*.scale", *turn_on])
+              for i, turn_on in enumerate(turn_ons)]
+    return _site_glob_diagnostics(stages, table, {})
+
+
+def _moduli(*rows: tuple[float, float | None]) -> list:
+    """``moment_unsupported_diagnostics`` over free moduli of (value, esd)."""
+    from rietx.report.magnetic import moment_unsupported_diagnostics
+    from rietx.schemas.results import RefinedParameter
+
+    return moment_unsupported_diagnostics([
+        RefinedParameter(path=f"phases.0.atoms.{i}.moment.dof0", value=value,
+                         stderr=esd, vary=True)
+        for i, (value, esd) in enumerate(rows)])
+
+
+def _unsupported_fires() -> list:
+    """#1075's repro 2 on its dead column, and a moment inside 3 esd (WP-2060)."""
+    return _moduli((-8.5e-8, 1.7e4)) + _moduli((0.5, 0.2))
+
+
+def _unsupported_silent() -> list:
+    """A moment at 35 esd (Cr2WO6 at 4 K's ratio), a held one with no esd, and
+    a non-moment row at 0."""
+    from rietx.report.magnetic import moment_unsupported_diagnostics
+    from rietx.schemas.results import RefinedParameter
+
+    return (_moduli((2.45, 0.07), (3.5, None))
+            + moment_unsupported_diagnostics([RefinedParameter(
+                path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -629,16 +942,30 @@ SILENCE: dict[str, Pair] = {
         "tests/test_extinction_gate.py (stub screens: the gate's fits are 20 s each)"),
     "FLOOR_HIT": Pair(
         _floor_fires, _floor_silent, "tests/test_bound_hit_at_convergence.py"),
+    "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED": Pair(
+        _rhombohedral_axes_fires, _rhombohedral_axes_silent,
+        "tests/test_projects_fullprof.py"),
     "GSAS2_INSTPRM_GEOMETRY_ASSUMED": Pair(
         _instprm_geometry_fires, _instprm_geometry_silent, "tests/test_gsas2_instprm.py"),
     "GSAS_PRM_PROFILE_SET_DEFAULTED": Pair(
         _profile_set_fires, _profile_set_silent, "tests/test_gsas_prm.py"),
+    "HISTORY_EARLIER_TREE_SKIPPED": Pair(
+        _earlier_tree_fires, _earlier_tree_silent, "tests/test_history.py"),
+    "MOMENT_UNSUPPORTED": Pair(
+        _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
+    "PATTERN_TOTAL_SCATTERING": Pair(
+        _total_scattering_fires, _total_scattering_silent, "tests/test_readers.py"),
     "PATTERN_UNDERSAMPLED": Pair(
         _undersampled_fires, _undersampled_silent, "tests/test_data_support.py"),
+    "PLAN_FREES_NO_MOMENT": Pair(
+        functools.partial(_held_moment, "mccusker_structural"),
+        lambda: (_held_moment("magnetic_structural")
+                 + _held_moment("mccusker_structural", moment=False)),
+        "tests/test_magnetic_structural_preset.py"),
     "PATTERN_WEIGHT_UNUSABLE": Pair(
         _weight_unusable_fires, _weight_unusable_silent, "tests/test_readers.py"),
     "RESOLUTION_UNCONSTRAINED": Pair(
@@ -648,16 +975,37 @@ SILENCE: dict[str, Pair] = {
         _dofs_renumbered_fires, _dofs_renumbered_silent, "tests/test_site_twins_merged.py"),
     "SEQUENTIAL_CANCELLED": Pair(
         _cancelled_fires, _cancelled_silent, "tests/test_sequential.py"),
+    "SEQUENTIAL_PATH_CHECK_NOT_RUN": Pair(
+        _path_not_run_fires, _path_not_run_silent,
+        "tests/test_sequential.py, tests/test_series_error_policy.py"),
+    "SEQUENTIAL_RESEED": Pair(
+        _reseed_fires, _reseed_silent, "tests/test_sequential.py"),
+    "SEQUENTIAL_UNRECOVERED": Pair(
+        _unrecovered_fires, _unrecovered_silent, "tests/test_sequential.py"),
     "SERIES_PATTERN_FAILED": Pair(
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
     "RESTRAINT_PAIRS_STALE": Pair(
         _stale_fires, _stale_silent, "tests/test_planarity_restraints.py"),
+    "SITE_MULTIPLICITY_KEPT": Pair(
+        functools.partial(_multiplicity_kept, 0.25 + 1e-6),
+        functools.partial(_multiplicity_kept, 0.2501),
+        "tests/test_site_multiplicity_kept.py"),
     "SITE_SNAPPED_TO_SPECIAL_POSITION": Pair(
         _snap_fires, _snap_silent, "tests/test_cif_stated_columns.py"),
     "SITE_TWINS_KEPT": Pair(
         _site_kept_fires, _site_kept_silent, "tests/test_site_twins_merged.py"),
     "SITE_TWINS_MERGED": Pair(
         _site_merged_fires, _site_merged_silent, "tests/test_site_twins_merged.py"),
+    "STAGE_NOT_FINITE": Pair(
+        functools.partial(_stage_solve, nan_column=True),
+        functools.partial(_stage_solve, nan_column=False),
+        "tests/test_non_finite_stage.py"),
+    "STAGE_PATH_NOT_FREE": Pair(
+        functools.partial(_site_glob, ["phases.0.atoms.0.dof.*"]),
+        functools.partial(_site_glob, ["phases.0.atoms.1.dof.*"],
+                          ["phases.*.atoms.*.dof.*"],
+                          ["phases.0.atoms.0.biso", "phases.0.atoms.0.adp.*"]),
+        "tests/test_params_surface.py"),
     "STAGE_WINDOWS_STALE": Pair(
         functools.partial(_windows_stale, 0.3), functools.partial(_windows_stale, None),
         "tests/test_window_loss.py"),

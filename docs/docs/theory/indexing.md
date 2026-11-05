@@ -244,17 +244,45 @@ Hofmann's set the standard deviation of $V_{\mathrm{obs}}/V_{\mathrm{est}}$ is
 
 Two uncertainties answer two questions. The tabulated mean errors say how well
 each average is known, about 0.5 % of an organic formula unit. One crystal
-scatters about the average by {{ VOLUME_SCATTER_PCT }} %, and a check on one
-candidate cell uses that. A cell of volume $V$ implies $Z = V/V_{\mathrm{fu}}$
-formula units. It is reported when the nearest whole number $n$ needs
-$\lvert Z/n - 1 \rvert$ above {{ Z_INTEGER_TOLERANCE_PCT }} %, twice the
-scatter. Above $Z$ = {{ Z_CHECK_SILENT_ABOVE }} every value lies that close to
-a whole number, so the check is silent there. A search window from a formula
-takes the paper's wider bounds instead, $V_{\mathrm{obs}}/V_{\mathrm{est}}$
-from {{ VOLUME_RATIO_LOW }} to {{ VOLUME_RATIO_HIGH }}, because a window that
-excludes the true cell makes the search return a wrong one. The volumes are
-fitted to organic and metal-organic crystals, and an ionic compound comes out
-too large.
+scatters about the average by about {{ VOLUME_SCATTER_PCT }} % (Hofmann's
+Fig. 1). A cell of volume $V$ holds $V/V_{\mathrm{fu}}$ formula units by the
+table, which `index_pattern(formula=)` records on each candidate. Hofmann calls
+a structure unusual past $V_{\mathrm{obs}}/V_{\mathrm{est}}$ =
+{{ VOLUME_RATIO_LOW }} or {{ VOLUME_RATIO_HIGH }}, where about 1 % of his
+182 239 structures lie (1746). That band is a mark of the unusual, not an
+error bound he measured. The volumes are fitted to organic and metal-organic
+crystals, and he notes that ionic, small-cell structures come out
+overestimated by 25 to 75 % and that the table may not apply to inorganic
+substances (§ 3 (iii)). Inorganic standards read from 0.38 to 0.87: fifteen of
+the sixteen measured lie under {{ VOLUME_RATIO_LOW }} (halite's 0.87 is inside the
+25 %), and nine of them under 0.57, which his § 3 (i) puts down to a wrong $Z$. So against this
+table a correct inorganic cell looks like a wrong $Z$, and no test for a whole
+number of formula units can be silent on true inorganic cells. None is made.
+A search window from a formula takes the one side that holds for every
+formula, the ceiling at {{ VOLUME_RATIO_HIGH }}, because a window that excludes
+the true cell makes the search return a wrong one. A cell larger than its
+formula, a framework with its pore contents left out, lies above it.
+
+A measured density fixes $Z$ the other way round, through the definition of
+the density of a crystal of $Z$ formula units of weight $M$ in a cell of volume
+$V$:
+
+```{math}
+:label: idx-density-z
+
+Z \;=\; \frac{\rho\, V\, N_A}{M},
+```
+
+{source}`rietx.indexing.extinction.declared_z`
+
+with $N_A = 6.022\,140\,76 \times 10^{23}\ \mathrm{mol}^{-1}$, exact in the SI since
+2019 {cite}`bipm2019`, so that $\rho$ in g/cm$^3$, $V$ in Å$^3$ and $M$ in
+g/mol give $Z = 0.602\,214\,076\,\rho V / M$. The error of $Z$ is the error of
+the density, since the cell volume is far better known. *International Tables*
+Vol. C asks that measured and calculated density "agree within at least 1.5%"
+{cite}`richards2006`; the screen takes {{ DENSITY_Z_TOLERANCE_PCT }} %
+and not the 8 % scatter of a volume estimated from atom counts. A density that
+fits two whole numbers (above $Z$ = {{ DENSITY_Z_AMBIGUOUS_ABOVE }}) names none.
 
 ## Figures of merit, in both directions
 
@@ -395,8 +423,9 @@ runs over those alone. The lattice's point symmetries are found from its metric,
 as the integer matrices on the reduced basis that preserve it, $WGW^\top = G$.
 
 Of the $n$ such lines the larger cell adds inside the measured range, $k$ fall
-inside an observed line's matching window. A position with no line at all falls
-inside one with probability $p_0$, the share of the range those windows cover.
+inside an observed line's window at the measured resolution, after the cell's
+own common shift. A position with no line at all falls inside one with
+probability $p_0$, the share of the range those windows cover.
 The chance of seeing at least $k$, had the added lines not existed, is the
 binomial tail
 
@@ -408,10 +437,18 @@ p \;=\; \sum_{j=k}^{n} \binom{n}{j}\, p_0^{\,j}\,(1-p_0)^{\,n-j},
 
 {source}`rietx.indexing.ambiguity.supercell_chance`
 
-and at $p \ge \alpha$ = {{ SUPERCELL_CHANCE_ALPHA }} the larger cell is ranked
-directly below the smaller. The test cannot refute where it could not have
-confirmed. When even $k = n$ gives $p_0^{\,n} \ge \alpha$, too few lines or
-too many windows, the verdict is undecided and the order stays as it was.
+and when the added lines are seen no more often than chance, $k \le n p_0$, and
+the larger cell's own lines are seen no more often than the smaller's, the
+larger cell is ranked directly below the smaller. Seen above chance but with
+$p \ge \alpha$ = {{ SUPERCELL_CHANCE_ALPHA }}, the verdict is undecided, since a
+test that is not significant does not establish its null. The test cannot refute
+where it could not have confirmed. When even $k = n$ gives $p_1^{\,n} \ge
+\alpha$, too few lines or too many windows, the verdict is undecided and the
+order stays as it was. Here $p_1 \ge p_0$ is the share of the range covered when
+each window is widened to the assumed bound on the 2θ shift. The count itself is
+taken after the cell's own shift and needs no such widening, so $p_0$ is its
+null. Whether the test could have said anything at all is bounded by the shift
+the data have not measured, so the power check reads $p_1$.
 
 The other direction asks a narrower count. Of the $k$, let $k'$ fall on an
 observed line that no line of the smaller cell's own lattice explains. When the

@@ -100,6 +100,29 @@ def test_tie_equal_is_one_name_written_twice():
     assert "beq B1_biso 0.7" in _site(text, "B2")
 
 
+def test_a_structure_that_breaks_a_tie_is_refused_where_its_values_are_in_hand(
+        tmp_path):
+    """The reader refuses a name stated at two values, so the writer refuses
+    the structure that would make one (WP-1986's find): ``free=ref`` names
+    one tie group, and the structure handed in states it at 0.7 and 0.9. The
+    fitted structure, whose values satisfy the tie, writes and reads back."""
+    from rietx.io.projects.topas import read_topas_inp, to_structure
+    from rietx.io.projects.topas_ties import TopasConstraints
+
+    ref = _ref()
+    ref.tie_equal(["phases.0.atoms.1.biso", "phases.0.atoms.2.biso"])
+    broken = ref.fitted_structure.model_copy(deep=True)
+    broken.phases[0].atoms[2].biso.value = 0.9
+    with pytest.raises(ValueError, match=r"phases\.0\.atoms\.1\.biso is tied "
+                                         r"as an equality.*0\.7 and 0\.9"):
+        rx.write_topas_inp(broken, tmp_path / "broken.inp", free=ref)
+    assert not (tmp_path / "broken.inp").exists()
+
+    rx.write_topas_inp(ref.fitted_structure, tmp_path / "ok.inp", free=ref)
+    to_structure(read_topas_inp(tmp_path / "ok.inp"),
+                 constraints=TopasConstraints())
+
+
 def test_an_affine_tie_is_an_equation_over_its_source():
     ref = _ref()
     ref.tie("phases.0.atoms.2.biso", "phases.0.atoms.1.biso", scale=2.0, offset=-0.7)
@@ -208,9 +231,9 @@ def test_scale_or_instrument_without_free_keeps_the_stored_flags(kwargs):
 
 
 def test_a_result_keeps_its_tied_copies_free():
-    """Review item 2: a result lists a row iff it varied *or was tied*, so a
-    ``vary=False`` row is a tied copy, which the note says 'refines as its own
-    parameter'."""
+    """Review item 2: a result lists a row iff the fit could move it (it varied,
+    or follows one that did, WP-1999), so a ``vary=False`` row is a tied copy,
+    which the note says 'refines as its own parameter'."""
     from rietx.schemas.results import RefinedParameter
 
     class _Result:

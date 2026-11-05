@@ -326,3 +326,216 @@ def test_magnetic_reading_returns_the_reason_rather_than_raising(tmp_path):
                                    _magnetic(scale="20.0000")))
     reason = magnetic_reading(model, model.magnetic_phases[0])
     assert isinstance(reason, str) and "Scale" in reason
+
+
+# ------------------------------------------------- Jbt ±10: one combined phase
+#
+# The manual's Jbt = ±10 (p. 90) is a phase that "can contain nuclear and
+# magnetic contributions", its atoms in LINE 25b (p. 105): `Atom Typ Mag Vek X
+# Y Z Biso Occ N_t Spc` and five codewords, then — where N_t = ±1 — `Rx Ry Rz
+# Ix Iy Iz MagPh` (or the spherical form) and seven codewords. A site with a
+# moment names its magnetic form factor in Typ, from which "the program
+# extracts internally the Fermi length symbol", so it reads as the element.
+# The positive arm writes the structure above both ways and asks for one
+# Structure; the twin's nuclear Fe is therefore spelled `FE`, the element the
+# combined phase's `MFE3` names.
+#
+# The combined spelling is FullProf's own, measured with fp2k 8.20 on exactly
+# these files (O spelled `O` for its neutron table): the symbol `P -1` only
+# generates reflections, the SYMM list is the structure's group, Nvk = 0, and
+# Jbt = -10 reads its spherical moment under N_t = 1. So written, the pair and
+# the combined phase gave one calculated pattern to 0.05 counts of 5976 (0.09
+# of 4985 for the spherical pair), where a `P 1 21/c 1` symbol lost the
+# magnetic (001) and a stated k = 0 lost the whole magnetic part.
+
+_TWIN_SITES = _NUCLEAR_SITES.replace("FE+3", "FE  ")
+
+
+def _combined_sites(moment=("1.50000", "-2.00000", "2.50000"), n_t=1, mag=1,
+                    codes=("81.00", "91.00", "101.00"), magph="0.00000",
+                    imaginary="0.00000  0.00000  0.00000", tail="") -> str:
+    m1, m2, m3 = moment
+    c1, c2, c3 = codes
+    lines = [f"Fe     MFE3    {mag}  0  0.13000  0.27000  0.41000  0.40000   "
+             f"1.00000   {n_t}   0",
+             "                  0.00     0.00     0.00     0.00      0.00"]
+    if n_t:
+        lines += [f"   {m1}  {m2}  {m3}  {imaginary}  {magph}{tail}",
+                  f"     {c1}    {c2}   {c3}     0.00     0.00     0.00     0.00"]
+    lines += ["O      O-2     0  0  0.31000  0.07000  0.19000  0.50000   "
+              "1.00000   0   0",
+              "                  0.00     0.00     0.00     0.00      0.00"]
+    return "\n".join(lines)
+
+
+def _combined(jbt=10, isy=-1, sg="P -1", symmetry=_P21C_PRIMED,
+              cell=_MONO, atoms=None, nvk=0, k=_K0):
+    block = _phase(name="FeO_synth", nat=2, jbt=jbt, isy=isy, sg=sg,
+                   symmetry=symmetry, atoms=atoms or _combined_sites(),
+                   cell=cell, cell_codes=_NO_CODES, nvk=nvk,
+                   atom_header="!Atom Typ Mag Vek X Y Z Biso Occ N_t Spc")
+    return block + ("\n" + k if nvk else "")
+
+
+def _pair(**magnetic_kw):
+    nuclear = _phase(name="FeO_synth", nat=2,
+                     sg=magnetic_kw.pop("sg", "P 1 21/c 1"),
+                     atoms=_TWIN_SITES, cell=magnetic_kw.get("cell", _MONO),
+                     cell_codes=_NO_CODES)
+    return nuclear, _magnetic(**magnetic_kw)
+
+
+def test_jbt_10_reads_to_the_structure_of_its_jbt_0_plus_jbt_1_pair(tmp_path):
+    """The positive arm: one structure written as a nuclear phase and the
+    Jbt = 1 phase restating it, and as one Jbt = 10 phase, is one Structure —
+    group, sites, moments and refine flags."""
+    _, pair, _ = _build(tmp_path, *_pair())
+    model, combined, diags = _build(tmp_path, _combined())
+    assert combined.model_dump(mode="json") == pair.model_dump(mode="json")
+    (phase,) = combined.phases
+    assert phase.atoms[0].moment.values() == (1.5, -2.0, 2.5)
+    assert phase.atoms[0].species == "Fe" and model.phases[0].atoms[0].species_raw == "MFE3"
+    (read,) = [d for d in diags if d.code == "FULLPROF_MAGNETIC_PHASE_READ"]
+    assert "one nuclear phase carrying its own moments" in read.message
+    assert read.where == ["phases.0.magnetic_symmetry", "phases.0.atoms.0.moment"]
+
+
+def test_jbt_minus_10_reads_the_spherical_moment_as_its_jbt_minus_1_pair(tmp_path):
+    """Jbt = −10 states (M, φ, θ) as Jbt = −1 does, under N_t = 1 (fp2k
+    8.20's spelling, not the manual's N_t = −1); on an orthogonal cell both read
+    to one Structure, the moment to 1e-12 in crystal axes."""
+    _, pair, _ = _build(tmp_path, *_pair(
+        sg="P 21 21 21", symmetry=_P212121, cell=_ORTHO, jbt=-1,
+        atom=_moment_atom(r=(3.0, 30.0, 60.0))))
+    _, combined, _ = _build(tmp_path, _combined(
+        jbt=-10, symmetry=_P212121, cell=_ORTHO,
+        atoms=_combined_sites(moment=("3.00000", "30.00000", "60.00000"))))
+    got = combined.phases[0].atoms[0].moment.values()
+    assert got == pytest.approx(pair.phases[0].atoms[0].moment.values(), abs=1e-12)
+    t, p = math.radians(60.0), math.radians(30.0)
+    assert got == pytest.approx((3 * math.sin(t) * math.cos(p),
+                                 3 * math.sin(t) * math.sin(p),
+                                 3 * math.cos(t)), abs=1e-12)
+    assert combined.model_dump(mode="json") == pair.model_dump(mode="json")
+
+
+def test_a_flipped_moment_component_changes_the_prediction(tmp_path):
+    """The negative arm: the read moments reach the pattern. Flipping one
+    component of the one moment changes predict(); a reader that dropped or
+    mis-slotted the moment line would leave it unchanged."""
+    import numpy as np
+
+    import rietx as rx
+
+    def predicted(moment):
+        _, structure, _ = _build(tmp_path, _combined(
+            atoms=_combined_sites(moment=moment)))
+        instrument = rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.3)
+        return np.asarray(rx.Refinement(structure, instrument).predict(
+            np.arange(8.0, 120.0, 0.05)))
+
+    base = predicted(("1.50000", "-2.00000", "2.50000"))
+    flipped = predicted(("1.50000", "2.00000", "2.50000"))
+    assert np.max(np.abs(flipped - base)) > 1e-3 * np.max(base)
+    assert np.array_equal(base, predicted(("1.50000", "-2.00000", "2.50000")))
+
+
+def test_a_jbt_10_phase_with_no_moment_is_a_nuclear_phase(tmp_path):
+    """LINE 25b "could be also used for X-rays, in such case Mag and Vek should
+    be zero for all the atoms": with no moment and no magnetic symmetry it
+    reads as its Jbt = 0 twin."""
+    sites = _combined_sites(n_t=0, mag=0).replace("MFE3", "FE  ")
+    _, twin, _ = _build(tmp_path, _pair()[0])
+    _, combined, _ = _build(tmp_path, _combined(isy=0, symmetry="", atoms=sites,
+                                                sg="P 1 21/c 1"))
+    assert combined.model_dump(mode="json") == twin.model_dump(mode="json")
+
+
+def test_the_moment_lines_trailing_marker_is_not_a_column(tmp_path):
+    """FullProf's own example file 1 ends a LINE 25b moment line with `<-MagPar`
+    and no comment marker; the seven numbers before it are the line."""
+    _, structure, _ = _build(tmp_path, _combined(
+        atoms=_combined_sites(tail=" <-MagPar")))
+    assert structure.phases[0].atoms[0].moment.values() == (1.5, -2.0, 2.5)
+
+
+def test_nuclear_only_builds_a_combined_phase_without_its_moments(tmp_path):
+    _, structure, diags = _build(tmp_path, _combined(), nuclear_only=True)
+    assert structure.phases[0].atoms[0].moment is None
+    assert structure.phases[0].magnetic_symmetry is None
+    (omitted,) = [d for d in diags if d.code == "FULLPROF_MAGNETIC_PHASE_OMITTED"]
+    assert "Jbt 10" in omitted.message and omitted.where == ["phases.0"]
+
+
+#: Three of P 1 21/c 1's four operators: not closed under composition.
+_NOT_A_GROUP = """\
+!Nsym Cen Laue MagMat
+   3   1   2   1
+!
+SYMM x, y, z
+MSYM u, v, w, 0.0
+SYMM -x, y+1/2, -z+1/2
+MSYM u, -v, w, 0.0
+SYMM -x, -y, -z
+MSYM u, v, w, 0.0
+!
+"""
+
+
+@pytest.mark.parametrize("kw, match", [
+    # k != 0: the propagation-vector form, pointed at its own work package.
+    ({"nvk": 1,
+      "k": "   0.500000   0.000000   0.000000\n       0.00       0.00       0.00"},
+     "propagation vector.*#757"),
+    # k = 0 stated: fp2k 8.20 then computes no magnetic part (measured).
+    ({"nvk": 1}, "Nvk = 1 with k = 0"),
+    # A symbol whose glide extinguishes the magnetic (001) (measured).
+    ({"sg": "P 1 21/c 1"}, "extinguishes reflections its lattice allows"),
+    # An operator list that is not a group.
+    ({"symmetry": _NOT_A_GROUP}, "not closed under composition"),
+    # Mag and N_t disagree on whether the site carries a moment.
+    ({"atoms": _combined_sites(mag=0)}, "Mag = 0 and N_t = 1"),
+    # A moment and no magnetic symmetry at all.
+    ({"isy": 0, "symmetry": ""}, "no magnetic symmetry"),
+    # The Fourier-component form, as for Jbt = 1.
+    ({"atoms": _combined_sites(imaginary="0.50000  0.00000  0.00000")},
+     "imaginary component Ix"),
+])
+def test_a_combined_phase_outside_the_model_is_refused_by_name(
+        tmp_path, kw, match):
+    model = read_fullprof_pcr(_pcr(tmp_path, "mag.pcr", _combined(**kw)))
+    with pytest.raises(FullProfPcrError, match=match) as err:
+        to_structure(model)
+    assert "Jbt = ±10 phase is a nuclear phase" in str(err.value) or \
+        "Jbt = ±1 phase" in str(err.value)
+    assert "nuclear_only=True" in str(err.value)
+
+
+def test_time_reversal_flags_are_read_and_their_order_refused(tmp_path):
+    """LINE 23a's flags follow "the same [order] as in CODFIL.out" (p. 96):
+    read, so the walk lands on the atoms, and refused at the build, since the
+    order is FullProf's output's and not the file's."""
+    block = _combined(isy=0, sg="P 1 21/c 1",
+                      symmetry="! Time Reversal Operations\n 1 -1 1 -1\n")
+    block = block.replace("P 1 21/c 1               <--Space group symbol",
+                          "P 1 21/c 1          Magnetic symmetry below")
+    model = read_fullprof_pcr(_pcr(tmp_path, "mag.pcr", block))
+    assert model.phases[0].time_reversal == (1, -1, 1, -1)
+    assert model.phases[0].space_group_raw == "P 1 21/c 1"
+    with pytest.raises(FullProfPcrError, match="CODFIL|order FullProf lists"):
+        to_structure(model)
+
+
+def test_a_mag_comment_beside_listed_operators_is_refused_at_read(tmp_path):
+    block = _combined().replace("P -1               <--Space group symbol",
+                                "P -1                Mag")
+    with pytest.raises(FullProfPcrError, match="two statements of one magnetic"):
+        read_fullprof_pcr(_pcr(tmp_path, "mag.pcr", block))
+
+
+@pytest.mark.parametrize("n_t", [-1, 2, 3, 4])
+def test_a_combined_site_with_an_unsettled_line_count_is_refused_at_read(
+        tmp_path, n_t):
+    block = _combined(atoms=_combined_sites(n_t=n_t))
+    with pytest.raises(FullProfPcrError, match=f"N_t = {n_t}"):
+        read_fullprof_pcr(_pcr(tmp_path, "mag.pcr", block))

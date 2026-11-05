@@ -22,11 +22,18 @@ OPENBLAS_NUM_THREADS=1 RIETX_TELEMETRY=0 .venv/bin/python docs/wp/2045-batch/pro
 | `probe4.py` | The Bragg intensity each stage's frozen windows drop at its answer, and the χ² ratio fresh/frozen | ~1 min |
 | `probe5.py` | A re-solve from the runaway answer on fresh windows at `ftol` 1e-6 and 1e-9 | ~3 min |
 | `probe6.py` | Option 5's cost on the four acceptance protocols and the mg090 joint fit, emulated through the last declared stage's own `ftol` | ~2 min (macOS arm64, 2026-10-25) |
+| `probe7.py` | The intermediate tolerance's net saving on today's schedule: each protocol, cpd-1a with an absent zircon among them, shipped against `intermediate_ftol=None`, closing stage kept in both | ~2.5 min (macOS arm64, 2026-11-02) |
 
 Probes 1-5 ran on a Linux x86-64 cloud container (4 cores, `[dev]`,
 Python 3.12) at `7d24e09e7`, and the numbers are in WP-2045's Context.
 `probe6.py` ran on macOS arm64 (`[dev]`) at `ab5922dd3`, before option 5
 was built. On a tree with option 5 its two arms run the same schedule.
+`probe7.py` ran on macOS arm64 (`[dev]`, compiled tier on) at `4e08411e5`,
+three interleaved rounds an arm. It takes the repository root as its argument
+like the others. It captures no models. It fits the acceptance protocols
+through `tests/test_window_domain._protocol`, and cpd-1a with zircon from
+`tests/test_acceptance_qpa_roundrobin`'s builders, so its cpd-1a arms need
+the same `tests/data/qarr` data.
 
 These scripts are records, not tests. Nothing runs them, so a change to
 `compile_model`'s signature or to `CompiledPhase.win`/`fcj_n` can break them

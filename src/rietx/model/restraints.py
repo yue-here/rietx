@@ -31,6 +31,7 @@ for the FD/autodiff Jacobians.
 
 from __future__ import annotations
 
+import functools
 import math
 from dataclasses import dataclass
 
@@ -46,6 +47,7 @@ from ..schemas.structure import (
     BondRestraint,
     PlanarityRestraint,
     TetherRestraint,
+    TorsionRestraint,
 )
 
 _CELL_NAMES = ("a", "b", "c", "alpha", "beta", "gamma")
@@ -140,6 +142,26 @@ class _Plane:
         return len(self.atoms)
 
 
+@dataclass
+class _Torsion:
+    """A torsion A–B–C–D: entry ``m`` is atom ``atoms[m]`` at ``R[m]·x + t[m] + n[m]``.
+
+    The one item both a :class:`~rietx.schemas.structure.TorsionRestraint`
+    and a :class:`~rietx.schemas.results.GeometryTorsion` row compile to
+    (WP-1815), so the row a fit is restrained by and the row an esd is
+    propagated through share :func:`_torsion_row_partials`.
+    """
+
+    phase: int
+    atoms: list
+    R: list
+    t: list
+    n: list
+    target_deg: float
+    sigma: float
+    weight: float
+
+
 def _item_rows(it) -> int:
     return it.n_rows if isinstance(it, _Plane) else 1
 
@@ -197,6 +219,8 @@ def resolve_phase_restraints(phase, ip: int, sites, cell) -> list:
                              r.target_deg, r.sigma, r.weight))
         elif isinstance(r, PlanarityRestraint):
             out.append(_resolve_plane(phase, ip, sites, cell, g, r))
+        elif isinstance(r, TorsionRestraint):
+            out.append(_resolve_torsion(phase, ip, sites, cell, g, r))
         else:  # ValueRestraint
             out.append(_Value(r.path, r.target, r.sigma, r.weight, ip))
     return out
@@ -241,6 +265,51 @@ def _resolve_plane(phase, ip, sites, cell, g, r) -> _Plane:
             "a set that is close to one plane, or use bond and angle restraints")
     return _Plane(ip, list(r.atoms), Rs, ts, ns, r.sigma, r.weight,
                   vec[:, 0].copy())
+
+
+def _resolve_torsion(phase, ip, sites, cell, g, r) -> _Torsion:
+    """Freeze each entry's image along the chain; refuse a straight bond angle.
+
+    The first entry sits where it is stored unless an image is named; every
+    other entry left ``None`` takes the image of its atom nearest the entry
+    before it, so A–B–C–D follows the chain's own bonds.
+    """
+    ops = r.op_indices or [None] * 4
+    trs = r.translations or [(0, 0, 0)] * 4
+    eye, zero = np.eye(3), np.zeros(3)
+    Rs, ts, ns = [], [], []
+    prev = None
+    for m, (j, op, tr) in enumerate(zip(r.atoms, ops, trs, strict=True)):
+        if m == 0 and op is None:
+            rot, t, n = eye, zero, np.asarray(tr, dtype=np.float64)
+        else:
+            rot, t, n = _resolve_image(sites, j, prev, _atom_xyz(phase, j),
+                                       op, tr, g)
+        Rs.append(rot)
+        ts.append(t)
+        ns.append(n)
+        prev = rot @ _atom_xyz(phase, j) + t + n
+    item = _Torsion(ip, list(r.atoms), Rs, ts, ns, float(r.target_deg),
+                    r.sigma, r.weight)
+    values = _phase_values(phase, ip, cell)
+    if not _torsion_defined(item, values):
+        labels = [phase.atoms[j].label for j in r.atoms]
+        raise ValueError(
+            f"torsion restraint on {phase.name!r} atoms {labels}: a bond angle "
+            "of the chain is straight (or two of its atoms coincide), so no "
+            "torsion is defined; restrain a chain whose A-B-C and B-C-D angles "
+            "are bent")
+    return item
+
+
+def _phase_values(phase, ip: int, cell) -> dict:
+    """The value dict a host-side geometry function reads, for one phase."""
+    out = {f"phases.{ip}.cell.{k}": float(v) for k, v in zip(_CELL_NAMES, cell,
+                                                              strict=True)}
+    for j, a in enumerate(phase.atoms):
+        for c in _XYZ:
+            out[f"phases.{ip}.atoms.{j}.{c}"] = float(getattr(a, c).value)
+    return out
 
 
 def _atom_xyz(phase, j: int) -> np.ndarray:
@@ -324,6 +393,10 @@ def restraint_residual(compiled: CompiledRestraints, values: dict):
             pref = math.sqrt(it.weight) / it.sigma
             rows.extend(d * pref for d in _plane_distances(it, values))
             continue
+        if isinstance(it, _Torsion):
+            rows.append(_torsion_deviation_traced(it, values)
+                        * (math.sqrt(it.weight) / it.sigma))
+            continue
         if isinstance(it, _Bond):
             computed, target = _bond_distance(it, values), it.target
         elif isinstance(it, _Angle):
@@ -365,6 +438,34 @@ def _plane_distances(it: "_Plane", values: dict):
     normal = normal * xp.where(dot >= 0.0, 1.0 + 0.0 * dot, -1.0 + 0.0 * dot)
     dist = xp.matmul(d, normal)
     return [dist[m] for m in range(len(it.atoms))]
+
+
+def _torsion_deviation_traced(it: "_Torsion", values: dict):
+    """The circular difference φ − target in degrees, traceable.
+
+    φ = atan2(|b₂|·b₁·(b₂×b₃), (b₁×b₂)·(b₂×b₃)) with bₖ the Cartesian bond
+    vectors along the chain (see :func:`_torsion_geometry_np`), and the
+    difference is taken as atan2(sin(φ − t), cos(φ − t)) from the same two
+    arguments, so the row is smooth wherever φ is, 180° included.
+    """
+    xp = get_backend()
+    ip = it.phase
+    amat = cartesian_frame(_cell_tuple(values, ip))
+    p = [xp.matmul(amat, xp.asarray(R) @ _xyz_traced(values, ip, j, xp)
+                   + xp.asarray(t) + xp.asarray(n))
+         for j, R, t, n in zip(it.atoms, it.R, it.t, it.n, strict=True)]
+    b1, b2, b3 = p[1] - p[0], p[2] - p[1], p[3] - p[2]
+    n1, n2 = _cross_traced(b1, b2, xp), _cross_traced(b2, b3, xp)
+    y = xp.sqrt(xp.sum(b2 * b2)) * xp.sum(b1 * n2)
+    x = xp.sum(n1 * n2)
+    tr = math.radians(it.target_deg)
+    ct, st = math.cos(tr), math.sin(tr)
+    return xp.degrees(xp.arctan2(y * ct - x * st, x * ct + y * st))
+
+
+def _cross_traced(u, v, xp):
+    return xp.stack([u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
+                     u[0] * v[1] - u[1] * v[0]])
 
 
 def _cell_tuple(values: dict, ip: int) -> tuple:
@@ -462,8 +563,8 @@ def _angle_geometry_np(it: _Angle, values: dict):
                        root=root, cos=cos, g=g, cell=cell)
 
 
-def restraint_partials(compiled: CompiledRestraints, values: dict, table
-                       ) -> np.ndarray:
+def restraint_partials(compiled: CompiledRestraints, values: dict, table,
+                       *, gross: np.ndarray | None = None) -> np.ndarray:
     """∂row_i/∂p_phys as (n_rows × n_entries), physical-parameter columns.
 
     The affine constraint chain ∂p_phys/∂θ = C·dφ/du is applied by the caller
@@ -472,6 +573,15 @@ def restraint_partials(compiled: CompiledRestraints, values: dict, table
     x/y/z and the six cell parameters for bond/angle, the target path for a
     value restraint.  DOF chaining then falls out of the shared C the analytic
     structural columns use.
+
+    ``gross``, an array of the same shape, is filled in the same pass with
+    each row's **gross** partials: the sum of the absolute values of every
+    term that adds into an entry, before they cancel.  It is what
+    ``model.geometry``'s cancellation floor scales by, because a torsion held
+    fixed by symmetry has partials that cancel between two images of one atom
+    — every entry's net partial is roundoff, so a floor scaled by the net
+    partials would be roundoff too (WP-1815).  A row of any other kind takes
+    the absolute value of its net row, the scale the floor always had.
     """
     idx = table._paths
     r_phys = np.zeros((compiled.n_rows, len(table.entries)), dtype=np.float64)
@@ -482,12 +592,18 @@ def restraint_partials(compiled: CompiledRestraints, values: dict, table
             _plane_row_partials(r_phys, row, it, values, idx, pref)
             row += it.n_rows
             continue
+        if isinstance(it, _Torsion):
+            _torsion_row_partials(r_phys, row, it, values, idx, pref, gross=gross)
+            row += 1
+            continue
         if isinstance(it, _Bond):
             _bond_row_partials(r_phys, row, it, values, idx, pref)
         elif isinstance(it, _Angle):
             _angle_row_partials(r_phys, row, it, values, idx, pref)
         else:  # _Value: ∂row/∂path = √w/σ
             r_phys[row, idx[it.path]] += pref
+        if gross is not None:
+            gross[row] = np.abs(r_phys[row])
         row += 1
     return r_phys
 
@@ -600,6 +716,141 @@ def _angle_row_partials(r_phys, row, it, values, idx, pref) -> None:
     _scatter_cell(r_phys, row, idx, ip, cell_row)
 
 
+#: |b₁ × b₂|² or |b₂ × b₃|² at or below this fraction of the arms' squared
+#: lengths' product is a straight (or collapsed) bond angle, where a torsion
+#: is undefined: sin² of the angle, so it is ``restraints._COS_CLAMP``'s own
+#: limit, 1 − cos² at the clamp, derived rather than chosen.
+_TORSION_SIN2_FLOOR = 1.0 - _COS_CLAMP * _COS_CLAMP
+
+
+def wrap_degrees(angle: float) -> float:
+    """``angle`` mapped into (−180°, 180°], the cif_core torsion range."""
+    out = math.remainder(float(angle), 360.0)
+    return 180.0 if out <= -180.0 else out + 0.0
+
+
+@functools.lru_cache(maxsize=16)
+def _frame_np(cell: tuple) -> tuple[np.ndarray, np.ndarray, tuple]:
+    """``cartesian_frame``, its inverse transpose and ``_metric_g_derivs`` for
+    one cell, host-side and cached: a torsion row needs all three, and the
+    geometry table asks for the same cell once per row at fit close."""
+    amat = np.asarray(cartesian_frame(cell), dtype=np.float64)
+    amat.setflags(write=False)
+    a_inv_t = np.linalg.inv(amat).T
+    a_inv_t.setflags(write=False)
+    return amat, a_inv_t, tuple(_metric_g_derivs(cell))
+
+
+def _torsion_geometry_np(it: _Torsion, values: dict):
+    """φ (degrees, in (−180, 180]) and what the partials need, host-side.
+
+    Klyne & Prelog (1960, *Experientia* 16, 521) define the sign: looking
+    along B → C, φ > 0 when B–A turns clockwise, by less than 180°, to
+    eclipse C–D.  With b₁ = B − A, b₂ = C − B, b₃ = D − C in Cartesian
+    coordinates and n₁ = b₁ × b₂, n₂ = b₂ × b₃,
+
+        φ = atan2(|b₂|·b₁·n₂, n₁·n₂)
+
+    which is exact at 0° and 180°, where arccos of the normals' cosine loses
+    its derivative (the singularity Blondel & Karplus 1996, *J. Comput.
+    Chem.* 17, 1132, set out to remove).
+    """
+    ip = it.phase
+    cell = tuple(float(v) for v in _cell_tuple(values, ip))
+    amat, a_inv_t, dg = _frame_np(cell)
+    frac = np.array([R @ _xyz_np(values, ip, j) + t + n for j, R, t, n
+                     in zip(it.atoms, it.R, it.t, it.n, strict=True)])
+    p = frac @ amat.T
+    b1, b2, b3 = p[1] - p[0], p[2] - p[1], p[3] - p[2]
+    n1, n2 = _cross3(b1, b2), _cross3(b2, b3)
+    lb2 = math.sqrt(float(b2 @ b2))
+    phi = math.degrees(math.atan2(lb2 * float(b1 @ n2), float(n1 @ n2)))
+    return wrap_degrees(phi), dict(cell=cell, amat=amat, a_inv_t=a_inv_t, dg=dg,
+                                   frac=frac, b1=b1, b2=b2, b3=b3, n1=n1, n2=n2,
+                                   lb2=lb2)
+
+
+def _cross3(u: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """u × v for two 3-vectors (``np.cross`` costs 25 µs a call in a loop
+    that runs once per torsion row at fit close)."""
+    return np.array([u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
+                     u[0] * v[1] - u[1] * v[0]])
+
+
+def _torsion_defined(it: _Torsion, values: dict) -> bool:
+    """Whether neither bond angle of the chain is straight (nor an arm zero)."""
+    return _bent_chain(_torsion_geometry_np(it, values)[1])
+
+
+def _bent_chain(s: dict) -> bool:
+    b1, b2, b3, n1, n2 = s["b1"], s["b2"], s["b3"], s["n1"], s["n2"]
+    l1, l2, l3 = (float(v @ v) for v in (b1, b2, b3))
+    return (min(l1, l2, l3) > 0.0
+            and float(n1 @ n1) > _TORSION_SIN2_FLOOR * l1 * l2
+            and float(n2 @ n2) > _TORSION_SIN2_FLOOR * l2 * l3)
+
+
+def _torsion_cartesian_gradient(s: dict) -> np.ndarray:
+    """∂φ/∂p for the four Cartesian points, (4, 3), in degrees per Å.
+
+    With the end gradients ∂φ/∂A = −|b₂|·n₁/|n₁|² and ∂φ/∂D = |b₂|·n₂/|n₂|², the
+    middle two follow from translation invariance and the bond projections,
+
+        ∂φ/∂B = (b₃·b₂/|b₂|²)·∂φ/∂D − (1 + b₁·b₂/|b₂|²)·∂φ/∂A
+        ∂φ/∂C = (b₁·b₂/|b₂|²)·∂φ/∂A − (1 + b₃·b₂/|b₂|²)·∂φ/∂D,
+
+    analytic everywhere a torsion is defined, 0° and 180° included (a central
+    difference of the value itself straddles the ±180° cut there and returned
+    an esd of 6·10⁶°, #759 § 2).  Derived here from the atan2 form and checked
+    against a central difference of φ away from the cut
+    (``tests/test_geometry_torsions.py``); derivatives of this kind, free of
+    the arccos singularity, are the subject of Blondel & Karplus (1996).
+    """
+    b1, b2, b3, n1, n2, lb2 = (s[k] for k in ("b1", "b2", "b3", "n1", "n2", "lb2"))
+    l2sq = lb2 * lb2
+    ga = -lb2 / float(n1 @ n1) * n1
+    gd = lb2 / float(n2 @ n2) * n2
+    f1, f3 = float(b1 @ b2) / l2sq, float(b3 @ b2) / l2sq
+    gb = f3 * gd - (1.0 + f1) * ga
+    gc = f1 * ga - (1.0 + f3) * gd
+    return np.degrees(np.array([ga, gb, gc, gd]))
+
+
+def _torsion_row_partials(r_phys, row, it, values, idx, pref, *,
+                          gross: np.ndarray | None = None) -> None:
+    """∂φ/∂p for a torsion row, fractional coordinates and cell.
+
+    A fractional coordinate enters through p = A·(R·x + t + n); the cell
+    through A.  φ is invariant under a rotation of the Cartesian frame, so it
+    depends on A only through G = AᵀA, and dA = ½·A⁻ᵀ·∂G serves for every
+    cell parameter, as for a plane (:func:`_plane_row_partials`).  A chain
+    whose bond angle is straight has no torsion and leaves the row zero.
+    ``gross`` receives every term's absolute value as well
+    (:func:`restraint_partials`).
+    """
+    _, s = _torsion_geometry_np(it, values)
+    if not _bent_chain(s):
+        return
+    grad = _torsion_cartesian_gradient(s)
+    amat = s["amat"]
+    ip = it.phase
+    for m, (j, R) in enumerate(zip(it.atoms, it.R, strict=True)):
+        term = pref * (R.T @ (amat.T @ grad[m]))
+        _scatter_xyz(r_phys, row, idx, ip, j, term)
+        if gross is not None:
+            _scatter_xyz(gross, row, idx, ip, j, np.abs(term))
+    a_inv_t = s["a_inv_t"]
+    cell_row, cell_gross = [], []
+    for gq in s["dg"]:
+        da = 0.5 * a_inv_t @ gq
+        per_atom = pref * np.sum(grad * (s["frac"] @ da.T), axis=1)
+        cell_row.append(float(np.sum(per_atom)))
+        cell_gross.append(float(np.sum(np.abs(per_atom))))
+    _scatter_cell(r_phys, row, idx, ip, cell_row)
+    if gross is not None:
+        _scatter_cell(gross, row, idx, ip, cell_gross)
+
+
 # ----------------------------------------------------------------------
 # reporting
 # ----------------------------------------------------------------------
@@ -635,6 +886,16 @@ def summarise_restraints(compiled: CompiledRestraints | None, values: dict,
                     computed=float(dk), target=0.0, sigma=it.sigma,
                     weight=it.weight, deviation=float(dk),
                     deviation_over_sigma=dev_sig))
+            continue
+        if isinstance(it, _Torsion):
+            computed, _ = _torsion_geometry_np(it, values)
+            dev = wrap_degrees(computed - it.target_deg)
+            dev_sig = dev / it.sigma
+            chi2 += it.weight * dev_sig * dev_sig
+            rows.append(RestraintRow(
+                phase_index=it.phase, kind="torsion", atoms=list(it.atoms),
+                computed=computed, target=it.target_deg, sigma=it.sigma,
+                weight=it.weight, deviation=dev, deviation_over_sigma=dev_sig))
             continue
         if isinstance(it, _Bond):
             computed, target = _bond_value_np(it, values), it.target

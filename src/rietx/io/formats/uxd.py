@@ -276,9 +276,9 @@ def list_uxd_scans(path: str | Path) -> list[ScanInfo]:
         at = (f" at 2θ {fixed:.4g}°"
               if fixed is not None and drive.lower() != "2theta" else "")
         out.append(ScanInfo(
-            index=i, label=f"{drive} {x.min():.4g}–{x.max():.4g}°{at}",
+            index=i, label=f"{drive} {np.nanmin(x):.4g}–{np.nanmax(x):.4g}°{at}",
             n_points=int(x.size),
-            two_theta_range=(float(x.min()), float(x.max()))))
+            two_theta_range=(float(np.nanmin(x)), float(np.nanmax(x)))))
     return out
 
 

@@ -10,12 +10,12 @@ the doc cannot drift the way a hand-maintained table does.  Regenerate with
 (the same convention the backend goldens use).
 
 The reason this exists is that a tolerance is meaningless without its
-referent.  ``abs(a - 4.156780) < 2e-4`` and ``abs(Δa) < 1e-9`` look like the
-same kind of statement and are not: the first is a certified value with a
-stated uncertainty the fit does not reach and does not claim to, the second is
-two of our own fits that must agree to floating-point.  Sorting every bar in
-the tree by its referent is what turns a pile of numbers into a claim about
-what this package has been shown to do.
+reference value.  ``abs(a - 4.156780) < 2e-4`` and ``abs(Δa) < 1e-9`` look
+like the same kind of statement and are not: the first is a certified value
+with a stated uncertainty the fit does not reach and does not claim to, the
+second is two of our own fits that must agree to floating-point.  Sorting
+every bar in the tree by its reference value is what turns a pile of numbers
+into a claim about what this package has been shown to do.
 
 **Judge a correction by what it changed, never by Δ Rwp.**  That is the v0.5
 milestone's method result, and it is why the vocabulary below has
@@ -508,6 +508,21 @@ CLAIMS: tuple[Claim, ...] = (
                  "reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %",
     ),
     Claim(
+        "test_acceptance_srm660c",
+        "test_srm660c_zero_apertures_report_names_axial_asymmetry",
+        "srm660c", ("characterisation",),
+        "with both axial apertures at 0 the report names the one-sided "
+        "low-angle residual as axial asymmetry, and no impurity phase leads",
+        reference="the shape of a known systematic: the certification data "
+                  "carry axial divergence (the apertures refine to about "
+                  "0.025 and 0.037 when declared), so the action must fire "
+                  "and its rationale name the zero apertures; no accuracy "
+                  "is asserted",
+        measured="three gated regions below 40 deg read asymmetry +0.020 to "
+                 "+0.025 at 7-9 esd; refine_axial_asymmetry 0.50 first, "
+                 "increase_background_flexibility 0.49 (WP-2054)",
+    ),
+    Claim(
         "test_acceptance_srm660c", "test_srm660c_extinction_does_no_harm",
         "srm660c", ("characterisation", "ceiling"),
         "primary extinction freed on a specimen that has none refines to "
@@ -712,12 +727,13 @@ CLAIMS: tuple[Claim, ...] = (
                   "as a result: the recipe is over-parameterised and no fit "
                   "of it can say otherwise",
         measured="HIGH_CORRELATION on the peak against the background, and "
-                 "the last stage freeing it at max_iter: since WP-2002 that is "
-                 "the closing stage, and the declared extra_components stage "
-                 "converges at the intermediate tolerance (1.9.0: the "
-                 "extra_components stage at max_iter); GSAS-II's own "
+                 "the last stage freeing it, the closing stage since WP-2002, "
+                 "never meeting the solver's own convergence test: since "
+                 "WP-1334 the slow-descent rule stops it at 123 evaluations "
+                 "(STAGE_SLOW_DESCENT), the declared extra_components stage "
+                 "spending its 400 (STAGE_MAX_ITER); GSAS-II's own "
                  "committed position 8.77e10 with esd exactly 0",
-        diagnostics=("HIGH_CORRELATION", "STAGE_MAX_ITER"),
+        diagnostics=("HIGH_CORRELATION", "STAGE_MAX_ITER", "STAGE_SLOW_DESCENT"),
     ),
     Claim(
         "test_acceptance_powderline", "test_the_written_tables_reproduce_the_answer_they_came_from",
@@ -783,7 +799,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "recovered the information rather than merely divided by "
                   "root-N.  The identity half is that the three tied rows "
                   "carry the *same* value and esd to 1e-12, since they are "
-                  "one parameter.  Rwp is deliberately not a referent: it "
+                  "one parameter.  Rwp is deliberately not a reference value: it "
                   "moves by 0.05 % of itself, so no bar on it could "
                   "distinguish a good constraint from a bad one",
         measured="20 -> 18 free parameters, 287.5 -> 319.4 points per "
@@ -987,6 +1003,24 @@ CLAIMS: tuple[Claim, ...] = (
         measured="corundum +24, magnetite -15, zircon -9 wt %",
         diagnostics=("BRINDLEY_OUTSIDE_REGIME",),
     ),
+    Claim(
+        "test_acceptance_qpa_roundrobin",
+        "test_flank_lobes_name_their_peak_and_buy_no_impurity",
+        "qarr", ("characterisation",),
+        "on each of the eight weighed three-phase mixtures, every unmatched "
+        "observed peak within 0.5° of a strong reflection says it sits "
+        "unresolved on a drawn peak (UnmatchedPeak.flank), and Layer 2 "
+        "suggests no impurity phase",
+        reference="**no accuracy band is claimed**.  The reference is the "
+                  "weighing: each mixture holds exactly the three modelled "
+                  "phases, so any impurity suggestion is wrong.  0.5° and a "
+                  "strong line's tenth of the tallest are the test's own "
+                  "scope, set by the lobes WP-1977 measured at 0.15-0.38°",
+        measured="2-6 rows a mixture on a drawn flank, 0.7-1.2 FWHM below "
+                 "the line, none near a strong line off one; no impurity "
+                 "call (main's rule, on the fits of 52cec09a1: cpd-1b suggested "
+                 "add_impurity_phase at 0.50 from two such rows)",
+    ),
     # ---- dispersion: the pre-registered prediction -----------------------
     Claim(
         "test_acceptance_dispersion",
@@ -1036,7 +1070,7 @@ CLAIMS: tuple[Claim, ...] = (
         "the sharpest single dispersion result: B(O) comes off its floor "
         "once Zn's missing f' stops being absorbed by a displacement "
         "parameter, while Rwp barely moves",
-        reference="physical plausibility, not a reference value — B(O) below "
+        reference="physical plausibility, not a measured value — B(O) below "
                   "0.1 A^2 is a parameter pinned on a bound, and 0.2-1.2 is "
                   "the range an oxide oxygen actually occupies.  Rwp is "
                   "asserted only one-sided, because this is exactly a case "
@@ -1193,41 +1227,43 @@ CLAIMS: tuple[Claim, ...] = (
         "test_acceptance_sequential",
         "test_the_hostile_series_exercises_the_reseed_fence", "qarr",
         ("identity", "characterisation"),
-        "the reseed fence's accounting is exact, the escalation ladder is "
+        "the reseed ladder's accounting is exact, the escalation ladder is "
         "only ever climbed as a prefix, and a reseed never leaves the fit "
         "worse than the warm start it rejected",
         reference="internal consistency: the SEQUENTIAL_RESEED diagnostic "
                   "count must equal the number of entries flagged reseeded, "
                   "exactly; every entry's rungs_tried must be a prefix of the "
-                  "ladder and contain the rung it kept.  The fence never fired "
+                  "ladder and contain the rung it kept.  The ladder never climbed "
                   "on the hostile series — the collapsed refit recovers a bad "
                   "warm start within the fit — so it is insurance, pinned by "
                   "unit tests rather than by this suite",
         measured="exact accounting; zero reseeds on the hostile series, "
                  "every pattern after the first kept on its warm rung, and no "
-                 "kept rung above the Rwp fence (2026-10-25, macOS arm64, "
-                 "after WP-2045; 1.9.0 the same).  1.10.0's hostile series did "
+                 "kept rung above the 1.25× Rwp fence the default then carried "
+                 "(2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same; the "
+                 "fence left the default in WP-2003).  1.10.0's hostile series did "
                  "not finish, spending over 50 CPU minutes in the closing "
                  "stage that follows cpd-1b's warm rung (Rwp 0.760)",
-        diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED",
-                     "SEQUENTIAL_RWP_OUTLIER"),
+        diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED"),
     ),
     Claim(
         "test_acceptance_sequential",
         "test_the_first_rung_bound_moves_no_accepted_value", "qarr",
         ("identity",),
-        "FIRST_RUNG_FACTOR is answer-invariant on the hostile series: the "
-        "chain with WP-1127's first-rung bound and the chain without it "
-        "report the same values, esds, rungs, fences and codes, and no kept "
-        "first rung reaches the budget the bound would set",
-        reference="the same chain with first_rung_factor=None, to the bit; "
-                  "the margin against FIRST_RUNG_FACTOR itself (WP-2003). "
+        "A first-rung bound at 3.0 (WP-1127's factor, the default until "
+        "WP-2003 C3 made it the caller's) is answer-invariant on the hostile "
+        "series: the chain with it and the default chain without it report "
+        "the same values, esds, rungs, fences and codes, and no kept first "
+        "rung reaches the budget the bound sets",
+        reference="the default chain, first_rung_factor=None, to the bit; "
+                  "the margin against the factor itself (WP-2003). "
                   "It verifies the bound and validates nothing, the "
                   "reference being rietx's own unbounded chain",
         measured="bit-identical; kept first rungs past the armed point "
-                 "0.064-0.080x the running maximum against a factor of 3.0 "
-                 "(2026-10-25, macOS arm64, after WP-2045; 0.34-0.39x on "
-                 "2026-10-24, Linux x86-64, with cpd-1b's runaway in the chain)",
+                 "0.045-0.062x the running maximum of a converged rung's "
+                 "dearest stage, the quantity capped since C3, against a "
+                 "factor of 3.0 (2026-11-02, macOS arm64; 0.064-0.080x of the "
+                 "rung's summed stages on 2026-10-25)",
     ),
     Claim(
         "test_acceptance_sequential",
@@ -2118,6 +2154,18 @@ CLAIMS: tuple[Claim, ...] = (
     ),
     Claim(
         "test_acceptance_indexing",
+        "test_the_formula_window_ranks_the_fluorapatite_cell_where_the_search_does",
+        "fap", ("own_result",),
+        "SearchSpec.from_formula('Ca5P3O12F', z=2), a ceiling only since "
+        "WP-2030 part 2, keeps the fluorapatite cell and ranks it where the "
+        "same search under the row's hand-set 600 A^3 ceiling does; 1.10.0's "
+        "window (738-1153 A^3) excluded it",
+        reference="the same pattern, systems and budgets searched under "
+                  "fap_index's declared 600 A^3 ceiling, the in-band cell "
+                  "read at that row's 500 ppm band on GSAS's FAP.EXP cell",
+        measured="ranked first in both (pearl, 2026-10-30, WP-2030 part 2)"),
+    Claim(
+        "test_acceptance_indexing",
         "test_the_cross_code_cell_leads_because_the_engines_agree_on_it",
         "fap", ("cross_code", "characterisation"),
         "the cross-code cell is reachable, every engine agrees on it, it leads "
@@ -2432,11 +2480,15 @@ CLAIMS: tuple[Claim, ...] = (
         reference="NIST SRM 640c certificate a = 5.4311946 +- 0.0000092 A at "
                   "22.5 C.  Held, not refined: holding a certified cell is what "
                   "turns a free lambda into a calibration measurement.  The "
-                  "cubic ties (b<-a, c<-a) carry the source's value, so this is "
-                  "an identity bar (exact) and the absent esd shows nothing was "
-                  "refined.  XND held 5.4311948, 0.4 ppm above, negligible "
-                  "against every band here and stated in the docstring",
-        measured="cell.b and cell.c both exactly 5.4311946 A, esd None",
+                  "answer lists no cell row, since a result carries only what "
+                  "the fit could move (WP-1999); no stage's free set holds a "
+                  "cell path, and the parameter table ties b and c to a, so "
+                  "this is an identity bar (exact).  XND held 5.4311948, 0.4 "
+                  "ppm above, negligible against every band here and stated "
+                  "in the docstring",
+        measured="no cell row in the answer and none in any stage's free "
+                 "set; cell.a, cell.b and cell.c in the parameter table all "
+                 "exactly 5.4311946 A, b and c tied to a",
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2880,7 +2932,7 @@ INTERMEDIATE_FTOL_DEFAULT = 1e-6
 #: * *What it costs.*  1.05-2.05x the fit time on those three and SRM 660c,
 #:   the fluorapatite the dearest (two runs each, interleaved, 2026-10-21).
 #: * *Where it fails.*  SRM 660c LaB6 stays 0.9 esd from the converged answer
-#:   in U, its Gaussian variance on the clamp floor at high angle (WP-1467),
+#:   in U, its Gaussian variance on the clamp floor at high angle (WP-1955),
 #:   and its two Biso starts land in mirrored axial minima (WP-2012).
 #: * *Why the suites here ride it.*  As for the schedule above: they say what
 #:   the shipped package reproduces, and each names the setting.
@@ -3157,7 +3209,7 @@ def render_markdown() -> str:
       "     Regenerate: .venv/bin/python -m tests.validation_matrix\n"
       "     Guarded by: tests/test_validation_matrix.py (fast suite) -->\n")
     w("Every real-data assertion in this repository, and what its tolerance "
-      "is\nreferenced to. A bar without its referent is not a claim: "
+      "is\nreferenced to. A bar without its reference value is not a claim: "
       "`abs(a - 4.156780) <\n2e-4` and `abs(delta_a) < 1e-9` look alike and "
       "are not remotely the same\nstatement — the first is a certified value "
       "the fit does not reach and does not\nclaim to, the second is two of "

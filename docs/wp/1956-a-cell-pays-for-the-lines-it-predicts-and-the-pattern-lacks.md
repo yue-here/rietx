@@ -1,6 +1,6 @@
 # WP-1956 — a cell pays for the lines it predicts and the pattern lacks
 
-Milestone: unscheduled · Status: 🔄 2026-10-25 — C3 merged (PR #941); open: the `fom_panel_disagrees` revisit, and tutorial 03's absence count (WP-2041)
+Milestone: unscheduled · Status: 🔄 2026-11-01 — #1263 (the containment refuter's null window) in PR #1302, `split` on top of #1251's `g` decided 2026-11-01; C3 merged (PR #941) and #941's follow-ups (PR #1177, `8260c78b`); open: the `fom_panel_disagrees` revisit, and tutorial 03's absence count (WP-2041)
 Track: What fires, and what stays silent
 Depends on: 1449 soft (the index 2–4 refutation it widens); 1511 soft (one Le Bail protocol per cell)
 Priority: P2 2026-10-13 — the absent-line detector fires on the truth and is blind on every wrong cell, and a distorted cell ranks first; no grade is confident today only because the run-level `fom_panel_disagrees` fires, which the reporter measured quiet on arms where a wrong cell reached `medium`
@@ -165,6 +165,49 @@ engine or the ranking. Indexing is provisional by declaration
   merge they go to the 1.11 notes, with "schema 0.59, indexing thresholds 1.11" read as
   0.60 and 1.12. WP-2043's `### Inherited` holds #1152's line the same way.
 
+- 2026-10-31, from the issue triage (issue #916): task 5 measured (reporter,
+  2026-10-30, addendum 2026-10-31, main at e016f187d, 19 runs from 4 sources).
+  Removing `fom_panel_disagrees` is still unsafe after the repair. Without it,
+  6 runs promote a wrong cell, and on LaB₆ as picked three reach `high`. The
+  reporter measured a lattice-aware form ("TL"). It fires only when the
+  members' co-winners share no lattice, comparing lattices by line set at 1e-3
+  relative in Q. TL promotes no wrong cell. It lifts three truths: #916 arm b
+  and brucite to `medium`, and zincite to `high`. Its tolerance has under a
+  factor of 3 of margin on LaB₆'s 0.12 % tetragonal descent, so the tolerance
+  needs its own measurement before code. The addendum looks at one commit
+  under `preset="quick"`. There the flag on the tP c/a 1.01 negative arm flips
+  with machine load. It fired on 3 of 3 runs with six busy loops and was quiet
+  unloaded, because load changes which cells get validated inside the ~120 s
+  ceiling. A flag that fires by wall clock at fixed inputs is a
+  reproducibility cost of its own. The reporter asks the maintainer to choose:
+  make the flag lattice-aware (a rule change), or close task 5 as "kept".
+  Checked against the tree at d87c8cc91: `fom_panel_disagrees` is unchanged
+  and task 5 is unticked. The figures were not re-run.
+
+- 2026-10-31, from the issue triage (issue #1267): under `preset="quick"`, at
+  one commit (`e016f187d`) with fixed seeds and synthetic inputs,
+  `fom_panel_disagrees` (and the truth's grade it lowers, medium → low) on the
+  tP c/a 1.01 negative arm fired in 3 of 3 runs with six busy loops on the
+  machine and stayed quiet unloaded. Every run took 108-115 s and returned 12
+  candidates, so the 120 s ceiling bound each time; the distinct-class count
+  among the candidates moved 9 (quiet) → 11-12 (loaded). Under a 4× ceiling
+  (`total_budget_seconds=480`) all three runs were quiet. This is the
+  measurement behind the reporter's addendum on #916, which withdrew their
+  earlier "the flag moves with the commit". Checked against the tree at
+  d87c8cc91: `quick` fills `QUICK_TOTAL_BUDGET_SECONDS` = 120 s (`engines.py`)
+  when the caller leaves the ceiling `None`, the search stops
+  `VALIDATION_RESERVE_FRACTION` (0.15) early, validation runs cheapest first
+  and stops at the first cancelled fit (`workflow.py:1083-1114`), and
+  `fom_panel_disagrees` is computed from the panel winners of whatever was
+  ranked (`consensus.py`). So the mechanism the reporter proposes (the clock
+  reaches different units and fits under load) is consistent with the code; it
+  was not instrumented, and not re-run here. Consequence for this WP's open
+  task "Revisit `fom_panel_disagrees` only on the same arms": run that revisit
+  under `preset="full"` or a declared ceiling long enough that no arm binds,
+  or its readings move with machine load. Whether `quick` should become
+  reproducible for a given input (budget by work units, or a deterministic
+  cut) is a change to WP-1042's ruled design and is the maintainer's.
+
 ## Non-goals
 
 - The blind search and enumeration ceilings (WP-1924), dedup across a reduction
@@ -187,6 +230,10 @@ engine or the ranking. Indexing is provisional by declaration
 - [x] Charge absences at the grade beyond index 2–4, with the glide and
       unresolved-split guards; re-measure every `predicted_but_absent` count in
       the tree and record the moves.
+- [x] #1263: the containment refuter's null counted in the seen test's own
+      windows, the assumed shift bound flooring only the power check (`split`).
+      *Built 2026-11-01 (PR #1302). Decided 2026-11-01 (maintainer): `split`
+      lands on top of #1251's `g`.*
 - [ ] Revisit `fom_panel_disagrees` only on the same arms, after the repair.
 - [x] Tests, and `tests/test_acceptance_indexing.py` green.
 - [x] Skill: the indexing reference row for any changed caveat or grade rule.
@@ -209,6 +256,140 @@ absences; Si, corundum and magnetite keep their correct cells.
 - WP-1043 (the magnetite measurement and the recorded design), WP-1449.
 
 ## Handover log
+
+- **2026-11-01** — #1263, built as the reporter's `split` rule (ghostshift runner,
+  PR #1302). Decided 2026-11-01 (maintainer): `split` lands on top of #1251's
+  `g` (PR #1302). The containment refuter compared how many of a cell's extra lines sit
+  on an observed line with a chance count taken in wider windows, floored at the
+  assumed shift bound (0.15° 2θ when nothing is measured). The seen count itself
+  is taken at the resolution after the cell's own common shift. So "expected by
+  chance" overstated chance, by 1.1–1.5× on the real-data acceptance rows where
+  the floor binds and 4–15× on narrow synthetic lists, and the refuter called
+  extras "no more than chance" that were seen well above it. Now the chance
+  rate is the seen test's own, and the floor bounds only whether the test had
+  the power to refute at all, which is what #951's row needs. One verdict
+  moved across the 244 pairs the indexing tests ask, on wrong cells. Which rule
+  lands, `split` on top of #1251's `g` or `g` alone, is the maintainer's call at
+  merge: the WP recorded it so (it narrows the approved tier-3
+  `INDEX_SUPERCELL_REFUTED` action, and turns on the reading of #951 that the
+  shift bound limits the power check and leaves the null alone).
+
+  *Done.* `PatternScreen.p0` is the unfloored union of the reversed windows;
+  `PatternScreen.p0_power` (new, `None` when no floor is declared) is the floored
+  one. `SupercellEvidence.p0_power` (new) carries it, and `p_floor` reads it;
+  `n_seen ≤ n·p0`, both p-values and `SupercellCheck.p0` read the unfloored
+  rate. The `supercell_chance` (index 2–4) route is untouched: its seen test and
+  its `chance_rate` already share the matching window. Docstrings that claimed
+  the windows matched (`SupercellEvidence.p0`, `containment_evidence`,
+  `SupercellCheck`) now say which windows; the `indexing/CLAUDE.md` clause, the
+  thresholds-1.12 note, the `_audit.py` row's evidence (tier unchanged) and the
+  1.11 release note say so. The skill row got the full stop #1251's round 2
+  asked for, re-synced to both copies. Option "pass the floor into
+  `seen_at_resolution`" was not built: the rulebook forbids asking a reversed
+  question in the search window (±0.15° on a 0.023° FWHM read a resolved split
+  as supported).
+
+  *Measured* (`[dev]` venv, macOS arm64, Python 3.12.10). The dense triclinic
+  fixture (#1230's aP2 kind, 289 lines): p₀ 0.228, and a 2·10⁴-point Monte Carlo
+  of `seen_at_resolution` reads 0.228; the floored rate is 0.667. The truth's
+  extras over the six-times-larger rival are 128 of 373 seen, against 85 by
+  chance (p 2.5e-7) and 249 at the floored rate. None sits on a line the rival
+  leaves unexplained, so the pair is undecided under `split` alone, under `g`
+  alone and under both. #951's list: p₀ 0.0115 (p₀² 1.3e-4) against 0.172 floored
+  (0.030 > α 0.01), so its 0-of-2 pair stays undecided. A pytest plugin logged
+  every containment pair's verdict under main's floored null and under `split`
+  (`~/.cache/ghostshift/rietx/issue-1263/gs_split_log.py`, not committed) over
+  `test_acceptance_indexing.py` plus the screen, consensus, reduce and
+  width-allowance files: 227 passed in 18:22 at `-n 4` on a loaded machine. Of
+  244 distinct pairs, 243 keep their verdict; one goes refuted → undecided, a
+  wrong cubic P 23.75 Å child of a wrong hexagonal 18.53 × 10.40 Å parent on
+  `test_an_unidentified_pattern_stays_unidentified` (23 of 100 seen against 18.6
+  by chance, 27.7 floored), still refuted by four other parents. No pair gains
+  `supported`. Without `g`, `split` alone moves five pairs to undecided. The
+  floor binds on 75 of the acceptance rows' 153 pairs. `python -m
+  tests.reader_output`: exit 0, unchanged (a Rietveld fit; it does not reach
+  indexing). What a reader sees that does change: `INDEX_SUPERCELL_REFUTED`'s
+  "N expected by chance" and `SupercellCheck.p0` drop by the ratios above
+  wherever the floor binds.
+
+  *Added after review.* `SupercellCheck.p0_power` (new, additive, schema note
+  under 0.60; `None` without a floor and in a record from before #1263),
+  written by `consensus.supercell_checks`, so a record reproduces its own
+  verdict: #951's pair stores p₀ 0.0115 with 0 of 2 seen, which alone reads as
+  refuted, beside the 0.172 the power check read. The texts giving the old
+  reason for `undecided` are corrected (`SupercellCheck`, `verdict`, `p_floor`,
+  the reference page's band and table, the theory page's power paragraph, which
+  also gains the k ≤ n·p₀ refutation and #1230's condition it lacked). The
+  reference page's text twin sits within a few characters of its 50 000 cap
+  after this, so the next addition there splits the page.
+
+  */code-review high --fix.* Seven findings. Applied three, all text: the
+  `p_floor` docstring, the dense fixture's line count (289 usable), #951's
+  test docstring's inequality. Built one after the judge agreed: the
+  `p0_power` record field above. Declined three, each a behaviour change for
+  its own measurement: (1) p₀ is not conditioned on the extras being far from
+  every parent line; on the dense fixture the conditional rate is 0.206
+  against p₀ 0.228, so n·p₀ still overstates chance by about 1.1× there (the
+  floored rate overstated it 3×), next action below; (2) `p0_floor_deg`'s
+  default 0 leaves `supercell_checks(screen=None)` without a power floor, as
+  before this branch (both rates were unfloored there, so nothing regressed),
+  and the keyword's name now describes a rate it no longer sets; (3) p₀ is
+  counted about the raw observed positions while the seen test reads each
+  candidate's shift-corrected ones, a gap the Monte Carlo bounds at 0.015 on
+  one constant-shift pattern.
+
+  *Generality* (judge's sections, unedited):
+
+  INDEX_SUPERCELL_REFUTED (code row, tier 3, ambiguity 2, approved
+  2026-10-21). Verdict: **holds.** "The new null is arithmetic that a test
+  verifies. The cost of refuting less was measured at one flipped verdict, on
+  a wrong cell that four other parents still refute. I found no case for
+  keeping the old null." Q5 note: the `approved` date was not refreshed,
+  although this entry says the rule is the maintainer's call at merge; a batch
+  reader of the table will not see that request. Q6 note: the 244 pairs are
+  not broken down by family, and all of them are development data (C3's
+  thresholds were measured on them), which this entry did not say.
+
+  The split (a heuristic the table cannot see). Verdict: **weak**; Q7
+  **fails**: "No field carries `p0_power` … for #951's pair, a reader computes
+  0.0115² = 1.3e-4 < 0.01 with 0 of 2 seen, expects `refuted`, and reads
+  `undecided`. Four texts still give the old reason." Q3 against the power
+  half: "#951's lines were missing because a weak-line intensity filter removed
+  them, not because of a 2θ shift. The shift bound protects it only by the
+  arithmetic of n = 2: 0.172² = 0.030 > 0.01. The same filtered superstructure
+  with three extras gives 0.172³ = 0.0051 < 0.01 and would be refuted. … This
+  proxy predates the branch, but the floor now carries the guard's whole
+  weight." Q5: the null half is tier 1 (arithmetic, verified by the Monte Carlo
+  test); the power half is tier 3 at best, its two constants
+  (`fom.MATCH_SIGMA`, `engines.DEFAULT_UNKNOWN_SHIFT_DEG`) at `unaudited`.
+  Q6: no count of how many verdicts the power check alone keeps undecided.
+  "Evidence that would change the verdict: a `SupercellCheck` field carrying
+  the power rate …, with those four texts corrected … And a count of how many
+  acceptance pairs the power check alone keeps undecided."
+
+  *Author's answer under the fail:* the field and the four texts are done
+  (above). Not done: the count of pairs the power check alone keeps undecided.
+  The proxy the judge names (#951's guard rests on n = 2, not on the shift)
+  predates this branch and goes to the maintainer with the rule.
+
+  *Gate* on the final tree (`f4f6f3c14` plus this entry; `main` had not moved
+  from `b0e0e4b71`): the fast selection 13 188 passed, 310 skipped, 32 xfailed,
+  0 failed in 8:13 alone on the machine (`[dev]`, macOS arm64, Python 3.12.10).
+  One test added (`test_the_null_is_the_chance_rate_of_the_seen_test_itself`,
+  0.02 s); the dense row was rewritten, not added. No pre-branch baseline was
+  run locally, so the +1 is CI's to confirm. The full suite did not run; the
+  slow rows this change can move are `test_acceptance_indexing.py`'s, measured
+  above. ruff clean.
+
+  *Not done.* The three #1230 truths under `preset="full"` were not re-run here;
+  the reporter's runs read #1 for `split + g`, and `g` alone already holds them
+  at #1 on main.
+
+  *Next.* With `split` decided, the next refinement of the null is the declined review finding (1): count p₀
+  only over the range farther than the resolution from every parent line, per
+  pair, and re-run the 244-pair log (`gs_split_log.py`'s method) on it. Then task 5
+  (`fom_panel_disagrees`), under `preset="full"` or a ceiling no arm binds, per
+  #1267's entry above.
 
 - **2026-10-13** — created, from the 2026-10-13 issue triage (issue #916).
   Checked against the tree at c3d0367: every symbol the issue names exists
@@ -250,3 +431,5 @@ absences; Si, corundum and magnetite keep their correct cells.
   passed (WP-2036's guide-precision cause). Task 5 stays open: nothing
   revisited `fom_panel_disagrees` on the #916 arms. *Next:* task 5, and
   WP-2041 re-measures tutorial 03's absence count on this tree.
+
+- **2026-10-31** (`/pr-review`) — PR #1177 (by @mustachefeeling) merged as `8260c78b` after two rounds: the four things #941 left open. `RESOLUTION_FWHM` stays 1.0: swept 0.5-1.0 on 15 real runs, one rank moves (PbSO₄ X-ray at 0.7, the truth second behind a cell within 0.5 % of its metric), and nothing above 1.0 ran on real data. The windowed cap gains a density form and an excess over the run's cleanest candidate, reported and never gated (`LeBailValidation.*_in_window`). `INDEX_PREDICTED_BUT_ABSENT` reads the validation's counts and fires at `info` when every uncancellable absence lies above de Wolff's window. The screen pairs absences with merged lines by index, and `screen_for` is memoised per run. Re-measured under the Pawley validation (#1191): identical cell for cell. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Gap, not blocking: the `RESOLUTION_FWHM` row's source list counts 12 sources and omits SRM 676a, which the sweep ran.

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import functools
 import math
+import numbers
 import os
 import re
 from collections.abc import Sequence
@@ -27,7 +28,12 @@ from typing import ClassVar, Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from .common import Base, Parameter, _InheritsDeclaredDefaults
+from .common import Base, Parameter, _InheritsDeclaredDefaults, declared_fills
+
+
+def _declared_extinction() -> Parameter:
+    """The range and unit a declared extinction coefficient takes (WP-1944)."""
+    return Parameter(value=0.0, min=0.0, unit="um^2")
 
 #: A lower bound at or under this is a bound at zero to
 #: :meth:`PreferredOrientation._r_bound_is_reachable`.  It is the value under
@@ -928,12 +934,66 @@ class PlanarityRestraint(Base):
         return self
 
 
+class TorsionRestraint(Base):
+    """A soft restraint on the torsion angle of four atoms A–B–C–D (WP-1815).
+
+    One residual row √weight·Δ/sigma, where Δ is the **circular difference**
+    of the torsion from ``target_deg``, wrapped into (−180°, 180°], so a
+    target of 180° is as smooth as any other: the row does not see the branch
+    cut of the angle itself, only the one opposite the target.  The angle is
+    Klyne and Prelog's (1960, *Experientia* 16, 521): looking along B → C, it
+    is positive when the bond B–A must turn clockwise, by less than 180°, to
+    eclipse C–D (the cif_core ``_geom_torsion.angle`` sign).  Its partials are
+    the ones :class:`~rietx.schemas.results.GeometryTorsion` reports esds with
+    (``model.restraints._torsion_row_partials``), so a geometry row is a
+    restraint row, as for bonds and angles (WP-1072's reuse rule).
+
+    ``atoms`` are four positional indices into ``Phase.atoms`` in chain order.
+    Images are given or resolved entry by entry, as on
+    :class:`PlanarityRestraint`: ``op_indices[k]``/``translations[k]`` name an
+    entry's image (an index into the atom's orbit, as on
+    :class:`BondRestraint`); an entry left ``None`` takes the minimum image of
+    its atom relative to the entry before it, so the chain follows its bonds,
+    and the first sits where it is stored unless named.  A chain with a
+    straight bond angle (A–B–C or B–C–D at 180°) has no torsion, so compiling
+    one raises.
+    """
+
+    atoms: list[int] = Field(min_length=4, max_length=4)
+    target_deg: float
+    sigma: float = Field(gt=0.0)  # degrees
+    weight: float = Field(default=1.0, ge=0.0)
+    op_indices: list[int | None] | None = None
+    translations: list[tuple[int, int, int]] | None = None
+
+    @model_validator(mode="after")
+    def _one_image_per_atom(self) -> "TorsionRestraint":
+        if not math.isfinite(self.target_deg):
+            raise ValueError("torsion restraint: target_deg must be finite")
+        for name in ("op_indices", "translations"):
+            got = getattr(self, name)
+            if got is not None and len(got) != 4:
+                raise ValueError(
+                    f"torsion restraint: {len(got)} {name} for 4 atoms; give "
+                    "one per atom or none")
+        if self.translations is not None:
+            ops = self.op_indices or [None] * 4
+            for k, (op, tr) in enumerate(zip(ops, self.translations, strict=True)):
+                if k > 0 and op is None and tuple(tr) != (0, 0, 0):
+                    raise ValueError(
+                        f"torsion restraint: translation {tuple(tr)} on entry {k} "
+                        "has no op_index, so it would be ignored; name the "
+                        "operation (0 is the identity) or drop the translation")
+        return self
+
+
 #: A soft observational restraint on one phase — a bond length, a bond angle,
-#: or a single parameter value.  Each contributes one residual row that is kept
-#: in the covariance (JᵀJ) but excluded from Rwp/Durbin-Watson/Bérar-Lelann
-#: (they are soft observations, not data — the standard Rietveld convention).
+#: a torsion, or a single parameter value.  Each contributes residual rows that
+#: are kept in the covariance (JᵀJ) but excluded from Rwp/Durbin-Watson/
+#: Bérar-Lelann (they are soft observations, not data — the standard Rietveld
+#: convention).
 Restraint = (BondRestraint | AngleRestraint | ValueRestraint | TetherRestraint
-             | AntiBumpRestraint | PlanarityRestraint)
+             | AntiBumpRestraint | PlanarityRestraint | TorsionRestraint)
 
 
 class MagneticSymmetry(Base):
@@ -1182,6 +1242,8 @@ class DistortionModes(Base):
 class Phase(_InheritsDeclaredDefaults):
     """A crystalline phase: symmetry, cell, atoms, scale, sample broadening."""
 
+    _declared_optional: ClassVar[dict] = {"extinction": _declared_extinction}
+
     name: str
     space_group: str  # Hermann-Mauguin symbol or number-as-string, resolved via gemmi
     # The phase's symmetry operations as ``x,y,z`` triplets, when the phase
@@ -1230,12 +1292,15 @@ class Phase(_InheritsDeclaredDefaults):
     # low-angle reflections of a well-crystallised sample: each reflection's
     # integrated intensity is multiplied by
     # E(hkl) = E_B·sin²θ + E_L·cos²θ with a dimensionless x ∝ ext·|F|²·(λ/V)².
-    # ext = 0 ⇒ E ≡ 1 exactly (off by default), so it is opt-in and never
-    # perturbs a structure that does not free it.  Bounded at zero, and the
-    # staged plan seeds it off zero.
-    extinction: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, vary=False, min=0.0, unit="um^2")
-    )
+    # Opt-in (WP-1944): None ⇒ no extinction and no table entry, so no plan
+    # can free it.  Declare it with a number, ``phase.extinction = 0.0``,
+    # which the validator below turns into the bounded parameter; a stored
+    # value from an older file opens unchanged, as a declaration.  The
+    # structural plan's extinction stage frees only a declared phase, as its
+    # preferred-orientation and roughness stages do.  Measured over 69 fits
+    # before the change, the plan freeing it on every phase put one value
+    # past 3σ, on a synthetic pattern with none planted.
+    extinction: Parameter | None = None
     # Optional single-axis March-Dollase preferred-orientation correction
     # (model/preferred_orientation.py).  None ⇒ no correction; a block with the
     # default r = 1 is also exactly the identity, so it is opt-in and never
@@ -1310,7 +1375,9 @@ class Phase(_InheritsDeclaredDefaults):
     # too, so it is opt-in and never perturbs a phase that does not use it.
     # The isotropic direction of the S subspace *is* the lor_strain column
     # (identically, not merely correlated), so declaring a block locks
-    # lor_strain — the same bargain Atom.aniso strikes with biso.
+    # lor_strain and the width law reads zero for it, whatever value it
+    # stores (CompiledModel.lor_strain_term, WP-1467) — the same bargain
+    # Atom.aniso strikes with biso.
     microstrain: StephensStrain | None = None
     # Physical particle radius in micrometres, used only by the Brindley
     # microabsorption correction of QPA weight fractions (Brindley 1945).
@@ -1441,6 +1508,35 @@ class Phase(_InheritsDeclaredDefaults):
                         "bodies by a restraint across them instead")
                 owner[label] = body.name
         return self
+
+    @field_validator("extinction", mode="before")
+    @classmethod
+    def _declare_extinction(cls, value):
+        """A number declares extinction at that value, bounded at its floor of 0.
+
+        ``phase.extinction = 0.0`` is the declaration a user writes, so it
+        must not need the unit and the bound spelled out.  A ``Parameter`` or
+        a dict that leaves ``min``, ``max`` or ``unit`` unset inherits them
+        from ``_declared_optional``, the rule every declared field follows
+        (issue #204).  The fill is made here as well as in
+        ``_inherit_declared_bounds``, because an assignment
+        (``phase.extinction = Parameter(value=0.0, vary=True)``, the other
+        way to declare it) runs this validator and not that one, and would
+        otherwise leave the coefficient unbounded below.
+        """
+        if isinstance(value, bool):
+            raise ValueError("extinction takes a number (µm²) or a Parameter; "
+                             "declare it with phase.extinction = 0.0")
+        if isinstance(value, numbers.Real):
+            return _declared_extinction().model_copy(update={"value": float(value)})
+        if isinstance(value, Parameter):
+            present, base = value.model_fields_set, value.model_dump()
+        elif isinstance(value, dict):
+            present, base = value.keys(), value
+        else:
+            return value
+        fills = declared_fills(_declared_extinction(), set(present))
+        return Parameter(**{**base, **fills}) if fills else value
 
     @field_validator("symmetry_operations", mode="before")
     @classmethod
@@ -1747,7 +1843,7 @@ class Phase(_InheritsDeclaredDefaults):
                 check(r.atom_i, "atom_i")
                 check(r.atom_j, "atom_j")
                 check(r.atom_k, "atom_k")
-            elif isinstance(r, PlanarityRestraint):
+            elif isinstance(r, (PlanarityRestraint, TorsionRestraint)):
                 for k, idx in enumerate(r.atoms):
                     check(idx, f"atoms[{k}]")
         return self

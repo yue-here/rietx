@@ -34,14 +34,15 @@ Each width term lies within one esd of the instrument that made the data.
 
 Hold the cell at the certificate's value.
 With the cell fixed, the peak positions measure the zero shift and the specimen displacement, which a free cell would absorb.
-`lab_calibrate` frees one group a stage: the scale and background, the zero shift and displacement, the width term W, the other four width terms, the emission-line weights and the two axial-divergence ratios, and the Biso.
+`lab_calibrate` frees one group a stage: the scale and background, the zero shift and displacement, the width term W, the other four width terms, the emission-line weights and the axial-divergence ratio S/L, and the Biso.
 [Plan presets](../reference/plans.md#lab_calibrate) draws its stages.
 
-Refine one of the two axial-divergence ratios, S/L, and hold the other, H/L.
-In rietx's profile the two are interchangeable: swapping their values gives the same pattern to the last bit.
+`lab_calibrate` refines one of the two axial-divergence ratios, S/L, and holds the other, H/L, at the value you set.
+The two are interchangeable in the Finger-Cox-Jephcoat profile: swapping their values gives the same pattern to the last bit.
 Refined together on this standard, they came back as S/L 0.02476(78) and H/L 0.01542(87), against 0.025 and 0.015.
 The exchanged pair gives the same pattern, so nothing in the data chose this order, and no finding names the pair.
 H/L is the receiving slit's height over the goniometer radius, 3 mm over 200 mm here, so take it from the instrument's dimensions.
+Left at 0, it gives a model with one axial ratio.
 
 ## Check the calibration before saving it
 
@@ -58,12 +59,7 @@ Read the calibration's diagnostics:
 warning[HIGH_CORRELATION]: Correlated pair: instrument.zero_shift ~ instrument.geometry.sample_displacement (ρ=+0.993). Flagged in stages: zero_disp, profile_w, profile, lines_axial, biso, closing.
   at: instrument.zero_shift, instrument.geometry.sample_displacement
   help: Fix one of the two at a known value, or free them in separate stages.
-info[HOLD_BLOCKED_PLAN]: 1 held parameter was matched by the turn_on glob of stages 'closing', 'lines_axial' and stayed fixed: instrument.geometry.axial_hl.
-  at: instrument.geometry.axial_hl
-  help: Call unhold() on them first if you meant the plan to refine them.
 ```
-
-`HOLD_BLOCKED_PLAN` confirms that H/L stayed at the value you set.
 
 The zero shift and the specimen displacement still correlate with the cell held.
 The zero shift refined to 0.01976(61)° against 0.02° in the instrument that made the data, and the displacement to −0.0006(14) mm against zero.

@@ -194,6 +194,35 @@ def test_the_message_counts_what_it_names(held_fit):
 # ----------------------------------------------------------------------
 # the cost
 # ----------------------------------------------------------------------
+def test_a_scale_profile_keeps_the_held_cell_held(held_fit, monkeypatch):
+    """The profile measures the model the fit returned, not a larger one (WP-2060).
+
+    Each pinned refit is a stage, and a stage re-decides the hold from where
+    it starts.  At the 99.99 % level the walk pins the absent phase's scale
+    out to 4 esd, past the 3 esd at which the hold's significance test calls the phase present:
+    before WP-2060 the refits there freed the cell the fit held and moved it
+    5.2 → 5.19904 Å (#1075, part 1).  Now the cell stays where the fit left it.
+    """
+    ref, result = held_fit
+    assert "phases.1.cell.a" in result.stages[-1].held
+    held_a = ref.structure.phases[1].cell.a.value
+    seen = []
+    run_stage = Refinement.run_stage
+
+    def spy(self, *args, **kwargs):
+        out = run_stage(self, *args, **kwargs)
+        seen.append((self.structure.phases[1].scale.value,
+                     self.structure.phases[1].cell.a.value))
+        return out
+
+    monkeypatch.setattr(Refinement, "run_stage", spy)
+    sigma = next(p.stderr for p in result.parameters if p.path == "phases.1.scale")
+    interval = ref.profile_interval(synthesize(), "phases.1.scale", level=0.9999)
+    assert max(s for s, _ in seen) > 3 * sigma   # past the support threshold
+    assert {a for _, a in seen} == {held_a}
+    assert interval.fit_is_minimum and interval.upper_stop == "threshold"
+
+
 def test_the_flat_column_is_gone_from_the_solve(held_fit):
     """The point of holding rather than bounding: no column to search.
 
@@ -759,13 +788,14 @@ RAMP_RUN_GRID = np.arange(15.0, 60.0 + 1e-9, 0.02)
 #: (WP-1420), so 300 s keeps the margin over the runaway's 13+ minutes.
 RAMP_RUNAWAY_GUARD_S = 300.0
 
-#: iterations the same 13 patterns took on ``main`` **with** the ±2.5 % cell
-#: bounds the agent added after the fact — the bounded baseline this replaces.
+#: residual evaluations (``SeriesEntry.n_iterations``' unit, #538) the same 13
+#: patterns took on ``main`` **with** the ±2.5 % cell bounds the agent added
+#: after the fact — the bounded baseline this replaces.
 #: Measured 2026-08-27 at 1638; re-measured on this tree's machine at 1342
 #: bounded and 2164 unbounded, which is the honest comparison (the same chain,
 #: the same commit, one flag apart).  The assertion is against the *unbounded*
 #: number, because the point is that no bound is needed.
-RAMP_MAIN_UNBOUNDED_ITERATIONS = 2164
+RAMP_MAIN_UNBOUNDED_EVALUATIONS = 2164
 
 
 @pytest.mark.slow
@@ -780,8 +810,8 @@ def test_the_ramp_reproduction_no_longer_runs_away():
     every pattern reports.
 
     Three properties, none of them an Rwp comparison: the chain finishes inside
-    a runaway guard, it costs fewer iterations than the unbounded baseline, and
-    no pattern reports a CaF₂ cell at all.
+    a runaway guard, it costs fewer residual evaluations than the unbounded
+    baseline, and no pattern reports a CaF₂ cell at all.
     """
     import time
 
@@ -801,8 +831,8 @@ def test_the_ramp_reproduction_no_longer_runs_away():
     elapsed = time.perf_counter() - started
 
     assert elapsed < RAMP_RUNAWAY_GUARD_S, f"{elapsed:.1f}s"
-    iterations = sum(e.n_iterations for e in series.entries)
-    assert iterations < RAMP_MAIN_UNBOUNDED_ITERATIONS, iterations
+    evaluations = sum(e.n_iterations for e in series.entries)
+    assert evaluations < RAMP_MAIN_UNBOUNDED_EVALUATIONS, evaluations
     for entry in series.entries:
         paths = {p.path for p in entry.parameters}
         assert "phases.1.cell.a" not in paths, entry.label
@@ -810,20 +840,19 @@ def test_the_ramp_reproduction_no_longer_runs_away():
 
     # and the aggregation is untouched: it reads `where`, which now carries the
     # held paths, so the chain still says the thing no per-pattern code can
-    persistent = [d for d in series.diagnostics
-                  if d.code == "SEQUENTIAL_PERSISTENT_FINDING"]
-    held = [d for d in persistent if d.message.startswith("PHASE_UNCONSTRAINED")]
-    assert len(held) == 1
-    assert held[0].where == ["phases.1.cell.a"]
-    assert "13 of 13" in held[0].message
-    # The one other persistent finding is the absent phase's scale on its
+    # (on most of the series: `code_counts` lists every count, WP-2003 C6)
+    persistent = [c for c in series.code_counts if 2 * c.count > c.n_patterns]
+    held = [c for c in persistent if c.code == "PHASE_UNCONSTRAINED"]
+    assert [(c.path, c.count, c.n_patterns) for c in held] == [
+        ("phases.1.cell.a", 13, 13)]
+    # The one other code on most of the series is the absent phase's scale on its
     # floor of 0.  Since WP-1938 a floor is an ordinary bound, so the bound
     # test answers it, where a softplus row was set aside as untested (11 of
     # 13 patterns, macOS arm64, `[dev,jax]`), and since WP-1929 a floor's code
     # is FLOOR_HIT.
-    others = [d for d in persistent if d not in held]
-    assert all(d.where == ["phases.1.scale"]
-               and d.message.startswith("FLOOR_HIT") for d in others), others
+    others = [c for c in persistent if c not in held]
+    assert all(c.path == "phases.1.scale" and c.code == "FLOOR_HIT"
+               for c in others), others
 
 
 @pytest.mark.slow
@@ -1298,8 +1327,7 @@ def test_the_hold_reaches_every_pattern_of_a_chain():
     import rietx as rx
     from rietx.sequential import SequentialRefinement
 
-    # five, which is `MIN_POINTS_FOR_PERSISTENCE`: the chain-level sentence is
-    # half of what this arm is for, and below that the aggregation declines
+    # five patterns: the chain-level count is half of what this arm is for
     temperatures = [25.0, 60.0, 95.0, 130.0, 165.0]
     assert max(temperatures) < RAMP_T_TRANSITION, "these are the sub-onset ones"
 
@@ -1328,16 +1356,13 @@ def test_the_hold_reaches_every_pattern_of_a_chain():
         assert "PHASE_UNCONSTRAINED" in [d.code for d in entry.diagnostics]
 
     # and the chain says the thing no per-pattern finding can
-    persistent = [d for d in series.diagnostics
-                  if d.code == "SEQUENTIAL_PERSISTENT_FINDING"]
-    held = [d for d in persistent if d.message.startswith("PHASE_UNCONSTRAINED")]
-    assert len(held) == 1
-    assert held[0].where == ["vars.caf2_a"]
-    assert "5 of 5" in held[0].message
+    persistent = [c for c in series.code_counts if 2 * c.count > c.n_patterns]
+    held = [c for c in persistent if c.code == "PHASE_UNCONSTRAINED"]
+    assert [(c.path, c.count, c.n_patterns) for c in held] == [("vars.caf2_a", 5, 5)]
     # the absent phase's scale on its floor, which is its truth: 4 of 5 since
     # the patterns are drawn at the closing stage's windows (WP-2002)
-    assert all(d.message.startswith("FLOOR_HIT") and d.where == ["phases.1.scale"]
-               for d in persistent if d not in held)
+    assert all(c.code == "FLOOR_HIT" and c.path == "phases.1.scale"
+               for c in persistent if c not in held)
 
 
 def test_a_held_column_is_released_when_its_phase_appears():
@@ -1621,3 +1646,176 @@ def test_the_packages_own_trials_run_under_the_callers_settings(monkeypatch):
         trial()
         assert seen, name
         assert set(seen) == {(0.9, None)}, (name, seen)
+
+
+# ----------------------------------------------------------------------
+# WP-2049: a frame no phase is seen in holds the instrument's peak terms too
+# ----------------------------------------------------------------------
+#: the instrument rows ``mccusker_default`` frees that reach the pattern only
+#: through phase peaks
+_PEAK_ONLY_FREED = {"instrument.zero_shift",
+                    *(f"instrument.profile.{n}" for n in "uvwxy")}
+
+
+@pytest.fixture(scope="module")
+def blank_frames():
+    """The planted series (``tests/planted_series.py``, seed 0), whose frame
+    87 is the blank one."""
+    from tests import planted_series as ps
+
+    assert ps.default_events(248)["bad"] == 87
+    return ps, ps.generate(248, seed=0)
+
+
+def _blank_frame_fit(ps, series, k: int):
+    """Frame 87 fitted alone from the fixture's start model under the
+    default plan, the start cell nudged by ``k`` × 1e-14 (the rounding that
+    picked the outcome in WP-2049's measurement), on the numpy path."""
+    @ps.numpy_path
+    def fit():
+        structure, ins = ps.cubic_model(series.temperature[87])
+        structure.phases[0].cell.a.value *= 1 + k * 1e-14
+        ref = Refinement(structure, ins, history=False)
+        return ref, ref.fit(series.patterns[87], plan="mccusker_default")
+    return fit()
+
+
+@pytest.mark.parametrize("k", [0, 1])
+def test_a_blank_frame_holds_the_instruments_peak_terms(blank_frames, k):
+    """With no phase seen, the zero shift and the widths are flat (WP-2049).
+
+    Measured on ``main`` before this: the zero shift came back
+    −0.0129 ± 0.0015° (8.7σ) against a truth of 0.006°, with U, V, W, X and
+    Y refined beside it and U and V correlated at ρ −0.991.  The zero shift
+    reaches the pattern only through the phase's peaks, so that value was
+    fitted to noise.  Held, it keeps the value handed in and leaves the
+    parameter list.  The background reaches the pattern without a phase,
+    and it refines.
+    """
+    ps, series = blank_frames
+    ref, result = _blank_frame_fit(ps, series, k)
+    last = result.stages[-1]
+    assert _PEAK_ONLY_FREED <= set(last.held)
+    rows = {p.path: p for p in result.parameters}
+    assert not _PEAK_ONLY_FREED & set(rows)
+    assert all(rows[f"instrument.background.c{i}"].stderr is not None
+               for i in range(4))
+    handed_in = ps.cubic_model(series.temperature[87])[1].zero_shift.value
+    assert ref.instrument.zero_shift.value == handed_in
+    fired = [d for d in result.diagnostics if d.code == "PHASE_UNCONSTRAINED"]
+    assert len(fired) == 1
+    assert "No phase was seen, so 6 instrument parameters" in fired[0].message
+    assert "instrument.zero_shift" in fired[0].message
+    # the record keeps its key: the phase's paths, never the instrument's
+    assert fired[0].where == ["phases.0.cell.a"]
+
+
+def test_one_seen_phase_leaves_the_instrument_free(held_fit):
+    """All, never any: a seen phase gives every peak term gradient, so the
+    absent-phase fixture holds the absent phase's cell and no instrument row."""
+    _, result = held_fit
+    for stage in result.stages:
+        assert not [p for p in stage.held if p.startswith("instrument.")], stage.name
+    assert not [d for d in result.diagnostics if "No phase was seen" in d.message]
+
+
+def test_the_clause_reports_what_the_answer_holds():
+    """A zero shift held in an early stage and released once a phase was seen
+    is a measurement at the answer, so no clause tells a reader to drop it
+    (WP-2049, review finding 4)."""
+    from rietx.refine import _instrument_held
+    from rietx.schemas.results import StageResult
+
+    def stage(name, held):
+        return StageResult(name=name, status="converged", n_iterations=1,
+                           cost_initial=1.0, cost_final=1.0, held=held)
+
+    zero = "instrument.zero_shift"
+    assert _instrument_held([stage("a", [zero]), stage("b", [])]) == ([], [])
+    assert _instrument_held([stage("a", [zero]), stage("b", ["phases.0.cell.a"]),
+                             stage("c", [zero])]) == ([zero], ["a", "c"])
+
+
+def test_what_reaches_the_pattern_without_a_phase_is_never_peak_only():
+    """The background and every extra component add to the pattern on their
+    own.  A declared sharp peak reads the polarisation and the line weights
+    too, so with one compiled those two are not peak-only (WP-2049)."""
+    from types import SimpleNamespace
+
+    from rietx.model.forward import CompiledModel
+    from rietx.refine import _peak_only_instrument_path
+
+    def model(peaks):
+        stub = SimpleNamespace(peak_components=peaks)
+        stub.scalar_chain_supported = (
+            lambda p: CompiledModel.scalar_chain_supported(stub, p))
+        return stub
+
+    bare, peaked = model(()), model((object(),))
+    for path in ("instrument.zero_shift", "instrument.profile.u",
+                 "instrument.geometry.sample_displacement",
+                 "instrument.geometry.axial_sl"):
+        assert _peak_only_instrument_path(bare, path), path
+        assert _peak_only_instrument_path(peaked, path), path
+    for path in ("instrument.polarization", "instrument.source.lines.1.weight"):
+        assert _peak_only_instrument_path(bare, path), path
+        assert not _peak_only_instrument_path(peaked, path), path
+    for path in ("instrument.background.c0", "instrument.extra_components.0.area",
+                 "phases.0.cell.a"):
+        assert not _peak_only_instrument_path(bare, path), path
+
+
+def test_a_series_carries_the_last_measured_zero_shift_across_a_blank_frame(
+        blank_frames):
+    """A series' carry (WP-2049).  The blank frame holds its zero shift at the
+    value carried in, so the frame after it starts from the last measured one
+    and lands near the truth, 0.006°, instead of from a value fitted to
+    noise.  The blank frame quotes no zero shift at all."""
+    import rietx as rx
+
+    ps, series = blank_frames
+
+    @ps.numpy_path
+    def fit():
+        structure, ins = ps.cubic_model(series.temperature[86])
+        return rx.refine_sequential(series.patterns[86:89], structure, ins,
+                                    x=series.temperature[86:89],
+                                    plan="mccusker_default")
+
+    entries = fit().entries
+    zero = [{p.path: p for p in e.parameters}.get("instrument.zero_shift")
+            for e in entries]
+    assert zero[1] is None
+    for row in (zero[0], zero[2]):
+        assert row is not None and row.stderr is not None
+        assert abs(row.value - ps.TRUE_ZERO) < 4 * row.stderr
+
+
+def test_a_joint_fit_holds_the_blank_patterns_own_zero_shift(blank_frames):
+    """The joint twin.  Each histogram's zero shift is its own, so the blank
+    frame's is held while the frame that sees the phase refines its own.  The
+    shared cell refines, because one histogram sees the phase."""
+    import rietx as rx
+
+    ps, series = blank_frames
+
+    @ps.numpy_path
+    def fit():
+        structure, ins = ps.cubic_model(series.temperature[86])
+        ref = rx.MultiHistogramRefinement(
+            [structure, structure.model_copy(deep=True)],
+            [ins, ins.model_copy(deep=True)])
+        return ref.fit([series.patterns[86], series.patterns[87]],
+                       plan=rx.RefinementPlan(stages=[
+                           rx.Stage("scale_bkg", ["phases.*.scale",
+                                                  "instrument.background.*"]),
+                           rx.Stage("zero", ["instrument.zero_shift",
+                                             "phases.*.cell.*"])]))
+
+    result = fit()
+    held = set(result.stages[-1].held)
+    assert "hist.1.instrument.zero_shift" in held
+    assert "hist.0.instrument.zero_shift" not in held
+    rows = {p.path: p for p in result.parameters}
+    assert rows["hist.0.instrument.zero_shift"].stderr is not None
+    assert rows["phases.0.cell.a"].stderr is not None

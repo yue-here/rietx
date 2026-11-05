@@ -54,12 +54,13 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ..backend import get_backend
+from ..schemas.common import Diagnostic
 from ..schemas.structure import Phase
 from .adp import VOIGT, ustar_from_ucif
 from .neutron import b_coh as neutron_b_coh
 from .neutron import normalize_species as neutron_normalize_species
 from .scattering import f0, normalize_species
-from .symmetry import SITE_TOL, resolve_group, site_orbit
+from .symmetry import SITE_TOL, TWIN_COORD_TOL, resolve_group, site_orbit
 
 
 @dataclass
@@ -152,9 +153,88 @@ def select_orbit_ops(sg, xyz: np.ndarray, *,
     return orbit.rot, orbit.tran
 
 
+def phase_orbit_split(phase: Phase) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Each atom's orbit split, decided from its current coordinates.
+
+    One ``(R, t)`` pair per atom, from :func:`select_orbit_ops`.  The value
+    :func:`compile_phase_sites` decides when it is handed none, and what a fit
+    decides once at its start and hands to every compile it makes (WP-2052).
+    """
+    sg = resolve_group(phase.space_group, phase.symmetry_operations)
+    return [select_orbit_ops(sg, np.array([a.x.value, a.y.value, a.z.value]))
+            for a in phase.atoms]
+
+
+def _multiplicity_kept_diagnostics(structure, split: list,
+                                   ) -> list[Diagnostic]:
+    """``SITE_MULTIPLICITY_KEPT`` for each site a fresh compile would recount.
+
+    ``structure`` is a :class:`~rietx.schemas.structure.Structure` at the
+    coordinates a fit returns.  A fit decides each site's split once, at its
+    start (``Refinement._decide_orbit_split``).  A site whose returned
+    coordinates give fewer images at a fresh compile is one the fit carried
+    within ``SITE_TOL`` of a special position.  The usual case is a
+    half-occupied general atom, a split pair across a mirror, that the data
+    do not resolve: its cost is even in the distance off the mirror, so the
+    solver stops on it (WP-2052, issue #1088).  The fit counted the site at the
+    multiplicity it started with, as GSAS-II does for a whole refinement.
+    Every later compile decides from the coordinates, so the message gives the
+    atoms per cell both ways and says which one the result used.
+
+    ``split`` is the split the result was measured on.  A compile keeps a
+    site's images and never drops them (:func:`compile_phase_sites`), so a
+    site reported here has fewer images at a fresh compile than the result
+    counted.  The test is arithmetic and has no threshold: any loss is
+    reported.
+    """
+    out: list[Diagnostic] = []
+    for i, (phase, ops) in enumerate(zip(structure.phases, split, strict=True)):
+        fresh = phase_orbit_split(phase)
+        for j, (atom, (rot, _), (rot_now, _)) in enumerate(
+                zip(phase.atoms, ops, fresh, strict=True)):
+            m_fit, m_now = len(rot), len(rot_now)
+            if m_now >= m_fit:
+                continue
+            occ = atom.occ.value
+            on_position = occ * m_fit / m_now
+            out.append(Diagnostic(
+                level="warning", code="SITE_MULTIPLICITY_KEPT",
+                where=[f"phases.{i}.atoms.{j}"],
+                value=occ * (m_fit - m_now),
+                message=(
+                    f"site {atom.label!r} of phase {phase.name!r} was fitted at "
+                    f"{m_fit} positions in the cell, the orbit it started the "
+                    f"fit with: {m_fit} × {occ:g} = {m_fit * occ:g} atoms per "
+                    f"cell. At the coordinates the fit returns, "
+                    f"{[round(a.value, 6) for a in (atom.x, atom.y, atom.z)]}, "
+                    f"a fresh compile counts {m_now} positions: {m_now} × "
+                    f"{occ:g} = {m_now * occ:g} atoms per cell. The result, "
+                    f"its statistics and its weight fractions use the fitted "
+                    f"count. Later compiles decide from the coordinates and use "
+                    f"the fresh count. They include predict() on a new grid, "
+                    f"suggest(), a new Refinement and the next fit."),
+                # the one-atom reading only where it is one atom: above 1
+                # the fitted content does not fit on the position
+                suggestion=(
+                    (f"if the site is one atom on the special position, state "
+                     f"it there at occupancy {on_position:g}, which keeps the "
+                     f"fitted content; if it is a split pair the data do not "
+                     f"resolve, state" if on_position <= 1.0 else
+                     f"the fitted content is {m_fit * occ:g} atoms per cell, "
+                     f"more than one atom on the special position holds, so "
+                     f"the site is a split pair or its occupancy is wrong; "
+                     f"to keep it split, state")
+                    + f" it more than {TWIN_COORD_TOL:g} (fractional) from the "
+                    f"special position, or the next fit counts it at {m_now} "
+                    f"positions.")))
+    return out
+
+
 def compile_phase_sites(phase: Phase,
                         f_anom: dict[str, complex] | None = None,
-                        *, neutron: bool = False) -> PhaseSites:
+                        *, neutron: bool = False,
+                        ops: list[tuple[np.ndarray, np.ndarray]] | None = None,
+                        ) -> PhaseSites:
     """Freeze the per-atom symmetry and species data for one stage.
 
     ``f_anom`` maps a **raw** ``Atom.species`` string (``"Zn2+"``, not the
@@ -171,14 +251,27 @@ def compile_phase_sites(phase: Phase,
     f′/f″ because that is a core-level effect, while for b a **mass number is
     kept**, because the isotope is the scatterer (see
     :mod:`rietx.crystallography.neutron`).
+
+    ``ops`` is an orbit split decided earlier, one ``(R, t)`` pair per atom.
+    A fit passes the split it decided at its start, so no stage and no
+    closing compile takes images away from a site that has moved onto a
+    special position (WP-2052).  A site whose current coordinates need *more*
+    images than ``ops`` holds has left a special position, which a rigid
+    body's pose can do, and gets the current split: fewer images than its
+    position has is no structure at all.  ``None`` decides every site here.
     """
-    sg = resolve_group(phase.space_group, phase.symmetry_operations)
-    ops: list[tuple[np.ndarray, np.ndarray]] = []
+    fresh = phase_orbit_split(phase)
+    if ops is None:
+        ops = fresh
+    elif len(ops) != len(phase.atoms):
+        raise ValueError(
+            f"phase {phase.name!r}: an orbit split for {len(ops)} atoms was "
+            f"handed to a phase of {len(phase.atoms)}")
+    ops = [kept if len(kept[0]) >= len(now[0]) else now
+           for kept, now in zip(ops, fresh, strict=True)]
     species: list[str] = []
     aniso: list[bool] = []
     for atom in phase.atoms:
-        xyz = np.array([atom.x.value, atom.y.value, atom.z.value])
-        ops.append(select_orbit_ops(sg, xyz))
         # The species convention follows the RADIATION.  The X-ray normaliser
         # validates against Waasmaier-Kirfel coefficients, which no isotope
         # has and a neutron phase never needs: it resolves ``b_coh`` below and

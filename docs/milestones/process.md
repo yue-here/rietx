@@ -642,6 +642,10 @@ one line in Current focus.  Prose, so the WP-1507 rule applies; the rule,
 the measurements and the decisions are in `generality.md`, and the section
 here carries one paragraph.  Landed 614, no headroom.
 
+614 -> 618 for the parametric milestone (2026-11-04, WP-1964): one table row,
+a `###` section of one paragraph and one line in Current focus.  The scope,
+order and acceptance are in `parametric.md`.  Landed 618, no headroom.
+
 ### `gui/CLAUDE.md`
 
 580 -> 612 for WP-1201 (2026-08-25): the house style — one token layer
@@ -894,6 +898,12 @@ which dataset is an absolute anchor, which is a cross-code consistency
 check and not truth, and which carries a weighed composition.  A claim
 referenced to the wrong one is green and worth nothing, and nothing in
 this file said so.
+
+302 -> 307 for WP-2077 (2026-11-02): the look-first check before a full
+suite counts `ps` lines naming `python -m pytest`, and a ghostshift runner's
+suite waiting on `serial.py`'s lock is one of them.  Without the clause a
+queued waiter reads as a running suite, and every session that runs the
+check meets it.
 
 ### `src/rietx/indexing/CLAUDE.md`
 
@@ -1253,6 +1263,8 @@ lanes, the ten trial sessions first:
 | 2026-10-25 | 21c429f1 | 1 | 0 | 9K | 9 | 27K | 2.68 | 1 / 0 | +3.57 | +10% |
 | 2026-10-26 | 5442497d | 1 | 0 | 1K | 17 | 25K | 4.12 | 1 / 0 | +8.03 | +17% |
 | 2026-10-28 | 91a42bee | 2 | 2 | 0K | 10 | 19K | 4.31 | 1 / 0 | +15.17 | +26% |
+| 2026-10-30 | 43767e25 | 1 | 0 | 0K | 3 | 12K | 1.92 | 0 / 0 | +1.52 | +13% |
+| 2026-11-02 | 7d134759 | 3 | 1 | 0K | 12 | 25K | 3.56 | 2 / 0 | +17.19 | +29% |
 
 Session 38257a74 (WP-1523) resumed its one lane by `SendMessage` with a
 revised design after the first report. The tool counts that as no redo, and the

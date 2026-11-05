@@ -184,6 +184,7 @@ class RigidBodyBlock(DerivedBlock):
             *self.twist_paths(body_base),
         )
         self.outputs = tuple(f"{a}.{c}" for a in atom_bases for c in "xyz")
+        self.frame_inputs = self.inputs[:self.N_CELL]
 
     def _refuse_still_torsions(self) -> None:
         """A torsion whose moved atoms all lie on its axis line moves nothing.

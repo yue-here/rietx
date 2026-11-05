@@ -238,6 +238,7 @@ def test_cancelled_stage_does_not_leave_its_seed_behind(ref, pattern):
         if event["kind"] == "eval":
             token.cancel()
 
+    ref.structure.phases[0].extinction = 0.0  # opt-in since WP-1944
     assert ref.structure.phases[0].extinction.value == 0.0
     with pytest.raises(RefinementCancelled):
         ref.run_stage(pattern,

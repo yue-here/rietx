@@ -506,6 +506,33 @@ def count_site_assignments(classes, composition: Mapping[str, int], *,
     return sum(states.values())
 
 
+
+def holds(classes, count: int) -> bool:
+    """Can ``count`` atoms of one species sit on these classes, each orbit whole?
+
+    The question :func:`count_site_assignments` answers for a one-species
+    composition (``> 0``), without the count: a class with no free parameter
+    is one orbit and is used at most once, a class with free parameters any
+    number of times.  So ``count`` must be a sum of the fixed classes'
+    multiplicities, each at most once, plus any multiples of the free ones'.
+    Fixed classes first, as a subset sum; the free ones then as unbounded coin
+    change over what that reaches.
+    """
+    if int(count) != count or count < 0:
+        raise ValueError(f"an atom count must be a non-negative integer; got {count!r}")
+    count = int(count)
+    reach = [False] * (count + 1)
+    reach[0] = True
+    for c in classes:
+        if c.dof == 0:
+            for r in range(count, c.multiplicity - 1, -1):
+                reach[r] = reach[r] or reach[r - c.multiplicity]
+    for c in classes:
+        if c.dof > 0:
+            for r in range(c.multiplicity, count + 1):
+                reach[r] = reach[r] or reach[r - c.multiplicity]
+    return reach[count]
+
 def site_assignments(classes, composition: Mapping[str, int], *,
                      max_assignments: int = MAX_SITE_ASSIGNMENTS,
                      max_sites_per_species: int | None = None,

@@ -43,6 +43,7 @@ from rietx.schemas.indexing import (
     PEAK_WIDTH_BOUND_FACTORS,
     ObservedPeak,
     PeakList,
+    q_esd_of_two_theta,
     q_of_two_theta,
 )
 from tests.peak_pictures import draw_pick
@@ -178,8 +179,9 @@ def test_width_capped_names_each_width_and_its_bound(flat_si):
 
 def _peak(tt: float, i_over_s: float) -> ObservedPeak:
     q = float(q_of_two_theta(np.array(tt), LAM))
+    q_esd = float(q_esd_of_two_theta(np.array(tt), np.array(0.001), LAM))
     return ObservedPeak(two_theta=tt, two_theta_esd=0.001, intensity=i_over_s,
-                        intensity_esd=1.0, q=q, q_esd=1e-5, fwhm=0.05,
+                        intensity_esd=1.0, q=q, q_esd=q_esd, fwhm=0.05,
                         eta=0.5, group=0, n_in_group=1, chi2_red=1.0)
 
 

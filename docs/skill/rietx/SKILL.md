@@ -13,7 +13,7 @@ description: >-
 license: MIT
 compatibility: Requires the rietx Python package (pip install rietx) and Python 3.11+. Works offline — this file and its references ship in the wheel; the user manual it names is hosted at https://rietx.org.
 metadata:
-  version: "1.11.0.dev0"
+  version: "1.12.0.dev0"
   homepage: "https://rietx.org"
 ---
 
@@ -70,8 +70,8 @@ Free parameters in groups, cumulatively, each group converged before the next (M
 | Plan | When |
 |---|---|
 | `mccusker_default` | a known structure's first fit, and the reset when one goes wrong: scale, background, zero, cell, widths |
-| `mccusker_structural` | the same, then coordinates, Biso and ADPs, PO, extinction, roughness. The worked default (§10) |
-| `lab_bragg_brentano` | zero and sample displacement free together (rule 6), with Kα2 ratio and axial divergence. Only where something outside the fit pins one of the two |
+| `mccusker_structural` | the same, then coordinates, Biso and ADPs, declared PO, extinction, roughness. The worked default (§10) |
+| `lab_bragg_brentano` | zero and sample displacement free together (rule 6), with Kα2 ratio and axial S/L. Only where something outside the fit pins one of the two |
 | `lab_calibrate` | a standard, its certified cell held; then `rx.save_instrument_profile` |
 | `lab_sample_refine` | a specimen after `rx.load_instrument_profile`, the only plan whose size and strain are the sample's |
 | `profile_only` | cell and widths with no structural model (Le Bail) |
@@ -84,7 +84,7 @@ Free parameters in groups, cumulatively, each group converged before the next (M
 **Le Bail** (`mode="lebail"`, plan `profile_only`) is for a cell without a trusted structure: an indexing check, intensities for structure solution, a cell independent of any model. With a CIF, run the Rietveld plan directly (judging.md § rules 4-5). Where reflections crowd, check a Le Bail cell against a structural model before you quote it.
 
 4. **Set `lebail_passes` (say 8) on a plan object**: `plan = rx.RefinementPlan.profile_only(); plan.lebail_passes = 8`.
-5. **Seed the background before a Le Bail run: `rx.auto_background(data, seed=True).background`.** Unseeded, every coefficient is 0.0 and the first partition gives the pedestal to the reflections; `seed=True` starts them at a low count percentile.
+5. **Seed the background before a Le Bail run: `rx.auto_background(data, seed=True).background`.** Unseeded, every coefficient is 0.0 and the pedestal goes to the reflections. Under a broad hump, hold `rx.background.snip` under a Chebyshev (judging.md).
 
 ---
 
@@ -116,7 +116,7 @@ Judge in this order. Declare your purpose with `ref.summary(deliverable=…)`; a
 
 9. **Status and guards first.** `result.usable` is false when the fit did not converge or carries an `"error"` diagnostic: read no value from it. Then `result.diagnostics`, then `result.statistics.max_shift_over_esd`. Above 0.1 under `converged`, a direction is still walking: bound it, or find its correlated partner (rule 7).
 10. **Read the difference curve by region**: `report.regions` (local Rwp, χ² share) and `cumulative_chi2_breakpoints`.
-11. **Read the unmatched peaks.** In `report.unmatched`, `unmatched_obs` is an impurity or a missing phase. `unmatched_calc` is a modelled phase that is absent, or an absence error; read it in Rietveld mode only. `result.tick_hkl` names `result.ticks` by index.
+11. **Read `report.unmatched`.** `unmatched_obs` is a missing phase, unless `flank.on_flank` (abstention.md). `unmatched_calc` is a modelled phase that is absent, or an absence error; read it in Rietveld mode only. `result.tick_hkl` names `result.ticks` by index.
 12. **Check that the values are possible**: no negative Biso, no occupancy above 1, no cell moved further than its start could have been off, no non-ellipsoid ADP. Read the bonds and angles in `result.geometry` too, which nothing scores. A `None` esd means no covariance or fixed by symmetry, never zero.
 13. **Quote each esd with its trio.** Every esd already carries `statistics.esd_inflation`. Pass on `report.identifiability`'s raw χ²_red, the inflation and Durbin-Watson beside it.
 14. **Settle an exchange by a swap.** An `exchangeable=True` row in `report.identifiability.exchanges` (or a `.soft_modes` entry) says a held parameter may carry the same signal as a free one. `rx.report.compare_rivals(ref, data, finding)` fits each member alone, the other at its null. If max(r, 1/r) of its `chi2_ratio` r (held over partner) is at least `rx.report.RIVAL_DECISIVE_MIN_CHI2_RATIO` (1.10), adopt the winner without caveat. Below it, declare the pair unresolved or settle it by protocol. Never free both in one fit: that rides §3's ridge to a better Rwp. `result.statistics.identifiability_clause` carries the sentence to quote.
@@ -136,7 +136,7 @@ Non-ideal data moves no bar. It changes which rows decide. Declare the deliverab
 |---|---|---|
 | Phase ID | `report.unmatched` (`unmatched_obs`); `report.lebail_gap.ratio`, Rietveld Rwp over Le Bail Rwp: ≫ 1 means every line is indexed and the intensity model is what misfits | no strong unmatched observed peak, at any Rwp. `abstained_kind="resolution_limited"` does not block it |
 | QPA | `result.qpa.phases` (`weight_fraction`, `zmv`); `report.background` absorption first, then absorption geometry, then impossible values. A large gap ratio means wrong fractions | fractions stable under a change of background flexibility, `worst_absorption` under its threshold, no unresolved scale or ZMV code, no trace-phase `ref.profile_fraction` finding. Never "Rwp stopped falling" |
-| Trajectory | `SEQUENTIAL_PATH_DEPENDENT`, `SEQUENTIAL_PERSISTENT_FINDING`, `series.steps`, `PHASE_UNCONSTRAINED`; 2θ anchor, precision/accuracy split, QPA check at every point (§9b) | each quoted number names the one thing that would make it wrong, and that thing is checked |
+| Trajectory | `series.direction_gaps`, `series.code_counts`, `series.steps`, `PHASE_UNCONSTRAINED`; 2θ anchor, precision/accuracy split, QPA check at every point (§9b) | each quoted number names the one thing that would make it wrong, and that thing is checked |
 | Microstructure | `result.microstructure`: size (Å), Δd/d, `size_agreement`; the report's `separable`; `SIZE_UNUSUALLY_SMALL`, `STRAIN_UNUSUALLY_LARGE`, `BOUND_HIT` | `separable` is not `False` and the readings agree. Quote the size as an order of magnitude with its `scherrer_k`. `False` asks for a wider 2θ range |
 | Structure | all of §4, plus `report.texture`, `report.strain`, restraint tension, ADP positive-definiteness, `report.identifiability.exchanges` | the three stop conditions (§10), with every `exchangeable` row swapped (rule 14) |
 | Cell | `report.identifiability.exchanges` with zero, displacement | exchanges settled (rule 14); an absolute only against a standard |

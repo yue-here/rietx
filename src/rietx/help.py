@@ -341,10 +341,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Finger-Cox-Jephcoat axial-divergence ratio S/L. It is the illuminated "
             "specimen length divided by the goniometer radius. It sets how strongly "
-            "low-angle peaks lean toward low 2θ. Fit it on a standard together with "
-            "`axial_hl`. The two are strongly correlated and are usually reported as a "
-            "pair. With both at zero and either refined, the peaks are computed with "
-            "windows and integration points sized for a ratio of 0.02 (see `axial_hl`)."
+            "low-angle peaks lean toward low 2θ. Refine it on a standard and hold "
+            "`axial_hl`: swapping the two gives the same pattern. With both at zero and "
+            "either refined, the peaks are computed with windows and integration points "
+            "sized for a ratio of 0.02 (see `axial_hl`)."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -355,9 +355,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Finger-Cox-Jephcoat axial-divergence ratio H/L. It is the "
             "receiving-slit height divided by the goniometer radius. It is the second "
-            "half of the axial asymmetry. It is so strongly correlated with `axial_sl` "
-            "that refining one and holding the other is a common protocol. One ratio "
-            "alone still smears the peaks. Only both at zero switch the asymmetry off. "
+            "half of the axial asymmetry. Swapping it with `axial_sl` gives the same "
+            "pattern, so set it from the instrument and hold it, as the lab plans do. "
+            "One ratio alone still smears the peaks. Only both at zero switch the "
+            "asymmetry off. "
             "With both at zero and either refined, the peaks are computed with windows "
             "and integration points sized for a ratio of 0.02, so the curve differs from the same model with "
             "both held by up to about 5e-5 of the strongest peak."
@@ -509,8 +510,9 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The tanθ term of the Lorentzian FWHM. The tanθ shape is microstrain "
             "broadening, and a phase's `lor_strain` adds to it. An anisotropic strain "
-            "block replaces the specimen part of this term with an hkl-dependent width "
-            "and locks `lor_strain`. The instrumental Y stays as it was. Y can go "
+            "block replaces the specimen part of this term with an hkl-dependent width. "
+            "It locks `lor_strain`, and the width then reads zero for it whatever value "
+            "it stores. The instrumental Y stays as it was. Y can go "
             "negative while X keeps the total width at or above zero."
         ),
         unit="deg 2θ", default="0.0",
@@ -779,14 +781,15 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The centre, in °2θ, of an explicit Gaussian background term, such as a "
             "diffuse or amorphous hump or a cryostat or sample-container contribution. "
-            "It has no default bounds. It is not a Bragg position, so only the data "
+            "It has no default value and no default bounds. It is not a Bragg "
+            "position, so only the data "
             "constrain it. Set min and max if you know the fitted range. A declared "
             "term is inert (`vary=False`, height 0) until a stage frees it, and nothing "
             "in the package adds one on its own. Freeing position, height and width "
             "together amounts to a reflection with no cell behind it. `HUMP_TOO_NARROW` "
             "flags a fitted width near the instrumental resolution."
         ),
-        unit="deg 2θ", default="0.0",
+        unit="deg 2θ", default=None,
         typical="wherever the diffuse feature sits, for example 14.4 on NIST BT-1",
         anchor="theory/background.html#explicit-humps",
     ),
@@ -907,11 +910,11 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         title="Primary extinction",
         description=(
             "The Sabine primary-extinction coefficient, a squared mosaic-block size. A "
-            "powder has no secondary extinction. The coefficient attenuates the strong "
-            "low-angle reflections of a well-crystallised specimen. At 0 there is no "
-            "correction, so a phase that does not free it is unaffected. The calculated "
-            "pattern still responds to it at 0, so the staged plans free it from 0 "
-            "without a seed."
+            "powder has no secondary extinction. It attenuates the strong low-angle "
+            "reflections of a well-crystallised specimen. No plan frees it until "
+            "`phase.extinction = 0.0` declares it. Declare it where those reflections "
+            "stay calculated above observed. At 0 there is no correction, yet the "
+            "pattern responds, so a plan needs no seed to free it."
         ),
         unit="µm²", default="0.0",
         typical="0 for a ground powder; 0.1 to 100 (blocks of 0.3 to 10 µm) "
@@ -1261,8 +1264,8 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "coefficients as a cone, so it cannot be a bound on each coefficient. The "
             "default Levenberg-Marquardt solver holds it as a linear inequality. Under "
             "`solver=\"trf\"` and in a joint fit, `STEPHENS_STRAIN_NOT_POSITIVE` reports "
-            "it instead. Read that flag as 'these coefficients are not quotable'. It is "
-            "no evidence of anisotropy."
+            "it instead. Read that flag as 'these coefficients are not quotable, and the "
+            "fit leaned on the clamp'. It is no evidence of anisotropy."
         ),
         unit=None, default=None,
         typical="the isotropic seed is ε²·[M²] for a strain ε of 1e-4 to 1e-3",
@@ -1640,6 +1643,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "background."
         ),
     ),
+    "BACKGROUND_SMOOTHING_AT_FLEXIBLE_END": HelpEntry(
+        title="Baseline smoothing stopped at its most flexible setting",
+        description=(
+            "The scan for the arPLS baseline's smoothing strength tried every "
+            "candidate from stiff to flexible. None left the peak-free channels "
+            "with a serially uncorrelated residual, so the data did not choose the "
+            "strength, and the most flexible candidate was returned. Hold that "
+            "baseline fixed only knowing it is the grid's end, not a choice. The "
+            "alternatives are a strength of your own, a co-refined background, or a "
+            "measured blank."
+        ),
+    ),
     "BISO_NEGATIVE": HelpEntry(
         title="A displacement parameter is negative",
         description=(
@@ -1735,6 +1750,33 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "check the cell transform before you compare it with a published symbol."
         ),
     ),
+    "CIF_ADP_SYMMETRY_PROJECTED": HelpEntry(
+        title="Anisotropic displacement moved onto its symmetry-allowed form",
+        description=(
+            "The file prints a site's anisotropic displacement parameters (`U^ij`) "
+            "to fewer decimals than the symmetry relation between them needs, such "
+            "as U12 = U11/2 on a hexagonal three-fold axis. The printed values then "
+            "sit slightly off the form the site symmetry allows. The reader moved "
+            "the tensor to the nearest allowed one within half a unit in the last "
+            "printed digit of each component. The message names the sites and the "
+            "components moved, and the change is no larger than the rounding in the "
+            "file. A larger disagreement, or one that needs a component the file "
+            "prints as zero, is left as written and refused when the parameter "
+            "table is built."
+        ),
+    ),
+    "CIF_ANISO_COLLAPSED": HelpEntry(
+        title="Anisotropic displacement read as isotropic",
+        description=(
+            "The file carries anisotropic displacement parameters (`U^ij`) for some "
+            "sites, and the reader keeps only each site's equivalent isotropic value "
+            "unless asked, because reading a file must not change which parameters a "
+            "refinement plan frees. The message counts the sites. Nothing is wrong "
+            "for a refinement of the isotropic model. An ellipsoid figure of the "
+            "structure draws these sites as spheres. Read the file again with "
+            "aniso=True to keep the tensors."
+        ),
+    ),
     "CIF_CELL_ANGLE_CORRECTED": HelpEntry(
         title="Lattice angle set to its symmetry value",
         description=(
@@ -1743,6 +1785,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "because a cell that contradicts its symmetry cannot be refined. The "
             "deviation may be real. If it is, the symmetry is lower than the symbol "
             "claims, and the phase needs a space group that leaves this angle free."
+        ),
+    ),
+    "CIF_EMPTY_BLOCK_SKIPPED": HelpEntry(
+        title="Data blocks that state nothing were skipped",
+        description=(
+            "The file holds more than one data block, and the structure was read "
+            "from the only one with atom sites. Every other block has no tags, or "
+            "only _audit_ tags, which record how the file was made and state no "
+            "cell, site or symmetry, such as an empty block a writer puts "
+            "ahead of the structure. The message names each "
+            "block skipped. Nothing is to be done. A file with two blocks holding "
+            "atom sites, or one beside a block stating anything else, is refused, "
+            "naming the blocks."
         ),
     ),
     "CIF_MAGNETIC_CENTERING_ASSUMED": HelpEntry(
@@ -2015,13 +2070,26 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "EXTINCTION_PRIOR_APPLIED": HelpEntry(
         title="Declared facts removed space groups from the extinction classes",
         description=(
-            "You declared facts about the specimen (chirality, centrosymmetry or "
-            "polarity), and they removed space groups from some classes. The declaration "
-            "only filters the members of each class. Every class was still fitted, and no "
-            "ΔBIC moved. It is a warning when the class the data rank first was emptied: "
-            "either the chemistry is doing what a powder cannot, or the declaration is "
-            "wrong. `best_or_none()` abstains when the data prefer an emptied class by "
-            "the decisive margin. Check the declaration before you read the answer."
+            "You declared facts about the specimen (chirality, centrosymmetry, "
+            "polarity, or the formula units per cell as a Z or a density), and they "
+            "removed space groups from some classes. Each removed group is named with "
+            "the fact it fails. A declared Z tests whether some element's atoms "
+            "per cell can sit on whole orbits of a group (a position with no free parameter "
+            "is one orbit, used once), the test of an ordered model. A group that fails "
+            "the count is kept and named, since a disordered alloy written with whole counts "
+            "fails it on its true group, and is removed only when you declare the model "
+            "`ordered`. A Z with no formula has no atoms to count, so it removes "
+            "nothing, and the message says so. "
+            "Where Z is not a whole multiple of a kept group's general multiplicity "
+            "(Z′ below one), the group stays and the message names the special "
+            "positions a formula unit then needs, since a molecule there must carry "
+            "that symmetry. The declaration only filters the members of each class. "
+            "Every class was still fitted, and no ΔBIC moved. It is a warning when the "
+            "class the data rank first was emptied: either the chemistry is doing what a "
+            "powder cannot, or the declaration is wrong. It is also a warning when a "
+            "declared density does not give the declared Z on this cell; nothing is then "
+            "filtered by Z. `best_or_none()` abstains in both cases. Check the "
+            "declaration before you read the answer."
         ),
     ),
     "EXTINCTION_SCREEN_FAILED": HelpEntry(
@@ -2047,12 +2115,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "model, weak data (for a perfect fit the quantity is about √(N/(N+S)), N the "
             "channels and S the weighted net Bragg power, so it passes the bound whenever "
             "S < N; counting longer helps and re-indexing does not), the range, the "
-            "wavelength and the width law. The bound, 1/√2 (at most half "
-            "of the net weighted power unexplained), sits between every right or nearly "
-            "right cell (≤ 0.36) and every cell outside the refinable basin (≥ 1.6) on "
+            "wavelength and the width law. `ExtinctionScreen.perfect_fit_rwp_net` is that "
+            "perfect-fit value, and the message says from the pair which failed: past the "
+            "bound too, either the data are weak or the envelope sits inside the lines "
+            "over that range (the pair cannot tell which; counting longer helps only the "
+            "first); below it, the reference misfits them. The bound, "
+            "1/√2 (at most half of the net weighted power unexplained), was measured on "
             "synthetic Si and P 2₁/c, 11-BM NAC, the GSAS-II fluorapatite and PbSO₄ "
-            "patterns and SRM 676a corundum; untested beyond them, and a second phase "
-            "carrying half the net weighted power trips it at a right cell. The gate does "
+            "patterns and SRM 676a corundum; every right cell of the four real patterns reads 0.12-0.19 on the default path "
+            "(cell refined; ≤ 0.36 was measured with the cell held), "
+            "and cells outside the refinable basin read 1.0-2.3 (corundum at ×1.02, "
+            "fluorapatite at ×0.99, NAC at ×0.99 and ×1.02, PbSO₄ at ×1.02, Si at ×1.01) "
+            "but one: PbSO₄ X-ray at ×0.99 reads 0.45, passes, and returns a wrong class. "
+            "Untested beyond them, and a second phase carrying half the net weighted power "
+            "trips it at a right cell. The net is taken against the peak picker's rolling "
+            "low-quantile envelope, which rides up into the lines where they form a "
+            "continuum (low symmetry, high angle), so a good reference fit over such a "
+            "range can read above the bound: GSAS-II's own fit of the PbSO₄ X-ray pattern "
+            "reads 0.436 against the envelope and 0.245 against its fitted background over "
+            "110-160°. The gate does "
             "not reach a local misfit: on certified SRM 676a corundum "
             "(`R -3 c`) the shared profile fit's `profile_rwp` is 0.149 over 20–90°, where "
             "`R - c -` wins, and 0.227 over 5–150° with declared widths, where `R - - -` "
@@ -2132,7 +2213,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "fit. A joint fit tests each pattern and names the worst. A large gap means the last stage carried its peaks "
             "past the windows it was solved on, so the solve may have stopped short of the "
             "minimum that windows sized at the answer give. Run one more stage with nothing "
-            "new freed and compare. A plan's closing stage does this already."
+            "new freed and compare. A plan's closing stage does this already. The fresh "
+            "calculation keeps each site's multiplicity from the fit, so the gap is never "
+            "a change of composition: `SITE_MULTIPLICITY_KEPT` reports a site whose "
+            "multiplicity the returned coordinates would change."
+        ),
+    ),
+    "FULLPROF_LIMITS_NOT_APPLIED": HelpEntry(
+        title="A FullProf file's parameter limits were not applied",
+        description=(
+            "The FullProf file holds hard limits on some refined parameters, one line "
+            "each after the phases, counted by its `Nre` flag. A limit names a FullProf "
+            "parameter number, which can drive several values at once. The reader keeps "
+            "every limit on the model it read and sets no bound from it, so the built "
+            "structure's parameters are free to leave those intervals. Set a "
+            "parameter's min and max where it should stay inside its limit."
         ),
     ),
     "FULLPROF_MAGNETIC_PHASE_OMITTED": HelpEntry(
@@ -2170,11 +2265,24 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "FULLPROF_ORIGIN_CHOICE": HelpEntry(
         title="A FullProf space group setting was chosen",
         description=(
-            "FullProf writes a space group symbol with no origin choice or axes suffix. "
-            "The reader added one: origin choice 2 where the bare symbol allows two, and "
-            "rhombohedral axes where the cell shows them. A wrong choice moves the "
-            "special positions and changes the multiplicities, so the structure would be "
-            "a different one. The choice is tested against the site occupancies."
+            "FullProf writes a space group symbol with no origin choice suffix. The "
+            "reader added one: origin choice 2 where the bare symbol allows two. A wrong "
+            "choice moves the special positions and changes the multiplicities, so the "
+            "structure would be a different one. The choice is tested against the site "
+            "occupancies."
+        ),
+    ),
+    "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED": HelpEntry(
+        title="A FullProf R phase was read on rhombohedral axes",
+        description=(
+            "The file states an R space group symbol with no axes suffix beside a "
+            "rhombohedral cell, with three equal edges and three equal angles. The "
+            "reader took the cell's word and read the phase on rhombohedral axes. "
+            "FullProf reads a bare R symbol on hexagonal axes and imposes 90°, 90° and "
+            "120° as the angles, so in FullProf the same file is a different cell. "
+            "Older rietx versions wrote such files. Check the cell against the "
+            "structure you meant, and treat any value FullProf refined from this file "
+            "as belonging to the hexagonal reading."
         ),
     ),
     "FULLPROF_RHOMBOHEDRAL_RESTATED": HelpEntry(
@@ -2688,6 +2796,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "matrix."
         ),
     ),
+    "HISTORY_EARLIER_TREE_SKIPPED": HelpEntry(
+        title="Earlier tree in a history file skipped",
+        description=(
+            "A history file holds one refinement's tree. Releases before 1.11 "
+            "appended a second refinement to a reused history file, so an old file "
+            "can hold two or more trees. Loading it returns the last tree, the most "
+            "recent run, and skips each earlier one. A refinement continued from the "
+            "loaded tree adds its nodes to the last tree. Nothing was deleted, and the "
+            "skipped tree's lines are still in the file."
+        ),
+    ),
     "HOLD_BLOCKED_PLAN": HelpEntry(
         title="A hold overrode part of the plan",
         description=(
@@ -2862,7 +2981,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Rwp: a converged fit of a cell that predicts every reflection of another "
             "fits at least as well (0.164 against 0.164 for a doubled cell on rietx's "
             "synthetic LaB6 pattern). Without a peak list the "
-            "count is the fitted background's, over the whole range. Compare the "
+            "count is the fitted background's, over the whole range. Absences that "
+            "sit only above the window are reported at info level and cap nothing. "
+            "Compare the "
             "smaller cell that indexes the same lines, and run the extinction screen "
             "before you reject this one."
         ),
@@ -2947,7 +3068,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Measured: it refutes Si's cubic I √2·a₀ (0 of 12 extra lines seen) and "
             "kept every truth tested as a child, the lowest at p = 0.0072; on the "
             "finished acceptance searches it put brucite's and 11-BM NAC's truths "
-            "first. Untested beyond those patterns."
+            "first. Untested beyond those patterns. A cell whose own lines are seen more "
+            "often than the smaller cell's is never refuted: an oversized cell cannot "
+            "do that. On dense low-symmetry patterns chance alone covers most of the "
+            "range, and three synthetic truths were refuted before this rule."
         ),
     ),
     "INDEX_SYSTEMS_NOT_COVERED": HelpEntry(
@@ -2976,17 +3100,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "first is an artefact of the search and describes no lattice. The second is "
             "a cell larger than the lines can justify. Narrow the maximum volume, or "
             "measure more lines."
-        ),
-    ),
-    "INDEX_Z_NOT_INTEGER": HelpEntry(
-        title="Cell holds a fractional number of formula units",
-        description=(
-            "With the formula you gave and typical atomic volumes, the cell holds a "
-            "number of formula units far from a whole number. A sub- or supercell of the "
-            "true cell does this. So does a formula that misses a solvent or "
-            "counter-ion, and so does an ionic specimen, where volumes run large. A "
-            "correct cell can fire occasionally. Check the formula first and weigh the "
-            "result beside the figures of merit."
         ),
     ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
@@ -3133,6 +3246,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the direction and whether the interval includes it. Where it does, quote "
             "the moment as lying along the symmetry direction. Where it does not, quote "
             "the angle with its interval."
+        ),
+    ),
+    "MOMENT_UNSUPPORTED": HelpEntry(
+        title="Moment the data do not support",
+        description=(
+            "A refined moment size is under three times its error estimate, or at "
+            "its floor of 0.001 Bohr magnetons. The data then cannot tell this "
+            "moment from no moment. The magnetic intensity goes as the square of the "
+            "size, so near zero the size has almost no effect on the pattern, and "
+            "its error estimate is no interval: a fit that ends on zero can report an "
+            "estimate of 10 000 Bohr magnetons. Read the moment as unsupported. For "
+            "a limit, `Refinement.profile_interval` gives the size's likelihood "
+            "interval, which stays at or above zero where the data cannot see the "
+            "moment's sign. The FitReport's "
+            "moment rows give the same verdict as `supported`."
         ),
     ),
     "MOMENT_PAIR_DEGENERATE": HelpEntry(
@@ -3294,13 +3422,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "PATTERN_ROWS_DROPPED": HelpEntry(
-        title="Some numeric rows were not read as data",
+        title="Some rows were not read as data",
         description=(
-            "The reader takes the most common number of values per line as the file's "
-            "layout, and it skipped numeric lines with a different count. A header table "
-            "or a limits row usually causes this. If a skipped line was a real "
-            "measurement, the file mixes layouts. Re-export it with the same number of "
-            "values on every row."
+            "The reader dropped rows from the file, for one of two reasons, and the "
+            "message says which. Every reader drops a point whose 2θ, count or error "
+            "estimate is NaN or infinite, and names the dropped points by their 2θ. "
+            "A NaN is what a reduction writes where it divided by a zero monitor or "
+            "detector efficiency, so these points hold no measurement. Left in, one "
+            "such point made every statistic of the fit NaN. The two- and "
+            "three-column text reader also takes the most common number of values "
+            "per line as the file's layout, and it skips numeric lines with a "
+            "different count, naming them by line. A header table or a limits row "
+            "usually causes this. If a skipped line was a real measurement, the file "
+            "mixes layouts. Re-export it with the same number of values on every row."
         ),
     ),
     "PATTERN_SCAN_REVERSED": HelpEntry(
@@ -3319,6 +3453,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "weight and the fit is unweighted. The reader kept the values, because a "
             "uniform error is legal. Goodness of fit and χ² mean something only if every "
             "point has that error. A placeholder in the error field is the usual cause."
+        ),
+    ),
+    "PATTERN_TOTAL_SCATTERING": HelpEntry(
+        title="The file holds a total-scattering function, not a pattern",
+        description=(
+            "The file holds a reduced total-scattering function: G(r), the pair "
+            "distribution function on a real-space axis r in Å, or S(Q) or F(Q) on "
+            "a scattering-vector axis Q in Å⁻¹. Neither axis is 2θ. rietx does not "
+            "read total-scattering data yet (issue #192), so the file is refused "
+            "rather than read as a powder pattern, which would fit a Bragg model to "
+            "it and report a plausible Rwp. The file is recognised by its own "
+            "column labels (an #L line naming r and G, or Q and S or F), by a "
+            "PDFgetX2 or PDFgetX3 header, or, with neither, by a .gr, .sq or .fq "
+            "suffix alone; the message says which. Refine the diffraction pattern "
+            "the reduction started from instead. A 2θ scan that only carries one of "
+            "those suffixes opens under any other name."
         ),
     ),
     "PATTERN_UNDERSAMPLED": HelpEntry(
@@ -3584,7 +3734,29 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the specimen and belongs out of the model, or the range must cover a "
             "reflection of it. With no reflection in range, the scale is held too, the "
             "phase has no weight fraction, and the other fractions are relative to the "
-            "phases seen in range."
+            "phases seen in range. When no phase is seen at all and the residual is "
+            "noise (Durbin-Watson d at or above Hill and Flack's Q), the instrument "
+            "terms that act only through the peaks are held as well, for example the "
+            "zero shift, the specimen displacement and the profile widths. With no line "
+            "of any phase in range they are held whatever d reads. The message names "
+            "every one. A low d says the residual has structure, so they stay free: "
+            "either the model missed the peaks or the background cannot follow the data."
+        ),
+    ),
+    "PLAN_FREES_NO_MOMENT": HelpEntry(
+        title="The plan never refines the magnetic moment",
+        description=(
+            "The structure carries a magnetic moment and no stage of the plan frees "
+            "it. Every moment stays at the value you supplied, with no esd, and is "
+            "not a result. The nuclear parameters can absorb part of what a wrong "
+            "moment misplaces, so read them with that in mind too. Its `where` lists the "
+            "modulus path of each held site, then the phase's `scale`, which is not a "
+            "site: the moment and the nuclear values share that scale, and its presence "
+            "keeps the level at warning under every purpose the scale reaches "
+            "(`structure`, `qpa`). The presets "
+            "`mccusker_default` and `mccusker_structural` free no moment. Use "
+            "`magnetic_structural`, or name `phases.*.atoms.*.moment.dof*` in a "
+            "stage. A moment you hold with `hold` is left out of this check."
         ),
     ),
     "QPA_ESD_UNAVAILABLE": HelpEntry(
@@ -3910,6 +4082,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "In some patterns the refined moment lies within the noise of its own esd. "
             "That reads as a moment the data do not support, and says nothing about a "
             "small moment. Patterns where the modulus has no esd give no verdict at all. "
+            "When the plan frees no moment, every pattern is one of these and the "
+            "modulus is the start value; `PLAN_FREES_NO_MOMENT` fires on each, and "
+            "the message says so. "
             "The value shown is the modulus the fit reached. Quote these points as held."
         ),
     ),
@@ -3925,34 +4100,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "SEQUENTIAL_PATH_CHECK_INCOMPLETE": HelpEntry(
-        title="The forward and backward comparison was partial",
+        title="The forward and backward comparison covered part of the series",
         description=(
-            "The check that compares the forward and backward chains either did not run "
-            "or covered less than the whole series. Zero path-dependent findings is a "
-            "clean result only when the check ran in full. A chain may have stopped, a "
-            "pattern may have failed, or a parameter may have had no esd in both chains. "
-            "Rerun in both directions to completion before you quote per-pattern esds as "
-            "the uncertainty."
+            "The comparison of the forward and backward chains ran, on less than the "
+            "whole series. A pattern may have failed in one chain, or a parameter may "
+            "have had no esd in both chains on any pattern. The named patterns and "
+            "parameters are unchecked, and every other gap in `direction_gaps` stands."
         ),
     ),
-    "SEQUENTIAL_PATH_DEPENDENT": HelpEntry(
-        title="A trajectory depends on the refinement order",
+    "SEQUENTIAL_PATH_CHECK_NOT_RUN": HelpEntry(
+        title="The forward and backward comparison did not run",
         description=(
-            "A parameter takes different values when the series is refined forward and "
-            "backward, by more than their esds allow. The data alone do not determine "
-            "it, so the path of the chain decides the value. Its per-pattern esd "
-            "understates the uncertainty. Hold the parameter, restrain it, or report the "
-            "spread between the two directions."
-        ),
-    ),
-    "SEQUENTIAL_PERSISTENT_FINDING": HelpEntry(
-        title="A per-pattern finding recurs across the series",
-        description=(
-            "The same diagnostic fired in most of the patterns. One occurrence says a "
-            "pattern has a problem. Most of the series says the model or the plan has "
-            "it. Refitting the individual patterns reproduces the finding. Change the "
-            "model or the plan instead. The per-pattern diagnostics carry each "
-            "occurrence."
+            "You asked for both directions, and the comparison of the two chains did "
+            "not run. The forward chain may have been cancelled, or the backward chain "
+            "cancelled or raised. `direction_gaps` is then `None`, and no trajectory has "
+            "been checked against its refinement order. Rerun in both directions to "
+            "completion before you quote per-pattern esds as the uncertainty."
         ),
     ),
     "SEQUENTIAL_RESEED": HelpEntry(
@@ -3962,29 +4125,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "refitted from the initial model. Its starting values did not come from its "
             "neighbour, so it is no evidence that the trajectory is continuous at this "
             "point. Check whether the specimen or the model changed there. If the same "
-            "pattern also carries an outlier or a finding the chain did not recover "
-            "from, read that first."
-        ),
-    ),
-    "SEQUENTIAL_RWP_OUTLIER": HelpEntry(
-        title="A pattern fits much worse than its neighbours",
-        description=(
-            "Even its best attempt left this pattern's Rwp well above that of the "
-            "patterns accepted before it. Compare its GoF and expected Rwp with an "
-            "accepted neighbour. A higher GoF means the model has been outgrown, by a "
-            "missing phase or a bad frame. A similar GoF with a higher expected Rwp "
-            "means fewer counts, and the fit may be sound. If restarts were switched "
-            "off, a cold start may still help."
+            "pattern also carries a finding the chain did not recover from, read that "
+            "first."
         ),
     ),
     "SEQUENTIAL_UNRECOVERED": HelpEntry(
         title="A pattern failed every restart",
         description=(
-            "The fit diverged on this pattern and stayed diverged after every restart "
-            "the chain tried. Its values are not a measurement, so do not interpolate "
-            "across it. It seeded no later pattern and was left out of the series "
-            "median, so its neighbours are unaffected. Fit the pattern on its own to "
-            "find out why."
+            "The fit on this pattern was still rejected after every restart the chain "
+            "tried: it diverged, or it carries an error-level finding such as "
+            "`MODEL_FAR_FROM_DATA`, and the message names which. Its values are not a "
+            "measurement, so do not interpolate across it. It seeded no later pattern "
+            "and was left out of the series median, so its neighbours are unaffected. "
+            "Fit the pattern on its own to find out why."
         ),
     ),
     "SEQUENTIAL_WIDTH_GROWTH": HelpEntry(
@@ -4033,11 +4186,31 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "holds the coupled direction, the one direction that moves x; a free path "
             "follows only where every coordinate that direction moves was free; a tie, "
             "which needs a single direction, is dropped. One on a direction the position "
-            "fixes is dropped. The message names every one that followed and every one "
+            "fixes is dropped. "
+            "The message names every one that followed and every one "
             "that was dropped. Nothing was moved: "
             "this is the bookkeeping of a site whose symmetry changed without a merge, "
             "for instance onto a mirror within 5e-5, after a fit wrote the coordinate "
             "back, or off one by an `edit` or a `checkout`."
+        ),
+    ),
+    "SITE_MULTIPLICITY_KEPT": HelpEntry(
+        title="A fit kept a site's multiplicity that its answer would change",
+        description=(
+            "A fit decides each site's multiplicity once, from the coordinates it "
+            "starts at, and keeps it for every stage and for the compile its result "
+            "is measured on. GSAS-II does the same for a whole refinement. This site "
+            "ended within the site tolerance of a special position it started off (1e-4 "
+            "fractional, an offset of 5e-5 on a mirror). A fresh compile of the "
+            "returned coordinates therefore counts it at fewer positions. A site that "
+            "leaves a special position, as a rigid body's pose can move one, gets its "
+            "full orbit at the next compile and is not reported. The usual case is a half-occupied general atom, written as "
+            "a split pair across a mirror, that the data do not resolve: the fit stops "
+            "on the mirror. The result, its statistics and its weight fractions use the "
+            "fitted count. Later compiles, the next fit among them, use the fresh one. "
+            "The message gives the atoms per cell both ways. The suggestion gives the "
+            "occupancy that keeps the fitted content on the special position, and the "
+            "distance that keeps the site counted as split."
         ),
     ),
     "SITE_TWINS_KEPT": HelpEntry(
@@ -4160,6 +4333,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "stage. More iterations do not find a different minimum."
         ),
     ),
+    "STAGE_NOT_FINITE": HelpEntry(
+        title="A stage stopped on a model that is not finite",
+        description=(
+            "The model held a NaN or an infinity at a point the solver reached, so the "
+            "solver had no step left to take. The stage ended at the values it started "
+            "from and changed nothing. The column that went non-finite is often not the "
+            "parameter that ran away. Hold some of the parameters the stage frees, or "
+            "start it nearer its answer."
+        ),
+    ),
     "STAGE_PATH_NOT_FREE": HelpEntry(
         title="A stage named a fixed parameter",
         description=(
@@ -4167,7 +4350,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "that follows another parameter. Nothing was freed for it, yet the fit "
             "converged. The parameter kept its value. Free the parameter it follows, or "
             "for a coordinate free the directions that the site symmetry allows. If the "
-            "model holds it fixed, there is nothing to refine."
+            "model holds it fixed, there is nothing to refine. A pattern that names one "
+            "atom site, such as `phases.0.atoms.0.dof.*`, gets the same report when it "
+            "frees nothing at that site. An atom on a fully fixed special position has "
+            "no directions, so its `dof.*` pattern matches no parameter."
         ),
     ),
     "STAGE_PATH_UNKNOWN": HelpEntry(
@@ -4179,6 +4365,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "stays silent, because some models lack a component. Correct the name, or "
             "use a wildcard if the stage should reach a component that only some models "
             "declare."
+        ),
+    ),
+    "STAGE_SLOW_DESCENT": HelpEntry(
+        title="A stage stopped while still falling slowly",
+        description=(
+            "The stage's cost was still falling when it stopped, but so slowly that "
+            "another 300 evaluations would have moved its parameters by less than one "
+            "esd. The stage counts as converged. The stop says how fast the cost was "
+            "falling, not how far the minimum is, so a crawl along a shallow or "
+            "constrained direction can stop well above it. A high correlation or a "
+            "bound hit reported for the same parameters names such a direction, and "
+            "its own entry gives the remedies."
         ),
     ),
     "STAGE_WINDOWS_STALE": HelpEntry(
@@ -4203,9 +4401,15 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The refined anisotropic strain coefficients give a negative variance at "
             "some reflections. A variance cannot be negative, so the coefficients lie "
             "outside the physical set. Those reflections receive no strain broadening, "
-            "and nothing else says so. A negative value is not evidence of large "
-            "anisotropy. Restart from the isotropic limit, refine fewer strain terms, or "
-            "extend the fitted range. Do not quote the coefficients."
+            "so the fit leaned on that clamp, and the finding states the share of the "
+            "phase's m·|F|² they carry. The fit's χ², cells and phase fractions lean "
+            "on those reflections too. A negative value is not evidence of large "
+            "anisotropy. Under `solver=\"trf\"`, refit with the default "
+            "Levenberg-Marquardt driver, which holds the variance at or above zero; a "
+            "joint fit holds it under neither driver, so fit each pattern alone or drop "
+            "the block from the joint fit. That "
+            "makes the coefficients admissible, not measured, so compare a few starts. "
+            "Do not quote the coefficients."
         ),
     ),
     "STRAIN_UNUSUALLY_LARGE": HelpEntry(
@@ -4413,6 +4617,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "reported."
         ),
     ),
+    "XYDATA_INTER_APPLIED": HelpEntry(
+        title="FullProf's INTER multipliers were applied",
+        description=(
+            "The file opens with FullProf's XYDATA heading, and its INTER line "
+            "states a multiplier other than 1. The FullProf manual defines `fac_x` as "
+            "a multiplier of the x values and `fac_y` as a multiplier of the "
+            "intensities and their esds, which FullProf applies before it uses the "
+            "data. The reader applied them the same way, so the pattern's numbers "
+            "are the file's numbers times the factors. A file with no esd column "
+            "gets the Poisson esd of the multiplied intensity, as in FullProf. "
+            "Compare the pattern against the file's own columns only after "
+            "multiplying."
+        ),
+    ),
 }
 
 
@@ -4536,6 +4754,20 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
 #: enumerating what a reader accepts.  These entries are the text a person
 #: reads beside the control.
 READER_OPTION_HELP: dict[str, HelpEntry] = {
+    "axis": HelpEntry(
+        title="Axis",
+        description=(
+            "What the x column of a plain two- or three-column file is: `two_theta`, "
+            "2θ in degrees, or `tof`, a flight time in microseconds. A file that "
+            "states no unit cannot say which, because both are ascending columns of "
+            "numbers, so the reader takes 2θ unless you declare otherwise. A "
+            "time-of-flight bank with no header needs `tof`. The pattern's metadata "
+            "records the declaration under `declared_axis`. A file that states its "
+            "own unit and disagrees with the declaration is refused, and the message "
+            "quotes both."
+        ),
+        typical="unset; `tof` for a time-of-flight bank exported without a header",
+    ),
     "bank": HelpEntry(
         title="Detector bank",
         description=(
@@ -4977,10 +5209,14 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
 #: record what a fit *did*: ``StageResult``, ``SeriesEntry`` and
 #: ``RefinementResult`` are the action-record types the generality record's
 #: § Acceptance names, and ``SeriesResult`` is where WP-2003's demoted step
-#: statistic lands.  Names rather than classes, because this module imports
-#: nothing but the standard library at its top.
+#: statistic lands.  ``UnmatchedPeak`` and ``FlankEvidence`` are the report's
+#: rows WP-1977 put evidence on in place of a suggestion, the seat the
+#: generality record's § Demotion names for a statistic with its meaning.
+#: Names rather than classes, because this module imports nothing but the
+#: standard library at its top.
 RESULT_FIELD_TYPES: tuple[str, ...] = (
-    "RefinementResult", "StageResult", "SeriesEntry", "SeriesResult")
+    "RefinementResult", "StageResult", "SeriesEntry", "SeriesResult",
+    "UnmatchedPeak", "FlankEvidence")
 
 #: One entry per field of every type in :data:`RESULT_FIELD_TYPES`, keyed
 #: ``"<Type>.<field>"`` (WP-2037).  A number in a result field costs nothing
@@ -5201,6 +5437,33 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "Rietveld mode and when the result did not come from a fit."
         ),
     ),
+    "RefinementResult.distortion_totals": HelpEntry(
+        title="Irrep blocks of a child on mode amplitudes",
+        description=(
+            "One `DistortionTotal` per irrep block, every mode sharing one irrep, k and "
+            "isotropy group, of each phase stated on mode amplitudes: A_τ, the norm of the "
+            "block's amplitudes in Å, with its esd from the block's own covariance, "
+            "labelled 'linearised; undefined at A_τ = 0 and Rice-biased below about 2 "
+            "esd'; Hotelling's T² with the mode count m and no p, because χ² is even in "
+            "an amplitude that breaks the parent's symmetry, so where the block's truth "
+            "may be zero T² is about 4 × the likelihood ratio and a χ²_m p is wrong "
+            "exactly there; whether the block alone has the child's group; the sign "
+            "convention; and the largest displacement. A correlation inside one irrep "
+            "block is a basis artefact; A_τ, its esd, T² and the block comparison are "
+            "basis-invariant. `Refinement.distortion_block_tests` refits with any blocks "
+            "held at 0 and reports ΔBIC at N/f² and Λ = Δχ²/(χ²_red·f²) with its p. Λ is "
+            "Hamilton's F form on rietx's esd scale; it holds its size on white-noise "
+            "nulls; under model misfit it can call a block that absorbs misfit, so it is "
+            "not a test of zero. With a bar it adds `A_det`, measured +2 % (five-mode Γ "
+            "block), +9 to +12 % (ten-mode zone-boundary block) and +48 % (one mode of a "
+            "57-mode P1 child) off the 50 % point at bar 6 on LaMnO₃ white noise, and "
+            "uncalibrated on misfit; a bar needs the caller's `detectability_probe` (Å), "
+            "which has no default. `None` when no phase carries `distortion_modes`, and on "
+            "a joint fit's result, whose builder writes none of the per-phase technique "
+            "fields (geometry, cell volumes and this one alike)."
+        ),
+        anchor="reference/parameter-table.html#what-the-fit-reports-about-the-blocks",
+    ),
     "RefinementResult.cell_volumes": HelpEntry(
         title="Cell volumes",
         description=(
@@ -5372,6 +5635,35 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "measured. `None` means nobody looked. A joint fit records its worst "
             "histogram."
         ),
+    ),
+    "StageResult.rwp": HelpEntry(
+        title="Stage Rwp",
+        description=(
+            "The stage's Rwp at the values it ended on, measured on the stage's own "
+            "frozen windows. It is the number the `stage_end` event carries. A joint "
+            "fit pools it over its histograms. The last stage's differs from "
+            "`statistics.rwp`, which is measured on a compile at the answer. Stages "
+            "that fit different ranges or modes cannot be compared by it. `None` "
+            "means a result stored before the field."
+        ),
+    ),
+    "StageResult.termination": HelpEntry(
+        title="Stage stopping test",
+        description=(
+            "Which test ended the stage's solve, where `status` says only whether it "
+            "converged. The default solver writes `ftol_runs`, `no_descent` or "
+            "`exhausted_fp64` when it met its own convergence test. It writes "
+            "`slow_descent` when the cost was still falling, but so slowly that "
+            "another 300 evaluations would have moved the parameters by less than "
+            "one esd. Both have `status` `converged`, and `STAGE_SLOW_DESCENT` names "
+            "a stage stopped the second way. It writes `max_nfev`, with `status` "
+            "`max_iter`, when the budget ran out. `solver=\"trf\"` writes "
+            "scipy's `ftol`, `xtol`, `gtol`, `ftol+xtol` and `max_nfev`. A model "
+            "that stopped being finite writes `non_finite_residual` or "
+            "`non_finite_jacobian`, with `status` `diverged`. `None` means "
+            "a result stored before the field, or a stage with nothing free."
+        ),
+        anchor="theory/estimation.html#convergence",
     ),
     "StageResult.n_constraint_truncations": HelpEntry(
         title="Steps held on a constraint",
@@ -5557,7 +5849,9 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The solver's exit for the attempt kept on this pattern. `diverged` after "
             "the last rung of the ladder means the pattern is quarantined: it seeds no "
-            "successor and joins no median, and `SEQUENTIAL_UNRECOVERED` says so."
+            "successor and joins no median, and `SEQUENTIAL_UNRECOVERED` says so. A "
+            "`converged` or `max_iter` attempt carrying an error-level finding is "
+            "quarantined the same way."
         ),
     ),
     "SeriesEntry.statistics": HelpEntry(
@@ -5643,7 +5937,11 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "Which attempt produced this entry's values: `warm`, a one-stage refit from "
             "the neighbour; `warm_staged`, the full plan from the warm state; or "
             "`cold`, the full plan from the initial models. The first pattern is always "
-            "`cold`, having no neighbour to start from."
+            "`cold`, having no neighbour to start from. Of several attempts the entry "
+            "keeps one that neither diverged nor carries an `error` code, then one the "
+            "first-rung bound did not cut, then the one with the lower least-squares "
+            "cost, which Rwp replaces where the two attempts minimised different "
+            "objectives."
         ),
     ),
     "SeriesEntry.rungs_tried": HelpEntry(
@@ -5662,13 +5960,22 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "as past a diverged one. Empty wherever no rung raised."
         ),
     ),
-    "SeriesEntry.rwp_fence": HelpEntry(
-        title="Rwp fence",
+    "SeriesEntry.rwp_over_median": HelpEntry(
+        title="Rwp over the median",
         description=(
-            "The Rwp limit the chain set at this pattern, from `reseed_factor` and the "
-            "Rwp of the patterns accepted before it (`sequential._rwp_fence`). An "
-            "attempt above it climbs the ladder. `None` where no earlier pattern had "
-            "been accepted, so no fence judged it."
+            "This pattern's Rwp divided by the median Rwp of the patterns accepted "
+            "before it in the walk. A record, not a verdict: no threshold reads it "
+            "unless you pass `reseed_factor`, which escalates a warm fit above that "
+            "ratio. No code flags a pattern for its misfit, so read this ratio and "
+            "the GoF down the series and inspect the entries well above their "
+            "neighbours. The first patterns are compared against a median of one or two "
+            "values, so an early ratio says as much about its neighbours: accepted Rwp "
+            "0.30 and 0.10 give a median of 0.20, against 0.10 for 0.10 and 0.10. Rwp "
+            "tracks the expected Rwp, so a ratio above 1 can be falling counts under a "
+            "right model. Compare GoF and the expected Rwp with an accepted neighbour "
+            "to tell them apart. A blank frame read GoF 1.00 against 1.06 with expected "
+            "Rwp 0.159 against 0.040, a right model over counts fallen 4x a similar GoF, "
+            "and an unmodelled phase GoF 16.7. `None` for the first pattern walked."
         ),
     ),
     "SeriesEntry.seeded_from": HelpEntry(
@@ -5688,6 +5995,16 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "floor, because the pattern it warm-started from did not support them. "
             "Empty when the kept attempt started cold and on a series with no moment. "
             "`SEQUENTIAL_MOMENT_HOLD` names these patterns."
+        ),
+    ),
+    "SeriesEntry.pattern_paths": HelpEntry(
+        title="This pattern's own paths",
+        description=(
+            "This pattern's own dot-path for each path of the entry that its model numbers "
+            "differently, keyed by the entry's path. Every path of a series reads one "
+            "numbering, so a trajectory follows one phase by name and one atom by label "
+            "where a `prepare` hook added or removed either. `{}` where the two agree; "
+            "`None` in a series saved before 1.11, whose paths are each pattern's own."
         ),
     ),
     "SeriesEntry.node_id": HelpEntry(
@@ -5735,23 +6052,24 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "Which way the chain ran: `forward`, `backward`, or `both`, which runs it "
             "each way and compares the two trajectories. Under `both` the entries are "
-            "the forward chain's and the comparison is `SEQUENTIAL_PATH_DEPENDENT`."
+            "the forward chain's and the comparison is `direction_gaps`."
         ),
     ),
     "SeriesResult.backward": HelpEntry(
         title="Reverse chain",
         description=(
             "The reverse chain's own series result when `direction` is `both`, so the "
-            "trajectory a path-dependence finding is about can be read. `None` for a "
-            "one-way run."
+            "trajectory each gap in `direction_gaps` compares against can be read. "
+            "`None` for a one-way run."
         ),
     ),
     "SeriesResult.diagnostics": HelpEntry(
         title="Series findings",
         description=(
-            "Findings about the series as a whole, such as path dependence, reseeds "
-            "and patterns that failed. Each pattern's own findings stay on its entry, "
-            "and the steps between patterns are `steps`, not findings."
+            "Findings about the series as a whole, such as reseeds and patterns that "
+            "failed. Each pattern's own findings stay on its entry and are counted in "
+            "`code_counts`. The steps between patterns are `steps`, and the gaps "
+            "between the two directions `direction_gaps`, not findings."
         ),
     ),
     "SeriesResult.steps": HelpEntry(
@@ -5770,6 +6088,35 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "document written before the field."
         ),
     ),
+    "SeriesResult.direction_gaps": HelpEntry(
+        title="Gaps between the two directions",
+        description=(
+            "Under `direction=\"both\"`, every parameter's forward minus backward value "
+            "at every pattern both chains fitted, in combined esds, largest first, with "
+            "the attempt each chain kept beside each gap. The size is `None` where "
+            "either chain measured no esd. rietx sets no threshold on it. Where a gap is "
+            "large against its esds, the data alone do not fix that parameter, and the "
+            "chain's order decides it. Hold the parameter, restrain it, or quote the "
+            "spread between the two directions as its uncertainty. A gap whose two "
+            "chains kept different attempts measures the restart ladder as well as the "
+            "order. A parameter near zero with an esd near zero can show thousands of "
+            "esds with no physical size, so read the two values too. `None` when the "
+            "comparison did not run, or in a document written before the field."
+        ),
+    ),
+    "SeriesResult.code_counts": HelpEntry(
+        title="Per-pattern codes counted",
+        description=(
+            "Every per-pattern diagnostic code and path, with the number of patterns "
+            "it fired on and the worst level it carried, largest count first. One "
+            "occurrence says a pattern has a problem. The same code on most of the "
+            "series says the model or the plan has it, and refitting single patterns "
+            "reproduces it. rietx sets no threshold on the count. Read the top rows "
+            "against the series: a count that starts at one pattern and holds to the "
+            "end can mark where the sample changed. Each occurrence stays on its "
+            "entry. `None` means a document written before the field."
+        ),
+    ),
     "SeriesResult.relative_paths": HelpEntry(
         title="Paths that are steps",
         description=(
@@ -5784,6 +6131,23 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The moment angle DOFs, whose differences across patterns are taken modulo "
             "a full turn. Recorded as `relative_paths` is, and `None` means the same."
+        ),
+    ),
+    "SeriesResult.phase_names": HelpEntry(
+        title="Series phase names",
+        description=(
+            "The phase each path of the series names by number: phase `i` is "
+            "`phase_names[i]`. The series' own structure's phases, then each phase a "
+            "`prepare` hook added, in the order the walk met it. `None` in a series "
+            "saved before 1.11."
+        ),
+    ),
+    "SeriesResult.atom_labels": HelpEntry(
+        title="Series atom labels",
+        description=(
+            "The atom each path of the series names by number: atom `j` of phase `i` is "
+            "`atom_labels[i][j]`, numbered as `phase_names` is. `None` in a series saved "
+            "before 1.11."
         ),
     ),
     "SeriesResult.failures": HelpEntry(
@@ -5807,6 +6171,111 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "What produced the series: the package version, backend, solver, version "
             "of the report thresholds and when it ran. `None` on the reverse chain in "
             "`backward`, which carries none of its own."
+        ),
+    ),
+    # ---------------------------------------------------------- UnmatchedPeak
+    "UnmatchedPeak.two_theta": HelpEntry(
+        title="Position",
+        description="Where the residual peak or trough sits, in degrees 2θ.",
+        unit="deg",
+    ),
+    "UnmatchedPeak.height_over_sigma": HelpEntry(
+        title="Height",
+        description=(
+            "How far the residual stands above (`unmatched_obs`) or below "
+            "(`unmatched_calc`) the calculated curve there, in units of the local esd."
+        ),
+    ),
+    "UnmatchedPeak.kind": HelpEntry(
+        title="Which side is missing",
+        description=(
+            "`unmatched_obs`: an observed peak with no calculated tick within 0.08°. "
+            "`unmatched_calc`: a calculated line with too little observed intensity "
+            "under it."
+        ),
+        anchor="reference/report.html#unmatched-peaks",
+    ),
+    "UnmatchedPeak.flank": HelpEntry(
+        title="Against the drawn peaks",
+        description=(
+            "Where an `unmatched_obs` peak sits against the peaks the model draws. "
+            "`on_flank` says the observed curve rises from it into a drawn peak with "
+            "no valley as deep as `build_report`'s `min_peak_sigma` (default 5σ), so "
+            "the data do not resolve the two. Four causes leave "
+            "such a shoulder. A shape or asymmetry misfit leaves one on most strong "
+            "lines, on one side, at a similar offset in FWHM: compare "
+            "`lines_with_lobe` with `lines_as_strong`. A lobe under the detection "
+            "level is not counted, so a low count does not rule a shape misfit out. "
+            "An unmodelled Kα2 sits above "
+            "each line at the Kα1-Kα2 separation for its angle. A symmetry lower "
+            "than the model's splits the lines of some hkl classes and not others, "
+            "the split growing with tanθ. A foreign line is a lone shoulder that "
+            "fits none of these. The report suggests no impurity phase for a row on "
+            "a flank. A row the data resolve keeps the suggestion. `None` means not "
+            "measured: every `unmatched_calc` row."
+        ),
+        anchor="reference/report.html#unmatched-peaks",
+    ),
+    # ---------------------------------------------------------- FlankEvidence
+    "FlankEvidence.on_flank": HelpEntry(
+        title="Unresolved from a drawn peak",
+        description=(
+            "Whether the observed curve rises from the residual peak into a drawn "
+            "peak without falling `min_peak_sigma` (default 5σ) below its running "
+            "maximum on the way. False "
+            "where the data resolve the two, or where no drawn peak lies uphill."
+        ),
+    ),
+    "FlankEvidence.peak_two_theta": HelpEntry(
+        title="Drawn peak position",
+        description=(
+            "The apex of the drawn peak reached by walking uphill along the "
+            "calculated curve. `None` where the walk reaches the pattern edge or an "
+            "apex less prominent than `min_peak_sigma` (default 5σ)."
+        ),
+        unit="deg",
+    ),
+    "FlankEvidence.peak_prominence_over_sigma": HelpEntry(
+        title="Drawn peak strength",
+        description=(
+            "That peak's prominence in the calculated curve, in units of the esd at "
+            "its apex, to set beside the residual's own height."
+        ),
+    ),
+    "FlankEvidence.peak_fwhm_deg": HelpEntry(
+        title="Drawn peak width",
+        description="That peak's width in the calculated curve at half its prominence.",
+        unit="deg",
+    ),
+    "FlankEvidence.offset_fwhm": HelpEntry(
+        title="Offset",
+        description=(
+            "(residual − apex) divided by the drawn peak's width. Negative below "
+            "the apex."
+        ),
+    ),
+    "FlankEvidence.valley_over_sigma": HelpEntry(
+        title="Deepest valley",
+        description=(
+            "The deepest fall of the observed curve between the residual and the "
+            "apex, below the highest point it had reached, in esd. Under "
+            "`min_peak_sigma` (default 5) is `on_flank`."
+        ),
+    ),
+    "FlankEvidence.lines_as_strong": HelpEntry(
+        title="Lines as strong",
+        description=(
+            "How many drawn peaks are at least as prominent as this one, this one "
+            "included. `None` where `on_flank` is False."
+        ),
+    ),
+    "FlankEvidence.lines_with_lobe": HelpEntry(
+        title="Lines with a lobe",
+        description=(
+            "How many of those carry an `on_flank` row on the same side, this one "
+            "included. A lobe within 0.08° of a tick, or under the detection level, "
+            "is no row and is not counted. "
+            "`None` where `on_flank` is False."
         ),
     ),
 }

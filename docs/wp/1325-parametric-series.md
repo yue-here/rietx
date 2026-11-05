@@ -1,7 +1,6 @@
 # WP-1325 — parametric series: a parameter as a function of each pattern's coordinates
 
-Milestone: unscheduled · Status: 🔄 2026-10-15 — ZrP₂O₇ and WO₃ out of sample settled decision 4 (χ²_red alone, a verdict beside a rejected equation provisional) and a declaration is now a parametric equation; next the next-term test, then in-step bounds
-Track: Candidates — named on a use case, not yet on a measurement
+Milestone: parametric · Status: 🔄 2026-11-04 — the parametric milestone took this WP; two tasks remain, in-step bounds and start agreement
 Depends on: — (1119 soft: a named coefficient is a named variable)
 Priority: P2 2026-10-14 — was P3: the maintainer took the combinatorial-library case (the first named outside user) and the scalable solver it needs; 1962 waits on that solver
 
@@ -86,6 +85,26 @@ standing concern is a check calibrated on one example.
    either rule's per-law false-alarm rate lay between 5 % and 10 % by the
    union bound, and its tied half could flag a right law beside a wrong
    one.
+
+### Direction, 2026-11-03
+
+The maintainer set the track's direction: all the machinery in place for
+experienced users who build their own parametric refinements in TOPAS or
+GSAS-II, on an accessible and well-documented surface. Built-in heuristics
+matter less, because these users will write their own, and presets for
+beginners can follow later. So [1964](1964-a-parametric-equation-the-user-writes.md)
+now owns equations the user writes. The checks here (the next-term test, the
+replicate reading from #1218) rank below a missing primitive.
+
+The maintainer opened the [parametric](../milestones/parametric.md) milestone on
+2026-11-04, and the tasks moved as follows.
+
+- This WP keeps two tasks: holding each target's own bounds inside the step, and
+  starting structures that agree beyond their parameters.
+- "Compute a target's peak-chain column once per pattern" moved to 1964, because a
+  nonlinear equation needs that column taken at the target.
+- The next-term test is parked, and so is the replicate reading (#1218, row S2,
+  § Inherited). Neither is rejected. Each comes back on a user's request.
 
 ### The general shape, and which part this WP builds
 
@@ -197,7 +216,7 @@ changes what every coefficient means.
    round-trip. It has:
    - targets as globs (superseded 2026-10-14: the declaration landed with
      one bare path per target, and a glob is
-     [1965](1965-a-law-declared-by-formula-condition-and-glob.md)'s);
+     [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md)'s);
    - a basis from a **closed** vocabulary: `constant`, `polynomial` (terms over
      named coordinates, e.g. `[[], ["x"], ["y"], ["x", "y"]]`), or `design`
      (explicit per-pattern rows; this is the escape hatch for splines,
@@ -1081,8 +1100,8 @@ right, each freed gain is 0.92-1.10 of its refit.
 October series work found. Neither comment asks for a change to #977. A
 private bundle with the harness, drafts and data goes to the maintainer
 separately. The points for this WP are below. The subset boundary and the
-detectors went to [1965](1965-a-law-declared-by-formula-condition-and-glob.md),
-the scanned nonlinear laws to [1964](1964-a-nonlinear-law-through-the-derived-block.md),
+detectors went to [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md),
+the scanned nonlinear laws to [1964](1964-a-parametric-equation-the-user-writes.md),
 and the telemetry and event pairing to [1322](1322-events-aggregator.md) (closed 2026-10-23; it returned the per-equation line here, see § Inherited).
 Their numbers are as reported and were not re-measured here.
 
@@ -1119,6 +1138,13 @@ Their numbers are as reported and were not re-measured here.
 
 ### Inherited
 
+- **2026-11-01, from [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md): a held
+  coefficient's target rows leave `parameters`.** A result now lists only the rows the fit
+  could move (`ParameterTable.moving_paths`). When the support hold takes `vars.b_0`, the
+  `hist.h.phases.1.cell.*` rows it drives are absent, so their `RefinedParameter.equations`
+  is no longer readable there. `PARAMETRIC_TARGET_UNSEEN` and `result.parametric` still name
+  both. `test_a_joint_fit_holds_a_coefficient_whose_phase_no_pattern_sees` was re-pinned to
+  that.
 - **2026-10-23, from [1341](1341-a-joint-fit-has-no-report.md) (closed): joint-report items now go
   to [2028](2028-a-joint-fits-guards-see-every-histogram.md).** The four joint items and the
   three `PARAMETRIC_*` rendering notes this WP sent 1341 on 2026-10-14 are 2028's Context items
@@ -1131,7 +1157,7 @@ Their numbers are as reported and were not re-measured here.
   (`history.aggregate.summarize_events`) shipped in PR #902. The line would
   carry the subset size, the form verdict, and whether a detector fired inside
   the subset (the subset boundary and the detectors are
-  [1965](1965-a-law-declared-by-formula-condition-and-glob.md)'s). Two rules
+  [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md)'s). Two rules
   for whoever builds it:
   - Pair events in file order, never by `(series_index, series_pass)`, since
     indices recur on reseeds and restarted segments. The aggregator already
@@ -1139,23 +1165,41 @@ Their numbers are as reported and were not re-measured here.
   - A segmented chain's summed fit time is not its wall time: 700 s against
     148 s on one chain, as reported and not re-measured.
 
+- 2026-10-31, from the issue triage (issue #1218, row S2): a pure-error
+  lack-of-fit beside the declared-form test. For every group of patterns that
+  share every declared coordinate, the χ² of the free-fit targets about their
+  inverse-variance mean on n_g − 1 dof, per group and pooled, with esds
+  uncorrected (the choice the form test already makes), and "no replicate
+  groups: not measured" when no coordinate repeats. It would sit on
+  `ParametricFormTest` as `replicates`, or on the series summary. Measured by
+  the reporter on one synthetic series (16 patterns, cubic perovskite
+  capillary, a = a₀(1 + αΔT) + 0.02·x, a ramp to 700 K then a hold): when x
+  drifts during the hold the 9 held patterns differ in `phases.0.cell.a` by χ²
+  = 24 054 on 8 dof; when x stays put, χ² = 12.0 on 8 dof (p ≈ 0.15). The
+  score test cannot see a misfit that varies at a repeated coordinate, which
+  is what replicates measure (Draper & Smith 1998, pure error). Checked
+  against the tree at d87c8cc91: `ParametricFormTest`
+  (`schemas/parametric.py:320`) carries `n_patterns`, `n_subset`, `tied`,
+  `others_freed`, `rejected` and no replicate reading; this WP's ticked
+  lack-of-fit task built the score test only. Not re-run here. The reporter
+  proposes landing S2 before S1.
+
 ## Non-goals
 
 - A library of physical models: here the caller supplies the basis, or names
-  a polynomial. Named nonlinear laws are
-  [1964](1964-a-nonlinear-law-through-the-derived-block.md)'s.
+  a polynomial, and [1964](1964-a-parametric-equation-the-user-writes.md) owns
+  equations the user writes.
 - Replacing the chain: it stays the exploratory tool and the seed.
-- Laws nonlinear in their coefficients: an order parameter's
+- Equations nonlinear in their coefficients: an order parameter's
   (1 − T/T_c)^β with T_c and β refined, an Avrami rate, an Einstein
   temperature. Filed 2026-10-14 as
-  [1964](1964-a-nonlinear-law-through-the-derived-block.md). The fence here
+  [1964](1964-a-parametric-equation-the-user-writes.md). The fence here
   rested on WP-1119's reading that only C·θ + d is exact under autodiff, and
   WP-1804's derived block has since given the table a second, nonlinear seam.
-  A law nonlinear in the coordinates alone is already declarable as a
+  An equation nonlinear in the coordinates alone is already declarable as a
   `design` basis.
-- Declaring a law by a formula string, a subset by a condition on the
-  coordinates, or a target by a glob:
-  [1965](1965-a-law-declared-by-formula-condition-and-glob.md).
+- Declaring a subset by a condition on the coordinates, or a target by a glob:
+  [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md).
 - One pattern as a sum over several specimens (A ≠ identity): direct XRD-CT,
   depth profiles. That is [1962](1962-xrd-ct-a-pattern-summed-over-the-voxels-its-beam-crosses.md).
 - Soft forms: partial pooling toward the surface, or a P-spline smoothness
@@ -1386,7 +1430,7 @@ Their numbers are as reported and were not re-measured here.
   `d9_02592_3phase_01.inp`. The ZrP₂O₇ input is refused at read, on its
   `B1(...)` site macros, so its phases need building by hand.
   - WO₃'s TOPAS law refines its Einstein temperature, which no linear
-    basis expresses ([1964](1964-a-nonlinear-law-through-the-derived-block.md)).
+    basis expresses ([1964](1964-a-parametric-equation-the-user-writes.md)).
     Held at TOPAS's 125.4 K it is a `design` law with columns 1 and
     1/(exp(θ/T) − 1), which is how to declare it here.
   - ZrP₂O₇'s TOPAS law calibrates the temperature itself, a law on a
@@ -1398,8 +1442,8 @@ Their numbers are as reported and were not re-measured here.
   from it: the divisor is χ²_red alone (741649b), and a verdict beside a
   rejected law is provisional, `ParametricFormTest.provisional_on` naming
   the others (667216c).
-- [ ] **Measure whether a one-direction test for the next term earns a
-  place** (added 2026-10-14, from a review of the API against prior art).
+- [ ] **Parked 2026-11-04, see § Direction.** **Measure whether a one-direction test
+  for the next term earns a place** (added 2026-10-14, from a review of the API against prior art).
   The form test's alternative spends n − m directions, one per pattern
   beyond the law. Against smooth curvature, a score test on the next
   polynomial term spends one. It is the same projection with one column
@@ -1456,22 +1500,6 @@ Their numbers are as reported and were not re-measured here.
 - [x] **Profile the joint Jacobian**, the maintainer's question of 2026-10-14:
   would another Rust kernel help? It would not, first. § Measured: where the
   joint Jacobian's time goes.
-- [ ] **Compute a target's peak-chain column once per pattern.** A tie's
-  coefficient columns each re-run `phase_peaks` (§ Measured: where the joint
-  Jacobian's time goes, 1.48-1.52× on the Jacobian loop).
-  - The seam is `_make_jacobian`'s column loop
-    (`optimize/least_squares.py:1604`) and `_peak_chain_column` (`:1170`).
-    Group the peak-chain columns by the targets they reach, compute each
-    target's column once, and chain through C. The restraint block already
-    does this, as `r_phys @ cmat`.
-  - A coefficient reaching several targets (one law per phase field, a
-    shared cell) takes the general form, J_columns = J_targets · C_sub, and
-    never a per-name shortcut.
-  - The finite-difference step then sits on the target, not the
-    coefficient, so it is not bit-identical. The bar: the converged answer
-    within 0.01 esd of today's, as the blocked solver's was.
-  - It also removes a near-zero effective step: a pattern near the reference
-    has Φ_kj ≈ 0, so today a coefficient's step barely moves its target.
 - [x] **Survey the prior art for declaring a parametric model**, for a
   self-driving lab as the writer. Written into Context: § Prior art, § The
   shape and § What the code has.
@@ -1649,6 +1677,19 @@ Their numbers are as reported and were not re-measured here.
   Schur identity), issue #212.
 
 ## Handover log
+
+### 2026-11-04 (ninth session) — the parametric milestone takes this WP
+
+The maintainer opened the milestone. This WP's status, § Direction, two tasks and its
+non-goals changed, and the moved task went to 1964 with its detail. No code changed.
+
+One correction to the record above. § Measured: the form test out of sample holds θ at
+125.37 K, the value in the 11-pattern `parametric_05.inp`, on the 100-pattern ramp, and
+quotes TOPAS's 12.81 % from `parametric_06.inp`, which stores θ = 71.47 K. That run was
+a form test and needed no agreement with TOPAS, so its conclusions stand. Any comparison
+with TOPAS on that ramp should use 71.47 K. 1964 records why the difference matters.
+
+Next: in-step bounds.
 
 ### 2026-10-15 (eighth session) — two real ramps settle the form test's divisor, a verdict beside a rejected law is provisional, and a declaration is a parametric equation
 

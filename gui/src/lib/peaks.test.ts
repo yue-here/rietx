@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import {
   INTENSITY_UNMEASURED_FLAGS,
   POSITION_ESD_MAX_DEG,
+  absentText,
   caveatTone,
   confidenceTone,
   cellText,
@@ -231,6 +232,15 @@ describe("the candidate table's shape", () => {
   it("looks a member up by name, never by position", () => {
     expect(fomOf(CANDIDATE, "F20")).toBe(80.2);
     expect(fomOf(CANDIDATE, "coverage")).toBeNull();
+  });
+
+  it("reads the absent column off the lines screened, with the windowed count", () => {
+    const fitted = CANDIDATE.lebail!;
+    expect(absentText(fitted)).toBe("0/28");
+    const screened = { ...fitted, predicted_but_absent: 6, n_reflections: 87,
+      absent_source: "line_screen" as const, n_lines_screened: 23,
+      predicted_but_absent_uncancellable_in_window: 0 };
+    expect(absentText(screened)).toBe("6/23 lines · 0 in window");
   });
 
   it("summarises a cell as lengths and angles", () => {

@@ -40,7 +40,7 @@ _COUNT_SCALE = 60.0
 
 
 def _truth(lo=18.0, hi=125.0, step=0.02, seed=17, disp=0.0,
-           count_scale=_COUNT_SCALE):
+           count_scale=_COUNT_SCALE, axial=0.02):
     """A model and the noisy pattern it generates — i.e. a *converged* state.
 
     The background lives in the instrument (a flat Chebyshev term), not added
@@ -59,6 +59,9 @@ def _truth(lo=18.0, hi=125.0, step=0.02, seed=17, disp=0.0,
     ``count_scale`` multiplies the counts.  Raised, it makes a model misfit
     dominate the counting noise, which is how ``test_compare_freed.py`` gets a
     serially correlated residual.
+
+    ``axial`` is both apertures, in the specimen and the returned model; 0
+    gives a symmetric pattern (WP-2054's controls).
     """
     from rietx.schemas.instrument import BackgroundChebyshev
 
@@ -68,8 +71,8 @@ def _truth(lo=18.0, hi=125.0, step=0.02, seed=17, disp=0.0,
     ins.profile.w.value = 4e-3
     ins.profile.u.value = 3e-3
     ins.profile.x.value = 6e-3
-    ins.geometry.axial_sl.value = 0.02
-    ins.geometry.axial_hl.value = 0.02
+    ins.geometry.axial_sl.value = axial
+    ins.geometry.axial_hl.value = axial
     ins.geometry.sample_displacement.value = disp
     ins.background = BackgroundChebyshev(coefficients=[
         rx.Parameter(value=80.0), rx.Parameter(value=0.0),
@@ -296,6 +299,89 @@ def test_a_model_broader_than_the_data_gets_no_size_clause():
     assert "L ≈" not in size[0].rationale
 
 
+# ----------------------------------------------------------------------
+# WP-2054: asymmetry the model cannot draw, with both apertures at zero
+# ----------------------------------------------------------------------
+def _zeroed(structure, ins):
+    ins = ins.model_copy(deep=True)
+    ins.geometry.axial_sl.value = ins.geometry.axial_hl.value = 0.0
+    return structure, ins
+
+
+def _asymmetry_action(report):
+    return next((a for a in report.suggested_actions
+                 if a.kind == "refine_axial_asymmetry" and a.active), None)
+
+
+def test_asymmetry_at_zero_apertures_is_named(truth):
+    """Data with S/L = H/L = 0.02, a model declaring both 0 (#1106).
+
+    The model draws no asymmetry and its own ∂Ω/∂(S/L) is zero, so the column
+    comes from the nominal-aperture twin.  Every low-angle coefficient reads
+    positive, more asymmetry than none, and the action says why it cannot
+    simply be refined from where it is.
+    """
+    structure, ins, data = truth
+    report = _report_for(*_zeroed(structure, ins), data)
+    low = [c for a in report.attribution if a.gates_passed
+           and a.mean_two_theta < 40.0 for c in a.coefficients
+           if c.kind == "asymmetry" and c.significant]
+    assert len(low) >= 2 and all(c.value > 0 for c in low)
+    action = _asymmetry_action(report)
+    assert action is not None
+    assert "axial apertures are 0" in action.rationale
+
+
+def test_declared_apertures_borrow_no_nominal_column(truth):
+    """The twin exists only at both apertures zero, so a fit declaring them
+    reads its own column and its report is the one it was before WP-2054."""
+    from rietx.report import _nominal_axial
+
+    structure, ins, data = truth
+    result, model, values = _result_for(structure, ins, data)
+    assert _nominal_axial(model, structure, ins, values) is None
+    report = _report_for(structure, ins, data)
+    assert _asymmetry_action(report) is None
+
+
+@pytest.mark.parametrize("knob, factor", [
+    ("ka2", 0.8), ("ka2", 1.2), ("w", 0.7), ("w", 1.4), ("none", 1.0)])
+def test_symmetric_misfits_do_not_read_as_axial_asymmetry(knob, factor):
+    """The three things WP-2054 names that could fool the column, two of them
+    here: a Kα2 weight error is one-sided about Kα1 by construction (#1166),
+    and a width error puts lobes on both flanks.  On a symmetric pattern with
+    the apertures 0 in data and model, neither fires the action, and nor does
+    the unperturbed model.  (Measured at ±20 % and ×0.7/×1.4: every low-angle
+    asymmetry coefficient insignificant.)"""
+    structure, ins, data = _truth(axial=0.0)
+    if knob == "ka2":
+        ins.source.lines[1].weight.value *= factor
+    elif knob == "w":
+        ins.profile.w.value *= factor
+    report = _report_for(structure, ins, data)
+    # the control reads the nominal column, never an abstained Layer 1
+    assert report.layer1_available, report.abstained_reason
+    assert any(c.kind == "asymmetry" for a in report.attribution
+               if a.mean_two_theta < 40.0 for c in a.coefficients)
+    assert _asymmetry_action(report) is None
+
+
+@pytest.mark.parametrize("shift", [0.02, -0.02])
+def test_a_position_error_keeps_its_reading_at_zero_apertures(shift):
+    """The borrowed column is an FCJ tangent, and at low angle most of it is
+    the centroid shift the position column already carries.  Before Layer 1
+    took that part out, a zero error of +0.02° on a symmetric pattern put
+    ``refine_axial_asymmetry`` first and dropped ``refine_zero_shift`` from
+    0.999 to 0.30 (WP-2054's review).  Now the position reading is the one it
+    is without the column, and the right cause still leads."""
+    structure, ins, data = _truth(axial=0.0)
+    ins.zero_shift.value += shift
+    report = _report_for(structure, ins, data)
+    active = [a for a in report.suggested_actions if a.active]
+    assert active and active[0].kind == "refine_zero_shift"
+    assert active[0].confidence > 0.9
+
+
 def test_injected_scale_error_is_recovered(truth):
     structure, ins, data = truth
     perturbed = structure.model_copy(deep=True)
@@ -466,6 +552,23 @@ def test_strategy_veto_marks_planned_actions_inactive(truth):
     zero = report.action("refine_zero_shift")
     assert not zero.active, "the plan already refines zero — must be vetoed"
     assert zero.vetoed_by and "staged plan" in zero.vetoed_by
+
+
+@pytest.mark.parametrize("form", ["name", "spec"])
+def test_the_veto_reads_a_preset_name_or_a_spec_as_its_plan(truth, form):
+    """``build_report`` crosses the plan mirror at ``resolve_plan`` (WP-2102).
+    Read by shape, a preset name has no ``stages`` and vetoed nothing."""
+    from rietx.schemas.plan import PlanSpec
+
+    structure, ins, data = truth
+    perturbed = ins.model_copy(deep=True)
+    perturbed.zero_shift.value = 0.02
+    plan = rx.RefinementPlan.lab_bragg_brentano()
+    given = "lab_bragg_brentano" if form == "name" else PlanSpec.from_plan(plan)
+    by_form = _report_for(structure, perturbed, data, plan=given)
+    by_plan = _report_for(structure, perturbed, data, plan=plan)
+    assert not by_form.action("refine_zero_shift").active
+    assert by_form.model_dump(mode="json") == by_plan.model_dump(mode="json")
 
 
 def test_veto_by_already_free_parameters(truth):
@@ -734,12 +837,19 @@ def test_abstained_branch_actions_carry_execution_too(truth):
 def test_broad_peak_lobes_cap_impurity_without_reindex():
     """The broad-peak variant: residual lobes of 0.66°-wide peaks under a
     0.05° zero error read as unmatched (the 0.08° matching tolerance is tiny
-    against the peak), and pre-WP they bought ``add_impurity_phase`` at 0.7.
-    They all sit within a fraction of a FWHM of a calculated position, so the
-    call is capped — and *no* reindex pointer is emitted, because the
-    validity failures here are saturated-fit artefacts (4 of 12 misfitting
-    regions, below the widespread-failure fraction; the true shift is inside
-    the validity radius of these broad peaks)."""
+    against the peak), and pre-WP-1054 they bought ``add_impurity_phase`` at
+    0.7.
+
+    Since WP-1977 each row says it sits unresolved on the flank of a drawn
+    peak (``UnmatchedPeak.flank``), and Layer 2 suggests no impurity phase
+    for such a row.  The rows stay listed.  Layer 2's older guard stays
+    measured on the same rows with the flank evidence taken off: they sit
+    within a fraction of a FWHM of a calculated position, so the call is
+    capped, and *no* reindex pointer is emitted, because the validity
+    failures here are saturated-fit artefacts (4 of 12 misfitting regions,
+    below the widespread-failure fraction; the true shift is inside the
+    validity radius of these broad peaks)."""
+    from rietx.report.layer2 import layer0_actions
     from rietx.report.schemas import IMPURITY_SHIFT_CAP
 
     structure, ins, data = _broad_truth(0.6)
@@ -751,12 +861,19 @@ def test_broad_peak_lobes_cap_impurity_without_reindex():
     strong = [u for u in report.unmatched
               if u.kind == "unmatched_obs" and u.height_over_sigma > 8.0]
     assert strong, "the residual lobes must still appear as unmatched"
+    assert all(u.flank.on_flank for u in strong), strong
+    kinds = [a.kind for a in report.suggested_actions]
+    assert "add_impurity_phase" not in kinds, kinds
+    assert "reindex_or_recheck_cell" not in kinds, kinds
 
-    impurity = report.action("add_impurity_phase")
+    unmeasured = [u.model_copy(update={"flank": None}) for u in report.unmatched]
+    ticks = [t for v in _result_for(structure, perturbed, data)[0].ticks.values()
+             for t in v]
+    impurity = next(a for a in layer0_actions(unmeasured, report.attribution,
+                                              ticks=ticks)
+                    if a.kind == "add_impurity_phase")
     assert impurity.confidence <= IMPURITY_SHIFT_CAP, impurity
     assert impurity.alternatives[0] == "reindex_or_recheck_cell", impurity
-    assert "reindex_or_recheck_cell" not in [a.kind
-                                             for a in report.suggested_actions]
 
     _plot_state(structure, perturbed, data, "wp1054_broad_zero_lobes")
 
@@ -889,11 +1006,11 @@ def _pore_proxy_data(seed=17):
 
 def test_pore_proxy_gap_and_contents_clause():
     """The WP-1057 headline scenario: a converged host fit over data whose
-    scattering contents it lacks.  Measured (2026-08-12): Rwp 0.0405,
-    GoF 2.97, partition Rwp 0.0170 → ratio 2.38; intensity carries 83 % of
-    the misfit in 8 gated regions split 5+/3−, best angular template
-    R² = 0.011.  The report must carry the gap and name the contents
-    signature — and still invent no action, because none applies."""
+    scattering contents it lacks.  Measured (2026-11-02): Rwp 0.0403,
+    GoF 2.96, partition Rwp 0.0171 → ratio 2.36; intensity carries 82 % of
+    χ² in 8 gated regions split 5+/3−, best angular template R² = 0.01.  The
+    report must carry the gap and name the contents signature — and still
+    invent no action, because none applies."""
     structure, ins, data = _pore_proxy_data()
     ref = rx.Refinement(structure, ins)
     result = ref.fit(data, plan="mccusker_default")
@@ -904,7 +1021,7 @@ def test_pore_proxy_gap_and_contents_clause():
     assert gap is not None
     assert gap.rwp_rietveld == pytest.approx(result.statistics.rwp, rel=1e-6)
     assert gap.rwp_lebail < gap.rwp_rietveld
-    assert gap.ratio > 2.0, gap                    # measured 2.38
+    assert gap.ratio > 2.0, gap                    # measured 2.36
     assert "Le Bail partition" in report.summary
     assert "intensity model carries the misfit" in report.summary
 

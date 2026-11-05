@@ -55,6 +55,20 @@ moves it for a reason about the action's cost, never about the caller's competen
 a record field and costs no attention, so the softening is a question about the
 decision line alone; 2037 neither needs it nor is changed by it.
 
+### Inherited
+
+- 2026-10-31, WP-2010's consistency read of the rule set (#1190): Rule 1's text already
+  disagrees with rulings and rows for the defaults a fit cannot run without. Rule 1 lets
+  a kind-2 ambiguity pick only on a caller's request or a unanimous margin, and a kind-3
+  one report and stop. Yet `ProfileTCHZ:shape` (kind 2, tier 2, `tchz_pv`) and
+  `auto_background:kind` (kind 2, tier 3, `pspline`) are picked on every default fit, and
+  `Source:polarization` (kind 3, tier 3) runs at 0.5, recorded as assumed. The
+  2026-10-21 ruling (`generality.md` § The rule, tier 2: a dissenter keeps a default at
+  tier 2, and rietx chooses from inside the range of practice) is a fourth outcome Rule 1
+  does not list, and the judge's question 5 applies it. Measured at 091600955: 126
+  default rows, 81 audited, 4 at kind 2 or 3. That is a contradiction to resolve
+  whatever the answer to question 1, so it is the brief's first worked case.
+
 ## Non-goals
 
 - Any change to Rule 1, the record or the audit table from this WP.

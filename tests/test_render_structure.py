@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import functools
 import json
+import re
 import struct
 import zlib
 from pathlib import Path
@@ -873,12 +874,12 @@ def test_a_label_in_any_place_is_inside_the_frame(anchor, monkeypatch):
     labels = render._labels
     monkeypatch.setattr(render, "_labels", spy)
     monkeypatch.setattr(render, "LABEL_ANCHORS", render.LABEL_ANCHORS[anchor:anchor + 1])
-    monkeypatch.setattr(render, "FIT_PAD", 0.0)
     molecule = _paracetamol()
     letters = {**molecule, "sites": [dict(s, label=s["element"]) for s in molecule["sites"]]}
     for geometry in (molecule, letters):
         placed.clear()
-        fig = render_structure(geometry, atom_labels=True, axis_labels=False, size=300)
+        fig = render_structure(geometry, atom_labels=True, axis_labels=False, size=300,
+                               pad=0)
         height, width = fig.image.shape[:2]
         em = render.LETTER_EM_CSS * 300 / render.CANVAS_CSS_PX
         assert len(placed) == 20
@@ -1243,3 +1244,131 @@ def test_an_axis_view_stacks_rather_than_hides(hkust, nac):
     assert 0.0 <= opening.report.stacked < opening.report.hidden
     for fig in (down_b, down_a, opening):
         assert 0.0 <= fig.report.stacked <= fig.report.hidden
+
+
+def test_an_ellipsoid_figure_counts_the_sites_it_drew_as_spheres():
+    """#1056: a CIF read with the default ``aniso=False`` draws spheres, and the
+    report says how many; the file's nine hydrogens stay spheres either way."""
+    path = str(DATA / "cod_2104364.cif")
+    default = render_structure(structure_from_cif(path), mode="ellipsoid", size=200)
+    kept = render_structure(structure_from_cif(path, aniso=True), mode="ellipsoid", size=200)
+    ball = render_structure(structure_from_cif(path), mode="ball", size=200)
+    pattern = r"^Drawn as spheres for want of an anisotropic displacement: (\d+) of (\d+) sites"
+    counts = [re.match(pattern, w).groups() for r in (default, kept) for w in r.report.warnings]
+    assert counts == [("20", "20"), ("9", "20")]
+    assert ball.report.warnings == []
+
+
+def test_the_reader_counts_the_tensors_it_collapses():
+    path = str(DATA / "cod_2104364.cif")
+    said: list = []
+    collapsed = structure_from_cif(path, diagnostics=said)
+    (d,) = [d for d in said if d.code == "CIF_ANISO_COLLAPSED"]
+    assert d.level == "info" and "11 sites carry U_ij" in d.message and len(d.where) == 11
+    assert all(collapsed.phases[0].atoms[int(p.split(".")[3])].aniso is None
+               for p in d.where)
+    kept: list = []
+    structure_from_cif(path, aniso=True, diagnostics=kept)
+    assert not [d for d in kept if d.code == "CIF_ANISO_COLLAPSED"]
+
+
+# ----------------------------------------------------------------------
+# a figure cropped to its ink, and the polyhedra's colours (WP-1468, from WP-1533)
+# ----------------------------------------------------------------------
+
+def _margins(image: np.ndarray) -> list[int]:
+    """The empty columns left and right and rows above and below the ink."""
+    ink = image[..., 3] > 0
+    rows, cols = np.flatnonzero(ink.any(1)), np.flatnonzero(ink.any(0))
+    h, w = ink.shape
+    return [int(cols[0]), int(w - 1 - cols[-1]), int(rows[0]), int(h - 1 - rows[-1])]
+
+
+def test_pad_zero_crops_to_the_ink_and_keeps_every_map():
+    """All six of the second promo take's scripts cropped ``fig.image`` to its
+    alpha by hand and then shifted every anchor they read.  ``pad=0`` fits the
+    frame to the ink instead, so ``to_px``, ``atoms`` and the recipe stay
+    right.  YBa₂Cu₃O₇ without its cell at 1000 px: 35 and 53 px of margin at
+    the default, 3 at ``pad=0`` (a line's half-width and a pixel, measured)."""
+    g = s3.build(structure_from_cif(str(DATA / "cod_9007744.cif")))
+    loose = render_structure(g, view=[4, 1, 0], cell=False, background=None)
+    tight = render_structure(g, view=[4, 1, 0], cell=False, background=None, pad=0)
+    _save(tight, "pad_ybco_0")
+    assert loose.recipe["pad"] == render.FIT_PAD and tight.recipe["pad"] == 0
+    assert min(_margins(loose.image)) > 30 and max(_margins(tight.image)) <= 4
+    assert max(tight.image.shape[:2]) == max(loose.image.shape[:2]) == render.DEFAULT_SIZE
+    assert tight.pixels_per_angstrom > 1.1 * loose.pixels_per_angstrom
+    pos = np.array([g["atoms"][a["index"]]["pos"] for a in tight.atoms])
+    xy = np.array([[a["x"], a["y"]] for a in tight.atoms])
+    assert np.allclose(tight.to_px(pos), xy, atol=1e-9)
+    again = render_structure(g, **json.loads(json.dumps(tight.recipe)))
+    assert np.array_equal(again.image, tight.image)
+    default = render_structure(g, view=[4, 1, 0], cell=False, background=None,
+                               pad=render.FIT_PAD)
+    assert np.array_equal(default.image, loose.image)
+
+
+@pytest.mark.parametrize("value", [-0.1, 0.5, float("nan"), True, "0"])
+def test_pad_is_a_share_below_one_half(nac, value):
+    with pytest.raises(ValueError, match="pad"):
+        render_structure(nac, size=100, pad=value)
+
+
+def test_the_polyhedron_palette_is_what_the_faces_were_drawn_in(nac):
+    """The take-2 scripts drew a polyhedron's legend swatch from
+    ``g["sites"]`` by element, guessing which site centred which formula."""
+    g = s3.build(nac)
+    fig = render_structure(g, size=200)
+    drawn = {sc.polyhedron_formula(g, g["polyhedra"][f["index"]])
+             for f in sc.build_scene(g, polyhedra=sc.shown_polyhedra(g, True))["faces"]}
+    assert set(fig.polyhedron_palette) == drawn and drawn
+    for formula, colour in fig.polyhedron_palette.items():
+        centres = {g["sites"][p["site"]]["color"] for p in g["polyhedra"]
+                   if sc.polyhedron_formula(g, p) == formula}
+        assert centres == {colour}
+    assert render_structure(g, size=200, polyhedra=False).polyhedron_palette == {}
+    off = next(iter(fig.polyhedron_palette))
+    assert off not in render_structure(g, size=200, polyhedra={off: False}).polyhedron_palette
+    # one polyhedron recoloured: its formula appears a second time
+    centre = next(p["center"] for p in g["polyhedra"]
+                  if sc.polyhedron_formula(g, p) == off)
+    mask = np.zeros(len(g["atoms"]), dtype=bool)
+    mask[centre] = True
+    part = render_structure(recolour(g, mask, "#ff0000"), size=200)
+    assert part.polyhedron_palette[f"{off} (recoloured)"] == "#ff0000"
+    assert part.polyhedron_palette[off] == fig.polyhedron_palette[off]
+
+
+def test_carbon_is_lighter_on_a_dark_ground_only(monkeypatch):
+    """Ruled by the maintainer 2026-11-02 (WP-1468): C draws #666666 on a dark
+    ground, 3.18:1 against the GUI's #151515 where #383838 read at 1.56:1,
+    and the light picture is untouched.  Only a site still in its CPK colour
+    moves; a colour the caller chose, even CPK's own hex, stays theirs."""
+    def carbon(fig):
+        return {fig.palette[k] for k in fig.palette if k.startswith("C")}
+
+    assert s3.DARK_GROUND == {"C": "#666666"}
+    molecule = _paracetamol()
+    # the payload carries the server's answer, which the GUI's dark theme reads
+    assert {s.get("dark_color") for s in molecule["sites"] if s["element"] == "C"} == {"#666666"}
+    assert all("dark_color" not in s for s in molecule["sites"] if s["element"] != "C")
+    dark = render_structure(molecule, size=200, background="#151515")
+    light = render_structure(molecule, size=200)
+    _save(dark, "dark_ground_paracetamol_C")
+    assert carbon(dark) == {"#666666"} and carbon(light) == {s3._CPK["C"]}
+    assert carbon(render_structure(molecule, size=200, background="black")) == {"#666666"}
+    monkeypatch.setattr(s3, "DARK_GROUND", {})
+    assert np.array_equal(render_structure(molecule, size=200).image, light.image)
+    assert not np.array_equal(
+        render_structure(molecule, size=200, background="#151515").image, dark.image)
+    monkeypatch.undo()
+    for colour in ("#383839", s3._CPK["C"]):  # a recolour to CPK's own hex included
+        chosen = recolour(molecule, select(molecule, element="C"), colour)
+        assert all("dark_color" not in s for s in chosen["sites"] if s.get("recoloured"))
+        kept = render_structure(chosen, size=200, background="#151515")
+        assert carbon(kept) == {colour}
+    # a dark-ground colour that would collide with another in the phase is not used
+    monkeypatch.setattr(s3, "DARK_GROUND", {"C": s3._CPK["N"]})
+    assert s3.dark_ground_colours(molecule["sites"]) == {}
+    clash = render_structure(molecule, size=200, background="#151515")
+    assert carbon(clash) == {s3._CPK["C"]}

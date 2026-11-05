@@ -95,7 +95,8 @@ irrep has no real gauge; the direction label is gauge-dependent) are in
    ĥ in — never :func:`~.operators.moment_to_cartesian`'s, which rebuilds the
    cell from its six parameters in a standard orientation.  The two frames
    agree only for an axis-aligned cell, and a k ≠ 0 child cell is usually
-   rotated or left-handed; M⊥ needs both vectors in one frame (issue #534).
+   rotated (and was left-handed too until #1197); M⊥ needs both vectors in
+   one frame (issue #534).
 
 What a powder measures, and the domains
 ---------------------------------------
@@ -435,6 +436,10 @@ def _reduce_basis(rows, lattice, *, span: int = 2) -> list[tuple[Fraction, ...]]
     [−``span``, ``span``], measured in the group's own compatible metric, and
     the replacement is required to be **unimodular** against the original, which
     is what makes it the same lattice rather than a sublattice of it.
+
+    The basis returned is **right-handed** in the coordinates ``rows`` are
+    written in (:func:`_right_handed`), so a group carried into it keeps its
+    handedness and every label read there is the one it had (#1197).
     """
     metric = np.asarray(lattice, dtype=np.float64) @ np.asarray(
         lattice, dtype=np.float64).T
@@ -463,8 +468,25 @@ def _reduce_basis(rows, lattice, *, span: int = 2) -> list[tuple[Fraction, ...]]
         chosen.append(coeffs)
         vectors.append(vector)
         if len(chosen) == 3:
-            return vectors
-    return [tuple(row) for row in base]  # pragma: no cover - span 2 always suffices
+            return _right_handed(vectors)
+    return _right_handed([tuple(row) for row in base])  # pragma: no cover - span 2 suffices
+
+
+def _right_handed(vectors: list[tuple[Fraction, ...]]) -> list[tuple[Fraction, ...]]:
+    """The same three basis vectors, the first two swapped when their determinant is negative.
+
+    spglib reads fractional operators on right-handed axes, and an
+    enantiomorphic pair is two space-group types related only by an
+    orientation-reversing affine map (Souvignier, B. (2016), *International
+    Tables for Crystallography* A, ch. 1.3), so a group written in a basis with
+    det < 0 is identified as the mirror type.  The reduced cell of P 4₂ c m at
+    k = (0, 0, ½) was (b, a, 2c) and printed BNS 78.22 (a 4₃) for operators
+    that are 76.10 (a 4₁), issue #1197.  Swapping the two shortest vectors
+    flips the sign and keeps the lattice and every length.
+    """
+    if _operators._rational_determinant(vectors) < 0:
+        return [vectors[1], vectors[0], vectors[2]]
+    return vectors
 
 
 def magnetic_cell(space_group, k) -> MagneticCell:
@@ -2278,13 +2300,16 @@ def _standard_child(parent, parent_group, candidate: MagneticCandidate):
 
     The group is :func:`candidates`' operator list in the magnetic cell.  A
     generic displacement of the parent's atoms, symmetrised over that list, is
-    handed to spglib, whose standardisation gives the setting; the symbol's
-    operations are then checked to be the list, element for element, so a
-    wrong (P, p) cannot pass silently.
+    handed to spglib, whose standardisation gives the setting.  The setting is
+    then read by the one standardiser the package has, that of
+    :func:`~rietx.crystallography.representation.subgroups.maximal`: spglib's
+    matrix and origin are snapped to rationals and P⁻¹HP is checked to be the
+    symbol's operations exactly, in ``Fraction`` arithmetic, so a wrong (P, p)
+    cannot pass silently.
     """
-    import gemmi
     import spglib
 
+    from ..representation import subgroups as _subgroups
     from ..symmetry import _group_arrays, group_key, site_orbit
     from ..wyckoff import SPGLIB_REFUSALS
 
@@ -2305,6 +2330,19 @@ def _standard_child(parent, parent_group, candidate: MagneticCandidate):
                 types.append(index + 1)
     positions = np.array(positions)
     positions[np.abs(positions - 1.0) < 1e-9] = 0.0
+    # a centred parent's centrings arrive twice, in site_orbit's images and in
+    # the cell's translations (at k = 0 they are the same vectors), and a
+    # magnetic cell smaller than the conventional one folds images together:
+    # keep each atom once modulo the magnetic cell, by image_of's own test
+    keep: list[int] = []
+    for n, x in enumerate(positions):
+        d = x[None, :] - positions[keep]
+        d -= np.rint(d)
+        same = np.all(np.abs(d) < 1e-6, axis=1)
+        if not any(types[m] == types[n] for m, hit in zip(keep, same) if hit):
+            keep.append(n)
+    positions = positions[keep]
+    types = [types[n] for n in keep]
 
     def image_of(rot, tran):
         moved = (positions @ rot.T + tran) % 1.0
@@ -2347,45 +2385,33 @@ def _standard_child(parent, parent_group, candidate: MagneticCandidate):
     else:
         raise _ChildRefused(_refusal(candidate, draws, len(ops)))
 
-    hall = spglib.get_spacegroup_type(data.hall_number).hall_symbol
-    sg = gemmi.find_spacegroup_by_ops(gemmi.symops_from_hall(hall))
-    t_m = np.asarray(data.transformation_matrix, dtype=np.float64)
-    shift = np.asarray(data.origin_shift, dtype=np.float64)
-    t_inv = np.linalg.inv(t_m)
-    big = p_m @ t_inv
-    small = -big @ shift
-    big = np.array([[float(Fraction(v).limit_denominator(48)) for v in row] for row in big])
-    small = np.array([float(Fraction(v).limit_denominator(48)) % 1.0 for v in small])
+    # the setting is read exactly, by the standardiser of ``subgroups.maximal``:
+    # H, the candidate's colourless group in the magnetic cell, must be
+    # spglib's standard setting of the type under (P, p), operation for
+    # operation and lattice for lattice, in Fraction arithmetic
+    group = _subgroups._from_pairs((op.rotation, op.translation)
+                                   for op in candidate.group.all_operations())
+    index = round(len(rot_g) * abs(_operators._rational_determinant(candidate.cell.basis))
+                  / len(ops))
+    bound = max(_subgroups._PROBE_DENOMINATOR_FLOOR,
+                _subgroups._PROBE_DENOMINATOR_PER_INDEX * index)
+    basis = _fraction_matrix(candidate.cell.basis)
+    inverse = _fraction_matrix(_exact_inverse(candidate.cell.basis))
 
-    # every operation of the symbol, carried into the magnetic cell, is one of
-    # the candidate's, and the two lists hold the same number per unit volume
-    step = p_m_inv @ big  # columns: the standard cell's axes in magnetic fractions
-    origin = p_m_inv @ small
-    keyed = {(r.tobytes()): [] for r, _ in ops}
-    for r, t in ops:
-        keyed[r.tobytes()].append(t)
-    n_std = 0
-    for op in sg.operations():
-        n_std += 1
-        rot_s = np.array(op.rot, dtype=np.float64) / 24
-        tran_s = np.array(op.tran, dtype=np.float64) / 24
-        rot = step @ rot_s @ np.linalg.inv(step)
-        tran = step @ tran_s + origin - rot @ origin
-        rot_i = np.rint(rot).astype(np.int64)
-        found = np.max(np.abs(rot - rot_i)) < 1e-6 and any(
-            np.all(np.abs((tran - t) - np.rint(tran - t)) < 1e-6)
-            for t in keyed.get(rot_i.tobytes(), ()))
-        if not found:
-            raise RuntimeError(
-                f"{candidate.label}: the standard setting {sg.xhm()!r} under "
-                f"P = {big.tolist()}, p = {small.tolist()} holds an operation that is not "
-                "in the candidate's isotropy group; this is a bug")
-    if abs(n_std / abs(np.linalg.det(step)) - len(ops)) > 1e-6:
-        raise RuntimeError(
-            f"{candidate.label}: {sg.xhm()!r} holds {n_std} operations per standard cell "
-            f"and the isotropy group {len(ops)} per magnetic cell, which is "
-            f"{abs(np.linalg.det(step)):.4g} standard cells; this is a bug")
-    return sg.xhm(), big, small, metric_p
+    def in_the_parent_cell(p):  # the child's origin, its parent fractions reduced mod 1
+        p = [x - (x.numerator // x.denominator)
+             for x in (sum(basis[i][j] * p[j] for j in range(3)) for i in range(3))]
+        return tuple(sum(inverse[i][j] * p[j] for j in range(3)) for i in range(3))
+
+    try:
+        _, symbol, (big_m, small_m) = _subgroups._exact_setting(
+            group, data, _subgroups._I3, bound, in_the_parent_cell)
+    except RuntimeError as error:
+        raise RuntimeError(f"{candidate.label}: {error}") from None
+    big = np.array([[float(sum(basis[i][m] * big_m[m][j] for m in range(3)))
+                     for j in range(3)] for i in range(3)])
+    small = np.array([float(sum(basis[i][m] * small_m[m] for m in range(3))) for i in range(3)])
+    return symbol, big, small, metric_p
 
 
 def _child_phase(parent, symbol: str, big, metric_p, basis):

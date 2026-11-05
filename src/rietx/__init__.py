@@ -113,6 +113,7 @@ from .schemas.project import DataRef, ProjectDoc
 from .schemas.sequential import (
     MagneticOnset,
     MagneticTrajectory,
+    QPATrajectory,
     SeriesEntry,
     SeriesResult,
     Trajectory,
@@ -187,6 +188,7 @@ __all__ = [
     "ProjectFormat",
     "ProjectModel",
     "ProjectDoc",
+    "QPATrajectory",
     "Recipe",
     "RecipeError",
     "RefinedParametricEquation",

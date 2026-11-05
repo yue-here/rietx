@@ -224,6 +224,12 @@ def _plan(*, asymmetric: bool) -> rx.RefinementPlan:
 
 
 def _fit(*, limits, asymmetric, free_wavelength=True):
+    return _fit_with_model(limits=limits, asymmetric=asymmetric,
+                           free_wavelength=free_wavelength)[1]
+
+
+def _fit_with_model(*, limits, asymmetric, free_wavelength=True):
+    """The fit and the refinement that ran it, for a test reading the model."""
     data = rx.read_pattern(PATTERN)
     ref = rx.Refinement(_structure(), _instrument(limits), history=False)
     if asymmetric:
@@ -236,15 +242,25 @@ def _fit(*, limits, asymmetric, free_wavelength=True):
     if not free_wavelength:
         plan.stages[-1] = rx.Stage(
             "zero_biso", ["instrument.zero_shift", "phases.*.atoms.*.biso"])
-    return ref.fit(data, plan=plan, two_theta_limits=limits)
+    return ref, ref.fit(data, plan=plan, two_theta_limits=limits)
 
 
 @pytest.fixture(scope="module")
-def full():
-    """The XND-range fit: 2–50°, FCJ asymmetry, λ free.  The cross-code row."""
+def full_fit():
+    """The XND-range fit: 2–50°, FCJ asymmetry, λ free.  The cross-code row.
+
+    The refinement rides beside the result for the one test that reads the
+    held cell, which lives in the model and not in the answer (WP-1999).
+    """
     if not PATTERN.exists():
         pytest.skip("11-BM Si SRM 640c dataset not present")
-    return _fit(limits=FULL_LIMITS, asymmetric=True)
+    return _fit_with_model(limits=FULL_LIMITS, asymmetric=True)
+
+
+@pytest.fixture(scope="module")
+def full(full_fit):
+    """The XND-range fit's result."""
+    return full_fit[1]
 
 
 @pytest.fixture(scope="module")
@@ -415,20 +431,33 @@ def test_the_lambda_zero_correlation_is_high_but_below_the_guard(full):
         f"lambda~zero rho = {rho:+.3f}; XND printed {XND['rho_lam_zero']}")
 
 
-def test_the_held_cell_is_the_certificate(full):
+def test_the_held_cell_is_the_certificate(full_fit):
     """The anchor of the whole protocol, asserted as the identity it is.
 
     Nothing about the cell is *measured* here — it is held, and holding a
     certified cell is exactly what turns a refined λ into a calibration
-    measurement.  The cubic ties (b ← a, c ← a) carry the source's value, so
-    reading them shows the held length is the certificate to the bit, and their
-    absent esd shows it was never refined.
+    measurement.  So the answer lists no cell row: a result carries only what
+    the fit could move, and a cubic b and c tied to a held a cannot move
+    (WP-1999).  The held lengths live in the model, where the parameter table
+    shows b and c tied to a and all three the certificate to the bit.  That a
+    was never freed is read off every stage's free set, since the final
+    ``vary`` flag says only what the last stage freed, and a row's esd is
+    merged from the answer and so is absent once the row is.
     """
-    for axis in ("b", "c"):
-        row = full.parameter(f"phases.0.cell.{axis}")
+    ref, result = full_fit
+    cell_rows = [p.path for p in result.parameters if ".cell." in p.path]
+    assert not cell_rows, f"the held cell came back as answer rows {cell_rows}"
+    freed = {(s.name, p) for s in result.stages for p in s.freed if ".cell." in p}
+    assert not freed, f"a stage freed the certified cell: {sorted(freed)}"
+    rows = {r.path: r for r in ref.parameters()}
+    for axis in ("a", "b", "c"):
+        row = rows[f"phases.0.cell.{axis}"]
         assert row.value == A_CERT, (
             f"held cell.{axis} = {row.value!r}, not the certificate {A_CERT}")
-        assert row.stderr is None, "the held cell came back with an esd"
+    for axis in ("b", "c"):
+        tie = rows[f"phases.0.cell.{axis}"].tie
+        assert tie is not None and tie.sources == ["phases.0.cell.a"], (
+            f"cubic cell.{axis} is not tied to a: {tie}")
 
 
 def test_the_sample_broadening_is_positive_and_finite(full):

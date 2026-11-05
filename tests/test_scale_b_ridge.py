@@ -931,3 +931,135 @@ def test_a_joint_message_names_the_histograms_that_held_the_scale():
         np.full(4, 0.5), np.array([5, 5, 5, 0]), (25.0, 44.0), [FE_SCALE],
         structure, [held, held])
     assert "in histogram 0" in finding.message
+
+
+# ----------------------------------------------------------------------
+# #1103's follow-ups: the trajectory flag (round 1, answer 5) and round 2's
+# read-only observations
+# ----------------------------------------------------------------------
+def test_a_qpa_trajectory_marks_the_points_whose_basis_left_a_phase_out(
+        pattern, four_phase_narrow_pattern):
+    """Iron's lines leave the range in the middle two patterns, so corundum's
+    fraction there is of the three phases seen and steps by 1.4 points with no
+    change in the specimen.  Each point names the phases its basis left out."""
+    from rietx.sequential import SequentialRefinement
+
+    series = SequentialRefinement(*_models(START_SCALES)).fit(
+        [pattern, four_phase_narrow_pattern, four_phase_narrow_pattern, pattern],
+        plan=RefinementPlan(stages=SCALES_ONLY), labels=["w0", "n1", "n2", "w3"])
+    corundum = series.qpa_trajectory("corundum")
+    assert corundum.positions == [0, 1, 2, 3]
+    assert corundum.unmeasured == [[], ["iron"], ["iron"], []]
+    assert corundum.basis_changes
+    assert "n1: relative to the phases seen; iron not measured" in str(corundum)
+    assert series.resolve_trajectory("qpa.corundum").unmeasured == corundum.unmeasured
+    iron = series.qpa_trajectory("iron")
+    assert iron.positions == [0, 3] and not iron.basis_changes
+    # the positive arm: every phase in range at every point, one basis
+    whole = SequentialRefinement(*_models(START_SCALES)).fit(
+        [pattern, pattern], plan=RefinementPlan(stages=SCALES_ONLY))
+    corundum = whole.qpa_trajectory("corundum")
+    assert corundum.unmeasured == [[], []] and not corundum.basis_changes
+    assert "not measured" not in str(corundum)
+
+
+def test_a_scale_held_through_a_variable_is_named_as_the_scale(
+        four_phase_narrow_pattern):
+    """The message sorted held columns by name, so a held ``vars.S_fe``
+    driving iron's scale read "Its 1 structural parameter was held" and the
+    scale clause never fired.  It is the scale, by what the column moves."""
+    ref = rx.Refinement(*_models(START_SCALES), solver="trf")
+    ref.add_variable("S_fe", START_SCALES[FE])
+    ref.tie(FE_SCALE, "vars.S_fe")
+    stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
+    res = ref.fit(four_phase_narrow_pattern, plan=RefinementPlan(stages=stages),
+                  telemetry=False)
+    assert all(sr.held == ["vars.S_fe"] for sr in res.stages)
+    (finding,) = _findings(res, "PHASE_UNCONSTRAINED")
+    assert finding.where == ["vars.S_fe"]
+    assert "Its scale was held at the value handed in" in finding.message
+    assert "structural" not in finding.message
+
+
+def test_a_held_variable_driving_a_cell_is_still_structural():
+    """The positive arm: a held ``vars.a`` driving iron's cell edge is a
+    structural parameter, and the scale clause stays silent."""
+    from rietx.refine import _phase_support_diagnostics
+
+    structure, _ = _models(START_SCALES)
+    held = StageResult(name="s", status="converged", n_iterations=1,
+                       cost_initial=1.0, cost_final=1.0, held=["vars.a"],
+                       held_reach={"vars.a": [f"phases.{FE}.cell.a"]})
+    (finding,) = _phase_support_diagnostics(
+        np.full(4, 0.5), np.array([5, 5, 5, 0]), (25.0, 33.0), [],
+        structure, [held])
+    assert "Its 1 structural parameter was held for stage s." in finding.message
+    assert "Its scale was held" not in finding.message
+
+
+def test_per_histogram_scales_tied_to_one_variable_are_quoted_everywhere():
+    """A constant ``ParametricEquation`` on iron's scale ties each pattern's
+    own scale to ``vars.S_fe_0``, which the wide scan measures, so the narrow
+    histogram's scale is the wide scan's measurement as a shared one is.  It
+    left iron out under the tie and quoted it under ``SharingMap.shared``."""
+    from rietx.multi import MultiHistogramRefinement
+    from rietx.schemas.parametric import ParametricEquation
+
+    structure, instrument = _models(START_SCALES)
+    narrow = _wide_pattern(TT_NARROW)
+    wide = _wide_pattern(np.arange(25.0, 90.0, 0.02))
+    stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
+    multi = MultiHistogramRefinement(
+        structure, [instrument.model_copy(deep=True) for _ in range(2)],
+        parametric=[ParametricEquation(name="S_fe", target=FE_SCALE,
+                                       basis="constant")])
+    res = multi.fit([narrow, wide], plan=RefinementPlan(stages=stages))
+    assert all("vars.S_fe_0" in sr.freed and sr.held == [] for sr in res.stages)
+    for hist in res.histograms:
+        assert hist.qpa.unmeasured_phases == []
+        (iron,) = [q for q in hist.qpa.phases if q.name == "iron"]
+        assert iron.weight_fraction is not None
+
+
+def test_a_variable_no_histogram_with_a_line_reaches_measures_nothing():
+    """The negative arm: the same tie over two narrow scans, neither with a
+    line of iron.  The stages hold the variable, and neither histogram
+    quotes iron."""
+    from rietx.multi import MultiHistogramRefinement
+    from rietx.schemas.parametric import ParametricEquation
+
+    structure, instrument = _models(START_SCALES)
+    narrow = _wide_pattern(TT_NARROW)
+    stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
+    multi = MultiHistogramRefinement(
+        structure, [instrument.model_copy(deep=True) for _ in range(2)],
+        parametric=[ParametricEquation(name="S_fe", target=FE_SCALE,
+                                       basis="constant")])
+    res = multi.fit([narrow, narrow], plan=RefinementPlan(stages=stages))
+    assert all("vars.S_fe_0" in sr.held for sr in res.stages)
+    assert [h.qpa.unmeasured_phases for h in res.histograms] == [["iron"]] * 2
+
+
+def test_a_polynomial_link_on_a_scale_leaves_the_narrow_scan_unmeasured():
+    """The a + b·T arm of the tie above (#1176 round 1, question 2).  One wide
+    scan sees iron and one narrow scan has no iron line; iron's scale is
+    linked by a + b·T.  Two columns face one measured scale, so one direction
+    of the pair is flat and the narrow scan's fraction would be the start
+    value wearing an esd.  Only a constant link counts as measured, so the
+    narrow histogram quotes no iron and the wide one does."""
+    from rietx.multi import MultiHistogramRefinement
+    from rietx.schemas.parametric import CoordinateTable, ParametricEquation
+
+    structure, instrument = _models(START_SCALES)
+    narrow = _wide_pattern(TT_NARROW)
+    wide = _wide_pattern(np.arange(25.0, 90.0, 0.02))
+    stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
+    multi = MultiHistogramRefinement(
+        structure, [instrument.model_copy(deep=True) for _ in range(2)],
+        coordinates=CoordinateTable(columns={"T": [300.0, 500.0]}, units={"T": "K"}),
+        parametric=[ParametricEquation(name="S_fe", target=FE_SCALE,
+                                       basis="polynomial", terms=[[], ["T"]])])
+    res = multi.fit([narrow, wide], plan=RefinementPlan(stages=stages))
+    narrow_res, wide_res = res.histograms
+    assert narrow_res.qpa.unmeasured_phases == ["iron"]
+    assert wide_res.qpa.unmeasured_phases == []

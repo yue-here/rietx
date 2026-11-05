@@ -59,6 +59,29 @@ every pick, so the C3 screen and the driven set are re-measured.
 practice (what other pickers do) or a measurement on several families. Holding a declared
 weight is the caller's choice and changes nothing.
 
+### Inherited
+
+- 2026-10-31, from the issue triage (issue #1166): the reporter ran this WP's
+  first task, the direction test, on `main` `2cf637372` (picker and
+  `qarr_instrument()` byte-identical to `c0e32ab29`), with arms and a reading
+  rule written down before the run. The 16 Oct census and direction reproduce
+  exactly (87 at bound, 24 usable above the bar, 19 below 90°; 17 lower : 2
+  higher below 90°, p = 0.0007). Declaring each pattern's own fitted Kα2
+  weight gives 79 / 19 / 14 and a split of 10 : 4 (p = 0.18), but the drop is
+  in the population, not the direction: the 10 low-angle components on the
+  bound in both arms move 8 : 2 in both, and the 10 that leave all moved low
+  when freed (five shoulders 0.09–0.12° below a line 5–14× stronger become
+  `not_separable`; three change their group's count; one becomes `weak_line`).
+  Fitted weights range 0.256–0.462, and brucite's fit drives it to 0, which is
+  not physical for a Cu tube. Positive arm, synthetic corundum: holding 0.5
+  against a true 0.44 shifts Kα1 by about −0.003°, a tenth of the median freed
+  move on the real patterns (−0.023°); only a gross mismatch (0.5 held against
+  0) puts usable lines on the bound. Their reading: the numbers count against
+  the Kα2 weight as the main cause and do not identify the cause; eight of the
+  17 declared-arm movers carry `axial_tail`, yet the aperture-fitted arm still
+  gives 11 : 5. The task-2 survey of other pickers is still owed. Checked
+  against the tree at d87c8cc91: no change to the picker since 2026-10-26.
+
 ## Non-goals
 
 - The flag's level (`info`, ruled 2026-10-21) and the false-line bar: WP-1968.

@@ -34,12 +34,15 @@ from . import lapack
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from ..model.forward import CompiledModel
+    from ..params.vector import ParameterTable
 
-#: Which free parameters McCusker §9's ratio is about.  fnmatch, so ``*``
-#: crosses dots — the glob reaches every atom entry (``…dof.k``, ``…occ``,
-#: ``…biso``, ``…adp.k``) and nothing else, since ``atoms.`` appears in no
-#: other path.  See :class:`~rietx.schemas.results.DataSupport` for why the
-#: cell, profile, background and scale are outside it.
+#: Which **entries** are atomic: the test :func:`structural_free_paths` reads
+#: what a free column reaches against, never the free path itself (WP-2067).
+#: fnmatch, so ``*`` crosses dots — the glob reaches every atom entry
+#: (``…dof.k``, ``…x``, ``…occ``, ``…biso``, ``…adp.k``) and nothing else,
+#: since ``atoms.`` appears in no other path.  See
+#: :class:`~rietx.schemas.results.DataSupport` for why the cell, profile,
+#: background and scale are outside it.
 STRUCTURAL_PARAMETER_GLOB = "phases.*.atoms.*"
 
 #: The relative cut :func:`normal_factors` hands :func:`_psd_pinv`: every
@@ -58,6 +61,14 @@ PINV_RCOND = 1e-15
 #: bit-identical; outside it, 2⁻⁴⁰⁰ ≈ 4e-121 squared is still a normal double,
 #: and 1/d² stays below 1e+241 (WP-1463).
 COLUMN_SAFE_EXPONENT = 400
+
+#: The forward-difference error :func:`resolved_correlation` assumes in each
+#: Jacobian column, relative to the column and in units of
+#: :data:`~rietx.optimize.least_squares.FD_STEP`.  It is the one free factor of
+#: that function's cut, n·(this × FD_STEP)² on the unit-diagonal normal matrix
+#: (WP-2050; the cut ruled 2026-11-01).  1 is what was measured on the width
+#: columns, 5e-7 against jax on lab brucite.
+FD_COLUMN_ERROR = 1.0
 
 
 def _is_blocked(jac) -> bool:
@@ -274,6 +285,108 @@ def discarded_directions(jac: np.ndarray) -> tuple[int, np.ndarray]:
     lost_var = (vec[:, gone] ** 2).sum(axis=1) / cut
     touched = np.flatnonzero(live & (lost_var >= kept_var))
     return (n_gone, touched) if len(touched) >= 1 else none
+
+
+def resolved_correlation(corr: np.ndarray, jac: np.ndarray
+                         ) -> tuple[np.ndarray, np.ndarray]:
+    """The correlation matrix with every direction the Jacobian cannot resolve
+    projected out, and the columns those directions dominate (WP-2050).
+
+    Returns ``(rho, unresolved)``.  ``rho`` is ``corr`` where nothing is
+    unresolved.  Otherwise a pair of resolved columns carries the correlation
+    of the covariance with the unresolved subspace removed, a pair with one
+    unresolved column is ``nan`` (its ρ is not determined), and a pair of
+    unresolved columns keeps ``corr``'s value, which is ±1 to rounding.
+    ``unresolved`` is a boolean mask over the columns of ``jac``.
+
+    **The cut is the Jacobian's own accuracy, not a tolerance.**  The forward
+    differences of the peak chain carry a relative error of order
+    :data:`~rietx.optimize.least_squares.FD_STEP` per column (5e-7 measured
+    against jax on lab brucite, :func:`~.least_squares._fd_typicals`).  With
+    every column scaled to unit norm, an error of at most ``FD_STEP`` in each
+    of *n* columns has a spectral norm of at most ``√n·FD_STEP`` (it is bounded
+    by the Frobenius norm), and by Weyl's inequality a singular value moves by
+    no more.  So an eigenvalue of the unit-diagonal normal matrix at or below
+    ``n·FD_STEP²`` is a direction the data has not been shown to move (the
+    per-column error is :data:`FD_COLUMN_ERROR` × ``FD_STEP``, a tier-3 row
+    approved 2026-11-01).  The covariance still inverts it, and rounding then sets it: on brucite's
+    Gaussian-size, Gaussian-strain and W triple it sat between 2.7e-15 and
+    4.9e-14 of |λ|max under 1e-14 nudges to one start value, while the next
+    direction stayed at 1.3-1.4e-10.  On corundum the same triple reached
+    1.2-1.9e-12 of |λ|max in its later stages, above ``FD_STEP²·|λ|max`` and
+    still under ``n·FD_STEP²``.  Every column carries a rounding-level
+    loading on such a direction, divided by that eigenvalue, so a ρ against
+    one of its members, and between two columns that load on it weakly, is
+    rounding too: ``lor_size ~ lor_strain`` read −0.995 or −0.9975 or fell
+    under the guard as the nudge moved, and −0.896 ± 0.003 projected.
+
+    GSAS-II computes its correlations off a pseudo-inverse truncated the same
+    way, at a relative cut of 1e-6 on the normal matrix's singular values
+    (``SVDtol``, ``GSASIImath.setHcorr``).  That cut would also remove
+    brucite's 1.4e-10 zero-shift/displacement direction, whose correlations
+    hold to 2e-5 under the same nudges and which a refiner wants reported.
+
+    **Which columns it dominates** is :func:`discarded_directions`' *touched*
+    test with this cut: the subspace adds at least ``Σ_gone v_i²/cut`` to
+    column *i*'s equilibrated variance, and the column is unresolved when that
+    is at least the variance the resolved directions give it.  A dead column
+    and a joint fit's :class:`~.blocked.BlockJacobian` are left as they are.
+
+    **Limits, measured or by construction.**  The error premise holds for the
+    width columns it was measured on; ``FD_STEP``'s audit row records other
+    columns up to 2.5e-4 from a Richardson oracle, and a direction set by such
+    an error sits above this cut and is left alone, as it was before.  The cut
+    grows with *n*: at 60 free columns it is 6e-11, 12× under brucite's
+    zero-shift/displacement direction.  On brucite's seventh stage the triple
+    reached 2.3× the cut under one nudge, so that stage reads it as resolved.
+    Two unresolved directions leave a ρ between members of different ones set
+    by two rounding eigenvalues.
+
+    **No message says which pairs were withheld** (ruled 2026-11-01): a
+    correlation whose value is rounding is not shown to a user.  The signal
+    for a developer is this function's ``unresolved`` mask, which a nightly
+    test asserts on the round-robin standards
+    (``tests/test_suite_alarms.py``).
+    """
+    from .least_squares import FD_STEP
+
+    corr = np.asarray(corr, dtype=float)
+    n = corr.shape[0]
+    unresolved = np.zeros(n, dtype=bool)
+    if _is_blocked(jac):
+        return corr, unresolved
+    jac = to_host_fp64(jac)
+    if jac.ndim != 2 or jac.shape[1] != n:
+        return corr, unresolved
+    s = column_rescale(jac)
+    if s is not None:
+        jac = jac * s
+    JTJ = jac.T @ jac
+    JTJ = 0.5 * (JTJ + JTJ.T)
+    d = np.sqrt(np.diag(JTJ))
+    live = np.flatnonzero(d > 0.0)
+    if len(live) < 2:
+        return corr, unresolved
+    sub = JTJ[np.ix_(live, live)] / np.outer(d[live], d[live])
+    lam, vec = lapack.eigh(sub)
+    cut = len(live) * (FD_COLUMN_ERROR * FD_STEP) ** 2
+    gone = np.abs(lam) <= cut
+    if not gone.any():
+        return corr, unresolved
+    kept_var = (vec[:, ~gone] ** 2 / np.abs(lam[~gone])).sum(axis=1)
+    lost_var = (vec[:, gone] ** 2).sum(axis=1) / cut
+    member = lost_var >= kept_var
+    unresolved[live[member]] = True
+    k = (vec[:, ~gone] / np.abs(lam[~gone])) @ vec[:, ~gone].T
+    sd = np.sqrt(np.diag(k))
+    rho = np.array(corr, copy=True)
+    res = live[~member]
+    rho[np.ix_(res, res)] = (k / np.outer(sd, sd))[np.ix_(~member, ~member)]
+    un = live[member]
+    rho[np.ix_(un, res)] = np.nan
+    rho[np.ix_(res, un)] = np.nan
+    rho[res, res] = 1.0
+    return rho, unresolved
 
 
 def normal_covariance(jac: np.ndarray, resid: np.ndarray, n_free: int, *,
@@ -972,6 +1085,67 @@ def roughness_absorption(jac: np.ndarray, free_paths: list[str],
     return out
 
 
+def durbin_watson(delta: np.ndarray) -> float | None:
+    """d = Σ(Δᵢ−Δᵢ₋₁)²/ΣΔᵢ² over weighted residuals ``delta`` (Hill & Flack,
+    1987, J. Appl. Cryst. 20, 356, eq. 1), with ``None`` for a residual of
+    nothing, where the ratio is 0/0.
+
+    ``delta`` holds the fitted channels in pattern order, so a channel an
+    excluded region removed never enters.  The two channels either side of
+    that region do form a pair: one pair per gap, and on counting noise such a
+    pair is drawn from the same distribution as any other.  This is the d on
+    :class:`Statistics`.  :func:`~rietx.report.background._pooled_durbin_watson`
+    is the variant for a mask with a gap at every peak, where the bridged
+    pairs would be a large share of the sum.
+    """
+    delta = np.asarray(delta, dtype=np.float64)
+    denom = float(np.sum(delta ** 2))
+    if delta.size < 2 or denom <= 0.0:
+        return None
+    return float(np.sum(np.diff(delta) ** 2) / denom)
+
+
+#: The 0.1 % point of the standard normal, as Hill & Flack (1987) print it in
+#: Q's eq. 2.  Φ⁻¹(0.999) = 3.09023: the paper's own number, never tuned.
+HILL_FLACK_Z = 3.0902
+
+
+def durbin_watson_q(n: int, n_free: int) -> float:
+    """Q = 2[(N−1)/(N−P) − 3.0902/(N+2)^½], Hill & Flack (1987), J. Appl.
+    Cryst. 20, 356, eq. 2, after Theil & Nagar (1961), J. Am. Stat. Assoc. 56,
+    793.
+
+    The 0.1 % significance point of d for residuals with no serial correlation
+    beyond what least squares itself leaves.  Under that null d has mean near
+    2(N−1)/(N−P) and variance near 4/(N+2), and d < Q puts it :data:`HILL_FLACK_Z`
+    standard deviations under the mean.  Requires N > P.
+    """
+    return 2.0 * ((n - 1) / (n - n_free) - HILL_FLACK_Z / float(np.sqrt(n + 2)))
+
+
+def residual_is_noise(delta: np.ndarray, n_free: int) -> bool:
+    """Whether the weighted residuals ``delta`` carry no run of same-sign
+    neighbours: d ≥ Q (:func:`durbin_watson`, :func:`durbin_watson_q`).
+
+    One-sided on purpose.  Hill & Flack also read d > 4 − Q, as neighbours of
+    opposite sign, but the question here is whether peaks are left in the
+    residual, and a peak is a run of one sign.  d depends on neither σ's scale
+    nor the counts, so a pattern's esd convention cannot move this reading,
+    which is why χ² is not used.
+
+    With nothing to test (N ≤ P + 1, a residual of zero, or Q ≥ 4, which no d
+    can reach) the answer is ``True``: a residual that cannot show structure
+    shows none.
+    """
+    delta = np.asarray(delta, dtype=np.float64)
+    n = delta.size
+    d = durbin_watson(delta)
+    if d is None or n <= n_free + 1:
+        return True
+    q = durbin_watson_q(n, n_free)
+    return q >= 4.0 or d >= q
+
+
 def compute_statistics(y_obs: np.ndarray, y_calc: np.ndarray, sigma: np.ndarray,
                        n_free: int, y_background: np.ndarray | None = None) -> Statistics:
     y_obs = np.asarray(y_obs, dtype=np.float64)
@@ -995,7 +1169,7 @@ def compute_statistics(y_obs: np.ndarray, y_calc: np.ndarray, sigma: np.ndarray,
             rwp_bs = float(np.sqrt(swd2 / denom))
 
     delta = np.sqrt(w) * diff
-    dw = float(np.sum(np.diff(delta) ** 2) / np.sum(delta ** 2)) if n > 2 else None
+    dw = durbin_watson(delta) if n > 2 else None
 
     return Statistics(
         rwp=rwp, rp=rp, rexp=rexp, chi2=chi2, gof=rwp / rexp,
@@ -1319,19 +1493,72 @@ def _peak_sum(model: "CompiledModel", x: np.ndarray, peaks) -> np.ndarray:
     return out
 
 
+def structural_free_paths(table: "ParameterTable") -> list[str]:
+    """The free columns McCusker §9's count is about: each one that moves an atom.
+
+    McCusker, Von Dreele, Cox, Louër & Scardi (1999), *J. Appl. Cryst.* **32**,
+    36-50, §9, count the structural parameters, the ones the integrated
+    intensities pay for.  A column is one when it **is** an atom entry or
+    **reaches** one, whatever its own name (WP-2067, issue #1250): a mode
+    amplitude (``…distortion_modes.modes.K.amplitude``) reaches x, y, z through
+    affine rows of C; a named variable ``vars.X`` reaches the coordinate DOF or
+    Biso it is tied to, which is then not free itself; a rigid body's origin,
+    rotation and twists reach its atoms through the derived block that writes
+    them.  A test on the free path's *name* saw none of the three — the rule
+    "a freeze resting on flatness needs the other reading of C" (WP-1342)
+    applied to a count.
+
+    The reach is :meth:`~rietx.params.vector.ParameterTable.column_reach`, one
+    read of the constraint map that already carries each derived row's
+    declared reach.  What that read cannot say is *which input* of a block
+    carried it, and a block's :attr:`~rietx.params.derived.DerivedBlock.
+    frame_inputs` are the exception: a body reads its phase's cell only to
+    turn Å into fractions, so through C the cell reaches every body atom, while
+    §9 excludes it because peak positions pay for it.  So an atom row a block
+    writes is not tested directly; a column reaches it through the block's
+    other inputs instead, each counted where the block's
+    :meth:`~rietx.params.derived.DerivedBlock.reach_pattern` says it moves an
+    atom.  Blocks are walked last to first, since a later block may read an
+    earlier one's output (a rider on a body atom).
+
+    **A superset of the name test**: every free atom entry reaches itself, so a
+    fit with no tie onto an atom, no variable and no block counts exactly what
+    the glob counted.  In :attr:`~rietx.params.vector.ParameterTable.
+    free_paths` order.
+    """
+    written = table.derived_paths()
+    moves_atom = {e.path for e in table.entries
+                  if fnmatch.fnmatch(e.path, STRUCTURAL_PARAMETER_GLOB)
+                  and e.path not in written}
+    for block in reversed(table.derived):
+        pattern = np.asarray(block.reach_pattern(), dtype=bool)
+        frame = set(block.frame_inputs)
+        out_moves = np.array(
+            [q in moves_atom or fnmatch.fnmatch(q, STRUCTURAL_PARAMETER_GLOB)
+             for q in block.outputs], dtype=bool)
+        for k, q in enumerate(block.inputs):
+            if q not in frame and bool((pattern[:, k] & out_moves).any()):
+                moves_atom.add(q)
+    reach = table.column_reach()
+    return [p for p in table.free_paths
+            if any(q in moves_atom for q in reach[p])]
+
+
 def data_support(model: "CompiledModel", values: dict[str, float],
-                 free_paths: list[str]) -> DataSupport:
+                 table: "ParameterTable") -> DataSupport:
     """Assemble :class:`~rietx.schemas.results.DataSupport` for a finished fit.
 
     Evidence, not a gate: nothing here refuses anything, and the band it is
     read against (three, preferably five — McCusker et al. 1999 §9) lives in
-    the report rather than in this function.
+    the report rather than in this function.  The structural count is
+    :func:`structural_free_paths` of ``table``, the fit's own table, since
+    what a column moves is a fact about the constraint map and not about its
+    name (WP-2067).
     """
     census = _reflection_peaks(model, values)
     n_refl = len(census)
     m_ind = _effective_from_census(model, census)
-    n_struct = sum(1 for p in free_paths
-                   if fnmatch.fnmatch(p, STRUCTURAL_PARAMETER_GLOB))
+    n_struct = len(structural_free_paths(table))
     return DataSupport(
         n_unique_reflections=n_refl,
         n_effective_observations=m_ind,

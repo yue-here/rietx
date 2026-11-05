@@ -16,9 +16,9 @@ beside** ``chi2_data`` **and never folded into it** (the architecture's D8):
   (``tests/test_solve_chemistry.py``).
 * :func:`site_clash` — the clash term Σ w·((r₀ − d)/σ)² over contacts closer
   than r₀, the per-site form a Metropolis move needs.  It is the numpy path
-  and the oracle of the compiled ``solve_clash`` kernel (#562 chunk 1, not on
-  ``main`` yet), and takes that kernel's arguments in its order, so the engine
-  swaps one for the other in one line.
+  and the oracle of the compiled ``solve_clash`` kernel (#562), and takes that
+  kernel's arguments in its order, so the engine swaps one for the other in
+  one line.
 * :class:`CoordinationPrior` — "each A has n_lo to n_hi B within [d_lo, d_hi]",
   a squared hinge outside, and :class:`ExcludedContact` — "A and B never
   within d", which raises r₀ and so is folded into the clash term, listed.
@@ -145,8 +145,13 @@ class CompositionCheck:
     matches a formula that says 0.17, though it also rounds ⅙; and 0.5 is ½,
     so the site holds 96 and no other count.  ``z`` is the declared Z, or the
     whole number nearest ``z_implied`` = V/V_fu when none was declared.
-    ``volume_ratio`` is V/(Z·V_fu), and ``in_volume_window`` whether it lies in
-    Hofmann's (2002) 0.8-1.25 (:data:`~rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS`).
+    ``volume_ratio`` is V/(Z·V_fu), and ``in_volume_window`` whether it lies under
+    Hofmann's (2002) ceiling of 1.25 (:data:`~rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS`).
+    Only the ceiling: his table is fitted to organic crystals and an inorganic
+    one lies under its 0.8 floor (15 of 16 measured true cells, WP-2030), so
+    a floor would flag a correct cell, the false alarm ``INDEX_Z_NOT_INTEGER``
+    was withdrawn for.  A cell past the ceiling is larger than its formula
+    and Z hold (a framework with its pore contents left out).
     """
 
     formula: str
@@ -230,7 +235,9 @@ class Composition:
     def volume_window(self, z: int | None = None) -> tuple[float, float]:
         """(V_min, V_max) for ``z`` (default: the declared Z), Å³: Z·V_fu
         times Hofmann's 0.8-1.25 (WP-1510).  His table is fitted to organic
-        and metal-organic crystals; an ionic specimen runs large.
+        and metal-organic crystals; an inorganic cell lies under the lower
+        edge, so :attr:`CompositionCheck.in_volume_window` tests the upper
+        edge alone and this band suits a specimen known to be organic.
 
         Hofmann, D. W. M. (2002) *Acta Cryst.* B58, 489-493."""
         z = self.z if z is None else z
@@ -269,11 +276,11 @@ class Composition:
             as_fraction[el] = as_fraction.get(el, 0.0) + len(rot) * (
                 float(frac) if frac is not None else occ)
         ratio = volume / (z * v_fu)
-        lo, hi = VOLUME_RATIO_BOUNDS
+        hi = VOLUME_RATIO_BOUNDS[1]
         return CompositionCheck(
             formula=self.formula, z=int(z), z_implied=z_implied, volume=volume,
             formula_unit_volume=v_fu, volume_ratio=ratio,
-            in_volume_window=bool(lo <= ratio <= hi), expected=expected, found=found,
+            in_volume_window=bool(ratio <= hi), expected=expected, found=found,
             omitted=omitted, found_as_fraction=as_fraction, read_as=read_as)
 
     def require(self, phase, *, omit: tuple[str, ...] = ()) -> CompositionCheck:
@@ -393,10 +400,10 @@ def site_clash(pos: np.ndarray, site_of: np.ndarray, moved: np.ndarray,
     elsewhere.  With ``w_same`` = ½ the change of this quantity under a move of
     that site is the change of the structure's total (:func:`clash_energy`).
 
-    The numpy path and the oracle of chunk 1's compiled ``solve_clash``, whose
+    The numpy path and the oracle of the compiled ``solve_clash``, whose
     arguments these are, in its order.  Raises ``ValueError`` where the 27
-    cells would miss a contact (:func:`clash_cells_suffice`), a refusal the
-    kernel does not make, and for an index outside the sites.
+    cells would miss a contact (:func:`clash_cells_suffice`), and for an index
+    outside the sites.
     """
     pos = np.asarray(pos, dtype=np.float64)
     site_of = np.asarray(site_of, dtype=np.intp)

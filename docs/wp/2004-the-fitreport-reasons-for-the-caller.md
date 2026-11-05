@@ -66,6 +66,8 @@ open under the same track; neither tiers a gate.
 
 ### Inherited
 
+- **From WP-1977 (2026-11-02, PR #1295, reworked to Yue's ruling of 2026-11-01): `build_report`'s `min_peak_sigma` (5.0) now sets two more levels, and Layer 2 reads them.** Layer 0 records on every `unmatched_obs` row whether the observed curve rises from it into a drawn peak (`UnmatchedPeak.flank`, measured by `report/layer0.on_drawn_flank`), using that same 5σ twice: the drawn apex's prominence and the deepest observed dip that still counts as unresolved. No row leaves the list. `layer2.layer0_actions` no longer counts a row with `flank.on_flank` toward `add_impurity_phase`, so the dip level decides which rows can buy that call. The default is at no declared seat, so the audit table cannot see it; tier it with the detection level when this WP seats `build_report`. On the twelve QPA round-robin fits and SRM 660c, 66 of 116 rows are on a flank, and the call left cpd-1b and SRM 660c with the apertures at 0. `THRESHOLDS_VERSION` went 1.13 → 1.14 for the new field and the withheld call. A bump this WP owes starts from 1.14.
+- **From WP-1977's generality reviews (2026-11-01 and 2026-11-02, PR #1295).** The first review rated the drop of flank rows weak (kind 2 read as kind 1, no record), and Yue's ruling replaced it with the evidence field. The second review's tiers are in WP-1977's last handover entry; tier the flank test and its two 5σ levels here. The first judge also rated `EXTRA_PEAK_ON_REFLECTION`'s 0.08° window weak, unmeasured on both sides; its proposed check is a declared peak 1-3 FWHM from a strong unresolved reflection, reading whether the peak's area trades against the phase scale.
 - **From WP-2003 (2026-10-26, fourth session): three sequential thresholds were removed under your version number.** `DISCONTINUITY_FACTOR` (5.0), `DISCONTINUITY_SIGMA` (3.0) and `MIN_POINTS_FOR_DISCONTINUITY` (5) went with `SEQUENTIAL_DISCONTINUITY` (2003's batch C4; the statistic is now `SeriesResult.steps`, no threshold). None is quoted by name in `report/schemas.py`'s `THRESHOLDS_VERSION` history, but the 1.9 bump treated the sequential `WIDTH_GROWTH_*` constants as covered, and every `SeriesResult.provenance` stamps `report_thresholds_version`. Nothing was bumped in 2003: fold the removal into the one bump this WP owes with the width-growth ruling, and name it in that bump's history line.
 - **From WP-2003 (2026-10-26, third session, PR #1169): the width-growth ruling is yours to land, under the one `THRESHOLDS_VERSION` bump.** Ruled 2026-10-26 (`2003-batch/batch.md` C7; the maintainer delegated the rulings to the session's judgement against DESIGN.md § Rules): `SEQUENTIAL_WIDTH_GROWTH` and its suggestion are removed and the statistic becomes a record field with no threshold, since its three tier-3 constants (`WIDTH_GROWTH_FACTOR`, `WIDTH_GROWTH_GOF_FACTOR`, `WIDTH_GROWTH_SIGMA`, `sequential.py:281`, `:299`, `:305`) decide whether the code exists, on one real family (silent on CPD; fired on #451's soak, its width planted). The field carries each pattern's `rung` (clash X6: an escalated pattern's width step is a cold fit's). `_WIDTH_SUFFIXES` is tier 1, no row. Nothing was bumped in 2003; the rows in `2003-batch/rows.json` carry the ruling and name this WP. Separately, WP-2037's ask that `SeriesResult.summary` become a declared seat was not taken up in 2003.
 - **From WP-2037 (2026-10-24, second session, PR #1145): a seat of yours, and the suite's alarm numbers.** `rietx.refine.Refinement.summary` is now a declared default seat owned by this WP (`_audit.DEFAULT_SEATS`), its five defaults rowed by 2037: `levels` caller-tier, `deliverable`/`plot`/`plan`/`report` answer-invariant (`tests/test_termination_view.py::test_summary_leaves_the_result_as_it_found_it`). `plan=None` skips the plan-stage veto (the free-path veto stands) and ignores the plan the last `fit()` ran (`Refinement._last_plan`, which the same summary prints as the protocol run), so a suggestion for a parameter an earlier stage freed can print as active; whether `None` should mean `_last_plan` is this WP's report decision. The generality judge also asked that `RefinementResult.summary` (and, for 2003, `SeriesResult.summary`) become declared seats: their `deliverable=`/`levels=` defaults are unseated though `print(result)` is the more-read path. `tests/suite_alarms.py` pins the eight `rietx compare` standards' firing table (`tests/data/suite_alarms.json`, written darwin/arm64, a prompt never a verdict); a retier here that moves a code's firing re-pins it with `python -m tests.suite_alarms --write`.
@@ -87,6 +89,43 @@ open under the same track; neither tiers a gate.
 - **From WP-2001 (2026-10-19, PR #1047).** The table is `src/rietx/_audit.py`; this WP's rows are the ones `_audit.WALKED` and `_audit.DEFAULT_SEATS` map to 2004, plus the codes and suggestion rows of its subsystem. Auditing a row means giving it a tier and evidence in place and deleting its line from `UNAUDITED_BASELINE`; `tests/test_audit_table.py` fails until both are done. The walk sees module-level numbers and tuples of numbers only, so a number held in a dict, list or array is audited here by hand: `report.texture._R_GRID` is one.
 
 - **From WP-2002 (2026-10-19, PR #1050).** 2002's batch class B13 proposes handing 15 rows to this WP, pending the maintainer's ruling: seven `background.diagnostics` constants that feed `diagnose()`'s fields and no code (`COVERAGE_*`, `CUTOFF_*` except `CUTOFF_MIN_DEG`), the four `optimize.identifiability` report caps, `refine.MAGNETIC_TICK_PURITY` (its comment at `refine.py` ~768 disagrees with its code at ~7020), and `optimize.statistics.EFFECTIVE_OBS_ALPHA`, `OBS_PER_PARAMETER_MIN` and `OBS_PER_PARAMETER_PREFERRED`. The table: `2002-batch/batch.md` § The B13 hand-off table.
+
+- 2026-10-31, from the issue triage (issue #1212): the width-growth record
+  field C7 asks for has the blind spot of the code it replaces. On a synthetic
+  chain where a vanishing minor phase broadens into an unmodelled broad
+  component (LaB6 plus a cubic perovskite whose lines sit within 0.3 % of
+  LaB6's, the issue's script), its `lor_strain` grows from 0.041(7) to
+  4.53(2.29), 110×, while GoF rises 1.00 → 2.98 and its fraction climbs to
+  18.8 wt % against a truth of 0. `SEQUENTIAL_WIDTH_GROWTH` stays silent
+  because the growth test asks for more than 3 combined esds (4.49 < 3 ×
+  2.29), and a runaway width is a flat direction whose esd grows with it. A
+  slightly weaker phase at the start also fails the reference test (value >
+  3σ), and the trajectory is then not judged at all. Checked against the tree
+  at d87c8cc91 (`[dev]`, macOS arm64): the issue's script reproduces its table
+  to the printed digits, and the series codes are
+  `SEQUENTIAL_PERSISTENT_FINDING`, `SEQUENTIAL_RESEED`,
+  `SEQUENTIAL_RWP_OUTLIER`, with no width-growth finding. Both tests are in
+  `sequential._width_growth_diagnostics` (~line 2671: the reference's
+  `value[k] > WIDTH_GROWTH_SIGMA * sd[k]`, the growth's `grown >
+  WIDTH_GROWTH_SIGMA * combined`). The issue proposes, for this WP's field:
+  take the reference as the first finite positive width and record whether it
+  was measured, rather than skipping an unmeasured one; carry the width ratio
+  and the GoF ratio as the primary columns, and the growth in esds as a
+  secondary column with the note that a runaway width's esd grows with it. It
+  reports that WP-1465's survey has no existing series pass GoF 1.14 against
+  its first pattern, so relaxing the reference should move nothing on the
+  suite; that needs a re-count on the tree. It also measured three default
+  width bounds (physical limits, the flag thresholds as bounds, a ±10 % band
+  per pattern) and agrees with 2003's B9 ruling that none should be a default:
+  each either misses the case or clips a real 2-3 nm phase.
+
+- 2026-10-31, from the issue triage (issue #1215): the issue asks for no
+  change to `too_stiff` beyond printing the analytic null beside the
+  off-region pair (text only, carried by the new residual-structure WP). It
+  measured `too_stiff` silent on a hump of 0.1, 0.3 and 0.6 × mean background
+  and firing at 1.2 × on a synthetic capillary family, where the fitted
+  background's bulge above its own hull read 2.3 / 9.8 / 41 / 82 %. Not re-run
+  here.
 
 ## Non-goals
 

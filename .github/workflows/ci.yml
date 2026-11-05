@@ -17,9 +17,9 @@ name: CI
 #                                 planning set, else code; a push is code
 #   docs                          scope docs: the tests that read the planning
 #                                 set (the job says how that list was measured)
-#   fast py3.11, py3.14  K/2      scope code: the "not slow" suite at both
+#   fast py3.11, py3.14  K/4      scope code: the "not slow" suite at both
 #                                 ends of the support window, each leg in
-#                                 two shards (below)
+#                                 four shards (below)
 #   fast jax                      scope code: the "not slow" cases that reach
 #                                 jax (tests/jax_cases.py), with [dev,jax]
 #                                 on 3.13, as one job (below)
@@ -57,7 +57,7 @@ name: CI
 # workflow_dispatch still run in full.  Measured on the PR that landed this
 # (#364): a draft run is lint plus two skipped jobs, and a skipped matrix does
 # not expand — it reports once, under the literal name `fast py${{
-# matrix.python }}`.  So the four per-version contexts exist only from the
+# matrix.python }}`.  So the per-shard contexts exist only from the
 # ready_for_review run onwards, which is the run that gates the merge anyway.
 # Since WP-1506 the guard sits on `changes` and `ci-ok`, and every job that
 # needs `changes` skips with it.
@@ -69,13 +69,27 @@ name: CI
 # xdist counts physical cores once psutil imports.  `-n logical` was measured
 # to buy nothing: four workers each ran at about half speed (WP-1547).
 #
-# Each Python leg runs as two shards.  `--shard K/2` (tests/shards.py) deals
+# Each Python leg runs as four shards.  `--shard K/4` (tests/shards.py) deals
 # whole files and whole xdist groups by the seconds in
 # tests/shard_times.json.  On main's six runs after WP-1547's tail cut, a
 # leg's fast suite took 15.5-31.2 min and a run waited 24-31 min for the
 # slowest of its five legs.  The middle Pythons left the per-push matrix: the
 # nightly runs the fast suite on 3.12 and 3.13.  So a break on a middle
 # version alone shows the next morning.
+#
+# Four shards since WP-2019.  Two shards made a run wait a median 25.0 min
+# for its slowest fast job over main's ten runs to 2026-11-01, against the
+# WP's bar of 15, and three made it 18.2 over the ten to 2026-11-02.  Even a
+# perfect three-way split of those ten runs' measured seconds gives a median
+# 14.7, on the bar, so a better record alone could not close the gap.  The
+# same seconds dealt into this record's four-shard split give a median 12.9
+# and a slowest run of 13.9 (the WP's 2026-11-02 3rd-session entry).  The
+# largest unit, test_examples.py, stays under a shard's share: 19.8 against
+# 22.6 worker-min on the newest leg's profile of the record from main run
+# 41407136163.  The shard count is `matrix.of`, and `matrix.shard` lists 1 to
+# it.  Each leg splits by the record's profile for its RIETX_DOCS value: one
+# split for both legs weighed the documentation at the newest leg's cost, so
+# on py3.11, which skips it, the shard holding it ran light.
 #
 # The jax job runs only the cases that reach jax (WP-2019): a jax parameter,
 # jax named in the test or in a fixture of it, or a module that skips without
@@ -90,9 +104,14 @@ name: CI
 # wherever jax does not import, a case that skips for want of jax outside the
 # selection fails, since no per-push leg would run it.
 #
-# Five fast jobs a run, four Python shards and the jax job, so four runs' fast
-# jobs fill the free plan's 20 concurrent jobs exactly, with nothing left for
-# their lint and changes jobs; three runs at once leave room to spare.
+# Nine fast jobs a run, eight Python shards and the jax job.  Two runs at
+# once take 18 of the free plan's 20 concurrent jobs.  `changes` ends before
+# the fast jobs start and `ci-ok` starts after they end, and `lint` overlaps
+# them by under a minute (38 s on main run 41407136163).  So two pull-request
+# runs fit beside each other.  A push to main also starts pages.yml's `build`
+# job beside its fast jobs, so two main runs at once take all 20, and either
+# a third run or a gui.yml or kernels.yml job queues a job or more until a
+# slot frees.  A queued job is visible in `gh run list`.
 
 on:
   push:
@@ -258,7 +277,7 @@ jobs:
           tests/test_closed_wp_writes.py
 
   fast:
-    name: fast py${{ matrix.python }} ${{ matrix.shard }}/2
+    name: fast py${{ matrix.python }} ${{ matrix.shard }}/${{ matrix.of }}
     needs: changes
     if: needs.changes.outputs.scope == 'code'
     runs-on: ubuntu-latest
@@ -269,10 +288,12 @@ jobs:
         # the oldest and newest Python of the support window.  The nightly
         # runs the fast suite on 3.12 and 3.13.
         python: ["3.11", "3.14"]
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
+        # the shard count, one value: the job name and --shard read it
+        of: [4]
         # the newest leg executes the documentation, in whichever shard holds
-        # each part.  Dropping its version from the list above makes this a
-        # job of its own with no shard, and `--shard /2` then fails it: move
+        # each part.  Dropping its version from `python` above makes this a
+        # job of its own with no shard, and `--shard` then fails it: move
         # the entry to the new newest version instead.
         include:
           - python: "3.14"
@@ -309,7 +330,7 @@ jobs:
           RIETX_DOCS: ${{ matrix.docs || 'skip' }}
         run: >-
           .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
-          --shard ${{ matrix.shard }}/2 -o faulthandler_timeout=600
+          --shard ${{ matrix.shard }}/${{ matrix.of }} -o faulthandler_timeout=600
           --junitxml=junit.xml -o junit_duration_report=total
       - name: Upload per-test timings
         if: always()

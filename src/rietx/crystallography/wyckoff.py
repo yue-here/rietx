@@ -34,6 +34,7 @@ ADP component order throughout: **(U11, U22, U33, U12, U13, U23)**.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from fractions import Fraction
 from math import gcd, lcm
@@ -236,6 +237,103 @@ def adp_basis(rotations: list[np.ndarray]) -> np.ndarray:
     return _nullspace_int(rows, 6)
 
 
+def adp_projection(basis: np.ndarray, u: np.ndarray
+                   ) -> tuple[np.ndarray, np.ndarray, bool]:
+    """A tensor's least-squares coefficients on :func:`adp_basis`, the nearest
+    allowed tensor, and whether the tensor already lies in the allowed subspace.
+
+    The one test of "this U^ij satisfies its site symmetry": no component of
+    the projection's residual exceeds 1e-6 × max(the tensor's largest
+    component, 1e-6 Å²), which is float round-off on a tensor the algebra allows, never a
+    tolerance for one it does not.  ``ParameterTable`` refuses a tensor that
+    fails it, and the CIF reader asks it before deciding whether a printed
+    tensor needs moving (:func:`~rietx.crystallography.cif.structure_from_cif`),
+    so the two cannot disagree about which tensors are already exact.
+    """
+    from ..optimize import lapack
+
+    b = np.asarray(basis, dtype=np.float64)
+    u0 = np.asarray(u, dtype=np.float64)
+    coef, *_ = lapack.lstsq(b.T, u0, rcond=None)
+    nearest = b.T @ coef
+    scale = max(float(np.abs(u0).max()), 1e-6)
+    return coef, nearest, float(np.abs(nearest - u0).max()) <= 1e-6 * scale
+
+
+def nearest_allowed_within_print(span: np.ndarray, value: np.ndarray,
+                                 half: np.ndarray, *, cap: float = math.inf,
+                                 ) -> np.ndarray | None:
+    """The point ``span @ c`` nearest ``value`` inside the box ``±half``, or ``None``.
+
+    ``value`` is a printed quantity a symmetry confines to the column span of
+    ``span`` (n × k), and ``half`` the half-width of each component's rounding;
+    a zero half-width holds that component exact, and ``cap`` bounds every
+    component's move absolutely without changing the units the box is measured
+    in (``magcif.moment_within_print``'s bare ``0``).  Two linear programmes.  The
+    first finds the smallest box, in the box's own units, that reaches the
+    span (a Chebyshev fit); past 1 no allowed point is inside the print and
+    the answer is ``None``.  The second keeps that box and minimises the summed
+    moves, which is what leaves a component the symmetry does not tie to the
+    others exactly as printed: a Chebyshev fit alone is degenerate there, and
+    the solver's vertex moved ZnO's free U33 by a third of its rounding for
+    nothing (WP-2016).  Callers: the CIF reader's U^ij
+    (:func:`~rietx.crystallography.cif.structure_from_cif`) and
+    :func:`~rietx.crystallography.magcif.moment_within_print`.
+    """
+    from scipy.optimize import linprog
+
+    a = np.asarray(span, dtype=np.float64)
+    v = np.asarray(value, dtype=np.float64)
+    n, k = a.shape
+    boxed, exact = half > 0.0, half == 0.0
+    if not boxed.any():
+        return None
+    eq = {"A_eq": None, "b_eq": None}
+    m = int(boxed.sum())
+    # stage 1: minimise t subject to |(Ac − v)_i| <= t·half_i, exact rows equal
+    if exact.any():
+        eq = {"A_eq": np.hstack([a[exact], np.zeros((int(exact.sum()), 1))]),
+              "b_eq": v[exact]}
+    h = half[boxed, None]
+    capped = math.isfinite(cap)
+
+    def cap_rows(width):
+        if not capped:
+            return np.zeros((0, k + width)), np.zeros(0)
+        pad = np.zeros((n, width))
+        return (np.vstack([np.hstack([a, pad]), np.hstack([-a, pad])]),
+                np.r_[v + cap, cap - v])
+
+    rows, rhs = cap_rows(1)
+    fit = linprog(np.r_[np.zeros(k), 1.0],
+                  A_ub=np.vstack([np.hstack([a[boxed], -h]),
+                                  np.hstack([-a[boxed], -h]), rows]),
+                  b_ub=np.r_[v[boxed], -v[boxed], rhs], **eq,
+                  bounds=[(None, None)] * k + [(0.0, None)], method="highs")
+    if not fit.success or fit.x[-1] > 1.0 + 1e-9:
+        return None
+    t = float(fit.x[-1])
+    first = fit.x[:k]
+    # stage 2: inside that box, minimise Σ s_i with |(Ac − v)_i| <= s_i·half_i
+    if exact.any():
+        eq = {"A_eq": np.hstack([a[exact], np.zeros((int(exact.sum()), m))]),
+              "b_eq": v[exact]}
+    d = np.diag(half[boxed])
+    rows, rhs = cap_rows(m)
+    fit = linprog(np.r_[np.zeros(k), np.ones(m)],
+                  A_ub=np.vstack([np.hstack([a[boxed], -d]),
+                                  np.hstack([-a[boxed], -d]), rows]),
+                  b_ub=np.r_[v[boxed], -v[boxed], rhs], **eq,
+                  bounds=[(None, None)] * k + [(0.0, t)] * m, method="highs")
+    # the second box is the first's own optimum, so a solver that calls it
+    # infeasible by its tolerance keeps the Chebyshev point
+    target = a @ (fit.x[:k] if fit.success else first)
+    target[exact] = v[exact]          # the equality's own value, bit for bit
+    unmoved = np.abs(target - v) <= 1e-12 * np.maximum(np.abs(v), 1e-300)
+    target[unmoved] = v[unmoved]      # a component left alone keeps its print
+    return target
+
+
 def _compatible_lattice(sg: gemmi.SpaceGroup) -> np.ndarray:
     """Row-vector lattice whose metric is invariant under the group.
 
@@ -263,9 +361,11 @@ def site_constraints(space_group, xyz, *, tol: float = SITE_TOL) -> SiteConstrai
     position count as on it).  Raises ``RuntimeError`` if spglib does not
     recover the requested group from the probe cell — that indicates
     coordinates given in a setting inconsistent with the operators, not a
-    tolerance issue.  **The Wyckoff letter and the oriented site-symmetry
-    symbol are both spglib's**, so they are available only for a group spglib
-    names; an :class:`~rietx.crystallography.symmetry.OperatorGroup` gets the
+    tolerance issue.  **The oriented site-symmetry symbol is spglib's; the
+    Wyckoff letter is the one**
+    :func:`~rietx.crystallography.representation.subgroups.wyckoff_positions`
+    **gives** (spglib's own only where that table cannot place the point), and
+    both are available only for a group spglib names; an :class:`~rietx.crystallography.symmetry.OperatorGroup` gets the
     constraint bases and the multiplicity — read off its own operations — with
     ``wyckoff`` and ``site_symmetry`` both empty, rather than a plausible wrong
     symbol for the type spglib would identify from the probe cell (the comment
@@ -319,8 +419,16 @@ def site_constraints(space_group, xyz, *, tol: float = SITE_TOL) -> SiteConstrai
             f"({sg.xhm()}): the coordinates are not consistent with this "
             "group's setting")
 
+    # spglib names the atom in its own standardised frame, which in some
+    # settings differs from the input's by a normaliser element that permutes
+    # letters; the table in representation.subgroups maps it back, so this
+    # letter and wyckoff_positions(group)'s agree.  Where the snapped point
+    # does not identify cleanly the table says nothing and spglib's letter stays.
+    from .representation.subgroups import _letter_at
+    letter = _letter_at(sg, xyz, len(rots), tol) or str(dataset.wyckoffs[0])
+
     return SiteConstraints(
-        wyckoff=f"{orbit.multiplicity}{dataset.wyckoffs[0]}",
+        wyckoff=f"{orbit.multiplicity}{letter}",
         site_symmetry=dataset.site_symmetry_symbols[0],
         multiplicity=orbit.multiplicity,
         coord_basis=coord,

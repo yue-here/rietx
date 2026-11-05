@@ -8,8 +8,9 @@ Priority: P2 2026-10-23 — 2002 closed with the width twin hold; the evidence e
 ## Goal
 
 Every tier-3 threshold the single-fit audit kept is measured on three unrelated dataset
-families, against an independent reference where one exists. Each one either holds (its
-evidence line gains the families and the reference distance), moves to tier 1 or
+families, against an independent measurement where one exists and otherwise a reference
+value under its protocol (DESIGN.md § Rules, 2). Each one either holds (its evidence line
+gains the families and the distance from each reference value), moves to tier 1 or
 `invariant` (a test now bounds it), or goes back to the maintainer as a ruling with the
 measurement that failed it.
 
@@ -57,9 +58,10 @@ ten to fifteen fit campaigns, not one per row:
   factors, `SCHERRER_K`, `BOND_SLACK_ANG` and `STEPS_PER_FWHM_*` (the judge's 2026-10-20
   reading).
 
-**The held-out family stays held out.** The Nd₂Ru₂O₇ pair (`tests/data/mg090*`: 11-BM
-X-ray and NCNR BT-1 neutron, one specimen, a published joint refinement) is evidence for no
-audit; it is run once at the milestone's close (`generality.md` § Acceptance).
+**Nd₂Ru₂O₇ is cited by no audit.** The pair (`tests/data/mg090*`: 11-BM X-ray and NCNR
+BT-1 neutron, one specimen, a published joint refinement) is evidence for no audit; it is
+run once at the milestone's close (`generality.md` § Acceptance). It is development data,
+not a sealed family in DESIGN.md § Rules, 2's sense (ruled 2026-10-27).
 
 **Families on disk** (WP-2002 § Context): the four round-robin standards and the qarr
 set (weighed compositions), 11-BM NAC and SRM 660c, the FAP suite, the Durham tutorials
@@ -67,6 +69,21 @@ under `~/rietx-local-data` (`python -m tests.local_data`), the magnetic fixtures
 LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
 
 ### Inherited
+
+- **From WP-2086 (2026-11-04, PR #1406): `MODEL_FAR_FROM_DATA` is silent on a fit that lost
+  the phase, so test it on background-subtracted Rwp.** This is the B12.13 row's other
+  direction: that row fires on a true model at sparse counts, and these rows say nothing on
+  a wrong one. On the reach table (WP-2086's handover, 119 fits from displaced starts) 12 fits
+  fail silently, all on the real FAP pattern: `usable=True`, `converged`, no error, Rwp
+  0.44-0.69. Their zero shift reaches −21 821° and −500 446°, and neither fires. Their
+  background-subtracted Rwp reads 0.93-1.00 on 9 rows, 0.575 and 0.467 on two `profile_only`
+  rows and 0.256 on `lab_bragg_brentano` at +3 %. Fits that reached the answer read 0.042 on
+  LaB₆, 0.12-0.14 on FAP and 0.16-0.17 on NAC, so the gap is 0.17 to 0.256 on this table. The
+  sparse-count family runs the opposite way and must be read beside it. Task: test the rule
+  on these families. The threshold and what a reader then sees are the maintainer's calls.
+  Each row ran once. Repeating the edge rows put FAP `mccusker_default` at +3 % among the silent
+  failures on one start in three, so 12 is a lower bound.
+  WP-2005 owns the code's level. Not implemented.
 
 - **From WP-2002 (2026-10-23, 9th session, PR #1113): the twin hold and the floor removal moved three start rows, and give two rows new families.** (1) `BISO_SEED`: cpd-1a's Biso starts now differ by 15.68 plain esd on zincite's `lor_strain` (0.070 before), because the width twin hold keeps the X/Y split `qpa_plan`'s instrument-only stage lands on, a strict xfail (decision 1(a)); FAP and NAC stay at 0.000. The row's evidence now rests on two families. (2) The intermediate-tolerance row on cpd-1a with an absent zircon reads 0.035 (0.185 before) and the axial sizing floor on cpd-1a 0.010 (0.138 before); both strict xfails went. (3) `StageResult.width_twins_held` (tier 2) has one real two-phase family (11-BM LaB6 + cBN) and the synthetic and CPD fits in its row; a second real multi-phase family freeing a twin pair would test it. (4) `ProfileTCHZ:y`'s floor went on a physical argument (a constant Lorentzian projects to Y < 0) with one synthetic cost (`tests/test_v02_core.py`: Y −0.0059 against a truth of 0, sample `lor_size` 55 % low); what real lab calibrations do with Y unfloored is unmeasured; the judge's test is SRM 660c refined with Y free and with Y ≥ 0, read on the certified cell and a sample's size and strain. (5) Under TRF no width row holds, and whether brucite and corundum put a coefficient on the ±180 far bound under the hold is unmeasured. (6) `optimize.least_squares._fd_typicals` still decides a row is a width from a lower bound ≥ 0 and patches Y with a name list (`_SIGNED_WIDTHS`); a caller's X or `lor_strain` with min < 0 takes the offset's step of 1, which put 1.4e-3 to 1.5e-2 errors into width columns (code review, declined as a design change: declare which rows are widths as table data). This entry supersedes the zircon and axial-floor readings in the two entries below.
 
@@ -85,7 +102,19 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
 
 - 2026-10-26 issue triage: #1052 (mustachefeeling, 2026-10-19) offers three held-out families for the milestone's close, and says the reporter will run them at the open and the close: Zr₆(BDC)₃(Fum)₃ on Diamond I11 (Tollitt et al. 2021, Angew. Chem. 60, 26939; pattern deposited CC BY 3.0), HfIn on a lab Empyrean, Cu Kα₁/Kα₂, flat plate (Oliynyk et al. 2018, Inorg. Chem. 57, 7966; not deposited, kept local by the reporter), and CrCl₂(pyrimidine) on ILL D1B at 1.5 K and 30 K, k ≠ 0 (Pitcairn et al. 2023, JACS 145, 1783; data doi:10.17639/nott.7257). Checked against the tree at c0e32ab29: none of the three is in `tests/data/README.md`, and the milestone's named held-out family is still only the Nd₂Ru₂O₇ pair (`11a68d96e`, 2026-10-19). Until the maintainer rules on #1052, do not use any of the three as second-pass evidence here: a public download makes the MOF and the magnet easy to reach for, and using one would end its use as held-out evidence.
 
-- Decided 2026-10-26 (maintainer, #1052): all three offered families are adopted as held-out beside Nd₂Ru₂O₇ (`docs/milestones/generality.md` § Acceptance). So none of them is audit evidence in this pass, permanently rather than while the issue is open.
+- Decided 2026-10-26 (maintainer, #1052): all three offered families are adopted as held-out beside Nd₂Ru₂O₇ (`docs/milestones/generality.md` § Acceptance). So none of them is audit evidence in this pass, nor in any pass before the milestone's close, when they are spent into development data (ruled 2026-10-27, replacing the 2026-10-26 "for good").
+
+- 2026-10-31, from the issue triage (issue #1052): the reporter answered the
+  maintainer's two asks of 2026-10-31 on the thread. They posted the SHA-256
+  of the open result table, of the recipe and of each per-case result file, so
+  the close run can be checked against what was fixed before it. They also
+  declared one added arm, run on both the open and the close tree: HfIn with
+  each co-sited pair's occupancies freed and tied to sum to 1, its refined Hf
+  fraction reported beside the EDX value Hf 0.51(2) with the fit's esd. The
+  milestone record (`docs/milestones/generality.md` § Acceptance) does not
+  carry either yet; the close session should quote the hashes from the thread.
+  Checked against the tree at d87c8cc91: nothing to run; the thread is the
+  record.
 
 ## Non-goals
 
@@ -103,6 +132,28 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
       distance, with obs/calc/diff PNGs to `tests/output/` for each refit used.
 - [ ] Each row's evidence line updated; a row a test now bounds moves to tier 1 or
       `invariant` with the test named; a row that fails goes to a batch for the maintainer.
+- [ ] Tell a blank frame with structure from a phase whose peaks missed (from WP-2086,
+      PR #1406). WP-2086 holds the instrument on a frame where every phase reads unseen
+      only when the residual is noise: Durbin-Watson d ≥ Q, Hill & Flack's (1987) 0.1 %
+      point. Q is 1.91 at 4200 channels and 1.96 at 21 001. Fourteen blank frames with
+      structure read under Q, at d 0.34-1.49. The real empty Kapton capillary reads
+      0.43-1.04 (one pattern, at 6 and 12 background terms), six synthetic humps 0.34-1.49
+      and six rebinned-noise frames 0.64-1.02. Strong phases whose peaks missed read
+      0.02-0.12. A weak phase that stayed misplaced reads 0.14-1.85, across the whole blank
+      range. Raw rows: `~/.cache/ghostshift/rietx/wp-2049/step/disc.jsonl` and
+      `blank_fix.jsonl`, not committed; the rebinned and weak-phase figures are from
+      WP-2086's handover.
+      What a user sees today: these frames stay free as on 1.10.0. Four of the 14, all
+      synthetic, refined a zero shift on nothing, each within 2 esd of zero (0.0048 ±
+      0.0255° to −0.0029 ± 0.0016°), with U up to 0.38 deg². Kapton stayed at scale 0 and
+      zero 0. `PHASE_UNCONSTRAINED` fired on the eight frames whose codes were recorded and
+      names the unseen phase. No finding says the instrument stayed free, and the zero
+      carries an esd as a measurement does.
+      A threshold chosen between 0.12 and 0.34 would be tuned to these frames and would read
+      a weak missed phase as blank. So this needs a design, and evidence from more than this
+      one fixture set: no real blank frame has yet been seen to pass the check, and the one
+      real frame here is from 11-BM. The threshold and anything the reader sees are the
+      maintainer's calls.
 - [ ] The batch, in the register of `~/.claude/CLAUDE.md`, if any row failed.
 
 ## Acceptance
@@ -123,5 +174,7 @@ No row this WP lists still names the second pass as owed.
 - PR #1050's second read of the batch (Mike Gaultois, 2026-10-20).
 
 ## Handover log
+
+- **2026-11-04** — Task added from WP-2086's review: tell a blank frame with structure from a phase whose peaks missed. Numbers re-read from the raw rows. With the synthetic humps the 14 frames span d 0.34-1.49, past the 0.43-1.04 quoted for Kapton, and Kapton's Q is 1.96 at its 21 001 channels. Nothing new measured, no code. PR #1408.
 
 - **2026-10-20** — Filed by WP-2002's session at the maintainer's request ("split"): the second pass moves here so that 2002 closes on its owed tests and B14's lifts. Nothing measured yet.

@@ -624,8 +624,8 @@ def test_a_joint_fit_holds_a_coefficient_whose_phase_no_pattern_sees(lab6_pair):
     as the plain one does, stage by stage, and lands on the same cell.
     """
     _, ins = perturbed_inputs()
-    plain = refine_multi(lab6_pair, _with_an_unseen_phase(), ins,
-                         plan="mccusker_default")
+    plain_ref = MultiHistogramRefinement(_with_an_unseen_phase(), ins)
+    plain = plain_ref.fit(lab6_pair, plan="mccusker_default")
     _, ins = perturbed_inputs()
     equation = ParametricEquation(name="b", target="phases.1.cell.a", basis="constant")
     result = refine_multi(lab6_pair, _with_an_unseen_phase(), ins, parametric=[equation],
@@ -643,7 +643,10 @@ def test_a_joint_fit_holds_a_coefficient_whose_phase_no_pattern_sees(lab6_pair):
             f"hist.{h}.phases.1.cell.{k}" for h in range(2) for k in "abc"}
     (coef,) = result.parametric
     assert coef.vary is False and coef.esd is None
-    assert coef.value == plain.parameter("phases.1.cell.b").value
+    # the held cell and its followers leave the plain answer (WP-1999), so the
+    # value the coefficient is held at is read off the plain fit's model
+    assert "phases.1.cell.b" not in {p.path for p in plain.parameters}
+    assert coef.value == plain_ref.fitted_structures[0].phases[1].cell.b.value
     unseen = [d for d in result.diagnostics if d.code == "PHASE_UNCONSTRAINED"]
     assert unseen and "vars.b_0" in unseen[0].where
     assert result.statistics == plain.statistics
@@ -651,9 +654,9 @@ def test_a_joint_fit_holds_a_coefficient_whose_phase_no_pattern_sees(lab6_pair):
     (blind,) = [d for d in result.diagnostics if d.code == "PARAMETRIC_TARGET_UNSEEN"]
     assert blind.level == "warning" and blind.value == 2.0
     assert blind.where == ["hist.0.phases.1.cell.a", "hist.1.phases.1.cell.a"]
-    for h in range(2):
-        for k in "abc":
-            assert result.parameter(f"hist.{h}.phases.1.cell.{k}").equations == ["b"]
+    # the held coefficient moves no cell, so no cell row of phase 1 is reported
+    # (WP-1999); the warning above and ``result.parametric`` say what set it
+    assert not [p.path for p in result.parameters if ".phases.1.cell." in p.path]
     (form,) = result.parametric_form
     assert (form.n_patterns, form.n_subset, form.tied, form.rejected) == (0, 2, None, None)
 

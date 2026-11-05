@@ -236,6 +236,119 @@ def test_axis_swaps_are_derived_from_the_subspace():
     assert axis_swaps(metric_basis("monoclinic")) == [(0, 2)]
 
 
+def test_swap_images_are_the_centrings_the_prune_maps_c_onto():
+    """WP-2066: the letters a leaf replays beside the admitted ones are the
+    admitted face letters moved by the system's own axis swaps.  Monoclinic C
+    gives A, orthorhombic C gives A and B, and no other system gives any."""
+    from rietx.indexing.dichotomy import _swap_images
+    from rietx.indexing.engines import CENTRINGS
+
+    got = {s: _swap_images(CENTRINGS[s], axis_swaps(metric_basis(s)))
+           for s in SYSTEM_ORDER}
+    assert got["monoclinic"] == {"A": "C"}
+    assert got["orthorhombic"] == {"A": "C", "B": "C"}
+    assert all(not v for s, v in got.items()
+               if s not in ("monoclinic", "orthorhombic"))
+
+
+def _exact_list(group: str, cell: tuple, tt_max: float) -> PeakList:
+    """#1258's lists: exact positions, one line per distinct 2θ, σ 0.005°."""
+    d = np.asarray(generate_reflections(group, cell, LAM, tt_max).d)
+    tt = np.unique(np.round(np.degrees(2.0 * np.arcsin(LAM / (2.0 * d))), 6))
+    return PeakList.from_positions(tt, LAM, two_theta_esd=0.005)
+
+
+def _truth_rows(candidates, primitive_volume: float) -> list[int]:
+    """Ranks of the candidates at the truth's primitive volume (1 %)."""
+    mult = {"P": 1, "A": 2, "B": 2, "C": 2, "I": 2, "F": 4, "R": 3}
+    return [i for i, c in enumerate(candidates)
+            if abs(c.volume / mult[c.centring] / primitive_volume - 1.0) < 0.01]
+
+
+def test_a_c_lattice_whose_every_c_setting_the_prune_drops_is_found():
+    """#1258, WP-2066: C m m m (4.2, 12.9, 5.9) centres the face of its
+    shortest and longest axes.  Sorted as the prune keeps them, that face is
+    B, so before the swap images were replayed the search reported itself
+    complete and returned the lattice only as P and I at twice its primitive
+    volume.  The B leaf is now re-set to C, and the lattice comes back once,
+    first, in the C setting, indexing every line."""
+    peaks = _exact_list("C m m m", (4.2, 12.9, 5.9, 90.0, 90.0, 90.0), 60.0)
+    result = search_dichotomy(peaks, spec=SearchSpec(
+        systems=("orthorhombic",), min_d_axis=2.0, max_d_axis=14.0,
+        max_volume=1500.0, shift_allowance_deg=1e-9,
+        budget_seconds=DEFAULT_TEST_BUDGET))
+
+    assert result.search_complete["orthorhombic"]
+    rows = _truth_rows(result.candidates, 4.2 * 12.9 * 5.9 / 2.0)
+    assert rows == [0], "one lattice, one candidate, ranked first"
+    best = result.candidates[0]
+    assert best.centring == "C"
+    assert best.cell[:3] == pytest.approx((4.2, 12.9, 5.9), abs=2e-3)
+    assert best.n_indexed == best.n_lines
+
+
+def test_a_search_restricted_to_c_still_replays_its_images():
+    """WP-2066: with the centrings restricted to C there is no P to make the
+    union every hkl, so the images widen the recursion's trial set.  The
+    restricted search finds the same lattice and still reports complete."""
+    peaks = _exact_list("C m m m", (4.2, 12.9, 5.9, 90.0, 90.0, 90.0), 60.0)
+    result = search_dichotomy(peaks, spec=SearchSpec(
+        systems=("orthorhombic",), centrings={"orthorhombic": ("C",)},
+        min_d_axis=2.0, max_d_axis=14.0, max_volume=1500.0,
+        shift_allowance_deg=1e-9, budget_seconds=DEFAULT_TEST_BUDGET))
+
+    assert result.search_complete["orthorhombic"]
+    best = result.candidates[0]
+    assert best.centring == "C"
+    assert best.cell[:3] == pytest.approx((4.2, 12.9, 5.9), abs=2e-3)
+
+
+@pytest.mark.slow
+def test_a_c_monoclinic_lattice_with_a_longer_than_c_is_found():
+    """#1258, WP-2066: C 1 2/c 1 (12.3, 6.1, 9.5, β 115°) has no C setting
+    in the half of the domain the a↔c prune keeps; there it is A.  The search
+    used to report itself complete with two P cells at twice the primitive
+    volume.  The A leaf is re-set to the conventional C cell (β obtuse), and
+    the lattice comes back once, first.  Slow: the monoclinic domain takes
+    one to two minutes alone."""
+    cell = (12.3, 6.1, 9.5, 90.0, 115.0, 90.0)
+    peaks = _exact_list("C 1 2/c 1", cell, 40.0)
+    result = search_dichotomy(peaks, spec=SearchSpec(
+        systems=("monoclinic",), min_d_axis=5.0, max_d_axis=12.5,
+        min_volume=250.0, max_volume=700.0, shift_allowance_deg=1e-9,
+        budget_seconds=BUDGET_SECONDS["monoclinic"]))
+
+    assert result.search_complete["monoclinic"]
+    from rietx.crystallography.lattice import cell_volume
+    rows = _truth_rows(result.candidates, cell_volume(*cell) / 2.0)
+    assert rows == [0], "one lattice, one candidate, ranked first"
+    best = result.candidates[0]
+    assert best.centring == "C"
+    assert best.cell[4] >= 90.0
+    assert best.n_indexed == best.n_lines
+
+
+def test_the_leaf_holding_a_dense_lists_truth_is_polished_onto_it():
+    """#1258's B case, WP-2066: 381 exact lines of P 1 21/c 1 (13.8, 19.1,
+    16.0, β 97.5°) over a narrow domain.  The leaf holding the truth is fine
+    on the 20 driven lines and many σ coarse above them, and annealing over
+    every line refined it onto cells indexing 288 and 273 of 381, with the
+    search reported complete.  Annealing on the lines up to the driven
+    window's top returns the truth first, indexing all 381.  Fast: a few
+    seconds under heavy load, the budget a runaway guard."""
+    cell = (13.8, 19.1, 16.0, 90.0, 97.5, 90.0)
+    peaks = _exact_list("P 1 21/c 1", cell, 40.0)
+    result = search_dichotomy(peaks, spec=SearchSpec(
+        systems=("monoclinic",), min_d_axis=13.0, max_d_axis=19.5,
+        min_volume=4000.0, max_volume=4400.0, shift_allowance_deg=1e-9,
+        budget_seconds=DEFAULT_TEST_BUDGET))
+
+    assert result.search_complete["monoclinic"]
+    best = result.candidates[0]
+    assert_same_lattice(best.cell, cell)
+    assert best.n_indexed == best.n_lines == len(peaks.two_theta())
+
+
 def test_predicted_reflection_count_matches_the_generator_it_guards():
     """The ceiling must count the same box ``generate_reflections`` allocates.
 
@@ -801,6 +914,57 @@ def test_dichotomy_recovers_a_monoclinic_cell():
     assert_same_lattice(result.candidates[0].cell, cell)
 
 
+def test_the_grid_frontier_is_bounded_by_its_lists_bytes(monkeypatch):
+    """The grid counts the bytes of its distinct survivor lists as well as
+    its cells, and overflows on either (WP-1924, #780's 2026-10-30 report).
+
+    A triclinic grid's 400 010 cells held lists enough to reach 18.4 GB and an
+    OOM kill, under a cell cap they never reached.  Siblings share one list,
+    so a list is counted once: a test handing every box the same array never
+    overflows, and one handing each box a fresh array does, through the cap's
+    existing "outgrew a size cap" report.
+    """
+    from rietx.indexing import dichotomy
+
+    basis = metric_basis("tetragonal")
+    lo0, hi0 = dichotomy._initial_box(basis, spec_for("tetragonal"))
+    shared = np.arange(1000, dtype=np.uint16)
+    monkeypatch.setattr(dichotomy, "MAX_GRID_BYTES", 4 * shared.nbytes)
+    budget = Budget(600.0)
+    *_rest, complete = dichotomy._grid_pass(
+        basis, lo0, hi0, shared, lambda rows, lo, hi: shared, budget)
+    assert complete
+    frontier, *_rest, complete = dichotomy._grid_pass(
+        basis, lo0, hi0, shared, lambda rows, lo, hi: rows.copy(), budget)
+    assert not complete and frontier is not None
+
+    peaks, _cell = synthetic_peaks("tetragonal")
+    monkeypatch.setattr(dichotomy, "MAX_GRID_BYTES", 1)
+    result = search_dichotomy(peaks, spec=spec_for("tetragonal"))
+    assert not result.search_complete["tetragonal"]
+    (diag,) = [d for d in result.diagnostics if d.code == "INDEX_SEARCH_INCOMPLETE"]
+    assert "outgrew a size cap on tetragonal" in diag.message
+
+
+def test_a_dichotomy_unit_stops_at_its_harvest_cap(monkeypatch):
+    """A unit's accepted leaves are bounded inside the unit (WP-1924, #780's
+    2026-10-30 report: 6 816 distinct orthorhombic lattices in five minutes,
+    7 GB at 70 min).  Reaching the cap ends the unit as a size cap does."""
+    from rietx.indexing import dichotomy
+
+    peaks, _cell = synthetic_peaks("tetragonal")
+    full = search_dichotomy(peaks, spec=spec_for("tetragonal"))
+    assert full.search_complete["tetragonal"]
+    assert full.stats["tetragonal.harvest"] >= 2, "the case no longer harvests"
+    monkeypatch.setattr(dichotomy, "MAX_HARVEST", 1)
+    result = search_dichotomy(peaks, spec=spec_for("tetragonal"))
+    # one leaf can add a candidate per centring before the cap is read
+    assert 1 <= result.stats["tetragonal.harvest"] < full.stats["tetragonal.harvest"]
+    assert not result.search_complete["tetragonal"]
+    (diag,) = [d for d in result.diagnostics if d.code == "INDEX_SEARCH_INCOMPLETE"]
+    assert "outgrew a size cap on tetragonal" in diag.message
+
+
 def test_dichotomy_holds_its_frontier_as_indices_until_a_cell_is_popped(
         monkeypatch):
     """Phase 2 holds the grid's survivor lists as narrow indices and gathers
@@ -1153,6 +1317,53 @@ def test_trial_error_survives_an_impurity_among_the_base_lines():
     result = search_trial_error(peaks, spec=spec_for("tetragonal"))
     assert result.candidates, "an impurity among the base lines lost the cell"
     assert_same_lattice(result.candidates[0].cell, cell)
+
+
+def test_a_stopped_dedup_leaves_the_ranked_list_as_it_was(monkeypatch):
+    """A token set while the dedup runs ends its walk only where the rest could
+    not reach the shortlist (WP-1924, #780: 10.7 s at 6 819 distinct lattices,
+    about n², with nothing reading the token).
+
+    Under the default preset the deadline *is* the token, so a dedup that
+    stopped on a count of candidates walked would hand every ceiling-bound
+    run a different pool.  Stopping where the next candidate indexes fewer
+    lines than ``keep`` leaders already held keeps the full pass's first
+    groups and the very list :func:`rank_candidates` returns unstopped.  The
+    harvest holds several line counts, so the stopped walk is shorter.
+    """
+    from rietx.indexing import dichotomy, engines
+    from rietx.optimize.cancel import CancelToken
+
+    raw: list = []
+    ranked = dichotomy.rank_candidates
+
+    def recording(cands, *args, **kw):
+        raw.extend(cands)
+        return ranked(cands, *args, **kw)
+
+    monkeypatch.setattr(dichotomy, "rank_candidates", recording)
+    peaks, _cell = synthetic_peaks("cubic")
+    search_dichotomy(peaks, spec=spec_for("cubic", n_unindexed=4))
+    monkeypatch.setattr(dichotomy, "rank_candidates", ranked)
+    full = engines.dedup_groups(raw)
+    idle = engines.dedup_groups(raw, cancel=CancelToken(), keep=1)
+    assert [[id(c) for c in g] for g in idle] == [[id(c) for c in g] for g in full]
+    stop = CancelToken()
+    stop.cancel()
+    part = engines.dedup_groups(raw, cancel=stop, keep=1)
+    assert len(part) < len(full), "the harvest no longer holds two line counts"
+    assert [g[0] for g in part] == [g[0] for g in full[:len(part)]]
+    # every lattice it left out indexes fewer lines than the one it kept last,
+    # so the pre-rank's volume tie-break saw the whole leading line count
+    assert all(g[0].n_indexed < part[-1][0].n_indexed for g in full[len(part):])
+
+    def ranked_ids(cancel, n):
+        out = engines.rank_candidates(raw, peaks, max_candidates=n, shortlist=1,
+                                      cancel=cancel)
+        return [id(c) for c in out]
+
+    for n in (1, 2, 3):
+        assert ranked_ids(stop, n) == ranked_ids(None, n)
 
 
 def test_the_fast_dedup_groups_exactly_as_the_plain_pass(monkeypatch):
@@ -1849,6 +2060,55 @@ def test_the_base_pool_is_a_prefix_of_the_selected_search_lines():
     assert not np.array_equal(np.sort(pool), np.sort(old_pool))
     assert peaks.two_theta()[pool].min() > tt[19], (
         "the pool is still drawn from lines the selection declined")
+
+
+def test_trial_error_reads_its_budget_between_the_solutions_of_one_base(
+        monkeypatch):
+    """WP-1924: a unit stops inside a base, not at the next one.
+
+    The budget was read once per base set, and one base's scoring is the long
+    step: an outside pattern ran a unit 282 s on a 60 s budget.  So a budget that
+    expires once one solution is scored must stop the unit before the second,
+    where a per-base read would score the whole base first.  Counted, never
+    timed: the budget here expires on a count of scored solutions.
+    """
+    from rietx.indexing import trial_error
+
+    peaks, _cell = synthetic_peaks("cubic")
+    calls = {"score": 0, "first_base": None}
+    real_score, real_solve = trial_error._score, trial_error._solve_assignments
+
+    def score(*args, **kwargs):
+        calls["score"] += 1
+        return real_score(*args, **kwargs)
+
+    def solve(*args, **kwargs):
+        # the scores before the second batch are the first scored base's
+        if calls["score"] and calls["first_base"] is None:
+            calls["first_base"] = calls["score"]
+        return real_solve(*args, **kwargs)
+
+    monkeypatch.setattr(trial_error, "_score", score)
+    monkeypatch.setattr(trial_error, "_solve_assignments", solve)
+    finished = trial_error.search_trial_error(peaks, spec=spec_for("cubic"),
+                                              probe=False)
+    assert finished.search_complete["cubic"]
+    # the precondition: without a stop, one base scores several solutions
+    assert calls["first_base"] is not None and calls["first_base"] > 1, calls
+
+    class ExpiresOnceScored(Budget):
+        def expired(self) -> bool:
+            return calls["score"] >= 1
+
+    calls["score"] = 0
+    monkeypatch.setattr(trial_error, "Budget", ExpiresOnceScored)
+    cut = trial_error.search_trial_error(peaks, spec=spec_for("cubic"),
+                                         probe=False)
+    assert calls["score"] == 1, (
+        f"{calls['score'] - 1} more solution(s) scored after the budget "
+        "expired on the first; the budget is read only between bases")
+    assert not cut.search_complete["cubic"]
+    assert "cubic.seconds" in cut.stats, "the clock rides the cut return"
 
 
 @pytest.mark.parametrize("engine", ["dichotomy", "trial_error"])

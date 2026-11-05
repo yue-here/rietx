@@ -1,6 +1,6 @@
 # WP-2028 — a joint fit's guards see every histogram
 
-Milestone: unscheduled · Status: 🔄 2026-10-26 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`); 4 measured, not wired; 7 and 8 open
+Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`), 7's census as PR #1205 (`d0d4831d`) and the joint `parameters()` as PR #1270 (`2d6e3e0b`); 4 measured, not wired; 8 measured on #1124, its two wording edits merged as PR #1277 (`e0cb41ea`); the joint identifiability screens are open as PR #1272
 Track: What fires, and what stays silent
 Depends on: — (1341 closed: it built the joint report this WP completes; 1325
 soft: its parametric codes and per-pattern holds are what tasks 3 and 6
@@ -129,6 +129,50 @@ The joint fit's curves come from the last stage's compile, not a compile at
 the answer, which is WP-1421's; a Layer 0 reading after a width stage carries
 that caveat until 1421 lands.
 
+### Inherited
+
+- 2026-11-01, from WP-1951 (issue #896): a single fit now reports a stage
+  glob that names one site (`phases.0.atoms.0.dof.*`) and frees nothing,
+  through `refine._site_glob_diagnostics` beside
+  `_fixed_literal_diagnostics`. A joint fit does not: `multi.
+  _joint_fixed_literals` calls only the literal builder, and WP-1951 left
+  it alone because PR #1270 is reshaping that wrapper. Once #1270 merges,
+  giving the site builder the literal one's `canonical` argument and
+  calling it there per histogram closes the gap. Check first that a site glob matching nothing everywhere
+  cannot also draw `STAGE_FREED_NOTHING`, which fires only where a glob
+  matched another histogram's rows.
+- 2026-11-01, from WP-2049 (PR #1305): a joint fit now holds a blank
+  histogram's own peak-only instrument rows (`hist.k.instrument.zero_shift`,
+  the profile terms) when that histogram sees no phase. `StageResult.held`
+  records it and the rows leave `result.parameters`, but no joint
+  diagnostic names it. `PHASE_UNCONSTRAINED` does not fire, since another
+  histogram sees the phase, and `PHASE_HELD_IN_PATTERNS`
+  (`multi._per_pattern_hold_diagnostics`) skips every path that names no
+  phase. Whether that code should list the instrument rows is this WP's
+  joint-report question. It is reader output, so it goes to the maintainer.
+- 2026-10-31, from the issue triage (issue #1124): task 8's measurement,
+  posted by the claimant 2026-10-28. Nothing wired. No source they read
+  defines observations per parameter over several patterns: McCusker 1999 §9
+  is one pattern, pdCIF keeps `_reflns_number_observed` per block, the GSAS
+  manual's joint χ² counts points; GSAS-II, FullProf and TOPAS manuals not
+  surveyed beyond their notes. Three candidates on seven public fits (LaB6
+  pair and three variants, corundum X-ray + neutron, MnF₂ three patterns,
+  `mg090`): (a) per pattern fires on a pattern short on its own while the
+  joint fit is supported (1.0 beside a joint 6.0) and charges a column to a
+  pattern that cannot see it; (b) #1128's candidate counts a per-pattern
+  column once per pattern, so it reads 3.6 and 3.0 where each pattern carries
+  5.0 and 6.0 and would fall as 1/N on a series; (c) the sum over-counts
+  repeats of one radiation. With every structural column shared no candidate
+  fires. Their recommendation: none; record "no agreed joint definition;
+  WP-2028 task 8 measured three candidates on #1124" in the
+  `_data_support_diagnostics` scope reason, leave `support=None`, and re-point
+  the four comments naming WP-1341 (`multi.py:249`, `:441`, `:2095`, `:2098`
+  on their tree) to this WP, in task 7's PR #1205 or a follow-up. A narrowed
+  (b), asked only when every free structural column is shared, is defined in
+  the comment if a number is wanted; it reads 6.0–25.3 on the shared fits and
+  fires on none. Checked against the tree at d87c8cc91: task 8 is still
+  unticked; PR #1205 (task 7) is open and leaves task 8 to #1124.
+
 ## Non-goals
 
 - The joint fit's compile at the answer (the #272 sibling): WP-1421.
@@ -168,11 +212,21 @@ that caveat until 1421 lands.
       (`SCALE_B_INSEPARABLE`, `PARAMETRIC_OUT_OF_RANGE`,
       `PARAMETRIC_FORM_REJECTED`) appear once. Decide whether a row with
       `equations` quotes `parametric_value()` beside it.
-- [ ] The `multi.py` census: list each member that re-derives something
+- [x] The `multi.py` census: list each member that re-derives something
       `Refinement` derives, `_ticks` first, compare it with the single path,
       and fold it or record why it stays, as `DIAGNOSTIC_SCOPES` does. Say
       whether a joint `parameters()` is owed. Include the declared-peak and
       parameter-space screens the joint path skips (Context item 7).
+- [ ] Joint identifiability screens (census, ruled 2026-10-31 on #1205): the
+      tables `check_guards` builds after the loop (`measured_top_correlations`,
+      `soft_modes`) run on the joint matrix, since that is what was solved; the
+      declared-peak absorption screen runs per histogram, since a declared peak
+      is one instrument's. This adds output, so it is its own change.
+- [x] A joint `parameters()` (census, ruled 2026-10-31 on #1205): read-only
+      first, returning the single fit's `ParameterRow` with paths spelled as
+      the joint table spells them; `set_vary` and `set_values` on the joint
+      follow when someone needs them. Re-point `STAGE_PATH_UNKNOWN`'s
+      suggestion to it.
 - [ ] Decide a joint observations-per-parameter for `DATA_SUPPORT_LOW`, or write
       why there is none in that scope reason (Context item 8). Re-point the four
       comments naming WP-1341 as owner (`multi.py:237`, `:411`, `:1920`, `:1923`)
@@ -209,6 +263,80 @@ shows the findings that name histogram h.
   WP-2001 and WP-2004 (the tier rule).
 
 ## Handover log
+
+- **2026-11-02** (ghostshift close batch) — the read-only joint `parameters()` merged from outside as PR #1270 (`2d6e3e0b`, head `6c5abbfd`). A joint fit now lists every parameter with the single fit's row type, each path spelled as the joint table spells it. The contributor's 2026-10-31 entry, its tick and its `Status:` addendum stand as written, so this entry adds the merge record. Round 2 of the review found both round-1 items fixed. A shared row's bounds are the intersection over its histograms, and both listings build their rows through `refine._parameter_row`. Three texts a joint fit's reader receives changed, and the maintainer approved them on the PR. *Gate*: #1270 and #1271 stacked on `main` `b54c27b28`, `[dev]` venv, macOS arm64. Fast selection 13 318 passed, 310 skipped, 32 xfailed, 0 failed. Slow selection 912 passed, 21 skipped, 18 xfailed, 0 failed. `python -m tests.reader_output` exited 0. A targeted re-run on `main` `ed8c75808` gave 169 passed. Gap, not blocking: `STAGE_FREED_NOTHING`'s suggestion still names `ref.mtable.tables[h].entries` and not `ref.parameters()`. This entry is recorded by PR #1336. Next: PR #1272 (the joint identifiability screens) is the open follow-up. It adds a handover entry at the same place in this log, so its branch needs that hunk rebased before it merges. Task 4 (WP-1523's test on the joint path) is unbuilt, and task 8's box waits on the maintainer.
+
+- **2026-11-01** (`/pr-review`) — task 8's two wording edits, asked on #1124, merged from outside as PR #1277 (`e0cb41ea`). The `_data_support_diagnostics` scope reason now says there is no agreed joint definition of observations per parameter, and points to task 8's measurement on #1124. Three comments in `multi.py` that named WP-1341 as owner of the joint report now name this WP. No number moves. This is the re-pointing and the written reason that task 8 asks for, so the PR looks to complete it. The box stays unticked for the maintainer. Gap, not blocking: the reason string now says "no agreed joint definition" twice. Open for this WP: PR #1270 (a read-only joint `parameters()`) and PR #1272 (the joint identifiability screens). Both were reviewed today with items to settle before merge. Both add a handover entry to this file, so the second to merge will conflict on this log. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
+
+- **2026-10-31** (`/pr-review`) — task 7's census merged from outside as PR #1205 (`d0d4831d`) after two rounds. The contributor's 2026-10-28 and 2026-10-31 entries, ticks and `Status:` edit stand as written, as WP-2030's did (ruled 2026-10-29), so this entry adds the merge record. Round 2 built the three rulings: a shared B is tested against the loosest bound among the histograms that hold it and the message names that histogram (`_large_biso_once`), a per-histogram B keeps its own cell's bound, and the identifiability screens and a read-only joint `parameters()` became their own tasks. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Gap, not blocking: `docs/releases/1.11.0.md` does not say that a shared B over per-histogram cells now fires only past the loosest bound, where 1.10.0 read histogram 0 alone.
+
+- **2026-10-31** — the joint `parameters()`, from outside (#1205's third
+  ruling). `MultiHistogramRefinement.parameters()` returns the single fit's
+  `ParameterRow` for every table entry, held rows included, before or after a
+  fit: a shared row once, at its first histogram's place, and a per-histogram
+  one per histogram, `hist.<h>.`-scoped. Each row is read off its own
+  histogram's table by `Refinement.parameters()`'s rules (`mode_fixed` for
+  `"rietveld"`, `needs_held_cell` from that histogram's cell, the esd from
+  `result_.parameters` under the same path). The spelling is the joint
+  result's, now `MultiParameterTable.row_path` (the `_row_shared` rule moved
+  to `params.multi.row_shared`). It differs from `_canonical` for a tied row
+  whose sources are per histogram: under `per_histogram=["phases.0.cell.a"]`
+  a cubic `b` is `hist.1.phases.0.cell.b`. So that every listed path is one
+  the joint fit accepts, `known_paths` adds that spelling, and
+  `STAGE_PATH_NOT_FREE` matches it: on `main` the literal
+  `hist.1.phases.0.cell.b` fired `STAGE_PATH_UNKNOWN` for a path the result
+  itself prints, and here it is `STAGE_PATH_NOT_FREE` naming
+  `hist.1.phases.0.cell.a`. `STAGE_PATH_UNKNOWN`'s suggestion names
+  `ref.parameters()` on both paths, and a locked joint literal's
+  `STAGE_PATH_NOT_FREE` suggestion points at `held_because` there, as a single
+  fit's does. No other joint finding's text moves. `set_vary` and `set_values` on the
+  joint are not built.
+
+- **2026-10-31** — review round on #1205 (task 7's census closed). The
+  maintainer ruled on the three open questions. (1) *Lindemann bound for a
+  shared B*: tested against the **loosest** bound among the histograms that
+  hold it, the message naming that histogram, since the case arises only with
+  per-histogram cells and the tightest or histogram 0's bound would report one
+  cell's reading as a fact about the B. Built here: `_large_biso_once`
+  (`multi.py`) over `strategy.staged.biso_over_bound`, which
+  `check_biso_plausible` now words; a per-histogram B keeps its own cell's
+  bound, and a single fit's findings are unchanged.
+  `test_a_shared_biso_is_tested_against_the_loosest_cell` fails on the
+  histogram-0-first rule (B = 20 shared over cells 1x and 3x in a: flagged
+  there, silent here). (2) *Per-histogram screens*: the identifiability tables
+  on the joint matrix, the declared-peak screen per histogram; adds output, so
+  its own change, listed above as a new item. (3) *Joint `parameters()`*: yes,
+  under that name, read-only first; listed above. The two stale `_ticks`
+  references (`model/forward.py`, `tests/test_tick_positions.py`) now name
+  `_build_result` and `_tick_rows`. Task 8 stays open.
+
+- **2026-10-28** — task 7's `_ticks` fold, from outside (claim #1124). The
+  joint path's tick loop is gone: `refine._tick_rows` is the one builder, and
+  `refine._build_result` and each histogram of
+  `MultiHistogramRefinement._build_result` call it. A joint fit's magnetic
+  phase now draws its `"<phase> (magnetic)"` row in each neutron pattern
+  (issue #278); an X-ray pattern, which does not see the moment, keeps one row.
+  *Measured*: `tests/test_magnetic_tick_row.py::test_a_joint_fit_draws_the_magnetic_row_in_each_neutron_histogram`
+  fails on `main` `2cf63737` (`['MnF2']`, the four magnetic-only reflections
+  on the nuclear row of the λ = 2.4 Å pattern) and passes here. A single fit's
+  `ticks`, `tick_hkl`, `tick_support` and diagnostic codes are byte-identical
+  to `main` on five fits (MnF₂ k = 0, a k = (0,0,½) supercell, a nuclear
+  phase, MnF₂ under X-rays, LaB6 with a declared peak; one SHA-256 over all
+  five). `tests/test_extra_components.py`'s joint test calls `_tick_rows`,
+  since `_ticks` is gone. *Also folded*, each a move-and-call:
+  `refine._merge_unresolved` (the merge by driver after a second solve, which
+  `Refinement._run_stage` kept inline and `multi.py` copied);
+  `MultiParameterTable._canonical` for `_specimen_path`'s non-ADP branch and
+  the QPA `where_of` (an ADP site keeps its own rule); and
+  `strategy.staged._correlation_findings`, `check_guards`' correlation and
+  flat-direction loop, which `_top_diagnostics` copied. Every whole result
+  (run-clock keys dropped) of six single fits and seven joint fits hashes the
+  same before and after these three; a mutant of each shared function turns a
+  test red (the merge rule is pinned directly in
+  `test_cell_runaway_safety.py`, since no fit reaches a second-solve escape).
+  *Open*: the Lindemann bound's histogram, the per-histogram screens and a
+  joint `parameters()`, for the maintainer's ruling; task 8 (measured on
+  #1124).
 
 - **2026-10-26** — tasks 1-3, 5 and 6 merged from outside as PR #1128
   (`1ba6c216`), after four review rounds. A joint fit's structure guards now

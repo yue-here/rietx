@@ -228,6 +228,27 @@ def test_best_or_none_is_none_under_every_gate_failure(break_it, expect):
     assert (result.best_or_none() is not None) is (expect == "high")
 
 
+@pytest.mark.parametrize("found_by,engines_run,expect", [
+    # #1308: one engine plus the caller's statement is one engine
+    (["prior", "svd"], ["svd"], "low"),
+    (["dichotomy", "prior"], sorted(engine_names()), "low"),
+    # two engines are agreement with or without the prior; the third's
+    # absence caps (``engines_disagree``)
+    (["dichotomy", "prior", "svd"], sorted(engine_names()), "medium"),
+    (["dichotomy", "svd"], sorted(engine_names()), "medium"),
+    # the prior adds nothing to ``high`` either way
+    (sorted([*engine_names(), "prior"]), sorted(engine_names()), "high"),
+])
+def test_a_prior_corroborates_and_never_counts_as_an_engine(
+        found_by, engines_run, expect):
+    """WP-1003 § E's rule, ruled and deferred until WP-2082: the gate's
+    two-engine floor counts independent searches, and a stated cell is not
+    one.  Every other row of this table is an otherwise clean candidate."""
+    cand = _candidate(TRUE_A, found_by=found_by)
+    caveats, verdict = _gate(cand, engines_run=engines_run)
+    assert verdict == expect, caveats
+
+
 def _fractions(by_line: float, by_intensity: float) -> list[FigureOfMerit]:
     return [FigureOfMerit(name="indexed_fraction", value=by_line, n_lines=53,
                           n_possible=40, k_sigma=3.0),
@@ -1010,6 +1031,13 @@ def test_index_pattern_recovers_the_cell_and_refutes_its_supercells(lab6_pattern
     assert root2.confidence_caveats == ["predicted_but_absent"]
     assert root2.lebail.predicted_but_absent_uncancellable_in_window >= 1
     assert result.candidates.index(root2) > result.candidates.index(best)
+    # the density compared across candidates (#941's follow-up), written by
+    # the run: the truth is the cleanest (excess 0), the a√2 I cell carries
+    # its windowed absences over and above it, which the raw count shares
+    # with magnetite's and PbSO₄'s true cells
+    assert best.lebail.predicted_but_absent_excess_in_window == 0.0
+    assert root2.lebail.predicted_but_absent_excess_in_window == pytest.approx(
+        root2.lebail.predicted_but_absent_uncancellable_in_window)
 
 
 def test_a_peaks_only_run_abstains_by_declaration(cubic_peaks):

@@ -168,6 +168,11 @@ def _axis_diagnostics(data: PatternData, fmt: PatternFormat,
             hint = (f" Divided by 100 it would run {lo / 100:g}° to "
                     f"{hi / 100:g}°. GSAS writes 2θ in centidegrees, and a "
                     "GSAS file whose BANK record is missing reads this way.")
+        if "axis" in fmt.options and data.metadata.get("declared_axis") is None:
+            # offered, never taken: a flight time and an angle are both
+            # ascending columns of numbers, and only the caller knows which
+            hint += (" If the column is a flight time in µs, declare it with "
+                     "axis='tof'.")
         raise ValueError(
             f"{name} was read as {fmt.title}, and its x axis runs {lo:g}° to "
             f"{hi:g}°. No scattering angle exceeds 180°, so this axis is not "

@@ -342,7 +342,7 @@ def search_trial_error(peaks: PeakList, *, spec: SearchSpec | None = None,
                                             peaks, search_line_order(peaks, spec),
                                             spec)[0],
                                         max_candidates=spec.engine_pool(),
-                                        q_match=sigma)
+                                        q_match=sigma, cancel=cancel)
     result.stats["candidates.raw"] = float(len(raw))
     if len(result.candidates) >= spec.engine_pool():
         for system in result.systems_searched:
@@ -432,6 +432,14 @@ def _search_system(peaks: PeakList, system: str, basis: np.ndarray,
                 key = solution_key(af, centring)
                 if key in seen:
                     continue
+                # **read per solution, not only per base** (WP-1924): one base's
+                # scoring is the long step (one synthetic triclinic base scored
+                # for 42 s, its batch solve took 1.3 s), and an outside pattern
+                # ran one unit 282 s on a 60 s budget.  The read changes no
+                # arithmetic, so a finished search is the same bits
+                if budget.expired():
+                    return found, {"solves": float(n_solved),
+                                   "seconds": round(budget.elapsed, 3)}, False
                 seen.add(key)
                 cand = _score(basis, system, centring, spec, af, hkl_full,
                               dm_full, index_full, q_all, sigma,

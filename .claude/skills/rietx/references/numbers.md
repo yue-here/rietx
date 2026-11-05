@@ -53,11 +53,11 @@ moves are logged in the schema version history:
 | `refine_profile_widths` | stage | a width template is significant — always as the instrument-side peer of the sample action, at half its confidence, because a width trend alone cannot separate the two sides (the instrument's Gaussian polynomial spans the same shapes; Toby 2024 §4's U/V/W example). Try the sample terms first; reach for this when they leave the trend standing (measured: the sample proxy stalls at χ²_red 4.3 on a planted Gaussian deficit, this action takes the same state to the 1.01 noise floor — WP-1106) | `instrument.profile.u`, `…v`, `…w` — the Gaussian half only: a *Lorentzian* instrument width error is column-degenerate with `phases.*.lor_size`/`…lor_strain`, so the sample actions absorb it exactly |
 | `refine_sample_size_broadening` | stage | the `inv_cos_theta` width template is significant | `phases.*.lor_size` |
 | `refine_sample_strain_broadening` | stage | the `tan_theta` width template is significant | `phases.*.lor_strain` |
-| `refine_axial_asymmetry` | stage | a significant asymmetry coefficient in gated regions below 2θ = 40° | `instrument.geometry.axial_sl`, `…axial_hl` |
+| `refine_axial_asymmetry` | stage | a significant asymmetry coefficient in gated regions below 2θ = 40°. With both apertures 0 the column is read at a nominal 0.02, only a positive coefficient counts, and the rationale says the apertures are 0: take S/L from a standard's calibration, or re-run the plan with a stage freeing S/L. | `instrument.geometry.axial_sl` alone: swapping it with `…axial_hl` gives the same pattern (WP-2012) |
 | `refine_biso` | stage | the relative intensity error trends with sin²θ/λ² — the ADP signature | `phases.*.atoms.*.biso` |
 | `refine_preferred_orientation` | stage | `TextureAnalysis.detected` with a best axis (both sides of the maturity gate); capped below a coexisting impurity call (§6's caveat row) | `phases.N.preferred_orientation.r` — named even when the phase declares no such block, on purpose: the rationale says which axis to declare first, and freeing nothing rolls back. A phase with no single fibre axis takes `Phase.texture` instead, at order 4 (6 on good data), freeing `phases.N.texture.*`, and is judged by `result.texture` and the composition (Measured: CPD-2 brucite, worst weighed fraction 3.41 wt % at order 4 and 2.71 at 6 against March-Dollase's 2.80). On a phase that declares `texture`, the rationale says to raise the order instead |
 | `refine_scale` | stage | the `constant` intensity template is significant — an angle-independent scale error | `phases.*.scale` |
-| `add_impurity_phase` | advice | strong unmatched observed peaks (> 8σ) not explained by the position-error evidence; when *every* one matches that evidence it is still emitted, capped at 0.3 with `reindex_or_recheck_cell` first among alternatives (§6) | empty **by design** — no phase is named yet, so there is nothing to free; the note says what to do instead |
+| `add_impurity_phase` | advice | strong unmatched observed peaks (> 8σ) not explained by the position-error evidence nor on a drawn flank; when *every* one matches that evidence it is still emitted, capped at 0.3 with `reindex_or_recheck_cell` first among alternatives (§6) | empty **by design** — no phase is named yet, so there is nothing to free; the note says what to do instead |
 | `increase_background_flexibility` | advice | between-peak misfit is systematic (high off-region χ²_red at low Durbin-Watson) — the too-stiff detector; capped at 0.6 however strong the evidence (§7's code block has why) | empty by design — the edit is to the background's *shape*, not to the free set; `instrument.background.*` would read as "free the background", which every plan already does |
 | `decrease_background_flexibility` | advice | the background column span reproduces a notable share of a structural parameter (`report.background.worst_absorption`) — the too-flexible detector | empty by design, same reason |
 | `reindex_or_recheck_cell` | index | validity-radius failures are widespread among the misfitting regions — and it survives abstention, where it matters most (§6) | `phases.*.cell.*`, but the verb is a search over cells, not a stage over parameters |
@@ -111,8 +111,9 @@ synthetic zincite under `mccusker_structural`, O at 0.38231(57) held, each z
 ±0.00039 under the centroid, against ±0.00029 on each z unheld; WP-1912.)
 
 **A symmetry-lowering can win ΔBIC and gain nothing where it splits.** Two fits
-of one pattern, a model and its lowering (cubic, tetragonal): ΔBIC says it paid
-for itself, not where. `rx.report.split_localisation(higher, lower)` shares the
+of one pattern, a model and its lowering (cubic, tetragonal): ΔBIC (judging.md §
+adding a parameter) and a nested F-test say it paid for itself, not where, so neither settles
+which space group. `rx.report.split_localisation(higher, lower)` shares the
 Δχ² among the windows of the reflections the lowering splits, the unsplit ones
 and the rest; read `split_share` against `split_point_share`. (Measured:
 synthetic Cu, tetragonal against cubic. A truly tetragonal specimen gave ΔBIC
@@ -139,3 +140,16 @@ calibrated pattern's wavelength, free the other's
 `WAVELENGTH_CALIBRATION` on `result.histograms[1].diagnostics`. (Measured:
 WP-1986, synthetic corundum, `examples/guides/joint.py`: +297.3 ppm recovered,
 5.1 ppm a esd.)
+
+**Ask for a torsion before you change the model.** `result.geometry.torsions`
+holds the torsion angles over bonded chains, Klyne-Prelog's sign in
+(−180°, 180°], at most 36 about each atom (`notes` counts the rest). For a row
+the table left out, call `ref.geometry({"torsions": [["C1", "C2", "C3",
+"C4"]], "distances": [["O1", ("N2", "2_555")]]})`: a label alone takes the
+image nearest the atom before it, and `(label, "n_klm")` names one. Its esds
+come from the last fit's covariance, which an edit or a checkout drops, after
+which every esd is `None`. A result saved before schema 0.60 reopens with
+`torsions` set to `None`, meaning "not listed", where `[]` means none were
+found; `ref.geometry()` lists them, without esds. (Measured: WP-1815, the
+published torsion loops of a TOPAS-6 and a SHELXL refinement reproduced to
+their printed digits.)
