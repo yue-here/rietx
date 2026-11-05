@@ -1,6 +1,6 @@
 # WP-1542 — a Le Bail background left at its seed
 
-Milestone: unscheduled · Status: 🔄 2026-11-05 — tasks 1-6 landed and Q1, Q2 ruled (PRs #1357, #1394); not closed by PR #1430, because the ruled cycle rule (task 7) was never built; next: task 7
+Milestone: unscheduled · Status: 🔄 2026-11-05 — claimed by @claude (ghostshift runner); tasks 1-6 landed and Q1, Q2 ruled (PRs #1357, #1394); working task 7, the ruled cycle rule
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-01 — was P2: WP-2062 moves every site where rietx picks a structure-free fit to Pawley (decided 2026-11-01), so no default path will run Le Bail; a caller who picks `mode="lebail"` still meets this
