@@ -89,7 +89,7 @@ for row in corrected.qpa.phases:
 # The page quotes every printed line; these pin the claims its prose makes.
 assert result.qpa.crystalline_only
 assert f"{100 * result.qpa.phases[1].weight_fraction:.2f}" == "1.34"
-assert not {"HIGH_CORRELATION", "EXTINCTION_UNDECLARED"} & {d.code for d in result.diagnostics}
+assert "HIGH_CORRELATION" not in {d.code for d in result.diagnostics}
 assert result.statistics.rwp < held_result.statistics.rwp
 assert f"{result.statistics.rwp:.3f}, {held_result.statistics.rwp:.3f}" == "0.088, 0.090"
 assert "HOLD_BLOCKED_PLAN" in {d.code for d in held_result.diagnostics}
