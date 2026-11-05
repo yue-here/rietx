@@ -2389,7 +2389,7 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.extinction.SCREEN_LEBAIL_CYCLES", "constant", tier=3, value=3,
         evidence=("the fixed 3 of StageSpec:lebail_cycles before WP-1542, kept for the fits the "
                   "extinction screen compares; its gates and margins are measured at this count, "
-                  "and a settled partition failed 11 rows of tests/test_extinction_margin.py and "
+                  "and a settled partition failed 10 rows of tests/test_extinction_margin.py and "
                   "test_extinction_gate.py (WP-1542, 2026-11-05); no stated source for the 3"),
         grounds=("Kept until WP-2062 moves the screen to Pawley, as the row it comes from was "
                  "kept until WP-1542 (B11, ruled 2026-10-19); re-measuring the screen's margins "
@@ -4436,19 +4436,30 @@ ROWS: tuple[Row, ...] = (
                  "and a budget is treated as not affecting the answer once a test confirms its "
                  "margin."),
         approved="2026-10-19"),
-    Row("rietx.schemas.plan.StageSpec:lebail_tol", "default", tier=1, ambiguity=1, value=1e-7,
-        evidence=("numerical setting with a domain test: the partition is an iterative solve for "
-                  "one fixed point, and this says how far it is taken; at fixed parameters from a "
-                  "flat start, max|dy|/sigma against a 1e-10 reference is 0.027 on #740's pattern, "
-                  "0.005 at its 2 % scale, 0.015 on BT-1 LaMnO3, 0.011 on FAP, under 0.001 on "
-                  "corundum, 11-BM NAC and LaB6+cBN, and 1e-6 fails at 0.237, 0.147 and 0.101; "
-                  "tests/test_lebail_cycles.py::test_the_tolerance_meets_its_bar holds bar 1 at "
-                  "the answer on six patterns and test_the_answer_does_not_read_the_tolerance "
-                  "bar 2 on five (0.023 plain esd on #740's pattern against 1e-9); #740 itself, "
-                  "the ruling's yardstick, ends at Rwp 1.07 % against 1.09 % for its true structure "
-                  "and 1.61 % at 3 cycles, with a cell 4.6 ppm off truth against 34.9 (WP-1542, "
-                  "2026-11-05, macOS arm64); the R package SQUAREM's own default tol is 1e-7, on "
-                  "another statistic")),
+    Row("rietx.schemas.plan.StageSpec:lebail_tol", "default", tier=3, ambiguity=1, value=1e-7,
+        evidence=("a numerical setting whose bar fails on one family; a cycle's share of the Bragg "
+                  "counts (the partition is one iterative solve, so this says how far it is taken); "
+                  "max|dy|/sigma against a 1e-10 reference at fixed parameters is, from a flat start, "
+                  "0.027 on #740's pattern, 0.005 at its 2 % scale, 0.015 on BT-1 LaMnO3, 0.011 on "
+                  "FAP and under 0.001 on corundum, 11-BM NAC and LaB6+cBN, where 1e-6 fails at "
+                  "0.237, 0.147 and 0.101; from the fit's own intensities 0.029, 0.001, 0.000 on "
+                  "#740, its 2 % scale, corundum and NAC; fails on FAP, 1.23: a pair 1e-4 A apart "
+                  "(506 and 10 -5 0) that 3000 more cycles swap, Rwp 10.108 to 10.103 %, with "
+                  "the answer 0.001 plain esd off; on #740 at 2 % scale settled intensities from "
+                  "two starts differ by 1.38, so no tolerance closes such a pair; bar 2, 0.1 plain "
+                  "esd, holds on five families (0.023 on #740's pattern against 1e-9); #740, the "
+                  "ruling's yardstick, ends at Rwp 1.07 % against 1.09 % for its true structure and "
+                  "1.61 % at 3 cycles, a cell 4.6 ppm off truth against 34.9; a stop on estimated "
+                  "distance (s2^2/(s1-s2), Aitken) left FAP at 1.23 too; a Le Bail plan costs "
+                  "1.0-2.1x on six patterns and 150x on LaMnO3 (0.45 s to about a minute); "
+                  "tests/test_lebail_cycles.py, WP-1542, 2026-11-05, macOS arm64"),
+        grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
+                 "judged against the true structure; the date is that rule's, and the number "
+                 "and its failing case are WP-1542's, put to the maintainer on its PR.  No "
+                 "surveyed program stops on the intensities at a fixed model, because each "
+                 "extracts inside the solve (docs/practice.md); 1e-8 leaves FAP at 0.55 and "
+                 "more than doubles LaMnO3's cycles."),
+        approved="2026-10-19"),
     Row("rietx.schemas.plan.StageSpec:seed", "default", tier="caller", ambiguity=1, value=0.0,
         evidence=("opt-in: Stage.seed > 0, default 0; the one shipped seed is "
                   "strategy.staged.ROUGHNESS_SEED's 0.3")),

@@ -99,9 +99,18 @@ where reflections overlap, so plain repetition needs thousands of cycles on a
 dense pattern. rietx accelerates it with SQUAREM, scheme S3 {cite}`varadhan2008`.
 Two cycles set a steplength, an extrapolation lands near the fixed point, and a
 third cycle starts from the landing. A landing below the starting likelihood is
-dropped for the plain second cycle. The acceleration changes the path and leaves
-the fixed point where it was, and an exact overlap keeps the ratio it started
-with. At $\mathrm{tol} = 0$ the cycles are plain and their number is fixed.
+dropped for the plain second cycle. The steplength is bounded, starting at 1. The
+bound grows fourfold after a kept landing that met it and shrinks fourfold after
+a dropped one, which is the rule of the SQUAREM package. The acceleration changes
+the path and leaves the fixed point where it was, and an exact overlap keeps the
+ratio it started with. At $\mathrm{tol} = 0$ the cycles are plain and their number
+is fixed.
+
+The stop reads how fast the intensities move. It does not read how far they still
+have to go. Two reflections the data barely separate can stand still at tol and
+exchange intensity over thousands of further cycles. On fluorapatite one such pair
+lies $10^{-4}$ Å apart, and the exchange moves the curve by 1.2 σ at that peak and
+the refined parameters by 0.001 esd.
 
 ### Pawley mode
 
