@@ -65,7 +65,7 @@ screenshots come from `docs/manual/make_screenshots.py`.
 - **2026-11-05, from the issue triage (issue #1396): in PR #1395.** The defect reads as the
   issue says at `541f0daf7`: `GuiSession._series_member_result` takes `runner.results_[index]`
   and `series_curves` takes `entry["data"][index]`, numbered differently once a pattern has
-  failed. The route is unreleased series GUI work and the issue names no failing run. PR #1395's
+  failed. The issue found this by reading, and this triage did not run it either. PR #1395's
   head looks the member up by its index on both routes, with a regression test, and its body
   carries the keyword that ends the issue at merge. Nothing is owed here beyond that merge.
 

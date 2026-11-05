@@ -140,6 +140,19 @@ rule above applies to the form factors.
 
 ### Inherited
 
+- **2026-11-05, from the issue triage (issue #1404): turning the analytic angle columns on in
+  the solve path is Michael's ruling, and it waits there.** PR #1403 lands the branch as
+  machinery and no solve asks for it. Issue #1404 holds what is left: the escape from a
+  symmetry-fixed start (a seed like `SEED_TILT`, the curvature-sign step #1207 would allow, or
+  the forward difference kept for such a start), the evidence that choice owes, and whether a
+  solve reaches the branch unconditionally or through a visible option. These are magnetic-path
+  decisions, Michael's since #1075 (Yue's offer 2026-11-03, accepted 2026-11-04, which names
+  #1404 as his next ruling). The issue's comment of 2026-11-04 adds a condition: the escape must
+  also reach the modulus profile's refits and a start exactly on the direction. The issue's own
+  numbers run on the PR's head, so they were not re-run in this triage. On main at `541f0daf7`
+  there is no `moment_angles` keyword yet. Nothing here waits on Yue, except a stored-format or
+  release consequence if the ruling has one.
+
 - **From WP-2068 (2026-11-02), for the PR that returns the angle seed with the analytic angle
   columns.** That PR owes "a comparison with the curvature-sign step #1207 would allow". WP-2068's
   task 1 measured what such a step would change, on macOS arm64 at `a8f679858`. With the
