@@ -930,15 +930,6 @@ def _unsupported_silent() -> list:
                 path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
 
 
-def _undeclared_extinction(ext_true: float, *, declare: bool = False) -> list:
-    """``EXTINCTION_UNDECLARED`` on a LaB6 synthetic with ``ext_true`` planted
-    (WP-1944): 2.5 µm² scores about 230, none planted leans negative, and a
-    phase that declares extinction is never pointed at it."""
-    from tests.test_extinction import _undeclared_fit
-
-    return _undeclared_fit(ext_true, declare=declare)
-
-
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -949,10 +940,6 @@ SILENCE: dict[str, Pair] = {
     "EXTINCTION_SCREEN_UNRELIABLE": Pair(
         _screen_unreliable_fires, _screen_unreliable_silent,
         "tests/test_extinction_gate.py (stub screens: the gate's fits are 20 s each)"),
-    "EXTINCTION_UNDECLARED": Pair(
-        lambda: _undeclared_extinction(2.5),
-        lambda: _undeclared_extinction(0.0) + _undeclared_extinction(2.5, declare=True),
-        "tests/test_extinction.py (a whole short fit: the score needs a converged one)"),
     "FLOOR_HIT": Pair(
         _floor_fires, _floor_silent, "tests/test_bound_hit_at_convergence.py"),
     "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED": Pair(
