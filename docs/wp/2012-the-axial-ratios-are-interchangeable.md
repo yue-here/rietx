@@ -1,9 +1,9 @@
 # WP-2012 — The two axial-divergence ratios are interchangeable, and a fit reports one branch
 
-Milestone: unscheduled · Status: 🔄 2026-11-05 — claimed by @mustachefeeling (ghostshift runner): the recipe sibling
+Milestone: unscheduled · Status: 🔄 2026-11-05 — the recipe import frees S/L alone on draft PR #1422; holding H/L against tying it to S/L awaits a ruling
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-11-02 — was P2: both presets fixed (PR #1356); what is left is an imported GSAS-II recipe freeing both ratios from one SH/L flag
+Priority: P3 2026-11-05 — was P3 2026-11-02: the recipe sibling is built (PR #1422, draft); one design question decides whether it ships as is
 
 ## Goal
 
@@ -126,6 +126,15 @@ choosing a fix.
       free set moves; the convention note says so where the flag is set. The tie was not
       taken: it needs a `Recipe` field. No committed recipe flags `axial_divergence`, so
       no fixture's fit moves.
+- [ ] Rule between the hold and the tie for the recipe import (2026-11-05, the generality
+      judge's "weak" on the hold). Freeing both is excluded by the exact swap symmetry. The
+      choice left is which one-parameter model replaces GSAS-II's: S/L free with H/L held at
+      SH/L / 2 (built on PR #1422), or S/L = H/L moving together, which is GSAS-II's own
+      model and needs a `Recipe` field (or a plan) that carries a tie. Against the hold: the
+      2026-11-01 ruling held H/L at a *declared* slit height, and here H/L is half a number
+      the recipe flags. The hold also starts exactly at s = h, where the analytic S/L column
+      is one-sided. Nothing measures the two models against each other, because no committed
+      recipe flags the term.
 - [x] The skill-placement episode's colleague script reads H/L as a result row, which the
       2026-11-03 nightly found raising `KeyError` (a slow row, so #1356's fast gates could not
       see it). **Done 2026-11-03 (PR #1387).** The script prints S/L alone, and
@@ -138,6 +147,67 @@ choosing a fix.
 ```
 
 ## Handover log
+
+- **2026-11-05 (ghostshift runner, the recipe sibling)** — An imported GSAS-II recipe no
+  longer frees both axial-divergence ratios from its one `SH/L` flag. It frees S/L and holds
+  H/L at the half the recipe states, matching the lab presets. Nothing a committed recipe
+  reads or fits changes, because none flags the term. The WP does not close. The generality
+  judge rated the hold weak against the other one-parameter model, a tie S/L = H/L, which
+  is GSAS-II's own. Which of the two a recipe import should use is the maintainer's call
+  (the open task above). PR #1422 stays a draft until it is made.
+
+  *Done.* `io/recipe.py`'s `_read_instrument` applies the `axial_divergence` entry to S/L
+  once. H/L is a copy of S/L with the flag held, so a stated bound is honoured and reported
+  once. `RECIPE_CONVENTION_ASSUMED` now fires wherever a split was made. Before, an entry
+  carrying its own value beside a zero `SH/L` was split silently. Where the flag is set, the
+  note says S/L alone is freed and H/L is held. A flag with no `SH/L` stated no longer
+  reports an `SH/L = 0` that the recipe never wrote. `help.py`'s entry, the recipe
+  reference chapter and `tests/data/README.md`'s convention row follow. Four tests in
+  `test_recipe.py`.
+
+  *Review.* `/code-review high --fix` found seven issues. It fixed three in `1aa04c665`:
+  the silent entry-only split, the invented `SH/L = 0`, and the doubled bound report. It
+  added three of the four tests. Declined, each for the ruling below:
+  - `RECIPE_FLAG_DROPPED` at `warning` in place of `info`;
+  - a flag with no `SH/L` starting S/L at the off state. Both ratios started there before
+    this change too.
+
+  Finding 7 (Status and Priority stale) is answered by this entry.
+
+  *Generality* (the judge, on this branch's diff). The hold is a heuristic the audit table
+  cannot see. It has two parts:
+  - **Not freeing both:** tier 1, verified by the bit-identical swap.
+  - **Holding H/L in place of a tie:** "weak". The judge names a dissenter: a refiner
+    reproducing the GSAS-II refinement the recipe encodes would tie the pair.
+    `io/CLAUDE.md` § Project writers prefers freeing to holding where a flag is narrower
+    than the model. The 2026-11-01 ruling held H/L at a declared slit height, and here
+    H/L is half a flagged number. No family measures the hold against the tie.
+  - **The note's widened trigger:** "holds".
+
+  Author's answer: the hold follows the presets' ruling, and the tie needs a `Recipe`
+  field. That makes it a design choice, so it goes to the maintainer and is not settled
+  here. The judge also called the s = h start the FCJ corner (`docs/docs/theory/method.md`
+  § The FCJ corner). That is true. The default instrument and both presets start there
+  too, so the corner is not specific to the recipe.
+
+  *Gates.* Measured on darwin/arm64, worktree venv `[dev]`, compiled tier on. The touched-area files (recipe, help, audit table, audit delta, docs consistency, manual API, GUI help, skill): 345 passed before the review added three tests. `test_recipe.py` alone gave 60 passed after it. FAST_LINE `tests.reader_output`: exit 0, unchanged against `078f10644`. Ruff
+  clean. Vale: 0 errors. The full suite did not run. The change cannot move a measured
+  number, because no committed recipe flags the term (`tests/CLAUDE.md` § Running). Pearl
+  did not answer (SOCKS error 1, and the wake got no answer within 120 s), so the gates ran
+  on the Mac.
+
+  *Next:* the maintainer rules on hold against tie.
+  - **Hold:** mark #1422 ready, tick the open task, close the WP and move its narrative to
+    `docs/milestones/v1.12.md`.
+  - **Tie:** add a tie channel to `Recipe` (or to the plan), apply `tie_equal` to the
+    axial pair in `read_recipe`'s plan, and rewrite the note and the four tests.
+
+  Either way, the judge's evidence would settle it: fit one recipe with the flag set under
+  each model, and compare the refined values with GSAS-II's own refined `SH/L` under the
+  same recipe. That needs a recipe file, and none is committed. The skill's
+  `RECIPE_CONVENTION_ASSUMED` row ("Treat the split as measured") contradicts `help.py`
+  ("assumed and not measured"). The row has said this since #287, and it was left as it is
+  and flagged on the PR.
 
 - **2026-11-03 (second ghostshift runner, the nightly)** — The 2026-11-03 nightly's one
   failure was this WP's. Since #1356 the lab plan no longer refines H/L, so H/L is not a row
