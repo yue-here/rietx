@@ -156,6 +156,7 @@ from .schemas.common import Diagnostic, Parameter, Provenance
 from .schemas.instrument import Instrument
 from .schemas.parametric import (
     CoordinateTable,
+    ParametricCoefficient,
     ParametricEquation,
     ParametricFormReading,
     ParametricFormTest,
@@ -2736,7 +2737,7 @@ class MultiHistogramRefinement:
         the subset carried gradient for it.
         """
         mt = self.mtable
-        if not mt.parametric:
+        if not (mt.parametric or mt.expressions):
             return None
         t0 = mt.tables[0]
         rows = []
@@ -2745,6 +2746,18 @@ class MultiHistogramRefinement:
             rows.extend(coefficient_rows(
                 r, {p: e.value for p, e in entries.items()}, esd0,
                 {p: e.vary for p, e in entries.items()}))
+        # An expression's rows are its variables (WP-1964): ``term`` is the
+        # variable's name, the value its own in its own unit, and no
+        # reference, since an expression has none.  A variable two
+        # equations read is listed under each.
+        for r in mt.expressions:
+            for name, path in zip(r.variables, r.paths, strict=True):
+                e = t0.entries[t0._paths[path]]
+                esd = esd0.get(path) if e.vary else None
+                rows.append(ParametricCoefficient(
+                    equation=r.name, target=r.target, term=name, path=path,
+                    value=float(e.value), esd=None if esd is None else float(esd),
+                    vary=bool(e.vary), unit=t0._units.get(path), reference=None))
         return rows
 
     def _parameters(self, thetas, stderr, corr, at_bounds, esd0,

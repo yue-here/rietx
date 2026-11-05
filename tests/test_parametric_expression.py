@@ -266,7 +266,19 @@ def test_an_einstein_cell_with_theta_held_recovers_its_two_variables():
         if path in rows:
             assert rows[path].equations == ["a"], path
     assert rows["hist.0.phases.0.cell.a"].equations == ["a"]
-    named = {p.path for p in result.parameters if p.equations}
+    # the variables are the equation's rows in result.parametric, θ held
+    by_term = {c.term: c for c in result.parametric}
+    assert list(by_term) == ["zero_a", "grad", "theta"]
+    for term in ("zero_a", "grad"):
+        c = by_term[term]
+        assert (c.equation, c.target, c.path) == ("a", "phases.0.cell.a", f"vars.{term}")
+        assert c.vary and c.value == rows[c.path].value and c.esd == rows[c.path].stderr
+        assert c.reference is None
+    assert not by_term["theta"].vary and by_term["theta"].esd is None
+    assert by_term["theta"].value == theta
+    printed = str(result)
+    assert "[grad]" in printed and "[theta] 400 (not free at the answer)" in printed
+    named ={p.path for p in result.parameters if p.equations}
     assert named == {p.path for p in result.parameters
                      if p.path.startswith("vars.") or ".phases.0.cell." in p.path}
 
