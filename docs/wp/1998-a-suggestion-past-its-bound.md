@@ -113,7 +113,8 @@ template line):
   New fields `ParameterCandidate.gain_unbounded` (writer `build_suggestion`)
   and `SuggestionResult.bound_limited`. `best_or_none` gates on the leader's
   `delta_bic > 0` and does not promote a lower group. Guide `next.md` and its
-  script, `reference/comparison.md`, theory eq `est-suggest-bounded`, the
+  script, `reference/comparison.md`, the theory page (the α(2−α) rule inline, the page being at its
+  50 000-character cap), the
   skill's `api.md` (three copies). No skill row (task 4 says why).
   The truth-fixture tests moved where the physics did: with W or X injected
   too broad, every sample width on its floor of 0 is now bound-held, so the
