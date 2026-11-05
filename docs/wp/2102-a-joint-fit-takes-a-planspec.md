@@ -1,6 +1,6 @@
 # WP-2102 — a joint fit takes a PlanSpec
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-05 — claimed by @yue-here (ghostshift runner)
 Depends on: —
 Priority: P2 2026-11-04 — a raise on a documented input type, and an expert's own plan is the first thing they pass
 
