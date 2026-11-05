@@ -413,13 +413,21 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
     That command is WP-2118, not this WP. Readers to update with the removal: the
     docstring, DESIGN.md § Parameter system, `io/projects/gsas2.py`'s note, and any manual
     or skill line naming the field.
+  - *Decided (Yue, 2026-11-05), (b).* The stored-format changes take a `SCHEMA_VERSION`
+    bump under the existing rules. The new fields (`basis="expression"`, `expression`,
+    `variables=`, `target=None`) are additive and defaulted, the 0.25 → 0.26 rule; the
+    `expr` removal reads through a migration. The log entry beside the constant says that
+    old files open unchanged and that a file using a formula does not open in 1.11 or
+    earlier. If 1.12 has not shipped when this merges, the entry is "Also in 0.61" (the
+    log's pattern within one release, inferred and to be checked); otherwise 0.62. Confirm
+    `PROJECT_FORMAT_VERSION` (the `.rex` layout) does not move.
   - *Task 15, the skill.* The series reference's parametric row now names `basis="expression"`
     and `variables=`. It grew 23 B and sits 16 B under its budget. The synced copies follow.
   - *Fast selection* at 93518e01f, `[dev,jax,torch]`, darwin/arm64, through ghostshift's
     `serial.py`: 14471 passed, 51 skipped, 36 xfailed, 0 failed (18:49). The total is 35 above
     the last entry's at 84fa4cb02, and this session added four tests; the rest is the
     second session's later commits and a different skip set, not reconciled here.
-  - *Next.* Task 11 (decision (c) answered above), the removal of `Parameter.expr` (decision (a) above), then 13 and 14.
+  - *Next.* Task 11 (decision (c) answered above), the removal of `Parameter.expr` and the schema bump (decisions (a) and (b) above), then 13 and 14. Consent items 1-6 and the reader-output additions still wait on the maintainer.
 
 - **2026-11-05 (second build session, a ghostshift runner)** — Tasks 7 and 8 landed, and
   the fast selection's three reds from the first session are fixed. Branch
