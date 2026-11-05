@@ -1,6 +1,6 @@
 # WP-1964 — a parametric equation the user writes
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-05 — claimed by ghostshift runner
 Depends on: 1804 (the derived block); 1325 soft (the joint path, its equations and its form test have landed, and its open tasks are separate); 2103 soft (the tie the WO₃ protocol needs)
 Priority: P2 2026-11-03 — the maintainer's direction: the machinery an experienced TOPAS or GSAS-II user needs comes first, and this is the piece they cannot work around
 
@@ -252,7 +252,7 @@ per-pattern one is an array.
 
 ## Tasks
 
-- [ ] **Write the grammar first.** The operators, the functions, precedence, the
+- [x] **Write the grammar first.** The operators, the functions, precedence, the
   spellings under § The grammar's traps, and the version. It goes in the manual
   as a reference page. Beside it goes a conformance table of (expression,
   bindings, expected value or error), which every evaluator runs. Bring the
