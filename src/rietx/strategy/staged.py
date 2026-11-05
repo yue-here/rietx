@@ -140,11 +140,11 @@ class Stage:
     ftol: float | None = None
     #: the most intensity-partitioning cycles run before and after the solve
     #: (lebail mode), and the seed's (pawley mode)
-    lebail_cycles: int = 300
+    lebail_cycles: int = 25000
     #: the share of the Bragg counts a cycle may still move and end the
     #: partition (``CompiledModel.lebail_update``).  0 runs exactly
     #: ``lebail_cycles``.
-    lebail_tol: float = 1e-4
+    lebail_tol: float = 1e-7
     #: start every row this stage frees that sits exactly on a lower bound of
     #: 0 or above at this value, before solving
     #: (``ParameterTable.seed_floored``; recorded in ``StageResult.seeded``).

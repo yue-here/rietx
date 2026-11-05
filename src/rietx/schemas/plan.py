@@ -203,10 +203,10 @@ class StageSpec(Base):
         "(intermediate_ftol for every declared stage but the last, the "
         "solver's 1e-9 for the last declared stage and for the closing stage "
         "when the plan has one)"))
-    lebail_cycles: int = Field(300, description=(
+    lebail_cycles: int = Field(25000, description=(
         "the most intensity-partitioning cycles run before and after the "
         "solve in lebail mode, and for the seed in pawley mode"))
-    lebail_tol: float = Field(1e-4, ge=0.0, description=(
+    lebail_tol: float = Field(1e-7, ge=0.0, description=(
         "the share of the Bragg counts a cycle may still move and end the "
         "partition; 0 runs exactly lebail_cycles"))
     seed: float = Field(0.0, description=(

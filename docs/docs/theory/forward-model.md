@@ -75,12 +75,40 @@ shares sum to 1 at each point. The update is a fixed point when $y_{\mathrm{obs}
 extracted intensities live outside the parameter vector and are path-dependent,
 so a history node serialises them beside the parameters it stores.
 
+Equation {eq}`fm-lebail` repeats until one cycle moves a small share of the Bragg
+counts:
+
+```{math}
+:label: fm-lebail-stop
+
+\frac{\sum_k A_k\,\lvert\Delta I_k\rvert}{\sum_k A_k\, I_k} \le \mathrm{tol},
+\qquad A_k = \sum_l w_l \sum_i \Omega_{lk,i}.
+```
+
+{source}`rietx.model.forward._settled_partition`
+
+Here $A_k$ is the counts a unit intensity lays on the pattern, and tol is
+`Stage.lebail_tol`. The weight matters because a reflection falling to its floor
+shrinks by a constant fraction of itself per cycle for as long as it lives. An
+unweighted largest relative change would therefore never end.
+
+Equation {eq}`fm-lebail` is a Richardson-Lucy step
+{cite}`richardson1972,lucy1974`, which is an expectation-maximisation step on a
+Poisson likelihood {cite}`shepp1982`. Such a step slows to a linear rate near 1
+where reflections overlap, so plain repetition needs thousands of cycles on a
+dense pattern. rietx accelerates it with SQUAREM, scheme S3 {cite}`varadhan2008`.
+Two cycles set a steplength, an extrapolation lands near the fixed point, and a
+third cycle starts from the landing. A landing below the starting likelihood is
+dropped for the plain second cycle. The acceleration changes the path and leaves
+the fixed point where it was, and an exact overlap keeps the ratio it started
+with. At $\mathrm{tol} = 0$ the cycles are plain and their number is fixed.
+
 ### Pawley mode
 
 The per-$hkl$ intensities sit inside the least-squares problem
 {cite}`pawley1981`, as an off-table parameter block appended to $\theta$.
-Equation {eq}`fm-lebail` is then used once, to seed the block before the first
-solve. Reflections whose primary-line centres sit within
+Equation {eq}`fm-lebail` is then used for at most three cycles, to seed the block
+before the first solve. Reflections whose primary-line centres sit within
 {{ PAWLEY_OVERLAP_FWHM_FRAC }} × their mean FWHM form an overlapped group and
 receive a soft equal-split restraint, scaled so that the split-direction esd is
 of order the group intensity itself. An unresolved split is then reported at

@@ -858,6 +858,14 @@ ROWS: tuple[Row, ...] = (
                   "fires exactly when used")),
     Row("LAUE_CLASS_NOT_SEPARABLE", "code"),
     Row("LEBAIL_ALTERNATION_STOPPED", "code"),
+    Row("LEBAIL_CYCLES_AT_CAP", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when StageResult.lebail_settled is False on the "
+                  "last stage, the answer's partition having reached Stage.lebail_cycles; "
+                  "gates nothing"),
+        response="warning",
+        responds=("raise lebail_cycles on the stage until StageResult.lebail_settled reads True, "
+                  "and read the intensities and widths as unsettled until then"),
+        scope=("all",)),
     Row("LOW_ANGLE_UNMODELLED", "code"),
     Row("MAGNETIC_ION_ASSUMED", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: fires exactly when the substitution was made (info); the "
@@ -1506,6 +1514,11 @@ ROWS: tuple[Row, ...] = (
                  "a standard, which side carries the width is the caller's, and the record names "
                  "the pair."),
         approved="2026-10-23"),
+    Row("rietx.schemas.results.StageResult.lebail_cycles_run", "action", tier=1, ambiguity=1,
+        evidence="arithmetic: the count each partition returned, recorded and acting on nothing"),
+    Row("rietx.schemas.results.StageResult.lebail_settled", "action", tier=1, ambiguity=1,
+        evidence=("arithmetic: the last partition ended under its cap with a tolerance above 0; "
+                  "None where no tolerance was asked, so it cannot read as an answer")),
     Row("rietx.schemas.results.StageResult.released", "action", tier=3, ambiguity=1,
         evidence=("WP-1301/1523: a held phase reading >= 3 sigma at the answer is released and the "
                   "stage re-solved once; one that fell under it is restored to its stage start and "
@@ -2373,6 +2386,15 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.engines._INDEX_MIN_DEFECT", "constant", value=1e-06),
     Row("rietx.indexing.engines._INDEX_MIN_ROWS", "constant", value=15000),
     Row("rietx.indexing.extinction.DECISIVE_DELTA_BIC", "constant", value=10.0),
+    Row("rietx.indexing.extinction.SCREEN_LEBAIL_CYCLES", "constant", tier=3, value=3,
+        evidence=("the fixed 3 of StageSpec:lebail_cycles before WP-1542, kept for the fits the "
+                  "extinction screen compares; its gates and margins are measured at this count, "
+                  "and a settled partition failed 11 rows of tests/test_extinction_margin.py and "
+                  "test_extinction_gate.py (WP-1542, 2026-11-05); no stated source for the 3"),
+        grounds=("Kept until WP-2062 moves the screen to Pawley, as the row it comes from was "
+                 "kept until WP-1542 (B11, ruled 2026-10-19); re-measuring the screen's margins "
+                 "for a method it is about to leave buys nothing."),
+        approved="2026-10-19"),
     Row("rietx.indexing.extinction.REFERENCE_NET_RWP_MAX", "constant", tier=3, value=0.7071,
         evidence=("Statistic: Toby (2006)'s background-subtracted Rwp over the picker's "
                   "envelope (the envelope is rietx's own). Right or nearly right cells read "
@@ -2604,6 +2626,10 @@ ROWS: tuple[Row, ...] = (
                  "2026-10-22) keeps it at tier 3 for WP-2017's second pass over a refine-from-zero "
                  "floor of its own."),
         approved="2026-10-22"),
+    Row("rietx.model.forward.LEBAIL_INTENSITY_FLOOR", "constant", tier=1, value=1e-10,
+        evidence=("numerical floor: keeps a partitioned intensity positive so the next cycle's "
+                  "share of the point is defined; ten orders under one count, and the partition's "
+                  "value since before WP-1542 named it")),
     Row("rietx.model.forward.MAGNETIC_SIZING_FLOOR", "constant", tier=3, value=0.1,
         evidence=("invariant behind the closing stage only: a magnetic width freed from "
                   "zero is drawn on windows sized at the floor, which lose 3.2 and 4.1 % of a "
@@ -2691,6 +2717,10 @@ ROWS: tuple[Row, ...] = (
                  "so this margin serves every compile; the eighth round (ruled 2026-10-22) keeps "
                  "it at 0.5 deg, the 0.03-0.04 esd it costs recorded, for WP-2017's second pass."),
         approved="2026-10-22"),
+    Row("rietx.model.forward.SQUAREM_STEP_GROWTH", "constant", tier=2, value=4.0,
+        evidence=("source: mstep = 4, the default of Varadhan and Roland's R package SQUAREM, with "
+                  "step.max0 = 1 and method = 3 (CRAN manual, checked 2026-11-05); unbounded, one "
+                  "FAP partition dropped every landing for hundreds of rounds (WP-1542)")),
     Row("rietx.model.forward.WINDOW_AREA_TOL", "constant", tier=3, value=0.02,
         evidence=("window area tolerance; measured 2026-10-21 on SRM 660c, FAP, cpd-1a and 11-BM NAC against 5e-5 (converged): fails on all four, "
                   "max |dy|/sigma 0.71-2.15 at fixed parameters against a bar of 0.1, a converged "
@@ -3479,6 +3509,15 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine.LOW_ANGLE_MIN_CHANNELS", "constant", value=10),
     Row("rietx.refine.LOW_ANGLE_UNMODELLED_RATIO", "constant", value=3.0),
     Row("rietx.refine.MAGNETIC_TICK_PURITY", "constant", value=0.05),
+    Row("rietx.refine.PAWLEY_SEED_CYCLES", "constant", tier="invariant", value=3,
+        evidence=("answer-invariant: the joint solve refines the seed; a seed settled at 1e-5 "
+                  "against 3 cycles moved 0.000 esd at identical evaluations (33, 70, 53, 63) on "
+                  "#740's pattern at 2 % scale, corundum, 11-BM NAC and LaB6+cBN (WP-1542); "
+                  "tests/test_lebail_cycles.py::test_the_pawley_answer_does_not_read_its_seed_count"),
+        grounds=("B11 (ruled 2026-10-19) treats a budget as not affecting the answer once a test "
+                 "confirms its margin; a longer seed would cost index validation, a default "
+                 "path, with nothing to show for it."),
+        approved="2026-10-19"),
     Row("rietx.refine.MODEL_FAR_FROM_DATA_RWP", "constant", tier=3, value=0.8,
         evidence=("WP-1028 (c): the zero-scale attractor converges at Rwp 0.99999, honest bad fits "
                   "sit at 0.2-0.5, the failures above it at 72.25 and 2.6e3 (docstring); gates "
@@ -4385,14 +4424,31 @@ ROWS: tuple[Row, ...] = (
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),
-    Row("rietx.schemas.plan.StageSpec:lebail_cycles", "default", tier=3, ambiguity=1, value=3,
-        evidence=("no stated source; issue #740 (synthetic LaMnO3-like neutron, cell and profile "
-                  "at truth): Rwp 4.56 % at 3 cycles, 1.62 % at 100-400, 1.09 % for the true "
-                  "structure; GSAS-II's DoLeBail runs 10 (GSASIIstrMain.py:761, checked); changed "
-                  "by WP-1542 (converge with a cap)"),
-        grounds=("Kept at 3 until WP-1542 replaces it with a stop once the intensities stop "
-                 "changing, under a cap; #740 is its stated failure (B11, ruled 2026-10-19)."),
+    Row("rietx.schemas.plan.StageSpec:lebail_cycles", "default", tier="invariant", ambiguity=1,
+        value=25000,
+        evidence=("answer-invariant: a cap the stop reaches first; the dearest partition of a "
+                  "profile_only fit at lebail_tol 1e-7 ran 8495 cycles on BT-1 LaMnO3, 1088 on "
+                  "#740's pattern and 161 on FAP, and one from a flat start 12 293 (2.0x); "
+                  "tests/test_lebail_cycles.py::test_the_tolerance_meets_its_bar asserts 2x on six "
+                  "patterns from four kinds of instrument; a cut says so (LEBAIL_CYCLES_AT_CAP); "
+                  "GSAS-II's DoLeBail runs a fixed 10 (GSASIIstrMain.py:761, checked)"),
+        grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
+                 "and a budget is treated as not affecting the answer once a test confirms its "
+                 "margin."),
         approved="2026-10-19"),
+    Row("rietx.schemas.plan.StageSpec:lebail_tol", "default", tier=1, ambiguity=1, value=1e-7,
+        evidence=("numerical setting with a domain test: the partition is an iterative solve for "
+                  "one fixed point, and this says how far it is taken; at fixed parameters from a "
+                  "flat start, max|dy|/sigma against a 1e-10 reference is 0.027 on #740's pattern, "
+                  "0.005 at its 2 % scale, 0.015 on BT-1 LaMnO3, 0.011 on FAP, under 0.001 on "
+                  "corundum, 11-BM NAC and LaB6+cBN, and 1e-6 fails at 0.237, 0.147 and 0.101; "
+                  "tests/test_lebail_cycles.py::test_the_tolerance_meets_its_bar holds bar 1 at "
+                  "the answer on six patterns and test_the_answer_does_not_read_the_tolerance "
+                  "bar 2 on five (0.023 plain esd on #740's pattern against 1e-9); #740 itself, "
+                  "the ruling's yardstick, ends at Rwp 1.07 % against 1.09 % for its true structure "
+                  "and 1.61 % at 3 cycles, with a cell 4.6 ppm off truth against 34.9 (WP-1542, "
+                  "2026-11-05, macOS arm64); the R package SQUAREM's own default tol is 1e-7, on "
+                  "another statistic")),
     Row("rietx.schemas.plan.StageSpec:seed", "default", tier="caller", ambiguity=1, value=0.0,
         evidence=("opt-in: Stage.seed > 0, default 0; the one shipped seed is "
                   "strategy.staged.ROUGHNESS_SEED's 0.3")),
@@ -4967,6 +5023,8 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
     Row("LEBAIL_ALTERNATION_STOPPED.suggestion", "suggestion", value=1),
+    Row("LEBAIL_CYCLES_AT_CAP.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: names the stage setting that lifts the cap"),
     Row("LOW_ANGLE_UNMODELLED.suggestion", "suggestion", value=1),
     Row("MAGNETIC_ION_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
         evidence="arithmetic: names the argument that overrides the default"),

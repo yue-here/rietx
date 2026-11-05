@@ -582,6 +582,9 @@ def _line_image_deg(tt_primary, lam_ratio: float, xp):
 
 # Keeps a reflection the partition emptied a positive share of the next cycle.
 LEBAIL_INTENSITY_FLOOR = 1e-10
+# ``mstep`` of the authors' R package SQUAREM, at that package's default: the
+# bound starts at 1 and the scheme is its ``method = 3``.
+SQUAREM_STEP_GROWTH = 4.0
 
 
 def _settled_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float, float]],
@@ -598,13 +601,17 @@ def _settled_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float, fl
     335): two cycles give the steplength, an extrapolation lands near the fixed
     point, and a third cycle from there keeps the iterate on the step's map.  A
     landing below the likelihood at the start of the round is dropped for the
-    plain second cycle, which is what makes it globally convergent.
+    plain second cycle, which is what makes it globally convergent.  The steplength
+    starts bounded at a plain step: the bound grows by
+    :data:`SQUAREM_STEP_GROWTH` when it binds on a landing that holds and shrinks
+    by that factor on one that does not.  Unbounded, one FAP partition dropped
+    every landing for hundreds of rounds, at 1.5 plain steps' cost a step.
 
     It changes the path and never the fixed point, and an exact overlap keeps
     its ratio, because each extrapolation is a sum of terms in that ratio.  The
     test always reads a plain cycle.  Returns the intensities and the cycles run.
     """
-    run = 0
+    run, limit = 0, 1.0
     while run < cap:
         if cap - run < 3:           # no room left for a round
             x, share, _ = cycle(x)
@@ -619,11 +626,18 @@ def _settled_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float, fl
         norm = math.sqrt(float((area * bend * bend).sum()))
         if share <= tol or norm == 0.0:
             return twice, run
-        alpha = min(-math.sqrt(float((area * step * step).sum())) / norm, -1.0)
+        reach = math.sqrt(float((area * step * step).sum())) / norm
+        alpha = -max(1.0, min(reach, limit))
         landed, _, reached = cycle(np.maximum(x - 2.0 * alpha * step + alpha * alpha * bend,
                                               LEBAIL_INTENSITY_FLOOR))
         run += 1
-        x = landed if reached >= start else twice
+        if reached >= start:
+            x = landed
+            if reach >= limit:
+                limit *= SQUAREM_STEP_GROWTH
+        else:
+            x = twice
+            limit = max(1.0, limit / SQUAREM_STEP_GROWTH)
     return x, run
 
 
