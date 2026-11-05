@@ -59,6 +59,16 @@ WP-1944's handover log. Three gaps remain.
   back within 1 esd. So the heavy atom's B goes down. WP-1944's skill pointer
   sits on `BISO_NEGATIVE` for that reason. Check the claim against Sabine
   (1988) and one more fixture, then correct both texts if it holds.
+- **2026-11-05, from [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md):
+  the unknown-path error points at the wrong parameter.** On a phase that
+  declares no extinction, `set_vary(["phases.0.extinction"], True)` raises
+  "unknown parameter path 'phases.0.extinction'; did you mean
+  'phases.0.lor_strain'?" (measured by WP-1944's code review). It is the one
+  place the package meets a user who already guessed the name. Having
+  `refine._path_hint` name the declaration for an opt-in path would fix it.
+  That changes an error's text, which is reader output, so it goes to the
+  maintainer before it lands, and this WP's rescope does not cover it
+  without that approval.
 
 ## Non-goals
 
