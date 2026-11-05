@@ -125,6 +125,7 @@ def _default_models() -> tuple[Structure, Instrument]:
         # them off this table.  An all-zero block still produces the same
         # `dof.k` paths, since the subspace is derived from the operators.
         microstrain=StephensStrain(),
+        extinction=0.0,  # opt-in since WP-1944, declared at its default
     )
     instrument = Instrument(source=Source(lines=[
         EmissionLine(wavelength=1.540598), EmissionLine(wavelength=1.544426)]))
