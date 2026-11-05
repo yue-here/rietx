@@ -155,7 +155,8 @@ and 2045 on 2026-10-25):
   test stops at its first assert, so only the first of the three shows in the log.
 
   PR #1425 closes this WP on the reading that both rows are Mac-only. That reading does not
-  hold for this row. The test's change belongs in a PR that runs the row, on either platform.
+  hold for this row. PR #1429 carries the same three pins, and holds for the maintainer
+  because it moves an acceptance number.
 
 ## Non-goals
 
