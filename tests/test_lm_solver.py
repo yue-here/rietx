@@ -919,3 +919,84 @@ def test_a_joint_stage_with_max_iter_0_is_refused_on_either_driver(solver):
         rx.refine_multi([_flat(20.0, 80.0), _flat(20.0, 80.0)],
                         rx.Structure(phases=[corundum()]), [_xray(), _neutron()],
                         plan=plan, solver=solver)
+
+
+# ----------------------------------------------------------------------
+# Coelho (2018)'s cusp, equation (12): the schedule's rarer branches
+# ----------------------------------------------------------------------
+def _cusp_fit(power, start, max_nfev=2000):
+    """Y_o = |x|^n against Y_c = |x − a|^n on x = −10..10; the minimum is a = 0.
+
+    Ordinary fits barely read these constants (WP-2017 group A).  This problem
+    does, so the audit rows of ``_M_HI``, ``_LAMBDA_FAIL_FACTOR``,
+    ``_LAMBDA_FAIL_FLOOR``, ``_Q_TRIGGER`` and ``_Q_WINDOW`` close on it.
+    Returns the outcome, the largest r_u and how many steps took branch (ii).
+    """
+    x = np.arange(-10.0, 11.0)
+    y_obs = np.abs(x) ** power
+
+    def residual(theta):
+        return y_obs - np.abs(x - theta[0]) ** power
+
+    def jacobian(theta):
+        u = x - theta[0]
+        size = np.abs(u)
+        safe = np.where(size > 0.0, size, np.inf)
+        return (power * safe ** (power - 1.0) * np.sign(u))[:, None]
+
+    seen = {"largest_r_u": 0.0, "fired": 0}
+    real = lm._next_lambda
+
+    def spy(lam, r_u, q):
+        if r_u is not None:
+            seen["largest_r_u"] = max(seen["largest_r_u"], r_u)
+            seen["fired"] += int(q > lm._Q_TRIGGER)
+        return real(lam, r_u, q)
+
+    lm._next_lambda = spy
+    try:
+        out = lm.minimize(residual, jacobian, np.array([start]), lo=np.array([-np.inf]),
+                          hi=np.array([np.inf]), max_nfev=max_nfev)
+    finally:
+        lm._next_lambda = real
+    return out, seen["largest_r_u"], seen["fired"]
+
+
+@pytest.mark.parametrize("name, below, above", [("_M_HI", 5.0, 20.0),
+                                                ("_LAMBDA_FAIL_FACTOR", 5.0, 20.0),
+                                                ("_LAMBDA_FAIL_FLOOR", 0.01, 1.0)])
+def test_a_schedule_constant_the_cusp_reaches_gives_one_answer(monkeypatch, name, below, above):
+    """Either side of the value changes the path and never the answer."""
+    shipped, largest_r_u, _ = _cusp_fit(0.1, 0.25)
+    assert largest_r_u > 20.0                   # past every cap tried, so ``_M_HI`` is read
+    assert abs(shipped.x[0]) < 1e-3
+    for value in (below, above):
+        monkeypatch.setattr(lm, name, value)
+        moved, _, _ = _cusp_fit(0.1, 0.25)
+        assert abs(moved.x[0]) < 1e-3
+        assert moved.nfev != shipped.nfev or moved.x[0] != shipped.x[0]
+
+
+def test_the_overshoot_branch_stalls_on_the_cusp(monkeypatch):
+    """A known failing case of equation (9)'s branch (ii), pinned and not wanted.
+
+    From a = 0.2375 to 0.243 at n = 0.5 every step overshoots, so Q stays at
+    10 and branch (ii) takes λ to exactly 0.  Branch (iv), the damper, is never
+    reached, so a zigzags across the minimum, shrinking 0.04 % a step, to the
+    budget.  This is the zigzag the paper built the schedule to remove.  No
+    diffraction start has fired the branch (WP-2017 group A), so it stays as
+    the paper prints it.  A change that cures the stall fails this test on
+    purpose: rewrite it, and the ``_Q_TRIGGER`` row that names it.
+    """
+    stuck, _, fired = _cusp_fit(0.5, 0.24, max_nfev=300)
+    assert stuck.termination == "max_nfev"
+    assert fired > 250
+    assert abs(stuck.x[0]) > 1e-5
+
+    for name, value in (("_Q_TRIGGER", 7), ("_Q_WINDOW", 5)):   # sums to 5 at most: off
+        with monkeypatch.context() as patch:
+            patch.setattr(lm, name, value)
+            free, _, fired = _cusp_fit(0.5, 0.24, max_nfev=300)
+        assert fired == 0
+        assert free.nfev < 50
+        assert abs(free.x[0]) < 1e-9
