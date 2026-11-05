@@ -676,6 +676,9 @@ def _with_roughness_pitschke(inputs: StandardInputs) -> None:
 
 
 def _with_extinction(inputs: StandardInputs) -> None:
+    for phase in inputs.structure.phases:  # opt-in since WP-1944
+        if phase.extinction is None:
+            phase.extinction = 0.0
     inputs.plan.stages.append(
         Stage("extinction", ["phases.*.extinction"]))
 

@@ -105,6 +105,7 @@ def _lab_variant(result, ref):
     from rietx.schemas.results import AbsorptionCorrection
 
     structure = ref.fitted_structure.model_copy(deep=True)
+    structure.phases[0].extinction = 0.0  # opt-in since WP-1944
     structure.phases[0].extinction.vary = True
     instrument = ref.fitted_instrument.model_copy(deep=True)
     instrument.source = rx.Instrument.bragg_brentano().source

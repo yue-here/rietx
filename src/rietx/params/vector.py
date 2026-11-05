@@ -1346,7 +1346,8 @@ class ParameterTable:
                 else:
                     self._add(f"{base}.cell.{name}", p)
             self._add(f"{base}.scale", phase.scale)
-            self._add(f"{base}.extinction", phase.extinction)
+            if phase.extinction is not None:
+                self._add(f"{base}.extinction", phase.extinction)
             if phase.preferred_orientation is not None:
                 self._add(f"{base}.preferred_orientation.r",
                           phase.preferred_orientation.r)
@@ -4728,7 +4729,8 @@ class ParameterTable:
             for name in ("a", "b", "c", "alpha", "beta", "gamma"):
                 put(getattr(phase.cell, name), f"{base}.cell.{name}")
             put(phase.scale, f"{base}.scale")
-            put(phase.extinction, f"{base}.extinction")
+            if phase.extinction is not None:
+                put(phase.extinction, f"{base}.extinction")
             if phase.preferred_orientation is not None:
                 put(phase.preferred_orientation.r, f"{base}.preferred_orientation.r")
             if phase.texture is not None:

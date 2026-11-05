@@ -94,7 +94,7 @@ def _ortho(moments, operations, *, extinction=0.0) -> Phase:
                   atoms=atoms,
                   magnetic_symmetry=MagneticSymmetry(operations=list(operations)))
     if extinction:
-        phase.extinction.value = extinction
+        phase.extinction = extinction
     return phase
 
 
@@ -105,7 +105,7 @@ def _mnf2_width(*, extinction=0.0) -> Phase:
     phase = _mnf2(size=0.20, strain=0.08)
     phase.scale.value = 0.05
     if extinction:
-        phase.extinction.value = extinction
+        phase.extinction = extinction
     return phase
 
 

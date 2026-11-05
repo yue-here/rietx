@@ -160,7 +160,7 @@ from .schemas.parametric import (
 )
 from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
-from .schemas.plan import check_phase_support_sigma
+from .schemas.plan import PlanSpec, check_phase_support_sigma
 from .schemas.results import (
     HistogramResult,
     Identifiability,
@@ -171,7 +171,6 @@ from .schemas.results import (
 from .schemas.structure import Structure
 from .strategy.staged import (
     BACKGROUND_ABSORPTION_GUARD,
-    PLAN_PRESETS,
     ROUGHNESS_ABSORPTION_GUARD,
     GuardFinding,
     GuardReport,
@@ -188,6 +187,7 @@ from .strategy.staged import (
     check_resolution_supported,
     check_stephens_positive,
     check_texture_positive,
+    resolve_plan,
 )
 
 #: A diagnostic reported **once per histogram**, on
@@ -1605,7 +1605,7 @@ class MultiHistogramRefinement:
 
     # ------------------------------------------------------------------
     def fit(self, data: list[PatternData], *, mode: str = "rietveld",
-            plan: RefinementPlan | str = "mccusker_default",
+            plan: RefinementPlan | PlanSpec | str = "mccusker_default",
             two_theta_limits=None, weights: list[float] | None = None,
             events=None, cancel=None, telemetry=None, label: str | None = None,
             progress=None) -> RefinementResult:
@@ -1662,13 +1662,9 @@ class MultiHistogramRefinement:
                 "multi-histogram refinement is Rietveld-only; Le Bail / "
                 "Pawley intensities are per-pattern extractions, not shared, so a "
                 "joint fit of them is just independent single-pattern fits")
-        if isinstance(plan, str):
-            try:
-                plan = PLAN_PRESETS[plan]()
-            except KeyError:
-                raise ValueError(
-                    f"unknown plan preset {plan!r}; available: {sorted(PLAN_PRESETS)}"
-                ) from None
+        # the one crossing of the plan mirror (WP-1110, WP-2102): a preset
+        # name, a ``PlanSpec`` or a plan, read as ``Refinement.fit`` reads it
+        plan = resolve_plan(plan, mode)
         if not plan.stages:
             # refused before an event is emitted or a run recorded, as
             # ``Refinement.fit`` refuses it (WP-1110 item 6)
@@ -1746,7 +1742,7 @@ class MultiHistogramRefinement:
             if recorder is not None:
                 recorder.close()
 
-    def report(self, histogram: int, *, plan: RefinementPlan | str | None = None,
+    def report(self, histogram: int, *, plan: RefinementPlan | PlanSpec | str | None = None,
                **kw):
         """The :class:`~rietx.report.FitReport` for one histogram of the last fit.
 
@@ -1756,7 +1752,8 @@ class MultiHistogramRefinement:
         :meth:`RefinementResult.for_histogram`, its compiled model and values
         for Layers 1-2, exactly as :meth:`Refinement.report
         <rietx.refine.Refinement.report>` asks them of a single fit.  ``plan``
-        supplies the Layer-2 strategy veto.
+        supplies the Layer-2 strategy veto: a plan, its ``PlanSpec`` or a
+        preset name, read as :meth:`fit` reads it.
 
         The specimen has one crystallite size (WP-1131), and the report says
         it once.  Its microstructure block is the joint result's, read off the
@@ -1782,8 +1779,9 @@ class MultiHistogramRefinement:
         n = self.n_histograms
         if not 0 <= histogram < n:
             raise IndexError(f"histogram {histogram} of a {n}-histogram fit")
-        if isinstance(plan, str):
-            plan = PLAN_PRESETS[plan]()
+        if plan is not None:
+            # read as the fit that made the result read it (WP-2102)
+            plan = resolve_plan(plan, self.result_.mode)
         answer = self._answer[histogram]
         return build_report(
             self.result_.for_histogram(histogram),
@@ -3465,7 +3463,7 @@ def _joint_origin_findings(stage_results, mtable) -> list[Diagnostic]:
 
 def refine_multi(data: list[PatternData], structure: Structure | list[Structure],
                  instruments: list[Instrument], *,
-                 plan: RefinementPlan | str = "mccusker_default",
+                 plan: RefinementPlan | PlanSpec | str = "mccusker_default",
                  sharing: SharingMap | None = None,
                  coordinates: CoordinateTable | None = None,
                  parametric: list[ParametricEquation] | None = None,
