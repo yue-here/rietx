@@ -936,3 +936,18 @@ def test_from_pawley_passes_the_group(nac_lebail):
     F = np.linspace(1.0, 2.0, len(cost.b))
     assert cost.chi2_at_texture(F, 1.0, (1, 1, 0))[:2] == cost.chi2(F)
     assert cost.chi2_at_texture(F, 0.7, (1, 1, 0))[0] != cost.chi2(F)[0]
+
+
+def test_texture_ratio_refuses_a_non_integer_axis_and_a_non_finite_r(texture_case):
+    """A fractional axis was truncated to int64 and evaluated at a different
+    axis; r = inf gave NaN through 0·inf.  Both are refused as ValueError."""
+    _, cost, _, _, _ = texture_case
+    for bad in ((0.5, 0.0, 1.9), (np.nan, 0.0, 1.0)):
+        with pytest.raises(ValueError, match="axis must be three integers"):
+            cost.texture_ratio(0.8, bad)
+    for bad_r in (float("inf"),):
+        with pytest.raises(ValueError, match="must be finite"):
+            cost.texture_ratio(bad_r, (0, 0, 1))
+    D_int, _ = cost.texture_ratio(0.8, (0, 0, 1))
+    D_float, _ = cost.texture_ratio(0.8, (0.0, 0.0, 1.0))
+    assert np.array_equal(D_int, D_float)

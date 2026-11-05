@@ -507,6 +507,8 @@ class SolveCost:
             raise TextureRefused(
                 "r_below_floor", f"March-Dollase r = {r!r} is below MARCH_R_MIN "
                 f"({MARCH_R_MIN}), where the factor has its pole")
+        if not np.isfinite(r):
+            raise ValueError(f"March-Dollase r must be finite, got {r!r}")
         if self.sh_texture:
             raise TextureRefused(
                 "texture_block", "the solved phase carries a spherical-harmonics "
@@ -523,9 +525,12 @@ class SolveCost:
                 "no_group", "the extraction declared no preferred_orientation "
                 "block and the cost was built without a group, so it holds no "
                 "reflection orbits: build it with from_model(..., group=...)")
-        axis = np.asarray(axis, dtype=np.int64)
-        if axis.shape != (3,) or not axis.any():
+        raw = np.asarray(axis)
+        if (raw.shape != (3,) or not np.issubdtype(raw.dtype, np.number)
+                or not np.all(np.isfinite(raw)) or np.any(raw != np.rint(raw))
+                or not raw.any()):
             raise ValueError(f"axis must be three integers, not all zero, got {axis!r}")
+        axis = raw.astype(np.int64)
         members, seg, counts = self.po_orbits
         T, dT = march_dollase_and_dr(members, seg, counts, axis, self.gstar, r)
         T, dT = np.asarray(T, dtype=np.float64), np.asarray(dT, dtype=np.float64)
