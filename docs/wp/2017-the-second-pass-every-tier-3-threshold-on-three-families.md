@@ -455,6 +455,8 @@ No row this WP lists still names the second pass as owed.
 
   Would change the verdict: the row quoting the silent half and naming `/Users/yue/Code/rietx/.claude/worktrees/wp2017-second-pass/tests/test_slow_descent.py` as the injected case, plus the rule acting under shipped constants on a third family's fit that reaches its answer.
 
+  *Settled by Claude.* WP-2017 over WP-2020, under the index's P2 order. Hard starts added to group A, under this file's control rule that a bit-identical arm measured nothing. Cell lengths +1 % and +3 %, under WP-2086's reach table. No demotion and no retier, under the Goal's exits and the judge's reading. Raw rows left out of the tree, under WP-2049's precedent.
+
   *Next.* (1) The maintainer's ruling on the seven rows' exit (`_M_HI`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_Q_TRIGGER`, `_Q_WINDOW`, `_CURVATURE_GATE`, `SLOW_DESCENT_ESD`), which also sets how later groups treat an unreached constant. (2) Hard starts for `FTOL`, `_CONVERGED_RUNS` and `_M_LO`, the same nine starts, 54 fits, for their failing case. (3) Group H next: it needs no new fits beyond counting where the cell window binds, and its removal is already ruled. (4) Coelho (2018) J. Appl. Cryst. 51, 428 and (2005) 38, 455 are not on disk. Rows citing them say "not checked", and the maintainer can supply them.
 
 - **2026-11-04** — Task added from WP-2086's review: tell a blank frame with structure from a phase whose peaks missed. Numbers re-read from the raw rows. With the synthetic humps the 14 frames span d 0.34-1.49, past the 0.43-1.04 quoted for Kapton, and Kapton's Q is 1.96 at its 21 001 channels. Nothing new measured, no code. PR #1408.
