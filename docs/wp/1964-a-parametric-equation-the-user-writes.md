@@ -296,7 +296,7 @@ per-pattern one is an array.
   across the coordinates. Report the value range, any non-finite pattern, any
   target outside its own bounds, and the dependencies each equation resolved to
   (TOPAS's `out_dependences`).
-- [ ] **Intervals and minima.** On two synthetic ramps with a known truth (an
+- [x] **Intervals and minima.** On two synthetic ramps with a known truth (an
   order parameter through T_c, an Avrami fraction against time), measure
   coverage at 2 esd over seeds, against a profile interval. Decide what a joint
   fit owes here and what a documented script covers. Plot obs/calc/diff to
@@ -306,7 +306,7 @@ per-pattern one is an array.
 - [ ] **A variable per pattern.** Declare it, carry it as a column per pattern, and let
   an expression read it (§ A variable per pattern). The test is Stinton & Evans's first
   method on a synthetic ramp: a ΔT per pattern through two phases' cell equations.
-- [ ] **A shared coefficient's interval.** `profile_interval`, or a documented script,
+- [x] **A shared coefficient's interval.** `profile_interval`, or a documented script,
   whichever the measurement above chooses. Moved from 2103 to break a cycle between the
   two WPs.
 - [ ] **Real data.** The WO₃ Einstein equations and the ZrP₂O₇ calibration, local
@@ -349,6 +349,51 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
   DESIGN.md § Parameter system, `docs/practice.md`.
 
 ## Handover log
+
+- **2026-11-05 (third build session, a ghostshift runner)** — Task 10 closed, and tasks 9
+  and 12 landed. Branch `wp1964-equations`, no PR: tasks 11, 13, 14 and 15 are left, and
+  the runner's brief opens the PR only on a finished checklist.
+  - *Task 10, the form test.* `params.parametric.expression_target_columns` recovers each
+    expression target's own column per pattern as T = J_V·G⁺, G the exact gradient of the
+    targets in the free variables. A variable shared by several targets is the general
+    case, not a special one. A pattern where G has fewer directions than targets gives no
+    column. So does a pattern where a variable reaches a row no expression writes, read
+    off each table's `entry_reach`. The alternative drops only the variables no other
+    expression reads. `PARAMETRIC_TARGET_UNSEEN` and `PARAMETRIC_OUT_OF_RANGE` now cover
+    expressions too, the siblings of the same gap. *Measured*: a line as a `polynomial`
+    and as an expression read the same statistic to 6.8e-11 relative. A line written over
+    an Einstein cell read 17 222 against the cut 7.8, and the Einstein expression 1.2.
+  - *Task 9, intervals and minima* (`docs/wp/1964-measure/coverage.py`, `profile.py`, and
+    their results files; `[dev,jax,torch]`, darwin/arm64). Two twelve-pattern LaB₆ ramps,
+    100 seeds each, every variable free, Biso started at its truth so the model is exact.
+    On the order-parameter ramp (T_c = 830 K, β = 0.3) the value ± 2 esd covered T_c and β
+    in 97 of 100 each, so the acceptance bar (90 to 99) passes with the esd the fit
+    already reports. The other three variables: 96-97. On the Avrami ramp it covered k and
+    n in 100 and S in 99. The esds carry the Bérar-Lelann factor f = 1.12-1.14; divided by
+    f the coverage was 93-99. A hand profile of T_c and β (2 seeds) was within 5 % of a
+    parabola to 3 esd, so a profile would add nothing here. *Minima*: one fit started below
+    the last ordered pattern, with T_c 10 K above it and Biso off its truth, stopped at T_c = 782 K and the form
+    test rejected it. With T_c 40 K from the pattern, 20 of 20 starts from below recovered
+    it. With Biso started 0.1 Å² off its truth, S came back 27 esd high on every seed, the
+    protocol's error and not the equation's: a single fit of one such pattern gives the same.
+  - *Task 12, decided by task 9.* The joint fit reports the esd, and a profile interval
+    is a documented script: `reference/parametric.md` § Intervals of an expression's
+    variables. No `profile_interval` on a joint fit. Settled by Claude under the WP's own
+    rule ("whichever the measurement above chooses"). The alternative is a joint
+    `profile_interval`, which the measurement gives no case for.
+  - *Found, not fixed.* The form test rejected the true order-parameter expression in 15
+    of 100 seeds, against 5 expected. On the Avrami ramp it rejected 2 of 100. The cause is
+    not measured. The manual's § Limits of the form test now says so. A χ² read across
+    separate fits carries an offset: the free fit sat 0.19 of the 2-esd cut above the pinned
+    fits' curve. The documented script reads the pinned fits against each other.
+  - *For the maintainer.* (c) Task 11 needs a declaration on the main surface. Proposal:
+    a per-pattern variable is a `variables=` entry whose `vars.<name>` path the sharing map
+    names literally in `SharingMap.per_histogram`, the seam § A variable per pattern names.
+    A glob that matches `vars.*` by accident is still refused. The alternative is a new
+    flag, such as `rx.Parameter(per_pattern=True)` or a TOPAS-like `local`. Decisions (a)
+    and (b) and consent items 1-6 of the first entry still stand unanswered. Reader output:
+    expression fits now carry `parametric_form` entries and the three warnings above.
+  - *Next.* Task 11 once (c) is answered, then 13, 14 and 15.
 
 - **2026-11-05 (second build session, a ghostshift runner)** — Tasks 7 and 8 landed, and
   the fast selection's three reds from the first session are fixed. Branch

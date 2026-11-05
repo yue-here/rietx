@@ -21,6 +21,45 @@ These figures come from synthetic LaB6 ramps of ten patterns at 300-1200 K, each
 - Where one pattern cannot see the parameter on its own, the declaration adds precision itself. A minor phase that dissolved on heating was held in the chain's last five patterns ([A phase that appears part-way](series.md#a-phase-that-appears-part-way)). Against a line through the points the chain kept, the declared line's slope scattered 0.72 times as much over the seeds, about two standard errors from no gain at twenty seeds, and its error at the held patterns was 6.8 × 10⁻⁴ Å against 10.1 × 10⁻⁴ Å. The joint fit uses the little each faint pattern carries, which the chain discards.
 - The esd is conditional on the declared form being right. Fitted as a line to a cell that in truth curved, the true value at the held patterns lay within two esds of the declared curve in 3 % of cases. Declare the terms the physics needs, and draw the declared curve over the chain's `SeriesResult.trajectory` before quoting a coefficient.
 
+### Intervals of an expression's variables
+
+An `"expression"` equation's variables can enter it nonlinearly, so their esds were measured as intervals.
+Two synthetic LaB6 ramps of twelve patterns each had a known truth, and each was fitted over 100 noise seeds with every variable free.
+The first was an order parameter through a transition, a(T) = a0 + k·(T − 300) + A·(1 − T/T_c)<sup>2β</sup> below T_c = 830 K.
+The second was an Avrami fraction against time, the phase's scale S·(1 − exp(−(k·t)<sup>n</sup>)).
+
+- The value ± 2 esd covered the true T_c and the true β in 97 of 100 seeds each, and the other three variables in 96 to 97.
+  On the Avrami ramp it covered k and n in 100 of 100 and S in 99.
+  The esds carry the fit's Bérar-Lelann factor, 1.12-1.14 here; without it the coverage was 93 to 99 of 100.
+- A profile interval adds nothing on these ramps.
+  Pinning T_c or β at 1, 2 and 3 esd either side and refitting gave a χ² profile within 5 % of a parabola out to 3 esd, so its ends are the esd's.
+- A start on the wrong side of a pattern can find another minimum.
+  With T_c 10 K above the last ordered pattern and started below it, one fit stopped at T_c = 782 K, with a0 80 esd from the truth (one seed, with Biso started 0.1 Å² off its truth).
+  The form test rejected that fit.
+  Started above the truth, or with the truth 40 K from the nearest pattern, every fit recovered it.
+
+So the joint fit reports the esd, and a variable the data determine weakly is checked with a profile by hand.
+Pin the variable at values either side, refit everything else, and read where χ² has risen by 4·χ²<sub>red</sub>·f², f being `Statistics.esd_inflation`:
+
+<!-- api-doc: no-exec — it refits a joint fit at each pinned value -->
+```python
+best = refine_multi(patterns, structure, instruments, plan="mccusker_default",
+                    coordinates=coords, variables=variables, parametric=equations)
+row = next(p for p in best.parameters if p.path == "vars.Tc")
+st = best.statistics
+cut = 4.0 * st.chi2 / (st.n_points - st.n_free_parameters) * st.esd_inflation ** 2
+profile = {}
+for m in (-3, -2, -1, 1, 2, 3):
+    pinned = dict(variables, Tc=rx.Parameter(value=row.value + m * row.stderr, vary=False))
+    fit = refine_multi(patterns, structure, instruments, plan="mccusker_default",
+                       coordinates=coords, variables=pinned, parametric=equations)
+    profile[m] = fit.statistics.chi2
+```
+
+Read the profile from the pinned fits against each other, never against the free fit.
+On these ramps the free fit's χ² sat 0.19 of the cut above the pinned fits' curve at every step, so Δχ² read from it puts the ends too far out.
+The scripts and their results are in `docs/wp/1964-measure/`.
+
 There is no soft form: no smoothness penalty and no kernel over the coordinates.
 In the weak-phase regime, a kernel whose settings were estimated from the chain's trajectory extrapolated into the held patterns worse than the straight line.
 One at hand-set good settings gave intervals that covered the truth more often, at no gain in accuracy.
@@ -344,6 +383,13 @@ The test is one Jacobian evaluation and no refit: 0.7-0.8 s on 33 patterns of 41
 | `ParametricFormTest.rejected` | the verdict: the `others_freed` reading's where there is one, else the `tied` reading's |
 | `ParametricFormTest.provisional_on` | the other tested equations whose verdict is a rejection; while it is not empty, this verdict is provisional |
 
+An `"expression"` equation is tested the same way, with its exact gradient in each pattern in place of Φ.
+Where one variable feeds several targets, a shared θ in three cell equations for example, the targets' columns are recovered together.
+A pattern then needs one direction per target, and a pattern without them is left out of `n_patterns`.
+The alternative drops only the variables no other expression reads, so a shared variable keeps driving the other targets.
+On a five-pattern ramp a line written as a `polynomial` and as an expression read the same statistic to 7e-11.
+A line written over an Einstein cell read 17 222 against the cut of 7.8, and the Einstein expression itself read 1.2.
+
 Each reading is a `ParametricFormReading`:
 
 | Field | Holds |
@@ -424,9 +470,10 @@ The joint warning names such an equation and quotes its tied reading.
 
 ### Limits of the form test
 
-The test has two limits.
+The test has three limits.
 
 - It sees the form only where, and as well as, each pattern measures the target. A pattern that cannot see the target adds nothing to the statistic, so an equation carried through patterns where a phase has faded out is not checked there. The verdict line counts the patterns tested against the subset, and `PARAMETRIC_TARGET_UNSEEN` names the patterns left out. On two synthetic ramps, one with a minor phase that faded out and one with a minor phase broad and overlapped, a curved truth on its cell was not rejected in any of 20 seeds. A full untied refit rejected none of them either.
+- On a strongly curved expression it rejects a right form more often than its level says. On the order-parameter ramp of § Intervals of an expression's variables it rejected the true equation in 15 of 100 seeds, against 5 expected; on the Avrami ramp it rejected 2 of 100. The cause is not measured.
 - Each verdict is a test at 95 %, and so is the joint reading. A fit with K equations therefore flags some right equation more often than one time in twenty: 1 − 0.95<sup>K</sup> of the time if the tests were independent, 14 % for three equations. No correction is applied.
 
 ## Equation at any coordinate

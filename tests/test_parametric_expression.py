@@ -432,6 +432,94 @@ def test_targets_sharing_a_variable_are_recovered_together():
                                      [True, True], {}) == [None]
 
 
+# -- intervals and minima (task 9) --------------------------------------------
+#
+# Two synthetic ramps with a known truth, the order parameter through T_c and
+# an Avrami fraction against time.  Over 100 seeds each the 2-esd interval's
+# coverage is measured by ``docs/wp/1964-measure/coverage.py``; these rows pin
+# one seed each, so a change to the machinery that moves the answer shows.
+
+ORDER = "a0 + k*(T - 300) + A*if(T < Tc, (1 - T/Tc)^(2*beta), 0)"
+AVRAMI = "S*(1 - exp(-(kr*t)^n))"
+
+
+def _exact_start():
+    """The starting model with Biso at the simulation's 0.4, so the model is
+    exact and a variable's error is the noise's alone."""
+    from tests.test_sequential import _start_models
+
+    structure, ins = _start_models()
+    for atom in structure.phases[0].atoms:
+        atom.biso.value = 0.4
+    return structure, ins
+
+
+@pytest.mark.xdist_group("parametric-expression")
+def test_an_order_parameter_through_its_transition_recovers_tc_and_beta():
+    """Twelve patterns, 300-1070 K, a(T) = a0 + k·(T - 300) + A·(1 - T/T_c)^(2β)
+    below T_c and the line above, with T_c = 830 K between the patterns at 790
+    and 860 K.  All five variables free, T_c started above the truth.
+    Measured (macOS arm64), seed 0: 2 s, every variable within 0.75 esd,
+    T_c = 829.79(38) K and β = 0.2998(7)."""
+    from tests.test_sequential import A0, _simulate
+
+    temps = [300.0 + 70.0 * i for i in range(12)]
+    truth = {"a0": A0, "k": A0 * 5e-6, "A": 0.004, "Tc": 830.0, "beta": 0.3}
+
+    def cell(t):
+        q = truth["A"] * (1 - t / truth["Tc"]) ** (2 * truth["beta"]) if t < truth["Tc"] else 0
+        return truth["a0"] + truth["k"] * (t - 300) + q
+
+    patterns = [_simulate(cell(t), seed=k) for k, t in enumerate(temps)]
+    structure, ins = _exact_start()
+    result = refine_multi(
+        patterns, structure, [ins] * len(temps), plan="mccusker_default",
+        sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
+        coordinates=CoordinateTable(columns={"T": temps}, units={"T": "K"}),
+        variables={"a0": rx.Parameter(value=A0 * 1.0005, vary=True),
+                   "k": rx.Parameter(value=A0 * 4e-6, vary=True),
+                   "A": rx.Parameter(value=0.003, vary=True, min=0.0, max=0.05),
+                   "Tc": rx.Parameter(value=870.0, vary=True, min=500.0, max=1100.0),
+                   "beta": rx.Parameter(value=0.35, vary=True, min=0.05, max=1.0)},
+        parametric=[_expression(expression=ORDER)])
+    _plot(result, "parametric_expression_order", (0, 7, len(temps) - 1))
+    assert result.status == "converged"
+    rows = {p.path: p for p in result.parameters}
+    for name, value in truth.items():
+        row = rows[f"vars.{name}"]
+        assert abs(row.value - value) < 2 * row.stderr, (name, row.value, row.stderr)
+
+
+@pytest.mark.xdist_group("parametric-expression")
+def test_an_avrami_fraction_recovers_its_rate_and_exponent():
+    """Twelve patterns, t = 200-1300 s, the phase's scale S·(1 - exp(-(k·t)^n))
+    with k = 1/600 s⁻¹ and n = 2, from 10 % to 99 % of S.  Measured (macOS
+    arm64), seed 0: 2 s, every variable within 0.35 esd."""
+    from tests.test_sequential import A0, TRUE_SCALE, _simulate
+
+    times = [200.0 + 100.0 * i for i in range(12)]
+    truth = {"S": TRUE_SCALE, "kr": 1.0 / 600.0, "n": 2.0}
+    patterns = [_simulate(A0, scale=truth["S"] * (1 - np.exp(-(truth["kr"] * t) ** truth["n"])),
+                          seed=k) for k, t in enumerate(times)]
+    structure, ins = _exact_start()
+    for name in "abc":
+        getattr(structure.phases[0].cell, name).value = A0
+    result = refine_multi(
+        patterns, structure, [ins] * len(times), plan="mccusker_default",
+        sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
+        coordinates=CoordinateTable(columns={"t": times}, units={"t": "s"}),
+        variables={"S": rx.Parameter(value=TRUE_SCALE * 1.2, vary=True, min=0.0),
+                   "kr": rx.Parameter(value=1.0 / 500.0, vary=True, min=1e-5, max=1.0),
+                   "n": rx.Parameter(value=1.6, vary=True, min=0.5, max=4.0)},
+        parametric=[_expression(target="phases.0.scale", expression=AVRAMI)])
+    _plot(result, "parametric_expression_avrami", (0, len(times) - 1))
+    assert result.status == "converged"
+    rows = {p.path: p for p in result.parameters}
+    for name, value in truth.items():
+        row = rows[f"vars.{name}"]
+        assert abs(row.value - value) < 2 * row.stderr, (name, row.value, row.stderr)
+
+
 # -- an equation feeding an equation -----------------------------------------
 #
 # ZrP2O7's temperature calibration: the sample's true temperature is the
