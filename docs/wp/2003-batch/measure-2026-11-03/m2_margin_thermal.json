@@ -1,0 +1,171 @@
+{
+ "env": {
+  "platform": "Darwin arm64 (macOS-27.2-arm64-arm-64bit)",
+  "python": "3.12.16",
+  "rietx": "1.11.0.dev0",
+  "rietx_file": "/private/tmp/claude-502/-Users-yuewu-Code-rietx/2d6ae8c9-3e42-4d89-bdce-b3f74821ad95/scratchpad/snap/src/rietx/__init__.py",
+  "venv": "worktree .venv, [dev]",
+  "compiled_available": true,
+  "compiled_enabled": true,
+  "numeric_path": "compiled tier (set_enabled(True))"
+ },
+ "family": "thermal",
+ "peaks": {
+  "p001": {
+   "peak": 12,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    12,
+    3
+   ]
+  },
+  "p002": {
+   "peak": 12,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    12,
+    3
+   ]
+  },
+  "p003": {
+   "peak": 12,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    12,
+    3
+   ]
+  },
+  "p004": {
+   "peak": 12,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    12,
+    3
+   ]
+  },
+  "p005": {
+   "peak": 12,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    12,
+    3
+   ]
+  },
+  "p006": {
+   "peak": 12,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    12,
+    3
+   ]
+  },
+  "p007": {
+   "peak": 12,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    12,
+    3
+   ]
+  },
+  "p008": {
+   "peak": 12,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    12,
+    3
+   ]
+  },
+  "p009": {
+   "peak": 12,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    12,
+    3
+   ]
+  }
+ },
+ "samples1": {
+  "max_ratio": 1.0,
+  "argmax": "p002",
+  "top3": [
+   [
+    "p002",
+    1.0
+   ],
+   [
+    "p003",
+    1.0
+   ],
+   [
+    "p004",
+    1.0
+   ]
+  ],
+  "n_armed": 8
+ },
+ "samples2": {
+  "max_ratio": 1.0,
+  "argmax": "p003",
+  "top3": [
+   [
+    "p003",
+    1.0
+   ],
+   [
+    "p004",
+    1.0
+   ],
+   [
+    "p005",
+    1.0
+   ]
+  ],
+  "n_armed": 7
+ },
+ "samples3": {
+  "max_ratio": 1.0,
+  "argmax": "p004",
+  "top3": [
+   [
+    "p004",
+    1.0
+   ],
+   [
+    "p005",
+    1.0
+   ],
+   [
+    "p006",
+    1.0
+   ]
+  ],
+  "n_armed": 6
+ }
+}

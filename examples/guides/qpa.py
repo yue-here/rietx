@@ -54,10 +54,20 @@ for d in result.diagnostics:
 
 # guide: hold start
 held = nac_and_fluorite()
-held.hold(["phases.1.extinction", "phases.1.atoms.*.biso"])
+held.hold(["phases.1.atoms.*.biso"])
 held_result = held.fit(data, plan="mccusker_structural", two_theta_limits=(2, 24))
 show(held_result)
 # guide: hold end
+
+# guide: extinction start
+declared = nac_and_fluorite()
+declared.structure.phases[1].extinction = 0.0
+declared_result = declared.fit(data, plan="mccusker_structural", two_theta_limits=(2, 24))
+show(declared_result)
+for d in declared_result.diagnostics:
+    if d.code == "HIGH_CORRELATION":
+        print(d.code, "|", d.message)
+# guide: extinction end
 
 # guide: profile start
 profile = held.profile_fraction(data, "CaF2", axes=["phases.1.lor_strain"])
@@ -67,7 +77,7 @@ print(f"admissible {100 * profile.range_low:.2f} to {100 * profile.range_high:.2
 
 # guide: brindley start
 radii = nac_and_fluorite()
-radii.hold(["phases.1.extinction", "phases.1.atoms.*.biso"])
+radii.hold(["phases.1.atoms.*.biso"])
 radii.structure.phases[0].particle_radius_um = 5.0
 radii.structure.phases[1].particle_radius_um = 2.0
 corrected = radii.fit(data, plan="mccusker_structural", two_theta_limits=(2, 24))
@@ -78,12 +88,14 @@ for row in corrected.qpa.phases:
 
 # The page quotes every printed line; these pin the claims its prose makes.
 assert result.qpa.crystalline_only
-assert f"{100 * result.qpa.phases[1].weight_fraction:.1f}" == "3.6"
-assert "HIGH_CORRELATION" in {d.code for d in result.diagnostics}
+assert f"{100 * result.qpa.phases[1].weight_fraction:.2f}" == "1.34"
+assert "HIGH_CORRELATION" not in {d.code for d in result.diagnostics}
 assert result.statistics.rwp < held_result.statistics.rwp
-assert f"{result.statistics.rwp:.3f}, {held_result.statistics.rwp:.3f}" == "0.082, 0.089"
+assert f"{result.statistics.rwp:.3f}, {held_result.statistics.rwp:.3f}" == "0.088, 0.090"
 assert "HOLD_BLOCKED_PLAN" in {d.code for d in held_result.diagnostics}
-assert f"{100 * held_result.qpa.phases[1].weight_fraction:.2f}" == "1.37"
+assert f"{100 * held_result.qpa.phases[1].weight_fraction:.2f}" == "1.41"
+assert "phases.1.extinction" not in {p.path for p in result.parameters}
+assert f"{declared_result.statistics.rwp:.3f}" == "0.083"
 assert profile.fit_admissible and profile.excess < 1.0
 assert [d.code for d in profile.diagnostics] == ["QPA_FRACTION_RANGE"]
 default = nac_and_fluorite().fit(data, plan="mccusker_default", two_theta_limits=(2, 24))

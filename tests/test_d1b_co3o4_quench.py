@@ -112,8 +112,18 @@ def test_every_real_file_reads_with_the_stated_shape(name):
 
 @pytest.mark.parametrize("name", PLANTED)
 def test_every_planted_file_reads(name):
-    pattern = rx.read_pattern(SERIES / name)
-    assert len(np.asarray(pattern.two_theta)) == 1280
+    diagnostics = []
+    pattern = rx.read_pattern(SERIES / name, diagnostics=diagnostics)
+    dropped = [d for d in diagnostics if d.code == "PATTERN_ROWS_DROPPED"]
+    assert np.all(np.isfinite(pattern.intensity))
+    if "nan_block" in name:
+        # the 60 NaN channels are dropped and named by their 2θ (WP-2079)
+        assert len(pattern.two_theta) == 1220
+        assert [d.where for d in dropped] == [["30.790-36.690"]]
+        assert "60 of 1280 points have a NaN count or σ" in dropped[0].message
+    else:
+        assert len(pattern.two_theta) == 1280
+        assert dropped == []
 
 
 def test_the_bytes_are_the_manifests():

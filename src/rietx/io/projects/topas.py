@@ -4247,8 +4247,11 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
     back into it (:func:`~.topas_ties.split_magnetic_parts`), its moments onto
     the same-label sites. That form's phase terms TOPAS has no keyword for are
     read back by the names ``p<i>_extinction``, ``p<i>_magnetic_lor_size``
-    and ``p<i>_magnetic_lor_strain`` (no writer in this tree writes them
-    yet; each one read is reported as ``TOPAS_PHASE_TERM_READ``). The merge is
+    and ``p<i>_magnetic_lor_strain``, each one read reported as
+    ``TOPAS_PHASE_TERM_READ``. :func:`write_topas_inp` writes the two widths
+    in that form; it refuses a phase carrying both a magnetic-only width and
+    extinction, so ``p<i>_extinction`` reaches this form only from another
+    writer. The merge is
     equal-or-refuse: the part's scale, cell, space group and each site's
     position, element and occupancy must equal the nuclear ``str``'s, every
     part site needs a nuclear counterpart, and the merge is reported as
@@ -4792,15 +4795,47 @@ def _magnetic_group_line(phase, *, ion_species_ok: bool = False) -> str | None:
         raise ValueError(f"{where}: {exc}") from exc
     nuclear = resolve_group(phase.space_group, phase.symmetry_operations)
     if _operation_set(family) != _operation_set(nuclear):
+        # The test is the groups; the message names the orbits it costs,
+        # since a phase read from a magCIF lists every orbit whole (#715).
+        from ...crystallography.magcif import _orbit_size
+
+        nuclear_ops = list(nuclear.operations())
+        family_ops = list(family.operations())
+        # The family group need not be the smaller one: a phase under P 1
+        # with a P2₁/c magnetic group gains positions rather than losing them.
+        split, grown = [], []
+        for atom in phase.atoms:
+            xyz = (atom.x.value, atom.y.value, atom.z.value)
+            n_nuclear = _orbit_size(nuclear_ops, xyz)
+            n_family = _orbit_size(family_ops, xyz)
+            if n_family < n_nuclear:
+                split.append(f"{atom.label!r} ({n_family} of {n_nuclear})")
+            elif n_family > n_nuclear:
+                grown.append(f"{atom.label!r} ({n_family} against {n_nuclear})")
+        under = (f"(positions under the magnetic operators, against those "
+                 f"under {phase.space_group!r})")
+        clauses = []
+        if split:
+            clauses.append(f"these sites would each generate only part of "
+                           f"their orbit {under}: {', '.join(split)}")
+        if grown:
+            clauses.append(f"these sites would each generate positions the "
+                           f"fitted model does not hold {under}: "
+                           f"{', '.join(grown)}")
+        cost = (
+            f", so {'; and '.join(clauses)}. List one site for each orbit of "
+            f"the magnetic group and"
+            if clauses else
+            ". Every listed site keeps its orbit, but TOPAS would refine the "
+            "positions under the magnetic group's site symmetry, a different "
+            "model from the one fitted. To accept that,")
         raise _GroupIdentityRefusal(
             f"{where}: its positions refine under {phase.space_group!r} and "
             f"its moments under BNS {number}, whose family group (its "
             f"operations with time reversal dropped) is {family.xhm()!r}. A "
             f"TOPAS magnetic `str` generates its atoms with the magnetic "
-            f"operators alone, so the sites listed for the larger group would "
-            f"each generate only part of their orbit. List the sites of each "
-            f"parent orbit the magnetic group splits and state the phase "
-            f"under {family.xhm()!r} yourself (a CIF round trip with "
+            f"operators alone{cost} state the phase under "
+            f"{family.xhm()!r} yourself (a CIF round trip with "
             f"nuclear_group='file' keeps the parent's sites and does not "
             f"restate them), or export a magCIF (Structure.to_cif)")
     for atom in moments:
@@ -5203,9 +5238,10 @@ def _width_lines(phase, spell=_spell_number, keep=None) -> list[str]:
     The forward model's laws (:mod:`rietx.model.profiles.caglioti`):
     Γ_L = lor_size/cosθ + (lor_strain + Λ(hkl))·tanθ and
     Γ_G² = gauss_strain·tan²θ + gauss_size/cos²θ beside the instrument's
-    terms, Λ from :func:`_stephens_lambda_expr`. A Stephens block *locks*
-    ``lor_strain`` (``Phase._one_strain_model``) rather than zeroing it, and
-    the forward model adds the two, so both are written. Each zero part is
+    terms, Λ from :func:`_stephens_lambda_expr`. A Stephens block *replaces*
+    ``lor_strain``: it locks the path (``Phase._one_strain_model``) without
+    zeroing the stored value, and the forward model reads zero for it
+    (``CompiledModel.lor_strain_term``, WP-1467), so only Λ is written. Each zero part is
     dropped, and a line with no part is not written, so a phase at every
     identity writes nothing and its file is byte-identical to one written
     before these lines existed. ``spell``/``keep`` are
@@ -5222,7 +5258,8 @@ def _width_lines(phase, spell=_spell_number, keep=None) -> list[str]:
     lor = []
     if on("lor_size", size):
         lor.append(f"{spell(size, 'lor_size')}/Cos(Th)")
-    tan = (([spell(strain, "lor_strain")] if on("lor_strain", strain) else [])
+    tan = (([spell(strain, "lor_strain")]
+            if block is None and on("lor_strain", strain) else [])
            + ([aniso] if aniso else []))
     if len(tan) == 1:
         lor.append(f"{tan[0]}*Tan(Th)")
@@ -5270,7 +5307,8 @@ def _not_written_diagnostics(structure: Structure, *,
     for i, phase in enumerate(structure.phases):
         here = []
         for name, what in () if whole else _PHASE_TERMS_NOT_WRITTEN:
-            if getattr(phase, name).value != 0.0:
+            term = getattr(phase, name)  # extinction is opt-in: None
+            if term is not None and term.value != 0.0:
                 here.append((name, what))
         po = phase.preferred_orientation
         if po is not None and po.r.value != 1.0:

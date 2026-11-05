@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: The repo's own process
 Depends on: 1327, 1418, 1419 (the v1.6 magnetic PRs carry most of the call sites)
-Priority: P3 2026-10-10 — the round-trip failure that motivated it is fixed upstream (spglib 2.8.0, now the floor); what remains is Context's item 1, which library matches the BNS tables
+Priority: P3 2026-11-03 — Yue set the direction (moyopy for everything, at some point) with no date; the round-trip failure that first motivated it is fixed upstream (spglib 2.8.0, now the floor)
 
 ## Goal
 
@@ -12,6 +12,16 @@ magnetic group round-trips, and every place the two libraries give
 different answers is either matched or shown to be the right one.
 
 ## Context
+
+**Direction, ruled by Yue 2026-11-03** (in chat): rietx moves from spglib to
+moyopy "for everything at some point". moyopy is the Python binding of moyo,
+spglib's Rust successor (`spglib/moyo` on GitHub, MIT OR Apache-2.0). The
+reason is one symmetry dependency with a maintained Python API that exposes
+Wyckoff data. spglib's Python API (2.7) does not expose it, so rietx rebuilds
+or ports what it needs. WP-2085 needs the first printed coordinates of each
+Wyckoff position. It waits for this migration and reads them from moyopy's
+`WyckoffPosition.coordinates` (ruled by Yue 2026-11-03). No milestone is
+set. The first task is an inventory only.
 
 Issue #426 (2026-09-23) and the maintainer's reply on its thread the same
 day, which took the timing decision: **one migration, after the v1.6
@@ -195,6 +205,14 @@ spglib convention, as PRs against the migration branch once it exists.
 
 ## Tasks
 
+- [ ] Inventory only, no migration: list every spglib call site in `src/`
+      (`subgroups._spglib_letters` and `_hall_table` among them) and every
+      place that would gain from moyopy, such as code that rebuilds or ports
+      Wyckoff data spglib's Python API does not expose (WP-2085's S1 waits
+      on this for moyopy's Wyckoff coordinates). Record the list here as
+      the port's checklist. A first count at origin/main `85d2ab514`: 23
+      `spglib.<fn>(` calls in 10 files (`git grep -E 'spglib\.[a-z_]+\('
+      -- src`), against 15 in 8 on 2026-10-16.
 - [ ] Settle difference 1 against the Stokes & Campbell BNS tables, and
       record which library matches and what rietx does with the other.
 - [ ] Primitive reduction before identification (take the reporter's helper
@@ -227,6 +245,13 @@ spglib convention, as PRs against the migration branch once it exists.
 - Issue #426 and the maintainer's reply of 2026-09-23.
 
 ## Handover log
+
+- **2026-11-03** — Yue's direction ruling folded in (Context's first
+  paragraph, the Priority line and a new first task, the inventory). The
+  brief asked for a new WP. This one already owns the migration, so the
+  ruling went here instead. WP-2085 then planned to port spglib's
+  `coordinates_first` as a stop-gap. A later ruling the same day dropped
+  the port, and WP-2085 now depends on this WP. Next: the inventory.
 
 - **2026-10-10** (reconstructed post hoc) — A session fixing main's red CI
   landed `b0d5c521` under this WP's prefix (PR #861, merged as `f52167e9`).

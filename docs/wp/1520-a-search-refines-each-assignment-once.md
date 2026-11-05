@@ -84,6 +84,12 @@ this closes 🛑 with the numbers, as WP-1508's gate did for the 2-D traversal.
 
 ### Inherited
 
+- **2026-11-03, from WP-2066 (its closing entry).** The reporter measured
+  #1301 on a private orthorhombic-F lab list (#1258, 2026-11-02): 19 % more
+  time per box than its merge-base, so within 60 s of wall clock the search
+  no longer reaches the truth. At an equal box count the accepted
+  candidates went 172 → 531. A real-data fixture of that shape is not in the
+  tree, so measure the leaf share on `tests/repro_780.py` instead.
 - **2026-11-01, from WP-2066 (PR #1301).** A dichotomy leaf now does more
   `_accept` work. It replays the swap images of C (monoclinic A, orthorhombic A
   and B) and refines each one that survives, and V3's annealing accepts more

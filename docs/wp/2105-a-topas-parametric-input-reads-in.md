@@ -1,0 +1,98 @@
+# WP-2105 — a TOPAS parametric input reads in
+
+Milestone: unscheduled · Status: ⬜
+Track: Coming from another code
+Depends on: 1964 (the grammar an equation lowers onto)
+Priority: P3 2026-11-04 — moved out of the parametric milestone by the maintainer's ruling: an agent ports an input from the documentation, so this waits for a failure a reader would fix
+
+## Goal
+
+`read_topas_inp` turns a parametric input into a `CoordinateTable`, `variables` and
+equations, and refuses by name what it cannot carry.
+
+## Context
+
+**Parked by ruling, 2026-11-04.** The maintainer: build robust machinery, do not overfit
+to TOPAS, and in the first instance a user with a decent agent ports what does not import.
+So this reader is no part of the milestone. Reopen it if a real agent port fails for a
+reason a reader would fix, or if porting the same construct by hand keeps recurring.
+
+`.inp` readers build no `ParametricEquation` today. WP-1325's real-data runs wrote each
+protocol by hand, and `read_topas_inp` refused ZrP₂O₇'s `B1` macros outright, so that
+run parsed the `str` blocks itself.
+
+The reader already has machinery here. `io/projects/topas.py` has a preprocessor that
+refuses `#list` by name and an `_arith` built on python `ast`, and
+`topas_ties.affine_of` reads equations and reports what it cannot. A new lowering beside
+these would be another TOPAS-expression path, which is WP-1119's first objection. So
+decide whether they route through the grammar.
+
+The two local inputs show what a real one is made of:
+
+- `prm` at top level holds shared coefficients, some fixed with `!`, some with
+  `val_on_continue` for restarts.
+- `local` holds a per-pattern value, and an equation on a `local` is a per-pattern
+  evaluation.
+- `#list Files T_val Range_val` and `#define` generate the per-pattern lines. Macro
+  text substitution comes first (TOPAS writes the expansion to `topas.log`). The reader
+  either expands them or takes a TOPAS-expanded input.
+- Spelling differs from the grammar in known ways: capitalised `Exp` and `Ln`,
+  left-associative `^`, and implied multiplication such as `(height) Cos(Th)`.
+
+Four lines in the Durham inputs depend on a reflection or an angle. Each needs a stated
+outcome:
+
+- WO₃'s `scale_pks = Exp(-2 b/(2 D_spacing)^2)` is one overall B per pattern. It
+  depends on the reflection, but its effect is an added Biso, so the reader can say so.
+- WO₃'s `th2_offset = -2 57.29... (height) Cos(Th) / Rs` is a sample height, which maps
+  to `sample_displacement`.
+- ZrP₂O₇'s `th2_offset` is a curve in `Xo`, which
+  [2107](2107-an-equation-over-a-reflection.md) can carry.
+- ZrMo₂O₈'s tutorial (9.2) writes `lor_fwhm` and `gauss_fwhm` through
+  `spherical_harmonics_hkl`, which 2107's harmonic can carry.
+
+Rules that apply: `src/rietx/io/CLAUDE.md`, and a reader may repair a file only where it
+can say that it did. **Corpus files are private**: a committed fixture carries synthetic
+numbers at the file's own column widths, and the Durham inputs stay in the local data
+root (root CLAUDE.md § Licensing).
+
+## Non-goals
+
+- GSAS-II's stored sequential equations (`SeqParFitEqList`):
+  [2106](2106-an-equation-fitted-to-a-series-trajectory.md).
+- Writing parametric `.inp` out.
+- Point-level equations.
+
+## Tasks
+
+- [ ] Decide how `_arith` and `affine_of` relate to the grammar, and write it here.
+- [ ] Mark each construct in 2101's inventory read, reported or refused. Bring anything a
+  reader cannot say honestly to the handover.
+- [ ] Macro expansion: decide between a small expander for `#list` and `#define` and
+  reading a `topas.log`.
+- [ ] Lower TOPAS's expression spelling to the grammar, with a table of each rewrite.
+  An exact rewrite is silent, and any other is a `Diagnostic`.
+- [ ] Build the coordinates, variables and equations, and run the WO₃ input end to end.
+- [ ] A synthetic fixture for the committed test.
+- [ ] Manual: `switching/topas.md` § Reading an `.inp`.
+- [ ] Skill: the foreign-inputs row, or "none" and why.
+
+## Acceptance
+
+```sh
+.venv/bin/python -m pytest tests/test_topas_whole_input.py tests/test_parametric_series.py
+.venv/bin/python -m ruff check src tests examples
+```
+
+## References
+
+- WP-1433, WP-1530 (the `.inp` reader's grammar), WP-1118 (the TOPAS boundary).
+- Evans, J. S. O. Durham TOPAS tutorials.
+
+## Handover log
+
+- **2026-11-04 (parked)** — Moved to unscheduled at P3 by the maintainer's ruling. Nothing
+  here had started. The inventory above stays useful to the port guide in 2101. Next:
+  nothing until the trigger under § Context fires.
+- **2026-11-04** — Filed on the opening of the milestone. No open WP owned it: 1455 and
+  1973 each read one profile or texture construct. Next: the inventory.

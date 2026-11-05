@@ -106,16 +106,16 @@ related specimens). `sequential.py` (`SequentialRefinement`/`refine_sequential`)
 (pinned by `TreeHeader.data_fingerprint`), linked by annotation notes. Not `multi.py`, which
 stacks patterns into **one joint residual**. Chaining buys ≈3× in iterations and nothing in
 accuracy, and its trajectory is path-dependent by construction → `direction="both"` runs the
-chain each way and flags parameters the two disagree on (`SEQUENTIAL_PATH_DEPENDENT`), the only
-check separating a measured trajectory from an ordering artefact. A rejected warm fit
-**escalates a rung at a time**, keeping the best attempt (`entry.rung`); still diverged after
-the last rung → **quarantined** (`SEQUENTIAL_UNRECOVERED`): seeds no successor, joins no median
-(WP-1051). **The first rung is a bet, budgeted from what a winning bet costs on this chain**
-(WP-1127): `first_rung_factor` × the dearest *converged* first rung, nothing until several have,
-never another fit's cost. `_prefer` ranks a truncated attempt below any completed one, so a bound
-only shortens work already being discarded and accepted values stay bit-identical. Set it for
-**margin**: win/lose rung gap ~6×. `events=`/`cancel=` are **per pattern** (WP-1016): `data`
-carries `series_index`/`…_label`/`…_n`/`…_pass` (+`…_rung`/`…_cold` on a *restart*), so no
+chain each way and records every path's gap, unthresholded (`SeriesResult.direction_gaps`), the only
+check separating a measured trajectory from an ordering artefact. A warm fit that diverged,
+raised or carries an `error`-level code (`schemas.sequential._rejected`, one test for both uses)
+**escalates a rung at a time**, keeping the best attempt (`entry.rung`); still rejected after the
+last rung → **quarantined** (`SEQUENTIAL_UNRECOVERED`): seeds no successor, joins no median
+(WP-1051). **Neither an Rwp fence nor a first-rung budget acts by default** (WP-2003 C1, C3):
+`reseed_factor` and `first_rung_factor` are the caller's, `None`, since a default action's
+evidence is never an Rwp comparison and a bound that cut a winning rung moved an accepted value;
+the ratio rides on `SeriesEntry.rwp_over_median`. `events=`/`cancel=` are **per pattern**
+(WP-1016): `data` carries `series_index`/`…_label`/`…_n`/`…_pass` (+`…_rung`/`…_cold` on a *restart*), so no
 `EventKind` is new; a cancelled series **returns** what completed with `SEQUENTIAL_CANCELLED`
 (WP-1006's rule one rank up; `sequential.py` docstring). **A `RefinementState` fact that is not
 in the models crosses no pattern boundary until someone builds it one** (WP-1441, #376): `carry`
@@ -295,8 +295,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   solver's 1e-9, WP-1123) is the schedule; `stage_ftols()` and `stage_window_tols()`, parallel to
   `run_stages()`, are the one authority, since the plan alone knows which stage is last — no runner
   reads `Stage.ftol` or `plan.stages`. **Cumulative staging bounds the cost**: every later stage
-  refines an intermediate stage's parameters again, so 1.2-1.6× fewer evaluations cost ≤ 0.03 esd
-  on **one fit**, and along a *chain* the effect is unbounded and of either sign (1.12× better,
+  refines an intermediate stage's parameters again, so 1.06-1.58× fewer evaluations cost ≤ 0.0004
+  esd on **one fit** (FAP, NAC, cpd-1a behind the closing stage; WP-2045 probe 7), and along a *chain* the effect is unbounded and of either sign (1.12× better,
   1.04× worse): a series is measured, never assumed. `None` for either is the bit-identical way
   back and what a golden declares; the record says what a stage **ran** at (`StageResult.ftol` and
   `.window_area_tol`, `NodeAction`'s twins), or a cherry-pick replays what never happened.
@@ -318,8 +318,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   measurement is the caller's**: held paths and their ties leave `RefinementResult.parameters` (its
   rows are `moving_paths`, WP-1999), a trajectory starts at the onset. Which phases: a scale under 3σ of its counting-noise esd
   (`refine._answer_significance`, WP-1523), never the fitted curve an absent phase's cell fits to
-  noise; zero limit `phase_line_counts`. Both feed `PHASE_UNCONSTRAINED`, which says what was done;
-  `SEQUENTIAL_PERSISTENT_FINDING` what no one pattern can: "42 of 68".
+  noise; zero limit `phase_line_counts`. **Missed peaks read as unseen too**, so holding the instrument needs Hill & Flack's d ≥ Q (WP-2086). What a decline leaves free finds the peaks at a rate, so a test pins the decision, never the landing. Both feed `PHASE_UNCONSTRAINED`, which says what was done;
+  `SeriesResult.code_counts` what no one pattern can: "42 of 68".
 - **Pydantic knows no crystallography, so a whole-model swap is checked by building its table.**
   Every symmetry refusal is raised in `ParameterTable.__init__`, and the snapshot
   `Refinement.edit` commits performs none of it, so `edit` builds the **proposed** pair's table
@@ -789,13 +789,13 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   the **FWHM** (not σ) of the ΔM/M distribution; coefficients are in **10⁻¹² Å⁻⁴** (physical values
   ~10⁻⁸ would be finite-differenced with a step 100× their own size); they multiply the **literal**
   monomials, where other codes fold symmetry multiplicities in. A block **locks `lor_strain`** (its
-  isotropic direction is identically that column), so the block subsumes it and must itself be
-  freed *in* the sample-broadening stage, not after. The isotropic limit S = ε²·[M²] is both the
+  isotropic direction is identically that column) **and replaces it**: every width reader takes
+  `CompiledModel.lor_strain_term`, 0 under a block, since a locked entry keeps its stored value and a
+  reader of the path stacked Λ on a frozen floor (WP-1467). The block is freed *in* the sample-broadening stage, not after. The isotropic limit S = ε²·[M²] is both the
   seed and the only legal start: at S ≡ 0 the √ has unbounded slope, so `Stage.strain_seed`, not
   `Stage.seed`, which lifts only a row sitting on a floor at or above 0. σ²(M) ≥ 0 is a *cone* coupling all fifteen, so it cannot be a box bound. The default
   LM driver holds it as a linear inequality. Under `solver="trf"`, and in a joint fit (no cone), it
-  is a guard (`STEPHENS_STRAIN_NOT_POSITIVE`). Read a firing as "these coefficients are
-  not quotable", never as evidence *of* anisotropy. **Zero is on the cone, not outside it** — the
+  is a guard (`STEPHENS_STRAIN_NOT_POSITIVE`). Read a firing as "not quotable, and the fit leaned on the clamp" (σ² < 0 → zero strain width, a free hinge; `detail` carries the m·|F|² share), never as evidence *of* anisotropy. **Zero is on the cone, not outside it** — the
   guard's test is one-sided; v0.6's record has the ≤ 0 form's withdrawn claim and the re-measured
   brucite and corundum cone counts.
 - **Anomalous scattering is ON by default since v1.0** (`Source.dispersion`, f = f₀ + f′ + i·f″

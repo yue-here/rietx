@@ -386,8 +386,8 @@ def recolour(geometry: Mapping, mask, colour) -> dict:
     for a in (a for a, c in zip(out["atoms"], chosen) if c):
         if a["site"] not in copies:
             copies[a["site"]] = len(out["sites"])
-            out["sites"].append({**out["sites"][a["site"]], "color": colour,
-                                 "recoloured": True})
+            site = {k: v for k, v in out["sites"][a["site"]].items() if k != "dark_color"}
+            out["sites"].append({**site, "color": colour, "recoloured": True})
         a["site"] = copies[a["site"]]
     for p in out["polyhedra"]:
         if chosen[p["center"]]:

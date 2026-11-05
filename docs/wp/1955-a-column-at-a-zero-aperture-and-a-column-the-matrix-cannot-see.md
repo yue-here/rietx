@@ -54,6 +54,7 @@ when U and V are both zero beside W on its floor. It is the only other
 
 **Both apertures at zero** (folded from `### Inherited` on 2026-11-02).
 
+- **From WP-2060 (2026-11-02): `profile_interval` no longer answers [0.0, 0.0] by its step alone.** A first probe past the Δχ² threshold now steps back in from the fit until one lands inside, so the axial-ratio profile of #1075's repro 1 should find a real end or a lower χ² (`fit_is_minimum=False`) instead of confirming the floor. Not re-run on repro 1. Re-measure it here before building on WP-2060's Context, which quotes the old [0.0, 0.0].
 - **From WP-2003 (2026-10-26): both apertures at 0 cost an answer, not only an esd.** CPD
   sample 1b fitted independently under `qpa_plan()` ends with S/L and H/L both on their
   floors at 0 (S/L esd 251). A warm refit of 1c from that state collapses: Rwp 10.724 with
@@ -87,6 +88,30 @@ when U and V are both zero beside W on its floor. It is the only other
   driver's handling of a small column, which this WP's non-goals give to
   WP-1953; 1953 is closed and its fix does not reach this case, so it lands
   here. Re-rated P3 → P2.
+
+- **2026-11-02, from WP-1467 (closing): the Gaussian-width floor is this WP's
+  class one parameter over.** Both bullets came to 1467 from WP-2002 (PR
+  #1085, 2026-10-21), and 1467 owns only the Stephens clamp, so they move here,
+  where a column read at a floor is the subject. (1) The SRM 660c and cpd-1a
+  protocol answers end with high-angle reflections on `caglioti._MIN_GAMMA_G2`
+  (`CONSTRAINT_ACTIVE`; a Kα2 reflection near 149.7° on LaB6, corundum past
+  150° on cpd-1a). There the FD width column is 2.2e-2 off the right
+  derivative, because the step moves Γ_G² by about 0.7 of the floor. A polish
+  under a 5e-7 FD step or a 1e-10 floor stops 1.2 plain esd away on
+  `profile.u` at χ² 0.25 % worse, and an FD step of 1e-8 does not cure it. A
+  candidate fix is analytic width scalars at the clamp
+  (`optimize/least_squares.py` near the width step and the scalar block, the
+  clamp in `caglioti.py`). Tests: `tests/test_gaussian_width_floor.py` and
+  `tests/test_cross_backend.py::test_fd_columns_hold_at_every_protocol_answer`
+  (strict xfails on lab6 and cpd1a). (2) The closing stage's LaB6 answer sits
+  0.908 plain esd from the converged-tails answer in `profile.u` for the same
+  reason: a second recompile moves u by 1 esd and a third by 0.002.
+  `tests/test_window_domain.py::test_the_closing_stage_meets_the_bar[lab6]` is
+  a strict xfail citing this WP, and turns green when the clamp stops moving
+  u. 1467 measured one thing nearby: from a collapsed start on synthetic LaB6
+  (U, V, W and scale free) both drivers stay under the floor on 20 of 20
+  reflections at χ² 6.34 against 1.01 from the true start, a stall rather than
+  a hinge the fit exploits, which is why 1467 left the floor alone.
 
 ## Non-goals
 

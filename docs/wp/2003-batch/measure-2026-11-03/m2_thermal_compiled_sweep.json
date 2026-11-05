@@ -1,0 +1,754 @@
+{
+ "env": {
+  "platform": "Darwin arm64 (macOS-27.2-arm64-arm-64bit)",
+  "python": "3.12.16",
+  "rietx": "1.11.0.dev0",
+  "rietx_file": "/private/tmp/claude-502/-Users-yuewu-Code-rietx/2d6ae8c9-3e42-4d89-bdce-b3f74821ad95/scratchpad/snap/src/rietx/__init__.py",
+  "venv": "worktree .venv, [dev]",
+  "compiled_available": true,
+  "compiled_enabled": true,
+  "numeric_path": "compiled (set_enabled(True))"
+ },
+ "family": "thermal",
+ "path": "compiled",
+ "N": 10,
+ "arms": {
+  "samples1_factor1.0": {
+   "samples": 1,
+   "factor": 1.0,
+   "n_armed": 8,
+   "n_cut": 8,
+   "cut": [
+    "p002",
+    "p003",
+    "p004",
+    "p005",
+    "p006",
+    "p007",
+    "p008",
+    "p009"
+   ],
+   "n_escalated": 8,
+   "escalated": [
+    "p002",
+    "p003",
+    "p004",
+    "p005",
+    "p006",
+    "p007",
+    "p008",
+    "p009"
+   ],
+   "escalated_in_ref": [],
+   "total_evals": 358,
+   "budgets": {
+    "p002": 12,
+    "p003": 12,
+    "p004": 12,
+    "p005": 12,
+    "p006": 12,
+    "p007": 12,
+    "p008": 12,
+    "p009": 12
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 39,
+    "p003": 39,
+    "p004": 38,
+    "p005": 38,
+    "p006": 38,
+    "p007": 38,
+    "p008": 38,
+    "p009": 38
+   },
+   "vs_ref": {
+    "bit_identical_values": false,
+    "values_identical": false,
+    "status_rung_changes": [
+     [
+      "p002",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p003",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p004",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p005",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p006",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p007",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p008",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p009",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ]
+    ],
+    "max_dvalue_esd": 0.0014876985504580248,
+    "max_dvalue_at": [
+     "p004",
+     "instrument.background.c1"
+    ]
+   },
+   "seconds": 6.7
+  },
+  "samples2_factor1.0": {
+   "samples": 2,
+   "factor": 1.0,
+   "n_armed": 7,
+   "n_cut": 7,
+   "cut": [
+    "p003",
+    "p004",
+    "p005",
+    "p006",
+    "p007",
+    "p008",
+    "p009"
+   ],
+   "n_escalated": 7,
+   "escalated": [
+    "p003",
+    "p004",
+    "p005",
+    "p006",
+    "p007",
+    "p008",
+    "p009"
+   ],
+   "escalated_in_ref": [],
+   "total_evals": 334,
+   "budgets": {
+    "p003": 12,
+    "p004": 12,
+    "p005": 12,
+    "p006": 12,
+    "p007": 12,
+    "p008": 12,
+    "p009": 12
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 39,
+    "p004": 38,
+    "p005": 38,
+    "p006": 38,
+    "p007": 38,
+    "p008": 38,
+    "p009": 38
+   },
+   "vs_ref": {
+    "bit_identical_values": false,
+    "values_identical": false,
+    "status_rung_changes": [
+     [
+      "p003",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p004",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p005",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p006",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p007",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p008",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p009",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ]
+    ],
+    "max_dvalue_esd": 0.0014877028954866508,
+    "max_dvalue_at": [
+     "p004",
+     "instrument.background.c1"
+    ]
+   },
+   "seconds": 6.4
+  },
+  "samples3_factor1.0": {
+   "samples": 3,
+   "factor": 1.0,
+   "n_armed": 6,
+   "n_cut": 6,
+   "cut": [
+    "p004",
+    "p005",
+    "p006",
+    "p007",
+    "p008",
+    "p009"
+   ],
+   "n_escalated": 6,
+   "escalated": [
+    "p004",
+    "p005",
+    "p006",
+    "p007",
+    "p008",
+    "p009"
+   ],
+   "escalated_in_ref": [],
+   "total_evals": 310,
+   "budgets": {
+    "p004": 12,
+    "p005": 12,
+    "p006": 12,
+    "p007": 12,
+    "p008": 12,
+    "p009": 12
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 15,
+    "p004": 38,
+    "p005": 38,
+    "p006": 38,
+    "p007": 38,
+    "p008": 38,
+    "p009": 38
+   },
+   "vs_ref": {
+    "bit_identical_values": false,
+    "values_identical": false,
+    "status_rung_changes": [
+     [
+      "p004",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p005",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p006",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p007",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p008",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ],
+     [
+      "p009",
+      [
+       "converged",
+       "warm",
+       [
+        "warm"
+       ]
+      ],
+      [
+       "converged",
+       "warm_staged",
+       [
+        "warm",
+        "warm_staged"
+       ]
+      ]
+     ]
+    ],
+    "max_dvalue_esd": 0.001487701935117084,
+    "max_dvalue_at": [
+     "p004",
+     "instrument.background.c1"
+    ]
+   },
+   "seconds": 5.9
+  },
+  "samples1_factor1.5": {
+   "samples": 1,
+   "factor": 1.5,
+   "n_armed": 8,
+   "n_cut": 0,
+   "cut": [],
+   "n_escalated": 0,
+   "escalated": [],
+   "escalated_in_ref": [],
+   "total_evals": 172,
+   "budgets": {
+    "p002": 18,
+    "p003": 18,
+    "p004": 18,
+    "p005": 18,
+    "p006": 18,
+    "p007": 18,
+    "p008": 18,
+    "p009": 18
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 15,
+    "p004": 15,
+    "p005": 15,
+    "p006": 15,
+    "p007": 15,
+    "p008": 15,
+    "p009": 15
+   },
+   "vs_ref": {
+    "bit_identical_values": true,
+    "values_identical": true,
+    "status_rung_changes": [],
+    "max_dvalue_esd": 0.0,
+    "max_dvalue_at": null
+   },
+   "seconds": 3.1
+  },
+  "samples2_factor1.5": {
+   "samples": 2,
+   "factor": 1.5,
+   "n_armed": 7,
+   "n_cut": 0,
+   "cut": [],
+   "n_escalated": 0,
+   "escalated": [],
+   "escalated_in_ref": [],
+   "total_evals": 172,
+   "budgets": {
+    "p003": 18,
+    "p004": 18,
+    "p005": 18,
+    "p006": 18,
+    "p007": 18,
+    "p008": 18,
+    "p009": 18
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 15,
+    "p004": 15,
+    "p005": 15,
+    "p006": 15,
+    "p007": 15,
+    "p008": 15,
+    "p009": 15
+   },
+   "vs_ref": {
+    "bit_identical_values": true,
+    "values_identical": true,
+    "status_rung_changes": [],
+    "max_dvalue_esd": 0.0,
+    "max_dvalue_at": null
+   },
+   "seconds": 3.3
+  },
+  "samples3_factor1.5": {
+   "samples": 3,
+   "factor": 1.5,
+   "n_armed": 6,
+   "n_cut": 0,
+   "cut": [],
+   "n_escalated": 0,
+   "escalated": [],
+   "escalated_in_ref": [],
+   "total_evals": 172,
+   "budgets": {
+    "p004": 18,
+    "p005": 18,
+    "p006": 18,
+    "p007": 18,
+    "p008": 18,
+    "p009": 18
+   },
+   "per_pattern_evals": {
+    "p000": 37,
+    "p001": 15,
+    "p002": 15,
+    "p003": 15,
+    "p004": 15,
+    "p005": 15,
+    "p006": 15,
+    "p007": 15,
+    "p008": 15,
+    "p009": 15
+   },
+   "vs_ref": {
+    "bit_identical_values": true,
+    "values_identical": true,
+    "status_rung_changes": [],
+    "max_dvalue_esd": 0.0,
+    "max_dvalue_at": null
+   },
+   "seconds": 3.8
+  }
+ },
+ "reference": {
+  "total_evals": 172,
+  "per_pattern_evals": {
+   "p000": 37,
+   "p001": 15,
+   "p002": 15,
+   "p003": 15,
+   "p004": 15,
+   "p005": 15,
+   "p006": 15,
+   "p007": 15,
+   "p008": 15,
+   "p009": 15
+  },
+  "rungs": {
+   "p000": [
+    "cold"
+   ],
+   "p001": [
+    "warm"
+   ],
+   "p002": [
+    "warm"
+   ],
+   "p003": [
+    "warm"
+   ],
+   "p004": [
+    "warm"
+   ],
+   "p005": [
+    "warm"
+   ],
+   "p006": [
+    "warm"
+   ],
+   "p007": [
+    "warm"
+   ],
+   "p008": [
+    "warm"
+   ],
+   "p009": [
+    "warm"
+   ]
+  }
+ },
+ "reference_repeat": {
+  "bit_identical_values": true,
+  "values_identical": true,
+  "status_rung_changes": [],
+  "max_dvalue_esd": 0.0,
+  "max_dvalue_at": null
+ },
+ "factors": [
+  1.0,
+  1.5
+ ],
+ "seconds": 36.3
+}

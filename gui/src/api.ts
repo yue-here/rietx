@@ -319,8 +319,8 @@ export const api = {
    *  events on the same stream with `series_index` stamped on. */
   runSeries: (plan?: unknown) =>
     call("POST", "/api/series/run", plan ? { plan } : {}),
-  /** Entries, trajectories with esds, and the fences — `path_dependent` hoisted
-   *  to the top level because it is the headline, not a footnote. */
+  /** Entries, trajectories with esds, and the fences. Each trajectory carries
+   *  its largest forward/backward gap in esds (`n_sigma`) and where it sits. */
   seriesResult: () => call("GET", "/api/series/result"),
   /** One member's channels and curves, as `curves` sends the project's: built
    *  by the same function, so the σ and the residuals are the same arithmetic. */

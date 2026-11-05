@@ -28,7 +28,8 @@ a held phase emits a second ``stage_start`` before re-solving, and the wall
 clock that matters is the whole named stage's — ``progress_writer``'s rule.
 A fit's cost is ``fit_start`` to ``fit_end``: a sum of stage spans leaves out
 whatever runs between stages (a stage report, a recompile), which can be most
-of it.
+of it.  The stage reports' own share is counted, because ``fit_end`` carries
+``stage_report_seconds`` when a fit built them (WP-1335).
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ from pathlib import Path
 from pydantic import Field
 
 from ..schemas.common import Base
-from .events import RUN_RECORD, RunHeader
+from .events import RUN_RECORD, RunHeader, StageClock
 
 #: Lines read per pass of the tail.  A bound on memory per pass, not on the log.
 _CHUNK_BYTES = 16 << 20
@@ -75,6 +76,10 @@ class RunSummary(Base):
     n_fits_ended: int = 0
     #: Σ ``fit_start`` → ``fit_end`` over the run's completed fits.
     fit_seconds: float = 0.0
+    #: Σ ``fit_end.stage_report_seconds``: the share of ``fit_seconds`` spent
+    #: building ``stage_reports=True`` rungs, which no stage span holds
+    #: (WP-1335).  ``None`` when no fit in the run built one.
+    stage_report_seconds: float | None = None
     n_stage_starts: int = 0
     n_stage_ends: int = 0
     n_evals: int = 0
@@ -95,6 +100,8 @@ class RunSummary(Base):
             lines.append("  header: none")
         fit = (f", {self.fit_seconds:.2f} s fit_start→fit_end"
                if self.n_fits_ended else "")
+        if self.n_fits_ended and self.stage_report_seconds is not None:
+            fit += f", {self.stage_report_seconds:.2f} s of it stage reports"
         lines.append(f"  fits {self.n_fits} ({self.n_fits_ended} ended{fit})"
                      f"   stages {self.n_stage_ends} ended "
                      f"({self.n_stage_starts} started)   evals {self.n_evals}")
@@ -181,8 +188,9 @@ def _summarize_run(header: dict | None, events: list[dict]) -> RunSummary:
              if isinstance(r.get("t"), (int, float))]
     n_fits = n_fits_ended = n_starts = n_ends = n_evals = 0
     fit_seconds = 0.0
+    report_seconds: float | None = None
     fit_open: float | None = None
-    stage_open: dict[str, float] = {}  # cleared at each fit_start
+    clock = StageClock()  # the rule progress_writer reads too (WP-2031)
     stage_count: Counter = Counter()
     stage_seconds: dict[str, float] = {}
     stage_evals: Counter = Counter()
@@ -198,24 +206,24 @@ def _summarize_run(header: dict | None, events: list[dict]) -> RunSummary:
         data = event.get("data") or {}
         t = event.get("t")
         stage = data.get("stage")
+        elapsed = clock.observe(kind, stage, t, resumed="released" in data)
         if kind == "fit_start":
             n_fits += 1
             fit_open = t
-            # a stage that raised emitted no stage_end; its start must not
-            # carry into the next fit's stage of the same name
-            stage_open.clear()
         elif kind == "fit_end":
             n_fits_ended += 1
             if fit_open is not None and t is not None:
                 fit_seconds += t - fit_open
             fit_open = None
+            if isinstance(data.get("stage_report_seconds"), (int, float)):
+                report_seconds = ((report_seconds or 0.0)
+                                  + float(data["stage_report_seconds"]))
         elif kind == "stage_start":
             n_starts += 1
             if stage is not None:
                 if stage not in stage_seconds:
                     order.append(stage)
                     stage_seconds[stage] = 0.0
-                stage_open.setdefault(stage, t)
         elif kind == "stage_end":
             n_ends += 1
             terminations[data.get("termination") or "(absent)"] += 1
@@ -225,9 +233,8 @@ def _summarize_run(header: dict | None, events: list[dict]) -> RunSummary:
                     order.append(stage)
                     stage_seconds[stage] = 0.0
                 stage_count[stage] += 1
-                start = stage_open.pop(stage, None)
-                if start is not None and t is not None:
-                    stage_seconds[stage] += t - start
+                if elapsed is not None:
+                    stage_seconds[stage] += elapsed
         elif kind == "eval":
             n_evals += 1
             if stage is not None:
@@ -242,6 +249,7 @@ def _summarize_run(header: dict | None, events: list[dict]) -> RunSummary:
         wall_seconds=(max(times) - min(times)) if times else 0.0,
         n_events=sum(r.get("record") == "event" for r in events),
         n_fits=n_fits, n_fits_ended=n_fits_ended, fit_seconds=fit_seconds,
+        stage_report_seconds=report_seconds,
         n_stage_starts=n_starts, n_stage_ends=n_ends, n_evals=n_evals,
         stages=[StageTiming(stage=s, count=stage_count[s],
                             seconds=stage_seconds[s], n_evals=stage_evals[s])

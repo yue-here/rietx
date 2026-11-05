@@ -135,6 +135,28 @@ each arm's search or cuts trailing systems. That cost is unmeasured.
 
 **Licensing.** Concepts only from papers. No program code is consulted.
 
+### Inherited
+
+- **2026-11-05, from the issue triage (issue #1382, finding 2): the same failure on a pure phase,
+  with lines the picker made from the phase's own Kα1 peak.** On
+  `tests._synthetic_silicon.silicon_pattern("flat")`, `pick_peaks` gives 10 usable lines where the
+  range holds eight, because the 111 line carries extra components at 28.60° and 28.77°. Its Kα2 is at
+  about 28.52°. Reproduced at `541f0daf7` (`[dev]`, arm64 Mac, `preset="quick"`): trigonal R
+  3.841/9.380 ranks first with 9 of 10 lines, and cubic F 5.431 second with 8 of 10. All three engines
+  find both. Their Pawley validations separate them: the R cell at Rwp 0.118, GoF 4.45, and the F cell
+  at Rwp 0.0299, GoF 1.12. The rank does not read that gap. This is a cheap public fixture for this
+  WP's Goal, and it carries no second phase, so "weak lines the host does not own" here means picker
+  artefacts. The issue's finding 1 is WP-2113.
+
+- **2026-11-03, from WP-2066 (closed).** #1301 has merged, so this WP's
+  dichotomy rows are pre-#1301 numbers. The reporter's one real-data
+  re-measure after it, a private orthorhombic-F lab list (#1258,
+  2026-11-02), moved dichotomy's ranking down. On the truth's grid cells
+  the truth went 5th → 6th. On the whole frontier at equal boxes the wrong
+  cells above it went 49 → 112, and it left the 60-candidate engine pool.
+  `index_pattern` returned no truth there on either tree. Re-run the
+  dichotomy rows on `main` before comparing an arm against them.
+
 ## Non-goals
 
 - The significance screen (`weak_line`, `PEAK_FDR_Q`). The harmful lines are

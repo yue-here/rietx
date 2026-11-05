@@ -51,7 +51,23 @@ $\mathrm{GoF} = \sqrt{\chi^2_{\mathrm{red}}} = R_{wp}/R_{\exp}$ and
 the background-subtracted $R_{wp}$ variant Toby recommends when the
 background carries much of the raw intensity. The Durbin-Watson statistic
 on weighted residuals {cite}`hillflack1987` flags serial correlation
-($d \approx 2$ ⇒ uncorrelated).
+($d \approx 2$ ⇒ uncorrelated). Hill and Flack test it against the 0.1 %
+significance point $Q$:
+
+```{math}
+:label: est-dw-q
+
+d = \frac{\sum_{i=2}^{N} (\Delta_i - \Delta_{i-1})^2}{\sum_{i=1}^{N} \Delta_i^2},
+\qquad
+Q = 2\left[\frac{N - 1}{N - P} - \frac{z}{(N + 2)^{1/2}}\right]
+```
+
+{source}`rietx.optimize.statistics.durbin_watson_q`
+
+$\Delta_i$ is the weighted residual at fitted channel $i$ and $z =$
+{{ HILL_FLACK_Z }} the normal 0.1 % point. Below $Q$, neighbours share a sign
+more often than chance allows. rietx reads this once, as a decision, and
+{doc}`../concepts/fit` says which.
 
 Across the shipped corrections, $\Delta R_{wp}$ recurs as a poor judge of a
 physical improvement ({ref}`ch-corrections`, {ref}`ch-method`). These indices
@@ -410,7 +426,22 @@ gives $P(T > c) = \tfrac12 P(\chi^2_1 > c)$, so $c$ = 2.71 at 95 %, and the
 interval is one-sided with the bound as one end. The two scaling factors put a
 two-sided interval on a quadratic profile at the value ± 1.96 esd. Each end is
 bracketed by steps of 1, 2, 4, … esd and solved by Brent's method on the
-refitted $\chi^2$.
+refitted $\chi^2$. Every refit keeps the fit's own free set: a parameter the
+fit held stays held, whatever the pinned value would have the stage decide.
+
+A moment's modulus $m$ has no declared bound, but the magnetic intensity goes
+as $m^2$. Where the sign of $m$ changes no intensity (one moment block in the
+phase, or a block whose free angles reach $-m$ by turning), the profile is
+even about 0, and the parameter the data measure is $u = m^2 \ge 0$, in which
+the intensity is linear. A likelihood ratio does not depend on the
+parameterisation, so the profile keeps $m \ge 0$, and a fit that ends on
+$m = 0$ is on the boundary of $u$: its interval is one-sided at $c$ = 2.71,
+with 0 as one end. Such a fit has a dead column, and its esd from
+{eq}`est-cov` can exceed the end by six orders of magnitude. A first step of
+one esd then overshoots the threshold. The walk steps back in to where a
+parabola through that probe puts the end, halved, until a probe lands inside,
+and solves the end in the logarithm of its distance from $\hat p$, where the
+quartic profile of a dead column is a straight line.
 
 A bound the data press against is not a stationary point of $\chi^2$. There
 $\chi^2$ rises from the bound with a slope as well as a curvature, and the

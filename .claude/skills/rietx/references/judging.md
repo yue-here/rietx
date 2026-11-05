@@ -60,29 +60,26 @@ esd of 0 on a symmetry-fixed 90° angle would be a claim about precision rather
 than a statement about constraint.
 
 `write_refinement_cif` writes the whole table as `_geom_bond_*`,
-`_geom_contact_*` and `_geom_angle_*` loops, with the symmetry codes resolvable
-against the `_space_group_symop_operation_xyz` loop it writes beside them.
+`_geom_contact_*`, `_geom_angle_*` and `_geom_torsion_*` loops, with the
+symmetry codes resolvable against the `_space_group_symop_operation_xyz` loop
+it writes beside them.
 
 ## §2 rules 4-5 — the two Le Bail measurements
 
-**Alternate under a cap, and keep the best pass.** On PbSO4 pass 1 ends at Rwp 20.756 % with an unphysical Caglioti **V = +0.0615**; passes 2-4 reach 10.247 % with the curve sane. On Tb2BaCoO5 a later pass rose, 17.3 % → 18.7 %. `plan.lebail_passes` stops at the first pass that does not lower Rwp and keeps the best. `LEBAIL_ALTERNATION_STOPPED` names the stop; `non_monotone` or a cap hit is no fixed point. Rwp % per pass (Measured: 11-BM LaB6+cBN, `profile_only`): exact cells 16.821, 16.907, pass 1 kept; 0.3 % off, a fixed point at 16.967; 2 % off, 230, 207, 175, 195, pass 3 kept.
+**Alternate under a cap, and keep the best pass.** On PbSO4 pass 1 ends at Rwp 20.756 % with an unphysical Caglioti **V = +0.0615**; passes 2-4 reach 10.247 % with the curve sane. On Tb2BaCoO5 a later pass rose, 17.3 % → 18.7 %. `plan.lebail_passes` stops at the first pass that does not lower Rwp and keeps the best. `LEBAIL_ALTERNATION_STOPPED` names the stop; `non_monotone` or a cap hit is no fixed point.
 
 **A known structure is no Le Bail job.** One staged Rietveld calibration took 43.8 s against ~40 min of Le Bail (#210).
 
-**Seed the background first.** `auto_background` chooses the knot spacing or the Chebyshev *order* but starts every coefficient at **0.0**, so the first `lebail_update` runs *before* the background is fitted. It partitions `max(y_obs − 0, 0)` (the whole pedestal) and gives it to the Bragg reflections. Measured on a synthetic pattern whose background is 5× its
-strongest peak: cycle one claims **571×** the true Bragg intensity. `seed=True` starts them at a low percentile of the counts.
+**Seed the background first.** `auto_background` starts every coefficient at **0.0**, and the first `lebail_update` runs before the background is fitted, so the reflections get the whole pedestal: **571×** their true intensity under a background 5× the strongest peak. `seed=True` starts at a low count percentile.
+
+**Under a broad hump, hold SNIP.** Each stage partitions against its starting background, so a co-refined one stops short and the reflections keep the rest. Hold `rx.BackgroundFixedPlusChebyshev.from_pattern(rx.PatternData(two_theta=tt, intensity=rx.background.snip(y, w)), source="snip")`, half-window `w` ≈ 3 FWHMs in points. (Measured, one synthetic fixture, WP-1542: background/truth at the hump 0.83 seeded; held, 0.97 at `w` = 3 FWHMs, 0.87 at 6, 0.62 at the hump's σ, which clips it.)
 
 **The cell is the weaker half.** Peterson (2005, *Powder Diffr.* **20**, 14)
-fitted triclinic tricalcium silicate at NSLS X7A. The Le Bail fit won on both
-indices reported (χ² 16.46 against 22.81, R_p 2.34 against 3.52 at ambient) and
-its cell parameters wandered over a heating and cooling series, while the
-Rietveld cell from an admittedly imperfect model stayed consistent. The cause is
-reflection density rather than low symmetry alone.
+fitted triclinic tricalcium silicate at NSLS X7A. Le Bail won on χ² (16.46 against 22.81) and R_p (2.34 against
+3.52) while its cell wandered over a heating and cooling series; the Rietveld cell from an imperfect model stayed
+consistent. Reflection density, not low symmetry, is the cause.
 
-**Measured at the other end of that variable**, one range and one instrument
-treatment, three modes: 11-BM LaB₆, 2-40°, 55 reflections, mean FWHM 0.0097°,
-**0.014 reflections per FWHM**. Rietveld a = 4.1568414(45) Å, Le Bail
-4.1568425(44), Pawley 4.1568431(44). They spread 0.4 ppm, two-fifths of one esd, and the esds agree within 3 %. Le Bail also won on Rwp there (0.0861 against 0.0879), so a better Rwp does not show the cell is wrong or right. Where reflections crowd, check the cell against a structural model; where resolved, skip it.
+**At the other end of that variable** (11-BM LaB₆, 2-40°, 55 reflections, **0.014 reflections per FWHM**) the modes agree: Rietveld a = 4.1568414(45) Å, Le Bail 4.1568425(44), Pawley 4.1568431(44), a 0.4 ppm spread. Le Bail won on Rwp there too (0.0861 against 0.0879), so Rwp cannot judge the cell. Where reflections crowd, check the cell against a structural model; where resolved, skip it.
 
 **Multi-phase Le Bail** works since v1.0. The shares sum to 1 across all phases at every channel (measured Σ calculated / Σ observed excess **1.79 → 1.0000** on LaB₆ + CaF₂, single-phase path bit-identical). One caveat is the method's own. The data do not split the intensity of two phases whose reflections *coincide*, so the partition splits it by the current model, a starting value. Treat a high multi-phase Le Bail Rwp as a reason to check the
 seeding above.
@@ -415,9 +412,9 @@ is resolution-limited changes numbers it cannot justify.
 ## §4b — the trajectory deliverable, and where its rows come from
 
 Four codes on `SeriesResult.summary(deliverable="series")` carry the chain's
-own rows. `SEQUENTIAL_PATH_DEPENDENT` is an ordering artefact — only a
-`direction="both"` chain can produce one, so a one-way chain has not looked.
-`SEQUENTIAL_PERSISTENT_FINDING` states a persistent count no per-pattern code
+own rows. `series.direction_gaps` measures an ordering artefact, and only a
+`direction="both"` chain fills it, so a one-way chain has not looked.
+`series.code_counts` states a count across the chain no per-pattern code
 can, measured at **42 of 68** patterns on this ramp (`BOUND_HIT` on one cell, original run). A large entry in
 `series.steps` is either the science or a chain failure, and `verify_steps=k`
 tells them apart (below). `PHASE_UNCONSTRAINED` says the value is held, so its trajectory is the one you handed in. Apply the QPA background check **at every point** too: an absent phase took **40–96 wt %** at equal Rwp.

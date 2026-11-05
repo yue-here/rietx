@@ -143,6 +143,42 @@ def _listed_twice_silent() -> list:
                      .format(extra="Ni2 Ni 0.5 0.5 0.0001 0.481\n"))
 
 
+# ---------------------------------------------------- the FullProf project reader
+
+
+def _pcr_r_phase(cell: str) -> list:
+    """``to_structure``'s diagnostics for a one-site bare ``R -3 c`` phase."""
+    from rietx.io.projects.fullprof import read_fullprof_pcr, to_structure
+    from tests.test_projects_fullprof import (
+        _PHASE_CELL_CODES,
+        _R_PHASE_ORIGIN_SITE,
+        _pcr,
+        _phase,
+    )
+
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = _pcr(pathlib.Path(tmp), "r.pcr",
+                    _phase(nat=1, sg="R -3 c", atoms=_R_PHASE_ORIGIN_SITE,
+                           cell=cell, cell_codes=_PHASE_CELL_CODES))
+        to_structure(read_fullprof_pcr(path), diagnostics=found)
+    return found
+
+
+def _rhombohedral_axes_fires() -> list:
+    """A rhombohedral cell beside the bare symbol, which FullProf reads hexagonal."""
+    from tests.test_projects_fullprof import _R_PHASE_RHOMBOHEDRAL_CELL
+
+    return _pcr_r_phase(_R_PHASE_RHOMBOHEDRAL_CELL)
+
+
+def _rhombohedral_axes_silent() -> list:
+    """The same lattice on hexagonal axes, the reading FullProf and rietx share."""
+    from tests.test_projects_fullprof import _R_PHASE_HEXAGONAL_CELL
+
+    return _pcr_r_phase(_R_PHASE_HEXAGONAL_CELL)
+
+
 # --------------------------------------------------- the instrument-file readers
 
 
@@ -193,6 +229,33 @@ def _instprm_geometry_silent() -> list:
                         "Gonio. radius:217.5\n", encoding="utf-8")
         read_gsas2_instprm(path, diagnostics=found)
     return found
+
+
+# ------------------------------------------------------------- the history reader
+
+
+def _load_log(n_trees: int) -> list:
+    """``RefinementTree.load``'s diagnostics for a log of ``n_trees`` headers."""
+    from rietx.history.tree import RefinementTree
+    from rietx.schemas.history import HistoryRecord, TreeHeader
+
+    line = HistoryRecord(record="header", header=TreeHeader(tree_id="t0")).model_dump_json()
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / "fit.jsonl"
+        path.write_text((line + "\n") * n_trees, encoding="utf-8")
+        RefinementTree.load(path, diagnostics=found)
+    return found
+
+
+def _earlier_tree_fires() -> list:
+    """A log an older release doubled: two headers, as a rerun appended them."""
+    return _load_log(2)
+
+
+def _earlier_tree_silent() -> list:
+    """The same log holding one tree."""
+    return _load_log(1)
 
 
 # ------------------------------------------------------- the data-support check
@@ -502,6 +565,104 @@ def _parametric_range_silent() -> list:
     return _parametric_range(0.0) + _parametric_range(-2e-4)
 
 
+def _reseed(**escalation) -> list:
+    """``SEQUENTIAL_RESEED``'s builder on one synthetic converged entry,
+    escalated as ``escalation`` says."""
+    from rietx.schemas.results import Statistics
+    from rietx.schemas.sequential import SeriesEntry
+    from rietx.sequential import _reseed_diagnostics
+
+    entry = SeriesEntry(
+        index=3, label="p3", x=3.0, status="converged",
+        statistics=Statistics(rwp=0.10, rp=0.08, rexp=0.09, chi2=1.2, gof=1.1,
+                              n_points=100, n_free_parameters=5), **escalation)
+    return _reseed_diagnostics(entry)
+
+
+def _reseed_fires() -> list:
+    """The warm rungs diverged and the cold rung was kept."""
+    return _reseed(rung="cold", reseeded=True, rwp_warm=0.6,
+                   rungs_tried=["warm", "warm_staged", "cold"])
+
+
+def _reseed_silent() -> list:
+    """Fitted first time, and escalated to a warm rung that was kept: the chain
+    is unbroken in both."""
+    return (_reseed(rung="warm", rungs_tried=["warm"])
+            + _reseed(rung="warm_staged", rwp_warm=0.6,
+                      rungs_tried=["warm", "warm_staged"]))
+
+
+def _path_chains(missing: int | None = None):
+    """Two one-path chains over three patterns, the backward one lacking the
+    pattern ``missing`` when it is given."""
+    from rietx.schemas.results import RefinedParameter
+    from rietx.schemas.sequential import SeriesEntry, SeriesResult
+
+    def chain(skip):
+        return SeriesResult(entries=[
+            SeriesEntry(index=k, label=f"p{k}", parameters=[RefinedParameter(
+                path="phases.0.cell.a", value=4.156 + 1e-4 * k, stderr=1e-5)])
+            for k in range(3) if k != skip])
+
+    return chain(None), chain(missing)
+
+
+def _path_not_run_fires() -> list:
+    """The comparison never ran: the builder ``fit`` calls for each way it
+    cannot (a cancel on either chain, a backward chain that raised)."""
+    from rietx.sequential import _path_check_not_run
+
+    return [_path_check_not_run("the backward chain was cancelled on pattern 2 (p2)")]
+
+
+def _path_not_run_silent() -> list:
+    """The comparison ran, on the whole series and on part of it: what it
+    reports is coverage at ``info``, never the warning."""
+    from rietx.sequential import _direction_gaps
+
+    whole = _direction_gaps(*_path_chains())[1]
+    part = _direction_gaps(*_path_chains(missing=1))[1]
+    return whole + part
+
+
+def _unrecovered(status: str, *codes: str) -> list:
+    """``SEQUENTIAL_UNRECOVERED``'s builder on one synthetic entry kept after
+    every rung, ending ``status`` and carrying each of ``codes`` at the level
+    ``MODEL_FAR_FROM_DATA`` really has (``error``) or, for a ``code`` spelled
+    ``warning:CODE``, at warning."""
+    from rietx.schemas.common import Diagnostic
+    from rietx.schemas.results import Statistics
+    from rietx.schemas.sequential import SeriesEntry
+    from rietx.sequential import _unrecovered_diagnostics
+
+    rows = []
+    for code in codes:
+        level, _, name = code.rpartition(":")
+        rows.append(Diagnostic(level=level or "error", code=name, where=[],
+                               message=""))
+    entry = SeriesEntry(
+        index=3, label="p3", x=3.0, status=status, rung="warm",
+        rungs_tried=["warm", "warm_staged", "cold"], diagnostics=rows,
+        statistics=Statistics(rwp=0.97, rp=0.9, rexp=0.04, chi2=1.2, gof=24.0,
+                              n_points=100, n_free_parameters=5))
+    return _unrecovered_diagnostics(entry)
+
+
+def _unrecovered_fires() -> list:
+    """Kept after every rung: diverged, or converged under an error-level
+    code (WP-2003, C2 q5)."""
+    return (_unrecovered("diverged")
+            + _unrecovered("converged", "MODEL_FAR_FROM_DATA"))
+
+
+def _unrecovered_silent() -> list:
+    """Converged after the ladder with only warnings, and ``max_iter`` with
+    none: neither is a rejected fit."""
+    return (_unrecovered("converged", "warning:FLOOR_HIT")
+            + _unrecovered("max_iter"))
+
+
 def _short_series(*, cancel_after_first: bool) -> list:
     """Two cheap patterns of ``tests/test_sequential.py``'s ramp, the chain
     cancelled once the first pattern's fit ends where ``cancel_after_first``,
@@ -725,6 +886,50 @@ def _stage_solve(*, nan_column: bool) -> list:
     return [] if found is None else [found]
 
 
+def _site_glob(*turn_ons: list[str]) -> list:
+    """``STAGE_PATH_NOT_FREE``'s site arm on LaB6 (``perturbed_models``), one
+    stage per ``turn_on``.  La on 1a has no ``dof`` rows, so its ``dof.*``
+    frees nothing (issue #896); B's ``dof.*`` frees its one row, a wildcard
+    index is WP-1414's healthy miss, and a ``biso`` answers the ``adp.*``
+    beside it."""
+    from rietx.params.vector import ParameterTable
+    from rietx.refine import _site_glob_diagnostics
+    from rietx.strategy.staged import Stage
+    from tests.test_refine_synthetic import perturbed_models
+
+    table = ParameterTable(*perturbed_models())
+    stages = [Stage(f"s{i}", ["phases.*.scale", *turn_on])
+              for i, turn_on in enumerate(turn_ons)]
+    return _site_glob_diagnostics(stages, table, {})
+
+
+def _moduli(*rows: tuple[float, float | None]) -> list:
+    """``moment_unsupported_diagnostics`` over free moduli of (value, esd)."""
+    from rietx.report.magnetic import moment_unsupported_diagnostics
+    from rietx.schemas.results import RefinedParameter
+
+    return moment_unsupported_diagnostics([
+        RefinedParameter(path=f"phases.0.atoms.{i}.moment.dof0", value=value,
+                         stderr=esd, vary=True)
+        for i, (value, esd) in enumerate(rows)])
+
+
+def _unsupported_fires() -> list:
+    """#1075's repro 2 on its dead column, and a moment inside 3 esd (WP-2060)."""
+    return _moduli((-8.5e-8, 1.7e4)) + _moduli((0.5, 0.2))
+
+
+def _unsupported_silent() -> list:
+    """A moment at 35 esd (Cr2WO6 at 4 K's ratio), a held one with no esd, and
+    a non-moment row at 0."""
+    from rietx.report.magnetic import moment_unsupported_diagnostics
+    from rietx.schemas.results import RefinedParameter
+
+    return (_moduli((2.45, 0.07), (3.5, None))
+            + moment_unsupported_diagnostics([RefinedParameter(
+                path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -737,10 +942,17 @@ SILENCE: dict[str, Pair] = {
         "tests/test_extinction_gate.py (stub screens: the gate's fits are 20 s each)"),
     "FLOOR_HIT": Pair(
         _floor_fires, _floor_silent, "tests/test_bound_hit_at_convergence.py"),
+    "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED": Pair(
+        _rhombohedral_axes_fires, _rhombohedral_axes_silent,
+        "tests/test_projects_fullprof.py"),
     "GSAS2_INSTPRM_GEOMETRY_ASSUMED": Pair(
         _instprm_geometry_fires, _instprm_geometry_silent, "tests/test_gsas2_instprm.py"),
     "GSAS_PRM_PROFILE_SET_DEFAULTED": Pair(
         _profile_set_fires, _profile_set_silent, "tests/test_gsas_prm.py"),
+    "HISTORY_EARLIER_TREE_SKIPPED": Pair(
+        _earlier_tree_fires, _earlier_tree_silent, "tests/test_history.py"),
+    "MOMENT_UNSUPPORTED": Pair(
+        _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
@@ -763,6 +975,13 @@ SILENCE: dict[str, Pair] = {
         _dofs_renumbered_fires, _dofs_renumbered_silent, "tests/test_site_twins_merged.py"),
     "SEQUENTIAL_CANCELLED": Pair(
         _cancelled_fires, _cancelled_silent, "tests/test_sequential.py"),
+    "SEQUENTIAL_PATH_CHECK_NOT_RUN": Pair(
+        _path_not_run_fires, _path_not_run_silent,
+        "tests/test_sequential.py, tests/test_series_error_policy.py"),
+    "SEQUENTIAL_RESEED": Pair(
+        _reseed_fires, _reseed_silent, "tests/test_sequential.py"),
+    "SEQUENTIAL_UNRECOVERED": Pair(
+        _unrecovered_fires, _unrecovered_silent, "tests/test_sequential.py"),
     "SERIES_PATTERN_FAILED": Pair(
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
     "RESTRAINT_PAIRS_STALE": Pair(
@@ -781,6 +1000,12 @@ SILENCE: dict[str, Pair] = {
         functools.partial(_stage_solve, nan_column=True),
         functools.partial(_stage_solve, nan_column=False),
         "tests/test_non_finite_stage.py"),
+    "STAGE_PATH_NOT_FREE": Pair(
+        functools.partial(_site_glob, ["phases.0.atoms.0.dof.*"]),
+        functools.partial(_site_glob, ["phases.0.atoms.1.dof.*"],
+                          ["phases.*.atoms.*.dof.*"],
+                          ["phases.0.atoms.0.biso", "phases.0.atoms.0.adp.*"]),
+        "tests/test_params_surface.py"),
     "STAGE_WINDOWS_STALE": Pair(
         functools.partial(_windows_stale, 0.3), functools.partial(_windows_stale, None),
         "tests/test_window_loss.py"),

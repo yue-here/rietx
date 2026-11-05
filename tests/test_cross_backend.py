@@ -1056,6 +1056,40 @@ def _state_texture():
     return model, table, {}
 
 
+def _state_stephens_over_lor_strain():
+    """``toy_stephens`` with the block declared over ``lor_strain = 0.3``
+    (WP-1467).  The block replaces the path it locks, so every backend must
+    read zero for it through ``CompiledModel.lor_strain_term``; a traced width
+    that read the stored value would put a 0.3·tanθ floor under every peak
+    and fail each width-reaching column here."""
+    from rietx.crystallography.stephens import stephens_basis
+    from rietx.schemas.instrument import BackgroundChebyshev
+    from rietx.schemas.structure import StephensStrain
+    from tests.test_backend_shim import _free, _toy_base
+
+    structure, instrument, pattern = _toy_base()
+    phase = structure.phases[0]
+    basis = stephens_basis(phase.space_group).astype(np.float64)
+    coef, *_ = np.linalg.lstsq(
+        basis.T,
+        np.array(StephensStrain.isotropic(900.0, phase.cell).values()), rcond=None)
+    coef[0] *= 1.7
+    phase.microstrain = StephensStrain.from_values(basis.T @ coef, vary=True)
+    phase.lor_strain = Parameter(value=0.3, min=0.0)
+    instrument.background = BackgroundChebyshev.with_terms(4)
+    table = ParameterTable(structure, instrument)
+    _free(table, [
+        "phases.0.cell.a", "phases.0.cell.c", "phases.0.scale",
+        "phases.0.microstrain.dof.*", "phases.0.lor_size",
+        "instrument.profile.y", "instrument.zero_shift",
+        "instrument.background.*",
+    ])
+    model = compile_model(structure, instrument, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
 def _state_extinction_strong():
     """Sabine extinction strong enough that reflections sit either side of
     x = 1 (WP-2044).
@@ -1078,7 +1112,7 @@ def _state_extinction_strong():
 
     structure = make_aniso_rutile()
     structure.phases[0].scale.value = 1e-3
-    structure.phases[0].extinction.value = 30.0
+    structure.phases[0].extinction = 30.0
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.source.dispersion = None    # declined, not inherited
     ins.profile.w.value = 1e-2
@@ -1188,7 +1222,8 @@ CONFIGS = {"families": _state_families,
            "magnetic_width": _state_magnetic_width,
            "magnetic_angles_tied": _state_magnetic_angles_tied,
            "satellites": _state_satellites,
-           "extinction_strong": _state_extinction_strong, **STATES}
+           "extinction_strong": _state_extinction_strong,
+           "stephens_over_lor_strain": _state_stephens_over_lor_strain, **STATES}
 
 #: the fast configs run everywhere; the two real-data ones are `slow`.
 #: ``families_voigt`` (WP-0405's shape) and ``toy_restraints`` (WP-0406's extra
@@ -1228,6 +1263,7 @@ CONFIG_PARAMS = [
     _config("satellites"),
     _config("bodies"),
     _config("extinction_strong"),
+    _config("stephens_over_lor_strain"),
     _config("distortion_modes"),
     _config("bodies_site"),
     _config("bodies_site_fixed"),

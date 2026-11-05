@@ -685,21 +685,20 @@ def test_a_wheel_lacking_a_kernel_is_declined_by_name(monkeypatch):
 
 
 def test_a_wheel_before_the_floor_is_declined_whole_and_says_so(monkeypatch):
-    """A 1.2.0 wheel lacks the dichotomy's two kernels (WP-1959).  Under the
-    1.3 floor it is declined like any wheel missing a kernel, so the indexer
+    """A 1.3.0 wheel lacks the solve engine's three kernels (WP-1997).  Under
+    the 1.4 floor it is declined like any wheel missing a kernel, so the indexer
     runs its numpy loop beside the model's, and the one warning names the pin
-    that installs them.  Until the floor rose, the indexer alone declined, in
-    silence, because PyPI had no 1.3.0 to point at."""
+    that installs them."""
     monkeypatch.delenv(COMPILED_ENV, raising=False)
-    _fresh_load(monkeypatch, _wheel(__version__="1.2.0", dichotomy_box_test=None,
-                                    dichotomy_child_key=None))
+    _fresh_load(monkeypatch, _wheel(__version__="1.3.0", solve_orbit_sums=None,
+                                    solve_orbit_sums_one=None, solve_clash=None))
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
         compiled.set_enabled(None)
         assert compiled.dichotomy_kernels() is None
     assert compiled.unavailable() == (
-        "rietx_kernels 1.2.0 lacks the kernels dichotomy_box_test, "
-        "dichotomy_child_key")
+        "rietx_kernels 1.3.0 lacks the kernels solve_orbit_sums, "
+        "solve_orbit_sums_one, solve_clash")
     runtime = [str(w.message) for w in seen if issubclass(w.category, RuntimeWarning)]
     assert len(runtime) == 1, runtime
     pin = f"rietx-kernels>={compiled.KERNEL_FLOOR},<{compiled.KERNEL_ABI + 1}"
