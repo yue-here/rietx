@@ -1,9 +1,8 @@
 # WP-1335 — the report costs more than the fit
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — PR #1346 cut a stage report's cost by a third, bit-identically; no further cut (2026-11-02 rulings entry); a joint fit's `stage_reports=` remains
+Milestone: unscheduled · Status: ✅ 2026-11-03 — a stage report costs about a third less on NAC and a sixth on the #250 shape, bit-identically on both, and its cost is in the event log (PR #1346); `summary(report=)` builds one report (PR #259); no further cut, by ruling; a joint fit's `stage_reports=` went back to the maintainer as a question (PR #1364)
 Track: A long run is not one fit
 Depends on: —
-Priority: P3 2026-09-23 — cost only: a report at 26× the fit it reports on
 
 ## Goal
 
@@ -120,40 +119,14 @@ flag whose name suggests it only adds output. The reporter turned it on for
 every fit of a multi-hundred-pattern batch because it seemed the diligent
 choice.
 
-### Inherited
-
-- **2026-10-11, from the issue triage (#245): the reporter's three paired
-  timings of 2026-09-04 are not carried here.** Neutron CW, neither a
-  March-Dollase nor a Stephens block, 3 292 points: 2.81 s against about
-  0.55 s (5.1×). X-ray, one phase, isotropic broadening, 13 997 points: 2.92 s
-  against 0.80 s (3.65×). X-ray with March-Dollase and a Stephens block,
-  48 001 points: 298.22 s against 5.35 s (55.7×), with another arm at about
-  26× on about 49 000 points. The reporter withdrew "scales with N_points",
-  since the 13 997-point case sits below both others. They suspect the
-  per-reflection texture and strain analysis at every stage, not isolated; a
-  pair differing only in the Stephens block would isolate it. The same comment
-  measured the bracketed `stage_start` to `stage_end` time at 2.36 s of the
-  298.22 s, and says `y_obs`, `y_calc`, background and ticks are filled whether
-  or not `stage_reports` is on. Checked against the tree at 7d9be3cb:
-  `refine.py:4115` still says "≈2.5× the fit", `_strain_errors` is still called
-  first (`report/strain.py:301`), and `references/series.md` in the skill
-  already gives 6.5×.
-
-- **From WP-1341 (2026-10-12): the joint fit waits on this WP for
-  `stage_reports=`.** `MultiHistogramRefinement.fit` declines it, because one
-  rung there is a report per histogram per stage, so the joint trajectory
-  would cost this WP's fixed ~0.36 s times the histogram count. The reason
-  is written in that method's docstring and in `docs/docs/reference/joint.md`. Once the
-  per-report cost is cut, offering it there is a small change on top:
-  `MultiHistogramRefinement.report(h)` already builds one histogram's report,
-  and `_run_plan` has the stage boundary. Those two sentences go when it is
-  offered.
-
 ## Non-goals
 
 - The solver's own cost, and the exhausted-budget stop rule — 1334.
-- A joint fit's `stage_reports=` (Inherited, from 1341): offered on top of
-  this WP once the per-report cost is cut far enough.
+- A joint fit's `stage_reports=` (from 1341): offered on top of this WP once
+  the per-report cost is cut far enough. *Superseded in part 2026-11-03:* the
+  cut stopped at about a third by the 2026-11-02 ruling, so whether that is
+  far enough is a call, and the item has no owner (WP-2028's Non-goals point
+  back here). The question is in the 2026-11-03 handover entry.
 - Removing the per-stage report. WP-1058's rule stands: **the report at every
   stage boundary, because a run's last state is routinely its least
   informative.** This WP makes it cheap and countable, not optional-by-stealth.
@@ -231,6 +204,63 @@ with Rwp bit-identical; a `summary()` + `report()` pair builds one report.
   platform, never as a figure.
 
 ## Handover log
+
+- **2026-11-03** (close, PR #1364) — WP-1335 closes as it stands. All
+  seven tasks were done and the acceptance was read as met on 2026-11-02. The
+  one item still named as open, a joint fit's `stage_reports=`, is one of this
+  WP's Non-goals, offered "on top of this WP once the per-report cost is cut
+  far enough". The cut stopped at about a third by the 2026-11-02 ruling, so
+  whether that is far enough is a call, not a task. The texts that said the
+  joint fit waits for this WP to land now say the cut stopped and the call is
+  open.
+
+  *Done.* `MultiHistogramRefinement.fit`'s docstring and the manual's
+  `reference/joint.md` no longer say "until WP-1335 lands". The docstring
+  keeps the #245 figure as the issue's, in the past tense. The page drops
+  its single 0.36 s figure: a report's cost is set by the pattern and its
+  phases, from a fraction of a second on NAC to seconds on 49 000 points,
+  times the pattern count. The `### Inherited` section was consumed and
+  deleted. Its #245 timings are the issue's own record. Its WP-1341 entry is
+  this question, also forwarded to WP-2028's `### Inherited`, whose Non-goals
+  still send the item here. The narrative went to `docs/milestones/v1.11.md`.
+
+  *Measured.* Nothing timed, since nothing that runs changed. `[dev]` venv,
+  darwin arm64: the acceptance files with the docs and joint-fit tests
+  (`test_report_apply`, `test_termination_view`, `test_docs_consistency`,
+  `test_docs_versions`, `test_multi_histogram`, `test_joint_report`) gave 192
+  passed. No test was added. Ruff clean, Vale 0 errors. The fast suite was
+  not run, since the branch changes a docstring and prose only.
+  `reader_output`: unchanged (exit 0).
+
+  *Review.* `/code-review high --fix` found eight, no code bug among them,
+  and fixed five. Fixed: the page's "fixed fraction of a second" contradicted
+  the 2.4-2.9 s measured on 49 000 points; WP-2028's Non-goal pointed at a
+  closed WP with no note (forwarded); the docstring named "the last handover
+  entry" in a newest-first log, and quoted 0.36 s in the present tense; the
+  record and the Status line said "a third" and "bit-identical" without the
+  sixth on the #250 shape or the two fits it was checked on. Declined three:
+  the older entries' pointers to `### Inherited` are dated history; this
+  placeholder (filled here); and "the docstring keeps the #245 figure", still
+  true after the fix.
+
+  *Question for the maintainer.* Should a joint fit offer
+  `stage_reports=` now, and if so, where does the work live? No open WP owns
+  it: WP-2028's Non-goals give it to WP-1335, and WP-1335's Non-goals put it
+  on top of this one. Three choices go with building it. (1) Whether the
+  one-third cut is enough. The cost is opt-in and `fit_end` carries
+  `stage_report_seconds`, the two grounds the 2026-11-02 ruling gave for
+  stopping. Against that, a rung is still one report per histogram per
+  stage. (2) The rung shape. `StageReport` has no histogram field, so it is
+  either a list per stage of per-histogram rungs or a new field. (3) Which
+  compile a rung reads. `report(h)` moved off the stage's own compile
+  because Layer 0 read cut peak tails as unmatched peaks (WP-1341). A single
+  fit's rungs do read the stage compile, so a joint rung would carry that
+  artefact after a width stage, or would pay a fresh compile per histogram
+  per stage.
+
+  *Next.* The maintainer's answer to the question above. If it is "offer
+  it", file it as its own WP or fold it into WP-2028. The build starts from
+  `MultiHistogramRefinement.report(h)` and `_run_plan`'s stage boundary.
 
 - **2026-11-02** (rulings, PR #1349) — The stage reports' cost is not
   cut further. The two cuts left were fewer Gauss-Newton steps in the
