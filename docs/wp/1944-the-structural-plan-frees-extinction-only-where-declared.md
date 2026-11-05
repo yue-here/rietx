@@ -120,6 +120,14 @@ with one phase declared and one not.
 
 ## Handover log
 
+- **2026-11-05** — `SCHEMA_VERSION` moves from 0.60 to 0.61, which this WP's
+  merge left out, so optional `Phase.extinction` now has its version note.
+  The field is the only schema change since the `v1.11.0` tag. Measured
+  with the released 1.11.0 wheel: it refuses a stored `null`, so a structure
+  or a `.rex` project written here does not open there. A Rietveld result and
+  an instrument do. A 1.11.0 project opens here with its extinction entry,
+  and the stage's glob still frees it.
+
 ### 2026-11-04 (2nd session) — merged with main, review fixes, PR #1391 ready
 
 The branch now sits on current main and is up for review as PR #1391. The
