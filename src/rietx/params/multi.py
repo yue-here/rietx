@@ -37,7 +37,7 @@ from ..schemas.common import Parameter
 from ..schemas.instrument import Instrument
 from ..schemas.parametric import CoordinateTable, ParametricEquation
 from ..schemas.structure import Structure
-from .expression import RESERVED, Expression
+from .expression import RESERVED, Expression, names_in
 from .parametric import ResolvedParametric, least_squares_start, resolve_parametric
 from .vector import (
     AffineTie,
@@ -278,6 +278,35 @@ class ResolvedExpression:
     def paths(self) -> list[str]:
         """The ``vars.{name}`` columns this equation reads."""
         return [f"vars.{n}" for n in self.variables]
+
+
+@dataclass
+class EquationPreview:
+    """One equation evaluated at the start, before any fit (WP-1964).
+
+    ``values[k]`` is the target's value at ``patterns[k]``.  ``variables``
+    are the shared columns the equation reads (a linear equation's
+    coefficients, an expression's ``vars.*``), ``coordinates`` the coordinate
+    columns, ``intermediates`` the earlier equations an expression named and
+    had inlined.  ``nonfinite`` and ``out_of_bounds`` list the patterns whose
+    value is NaN or ±inf, or outside the target's own bounds; empty when none.
+    """
+
+    name: str
+    target: str
+    patterns: list[int]
+    values: list[float]
+    variables: list[str]
+    coordinates: list[str]
+    intermediates: list[str]
+    nonfinite: list[int]
+    out_of_bounds: list[int]
+
+    @property
+    def span(self) -> tuple[float, float] | None:
+        """The lowest and highest finite value, ``None`` when none is finite."""
+        finite = [v for v in self.values if math.isfinite(v)]
+        return (min(finite), max(finite)) if finite else None
 
 
 def _target_refusal(table: ParameterTable, e) -> str | None:
@@ -924,6 +953,42 @@ class MultiParameterTable:
         both kinds."""
         return {r.target for r in (*self.parametric, *self.expressions)
                 if h in r.patterns}
+
+    def preview_equations(self) -> list[EquationPreview]:
+        """Every equation with a target, evaluated at the current values (WP-1964).
+
+        Nothing is fitted: each table decodes at its present start, so the
+        value at pattern h is what the first residual would see.  Linear and
+        ``expression`` equations alike, in declaration order.  What each
+        equation resolved to is listed by kind (TOPAS's ``out_dependences``).
+        """
+        values = self.decode(self.x0())
+        names = {r.name for r in self.intermediates}
+        out = []
+        for r in (*self.parametric, *self.expressions):
+            if isinstance(r, ResolvedExpression):
+                variables, coordinates = r.paths, list(r.coordinates)
+                via = [n for n in names_in(Expression(r.equation.expression).tree)
+                       if n in names]
+            else:
+                variables = list(r.paths)
+                coordinates = list(dict.fromkeys(c for t in (r.equation.terms or [])
+                                                 for c in t))
+                via = []
+            got, nonfinite, outside = [], [], []
+            for h in r.patterns:
+                v = float(values[h][r.target])
+                got.append(v)
+                e = self.tables[h].entries[self.tables[h]._paths[r.target]]
+                if not math.isfinite(v):
+                    nonfinite.append(h)
+                elif v < e.lo or v > e.hi:
+                    outside.append(h)
+            out.append(EquationPreview(
+                name=r.name, target=r.target, patterns=list(r.patterns),
+                values=got, variables=variables, coordinates=coordinates,
+                intermediates=via, nonfinite=nonfinite, out_of_bounds=outside))
+        return out
 
     def _parametric_reached(self, path_globs: list[str]) -> set[str]:
         """The coefficient and variable paths of every declaration a glob reaches.

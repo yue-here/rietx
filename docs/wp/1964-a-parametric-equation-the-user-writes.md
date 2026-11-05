@@ -292,7 +292,7 @@ per-pattern one is an array.
   - It also removes a near-zero effective step: a pattern near the reference
     has Φ_kj ≈ 0, so today a coefficient's step barely moves its target.
   - `polynomial` and `design` come through unchanged or moved knowingly.
-- [ ] **A preview without a fit.** Evaluate every equation at the starting values
+- [x] **A preview without a fit.** Evaluate every equation at the starting values
   across the coordinates. Report the value range, any non-finite pattern, any
   target outside its own bounds, and the dependencies each equation resolved to
   (TOPAS's `out_dependences`).

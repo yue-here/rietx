@@ -174,6 +174,40 @@ They must agree on phase count, space group, sites and every shared path, and ma
 The coefficients start from the least-squares fit of the declared form to the targets' starting values, so starting cells placed on the expected line start the coefficients on it.
 A shared path whose starting values differ is refused, naming the path, the histograms and the three ways out.
 
+## Preview without a fit
+
+`MultiHistogramRefinement.preview_equations` evaluates every equation at the starting values, at every pattern it holds over, and fits nothing.
+It returns one `EquationPreview` per equation with a target, linear and `expression` equations alike, in declaration order.
+`EquationPreview.name` is the equation's name and `EquationPreview.target` the path it drives.
+`EquationPreview.values` holds the target's value at each of `EquationPreview.patterns`, and `EquationPreview.span` the lowest and highest finite one.
+`EquationPreview.nonfinite` lists the patterns where the value is NaN or infinite, and `EquationPreview.out_of_bounds` those outside the target's own `min` and `max`.
+Both are empty for a sound start.
+`EquationPreview.variables`, `EquationPreview.coordinates` and `EquationPreview.intermediates` list what the equation resolved to: the refined variables it reads, the coordinate columns, and the earlier equations it named.
+
+```python
+import rietx as rx
+
+lab6 = rx.Structure(phases=[rx.Phase(
+    name="LaB6", space_group="P m -3 m", cell=rx.Cell.cubic(4.15689),
+    atoms=[rx.Atom(label="La", species="La", x=rx.Parameter(value=0.0),
+                   y=rx.Parameter(value=0.0), z=rx.Parameter(value=0.0))],
+)])
+temperatures = [300.0, 450.0, 600.0]
+instruments = [rx.Instrument.debye_scherrer(wavelength=0.4139) for _ in temperatures]
+coordinates = rx.CoordinateTable(columns={"T": temperatures}, units={"T": "K"})
+einstein = rx.ParametricEquation(name="a", target="phases.0.cell.a", basis="expression",
+                                 expression="a0 + k/(exp(theta/T) - 1)")
+variables = {"a0": rx.Parameter(value=4.15, vary=True),
+             "k": rx.Parameter(value=0.02, vary=True),
+             "theta": rx.Parameter(value=0.0)}
+joint = rx.MultiHistogramRefinement(lab6, instruments, coordinates=coordinates,
+                                    parametric=[einstein], variables=variables)
+(preview,) = joint.preview_equations()
+assert preview.variables == ["vars.a0", "vars.k", "vars.theta"]
+assert preview.coordinates == ["T"]
+assert preview.nonfinite == [0, 1, 2]   # theta = 0 divides by exp(0) - 1 at every pattern
+```
+
 ## Refusals
 
 Every refusal is a `ValueError`, raised when the declaration or the `MultiHistogramRefinement` is built, and most name their fix.

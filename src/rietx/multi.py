@@ -59,6 +59,7 @@ from .optimize.statistics import (
 )
 from .params.multi import (
     SIZE_LAMBDA_POWER,
+    EquationPreview,
     MultiParameterTable,
     SharingMap,
     _longest_wavelength,
@@ -1534,6 +1535,16 @@ class MultiHistogramRefinement:
         its place in the order given.  Empty when nothing was declared.
         """
         return list(self.mtable.declared)
+
+    def preview_equations(self) -> list[EquationPreview]:
+        """Every parametric equation evaluated at the start, with no fit (WP-1964).
+
+        Per equation: the target's value at each pattern, the patterns where
+        it is non-finite or outside the target's bounds, and the variables,
+        coordinates and intermediates it resolved to.  The check to run before
+        a long joint fit: a bad start shows here in milliseconds.
+        """
+        return self.mtable.preview_equations()
 
     @property
     def fitted_structures(self) -> list[Structure]:

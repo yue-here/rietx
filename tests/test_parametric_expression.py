@@ -513,3 +513,41 @@ def test_a_temperature_calibration_feeding_the_cell_recovers_its_coefficients():
     for h, temp in enumerate(temps):
         a = rows[f"hist.{h}.phases.0.cell.a"].value
         assert a == pytest.approx(a0 + k * (temp + got0 + got1 * temp), rel=1e-13)
+
+
+# -- a preview without a fit (task 8) ----------------------------------------
+
+def test_a_preview_evaluates_each_equation_at_the_start_and_names_its_inputs():
+    """Values, dependencies, and the two ways a start goes wrong, with no fit."""
+    temps = [300.0, 450.0, 600.0]
+    rows = {p.name: p for p in _fed_table().preview_equations()}
+    assert list(rows) == ["a"]
+    a = rows["a"]
+    assert a.target == "phases.0.cell.a" and a.patterns == [0, 1, 2]
+    assert a.variables == ["vars.a0", "vars.k", "vars.c0", "vars.c1"]
+    assert a.coordinates == ["T"] and a.intermediates == ["T_true"]
+    for v, temp in zip(a.values, temps, strict=True):
+        assert v == pytest.approx(4.15 + 2e-5 * (temp + C0 + C1 * temp), rel=1e-13)
+    assert a.span == (min(a.values), max(a.values))
+    assert a.nonfinite == [] and a.out_of_bounds == []
+    # theta = 0 divides by exp(0) - 1 = 0 at every pattern
+    bad = _table(variables=_variables(theta=rx.Parameter(value=0.0, vary=False)))
+    (row,) = bad.preview_equations()
+    assert row.nonfinite == [0, 1, 2] and row.span is None
+    # a cell the target's own bounds refuse
+    s, _ = perturbed_inputs()
+    s.phases[0].cell.a.max = 4.17
+    far = MultiParameterTable(s, _lab6_instruments(3), coordinates=_coords(3),
+                              parametric=[_expression()],
+                              variables=_variables(zero_a=rx.Parameter(value=4.2, vary=True)))
+    (row,) = far.preview_equations()
+    assert row.out_of_bounds == [0, 1, 2]
+
+
+def test_a_preview_covers_a_linear_equation_too():
+    from tests.test_parametric_series import _ramp_table
+
+    (row,) = _ramp_table().preview_equations()
+    assert row.target == "phases.0.cell.a"
+    assert row.variables == ["vars.a_0", "vars.a_1"] and row.coordinates == ["T"]
+    assert row.intermediates == [] and len(row.values) == 3
