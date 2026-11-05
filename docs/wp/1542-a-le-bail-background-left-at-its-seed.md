@@ -500,7 +500,22 @@ no finding, by the maintainer's ruling of 2026-11-03 on Q1.
     invariant, because a cut is reported rather than silent. Tier 3 is the alternative,
     and that is the maintainer's to pick.
 
-  *Counts.* COUNTS
+  *Counts.* All on main merged into this branch, `[dev]`,
+  macOS arm64, other runners on the machine. Fast selection: 13 969 passed, 240 skipped,
+  36 xfailed, 1 failed, 8:58. The failure was this branch's: the reference page's twin at
+  50 001 characters against its 50 000 cap. Cut by a clause, then `test_manual` and
+  `test_manual_api` 82 passed. Full selection, through `serial.py`, on the final code:
+  14 907 passed, 251 skipped, 55 xfailed, 3 failed, 43:21. None of the three is this
+  branch's. `test_acceptance_wavelength.py::test_the_neutron_widths_leave_one_esd_at_every_start`
+  and `test_pair_diagnostic_class.py::test_the_two_site_winner_finds_each_site_its_own_moment`
+  fail with identical values on a snapshot of `origin/main` under this venv, and the first
+  also failed main's nightly of 2026-11-05 (run 42037632923). Nothing here re-pins them.
+  `test_watch_app.py::test_a_real_gui_boots_on_a_scratch_copy_and_the_project_is_untouched`
+  timed out under load and passes alone. All Le Bail acceptance rows passed. Vitest 603
+  passed, svelte-check 0 errors on 392 files, `test_docs_consistency` 25 passed, ruff clean.
+  `tests/test_lebail_cycles.py` adds 24 fast test functions (35 cases, 4.29 s, local file)
+  and 2 slow ones (11 cases, one strict xfail). The baseline for an exact delta is CI's.
+  `python -m tests.reader_output` exits 0, and the new fields are in the PR's section.
 
   **Next**, for the maintainer on PR #1434, in order:
   1. Approve `lebail_tol` = 1e-7 at tier 3 with FAP as its failing case and LaMnO3's
