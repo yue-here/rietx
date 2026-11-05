@@ -47,6 +47,30 @@ is polished the same way, so the comparison tells a path scatter from a second m
 
     .venv/bin/python docs/wp/2017-batch/group_a.py          # sweep, resumes from the JSONL
     .venv/bin/python docs/wp/2017-batch/group_a.py summary  # rewrite group_a_summary.md
+    .venv/bin/python docs/wp/2017-batch/group_a.py --hard   # the hard starts, resumes
+    .venv/bin/python docs/wp/2017-batch/group_a.py --hard summary
+
+``--hard`` runs the seven constants the shipped starts rarely reach, on their same arms,
+from nine harder starts (WP-2017 § The list, "Group A's hard starts", fixed 2026-11-05
+before running): each family's start with every phase's cell lengths ×1.01 and ×1.03,
+and cpd-1a with zircon declared.  NAC is displaced after its Le Bail pass, since that
+pass fixes the cell.  Scales stay as the family's start seeded them.  Each start gets the
+shipped constants, the noise arm and the 15 arms, 153 fits.  It writes
+``group_a_hard.jsonl`` and ``group_a_hard_summary.md`` and reads ``group_a.jsonl`` for
+each family's answer.  In these rows ``family`` is the start's name and ``base`` the family.
+
+``verdict`` reads a hard fit against the family's answer, the shipped constants from the
+family's shipped start: every non-background row of that answer present and within 0.1
+plain esd.  ``verdict.changed`` says whether the arm's verdict differs from the verdict
+of the shipped constants from the same start.  ``measures`` reads the arm against the
+shipped constants from the same start, and an arm's effect counts only past that
+start's noise arm, since a hard start may land in a wrong basin and scatter there.  The
+shipped arm of each start carries ``reach``, what the fit asked of each constant.  A fit
+past ``FIT_GUARD_S`` of wall clock is a row with ``status`` "timeout": a runaway guard,
+never a result.
+
+The polish covers an arm over the bar or one changing a verdict, and the shipped arm of
+any start with such an arm or a shipped verdict that fails.
 
 Reading a row: ``measures.model`` and ``measures.background`` are
 ``tests.test_window_domain._shift`` against the shipped arm, in plain esd
@@ -66,11 +90,12 @@ import json
 import math
 import os
 import pickle
+import signal
 import subprocess
 import sys
 import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from multiprocessing import get_context
 from pathlib import Path
 
@@ -93,6 +118,8 @@ from tests.test_staged_start_invariance import _axial_pair_ordered  # noqa: E402
 HERE = Path(__file__).resolve().parent
 JSONL = HERE / "group_a.jsonl"
 SUMMARY = HERE / "group_a_summary.md"
+HARD_JSONL = HERE / "group_a_hard.jsonl"
+HARD_SUMMARY = HERE / "group_a_hard_summary.md"
 OUT = ROOT / "tests" / "output"
 FITS = OUT / "wp2017_groupA_fits"
 
@@ -106,6 +133,14 @@ ARMS = {"_M_HI": (5.0, 20.0), "_M_LO": (0.2, 0.8), "_Q_TRIGGER": (3, 7),
         "_LAMBDA_FAIL_FLOOR": (0.01, 1.0), "_CONVERGED_RUNS": (2, 5),
         "_CURVATURE_GATE": (30.0, 1000.0), "FTOL": (1e-8, 1e-10),
         "SLOW_DESCENT_ESD": (0.5, 2.0, None)}
+
+HARD_ARMS = {c: ARMS[c] for c in ("_M_HI", "_Q_TRIGGER", "_Q_WINDOW", "_LAMBDA_FAIL_FACTOR",
+                                   "_LAMBDA_FAIL_FLOOR", "_CURVATURE_GATE", "SLOW_DESCENT_ESD")}
+#: start name: (family, factor on every phase's cell lengths); no factor is zircon declared
+HARD_STARTS = {**{f"{f}_x{x}": (f, x) for f in FAMILIES for x in (1.01, 1.03)},
+               "cpd1a_zircon": ("cpd1a", None)}
+#: a runaway guard, read between python bytecodes
+FIT_GUARD_S = 1200
 
 ESD_BAR = 0.1
 FIXED_POINT_ESD = 0.01
@@ -182,6 +217,82 @@ def spied(solves: list):
         lm.minimize = inner
 
 
+class FitTimeout(BaseException):
+    """Past the runaway guard.  A ``BaseException``, so no handler in the package eats it."""
+
+
+@contextmanager
+def guarded(seconds: int | None):
+    """Raise :class:`FitTimeout` in this process's main thread after ``seconds``."""
+    if seconds is None:
+        yield
+        return
+
+    def alarm(signum, frame):
+        raise FitTimeout
+
+    was = signal.signal(signal.SIGALRM, alarm)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, was)
+
+
+@contextmanager
+def lambda_spied():
+    """Every λ update with what it read, the gate's reads and what each returned."""
+    calls: list = []
+    gates: list = []
+    measured: list = []
+    inner, moved, curvature = lm._next_lambda, lm._furthest_moved, lm._measured_curvature
+
+    def spy(lam, r_u, q):
+        out = inner(lam, r_u, q)
+        calls.append((lam, r_u, q, out))
+        return out
+
+    def spy_moved(*args):
+        gates.append(calls[-1][3])
+        return moved(*args)
+
+    def spy_curvature(*args):
+        out = curvature(*args)
+        measured.append(out)
+        return out
+
+    lm._next_lambda, lm._furthest_moved = spy, spy_moved
+    lm._measured_curvature = spy_curvature
+    try:
+        yield calls, gates, measured
+    finally:
+        lm._next_lambda, lm._furthest_moved = inner, moved
+        lm._measured_curvature = curvature
+
+
+def reach_numbers(calls: list, gates: list, measured: list, solves: list) -> dict:
+    """What a fit asked of each constant, ``group_a_reach.py``'s docstring naming the terms."""
+    accepted = [c for c in calls if c[1] is not None]
+    rejected = [c for c in calls if c[1] is None]
+    damped = [c for c in accepted if c[0] > 0.0]
+    return {
+        "n_accepted": len(accepted), "n_rejected": len(rejected),
+        "n_accepted_with_lambda_above_0": len(damped),
+        "r_u_range_accepted": ([min(c[1] for c in accepted), max(c[1] for c in accepted)]
+                               if accepted else None),
+        "r_u_range_damped": ([min(c[1] for c in damped), max(c[1] for c in damped)]
+                             if damped else None),
+        "n_M_HI_reach": sum(c[1] > 5.0 for c in accepted),
+        "n_M_LO_reach": sum(c[1] < 0.8 for c in damped),
+        "max_q": max((c[2] for c in accepted), default=None),
+        "max_lambda": max((c[3] for c in calls), default=None),
+        "gate_lambdas": gates,
+        "n_curvature_measured": sum(m is not None for m in measured),
+        "max_stage_nfev": max((s["nfev"] for s in solves), default=None),
+    }
+
+
 def _start_path(family: str) -> Path:
     return FITS / f"start_{family}.pkl"
 
@@ -191,7 +302,8 @@ def _fit_path(constant: str, arm: str, family: str) -> Path:
 
 
 def _png(family: str, constant: str, arm: str) -> Path:
-    return OUT / f"wp2017_groupA_{family}_{constant.lstrip('_')}_{arm}.png"
+    group = "groupAhard" if family in HARD_STARTS else "groupA"
+    return OUT / f"wp2017_{group}_{family}_{constant.lstrip('_')}_{arm}.png"
 
 
 def build_start(family: str) -> str:
@@ -208,6 +320,51 @@ def build_start(family: str) -> str:
 
 
 _STARTS: dict = {}
+
+
+def _displaced(st: rx.Structure, factor: float) -> None:
+    """Every phase's cell lengths × ``factor``.  A tied length is stored and scaled too, so
+    the table's tie reproduces it."""
+    for phase in st.phases:
+        for name in ("a", "b", "c"):
+            length = getattr(phase.cell, name)
+            length.value *= factor
+
+
+def _zircon_declared() -> tuple:
+    """As ``test_the_intermediate_tolerance_with_an_absent_phase_declared`` builds it."""
+    from tests.test_acceptance_qpa_roundrobin import (
+        DATA,
+        corundum_phase,
+        fluorite_phase,
+        qarr_instrument,
+        qpa_plan,
+        seed_scales,
+        zincite_phase,
+        zircon_phase,
+    )
+    data = rx.read_pattern(DATA / "cpd-1a.prn")
+    st = rx.Structure(phases=[corundum_phase(), zincite_phase(), fluorite_phase(),
+                              zircon_phase()])
+    ins = qarr_instrument()
+    seed_scales(st, ins, data)
+    return data, st, ins, qpa_plan(), {}
+
+
+def build_hard_start(name: str) -> str:
+    """Pickle a hard start; its sha256."""
+    path = _start_path(name)
+    if not path.exists():
+        family, factor = HARD_STARTS[name]
+        if factor is None:
+            start = _zircon_declared()
+        else:
+            start = pickle.loads(_start_path(family).read_bytes())
+            _displaced(start[1], factor)
+        assert start[3].closing_window_tol == 1e-3, "the protocols ride the shipped stage"
+        assert start[2].source.dispersion is None
+        path.write_bytes(pickle.dumps(start))
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _start(family: str):
@@ -261,9 +418,16 @@ def _nudged(ref: rx.Refinement, plan) -> dict:
     return {"n_nudged": len(values), "zero_starts": zeros}
 
 
+def _error_line(exc: Exception) -> str:
+    """The exception's type and first line."""
+    lines = str(exc).splitlines()
+    return f"{type(exc).__name__}: {lines[0] if lines else ''}"
+
+
 def fit_arm(task: dict) -> dict:
     """One whole fit: the shipped arm, a constant's arm, or the nudged start."""
     family, constant, arm, value = task["family"], task["constant"], task["arm"], task["value"]
+    hard = family in HARD_STARTS
     warnings.simplefilter("ignore")
     compiled.set_enabled(True)
     row: dict = {"family": family, "constant": constant, "arm": arm}
@@ -273,9 +437,13 @@ def fit_arm(task: dict) -> dict:
         extra = _nudged(ref, plan) if constant == "noise" else {}
         solves: list = []
         name = constant if constant in SHIPPED else None
-        with patched(name, value), spied(solves):
+        lambdas = lambda_spied() if hard and constant == "shipped" else nullcontext()
+        with guarded(FIT_GUARD_S if hard else None), patched(name, value), spied(solves), \
+                lambdas as seen:
             result = ref.fit(data, plan=plan, **kw)
-        assert result.stages[-1].name == "closing"
+        assert hard or result.stages[-1].name == "closing"
+        if seen is not None:
+            extra["reach"] = reach_numbers(*seen, solves)
         if constant == "FTOL":
             received = {s["ftol"] for s in solves}
             assert value in received and SHIPPED["FTOL"] not in received, received
@@ -283,14 +451,19 @@ def fit_arm(task: dict) -> dict:
         row = _result_row(family, constant, arm, result, ref, solves,
                           _png(family, constant, arm))
         row.update(extra)
+    except FitTimeout:
+        row.update(status="timeout", error=f"FitTimeout: past {FIT_GUARD_S} s")
     except Exception as exc:  # noqa: BLE001  a refused fit is a result of the sweep
-        row["error"] = f"{type(exc).__name__}: {exc}"
+        row["error"] = _error_line(exc)
+    if hard:
+        row["base"] = HARD_STARTS[family][0]
     return row
 
 
 def polish(task: dict) -> dict:
     """From an arm's answer, under the shipped constants, to a fixed point."""
     family, constant, arm = task["family"], task["constant"], task["arm"]
+    hard = family in HARD_STARTS
     warnings.simplefilter("ignore")
     compiled.set_enabled(True)
     out: dict = {"family": family, "constant": constant, "arm": arm, "kind": "polish"}
@@ -303,7 +476,8 @@ def polish(task: dict) -> dict:
         prev, settled, rounds, n_eval = None, False, 0, 0
         for rounds in range(1, POLISH_ROUNDS + 1):
             ref = rx.Refinement(st, ins, history=False)
-            result = ref.fit(data, plan=copy.deepcopy(one), **copy.deepcopy(kw))
+            with guarded(FIT_GUARD_S if hard else None):
+                result = ref.fit(data, plan=copy.deepcopy(one), **copy.deepcopy(kw))
             cur = _axial_pair_ordered(w._rows(result))
             n_eval += int(sum(s.n_iterations for s in result.stages))
             st = ref.fitted_structure.model_copy(deep=True)
@@ -325,8 +499,10 @@ def polish(task: dict) -> dict:
                    status=result.status, converged=result.status == "converged",
                    cost_final=result.stages[-1].cost_final, n_eval=n_eval, rounds=rounds,
                    settled=settled, png=str(png.relative_to(ROOT)))
+    except FitTimeout:
+        out.update(status="timeout", error=f"FitTimeout: past {FIT_GUARD_S} s in one round")
     except Exception as exc:  # noqa: BLE001  a refused fit is a result of the sweep
-        out["error"] = f"{type(exc).__name__}: {exc}"
+        out["error"] = _error_line(exc)
     return out
 
 
@@ -389,15 +565,15 @@ def measure(row: dict, shipped: dict, targets: dict) -> dict:
     }
 
 
-def read_rows() -> list[dict]:
-    if not JSONL.exists():
+def read_rows(path: Path = JSONL) -> list[dict]:
+    if not path.exists():
         return []
-    with JSONL.open(encoding="utf-8") as fh:
+    with path.open(encoding="utf-8") as fh:
         return [json.loads(line) for line in fh if line.strip()]
 
 
-def _append(row: dict) -> None:
-    with JSONL.open("a", encoding="utf-8") as fh:
+def _append(row: dict, path: Path = JSONL) -> None:
+    with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(row) + "\n")
 
 
@@ -415,14 +591,125 @@ def _tasks() -> list[dict]:
     return tasks
 
 
-def _run(pool, func, tasks, done, read) -> None:
+def _run(pool, func, tasks, done, read, path: Path = JSONL) -> None:
     futures = [pool.submit(func, t) for t in tasks if _key(t) not in done]
     for future in as_completed(futures):
         row = read(future.result())
-        _append(row)
+        _append(row, path)
         done[_key(row)] = row
         print(_key(row), row.get("error") or round(row.get("rwp", math.nan), 6),
               flush=True)
+
+
+def _polish_read(row: dict, shipped: dict, base: dict | None) -> dict:
+    """A polished row against the shipped arm and the polished shipped arm."""
+    versus = {"to_shipped": w._shift(row["rows"], _axial_pair_ordered(
+        shipped["rows"]), background=False)}
+    if base is not None and "error" not in base:
+        versus["to_shipped_polished"] = w._shift(row["rows"], base["rows"], background=False)
+        versus["to_shipped_polished_bkg"] = w._shift(row["rows"], base["rows"], background=True)
+        versus["chi2_ratio_to_shipped_polished"] = row["cost_final"] / base["cost_final"]
+    return {"kind": "polish_read", "family": row["family"], "constant": row["constant"],
+            "arm": row["arm"], "versus": versus, "rwp": row["rwp"],
+            "rounds": row["rounds"], "settled": row["settled"]}
+
+
+def _hard_tasks() -> list[dict]:
+    tasks = []
+    for start in HARD_STARTS:
+        for constant, values in HARD_ARMS.items():
+            tasks += [{"family": start, "constant": constant, "arm": str(v), "value": v}
+                      for v in values]
+        tasks.append({"family": start, "constant": "noise", "arm": str(NUDGE), "value": None})
+    return tasks
+
+
+def verdict(row: dict, answer: dict, shipped: dict | None) -> dict:
+    """Does the fit reach the family's answer, and does that differ from ``shipped``."""
+    out: dict = {"reaches_answer": False, "to_answer_esd": None, "to_answer_path": None,
+                 "missing": [], "unjudged": [], "rwp_to_answer": None, "changed": None}
+    if "error" not in row:
+        cur = _axial_pair_ordered(row["rows"])
+        base = _axial_pair_ordered(answer["rows"])
+        esd, path = w._shift(cur, base, background=False)
+        model = [p for p in base if not p.startswith("instrument.background.")]
+        missing = sorted(p for p in model if p not in cur)
+        unjudged = sorted(
+            p for p in model if p in cur and not any(
+                e is not None and math.isfinite(e) and e > 0.0 for e in (cur[p][1], base[p][1])))
+        out.update(reaches_answer=not missing and esd <= ESD_BAR, to_answer_esd=esd,
+                   to_answer_path=path, missing=missing, unjudged=unjudged,
+                   rwp_to_answer=row["rwp"] / answer["rwp"])
+    if shipped is not None:
+        out["changed"] = out["reaches_answer"] != shipped["verdict"]["reaches_answer"]
+    return out
+
+
+def hard_sweep() -> None:
+    OUT.mkdir(exist_ok=True)
+    FITS.mkdir(exist_ok=True)
+    assert compiled.available(), compiled.unavailable()
+    first = read_rows()
+    meta0 = next(r for r in first if r.get("kind") == "meta")
+    for family in FAMILIES:
+        assert build_start(family) == meta0["starts"][family], f"{family}'s start moved"
+    answers = {r["family"]: r for r in first
+               if r.get("kind", "fit") == "fit" and r["constant"] == "shipped"}
+    done = {_key(r): r for r in read_rows(HARD_JSONL)}
+    if ("meta", "", "", "") not in done:
+        head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+                              capture_output=True, text=True, check=True).stdout.strip()
+        meta = {"kind": "meta", "family": "", "constant": "", "arm": "", "head": head,
+                "version": rx.__version__, "platform": sys.platform,
+                "threads": os.environ[COMPILED_THREADS_ENV],
+                "starts": {s: build_hard_start(s) for s in HARD_STARTS}}
+        _append(meta, HARD_JSONL)
+        done[_key(meta)] = meta
+    targets = {f: references(f) for f in FAMILIES}
+    targets["nac"]["a_lebail"] = ("rows:phases.0.cell.a",
+                                  _start("nac")[1].phases[0].cell.a.value)
+
+    def shipped_of(start: str) -> dict | None:
+        return done.get(("fit", start, "shipped", "shipped"))
+
+    def read(row: dict) -> dict:
+        shipped = shipped_of(row["family"])
+        row["verdict"] = verdict(row, answers[row["base"]], shipped)
+        if shipped is not None and "error" not in row and "error" not in shipped:
+            row["measures"] = measure(row, shipped, targets[row["base"]])
+        return row
+
+    context = get_context("spawn")
+    with ProcessPoolExecutor(WORKERS, mp_context=context) as pool:
+        _run(pool, fit_arm,
+             [{"family": s, "constant": "shipped", "arm": "shipped", "value": None}
+              for s in HARD_STARTS], done, read, HARD_JSONL)
+        _run(pool, fit_arm, _hard_tasks(), done, read, HARD_JSONL)
+
+        fits = [r for r in done.values() if r.get("kind", "fit") == "fit"
+                and r["constant"] != "shipped"]
+        flagged = [r for r in fits if r.get("measures", {}).get("over_bar")
+                   or r["verdict"]["changed"]]
+        polish_tasks = [{"family": r["family"], "constant": r["constant"], "arm": r["arm"],
+                         "kind": "polish"} for r in flagged if "error" not in r]
+        wanted = {r["family"] for r in flagged}
+        wanted |= {s for s in HARD_STARTS if not shipped_of(s)["verdict"]["reaches_answer"]}
+        polish_tasks += [{"family": s, "constant": "shipped", "arm": "shipped", "kind": "polish"}
+                         for s in sorted(wanted) if "error" not in shipped_of(s)]
+        _run(pool, polish, polish_tasks, done, lambda r: r, HARD_JSONL)
+
+    for key, row in list(done.items()):
+        if (key[0] == "polish" and "error" not in row
+                and ("polish_read", *key[1:]) not in done):
+            start = row["family"]
+            read_row = _polish_read(row, shipped_of(start),
+                                    done.get(("polish", start, "shipped", "shipped")))
+            answer = answers[HARD_STARTS[start][0]]
+            read_row["versus"]["to_answer"] = w._shift(
+                row["rows"], _axial_pair_ordered(answer["rows"]), background=False)
+            read_row["versus"]["chi2_ratio_to_answer"] = row["cost_final"] / answer["cost_final"]
+            _append(read_row, HARD_JSONL)
+    hard_summary()
 
 
 def sweep() -> None:
@@ -473,19 +760,8 @@ def sweep() -> None:
         if (key[0] == "polish" and "error" not in row
                 and ("polish_read", *key[1:]) not in done):
             family = row["family"]
-            base = done.get(("polish", family, "shipped", "shipped"))
-            versus = {"to_shipped": w._shift(row["rows"], _axial_pair_ordered(
-                shipped[family]["rows"]), background=False)}
-            if base is not None and "error" not in base:
-                versus["to_shipped_polished"] = w._shift(row["rows"], base["rows"],
-                                                         background=False)
-                versus["to_shipped_polished_bkg"] = w._shift(row["rows"], base["rows"],
-                                                             background=True)
-                versus["chi2_ratio_to_shipped_polished"] = (
-                    row["cost_final"] / base["cost_final"])
-            _append({"kind": "polish_read", "family": family, "constant": row["constant"],
-                     "arm": row["arm"], "versus": versus, "rwp": row["rwp"],
-                     "rounds": row["rounds"], "settled": row["settled"]})
+            _append(_polish_read(row, shipped[family],
+                                 done.get(("polish", family, "shipped", "shipped"))))
     summary()
 
 
@@ -543,8 +819,151 @@ def summary() -> None:
     SUMMARY.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _noise_floor(fits: list[dict]) -> dict:
+    """Each start's noise arm, in plain esd against the same start's shipped arm."""
+    return {r["family"]: r.get("measures", {}).get("model") for r in fits
+            if r["constant"] == "noise"}
+
+
+def _yes(flag) -> str:
+    return "n/a" if flag is None else ("yes" if flag else "no")
+
+
+def hard_summary() -> None:
+    """Rewrite ``group_a_hard_summary.md`` from the JSONL, computing nothing new."""
+    rows = read_rows(HARD_JSONL)
+    fits = [r for r in rows if r.get("kind", "fit") == "fit"]
+    noise = _noise_floor(fits)
+    reaches = {r["family"]: r["verdict"]["reaches_answer"] for r in fits
+               if r["constant"] == "shipped"}
+    lines = ["# WP-2017 group A from hard starts, read from group_a_hard.jsonl", ""]
+    meta = next((r for r in rows if r.get("kind") == "meta"), None)
+    if meta is not None:
+        lines += [f"head {meta['head'][:9]}, rietx {meta['version']}, {meta['platform']}, "
+                  f"{meta['threads']} kernel thread per worker, compiled tier on, `[dev]`.", ""]
+    planned = len(HARD_STARTS) * (2 + sum(len(v) for v in HARD_ARMS.values()))
+    lines += [f"{len(fits)} of {planned} planned fits have a row, "
+              f"{sum('error' in r for r in fits)} of them an error or a timeout.", "",
+              "## Shipped constants from each start", "",
+              "'Reaches' is the family's shipped answer within 0.1 plain esd on every "
+              "non-background row.  'Noise' is the 1e-12 arm against this row, in plain esd.",
+              "", "| start | reaches | to answer esd | path | Rwp | Rwp / answer | evaluations "
+              "| noise esd | max r_u | max Q | max λ | rejected | longest stage | gate reads |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for r in fits:
+        if r["constant"] != "shipped":
+            continue
+        v = r["verdict"]
+        if "error" in r:
+            lines.append(f"| {r['family']} | no | error: {r['error']} ||||||||||||")
+            continue
+        reach = r["reach"]
+        lines.append(
+            f"| {r['family']} | {_yes(v['reaches_answer'])} | {_fmt(v['to_answer_esd'], '.4g')} | "
+            f"{v['to_answer_path']} | {r['rwp']:.6f} | {v['rwp_to_answer']:.6f} | {r['n_eval']} | "
+            f"{_fmt(noise.get(r['family']), '.3g')} | "
+            f"{_fmt(reach['r_u_range_accepted'] and reach['r_u_range_accepted'][1], '.3g')} | "
+            f"{reach['max_q']} | {_fmt(reach['max_lambda'], '.3g')} | {reach['n_rejected']} | "
+            f"{reach['max_stage_nfev']} | {len(reach['gate_lambdas'])} |")
+    lines += ["", "## Per constant", "",
+              "'Worst over noise' is the arm furthest from the same start's shipped arm among "
+              "those past that start's noise arm.", "",
+              "| constant | starts reached | worst esd | noise there | arm | start | path | "
+              "verdict changes | worst where shipped reaches, noise there |",
+              "|---|---|---|---|---|---|---|---|---|"]
+    for constant in HARD_ARMS:
+        arms = [r for r in fits if r["constant"] == constant]
+        reached = sorted({r["family"] for r in arms
+                          if "error" in r or not r.get("measures", {}).get("unreached", False)})
+        over = [r for r in arms if "measures" in r and noise.get(r["family"]) is not None
+                and r["measures"]["model"] > noise[r["family"]]]
+        worst = max(over, key=lambda r: r["measures"]["model"], default=None)
+        changes = [f"{r['family']} {r['arm']}" for r in arms if r["verdict"]["changed"]]
+        sound = max((r for r in over if reaches[r["family"]]),
+                    key=lambda r: r["measures"]["model"], default=None)
+        tail = ("none" if sound is None else
+                f"{sound['measures']['model']:.3g}, {noise[sound['family']]:.3g} "
+                f"({sound['family']} {sound['arm']})")
+        head = f"| {constant} | {len(reached)}: {', '.join(reached)} | "
+        if worst is None:
+            lines.append(head + f"none ||||| {', '.join(changes) or 'none'} | {tail} |")
+            continue
+        m = worst["measures"]
+        lines.append(head + f"{m['model']:.4g} | {noise[worst['family']]:.3g} | {worst['arm']} | "
+                     f"{worst['family']} | {m['model_path']} | {', '.join(changes) or 'none'} | "
+                     f"{tail} |")
+    lines += ["", "## Starts whose shipped fit misses the answer", "",
+              "Esds on these answers can be huge or absent, so Rwp shows the scatter better.  "
+              "One noise arm is one draw.", "",
+              "| start | shipped Rwp | noise Rwp | reached arms' Rwp | polished shipped | "
+              "polished noise | polished arms |", "|---|---|---|---|---|---|---|"]
+    polished = [r for r in rows if r.get("kind") == "polish" and "error" not in r]
+
+    def span(values: list[float]) -> str:
+        return f"{min(values):.4f} to {max(values):.4f}" if values else "n/a"
+
+    for start, good in reaches.items():
+        if good:
+            continue
+        here = [r for r in fits if r["family"] == start and "error" not in r]
+        pick = {r["constant"]: r["rwp"] for r in here if r["constant"] in ("shipped", "noise")}
+        arms = [r["rwp"] for r in here if r["constant"] in HARD_ARMS
+                and not r["measures"]["unreached"]]
+        done = {(r["constant"]): r["rwp"] for r in polished
+                if r["family"] == start and r["constant"] in ("shipped", "noise")}
+        rest = [r["rwp"] for r in polished
+                if r["family"] == start and r["constant"] in HARD_ARMS]
+        lines.append(f"| {start} | {_fmt(pick.get('shipped'), '.4f')} | "
+                     f"{_fmt(pick.get('noise'), '.4f')} | {span(arms)} | "
+                     f"{_fmt(done.get('shipped'), '.4f')} | {_fmt(done.get('noise'), '.4f')} | "
+                     f"{span(rest)} |")
+    lines += ["", "## Every arm", "",
+              "| start | constant | arm | model esd | noise esd | path | bkg esd | Rwp ratio | "
+              "eval ratio | conv | reached | reaches answer | changed | ref further esd | "
+              "ref name |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for r in fits:
+        if r["constant"] == "shipped":
+            continue
+        m, v = r.get("measures"), r["verdict"]
+        head = f"| {r['family']} | {r['constant']} | {r['arm']} | "
+        if m is None:
+            lines.append(head + f"error: {r.get('error')} ||||||||| "
+                         f"{_yes(v['reaches_answer'])} | {_yes(v['changed'])} |||")
+            continue
+        ref = m["reference"]
+        lines.append(
+            head + f"{m['model']:.4g} | {_fmt(noise.get(r['family']), '.3g')} | {m['model_path']} | "
+            f"{m['background']:.4g} | {m['rwp_ratio']:.6f} | {m['eval_ratio']:.3f} | "
+            f"{r['converged']} | {'unreached' if m['unreached'] else 'yes'} | "
+            f"{_yes(v['reaches_answer'])} | {_yes(v['changed'])} | "
+            f"{_fmt(ref['worst_further_esd'])} | {ref['worst_name']} |")
+    reads = [r for r in rows if r.get("kind") == "polish_read"]
+    polish_rows = [r for r in rows if r.get("kind") == "polish"]
+    lines += ["", "## Polish", "",
+              f"{len(polish_rows)} polishes, {sum('error' in r for r in polish_rows)} refused.",
+              "", "| start | constant | arm | to shipped | to shipped polished | path | bkg | "
+              "S/S polished | to answer | S/S answer | rounds | settled |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for r in reads:
+        v = r["versus"]
+        lines.append(
+            f"| {r['family']} | {r['constant']} | {r['arm']} | {v['to_shipped'][0]:.4g} | "
+            f"{_fmt(v.get('to_shipped_polished', [None])[0], '.4g')} | "
+            f"{v.get('to_shipped_polished', [None, None])[1]} | "
+            f"{_fmt(v.get('to_shipped_polished_bkg', [None])[0], '.4g')} | "
+            f"{_fmt(v.get('chi2_ratio_to_shipped_polished'), '.7f')} | "
+            f"{v['to_answer'][0]:.4g} | {_fmt(v.get('chi2_ratio_to_answer'), '.7f')} | "
+            f"{r['rounds']} | {r['settled']} |")
+    HARD_SUMMARY.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 if __name__ == "__main__":
-    if sys.argv[1:] == ["summary"]:
+    args = sys.argv[1:]
+    if args == ["summary"]:
         summary()
+    elif args == ["--hard"]:
+        hard_sweep()
+    elif args == ["--hard", "summary"]:
+        hard_summary()
     else:
         sweep()

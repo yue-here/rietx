@@ -109,53 +109,11 @@ def seats() -> dict:
 
 def reach(family: str) -> dict:
     """The shipped fit's λ updates and what each constant needed."""
-    calls: list = []
-    gates: list = []
-    measured: list = []
-    inner, moved, curvature = lm._next_lambda, lm._furthest_moved, lm._measured_curvature
-
-    def spy(lam, r_u, q):
-        out = inner(lam, r_u, q)
-        calls.append((lam, r_u, q, out))
-        return out
-
-    def spy_moved(*args):
-        gates.append(calls[-1][3])
-        return moved(*args)
-
-    def spy_curvature(*args):
-        out = curvature(*args)
-        measured.append(out)
-        return out
-
     data, st, ins, plan, kw = a._start(family)
     solves: list = []
-    lm._next_lambda, lm._furthest_moved = spy, spy_moved
-    lm._measured_curvature = spy_curvature
-    try:
-        with a.spied(solves):
-            result = rx.Refinement(st, ins, history=False).fit(data, plan=plan, **kw)
-    finally:
-        lm._next_lambda, lm._furthest_moved = inner, moved
-        lm._measured_curvature = curvature
-    accepted = [c for c in calls if c[1] is not None]
-    rejected = [c for c in calls if c[1] is None]
-    damped = [c for c in accepted if c[0] > 0.0]
-    return {
-        "rwp": result.statistics.rwp,
-        "n_accepted": len(accepted), "n_rejected": len(rejected),
-        "n_accepted_with_lambda_above_0": len(damped),
-        "r_u_range_accepted": [min(c[1] for c in accepted), max(c[1] for c in accepted)],
-        "r_u_range_damped": ([min(c[1] for c in damped), max(c[1] for c in damped)]
-                             if damped else None),
-        "n_M_HI_reach": sum(c[1] > 5.0 for c in accepted),
-        "n_M_LO_reach": sum(c[1] < 0.8 for c in damped),
-        "max_q": max(c[2] for c in accepted),
-        "max_lambda": max(c[3] for c in calls),
-        "gate_lambdas": gates,
-        "n_curvature_measured": sum(m is not None for m in measured),
-        "max_stage_nfev": max(s["nfev"] for s in solves),
-    }
+    with a.lambda_spied() as seen, a.spied(solves):
+        result = rx.Refinement(st, ins, history=False).fit(data, plan=plan, **kw)
+    return {"rwp": result.statistics.rwp, **a.reach_numbers(*seen, solves)}
 
 
 def main() -> None:

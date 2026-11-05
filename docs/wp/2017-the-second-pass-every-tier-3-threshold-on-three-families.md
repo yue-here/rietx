@@ -93,7 +93,7 @@ different laboratory, instrument and material:
 
 | Group | Rows | Arms | Families | State |
 |---|---|---|---|---|
-| A. LM stop | `lm._M_HI`, `_M_LO`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_CONVERGED_RUNS`, `_CURVATURE_GATE`, `FTOL`, `SLOW_DESCENT_ESD` | one each side of each value, `FTOL` at 1e-8 and 1e-10 | the four | first |
+| A. LM stop | `lm._M_HI`, `_M_LO`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_CONVERGED_RUNS`, `_CURVATURE_GATE`, `FTOL`, `SLOW_DESCENT_ESD` | one each side of each value, `FTOL` at 1e-8 and 1e-10 | the four, then the hard starts below | done 2026-11-05 |
 | B. Bounded step | `lm._POLISH_FEASIBLE`, `_POLISH_STATIONARY`, `BVLS_MAX_COLUMNS` | each side | Stephens fits on qarr brucite and corundum and one more; FAP Pawley for the column cut | open |
 | C. BCCG | `bccg._CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`, `_CAUCHY_ARMIJO`, `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE` | each side | Pawley on `fap`, `nac` and `cpd1a` | open |
 | D. Blocked solve | `blocked.DENSE_JACOBIAN_MAX_BYTES` | forced each way | the four | open |
@@ -113,6 +113,15 @@ different laboratory, instrument and material:
 | R. Width terms | `StageResult.width_twins_held`, `ProfileTCHZ:y` unfloored | see below | a real multi-phase fit freeing a twin pair; SRM 660c | open |
 | S. Tier-2 citations | `SCHERRER_K`, `BOND_SLACK_ANG`, `STEPS_PER_FWHM_*` | read each citation | none: they stay at tier 2 unless a source fails | open |
 
+**Group A's hard starts, fixed 2026-11-05 before running.** The shipped starts never reached
+seven of group A's ten constants on most families (handover, 2026-11-05). So those seven
+(`_M_HI`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`,
+`_CURVATURE_GATE`, `SLOW_DESCENT_ESD`) run their same arms from harder starts: every phase's
+cell lengths displaced +1 % and +3 % on the four families, and cpd-1a with zircon declared at
+the shipped start. Each arm is read against the shipped constants from the same start, on the
+same bar, and also on whether it changes the fit's verdict: reaching the shipped start's answer
+within 0.1 plain esd, or not.
+
 **Taken off the list.** `INTERMEDIATE_FTOL` and its default were re-ruled cost-only on
 2026-11-01, so they owe nothing here. `PAWLEY_SPARSE_DENSITY` chooses which arithmetic forms
 JᵀJ, agrees with the dense build to 2e-15 on each side, and was confirmed on 2026-10-28.
@@ -128,6 +137,10 @@ and have no free factor to measure, so this file's old list named them without c
 - **G.** cpd-1a with zircon declared flips with the intermediate tolerance: zircon's scale sits
   near 2σ, nine structural paths held at 1e-6, the cell walking at 1e-9, `lines_axial` at its
   400-evaluation budget (`2002-batch/waiting.md` § B7).
+- **G, from group A's hard starts.** LaB₆ with its cell +1 % takes the scale to 0 in the first
+  stage and holds the phase: Rwp 0.86, 9 evaluations, `usable=False` through
+  `MODEL_FAR_FROM_DATA`. NAC +3 % keeps NAC, loses CaF₂ to a held scale 0, and reads
+  `usable=True`, Rwp 0.139, with `PHASE_UNCONSTRAINED` the only word on it.
 - **K.** From WP-2086 (PR #1406), the other direction from B12.13: on 119 fits from displaced
   starts, 12 fail silently on real FAP, `usable=True`, `converged`, Rwp 0.44-0.69, zero shift
   to −500 446°. Background-subtracted Rwp reads 0.93-1.00 on nine, 0.575 and 0.467 on two
@@ -158,6 +171,10 @@ and have no free factor to measure, so this file's old list named them without c
   with `_SIGNED_WIDTHS`, so a caller's X or `lor_strain` with min < 0 takes the offset's step of
   1, an error of 1.4e-3 to 1.5e-2 in a width column. A fix declares which rows are widths as table
   data, a design change.
+- **Reading a wrong answer.** The esd yardstick is blind there, since `_shift` skips a row with
+  no esd and a lost phase's rows have none, and a two-valued verdict hides how far a fit
+  missed. One noise draw is a weak floor on a chaotic start (cpd-1a +3 % reads 3.99 esd). A
+  hard start's table carries Rwp too (`2017-batch/group_a_hard_summary.md`).
 - **Every refit.** A staged plan carries a path-dependent scatter of up to about 0.16 esd, and 0.5
   in a background term, from its last frozen compile. Polish both arms from one common start or
   the refit measures that scatter. The CPD QPA plan frees exact pairs (X with `lor_size`, Y with
