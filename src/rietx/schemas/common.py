@@ -664,7 +664,16 @@ from .._nearmiss import did_you_mean
 #: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
 #: where it defaulted to 0.0.  A stored document that omits it still opens, at
 #: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
-SCHEMA_VERSION = "0.60"
+#: 0.60 → 0.61 (WP-1944): ``Phase.extinction`` is ``Parameter | None`` and
+#: defaults to ``None``, "not declared", where it defaulted to a ``Parameter``
+#: at 0.  ``None`` has no table entry, so no plan can free it.  A file written
+#: before 0.61 opens unchanged: its stored block reads as a declaration, and
+#: the structural plan's extinction stage still frees it.  A phase that
+#: declares none now stores ``null``, which 1.11.0 refuses:
+#: ``Phase`` raises a ``ValidationError``, and ``Project.open`` stops at
+#: "malformed history record".  So a structure or a ``.rex`` project written
+#: here does not open there.
+SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated

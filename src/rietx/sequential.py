@@ -190,6 +190,7 @@ from .schemas.common import Diagnostic, Mode, Provenance
 from .schemas.history import ReflectionState
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData, require_two_theta
+from .schemas.plan import PlanSpec
 from .schemas.results import RefinementResult
 from .schemas.sequential import (
     _NAMED_PATH,
@@ -1252,7 +1253,7 @@ class SequentialRefinement:
             x_label: str = "index",
             labels: Sequence[str] | None = None,
             mode: Mode = "rietveld",
-            plan: RefinementPlan | str = "mccusker_default",
+            plan: RefinementPlan | PlanSpec | str = "mccusker_default",
             refit: str = "single",
             two_theta_limits: tuple[float, float] | None = None,
             direction: str = "forward",
