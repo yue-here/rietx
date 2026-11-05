@@ -5302,10 +5302,13 @@ class Refinement:
 
         if mode == "lebail" and outcome.non_finite is None:
             # a stopped stage changed nothing, its intensities included (WP-2048)
-            run, lebail_settled = model.lebail_update(
+            # the solve fitted against the first partition, so a settled second
+            # one does not undo a cut in it
+            run, settled = model.lebail_update(
                 table.decode(outcome.theta), n_cycles=stage.lebail_cycles,
                 tol=stage.lebail_tol, check=check)
             lebail_run.append(run)
+            lebail_settled = settled if lebail_settled is None else lebail_settled and settled
 
         guard = check_guards(table, outcome, correlation_guard, model=model,
                              scan_exchangeability=stage_index == n_stages)
@@ -10738,20 +10741,20 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
 def _lebail_cap_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
     """``LEBAIL_CYCLES_AT_CAP``: the answer's partition stopped on its cap (WP-1542).
 
-    Only the last stage's last partition is the answer's.  An earlier stage's
-    runs from intensities the next solve moves, so a cap there costs nothing
-    the next partition keeps.
+    Only the last stage's partitions are the answer's: the solve fitted against
+    the first and the result carries the second.  An earlier stage's run from
+    intensities the next solve moves, so a cap there costs nothing the next
+    partition keeps.
     """
     last = stage_results[-1] if stage_results else None
     if last is None or last.lebail_settled is not False:
         return []
     return [Diagnostic(
         level="warning", code="LEBAIL_CYCLES_AT_CAP",
-        message=(f"The last Le Bail partition of stage {last.name!r} stopped at its cap of "
-                 f"{last.lebail_cycles_run[-1]} cycles, before the intensities settled."),
+        message=(f"A Le Bail partition of stage {last.name!r} stopped at its cap of "
+                 f"{max(last.lebail_cycles_run)} cycles, before the intensities settled."),
         where=[],
-        suggestion="Raise lebail_cycles on the stage.  The cell is usually the "
-                   "last thing to suffer, so read the intensities and the widths first.",
+        suggestion="Raise lebail_cycles on the stage.",
     )]
 
 

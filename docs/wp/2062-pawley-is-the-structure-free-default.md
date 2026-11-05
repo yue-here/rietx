@@ -159,6 +159,24 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
+- **From WP-1542, 2026-11-05: under TRF a Pawley fit reads its seed on FAP.** With
+  `solver="trf"` a 3-cycle seed stops at Rwp 8.17 % and a 300-cycle seed reaches 7.87 %
+  (LM 7.86 % from either), 8.8 esd apart. LM reads nothing of the seed on the four
+  patterns measured, and TRF nothing on #740's two patterns or corundum.
+  `refine.PAWLEY_SEED_CYCLES` stays 3 with this as its failing case. It belongs in
+  the Pawley bug list this WP fixes first.
+
+- **From WP-1542, 2026-11-05: three facts about Le Bail for decision 0.** A stage's
+  partition now repeats until a cycle moves 1e-7 of the Bragg counts, under a cap of
+  25 000. That closes #740's plateau inside a fit: Rwp 1.07 % against the true
+  structure's 1.09 %, where three cycles gave 1.61 % on that plan. Its cost falls on
+  the caller who picks `mode="lebail"`: BT-1 LaMnO3 went from 0.45 s to about a
+  minute. The extinction screen stays on three fixed cycles
+  (`indexing.extinction.SCREEN_LEBAIL_CYCLES`), because a settled partition failed
+  10 rows of its margin and gate tests. This WP's move to Pawley retires that
+  constant, and it should say so when it lands. The issue's per-iteration
+  re-extraction question stands, though the plateau no longer argues for it.
+
 - **From WP-2011, 2026-10-28: Pawley's cost on large patterns, re-measured
   with option (c) built** (WP-2011 § Option (c) probed, commit e39b8c19d on
   its branch). A Pawley stage above the BVLS cut now forms JᵀJ sparse over

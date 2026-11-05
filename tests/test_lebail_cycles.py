@@ -19,7 +19,12 @@ import numpy as np
 import pytest
 
 import rietx as rx
-from rietx.model.forward import LEBAIL_INTENSITY_FLOOR, _settled_partition, compile_model
+from rietx.model.forward import (
+    LEBAIL_INTENSITY_FLOOR,
+    CompiledModel,
+    _settled_partition,
+    compile_model,
+)
 from rietx.optimize.cancel import CancelToken, RefinementCancelled
 from rietx.optimize.least_squares import _cancel_check
 from rietx.params.vector import ParameterTable
@@ -321,10 +326,14 @@ def test_the_pawley_answer_does_not_read_its_seed_count(pattern, monkeypatch):
     """Why the seed stays at three cycles: the joint solve refines the intensities
     anyway, so a longer seed costs a validation fit and buys nothing."""
     plan = resolve_plan("profile_only", "pawley")
-    three = _refinement(pattern).fit(pattern, mode="pawley", plan=plan, telemetry=False)
+    ref = _refinement(pattern)
+    three = ref.fit(pattern, mode="pawley", plan=plan, telemetry=False)
+    intensities = ref._model.phases[0].hkl_intensity
     monkeypatch.setattr(sys.modules["rietx.refine"], "PAWLEY_SEED_CYCLES", 300)
-    settled = _refinement(pattern).fit(pattern, mode="pawley", plan=plan, telemetry=False)
+    ref = _refinement(pattern)
+    settled = ref.fit(pattern, mode="pawley", plan=plan, telemetry=False)
     assert settled.stages[0].lebail_cycles_run == [300]
+    assert np.abs(ref._model.phases[0].hkl_intensity - intensities).max() <= 1e-6 * intensities.max()
     rows = {p.path: p for p in settled.parameters}
     for row in three.parameters:
         if row.stderr_uncorrected:
@@ -339,6 +348,24 @@ def test_a_cap_that_cut_the_last_partition_short_says_so(pattern):
     assert "5" in found[0].message
     assert found[0].suggestion
     assert result.stages[-1].lebail_settled is False
+
+
+def test_a_settled_second_partition_does_not_undo_a_cut_first_one(pattern, monkeypatch):
+    """The solve fitted against the first partition of the stage."""
+    update = CompiledModel.lebail_update
+    calls = []
+
+    def cut_first(self, *args, **kwargs):
+        run, settled = update(self, *args, **kwargs)
+        calls.append(run)
+        return run, settled and len(calls) != 3    # the closing stage's first
+
+    monkeypatch.setattr(CompiledModel, "lebail_update", cut_first)
+    plan = rx.RefinementPlan(stages=[Stage("bkg", ["instrument.background.*"])])
+    result = _refinement(pattern).fit(pattern, mode="lebail", plan=plan, telemetry=False)
+    assert len(result.stages[-1].lebail_cycles_run) == 2
+    assert result.stages[-1].lebail_settled is False
+    assert [d.code for d in result.diagnostics].count(CODE) == 1
 
 
 def test_a_count_the_caller_fixed_says_nothing(fixed_three, settled):
@@ -483,12 +510,12 @@ def test_the_tolerance_meets_its_bar(family):
     model = ref._model
     table = ParameterTable(ref.structure, ref.instrument)
     values = table.decode(table.x0())
-    model.lebail_update(values, n_cycles=CAP, tol=TOL)
+    fresh, _ = model.lebail_update(values, n_cycles=CAP, tol=TOL)
+    assert max(fresh, *(n for stage in result.stages for n in stage.lebail_cycles_run)) * 2 <= CAP
+    assert all(stage.lebail_settled for stage in result.stages)
     shipped = np.asarray(model.evaluate(values))
     model.lebail_update(values, n_cycles=REFERENCE_CAP, tol=TOL * 0.1)
     assert (np.abs(shipped - np.asarray(model.evaluate(values))) / model.sigma).max() <= 0.1
-    assert max(n for stage in result.stages for n in stage.lebail_cycles_run) * 2 <= CAP
-    assert all(stage.lebail_settled for stage in result.stages)
 
 
 @pytest.mark.slow

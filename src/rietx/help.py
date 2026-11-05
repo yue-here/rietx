@@ -3143,11 +3143,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "LEBAIL_CYCLES_AT_CAP": HelpEntry(
-        title="The last Le Bail partition hit its cap",
+        title="A Le Bail partition hit its cap",
         description=(
             "The partition repeats until the intensities stop moving, under the cap "
-            "`lebail_cycles`. The answer's last partition reached the cap first, so "
-            "its intensities and any width that depends on them are not settled. "
+            "`lebail_cycles`. A partition in the last stage reached the cap first, so "
+            "the intensities and any width that depends on them are not settled. "
             "Raise `lebail_cycles` on the stage."
         ),
     ),
@@ -5603,7 +5603,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
     "StageResult.lebail_settled": HelpEntry(
         title="Le Bail partition settled",
         description=(
-            "Whether the stage's last partition met `lebail_tol` under its cap of "
+            "Whether each of the stage's partitions met `lebail_tol` under its cap of "
             "`lebail_cycles`. It is empty where nothing was asked: another mode, or "
             "a fixed count."
         ),

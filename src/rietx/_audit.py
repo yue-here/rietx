@@ -860,7 +860,7 @@ ROWS: tuple[Row, ...] = (
     Row("LEBAIL_ALTERNATION_STOPPED", "code"),
     Row("LEBAIL_CYCLES_AT_CAP", "code", tier=1, ambiguity=1,
         evidence=("arithmetic: fires exactly when StageResult.lebail_settled is False on the "
-                  "last stage, the answer's partition having reached Stage.lebail_cycles; "
+                  "last stage, a partition there having reached Stage.lebail_cycles; "
                   "gates nothing"),
         response="warning",
         responds=("raise lebail_cycles on the stage until StageResult.lebail_settled reads True, "
@@ -2720,7 +2720,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.model.forward.SQUAREM_STEP_GROWTH", "constant", tier=2, value=4.0,
         evidence=("source: mstep = 4, the default of Varadhan and Roland's R package SQUAREM, with "
                   "step.max0 = 1 and method = 3 (CRAN manual, checked 2026-11-05); unbounded, one "
-                  "FAP partition dropped every landing for hundreds of rounds (WP-1542)")),
+                  "FAP partition dropped every landing for hundreds of rounds; of 2, 4 and 8 on six "
+                  "patterns only 4 stays within 1.25x of the best total cycles on all of them (2 "
+                  "loses 1.9x on FAP, 8 loses 2.4x on #740); the factor picks the path, so at 2 and "
+                  "8 #740's 2 % scale lands 1.25 esd away (Rwp 4.697 against 4.680 %), the "
+                  "failing case of StageSpec:lebail_tol (WP-1542, 2026-11-05)")),
     Row("rietx.model.forward.WINDOW_AREA_TOL", "constant", tier=3, value=0.02,
         evidence=("window area tolerance; measured 2026-10-21 on SRM 660c, FAP, cpd-1a and 11-BM NAC against 5e-5 (converged): fails on all four, "
                   "max |dy|/sigma 0.71-2.15 at fixed parameters against a bar of 0.1, a converged "
@@ -3509,14 +3513,18 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine.LOW_ANGLE_MIN_CHANNELS", "constant", value=10),
     Row("rietx.refine.LOW_ANGLE_UNMODELLED_RATIO", "constant", value=3.0),
     Row("rietx.refine.MAGNETIC_TICK_PURITY", "constant", value=0.05),
-    Row("rietx.refine.PAWLEY_SEED_CYCLES", "constant", tier="invariant", value=3,
-        evidence=("answer-invariant: the joint solve refines the seed; a seed settled at 1e-5 "
-                  "against 3 cycles moved 0.000 esd at identical evaluations (33, 70, 53, 63) on "
-                  "#740's pattern at 2 % scale, corundum, 11-BM NAC and LaB6+cBN (WP-1542); "
-                  "tests/test_lebail_cycles.py::test_the_pawley_answer_does_not_read_its_seed_count"),
-        grounds=("B11 (ruled 2026-10-19) treats a budget as not affecting the answer once a test "
-                 "confirms its margin; a longer seed would cost index validation, a default "
-                 "path, with nothing to show for it."),
+    Row("rietx.refine.PAWLEY_SEED_CYCLES", "constant", tier=3, value=3,
+        evidence=("the fixed 3 of StageSpec:lebail_cycles before WP-1542, kept for the Pawley seed; "
+                  "under the default LM a 300-cycle seed against 3 moved 0.000 esd, 0.000 sigma and "
+                  "under 2e-8 of the largest intensity on #740's pattern, its 2 % scale, corundum "
+                  "and FAP, and a seed settled at 1e-5 moved 0.000 esd at identical evaluations (33, "
+                  "70, 53, 63) on the 2 % scale, corundum, 11-BM NAC and LaB6+cBN; fails under "
+                  "solver='trf' on FAP: 3 cycles stop at Rwp 8.17 % where 300 reach 7.87 % (LM "
+                  "7.86 %), 8.8 esd apart; the same bar holds under TRF on the other three (WP-1542, "
+                  "2026-11-05, macOS arm64); no stated source for the 3"),
+        grounds=("Kept at the count B11 (ruled 2026-10-19) left in place, because under the default "
+                 "solver a longer seed costs index validation, a default path, and moves nothing; "
+                 "the TRF failing case goes to WP-2062, which owns Pawley's bugs."),
         approved="2026-10-19"),
     Row("rietx.refine.MODEL_FAR_FROM_DATA_RWP", "constant", tier=3, value=0.8,
         evidence=("WP-1028 (c): the zero-scale attractor converges at Rwp 0.99999, honest bad fits "
@@ -4428,9 +4436,11 @@ ROWS: tuple[Row, ...] = (
         value=25000,
         evidence=("answer-invariant: a cap the stop reaches first; the dearest partition of a "
                   "profile_only fit at lebail_tol 1e-7 ran 8495 cycles on BT-1 LaMnO3, 1088 on "
-                  "#740's pattern and 161 on FAP, and one from a flat start 12 293 (2.0x); "
-                  "tests/test_lebail_cycles.py::test_the_tolerance_meets_its_bar asserts 2x on six "
-                  "patterns from four kinds of instrument; a cut says so (LEBAIL_CYCLES_AT_CAP); "
+                  "#740's pattern and 161 on FAP, and one from a flat start 12 293 (2.0x, measured "
+                  "once); tests/test_lebail_cycles.py::test_the_tolerance_meets_its_bar asserts 2x "
+                  "on the fit's partitions on six patterns from four kinds of instrument, the "
+                  "largest 329 reflections; past that domain a cut says so "
+                  "(LEBAIL_CYCLES_AT_CAP); "
                   "GSAS-II's DoLeBail runs a fixed 10 (GSASIIstrMain.py:761, checked)"),
         grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
                  "and a budget is treated as not affecting the answer once a test confirms its "
@@ -4446,8 +4456,10 @@ ROWS: tuple[Row, ...] = (
                   "#740, its 2 % scale, corundum and NAC; fails on FAP, 1.23: a pair 1e-4 A apart "
                   "(506 and 10 -5 0) that 3000 more cycles swap, Rwp 10.108 to 10.103 %, with "
                   "the answer 0.001 plain esd off; on #740 at 2 % scale settled intensities from "
-                  "two starts differ by 1.38, so no tolerance closes such a pair; bar 2, 0.1 plain "
-                  "esd, holds on five families (0.023 on #740's pattern against 1e-9); #740, the "
+                  "two starts differ by 1.38, so no tolerance closes such a pair, and neither bar "
+                  "reads the split of such a pair, which can move while the curve holds; bar 2, "
+                  "0.1 plain esd, holds on four families of five patterns, #740 and its 2 % "
+                  "scale being one (0.023 on #740's pattern against 1e-9); #740, the "
                   "ruling's yardstick, ends at Rwp 1.07 % against 1.09 % for its true structure and "
                   "1.61 % at 3 cycles, a cell 4.6 ppm off truth against 34.9; a stop on estimated "
                   "distance (s2^2/(s1-s2), Aitken) left FAP at 1.23 too; a Le Bail plan costs "

@@ -1175,7 +1175,7 @@ class StageResult(Base):
     #: solve stopped has only the partition before it.  Empty where none ran:
     #: a Rietveld stage, or a Pawley stage that carried its intensities in.
     lebail_cycles_run: list[int] = Field(default_factory=list)
-    #: did this Le Bail stage's last partition meet ``lebail_tol`` under its
+    #: did every partition of this Le Bail stage meet ``lebail_tol`` under its
     #: cap?  ``None`` where nothing was asked: another mode, or a fixed count.
     lebail_settled: bool | None = None
     #: the stage's Rwp at the values it ended on, measured on its own frozen
