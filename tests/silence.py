@@ -663,6 +663,24 @@ def _unrecovered_silent() -> list:
             + _unrecovered("max_iter"))
 
 
+def _onset_fires() -> list:
+    """Verdicts that switch more than once: no single onset to quote."""
+    from rietx.sequential import _moment_diagnostics
+    from tests.test_magnetic_series import _INTERLEAVED, _verdicts
+
+    return _moment_diagnostics(_verdicts(_INTERLEAVED))
+
+
+def _onset_silent() -> list:
+    """One clean 60 → 75 bracket, and a moment supported everywhere: the
+    bracket is ``info``, never the warning."""
+    from rietx.sequential import _moment_diagnostics
+    from tests.test_magnetic_series import _BRACKETED, _EVERYWHERE, _verdicts
+
+    return (_moment_diagnostics(_verdicts(_BRACKETED))
+            + _moment_diagnostics(_verdicts(_EVERYWHERE)))
+
+
 def _short_series(*, cancel_after_first: bool) -> list:
     """Two cheap patterns of ``tests/test_sequential.py``'s ramp, the chain
     cancelled once the first pattern's fit ends where ``cancel_after_first``,
@@ -1029,6 +1047,8 @@ SILENCE: dict[str, Pair] = {
         _dofs_renumbered_fires, _dofs_renumbered_silent, "tests/test_site_twins_merged.py"),
     "SEQUENTIAL_CANCELLED": Pair(
         _cancelled_fires, _cancelled_silent, "tests/test_sequential.py"),
+    "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED": Pair(
+        _onset_fires, _onset_silent, "tests/test_magnetic_series.py"),
     "SEQUENTIAL_PATH_CHECK_NOT_RUN": Pair(
         _path_not_run_fires, _path_not_run_silent,
         "tests/test_sequential.py, tests/test_series_error_policy.py"),
