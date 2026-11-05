@@ -378,9 +378,19 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
   - *For the maintainer.* `preview_equations` and `EquationPreview` are new reader output
     (memory rule: reader-output changes go to Yue before merge). Decisions (a) and (b) of
     the first entry stand unanswered.
-  - *Next.* Task 10, the result: variable rows in `result.parametric`, an expression
-    evaluated through its gradient, and the three inherited readers (§ Inherited, 2026-10-14).
-    Then 9, 11-15.
+  - *Task 10, in part.* An expression's variables are now its rows in `result.parametric`:
+    one `ParametricCoefficient` each, `term` the variable's name, no reference, so no
+    field is new. A variable two equations read is listed under each.
+    `RefinedParameter.equations` names an expression's variables and the rows of the block
+    that writes its target, cubic b and c included (the third inherited reader). Both
+    change what a fit prints and returns.
+  - *Next.* The rest of task 10: an expression evaluated anywhere with its esd,
+    √(g·Σ·gᵀ) through `Expression.gradient`. `RefinedParametricEquation` has no field for
+    the variables' order, and an expression naming an intermediate needs that definition
+    to be evaluated from a stored result. Either needs a stored field, so it waits on
+    decision (b), or a design that derives both from `result.parametric_equations`. The
+    form test (`target_columns`) still covers linear equations only, and an expression
+    reports no form verdict. Then 9, 11-15.
 
 - **2026-11-05 (first build session, a ghostshift runner)** — Tasks 1-6 landed: the grammar,
   the parser and tree, evaluation and exact derivatives, the block on `ParameterTable`,
