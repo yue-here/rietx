@@ -401,13 +401,25 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
     sharing field, and one matching rule is what an agent calling rietx learns from the docs
     and error messages; the exception guarded a mistake only a glob starting `*` or `vars.`
     could make. Task 11 builds on this; the current "a variable is one number" refusal goes.
+  - *Decided (Yue, 2026-11-05), the vision.* One formula language for constraints and
+    restraints, in single and parametric refinements. This grammar is that language. The
+    milestone record carries the ruling, and WP-2118 owns the single-refinement half.
+  - *Decided (Yue, 2026-11-05), (a).* `Parameter.expr` is **removed** in this WP: a
+    `mode="before"` migration drops a stored `"expr": null` so old files open, and the
+    field leaves the schema (part of decision (b)'s `SCHEMA_VERSION` move). A formula in a
+    single refinement is declared by a **command** in the `tie` family, recorded and
+    symmetry-checked like a tie, never by a field on the parameter. Grounds: one place
+    declares what a parameter follows, and the same command can serve a joint fit (2103).
+    That command is WP-2118, not this WP. Readers to update with the removal: the
+    docstring, DESIGN.md § Parameter system, `io/projects/gsas2.py`'s note, and any manual
+    or skill line naming the field.
   - *Task 15, the skill.* The series reference's parametric row now names `basis="expression"`
     and `variables=`. It grew 23 B and sits 16 B under its budget. The synced copies follow.
   - *Fast selection* at 93518e01f, `[dev,jax,torch]`, darwin/arm64, through ghostshift's
     `serial.py`: 14471 passed, 51 skipped, 36 xfailed, 0 failed (18:49). The total is 35 above
     the last entry's at 84fa4cb02, and this session added four tests; the rest is the
     second session's later commits and a different skip set, not reconciled here.
-  - *Next.* Task 11 (decision (c) answered above), then 13 and 14.
+  - *Next.* Task 11 (decision (c) answered above), the removal of `Parameter.expr` (decision (a) above), then 13 and 14.
 
 - **2026-11-05 (second build session, a ghostshift runner)** — Tasks 7 and 8 landed, and
   the fast selection's three reds from the first session are fixed. Branch
