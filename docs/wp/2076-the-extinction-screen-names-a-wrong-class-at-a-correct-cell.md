@@ -447,7 +447,7 @@ corundum, FAP, NAC and PbSO₄ rows keep their classes.
     weighs answering above that, (a) with a PbSO₄ rule is the runner-up, and no such rule exists yet. A
     rule that separates PbSO₄'s silent positions from a true absence would flip this.
 
-  *Next.* The maintainer answers Questions 1 and 2. On (b) here: port `candidate.diff` with the chosen
+  *Next.* PR #1433 carries this entry. The maintainer answers Questions 1 and 2. On (b) here: port `candidate.diff` with the chosen
   margin, name the undecided position in the finding (task 5), add the five rows with their PNGs (task
   6), and rewrite the acceptance clause. A new abstention brings its audit row to the maintainer first.
   Then run the three extinction files and `tests/test_acceptance_indexing.py`, and show the
