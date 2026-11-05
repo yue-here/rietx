@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
 Depends on: [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md)
-Priority: P3 2026-11-05 — three opt-in corrections are documented without the declaration a user writes, so a user who never declared one has no page that says how; nothing is wrong in any number
+Priority: P3 2026-11-05 — WP-1944 closed, so nothing blocks it; three opt-in corrections are documented without the declaration a user writes, and nothing is wrong in any number
 
 ## Goal
 

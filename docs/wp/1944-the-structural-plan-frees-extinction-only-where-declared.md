@@ -1,9 +1,8 @@
 # WP-1944 — the structural plan frees extinction only where it says it does
 
-Milestone: unscheduled · Status: 🔄 2026-11-05 — follow-up: EXTINCTION_UNDECLARED removed under the maintainer's ruling of 2026-11-04
+Milestone: unscheduled · Status: ✅ 2026-11-05 — extinction is opt-in per phase and findable through its documentation (PRs #1391, #1412)
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-10-11 — a plan frees a parameter its description says it leaves alone, and the esd shows the data cannot see it; nothing fires
 
 ## Goal
 
@@ -55,26 +54,20 @@ change. The PR still goes to the maintainer before merge, because it changes
 the stored format. A second ruling the same evening widened the WP: opt-in
 physics must be findable from a fit's output (§ Handover log, 2026-11-04).
 
+**Decided 2026-11-04 (late evening):** the maintainer read the pointer that
+second ruling produced and reversed it: "remove EXTINCTION_UNDECLARED from
+the package entirely; keep findability through documentation; the skill row
+as concise as possible." Findable now means documented, never detected from
+the residual. PR #1391 merged before the ruling could be applied, so the
+follow-up PR #1412 applies it and closes issue #877. WP-2087 is rescoped to
+documentation pointers by the same ruling.
+
 **The sibling class, not generalised here.** A freed parameter the data do
 not determine, reported with no diagnostic. WP-1523 settled it for a phase
 scale (significance under 3σ, `refine._answer_significance`). WP-1914 owns
 it for a sample-broadening coefficient at its softplus floor. This WP fixes
 the plan and its texts. A general "esd exceeds value" diagnostic is not in
 it.
-
-### Inherited
-
-- **2026-10-24, from [2044](2044-the-sabine-laue-factor-is-continuous.md):
-  the QPA guide's free fit moved.** With Sabine's Laue factor continuous, the
-  guide's first fit (11-BM NAC + CaF₂, `mccusker_structural`) gives CaF₂
-  3.58 ± 3.53 wt% and extinction 1919 ± 4066 µm², the same on macOS and Linux,
-  where 1.9.0 gave 3.09 ± 2.32. `HIGH_CORRELATION` reads scale ~ extinction at
-  ρ = +0.998. That fit is this WP's worked case: an extinction the data cannot
-  see, freed by the plan on a weak phase. The held fit is unchanged at
-  1.37 ± 0.07 wt%. Re-pin `examples/guides/qpa.py` and its page if this WP
-  changes what the plan frees.
-  The fit moves a quoted weight fraction by more than the fraction itself,
-  which may move this WP's priority row (noted by WP-2043).
 
 ## Non-goals
 
@@ -99,6 +92,9 @@ it.
       moves.
 - [x] Skill: the plan table row in `SKILL.md` matches the code; nothing else
       expected.
+- [x] Under the ruling of 2026-11-04 (late evening): remove
+      `EXTINCTION_UNDECLARED`, and keep extinction findable through its help
+      entry, the theory page and one skill row (PR #1412).
 
 ## Acceptance
 
