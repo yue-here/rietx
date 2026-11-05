@@ -350,6 +350,48 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
 
 ## Handover log
 
+- **2026-11-05 (first build session, a ghostshift runner)** — Tasks 1-4 landed: the grammar,
+  the parser and tree, evaluation and exact derivatives, and the block on `ParameterTable`.
+  Nothing reaches `refine_multi` yet. Branch `wp1964-equations`, no PR.
+  - *Done.* `docs/docs/reference/expressions.md` is the specification, version 1, with a
+    73-row conformance table whose values came from mpmath at 50 digits. `params/expression.py`
+    implements it. `tests/test_expression.py` reads the table off the page and runs every row on
+    numpy, jax and torch. Random trees match complex step, and jax's and torch's autodiff match
+    the numpy rules. `arctan`, `expm1` and `log1p` joined `_OP_NAMES`. The grammar's version is
+    the seventh contract in `capabilities()`. `ParameterTable.add_expression` builds an
+    `ExpressionBlock`, and `test_cross_backend.py` has an `expression` row.
+  - *Followers.* A cubic `b` and `c` follow `a` by a symmetry tie, and C would read `a` before
+    the block writes it. `add_expression` therefore moves each follower's tie into the block:
+    the follower becomes a locked, untied output written as coeff·target + const. A follower
+    tied to the target and to anything else is refused by name. The symmetry is unchanged, so
+    the rule that symmetry outranks a user tie still holds.
+  - *Measured.* `debye(x)` is a 32-point Gauss-Legendre rule below |x| = 10 and the exponential
+    tail above, within 4e-15 of mpmath over -30 to 300. Without the `expm1` rewrite the Einstein
+    term at θ/T = 1e-10 is wrong in the eighth significant figure.
+  - *Consent list for the maintainer* (task 1 asks for one; names on the main surface). Each
+    stands unless you object.
+    1. Function names are python's and C's, lowercase: `exp`, `expm1`, `log` (natural), `log1p`,
+       `sqrt`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `abs`, `min`, `max`, `debye`. A
+       condition goes in `if(c, a, b)`, joined by the words `and`, `or`, `not`. `^` and `**`
+       are both the power. GSAS-II users already write python, and TOPAS's `Ln` and `Exp` are
+       rewritten by an agent from the manual (the ruling of 2026-11-04 takes no aliases).
+    2. Trigonometry is in radians only, with the constant `pi`. GSAS-II's `sind` is left out,
+       so each function has one unit.
+    3. `debye(x)` is the first Debye function D₁(x) of Abramowitz and Stegun § 27.1. A
+       Debye-model Biso is the user's own prefactor times `debye(theta_D/T)`.
+    4. Left out until someone asks: `sinh`, `cosh`, `tanh`, `log10`, `sind`. Each costs an op
+       on every backend.
+    5. The field is `Capabilities.expression_grammar_version`, and the version is `"1"`.
+  - *Decisions for the maintainer.* Both change the stored format, which the WP gives to you.
+    (a) `Parameter.expr`: wire it to this grammar as a single fit's spelling (a parameter set
+    by an expression over `Refinement.add_variable`'s variables, TOPAS's everyday use), or remove
+    it. The block is one caller away, so wiring is cheap. Lean: wire it. (b) Task 5 adds
+    `basis="expression"` and an `expression` field to `ParametricEquation`, and `variables=` to
+    `refine_multi`, with the spelling in § Goal. That moves `SCHEMA_VERSION`.
+  - *Next.* Task 5, variables on a joint fit, on the § Goal spelling until (b) is answered.
+    The result readers (task 10) assume a linear equation (`ResolvedParametric.phi`), so an
+    expression equation needs its own list on `MultiParameterTable` until then.
+
 - **2026-11-04 (second review)** — A second clean-context review tested the plan against
   the code and the local inputs. It gave the agent-port row a pass and a fail, fixed a
   ZrP₂O₇ gate that could not test the calibration feed, and found two constructs with
