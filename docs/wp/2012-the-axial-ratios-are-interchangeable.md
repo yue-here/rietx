@@ -190,7 +190,7 @@ choosing a fix.
   § The FCJ corner). That is true. The default instrument and both presets start there
   too, so the corner is not specific to the recipe.
 
-  *Gates.* Measured on darwin/arm64, worktree venv `[dev]`, compiled tier on. The touched-area files (recipe, help, audit table, audit delta, docs consistency, manual API, GUI help, skill): 345 passed before the review added three tests. `test_recipe.py` alone gave 60 passed after it. The fast selection was queued on the Mac behind machine load when this entry was written. Its counts are owed here before the PR leaves draft. `tests.reader_output`: exit 0, unchanged against `078f10644`. Ruff
+  *Gates.* Measured on darwin/arm64, worktree venv `[dev]`, compiled tier on. The touched-area files (recipe, help, audit table, audit delta, docs consistency, manual API, GUI help, skill): 345 passed before the review added three tests. `test_recipe.py` alone gave 60 passed after it. The fast selection (`-m "not slow"`, `-n 4` through testslot, 12:10–12:20Z, code at `1aa04c665`) gave 13931 passed, 239 skipped, 36 xfailed. This branch adds four tests, and there was no local base run to difference against. `tests.reader_output`: exit 0, unchanged against `078f10644`. Ruff
   clean. Vale: 0 errors. The full suite did not run. The change cannot move a measured
   number, because no committed recipe flags the term (`tests/CLAUDE.md` § Running). Pearl
   did not answer (SOCKS error 1, and the wake got no answer within 120 s), so the gates ran
