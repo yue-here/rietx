@@ -58,6 +58,18 @@ stored linear tie read as its formula.
 **Tier.** The command and the shorthand are named practice (TOPAS, lmfit and Mantid
 declare formulas on parameters; practice.md). No new judgement is added.
 
+### Inherited
+
+- **2026-11-05, from WP-1964 (consent item 2).** The grammar's trigonometry is in
+  radians only, with `pi`, and GSAS-II's `sind` was left out. rietx gives every angle in
+  degrees, cell angles included. Once a formula here can read a cell angle, `cos(beta)`
+  would treat 95° as 95 radians without a word. Task 1's review asks how other programs
+  meet this, and the fix if a case needs it is additive (`sind`, `cosd`, `tand`).
+- **2026-11-05, from WP-1964 (consent item 6).** A joint fit declares its variables at
+  construction, `refine_multi(variables={…})`, while a single refinement uses the
+  `add_variable` command. WP-2103 gives a joint fit the single fit's commands. The
+  command built here should keep the two routes one convention, or say why they differ.
+
 ## Non-goals
 
 - The grammar itself, its functions and its version: WP-1964.
