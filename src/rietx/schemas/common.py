@@ -1013,6 +1013,20 @@ class _InheritsDeclaredDefaults(Base):
     _declared_since: ClassVar[str] = "0.35"
     #: A class-specific way out, appended to the out-of-range refusal.
     _declared_escape: ClassVar[str] = ""
+    #: An opt-in ``Parameter | None`` field has no default to carry its range,
+    #: so it names one here (``Phase.extinction``, WP-1944): field name → a
+    #: factory for the ``Parameter`` whose range and unit a declaration inherits.
+    _declared_optional: ClassVar[dict] = {}
+
+    @classmethod
+    def _declared_default(cls, name: str):
+        """The factory whose ``Parameter`` carries field ``name``'s declared
+        range, or ``None`` where the field declares none.  One answer for
+        construction and for the history reader's repair."""
+        info = cls.model_fields[name]
+        if info.annotation is Parameter and info.default_factory is not None:
+            return info.default_factory
+        return cls._declared_optional.get(name)
 
     @model_validator(mode="before")
     @classmethod
@@ -1020,8 +1034,9 @@ class _InheritsDeclaredDefaults(Base):
         if not isinstance(data, dict):
             return data
         data = dict(data)
-        for name, info in cls.model_fields.items():
-            if info.annotation is not Parameter or info.default_factory is None:
+        for name in cls.model_fields:
+            factory = cls._declared_default(name)
+            if factory is None:
                 continue
             if name not in data:
                 continue  # omitted: default_factory already carries the range
@@ -1040,7 +1055,7 @@ class _InheritsDeclaredDefaults(Base):
             # write-back leaves the last site's value in all of them (PR #206's
             # behaviour, kept).  Sharing *on purpose* states every attribute —
             # ``Harmonic.weight``'s default does, being its line's by reference
-            fills = declared_fills(info.default_factory(), set(present))
+            fills = declared_fills(factory(), set(present))
             if not fills:
                 continue
             try:

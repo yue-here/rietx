@@ -35,6 +35,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 2026-10-31 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 2026-10-09 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
+| [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md) | The structural plan frees extinction only where it says it does | 2026-11-04 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) | A cell pays for the lines it predicts and the pattern lacks | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | 2026-10-24 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -78,6 +79,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | P2 | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | P2 | — ([1969](1969-an-exhaustive-search-that-ends-in-no-cell.md), [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | P2 | — ([2003](2003-the-chain-actions.md) soft) | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [2088](2088-an-assigned-parameter-inherits-its-declared-range.md) | An assigned Parameter inherits its declared range | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | P2 | — | [parametric](#parametric) |
 | [2102](2102-a-joint-fit-takes-a-planspec.md) | A joint fit takes a PlanSpec | P2 | — | [parametric](#parametric) |
 | [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | A joint fit has the verbs a single fit has | P2 | — ([2102](2102-a-joint-fit-takes-a-planspec.md), [2081](2081-how-a-series-holds-what-the-setup-fixes.md) soft) | [parametric](#parametric) |
@@ -596,7 +598,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1936](1936-a-forward-difference-step-sized-by-its-parameter.md) | A forward-difference step sized by its parameter | ✅ 2026-10-09 | — | — |
 | [1937](1937-a-bounded-step-solved-exactly.md) | A bounded step solved exactly | ✅ 2026-10-10 | — | — ([1936](1936-a-forward-difference-step-sized-by-its-parameter.md) soft) |
 | [1938](1938-every-parameter-refined-in-its-own-units.md) | Every parameter refined in its own units | ✅ 2026-10-11 | — | [1936](1936-a-forward-difference-step-sized-by-its-parameter.md), [1937](1937-a-bounded-step-solved-exactly.md) ([1940](1940-the-kernel-tier-in-a-wheel.md) soft) |
-| [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md) | The structural plan frees extinction only where it says it does | ⬜ | P3 | — |
+| [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md) | The structural plan frees extinction only where it says it does | 🔄 2026-11-04 | P3 | — |
 | [1946](1946-a-strain-block-that-cannot-leave-its-cone.md) | A strain block that cannot leave its cone | ⬜ | P3 | [1938](1938-every-parameter-refined-in-its-own-units.md), [1467](1467-a-stephens-block-on-a-frozen-floor.md) |
 | [1951](1951-a-glob-that-names-a-site-and-frees-nothing.md) | A glob that names a site and frees nothing | ✅ 2026-11-02 | — | — |
 | [1952](1952-the-xy-reader-says-what-it-skipped.md) | The xy reader says what it skipped | ⬜ | P3 | — |
@@ -641,6 +643,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2082](2082-a-stated-prior-is-not-an-engine-in-the-grade.md) | A stated prior is not an engine in the grade | ✅ 2026-11-02 | — | — |
 | [2084](2084-lab6-has-two-minima-in-the-widths.md) | The SRM 660c protocol has two minima in the Gaussian widths, and the shipped start reaches the shallower | ⬜ | P3 | — |
 | [2086](2086-a-zero-scale-holds-the-instrument-only-where-the-residual-is-noise.md) | A zero scale holds the instrument only where the residual is noise | ✅ 2026-11-04 | — | — |
+| [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md) | An opt-in correction the residual asks for names its declaration | ⬜ | P3 | [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md) |
+| [2088](2088-an-assigned-parameter-inherits-its-declared-range.md) | An assigned Parameter inherits its declared range | ⬜ | P2 | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 

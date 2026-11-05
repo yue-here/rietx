@@ -56,9 +56,9 @@ This runs APS 11-BM's scan of NIST SRM 640c silicon in a Kapton capillary, which
 
 <!-- output of examples/guides/hump.py -->
 ```text
-3 terms         Biso 0.443 ± 0.100 Å²
-3 terms + hump  Biso 0.446 ± 0.018 Å²
-6 terms         Biso 0.448 ± 0.039 Å²
+3 terms         Biso 0.417 ± 0.065 Å²
+3 terms + hump  Biso 0.425 ± 0.012 Å²
+6 terms         Biso 0.425 ± 0.026 Å²
 ```
 
 Silicon's Biso is the only structural parameter in this fit.
@@ -72,7 +72,7 @@ For this pattern, 11-BM's scan of the same capillary empty peaks near 5.0° 2θ,
 A scan of the beam path with no capillary shows no feature at all.
 Without such a check, a hump is three parameters that lower Rwp.
 
-A hump narrower than {{ HUMP_MIN_WIDTH_MULT }} times the instrumental peak width at its position is reported as [`HUMP_TOO_NARROW`](../reference/diagnostics-refinement.md#hump_too_narrow).
+A hump narrower than {{ HUMP_MIN_WIDTH_MULT }} times the instrumental peak width at its position is reported as [`HUMP_TOO_NARROW`](../reference/diagnostics-corrections.md#hump_too_narrow).
 That width belongs to a reflection, so model it as a second phase instead.
 
 ## Read the fitted position with care

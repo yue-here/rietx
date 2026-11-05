@@ -196,9 +196,9 @@ Freed after the profile and the scale have settled, it gets only the intensity n
 
 Three diagnostics report the outcome.
 
-- [`HARMONIC_FRACTION`](diagnostics-refinement.md#harmonic_fraction) gives the refined weight as a percentage of the fundamental with its esd. The fractions reported for real instruments are a few per cent. Above 15 % it is reported at `warning`, since a fraction that large usually means the line is absorbing something else: an unindexed impurity, a magnetic contribution or a background too stiff to follow.
-- [`HARMONIC_ABSENT`](diagnostics-refinement.md#harmonic_absent) means the weight refined below 0.1 % of the fundamental. The beam carries no measurable order-n component, as a monochromator whose nth order is extinct must give, and the declaration can be dropped.
-- [`HARMONIC_HELD`](diagnostics-refinement.md#harmonic_held) means the weight was never freed, so the reported fraction is the declared value and is not a result.
+- [`HARMONIC_FRACTION`](diagnostics-corrections.md#harmonic_fraction) gives the refined weight as a percentage of the fundamental with its esd. The fractions reported for real instruments are a few per cent. Above 15 % it is reported at `warning`, since a fraction that large usually means the line is absorbing something else: an unindexed impurity, a magnetic contribution or a background too stiff to follow.
+- [`HARMONIC_ABSENT`](diagnostics-corrections.md#harmonic_absent) means the weight refined below 0.1 % of the fundamental. The beam carries no measurable order-n component, as a monochromator whose nth order is extinct must give, and the declaration can be dropped.
+- [`HARMONIC_HELD`](diagnostics-corrections.md#harmonic_held) means the weight was never freed, so the reported fraction is the declared value and is not a result.
 
 `diagnose(data)` runs a related check before any fit ([Contamination](pattern-diagnostics.md#contamination)).
 It asks whether several strong reflections carry a Kβ or tungsten Lα line at one common ratio, and needs no structure.
