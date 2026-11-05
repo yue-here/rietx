@@ -1,6 +1,6 @@
 # WP-2078 — Weak lines from another phase push the true cell off rank 1
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-05 — task 2 done (PR #1341, merged at `4eecc6632`): the three fixtures and the truth's rank on `main`; the WP stays open, task 1 is free, and the first Linux nightly owes a reading of the as-picked row
 Track: What fires, and what stays silent
 Depends on: — (1969 soft: the inlier rule answers the same failure by another mechanism; 2066 soft: the reporter's dichotomy rows predate it)
 Priority: P2 2026-11-02 — a ranking defect with a hand workaround: on the reporter's private benchmark the true cell ranks first on 48 of 172 host and one-impurity lists under all three engines, and on 75 when the search is given only the lines at or above 1 % of the strongest; thinning the list by hand is the workaround
@@ -180,7 +180,7 @@ each arm's search or cuts trailing systems. That cost is unmeasured.
       Bergmann et al. (2004) Table 5 for whether the 5 % sets scored better
       than the raw ones. Mark each claim checked or inferred. The section says
       whether a relative floor is practice (tier 2) or new (tier 3).
-- [ ] Synthetic fixtures, built in-test from rietx's forward model (the
+- [x] Synthetic fixtures, built in-test from rietx's forward model (the
       reporter offered to write them). (a) A host with an injected weak
       second phase, where the floor must move the truth to rank 1. (b) A
       superlattice host whose weak lines are structural, where the floor must
@@ -236,6 +236,18 @@ position-only list returns the same candidates as on `main`.
 
 ## Handover log
 
+- **2026-11-05** (post-merge record) — PR #1341 merged at `4eecc6632`. It
+  carries task 2's own entry, the second of the two below. Task 2 is done and
+  the WP stays open.
+  *Owed:* the slow rows of `RANK_ON_MAIN` have run on macOS only. The first
+  Linux nightly after this merge is their first reading on another platform,
+  so read `test_truth_rank_on_main[a-0]` there (fixture (a) as picked). That
+  search took 17-30 s on the Mac, and a CI leg runs 3-4× slower, against the
+  120 s ceiling. If the ceiling cuts it, the row and
+  `test_a_trace_second_phase_leaves_the_truth_first` both skip, and (a)'s range
+  needs narrowing again. If the row passes, its rank stands on both platforms.
+  *Next:* that reading, then task 1 (free) and task 3.
+
 - **2026-11-02** — created, from the 2026-11-02 issue triage (issue #1291).
   Checked against the tree at `992b7048f`: every symbol the issue names
   exists, and `PEAK_UNDRIVEN_FLAGS` is an existing seam the issue did not
@@ -246,3 +258,30 @@ position-only list returns the same candidates as on `main`.
   twenty, is closed. The reporter's numbers are quoted from the issue and
   not reproduced; their data is private. Filed in PR #1315. *Next:* tasks 1
   and 2, which need no decision.
+
+- **2026-11-02** — task 2, by a contributor's PR whose claim covers task 2
+  only. Builders in `tests/_synthetic_weak_lines.py`, rows in
+  `tests/test_indexing_weak_lines.py`. (a) is molybdenum with an α-MoO₃
+  trace (Sitepu, O'Connor & Li 2005) whose strongest line is 0.6 % of the
+  host's, over 12.1-55° (12.1-60° took 51 s alone and 122 s in a full-suite
+  run, cut by the ceiling, so its rows skipped; 55° takes 17-30 s; 12.1-45°
+  left the host four lines, one short of a cubic search's five): 38 lines
+  picked, 6 the host's and 29 at the oxide's positions. (b)
+  is an idealised ordered double perovskite, F m -3 m at 2·a_p, with 10 %
+  antisite disorder, so its twelve ordering lines run 0.1-2.3 % of the
+  strongest. (c) is #933's Si with twelve planted lines. Today's picker finds
+  29 usable lines where #933 had 53. The truth's rank on `main` at the
+  default with `systems=("cubic",)` declared, as picked / 0.5 / 1 / 2 %:
+  - (a): absent / 1 / 1 / 1;
+  - (b): 1 / 1 / 2 / 3, the cubic subcell first from 1 %;
+  - (c): absent at all four.
+
+  Si with nothing planted ranks first. Undeclared, the default binds its
+  120 s ceiling on every as-picked list (`INDEX_BUDGET_EXHAUSTED`, lower
+  systems cut), so its rank there is a load reading (WP-1449); that is why
+  the rows declare the system. Read undeclared on one laptop, (a) over the
+  original 12.1-60° range: absent / 1 / 1 / 1, (b) 1 / 1 / 1 / 12, (c) absent at all four. (a) reproduces the
+  failure and the 1 % floor fixes it; with the system declared, the same
+  floor loses (b)'s supercell. (a)'s acceptance row is
+  `xfail(strict=True)`. *Next:* task 1 (free), task 3, then task 4 on these
+  rows.
