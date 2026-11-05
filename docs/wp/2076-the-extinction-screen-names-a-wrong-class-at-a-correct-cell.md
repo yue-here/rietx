@@ -1,6 +1,6 @@
 # WP-2076 — The extinction screen names a wrong class at a correct cell
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-05 — claimed by ghostshift runner (Claude)
 Track: What fires, and what stays silent
 Depends on: — (1910 soft: its second screen agrees with the wrong class here; 2062 soft: its decision 2 moves the screen's fits to Pawley)
 Priority: P2 2026-11-02 — a silent wrong answer on a path few fits run: on five of 41 synthetic groups the default screen and PR #1286's held screen agree on a class that excludes the true group, at a prefit cell within 600 ppm of the truth (13-599 ppm on the worst axis), and nothing fires
