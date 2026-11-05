@@ -444,10 +444,10 @@ A modulus with no verdict is not reseeded, so the next pattern starts from the l
 The reseed cannot protect the first pattern above the transition, which is warm-started from a supported neighbour.
 Whether that pattern comes back unsupported is a measurement.
 Two checks cover it, and you have to ask for both.
-Under `direction="both"`, the two chains' brackets are compared.
+Under `direction="both"`, the chains' brackets are compared.
 They agree when the brackets overlap, both chains read the same `sense`, and neither bracket owes a verdict to a fit that stopped early.
 `SEQUENTIAL_MOMENT_ONSET` then carries the other's bracket.
-Otherwise [`SEQUENTIAL_MOMENT_ONSET_UNRESOLVED`](diagnostics-series.md#sequential_moment_onset_unresolved) says how they differ.
+Otherwise [`SEQUENTIAL_MOMENT_ONSET_UNRESOLVED`](diagnostics-series.md#sequential_moment_onset_unresolved) says why.
 `MagneticOnset.bracket_verdicts_final` catches a supported verdict from a fit that stopped at its iteration cap.
 On a synthetic ramp starved to `max_iter=1`, the moment above the transition came back supported and the onset moved to a confident, wrong bracket, with Rwp fine and no other fence firing.
 ```
@@ -467,7 +467,7 @@ These diagnostics fence that, and none of them alters a fitted value.
 | `SEQUENTIAL_WIDTH_GROWTH` | a phase width reached 3× its first measured value while GoF reached 2× its own at the same pattern; a width growing at a flat GoF fires nothing |
 | `SEQUENTIAL_MOMENT_HOLD` | how many patterns' moment came back unsupported, and which successors' modulus was reseeded to its floor |
 | `SEQUENTIAL_MOMENT_ONSET` | where along the axis the moment stops being supported, as a bracket |
-| `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` | why the onset is not to be quoted |
+| `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` | why the onset is not quotable |
 | `SEQUENTIAL_CANCELLED` | the series stopped before its last pattern ([Events, history and cancellation](#events-history-and-cancellation)) |
 | `SERIES_PATTERN_FAILED` | every attempt on a pattern raised ([Restart ladder](#restart-ladder)) |
 
