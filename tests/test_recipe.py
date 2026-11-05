@@ -261,6 +261,50 @@ def test_a_flagged_sh_l_frees_s_l_alone(lab6_doc):
     assert f"held at {shl / 2.0:g}" in note.message
 
 
+def test_an_sh_l_stated_only_on_the_entry_is_reported(lab6_doc):
+    """The split is reported wherever it is made: an ``axial_divergence``
+    entry carrying its own value, with Iparm's SH/L at zero, is split the
+    same way and must say so (WP-2012 review)."""
+    doc = _edit(lab6_doc)
+    doc["payload"]["instrument"]["initialization"][0]["SH/L"][1] = 0.0
+    doc["payload"]["instrument"]["parameterization"]["corrections"][
+        "axial_divergence"] = [0.002, False, None, None]
+    recipe = read_recipe(doc)
+    g = recipe.instrument.geometry
+    assert g.axial_sl.value == g.axial_hl.value == pytest.approx(0.001)
+    assert "RECIPE_CONVENTION_ASSUMED" in _codes(recipe)
+
+
+def test_a_flagged_sh_l_reports_its_bounds_once(lab6_doc):
+    """H/L copies S/L's bounds without a second ``_apply``, so the entry's
+    min/max is honoured once and reported once."""
+    doc = _edit(lab6_doc)
+    doc["payload"]["instrument"]["parameterization"]["corrections"][
+        "axial_divergence"] = [None, True, 0.0, 0.01]
+    recipe = read_recipe(doc)
+    g = recipe.instrument.geometry
+    assert g.axial_sl.vary and not g.axial_hl.vary
+    assert g.axial_hl.max == g.axial_sl.max == pytest.approx(0.005)
+    bound_notes = [d for d in recipe.diagnostics
+                   if d.code == "RECIPE_BOUND_HONOURED"
+                   and "axial_divergence" in d.where[0]]
+    assert len(bound_notes) == 1
+
+
+def test_a_flag_with_no_sh_l_claims_no_split(lab6_doc):
+    """A flag beside no stated SH/L starts both ratios at zero, and the note
+    does not invent an ``SH/L = 0`` the recipe never wrote."""
+    doc = _edit(lab6_doc)
+    doc["payload"]["instrument"]["initialization"][0]["SH/L"][1] = 0.0
+    doc["payload"]["instrument"]["parameterization"]["corrections"][
+        "axial_divergence"] = [None, True, None, None]
+    recipe = read_recipe(doc)
+    note = next(d for d in recipe.diagnostics
+                if d.code == "RECIPE_CONVENTION_ASSUMED")
+    assert "SH/L = 0 " not in note.message
+    assert "only axial_sl is freed" in note.message
+
+
 def test_this_pattern_cannot_distinguish_the_sh_l_split(lab6):
     """The honest half of the row above: show the fixture cannot decide it.
 

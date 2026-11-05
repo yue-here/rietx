@@ -654,26 +654,31 @@ def _read_instrument(payload: dict, pattern: PatternData,
         _apply(geometry.axial_sl, axial,
                "payload.instrument.parameterization.corrections."
                "axial_divergence", diagnostics=diags, scale=0.5)
-        _apply(geometry.axial_hl, axial,
-               "payload.instrument.parameterization.corrections."
-               "axial_divergence", diagnostics=diags, scale=0.5)
-        # One flag frees S/L alone (WP-2012).  The FCJ profile is symmetric
-        # under S/L <-> H/L, so freeing both from GSAS-II's single SH/L lets a
-        # fit land on either assignment; the lab presets hold H/L the same way.
-        geometry.axial_hl.vary = False
-    if shl or geometry.axial_sl.vary:
-        half = geometry.axial_sl.value
+        # H/L takes S/L's half and bounds but never its flag (WP-2012).  The
+        # FCJ profile is symmetric under S/L <-> H/L, so freeing both from
+        # GSAS-II's single SH/L lets a fit land on either assignment; the lab
+        # presets hold H/L the same way.
+        geometry.axial_hl = geometry.axial_sl.model_copy(
+            update={"vary": False})
+    half = geometry.axial_sl.value
+    if half or geometry.axial_sl.vary:
+        # reported wherever a split was made, whether the number came from
+        # Iparm's SH/L or from the axial_divergence entry's own value
         held = (
             f" The recipe flags it for refinement, and only axial_sl is "
             f"freed: axial_hl is held at {geometry.axial_hl.value:g}, because "
             f"swapping the two gives the same pattern, so a fit freeing both "
             f"could return either assignment."
             if geometry.axial_sl.vary else "")
+        split = (
+            f"SH/L = {2.0 * half:g} is GSAS-II's combined (S+H)/L. It was "
+            f"split evenly into axial_sl = axial_hl = {half:g}."
+            if half else
+            "The recipe states SH/L, GSAS-II's combined (S+H)/L, as zero or "
+            "not at all, so axial_sl and axial_hl both start at 0.")
         diags.append(Diagnostic(
             level="info", code="RECIPE_CONVENTION_ASSUMED",
-            message=(
-                f"SH/L = {2.0 * half:g} is GSAS-II's combined (S+H)/L. It was "
-                f"split evenly into axial_sl = axial_hl = {half:g}.{held}"),
+            message=f"{split}{held}",
             where=["instrument.geometry.axial_sl",
                    "instrument.geometry.axial_hl"],
             value=half))
