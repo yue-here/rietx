@@ -554,6 +554,23 @@ def test_strategy_veto_marks_planned_actions_inactive(truth):
     assert zero.vetoed_by and "staged plan" in zero.vetoed_by
 
 
+@pytest.mark.parametrize("form", ["name", "spec"])
+def test_the_veto_reads_a_preset_name_or_a_spec_as_its_plan(truth, form):
+    """``build_report`` crosses the plan mirror at ``resolve_plan`` (WP-2102).
+    Read by shape, a preset name has no ``stages`` and vetoed nothing."""
+    from rietx.schemas.plan import PlanSpec
+
+    structure, ins, data = truth
+    perturbed = ins.model_copy(deep=True)
+    perturbed.zero_shift.value = 0.02
+    plan = rx.RefinementPlan.lab_bragg_brentano()
+    given = "lab_bragg_brentano" if form == "name" else PlanSpec.from_plan(plan)
+    by_form = _report_for(structure, perturbed, data, plan=given)
+    by_plan = _report_for(structure, perturbed, data, plan=plan)
+    assert not by_form.action("refine_zero_shift").active
+    assert by_form.model_dump(mode="json") == by_plan.model_dump(mode="json")
+
+
 def test_veto_by_already_free_parameters(truth):
     structure, ins, data = truth
     perturbed = ins.model_copy(deep=True)

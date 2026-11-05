@@ -18,7 +18,7 @@ constructor call.  So a reader of stored models validates with the
 :data:`~rietx.schemas.common.STORED_DOCUMENT` context, and the validator fills
 the old placeholder only under it (:data:`STORED_DOCUMENT_READ_POINTS`).
 ``HumpComponent.position`` (schema 0.60, WP-2013) is one such field.
-``Geometry.kind`` (schema 0.60, WP-2015) is the other, a default that moved
+``Geometry.kind`` (schema 0.61, WP-2015) is the other, a default that moved
 rather than one that went: a stored geometry without the key, or an
 instrument without a geometry, reads ``debye_scherrer`` as it was written.
 

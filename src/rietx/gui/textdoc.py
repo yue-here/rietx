@@ -1257,10 +1257,13 @@ def apply(project, delta: Delta, peak_editor=None) -> list[str]:
         hits = project.refinement.set_vary(path, flag)
         calls.append(f"ref.set_vary({path!r}, {flag!r})  # {len(hits)} path(s)")
     if delta.plan is not None:
-        # through the mode and the geometry, as the GUI's preset route
-        # stores it (WP-2015): the stored spec runs verbatim
+        # a preset is stored expanded through the mode the project will run
+        # in and the instrument's geometry, as the GUI's preset route stores
+        # it, because a project's plan runs verbatim (WP-2102, WP-2015); a mode
+        # edited in the same delta is that mode
+        mode = delta.settings.get("mode", project.doc.mode)
         spec = (PlanSpec.from_plan(resolve_plan(
-                    delta.plan["preset"], project.doc.mode,
+                    delta.plan["preset"], mode,
                     project.refinement.instrument.geometry.kind))
                 if "preset" in delta.plan
                 else PlanSpec.model_validate(delta.plan["plan"]))

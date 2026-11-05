@@ -473,19 +473,18 @@ def fitted_mask(data: PatternData,
 def _as_plan_spec(plan: Any, mode: Mode, geometry: str) -> PlanSpec | None:
     """A ``PlanSpec`` from a preset name, a ``RefinementPlan`` or a spec.
 
-    A name resolves as ``Refinement.fit`` resolves it, under the project's
-    mode and its instrument's geometry (``resolve_plan``, WP-2015): the spec
-    is stored and later run as an object, which no longer resolves, so a
-    Bragg-Brentano project's ``"mccusker_default"`` must carry its
-    displacement from here.
+    A preset name is expanded through ``mode`` and the instrument's geometry,
+    by ``resolve_plan`` (WP-2102, WP-2015): a project records the plan that
+    will run, verbatim (``PlanSpec.preset_name``), so ``"mccusker_default"``
+    in a Le Bail project is ``profile_only``'s stages, as ``Refinement.fit``
+    and the GUI's preset route read it, and a Bragg-Brentano project's carries
+    its displacement from here.
     """
     if plan is None or isinstance(plan, PlanSpec):
         return plan
-    if isinstance(plan, str):
-        from .strategy.staged import resolve_plan
+    from .strategy.staged import resolve_plan
 
-        plan = resolve_plan(plan, mode, geometry)
-    return PlanSpec.from_plan(plan)
+    return PlanSpec.from_plan(resolve_plan(plan, mode, geometry))
 
 
 def _data_ref(path: Path, data: PatternData, reader: str,

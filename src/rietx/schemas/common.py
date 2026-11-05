@@ -664,14 +664,23 @@ from .._nearmiss import did_you_mean
 #: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
 #: where it defaulted to 0.0.  A stored document that omits it still opens, at
 #: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
-#: Also in 0.60 (WP-2015): ``Geometry.kind`` gains ``"unstated"``, the new
+#: 0.60 → 0.61 (WP-1944): ``Phase.extinction`` is ``Parameter | None`` and
+#: defaults to ``None``, "not declared", where it defaulted to a ``Parameter``
+#: at 0.  ``None`` has no table entry, so no plan can free it.  A file written
+#: before 0.61 opens unchanged: its stored block reads as a declaration, and
+#: the structural plan's extinction stage still frees it.  A phase that
+#: declares none now stores ``null``, which 1.11.0 refuses:
+#: ``Phase`` raises a ``ValidationError``, and ``Project.open`` stops at
+#: "malformed history record".  So a structure or a ``.rex`` project written
+#: here does not open there.
+#: Also in 0.61 (WP-2015): ``Geometry.kind`` gains ``"unstated"``, the new
 #: default, where a hand-built geometry was ``"debye_scherrer"``.  A stored
 #: document that omits the key (or the whole geometry) reads at the old
 #: ``"debye_scherrer"`` through the same readers.  Every writer here writes
 #: the key, so only a hand-written file meets this.  The new field
 #: ``RefinementResult.assumed_instrument`` is additive and defaults to
 #: ``None``, "a result stored before the field".
-SCHEMA_VERSION = "0.60"
+SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
