@@ -1,6 +1,6 @@
 # WP-2017 — The second pass: every surviving tier-3 threshold measured on three families
 
-Milestone: generality · Status: 🔄 2026-11-05 — the list and group A landed (PR #1428); seven rows' exit waits on the maintainer; 54 hard-start fits and 18 groups open
+Milestone: generality · Status: 🔄 2026-11-05 — the list and group A landed (PR #1428); seven rows closed by ruling; 54 hard-start fits and 18 groups open
 Track: The audits
 Depends on: 2002
 Priority: P2 2026-10-23 — 2002 closed with the width twin hold; the evidence every tier-3 approval in the single-fit audit was granted on the promise of, now with 2002's two owed domain tests
@@ -93,7 +93,7 @@ different laboratory, instrument and material:
 
 | Group | Rows | Arms | Families | State |
 |---|---|---|---|---|
-| A. LM stop | `lm._M_HI`, `_M_LO`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_CONVERGED_RUNS`, `_CURVATURE_GATE`, `FTOL`, `SLOW_DESCENT_ESD` | one each side of each value, `FTOL` at 1e-8 and 1e-10 | the four, then the hard starts below | measured 2026-11-05; three rows owe hard starts, seven a ruling |
+| A. LM stop | `lm._M_HI`, `_M_LO`, `_Q_TRIGGER`, `_Q_WINDOW`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_CONVERGED_RUNS`, `_CURVATURE_GATE`, `FTOL`, `SLOW_DESCENT_ESD` | one each side of each value, `FTOL` at 1e-8 and 1e-10 | the four, then the hard starts below | measured 2026-11-05; three rows owe hard starts, seven closed by ruling |
 | B. Bounded step | `lm._POLISH_FEASIBLE`, `_POLISH_STATIONARY`, `BVLS_MAX_COLUMNS` | each side | Stephens fits on qarr brucite and corundum and one more; FAP Pawley for the column cut | open |
 | C. BCCG | `bccg._CONVERGED_FRACTION`, `_CONVERGED_RUNS`, `_SMALL_FACTOR`, `_SMALL_RUNS`, `_CAUCHY_ARMIJO`, `_PCG_TOL`, `_PCG_BUDGET_PER_VARIABLE` | each side | Pawley on `fap`, `nac` and `cpd1a` | open |
 | D. Blocked solve | `blocked.DENSE_JACOBIAN_MAX_BYTES` | forced each way | the four | open |
@@ -122,7 +122,7 @@ the shipped start. Each arm is read against the shipped constants from the same 
 same bar, and also on whether it changes the fit's verdict: reaching the shipped start's answer
 within 0.1 plain esd, or not.
 
-**Group A's open rows, 2026-11-05.** `FTOL`, `_CONVERGED_RUNS` and `_M_LO` gave one answer from shipped starts and owe the same nine hard starts, for a failing case. Seven rows are in the batch (handover, 2026-11-05).
+**Group A's open rows, 2026-11-05.** `FTOL`, `_CONVERGED_RUNS` and `_M_LO` gave one answer from shipped starts and owe the same nine hard starts, for a failing case. Seven rows closed by the maintainer's ruling of 2026-11-05: they stay at tier 3 on a named synthetic case, and a later group treats a constant its families barely reach the same way (`docs/milestones/generality.md` § The rule).
 
 **Taken off the list.** `INTERMEDIATE_FTOL` and its default were re-ruled cost-only on
 2026-11-01, so they owe nothing here. `PAWLEY_SPARSE_DENSITY` chooses which arithmetic forms
@@ -461,7 +461,9 @@ No row this WP lists still names the second pass as owed.
 
   `docs/wp/2017-batch/group_a_paper_cases.py` runs the paper's AntiBump, equation (16), and cusp, equation (12), on `lm.minimize`, 260 fits an arm on 17 arms (macOS arm64, worktree `[dev]` venv, numpy path, no diffraction model). No arm changed an answer: the cusp reached a = 0 from 200 of 200 starts on every arm, and AntiBump at cell 4.5 reached S under 5e-12 on every fit. At cell 4 the spheres would fill 82 % of the box, so S cannot reach 0; fits land on other minima either way and the median S moves by 1.7 % at most. Cost moved: 0.60x (`_M_LO` 0.2) to 1.19x (`_Q_TRIGGER` 3, three more fits on the budget) evaluations on the cusp. So `_M_HI` and both `_LAMBDA_FAIL` constants now have a case that reaches them, and shipped is neither the cheapest nor the dearest. The Q branch fires on one fit of 260, the cusp n = 0.5 from a = 0.2375, and there it hurts. Every step overshoots, so Q sits at 10, branch (ii) takes λ to exactly 0, and branch (iv), the damper, is never reached. `a` zigzags across the minimum to the 2000-evaluation budget and ends at 7.3e-5, where trigger 7 or the branch off stops in 13 evaluations at 4e-13. Nothing changes on this: it is one synthetic start, and no diffraction start of 13 fires the branch. The probe's first run leaked each arm's constant into later arms, through pool workers that outlive a job. Its one clean row was shipped; `one()` now restores the constant, the run above is the second, and `group_a.py` restores it in `finally` so group A is unaffected. The judge did not re-run on this evidence-only correction: no tier, value or condition moved.
 
-  *Next.* (1) The maintainer's ruling on the seven rows' exit (`_M_HI`, `_LAMBDA_FAIL_FACTOR`, `_LAMBDA_FAIL_FLOOR`, `_Q_TRIGGER`, `_Q_WINDOW`, `_CURVATURE_GATE`, `SLOW_DESCENT_ESD`), which also sets how later groups treat an unreached constant. (2) Hard starts for `FTOL`, `_CONVERGED_RUNS` and `_M_LO`, the same nine starts, 54 fits, for their failing case. (3) Group H next: it needs no new fits beyond counting where the cell window binds, and its removal is already ruled.
+  *Ruling, 2026-11-05.* The maintainer took option 1 of the batch. The seven rows stay at tier 3 and close on a named synthetic case, with `_M_LO`, `FTOL` and `_CONVERGED_RUNS` outside it, since they still owe hard starts. The alternative was tier 2 for the five that equation (9) prints. `tests/test_lm_solver.py` gains the cusp, 4 passed on `[dev]`, macOS arm64. From a = 0.2375 to 0.243 at n = 0.5 the stall holds on every start tried, and a nudge of 1e-4 at 0.2375 does not end it, so the test pins it mid-band at 0.24. On 981 starts from 0.01 to 0.5 it fires on those 12 alone. The grounds of the seven rows changed and the judge did not re-run, because the exit is the maintainer's ruling and no tier or value moved.
+
+  *Next.* (1) Hard starts for `FTOL`, `_CONVERGED_RUNS` and `_M_LO`, the same nine starts, 54 fits, for their failing case. (2) Group H next: it needs no new fits beyond counting where the cell window binds, and its removal is already ruled.
 
 - **2026-11-04** — Task added from WP-2086's review: tell a blank frame with structure from a phase whose peaks missed. Numbers re-read from the raw rows. With the synthetic humps the 14 frames span d 0.34-1.49, past the 0.43-1.04 quoted for Kapton, and Kapton's Q is 1.96 at its 21 001 channels. Nothing new measured, no code. PR #1408.
 

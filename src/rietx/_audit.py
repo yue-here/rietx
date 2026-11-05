@@ -3208,9 +3208,10 @@ ROWS: tuple[Row, ...] = (
         grounds=("A constant that decides where a solve stops, rietx's own; tier 3 until "
                  "three families on either side give one answer, as the solver's other "
                  "stopping constants (B10)."
-                 "  WP-2017 group A did not meet that condition, and the row is in that WP's batch for the "
-                 "maintainer."),
-        approved="2026-11-03"),
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_slow_descent.py."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._SLOW_DESCENT_HORIZON", "constant", tier=3, value=300,
         evidence=("WP-1334: the evaluations the slow-descent rule projects over, the rest of "
                   "a default 400-evaluation stage after its first window; a count so the "
@@ -3240,9 +3241,10 @@ ROWS: tuple[Row, ...] = (
                   "which never reach it"),
         grounds=("A solver-path switch no refiner has a view on; kept at tier 3 until refits of "
                  "three families on either side give one answer (B10, ruled 2026-10-19)."
-                 "  WP-2017 group A did not meet that condition, and the row is in that WP's batch for the "
-                 "maintainer."),
-        approved="2026-10-19"),
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py's two vanishing-column tests."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._CURVATURE_STEP", "constant", tier=1, value=0.0001220703125,
         evidence=("arithmetic: eps^(1/4) balances the difference's truncation (h^2 S''''/12) "
                   "against its rounding (4uS/h^2) (docstring)")),
@@ -3278,9 +3280,10 @@ ROWS: tuple[Row, ...] = (
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A did not meet that condition, and the row is in that WP's batch for the "
-                 "maintainer."),
-        approved="2026-10-20"),
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py::test_a_schedule_constant_the_cusp_reaches_gives_one_answer."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._LAMBDA_FAIL_FLOOR", "constant", tier=3, value=0.1,
         evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9), read 2026-11-05: prints max(lambda, 0.1) "
                   "and never varies it. GSAS-II 5.8.4's first failure sets 1e-3 instead (HessianLSQ's "
@@ -3297,9 +3300,10 @@ ROWS: tuple[Row, ...] = (
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A did not meet that condition, and the row is in that WP's batch for the "
-                 "maintainer."),
-        approved="2026-10-20"),
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py::test_a_schedule_constant_the_cusp_reaches_gives_one_answer."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._M_HI", "constant", tier=3, value=10.0,
         evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9), read 2026-11-05: prints Limit(r_u, 0.4, "
                   "10) and never varies the 10. group_a_paper_cases, the paper's hard problems on this "
@@ -3318,9 +3322,10 @@ ROWS: tuple[Row, ...] = (
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A did not meet that condition, and the row is in that WP's batch for the "
-                 "maintainer."),
-        approved="2026-10-20"),
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py::test_a_schedule_constant_the_cusp_reaches_gives_one_answer."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._M_LO", "constant", tier=3, value=0.4,
         evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9), read 2026-11-05: prints Limit(r_u, 0.4, "
                   "10) and never varies the 0.4. group_a_paper_cases, the paper's hard problems on this "
@@ -3380,9 +3385,10 @@ ROWS: tuple[Row, ...] = (
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A did not meet that condition, and the row is in that WP's batch for the "
-                 "maintainer."),
-        approved="2026-10-20"),
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py::test_the_overshoot_branch_stalls_on_the_cusp."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._Q_WINDOW", "constant", tier=3, value=10,
         evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9), read 2026-11-05: prints the sum over i = "
                   "u-10 to u, eleven terms read literally, where rietx sums ten. group_a_paper_cases, the "
@@ -3396,9 +3402,10 @@ ROWS: tuple[Row, ...] = (
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."
-                 "  WP-2017 group A did not meet that condition, and the row is in that WP's batch for the "
-                 "maintainer."),
-        approved="2026-10-20"),
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py::test_the_overshoot_branch_stalls_on_the_cusp."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._ROW_ROUNDING", "constant", tier=1, value=1e-12,
         evidence=("numerical floor: rounding of the row's own evaluation, 4.5e3 eps, seven decades "
                   "under the guards' 1e-9 (docstring)")),
