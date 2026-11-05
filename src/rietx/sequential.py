@@ -484,7 +484,9 @@ def _collapse(plan: RefinementPlan) -> RefinementPlan:
         stages=[Stage("warm_refit", turn_on,
                       max_iter=max((s.max_iter for s in plan.stages), default=100),
                       lebail_cycles=max((s.lebail_cycles for s in plan.stages),
-                                        default=3),
+                                        default=Stage.lebail_cycles),
+                      lebail_tol=(plan.stages[-1].lebail_tol if plan.stages
+                                  else Stage.lebail_tol),
                       seed=0.0,
                       strain_seed=max((s.strain_seed for s in plan.stages),
                                       default=0.0))],

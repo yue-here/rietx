@@ -561,6 +561,7 @@
   "search_fields:validate_candidates",
   "stage_fields:ftol",
   "stage_fields:lebail_cycles",
+  "stage_fields:lebail_tol",
   "stage_fields:max_iter",
   "stage_fields:name",
   "stage_fields:restraint_weight_scale",
