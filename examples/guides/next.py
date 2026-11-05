@@ -72,8 +72,8 @@ c_direct = compare_freed(ref, direct)
 paired = base.branch()
 paired.run_stage(data, rx.Stage("extinction", ["phases.0.extinction"]))
 c_paired = compare_freed(base, paired)
-# The page's second caution: on the re-solved fit the narrowed query favours
-# extinction, which sits on its floor with the data pushing it below.
+# On the re-solved fit the narrowed query still sets extinction aside: it
+# sits on its floor with the data pushing it below.
 narrowed_again = base.suggest(data, include="phases.*", exclude=["*.occ"])
 
 # The page's measurement of why the re-solve moved: the same profile stage,
@@ -100,14 +100,19 @@ assert [round(g.gain) for g in at_profile.groups[:3]] == [474, 218, 201]
 assert [f"{g.delta_bic:+.1f}" for g in at_profile.groups[:3]] == ["+21.0", "+5.8", "+4.8"]
 assert {"instrument.geometry.axial_sl", "instrument.geometry.axial_hl"} <= {
     c.path for c in at_profile.non_separable}
-# Narrowed to the phase without occupancies, ΔBIC refuses what is left, and
-# `best_or_none` still names it: it gates on the noise floor and on a tie.
-assert narrowed.best_or_none().path == "phases.0.extinction"
-assert narrowed.groups[0].delta_bic < 0
+# Narrowed to the phase without occupancies: extinction, on its floor with
+# the data pushing it below, can reach none of its gain and is held back by
+# its bound (WP-1998); ΔBIC refuses what is left, and so does `best_or_none`.
+[held] = narrowed.bound_limited
+assert held.path == "phases.0.extinction" and held.gain == 0.0
+assert f"{held.gain_unbounded:.1f}" == "96.1" and held.gradient > 0
+assert "1 held back by a bound" in narrowed.summary
+assert [g.members[0].path for g in narrowed.groups] == ["phases.0.atoms.6.biso"]
+assert narrowed.best_or_none() is None
+assert narrowed.summary.startswith("phases.0.atoms.6.biso leads: ")
 assert "ΔBIC refuses it" in narrowed.summary
-assert f"{narrowed.groups[0].gain:.1f}" == "96.1"
-# −1.29940 to −1.29971 between starts 1e-14 apart, so one decimal, as the summary prints it
-assert f"{narrowed.groups[0].delta_bic:.1f}" == "-1.3"
+assert f"{narrowed.groups[0].gain:.1f}" == "32.7"
+assert f"{narrowed.groups[0].delta_bic:.1f}" == "-5.0"
 assert round(narrowed.n_effective) == 1001 and narrowed.n_evaluated == 24
 assert round(narrowed.noise_floor, 2) == 26.98
 assert sorted(c.path for c in narrowed.non_separable) == [
@@ -126,7 +131,8 @@ assert round(c.delta_bic_raw_n) == 156
 # The warning's numbers: extinction does not move, yet the unpaired ΔBIC is large.
 assert c_direct.freed[0].value == 0.0 and c_paired.freed[0].value == 0.0
 assert round(c_direct.delta_bic) == 46 and round(c_paired.delta_bic) == -7
-assert narrowed_again.groups[0].members[0].path == "phases.0.extinction"
-assert f"{narrowed_again.groups[0].delta_bic:+.1f}" == "+0.4"
-assert narrowed_again.groups[0].members[0].gradient > 0  # χ² falls below the floor
+[held_again] = narrowed_again.bound_limited
+assert held_again.path == "phases.0.extinction" and held_again.gain == 0.0
+assert held_again.gradient > 0  # χ² falls below the floor
+assert narrowed_again.groups[0].members[0].path == "phases.0.atoms.6.biso"
 assert c_paired.freed[0].t_ratio == 0.0

@@ -1,9 +1,8 @@
 # WP-1998 — A suggestion whose gain lies past its bound
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-03 — suggest scores the gain a candidate's bounds let it reach; best_or_none abstains where ΔBIC refuses (PR #1383; open questions in #1392)
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-17 — the top suggestion, and `summary()`'s `next:` line, name a parameter that freeing cannot move; a refit shows it, at the cost of a wasted stage
 
 ## Goal
 
@@ -48,7 +47,22 @@ True)`) therefore frees a parameter the same result refuses. Either gate on
 reader does not take it as the answer. The new guide says it does not check
 ΔBIC; a change updates that sentence.
 
-### Inherited
+The tier of each rule this WP adds (written 2026-11-03, the WP predating the
+template line):
+- **Bounded gain** — tier 1, arithmetic. The linearised Σr² along one
+  candidate, with the free block re-solved, is an exact quadratic in its step,
+  so the reachable drop at a clipped step is `gain·α(2 − α)`; a group's is the
+  bounded least-squares optimum of the same linearisation (BVLS, Stark &
+  Parker 1995). No threshold, no default. The box is the one a stage would
+  solve in: `ParameterTable.bounds()` after the probe freezes the same
+  per-stage windows `run_least_squares` does (cell window, strain and size
+  caps), so stored bounds, tie windows and the caps all count.
+- **`best_or_none` abstains when the leader's ΔBIC ≤ 0** — statistic tier 2
+  (Schwarz 1978, the package's one BIC form) charged at N_eff = N/f², which
+  is tier 3 and already rietx's (#270), and *predicted* from the linearised
+  gain rather than refitted; threshold 0 tier 1 (the sign
+  the criterion defines), action: *abstain*, the conservative direction —
+  `None` names nothing, and the groups stay for a caller who reads them.
 
 - **From WP-2102 (2026-11-05): the report's Layer 2 suggests a parameter the
   mode force-fixes.** A sibling of this WP's defect in the FitReport rather
@@ -70,14 +84,20 @@ reader does not take it as the answer. The new guide says it does not check
 
 ## Tasks
 
-- [ ] Bounded gain for a candidate on or near a bound, both sides, seeded
+- [x] Bounded gain for a candidate on or near a bound, both sides, seeded
       candidates included; a test on the fluorapatite state above where
       extinction drops below the noise floor.
-- [ ] `best_or_none` and ΔBIC: decide the gate, then make the summary, the
+- [x] `best_or_none` and ΔBIC: decide the gate, then make the summary, the
       method and its docstring say one thing.
-- [ ] Update `examples/guides/next.py`'s assertions and
+- [x] Update `examples/guides/next.py`'s assertions and
       `docs/docs/guides/next.md`'s sentence on `best_or_none` if either moves.
-- [ ] Skill: the row on reading `suggest`, or "none" and why.
+- [x] Skill: the row on reading `suggest`, or "none" and why. **None**
+      (2026-11-03): the trap this WP found — a bounded candidate scored as if
+      free — is fixed in the package, and the one ΔBIC reading a caller needs
+      is now in `best_or_none` and the summary itself; a skill row is API
+      vocabulary or a trap sourced outside rietx's own runs, and this is
+      neither. The API index (`references/api.md`, three copies) is
+      regenerated for `SuggestionResult.bound_limited`.
 
 ## Acceptance
 
@@ -86,6 +106,60 @@ reader does not take it as the answer. The new guide says it does not check
 ```
 
 ## Handover log
+
+- **2026-11-03** — `suggest` no longer recommends a parameter its bounds
+  will not let move. A candidate is scored by the drop in χ² it can reach
+  inside the box a stage would solve it in, so a parameter on its floor with
+  the data pushing it through scores zero and is listed separately as held
+  back by a bound. `best_or_none()` now abstains when the same result's ΔBIC
+  refuses the top group, and the summary says that parameter *leads* rather
+  than that it is next. On the fluorapatite guide the narrowed query no longer
+  names extinction, and nothing is named. Four questions the review raised
+  are left in #1392, with no wrong answer in any case tested. PR #1383.
+
+  *Done.* `strategy/suggest.py`: `_bounded_single` (exact α(2−α) on the
+  projected quadratic), `_bounded_group` (BVLS when the min-norm joint step
+  leaves the box, `min(gain, reach)`), `Candidate.value/lo/hi`;
+  `refine.py`'s `suggest` reads `x0()`/`bounds()` after seeding and after
+  freezing the cell window and strain/size caps as `run_least_squares` does
+  (the review's finding 1); `_next_parameter_line` counts the held-back ones.
+  New fields `ParameterCandidate.gain_unbounded` (writer `build_suggestion`)
+  and `SuggestionResult.bound_limited`. `best_or_none` gates on the leader's
+  `delta_bic > 0` and does not promote a lower group. Guide `next.md` and its
+  script, `reference/comparison.md`, the theory page (the α(2−α) rule inline, the page being at its
+  50 000-character cap), the
+  skill's `api.md` (three copies). No skill row (task 4 says why).
+  The truth-fixture tests moved where the physics did: with W or X injected
+  too broad, every sample width on its floor of 0 is now bound-held, so the
+  X ↔ lor_size identity tie is asserted with X injected too *narrow* instead,
+  and a new test asserts the too-broad case resolves to X.
+
+  *Measured* (`[dev]`, darwin/arm64, origin/main 99fe3f149 merged in): fast
+  selection 13766 passed, 318 skipped, 34 xfailed in 11:39, alone under
+  ghostshift's serial lock; the branch adds 13 cases to `test_suggest.py`
+  (10 functions, one a rename), 0.54 s together, slowest 0.26 s. Full
+  selection not run: the change moves no fitted number, only `suggest`'s
+  predictions. `python -m tests.reader_output` exit 0, unchanged against the
+  merge-base; the new fields are a reader change all the same (PR body).
+  The cap test fails with the strain-cap freeze removed (checked once).
+
+  *Review.* `/code-review high --fix`: 8 findings; 3 taken (stage box on the
+  probe, the `next:` line, one shared projection). Declined into #1392: the
+  projected-step vs unprojected-`gradient` sign (would change what
+  `gradient` means), a bounded group charged k = all members, the group
+  shortcut's min-norm columns vs the absorbed ones; not taken: shared QR
+  (signature change outside the diff), two dead guards.
+
+  *Generality* (judge, verbatim verdicts): `best_or_none` abstains when the
+  leader's ΔBIC ≤ 0 — **holds** ("the case for this abstention is
+  stronger"; tier: statistic 2 with N_eff at tier 3, threshold 1 — taken
+  into the tier line). Bounded gain and `bound_limited` — **holds, with one
+  wording fix** (the box was not the stage's own; fixed in code, not only in
+  words). Summary "leads" — **holds**. Families: fluorapatite tutorial plus
+  synthetic; no tier-3 number added.
+
+  *Next:* Yue's ruling on the PR, then #1392's four items, of which (2), the
+  ΔBIC count of a bound-pinned member, is a ruling rather than a patch.
 
 - **2026-10-17** — filed from WP-1986's guide work. No open WP owns
   `suggest`: WP-1050 built it and is closed, and WP-1434's bound test is about
