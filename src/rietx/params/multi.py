@@ -230,6 +230,8 @@ def _refuse_clashing_declarations(declared: list[ParametricEquation], n: int) ->
                 f"two parametric equations are named {equation.name!r}: a name is its "
                 f"coefficients' paths (vars.{equation.name}_0, …), so each needs its own")
         names.add(equation.name)
+        if equation.target is None:          # an intermediate drives nothing
+            continue
         mine = set(range(n)) if equation.patterns is None else set(equation.patterns)
         for other, theirs in targets.get(equation.target, []):
             both = sorted(mine & theirs)
@@ -268,7 +270,8 @@ class ResolvedExpression:
         return self.equation.name
 
     @property
-    def target(self) -> str:
+    def target(self) -> str | None:
+        """The driven path, ``None`` for an intermediate."""
         return self.equation.target
 
     @property
@@ -372,7 +375,10 @@ class MultiParameterTable:
     derived row (``ParameterTable.add_expression``) evaluated at that
     pattern's coordinates.  Its free names are the ``variables``, each
     ``vars.{name}`` added to every table so it folds onto one shared column,
-    however many equations name it, or coordinate columns.
+    however many equations name it, or coordinate columns.  A later expression
+    may name an earlier expression equation, whose tree is inlined into it; one
+    with ``target=None`` is such an intermediate alone, held in
+    :attr:`intermediates`, and wires no row.
     :attr:`declared` lists every declaration, both kinds, in the order given.
     """
 
@@ -395,7 +401,8 @@ class MultiParameterTable:
             # declarations and never an edit of the caller's object
             self.sharing = SharingMap(
                 per_histogram=[*self.sharing.per_histogram,
-                               *(t.target for t in declared)],
+                               *(t.target for t in declared
+                                 if t.target is not None)],
                 shared=list(self.sharing.shared))
         #: coefficient path → (its target, j + 1): where its column sits in the
         #: combined order (:meth:`_rebuild_columns`), empty without a
@@ -404,8 +411,12 @@ class MultiParameterTable:
         #: the linear parametric declarations as resolved (reference and
         #: scale frozen)
         self.parametric: list[ResolvedParametric] = []
-        #: the ``expression`` declarations as resolved (WP-1964)
+        #: the ``expression`` declarations with a target, as resolved, each
+        #: tree with every earlier equation it names inlined (WP-1964)
         self.expressions: list[ResolvedExpression] = []
+        #: the ``expression`` declarations with ``target=None``, which only a
+        #: later expression names; they wire no block (WP-1964)
+        self.intermediates: list[ResolvedExpression] = []
         #: every declaration, both kinds, in the order given, as resolved
         self.declared: list[ParametricEquation] = []
         #: ``vars.{name}`` of each variable declared ``vary=False``, which a
@@ -516,18 +527,22 @@ class MultiParameterTable:
         linear = [e for e in declared if e.basis != "expression"]
         expressions = self._resolve_expressions(
             [e for e in declared if e.basis == "expression"], coordinates, variables,
-            taken={p for e in linear for p in e.coefficient_paths()})
+            taken={p for e in linear for p in e.coefficient_paths()},
+            linear_names=[e.name for e in linear])
         if linear:
             self._install_linear(linear, coordinates)
         if expressions:
             self._install_expressions(expressions, variables)
-        resolved = {r.name: r.equation for r in (*self.parametric, *self.expressions)}
+        resolved = {r.name: r.equation
+                    for r in (*self.parametric, *self.expressions, *self.intermediates)}
         self.declared = [resolved[e.name] for e in declared]
 
     def _resolve_expressions(self, declared: list[ParametricEquation],
                              coordinates: CoordinateTable | None,
                              variables: dict[str, Parameter], *,
-                             taken: set[str]) -> list[ResolvedExpression]:
+                             taken: set[str],
+                             linear_names: list[str] | None = None
+                             ) -> list[ResolvedExpression]:
         """Resolve each ``expression`` declaration and refuse, before any wiring.
 
         Refused, each naming its fix: a variable that is not a ``Parameter``,
@@ -538,8 +553,20 @@ class MultiParameterTable:
         naming something that is neither a variable nor a coordinate; a
         coordinate it names with no value at a pattern of its subset; and
         every target refusal the linear path makes (:meth:`_install_linear`).
+
+        An expression equation's name may be used by a **later** expression
+        equation.  Each tree is inlined in declaration order
+        (:meth:`Expression.inline`), so a resolved tree names variables and
+        coordinates alone and its block needs nothing new.  Refused: naming an
+        equation declared later, or the equation itself (a cycle); naming a
+        linear equation; an equation name that is a variable, a coordinate
+        column or a reserved word; and an intermediate (``target=None``) no
+        later equation names.  A variable is used when an inlined tree names
+        it.  The intermediates go to :attr:`intermediates`; the equations with
+        a target are returned.
         """
         n = self.n_histograms
+        linear_names = list(linear_names or [])
         if coordinates is not None and coordinates.n_patterns != n:
             raise ValueError(
                 f"the coordinate table has {coordinates.n_patterns} rows for "
@@ -573,12 +600,55 @@ class MultiParameterTable:
                     f"variable {name!r}: the sharing map makes {path} per-histogram "
                     "(a per_histogram glob matches it), but a variable is one number "
                     "across the patterns; narrow the glob so vars.* stays shared")
+        own = [e.name for e in declared]
+        # a linear equation's name can collide only where an expression exists
+        for nm in (*own, *(linear_names if declared else [])):
+            if nm in RESERVED:
+                raise ValueError(
+                    f"parametric equation name {nm!r} is a reserved word of the "
+                    "expression grammar (a function, a constant or a keyword); "
+                    "rename the equation")
+            if nm in variables:
+                raise ValueError(
+                    f"parametric equation {nm!r} has the name of a variable, so an "
+                    "expression naming it would be ambiguous; rename one of the two")
+            if nm in columns:
+                raise ValueError(
+                    f"parametric equation {nm!r} has the name of a coordinate column, "
+                    "so an expression naming it would be ambiguous; rename one of "
+                    "the two")
         resolved: list[ResolvedExpression] = []
+        intermediates: list[ResolvedExpression] = []
+        defined: dict[str, Expression] = {}   # each earlier equation's inlined tree
+        named: set[str] = set()               # the equations a later one names
         used: set[str] = set()
         for equation in declared:
             name = equation.name
-            expr = Expression(equation.expression)
-            patterns = (list(range(n)) if equation.patterns is None
+            written = Expression(equation.expression)
+            for nm in written.names:
+                if nm == name:
+                    raise ValueError(
+                        f"parametric equation {name!r}: its expression "
+                        f"{equation.expression!r} names {name!r}, the equation "
+                        "itself; an equation cannot use itself")
+                if nm in own and nm not in defined:
+                    raise ValueError(
+                        f"parametric equation {name!r}: its expression names {nm!r}, "
+                        f"which is declared after {name!r}; declare it first, and an "
+                        "equation cannot use itself")
+                if nm in linear_names:
+                    raise ValueError(
+                        f"parametric equation {name!r}: its expression names {nm!r}, "
+                        "a parametric equation with a linear basis; only expression "
+                        "equations can be named in an expression (write that one as "
+                        "an expression too)")
+            feeds = {nm: defined[nm] for nm in written.names if nm in defined}
+            named.update(feeds)
+            expr = written.inline(feeds) if feeds else written
+            # an intermediate has no patterns of its own: it is evaluated at
+            # each later equation's, whose coordinate values are checked there
+            patterns = ([] if equation.target is None
+                        else list(range(n)) if equation.patterns is None
                         else list(equation.patterns))
             bad = [k for k in patterns if k >= n]
             if bad:
@@ -595,7 +665,7 @@ class MultiParameterTable:
                 else:
                     from .._nearmiss import did_you_mean
 
-                    hint = did_you_mean(nm, [*variables, *columns])
+                    hint = did_you_mean(nm, [*variables, *columns, *defined])
                     raise ValueError(
                         f"parametric equation {name!r}: the expression "
                         f"{equation.expression!r} names {nm!r}, which is neither a "
@@ -607,15 +677,22 @@ class MultiParameterTable:
                 for c in names_c:
                     v = columns[c][h]
                     if v is None:
+                        via = ("" if c in written.names else " through " + ", ".join(
+                            repr(k) for k, f in feeds.items() if c in f.names))
                         raise ValueError(
                             f"parametric equation {name!r}: pattern {h} has no value "
-                            f"for coordinate {c!r}, which the expression uses; give it "
-                            "one, or leave the pattern out of the subset (patterns=…)")
+                            f"for coordinate {c!r}, which the expression uses{via}; "
+                            "give it one, or leave the pattern out of the subset "
+                            "(patterns=…)")
                     row[c] = float(v)
                 constants[h] = row
             r = ResolvedExpression(equation=equation, patterns=patterns, expression=expr,
                                    variables=names_v, coordinates=names_c,
                                    constants=constants)
+            defined[name] = expr
+            if equation.target is None:
+                intermediates.append(r)
+                continue
             for h in patterns:
                 table = self.tables[h]
                 i = table._paths.get(r.target)
@@ -632,12 +709,19 @@ class MultiParameterTable:
             self._refuse_size_across_wavelengths(r)
             used.update(names_v)
             resolved.append(r)
+        idle = [r.name for r in intermediates if r.name not in named]
+        if idle:
+            raise ValueError(
+                f"parametric equation {idle[0]!r} has no target and no later "
+                "expression equation names it, so it would drive nothing; name it "
+                "in a later equation's expression, give it a target, or leave it out")
         unused = [v for v in variables if v not in used]
         if unused:
             raise ValueError(
                 f"variable {unused[0]!r} is declared but no expression equation names "
                 "it: an unused variable would be a column with no gradient. Use it in "
                 "an equation, or leave it out of variables=")
+        self.intermediates = intermediates
         return resolved
 
     def _install_expressions(self, resolved: list[ResolvedExpression],

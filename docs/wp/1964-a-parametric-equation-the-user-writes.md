@@ -270,7 +270,7 @@ per-pattern one is an array.
 - [x] **Variables on a joint fit.** `variables=` beside `coordinates=`, one
   column shared by every equation that names it. A coordinate may not shadow a
   variable. An unused variable is refused.
-- [ ] **An equation feeding an equation.** A named intermediate over variables
+- [x] **An equation feeding an equation.** A named intermediate over variables
   and coordinates, in declaration order, as ZrP₂O₇'s temperature calibration
   needs. A cycle is refused. The bar uses nonzero calibration coefficients: the input
   stores zero, where a broken feed gives the right cells.

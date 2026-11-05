@@ -15,7 +15,11 @@ What is checked here, and on what:
 * a five-pattern LaB6 ramp on an Einstein cell edge with θ held at its true
   value, whose two free variables come back within 2 esd of the truth;
 * the WP's acceptance row: a ``polynomial`` and the same form written as an
-  expression agree to 0.01 esd.
+  expression agree to 0.01 esd;
+* an equation feeding an equation: an intermediate (``target=None``) as data,
+  each refusal of a cycle or an ambiguous name, the wiring at nonzero
+  calibration coefficients, one intermediate feeding two targets, and a
+  temperature calibration recovered by a joint fit.
 """
 
 from __future__ import annotations
@@ -305,3 +309,207 @@ def test_a_polynomial_and_the_same_form_as_an_expression_agree_to_a_hundredth_es
     for h in range(len(temps)):
         path = f"hist.{h}.phases.0.cell.a"
         assert abs(e[path].value - p[path].value) < 0.01 * p[path].stderr, path
+
+
+# -- an equation feeding an equation -----------------------------------------
+#
+# ZrP2O7's temperature calibration: the sample's true temperature is the
+# setpoint corrected, T_true = T + c0 + c1*T, and the cell follows T_true.  The
+# calibration coefficients are nonzero throughout, because a feed that never
+# reached the downstream equation gives the right cell at c0 = c1 = 0.
+
+CALIBRATION = "T + c0 + c1*T"
+C0, C1 = 12.5, 0.03
+
+
+def _calibration(**kw) -> ParametricEquation:
+    base = dict(name="T_true", basis="expression", expression=CALIBRATION)
+    base.update(kw)
+    return ParametricEquation(**base)
+
+
+def _fed(**kw) -> ParametricEquation:
+    base = dict(name="a", target="phases.0.cell.a", basis="expression",
+                expression="a0 + k*T_true")
+    base.update(kw)
+    return ParametricEquation(**base)
+
+
+def _fed_variables(**more) -> dict[str, rx.Parameter]:
+    out = {"a0": rx.Parameter(value=4.15, vary=True),
+           "k": rx.Parameter(value=2e-5, vary=True),
+           "c0": rx.Parameter(value=C0, vary=True),
+           "c1": rx.Parameter(value=C1, vary=True)}
+    out.update(more)
+    return out
+
+
+def _fed_table(n: int = 3, *, parametric=None, variables=None, coordinates=None
+               ) -> MultiParameterTable:
+    return _table(n, parametric=[_calibration(), _fed()] if parametric is None else parametric,
+                  variables=_fed_variables() if variables is None else variables,
+                  coordinates=coordinates)
+
+
+def test_an_intermediate_round_trips_and_only_an_expression_can_be_one():
+    equation = _calibration()
+    assert equation.target is None
+    text = equation.model_dump_json()
+    assert ParametricEquation.model_validate_json(text) == equation
+    assert ParametricEquation.model_validate(json.loads(text)) == equation
+    with pytest.raises(ValidationError, match="a polynomial basis needs a target"):
+        ParametricEquation(name="w", basis="polynomial", terms=[[], ["T"]])
+    with pytest.raises(ValidationError, match="a constant basis needs a target"):
+        ParametricEquation(name="w", basis="constant")
+    with pytest.raises(ValidationError, match="is an intermediate .* takes no patterns"):
+        _calibration(patterns=[0, 1])
+
+
+@pytest.mark.parametrize("parametric, variables, fragment", [
+    ([_calibration(expression="T + c0 + c1*T_true"), _fed()], None,
+     r"'T_true': its expression .* names 'T_true', the equation itself; "
+     "an equation cannot use itself"),
+    ([_fed(), _calibration()], None,
+     r"'a': its expression names 'T_true', which is declared after 'a'; "
+     "declare it first"),
+    ([_calibration(expression="T + c0 + c1*T + 0*a"), _fed()], None,
+     r"names 'a', which is declared after 'T_true'"),
+    ([ParametricEquation(name="w0", target="instrument.profile.w", basis="constant"),
+      _calibration(expression="T + c0 + c1*T + 0*w0"), _fed()], None,
+     "names 'w0', a parametric equation with a linear basis; only expression "
+     "equations can be named"),
+    ([_calibration(name="c1"), _fed(expression="a0 + k*c1")], None,
+     "parametric equation 'c1' has the name of a variable"),
+    ([_calibration(name="T"), _fed(expression="a0 + k*T")], None,
+     "parametric equation 'T' has the name of a coordinate column"),
+    ([_calibration(name="sqrt"), _fed(expression="a0 + k*T")], None,
+     "parametric equation name 'sqrt' is a reserved word"),
+    ([_calibration(), _fed(expression="a0 + k*T")], None,
+     "'T_true' has no target and no later expression equation names it"),
+    ([_calibration(), _fed(expression="a0 + k*T_ture")], None,
+     r"names 'T_ture', which is neither a variable.*did you mean 'T_true'"),
+], ids=["itself", "later", "later-target", "linear", "variable-name", "coordinate-name",
+        "reserved-name", "idle", "near-miss"])
+def test_each_refusal_of_an_equation_feeding_another_names_its_fix(parametric, variables,
+                                                                   fragment):
+    with pytest.raises(ValueError, match=fragment):
+        _fed_table(parametric=parametric, variables=variables)
+
+
+def test_a_coordinate_an_intermediate_uses_is_checked_at_the_patterns_it_feeds():
+    holes = CoordinateTable(columns={"T": [300.0, None, 600.0]}, units={"T": "K"})
+    with pytest.raises(ValueError, match="pattern 1 has no value for coordinate 'T', "
+                                         "which the expression uses through 'T_true'"):
+        _fed_table(coordinates=holes)
+    # the downstream subset leaves the hole out, so the intermediate needs no T there
+    mt = _fed_table(coordinates=holes, parametric=[_calibration(), _fed(patterns=[0, 2])])
+    assert [r.patterns for r in mt.expressions] == [[0, 2]]
+
+
+def test_an_intermediate_feeds_the_cell_at_each_patterns_coordinate():
+    """``T_true = T + c0 + c1*T`` feeding ``a = a0 + k*T_true`` at c0 = 12.5 K and
+    c1 = 0.03.  Each pattern's cell edge is the hand evaluation, and its row of
+    the local Jacobian carries ∂a/∂c1 = k·T exactly: the feed reaches."""
+    mt = _fed_table()
+    assert [r.name for r in mt.intermediates] == ["T_true"]
+    assert [r.name for r in mt.expressions] == ["a"]
+    assert [e.name for e in mt.declared] == ["T_true", "a"]
+    assert mt.declared[0] == _calibration()          # as written, not inlined
+    # the downstream tree names variables and coordinates alone
+    assert set(mt.expressions[0].expression.names) == {"a0", "k", "T", "c0", "c1"}
+    assert mt.expressions[0].paths == ["vars.a0", "vars.k", "vars.c0", "vars.c1"]
+    # a glob on the cell frees the variables only the intermediate names, too
+    mt.set_vary(["*"], False)
+    assert sorted(mt.set_vary(["phases.*.cell.*"], True)) == [
+        "vars.a0", "vars.c0", "vars.c1", "vars.k"]
+    for h, t in enumerate(mt.tables):
+        temp = 300.0 + 150.0 * h
+        want = 4.15 + 2e-5 * (temp + C0 + C1 * temp)
+        theta = t.x0()
+        values = t.decode(theta)
+        for edge in "abc":
+            assert values[f"phases.0.cell.{edge}"] == pytest.approx(want, rel=1e-12)
+        jac = t.local_jacobian(theta).toarray()
+        row = jac[t._paths["phases.0.cell.a"]]
+        d_c1 = row[t.free_paths.index("vars.c1")]
+        assert d_c1 != 0.0
+        assert d_c1 == pytest.approx(2e-5 * temp, rel=1e-12)
+        assert row[t.free_paths.index("vars.c0")] == pytest.approx(2e-5, rel=1e-12)
+
+
+def test_one_intermediate_feeds_two_equations():
+    """One calibration feeds a cell edge and a Biso, so one c1 column reaches
+    both targets in every pattern."""
+    biso = ParametricEquation(name="b", target="phases.0.atoms.0.biso", basis="expression",
+                              expression="b0 + b1*T_true")
+    mt = _fed_table(parametric=[_calibration(), _fed(), biso],
+                    variables=_fed_variables(b0=rx.Parameter(value=0.3, vary=True),
+                                             b1=rx.Parameter(value=2e-4, vary=False)))
+    assert [r.name for r in mt.expressions] == ["a", "b"]
+    # the Biso's glob frees the calibration with it, bar b1, declared vary=False
+    mt.set_vary(["*"], False)
+    assert sorted(mt.set_vary(["phases.0.atoms.0.biso"], True)) == [
+        "vars.b0", "vars.c0", "vars.c1"]
+    for h, t in enumerate(mt.tables):
+        temp = 300.0 + 150.0 * h
+        t_true = temp + C0 + C1 * temp
+        values = t.decode(t.x0())
+        assert values["phases.0.cell.a"] == pytest.approx(4.15 + 2e-5 * t_true, rel=1e-12)
+        assert values["phases.0.atoms.0.biso"] == pytest.approx(0.3 + 2e-4 * t_true,
+                                                                rel=1e-12)
+        reach = set(t.column_reach()["vars.c1"])
+        assert {"phases.0.cell.a", "phases.0.atoms.0.biso"} <= reach
+
+
+def test_the_refinement_lists_an_intermediate_in_its_place():
+    s, _ = perturbed_inputs()
+    ref = MultiHistogramRefinement(s, _lab6_instruments(3), coordinates=_coords(3),
+                                   parametric=[_calibration(), _fed()],
+                                   variables=_fed_variables())
+    assert ref.parametric == [_calibration(), _fed()]
+
+
+@pytest.mark.xdist_group("parametric-expression")
+def test_a_temperature_calibration_feeding_the_cell_recovers_its_coefficients():
+    """Five patterns, 300-1200 K, simulated at a = a0 + k·T_true with
+    T_true = T + c0 + c1·T, c0 = 15 K and c1 = 0.02.
+
+    k is held at its truth, as a calibration against a known expansion
+    coefficient does.  a0 is held too: a = (a0 + k·c0) + k·(1 + c1)·T is a
+    line in T, so the patterns measure its intercept and slope, and a0 and c0
+    enter the intercept only as a0 + k·c0, one direction no data separates.
+    With a0 and k held, c0 is the intercept and c1 the slope, both
+    identifiable.  Both start at zero, so the fit has to move them through
+    the feed.  Measured (macOS arm64): 0.5 s, c0 = 15.10(15) K at 0.7 esd and
+    c1 = 0.01989(13) at 0.9 esd from the truth."""
+    from tests.test_sequential import A0, _start_models
+
+    temps = [300.0, 525.0, 750.0, 975.0, 1200.0]
+    k = A0 * 5e-6                                  # the ramp's 5e-4 per 100 K
+    a0, c0, c1 = A0 - k * 300.0, 15.0, 0.02
+    patterns = _ramp([a0 + k * (t + c0 + c1 * t) for t in temps], seed=60)
+    structure, ins = _start_models()
+    variables = {"a0": rx.Parameter(value=a0, vary=False),
+                 "k": rx.Parameter(value=k, vary=False),
+                 "c0": rx.Parameter(value=0.0, vary=True),
+                 "c1": rx.Parameter(value=0.0, vary=True)}
+    ref = MultiHistogramRefinement(
+        structure, [ins] * len(temps),
+        sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"]),
+        coordinates=CoordinateTable(columns={"T": temps}, units={"T": "K"}),
+        variables=variables, parametric=[_calibration(), _fed()])
+    result = ref.fit(patterns, plan="mccusker_default")
+    _plot(result, "parametric_expression_calibration", (0, len(temps) - 1))
+    assert result.status == "converged"
+    rows = {p.path: p for p in result.parameters}
+    for path, truth in (("vars.c0", c0), ("vars.c1", c1)):
+        row = rows[path]
+        assert row.stderr is not None and row.stderr > 0.0, path
+        assert abs(row.value - truth) < 2 * row.stderr, (path, row.value, row.stderr, truth)
+    assert "vars.a0" not in rows and "vars.k" not in rows
+    cell = next(st for st in result.stages if st.name == "cell")
+    assert sorted(cell.freed) == ["vars.c0", "vars.c1"]
+    got0, got1 = rows["vars.c0"].value, rows["vars.c1"].value
+    for h, temp in enumerate(temps):
+        a = rows[f"hist.{h}.phases.0.cell.a"].value
+        assert a == pytest.approx(a0 + k * (temp + got0 + got1 * temp), rel=1e-13)

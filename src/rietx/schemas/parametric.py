@@ -130,9 +130,17 @@ class ParametricEquation(Base):
     name it), or coordinate columns.  It has no coefficients of its own, and a
     stage's glob reaching the target frees the variables it names.
 
+    An ``expression`` equation's ``name`` may be used in the expression of a
+    **later** expression equation, so one equation feeds another: a
+    temperature calibration ``T_true = T + c0 + c1*T`` feeding a cell edge
+    ``a0 + k*T_true``.  An expression equation with ``target=None`` is such an
+    **intermediate** alone.  It drives nothing itself and is evaluated wherever
+    a later equation names it, so it takes no ``patterns``.
+
     * ``target`` — one model parameter's bare dot-path, no glob and no
       ``hist.`` scope (the subset says which patterns): ``phases.0.cell.a``,
-      ``instrument.background.c2``.
+      ``instrument.background.c2``.  ``None`` only on an expression equation,
+      which is then an intermediate.
     * ``basis`` — ``constant``; ``polynomial``, with ``terms``: each a list of
       coordinate names, a repeat being a power and ``[]`` the intercept
       (``[[], ["T"]]`` is a + b·T, ``[[], ["x"], ["y"], ["x", "y"]]`` a bilinear
@@ -149,7 +157,7 @@ class ParametricEquation(Base):
     """
 
     name: str
-    target: str
+    target: str | None = None
     basis: ParametricBasis
     terms: list[list[str]] | None = None
     design: list[list[float]] | None = None
@@ -166,11 +174,22 @@ class ParametricEquation(Base):
                 f"its coefficients are the variables vars.{self.name}_0, …, and a "
                 "glob must be able to name them")
         t = self.target
-        if not t or _GLOB_CHARS & set(t):
+        if t is None:
+            if self.basis != "expression":
+                raise ValueError(
+                    f"a {self.basis} basis needs a target: only an expression "
+                    "equation can be an intermediate (target=None), named by a "
+                    "later expression equation")
+            if self.patterns is not None:
+                raise ValueError(
+                    f"parametric equation {self.name!r} is an intermediate "
+                    "(target=None), so it takes no patterns: it is evaluated at the "
+                    "patterns of each later equation that names it")
+        elif not t or _GLOB_CHARS & set(t):
             raise ValueError(
                 f"target {t!r} must be one bare dot-path, not a glob: one "
                 "declaration ties one parameter")
-        if not t.startswith(("phases.", "instrument.")):
+        elif not t.startswith(("phases.", "instrument.")):
             raise ValueError(
                 f"target {t!r} must be a model parameter, a dot-path under "
                 "'phases.' or 'instrument.'; name the patterns it applies to "
