@@ -350,9 +350,32 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
 
 ## Handover log
 
-- **2026-11-05 (first build session, a ghostshift runner)** — Tasks 1-4 landed: the grammar,
-  the parser and tree, evaluation and exact derivatives, and the block on `ParameterTable`.
-  Nothing reaches `refine_multi` yet. Branch `wp1964-equations`, no PR.
+- **2026-11-05 (first build session, a ghostshift runner)** — Tasks 1-6 landed: the grammar,
+  the parser and tree, evaluation and exact derivatives, the block on `ParameterTable`,
+  variables on a joint fit, and one equation feeding another. Branch `wp1964-equations`, no
+  PR. Tasks 5 and 6 ran as lanes and were checked and committed here.
+  - *Tasks 5 and 6.* `refine_multi(variables=…)` takes a dict of `Parameter`. Each is
+    `vars.<name>`, one shared column however many equations name it. An expression equation
+    is held apart from the linear ones (`MultiParameterTable.expressions`), because the result
+    readers assume a linear basis until task 10. An expression equation with `target=None` is
+    an intermediate, and a later expression may name any earlier one; resolution inlines it
+    (`Expression.inline`). On a five-pattern LaB6 Einstein ramp the fit recovers `zero_a`
+    within 0.002 esd and `grad` within 0.9 esd. A `polynomial` and the same form as an
+    expression agree to 8e-10 esd against the 0.01 bar. With nonzero calibration
+    coefficients each cell matches a hand evaluation to 1e-12, and a fit recovers c0 and c1
+    within 0.7 and 0.9 esd.
+  - *Settled by Claude* (each could have gone the other way).
+    1. A variable declared `vary=False` stays fixed when a stage reaches its equation's target,
+       but a glob naming `vars.<name>` frees it. Grounds: a literal path is the caller's own
+       request, and the hold mechanism (`Entry.held`) means a floating-origin hold in a joint
+       fit. The alternative is fixed in every stage.
+    2. An intermediate is a `ParametricEquation` with `target=None`, rather than a separate
+       `intermediates=` keyword or a `Parameter(expr=…)` variable. Grounds: one declaration type
+       in declaration order, TOPAS's `prm t = …;` and GSAS-II's repeated label both put the
+       definition in the same list. This also names something on the main surface, so it joins
+       the consent list as item 6.
+    3. A follower tied to the target and to another parameter is refused (task 4), since the
+       block would have to carry the other half. No input in hand needs it.
   - *Done.* `docs/docs/reference/expressions.md` is the specification, version 1, with a
     73-row conformance table whose values came from mpmath at 50 digits. `params/expression.py`
     implements it. `tests/test_expression.py` reads the table off the page and runs every row on
@@ -382,15 +405,21 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
     4. Left out until someone asks: `sinh`, `cosh`, `tanh`, `log10`, `sind`. Each costs an op
        on every backend.
     5. The field is `Capabilities.expression_grammar_version`, and the version is `"1"`.
+    6. `ParametricEquation(basis="expression", expression="…")`, `refine_multi(variables={…})`
+       and `target=None` for an intermediate, as § Goal spells them.
   - *Decisions for the maintainer.* Both change the stored format, which the WP gives to you.
     (a) `Parameter.expr`: wire it to this grammar as a single fit's spelling (a parameter set
     by an expression over `Refinement.add_variable`'s variables, TOPAS's everyday use), or remove
     it. The block is one caller away, so wiring is cheap. Lean: wire it. (b) Task 5 adds
     `basis="expression"` and an `expression` field to `ParametricEquation`, and `variables=` to
     `refine_multi`, with the spelling in § Goal. That moves `SCHEMA_VERSION`.
-  - *Next.* Task 5, variables on a joint fit, on the § Goal spelling until (b) is answered.
-    The result readers (task 10) assume a linear equation (`ResolvedParametric.phi`), so an
-    expression equation needs its own list on `MultiParameterTable` until then.
+  - *Reader output.* A joint fit with `variables=` now returns `vars.*` rows in
+    `result.parameters`, and `MultiHistogramRefinement.parametric` lists expression equations.
+    `RefinedParameter.equations`, `result.parametric` and the form test do not see an
+    expression equation yet (task 10). These changes go to the maintainer before merge.
+  - *Next.* Task 7, the chained column, then 8 (preview) and 10 (result). `SCHEMA_VERSION` is
+    unbumped until decision (b) is answered. `reference/parametric.md` still says "the three
+    bases" below its table; task 14 owns that prose.
 
 - **2026-11-04 (second review)** — A second clean-context review tested the plan against
   the code and the local inputs. It gave the agent-port row a pass and a fail, fixed a
