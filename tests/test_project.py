@@ -127,6 +127,17 @@ def test_create_refuses_to_write_over_a_project(tmp_path, pattern_file):
         _create(tmp_path / "s.rex", pattern_file)
 
 
+def test_create_refuses_a_directory_a_failed_create_left_a_log_in(tmp_path, pattern_file):
+    """A log holds one tree (WP-2031); before, the retry appended a second."""
+    root = tmp_path / "s.rex"
+    _create(root, pattern_file)
+    (root / "project.json").unlink()            # as a create that raised part-way
+    log = (root / "history.jsonl").read_bytes()
+    with pytest.raises(FileExistsError, match="earlier create stopped part-way"):
+        _create(root, pattern_file)
+    assert (root / "history.jsonl").read_bytes() == log
+
+
 def test_missing_pattern_file_is_named(tmp_path):
     structure, ins = perturbed_models()
     with pytest.raises(FileNotFoundError, match="pattern file not found"):
@@ -465,7 +476,10 @@ def test_a_unit_declared_later_is_no_range_to_restore(tmp_path, pattern_file):
     no unit: nothing is unbounded, so nothing is restored and no note blames
     issue #204 for a label no release before it could write."""
     def unitless_extinction(state):
-        state["structure"]["phases"][0]["extinction"]["unit"] = None
+        # every log before WP-1944 stored extinction; this tree writes None
+        state["structure"]["phases"][0]["extinction"] = {
+            "value": 0.0, "vary": False, "min": 0.0, "max": "Infinity",
+            "expr": None, "unit": None, "stderr": None}
     project = _create(tmp_path / "s.rex", pattern_file)
     _age_log(project, "0.34", unitless_extinction)
     reopened = rx.Project.open(project.path)

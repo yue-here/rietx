@@ -82,6 +82,130 @@ asked to save; GSAS-II's and MAUD's stop is the named dissent, EasyDiffraction t
 Each entry's `ruling` field in `rows.json` carries the date; the table rows land with the
 demotions (WP task 7), each its own commit.
 
+**Relabelled 2026-11-02: these are settlements by Claude, not the maintainer's rulings.** The
+maintainer's standing instructions say an earlier settlement by Claude is evidence, never a
+ruling. They send a decision to the maintainer when a written rule gives it to them, when its
+crux is a value judgement, or when it changes a stored format. The rietx memory adds that a
+tier-3 `approved` date and any change to what a fit prints or returns are the maintainer's
+whoever drafted them (ruled 2026-11-01). The delegation above predates both. So each
+`ruling` in `rows.json` and each audit-table row citing this paragraph now reads "settled by
+Claude", and the `approved="2026-10-26"` dates on the seven WP-2003 tier-3 rows stand only
+until the maintainer approves or reverses each one. The open picks go back to the maintainer
+as briefs one at a time: C1 and PR #1310's reader-output changes, C2's question 4 (on its own
+words above, a value judgement), C5, C6, C9 and C10's question 2, with C2's question 2 and
+the seven `approved` dates as consent lines. C2's question 3 and C10's question 1 stay
+Claude's to settle, recorded as such.
+
+**Sent to the maintainer 2026-11-02, awaiting answers** (in the house decision format; the
+evidence is in the class sections below and in WP-2080). Five briefs, each with Claude's pick:
+1. *What sends a warm fit up the ladder* (C1 with WP-2080's question). Options: keep main's
+   Rwp fence; (A) PR #1310 as is, diverged or error-level only; (B) A plus one rung when GoF
+   exceeds 1.25 × the seed pattern's GoF (WP-2080 option B, landing there). Pick B, a lean.
+2. *How a series reports a pattern fitting worse than its neighbours* (C1's ranked summary
+   line, the generality judge's weak verdict). Options: field only; (A) a summary line of
+   the largest `rwp_over_median`; (B) A on a GoF ratio, renaming the field before it ships,
+   since Rwp rises with falling counts (WP-1469). Pick B, a lean; an agent-harness run after,
+   spend owed the maintainer's OK.
+3. *Carry on or stop when every rung raises* (C2 q4): `carry` / `skip` / `raise`. Pick
+   `carry`, a lean; the crux a value judgement.
+4. *The persistent-finding summary* (C6): demote the half cut to a field of counts plus one
+   summary line, after an agent-harness run (spend owed the maintainer's OK). Pick demote.
+5. *What a warm start carries* (C9 q1): (A) the warm start is the caller's, `"*"` invariant
+   once its test lands; (B) tier 3 now, GSAS-II's no-carry default the dissent. Pick A.
+
+Consent lines (stand unless the maintainer objects): C5 demoted to a field of gaps with each
+walk's rung; C5's incomplete-check code split into `warning` and `info`; C9 q4 (a), the
+closing stage kept on warm refits; C9 q2 and q3 tier 3; C10 q2 (a) after a joint fixture;
+C2 q2, diverged ranks below truncated; and the seven tier-3 `approved` dates, re-dated to
+the maintainer's answer. PR #1310 does not merge before briefs 1 and 2 are answered.
+Seen 2026-11-02: PR #1331 (WP-2010's reconstructed entry) duplicates `d568e0b`/`02cad1b`
+on this branch, so whichever merges second conflicts in WP-2010's log.
+
+**Re-sent one at a time 2026-11-03, after WP-2080's settlement.** WP-2080's trigger (option B
+at 1.25) was settled by Claude under the maintainer's 2026-11-02 delegation ("use your best
+judgement on 2080"), which answers brief 1's second half. Brief 1 went back as C1 alone, with
+a measurement: WP-2081's held-zero-shift case (`2081-batch/measure_cold_rung.py` run on this
+branch, macOS arm64, worktree venv `[dev]`, 2.3 s) keeps pattern 3's cell 547 ppm off at GoF
+9.76 against about 1.06. On `main` the fence sends pattern 3 up all three rungs with no change
+in value, and `SEQUENTIAL_RWP_OUTLIER` names patterns 2 and 3. On this branch no diagnostic
+names pattern 3, so brief 2 decides whether anything does.
+
+**Ruled by the maintainer 2026-11-03: C1 1 (b) and 2 (i).** The Rwp fence is no default
+trigger, and `reseed_factor` stays the caller's. A warm pattern escalates when it diverged,
+raised or carries an error-level code (C2 q5), or on WP-2080's GoF step. The three tier-3 rows
+of the escalation (`SEQUENTIAL_RESEED`, `SeriesEntry.reseeded`, `fit:reseed`) carry this
+date as their approval. Open: briefs 2-5 and the consent lines, with WP-2080's tier-3 row,
+approved under the 2026-11-02 delegation, added to the approval dates the maintainer confirms.
+
+**Ruled by the maintainer 2026-11-03: brief 2, field only.** No summary line and no code
+report a pattern fitting worse than its neighbours. The maintainer's grounds: looking at the
+refinement metrics is a normal part of assessing series output, and both humans and agents
+should inspect any refinement that is off, so a ranked line is noise. This reverses Claude's
+pick (B, a summary line on a GoF ratio). The brief carried a measurement (24-pattern planted
+series, this branch, macOS arm64, `[dev]`): the largest Rwp and GoF ratios were 5.19 and 6.15
+on the planted series, 1.01 and 1.01 on its null twin, and 2.21 and 1.10 on the null twin with
+its counts cut 4× from pattern 6 under a right model. `SeriesEntry.rwp_over_median` stays as
+it is, settled by Claude: it is the statistic a caller's `reseed_factor` compares, so a GoF
+rename would part it from the fence it records. Owed by the ruling: the skill's series
+reference tells an agent to read each entry's Rwp and GoF down the series, since nothing in
+the package flags a pattern above its neighbours (the fence paragraph there is stale too).
+The agent-harness run brief 2 asked for is moot.
+
+**Ruled by the maintainer 2026-11-03: brief 3 (C2 q4), "carry by default, but let people set
+options".** `on_error="carry"` stays the default, now tier 3 with this date as its approval and
+off `UNAUDITED_BASELINE`; `"skip"` and `"raise"` stay the caller's, as they are today. GSAS-II's
+and MAUD's stop is the named dissent.
+
+**Ruled by the maintainer 2026-11-03: brief 4 (C6), a field of counts plus one summary line.**
+`SEQUENTIAL_PERSISTENT_FINDING`, its suggestion, the half cut and `MIN_POINTS_FOR_PERSISTENCE`
+go. A record field on the series lists each per-pattern code and path with its count, the
+number of patterns and the worst level, largest first, with no threshold, and
+`SeriesResult.summary` prints one line naming the top counts and the field. Dropping the cut
+was settled by Claude on DESIGN.md § Rules, 1 and the maintainer's 2026-08-11 ruling on
+editorial thresholds. The line follows generality.md § Demotion as written. Brief 2's
+field-only ruling is an exception to that clause, on the maintainer's grounds that a misfit
+ratio restates metrics every pattern already prints. A tally across patterns is something no
+single pattern shows (WP-1110's 425 unread `BOUND_HIT`s, "42 of 68"). The agent-harness run
+§ "A contested demotion is measured on agents" asks for checks the wording and gates nothing
+(ruled 2026-10-19). Its spend waits on the maintainer's OK.
+
+**Ruled by the maintainer 2026-11-03: brief 5 (C9 q1), the warm start is a tier-3 default,
+approved.** Correction to C9's question 1: a default path does reach it. The GUI's series route
+defaults to `carry=["*"]` (`gui/series.py` `DEFAULTS`), so the warm start fails the caller
+class's first condition (generality.md § The rule), and the `best_or_none` analogy covers a pick
+from a ranking, not an action. Re-briefed on that check as a tier-3 default with GSAS-II's
+carry-nothing default as the dissent, kept as `carry=()`. Carrying every entry rather than the
+varied ones becomes `invariant` once the test C9 names shows the two bit-identical; a path that
+differs comes back to the maintainer at tier 3. `refine_sequential:carry` leaves
+`UNAUDITED_BASELINE`. WP-2081's questions on the cold rung stay open there.
+
+**The consent list, re-checked against DESIGN.md and generality.md and sent 2026-11-03; the
+maintainer: "All stand".** (1) C2 q2: a diverged attempt ranks below a truncated finite one.
+(2) C5 q1: `SEQUENTIAL_PATH_DEPENDENT` and `PATH_DEPENDENCE_SIGMA` go; a record field gives
+each path's forward-backward gap in combined esds per pattern, largest first, with each walk's
+rung, and the summary prints one line naming it (§ Demotion, as brief 4; changed from field
+only in the check). (3) C5 q2: `SEQUENTIAL_PATH_CHECK_INCOMPLETE` splits into a `warning` (did
+not run) and an `info` (ran on fewer patterns). (4) C9 q4 (a): a warm refit keeps the closing
+stage. (5) C9 q3: `SequentialRefinement.fit:plan` tier 3 on B7's approval (2026-10-19),
+extended to the series seat. (6) C10 q2 (a): the joint absent-phase hold is aligned with
+`_answer_significance` after a joint fixture shows what moves; tier 3 on (b)'s wording until
+then. (7) Approval dated 2026-11-03 on `SEQUENTIAL_UNRECOVERED`, `SeriesEntry.seeded_from` and
+`SeriesEntry.floored`, and WP-2080's GoF-step row approved under the 2026-11-02 delegation when
+it lands. Held back for measurement in the check, approval still owed: C9 q2
+(`carry_hkl_intensities`, a Le Bail and a Pawley chain carried and not) and
+`FIRST_RUNG_SAMPLES` (re-measured at 1, 2 and 3 samples on the dearest-stage quantity, the
+judge's ask). The agent-harness run for the wording of (2) and brief 4 awaits a costed menu.
+
+**The two held back, ruled 2026-11-03.** C9 q2: "Approve the carry".
+`carry_hkl_intensities=True` is tier 3. Carried and not, on the planted and thermal-ramp
+chains (`measure-2026-11-03/m1_*.json`), the median cell error was equal in all four arms.
+Evaluations were equal on thermal. On planted they were 1278 against 1163 (Le Bail) and 958
+against 738 (Pawley). The Le Bail difference falls on patterns at GoF > 8. The Pawley one falls
+mostly on T009 at GoF 1.0 (+268 evaluations, the cell unchanged). `FIRST_RUNG_SAMPLES = 3`:
+consent line sent, no objection, approved. At factor 1.0 the bound cut patterns at every
+sample size; at 1.5 it cut none and every value was bit-identical at 1, 2 and 3 samples
+(`m2_*_sweep.json`).
+
 ---
 
 ## C1. What sends a warm fit up the ladder

@@ -529,7 +529,8 @@ def diagnostic_index(root: _Path = SOURCE_ROOT) -> dict[str, dict[str, set]]:
 #: The first area prefix a code's first file matches decides; "" takes the rest.
 DIAGNOSTIC_GROUPS = (
     ("diagnostics-projects", "Other programs' projects", ("rietx/io/projects/",)),
-    ("diagnostics-files", "Reading files", ("rietx/io/",)),
+    # the history log's reader too: a file read, not a fit (WP-2031)
+    ("diagnostics-files", "Reading files", ("rietx/io/", "rietx/history/")),
     ("diagnostics-indexing", "Peaks and indexing", ("rietx/indexing/",)),
     # not `rietx/schemas/`: the codes raised there are a result's capped
     # correlation counts and a stored file's migrated ranges, not structure
@@ -537,15 +538,45 @@ DIAGNOSTIC_GROUPS = (
      ("rietx/crystallography/", "rietx/strategy/magnetic",
       "rietx/report/magnetic")),
     ("diagnostics-series", "Series and joint fits", ("rietx/sequential", "rietx/multi")),
+    # out of the catch-all, whose page reached the cap with its second code (WP-1931)
+    ("diagnostics-background", "Background selection", ("rietx/background/",)),
+    # no area: STAGE_CODE_PREFIXES files its codes
+    ("diagnostics-stages", "Stages and plans", ()),
+    # no area: CORRECTION_CODE_PREFIXES files its codes
+    ("diagnostics-corrections", "Corrections", ()),
     ("diagnostics-refinement", "Refinement", ("",)),
 )
 
+#: The refinement page passed the 50 000-character cap too (WP-1334), and
+#: most of its codes are raised in one file, ``refine.py``, so the area rule
+#: cannot split it.  Its codes about how a stage or a plan ran are filed by
+#: their code's prefix instead, on ``diagnostics-stages``.
+STAGE_CODE_PREFIXES = ("STAGE_", "PLAN_", "HOLD_")
 
-def diagnostic_group(files: set[str]) -> str:
+#: The codes the Refinement page hands to the Corrections page, by name prefix.
+#: Nearly every refinement code is raised in ``refine.py``, so no file prefix
+#: separates them, and the one page passed the 50 000-character cap again when
+#: WP-1944 added ``EXTINCTION_UNDECLARED``.  These name a physical correction
+#: the model declares or could declare: absorption, roughness, extinction,
+#: dispersion, harmonics, texture, Stephens strain and declared peaks.
+CORRECTION_CODE_PREFIXES = (
+    "ABSORPTION_", "AIR_SCATTER_", "BRINDLEY_", "CAPILLARY_OFFSET_",
+    "DISPERSION_", "EXTINCTION_", "EXTRA_PEAK_", "HARMONIC_", "HUMP_",
+    "MICROABSORPTION_", "NEUTRON_RESONANT_", "ROUGHNESS_", "SPECIES_FALLBACK_",
+    "STEPHENS_", "TEXTURE_",
+)
+
+
+def diagnostic_group(files: set[str], code: str = "") -> str:
     """The page stem a code with these raising files is listed on."""
     first = sorted(files)[0]
-    return next(stem for stem, _title, areas in DIAGNOSTIC_GROUPS
+    stem = next(stem for stem, _title, areas in DIAGNOSTIC_GROUPS
                 if any(first.startswith(area) for area in areas))
+    if stem == "diagnostics-refinement" and code.startswith(STAGE_CODE_PREFIXES):
+        return "diagnostics-stages"
+    if stem == "diagnostics-refinement" and code.startswith(CORRECTION_CODE_PREFIXES):
+        return "diagnostics-corrections"
+    return stem
 
 
 def _levels(entry: dict[str, set]) -> str:
@@ -565,7 +596,7 @@ def diagnostic_page() -> str:
            f"The package raises {len(index)} codes.", "",
            "| Code | Name | Page |", "| --- | --- | --- |"]
     for code in sorted(index):
-        stem = diagnostic_group(index[code]["files"])
+        stem = diagnostic_group(index[code]["files"], code)
         entry = explain(code)
         name = "" if entry is None else entry.title
         out.append(f"| [`{code}`]({stem}.md#{code.lower()}) "
@@ -585,7 +616,7 @@ def diagnostic_group_page(stem: str) -> str:
 
     ref = _source_ref()
     index = diagnostic_index()
-    codes = [c for c in sorted(index) if diagnostic_group(index[c]["files"]) == stem]
+    codes = [c for c in sorted(index) if diagnostic_group(index[c]["files"], c) == stem]
     out = [_BANNER.format(source="the source tree under src/rietx/"), ""]
     for code in codes:
         files = ", ".join(f"[`{rel}`]({REPO_URL}/blob/{ref}/src/{rel})"

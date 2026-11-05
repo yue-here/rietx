@@ -6,7 +6,7 @@ general-purpose package. The block 20xx is claimed for it. [`../ROADMAP.md`](../
 § generality carries the short prose, and the WP index lists the rows.
 
 Narrative about the WPs below goes to the record of the release in flight,
-[v1.11](v1.11.md) today, as for every other WP (protocol rule 5).
+[v1.12](v1.12.md) today, as for every other WP (protocol rule 5).
 
 ## Scope
 
@@ -395,8 +395,8 @@ sharpens its own row here.
   referenced to the package's own arithmetic or another code (six to seven of nine, over
   four features) are retiered as verification. The record is the validation matrix's and
   its generated page, kept for
-  developers, and a result that reports a number from a topic with no independent
-  measurement says so in its report (ruled 2026-10-27).
+  developers (ruled 2026-10-27). The report carries no validation verdict: the sentence
+  first ruled for it was reversed 2026-11-01 (§ Decisions).
 - **The rulebooks state Rule 1's three outcomes** (2001, 2009): act and record where every
   competent refiner would act, rank where the data can rank, otherwise report the number
   with its meaning; and the rule that rewards a firing code is rewritten.

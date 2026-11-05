@@ -514,7 +514,9 @@ class RefinementPlan:
             Stage("preferred_orientation", ["phases.*.preferred_orientation.r",
                                             "phases.*.texture.*"]),
             # primary extinction (WP-0506, named secondary until WP-1451)
-            # comes *after* the displacement stage on purpose: ext, Biso and
+            # frees only a phase that declares it (``Phase.extinction``,
+            # opt-in since WP-1944, as PO and roughness are).  It comes
+            # *after* the displacement stage on purpose: ext, Biso and
             # the ADPs all attenuate high-Q intensity, so letting the
             # structure/ADPs settle first leaves extinction with only its
             # (different, low-angle-weighted) signature to fit.  The
@@ -2234,7 +2236,7 @@ def _correlation_findings(corr, free: list[str], threshold: float
                 # correlation, and saying so in the same vocabulary as
                 # ρ = 0.96 undersells it.  Reported *beside* the
                 # correlation rather than instead of it: the
-                # SEQUENTIAL_PERSISTENT_FINDING precedent, where the
+                # series code-count precedent (WP-1110), where the
                 # sharper finding rides alongside the ones it sharpens,
                 # so no existing consumer loses a row it counts on.
                 if abs(corr[i, j]) >= FLAT_DIRECTION_RHO:

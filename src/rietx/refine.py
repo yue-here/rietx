@@ -61,7 +61,7 @@ from .crystallography.twins import (
 )
 from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
-from .history.store import fingerprint
+from .history.store import fingerprint, refuse_existing_log
 from .history.tree import RefinementTree
 from .model.absorption import (
     CYLINDER_MU_R_MAX,
@@ -123,6 +123,7 @@ from .optimize.statistics import (
     berar_lelann_factor,
     compute_statistics,
     data_support,
+    residual_is_noise,
     structure_r_factors,
 )
 from .params.multi import _unscoped
@@ -635,6 +636,14 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     leaves their columns identically zero, so with every phase lineless they
     are held from the start.
 
+    **Unseen is not flat until the residual says so.**  A zero scale says these
+    peaks are not in the data, which a blank frame and a phase whose peaks
+    missed both say.  The second leaves every real peak in the residual, and
+    its zero shift and widths are how it reaches them: on tutorial 05's 2 %
+    step, U climbing to 6 deg² took the scale from 2.47σ to 83σ and the cell
+    home.  So the hold at an answer also needs a residual with no structure,
+    :func:`_peak_columns_flat_at_answer`.
+
     ``tried`` is what the previous stage's answer held.  A column there was
     free for that stage's first solve, and the phases were judged unseen with
     it free, so this stage holds it from its start: WP-1523's prior, one
@@ -656,7 +665,8 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     # and with every phase unseen, an instrument column reaching the pattern
     # through phase peaks alone is as flat as their cells (WP-2049)
     tried = set(tried)
-    every = _every_phase_unseen(model, absent if at_answer else lineless)
+    every = (_peak_columns_flat_at_answer(model, table, absent, lineless)
+             if at_answer else _every_phase_unseen(model, lineless))
     prior = not every and bool(tried) and _every_phase_unseen(model, absent)
 
     def flat(p: str) -> bool:
@@ -1594,6 +1604,30 @@ def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
         path in AXIAL_PATHS or model.scalar_chain_supported(path))
 
 
+def _residual_is_noise(model: CompiledModel, table: ParameterTable) -> bool:
+    """:func:`~rietx.optimize.statistics.residual_is_noise` of the fitted
+    channels at the table's values.  A channel an excluded region removed is
+    not in ``model.y_obs``, so it cannot read as structure.  One forward
+    evaluation, spent only where every phase is already unseen."""
+    y = np.asarray(model.evaluate(table.decode(table.x0())), dtype=np.float64)
+    delta = (np.asarray(model.y_obs, dtype=np.float64) - y) / np.asarray(
+        model.sigma, dtype=np.float64)
+    return residual_is_noise(delta, len(table.free_paths))
+
+
+def _peak_columns_flat_at_answer(model: CompiledModel, table: ParameterTable,
+                                 absent: set[int], lineless: set[int]) -> bool:
+    """Whether the instrument's peak-only columns are flat at a stage's answer:
+    every phase is unseen, and either none has a line in range, so the columns
+    are identically zero, or the residual is noise and nothing is left for them
+    to find (Hill & Flack's d ≥ Q).  A declined hold leaves d on the record: on
+    ``RefinementResult.statistics`` beside N and P where the fit ended at that
+    answer, and on the stage's history node
+    (``HistoryNode.metrics.statistics``) where it went on to find the peaks."""
+    return _every_phase_unseen(model, absent) and (
+        _every_phase_unseen(model, lineless) or _residual_is_noise(model, table))
+
+
 def _every_phase_unseen(model: CompiledModel, absent: set[int]) -> bool:
     """Whether ``absent`` holds every phase of ``model`` (and there is one)."""
     n = len(model.phases)
@@ -2432,7 +2466,9 @@ class Refinement:
     down a different branch with :meth:`run_stage`.
 
     Pass ``history=False`` for the light path: no snapshots, no per-stage
-    statistics, no serialisation.
+    statistics, no serialisation.  A ``history`` path that already holds a log
+    raises ``FileExistsError`` here, because a log holds one tree (WP-2031);
+    continue one with :meth:`from_node` on the loaded tree.
     """
 
     def __init__(self, structure: Structure, instrument: Instrument, *,
@@ -2558,6 +2594,10 @@ class Refinement:
         if isinstance(history, RefinementTree):
             self.history = history
             self._head_id = history.head
+        elif isinstance(history, str | Path):
+            # before any fit is paid for; ``RefinementTree.for_data`` asks
+            # again when the tree is made, for a file written in between
+            refuse_existing_log(history)
 
         # carried across calls so a checkout can be continued
         self._mode: Mode = "rietveld"
@@ -5977,6 +6017,7 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths,
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                termination=outcome.termination or None,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
                 # checked, trivially: one histogram has no elsewhere
@@ -6297,6 +6338,7 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, unreached_histograms={},
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                termination=outcome.termination or None,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
                 moment_angle_tests=outcome.moment_angle_tests)
@@ -9052,7 +9094,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # solver and false of the answer (WP-1028 §§(c),(d)).
     diagnostics = (diagnostics
                    + _far_from_data_diagnostics(model, y_calc, y_bkg, stats)
-                   + _max_iter_diagnostics(stage_results))
+                   + _max_iter_diagnostics(stage_results)
+                   + _slow_descent_diagnostics(stage_results))
 
     # Does the data support it (WP-1071): the observation/parameter ratio and
     # the step size, both reported and neither gating.  Built before the
@@ -9072,6 +9115,11 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # reflection, and auto_background's trigger reads the envelope (#636).
     diagnostics = diagnostics + _air_scatter_undeclared_diagnostics(
         model, values, y_calc, stats)
+
+    # The extinction a structure did not declare (WP-1944): opt-in, so a plan
+    # cannot free it, and this is what keeps it findable from the residual.
+    diagnostics = diagnostics + _extinction_undeclared_diagnostics(
+        model, table, theta, values, y_calc, stats, structure)
 
     # What a declared sharp peak did, once the fit has an answer about it
     # (WP-1103).  Built after ``ticks`` because "is this component sitting on a
@@ -10490,6 +10538,145 @@ def _air_scatter_undeclared_diagnostics(model: CompiledModel,
     )]
 
 
+#: the paths whose free columns the score test re-fits beside every phase's
+#: scale: those that change a phase's intensities without moving its lines,
+#: which is where extinction's correlations sit (ρ 0.97 with the scale, 0.87
+#: with Biso on LaB6,
+#: ``test_extinction_correlates_with_scale_and_biso_and_the_guard_fires``).
+#: Matched against what each free column *reaches* (``column_reach``), so a
+#: Biso tied across sites or driven by a ``vars.X`` is one column moving all
+#: of them.  Every atom parameter is one, as in ``least_squares._INTENSITY_ONLY``:
+#: a distortion mode or a rigid body reaches the coordinates themselves rather
+#: than a site DOF, and a moment changes the magnetic intensities.
+_EXTINCTION_PARTNER = re.compile(
+    r"phases\.\d+\.(atoms\.\d+\..+|preferred_orientation\.r|texture\..+)$")
+
+#: the coefficient (µm²) the score test's column is differenced at.  The
+#: forward difference's relative error is about x/2 at the probe, under 1e-4
+#: on the fits WP-1944 measured, far below what moves a score of 25
+#: (``test_the_extinction_probe_column_is_the_derivative_at_zero``).
+_EXTINCTION_PROBE = 1e-3
+
+
+def _extinction_undeclared_diagnostics(model: CompiledModel, table: ParameterTable,
+                                       theta: np.ndarray,
+                                       values: dict[str, float], y_calc, stats,
+                                       structure: Structure) -> list[Diagnostic]:
+    """``EXTINCTION_UNDECLARED``: a phase with no extinction declared, whose
+    strongest reflections the fit calculates stronger than it observes (WP-1944).
+
+    Extinction is opt-in, so no plan frees it on a phase that does not declare
+    it, and its row is absent from every listing.  This is the evidence-gated
+    pointer that keeps it findable.  It is the air-scatter screen's one-column
+    score test (``_air_scatter_undeclared_diagnostics``) on the extinction
+    column at 0: a = ∂y/∂ext, differenced at :data:`_EXTINCTION_PROBE` with
+    the extinction factor switched on for that phase alone, weighted and
+    projected off the background block, every phase's scale column and the
+    free intensity parameters (:data:`_EXTINCTION_PARTNER`: every atom
+    parameter, preferred orientation and texture, each free column of θ that
+    reaches one, through ``table.decode``).  Extinction and those all change the
+    strong lines, so the projection is what leaves only the part of the
+    signature none of them can draw.  It removes (a⊥·r)²/(a⊥·a⊥) of χ², a
+    Gauss-Newton step with those re-fitted and the positions held, which in
+    reduced-χ² units is the square of the significance the coefficient would
+    have if declared.  Measured (WP-1944): projected off the scale and the
+    background alone, the 11-BM NAC + CaF₂ fit scored 277 and 1945, where the
+    refit's own significances were 2.8σ and 0.5σ, the Biso absorbing the rest.
+    **One-sided**: the coefficient is bounded at 0, so a lean toward a negative
+    one does not fire.  Fires at :data:`AIR_SCATTER_UNDECLARED_SCORE` (5σ),
+    the level of the one test this is, in reduced-χ² units with the esd
+    inflation included.  Measured (WP-1944, gate off): a LaB6 synthetic with
+    ext 2.5 planted scores 230, and 0 or 0.5 planted leans the other way; the
+    11-BM NAC + CaF₂ fit scores 8.1 and 14.6, Si 640c 0.13, and FAP leans the
+    other way.  Over WP-1944's 69 structural-plan fits a freed extinction
+    without one planted reached at most 3.1σ, a score near 10.  Rietveld mode only, since Le Bail and Pawley fit the intensities.
+    """
+    if model.mode != "rietveld" or not (stats.chi2 > 0.0):
+        return []
+    w = 1.0 / model.sigma
+    r = (model.y_obs - np.asarray(y_calc)) * w
+    theta = np.asarray(theta[:len(table.free_paths)], dtype=np.float64)
+    n_phases = len(structure.phases)
+    out = []
+    block = None
+    at: list[np.ndarray] = []
+
+    def partners():
+        # every phase's scale column, and a forward-difference column for each
+        # free column of θ that reaches an intensity parameter (positions
+        # held).  In a mixture the fraction moves too, so one phase's scale is
+        # a partner of the other's extinction.  A column is moved through
+        # ``table.decode``, the residual's own map (C, then any derived
+        # block), so a tie, a variable or a rigid body is one column, never
+        # one site's share of it.  Only the phases it reaches are re-evaluated.
+        cols = list(model.bkg_design * w)
+        at.extend(np.asarray(model.phase_component(jp, values))
+                  for jp in range(n_phases))
+        cols += [a_jp * w for a_jp in at]
+        reach = table.column_reach()
+        for j, free in enumerate(table.free_paths):
+            if not any(_EXTINCTION_PARTNER.match(p) for p in reach[free]):
+                continue
+            touched = {m.group(1) for p in reach[free]
+                       if (m := re.match(r"phases\.(\d+)\.", p))}
+            phases = (sorted(int(i) for i in touched)
+                      if all(p.startswith("phases.") for p in reach[free])
+                      else range(n_phases))
+            step = 1e-6 * max(abs(float(theta[j])), 1.0)
+            nudged = theta.copy()
+            nudged[j] += step
+            moved = table.decode(nudged)
+            delta = sum(np.asarray(model.phase_component(jp, moved)) - at[jp]
+                        for jp in phases)
+            cols.append(delta / step * w)
+        return np.vstack(cols).T
+    for ip, phase in enumerate(structure.phases):
+        path = f"phases.{ip}.extinction"
+        if phase.extinction is not None:
+            continue
+        cp = model.phases[ip]
+        held = cp.skip_extinction
+        try:
+            cp.skip_extinction = False
+            base = np.asarray(model.phase_component(ip, {**values, path: 0.0}))
+            probe = np.asarray(model.phase_component(
+                ip, {**values, path: _EXTINCTION_PROBE}))
+        finally:
+            cp.skip_extinction = held
+        a = (probe - base) / _EXTINCTION_PROBE * w
+        block = partners() if block is None else block
+        beta, *_ = lapack.lstsq(block, a, rcond=None)
+        perp = a - block @ beta
+        norm = float(perp @ perp)
+        lean = float(perp @ r)
+        if not (norm > 0.0 and lean > 0.0):
+            continue
+        # in units of the reduced χ² the esds are quoted in, inflation
+        # included, so the score is the squared significance a declared
+        # coefficient would be reported at
+        score = lean * lean / norm / stats.chi2 / (stats.esd_inflation or 1.0) ** 2
+        if score < AIR_SCATTER_UNDECLARED_SCORE:
+            continue
+        out.append(Diagnostic(
+            level="warning", code="EXTINCTION_UNDECLARED", where=[path],
+            message=(
+                f"Phase {phase.name!r} declares no extinction, and its strongest "
+                "reflections are calculated stronger than observed. Freeing "
+                "extinction, with the scales, the background and the free "
+                "intensity parameters re-fitted and the line positions held, "
+                f"would remove {score:.0f}× this fit's "
+                "reduced χ² (a score test on the fit's own residual)."),
+            suggestion=(
+                f"Declare it with structure.phases[{ip}].extinction = 0.0, free "
+                f"phases.{ip}.extinction and refit. Preferred orientation "
+                f"(structure.phases[{ip}].preferred_orientation) and a wrong Biso "
+                "also change the strong lines, so read its esd and its "
+                "correlation with the scale before quoting it."),
+            value=score,
+        ))
+    return out
+
+
 def _quantify_phases(table: ParameterTable, theta: np.ndarray,
                      stderr_internal: np.ndarray | None,
                      correlation: np.ndarray | None, structure: Structure,
@@ -10645,6 +10832,9 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
     is now ``max_iter ×`` :data:`~rietx.optimize.least_squares.NFEV_PER_ITERATION`,
     sized from the measured worst-case rejection rate, so a stage that stalls
     reports it roughly 30x sooner with its answer unchanged.
+
+    A stage the slow-descent rule stopped (WP-1334) is ``converged`` and
+    never reaches this code: :func:`_slow_descent_diagnostics` names it.
     """
     hit = [s.name for s in stage_results if s.status == "max_iter"]
     if not hit:
@@ -10659,6 +10849,46 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
         where=[],
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",
+    )]
+
+
+def _slow_descent_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``STAGE_SLOW_DESCENT``: the stages the slow-descent rule stopped.
+
+    The rule (WP-1334, ``optimize.lm.SLOW_DESCENT_ESD``) ends a stage whose
+    cost is still falling, but so slowly that the next
+    :data:`~rietx.optimize.lm._SLOW_DESCENT_HORIZON` evaluations would move
+    its parameters by less than one esd.  Such a stage reports ``converged``
+    (Yue's ruling of 2026-11-03), since more iterations would not change the
+    answer by an esd, which is McCusker et al. (1999) §7's test.  So this
+    code is ``info`` and only names the stages, read off
+    ``StageResult.termination``, so a reader can tell a slow crawl from a
+    stage that met the solver's own tests.  It states and gates nothing.
+    """
+    from .optimize import lm
+
+    slow = [s.name for s in stage_results if s.termination == "slow_descent"]
+    if not slow:
+        return []
+    esd = lm.SLOW_DESCENT_ESD
+    esds = "one esd" if esd in (None, 1.0) else f"{esd:g} esd"
+    one = len(slow) == 1
+    return [Diagnostic(
+        level="info", code="STAGE_SLOW_DESCENT",
+        message=(("Stage " if one else "Stages ")
+                 + ", ".join(repr(n) for n in slow)
+                 + " stopped while " + ("its" if one else "their")
+                 + " χ² was still falling slowly. At that rate, another "
+                 f"{lm._SLOW_DESCENT_HORIZON} evaluations would have moved "
+                 + ("its" if one else "their")
+                 + f" parameters by less than {esds}, so the "
+                 + ("stage counts" if one else "stages count")
+                 + " as converged."),
+        where=[],
+        suggestion="Quote the stage's answer as converged. A high correlation "
+                   "or a bound hit reported for the same parameters names a "
+                   "shallow direction the descent may have crawled along, "
+                   "and its own suggestion names the remedies.",
     )]
 
 

@@ -330,7 +330,7 @@ from .._nearmiss import did_you_mean
 #: header says 0.35 or later is never walked.
 #: 0.35 → 0.36 (WP-1469, issue #481): ``SeriesEntry.rwp_fence`` — the Rwp
 #: limit the chain's fence set at the pattern, so the verdict on a kept
-#: attempt still above it (``SEQUENTIAL_RWP_OUTLIER``) is read off the entry —
+#: attempt still above it (``SEQUENTIAL_RWP_OUTLIER``, gone in 0.60) is read off the entry —
 #: and ``SeriesResult.discontinuities`` (``list[SeriesStep]``), the pair each
 #: ``SEQUENTIAL_DISCONTINUITY`` names in prose.  Both additive and defaulted to
 #: ``None``, the rule of 0.25 → 0.26: a series from before this may have had
@@ -585,6 +585,25 @@ from .._nearmiss import did_you_mean
 #: cannot be rebuilt as every step, so a document's ``discontinuities`` key is
 #: dropped at read (``SeriesResult``'s ``mode="before"`` validator) and its
 #: ``steps`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2003, C1): ``SeriesEntry.rwp_fence`` replaced by
+#: ``SeriesEntry.rwp_over_median``, the kept attempt's Rwp over the accepted
+#: median with no threshold.  Not additive: the factor that scaled the old
+#: limit is not on the entry, so an entry's ``rwp_fence`` key is dropped at
+#: read (``SeriesEntry``'s ``mode="before"`` validator) and its
+#: ``rwp_over_median`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2003, C6): ``SeriesResult.code_counts``, a
+#: ``SeriesCodeCount`` per per-pattern code and path with its count, the
+#: series length and the worst level.  Additive and defaulted to ``None``,
+#: "not recorded", the 0.25 → 0.26 rule; ``SequentialRefinement.fit`` writes
+#: it on every series.  ``SEQUENTIAL_PERSISTENT_FINDING``, the threshold it
+#: replaces, is gone, so a document carrying one still reads.
+#: Also in 0.60 (WP-2003, C5): ``SeriesResult.direction_gaps``, a
+#: ``DirectionGap`` per path and pattern under ``direction="both"``.  Additive
+#: and defaulted to ``None``, "not compared"; ``SequentialRefinement.fit``
+#: writes it whenever the two chains were compared.
+#: ``SEQUENTIAL_PATH_DEPENDENT`` is gone, and ``SEQUENTIAL_PATH_CHECK_NOT_RUN``
+#: takes the ``warning`` half of ``SEQUENTIAL_PATH_CHECK_INCOMPLETE``; a stored
+#: INCOMPLETE at ``warning`` still reads as not run.
 #: Also in 0.60 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
 #: formula and temperature read, and ``PeakList.instrument_undeclared``,
 #: the instrument blocks the picker found at default on a lab source.  Additive
@@ -631,6 +650,10 @@ from .._nearmiss import did_you_mean
 #: its own frozen compile, the number ``stage_end`` already emitted.  Additive
 #: and defaulted to ``None``, "a result stored before the field", the 0.25 →
 #: 0.26 rule; all three runners write it on every stage.
+#: Also in 0.60 (WP-1334): ``StageResult.termination``, which test ended the
+#: solve, the token ``stage_end`` already emitted; ``slow_descent`` is the LM
+#: driver's new one (``optimize.lm.SLOW_DESCENT_ESD``).  Additive and
+#: defaulted to ``None``, the same rule.
 #: Also in 0.60 (WP-1991, Yue's ruling of 2026-11-01): a ``SeriesResult``'s
 #: paths read one series numbering, matched by phase name and atom label
 #: (``SeriesResult.phase_names``/``.atom_labels``), and
@@ -990,6 +1013,20 @@ class _InheritsDeclaredDefaults(Base):
     _declared_since: ClassVar[str] = "0.35"
     #: A class-specific way out, appended to the out-of-range refusal.
     _declared_escape: ClassVar[str] = ""
+    #: An opt-in ``Parameter | None`` field has no default to carry its range,
+    #: so it names one here (``Phase.extinction``, WP-1944): field name → a
+    #: factory for the ``Parameter`` whose range and unit a declaration inherits.
+    _declared_optional: ClassVar[dict] = {}
+
+    @classmethod
+    def _declared_default(cls, name: str):
+        """The factory whose ``Parameter`` carries field ``name``'s declared
+        range, or ``None`` where the field declares none.  One answer for
+        construction and for the history reader's repair."""
+        info = cls.model_fields[name]
+        if info.annotation is Parameter and info.default_factory is not None:
+            return info.default_factory
+        return cls._declared_optional.get(name)
 
     @model_validator(mode="before")
     @classmethod
@@ -997,8 +1034,9 @@ class _InheritsDeclaredDefaults(Base):
         if not isinstance(data, dict):
             return data
         data = dict(data)
-        for name, info in cls.model_fields.items():
-            if info.annotation is not Parameter or info.default_factory is None:
+        for name in cls.model_fields:
+            factory = cls._declared_default(name)
+            if factory is None:
                 continue
             if name not in data:
                 continue  # omitted: default_factory already carries the range
@@ -1017,7 +1055,7 @@ class _InheritsDeclaredDefaults(Base):
             # write-back leaves the last site's value in all of them (PR #206's
             # behaviour, kept).  Sharing *on purpose* states every attribute —
             # ``Harmonic.weight``'s default does, being its line's by reference
-            fills = declared_fills(info.default_factory(), set(present))
+            fills = declared_fills(factory(), set(present))
             if not fills:
                 continue
             try:
