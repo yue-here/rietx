@@ -3,7 +3,6 @@
 Milestone: unscheduled · Status: 🔄 2026-11-02 — the 11-01 nightly's three red rows and two cancelled nights answered (PR #1309); WP-2050 merged, so a green nightly waits on #1309 alone
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
-Priority: P3 2026-11-02 — every task here is done; a green nightly waits on PR #1309 merging
 
 ## Goal
 
@@ -133,8 +132,6 @@ and 2045 on 2026-10-25):
 - **An indexing answer's axis order moves with the platform** (WP-2043):
   notebook 03's orthorhombic P cell printed a and c swapped on Linux. No prose
   quotes the order, so nothing fails.
-
-### Inherited
 
 ## Non-goals
 
