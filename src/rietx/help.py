@@ -3435,6 +3435,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The reader dropped rows from the file, for one of two reasons, and the "
             "message says which. Every reader drops a point whose 2θ, count or error "
             "estimate is NaN or infinite, and names the dropped points by their 2θ. "
+            "On a time-of-flight pattern, flight time takes the place of 2θ. "
             "A NaN is what a reduction writes where it divided by a zero monitor or "
             "detector efficiency, so these points hold no measurement. Left in, one "
             "such point made every statistic of the fit NaN. The two- and "

@@ -16,7 +16,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1132](1132-neutron-specimen-absorption.md) | A neutron µR, from the table this package already ships | 2026-10-01 | P2 | [Unscheduled](#unscheduled-the-specimen-is-not-an-angle-and-the-neutron-follow-through) |
 | [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 2026-10-21 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1325](1325-parametric-series.md) | Parametric series: a parameter as a function of each pattern's coordinates | 2026-11-04 | P2 | [parametric](#parametric) |
-| [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 2026-10-07 | P2 | [magnetic](#magnetic) |
+| [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 2026-11-04 | P2 | [magnetic](#magnetic) |
 | [1335](1335-the-report-costs-more-than-the-fit.md) | The report costs more than the fit | 2026-11-02 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 2026-10-25 | P2 | [magnetic](#magnetic) |
 | [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-11-01 | P2 | [magnetic](#magnetic) |
@@ -45,6 +45,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-10-24 | P3 | [generality](#generality-the-audits) |
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-11-01 | P3 | [generality](#generality-the-audits) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 2026-11-05 | P2 | [generality](#generality-the-audits) |
 | [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 2026-11-02 | P2 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
@@ -54,7 +55,9 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 2026-11-01 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2109](2109-the-solve-cost-at-a-stated-march-dollase-r.md) | The solve cost at a stated March-Dollase r | 2026-11-05 | P3 | [structure-solution](#structure-solution) |
 
 ## Next, by priority
 
@@ -71,10 +74,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1998](1998-a-suggestion-past-its-bound.md) | A suggestion whose gain lies past its bound | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2004](2004-the-fitreport-reasons-for-the-caller.md) | The FitReport reasons for the caller: its gates, actions and thresholds | P2 | [2002](2002-the-single-fit-actions.md), [2003](2003-the-chain-actions.md) | [generality](#generality-the-audits) |
 | [2015](2015-the-declared-geometry-picks-the-plan.md) | The declared geometry picks the plan, and a geometry can be unstated | P2 | — | [generality](#generality-the-audits) |
-| [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | P2 | [2002](2002-the-single-fit-actions.md) | [generality](#generality-the-audits) |
 | [2020](2020-opt-in-sets-of-bounds-and-defaults-per-scenario.md) | Opt-in sets of bounds and defaults for a scenario, tested on the datasets they name | P2 | — | [generality](#generality-the-registry-and-the-guard) |
 | [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | P2 | — ([1969](1969-an-exhaustive-search-that-ends-in-no-cell.md), [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | P2 | — ([2003](2003-the-chain-actions.md) soft) | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2088](2088-an-assigned-parameter-inherits-its-declared-range.md) | An assigned Parameter inherits its declared range | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | P2 | — | [parametric](#parametric) |
@@ -393,7 +394,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [1326](1326-satellites-without-a-moment.md) | Satellites at G ± k, with no moment model: is it magnetic? | ✅ 2026-10-23 | — | — |
-| [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 🔄 2026-10-07 | P2 | [1326](1326-satellites-without-a-moment.md) |
+| [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 🔄 2026-11-04 | P2 | [1326](1326-satellites-without-a-moment.md) |
 | [1328](1328-magnetic-interchange.md) | Magnetic interchange: magCIF in and out, and the readers stop refusing | ✅ 2026-10-03 | — | [1327](1327-magnetic-structure.md) ([1118](1118-foreign-model-files.md) soft) |
 | [1329](1329-moment-in-a-series.md) | The moment in a series: the onset, the hold, the trajectory | ✅ 2026-11-01 | — | [1327](1327-magnetic-structure.md) ([1326](1326-satellites-without-a-moment.md) soft) |
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 🔄 2026-10-25 | P2 | [1327](1327-magnetic-structure.md) ([1326](1326-satellites-without-a-moment.md) soft) |
@@ -442,7 +443,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1901](1901-the-difference-fourier-map.md) | The difference-Fourier map: a missing atom shows as a peak | ⬜ | P3 | — |
 | [1902](1902-the-solve-cost-as-a-quadratic-form.md) | The solve cost as a quadratic form, and the doublet question first | ✅ 2026-10-03 | — | — |
 | [1997](1997-the-direct-space-solver-on-main.md) | The direct-space solver on main: site classes, kernels, chemistry, engine and entry point | 🔄 2026-11-05 | P2 | [1902](1902-the-solve-cost-as-a-quadratic-form.md), [1940](1940-the-kernel-tier-in-a-wheel.md) ([1901](1901-the-difference-fourier-map.md) soft) |
-| [2109](2109-the-solve-cost-at-a-stated-march-dollase-r.md) | The solve cost at a stated March-Dollase r | ⬜ | P3 | [1902](1902-the-solve-cost-as-a-quadratic-form.md) |
+| [2109](2109-the-solve-cost-at-a-stated-march-dollase-r.md) | The solve cost at a stated March-Dollase r | 🔄 2026-11-05 | P3 | [1902](1902-the-solve-cost-as-a-quadratic-form.md) |
 
 ## <a id="generality"></a>generality — every decision rietx makes holds beyond the data it was tuned on
 
@@ -469,7 +470,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 🔄 2026-11-01 | P3 | — |
 | [2015](2015-the-declared-geometry-picks-the-plan.md) | The declared geometry picks the plan, and a geometry can be unstated | ⬜ | P2 | — |
 | [2016](2016-a-cif-adp-off-symmetry-by-rounding-is-projected.md) | A literature CIF's U^ij that breaks site symmetry only by rounding is projected, and says so | ✅ 2026-11-02 | — | — |
-| [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | ⬜ | P2 | [2002](2002-the-single-fit-actions.md) |
+| [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 🔄 2026-11-05 | P2 | [2002](2002-the-single-fit-actions.md) |
 | [2018](2018-the-clash-table-measured.md) | The clash table: actions that read or move the same parameter, measured both ways | ⬜ | P3 | — |
 
 ### <a id="generality-the-prose"></a>The prose
@@ -634,7 +635,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2071](2071-a-peak-list-refuses-a-q-esd-its-two-theta-esd-does-not-give.md) | A peak list refuses a q_esd that its two_theta_esd does not give | ✅ 2026-11-01 | — | — |
 | [2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) | The result records its fit range, and what lies outside it | ⬜ | P3 | — ([2005](2005-refine-py-codes-and-literals.md) soft) |
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 🔄 2026-11-05 | P2 | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) |
-| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | ⬜ | P2 | — ([1969](1969-an-exhaustive-search-that-ends-in-no-cell.md), [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) soft) |
+| [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 🔄 2026-11-05 | P2 | — ([1969](1969-an-exhaustive-search-that-ends-in-no-cell.md), [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) soft) |
 | [2079](2079-a-non-finite-count-is-dropped-and-said.md) | A non-finite count or σ in a pattern file is dropped, and the reader says so | ✅ 2026-11-03 | — | — |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 🔄 2026-11-02 | P2 | [2003](2003-the-chain-actions.md) |
 | [2082](2082-a-stated-prior-is-not-an-engine-in-the-grade.md) | A stated prior is not an engine in the grade | ✅ 2026-11-02 | — | — |

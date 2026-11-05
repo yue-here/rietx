@@ -1,6 +1,6 @@
 # WP-2078 — Weak lines from another phase push the true cell off rank 1
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-05 — task 2 done (PR #1341, merged at `4eecc6632`): the three fixtures and the truth's rank on `main`; the WP stays open, task 1 is free, and the first Linux nightly owes a reading of the as-picked row
 Track: What fires, and what stays silent
 Depends on: — (1969 soft: the inlier rule answers the same failure by another mechanism; 2066 soft: the reporter's dichotomy rows predate it)
 Priority: P2 2026-11-02 — a ranking defect with a hand workaround: on the reporter's private benchmark the true cell ranks first on 48 of 172 host and one-impurity lists under all three engines, and on 75 when the search is given only the lines at or above 1 % of the strongest; thinning the list by hand is the workaround
@@ -235,6 +235,18 @@ position-only list returns the same candidates as on `main`.
   driven).
 
 ## Handover log
+
+- **2026-11-05** (post-merge record) — PR #1341 merged at `4eecc6632`. It
+  carries task 2's own entry, the second of the two below. Task 2 is done and
+  the WP stays open.
+  *Owed:* the slow rows of `RANK_ON_MAIN` have run on macOS only. The first
+  Linux nightly after this merge is their first reading on another platform,
+  so read `test_truth_rank_on_main[a-0]` there (fixture (a) as picked). That
+  search took 17-30 s on the Mac, and a CI leg runs 3-4× slower, against the
+  120 s ceiling. If the ceiling cuts it, the row and
+  `test_a_trace_second_phase_leaves_the_truth_first` both skip, and (a)'s range
+  needs narrowing again. If the row passes, its rank stands on both platforms.
+  *Next:* that reading, then task 1 (free) and task 3.
 
 - **2026-11-02** — created, from the 2026-11-02 issue triage (issue #1291).
   Checked against the tree at `992b7048f`: every symbol the issue names

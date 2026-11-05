@@ -260,6 +260,10 @@ absences; Si, corundum and magnetite keep their correct cells.
 
 ## Handover log
 
+- **2026-11-05** (post-merge record) — PR #1353 merged at `7ac1f54c1`. Its own
+  entry is below and lacked the sha. Status stays 🔄, and task 5 still waits on
+  the maintainer's ruling on #916.
+
 - **2026-11-02** — task 5 measured: `fom_panel_disagrees` on the #916 arms after
   PR #1302, with no whole-run ceiling (ghostshift runner, PR #1353; no code
   changed). The reporter's 10-30 reading holds once the clock is taken out. Removing the flag
