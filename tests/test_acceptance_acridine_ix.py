@@ -4,8 +4,7 @@ The case is COD 2242872 (CC0): acridine form IX, C₁₃H₉N, P2₁/n, from Ste
 Schur, Lapidus & Bernstein (2019) *Acta Cryst.* E75, 489,
 doi:10.1107/S2056989019003645, with its NSLS X16C capillary pattern
 (λ 0.699789 Å, 6 601 points) deposited in the same file.  The body is the 14
-deposited heavy atoms (``body_from_atoms``, allowed by WP-1806's 2026-10-16
-Inherited entry) plus 9 riding H, and only its origin and orientation refine.
+deposited heavy atoms (``body_from_atoms``) plus 9 riding H, and only its origin and orientation refine.
 
 This file asserts what the body machinery owns, and nothing about the
 published esds:
@@ -22,9 +21,11 @@ published esds:
   ``KNOWN_ANSWER_BOUND`` of rietx's esds; a regular-hexagon template refitted
   the same way does not.
 
-The bar against the published esds is part 2 of WP-1806 and undecided, so the
-per-atom option-(3) table (|Δ|, published esd, rietx esd, ratio) is written to
-``tests/output/acridine_ix_option3_table.md`` as a record and asserts nothing.
+The deposited coordinates are another model's answer under another protocol
+(``docs/DESIGN.md`` Rule 2), so they judge nothing here: the per-atom table
+against the deposit (|Δ|, published esd, rietx esd, ratio) is written to
+``tests/output/acridine_ix_deposit_table.md`` as a record and asserts nothing.
+Part 2's bar is a free-atom control in rietx (WP-1806 ``### Inherited``).
 
 **The protocol** is the authors' profile as the 2026-10-16 measurement read it
 from the paper: Debye-Scherrer, a 10-term Chebyshev plus one broad Gaussian
@@ -32,8 +33,10 @@ hump, TCHZ U V W X Y, FCJ asymmetry, Stephens 2/m strain seeded at 1000 ppm,
 March-Dollase along (100), one Biso for the heavy atoms with the H at 1.5×, a
 zero shift and the cell, in four cumulative stages.  **FCJ H/L is held at
 0.01**: on this pattern S/L and H/L are one direction (ρ −1.000 on main at
-feae4c75, 2026-10-27), and holding H/L moves no coordinate by more than 0.01
-of the option-(3) bar, so freeing both buys nothing but a flat direction.
+feae4c75, 2026-10-27), and holding H/L moves no heavy-atom coordinate by more
+than 0.041 of rietx's own esd (median 0.011, 42 components, deposited start,
+Rwp 0.058424 held against 0.058395 freed), so freeing both buys nothing but a
+flat direction.
 """
 
 from __future__ import annotations
@@ -248,12 +251,13 @@ def _ratios(phase: Phase) -> dict[str, list[float]]:
     return out
 
 
-def _option3_table(phase: Phase, rwp: float) -> str:
-    """The per-atom table against the published esds: a record, not a bar."""
+def _deposit_table(phase: Phase, rwp: float) -> str:
+    """The per-atom table against the deposit: a record, not a bar."""
     pub, _ = _published()
-    lines = ["# Acridine form IX, deposited start: the option-(3) record (not asserted)",
+    lines = ["# Acridine form IX, deposited start: the deposit record (not asserted)",
              "", f"Rwp {rwp:.5f}.  ratio = |Δ| / max(published esd, rietx esd), "
-             "per component; WP-1806 part 2 decides what bar, if any, it meets.", "",
+             "per component.  A record: it asserts nothing, and part 2's bar is a "
+             "free-atom control in rietx.", "",
              "| atom | axis | |Δ| frac | published esd | rietx esd | ratio |",
              "|---|---|---|---|---|---|"]
     for lab, (xyz, esd) in _heavy(phase).items():
@@ -301,8 +305,8 @@ def real_deposited(pattern):
                                     perturb=False)), pattern)
     _draw(result, "acridine_ix_real_deposited_start")
     OUT.mkdir(exist_ok=True)
-    (OUT / "acridine_ix_option3_table.md").write_text(
-        _option3_table(ref.fitted_structure.phases[0], result.statistics.rwp), encoding="utf-8")
+    (OUT / "acridine_ix_deposit_table.md").write_text(
+        _deposit_table(ref.fitted_structure.phases[0], result.statistics.rwp), encoding="utf-8")
     return ref, result
 
 
@@ -380,6 +384,10 @@ def test_an_intra_body_distance_has_no_esd_and_an_inter_body_one_has_a_full_esd(
         [(d.atom_1, d.atom_2, d.stderr) for d in intra if d.stderr is not None][:5]
     assert all(d.stderr is not None and d.stderr > 0.0 for d in inter), \
         [(d.atom_1, d.atom_2, d.symmetry_2) for d in inter if not d.stderr][:5]
+    # "full" means the covariance's off-diagonals are in it: a fall-back to the
+    # diagonal-only esd would pass every line above (Yue, #1416 review)
+    assert any(abs(d.stderr / d.stderr_diagonal - 1.0) > 0.01 for d in inter
+               if d.stderr_diagonal), "every inter-body esd equals its diagonal-only one"
     heavy = [d for d in inter if d.atom_1 in HEAVY and d.atom_2 in HEAVY]
     assert heavy and all(math.isfinite(d.stderr) for d in heavy)
 

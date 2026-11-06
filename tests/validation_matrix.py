@@ -243,8 +243,10 @@ DATASETS: dict[str, Dataset] = {
         "Bernstein (2019) Acta Cryst. E75, 489: synchrotron capillary data "
         "at lambda 0.699789 A deposited with the structure in one CC0 COD "
         "file.  A molecular crystal refined as one rigid body; no row asserts "
-        "against the published esds (WP-1806 part 2), so every row referenced "
-        "to it is about the body machinery, not the structure's accuracy",
+        "against the deposited coordinates or their esds, which are another "
+        "model's answer under another protocol (docs/DESIGN.md Rule 2), so "
+        "every row referenced to it is about the body machinery, not the "
+        "structure's accuracy",
         "characterisation"),
 }
 
@@ -2891,7 +2893,7 @@ CLAIMS: tuple[Claim, ...] = (
     ),
     Claim(
         "test_acceptance_acridine_ix", "test_an_intra_body_distance_has_no_esd_and_an_inter_body_one_has_a_full_esd",
-        "acridine_ix", ("identity",),
+        "acridine_ix", ("identity", "ceiling"),
         "a distance inside the rigid body is held exactly, so it reports no "
         "esd rather than a small one; a contact to another molecule reports a "
         "full one",
@@ -2900,8 +2902,9 @@ CLAIMS: tuple[Claim, ...] = (
                   "cancels below VARIANCE_CANCELLATION_FLOOR and the honest "
                   "answer is absent (WP-1072)",
         measured="212 intra-body rows, all None; 112 inter-body rows, all with "
-                 "an esd; shortest heavy-atom contact N1...C7 3.4824(36) A, "
-                 "diagonal-only 0.0038",
+                 "an esd; the full esd differs from the diagonal-only one by more than "
+                 "1 % on 100 of the 112 (ratio 0.81 to 1.13); shortest "
+                 "heavy-atom contact N1...C7 3.4824(36) A, diagonal-only 0.0038",
     ),
     Claim(
         "test_acceptance_acridine_ix", "test_a_simulated_known_answer_is_recovered_from_the_perturbed_start",
@@ -2918,7 +2921,7 @@ CLAIMS: tuple[Claim, ...] = (
     ),
     Claim(
         "test_acceptance_acridine_ix", "test_a_regular_hexagon_template_fails_the_known_answer_bound",
-        "acridine_ix", ("characterisation",),
+        "acridine_ix", ("characterisation", "ceiling"),
         "the positive arm: the same simulated pattern refitted with a regular "
         "hexagon template (C-C 1.39, C-N 1.34 A, floor 0.064 A RMS) breaks the "
         "bound above, so that bound can fail",
@@ -3139,8 +3142,9 @@ SUITE_INTROS: dict[str, str] = {
         "on the real data; the esd rules (an intra-body distance is absent, an "
         "inter-body one is full); and a simulated known answer whose positive "
         "arm, a regular-hexagon template, must fail.  The per-atom table "
-        "against the published esds is written to tests/output/ as a record "
-        "and asserts nothing: that bar is part 2."
+        "against the deposit is written to tests/output/ as a record and "
+        "asserts nothing; part 2's bar is a free-atom control in rietx "
+        "(WP-1806 Inherited)."
     ),
     "test_acceptance_extra_peaks": (
         "WP-1103's design case on real data: the SRM 660c protocol, "

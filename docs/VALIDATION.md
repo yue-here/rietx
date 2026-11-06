@@ -99,7 +99,7 @@ either fine or broken depending on which seed the suite happened to pin.
 | `cr2wo6_hb2a` | `tests/data/gsas2_hb2a_cr2wo6_4K.dat` | characterisation | HFIR HB-2A constant-wavelength neutron (lambda 2.4067 A) Cr2WO6 at 4 K, below its ordering temperature, and its 150 K partner gsas2_hb2a_cr2wo6_150K.dat, above it -- the GSAS-II Magnetic-II tutorial pair, vendored verbatim.  No certified moment exists, so every row referenced to it is characterisation: a moment the report supports below T_N and refuses above it |
 | `lamno3_bt1` | `tests/data/gsas2_bt1_lamno3_50K.gsas` | characterisation | NIST BT-1 constant-wavelength neutron (lambda 1.5403 A, Cu(311)) LaMnO3 at 50 K, below its ordering temperature, with the tutorial's own structure file -- the GSAS-II Magnetic-I tutorial, vendored verbatim.  k = 0, and two magnetic groups index every line.  The tutorial quotes no moment, so every row referenced to it is characterisation: which group the data prefers, and the shape of the moment it carries |
 | `srm1976a_plate` | `tests/data/srm1976a_corundum_xpert.xy` | cross-code | NIST SRM 1976a sintered corundum plate, lab Cu Ka on a Philips/PANalytical X'Pert with X'Celerator, 2013; a genuinely textured flat specimen, committed with its solved TOPAS refinement (PO_Spherical_Harmonics at order 4).  The certificate certifies relative intensities on another instrument, not this texture, so every row referenced to it is cross-code |
-| `acridine_ix` | `tests/data/cod_2242872.cif` | characterisation | Acridine form IX, C13H9N, P2_1/n, Stephens, Schur, Lapidus & Bernstein (2019) Acta Cryst. E75, 489: synchrotron capillary data at lambda 0.699789 A deposited with the structure in one CC0 COD file.  A molecular crystal refined as one rigid body; no row asserts against the published esds (WP-1806 part 2), so every row referenced to it is about the body machinery, not the structure's accuracy |
+| `acridine_ix` | `tests/data/cod_2242872.cif` | characterisation | Acridine form IX, C13H9N, P2_1/n, Stephens, Schur, Lapidus & Bernstein (2019) Acta Cryst. E75, 489: synchrotron capillary data at lambda 0.699789 A deposited with the structure in one CC0 COD file.  A molecular crystal refined as one rigid body; no row asserts against the deposited coordinates or their esds, which are another model's answer under another protocol (docs/DESIGN.md Rule 2), so every row referenced to it is about the body machinery, not the structure's accuracy |
 
 `consistency` is a fence, not a label: 11-BM calibrated its wavelength against
 SRM 660a LaB6 itself, so a refined LaB6 cell from that file reproduces the
@@ -1694,7 +1694,7 @@ The spherical-harmonics texture (WP-1960) on a sintered NIST SRM 1976a corundum 
 
 ### `tests/test_acceptance_acridine_ix.py`
 
-WP-1806 part 1: what the rigid body itself owns, on acridine form IX (COD 2242872, CC0), whose synchrotron pattern is deposited with the structure.  The body is the 14 deposited heavy atoms plus 9 riding H, and only its pose refines, under the authors' profile as read from the paper.  Four checks: the template round trip; start-independence on the real data; the esd rules (an intra-body distance is absent, an inter-body one is full); and a simulated known answer whose positive arm, a regular-hexagon template, must fail.  The per-atom table against the published esds is written to tests/output/ as a record and asserts nothing: that bar is part 2.
+WP-1806 part 1: what the rigid body itself owns, on acridine form IX (COD 2242872, CC0), whose synchrotron pattern is deposited with the structure.  The body is the 14 deposited heavy atoms plus 9 riding H, and only its pose refines, under the authors' profile as read from the paper.  Four checks: the template round trip; start-independence on the real data; the esd rules (an intra-body distance is absent, an inter-body one is full); and a simulated known answer whose positive arm, a regular-hexagon template, must fail.  The per-atom table against the deposit is written to tests/output/ as a record and asserts nothing; part 2's bar is a free-atom control in rietx (WP-1806 Inherited).
 
 #### `test_the_deposited_body_reproduces_the_deposited_atoms`
 
@@ -1718,13 +1718,13 @@ WP-1806 part 1: what the rigid body itself owns, on acridine form IX (COD 224287
 
 #### `test_an_intra_body_distance_has_no_esd_and_an_inter_body_one_has_a_full_esd`
 
-`identity` · dataset `acridine_ix`
+`identity` `ceiling` · dataset `acridine_ix`
 
 **Claims:** a distance inside the rigid body is held exactly, so it reports no esd rather than a small one; a contact to another molecule reports a full one
 
 **Referenced to:** the body's construction: an intra-body distance is constant under every free parameter, so its propagated variance cancels below VARIANCE_CANCELLATION_FLOOR and the honest answer is absent (WP-1072)
 
-**Measured:** 212 intra-body rows, all None; 112 inter-body rows, all with an esd; shortest heavy-atom contact N1...C7 3.4824(36) A, diagonal-only 0.0038
+**Measured:** 212 intra-body rows, all None; 112 inter-body rows, all with an esd; the full esd differs from the diagonal-only one by more than 1 % on 100 of the 112 (ratio 0.81 to 1.13); shortest heavy-atom contact N1...C7 3.4824(36) A, diagonal-only 0.0038
 
 #### `test_a_simulated_known_answer_is_recovered_from_the_perturbed_start`
 
@@ -1738,7 +1738,7 @@ WP-1806 part 1: what the rigid body itself owns, on acridine form IX (COD 224287
 
 #### `test_a_regular_hexagon_template_fails_the_known_answer_bound`
 
-`characterisation` · dataset `acridine_ix`
+`characterisation` `ceiling` · dataset `acridine_ix`
 
 **Claims:** the positive arm: the same simulated pattern refitted with a regular hexagon template (C-C 1.39, C-N 1.34 A, floor 0.064 A RMS) breaks the bound above, so that bound can fail
 
