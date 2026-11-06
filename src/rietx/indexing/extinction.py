@@ -912,6 +912,18 @@ def _model_is_quiet(two_theta: np.ndarray, y_calc: np.ndarray,
 # ----------------------------------------------------------------------
 # the screen
 # ----------------------------------------------------------------------
+#: The fixed Le Bail cycles of every fit the screen compares (WP-1542).  Its gates
+#: and margins are measured at this count, so a partition that settled would
+#: move them.  WP-2062 moves the screen to Pawley, which retires this.
+SCREEN_LEBAIL_CYCLES = 3
+
+
+def _fixed_partition(plan):
+    """The screen's partition: :data:`SCREEN_LEBAIL_CYCLES`, with no stop on the intensities."""
+    return replace(plan, stages=[replace(stage, lebail_cycles=SCREEN_LEBAIL_CYCLES, lebail_tol=0.0)
+                                 for stage in plan.stages])
+
+
 def _screen_plan(instrument: Instrument | None = None):
     """The one stage every class is fitted with: the background, and nothing else.
 
@@ -947,7 +959,8 @@ def _screen_plan(instrument: Instrument | None = None):
                   if COMPONENT_AGGREGATE.get(c.kind) == "background"]
     # one class's screen fit among several fitted alike: no closing stage
     # (WP-2002, the sixth round's Q1 and Q2)
-    return RefinementPlan(stages=[Stage("bkg", paths)], closing_window_tol=None)
+    return _fixed_partition(RefinementPlan(stages=[Stage("bkg", paths)],
+                                           closing_window_tol=None))
 
 
 def _with_background_width_humps(instrument: Instrument) -> Instrument:
@@ -1041,8 +1054,8 @@ def _prefit(data: PatternData, candidate: CellCandidate, instrument: Instrument,
     # the prefit's answer is the cell and widths every class is then compared
     # at, so it pays for no closing stage either (WP-2002, the sixth round's
     # Q1 and Q2; the screen's own fits and the validation's run without one)
-    plan = replace(resolve_plan("profile_only", "lebail"),
-                               closing_window_tol=None)
+    plan = _fixed_partition(replace(resolve_plan("profile_only", "lebail"),
+                                    closing_window_tol=None))
     result = ref.fit(data, mode="lebail", plan=plan,
                      two_theta_limits=two_theta_limits, telemetry=False,
                      cancel=cancel if hasattr(cancel, "is_set") else None)
@@ -1241,7 +1254,7 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         tt_max = float(np.max(data.tt()))
         if two_theta_limits is not None:
             tt_max = min(tt_max, float(two_theta_limits[1]))
-        plan = validation_plan(candidate, ins, two_theta_max=tt_max)
+        plan = _fixed_partition(validation_plan(candidate, ins, two_theta_max=tt_max))
         profile = pre.fit(data, mode="lebail", plan=plan,
                           two_theta_limits=two_theta_limits,
                           telemetry=False)      # the screen's own, not a run

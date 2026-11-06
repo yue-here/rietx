@@ -220,6 +220,24 @@ only"). RIETAN-FP 3.12 manual, by full-text search (one hit, on secondary
 extinction). BGMN by the binary's keyword table, with no manual
 installed.
 
+### Is powder extinction refined unasked?
+
+Surveyed 2026-11-03 for WP-1944 (issue #877), on whether a structural
+refinement frees extinction by default.
+
+| Program | Where the parameter lives | Refined by default | Mark |
+|---|---|---|---|
+| GSAS-II 5.8.4 | every phase-histogram pair carries `'Extinction': [0.0, False]` | no; the user ticks it | checked: `GSASIIddataGUI.py:1436`, `GSASIIphsGUI.py:9412`, `GSASIImath.py:6300` |
+| FullProf | `Extinc` on each phase's scale line, with its own codeword | no; a codeword of 0 holds it, and nothing turns it on unasked | recall, not checked |
+| TOPAS | no keyword (table above) | nothing to refine | checked, table above |
+| RIETAN-FP | none (table above) | nothing to refine | checked, table above |
+| BGMN | none found (table above) | nothing to refine | checked, table above |
+
+No program surveyed refines powder extinction unless the user asks. GSAS-II
+matches rietx's data shape: the parameter exists on every phase at 0. It
+differs in the refine flag. None of these programs ships a staged plan, so
+none has a stage that could free it on the user's behalf.
+
 ## A sharp peak no phase accounts for
 
 Surveyed 2026-10-25 for WP-2036, on what `tests/test_acceptance_extra_peaks.py` should assert.
@@ -304,7 +322,7 @@ When a fit goes wrong:
 
 | Program | Restart on a bad fit | A pattern that fails | Does the failure seed the next? |
 |---|---|---|---|
-| rietx | a rung at a time, collapsed warm refit, then the full plan from the warm state, then the full plan cold, when the fit diverges or its Rwp exceeds `RESEED_FACTOR` (1.25) × the median Rwp of the accepted patterns; the best attempt is kept, convergence before Rwp and a truncated rung below any completed one (`reseed=True`, checked) | diverged after every rung: quarantined, `SEQUENTIAL_UNRECOVERED`. Every rung raised: `on_error="carry"` records it (`SERIES_PATTERN_FAILED`) and the chain goes on; `"skip"` starts the successor cold, `"raise"` stops. Converged above the fence: kept, `SEQUENTIAL_RWP_OUTLIER` | no: the successor starts from the last accepted pattern, and a quarantined pattern joins no median (checked) |
+| rietx | a rung at a time, collapsed warm refit, then the full plan from the warm state, then the full plan cold, when the fit diverges, raises or carries an `error`-level code (an Rwp fence only where the caller passes `reseed_factor`, none by default since WP-2003); the best attempt is kept, an unrejected one before Rwp and a truncated rung below any completed one (`reseed=True`, checked) | still rejected after every rung: quarantined, `SEQUENTIAL_UNRECOVERED`. Every rung raised: `on_error="carry"` records it (`SERIES_PATTERN_FAILED`) and the chain goes on; `"skip"` starts the successor cold, `"raise"` stops. A high Rwp is kept and recorded, `SeriesEntry.rwp_over_median` | no: the successor starts from the last accepted pattern, and a quarantined pattern joins no median (checked) |
 | GSAS-II | none | a singular normal matrix ends the chain at that histogram ("Sequential refinement failed at histogram") and the histograms before it are written to the results table; an exception ends the run before that table is written (checked) | not applicable: the chain has stopped |
 | EasyDiffraction | none | an exception is caught and written as a failed row of `results.csv`, and the chain goes on (checked) | no: only a fit whose `fit_result.success` is true moves the start values (checked) |
 | MAUD | none | an exception that reaches the batch loop ends the batch; a fit that finishes, however poor, is saved and the next row runs (checked) | the next row reads whatever file it names (inferred) |
@@ -317,7 +335,7 @@ Order and flags:
 
 | Program | Reverse order | Forward-backward comparison | Test on steps between neighbours |
 |---|---|---|---|
-| rietx | `direction="backward"`; `"forward"` by default | `direction="both"`, off by default, runs the chain each way and flags a parameter whose two trajectories differ by more than `PATH_DEPENDENCE_SIGMA` (3) combined esds, `SEQUENTIAL_PATH_DEPENDENT` | none since WP-2003: `SeriesResult.steps` lists every step in esds of the later fit, largest first, with no threshold and no diagnostic (until then `SEQUENTIAL_DISCONTINUITY`, at 5× the median absolute step and 3 combined esds from 5 points); `verify_steps=k` refits the k largest pairs cold, 0 by default (checked) |
+| rietx | `direction="backward"`; `"forward"` by default | `direction="both"`, off by default, runs the chain each way and lists every path's gap per pattern in combined esds, largest first, with no threshold (`SeriesResult.direction_gaps`; until WP-2003 `SEQUENTIAL_PATH_DEPENDENT` at 3 combined esds) | none since WP-2003: `SeriesResult.steps` lists every step in esds of the later fit, largest first, with no threshold and no diagnostic (until then `SEQUENTIAL_DISCONTINUITY`, at 5× the median absolute step and 3 combined esds from 5 points); `verify_steps=k` refits the k largest pairs cold, 0 by default (checked) |
 | GSAS-II | "Reverse order?" (`Reverse Seq`), off by default | none | none. The results table colours a last-cycle Δχ² above 1 % yellow and above 10 % red, only with `ShowCell` on (off by default); a user-run cluster analysis offers outlier detection on the data (checked) |
 | EasyDiffraction | `reverse`, off by default ("useful when starting values are better matched to the last file") | none | none (checked) |
 | MAUD | the row order of the instruction file | none | none (checked) |
@@ -329,13 +347,13 @@ Order and flags:
 Anything else a series mode decides by itself:
 
 - rietx: stage seeds are zeroed on a warm start, so a neighbour's answer sitting on a floor is
-  not lifted; the collapsed first rung gets an evaluation budget of `first_rung_factor` (3.0) ×
-  the dearest converged first rung, once `FIRST_RUNG_SAMPLES` (3) have converged; a magnetic
+  not lifted; the collapsed first rung gets no evaluation budget unless the caller passes
+  `first_rung_factor` (none by default since WP-2003's C3, 2026-11-02); a magnetic
   moment the pattern does not support is floored before it seeds the next
   (`SEQUENTIAL_MOMENT_HOLD`); the wavelength-calibration diagnostic measures from the series
   root's declared λ, not the carried one; a cancelled
-  series returns what completed (`SEQUENTIAL_CANCELLED`); a finding on most patterns is
-  summarised once (`SEQUENTIAL_PERSISTENT_FINDING`) (checked).
+  series returns what completed (`SEQUENTIAL_CANCELLED`); every per-pattern code is
+  counted over the series (`SeriesResult.code_counts`, no threshold since WP-2003) (checked).
 - GSAS-II refuses to start a sequential refinement that refines a phase's lattice parameters
   or texture coefficients, and says to use the per-histogram Dij and C(L,N) instead. With
   `Copy2Next` on it prints the variables added or removed when a histogram's vary list
@@ -370,11 +388,11 @@ the step between neighbours. The rietx behaviours with a program default behind 
 rietx carries every entry where GSAS-II and EasyDiffraction carry the varied ones. A fixed
 entry holds the same value either way, so the two differ only where a fixed value changes
 during the chain. The behaviours with no program default behind them are rietx's own: the
-restart ladder with its Rwp fence (`RESEED_FACTOR`, the median, `_prefer`) and the first-rung
-budget; the quarantine's exclusion from the median; `direction="both"` and
-`SEQUENTIAL_PATH_DEPENDENT`; the discontinuity scan and its cold verification; and the moment
-floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the persistent-finding
-summary and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
+restart ladder (its Rwp fence and first-rung budget the caller's opt-ins since WP-2003, the
+median, `_prefer`); the quarantine's exclusion from the median; `direction="both"` and
+its gap list; the step list and its cold verification; and the moment
+floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the per-pattern code
+counts and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
 
 Parameters the setup fixes. Surveyed 2026-11-02 for WP-2081, one session. GSAS-II 5.8.4 is
 read in its source (`GSASIIstrMain.SeqRefine`, `GSASIIstrIO.ReadConstraints`,
@@ -398,6 +416,27 @@ series honours. And the cold rung restarts a pattern from the initial models, wh
 other program does (the restart table above), so what a held value is on that rung is a
 question only rietx has.
 
+How a person works a series. Surveyed 2026-11-04 for WP-2081, one session, against Yue's
+account of the traditional workflow recorded there. GSAS-II 5.8.4 is read in its source:
+`GSASIIplot.py` (the multi-pattern key commands, `:2067`, `:2213`), `GSASIIpwdplot.py` (`:140`),
+`GSASIIstrMain.py:996-1000`, `GSASIIstrIO.py:3019-3027` and `GSASIIpwdGUI.py:2506-2520`
+(`OnLimitCopy`). FullProf rests on its manual (`FullProf_Manual.pdf` shipped with 8.20: `Jbt`,
+`Nex` and the multi-pattern lines). TOPAS is recall only. MAUD, BGMN with Profex, RIETAN-FP
+and EasyDiffraction were not surveyed for this topic, and the literature was not searched.
+
+| Program | A view of the raw series before any fit | A second pass over the series | Rietveld beside Pawley or Le Bail in one fit | Excluded regions across a series |
+|---|---|---|---|---|
+| rietx | none: `plot_pattern` draws one pattern and the GUI's Series panel draws a frame only after the run (checked) | no verb. A `prepare` hook can start each frame from its own earlier answer, and the record still names the neighbour (measured, WP-2081) | no: `mode` is one value for a fit, and `Phase` has no mode field (checked) | a list on each `PatternData`, and the GUI copies the project's regions to every frame. Nothing reports a reflection crossing a region's edge (checked) |
+| GSAS-II | waterfall and contour plots over several histograms (checked) | with `Copy2Next` off, its default, each histogram starts its phase parameters from its own result in an earlier sequential run (`elif histogram in SeqResult`, checked) | per phase: `doPawley` on the phase, and a `LeBail` flag per phase and histogram (checked) | per histogram under Limits, and "Copy limits" copies them to other histograms (checked). Any warning for a reflection crossing an edge was not checked |
+| FullProf | not checked (WinPLOTR was not read) | the user reruns the cyclic mode on the rewritten PCR (inferred) | per phase: `Jbt` 0 is Rietveld and 2 is profile matching, in one PCR (checked in the manual) | `Nex` regions per pattern in a multi-pattern PCR (checked); cyclic mode reuses one PCR, so one list for every file (inferred) |
+| TOPAS | not checked | the user's script (inferred) | a `str` phase beside an `hkl_Is` phase in one `xdd` (recall) | `exclude` per `xdd` (recall) |
+
+Two of these change the comparison with rietx. A second pass is free in GSAS-II because each
+histogram keeps its own values between runs. rietx's chain starts every later frame from a
+neighbour, so its stages stay inside one frame. And GSAS-II and FullProf (TOPAS by recall)
+let a phase be fitted without a structure beside one fitted with a structure, where rietx
+sets that for the whole fit.
+
 ## A pdCIF weight column with bad entries
 
 Surveyed 2026-10-26 for PR #1173, by the lead. The question: a `_pd_proc_ls_weight` column with
@@ -420,6 +459,23 @@ data point not used for refinement". It states no meaning for a null.
 No program surveyed uses a pdCIF weight column at all. rietx's whole-column fallback
 therefore never trusts the file less than practice does. GSAS-II's unused code shows one
 intent: a null weight means an excluded point.
+
+## A NaN or infinite value in a pattern file
+
+Surveyed 2026-11-01 for WP-2079 (issue #1187), and its GSAS-II row re-read 2026-11-03. The
+question: a pattern file whose count, σ or 2θ is NaN or ±inf on some rows, as a reduction writes
+where it divided by a zero monitor. Does a reader drop the row, keep it at zero weight, or refuse
+the file?
+
+| Program | What it does with the row |
+|---|---|
+| rietx | Every reader drops a row whose 2θ, count or σ is NaN or ±inf and reports `PATTERN_ROWS_DROPPED` with the 2θ of the dropped rows; a file with no finite row is refused. Bruker RAW refuses the file instead, since a non-finite float32 there means a wrong stride (checked, `io/formats/base.py` `finite_rows`) |
+| GSAS-II 5.8.4 | `imports/G2pwd_xye.py:170-201` passes the columns through `nan_to_num`: a NaN count or σ becomes y = 0 at weight 0, so the point stays in the pattern and leaves the fit, silently. A +inf count with a finite σ becomes y ≈ 1.8e308 at weight 1/σ², and a NaN 2θ passes through (checked by reading, not run). One importer only |
+| FullProf, TOPAS, RIETAN-FP, BGMN, MAUD, EasyDiffraction | Not checked |
+
+Dropping and zero weight give the same χ². The two differ in what the pattern holds afterwards:
+GSAS-II keeps the point to plot, and rietx's pdCIF reader likewise keeps a zero-weight point as an
+excluded region.
 
 ## A magCIF in a non-standard orientation
 
@@ -462,7 +518,7 @@ calls its Pawley-type mode "LeBail". TOPAS was read at Technical Reference v5 (�
 
 | Program | Offers | Default or first steer | Le Bail re-extraction | Pawley overlap handling |
 |---|---|---|---|---|
-| rietx | both | no default argument picks either (`mode` defaults to `rietveld`); the indexer's validation fit is Pawley since WP-2011 | `lebail_cycles` = 3 partitions before each least-squares *run*, none inside it | seeded from one Le Bail partition; overlapped groups held by an equal-split restraint and flagged |
+| rietx | both | no default argument picks either (`mode` defaults to `rietveld`); the indexer's validation fit is Pawley since WP-2011 | a partition before and after each least-squares *run*, none inside it, repeated until a cycle moves 1e-7 of the Bragg counts under a cap of 25000 cycles (WP-1542; 3 fixed cycles before it) | seeded from one Le Bail partition; overlapped groups held by an equal-split restraint and flagged |
 | GSAS-II 5.8.4 | both | neither is on by default (`doPawley` and the histogram's `LeBail` both False); a "Start Le Bail extraction?" button on each histogram, Pawley a Phase › General checkbox | once per least-squares iteration under the default analytic Hessian (checked) | reflections exactly overlapped by symmetry tied equal; a negative-intensity penalty, weight 0 by default |
 | FullProf 8.20 | Le Bail only (`Jbt` = 2, profile matching) | the manual advises profile matching before Rietveld when the model is crude | every least-squares cycle (ran); stops when χ² changes by < 1e-3 | not offered |
 | TOPAS (TR v5) | both | Pawley: "The default is Pawley refinement, the keyword lebail triggers a Le Bail refinement" (§8, p.84) | every iteration, a "two-step cyclic process"; "convergence is usually slow" | each intensity a parameter from 1; no rule stated |
@@ -476,6 +532,20 @@ refinement, once per least-squares cycle or iteration.** rietx re-extracts only 
 solves, so one rietx Le Bail pass is one cycle of everyone else's. Of the two programs that
 offer both, TOPAS defaults to Pawley and GSAS-II defaults to neither. MAUD steers Le Bail
 first and then Pawley. No program makes a structure-free fit the default mode.
+
+**How many cycles, and what stops them** (survey for WP-1542, 2026-11-05; GSAS-II source
+checked, the rest from the table's sources). No surveyed program stops on the extracted
+intensities at a fixed model. GSAS-II's `DoLeBail` runs a fixed `cycles=10`
+(`GSASIIstrMain.py:761`, the loop near `:825`), and in a refinement it extracts once per
+least-squares iteration and stops on the relative change in χ² (1e-3, at most 3 cycles by
+default). FullProf extracts once per cycle and stops when χ² changes by under 1e-3. TOPAS
+extracts every iteration and RIETAN-FP every cycle. MAUD runs up to 5 inner iterations. Le Bail
+(2005) gives no rule for the count, and says only that one pass is not enough to reach the
+minimum Rwp. In those programs the model moves between extractions, so many cycles accumulate
+over a refinement. rietx holds the model frozen through a solve (the frozen-per-stage rule),
+so one partition has to carry what those cycles carry. That is why rietx alone has a stop on
+the intensities, and why it accelerates the step: plain repetition needed 17 512 cycles on
+one partition of a real neutron pattern at ten times this tolerance.
 
 **GSAS-II** (source, checked). `GetFobsSq`, the Le Bail update, runs at the end of every
 derivative pass (`GSASIIstrMath.py:4808`, `:4929`) and overwrites the calculated F² with the
@@ -517,6 +587,26 @@ The paper gives no timings.
 
 Not determined: TOPAS v9 and its Pawley overlap rule, FullProf's current manual, the Profex
 5.7.2 manual. MAUD, BGMN and RIETAN-FP were not run.
+
+## Ranking extinction symbols: which fit, and how a weak line is judged
+
+Surveyed 2026-11-05 for WP-2076, from the GSAS-II source and a web search. The paper corpus
+holds neither ExtSym paper, so the ExtSym row rests on its abstract and its catalogue records.
+
+| Program | What the ranking reads | How a weak line enters |
+|---|---|---|
+| rietx (main) | a Le Bail χ² per class against an absence-free reference, as ΔBIC | a testable forbidden position counts ln N in the class's favour, and a window test at 3σ refutes |
+| ExtSym (Markvardsen et al. 2001, 2008) | integrated intensities and their errors, from a Pawley-type fit. Validated on TF12LS output, then on DASH, FullProf, GSAS, PRODD and TOPAS output | a probability per symbol. The abstract says the result depends heavily on the accuracy of the error estimates |
+| GSAS-II 5.8.4 | no extinction-symbol ranking found. The Unit Cells tab lists space groups for a cell with M20 and X20 (`GSASIIpwdGUI.py:737-768`) | not applicable |
+| TOPAS, FullProf | not checked | not checked |
+
+**The Le Bail partition clamps in GSAS-II too.** `ComputeFobsSqCW` keeps a channel only where the
+observed-over-calculated ratio is positive (`GSASIImpsubs.py:177`, checked), which is the
+channel clamp `lebail_update` applies through `max(net, 0)`. The bias was not measured in
+GSAS-II, and the two programs' peak windows were not compared.
+
+Not determined: how DASH or TOPAS rank without ExtSym, and what EXPO2014's statistical
+approach reads.
 
 ## A volume window from the formula, in indexing
 
@@ -657,6 +747,99 @@ So no program reports a fit that leaned on the clamp, and a TOPAS Stephens fit c
 evidence that σ²(M) stayed positive. A protocol that refines ζ cannot be mirrored in rietx
 (WP-0503's fence).
 
+## Testing the residual for serial correlation
+
+Surveyed 2026-11-04 for WP-2086, which reads Hill & Flack's test as a decision. Their paper
+(1987, J. Appl. Cryst. 20, 356, eq. 2, read) sets Q = 2[(N−1)/(N−P) − 3.0902/(N+2)^½], the
+0.1 % point, and reads d < Q as neighbours sharing a sign and d > 4 − Q as neighbours
+alternating.
+
+| Program | d | The threshold it states |
+|---|---|---|
+| rietx | `Statistics.durbin_watson`, printed as `DW` | Q as the paper prints it, used to gate the instrument half of the unseen-phase hold and never printed |
+| FullProf 8.20 | `DW-Stat.` in the `.sum` file (ran) | `DW-exp`, printed by default. The manual's QD (eq. 3.20) and the output are the paper's Q with 3.0901: N − P 5723 and 5275 give the printed 1.9301 and 1.9277 to the digit (ran on `pbso4.sum`, N from N−P+C and P = 34) |
+| RIETAN-FP 3.12 | defined in the manual, § Durbin–Watson statistics | the paper's Q, manual eq. 4.32, and its 4 − Q |
+| GSAS-II 5.8.4 | `Histogram['Residuals']['Durbin-Watson']`, `GSASIIstrMath.py:4995` | none |
+| TOPAS (Tech. Ref. v9) | among the criteria of fit, § 5.19 | none stated |
+| BGMN, MAUD, EasyDiffraction | no match for "durbin" in the BGMN and EasyDiffraction trees or MAUD's java source (searched by file text, not read, and PDFs not searched) | none found |
+
+On white noise of 3000-22 000 points (200 000 draws, 60 000 at the largest, not fitted, P 12-34),
+the one-sided test d < Q fires 0.17-0.41 % of the time.
+
+Every program that has the test reports it. None gates an action on it, and none holds an
+instrument term because no phase is seen (§ Staging and what a stage holds; `StageResult.held`'s
+audit row). So rietx's use of the threshold is its own, and the number is the paper's.
+
+## A parameter set by an equation the user writes
+
+Surveyed 2026-11-03 for WP-1964, three agents and the lead, across scattering software, global
+fitting in other fields, and expression languages. The lead re-read the TOPAS rows in the Technical
+Reference and in the Durham inputs. Web pages were read through a summarising tool, so wording in
+the non-TOPAS rows is unverified. "Checked" means the page or file was read; "recall" means it was
+not. Every source is a user document or paper, and no closed or GPL code was read.
+
+| Program or format | How the form is written | Parameters, sharing, bounds | Per-dataset values | Derivatives | Status |
+|---|---|---|---|---|---|
+| TOPAS | a string on any parameter, one grammar throughout (Tech. Ref. Table 3-1): `+ - * / ^`, `If`, `And`, `Or`, `Min`, `Max`, `Exp`, `Ln`, `Gamma_P` and more; user `fn` with `def` and `return` (§21.3) | `prm` is global and `local` per `xdd` or `str` (§2.2); sharing is by name; min and max are equations (§2.3) | `#list` of macros, or a generated `prm` per pattern (§2.26.2) | computer algebra carries the chain through equations (§21.3.2, Coelho 2018 abstract); `del` is the step for numerical derivatives of the pattern (§2.3) | checked |
+| GSAS-II | a Python-syntax string, fitted to the sequential table after the refinement and stored with it (`SeqParFitEqList`), never in a joint residual, and also usable as an expression restraint; external functions allowed | a repeated label links equations; a `b` is auto-renamed to stop accidental sharing | the table's columns | not stated | checked, derivatives recall |
+| FullProf | `EQUAL` and `PEQU_pat` link parameters; no equation in a coordinate found | none found | none found | none found | search excerpts |
+| Jana2020, MAUD | no equation across datasets found | | | | not found |
+| Artemis, Larch | strings on path parameters, with roles `guess`, `def`, `set`, `lguess`, `restrain`, and built-in `eins()`, `debye()` | by name | `set` per dataset | finite difference (recall) | checked |
+| Mantid | tie strings, muParser (search excerpt) | `$domains=All`, ties, bound strings | from the workspace | analytic if the function supplies it, else numerical with a named step | checked |
+| Bumps, refnx | operator overloading on `Parameter` objects builds a lazy tree | one shared object | model objects | not stated | checked, refnx syntax recall |
+| lmfit | a Python-syntax string run by asteval | `Parameter(value, min, max, vary, expr)` | caller's own | finite difference (recall) | checked |
+| PEtab (systems biology) | formula strings in tables; v1's page names no grammar | one parameter table holds bounds, start and estimate; v2 removed `parameterScale` as "a constant source of confusion" | a condition table of overrides by id | AMICI: symbolic partials, sparse assembly, threads over conditions | checked |
+| NONMEM, Monolix, nlmixr2 | code lines; the structural model and the covariate model are separate layers | `(low, init, up)` per coefficient; covariates centred on a reference | columns of the dataset | sensitivity equations (recall) | checked |
+| pyhf, HS3 (particle physics) | pyhf: seven closed modifier types; HS3: a graph with a generic-expression escape, its grammar the least specified part | by name, in a flat namespace; bounds sit in a separate measurement block | channels | autodiff (recall) | checked |
+| RooFit | `RooFormulaVar` strings over shared objects | one object, many models | an index category | numerical, or generated code with Clad | checked |
+| JuMP, CasADi, AMPL | the system owns an operator tree or graph with a registered vocabulary, and never evaluates host code | variables apart from data | data apart from the model | exact, on the graph; forward mode for small user operators | checked, AMPL recall |
+| CEL | a written grammar with a version and conformance tests, no side effects, always terminates | | bindings | none | checked |
+
+What they agree on.
+
+- **Form.** Every system with exact derivatives owns a tree with a closed operator list. `asteval`
+  and `simpleeval` evaluate python values, so they expose nothing to differentiate. sympy's
+  `parse_expr` calls `eval` and `lambdify` calls `exec`. sympy 1.14.0's `lambdify` does ship a
+  `torch` module (`MODULES`, checked 2026-11-04), so DESIGN.md's reason has aged and these two
+  grounds carry the rejection. General parser libraries such as lark were not surveyed.
+- **Sharing.** Text formats share a coefficient by name, and python APIs (Bumps, refnx, RooFit)
+  by a shared object. The per-dataset value is an ordinary fixed number. Start, bounds and fixed
+  flag sit beside the equations.
+- **Grammar.** Where a format left its grammar unwritten (PEtab v1, HS3), the first parser became
+  the specification. PEtab's test suite and CEL's conformance tests are the counter-examples: small
+  cases with an expected number.
+- **Presets.** Monolix's library and nlmixr2's `linCmt()` expand into the expert layer. No program
+  found has a second parser for its presets.
+- **Traps.** TOPAS ignores min and max on a parameter defined by an equation, as stated in its forum
+  (threads 767 and 831, checked). The Reference pages read here do not say so. A generated
+  equation's error points at `topas.log` rather than the user's text. `x^y^z` is left-associative in
+  TOPAS (Table 3-1) and right-associative in python and most mathematics. `^` is XOR in python's
+  parser.
+- **Nonlinear fits.** Systems biology treats multi-start with a sorted-objective plot as routine, and
+  profile likelihood as the honest interval, because a Wald interval is symmetric (Villaverde et al.
+  protocol, checked). Evans warns that a wrong form can fit better than the right one, and recommends
+  a sequential fit unless there is a good reason (slides and forum 582, checked).
+
+Not reached: `Topas.inc`, the Jana2020
+and MAUD manuals, the HS3 expression appendix, and MathOptInterface's nonlinear pages.
+
+## An equation over a reflection
+
+Surveyed 2026-11-04 for WP-2107. This is about a value that differs between reflections, set by
+something the user writes. "Checked" means the document or source was read.
+
+| Program | What the user can write | Symmetry | Status |
+|---|---|---|---|
+| TOPAS | an equation in `H`, `K`, `L`, `M`, `Xo`, `Th` and `D_spacing` on `lor_fwhm`, `gauss_fwhm`, `th2_offset`, `scale_pks`, `hat`, the other convolutions and more (Tech. Ref. Table 2-3). `spherical_harmonics_hkl` and `str_hkl_angle` supply values to use in one. A separate peak shape is then calculated for each peak (§ `peak_buffer_step`) | left to the user, with `Multiplicities_Sum` to iterate over the multiplicities (§ 20.17, `scale_occ`). Which image an equation sees otherwise is not stated | checked (Technical Reference); not run |
+| FullProf | closed models chosen by integer: selective size (`IsizeModel`) and selective shift (`ModS`). The user may add rules on the indices, each a linear equality, up to 10 lines for shifts. The shift takes the form 2 SHIFT d² tanθ × 10⁻², and no free expression was found | a rule is applied to the hkl FullProf holds; not established further | checked (manual, § Selective size broadening and § HKL-dependent shifts) |
+| GSAS-II 5.8.4 | none. Size and microstrain take built-in forms (`uniaxial`, ellipsoidal, generalized). `ExpressionCalcObj` reaches restraints, and no reflection-level use was found in `GSASIIstrMath.py` | derived from the Laue class in the built-in forms | checked (grep of the source) |
+
+TOPAS's own examples are `If(L==0, a Tan(Th) + 0.2, b Tan(Th))` on `gauss_fwhm`, `If(L == 0, at Tan(Th), bt Tan(Th))` on `th2_offset`, and a March relation over `str_hkl_angle` on `lor_fwhm`. TOPAS's `occ` stays single-valued for QUANT, so it cannot be a function of hkl, and `scale_occ` exists for that case. Whether its QPA reads a `scale_pks` is not established.
+
+Stinton & Evans (2007) use both shapes: a second-order 2θ calibration polynomial on the whole pattern (§§ 4.1, 4.2) and two terms of extra broadening on 0kl reflections (§ 4.3). They also give each phase its own TCHZ terms, shared across patterns. Their first example fits a sample holder by Pawley beside two Rietveld phases, and their second refines one temperature offset per data set through every phase's cell equation (checked).
+
+Of the Durham tutorials, ZrP₂O₇ writes a two-coefficient curve in `Xo` on `th2_offset`, and ZrMo₂O₈ writes a tanθ width scaled by `spherical_harmonics_hkl` with fixed coefficients. WO₃'s two lines need neither: one is an overall B and one a sample height. Incidence over a larger set is not measured, since the private archive was not on the machine that ran this, and since 2026-11-04 it decides nothing here.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
@@ -676,7 +859,7 @@ Sequential refinement (WP-2003, read 2026-10-24):
 
 | Program | Where |
 |---|---|
-| rietx | `src/rietx/sequential.py`: `SequentialRefinement.fit` and its docstring, `refine_sequential`, `RESEED_FACTOR`, `FIRST_RUNG_FACTOR`, `_series_steps`, `PATH_DEPENDENCE_SIGMA`, `ON_ERROR_POLICIES`, `_ladder`, `_reseed_needed`, `_prefer`, `_carry_into`, `_fit_one` |
+| rietx | `src/rietx/sequential.py`: `SequentialRefinement.fit` and its docstring, `refine_sequential`, `_check_factor`, `_rejected`, `_series_steps`, `PATH_DEPENDENCE_SIGMA`, `ON_ERROR_POLICIES`, `_ladder`, `_reseed_needed`, `_prefer`, `_carry_into`, `_fit_one` |
 | GSAS-II 5.8.4 | `SeqRefine`, `GSASIIstrMain.py:875-1196`: cell and texture refused `:910-918`; reverse `:923-924`; `Copy2Next`, the Le Bail copy and the earlier-run start `:980-1000`; vary-list change `:1038-1058`; stop on failure `:1098-1100`, singular matrix in a sequential fit `:376-391`; carried set `:1146-1162`; exception `:1169-1173`; results table written `:1178-1180`; `dropOOBvars` `:1123, 1198-1230`. Defaults `GSASIIobj.py:22, 27`; checkboxes and the clear button `GSASIIdataGUI.py:8158-8199`; Δχ² colouring `GSASIIseqGUI.py:1491-1499, 1818-1830`; cluster-analysis outliers `GSASIIseqGUI.py:2232-2249`; scripting `seqCopy`/`Reverse Seq` `GSASIIscriptable.py:3144-3152` |
 | EasyDiffraction 0.21.1 | `easydiffraction/analysis/sequential.py`: worker and caught errors `:73-170`, collected values `:330-375`, start values `:591-598`, reverse `:923-924`, resume `:1094-1110`, chunk size `:1146-1147`, one start per chunk `:1229-1233`, propagation `:1251-1262`, `fit_sequential` `:1265-1294`; defaults `easydiffraction/analysis/categories/sequential_fit/default.py:54-95` |
 | MAUD 3.07 | `src/it/unitn/ing/rista/util/batchProcess.java`: exception ends the batch `:111-187`, row loop `:261-514`, analysis read per row `:284-327`, refine and save `:562-575`, GoF loop `:591-613`; dialog defaults `src/it/unitn/ing/rista/awt/BatchFileDialog.java:181, 187, 243, 297, 398-453` |

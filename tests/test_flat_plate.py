@@ -291,7 +291,7 @@ def _flat_plate_model(mu_t: float, kind: str):
 
     structure = make_aniso_rutile()
     structure.phases[0].scale.value = 1e-3
-    structure.phases[0].extinction.value = 2.0
+    structure.phases[0].extinction = 2.0
     if kind == "flat_plate_transmission":
         ins = Instrument.flat_plate_transmission(radiation="CuKa1", mu_t=mu_t)
     else:

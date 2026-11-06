@@ -41,7 +41,7 @@ from pathlib import Path
 from pydantic import Field
 
 from ..schemas.common import Base
-from .events import RUN_RECORD, RunHeader
+from .events import RUN_RECORD, RunHeader, StageClock
 
 #: Lines read per pass of the tail.  A bound on memory per pass, not on the log.
 _CHUNK_BYTES = 16 << 20
@@ -190,7 +190,7 @@ def _summarize_run(header: dict | None, events: list[dict]) -> RunSummary:
     fit_seconds = 0.0
     report_seconds: float | None = None
     fit_open: float | None = None
-    stage_open: dict[str, float] = {}  # cleared at each fit_start
+    clock = StageClock()  # the rule progress_writer reads too (WP-2031)
     stage_count: Counter = Counter()
     stage_seconds: dict[str, float] = {}
     stage_evals: Counter = Counter()
@@ -206,12 +206,10 @@ def _summarize_run(header: dict | None, events: list[dict]) -> RunSummary:
         data = event.get("data") or {}
         t = event.get("t")
         stage = data.get("stage")
+        elapsed = clock.observe(kind, stage, t, resumed="released" in data)
         if kind == "fit_start":
             n_fits += 1
             fit_open = t
-            # a stage that raised emitted no stage_end; its start must not
-            # carry into the next fit's stage of the same name
-            stage_open.clear()
         elif kind == "fit_end":
             n_fits_ended += 1
             if fit_open is not None and t is not None:
@@ -226,7 +224,6 @@ def _summarize_run(header: dict | None, events: list[dict]) -> RunSummary:
                 if stage not in stage_seconds:
                     order.append(stage)
                     stage_seconds[stage] = 0.0
-                stage_open.setdefault(stage, t)
         elif kind == "stage_end":
             n_ends += 1
             terminations[data.get("termination") or "(absent)"] += 1
@@ -236,9 +233,8 @@ def _summarize_run(header: dict | None, events: list[dict]) -> RunSummary:
                     order.append(stage)
                     stage_seconds[stage] = 0.0
                 stage_count[stage] += 1
-                start = stage_open.pop(stage, None)
-                if start is not None and t is not None:
-                    stage_seconds[stage] += t - start
+                if elapsed is not None:
+                    stage_seconds[stage] += elapsed
         elif kind == "eval":
             n_evals += 1
             if stage is not None:

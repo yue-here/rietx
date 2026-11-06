@@ -40,7 +40,7 @@ from rietx.schemas.structure import Atom, Cell, MagneticSymmetry, Moment, Phase
 from rietx.sequential import (
     _angle_difference,
     _angle_paths,
-    _path_dependence_diagnostics,
+    _direction_gaps,
     _series_steps,
 )
 
@@ -272,7 +272,7 @@ def _series(path, values, sd=0.01) -> SeriesResult:
                        n_points=100, n_free_parameters=3)
     return SeriesResult(x_label="T (K)", entries=[
         SeriesEntry(index=k, label=f"p{k}", x=10.0 * (k + 1), status="converged",
-                    rwp_fence=None if k == 0 else 0.1, statistics=stats,
+                    rwp_over_median=None if k == 0 else 1.0, statistics=stats,
                     parameters=[RefinedParameter(path=path, value=v, stderr=sd)])
         for k, v in enumerate(values)])
 
@@ -317,23 +317,28 @@ def test_a_two_pi_step_on_a_parameter_that_is_not_an_angle_is_not_wrapped():
     assert s.step == pytest.approx(2 * np.pi + 0.001, abs=1e-9)
 
 
+def _largest_gap_esd(forward, backward, angles=frozenset()):
+    gaps, _ = _direction_gaps(forward, backward, frozenset(), angles)
+    return max(abs(g.gap_esd) for g in gaps if g.gap_esd is not None)
+
+
 def test_two_chains_either_side_of_the_cut_are_not_path_dependent():
     forward = _series(AZIMUTH_2D, ON_THE_CUT)
     backward = _series(AZIMUTH_2D, [-v for v in ON_THE_CUT[:4]] + [
         v + 0.002 for v in ON_THE_CUT[4:]])
-    assert [d.code for d in _path_dependence_diagnostics(forward, backward)] == [
-        "SEQUENTIAL_PATH_DEPENDENT"]
-    assert _path_dependence_diagnostics(
-        forward, backward, angles=frozenset({AZIMUTH_2D})) == []
+    # read as a plain number the two sides of the cut are 2π apart
+    assert _largest_gap_esd(forward, backward) > 100
+    # read as an angle the widest pair is 0.023 rad apart (3.130 and -3.130)
+    assert _largest_gap_esd(forward, backward, angles=frozenset({AZIMUTH_2D})) \
+        == pytest.approx((2 * np.pi - 6.26) / (0.01 * 2 ** 0.5), abs=1e-6)
 
 
 def test_two_chains_a_real_half_radian_apart_across_the_cut_are():
     forward = _series(AZIMUTH_2D, [3.0] * 7)
     backward = _series(AZIMUTH_2D, [3.0 + 0.5 - 2 * np.pi] * 7)
-    (d,) = _path_dependence_diagnostics(forward, backward,
-                                        angles=frozenset({AZIMUTH_2D}))
-    assert d.code == "SEQUENTIAL_PATH_DEPENDENT"
-    assert "35.4σ" in d.message      # 0.5 / (0.01·√2), not 5.78 / it
+    # 0.5 / (0.01·√2), not 5.78 / it
+    assert _largest_gap_esd(forward, backward, angles=frozenset({AZIMUTH_2D})) \
+        == pytest.approx(35.36, abs=0.01)
 
 
 # ============================================================ fitted
@@ -455,14 +460,11 @@ def test_a_series_on_the_cut_gives_no_finding_from_the_cut_and_every_angle_in_th
     moment = [d for d in series.diagnostics
               if d.code.startswith("SEQUENTIAL_") and any(".moment." in w
                                                            for w in d.where)]
-    # allowed: the twin path dependence, and since WP-1929 the series-level
-    # count of the azimuth sitting at the stationary direction, which is a
-    # fact about the symmetry and not about the cut
-    assert all(d.where == [AZIMUTH_2D] and (
-        d.code == "SEQUENTIAL_PATH_DEPENDENT"
-        or (d.code == "SEQUENTIAL_PERSISTENT_FINDING"
-            and d.message.startswith("MOMENT_ANGLE_STATIONARY")))
-        for d in moment), [d.message for d in moment]
+    # the twin gap (the azimuth sitting at the stationary direction) is a fact
+    # about the symmetry and not about the cut; since WP-2003 it is a row of
+    # `series.direction_gaps`, and no series code names a moment path
+    assert moment == [], [d.message for d in moment]
+    assert AZIMUTH_2D in {g.path for g in series.direction_gaps}
     back = {e.label: e for e in series.backward.entries}
     for entry in series.entries:
         f = next(p for p in entry.parameters if p.path == AZIMUTH_2D)

@@ -253,7 +253,7 @@ def _label(header: dict[str, str], index: int, x: np.ndarray) -> str:
     for key in ("SampleName", "Comment", "Memo"):
         if (value := header.get(key, "").strip()):
             return value
-    return f"{header.get('AxisName', '2θ')} {x.min():.4g}–{x.max():.4g}°"
+    return f"{header.get('AxisName', '2θ')} {np.nanmin(x):.4g}–{np.nanmax(x):.4g}°"
 
 
 def read_rasx(path: str | Path, *, scan: int | None = None,
@@ -303,7 +303,7 @@ def list_rasx_scans(path: str | Path) -> list[ScanInfo]:
                 index=i, label=_label(_conditions(zip_archive, conditions, path=p),
                                       i, x),
                 n_points=int(x.size),
-                two_theta_range=(float(x.min()), float(x.max()))))
+                two_theta_range=(float(np.nanmin(x)), float(np.nanmax(x)))))
     return out
 
 

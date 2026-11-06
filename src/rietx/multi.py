@@ -21,6 +21,7 @@ import copy
 import dataclasses
 import math
 import re
+from collections.abc import Iterable
 from contextlib import contextmanager
 
 import numpy as np
@@ -45,9 +46,11 @@ from .optimize.least_squares import (
     SOLVERS,
     _longest_line_wavelength,
     _multi_closures,
+    covariance_estimates,
     covariance_jacobian,
     rechart_outcome,
     run_multi_least_squares,
+    stationary_columns,
 )
 from .optimize.statistics import (
     background_absorption,
@@ -113,6 +116,7 @@ from .refine import (
     _onto_flat_meridian,
     _origin_diagnostics,
     _parameter_row,
+    _peak_columns_flat_at_answer,
     _peak_only_instrument_path,
     _phase_agreement,
     _phase_support_diagnostics,
@@ -126,8 +130,10 @@ from .refine import (
     _restrained_scale_phases,
     _roughness_regime_diagnostics,
     _scale_b_ridge_diagnostics,
+    _significance_columns,
     _site,
     _size_flag_diagnostics,
+    _slow_descent_diagnostics,
     _species_fallback_diagnostics,
     _strain_flag_diagnostics,
     _symmetry_silence_diagnostics,
@@ -154,7 +160,7 @@ from .schemas.parametric import (
 )
 from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
-from .schemas.plan import check_phase_support_sigma
+from .schemas.plan import PlanSpec, check_phase_support_sigma
 from .schemas.results import (
     HistogramResult,
     Identifiability,
@@ -165,7 +171,6 @@ from .schemas.results import (
 from .schemas.structure import Structure
 from .strategy.staged import (
     BACKGROUND_ABSORPTION_GUARD,
-    PLAN_PRESETS,
     ROUGHNESS_ABSORPTION_GUARD,
     GuardFinding,
     GuardReport,
@@ -182,6 +187,7 @@ from .strategy.staged import (
     check_resolution_supported,
     check_stephens_positive,
     check_texture_positive,
+    resolve_plan,
 )
 
 #: A diagnostic reported **once per histogram**, on
@@ -303,6 +309,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "worst histogram's loss (WP-2047)"),
     "_max_iter_diagnostics": (
         (FIT,), "a stage's budget is spent by the one joint solve"),
+    "_lebail_cap_diagnostics": (
+        (ABSENT,), "a joint fit is Rietveld-only, so it runs no partition"),
+    "_slow_descent_diagnostics": (
+        (FIT,), "the slow-descent rule reads the one joint solve's cost"),
     "_frozen_compile_diagnostics": (
         (FIT,), "one finding per fit naming the histogram whose own χ² moved "
                 "most: a pooled χ² would hide one pattern (WP-1421)"),
@@ -446,7 +456,8 @@ def _normalize_limits(ttl, n: int) -> list[tuple[float, float] | None]:
 
 
 def _joint_unsupported_phases(models, mtable,
-                              sigma: float | None = PHASE_SUPPORT_SIGMA
+                              sigma: float | None = PHASE_SUPPORT_SIGMA,
+                              support: list[np.ndarray] | None = None
                               ) -> list[set[int]]:
     """Per histogram, the phases below support in it (WP-1301).
 
@@ -462,20 +473,203 @@ def _joint_unsupported_phases(models, mtable,
     phase absent from one pattern and present in the other
     (``test_a_joint_series_fit_holds_a_vanished_phase_in_its_own_pattern``).
 
-    The screen ``CompiledModel.phase_support`` alone, at the stage start and
-    at the answer alike.  The single fit's answer reads the scale's
-    significance (``refine._answer_significance``, WP-1523); the joint path
-    deliberately does not, because its joint report is WP-2028's to define.
+    ``support`` is the significance per histogram where the caller measured
+    it: :func:`_joint_answer_significance` at a stage's answer, and the
+    screen beside the previous answer's reading at a stage's start
+    (:func:`_hold_unsupported_phases_multi`).  ``None`` reads the screen
+    ``CompiledModel.phase_support`` alone, which bounds both from above.
+    The single runner reads the same two statistics at the same two points
+    (WP-1523), and the joint path follows it since WP-2003 C10.
 
     ``sigma`` is the plan's ``phase_support_sigma`` (WP-2002, B1).  ``None``
     calls no phase unseen anywhere, so nothing is held, released or restored.
     """
     if sigma is None:
         return [set() for _ in models]
-    per_model = [m.phase_support(t.decode(t.x0()))
-                 for m, t in zip(models, mtable.tables, strict=True)]
-    return [{ip for ip, s in enumerate(support) if s < sigma}
-            for support in per_model]
+    if support is None:
+        support = _joint_screen(models, mtable)
+    return [{ip for ip, s in enumerate(z) if s < sigma} for z in support]
+
+
+def _joint_screen(models, mtable) -> list[np.ndarray]:
+    """Per histogram, ``CompiledModel.phase_support`` at the table's values:
+    each phase's conditional z in that histogram's own rows."""
+    return [np.asarray(m.phase_support(t.decode(t.x0())), dtype=np.float64)
+            for m, t in zip(models, mtable.tables, strict=True)]
+
+
+def _joint_theta(mtable) -> np.ndarray:
+    """The joint θ read off the tables' committed values.
+
+    ``MultiParameterTable.x0`` is cached and a commit does not refresh it, so
+    a reader at a stage's answer assembles it from each table instead.  A
+    shared column is one value in every table that holds it.
+    """
+    theta = np.zeros(len(mtable.free_paths), dtype=np.float64)
+    for h, table in enumerate(mtable.tables):
+        theta[mtable.col_map(h)] = table.x0()
+    return theta
+
+
+def _joint_unit_jacobian(models, mtable, theta: np.ndarray, backend: str,
+                         layout: str | None):
+    """The stacked Jacobian against counting noise alone, at ``theta``.
+
+    ``_multi_closures``' own matrix with every histogram's weight at 1, so
+    each row is a residual over its own σ.  A weight ``w_h`` multiplies that
+    histogram's rows by √w_h in the solve.  Read with it, a phase's esd would
+    move with a choice of the caller's, and the threshold is against counting
+    statistics.
+    """
+    _, jacobian, _ = _multi_closures(models, mtable, weights=None,
+                                     backend=backend, layout=layout or "dense")
+    return jacobian(theta)
+
+
+def _joint_scale_esds(mtable, jac, idx: np.ndarray, theta: np.ndarray
+                      ) -> list[dict[str, float]]:
+    """Per histogram, the physical esds from (JᵀJ)⁻¹ on the columns ``idx``.
+
+    ``refine._scale_significance``'s covariance on the joint matrix: a unit
+    residual, so neither √χ²_red nor the Bérar-Lelann factor enters, through
+    the same equilibration and cut every reported esd takes.  A blocked
+    matrix keeps its blocks and has the other columns zeroed.  A zero column
+    measured nothing and correlates with nothing, so the result is the same
+    marginal.
+    """
+    n = len(mtable.free_paths)
+    unit = np.zeros(len(idx) + 1)
+    unit[0] = 1.0
+    stderr = np.zeros(n)
+    corr = np.zeros((n, n))
+    if isinstance(jac, BlockJacobian):
+        keep = np.zeros(n, dtype=bool)
+        keep[idx] = True
+        sd, c = covariance_estimates(jac.without_columns(np.flatnonzero(~keep)),
+                                     unit, len(idx))
+        stderr[idx] = np.asarray(sd)[idx]
+        corr[np.ix_(idx, idx)] = np.asarray(c)[np.ix_(idx, idx)]
+    else:
+        sd, c = covariance_estimates(np.asarray(jac)[:, idx], unit, len(idx))
+        stderr[idx] = sd
+        corr[np.ix_(idx, idx)] = c
+    thetas = mtable.split(theta)
+    out = []
+    for h, table in enumerate(mtable.tables):
+        cm = mtable.col_map(h)
+        out.append(table.stderr_physical(thetas[h], stderr[cm],
+                                         corr[np.ix_(cm, cm)]))
+    return out
+
+
+def _joint_answer_significance(models, mtable, outcome, held: list[str],
+                               reach: dict[str, list[str]], backend: str, *,
+                               sigma: float = PHASE_SUPPORT_SIGMA
+                               ) -> list[np.ndarray]:
+    """Per histogram, each phase's significance in σ at a stage's answer.
+
+    ``refine._answer_significance`` across the stack (WP-1523, aligned by
+    WP-2003 C10).  A phase is seen in histogram h when its scale there is
+    ``sigma`` of its esds from zero.  The esd is marginal over the columns
+    ``refine._significance_columns`` names, read off the **joint** normal
+    matrix at unit weights (:func:`_joint_unit_jacobian`).  So a shared cell
+    that another histogram pins costs the scale little, and one no pattern
+    pins costs it what it costs a single fit.  It is the solve's matrix with
+    the caller's histogram weights set to one, so a phase is judged against
+    each pattern's counting noise, as the single fit judges it, whatever
+    weight the caller gave its histogram.
+
+    The screen comes first and bounds the result from above, as there: a
+    phase under it keeps the screen value with no Jacobian built, and the
+    marginal is never quoted above it.  A shared scale is one column, so its
+    marginal is one number, and each histogram keeps the smaller of it and
+    its own screen.  The support hold's columns (``held``) are freed for the
+    measurement and held again, each phase measured with only the held
+    columns that reach it, so a held cell cannot make a phase look better
+    determined than it would be free.  ``reach`` is the hold's record
+    (``StageResult.held_reach``).
+    """
+    out = _joint_screen(models, mtable)
+    if any(m.mode != "rietveld" for m in models):
+        return out
+    seen = [(h, ip) for h, (z, t) in enumerate(zip(out, mtable.tables, strict=True))
+            for ip in range(len(z)) if z[ip] >= sigma
+            and f"phases.{ip}.scale" in set(t.moving_paths)]
+    if not seen:
+        return out
+    # an instrument column held because no phase was seen (WP-2049) shapes
+    # every phase's peaks, so each phase is measured with it freed
+    peak_only = [c for c in held
+                 if any(_peak_only_instrument_path(m, _unscoped(q))
+                        for m in models for q in (c, *reach.get(c, ())))]
+    held_of = {ip: [c for c in held if ip in _joint_phases_reached([c], reach)
+                    or c in peak_only]
+               for ip in {ip for _, ip in seen}}
+    free = list(mtable.free_paths)
+    # the moment angles the solve's covariance left out (WP-1929) leave this
+    # marginal too
+    stationary = {free[i] for i in stationary_columns(outcome, free)}
+    extra = list(dict.fromkeys(c for cs in held_of.values() for c in cs))
+    freed = mtable.set_vary(extra, True) if extra else []
+    try:
+        theta = _joint_theta(mtable)
+        jac = _joint_unit_jacobian(models, mtable, theta, backend,
+                                   getattr(outcome, "jacobian_layout", None))
+        blocks = jac.blocks if isinstance(jac, BlockJacobian) else [jac]
+        if not all(np.all(np.isfinite(b)) for b in blocks):
+            # a stage stopped where its Jacobian is not finite (WP-2048): no
+            # covariance, the screen stands
+            return out
+        index = {p: k for k, p in enumerate(mtable.free_paths)}
+        column_reach = {c: [_unscoped(q) for q in moved]
+                        for c, moved in _joint_column_reach(mtable).items()}
+        values = mtable.decode(theta)
+        # one covariance per column set: every phase but one shares most of it
+        esds: dict[tuple[str, ...], list[dict[str, float]] | None] = {}
+        for h, ip in seen:
+            columns = tuple(c for c in _significance_columns(
+                free, [c for c in held_of[ip] if c in freed], column_reach, ip)
+                if c not in stationary and c in index)
+            if not columns:
+                out[h][ip] = 0.0  # ``refine._scale_significance``'s empty set
+                continue
+            if columns not in esds:
+                try:
+                    esds[columns] = _joint_scale_esds(
+                        mtable, jac, np.array([index[c] for c in columns],
+                                              dtype=np.intp), theta)
+                except np.linalg.LinAlgError:
+                    esds[columns] = None
+            if esds[columns] is None:
+                continue  # no covariance: the screen stands
+            path = f"phases.{ip}.scale"
+            esd = esds[columns][h].get(path)
+            value = values[h][path]
+            z = (float(value) / esd if esd is not None and np.isfinite(esd)
+                 and esd > 0.0 else 0.0)
+            # never above the screen it is bounded by
+            out[h][ip] = min(out[h][ip], z)
+    finally:
+        if freed:
+            mtable.set_vary(freed, False)
+    return out
+
+
+def _joint_held_phase_pairs(mtable, columns: list[str],
+                            reach: dict[str, list[str]]) -> set[tuple[int, int]]:
+    """Every (histogram, phase) a held column reaches: the column's name and
+    the hold's reach, each entry where it lives (a ``hist.h.`` entry in
+    histogram h, a bare one in every histogram)."""
+    out: set[tuple[int, int]] = set()
+    for c in columns:
+        for name in (c, *reach.get(c, ())):
+            m = _PHASE_PREFIX.match(_unscoped(name))
+            if m is None:
+                continue
+            owner = mtable._owner(name)
+            hists = range(mtable.n_histograms) if owner is None else [owner]
+            out.update((h, int(m.group(1))) for h in hists)
+    return out
 
 
 def _joint_lineless_phases(models) -> list[set[int]]:
@@ -663,7 +857,8 @@ def _unsupported_paths_multi(mtable, absent: list[set[int]],
     already holds every ``lineless`` phase.  ``models`` lets an instrument
     column be held where no histogram it reaches sees a phase (WP-2049).
     ``instrument_absent`` replaces ``absent`` for that question alone: the
-    stage-start hold passes ``lineless``, the collapse leaves it ``None``.
+    stage-start hold passes ``lineless``, the collapse passes
+    ``refine._peak_columns_flat_at_answer``'s reading per histogram.
     """
     if not any(absent):
         return []
@@ -675,7 +870,10 @@ def _unsupported_paths_multi(mtable, absent: list[set[int]],
 
 def _hold_unsupported_phases_multi(models, mtable,
                                    reach: dict[str, list[str]] | None = None,
-                                   sigma: float | None = PHASE_SUPPORT_SIGMA
+                                   sigma: float | None = PHASE_SUPPORT_SIGMA,
+                                   prior: list[np.ndarray] | None = None,
+                                   seeded_phases: Iterable[int] = (),
+                                   tried: Iterable[str] = ()
                                    ) -> tuple[list[str], list[set[int]]]:
     """Hold what :func:`_unsupported_paths_multi` finds; returns the columns
     and, per histogram, the phases judged unseen (the width-twin hold's
@@ -687,16 +885,46 @@ def _hold_unsupported_phases_multi(models, mtable,
     ``sigma`` is :func:`_joint_unsupported_phases`' own.  A phase with no
     reflection in a histogram's range is held there whatever ``sigma`` says,
     its scale included (WP-1958, ``refine._unsupported_phase_paths``).
+
+    ``prior`` is the previous stage's :func:`_joint_answer_significance`, one
+    vector per histogram, read beside the screen: a phase under the threshold
+    by either is unseen there (``refine._hold_unsupported_phases``' rule,
+    WP-1523).  A phase in ``seeded_phases`` drops its prior in every
+    histogram, since the seed moved it off the values the reading was taken
+    at.
+
+    ``tried`` is what the previous stage's answer held.  An instrument column
+    there reaching the pattern through phase peaks alone is held from this
+    stage's start wherever every phase it reaches is unseen, the single
+    runner's WP-2049 prior (``refine._unsupported_phase_paths``).  Without
+    it each stage chased the noise with the widths and put them back again:
+    on two copies of #481's seed-107 blank frame the ``profile`` stage took
+    402 evaluations, against 19 for the single fit of one copy.
     """
     lineless = _joint_lineless_phases(models)
-    absent = [a | n for a, n in zip(_joint_unsupported_phases(models, mtable, sigma),
-                                    lineless, strict=True)]
+    support = None
+    if sigma is not None and prior is not None:
+        drop = list(seeded_phases)
+        support = []
+        for screen, p in zip(_joint_screen(models, mtable), prior, strict=True):
+            p = np.array(p, dtype=np.float64)
+            p[drop] = np.inf
+            support.append(np.minimum(screen, p))
+    absent = [a | n for a, n in zip(
+        _joint_unsupported_phases(models, mtable, sigma, support),
+        lineless, strict=True)]
     # the instrument's peak-only columns only where every phase is out of
     # range: a significance hold of them waits for the answer (WP-2049,
     # ``refine._unsupported_phase_paths``)
-    held = _unsupported_paths_multi(mtable, absent, reach,
-                                    _joint_flat_scales(models, mtable, lineless),
+    flat_scales = _joint_flat_scales(models, mtable, lineless)
+    held = _unsupported_paths_multi(mtable, absent, reach, flat_scales,
                                     models, instrument_absent=lineless)
+    tried = set(tried) - set(held)
+    if tried and any(absent):
+        reach = _joint_column_reach(mtable) if reach is None else reach
+        held = held + [p for p in mtable.free_paths if p in tried and _only_unseen(
+            mtable, reach.get(p, [p]), absent, flat_scales, models,
+            instrument_absent=absent)]
     if held:
         mtable.set_vary(held, False)
     return held, absent
@@ -821,7 +1049,8 @@ def _rehold_multi(models, mtable, held: list[str],
                   start_values: list[dict[str, float]],
                   held_reach: dict[str, list[str]] | None = None,
                   reach: dict[str, list[str]] | None = None,
-                  sigma: float | None = PHASE_SUPPORT_SIGMA
+                  sigma: float | None = PHASE_SUPPORT_SIGMA,
+                  support: list[np.ndarray] | None = None
                   ) -> tuple[list[str], list[str]]:
     """The post-solve half of the rule, for the joint path.
 
@@ -837,7 +1066,9 @@ def _rehold_multi(models, mtable, held: list[str],
     parametric coefficient would be released the moment it was held, its
     name carrying no phase.  ``reach`` is :func:`_joint_column_reach` of the
     free columns as the solve left them, read by the caller (who records the
-    collapsed columns' reach from it) or here.
+    collapsed columns' reach from it) or here.  ``support`` is
+    :func:`_joint_answer_significance` at the answer, the one measurement both
+    questions read; ``None`` reads the screen.
     """
     # one measurement, two questions — the release and the collapse are
     # complementary readings of the same joint support test, at the plan's
@@ -845,16 +1076,24 @@ def _rehold_multi(models, mtable, held: list[str],
     # a phase with no line in range stays held whatever ``sigma`` says: its
     # count is frozen with the stage's windows (WP-1958)
     lineless = _joint_lineless_phases(models)
-    absent = [a | n for a, n in zip(_joint_unsupported_phases(models, mtable, sigma),
-                                    lineless, strict=True)]
+    absent = [a | n for a, n in zip(
+        _joint_unsupported_phases(models, mtable, sigma, support),
+        lineless, strict=True)]
     flat_scales = _joint_flat_scales(models, mtable, lineless)
     held_set = set(held)
     held_reach = held_reach or {}
     released = [p for p in held
                 if not _only_unseen(mtable, [p, *held_reach.get(p, ())], absent,
                                     flat_scales, models)]
+    # the single runner's test, per histogram: a shared column is then held
+    # only if it is flat in every histogram that carries it, so one histogram
+    # with peaks left in its residual keeps it free (``_unseen``, all, never any)
+    instrument_absent = [
+        a if _peak_columns_flat_at_answer(m, t, a, n) else set()
+        for a, n, m, t in zip(absent, lineless, models, mtable.tables, strict=True)]
     collapsed = [p for p in _unsupported_paths_multi(mtable, absent, reach,
-                                                     flat_scales, models)
+                                                     flat_scales, models,
+                                                     instrument_absent)
                  if p not in held_set]
     if collapsed:
         for h, table in enumerate(mtable.tables):
@@ -1368,7 +1607,7 @@ class MultiHistogramRefinement:
 
     # ------------------------------------------------------------------
     def fit(self, data: list[PatternData], *, mode: str = "rietveld",
-            plan: RefinementPlan | str = "mccusker_default",
+            plan: RefinementPlan | PlanSpec | str = "mccusker_default",
             two_theta_limits=None, weights: list[float] | None = None,
             events=None, cancel=None, telemetry=None, label: str | None = None,
             progress=None) -> RefinementResult:
@@ -1425,13 +1664,9 @@ class MultiHistogramRefinement:
                 "multi-histogram refinement is Rietveld-only; Le Bail / "
                 "Pawley intensities are per-pattern extractions, not shared, so a "
                 "joint fit of them is just independent single-pattern fits")
-        if isinstance(plan, str):
-            try:
-                plan = PLAN_PRESETS[plan]()
-            except KeyError:
-                raise ValueError(
-                    f"unknown plan preset {plan!r}; available: {sorted(PLAN_PRESETS)}"
-                ) from None
+        # the one crossing of the plan mirror (WP-1110, WP-2102): a preset
+        # name, a ``PlanSpec`` or a plan, read as ``Refinement.fit`` reads it
+        plan = resolve_plan(plan, mode)
         if not plan.stages:
             # refused before an event is emitted or a run recorded, as
             # ``Refinement.fit`` refuses it (WP-1110 item 6)
@@ -1466,7 +1701,7 @@ class MultiHistogramRefinement:
                                         for h, d in enumerate(data)])
             try:
                 (models, outcome, stage_results, cell_runaway_diags,
-                 answer_runaway, opening_diags) = self._run_plan(
+                 answer_runaway, opening_diags, significance) = self._run_plan(
                     plan, mode, data, limits, weights, stream, cancel)
             except RefinementCancelled as exc:
                 if stream is not None:
@@ -1481,7 +1716,8 @@ class MultiHistogramRefinement:
                                                plan.correlation_guard,
                                                stage_results, cell_runaway_diags,
                                                answer_runaway, opening_diags,
-                                               plan.phase_support_sigma)
+                                               plan.phase_support_sigma,
+                                               significance=significance)
             self._answer = self._freeze_answer()
             if stream is not None:
                 stream.emit("fit_end", status=self.result_.status,
@@ -1508,7 +1744,7 @@ class MultiHistogramRefinement:
             if recorder is not None:
                 recorder.close()
 
-    def report(self, histogram: int, *, plan: RefinementPlan | str | None = None,
+    def report(self, histogram: int, *, plan: RefinementPlan | PlanSpec | str | None = None,
                **kw):
         """The :class:`~rietx.report.FitReport` for one histogram of the last fit.
 
@@ -1518,7 +1754,8 @@ class MultiHistogramRefinement:
         :meth:`RefinementResult.for_histogram`, its compiled model and values
         for Layers 1-2, exactly as :meth:`Refinement.report
         <rietx.refine.Refinement.report>` asks them of a single fit.  ``plan``
-        supplies the Layer-2 strategy veto.
+        supplies the Layer-2 strategy veto: a plan, its ``PlanSpec`` or a
+        preset name, read as :meth:`fit` reads it.
 
         The specimen has one crystallite size (WP-1131), and the report says
         it once.  Its microstructure block is the joint result's, read off the
@@ -1544,8 +1781,9 @@ class MultiHistogramRefinement:
         n = self.n_histograms
         if not 0 <= histogram < n:
             raise IndexError(f"histogram {histogram} of a {n}-histogram fit")
-        if isinstance(plan, str):
-            plan = PLAN_PRESETS[plan]()
+        if plan is not None:
+            # read as the fit that made the result read it (WP-2102)
+            plan = resolve_plan(plan, self.result_.mode)
         answer = self._answer[histogram]
         return build_report(
             self.result_.for_histogram(histogram),
@@ -1676,6 +1914,12 @@ class MultiHistogramRefinement:
         models = None
         outcome = None
         carried_hold: list[str] = []
+        # the previous stage's answer significance, one vector per histogram:
+        # the next stage's support hold reads it beside the screen (WP-1523's
+        # prior, the single runner's ``prior_significance``; WP-2003 C10)
+        answer_significance: list[np.ndarray] | None = None
+        # what PHASE_UNCONSTRAINED and that significance are read against
+        report_sigma = _reported_support_sigma(phase_support_sigma)
         # the declared stages and the closing one, the single runner's
         # schedule (WP-2002, the sixth round's Q1 and Q2)
         stages = plan.run_stages()
@@ -1695,6 +1939,9 @@ class MultiHistogramRefinement:
                 # while reaching another's
                 unknown_paths = self.mtable.unknown_paths(stage.turn_on)
                 unreached = self.mtable.unreached_histograms(stage.turn_on)
+                # what the previous stage's answer held, which the support hold
+                # reads as tried and flat (WP-2049, the single runner's ``tried``)
+                tried = list(carried_hold)
                 if carried_hold:
                     # lift the previous stage's hold before this one decides its
                     # own — the single-histogram runner's rule (``_run_stage``),
@@ -1733,8 +1980,15 @@ class MultiHistogramRefinement:
                 # what each column moves, read while every one is still free:
                 # the hold's record (``StageResult.held_reach``, WP-1342)
                 reach = _joint_column_reach(self.mtable)
+                # a seed moved these phases off the values the previous
+                # answer's significance was read at, so the hold drops that
+                # reading for them (``refine._run_stage``'s rule)
+                seeded_phases = (_joint_phases_reached(list(seeded), reach)
+                                 if seeded else set())
                 held, unseen = _hold_unsupported_phases_multi(
-                    models, self.mtable, reach, phase_support_sigma)
+                    models, self.mtable, reach, phase_support_sigma,
+                    prior=answer_significance, seeded_phases=seeded_phases,
+                    tried=tried)
                 held_reach = _joint_reach_beyond_self(held, reach)
                 # a phase whose scales and displacement parameters the ranges
                 # cannot separate (WP-1534): the single runner's probe, asked of
@@ -1798,16 +2052,30 @@ class MultiHistogramRefinement:
                 # answer to re-measure and no second solve
                 stopped = outcome.non_finite is not None
                 released, collapsed, restored, m_turned = [], [], [], []
+                support: list[np.ndarray] | None = None
+                support_held: list[str] = []
                 if not stopped:
                     moment_set = set(moment_hold)
+                    # one measurement, two questions (WP-1523): the release and
+                    # the collapse read the scale's marginal significance, a
+                    # held phase measured with its held columns free
+                    support = _joint_answer_significance(
+                        models, self.mtable, outcome, list(support_hold),
+                        held_reach, self._backend, sigma=report_sigma)
                     # the free columns as the solve left them, read before the
                     # collapse takes any out of θ, so a collapsed column's reach is
                     # on the record beside the stage-start hold's
                     reach = _joint_column_reach(self.mtable)
                     released, collapsed = _rehold_multi(
                         models, self.mtable, list(support_hold), start_values,
-                        held_reach=held_reach, reach=reach, sigma=phase_support_sigma)
+                        held_reach=held_reach, reach=reach, sigma=phase_support_sigma,
+                        support=support)
                     held_reach.update(_joint_reach_beyond_self(collapsed, reach))
+                    # the support hold's columns once the release and the
+                    # collapse have acted, whose phases keep the reading the
+                    # hold was decided on past a second solve
+                    support_held = ([p for p in support_hold if p not in set(released)]
+                                    + list(collapsed))
                     # ``StageResult.collapsed``: the restored columns alone, taken
                     # before the late scale-B hold joins ``collapsed`` below, since
                     # that one holds a released phase's B where it stands
@@ -1902,6 +2170,20 @@ class MultiHistogramRefinement:
                                                   + second.n_degenerate_cell_probes),
                         n_lapack_fallbacks=(outcome.n_lapack_fallbacks
                                             + second.n_lapack_fallbacks))
+                    if support is not None:
+                        # the significance the next stage and the result read.
+                        # A phase the support hold still holds keeps the
+                        # reading its hold was decided on, so the hold and
+                        # PHASE_UNCONSTRAINED cannot disagree; every other
+                        # phase is read again off the second solve
+                        decided = support
+                        support = _joint_answer_significance(
+                            models, self.mtable, outcome, [], held_reach,
+                            self._backend, sigma=report_sigma)
+                        for h, ip in _joint_held_phase_pairs(
+                                self.mtable, support_held, held_reach):
+                            support[h][ip] = decided[h][ip]
+                answer_significance = support
                 runaway_diag = _cell_runaway_diagnostic(cell_runaway, unresolved)
                 answer_runaway = [] if runaway_diag is None else [runaway_diag]
                 if runaway_diag is not None:
@@ -1950,7 +2232,8 @@ class MultiHistogramRefinement:
                     seeded=seeded, blocked_by_hold=blocked_by_hold,
                     moment_angle_tests=outcome.moment_angle_tests,
                     cell_reset=cell_reset, collapsed=restored,
-                    window_loss=max(losses) if losses else None, rwp=rwp))
+                    window_loss=max(losses) if losses else None, rwp=rwp,
+                    termination=outcome.termination or None))
                 if stream is not None:
                     stream.emit("stage_end", stage=stage.name, status=outcome.status,
                                 n_iterations=outcome.n_iterations,
@@ -1968,7 +2251,7 @@ class MultiHistogramRefinement:
                                                   window_tol)
         opening_diags = [*opening_diags, *recompiled]
         return (models, outcome, stage_results, cell_runaway_diags,
-                answer_runaway, opening_diags)
+                answer_runaway, opening_diags, answer_significance)
 
     def _final_compiles(self, models, outcome, data, limits, window_tol):
         """One compile per histogram at the values the result returns.
@@ -2036,7 +2319,8 @@ class MultiHistogramRefinement:
     def _build_result(self, models, outcome, weights, correlation_guard,
                       stage_results, cell_runaway_diags=(),
                       answer_runaway=(), opening_diags=(),
-                      phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA
+                      phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
+                      significance: list[np.ndarray] | None = None
                       ) -> RefinementResult:
         mt = self.mtable
         # the threshold PHASE_UNCONSTRAINED and the parametric screen report
@@ -2289,6 +2573,7 @@ class MultiHistogramRefinement:
                                                               mt)
         # a stage's budget is spent by the one joint solve (FIT)
         diagnostics = diagnostics + _max_iter_diagnostics(stage_results)
+        diagnostics = diagnostics + _slow_descent_diagnostics(stage_results)
         # one CELL_RUNAWAY per stage that fired the joint reset above,
         # collected during the loop since there is no per-stage StageReport
         # here to carry it on (review of #385 finding 2)
@@ -2310,18 +2595,27 @@ class MultiHistogramRefinement:
         # (``_unseen``, WP-1325), and that hold is on ``StageResult.held``;
         # naming it per pattern is the joint report's, WP-2028's.
         #
-        # The screen alone, never the single fit's significance (WP-1523): the
-        # joint report is WP-2028's, so the message names the screen's basis.
-        per_support = np.array([m.phase_support(v)
-                                for m, v in zip(models, per_values, strict=True)])
+        # The number the last stage's hold was decided on, as the single fit
+        # reads it (WP-1523, aligned by WP-2003 C10): each histogram's
+        # marginal significance at the answer, a held phase keeping the
+        # reading its hold was taken on.  Read otherwise, a shared cell the
+        # hold kept could leave the result with no finding naming it.  A
+        # stage stopped on a non-finite model measured nothing, so the screen
+        # stands there.
+        decided = significance is not None
+        per_support = (np.array(significance) if decided else
+                       np.array([m.phase_support(v)
+                                 for m, v in zip(models, per_values, strict=True)]))
         per_lines = np.array([m.phase_line_counts() for m in models])
         diagnostics = diagnostics + _phase_support_diagnostics(
             per_support.max(axis=0), per_lines.sum(axis=0),
             (min(m.tt_min for m in models), max(m.tt_max for m in models)),
             [_unscoped(p) for p in mt.free_paths],
             self.mtable.structures[0], stage_results,
-            basis="with everything else held, in the histogram that shows it best",
-            decided=False, sigma=support_sigma,
+            basis=("against the counting noise, in the histogram that shows it "
+                   "best" if decided else
+                   "with everything else held, in the histogram that shows it best"),
+            decided=decided, sigma=support_sigma,
             quantified=models[0].mode == "rietveld")
         # the patterns where the support hold kept a phase's per-pattern
         # structure, which PHASE_UNCONSTRAINED's joint statement cannot name
@@ -3079,8 +3373,8 @@ def _unreached_histogram_diagnostics(stage_results: list[StageResult],
                      f"nothing in histogram {h} ({label}): "
                      f"{', '.join(where)} matched rows of another histogram "
                      "and none of this one."),
-            suggestion=("List this histogram's parameters with "
-                        f"[e.path for e in ref.mtable.tables[{h}].entries] "
+            suggestion=("List this histogram's own parameters with "
+                        f"[r.path for r in ref.parameters() if r.path.startswith('hist.{h}.')] "
                         "and add a glob that reaches them. Scope the stage "
                         "(hist.<k>.…) if one histogram was the intent."),
         ))
@@ -3167,7 +3461,7 @@ def _joint_origin_findings(stage_results, mtable) -> list[Diagnostic]:
 
 def refine_multi(data: list[PatternData], structure: Structure | list[Structure],
                  instruments: list[Instrument], *,
-                 plan: RefinementPlan | str = "mccusker_default",
+                 plan: RefinementPlan | PlanSpec | str = "mccusker_default",
                  sharing: SharingMap | None = None,
                  coordinates: CoordinateTable | None = None,
                  parametric: list[ParametricEquation] | None = None,

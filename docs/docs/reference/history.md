@@ -30,9 +30,11 @@ Until then `Refinement.history` is `None`.
 A recording verb such as `Refinement.set_vary` or `Refinement.edit` changes the working state and commits nothing, so its change arrives in the root.
 `Refinement.checkout`, `Refinement.branch`, `Refinement.merge` and `Refinement.cherry_pick` raise `RuntimeError` until the tree exists.
 
-A path that already holds a log gains a second tree after the first, with its own header and node ids that start again at `n0000`.
-`RefinementTree.load` reads such a file as one tree that holds each id twice.
-To continue a saved log, load it and open a refinement on it with `Refinement.from_node`.
+A log holds one tree.
+So a path that already holds a log raises `FileExistsError` naming the path, at the `Refinement` constructor and again when the tree is created.
+An empty file holds no tree and is used.
+To continue a saved log, load it with `RefinementTree.load` and open a refinement on it with `Refinement.from_node`.
+A series given a history directory checks it before its first fit, and raises `FileExistsError` when the directory holds a log this run would write.
 A `RefinementTree` passed to the constructor takes new nodes on top of its head, with the models you passed as the working state.
 
 ## Nodes
@@ -109,7 +111,8 @@ These are the fields of `Stage`, and [stage settings](settings.md#stage-settings
 | Field | Default | Holds |
 |---|---|---|
 | `NodeAction.max_iter` | `100` | the iteration budget |
-| `NodeAction.lebail_cycles` | `3` | the intensity-partitioning cycles before each solve in `lebail` mode |
+| `NodeAction.lebail_cycles` | `3` | the most intensity-partitioning cycles before and after each solve in `lebail` mode |
+| `NodeAction.lebail_tol` | `0.0` | the share of the Bragg counts that ends the partition; `0.0` runs exactly `lebail_cycles` |
 | `NodeAction.seed` | `0.0` | the starting value for a freed parameter sitting on a lower bound of 0 |
 | `NodeAction.strain_seed` | `0.0` | the microstrain in ppm that starts an all-zero Stephens block |
 | `NodeAction.restraint_weight_scale` | `1.0` | the weight on the geometric restraints |
@@ -536,6 +539,12 @@ So a reloaded tree resumes at the last commit or the last checkout, whichever ca
 A log written by a plain fit, with no annotation line at all, resumes at its last node.
 Blank lines are skipped.
 A file with no header line raises `ValueError` saying it is not a history log.
+A file that holds more than one tree loads its last tree.
+Releases before 1.11 could write such a file, by appending a second run to a reused path.
+The last tree is the most recent run, and a node committed on it is appended at the end of the file, inside that tree.
+Each earlier tree is skipped and reported as a [`HISTORY_EARLIER_TREE_SKIPPED`](diagnostics-files.md#history_earlier_tree_skipped) warning naming its lines and its node count.
+Pass `diagnostics=[]` to collect it.
+Nothing is deleted from the file, so an earlier tree is read by copying its lines into a file of their own and loading that.
 A line that does not parse raises `ValueError` naming the file and the line number.
 
 A log has one writer.

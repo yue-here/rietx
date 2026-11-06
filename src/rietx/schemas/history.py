@@ -99,6 +99,11 @@ class NodeAction(Base):
     ``turn_on`` describes a ``set_vary`` whose result is read off ``free_paths``.
     ``held``/``unheld`` (WP-1435) are ``"set_hold"``'s, on that same pattern,
     against :attr:`RefinementState.holds`.
+
+    ``lebail_cycles`` and ``lebail_tol`` keep the defaults of the stage a node
+    without them ran (WP-1542): three cycles, no test.  The stage's own defaults
+    moved, and these must not follow them, or an old node replays what it never
+    ran.  Every stage now writes both.
     """
 
     kind: NodeKind
@@ -108,6 +113,7 @@ class NodeAction(Base):
     values: dict[str, float] = Field(default_factory=dict)
     max_iter: int = 100
     lebail_cycles: int = 3
+    lebail_tol: float = 0.0
     seed: float = 0.0
     strain_seed: float = 0.0
     restraint_weight_scale: float = 1.0

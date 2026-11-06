@@ -109,8 +109,10 @@ class ProjectFormat:
     #: single value would drop one channel **in silence** — the caller gets an
     #: empty list, which reads as "this file needed no repairs".  Pinned against
     #: the real signatures by a meta-test that partitions **both ways**, so a
-    #: reader that grows or loses the keyword fails here rather than going quiet
-    reports_at: Literal["read", "build", "both"]
+    #: reader that grows or loses the keyword fails here rather than going quiet.
+    #: A ``"read"`` member was dropped with no format producing it (WP-2013,
+    #: the WP-1076 rule): a read-only reader would add it back with its writer
+    reports_at: Literal["build", "both"]
     matches: Callable[[Path], bool]
     #: the format's own reader — returns what the file states
     read: Callable[..., Any]
@@ -182,16 +184,15 @@ class ProjectModel:
         agreement.
 
         ``diagnostics`` collects what *this* call repairs, which is a format's
-        whole channel where :attr:`ProjectFormat.reports_at` is ``"build"``,
-        none of it where that is ``"read"``, and half of it where that is
-        ``"both"``.  The read's half is never lost
+        whole channel where :attr:`ProjectFormat.reports_at` is ``"build"``
+        and half of it where that is ``"both"``.  The read's half is never lost
         either way: it is on :attr:`diagnostics` above, filled whether or not a
         caller passed a list to :func:`read_project_model`.  That is what keeps
         the asymmetry from becoming a trap — handing back an empty list reads as
         "this file needed no repairs", and a caller who passed the list to the
         other call would believe it (WP-1076).
         """
-        if diagnostics is not None and self.format.reports_at in ("build", "both"):
+        if diagnostics is not None:
             options["diagnostics"] = diagnostics
         return self.format.to_structure(self.stated, **options)
 
@@ -483,7 +484,7 @@ def read_project_model(path: str | Path, *,
     """
     p = Path(path)
     fmt = identify_project_format(p)
-    if fmt.reports_at not in ("read", "both"):
+    if fmt.reports_at != "both":
         return ProjectModel(format=fmt, path=p, stated=fmt.read(p))
     # Read into a list of this function's own and copy the caller's in at the
     # end, rather than handing the reader the caller's list directly: the
