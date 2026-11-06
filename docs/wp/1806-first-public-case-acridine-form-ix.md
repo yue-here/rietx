@@ -1,6 +1,6 @@
 # WP-1806 — first public case: acridine form IX
 
-Milestone: rigid-bodies · Status: 🔄 2026-11-05 — the pdCIF reader merged (PR #1006); the bar is a free-atom control (Yue, 2026-11-05); open: the data file, the authors' profile, the acceptance test
+Milestone: rigid-bodies · Status: 🔄 2026-11-06 — Part 1 merged (PR #1416); open: Part 2, the free-atom control
 Depends on: 1805
 Priority: P3 2026-10-23 — the first real-data proof of the body; 1810 closed without it (PR #955), and 1989 waits on it soft for its public case and pdCIF reader
 
@@ -123,13 +123,13 @@ of issue #561, sized M.
 ## Tasks
 
 - [x] pdCIF reader: accept the net-intensity and weight columns, with a diagnostic where it repairs
-- [ ] The data file and a provenance row in `tests/data/README.md`
-- [ ] The authors' profile; the template-superposition floor, measured and recorded
+- [x] The data file and a provenance row in `tests/data/README.md`
+- [x] The authors' profile; the template-superposition floor, measured and recorded
 - [ ] The acceptance test + obs/calc/diff PNGs to `tests/output/`
-- [ ] Part 1: a 10° / 0.3 Å perturbed start returns to the same minimum
-- [ ] Part 1: an intra-body distance reports `None`, and an inter-body one reports a full esd
-- [ ] Part 1: a simulated known answer is recovered, and a regular-hexagon template fails
-- [ ] Part 1: the per-atom table goes to `tests/output/` as a record
+- [x] Part 1: a 10° / 0.3 Å perturbed start returns to the same minimum
+- [x] Part 1: an intra-body distance reports `None`, and an inter-body one reports a full esd
+- [x] Part 1: a simulated known answer is recovered, and a regular-hexagon template fails
+- [x] Part 1: the per-atom table goes to `tests/output/` as a record
 - [ ] Part 2: the free-atom control under the same profile and background, compared with the body atom by atom
 - [ ] Skill: none expected; say why at handover
 
@@ -147,6 +147,55 @@ of issue #561, sized M.
 - Issue #561; PR #596.
 
 ## Handover log
+
+- **2026-11-06** — Part 1 is on main. Mike's PR #1416 merged as `fd6232320`
+  (PR head `170dee168`, main `263227986`), after two review rounds at heads
+  `4935f767e` and `86ad3c53a`. The rigid body now has its own checks on the
+  real acridine pattern. A start 10° and 0.3 Å off returns to the same answer.
+  A distance inside the body carries no esd, and one between molecules carries
+  a full one. A simulated pattern's known answer is recovered, and a
+  regular-hexagon template fails it. Nothing yet says whether the body is
+  right about the deposit. That is Part 2, the free-atom control.
+  Handover filed in PR #1443 by a ghostshift runner.
+
+  *Done.* `tests/test_acceptance_acridine_ix.py` holds the four Part 1 checks
+  under the authors' profile read from the paper. FCJ H/L is held at 0.01,
+  because S/L and H/L are one direction on this pattern. The per-atom table
+  against the deposit goes to `tests/output/acridine_ix_deposit_table.md` as a
+  record and asserts nothing. `tests/validation_matrix.py` and
+  `docs/VALIDATION.md` carry the suite's rows. The data file and its
+  provenance row were already on main (`af5fb4571`), so that task is ticked
+  with this merge. The template floor is 0.064 Å RMS for the regular-hexagon
+  template, worst atom 0.096 Å (round-1 review), and zero for the body built
+  from the deposited atoms.
+
+  *Measured* (the review runner's, macOS arm64, Python 3.12.10, `[dev,jax]`).
+  Start-independence: gap 1.6e-6 Å against a 1e-3 Å bar. The esd rule: 212
+  intra-body rows `None`; 112 inter-body rows full, 100 of them more than 1 %
+  off the diagonal-only esd. The known answer's 0.64 is the best of eight
+  seeds. Over seeds 1806 and 1-7 the worst |Δ|/esd ran 0.64 to 2.27, median
+  1.5, so the margin to the bound of 4 is about 1.8×. The full `-m slow` gate
+  on `170dee168` gave 949 passed, 14 skipped, 19 xfailed, 1 failed, in 1710 s.
+  The one failure is
+  `tests/test_pair_diagnostic_class.py::test_the_two_site_winner_finds_each_site_its_own_moment`.
+  It found m1 = 0.6995 μ_B against an expected 3.5, a swapped minimum. It
+  fails identically, run alone, on bare main `263227986`. So it is main's and
+  not this PR's, and the lead merged on that ground. The fast suite on the
+  round-2 merged tree gave 14 165 passed, 157 skipped, 36 xfailed.
+
+  *Owed by Mike* (his note on the PR). The known-answer row's `measured` should
+  quote the seed range above. Part 2 should note that the esds on this pattern
+  may run conservative: over those seeds the 14 heavy atoms' mean z error ran
+  −1.02 to +0.19 of an esd, rms 0.44.
+
+  *Gotchas.* The test writes no obs/calc/diff PNG, so that task stays open for
+  Part 2. Acceptance's "the cell matches the published cell" is unruled. It may
+  be a comparison against another model's answer under Rule 2, as the
+  coordinates were.
+
+  *Next:* Part 2, the free-atom control under the same profile and
+  background, compared with the body atom by atom, with its PNGs. Bring the
+  cell clause to Yue with it.
 
 - **2026-10-06** — created by WP-1803's re-cut. The maintainer kept the
   published-esd bar, so the reader fix and the authors' profile are tasks here and the
