@@ -1,9 +1,8 @@
 # WP-2055 — the picker holds a line shape the lab pattern does not have
 
-Milestone: unscheduled · Status: 🔄 2026-11-06 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: ✅ 2026-11-06 — the picker keeps its declared line shape (no picker refines the doublet ratio by default, and freeing the bound moves as many lines away from the lattice as towards it); the flag's help no longer names detection as the cause; the tail shoulders left are WP-2120's
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-10-26 — a diagnostic that says less than it could: 24 usable lines on 16 round-robin patterns report their position bound as their position, flagged `info`, and no case yet moves a cell
 
 ## Goal
 
@@ -180,6 +179,35 @@ records why holding the declared shape is right and the census stands.
 - Issue #1166; PR #993 and its round-2 review; WP-1968.
 
 ## Handover log
+
+- **2026-11-06** — closed (ghostshift runner, PR #1445). The picker keeps the Kα2 weight and
+  apertures it is handed. Refining them per pattern would not give usable lines better
+  positions: on 16 round-robin patterns, freeing the bound moves 8 lines towards the known
+  lattice and 11 away from it, and the fitted weight ranges from 0 to 0.46 on one tube, so it is
+  absorbing profile shape rather than measuring the tube. No other peak picker surveyed
+  refines the ratio by default. What the work did find is what the bound-held lines are: a
+  third are shoulders on the tail of a much stronger line, which are not lines at all. The
+  flag's help text said detection had misplaced them; it now says what they usually are.
+
+  *Done.* Task 1 re-ran the direction test on `a84379aac` with an independent harness
+  (`~/.cache/ghostshift/rietx/wp-2055/direction.py`, outside the tree). Every census and
+  direction count matches the reporter's to the digit (§ Findings, 2026-11-06). The
+  `### Inherited` entry from the 2026-10-31 triage is folded into those findings and deleted.
+  Task 2 added `docs/practice.md` § The doublet ratio and asymmetry a peak picker holds.
+  Task 3 records the decision, settled by Claude under the WP's tier line, the survey and
+  the measurement. Task 4 rewrote the `position_at_bound` help entry and the two developer
+  comments that said the same. Filed WP-2120 for the two classes left over (tail shoulders
+  on the bound, 7 of 8 off-lattice; window-edge re-seeds, 53 usable of 120): no open WP owns
+  them, since WP-1968 and WP-1977 are closed and WP-1909 is the background-flank envelope.
+
+  *Measured* (`[dev]`, macOS arm64): the table in § Findings; window-edge census 120 of
+  1056 components. Gates: see the PR body.
+
+  *For Yue.* The help text is reader-facing (the GUI chip and the manual's reference page
+  show it), so it waits on your approval before merge.
+
+  *Next:* none here. WP-2120 task 1 measures the tail-shoulder class on a second
+  diffractometer.
 
 - **2026-10-26** — created, from the 2026-10-26 issue triage (issue #1166). Checked against
   the tree at c0e32ab29: the census reproduces exactly (87 components on their position
