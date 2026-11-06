@@ -2,7 +2,9 @@
  "control_fields": [
   "engines",
   "validate_candidates",
-  "check_top"
+  "check_top",
+  "formula",
+  "temperature"
  ],
  "enums": {
   "centrings": {
