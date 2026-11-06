@@ -33,6 +33,9 @@ from .crystallography.twins import merge_site_twins
 from .history.events import _attach_progress, as_event_stream
 from .model.forward import (
     PHASE_SUPPORT_SIGMA,
+    apertures_to_lift,
+    axial_lift_start,
+    axial_partner,
     compile_model,
     orbit_split_of,
     recorded_window_tol,
@@ -1953,6 +1956,8 @@ class MultiHistogramRefinement:
         # schedule (WP-2002, the sixth round's Q1 and Q2)
         stages = plan.run_stages()
         n_stages = len(stages)
+        # what an earlier stage left free: the aperture lift's gate (WP-1955)
+        refined_before: set[str] = set()
         for index, (stage, ftol, window_tol) in enumerate(
                 zip(stages, plan.stage_ftols(), plan.stage_window_tols(),
                     strict=True), start=1):
@@ -1978,10 +1983,25 @@ class MultiHistogramRefinement:
                     # and a cumulative plan need not name its cell again
                     self.mtable.set_vary(carried_hold, True)
                     carried_hold = []
+                # the single-histogram runner's lift (``_run_stage``,
+                # WP-1955): an FCJ aperture this stage frees on zero starts
+                # off it, unless an earlier stage already refined it, before
+                # the plan's seed
                 seeded: dict[str, float] = {}
+                for path in apertures_to_lift([p for p in freed
+                                               if p not in refined_before]):
+                    # the partner's live value, so S/L's lift is already in it
+                    mt = self.mtable
+                    partner = axial_partner(path)
+                    h = mt._owner(partner) or 0
+                    start = axial_lift_start(
+                        path, mt.decode(mt.x0())[h][mt._unscope(h, partner)])
+                    seeded.update(dict.fromkeys(
+                        mt.seed_floored([path], start), start))
+                refined_before.update(self.mtable.free_paths)
                 if stage.seed:
-                    seeded = dict.fromkeys(
-                        self.mtable.seed_floored(freed, stage.seed), stage.seed)
+                    seeded.update(dict.fromkeys(
+                        self.mtable.seed_floored(freed, stage.seed), stage.seed))
                 self.mtable.apply_to_models()
                 # the single-histogram runner's rule (``_run_stage``, #598): the
                 # moment frames follow the cell this stage starts from, and the

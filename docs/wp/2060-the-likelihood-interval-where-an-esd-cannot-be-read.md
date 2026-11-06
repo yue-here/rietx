@@ -39,6 +39,14 @@ What it says: where the flag fires and the model is right, every rule covers, so
 
 ### Inherited
 
+- **2026-11-03, from WP-1955 (PR #1372): #1075 repro 1 re-measured.** On
+  `main` at 4099cbd07 the fit still ends on S/L = H/L = 0, and
+  `profile_interval("instrument.geometry.axial_sl")` now returns [0.0, 0.0533]
+  with `fit_is_minimum=False`, so the step fix noticed. With WP-1955's lift the
+  fit no longer ends on zero (Rwp 0.0453, S/L 0.030), and the profile is
+  [0.02744, 0.03251] with `fit_is_minimum=True`. Context's [0.0, 0.0] quote is
+  history; repro 1 no longer exercises this WP's step on the FCJ ratios.
+
 ## Non-goals
 
 - The FCJ aperture stall (#1075's repro 1): WP-1955.
