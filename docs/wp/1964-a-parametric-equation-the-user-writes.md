@@ -309,7 +309,7 @@ per-pattern one is an array.
 - [x] **A shared coefficient's interval.** `profile_interval`, or a documented script,
   whichever the measurement above chooses. Moved from 2103 to break a cycle between the
   two WPs.
-- [ ] **Real data.** The WO₃ Einstein equations and the ZrP₂O₇ calibration, local
+- [x] **Real data.** The WO₃ Einstein equations and the ZrP₂O₇ calibration, local
   only, each against the TOPAS input's own answer under its protocol. The bars are
   in [the milestone's Acceptance](../milestones/parametric.md#acceptance).
 - [x] **Manual.** The grammar reference, the equation with its *Source* line in
