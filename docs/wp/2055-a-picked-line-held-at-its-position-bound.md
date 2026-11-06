@@ -151,10 +151,17 @@ at 0.5 against a true 0.44 moves Kα1 by −0.003°, a tenth of the median freed
       of a stronger line, which one also flagged `axial_tail` usually is (7 of 8 here).
       The two developer comments that said the same (`schemas/indexing.py`,
       `peakfit._GroupModel.bounds`) are corrected with it.
-- [ ] Tests + obs/calc/diff PNGs of three bound-held lines before and after to
+- [x] Tests + obs/calc/diff PNGs of three bound-held lines before and after to
       `tests/output/`.
-- [ ] Skill: the `PEAK_POSITION_AT_BOUND` reference row, if what it means changes; else
+      `tests/output/wp2055_bound_held_vs_freed.png` (local, gitignored; drawn by
+      `~/.cache/ghostshift/rietx/wp-2055/pictures.py`): fluorite 46.918° and zircon
+      67.674°, tail shoulders of the strong line, and cpd-1b 86.482°, a re-seed at its
+      window's edge fitting a neighbour's tail. Each is drawn held and freed against the
+      lattice line. No test: no behaviour changed, and `tests/test_help.py` already crosses
+      the entry against the flag vocabulary.
+- [x] Skill: the `PEAK_POSITION_AT_BOUND` reference row, if what it means changes; else
       none, because the flag's help entry already says the position is the bound's.
+      None: the row says the 2θ is the bound's and names no cause, which still holds.
 
 ## Acceptance
 
