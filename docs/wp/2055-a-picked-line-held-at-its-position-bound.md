@@ -125,7 +125,7 @@ at 0.5 against a true 0.44 moves Kα1 by −0.003°, a tenth of the median freed
 - [x] Re-run the direction test on this tree: a second solve that re-centres each bound,
       recording each freed component's move and its distance to the pattern's own lattice,
       at the declared Kα2 weight and at a per-pattern fitted one.
-- [ ] Survey what other peak pickers hold for the doublet ratio and asymmetry (GSAS-II's
+- [x] Survey what other peak pickers hold for the doublet ratio and asymmetry (GSAS-II's
       peak fit, FullProf's WinPLOTR, DICVOL's input lists, TOPAS's peak-fit mode); add a
       `docs/practice.md` section.
 - [ ] Decide, from the two above, whether the picker refines the Kα2 weight (or an
