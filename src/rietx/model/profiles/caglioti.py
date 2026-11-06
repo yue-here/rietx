@@ -289,7 +289,12 @@ def gaussian_fwhm(theta_deg: np.ndarray, u: float, v: float, w: float,
     # variance floor below absorbs any −0.0 sign flip
     c = xp.cos(th)
     g2 = g2 + gauss_size / (c * c)
-    return xp.sqrt(xp.maximum(g2, _MIN_GAMMA_G2))
+    # the floor as a select, never ``maximum`` (WP-1955): at U = V = 0 with W
+    # on its floor, g2 sits on the floor exactly, and a traced backend's
+    # ``maximum`` gives each side of that tie half the derivative.  The
+    # feasible side is g2's own (LM holds Γ_G² ≥ the floor), so a tie selects
+    # g2; ``g2 < floor`` also keeps a NaN g2 a NaN, as ``maximum`` did
+    return xp.sqrt(xp.where(g2 < _MIN_GAMMA_G2, _MIN_GAMMA_G2, g2))
 
 
 def lorentzian_negative_above(x_size: float, y_strain: float) -> float:

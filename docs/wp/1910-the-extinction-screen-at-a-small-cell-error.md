@@ -106,6 +106,21 @@ and is not proposed here. No code is ported.
 
 ### Inherited
 
+- **2026-11-05, from WP-2076: the default screen's own wrong answers.** Its four strict xfails of the
+  confident-miss rows pass under WP-2076's candidate, so they would need their marks lifted if it lands.
+  The held screen reads the same Le Bail path, so its agreement with a wrong class carries the same
+  break. WP-2076 § Findings has the mechanism. Its repair waits on the maintainer.
+
+- **2026-11-02, from WP-2062: this screen's fits move to Pawley, and WP-2062
+  moves them.** The maintainer decided on 2026-11-01 that Pawley replaces
+  Le Bail wherever rietx picks a structure-free fit, this screen included.
+  Claude settled the timing the same day: the move happens inside WP-2062,
+  after the Hamilton count below takes the intensities once. The route through
+  #1170 is gone, since it merged. A session here keeps `mode="lebail"` in
+  `_fit_class`, the cell-free prefit and the reference fit, and leaves the
+  switch and its re-measure to WP-2062. That answers the question the next
+  entry closes on.
+
 - **2026-10-27, from WP-2011: the indexer's validation fit is Pawley, and this
   screen's fits are not.** `validate_by_lebail` runs `mode="pawley"`
   (`workflow.VALIDATION_MODE`) and records `LeBailValidation.mode`. The screen's

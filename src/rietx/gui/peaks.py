@@ -21,7 +21,13 @@ picker used, never a second reading) and their ghost marks
 recomputing cannot resurrect a mark a user cleared on an untouched peak).
 Everything a *human* decided — an ``excluded`` flag, an ``origin`` — is carried
 across the refit by component identity, because a fitter must not overrule the
-person correcting it.  Peaks in other groups are not touched at all.
+person correcting it.  A peak in another group keeps its own fit and flags,
+with two exceptions, each a mark whose basis the edit moved.  The
+false-discovery bar (``weak_line``) is the whole pattern's, so every line is
+re-marked.  A cross-group mark (``duplicate_line``, ``ghost_kbeta``,
+``ghost_tungsten``) is judged against a line that may sit in the edited group,
+so an untouched peak's mark follows a *change* in that judgement and nothing
+else (:func:`_follow_cross_group_marks`, WP-2030).
 
 **What ``peaks.json`` stores beyond the list** is exactly what re-editing
 needs and the flattened list has lost: per group, the fitted width pair
@@ -310,7 +316,13 @@ class PeakEditor:
         g = peak.group
         comps = [(p, c) for p, c in self._components(doc, g) if p is not peak]
         if not comps:
-            doc.peaks = _spliced(doc.peaks, g, [], self.det, windows=doc.groups)
+            # the declared source, as a refit passes it: the cross-group ghost
+            # marks are re-judged here too, and a neutron or monochromated
+            # source must skip that search (WP-1445)
+            doc.peaks = _spliced(doc.peaks, g, [], self.det,
+                                 self.instrument.source.lines,
+                                 source=self.instrument.source,
+                                 windows=doc.groups)
             doc.groups.pop(g, None)
             return doc
         return self._refit_with(doc, g, [p.two_theta for p, _ in comps],
@@ -524,6 +536,50 @@ class PeakEditor:
         return doc
 
 
+#: the marks :func:`~rietx.indexing.pick.flag_ghosts` writes
+_GHOST_MARKS = frozenset({"ghost_kbeta", "ghost_tungsten"})
+
+
+def _machine_marks(peaks: list[ObservedPeak], marks, flagger
+                   ) -> set[tuple[int, str]]:
+    """Which of ``marks`` the picker's own rule puts on each peak of ``peaks``.
+
+    The rule runs on copies stripped of ``marks``, so the answer is the
+    machine's judgement alone, whatever a user has set or cleared since.
+    Returned as ``(id(peak), mark)`` pairs, keyed on the caller's objects.
+    """
+    copies = [p.model_copy(update={"flags": [f for f in p.flags
+                                             if f not in marks]})
+              for p in peaks]
+    flagger(copies)
+    return {(id(p), m) for p, c in zip(peaks, copies, strict=True)
+            for m in marks if m in c.flags}
+
+
+def _follow_cross_group_marks(untouched: list[ObservedPeak],
+                              before: set[tuple[int, str]],
+                              after: set[tuple[int, str]]) -> None:
+    """Move an untouched peak's cross-group mark where the judgement moved.
+
+    A ghost's parent and a copy's owner can sit in any group, so an edit to one
+    group can leave another group's mark stale, or owe it one (WP-2030).  Only
+    a *change* in the machine's judgement acts: a mark the rule set before the
+    edit and not after is cleared, and one it sets only after is added.  Where
+    the judgement did not move, the peak keeps whatever a user made of it, so a
+    mark a user cleared is not resurrected (WP-1043's rule, which ``only=``
+    keeps for the edited group's own marks).
+    """
+    moved: dict[int, list[tuple[str, bool]]] = {}
+    for pid, mark in before ^ after:
+        moved.setdefault(pid, []).append((mark, (pid, mark) in after))
+    for p in untouched:
+        for mark, now in moved.get(id(p), ()):
+            if now and mark not in p.flags:
+                p.flags = [*p.flags, mark]
+            elif not now and mark in p.flags:
+                p.flags = [f for f in p.flags if f != mark]
+
+
 def _spliced(peaks: PeakList, g: int, fresh: list[ObservedPeak],
              det: Detection, lines=(), source=None,
              windows: dict[int, GroupMeta] | None = None) -> PeakList:
@@ -535,14 +591,34 @@ def _spliced(peaks: PeakList, g: int, fresh: list[ObservedPeak],
     component was fitted in."""
     merged = [p for p in peaks.peaks if p.group != g] + list(fresh)
     merged.sort(key=lambda p: p.two_theta)
+    untouched = [p for p in merged if p.group != g]
+
+    def ghosts(ps, only=None):
+        flag_ghosts(ps, peaks.wavelength, det, only=only, source=source)
+
+    # judged on the list as it was, before anything below moves a flag
+    ghosts_before = _machine_marks(peaks.peaks, _GHOST_MARKS, ghosts)
+    copies_before = _machine_marks(peaks.peaks, {"duplicate_line"},
+                                   flag_duplicate_lines)
+    only: set[int] = set()
     if fresh:
         new_ids = {id(p) for p in fresh}
         only = {i for i, p in enumerate(merged) if id(p) in new_ids}
-        flag_ghosts(merged, peaks.wavelength, det, only=only, source=source)
+        ghosts(merged, only=only)
         # the same one-group restriction, for the same reason: recomputing the
         # Kα2-residual mark on edited components must not resurrect one a user
-        # cleared on an untouched line (WP-1043)
+        # cleared on an untouched line (WP-1043).  A Kα2 residual is judged
+        # against its own group's strongest line, so it never crosses groups.
         flag_kalpha2_residuals(merged, lines, only=only)
+    # a ghost or a copy is judged against a line anywhere in the list, so an
+    # untouched peak's mark follows the edit, a deleted group included
+    # (WP-2030).  Ghosts first: a ghost owns no line, so the copies read them.
+    _follow_cross_group_marks(untouched, ghosts_before,
+                              _machine_marks(merged, _GHOST_MARKS, ghosts))
+    _follow_cross_group_marks(
+        untouched, copies_before,
+        _machine_marks(merged, {"duplicate_line"}, flag_duplicate_lines))
+    if fresh:
         flag_duplicate_lines(merged, only=only)
     # unlike the three above, the false-discovery bar is the whole pattern's:
     # an edit moves it for every line (a deleted group too, which is why this

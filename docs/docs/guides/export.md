@@ -34,11 +34,11 @@ _cell_length_b 9.370962(83)
 _cell_length_c 6.885324(80)
 _cell_volume 523.629(12)
 _space_group_name_H-M_alt 'P 63/m'
-10 loops
+11 loops
 ```
 
 Every refined value carries its esd in value(esd) form, and the volume's esd includes the correlation between a and c.
-The ten loops hold the dictionaries the file conforms to, the symmetry operations, the atom types, the atom sites, the bond distances, contacts and angles with their esds, the wavelengths, every point of the pattern with its observed, calculated and background intensity, and the reflections.
+The eleven loops hold the dictionaries the file conforms to, the symmetry operations, the atom types, the atom sites, the bond distances, contacts, angles and torsion angles with their esds, the wavelengths, every point of the pattern with its observed, calculated and background intensity, and the reflections.
 The R factors, the profile function and the background are single items in the same block.
 
 The pattern loop holds every point of the pattern the fit was given.

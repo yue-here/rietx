@@ -1045,9 +1045,10 @@ def test_what_a_recorded_stage_costs_in_forward_evaluations(
     """Per stage and per name, with the caller's own stream in between.
 
     The middle arm is what makes this a decomposition rather than a total: a
-    caller who passes ``events=`` has always paid the real ``stage_end.rwp``,
-    so that half of the bill is not new and is not the recorder's.  What the
-    recorder adds beyond it is its per-stage picture, which is the same forward
+    caller who passes ``events=`` once paid the real ``stage_end.rwp`` on top
+    of an unrecorded fit, and since ``StageResult.rwp`` (WP-1334) every fit
+    pays it, so the caller's stream now costs nothing in forwards.  What the
+    recorder adds is its per-stage picture, which is the same forward
     work a ``LiveSession`` has always done — measured identical, 2026-09-15.
     The news in WP-1403 is therefore not that a picture costs a forward, but
     that it is now taken unasked.
@@ -1065,20 +1066,17 @@ def test_what_a_recorded_stage_costs_in_forward_evaluations(
     recorded, n_recorded = take()
     assert n == n_caller == n_recorded > 1
 
-    # a caller's own stream buys the real ``stage_end.rwp``: one background
-    # pass and one Bragg sum a stage, and no second y_calc — the block at
-    # ``refine.py``'s ``if events is not None`` reuses the background it
-    # computed rather than calling ``evaluate``
-    assert caller["evaluate"] - plain["evaluate"] == 0
-    assert caller["bragg_component"] - plain["bragg_component"] == n
-    assert caller["background"] - plain["background"] == n
+    # the stage Rwp, one background pass and one Bragg sum a stage, is paid
+    # whether or not anyone listens, because ``StageResult.rwp`` carries it
+    # (WP-1334): a caller's own stream adds no forward work at all
+    assert caller == plain
 
     # the recorder adds its snapshot on top: one whole ``evaluate`` a stage,
     # which is a second Bragg sum and a second background, plus the background
     # curve the snapshot carries in its own right
     assert recorded["evaluate"] - plain["evaluate"] == n
-    assert recorded["bragg_component"] - plain["bragg_component"] == 2 * n
-    assert recorded["background"] - plain["background"] == 3 * n
+    assert recorded["bragg_component"] - plain["bragg_component"] == n
+    assert recorded["background"] - plain["background"] == 2 * n
 
 
 def test_the_flush_count_is_bounded_by_the_events_and_the_cadence(

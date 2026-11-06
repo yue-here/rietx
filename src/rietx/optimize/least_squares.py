@@ -775,24 +775,28 @@ def _moment_angle_columns(entries: list[dict[tuple[int, str], float]]
 
 
 def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
-                  modulus_norms: np.ndarray) -> _StationaryPoint:
+                  modulus_norms: np.ndarray, block=None) -> _StationaryPoint:
     """Move the angles ``idx`` together until their columns vanish.
 
     Gauss-Newton on the stacked columns C(α) = ∂r/∂α, every other entry of
-    ``x`` fixed: δα = −lstsq(∂C/∂α, C), central differences at
-    :data:`STATIONARY_ANGLE_STEP` for C and for ∂C/∂α = ∂²r/∂α∂α.  Iterated,
-    because one step leaves an error of order δ³, and joint, because two
-    sites' angle columns are coupled (WP-1929's deferred measurement).  The
-    best iterate is kept, by its largest column over its modulus column.  Costs
-    2k² + 1 residual evaluations an iteration for k angles, the k columns
-    reusing the diagonal second differences' points.
+    ``x`` fixed: δα = −lstsq(∂C/∂α, C).  Iterated, because one step leaves an
+    error of order δ³, and joint, because two sites' angle columns are coupled
+    (WP-1929's deferred measurement).  The best iterate is kept, by its
+    largest column over its modulus column.
+
+    ``block(th)``, where given, returns C and ∂C/∂α = ∂²r/∂α∂α analytically
+    (:func:`_analytic_angle_block`, WP-2068), and an iteration then costs one
+    residual evaluation.  Without it both come from central differences at
+    :data:`STATIONARY_ANGLE_STEP`, 2k² + 1 residual evaluations an iteration
+    for k angles, the k columns reusing the diagonal second differences'
+    points.
     """
     from .statistics import column_norms
 
     h = STATIONARY_ANGLE_STEP
     k = len(idx)
 
-    def columns(th: np.ndarray):
+    def fd_columns(th: np.ndarray):
         plus, minus = [], []
         for i in idx:
             tp, tm = th.copy(), th.copy()
@@ -802,18 +806,10 @@ def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
             minus.append(resid(tm))
         c = np.column_stack([(p - m) / (2.0 * h)
                              for p, m in zip(plus, minus, strict=True)])
-        return c, plus, minus
+        return c, (plus, minus)
 
-    def ratios_of(c: np.ndarray) -> np.ndarray:
-        return column_norms(c) / modulus_norms
-
-    th, r0 = x.copy(), r_stop
-    c, plus, minus = columns(th)
-    ratios = ratios_of(c)
-    curvature_stop = None
-    for _ in range(STATIONARY_ANGLE_MAX_ITER):
-        if not np.all(np.isfinite(ratios)) or ratios.max() <= MOMENT_DIRECTION_SUPPORT:
-            break
+    def fd_curvature(th: np.ndarray, r0: np.ndarray, aux) -> np.ndarray:
+        plus, minus = aux
         m = np.empty((len(r0), k, k))
         for a in range(k):
             m[:, a, a] = (plus[a] - 2.0 * r0 + minus[a]) / h ** 2
@@ -828,6 +824,36 @@ def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
                 m[:, a, b] = m[:, b, a] = (
                     corner[1.0, 1.0] - corner[1.0, -1.0]
                     - corner[-1.0, 1.0] + corner[-1.0, -1.0]) / (4.0 * h ** 2)
+        return m
+
+    def fd_diagonal(r0: np.ndarray, aux) -> np.ndarray:
+        plus, minus = aux
+        return np.column_stack([(plus[a] - 2.0 * r0 + minus[a]) / h ** 2
+                                for a in range(k)])
+
+    if block is None:
+        columns, curvature, diagonal = fd_columns, fd_curvature, fd_diagonal
+    else:
+        def columns(th: np.ndarray):
+            return block(th)
+
+        def curvature(th: np.ndarray, r0: np.ndarray, aux) -> np.ndarray:
+            return aux
+
+        def diagonal(r0: np.ndarray, aux) -> np.ndarray:
+            return aux[:, np.arange(k), np.arange(k)].copy()
+
+    def ratios_of(c: np.ndarray) -> np.ndarray:
+        return column_norms(c) / modulus_norms
+
+    th, r0 = x.copy(), r_stop
+    c, aux = columns(th)
+    ratios = ratios_of(c)
+    curvature_stop = None
+    for _ in range(STATIONARY_ANGLE_MAX_ITER):
+        if not np.all(np.isfinite(ratios)) or ratios.max() <= MOMENT_DIRECTION_SUPPORT:
+            break
+        m = curvature(th, r0, aux)
         if curvature_stop is None:
             curvature_stop = m
         # block a of the stacked system is column a's rows: C[:, a] against
@@ -836,19 +862,17 @@ def _joint_newton(resid, x: np.ndarray, r_stop: np.ndarray, idx: list[int],
                                 c.T.reshape(-1), rcond=None)[0]
         trial = th.copy()
         trial[idx] += step
-        c_new, plus_new, minus_new = columns(trial)
+        c_new, aux_new = columns(trial)
         ratios_new = ratios_of(c_new)
         if not np.all(np.isfinite(ratios_new)) or ratios_new.max() >= ratios.max():
             break
-        th, c, plus, minus, ratios = trial, c_new, plus_new, minus_new, ratios_new
+        th, c, aux, ratios = trial, c_new, aux_new, ratios_new
         r0 = resid(th)
-    diag = np.column_stack([(plus[a] - 2.0 * r0 + minus[a]) / h ** 2
-                            for a in range(k)])
     return _StationaryPoint(
         theta=th, ratios=ratios,
         reached=bool(np.all(np.isfinite(ratios))
                      and ratios.max() <= MOMENT_DIRECTION_SUPPORT),
-        resid=r0, curvature_stop=curvature_stop, curvature_diag=diag)
+        resid=r0, curvature_stop=curvature_stop, curvature_diag=diagonal(r0, aux))
 
 
 def _refitted_increase(jac_data: np.ndarray, angles: list[int],
@@ -906,7 +930,7 @@ def _half_widths(curvature_diag: np.ndarray, resid: np.ndarray,
 def stationary_angle_test(resid, x: np.ndarray, jac: np.ndarray, n_data: int,
                           free_paths: list[str],
                           entries: list[dict[tuple[int, str], float]],
-                          n_free: int
+                          n_free: int, angle_block=None
                           ) -> tuple[list[MomentAngleTest] | None, list[int]]:
     """Which free moment angles sit at a direction the symmetry fixes (WP-1929).
 
@@ -933,6 +957,10 @@ def stationary_angle_test(resid, x: np.ndarray, jac: np.ndarray, n_data: int,
     pass alone, and this is how they are separated.
 
     ``resid`` is the solve's residual; only its first ``n_data`` rows are read.
+    ``angle_block`` is :func:`_analytic_angle_block`'s answer for the solve's
+    model, where it has one: a round whose set it claims builds its columns
+    and curvature from it, and every other round, or a caller passing
+    ``None``, from central differences of ``resid``.
     ``jac`` is the solve's own Jacobian at ``x``, and ``n_free`` is P in
     χ²_red = χ²/(N − P), as :func:`covariance_estimates` counts it.  Returns
     the record, ``None`` where no angle was a candidate or χ²_red·f² is not
@@ -981,7 +1009,9 @@ def stationary_angle_test(resid, x: np.ndarray, jac: np.ndarray, n_data: int,
         cut = chi_bar_squared_quantile(STATIONARY_ANGLE_LEVEL, k)
         try:
             point = _joint_newton(r, x, r_stop, tested,
-                                  np.array([reference[i] for i in tested]))
+                                  np.array([reference[i] for i in tested]),
+                                  None if angle_block is None
+                                  else angle_block(tested))
             statistic = None
             if point.reached:
                 statistic = _refitted_increase(jac_data, tested, r_stop,
@@ -1421,7 +1451,8 @@ def _moment_column(model: CompiledModel, table: ParameterTable,
                    bases: DerivativeBases, values: dict[str, float], c: int,
                    ip: int, reach: list[str],
                    grads: dict[tuple[int, int], np.ndarray]) -> np.ndarray:
-    """∂y/∂θ_c for a column moving moment moduli of phase ip only (WP-1327).
+    """∂y/∂θ_c for a column moving moment DOFs of phase ip only (WP-1327):
+    moduli by default, any DOF where ``_moment_reach_ok``'s ``angles`` asks.
 
     The moment enters only p²⟨|F_⊥|²⟩, so only the intensity scalar moves.
     ``grads`` is :meth:`CompiledModel.moment_f2_grads` for the phase at this
@@ -1453,18 +1484,29 @@ def _moment_column(model: CompiledModel, table: ParameterTable,
     return _accumulate(len(model.tt), parts)
 
 
-def _moment_reach_ok(path: str, extra: list[str]) -> bool:
-    """Whether ``_moment_column`` claims this column: moduli of one phase only.
+def _moment_reach_ok(path: str, extra: list[str], *,
+                     angles: bool = False) -> bool:
+    """Whether ``_moment_column`` claims this column: moduli of one phase only,
+    or, with ``angles``, any moment DOF of one phase.
 
     Its reach is moment **moduli** (``dof0``) of one phase, any atom — the
     affine block can tie two sites' moduli or drive them from a variable, and
     the branch sums those.  Anything else (a cell, a coordinate, another
     phase's moment) takes the peak-chain column.
 
-    **An angle is declined by name, and the reason is measured, not a gap in
-    the derivative** (``d_magnetic_f2_d_dofs`` returns the angle rows, held to
-    the same exact oracle).  A moment seeded on a direction the symmetry fixes
-    — (2.5, 0, 2.5) on P 1 2/m 1 puts the azimuth at exactly 0 — sits where
+    ``angles`` widens the claim to every moment DOF of the phase, the angles
+    (``dof1``, ``dof2``) beside the moduli, and to a column mixing the two.
+    ``_moment_column`` needs nothing more for them: a column is Σ_k C[k, c]·
+    ∂(p²⟨|F_⊥|²⟩)/∂d_k over the DOFs it reaches, the DOFs are affine in θ
+    however non-affine the moment is in an angle, and
+    ``d_magnetic_f2_d_dofs`` returns every DOF's row.  It is the caller's to
+    ask for (``_make_jacobian``'s ``moment_angles``); no solve asks today,
+    for the reason below.
+
+    **By default an angle is declined by name, and the reason is measured,
+    not a gap in the derivative** (``d_magnetic_f2_d_dofs`` returns the angle
+    rows, held to the same exact oracle).  A moment seeded on a direction the
+    symmetry fixes — (2.5, 0, 2.5) on P 1 2/m 1 puts the azimuth at exactly 0 — sits where
     the pattern is even in the angle, so its exact column is zero up to
     round-off (2.3e-16 of the modulus column there).  Where that direction is
     a *maximum* along the angle, whether the solver leaves it depends on that
@@ -1476,15 +1518,128 @@ def _moment_reach_ok(path: str, extra: list[str]) -> bool:
     anyone chose; the analytic angle column waits on one that is — an angle
     seeded off its stationary point before the stage that frees it,
     ``moments.tilted_seed``'s shape for the same stationary point, in its own
-    PR.  The decline stands on either platform.  A modulus has no such point a
-    fit can start at: a varied moment of zero is refused by the schema.
+    PR.  The decline stands on either platform, and it is a default, not a
+    gap: re-measured 2026-11-04 (darwin/arm64) with ``angles`` forced on for
+    every solve, those two fits still end at |m| 3.1804 and 3.1766 against
+    the pinned 3.1772(5).  A modulus has no such point a fit can start at: a
+    varied moment of zero is refused by the schema.
     """
     m = _MOMENT_PATH.match(path)
-    if m is None or m.group(3) != "0":
+    if m is None or not (angles or m.group(3) == "0"):
         return False
     prefix = f"phases.{m.group(1)}.atoms."
-    return all((n := _MOMENT_PATH.match(q)) and n.group(3) == "0"
+    return all((n := _MOMENT_PATH.match(q)) and (angles or n.group(3) == "0")
                and q.startswith(prefix) for q in extra)
+
+
+def _analytic_angle_block(model: CompiledModel, table: ParameterTable):
+    """The stationary-angle test's analytic block, or ``None`` (WP-2068).
+
+    Returns ``make(idx)``, which answers for a set of θ columns either
+    ``None`` (the test keeps its central differences) or ``block(th)`` giving
+    the data rows' C = ∂r/∂θ_idx, (n, k), and ∂²r/∂θ_a∂θ_b, (n, k, k), at
+    ``th``.  The branch claims a set only when every model path each column
+    moves is a moment **angle** of a phase whose intensity is affine in
+    p²⟨|F_⊥|²⟩ (:meth:`CompiledModel.moment_angle_block_supported`); a
+    variable is dropped before that test, the forward model never reading
+    one.  The test's own candidates pass the first half by construction
+    (``_moment_angle_columns``), so the second is what sends a set back to
+    the differences.
+
+    Within that reach the chain is linear: y is affine in |F|², so
+    ∂²y/∂a∂b is ∂²|F_⊥|²/∂a∂b through the same per-reflection factor and
+    the same frozen profile Ω as the first derivative.  Neither depends on
+    an angle, so both are built once per phase, at the first ``th`` any set
+    is evaluated at, and shared by every round's set.  The coefficients are
+    C's, so a tie or a variable driving several sites' angles is carried
+    exactly, the DOFs being affine in θ.  The reach is read off
+    :meth:`~rietx.params.vector.ParameterTable.column_reach`, never C's
+    sparsity: a derived row a column moves carries no coefficient in C, and
+    the branch declines it rather than reading it as unmoved.
+    """
+    if (model.mode != "rietveld" or model.pawley is not None
+            or all(cp.magnetic is None for cp in model.phases)):
+        return None
+    coef = table.constraint_block()[0].tocsc()
+    reach = list(table.column_reach().values())
+    n_table = len(table.free_paths)
+    sqrt_w = 1.0 / model.sigma
+    n_pts = len(model.tt)
+    frozen: dict[int, list] = {}
+
+    def freeze(values: dict[str, float], phases) -> None:
+        """Per phase and drawn component, ∂y/∂(p²⟨|F_⊥|²⟩) as a sparse
+        (points × reflections) operator: Ω scattered by its window
+        indices, times the per-reflection factor the first-derivative
+        chain applies (:meth:`CompiledModel.moment_intensity_grad`)."""
+        from scipy import sparse
+
+        todo = [ip for ip in phases if ip not in frozen]
+        if not todo:
+            return
+        bases = model.derivative_bases(values, None, axial_derivs=False,
+                                       profile_derivs=False)
+        for ip in todo:
+            n_refl = len(model.phases[ip].reflections)
+            ops = []
+            for pp, fac in zip(bases.components(ip),
+                               model.moment_intensity_grad(
+                                   ip, np.ones(n_refl), values),
+                               strict=True):
+                lay = pp.layout
+                if not len(lay.i0):
+                    continue
+                row_fac = np.where(pp.finite, _gather_per_line(lay, fac), 0.0)
+                data = (np.asarray(pp.omega) * row_fac[:, None]).ravel()
+                rows = np.asarray(lay.idx).ravel()
+                refl = np.broadcast_to(np.asarray(lay.k)[:, None],
+                                       lay.idx.shape).ravel()
+                ops.append(sparse.csr_matrix((data, (rows, refl)),
+                                             shape=(n_pts, n_refl)))
+            frozen[ip] = ops
+
+    def make(idx: list[int]):
+        weights: dict[int, list[dict[tuple[int, int], float]]] = {}
+        for a, c in enumerate(idx):
+            if c >= n_table:
+                return None
+            for path in reach[c]:
+                if is_variable_path(path):
+                    continue
+                w = float(coef[table._paths[path], c])
+                m = _MOMENT_PATH.match(path)
+                if w == 0.0 or m is None or m.group(3) == "0":
+                    # a derived row (no coefficient in C), a modulus or
+                    # anything that is not a moment angle
+                    return None
+                ip = int(m.group(1))
+                if not model.moment_angle_block_supported(ip):
+                    return None
+                per = weights.setdefault(ip, [{} for _ in idx])
+                per[a][int(m.group(2)), int(m.group(3))] = w
+        if not weights:
+            return None
+        k = len(idx)
+        upper = np.triu_indices(k)
+
+        def block(th: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            values = table.decode(th[:n_table])
+            freeze(values, weights)
+            dy = np.zeros((n_pts, k + len(upper[0])))
+            for ip, w in weights.items():
+                g, h = model.moment_f2_angle_block(ip, values, w)
+                rhs = np.concatenate([g, h[:, upper[0], upper[1]]], axis=1)
+                for op in frozen[ip]:
+                    dy += op @ rhs
+            dy *= -sqrt_w[:, None]
+            curv = np.empty((n_pts, k, k))
+            curv[:, upper[0], upper[1]] = dy[:, k:]
+            curv[:, upper[1], upper[0]] = dy[:, k:]
+            return dy[:, :k], curv
+
+        return block
+
+    return make
 
 
 def _po_column(model: CompiledModel, bases: DerivativeBases,
@@ -1836,12 +1991,21 @@ def _affected_phases(model: CompiledModel, path: str, extra: list[str]):
     return sorted({int(p.split(".")[1]) for p in touched})
 
 
-def _make_jacobian(model: CompiledModel, table: ParameterTable):
+def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
+                   moment_angles: bool = False):
     """Mixed analytic/FD Jacobian of the residual w.r.t. the internal vector.
 
     In Pawley mode the vector is [table θ | intensities]; the table columns are
     built exactly as for Rietveld/Le Bail, then the intensity block gets its own
     exact linear columns (:func:`_pawley_intensity_columns`).
+
+    ``moment_angles`` lets the analytic moment branch claim a moment
+    **angle** column as well as a modulus (``_moment_reach_ok``, WP-1327).
+    Off, an angle takes the peak chain's forward difference, which is what
+    every solve in the package builds: the exact column is zero at a start
+    the symmetry fixes, and a fit started on a maximum there then cannot
+    leave it (the decline's docstring has the measurement).  On, the angle
+    column is exact; nothing above this function asks for it yet.
     """
     sqrt_w = 1.0 / model.sigma
     free = table.free_paths
@@ -1956,7 +2120,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
                     int(dof.group(1)), int(dof.group(2)), rows, grad)
             elif ((mom := _MOMENT_PATH.match(path))
                     and model.moment_grad_supported(int(mom.group(1)))
-                    and _moment_reach_ok(path, extra)):
+                    and _moment_reach_ok(path, extra, angles=moment_angles)):
                 ip = int(mom.group(1))
                 J[:n_data, c] = -sqrt_w * _moment_column(
                     model, table, get_bases(), values, c, ip, [path, *extra],
@@ -2051,7 +2215,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
     return jacobian
 
 
-def _jacobian_for(model, table, backend: str):
+def _jacobian_for(model, table, backend: str, *, moment_angles: bool = False):
     """The Jacobian callable for ``backend`` (lazy import keeps numpy pure).
 
     Every autodiff callable produces the same fp64 host array in the same
@@ -2066,6 +2230,10 @@ def _jacobian_for(model, table, backend: str):
     per column if (and only if) a policy asked for it.  With the default fp64
     policy the wrapper is a plain ``np.asarray``, so the numpy path is
     unchanged.
+
+    ``moment_angles`` is :func:`_make_jacobian`'s, passed to the numpy
+    assembly; a traced backend declines every magnetic model by name, so it
+    has no moment angle to claim.
     """
     if backend == "jax":
         from ..backend.jax_backend import make_jax_jacobian
@@ -2076,7 +2244,7 @@ def _jacobian_for(model, table, backend: str):
 
         inner = make_torch_jacobian(model, table, device=TORCH_DEVICES[backend])
     elif backend == "numpy":
-        inner = _make_jacobian(model, table)
+        inner = _make_jacobian(model, table, moment_angles=moment_angles)
     else:
         raise ValueError(f"unknown backend {backend!r}; "
                          f"available: numpy, jax, {', '.join(TORCH_DEVICES)}")
@@ -2299,7 +2467,8 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
     ``magnetic_lor_strain`` added at a magnetic component's windows.  A
     Stephens block adds Λ(hkl)·tanθ, which its own cone holds at or above
     zero (:func:`strain_cone_inequalities`), so it is left out of the row.
-    The row is then a sufficient condition, never a necessary one.  The
+    It also replaces ``lor_strain`` (WP-1467), whose value leaves the row with
+    it.  The row is then a sufficient condition, never a necessary one.  The
     phase terms have floors of 0, so a row can bind only through X and Y.
 
     **A row at every reflection of the frozen list**, where the Gaussian rows
@@ -2344,6 +2513,13 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
         # the magnetic pair is a table row only where a moment block is declared
         if cp.win_mag is not None and all(n in table._paths for n in magnetic):
             families.append((cp.win_mag, rows + [table._paths[n] for n in magnetic]))
+        # a Stephens block replaces lor_strain (CompiledModel.lor_strain_term,
+        # WP-1467): the entry is force-fixed, so its C row is zero and only its
+        # stored value in d would reach the row, a width the model never draws
+        d_ph = d
+        if cp.strain_monomials is not None:
+            d_ph = d.copy()
+            d_ph[table._paths[f"phases.{ip}.lor_strain"]] = 0.0
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         _d, tt_lines = model._cell_block(cp, cell, lams)
@@ -2361,7 +2537,7 @@ def lorentzian_width_inequalities(model: CompiledModel, table: ParameterTable,
             inv_cos, t = 1.0 / np.cos(th), np.tan(th)
             basis = np.column_stack([inv_cos, t] * (len(idx) // 2))
             blocks_T.append(basis @ C[idx, :])
-            blocks_c.append(basis @ d[idx])
+            blocks_c.append(basis @ d_ph[idx])
         if not blocks_T:
             continue
         Tc = np.unique(np.column_stack([np.vstack(blocks_T),
@@ -2987,7 +3163,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
         moment_angle_tests, stationary = stationary_angle_test(
             probe, res.x, res.jac, len(model.tt), table.free_paths,
             _column_entries([table], [np.arange(n_table)], len(res.x)),
-            len(res.x))
+            len(res.x), angle_block=_analytic_angle_block(model, table))
         stderr_full, corr_full, esd_inflation, covariance_error = _guarded_covariance(
             _without_columns(res.jac, stationary), res.fun, len(res.x),
             n_data=len(model.tt))

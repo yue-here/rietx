@@ -543,7 +543,7 @@ def _closed(family):
 _CLOSING_FAILS = {
     "lab6": ("0.908 esd on profile.u, not a window: the closing stage is one polish at 1e-3 to "
              "every printed digit, a second recompile moves u 1 esd and a third 0.002, with the "
-             "high-angle Gaussian variance on the clamp floor (WP-1467)"),
+             "high-angle Gaussian variance on the clamp floor (WP-1955)"),
 }
 
 
@@ -566,7 +566,7 @@ def test_the_closing_stage_meets_the_bar(family):
     on ``profile.u``.  That is no window: its answer puts the highest-angle
     reflections' Gaussian variance U·tan²θ + V·tanθ + W under the clamp
     floor, where a polish moves U by an esd at any window (``waiting.md``
-    § B10, forwarded to WP-1467), so a second recompile moves it 1 esd and a
+    § B10, forwarded to WP-1955), so a second recompile moves it 1 esd and a
     third 0.002.
     """
     f = _closed(family)

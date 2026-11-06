@@ -632,6 +632,12 @@ def texture_actions(texture, *, harmonic_phases=frozenset()
             rationale += (f"; the axis is not cleanly resolved — {runner} "
                           f"fits R²={t.runner_up_r2:.2f}, so refine r but do "
                           "not report the axis as measured")
+            if t.phase_index not in harmonic_phases:
+                # the opt-in that needs no single axis, named where the
+                # evidence says one axis does not fit (WP-1944 ruling 2)
+                rationale += ("; a texture with no single fibre axis takes "
+                              "Phase.texture = SphericalHarmonicTexture(order=4) "
+                              "instead")
         if t.phase_index in harmonic_phases:
             rationale += ("; the phase carries a spherical-harmonics texture, "
                           "which excludes a preferred_orientation block, so "
@@ -736,7 +742,9 @@ def background_actions(background) -> list[SuggestedAction]:
                 f"or an un-modelled broad crystalline phase produces exactly "
                 f"this signature, and a background bent over either *hides* "
                 f"it while improving every statistic — so check the "
-                f"between-peak shape before adding flexibility, and if you "
+                f"between-peak shape before adding flexibility.  A hump is "
+                f"declared as instrument.extra_components = "
+                f"[HumpComponent(...)], which the plans then free; if you "
                 f"add it anyway, read any QPA from the result as fractions of "
                 f"the crystalline content you did model"),
             alternatives=["add_impurity_phase"]))
@@ -978,7 +986,8 @@ def suggest_actions(attributions: list[RegionAttribution],
                     *, rwp: float,
                     ticks: list[float] | None = None,
                     geometry: str | None = None,
-                    wavelength: float | None = None) -> list[SuggestedAction]:
+                    wavelength: float | None = None,
+                    axial_off: bool = False) -> list[SuggestedAction]:
     """Build the typed action list from Layers 0-1.
 
     ``geometry`` picks the position-action map (:data:`_POSITION_ACTIONS_BY_
@@ -993,6 +1002,12 @@ def suggest_actions(attributions: list[RegionAttribution],
     an apparent crystallite size (:func:`_size_clause`); ``None`` is *no claim*
     and leaves the text as it was, which is what a caller with no instrument in
     hand gets.
+
+    ``axial_off`` says both axial apertures are 0, so the ``asymmetry``
+    coefficients were read off the column at the nominal aperture
+    (:func:`.layer1.nominal_axial_columns`, WP-2054).  Only a positive one then
+    counts, since a negative one asks for less asymmetry than a model that
+    draws none, and the rationale says the apertures are 0.
     """
     actions: list[SuggestedAction] = []
     by_obs = {t.observable: t for t in trends}
@@ -1042,14 +1057,24 @@ def suggest_actions(attributions: list[RegionAttribution],
     # asymmetry: a significant coefficient in the low-angle regions
     low = [a for a in attributions if a.gates_passed and a.mean_two_theta < 40.0]
     asym = [c for a in low for c in a.coefficients
-            if c.kind == "asymmetry" and c.significant]
+            if c.kind == "asymmetry" and c.significant
+            and (c.value > 0.0 or not axial_off)]
     if asym:
+        rationale = (f"axial-divergence shape term is significant in "
+                     f"{len(asym)} low-angle region(s)")
+        if axial_off:
+            rationale += (
+                " while both axial apertures are 0, so the model draws no "
+                "asymmetry: take S/L from a standard's calibration, or add a "
+                "stage freeing S/L to the plan and run it again, since the "
+                "widths and positions fitted without it have absorbed part "
+                "of it")
         actions.append(SuggestedAction(
             kind="refine_axial_asymmetry", confidence=0.5,
-            rationale=(f"axial-divergence shape term is significant in "
-                       f"{len(asym)} low-angle region(s)"),
-            parameter_paths=["instrument.geometry.axial_sl",
-                             "instrument.geometry.axial_hl"],
+            rationale=rationale,
+            # S/L alone: the FCJ weight is symmetric under S/L <-> H/L, so
+            # freeing both reaches one of two mirrored minima (WP-2012).
+            parameter_paths=["instrument.geometry.axial_sl"],
             two_theta_range=(min(a.two_theta_lo for a in low),
                              max(a.two_theta_hi for a in low))))
 
@@ -1278,10 +1303,10 @@ def estimate_delta_chi2(result: RefinementResult,
     and the corrections mutually compatible.  It is **not** a bound on what
     applying an action achieves: a refinement also improves regions that failed a
     gate and stretches of pattern no region entry covers, and WP-1012 measured the
-    observed reduction exceeding this estimate by 0.8 % on a cell correction
-    (16.19 predicted, 16.33 observed).  It is also one number for the whole
-    report, which ``build_report`` stamps on every action, so it ranks nothing —
-    see :class:`~rietx.report.schemas.SuggestedAction`.
+    observed reduction exceeding this estimate by 0.9 % on a cell correction
+    (16.16 predicted, 16.30 observed, re-measured 2026-11-02).  It is also one
+    number for the whole report, which ``build_report`` stamps on every action,
+    so it ranks nothing — see :class:`~rietx.report.schemas.SuggestedAction`.
     """
     usable = [a for a in attributions if a.gates_passed]
     if not usable:

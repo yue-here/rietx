@@ -201,6 +201,13 @@ from .structure import Cell
 #: orbits cannot hold the declared content (removing them only under
 #: ``ordered=True``) and the special positions a Z′ below one needs.  Only a screen that declares one of them can answer differently;
 #: with none declared every screen answers as before.
+#: Also 1.12 (WP-2033, #1140's follow-ups): under ``ordered=True`` a fractional
+#: formula count whose atoms per cell are whole (``CaSO4·0.5H2O`` at Z = 2) is
+#: now counted, so the screen removes groups it used to keep; ``z`` with no
+#: formula opens ``EXTINCTION_PRIOR_APPLIED`` with "filters no group" rather
+#: than "removed 0 space group(s)"; the collapsed special-position ``where``
+#: line splits by note kind; an element an ordered count cannot test (atoms per
+#: cell not whole) gets its own ``where`` line.
 #: Also 1.12 (WP-2030): ``INDEX_DATA_INSUFFICIENT`` names an undeclared
 #: instrument first only on a laboratory source, read off the declared source
 #: (``diagnostics.lab_source``), and reads it from the list's own record when
@@ -1380,7 +1387,9 @@ class CellCandidate(Base):
     Deliberately *not* named "solution" and deliberately carrying no "is correct"
     field.  ``found_by`` is the engines that produced it — agreement between
     independent engines is the confidence, the same device as the cross-backend
-    Jacobian matrix and ``direction="both"`` — and ``ambiguity`` is populated
+    Jacobian matrix and ``direction="both"`` — plus ``"prior"`` for a checked
+    prior cell, which is not an engine and counts toward no agreement
+    (WP-2082); ``ambiguity`` is populated
     whenever a geometrically indistinguishable partner exists.
 
     ``cell`` is a bare (a, b, c, α, β, γ) tuple in Å and degrees, kept so for
@@ -1770,7 +1779,7 @@ class SearchSpecSpec(Base):
         "cell is what supplies them"))
     budget_seconds: float = Field(30.0, gt=0.0, description=(
         "wall clock per (engine x crystal system) SLICE of the search, not per "
-        "run: a default two-engine, seven-system call is up to 2x7x30 s of "
+        "run: a default three-engine, seven-system call is up to 3x7x30 s of "
         "search before the probe and validation. An engine stopped by it "
         "reports search_complete[system] = false, and a negative result there "
         "is not evidence. total_budget_seconds is the whole-run bound"))
@@ -1906,6 +1915,13 @@ class IndexingControls(Base):
     same fields, and ``tests/test_search_controls.py`` holds all three to
     ``index_pattern``'s own signature.  ``two_theta_limits`` is deliberately
     absent: the project document already owns it (one authority per fact).
+
+    ``formula`` and ``temperature`` are the specimen's, stored here because
+    they are search settings that sit beside the volume limits (WP-2030, the
+    2026-11-02 ruling).  The GUI's indexing form writes them, and its index run
+    passes them to ``index_pattern``.  A bad pair is refused in the words
+    ``rietx index`` uses (:func:`~rietx.crystallography.atomic_volume.check_formula_input`),
+    on load and on assignment alike.
     """
 
     search: SearchSpecSpec = Field(default_factory=SearchSpecSpec)
@@ -1922,6 +1938,13 @@ class IndexingControls(Base):
         "ambiguity + Le Bail validation); None = the package default plus "
         "every candidate the gate could promote, which never removes a "
         "candidate that might grade high"))
+    formula: str | None = Field(None, description=(
+        "the specimen's chemical formula; each candidate then records the "
+        "formula units its volume holds (formula_units). It never narrows "
+        "the search; None = no formula"))
+    temperature: float | None = Field(None, description=(
+        "the pattern's temperature in K, for the formula's volumes; None = "
+        "298 K. Needs a formula"))
 
     @field_validator("engines")
     @classmethod
@@ -1933,6 +1956,13 @@ class IndexingControls(Base):
                 raise ValueError(f"unknown indexing engine {name!r}; "
                                  f"available: {', '.join(engine_names())}")
         return v
+
+    @model_validator(mode="after")
+    def _readable_formula(self):
+        from ..crystallography.atomic_volume import check_formula_input
+
+        check_formula_input(self.formula, self.temperature)
+        return self
 
 
 class CaveatEvidence(Base):
@@ -2101,8 +2131,9 @@ class IndexingResult(Base):
     #: collide
     engine_stats: dict[str, float] = Field(default_factory=dict)
     #: do the panel's members put different candidates first?  A *result*-level
-    #: fact (it is a statement about the comparison, not about one cell) that caps
-    #: every candidate's confidence
+    #: fact (it is a statement about the comparison, not about one cell) that
+    #: refutes every candidate: ``fom_panel_disagrees`` is a refuting caveat, so
+    #: each grades ``low``
     fom_panel_disagrees: bool = False
     quality: DataQualityReport | None = None
     #: was a pattern supplied, i.e. did Le Bail validation run at all?  ``False``
@@ -2272,8 +2303,10 @@ class ExtinctionPrior(Base):
     a measured ``density`` that fixes Z through the formula weight and the
     screened cell.  A group whose orbits cannot hold some element's atoms per
     cell is named in ``count_notes`` and kept; only under ``ordered=True`` is
-    it removed, the count being the test of an ordered model; a
-    fractional formula count declares a shared site and is not counted
+    it removed, the count being the test of an ordered model.  A
+    fractional formula count declares a shared site and is not counted,
+    unless ``ordered``: then it belongs to the formula unit (a hemihydrate)
+    and is counted where count × Z is whole
     (:func:`rietx.indexing.extinction.content_exclusion`).  Where Z is not a
     whole multiple of a member's general multiplicity (Z′ < 1, as for #935's
     P 2₁ salt against P 2₁/m) the member is kept and the special positions a
@@ -2314,7 +2347,8 @@ class ExtinctionPrior(Base):
     #: weight and the screened cell's volume
     density: float | None = Field(default=None, gt=0.0)
     #: the formula unit as a chemist writes it (``"Cu12Sb4S13"``, brackets and
-    #: ``·`` adducts allowed); a fractional count declares a shared site
+    #: ``·`` adducts allowed); a fractional count declares a shared site,
+    #: unless :attr:`ordered`
     formula: str | None = None
     #: every site is one element at full occupancy (no mixed or partial
     #: sites): only then does a group whose orbits cannot hold the declared

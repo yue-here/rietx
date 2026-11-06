@@ -655,6 +655,9 @@ class PatternDiagnostics(Base):
       (WP-2039), which cannot say.
     * ``baseline_lambda`` — the arPLS stiffness the whiteness rule selects
       for this pattern (:func:`rietx.background.select_arpls_lambda`).
+      Where no candidate reaches the rule's floor it is the grid's most
+      flexible end, and the scan's ``BACKGROUND_SMOOTHING_AT_FLEXIBLE_END`` is
+      not carried here: call the selector to read it.
     * ``steps_per_fwhm`` / ``n_peaks_measured`` — how finely the peaks were
       sampled, and over how many of them
       (:func:`sampling_steps_per_fwhm`).  ``None`` when no peak was

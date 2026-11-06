@@ -130,6 +130,11 @@ So each free parameter is written under a name derived from its path (`Ba1_x`, `
 - a coordinate refined through its site-symmetry degree of freedom is named after the coordinate;
 - a source that no written value carries alone is declared with `prm`.
 
+A `tie_equal` group's members must therefore hold one value in the structure you pass.
+One name written at two values is two statements of one parameter, and rietx's reader refuses such a file.
+So the writer refuses a structure whose members disagree by more than 1e-6 of the larger value, and names the tie.
+`ref.fitted_structure` always satisfies the ties.
+
 Each free parameter's finite bounds are written as `min` and `max`, since TOPAS's own default windows are not rietx's.
 `free=` also takes a `RefinementResult` or a list of paths.
 Those carry the free set and no ties, so each copy of a tied value is written as its own parameter, and the file's header says so.

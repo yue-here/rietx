@@ -4,7 +4,8 @@ A fit is a python loop calling numpy; there is no safe way to interrupt one
 from outside, and there is no need for one.  :class:`CancelToken` is a flag the
 caller sets from another thread (the GUI server holds one per session and POST
 ``/api/cancel`` sets it), and the solver reads it **at eval boundaries** — in
-between two residual evaluations, where the compiled model is quiescent.  That
+between two residual evaluations, where the compiled model is quiescent, and a
+Le Bail partition between its cycles.  That
 is what keeps frozen-per-stage discreteness intact: nothing reaches into the
 compiled state, and the stage simply stops being asked for more evaluations.
 
@@ -36,8 +37,7 @@ class CancelToken:
     """A thread-safe "stop asking for evaluations" flag.
 
     Wraps :class:`threading.Event` rather than a bare bool because the setter
-    and the reader are genuinely on different threads in the GUI, and because
-    :meth:`wait` costs nothing to inherit.
+    and the reader are genuinely on different threads in the GUI.
     """
 
     __slots__ = ("_event",)

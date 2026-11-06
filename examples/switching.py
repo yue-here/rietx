@@ -184,15 +184,15 @@ def topas_page(out: Path) -> None:
                          rx.Instrument.bragg_brentano(radiation="CuKa"))
     apply_ties(back, cons)
     assert free_paths(back)[:4] == [
-        "phases.0.cell.a", "phases.0.cell.c", "phases.0.scale", "phases.0.extinction"]
+        "phases.0.cell.a", "phases.0.cell.c", "phases.0.scale", "phases.0.atoms.0.dof.0"]
     # The oxygens' shared name came back as a tie: two of the three are not free.
     assert OXYGENS[0] in free_paths(back) and not set(OXYGENS[1:]) & set(free_paths(back))
-    assert [d.code for d in model.diagnostics] == ["TOPAS_FEATURES_NOT_IMPORTED"] * 2
+    # One: the `LP_Factor(…)` the writer states is read, not an unread call (WP-1530).
+    assert [d.code for d in model.diagnostics] == ["TOPAS_FEATURES_NOT_IMPORTED"]
     # topas.md quotes this message after the file's own path.
     assert model.diagnostics[0].message.endswith(
         "this import is partial. The file states peak profile (Finger_et_al, peak_type, "
-        "pv_fwhm, pv_lor) [fluorapatite]; phase scaling (scale_pks) [fluorapatite], and none "
-        "of it reaches the built structure.")
+        "pv_fwhm, pv_lor) [fluorapatite], and none of it reaches the built structure.")
 
 
 def gsas_exp_page() -> None:

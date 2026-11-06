@@ -1,6 +1,6 @@
 # WP-1335 — the report costs more than the fit
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — PR #1346 cut a stage report's cost by a third, bit-identically; no further cut (2026-11-02 rulings entry); a joint fit's `stage_reports=` remains
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-09-23 — cost only: a report at 26× the fit it reports on
@@ -122,17 +122,6 @@ choice.
 
 ### Inherited
 
-- **2026-10-23, from [1341](1341-a-joint-fit-has-no-report.md) (closed): a joint fit has a report, so this WP's Non-goals line about it is stale.** The line "Reporting for joint fits, which has no cost because it does not exist — 1341" predates `MultiHistogramRefinement.report(h)` (2026-10-12), which builds one histogram's Layer 0-2 report and pays the same per-report cost this WP cuts. The Inherited bullet from 1341 dated 2026-10-12 (offering `stage_reports=` on a joint fit once the cost is cut) still holds. The joint report's remaining gaps are [2028](2028-a-joint-fits-guards-see-every-histogram.md)'s. Context's accidental control (the joint fit at 1.11-1.14×, "has no `.report()`") no longer holds: since 2026-10-12 the joint arm pays the report cost too.
-- **2026-10-02, from the issue triage (issue #245): the cost to cut is a fixed
-  ~0.36 s per stage report, and a docstring still quotes the old ratio.** The
-  reporter re-measured on `3d1a6feb` (2026-09-29; `11BM_NAC.fxye`, 5 stages,
-  median of 3, BLAS pinned to 1): `stage_reports=False` 0.331 s,
-  `stage_reports=True` 2.136 s, 6.45×. The per-report cost is unchanged from
-  the docstring's 0.33 s; the fit got about 3× faster, so the multiple grew
-  and will keep growing as fits speed up. *Checked at `ca9bda29`*:
-  `Refinement.fit`'s docstring (`refine.py:3376`) still says "a trajectory
-  costs ≈2.5× the fit". Correct it in the same change that cuts the cost.
-
 - **2026-10-11, from the issue triage (#245): the reporter's three paired
   timings of 2026-09-04 are not carried here.** Neutron CW, neither a
   March-Dollase nor a Stephens block, 3 292 points: 2.81 s against about
@@ -163,35 +152,66 @@ choice.
 ## Non-goals
 
 - The solver's own cost, and the exhausted-budget stop rule — 1334.
-- Reporting for joint fits, which has no cost because it does not exist —
-  1341.
+- A joint fit's `stage_reports=` (Inherited, from 1341): offered on top of
+  this WP once the per-report cost is cut far enough.
 - Removing the per-stage report. WP-1058's rule stands: **the report at every
   stage boundary, because a run's last state is routinely its least
   informative.** This WP makes it cheap and countable, not optional-by-stealth.
 
 ## Tasks
 
-- [ ] Separate the leverage weights from the Gauss-Newton solve in
+- [x] Separate the leverage weights from the Gauss-Newton solve in
       `_strain_errors` so the reflection-count guard runs before any `lstsq`,
       if the weights admit it; measure the recovered fraction on the #250
       shape either way.
-- [ ] Decide, and write down, whether a phase with no free structural
+      **Done 2026-11-02, in the bound form.** The weights are re-formed every
+      iteration at the updated Λ, so the exact count is not known before the
+      solves. An upper bound is: a reflection with no leverage at the start
+      has none later. `_strain_errors(min_reflections=)` returns the first
+      iteration's weights with no solve when that bound is under the floor.
+      Recovered fraction on the #250 shape: about zero, by construction. A
+      solve costs npts × (2·n_group)², and a phase under the floor has fewer
+      than 16 groups. The phases that cost the 120 s pass the floor. Zero-row
+      trimming of the design was measured too and dropped: the windows cover
+      75-100 % of the rows on LaB6+cBN and NAC, and trimming moved Λ by up to
+      1.8e-7 relative.
+- [x] Decide, and write down, whether a phase with no free structural
       parameter is analysed at all — the docstring argument covers refined
       microstrain and does not obviously extend.
+      **Decided 2026-11-02: analysed.** Settled by Claude under the module's
+      written rule (`report/strain.py`'s docstring: the subject is the
+      specimen, not the residual). A held width model is where a
+      directional misfit has nowhere else to show, and acting on it is the
+      Layer-2 veto's call. Written into `analyse_strain`'s docstring.
 - [x] `summary()` accepts a precomputed report, or returns one; the doubling
       goes away by a documented route rather than by a caller's workaround.
       **Landed in PR #259**: `summary(report=)`, refusing `plan=` beside it;
       the test counts builds at `build_report`, the seam both routes share.
-- [ ] A span (or field) covering the stage-report work, so a caller summing
+- [x] A span (or field) covering the stage-report work, so a caller summing
       events sees it; decide the `EVENT_SCHEMA_VERSION` question deliberately.
-- [ ] Document what `stage_reports=True` costs, roughly, where the flag is
+      **Done 2026-11-02: a field.** `fit_end.stage_report_seconds` is the
+      wall time the rungs took, absent when no rung was built, and `rietx
+      events` adds it to the fit line. Settled by Claude under
+      `history/events.py`'s written rule: a new key on an existing kind does
+      not bump `EVENT_SCHEMA_VERSION`, a new kind does. A span kind would
+      have been the first kind added for timing alone, and WP-1024's
+      precedent reused existing kinds with added keys.
+- [x] Document what `stage_reports=True` costs, roughly, where the flag is
       documented — the reporter would have sampled rather than enabled it
       everywhere had the tax been stated.
-- [ ] Tests: a counter over `build_report` across a `summary()` + `report()`
+      **Done 2026-11-02**: `Refinement.fit`'s docstring (its "≈2.5×" gone),
+      the manual's `reference/report.md` § Reports at every stage, and the
+      event tables in `reference/refinement.md` and `reference/cli.md`.
+- [x] Tests: a counter over `build_report` across a `summary()` + `report()`
       pair asserts **1**; a phase below the reflection floor costs no solve.
-- [ ] Skill: `references/batch.md` — the row on when to enable
+      The counter landed with PR #259 (`tests/test_termination_view.py`); the
+      floor test and the bit-identity oracles are `tests/test_report_cost.py`.
+- [x] Skill: `references/batch.md` — the row on when to enable
       `stage_reports`, and the row warning that per-stage sums are not fit
       cost.
+      Both rows live elsewhere since the skill was split: the cost row in
+      `references/series.md` (re-measured) and the sum row as § 9c.11 of
+      `references/batch-operating.md` (now naming the new field).
 
 ## Acceptance
 
@@ -211,6 +231,114 @@ with Rwp bit-identical; a `summary()` + `report()` pair builds one report.
   platform, never as a figure.
 
 ## Handover log
+
+- **2026-11-02** (rulings, PR #1349) — The stage reports' cost is not
+  cut further. The two cuts left were fewer Gauss-Newton steps in the
+  Stephens strain arm on the intermediate rungs, or a coarser March-Dollase
+  grid. Either would make the rungs' numbers less accurate than the final
+  report's. Asked in chat on 2026-11-02, the maintainer answered "no idea".
+
+  *Settled by Claude: no further cut.* Grounds: root CLAUDE.md's companion
+  rule, the report at every stage boundary, exists because a run's last state
+  is routinely its least informative. A cheaper, less accurate rung would
+  undercut the reason the feature exists. The cost is also opt-in:
+  `stage_reports` is off by default, and PR #1346 put the rungs' wall time in
+  `fit_end.stage_report_seconds`, so a caller sees what it pays.
+
+  *Acceptance.* Its "well below 6.5×" is read as met by PR #1346's measurement:
+  NAC with its seven stage reports at 4.7-5.7× the bare fit, CPU seconds on a
+  shared machine (the entry below has the conditions), Rwp and every report
+  field bit-identical. The second half, a `summary()` + `report()` pair
+  building one report, landed with PR #259.
+
+  *Next.* A joint fit's `stage_reports=` (from WP-1341, in `### Inherited`)
+  is the one open item. `MultiHistogramRefinement.fit` declines it today;
+  offering it means one rung per histogram per stage, built from
+  `MultiHistogramRefinement.report(h)` at `_run_plan`'s stage boundary, and
+  deleting the two sentences in that docstring and in
+  `docs/docs/reference/joint.md` that say why it is declined.
+
+- **2026-11-02** — a stage report costs about a third less, with every
+  report number unchanged, and its cost is now in the event log. Measured on
+  this machine against `main`, a NAC fit with its seven stage reports went
+  from 7.1-8.3× the bare fit to 4.7-5.7×. On the 49 000-point LaB6+cBN fit,
+  the shape #250 reported, one report went from 2.85-3.13 s to 2.41-2.85 s of
+  CPU, so there the cut is about a sixth. What remains is arithmetic the
+  answers are made of: the Stephens strain arm's four Gauss-Newton solves,
+  each a dense least-squares problem over the whole pattern, and the
+  March-Dollase grid's 121 powers per angle. Cutting either further would move
+  rung numbers, and that is a reader-output change for the maintainer. A
+  `fit_end` now carries `stage_report_seconds`, so a caller summing events
+  sees the rungs' share instead of inferring it. PR #1346.
+
+  *Done.* Task 1 in its bound form: `_strain_errors(min_reflections=)` returns
+  the first iteration's leverage, with no solve, when fewer reflections than
+  the floor have leverage and tanθ > 0. The weights are re-formed every
+  iteration, so only that bound is known before the solves. Task 2: a phase
+  with no free structural parameter is analysed, settled by Claude under
+  `report/strain.py`'s own rule that the subject is the specimen; written into
+  `analyse_strain`'s docstring. Task 4: a field, not a kind, settled by
+  Claude under `history/events.py`'s written rule (a key on an existing kind
+  does not bump `EVENT_SCHEMA_VERSION`); `rietx events` prints it on the fit
+  line. The savings beyond the task list, each bit-identical:
+  `strain_basis` and `zone_boundary_candidates` are cached per group (both
+  are exact-rational eliminations repeated per phase per stage); the texture
+  grid is scored a block of r at a time and raises each distinct cos²α to
+  its power once; a rung's `_build_result(with_geometry=False)` skips the
+  bond search, which no `StageReport` field reads. Docs: `fit`'s docstring
+  lost its "≈2.5×", the manual's report and event pages and the skill's
+  `series.md` row and § 9c.11 carry the re-measured cost and the field.
+
+  *Measured.* `[dev]` venv, darwin arm64, CPU seconds (`time.process_time`)
+  with BLAS and kernel threads pinned to 1, on a machine at load average
+  30-110 from other runners' suites, so wall clock was unusable and every
+  figure is a range. Bit-identity: every field of the seven NAC rungs, the
+  NAC final report and the LaB6+cBN report, dumped as JSON, is byte-identical
+  to an `origin/main` snapshot (`cmp`). Recovered by the floor guard on the
+  #250 shape: about zero, by construction, since a solve costs
+  npts × (2·n_group)² and a phase under the floor has under 16 groups.
+  Trimming the design's all-zero rows was measured and dropped: the windows
+  cover 75-100 % of the rows, and trimming moved Λ by up to 1.8e-7 relative.
+  The fast suite did not run locally: the machine's suite lock had six
+  waiters ahead of it, so CI's fast matrix is the gate. A targeted selection
+  of 23 files reaching the changed modules, on the tree merged with
+  `origin/main` (e4d4f044c), gave 830 passed, 2 xfailed and 3 failed. The
+  three (an audit row, the events page over its size cap) were fixed and
+  their files rerun green, 124 passed. This session added 17 cases from 9
+  test functions, all in `tests/test_report_cost.py`: 1.25 s together
+  locally, the slowest 0.52 s. The full selection did not run: the change
+  claims bit-identity, checked directly on two real-data fits.
+  `reader_output`: unchanged.
+
+  *Review.* `/code-review high --fix` found seven. Fixed four: the two floors
+  shared a name, the cache docstrings quoted single figures, the manual's
+  cancelled `fit_end` omitted the key, the skill claimed bit-identity
+  everywhere rather than where measured. Declined three: the floor guard's
+  saving is near zero (kept, because the task and its test ask for it and
+  it costs one comparison); `_stage_report_seconds` is instance state that a
+  kept Le Bail pass does not restore (no reader); the blocked texture grid's
+  bit-identity rests on numpy summing a row as it sums a 1-D array (the
+  oracle test runs on every CI platform, which is the check). The
+  generality judge passed the audit row's `invariant` tier and found the
+  oracle test never cut the grid into blocks of more than one r; it now
+  does, at 50.
+
+  *Gotchas.* `n_reflections_used` on a phase under the floor is now counted
+  at the fitted widths rather than four steps on; the two differ only where
+  a reflection's leverage crosses the 1e-6 relative cut between them, and
+  were equal on the brucite fixture. The events page
+  (`reference/refinement.md`) sits 11 characters under its 50 000 cap, so
+  `stage_report_seconds` is named on the report page, not in the events
+  table's `fit_end` row. Symmetry-equivalent texture axes cannot
+  be merged without changing which of them the report names, since their
+  scores tie to the last bit only by accident.
+
+  *Next.* (1) Offer `stage_reports=` on a joint fit (Inherited, from 1341):
+  the cut is a third, so the per-histogram multiple the docstring warns of
+  is smaller but not gone; decide whether that is enough. (2) If the
+  maintainer wants rungs cheaper still, the levers move rung numbers: fewer
+  Gauss-Newton steps on intermediate rungs, or a coarser r grid there. Each
+  is a reader-output change and goes to the maintainer first.
 
 - **2026-09-03** — created, from the 2026-09-03 issue triage (issues #245,
   #250, #251). Verified on the tree that `analyse_strain` calls

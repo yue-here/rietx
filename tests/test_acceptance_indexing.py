@@ -72,7 +72,7 @@ import pathlib
 import numpy as np
 import pytest
 
-from rietx.indexing.engines import SYSTEM_ORDER, SearchSpec
+from rietx.indexing.engines import SYSTEM_ORDER, SearchSpec, corroborated
 from rietx.indexing.fom import (
     _count_possible,
     nearest_discrepancy,
@@ -1928,7 +1928,7 @@ def test_the_cross_code_cell_leads_because_the_engines_agree_on_it(fap_index,
     # the panel is untouched and still prefers a wrong cell — the inversion this
     # row documents is intact, it is simply no longer what decides the order
     outranked = [c for c in res.candidates
-                 if len(set(c.found_by)) < 2
+                 if not corroborated(c)
                  and c.fom_value("m20") > best_in_band.fom_value("m20")]
     assert outranked, (
         "no single-engine candidate scores a higher M20 than the in-band cell, "

@@ -1,25 +1,30 @@
 """WP-2003 task 2, the measurement half: the reseed fence on, status-only and off.
 
-What it measures.  :data:`rietx.sequential.RESEED_FACTOR` sets the Rwp fence of
+What it measures.  ``RESEED_FACTOR`` (1.25) was the default Rwp fence of
 :meth:`rietx.SequentialRefinement.fit`: a warm fit above ``reseed_factor`` × the
 median Rwp of the accepted patterns climbs the rung ladder (``_ladder``), and a
-kept fit above it is an outlier (``SEQUENTIAL_RWP_OUTLIER``) whose steps the
-discontinuity scan drops.  Each chain family is run under three arms, every
-other setting at the family's own protocol:
+kept fit above it was an outlier (``SEQUENTIAL_RWP_OUTLIER``) whose steps the
+discontinuity scan dropped.  WP-2003's C1 removed that default (``reseed_factor``
+is ``None`` since), the code and the field, so the constant is this script's
+own and the record's ``rwp_fence``/``above_fence`` columns are derived from
+``SeriesEntry.rwp_over_median`` against it, in every arm.  Each chain family is
+run under three arms, every other setting at the family's own protocol:
 
 ``on``
-    the default, ``reseed=True, reseed_factor=RESEED_FACTOR`` (1.25).
+    the pre-C1 default, ``reseed=True, reseed_factor=RESEED_FACTOR`` (1.25).
 ``status``
-    ``reseed=True, reseed_factor=float("inf")``: the ladder escalates only on a
-    diverged or raised rung, never on Rwp.  ``fit`` does not validate the
-    factor, so ``inf`` is accepted as given; every ``rwp_fence`` is then
-    ``inf`` and no entry is ever ``above_fence``.
+    ``reseed=True, reseed_factor=None``: the ladder escalates only on a
+    diverged or raised rung, never on Rwp, which is the default since C1.
+    Before C1 this arm passed ``float("inf")``, which ``fit`` now refuses, and
+    its records wrote ``rwp_fence`` ``inf`` where they now write the 1.25
+    limit the entry sat under.
 ``off``
-    ``reseed=False``: no fence- or status-driven escalation.  Not "no ladder":
-    a first rung WP-1127's budget truncated still escalates one rung
-    (``forced`` in ``SequentialRefinement._chain`` bypasses ``reseed``).  The
-    fence is still *recorded* (the field is written whatever ``reseed``
-    says), so its codes still fire.
+    ``reseed=False``: no fence- or status-driven escalation.  Until C3 not "no
+    ladder": a first rung WP-1127's budget truncated still escalated one rung
+    (``forced`` in ``SequentialRefinement._chain`` bypassed ``reseed``); since
+    C3 no budget applies under ``reseed=False``.  The fence is still
+    *recorded* (the field is written whatever ``reseed`` says), so its codes
+    still fire.
 ``status_maxiter``
     as ``status``, and the ladder also escalates while its best attempt so
     far ended ``max_iter`` (added the second session, 2026-10-24: cpd-1b's bad
@@ -37,9 +42,11 @@ other setting at the family's own protocol:
     ``SequentialRefinement._chain``, looked up as a module global at call
     time, so the wrapper reaches the forward and the backward pass.
 
-Two arms put the first-rung bound aside (WP-1127, ``first_rung_factor``,
-default :data:`rietx.sequential.FIRST_RUNG_FACTOR`), each to be read against
-the arm it differs from by that alone (clashes.md X1, X2):
+Every arm above passes ``first_rung_factor=FIRST_RUNG_FACTOR`` (3.0), the
+first-rung bound's default (WP-1127) until WP-2003's C3 made it the caller's
+(``None`` by default since), so the committed records stay reproducible.
+Three arms put the bound aside, each to be read against the arm it differs
+from by that alone (clashes.md X1, X2):
 
 ``on_nobound``
     as ``on``, with ``first_rung_factor=None``.
@@ -47,7 +54,11 @@ the arm it differs from by that alone (clashes.md X1, X2):
     as ``off``, with ``first_rung_factor=None``: the one arm with no
     escalation of any kind, since ``reseed=False`` declines the fence and the
     status, and with no bound no first rung is truncated, so ``forced`` never
-    fires.
+    fires.  Since C3 ``reseed=False`` computes no budget at all, so ``off``
+    and ``off_nobound`` run the same chain.
+``status_nobound``
+    as ``status``, with ``first_rung_factor=None``: the package default since
+    C3 (added 2026-11-02, C3's measurement).
 
 and one reference arm, ``ref``: every pattern fitted cold and alone, as
 ``SequentialRefinement(...).fit([pattern])`` from the chain's own initial
@@ -149,20 +160,31 @@ import numpy as np  # noqa: E402
 
 import rietx as rx  # noqa: E402
 from rietx.model import compiled  # noqa: E402
-from rietx.sequential import RESEED_FACTOR  # noqa: E402
+
+#: the default fence WP-2003's C1 removed; the ``on`` arms pass it by name
+RESEED_FACTOR = 1.25
+#: the first-rung bound's default C3 removed; every arm but the ``_nobound``
+#: ones passes it by name
+FIRST_RUNG_FACTOR = 3.0
 
 OUT = Path(__file__).resolve().parent / "reseed"
 
 #: the chain arms (module docstring), as ``SequentialRefinement.fit`` kwargs
 ARMS = {
-    "on": {"reseed": True, "reseed_factor": RESEED_FACTOR},
-    "status": {"reseed": True, "reseed_factor": float("inf")},
-    "off": {"reseed": False},
-    "status_maxiter": {"reseed": True, "reseed_factor": float("inf")},
-    "status_runaway": {"reseed": True, "reseed_factor": float("inf")},
+    "on": {"reseed": True, "reseed_factor": RESEED_FACTOR,
+           "first_rung_factor": FIRST_RUNG_FACTOR},
+    "status": {"reseed": True, "reseed_factor": None,
+               "first_rung_factor": FIRST_RUNG_FACTOR},
+    "off": {"reseed": False, "first_rung_factor": FIRST_RUNG_FACTOR},
+    "status_maxiter": {"reseed": True, "reseed_factor": None,
+                       "first_rung_factor": FIRST_RUNG_FACTOR},
+    "status_runaway": {"reseed": True, "reseed_factor": None,
+                       "first_rung_factor": FIRST_RUNG_FACTOR},
     "on_nobound": {"reseed": True, "reseed_factor": RESEED_FACTOR,
                    "first_rung_factor": None},
     "off_nobound": {"reseed": False, "first_rung_factor": None},
+    "status_nobound": {"reseed": True, "reseed_factor": None,
+                       "first_rung_factor": None},
 }
 #: arms whose rule ``fit`` cannot express, so ``_reseed_needed`` is wrapped:
 #: the best attempt so far also escalates on a ``status`` in the first tuple
@@ -174,7 +196,7 @@ ESCALATE_ON: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 #: an arm → the arm it differs from by one switch, which ``--table`` also
 #: compares it against (every arm is compared against ``on`` besides)
 PAIRED = {"status_maxiter": "status", "status_runaway": "status",
-          "off_nobound": "off"}
+          "off_nobound": "off", "status_nobound": "status"}
 REFERENCE_ARMS = ("ref", "ref_seeded")
 #: a between-arm difference counted as "the accepted values differ"
 DIFFER_ESD = 0.1
@@ -652,6 +674,16 @@ def _values_sha(entry) -> str:
     return hashlib.sha256(repr(rows).encode()).hexdigest()[:16]
 
 
+def _fence_record(entry) -> dict:
+    """The 1.25 fence's limit at this entry and whether the kept fit sat above
+    it, read off ``rwp_over_median`` (module docstring)."""
+    ratio, stats = entry.rwp_over_median, entry.statistics
+    if ratio is None or stats is None or not ratio > 0:
+        return {"rwp_fence": None, "above_fence": False}
+    return {"rwp_fence": _num(RESEED_FACTOR * stats.rwp / ratio),
+            "above_fence": entry.status != "diverged" and ratio > RESEED_FACTOR}
+
+
 def _entry_record(entry, result, wall, delta, warned) -> dict:
     stats = entry.statistics
     qpa = {}
@@ -667,7 +699,8 @@ def _entry_record(entry, result, wall, delta, warned) -> dict:
         "rwp": _num(stats.rwp) if stats else None,
         "gof": _num(stats.gof) if stats else None,
         "rexp": _num(stats.rexp) if stats else None,
-        "rwp_fence": _num(entry.rwp_fence), "above_fence": entry.above_fence,
+        "rwp_over_median": _num(entry.rwp_over_median),
+        **_fence_record(entry),
         "n_iterations": entry.n_iterations,
         "kept_nfev": int(sum(s.n_iterations for s in result.stages)),
         "kept_status": result.status,

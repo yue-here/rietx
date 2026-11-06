@@ -9,7 +9,7 @@ A profile interval is read off the data's χ² instead: it pins the parameter at
 ## Find the rows on a bound
 
 This runs `mccusker_structural` on the fluorapatite pattern that ships with rietx.
-Its extinction stage frees the Sabine extinction coefficient, in µm²:
+The phase declares extinction, so the plan's extinction stage frees the Sabine extinction coefficient, in µm²:
 
 ```{literalinclude} ../../../examples/guides/interval.py
 :language: python
@@ -36,11 +36,11 @@ The same rows appear in the `FLOOR_HIT` diagnostic for a floor at 0, and in `BOU
 
 <!-- output of examples/guides/interval.py -->
 ```text
-one-sided True: 0.000 to 0.749
+one-sided True: 0.000 to 0.748
 ```
 
 A row on its bound gets a one-sided interval: the bound is one end, and the other is where χ² has risen by 2.71 × χ²<sub>red</sub> × f², with f the fit's `Statistics.esd_inflation`.
-At 95 %, read this one as "extinction is below 0.749 µm²", mosaic blocks no larger than about 0.9 µm.
+At 95 %, read this one as "extinction is below 0.748 µm²", mosaic blocks no larger than about 0.9 µm.
 A one-sided bound read from the esd would reach 1.645 × 1.973 = 3.2 µm², more than four times as far.
 The data push extinction below 0, so χ² rises from the floor faster than the esd assumes.
 
@@ -72,6 +72,9 @@ Profile a row away from its bounds when it is strongly correlated with a row tha
 `level` sets the confidence level, 0.95 by default, and moves both thresholds.
 `max_refits` caps the refits on each side, {{ PARAMETER_INTERVAL_MAX_REFITS }} by default.
 Each side steps outward by 1, 2, 4, … esd until χ² passes the threshold, then solves for the end to a thousandth of an esd.
+Where the first step already passes the threshold, the esd was far too large to step in, and the side steps back in until a probe lands inside.
+A moment's modulus on its dead column at m = 0 is the usual case: an esd of 1e4 μ<sub>B</sub> against an end near 0.06 μ<sub>B</sub>.
+Every refit keeps the fit's own free set, so a parameter the fit held is not freed by a pinned value.
 `interval.n_refits` counts the refits, and `interval.points` holds each pinned value with its χ².
 
 Every refit runs on a branch of the history.

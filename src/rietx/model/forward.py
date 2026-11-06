@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import functools
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 
 import numpy as np
@@ -72,6 +73,7 @@ from ..crystallography.magnetic.scattering import (
     compile_magnetic_sites,
     d_magnetic_f2_d_dofs,
     magnetic_f2,
+    magnetic_f2_angle_block,
     magnetic_reflections,
     merge_magnetic,
 )
@@ -576,6 +578,92 @@ def _line_image_deg(tt_primary, lam_ratio: float, xp):
         return tt_primary
     s = lam_ratio * xp.sin(xp.radians(0.5 * tt_primary))
     return 2.0 * xp.degrees(xp.arcsin(s))
+
+
+# Keeps a reflection the partition emptied a positive share of the next cycle.
+LEBAIL_INTENSITY_FLOOR = 1e-10
+# ``mstep`` of the authors' R package SQUAREM, at that package's default: the
+# bound starts at 1 and the scheme is its ``method = 3``.
+SQUAREM_STEP_GROWTH = 4.0
+
+
+def _settled_partition(cycle: Callable[[np.ndarray], tuple[np.ndarray, float, float]],
+                       x: np.ndarray, cap: int, tol: float,
+                       area: np.ndarray) -> tuple[np.ndarray, int, bool]:
+    """Repeat a Le Bail ``cycle`` until one moves a share ``tol``, at most ``cap``.
+
+    The partition is the Richardson-Lucy step (Richardson 1972, *J. Opt. Soc.
+    Am.* 62, 55; Lucy 1974, *Astron. J.* 79, 745), an expectation-maximisation
+    step on a Poisson likelihood (Shepp & Vardi 1982, *IEEE Trans. Med. Imaging*
+    1, 113).  Such a step slows to a linear rate near 1 where reflections
+    overlap, so plain repetition needs thousands of cycles on a dense pattern.
+    This is SQUAREM, scheme S3 (Varadhan & Roland 2008, *Scand. J. Stat.* 35,
+    335): two cycles give the steplength, an extrapolation lands near the fixed
+    point, and a third cycle from there keeps the iterate on the step's map.  A
+    landing below the likelihood at the start of the round is dropped for the
+    plain second cycle, which is what makes it globally convergent.  The steplength
+    starts bounded at a plain step: the bound grows by
+    :data:`SQUAREM_STEP_GROWTH` when it binds on a landing that holds and shrinks
+    by that factor on one that does not.  Unbounded, one FAP partition dropped
+    every landing for hundreds of rounds, at 1.5 plain steps' cost a step.
+
+    It changes the path and never the fixed point, and an exact overlap keeps
+    its ratio, because each extrapolation is a sum of terms in that ratio.  The
+    test always reads a plain cycle.  Returns the intensities, the cycles run and
+    whether a cycle met ``tol``, which a cycle at the cap may do.
+    """
+    run, limit = 0, 1.0
+    while run < cap:
+        if cap - run < 3:           # no room left for a round
+            x, share, _ = cycle(x)
+            run += 1
+            if share <= tol:
+                return x, run, True
+            continue
+        once, _, start = cycle(x)
+        twice, share, _ = cycle(once)
+        run += 2
+        step, bend = once - x, twice - 2.0 * once + x
+        norm = math.sqrt(float((area * bend * bend).sum()))
+        if share <= tol:
+            return twice, run, True
+        if norm == 0.0:             # a steady drift gives no steplength
+            x = twice
+            continue
+        reach = math.sqrt(float((area * step * step).sum())) / norm
+        alpha = -max(1.0, min(reach, limit))
+        landed, _, reached = cycle(np.maximum(x - 2.0 * alpha * step + alpha * alpha * bend,
+                                              LEBAIL_INTENSITY_FLOOR))
+        run += 1
+        if reached >= start:
+            x = landed
+            if reach >= limit:
+                limit *= SQUAREM_STEP_GROWTH
+        else:
+            x = twice
+            limit = max(1.0, limit / SQUAREM_STEP_GROWTH)
+    return x, run, False
+
+
+@dataclass(frozen=True)
+class _PartitionLine:
+    """One phase's one emission line, flattened for a Le Bail cycle.
+
+    ``omega``, ``channel`` and ``owner`` run over the window points of every
+    reflection with a non-empty profile, in reflection order.  ``spans`` and
+    ``start`` say where each window sits in them, ``first`` the reflection it
+    belongs to and ``mass`` its profile sum.
+    """
+
+    weight: np.ndarray
+    w_line: float
+    omega: np.ndarray
+    channel: np.ndarray
+    owner: np.ndarray
+    spans: list[tuple[int, int]]
+    start: np.ndarray
+    first: np.ndarray
+    mass: np.ndarray
 
 
 @dataclass
@@ -1308,7 +1396,7 @@ class CompiledModel:
                    + values[f"phases.{ip}.lor_size"]
                    + values[f"phases.{ip}.magnetic_lor_size"])
             y_l = (values["instrument.profile.y"]
-                   + values[f"phases.{ip}.lor_strain"]
+                   + self.lor_strain_term(ip, values)
                    + values[f"phases.{ip}.magnetic_lor_strain"])
         for tt_bragg in tt_bragg_lines:
             theta = 0.5 * tt_bragg  # Bragg angle drives the widths
@@ -1323,7 +1411,7 @@ class CompiledModel:
                 gam_l = lorentzian_fwhm(
                     theta,
                     values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
-                    values["instrument.profile.y"] + values[f"phases.{ip}.lor_strain"],
+                    values["instrument.profile.y"] + self.lor_strain_term(ip, values),
                     aniso)
             out.append(self._peak_widths(gam_g, gam_l))
         return out
@@ -1673,6 +1761,28 @@ class CompiledModel:
         s = xp.stack([values[f"phases.{ip}.microstrain.{n}"] for n in S_NAMES])
         return strain_width_deg(cp.strain_monomials, s, d)
 
+    def lor_strain_term(self, ip: int, values: dict[str, float]):
+        """The isotropic tanθ Lorentzian coefficient phase ip adds to Y.
+
+        ``lor_strain``, or ``0.0`` when the phase carries a Stephens block
+        (WP-1467).  The block *replaces* the isotropic strain: its isotropic
+        direction is the ``lor_strain`` column, which is why declaring one
+        force-fixes that path.  A force-fixed entry keeps its stored value, so
+        a width law that went on reading it stacked Λ(hkl) ≥ 0 on a frozen
+        floor the block could never narrow below.  This is the Stephens half
+        of the ``Atom.aniso`` ⇒ ``biso`` bargain: an anisotropic site's
+        Debye-Waller factor never reads ``biso`` either.
+
+        Every reader of the Lorentzian strain width calls this rather than
+        reading the path: the width block, its memo key, the compile-time
+        window sizing (which spells the same test off the schema), the
+        Lorentzian-width inequality rows and the strain report.  The test is
+        compile-time structural, like :meth:`strain_width`'s.
+        """
+        if self.phases[ip].strain_monomials is not None:
+            return 0.0
+        return values[f"phases.{ip}.lor_strain"]
+
     # ------------------------------------------------------------------
     # peak-shape dispatch — the two width scalars, the unit-area profile and
     # its partials all switch on the frozen ``shape`` (default TCHZ).  Both
@@ -1963,7 +2073,7 @@ class CompiledModel:
             # on θ.  Otherwise it is evaluated unconditionally, and the off
             # state stays bit-identical anyway (purity (b)).
             # V moves with the cell, hence recomputed here rather than cached.
-            ext = values[f"phases.{ip}.extinction"]
+            ext = values.get(f"phases.{ip}.extinction", 0.0)
             vol = cell_volume(*cell)
 
         # anisotropic strain is line-independent (it depends on hkl and the
@@ -1992,7 +2102,7 @@ class CompiledModel:
                     float(values[f"phases.{ip}.gauss_size"]),
                     float(values[f"phases.{ip}.gauss_strain"]),
                     float(values[f"phases.{ip}.lor_size"]),
-                    float(values[f"phases.{ip}.lor_strain"]))
+                    float(self.lor_strain_term(ip, values)))
 
         if component == 0:
             widths = self._memo(cp, "widths", width_key,
@@ -2257,6 +2367,21 @@ class CompiledModel:
             return self.background(values) + self.bragg_component(values, intensities)
         return (self.background(values) + self.extra_peak_curve(values)
                 + self.bragg_component(values, intensities))
+
+    def evaluate_with_background(self, values: dict[str, float]
+                                 ) -> tuple[np.ndarray, np.ndarray]:
+        """``(evaluate(values), background(values))`` for one background pass.
+
+        For an at-rest reader that needs both curves, such as an Rwp with its
+        background-subtracted twin.  The sum is :meth:`evaluate`'s in its own
+        association order, so the curve is bit-identical to it, declared
+        peaks included (#441).
+        """
+        y_bkg = self.background(values)
+        if not self.peak_components:
+            return y_bkg + self.bragg_component(values), y_bkg
+        return (y_bkg + self.extra_peak_curve(values)
+                + self.bragg_component(values)), y_bkg
 
     def phase_support(self, values: dict[str, float]) -> np.ndarray:
         """Each phase's integrated contribution ‖y_p/σ‖₂ over the fitted range.
@@ -2554,6 +2679,40 @@ class CompiledModel:
                                     stol, cp.magnetic, cell, xyz, occ, biso,
                                     self._moment_dofs(ip, values))
 
+    def moment_angle_block_supported(self, ip: int) -> bool:
+        """Whether phase ip's intensity is affine in p²⟨|F_⊥|²⟩ (WP-2068).
+
+        The stationary-angle test's analytic curvature block chains the
+        second derivative of |F_⊥|² through the same factors as the first,
+        which is exact only where nothing between |F|² and the intensity
+        depends on it.  :meth:`moment_grad_supported` plus extinction skipped:
+        evaluated, extinction reads the total |F|² through x, and ∂²I picks up
+        a dG/dx term the first-order chain has no place for.  Such a phase
+        keeps the central differences.
+        """
+        return self.moment_grad_supported(ip) and self.phases[ip].skip_extinction
+
+    def moment_f2_angle_block(self, ip: int, values: dict[str, float],
+                              weights: list[dict[tuple[int, int], float]]
+                              ) -> tuple[np.ndarray, np.ndarray]:
+        """``(g, h)``, (N, k) and (N, k, k): ∂ and ∂² of p²⟨|F_⊥|²⟩ along k
+        directions in phase ip's moment DOFs (WP-2068).
+
+        ``weights[a]`` is ``{(atom, dof): coefficient}`` for direction a.
+        The arithmetic is
+        ``crystallography.magnetic.scattering.magnetic_f2_angle_block``'s, at
+        :meth:`moment_f2_grads`' arguments.
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        xyz, occ, biso, _u, _a = self._site_values(ip, values, cell)
+        stol = 1.0 / (2.0 * np.asarray(d, dtype=np.float64))
+        return magnetic_f2_angle_block(cp.mag_members, cp.mag_seg, cp.mag_counts,
+                                       stol, cp.magnetic, cell, xyz, occ, biso,
+                                       self._moment_dofs(ip, values), weights)
+
     def moment_intensity_grad(self, ip: int, df2: np.ndarray,
                               values: dict[str, float]
                               ) -> list[list[np.ndarray]]:
@@ -2639,7 +2798,7 @@ class CompiledModel:
         # applies it unconditionally.  Only these pure-analytic columns need it
         # explicitly; the scale/occ/biso/cell/extinction columns pick it up
         # from the FD-of-phase_peaks chain.
-        ext = values[f"phases.{ip}.extinction"]
+        ext = values.get(f"phases.{ip}.extinction", 0.0)
         # the extinction variable x is built from the whole reflection, so the
         # magnetic term belongs in it exactly as it does in ``phase_peaks``
         f2 = None
@@ -2736,7 +2895,7 @@ class CompiledModel:
         cp = self.phases[ip]
         # gated exactly like phase_peaks, and unconditional otherwise: E ≡ 1
         # exactly at ext=0 either way (purity (b))
-        ext = values[f"phases.{ip}.extinction"]
+        ext = values.get(f"phases.{ip}.extinction", 0.0)
         vol = cell_volume(*cell)
         out = []
         # λ read through ``line_lambdas``, never off the frozen tuple: a joint
@@ -3053,7 +3212,10 @@ class CompiledModel:
                                peaks_mag=peaks_mag)
 
     # ------------------------------------------------------------------
-    def lebail_update(self, values: dict[str, float], n_cycles: int = 1) -> None:
+    def lebail_update(self, values: dict[str, float], n_cycles: int = 1,
+                      *, tol: float = 0.0,
+                      check: Callable[[], None] | None = None
+                      ) -> tuple[int, bool | None]:
         """Refresh per-hkl intensities by observed-intensity partitioning.
 
         Per-hkl intensities are shared across emission lines: reflection k
@@ -3081,73 +3243,142 @@ class CompiledModel:
         overcount compounding through the profile stages that follow, not the
         partition running away by itself.
 
+        **Stopping** (WP-1542, B11).  ``tol=0`` runs exactly ``n_cycles``.
+        Above it, ``n_cycles`` is a cap and :func:`_settled_partition` repeats
+        the step until one moves a share of the Bragg counts no larger than
+        ``tol``: Σ_k A_k·|ΔI_k| / Σ_k A_k·I_k, with A_k = Σ_l w_l·Σ_i Ω_lk,i the
+        counts a unit intensity lays on the pattern.  Weighted by A_k because a
+        reflection falling to the floor shrinks by a constant fraction of
+        itself per cycle for as long as it lives, so an unweighted largest
+        relative change never ends.
+
+        Only the intensities move between cycles, so the background and the
+        profiles are built once.  The adds keep the order the per-reflection
+        loop had, so a fixed count is bit-identical to it: ``np.add.at`` on one
+        buffer, and each window's own ``sum``, which ``reduceat`` is not bit
+        for bit.  A partition with a stop has no such loop to match, so it
+        takes ``reduceat``.
+
+        ``check`` runs before every cycle, because a partition can outlast a
+        whole solve and a cancel must not wait for it.  What it raises leaves
+        the at-rest buffers as they were.
+
         Runs *between* least-squares solves, so it may commit to the at-rest
         buffers — but it threads the intensity vectors functionally through its
         own cycles and writes each phase's buffer exactly once at the end.
+
+        Returns the cycles it ran, and whether a cycle met ``tol``: ``None`` at
+        ``tol=0``, or where nothing ran, since nothing was asked.
         """
         if self.mode not in ("lebail", "pawley"):
             raise RuntimeError("lebail_update on a Rietveld-mode model")
+        if n_cycles < 1:
+            return 0, None
         xp = get_backend()
+        # clause 3, and the one thing a peak-landing member costs that a
+        # background-landing one does not: a hump is inside ``background``
+        # and so is subtracted for free, a peak has to be subtracted here.
+        # Without it the phases are handed shares of counts that belong to
+        # a holder.
+        net = np.asarray(xp.maximum(
+            self.y_obs - self.background(values) - self.extra_peak_curve(values), 0.0))
+        terms = self._partition_terms(values)
+        intens = [np.asarray(cp.hkl_intensity, dtype=np.float64) for cp in self.phases]
+        area = np.concatenate([
+            sum((np.bincount(line.first, weights=line.w_line * line.mass,
+                             minlength=vec.size) for line in lines),
+                np.zeros_like(vec))
+            for vec, lines in zip(intens, terms, strict=True)])
+        ends = np.cumsum([vec.size for vec in intens])[:-1]
+
+        def cycle(x: np.ndarray) -> tuple[np.ndarray, float, float]:
+            """One partition: the new intensities, the share of the Bragg counts
+            that moved, and the Poisson likelihood of ``x`` the step climbs."""
+            if check is not None:
+                check()
+            vectors = np.split(x, ends)
+            # the total Bragg curve the reflections are shares of
+            y_bragg = np.zeros(self.tt.shape, dtype=np.float64)
+            counts = []
+            for vec, lines in zip(vectors, terms, strict=True):
+                counts.append([(vec * line.weight)[line.owner] * line.omega
+                               for line in lines])
+                for line, curve in zip(lines, counts[-1], strict=True):
+                    np.add.at(y_bragg, line.channel, curve)
+            new_vectors = []
+            for vec, lines, curves in zip(vectors, terms, counts, strict=True):
+                num = np.zeros_like(vec)
+                den = np.zeros_like(vec)
+                for line, curve in zip(lines, curves, strict=True):
+                    # each reflection takes its share of net out of the total
+                    denom = y_bragg[line.channel]
+                    good = denom > 1e-12
+                    taken = np.divide(curve, denom, out=np.zeros_like(curve),
+                                      where=good) * net[line.channel]
+                    num[line.first] += (
+                        np.add.reduceat(taken, line.start) if tol > 0.0
+                        else [taken[i0:i1].sum() for i0, i1 in line.spans])
+                    den[line.first] += np.where(
+                        np.logical_or.reduceat(good, line.start),
+                        line.w_line * line.mass, 0.0)
+                new_vectors.append(np.maximum(
+                    np.divide(num, den, out=vec.copy(), where=den > 0.0),
+                    LEBAIL_INTENSITY_FLOOR))
+            new = np.concatenate(new_vectors)
+            held = float((area * new).sum())
+            share = float((area * np.abs(new - x)).sum()) / held if held > 0.0 else 0.0
+            live = y_bragg > 1e-12
+            return new, share, float((net[live] * np.log(y_bragg[live])).sum() - y_bragg.sum())
+
+        x = np.concatenate(intens)
+        if tol > 0.0:
+            x, run, settled = _settled_partition(cycle, x, n_cycles, tol, area)
+        else:
+            run, settled = n_cycles, None
+            for _ in range(n_cycles):
+                x, _, _ = cycle(x)
+        for cp, vec in zip(self.phases, np.split(x, ends), strict=True):
+            cp.hkl_intensity = vec
+        return run, settled
+
+    def _partition_terms(self, values: dict[str, float]) -> list[list[_PartitionLine]]:
+        """Per phase, per emission line, what a Le Bail cycle does not change."""
         sl = values["instrument.geometry.axial_sl"]
         hl = values["instrument.geometry.axial_hl"]
-        n_lines = len(self.line_wavelengths)
-        intens = [np.asarray(cp.hkl_intensity, dtype=np.float64) for cp in self.phases]
-        for _ in range(n_cycles):
-            bkg = self.background(values)
-            # clause 3, and the one thing a peak-landing member costs that a
-            # background-landing one does not: a hump is inside ``background``
-            # and so is subtracted for free, a peak has to be subtracted here.
-            # Without it the phases are handed shares of counts that belong to
-            # a holder.
-            net = xp.maximum(self.y_obs - bkg - self.extra_peak_curve(values), 0.0)
-
-            # pass 1 — every phase's profiles, and the *total* Bragg curve they
-            # are shares of.  One pass per phase would be cheaper by nothing:
-            # the profiles are needed again below either way.
-            all_peaks, all_profs = [], []
-            y_bragg = xp.zeros_like(self.tt)
-            for ip, cp in enumerate(self.phases):
-                peaks = self.phase_peaks(ip, values, intens[ip])
-                profs: list[list[np.ndarray | None]] = []
-                for il, (pos, gamma, eta, intensity) in enumerate(peaks):
-                    row: list[np.ndarray | None] = []
-                    for k in range(len(cp.reflections)):
-                        om = self._reflection_profile(cp, il, k, pos[k], gamma[k], eta[k], sl, hl)
-                        row.append(om)
-                        if om is not None:
-                            i0, i1 = int(cp.win[il, k, 0]), int(cp.win[il, k, 1])
-                            y_bragg = xp.window_add(y_bragg, i0, i1, intensity[k] * om)
-                    profs.append(row)
-                all_peaks.append(peaks)
-                all_profs.append(profs)
-
-            # pass 2 — each reflection takes its share of net out of the total
-            for ip, cp in enumerate(self.phases):
-                peaks, profs = all_peaks[ip], all_profs[ip]
-                new_int = intens[ip].copy()
+        terms: list[list[_PartitionLine]] = []
+        for ip, cp in enumerate(self.phases):
+            # a unit intensity through the chain leaves what multiplies it: the
+            # line weight, zero at a reflection with no finite position
+            peaks = self.phase_peaks(ip, values, np.ones(len(cp.reflections)))
+            lines: list[_PartitionLine] = []
+            for il, (pos, gamma, eta, weight) in enumerate(peaks):
+                omegas, channels, owners, spans, firsts, masses = [], [], [], [], [], []
+                at = 0
                 for k in range(len(cp.reflections)):
-                    num = 0.0
-                    den = 0.0
-                    for il in range(n_lines):
-                        om = profs[il][k]
-                        if om is None or om.sum() <= 0:
-                            continue
-                        i0, i1 = cp.win[il, k]
-                        denom = y_bragg[i0:i1]
-                        good = denom > 1e-12
-                        if not np.any(good):
-                            continue
-                        intensity = peaks[il][3]
-                        share = np.zeros_like(om)
-                        share[good] = intensity[k] * om[good] / denom[good]
-                        w_line = values[f"instrument.source.lines.{il}.weight"]
-                        num += float((share * net[i0:i1]).sum())
-                        den += w_line * float(om.sum())
-                    if den > 0.0:
-                        new_int[k] = num / den
-                intens[ip] = np.maximum(new_int, 1e-10)
-        for cp, vec in zip(self.phases, intens, strict=True):
-            cp.hkl_intensity = vec
+                    om = self._reflection_profile(cp, il, k, pos[k], gamma[k], eta[k], sl, hl)
+                    if om is None or om.sum() <= 0:
+                        continue
+                    om = np.asarray(om, dtype=np.float64)
+                    masses.append(om.sum())
+                    i0, i1 = int(cp.win[il, k, 0]), int(cp.win[il, k, 1])
+                    omegas.append(om)
+                    channels.append(np.arange(i0, i1, dtype=np.intp))
+                    owners.append(np.full(om.size, k, dtype=np.intp))
+                    spans.append((at, at + om.size))
+                    firsts.append(k)
+                    at += om.size
+                if not omegas:
+                    continue
+                lines.append(_PartitionLine(
+                    weight=np.asarray(weight, dtype=np.float64),
+                    w_line=float(values[f"instrument.source.lines.{il}.weight"]),
+                    omega=np.concatenate(omegas), channel=np.concatenate(channels),
+                    owner=np.concatenate(owners), spans=spans,
+                    start=np.array([i0 for i0, _ in spans], dtype=np.intp),
+                    first=np.array(firsts, dtype=np.intp),
+                    mass=np.array(masses, dtype=np.float64)))
+            terms.append(lines)
+        return terms
 
     def structure_intensity_partition(
             self, values: dict[str, float]
@@ -4189,7 +4420,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                                       instrument.profile.v.value, instrument.profile.w.value,
                                       phase.gauss_size.value, phase.gauss_strain.value)
                 x_l = instrument.profile.x.value + phase.lor_size.value
-                y_l = instrument.profile.y.value + phase.lor_strain.value
+                # a Stephens block replaces lor_strain (WP-1467,
+                # CompiledModel.lor_strain_term), so it sizes nothing here
+                y_l = instrument.profile.y.value + (
+                    0.0 if phase.microstrain is not None else phase.lor_strain.value)
                 if extra_size or extra_strain:
                     x_l = x_l + extra_size
                     y_l = y_l + extra_strain
@@ -4260,9 +4494,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             cp.batch_mag = _batch_layout(win_mag, fcj_n_mag, tt)
         # the off-state gate (see the field): ext is exactly its identity and
         # nothing this stage moves can take it off there
-        cp.skip_extinction = (gate_off_states
-                              and phase.extinction.value == 0.0
-                              and f"phases.{ip}.extinction" not in moving_paths)
+        cp.skip_extinction = (phase.extinction is None
+                              or (gate_off_states
+                                  and phase.extinction.value == 0.0
+                                  and f"phases.{ip}.extinction" not in moving_paths))
         # WP-0605 task 0: the FCJ node memo needs no free-path analysis —
         # correctness rests on input equality alone — so it is allocated
         # whenever any peak has quadrature nodes at all.

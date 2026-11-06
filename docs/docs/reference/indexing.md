@@ -195,7 +195,7 @@ Under every rule, what a cell leaves is reported rather than hidden: `CellCandid
 A prior steers the search and never gates it.
 Each crystal system a prior names moves to the front of the queue, and a prior cell's metric seeds the `svd` engine's starting basin.
 The cell is then checked against the peak list the engines' own way, and if it indexes the driven lines it joins the answer as finder `"prior"`: added to `CellCandidate.found_by` when an engine also found the lattice, and otherwise appended after the ranked list, never ranked among the engines' candidates.
-`"prior"` never appears in `IndexingResult.engines_run`, so the agreement caveat grades a prior-only candidate down.
+`"prior"` is not an engine: it never appears in `IndexingResult.engines_run`, and the confidence gate counts only engines.
 
 No system is dropped and no range changes, so a wrong prior costs time rather than truth.
 A prior cell outside the declared axis range is reported as unusable rather than widening the box, and the check refutes a cell it would have to move more than 10 % in volume to fit.
@@ -204,17 +204,18 @@ Two settings of one lattice, such as an acute and an obtuse monoclinic angle, co
 
 #### The controls a project stores
 
-`IndexingControls` is the same surface one level up: everything a run is asked with that is not the data.
-It is what `ProjectDoc.indexing` persists, so a run can be repeated from a stored setting rather than from a call site.
+`IndexingControls` is what `ProjectDoc.indexing` persists: everything a run is asked with but the data.
 
 | Field | Default | Holds |
 |---|---|---|
 | `IndexingControls.search` | every default | the `SearchSpecSpec` |
-| `IndexingControls.engines` | `None`, every registered engine | which engines to run; an unknown name raises `ValidationError` |
+| `IndexingControls.engines` | `None`, every engine | which engines to run; an unknown name raises `ValidationError` |
 | `IndexingControls.validate_candidates` | `True` | whether to run the whole-profile test |
 | `IndexingControls.check_top` | `None`, three | how many top candidates get the expensive checks, at least 1 |
+| `IndexingControls.formula` | `None` | the specimen's formula, for `formula_units` |
+| `IndexingControls.temperature` | `None`, 298 K | its temperature in K |
 
-`two_theta_limits` is deliberately not a field: the project document already owns the range.
+`two_theta_limits` is not a field: the project document owns it.
 
 ### A volume window from the formula
 
@@ -506,9 +507,9 @@ A nonzero count raises [`INDEX_PREDICTED_BUT_ABSENT`](diagnostics-indexing.md#in
 
 `CellCandidate.confidence` is `high`, `medium` or `low`, written by one rule:
 
-- `low` when fewer than two finders stand behind the candidate, or when any refuting caveat applies;
+- `low` when fewer than two engines found the candidate, or when any refuting caveat applies;
 - `high` when every engine that ran found it and no caveat applies at all;
-- `medium` otherwise: at least two finders, and only capping caveats.
+- `medium` otherwise: at least two engines, and only capping caveats.
 
 Every reason a candidate falls short is a member of a closed vocabulary in `CellCandidate.confidence_caveats`.
 Six of the fourteen refute the candidate, each being evidence against the cell or evidence that the data cannot choose.

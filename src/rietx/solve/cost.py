@@ -76,6 +76,39 @@ line 0 reaches (a λ/n harmonic beyond line 0's sphere): its columns carry the
 line ratios relative to line 0's intensity, which is zero there.  The solved
 phase reads its factor off |F|², so a λ/n reflection is carried there, and
 ``"scale"`` draws every line (#580 review, item 5).
+
+**Texture at a stated r** (WP-2109).  The solved phase's March-Dollase
+factor T(a, r) (Dollase 1986, J. Appl. Cryst. 19, 267; March 1932,
+Z. Kristallogr. 81, 285), the mean of
+:func:`~rietx.model.preferred_orientation.march_term` over the reflection's
+orbit with a the axis, is folded into Ω at the extraction's a₀ and r₀ as
+T₀ (≡ 1 with no ``preferred_orientation`` block).  ``phase_peaks`` multiplies
+it into a line-independent ``base`` before any per-line term, so it is one
+number per reflection on every emission line, and with D = diag(T(a, r)/T₀)
+
+    Ω(a, r) = Ω·D,   M(a, r) = D·M·D,   b(a, r) = D·b,   c unchanged,
+    χ²(F; a, r) = χ²(D·F).
+
+D is positive for every r > 0 (the March bracket is positive).  With
+G = D·F, s the closed-form scale and D′ = diag((∂T/∂r)/T₀),
+
+    ∂χ²/∂r = −2s·(b − s·M·G)ᵀ(D′·F),
+
+the ∂s/∂r term dropping because χ² is stationary in s; where s = 0, χ² = c
+and the derivative is 0, a kink at that boundary.  D is invertible, so
+I ↦ D·I maps the free intensities onto themselves and ``chi2_floor`` (so
+``ratio``) is the same at every r.  ``intensities`` (I_P = M⁺b) is not: M is
+singular under exact overlap and the minimum-norm solution does not transform
+by D⁻¹, so it belongs to r₀ alone.  The r is the solved phase's; a
+``"scale"`` nuisance phase's own texture sits inside X and does not move.
+:meth:`SolveCost.texture_ratio` gives D and D′, and
+:meth:`SolveCost.chi2_at_texture` the value and the derivative; nothing in the
+package calls either, and none chooses r (a search over r is S9's, #677).
+The orbit exists at construction only where the phase declares the block, so
+a cost with none needs the group passed in (``from_model(group=...)``;
+:meth:`SolveCost.from_pawley` passes it).  A spherical-harmonics ``texture``
+block on the solved phase is folded into Ω the same way and has no r, so an
+evaluation over it is refused (:class:`TextureRefused`).
 """
 
 from __future__ import annotations
@@ -86,10 +119,13 @@ from typing import Literal
 import numpy as np
 from scipy.sparse import csr_matrix
 
-from ..crystallography.symmetry import reflection_label
+from ..crystallography.lattice import reciprocal_metric_tensor
+from ..crystallography.symmetry import reflection_label, reflection_orbits, resolve_group
 from ..model.forward import d_spacings
+from ..model.preferred_orientation import march_dollase_and_dr, orbit_layout
 from ..optimize import lapack
 from ..optimize.statistics import column_rescale
+from ..schemas.structure import MARCH_R_MIN
 
 _CELL_KEYS = ("a", "b", "c", "alpha", "beta", "gamma")
 
@@ -129,6 +165,27 @@ class ExtractionRefused(ValueError):
     """
 
     def __init__(self, reason: Refusal, message: str):
+        super().__init__(message)
+        self.reason = reason
+
+
+TextureRefusal = Literal["r_below_floor", "texture_block", "no_group", "no_axis"]
+
+
+class TextureRefused(ValueError):
+    """The cost cannot be evaluated at the stated texture; ``reason`` says why.
+
+    ``"r_below_floor"``: r below :data:`~rietx.schemas.structure.MARCH_R_MIN`
+    (or not a number), where the March factor has its pole.
+    ``"texture_block"``: the solved phase carries a spherical-harmonics
+    ``texture`` block, which ``Phase`` refuses beside March-Dollase, so a stated
+    r over it is a model the schema refuses.  ``"no_group"``: the extraction
+    declared no ``preferred_orientation`` block and the cost was built without
+    a group, so it holds no orbits to average over.  ``"no_axis"``: no block
+    and no axis stated, so there is no axis to evaluate at.
+    """
+
+    def __init__(self, reason: TextureRefusal, message: str):
         super().__init__(message)
         self.reason = reason
 
@@ -267,7 +324,7 @@ def _design(model, values: dict, phase: int, background: str, nuisance: str):
     """(y, w, Ω, X): the target, the weights, the solved phase's columns and
     the nuisance columns (``None`` when there are none), as the module
     docstring defines them; y already has every held term subtracted."""
-    if not model.phases[phase].skip_extinction and values[f"phases.{phase}.extinction"] != 0:
+    if not model.phases[phase].skip_extinction and values.get(f"phases.{phase}.extinction", 0.0) != 0:
         raise ExtractionRefused(
             "nonlinear", "primary extinction is on for the solved phase: its "
             "intensity is not linear in |F|² (hold extinction at 0)")
@@ -385,12 +442,20 @@ class SolveCost:
     b: np.ndarray              # (N,)
     c: float
     chi2_floor: float          # c − bᵀM⁺b, the Pawley floor of the same form
-    intensities: np.ndarray    # (N,) I_P = M⁺b, per-reflection |F|²·s at the floor
+    intensities: np.ndarray    # (N,) I_P = M⁺b, per-reflection |F|²·s at the floor, at r₀ only
     n_points: int
     background: Literal["projected", "held"]
     nuisance: Literal["pawley", "scale"]
     n_nuisance: int            # nuisance columns projected out, background included
     records: dict = field(default_factory=dict)
+    # -- the solved phase's March-Dollase texture at extraction (WP-2109) -----
+    gstar: np.ndarray | None = None        # (3, 3) G* at the frozen cell
+    po_axis: np.ndarray | None = None      # (3,) a₀; None: no block at extraction
+    po_r: float | None = None              # r₀; None: no block at extraction
+    po_factors: np.ndarray | None = None   # (N,) T₀ folded into Ω; None: ≡ 1
+    po_orbits: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+    #                                        (members, seg, counts); None: no group
+    sh_texture: bool = False               # a spherical-harmonics block on the phase
 
     # -- the form -------------------------------------------------------------
     def matvec(self, f: np.ndarray) -> np.ndarray:
@@ -426,6 +491,70 @@ class SolveCost:
     def ratio(self, chi2: float) -> float:
         """χ²/χ²_floor; ∞ when the floor is not positive."""
         return float(chi2 / self.chi2_floor) if self.chi2_floor > 0 else np.inf
+
+    # -- texture at a stated r (WP-2109) ---------------------------------------
+    def texture_ratio(self, r: float, axis=None) -> tuple[np.ndarray, np.ndarray]:
+        """(D, D′), each (N,): T(axis, r)/T₀ and (∂T/∂r)/T₀ (module docstring).
+
+        ``axis`` (integer hkl) defaults to the extraction's a₀; with no block
+        at extraction it must be stated.  ``r`` is always stated: nothing here
+        chooses it.  At the extraction's own (a₀, r₀) D is exactly 1, and with
+        no block so is D at r = 1 on any axis.  An engine evaluates a stack
+        through ``chi2_batch(D * F)``.  Refuses with :class:`TextureRefused`.
+        """
+        r = float(r)
+        if not r >= MARCH_R_MIN:
+            raise TextureRefused(
+                "r_below_floor", f"March-Dollase r = {r!r} is below MARCH_R_MIN "
+                f"({MARCH_R_MIN}), where the factor has its pole")
+        if not np.isfinite(r):
+            raise ValueError(f"March-Dollase r must be finite, got {r!r}")
+        if self.sh_texture:
+            raise TextureRefused(
+                "texture_block", "the solved phase carries a spherical-harmonics "
+                "texture block, folded into Ω; Phase refuses March-Dollase beside "
+                "it, so a stated r over it is a model the schema refuses")
+        if axis is None:
+            if self.po_axis is None:
+                raise TextureRefused(
+                    "no_axis", "the extraction declared no preferred_orientation "
+                    "block, so there is no axis to default to: state one")
+            axis = self.po_axis
+        if self.po_orbits is None:
+            raise TextureRefused(
+                "no_group", "the extraction declared no preferred_orientation "
+                "block and the cost was built without a group, so it holds no "
+                "reflection orbits: build it with from_model(..., group=...)")
+        raw = np.asarray(axis)
+        if (raw.shape != (3,) or not np.issubdtype(raw.dtype, np.number)
+                or not np.all(np.isfinite(raw)) or np.any(raw != np.rint(raw))
+                or not raw.any()):
+            raise ValueError(f"axis must be three integers, not all zero, got {axis!r}")
+        axis = raw.astype(np.int64)
+        members, seg, counts = self.po_orbits
+        T, dT = march_dollase_and_dr(members, seg, counts, axis, self.gstar, r)
+        T, dT = np.asarray(T, dtype=np.float64), np.asarray(dT, dtype=np.float64)
+        if self.po_factors is None:
+            return T, dT
+        return T / self.po_factors, dT / self.po_factors
+
+    def chi2_at_texture(self, f2: np.ndarray, r: float, axis=None
+                        ) -> tuple[float, float, float]:
+        """(χ², s, ∂χ²/∂r) at a stated March-Dollase r and axis.
+
+        χ² and s are :meth:`chi2` at D·F, so at the extraction's own texture
+        they are :meth:`chi2`'s bit for bit; s is the scale at r.  The
+        derivative is −2s·(b − s·M·D·F)ᵀ(D′·F), 0 where s = 0.  ``axis`` and
+        the refusals are :meth:`texture_ratio`'s.
+        """
+        D, dD = self.texture_ratio(r, axis)
+        f2 = np.asarray(f2, dtype=np.float64)
+        g = D * f2
+        chi2, s = self.chi2(g)
+        if s == 0.0:
+            return chi2, s, 0.0
+        grad = -2.0 * s * (self.b - s * self.matvec(g))
+        return chi2, s, float(grad @ (dD * f2))
 
     # -- construction ---------------------------------------------------------
     @classmethod
@@ -496,8 +625,11 @@ class SolveCost:
                 f"fitted {result.statistics.n_points}: pass the pattern the "
                 "refinement was fitted to, with its excluded regions")
         table = ParameterTable(structure, instrument)
+        solved = structure.phases[phase]
         cost = cls.from_model(model, table.decode(table.x0()), phase=phase,
-                              background=background, nuisance=nuisance)
+                              background=background, nuisance=nuisance,
+                              group=resolve_group(solved.space_group,
+                                                  solved.symmetry_operations))
         cost.records["extraction"] = {"mode": result.mode, "status": result.status,
                                       "rwp": rwp}
         return cost
@@ -505,7 +637,8 @@ class SolveCost:
     @classmethod
     def from_model(cls, model, values: dict, *, phase: int = 0,
                    background: Literal["projected", "held"] = "projected",
-                   nuisance: Literal["pawley", "scale"] = "pawley") -> SolveCost:
+                   nuisance: Literal["pawley", "scale"] = "pawley",
+                   group=None) -> SolveCost:
         """Build from a **Rietveld-mode** compiled ``model`` at frozen ``values``.
 
         The lower rung of :meth:`from_pawley`, which compiles the model; this
@@ -514,6 +647,14 @@ class SolveCost:
         :class:`ExtractionRefused`, satellites in the fitted range and, under
         ``"pawley"``, a nuisance reflection only a line other than line 0
         reaches (the module docstring's last two refusals).
+
+        The solved phase's March-Dollase a₀, r₀ and T₀ are kept, with its
+        orbits, for :meth:`texture_ratio`.  Where the phase declares the block
+        the orbits are the compile's own; where it does not, they come from
+        ``group`` (what :func:`~rietx.crystallography.symmetry.resolve_group`
+        returns for the solved phase), since neither the compile nor ``values``
+        holds one.  Without either, the cost is built and an evaluation at a
+        stated r is refused.
         """
         if model.mode != "rietveld":
             raise ValueError(
@@ -545,6 +686,18 @@ class SolveCost:
         ip_sol, *_ = lapack.lstsq(M, b, rcond=None)
         cp = model.phases[phase]
         cell = _cell(values, phase)
+        gstar = np.asarray(reciprocal_metric_tensor(*cell), dtype=np.float64)
+        po_axis = po_r = po_factors = orbits = None
+        if cp.po_axis is not None:
+            # the compile's own frozen layout, axis and r: T₀ is the factor
+            # phase_peaks folded into Ω, by the same call at the same G*
+            orbits = (cp.po_members, cp.po_seg, cp.po_counts)
+            po_axis = np.array(cp.po_axis, dtype=np.int64)
+            po_r = float(values[f"phases.{phase}.preferred_orientation.r"])
+            po_factors = np.asarray(march_dollase_and_dr(*orbits, po_axis, gstar, po_r)[0],
+                                    dtype=np.float64)
+        elif group is not None:
+            orbits = orbit_layout(reflection_orbits(group, cp.reflections.index))
         return cls(
             hkl=np.asarray(cp.reflections.index, dtype=np.int64),
             d=np.asarray(d_spacings(cp.reflections.index, *cell), dtype=np.float64),
@@ -552,4 +705,6 @@ class SolveCost:
             M0=M0, V=V, b=b, c=c, chi2_floor=float(c - b @ ip_sol), intensities=ip_sol,
             n_points=len(y), background=background, nuisance=nuisance, n_nuisance=n_x,
             records={"nnz_omega": int(om.nnz), "nnz_M0": int(M0.nnz),
-                     "rank_V": int(V.shape[1]), "n_reflections": int(len(b))})
+                     "rank_V": int(V.shape[1]), "n_reflections": int(len(b))},
+            gstar=gstar, po_axis=po_axis, po_r=po_r, po_factors=po_factors,
+            po_orbits=orbits, sh_texture=cp.tex_basis is not None)

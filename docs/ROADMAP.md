@@ -85,10 +85,8 @@ so a session loads only what it needs:
    flip its row; it ships in the next release. **Release is cut** weekly, and
    at once for a P1 fix (`RELEASING.md` § When): it carries what `main` holds,
    numbered over the last
-   release (a minor when anything was added); finish `milestones/vX.Y.md` with
-   the measured ship block naming the milestones it completes, check README's
-   claims, then move `pyproject.version` to the next minor's `.dev0` and open
-   that version's record. **A break or a user-facing addition is staged on the
+   release (a minor when anything was added), and closed by `RELEASING.md`'s
+   steps 9-11, which finish its record and open the next. **A break or a user-facing addition is staged on the
    day it lands**, in the release record and the staged notes.
    The notes are written from the **tag range**, not from the milestone, and
    v1.4's pass found two changes shipping with no record entry behind them
@@ -101,13 +99,13 @@ placement, link resolution, and the size caps on this file and CLAUDE.md.
 
 ## Current focus
 
-**The next release is 1.11** (`pyproject.version` `1.11.0.dev0`), cut from what `main` holds
-([record](milestones/v1.11.md), [staged notes](releases/1.11.0.md)). 1.10.0 shipped 2026-10-24 ([notes](releases/1.10.0.md)).
+**The next release is 1.12** (`pyproject.version` `1.12.0.dev0`), cut from what `main` holds
+([record](milestones/v1.12.md), [staged notes](releases/1.12.0.md)). 1.11.0 shipped 2026-11-04 ([notes](releases/1.11.0.md)).
 
-**Two milestones are open and three are queued, by name.** [magnetic](#magnetic--the-magnetic-structure)
+**Three milestones are open and three are queued, by name.** [magnetic](#magnetic--the-magnetic-structure)
 opened 2026-09-18 as v1.6; [generality](#generality--every-decision-rietx-makes-holds-beyond-the-data-it-was-tuned-on)
-opened 2026-10-18; rietview, rigid-bodies and structure-solution were
-queued as v1.7, v1.8 and v1.9. Threads #286, #426, #561 and #562 quote those
+opened 2026-10-18; [parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx)
+opened 2026-11-04; rietview, rigid-bodies and structure-solution were queued as v1.7, v1.8 and v1.9. Threads #286, #426, #561 and #562 quote those
 numbers, so each row in § Milestones says which it was. **Neutron TOF stays at
 [§ v2+](#v2--fenced)** behind issue #193, but for its T-1 cut ([1927](wp/1927-tof-t1-the-axis-and-its-readers.md), 2026-10-08).
 
@@ -151,12 +149,14 @@ covers (1119 § Gotchas).
 | v1.8 | Every parameter in its own units: what `main` held on 2026-10-12, completing no milestone | ✅ **shipped 2026-10-12** ([record](milestones/v1.8.md), [notes](releases/1.8.0.md)) | 47 pull requests since v1.7.0, every user-facing change named in the notes or dispositioned in WP-1954's handover; cut on the merge of WP-1929, a P1 fix for esds that followed where the solver stopped; WP-1953's large Pawley stage ships as a stated limit, and so does the Windows pre-upload gate's one red test, a report-loop stop that differs on Windows; VALIDATION.md's moved rows, Part 1 and the skill re-run on the release tree; suite counts in the record's ship appendix |
 | v1.9 | A parameter as a function of each pattern's coordinates: what `main` held on 2026-10-14, completing no milestone | ✅ **shipped 2026-10-14** ([record](milestones/v1.9.md), [notes](releases/1.9.0.md)) | 41 pull requests since v1.8.0, every user-facing change named in the notes or dispositioned in WP-1961's handover; cut early at the maintainer's ask, once WP-1959's kernel wheel was on PyPI and rietx's floor rose to it; VALIDATION.md re-measured on the release tree; suite counts in the record's ship appendix |
 | v1.10 | Every fit ends in a closing stage: what `main` held on 2026-10-24, completing no milestone | ✅ **shipped 2026-10-24** ([record](milestones/v1.10.md), [notes](releases/1.10.0.md)) | 128 pull requests since v1.9.0, every user-facing change named in the notes or dispositioned in WP-2043's handover; the tag waited on WP-2044, a P1 fix for an esd that depended on the platform; the Windows pre-upload gate, red since 2026-10-20, fixed twice more on the day (#1151) and its suite green on the release commit, the job cut off by its limit in cleanup; VALIDATION.md re-measured on the release tree; suite counts in the record's ship appendix |
-| v1.11 | The next release: what `main` carries when it is cut, and the milestones complete by then | 🔄 **accumulating since 2026-10-24** ([record](milestones/v1.11.md)) | written at the cut |
+| v1.11 | An indexing candidate is validated by a fit: what `main` held on 2026-11-04, completing no milestone | ✅ **shipped 2026-11-04** ([record](milestones/v1.11.md), [notes](releases/1.11.0.md)) | 183 pull requests since v1.10.0, every user-facing change named in the notes; the tag waited on WP-2086, the noise check that gave tutorial 05's 2 % step back; every nightly job green on the release commit, `full` included; cut on kernel wheel 1.3; suite counts in the record's ship appendix |
+| v1.12 | The next release: what `main` carries when it is cut, and the milestones complete by then | 🔄 **accumulating since 2026-11-04** ([record](milestones/v1.12.md)) | written at the cut |
 | magnetic | The magnetic structure (was v1.6): the satellite, the moment, the determination, the mode amplitude — [§ magnetic](#magnetic--the-magnetic-structure) | 🔄 **opened 2026-09-18** ([record](milestones/magnetic.md)) | eleven rows written at the open, the record's § Acceptance; the measured half is still to come |
 | rietview | rietview (was v1.7): the structure figure an agent composes — cuts, extents, a figure that reports on itself, a real-agent measurement, the split — [§ rietview](#rietview--the-structure-figure-an-agent-composes) | ⬜ **queued 2026-09-27** | written at the open |
 | rigid-bodies | Rigid bodies (was v1.8): a fragment refined as one body, its atoms reported with esds — [WPs](wp/README.md#rigid-bodies): 1801-1813, the seam decided by 1803 and the rest cut from its record | ⬜ **queued 2026-09-30** | written at the open |
 | structure-solution | Structure solution (was v1.9): a difference-Fourier map, a cost from the Pawley intensities, direct-space search — [WPs](wp/README.md#structure-solution): 1901-1902, the map then the cost; #197 and #198 left the fence 2026-09-30 | ⬜ **queued 2026-09-30** | written at the open |
 | generality | Every decision rietx makes holds beyond the data it was tuned on: every verdict, action and threshold tiered, the unproven demoted, a guard against the next one — [§ generality](#generality--every-decision-rietx-makes-holds-beyond-the-data-it-was-tuned-on) | 🔄 **opened 2026-10-18** ([record](milestones/generality.md)) | eight rows written at the open, the record's § Acceptance |
+| parametric | A parametric refinement written by hand ports to rietx: equations as text, shared variables, a joint fit with a single fit's verbs, equations over a reflection, and the documentation an agent ports an input from — [§ parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx) | 🔄 **opened 2026-11-04** ([record](milestones/parametric.md)) | fourteen rows, the first thirteen written at the open, the record's § Acceptance |
 | v2+ | FPA (with the peaks buffer), neutron TOF, modulated structures, PDF — [§ v2+](#v2--fenced) | ⬜ fenced | — |
 
 ## Work packages
@@ -434,6 +434,10 @@ One seam each, the same task shape: lanes read and tier, the lead tables, the ma
 #### The prose
 
 2008 the skill slimmed to the API, the feedback surface and sourced traps; 2009 the rulebooks, findings out and the generator rules rewritten. [The WPs](wp/README.md#generality-the-prose).
+
+### parametric — a parametric refinement written by hand ports to rietx
+
+Opened 2026-11-04 by the maintainer ([record](milestones/parametric.md)). The reader is an experienced TOPAS or GSAS-II user, so a missing primitive ranks above a missing check, and presets for beginners wait. The machinery stands on its own terms, and an agent ports what does not import. The block 21xx is claimed. The manual for what exists today and a crash on the way in come first (2101, 2102), then the grammar (1964), and the rest stands on those. [The WPs](wp/README.md#parametric).
 
 ### Unscheduled
 

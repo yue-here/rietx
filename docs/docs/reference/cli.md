@@ -334,6 +334,7 @@ The split assumes one writer at a time: if two processes append to one path at o
 A stage's seconds run from its first `stage_start` to its `stage_end`, so a stage that releases a held phase and solves again is one span.
 A fit's cost is `fit_start` to `fit_end`.
 The stage spans do not add up to it, because a stage report or a recompile between stages is outside every span.
+A fit run with `stage_reports=True` adds `s of it stage reports` to its line, read from the `stage_report_seconds` key of `fit_end`.
 
 A line that is not JSON is counted and skipped.
 The half line a running writer has not finished is left alone, so a running job can be summarised.

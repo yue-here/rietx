@@ -10,7 +10,8 @@ This page gives what a `FitReport` carries, field by field: how to build one, th
 
 `Refinement.report` builds the report for the session's last fit.
 It hands the compiled model, the structure and the instrument to `build_report`, and Layers 1 and 2 need that model.
-Pass the plan you ran as `plan=`, either a plan or a preset name.
+Pass the plan you ran as `plan=`: a plan, its `PlanSpec` or a preset name.
+A preset name is read for the result's mode, as the fit read it, so `"mccusker_default"` on a Le Bail result is `profile_only`.
 Layer 2 then marks each suggestion the plan already covers.
 The session also passes its free parameters, so a suggestion to free one that is already free is marked too.
 
@@ -409,6 +410,11 @@ for rung in ref.stage_reports_:
 ```
 
 The flag is off by default, because `fit` is called in loops.
+Each rung is a whole report build, so the cost is per rung and does not shrink with the fit.
+On the 11-BM NAC example, with seven rungs, a fit with rungs took 4.7 to 5.7 times as long as the same fit without them.
+Turn it on for the fits you will read: the first of a batch, the last, one you will plot.
+The fit's `fit_end` event carries the rungs' wall time as `stage_report_seconds` ([Events](refinement.md#events)), on a cancelled run too.
+No stage span holds that time, because each rung is built after one `stage_end` and before the next `stage_start`.
 The rungs are read off states the plan already visits, so the fitted values are bit-identical to a run without them.
 A cancelled run keeps the rungs of the stages that completed.
 Each rung's veto reads the whole plan, so a rung answers "what will this plan still not fix?".

@@ -14,6 +14,7 @@ from rietx.examples import examples_dir
 
 data = rx.read_pattern(examples_dir() / "FAP.XRA")
 structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
+structure.phases[0].extinction = 0.0  # opt-in: declared, so the plan frees it
 instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 instrument.background = rx.BackgroundChebyshev.with_terms(6)
 ref = rx.Refinement(structure, instrument)
@@ -39,7 +40,7 @@ assert "FLOOR_HIT" in {d.code for d in result.diagnostics}
 assert f"{row.value:.3f} ± {row.stderr:.3f}" == "0.000 ± 1.973"
 assert interval.at_bound and interval.lower == 0.0
 assert interval.lower_stop == "bound" and interval.upper_stop == "threshold"
-assert f"{interval.upper:.3f}" == "0.749"
+assert f"{interval.upper:.3f}" == "0.748"
 # the 1.645-esd reach a symmetric reading would give is 3.2, "more than four times as far"
 assert f"{1.645 * row.stderr:.1f}" == "3.2"
 assert 0.2 < interval.upper / (1.645 * row.stderr) < 0.25

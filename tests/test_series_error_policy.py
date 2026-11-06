@@ -391,12 +391,11 @@ def test_a_backward_raise_keeps_the_complete_forward_chain(
     assert len(forward.entries) == N_PATTERNS
     assert forward.backward is None and series.backward_ is None
     not_run = [d for d in forward.diagnostics
-               if d.code == "SEQUENTIAL_PATH_CHECK_INCOMPLETE"]
+               if d.code == "SEQUENTIAL_PATH_CHECK_NOT_RUN"]
     assert len(not_run) == 1 and not_run[0].level == "warning"
     assert "did not run: the backward chain raised" in not_run[0].message
     assert f"on pattern {FAIL_INDEX}" in not_run[0].message
-    assert not any(d.code == "SEQUENTIAL_PATH_DEPENDENT"
-                   for d in forward.diagnostics)
+    assert forward.direction_gaps is None
 
 
 def test_a_backward_failure_is_recorded_and_narrows_the_comparison(
@@ -442,10 +441,9 @@ def test_a_cancelled_backward_chain_reports_the_comparison_as_not_run(
                         cancel=token)
 
     assert len(result.entries) == N_PATTERNS
-    codes = [d.code for d in result.diagnostics]
-    assert "SEQUENTIAL_PATH_DEPENDENT" not in codes
+    assert result.direction_gaps is None
     not_run = [d for d in result.diagnostics
-               if d.code == "SEQUENTIAL_PATH_CHECK_INCOMPLETE"]
+               if d.code == "SEQUENTIAL_PATH_CHECK_NOT_RUN"]
     assert len(not_run) == 1 and not_run[0].level == "warning"
     assert "backward chain was cancelled after 3 of 8 patterns" in not_run[0].message
 
@@ -457,6 +455,8 @@ def test_a_clean_both_way_series_reports_the_check_as_run(eight_patterns):
     named on every run."""
     series = _series()
     result = series.fit(eight_patterns, direction="both")
-    assert not any(d.code == "SEQUENTIAL_PATH_CHECK_INCOMPLETE"
+    assert not any(d.code in ("SEQUENTIAL_PATH_CHECK_INCOMPLETE",
+                              "SEQUENTIAL_PATH_CHECK_NOT_RUN")
                    for d in result.diagnostics)
+    assert result.direction_gaps
     assert result.backward is not None and result.backward.n_failed == 0

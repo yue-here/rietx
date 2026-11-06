@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
 Depends on: 2011 (the indexer's validation, built provisionally as Pawley); 1910 soft (the extinction screen's fits)
-Priority: P2 2026-10-27 — a scoping WP, the decision with a named user that other WPs wait on (1542, 1910's fit mode)
+Priority: P2 2026-11-01 — decided: Pawley at every site, its known bugs fixed first; A1 already sends every `index_pattern` user through Pawley, unit dependence included
 
 ## Goal
 
@@ -159,6 +159,42 @@ above, which come from lab and synchrotron single-phase patterns
 
 ### Inherited
 
+- **From WP-1542, 2026-11-05: whether a Le Bail result's final compile should
+  re-partition. Decide it or retire it with this move.** `_final_compile` carries the
+  intensities onto the result's windows without a partition. A one-channel window
+  change then splits a near-overlap differently, which reads 1.6 σ on #740's pattern
+  until the next partition. Re-partitioning closes that gap. It would also change the
+  numbers of every Le Bail fit, and its cost is unmeasured. WP-1542 made no code
+  change, settled by Claude under Yue's delegation of 2026-11-05. The grounds: the
+  change moves every Le Bail fit for a method leaving the default.
+
+- **From WP-1542, 2026-11-05: under TRF a Pawley fit reads its seed on FAP.** With
+  `solver="trf"` a 3-cycle seed stops at Rwp 8.17 % and a 300-cycle seed reaches 7.87 %
+  (LM 7.86 % from either), 8.8 esd apart. LM reads nothing of the seed on the four
+  patterns measured, and TRF nothing on #740's two patterns or corundum.
+  `refine.PAWLEY_SEED_CYCLES` stays 3 with this as its failing case. It belongs in
+  the Pawley bug list this WP fixes first.
+
+- **From WP-1542, 2026-11-05: three facts about Le Bail for decision 0.** A stage's
+  partition now repeats until a cycle moves 1e-7 of the Bragg counts, under a cap of
+  25 000. That closes #740's plateau inside a fit: Rwp 1.07 % against the true
+  structure's 1.09 %, where three cycles gave 1.61 % on that plan. Its cost falls on
+  the caller who picks `mode="lebail"`: BT-1 LaMnO3 went from 0.45 s to about a
+  minute. The extinction screen stays on three fixed cycles
+  (`indexing.extinction.SCREEN_LEBAIL_CYCLES`), because a settled partition failed
+  10 rows of its margin and gate tests. This WP's move to Pawley retires that
+  constant, and it should say so when it lands. The issue's per-iteration
+  re-extraction question stands, though the plateau no longer argues for it.
+
+- **2026-11-05, from WP-2076: A2 alone loses corundum.** With Pawley in the screen's class and reference
+  fits, corundum's `R - c -` becomes `R - - -` (+59 to +70), because the reference's four lines at
+  untestable positions absorb neighbouring tails while the BIC charges only the six testable ones. The
+  score must drop only the lines a class is charged for, which is one extra fit per class. WP-2076
+  § Findings has the numbers and `~/.cache/ghostshift/rietx/wp-2076/candidate.diff` the patch. That patch
+  also counts `n_free_parameters` alone, this WP's Hamilton-count task. A Pawley screen read the same
+  on two rows at pattern and σ × 5 × 10⁻⁵, so the unit-dependence task does not reach it there. Whether
+  WP-2076 lands this first is the maintainer's question, in its newest handover entry.
+
 - **From WP-2011, 2026-10-28: Pawley's cost on large patterns, re-measured
   with option (c) built** (WP-2011 § Option (c) probed, commit e39b8c19d on
   its branch). A Pawley stage above the BVLS cut now forms JᵀJ sparse over
@@ -221,13 +257,69 @@ above, which come from lab and synchrotron single-phase patterns
    issue #740) continues as it is, or drops a rung once no default path runs
    Le Bail.
 
+**The record, 2026-11-01.**
+
+- 0. **Decided 2026-11-01 (maintainer): replace, route (a), with Pawley's
+  known bugs fixed first.** The end goal is Pawley wherever rietx runs a
+  structure-free fit for the user: the extinction screen (A2), the GUI's
+  Adopt (B1), the GUI's new-project wizard (B2), and the prose that says
+  "Le Bail before Rietveld" (C). The bugs come first, in the order of the
+  Tasks below: the unexplained unit dependence (synthetic LaB6's true cell at
+  Rwp 0.164 on raw counts and 0.262 rescaled), the extinction screen's
+  Hamilton count taking Pawley's intensities twice, `compare_rivals` raising
+  in Pawley, the exchangeability scan returning nothing, and cross-phase
+  overlaps neither restrained nor flagged. If the unit dependence turns out
+  to belong to Pawley in rietx's form, bring decision 0 back: the brief named
+  that finding as the one that would favour the repair, route (b).
+- 1. **Decided 2026-11-01 (maintainer), with decision 0:** A2, B1, B2 and C
+  move. A1 is already Pawley (WP-2011). **Settled 2026-11-01 by Claude under
+  the WP's own definition of a site** (rietx choosing for the user): D stays.
+  Under `mccusker_default` the caller has chosen `mode="lebail"`, so the
+  substitution runs the method the caller picked.
+- 2. **Settled 2026-11-01 by Claude under the record:** A2 moves inside this
+  WP, after the Hamilton-count fix. The other route, inside WP-1910's PR
+  #1170, is gone, because #1170 merged on 2026-11-01 (`3defa3b6`).
+- 3. **Settled 2026-11-01 by Claude under the root CLAUDE.md rule "a declared
+  name is a claim":** the `lebail`-named public names are renamed to the
+  field's term for both methods, whole powder pattern decomposition (Le Bail
+  2005). The rename lands in the change that makes Pawley the method, so the
+  names break once (the maintainer's ruling of 2026-10-28). Old files open
+  through `schemas/migrate.py`'s read points. The names: `rietx.LeBailValidation`,
+  `CellCandidate.lebail`, `CandidateEvidence.lebail_status` and `.lebail_rwp`,
+  `rietx.indexing.validate_by_lebail`, the label "Le Bail validation", and
+  tutorial 03's file name (a published URL). The names listed in § Context as
+  true either way stay. A renamed result field changes what a fit returns, so
+  it goes to the maintainer before merge under the reader-output rule.
+- 4. **Settled 2026-11-01 by Claude, following decision 0** (this decision
+  was written to follow the site choice): WP-1542 drops one priority rung,
+  P2 to P3. A user who picks `mode="lebail"` still meets its background.
+
 ## Tasks
 
 - [x] Fill § Practice from the survey, and add its section to
       `docs/practice.md`.
-- [ ] The maintainer's five decisions (0-4), each recorded as `Decided YYYY-MM-DD:`.
-- [ ] Per site chosen: switch, record, re-measure the numbers that site's
-      tests pin, and stage the change in the release record (ROADMAP rule 6).
+- [x] The maintainer's five decisions (0-4), each recorded as `Decided YYYY-MM-DD:`.
+      Recorded 2026-11-01 above: 0 and 1 decided by the maintainer, 1's D and
+      2-4 settled by Claude.
+- [ ] Find the unit dependence: synthetic LaB6's true cell validates at Rwp
+      0.164 on raw counts and 0.262 with pattern and σ divided by the maximum
+      count, where Le Bail reads 0.2339 and 0.2338. Fix it, or show it belongs
+      to the method and bring decision 0 back.
+- [ ] The extinction screen's Hamilton test adds `n_lines + n_free_parameters`
+      (`indexing/extinction.py:1137-1141`), and Pawley's `n_free_parameters`
+      already counts the intensities. Count them once, before A2 moves.
+- [ ] `compare_rivals` in Pawley (`report/layer2.py:1202` raises).
+- [ ] The exchangeability scan in Pawley (`optimize/identifiability.py:191`
+      returns nothing).
+- [ ] Coincident reflections of two phases: restrain or flag them
+      (`model/forward.py:4396-4415` builds overlap groups per phase). Test
+      first, since the gap is inferred from the code.
+- [ ] Per site chosen (A2, B1, B2, C): switch, record, re-measure the numbers
+      that site's tests pin, and stage the change in the release record
+      (ROADMAP rule 6). B2 needs a rebuilt GUI dist.
+- [ ] The rename (decision 3), in the change that makes Pawley the method,
+      with old files opening through `schemas/migrate.py`, and the
+      reader-output approval before merge.
 - [ ] Reopen the three tier-3 Pawley constants with the generality review
       if any site moves that a user reaches without asking for Pawley.
 
@@ -251,6 +343,18 @@ green, and no ranking or class decision on the acceptance suites lost.
   issue #740, WP-1910, WP-1953 (large Pawley stages), WP-2011.
 
 ## Handover log
+
+- **2026-11-02** — the five decisions are recorded (§ Decisions, the record
+  of 2026-11-01). The maintainer chose Pawley as the end state at every site
+  where rietx picks a structure-free fit, with Pawley's known bugs fixed
+  first. Claude settled the rest: D stays, A2 moves here, the `lebail` names
+  are renamed in the same change, and WP-1542 drops to P3. The work is now a
+  build WP with five bug tasks ahead of the four sites. Recorded by a
+  ghostshift runner from the 2026-11-01 decision briefs in PR #1317; nothing
+  was run.
+  Forward references went to WP-1542 (re-rated) and WP-1910 (A2's mode is
+  this WP's). *Next:* the unit dependence, since its answer can reopen
+  decision 0.
 
 - **2026-10-28** — forward notes from WP-2011's `quick` measurement added to
   § Context (Pawley's cost on a pseudo-symmetric cell, the `quick` result, a
