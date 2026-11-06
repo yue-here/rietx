@@ -683,6 +683,10 @@ from .._nearmiss import did_you_mean
 #: test, so a stored node reads as what it ran, while ``StageSpec`` moved to
 #: 25 000 and 1e-7.  A stored plan naming ``lebail_cycles: 3`` reads that as a
 #: cap: it runs the same three cycles and reports ``LEBAIL_CYCLES_AT_CAP``.
+#: Also in 0.61 (WP-1969, #933): ``PeakFlag`` gains ``residue_misfit``, written
+#: only by ``index_residue`` on a pick standing on the subtracted phase's
+#: profile.  Additive: no existing list carries it, and an older build refuses
+#: a list that does.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
