@@ -314,17 +314,16 @@ def _index(argv: list[str]) -> int:
     args = p.parse_args(argv)
     # a bad formula or temperature is a usage error, refused before the
     # pattern is read, never a traceback from deep in the run; and a flag that
-    # would change nothing is refused rather than ignored
-    if args.temperature is not None and args.formula is None:
-        p.error("--temperature sets only --formula's volumes; give --formula too")
-    from .crystallography.atomic_volume import TABLE_TEMPERATURE, formula_unit_volume
+    # would change nothing is refused rather than ignored.  The words are
+    # check_formula_input's, which a project file's IndexingControls refuses
+    # with too
+    from .crystallography.atomic_volume import TABLE_TEMPERATURE, check_formula_input
 
+    try:
+        check_formula_input(args.formula, args.temperature)
+    except ValueError as exc:
+        p.error(str(exc))
     temperature = TABLE_TEMPERATURE if args.temperature is None else args.temperature
-    if args.formula is not None:
-        try:
-            formula_unit_volume(args.formula, temperature)
-        except ValueError as exc:
-            p.error(str(exc))
 
     from .indexing import SearchSpec, index_pattern
     from .io.readers import read_pattern

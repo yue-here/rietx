@@ -673,6 +673,16 @@ from .._nearmiss import did_you_mean
 #: ``Phase`` raises a ``ValidationError``, and ``Project.open`` stops at
 #: "malformed history record".  So a structure or a ``.rex`` project written
 #: here does not open there.
+#: Also in 0.61 (WP-2030 part 3): ``IndexingControls.formula`` and
+#: ``.temperature``, the specimen's formula a project stores for its indexing
+#: run.  Additive and defaulted to ``None``; an older build refuses a document
+#: carrying either key.
+#: Also in 0.61 (WP-1542): ``StageSpec.lebail_tol``, ``NodeAction.lebail_tol``,
+#: ``StageResult.lebail_cycles_run`` and ``StageResult.lebail_settled``, all
+#: additive.  ``NodeAction``'s two Le Bail defaults stay at three cycles and no
+#: test, so a stored node reads as what it ran, while ``StageSpec`` moved to
+#: 25 000 and 1e-7.  A stored plan naming ``lebail_cycles: 3`` reads that as a
+#: cap: it runs the same three cycles and reports ``LEBAIL_CYCLES_AT_CAP``.
 #: Also in 0.61 (WP-1419, C2): ``Phase.parent_cell``, a ``ParentCell`` (the
 #: parent's ``space_group``, the parent → child ``transform``, the parent's
 #: ``cell`` and one ``strain`` amplitude per Γ strain the child's group

@@ -3154,6 +3154,15 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "best one. Check the cell and the background, or allow more passes."
         ),
     ),
+    "LEBAIL_CYCLES_AT_CAP": HelpEntry(
+        title="A Le Bail partition hit its cap",
+        description=(
+            "The partition repeats until the intensities stop moving, under the cap "
+            "`lebail_cycles`. A partition in the last stage reached the cap first, so "
+            "the intensities and any width that depends on them are not settled. "
+            "Raise `lebail_cycles` on the stage."
+        ),
+    ),
     "LOW_ANGLE_UNMODELLED": HelpEntry(
         title="Unexplained signal below the first reflection",
         description=(
@@ -3451,6 +3460,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The reader dropped rows from the file, for one of two reasons, and the "
             "message says which. Every reader drops a point whose 2θ, count or error "
             "estimate is NaN or infinite, and names the dropped points by their 2θ. "
+            "On a time-of-flight pattern, flight time takes the place of 2θ. "
             "A NaN is what a reduction writes where it divided by a zero monitor or "
             "detector efficiency, so these points hold no measurement. Left in, one "
             "such point made every statistic of the fit NaN. The two- and "
@@ -4710,14 +4720,27 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
     "lebail_cycles": HelpEntry(
         title="Le Bail cycles",
         description=(
-            "How many cycles of intensity partitioning run before each solve in "
-            "`lebail` mode. In `pawley` mode the same partition seeds the intensities "
-            "on a stage that carries none in, and the solve then refines them. The "
-            "setting is ignored in `rietveld` mode, where the intensities come from "
-            "the structure."
+            "The most cycles of intensity partitioning that run before and after each "
+            "solve in `lebail` mode. The partition stops earlier once a cycle meets "
+            "`lebail_tol`, and at 0 it runs exactly this many. In `pawley` mode the "
+            "partition seeds the intensities on a stage that carries none in, in at "
+            "most three cycles, and the solve then refines them. The setting is "
+            "ignored in `rietveld` mode, where the intensities come from the structure."
         ),
-        default="3",
-        typical="3",
+        default="25000",
+        typical="leave as it is; set 3 with a tolerance of 0 for the fixed count of "
+                "earlier releases",
+        anchor="theory/forward-model.html#three-intensity-models",
+    ),
+    "lebail_tol": HelpEntry(
+        title="Le Bail stop",
+        description=(
+            "The share of the Bragg counts a partition cycle may still move and end "
+            "the partition. Each reflection counts by the area it lays on the pattern. "
+            "0 switches the test off, so the partition runs exactly `lebail_cycles`."
+        ),
+        default="1e-7",
+        typical="leave as it is",
         anchor="theory/forward-model.html#three-intensity-models",
     ),
     "seed": HelpEntry(
@@ -4973,7 +4996,7 @@ INSTRUMENT_FIELD_HELP: dict[str, HelpEntry] = {
 
 #: One entry per control :class:`~rietx.schemas.indexing.IndexingControls`
 #: carries, flattened one level: the eighteen fields of its ``search`` block
-#: plus the three beside it.  These are search settings, not refined
+#: plus the five beside it.  These are search settings, not refined
 #: quantities, so ``default`` is the schema's own value rendered as JSON and
 #: ``tests/test_help.py`` crosses every one of them.
 #:
@@ -5223,6 +5246,28 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
         ),
         typical="empty",
         anchor="reference/indexing.html#the-whole-profile-test",
+    ),
+    "formula": HelpEntry(
+        title="Specimen formula",
+        description=(
+            "The specimen's chemical formula, written as a chemist writes it, with `·` "
+            "before water of crystallisation. Each candidate then shows Z, the formula "
+            "units its volume holds by Hofmann's (2002) average atomic volumes. Z moves "
+            "no search and no rank. A correct inorganic cell reads 0.4 to 0.9 of its "
+            "true Z, so read Z as a guide rather than a test."
+        ),
+        typical="empty",
+        anchor="reference/indexing.html#a-volume-window-from-the-formula",
+    ),
+    "temperature": HelpEntry(
+        title="Pattern temperature",
+        description=(
+            "The temperature the pattern was measured at, which scales the formula's "
+            "volumes for thermal expansion. Empty reads 298 K. It needs a formula."
+        ),
+        unit="K",
+        typical="empty at room temperature",
+        anchor="reference/indexing.html#a-volume-window-from-the-formula",
     ),
 }
 
@@ -5593,6 +5638,23 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "purpose (`ftol`), so the last stage's exit is the one about the answer."
         ),
         anchor="theory/estimation.html#convergence",
+    ),
+    "StageResult.lebail_cycles_run": HelpEntry(
+        title="Le Bail cycles run",
+        description=(
+            "The cycles each partition of the stage ran, in order: before the solve, "
+            "then after it. A Pawley seed is the one entry. A stage whose solve "
+            "stopped has only the partition before it. It is empty where none ran: a "
+            "Rietveld stage, or a Pawley stage that carried its intensities in."
+        ),
+    ),
+    "StageResult.lebail_settled": HelpEntry(
+        title="Le Bail partition settled",
+        description=(
+            "Whether each of the stage's partitions met `lebail_tol` under its cap of "
+            "`lebail_cycles`. It is empty where nothing was asked: another mode, or "
+            "a fixed count."
+        ),
     ),
     "StageResult.n_iterations": HelpEntry(
         title="Residual evaluations",
