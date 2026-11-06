@@ -158,7 +158,7 @@ def test_document_round_trip_including_infinite_bounds(tmp_path, pattern_file):
     project.save()
 
     raw = json.loads((project.path / PROJECT_JSON).read_text(encoding="utf-8"))
-    assert raw["format_version"] == "1.5"   # WP-2002 B1: the plan's phase_support_sigma
+    assert raw["format_version"] == "1.6"   # WP-2030: the indexing controls' formula
     assert raw["patterns"][0]["reader"] == "xy"
 
     reopened = rx.Project.open(project.path)

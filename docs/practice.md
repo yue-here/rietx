@@ -518,7 +518,7 @@ calls its Pawley-type mode "LeBail". TOPAS was read at Technical Reference v5 (�
 
 | Program | Offers | Default or first steer | Le Bail re-extraction | Pawley overlap handling |
 |---|---|---|---|---|
-| rietx | both | no default argument picks either (`mode` defaults to `rietveld`); the indexer's validation fit is Pawley since WP-2011 | `lebail_cycles` = 3 partitions before each least-squares *run*, none inside it | seeded from one Le Bail partition; overlapped groups held by an equal-split restraint and flagged |
+| rietx | both | no default argument picks either (`mode` defaults to `rietveld`); the indexer's validation fit is Pawley since WP-2011 | a partition before and after each least-squares *run*, none inside it, repeated until a cycle moves 1e-7 of the Bragg counts under a cap of 25000 cycles (WP-1542; 3 fixed cycles before it) | seeded from one Le Bail partition; overlapped groups held by an equal-split restraint and flagged |
 | GSAS-II 5.8.4 | both | neither is on by default (`doPawley` and the histogram's `LeBail` both False); a "Start Le Bail extraction?" button on each histogram, Pawley a Phase › General checkbox | once per least-squares iteration under the default analytic Hessian (checked) | reflections exactly overlapped by symmetry tied equal; a negative-intensity penalty, weight 0 by default |
 | FullProf 8.20 | Le Bail only (`Jbt` = 2, profile matching) | the manual advises profile matching before Rietveld when the model is crude | every least-squares cycle (ran); stops when χ² changes by < 1e-3 | not offered |
 | TOPAS (TR v5) | both | Pawley: "The default is Pawley refinement, the keyword lebail triggers a Le Bail refinement" (§8, p.84) | every iteration, a "two-step cyclic process"; "convergence is usually slow" | each intensity a parameter from 1; no rule stated |
@@ -532,6 +532,20 @@ refinement, once per least-squares cycle or iteration.** rietx re-extracts only 
 solves, so one rietx Le Bail pass is one cycle of everyone else's. Of the two programs that
 offer both, TOPAS defaults to Pawley and GSAS-II defaults to neither. MAUD steers Le Bail
 first and then Pawley. No program makes a structure-free fit the default mode.
+
+**How many cycles, and what stops them** (survey for WP-1542, 2026-11-05; GSAS-II source
+checked, the rest from the table's sources). No surveyed program stops on the extracted
+intensities at a fixed model. GSAS-II's `DoLeBail` runs a fixed `cycles=10`
+(`GSASIIstrMain.py:761`, the loop near `:825`), and in a refinement it extracts once per
+least-squares iteration and stops on the relative change in χ² (1e-3, at most 3 cycles by
+default). FullProf extracts once per cycle and stops when χ² changes by under 1e-3. TOPAS
+extracts every iteration and RIETAN-FP every cycle. MAUD runs up to 5 inner iterations. Le Bail
+(2005) gives no rule for the count, and says only that one pass is not enough to reach the
+minimum Rwp. In those programs the model moves between extractions, so many cycles accumulate
+over a refinement. rietx holds the model frozen through a solve (the frozen-per-stage rule),
+so one partition has to carry what those cycles carry. That is why rietx alone has a stop on
+the intensities, and why it accelerates the step: plain repetition needed 17 512 cycles on
+one partition of a real neutron pattern at ten times this tolerance.
 
 **GSAS-II** (source, checked). `GetFobsSq`, the Le Bail update, runs at the end of every
 derivative pass (`GSASIIstrMath.py:4808`, `:4929`) and overwrites the calculated F² with the
@@ -573,6 +587,26 @@ The paper gives no timings.
 
 Not determined: TOPAS v9 and its Pawley overlap rule, FullProf's current manual, the Profex
 5.7.2 manual. MAUD, BGMN and RIETAN-FP were not run.
+
+## Ranking extinction symbols: which fit, and how a weak line is judged
+
+Surveyed 2026-11-05 for WP-2076, from the GSAS-II source and a web search. The paper corpus
+holds neither ExtSym paper, so the ExtSym row rests on its abstract and its catalogue records.
+
+| Program | What the ranking reads | How a weak line enters |
+|---|---|---|
+| rietx (main) | a Le Bail χ² per class against an absence-free reference, as ΔBIC | a testable forbidden position counts ln N in the class's favour, and a window test at 3σ refutes |
+| ExtSym (Markvardsen et al. 2001, 2008) | integrated intensities and their errors, from a Pawley-type fit. Validated on TF12LS output, then on DASH, FullProf, GSAS, PRODD and TOPAS output | a probability per symbol. The abstract says the result depends heavily on the accuracy of the error estimates |
+| GSAS-II 5.8.4 | no extinction-symbol ranking found. The Unit Cells tab lists space groups for a cell with M20 and X20 (`GSASIIpwdGUI.py:737-768`) | not applicable |
+| TOPAS, FullProf | not checked | not checked |
+
+**The Le Bail partition clamps in GSAS-II too.** `ComputeFobsSqCW` keeps a channel only where the
+observed-over-calculated ratio is positive (`GSASIImpsubs.py:177`, checked), which is the
+channel clamp `lebail_update` applies through `max(net, 0)`. The bias was not measured in
+GSAS-II, and the two programs' peak windows were not compared.
+
+Not determined: how DASH or TOPAS rank without ExtSym, and what EXPO2014's statistical
+approach reads.
 
 ## A volume window from the formula, in indexing
 
