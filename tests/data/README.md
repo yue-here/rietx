@@ -1832,7 +1832,7 @@ also have a 100 K or 300 K scan:
   0 on Co₃O₄'s room-temperature cell (8.084 Å, Smith & Hobson, *Acta Cryst.* B,
   1973); at that λ and zero the garnet's cell is 12.378 Å, against YIG's 12.376 Å
   (Geller & Gilleo, *J. Phys. Chem. Solids*, 1957), and YAG's would need
-  λ = 2.44 Å. Independent of λ, with each structure scaled to the whole pattern,
+  λ = 2.45 Å. Independent of λ, with each structure scaled to the whole pattern,
   (220) is about 24 times stronger than YIG's nuclear structure factors give and
   about 270 times YAG's, and (321) about 5 and 50 times: the excess is magnetic
   scattering from Fe, and YAG has no magnetic ion. Calibrating λ against YAG's
