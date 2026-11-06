@@ -427,13 +427,27 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
     spellings. Two follow-ups went to WP-2118's Inherited: degree trig (`sind`) once a
     formula can read a cell angle in degrees, and keeping a joint fit's `variables=` and a
     single fit's `add_variable` one convention.
+  - *Decided (Yue, 2026-11-06), the reader output.* Accepted: `preview_equations` and
+    `EquationPreview`; `vars.*` rows in `result.parameters`; `RefinedParameter.equations`
+    naming a formula's variables and every row it writes; `result.parametric_equations`
+    and `evaluate()` for formulas; the form test, `PARAMETRIC_OUT_OF_RANGE` and
+    `PARAMETRIC_TARGET_UNSEEN` covering formulas. For the variable rows in
+    `result.parametric` the maintainer chose option A: keep them, and make
+    `ParametricCoefficient` say what they mean. Its docstring now defines a coefficient
+    for a linear term only, so a formula variable's row breaks the "a declared name is a
+    claim" rule (root CLAUDE.md, WP-1076). **Task before the PR:** the docstring defines
+    the formula-variable case (value and esd are the variable's own, `unit` the variable's,
+    `reference` None, `term` its name, and a variable two formulas read is listed under
+    each), and `reference/parametric.md` says in one line that the free-parameter count
+    comes from `result.parameters`, never from this table. Option B (drop the rows) split
+    where a reader looks; option C left the docstring wrong.
   - *Task 15, the skill.* The series reference's parametric row now names `basis="expression"`
     and `variables=`. It grew 23 B and sits 16 B under its budget. The synced copies follow.
   - *Fast selection* at 93518e01f, `[dev,jax,torch]`, darwin/arm64, through ghostshift's
     `serial.py`: 14471 passed, 51 skipped, 36 xfailed, 0 failed (18:49). The total is 35 above
     the last entry's at 84fa4cb02, and this session added four tests; the rest is the
     second session's later commits and a different skip set, not reconciled here.
-  - *Next.* Task 11 (decision (c) answered above), the removal of `Parameter.expr` and the schema bump (decisions (a) and (b) above), then 13 and 14. The reader-output additions still wait on the maintainer.
+  - *Next.* Task 11 (decision (c) answered above), the removal of `Parameter.expr` and the schema bump (decisions (a) and (b) above), the `ParametricCoefficient` docstring and manual line (the reader-output ruling above), then 13 and 14. No decision waits on the maintainer.
 
 - **2026-11-05 (second build session, a ghostshift runner)** — Tasks 7 and 8 landed, and
   the fast selection's three reds from the first session are fixed. Branch
