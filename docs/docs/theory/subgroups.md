@@ -220,7 +220,7 @@ triclinic group; for a monoclinic P group without a glide, the shortest a and c
 normal to b with a ≤ c and β ≥ 90°; for a monoclinic group with a glide or a
 C lattice, the "best" cell for cell choice 1 {cite}`parthe1985`; for an
 orthorhombic group, a ≤ b ≤ c over the axis permutations its affine normaliser
-contains, computed from the operations (six for P2₁2₁2₁, two for Cmmm, three
+contains {cite}`burzlaff1980`, computed from the operations (six for P2₁2₁2₁, two for Cmmm, three
 cyclic ones for $Pbca$, one for $Pnma$). The best cell keeps the standard symbol
 and has the shortest a and c normal to b that allow it, with β ≥ 90°. Writing
 $a' = pa + qc$ and $c' = ra + sc$, the glide groups $Pc$, $P2/c$ and $P2_1/c$ allow

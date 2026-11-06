@@ -1,6 +1,6 @@
 """Structure standardization S0: a phase's change of basis and its ITA standard setting.
 
-Verification, not validation (AGENT_RULES, machinery): exact operator lists,
+Verification, not validation: exact operator lists,
 per-reflection |F(hkl)|² invariance under every transform (h′ = Pᵀh), round
 trips, the published rules' known answers (Parthé & Gelato 1984, *Acta Cryst.*
 A40, 169, pp. 172–173), and spglib's ``std_lattice`` with the origin-2 Hall
@@ -168,6 +168,15 @@ def test_change_basis_keeps_every_structure_factor(P, p):
     assert not any(a.x.vary or a.x.stderr is not None for a in new.atoms)
     det = round(np.linalg.det(Pf))
     assert new.scale.value == pytest.approx(old.scale.value / det ** 2)
+
+
+def test_change_basis_clears_the_scales_esd_and_expression():
+    old = _phase("P 1 21/c 1", MONO, GENERAL)
+    old = old.model_copy(update={"scale": old.scale.model_copy(
+        update={"stderr": 0.01, "expr": "2 * x"})})
+    new = S.change_basis(old, ((2, 0, 0), (0, 1, 0), (0, 0, 1)))
+    assert new.scale.value == pytest.approx(old.scale.value / 4)
+    assert new.scale.stderr is None and new.scale.expr is None
 
 
 def test_change_basis_round_trip_is_exact():

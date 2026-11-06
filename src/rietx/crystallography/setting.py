@@ -18,7 +18,7 @@ goes as G′ = PᵀGP, coordinates as x′ = P⁻¹(x − p), Miller indices as 
 and the U* form of a displacement tensor as U*′ = P⁻¹U*P⁻ᵀ.
 
 **The rules** are Parthé & Gelato (1984), *Acta Cryst.* A40, 169–183,
-pp. 172–173 (page images checked; ``planning/papers`` note), the setting and
+pp. 172–173 (page images checked), the setting and
 cell half of the standardization behind the standardized data of Pearson's
 and the TYPIX-based databases:
 
@@ -36,8 +36,7 @@ and the TYPIX-based databases:
   without a glide, the "reset" Niggli cell, a and c the shortest translations
   ⊥ b with a ≤ c and β ≥ 90°; monoclinic with a glide or a C lattice (Pc,
   P2/c, P2₁/c, C2, Cm, Cc, C2/m, C2/c), the "best" cell for cell choice 1 of
-  Parthé & Gelato (1985), *Acta Cryst.* A41, 142–151 (page images checked;
-  ``planning/papers`` note): a and c the shortest translations ⊥ b among the
+  Parthé & Gelato (1985), *Acta Cryst.* A41, 142–151 (page images checked): a and c the shortest translations ⊥ b among the
   bases that keep the standard symbol, β non-acute, and no a ≤ c order, since
   interchanging a and c would leave cell choice 1 (their Sc₂FeSi₂ best cell,
   Table 3 p. 151, has a > c); (c) orthorhombic, a ≤ b ≤ c where the affine
@@ -374,7 +373,8 @@ def change_basis(phase, P, p=(0, 0, 0), *, allow_inversion: bool = False):
     ratio = (math.sqrt(np.linalg.det(G_old)) / math.sqrt(np.linalg.det(G_new))) ** 2
     scale = phase.scale.model_copy(update={
         "value": phase.scale.value * ratio,
-        "min": phase.scale.min * ratio, "max": phase.scale.max * ratio})
+        "min": phase.scale.min * ratio, "max": phase.scale.max * ratio,
+        "stderr": None, "expr": None})
     return phase.model_copy(update={
         "space_group": label, "symmetry_operations": xyz, "cell": new_cell,
         "atoms": atoms, "scale": scale})
@@ -438,7 +438,7 @@ def orthorhombic_relabellings(space_group: str) -> tuple[tuple, ...]:
     first: P a signed permutation matrix with det P = +1 (rule 1), and p the
     origin shift that, with it, carries the group's operation list onto itself
     exactly.  Six entries are the cubic affine normalisers of Parthé & Gelato
-    (1984) rule 3(c) (and Burzlaff & Zimmermann 1980), where a ≤ b ≤ c is
+    (1984) rule 3(c) (and Burzlaff & Zimmermann (1980), *Z. Kristallogr.* 153, 151–179), where a ≤ b ≤ c is
     reachable; two (identity and a ↔ b) the tetragonal ones, where a ≤ b is;
     one, a symbol that fixes its axes; three, the cyclic permutations of a
     normaliser like Pbca's.

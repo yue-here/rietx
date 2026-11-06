@@ -5049,8 +5049,8 @@ ROWS: tuple[Row, ...] = (
         ambiguity=1, value=2,
         evidence=("Parthé & Gelato (1984) Acta Cryst. A40, 169, p. 172 rule 2(c), page-verified: the "
                   "origin at the centre of symmetry where ITA gives two; Stokes (2011) § 5.1(2) and "
-                  "WP-1452's decision (1) the same; a licensed database's standardized entries follow "
-                  "it on every origin-choice entry sampled (local oracle, aggregates only)")),
+                  "WP-1452's decision (1) the same; dissent: spglib's default (hall_number=0) takes "
+                  "origin choice 1, which is why _standardise names the target's Hall number")),
     Row("rietx.crystallography.setting.standard_setting:smaller_screw", "default", tier=2,
         ambiguity=1, value=True,
         evidence=("Parthé & Gelato (1984) p. 172 rule 2(d) and p. 174: an enantiomorphic pair is "
