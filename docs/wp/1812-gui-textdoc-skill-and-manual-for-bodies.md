@@ -23,6 +23,19 @@ generated skill reference and manual section. This is chunk R10 of issue #561, s
 
 ### Inherited
 
+- **2026-11-06, from the issue triage (issue #1417): the manual owes a
+  paragraph on where a body's origin goes.** Moving the origin changes no atom,
+  no χ² and no atom esd, only the origin's own esds and its correlations with
+  the rotation. The unit-weight centroid default is fine for a light-atom
+  molecule. With one heavy atom the decorrelating point can sit several Å away
+  (3.8 Å for a synthetic Br-acridine, as the reporter measured it), and an
+  f²- or b²-weighted centroid lands near it. The paragraph says when to move
+  the origin and shows the route that exists today: compute the weighted
+  centroid and pass it as the fractional `origin=` point. Whether a reading
+  of the best origin, or new arguments, come with it is
+  [2120](2120-where-a-body-turns-about.md)'s open question; write the paragraph
+  after it is answered.
+
 - **2026-10-23, from [1810](1810-hydrogens-riding-on-a-body.md) (closed): the
   riding hydrogens have no user-facing call yet.** `RigidBody.riding` and
   `crystallography/riding.py` landed in PR #955, and a CIF write carries
