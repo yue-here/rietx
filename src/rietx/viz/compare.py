@@ -282,9 +282,9 @@ def _build_srm660c(data_dir: Path) -> StandardInputs:
         Stage("profile_w", ["instrument.profile.w"]),
         Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                           "instrument.profile.x", "instrument.profile.y"]),
+        # S/L alone, H/L held at its declared 0.025, as the preset (WP-2012).
         Stage("lines_axial", ["instrument.source.lines.*.weight",
-                              "instrument.geometry.axial_sl",
-                              "instrument.geometry.axial_hl"]),
+                              "instrument.geometry.axial_sl"]),
         Stage("biso", ["phases.*.atoms.*.biso"]),
     ])
     return StandardInputs(data=data, structure=structure, instrument=ins, plan=plan)
@@ -676,6 +676,9 @@ def _with_roughness_pitschke(inputs: StandardInputs) -> None:
 
 
 def _with_extinction(inputs: StandardInputs) -> None:
+    for phase in inputs.structure.phases:  # opt-in since WP-1944
+        if phase.extinction is None:
+            phase.extinction = 0.0
     inputs.plan.stages.append(
         Stage("extinction", ["phases.*.extinction"]))
 

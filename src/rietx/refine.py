@@ -58,10 +58,11 @@ from .crystallography.twins import (
     coordinate_snapshot,
     merge_site_twins,
     numbering_moves,
+    site_of,
 )
 from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
-from .history.store import fingerprint
+from .history.store import fingerprint, refuse_existing_log
 from .history.tree import RefinementTree
 from .model.absorption import (
     CYLINDER_MU_R_MAX,
@@ -98,6 +99,7 @@ from .optimize.least_squares import (
     DEFAULT_SOLVER,
     SOLVERS,
     STATIONARY_ANGLE_STEP,
+    _cancel_check,
     _jacobian_for,
     _longest_line_wavelength,
     covariance_estimates,
@@ -120,6 +122,7 @@ from .optimize.statistics import (
     berar_lelann_factor,
     compute_statistics,
     data_support,
+    residual_is_noise,
     structure_r_factors,
 )
 from .params.multi import _unscoped
@@ -157,6 +160,7 @@ from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.plan import (
     CLOSING_WINDOW_TOL,
+    PlanSpec,
     check_closing_window_tol,
     check_phase_support_sigma,
 )
@@ -453,6 +457,11 @@ class _StageHold:
     #: asked of the table afterwards, for this carrier's own reason.
     reach: dict[str, list[str]] = dataclasses.field(default_factory=dict)
     blocked_by_hold: list[str] = dataclasses.field(default_factory=list)
+    #: ``StageResult.lebail_cycles_run`` (WP-1542): the cycles each partition
+    #: of this stage ran, which only the two ``lebail_update`` calls know
+    lebail_run: list[int] = dataclasses.field(default_factory=list)
+    #: ``StageResult.lebail_settled``, for the same reason
+    lebail_settled: bool | None = None
     #: the ``turn_on`` paths naming no entry (WP-1414), riding here
     #: for ``blocked_by_hold``'s reason: decided before the solve, unchanged
     #: by it, and delivered to the two ``StageResult`` call sites this way
@@ -632,6 +641,14 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     leaves their columns identically zero, so with every phase lineless they
     are held from the start.
 
+    **Unseen is not flat until the residual says so.**  A zero scale says these
+    peaks are not in the data, which a blank frame and a phase whose peaks
+    missed both say.  The second leaves every real peak in the residual, and
+    its zero shift and widths are how it reaches them: on tutorial 05's 2 %
+    step, U climbing to 6 deg² took the scale from 2.47σ to 83σ and the cell
+    home.  So the hold at an answer also needs a residual with no structure,
+    :func:`_peak_columns_flat_at_answer`.
+
     ``tried`` is what the previous stage's answer held.  A column there was
     free for that stage's first solve, and the phases were judged unseen with
     it free, so this stage holds it from its start: WP-1523's prior, one
@@ -653,7 +670,8 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     # and with every phase unseen, an instrument column reaching the pattern
     # through phase peaks alone is as flat as their cells (WP-2049)
     tried = set(tried)
-    every = _every_phase_unseen(model, absent if at_answer else lineless)
+    every = (_peak_columns_flat_at_answer(model, table, absent, lineless)
+             if at_answer else _every_phase_unseen(model, lineless))
     prior = not every and bool(tried) and _every_phase_unseen(model, absent)
 
     def flat(p: str) -> bool:
@@ -1593,6 +1611,30 @@ def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
         path in _AXIAL_PATHS or model.scalar_chain_supported(path))
 
 
+def _residual_is_noise(model: CompiledModel, table: ParameterTable) -> bool:
+    """:func:`~rietx.optimize.statistics.residual_is_noise` of the fitted
+    channels at the table's values.  A channel an excluded region removed is
+    not in ``model.y_obs``, so it cannot read as structure.  One forward
+    evaluation, spent only where every phase is already unseen."""
+    y = np.asarray(model.evaluate(table.decode(table.x0())), dtype=np.float64)
+    delta = (np.asarray(model.y_obs, dtype=np.float64) - y) / np.asarray(
+        model.sigma, dtype=np.float64)
+    return residual_is_noise(delta, len(table.free_paths))
+
+
+def _peak_columns_flat_at_answer(model: CompiledModel, table: ParameterTable,
+                                 absent: set[int], lineless: set[int]) -> bool:
+    """Whether the instrument's peak-only columns are flat at a stage's answer:
+    every phase is unseen, and either none has a line in range, so the columns
+    are identically zero, or the residual is noise and nothing is left for them
+    to find (Hill & Flack's d ≥ Q).  A declined hold leaves d on the record: on
+    ``RefinementResult.statistics`` beside N and P where the fit ended at that
+    answer, and on the stage's history node
+    (``HistoryNode.metrics.statistics``) where it went on to find the peaks."""
+    return _every_phase_unseen(model, absent) and (
+        _every_phase_unseen(model, lineless) or _residual_is_noise(model, table))
+
+
 def _every_phase_unseen(model: CompiledModel, absent: set[int]) -> bool:
     """Whether ``absent`` holds every phase of ``model`` (and there is one)."""
     n = len(model.phases)
@@ -2431,7 +2473,9 @@ class Refinement:
     down a different branch with :meth:`run_stage`.
 
     Pass ``history=False`` for the light path: no snapshots, no per-stage
-    statistics, no serialisation.
+    statistics, no serialisation.  A ``history`` path that already holds a log
+    raises ``FileExistsError`` here, because a log holds one tree (WP-2031);
+    continue one with :meth:`from_node` on the loaded tree.
     """
 
     def __init__(self, structure: Structure, instrument: Instrument, *,
@@ -2557,6 +2601,10 @@ class Refinement:
         if isinstance(history, RefinementTree):
             self.history = history
             self._head_id = history.head
+        elif isinstance(history, str | Path):
+            # before any fit is paid for; ``RefinementTree.for_data`` asks
+            # again when the tree is made, for a file written in between
+            refuse_existing_log(history)
 
         # carried across calls so a checkout can be continued
         self._mode: Mode = "rietveld"
@@ -2816,10 +2864,9 @@ class Refinement:
         if isinstance(moves, NumberingMoves) and moves.atoms:
             self._renumber_atoms(moves)
             moves = moves.in_new_numbering()
-        sites = sorted({path.rsplit(".dof.", 1)[0] for path in moves})
+        sites = sorted({site_of(path) for path in moves})
         for site in sites:
-            site_moves = {p: m for p, m in moves.items()
-                          if p.rsplit(".dof.", 1)[0] == site}
+            site_moves = {p: m for p, m in moves.items() if site_of(p) == site}
             holds, ties, free, notes = carry_constraints(
                 site_moves, holds=sorted(self._user_holds), ties=self._ties,
                 free_paths=self._free_paths)
@@ -2839,13 +2886,16 @@ class Refinement:
                         + "; ".join(notes) + "."})
                     break
             else:
+                what = ("coordinate directions and anisotropic ADP patterns"
+                        if any(".adp." in n for n in notes) else "coordinate directions")
                 found.append(Diagnostic(
                     level="warning", code="SITE_DOFS_RENUMBERED", where=[site],
-                    message=(f"site {site} changed its site symmetry, so its coordinate "
-                             f"directions were renumbered: " + "; ".join(notes)
+                    message=(f"site {site} changed its site symmetry, so its {what} "
+                             f"were renumbered: " + "; ".join(notes)
                              + "."),
-                    suggestion="check the holds and ties on this site's "
-                               "coordinates against parameters()."))
+                    suggestion=f"check the holds and ties on this site's "
+                               f"{what.replace(' directions', 's')} against "
+                               f"parameters()."))
 
     def _renumber_atoms(self, moves: NumberingMoves) -> None:
         """Read every constraint register into ``moves``' new atom numbering.
@@ -4338,13 +4388,14 @@ class Refinement:
                 # they stay pending: the next *stage* consumes them, not this
                 _restore_lebail(self._pending_reflections, model)
                 carried = True
-            cycles = Stage("suggest", []).lebail_cycles
+            probe = Stage("suggest", [])
             if mode == "lebail":
-                model.lebail_update(table.decode(table.x0()), n_cycles=cycles)
+                model.lebail_update(table.decode(table.x0()),
+                                    n_cycles=probe.lebail_cycles, tol=probe.lebail_tol)
             elif mode == "pawley":
                 if not carried:
                     model.lebail_update(table.decode(table.x0()),
-                                        n_cycles=cycles)
+                                        n_cycles=_pawley_seed_cycles(probe))
                 model.build_pawley_restraint()
             x0 = table.x0()
             if model.pawley is not None:
@@ -4586,6 +4637,7 @@ class Refinement:
                       list(node.action.turn_on),
                       max_iter=node.action.max_iter,
                       lebail_cycles=node.action.lebail_cycles,
+                      lebail_tol=node.action.lebail_tol,
                       seed=node.action.seed, strain_seed=node.action.strain_seed,
                       restraint_weight_scale=node.action.restraint_weight_scale,
                       ftol=node.action.ftol,
@@ -4834,14 +4886,20 @@ class Refinement:
         self._pending_reflections = []
         model = new_model
 
+        lebail_run: list[int] = []
+        lebail_settled: bool | None = None
+        check = None if cancel is None else _cancel_check(cancel, stage.name)
         if mode == "lebail":
             values = table.decode(table.x0())
-            model.lebail_update(values, n_cycles=stage.lebail_cycles)
+            run, lebail_settled = model.lebail_update(
+                values, n_cycles=stage.lebail_cycles, tol=stage.lebail_tol, check=check)
+            lebail_run.append(run)
         elif mode == "pawley":
             if not carried:
                 # seed the intensity block from one Le Bail partition — a good
                 # warm start for the joint solve; refined values carry onward
-                model.lebail_update(table.decode(table.x0()), n_cycles=stage.lebail_cycles)
+                lebail_run.append(model.lebail_update(
+                    table.decode(table.x0()), n_cycles=_pawley_seed_cycles(stage))[0])
             # equal-split restraint on overlapped groups, scaled to the current
             # intensities (constant within the coming least-squares run)
             model.build_pawley_restraint()
@@ -5245,7 +5303,13 @@ class Refinement:
 
         if mode == "lebail" and outcome.non_finite is None:
             # a stopped stage changed nothing, its intensities included (WP-2048)
-            model.lebail_update(table.decode(outcome.theta), n_cycles=stage.lebail_cycles)
+            # the solve fitted against the first partition, so a settled second
+            # one does not undo a cut in it
+            run, settled = model.lebail_update(
+                table.decode(outcome.theta), n_cycles=stage.lebail_cycles,
+                tol=stage.lebail_tol, check=check)
+            lebail_run.append(run)
+            lebail_settled = settled if lebail_settled is None else lebail_settled and settled
 
         guard = check_guards(table, outcome, correlation_guard, model=model,
                              scan_exchangeability=stage_index == n_stages)
@@ -5296,10 +5360,11 @@ class Refinement:
             # Le Bail and Pawley read the screen alone, which the result
             # measures on its own compile as it always has
             significance=support if mode == "rietveld" else None,
-            window_loss=loss, rwp=stage_rwp)
+            window_loss=loss, rwp=stage_rwp, lebail_run=lebail_run,
+            lebail_settled=lebail_settled)
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
-            plan: RefinementPlan | str = "mccusker_default",
+            plan: RefinementPlan | PlanSpec | str = "mccusker_default",
             two_theta_limits: tuple[float, float] | None = None,
             events=None, cancel=None, telemetry=None, label: str | None = None,
             stage_reports: bool = False, progress=None) -> RefinementResult:
@@ -5962,6 +6027,9 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths,
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                lebail_cycles_run=hold.lebail_run,
+                lebail_settled=hold.lebail_settled,
+                termination=outcome.termination or None,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
                 # checked, trivially: one histogram has no elsewhere
@@ -5983,6 +6051,7 @@ class Refinement:
                 self._record(tree, NodeAction(
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
+                    lebail_tol=stage.lebail_tol,
                     seed=stage.seed, strain_seed=stage.strain_seed,
                     restraint_weight_scale=stage.restraint_weight_scale,
                     # the tolerance this stage *ran* at, not the one it declared
@@ -6282,6 +6351,9 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, unreached_histograms={},
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                lebail_cycles_run=hold.lebail_run,
+                lebail_settled=hold.lebail_settled,
+                termination=outcome.termination or None,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
                 moment_angle_tests=outcome.moment_angle_tests)
@@ -6310,6 +6382,7 @@ class Refinement:
                 self._record(tree, NodeAction(
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
+                    lebail_tol=stage.lebail_tol,
                     seed=stage.seed, strain_seed=stage.strain_seed,
                     restraint_weight_scale=stage.restraint_weight_scale,
                     ftol=stage.ftol, window_slack_deg=stage.window_slack_deg,
@@ -6468,20 +6541,25 @@ class Refinement:
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
 
-    def report(self, *, plan: RefinementPlan | str | None = None, **kw):
+    def report(self, *, plan: RefinementPlan | PlanSpec | str | None = None, **kw):
         """The full :class:`~rietx.report.FitReport` for the last fit.
 
         Unlike ``build_report(result)``, this has the compiled model in hand,
         so Layers 1-2 (misfit attribution and typed suggested actions) are
         computed — subject to their gates.  ``plan`` supplies the Layer-2
-        strategy veto; pass the plan you ran (or its preset name).
+        strategy veto; pass the plan you ran, its ``PlanSpec`` or its preset
+        name.  A name is read for the result's mode, as the fit read it, so
+        ``"mccusker_default"`` on a Le Bail result is ``profile_only``.
         """
         from .report import build_report
 
         if self._model is None or self.result_ is None:
             raise RuntimeError("call fit() first")
-        if isinstance(plan, str):
-            plan = PLAN_PRESETS[plan]()
+        if plan is not None:
+            # read as the fit that made the result read it: a preset name
+            # through the mode's substitution, a ``PlanSpec`` converted
+            # (WP-2102)
+            plan = resolve_plan(plan, self.result_.mode)
         # the answer frozen with the result, never the live models: a later
         # cancelled fit keeps its completed stages and this result (WP-1421)
         answer = self._answer
@@ -6527,7 +6605,7 @@ class Refinement:
                             bond_sigma=bond_sigma, angle_sigma=angle_sigma)
 
     def summary(self, *, deliverable: str | None = None, plot: str | None = None,
-               plan: RefinementPlan | str | None = None,
+               plan: RefinementPlan | PlanSpec | str | None = None,
                report: FitReport | None = None,
                levels: dict[str, str] | None = None) -> str:
         """The termination view (WP-1302): "done, or not, and why" from one call.
@@ -9056,7 +9134,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # solver and false of the answer (WP-1028 §§(c),(d)).
     diagnostics = (diagnostics
                    + _far_from_data_diagnostics(model, y_calc, y_bkg, stats)
-                   + _max_iter_diagnostics(stage_results))
+                   + _max_iter_diagnostics(stage_results)
+                   + _lebail_cap_diagnostics(stage_results)
+                   + _slow_descent_diagnostics(stage_results))
 
     # Does the data support it (WP-1071): the observation/parameter ratio and
     # the step size, both reported and neither gating.  Built before the
@@ -9140,6 +9220,10 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
 #: no more, has reached a fixed point.  Measured on WP-1323's baseline: cells
 #: exact 16.908 -> 16.908 (0), cells +0.3 % 16.969 -> 16.967 (1e-4).
 LEBAIL_CONVERGED_REL = 1e-4
+#: the most cycles a Pawley seed runs.  The solve refines every intensity
+#: jointly, so the seed only says where it starts, and how settled the seed is
+#: moves no answer and saves no evaluation (WP-1542's handover).
+PAWLEY_SEED_CYCLES = 3
 
 
 def _lebail_stop_diagnostic(reason: str, kept: int, rows: list[float],
@@ -9259,6 +9343,11 @@ def _copy_seeded_column(jac: np.ndarray, jac2: np.ndarray, i: int,
                 f"{path!r} reaches that block, so its seeded column cannot be "
                 f"carried into the current state; seed {path!r} off its floor "
                 f"yourself (set_values) and ask again")
+
+
+def _pawley_seed_cycles(stage: Stage) -> int:
+    """The fixed count a Pawley seed runs: a stage may ask for fewer."""
+    return min(stage.lebail_cycles, PAWLEY_SEED_CYCLES)
 
 
 def _carry_lebail(old: CompiledModel, new: CompiledModel) -> None:
@@ -10649,6 +10738,9 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
     is now ``max_iter ×`` :data:`~rietx.optimize.least_squares.NFEV_PER_ITERATION`,
     sized from the measured worst-case rejection rate, so a stage that stalls
     reports it roughly 30x sooner with its answer unchanged.
+
+    A stage the slow-descent rule stopped (WP-1334) is ``converged`` and
+    never reaches this code: :func:`_slow_descent_diagnostics` names it.
     """
     hit = [s.name for s in stage_results if s.status == "max_iter"]
     if not hit:
@@ -10663,6 +10755,66 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
         where=[],
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",
+    )]
+
+
+def _lebail_cap_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``LEBAIL_CYCLES_AT_CAP``: the answer's partition stopped on its cap (WP-1542).
+
+    Only the last stage's partitions are the answer's: the solve fitted against
+    the first and the result carries the second.  An earlier stage's run from
+    intensities the next solve moves, so a cap there costs nothing the next
+    partition keeps.
+    """
+    last = stage_results[-1] if stage_results else None
+    if last is None or last.lebail_settled is not False:
+        return []
+    return [Diagnostic(
+        level="warning", code="LEBAIL_CYCLES_AT_CAP",
+        message=(f"A Le Bail partition of stage {last.name!r} stopped at its cap of "
+                 f"{max(last.lebail_cycles_run)} cycles, before the intensities settled."),
+        where=[],
+        suggestion="Raise lebail_cycles on the stage.",
+    )]
+
+
+def _slow_descent_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``STAGE_SLOW_DESCENT``: the stages the slow-descent rule stopped.
+
+    The rule (WP-1334, ``optimize.lm.SLOW_DESCENT_ESD``) ends a stage whose
+    cost is still falling, but so slowly that the next
+    :data:`~rietx.optimize.lm._SLOW_DESCENT_HORIZON` evaluations would move
+    its parameters by less than one esd.  Such a stage reports ``converged``
+    (Yue's ruling of 2026-11-03), since more iterations would not change the
+    answer by an esd, which is McCusker et al. (1999) §7's test.  So this
+    code is ``info`` and only names the stages, read off
+    ``StageResult.termination``, so a reader can tell a slow crawl from a
+    stage that met the solver's own tests.  It states and gates nothing.
+    """
+    from .optimize import lm
+
+    slow = [s.name for s in stage_results if s.termination == "slow_descent"]
+    if not slow:
+        return []
+    esd = lm.SLOW_DESCENT_ESD
+    esds = "one esd" if esd in (None, 1.0) else f"{esd:g} esd"
+    one = len(slow) == 1
+    return [Diagnostic(
+        level="info", code="STAGE_SLOW_DESCENT",
+        message=(("Stage " if one else "Stages ")
+                 + ", ".join(repr(n) for n in slow)
+                 + " stopped while " + ("its" if one else "their")
+                 + " χ² was still falling slowly. At that rate, another "
+                 f"{lm._SLOW_DESCENT_HORIZON} evaluations would have moved "
+                 + ("its" if one else "their")
+                 + f" parameters by less than {esds}, so the "
+                 + ("stage counts" if one else "stages count")
+                 + " as converged."),
+        where=[],
+        suggestion="Quote the stage's answer as converged. A high correlation "
+                   "or a bound hit reported for the same parameters names a "
+                   "shallow direction the descent may have crawled along, "
+                   "and its own suggestion names the remedies.",
     )]
 
 
@@ -11828,7 +11980,8 @@ def estimate_mu_r(structure: Structure, instrument: Instrument) -> float | None:
 
 
 def refine(data: PatternData, structure: Structure, instrument: Instrument,
-           *, mode: Mode = "rietveld", plan: RefinementPlan | str = "mccusker_default",
+           *, mode: Mode = "rietveld",
+           plan: RefinementPlan | PlanSpec | str = "mccusker_default",
            two_theta_limits: tuple[float, float] | None = None,
            backend: str = "numpy", solver: str = DEFAULT_SOLVER,
            history: bool | str | Path | RefinementTree = False,

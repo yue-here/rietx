@@ -238,6 +238,7 @@ def test_nac_extinction_on_the_main_phase_is_bounded_and_unbiasing(
 
     # only the main phase — the recommended usage; not the CaF2 impurity
     ref = ref_base.branch()
+    ref.structure.phases[0].extinction = 0.0  # opt-in since WP-1944
     result = ref.run_stage(
         data, rx.Stage("extinction", ["phases.0.extinction"], seed=1e-3))
 
@@ -245,8 +246,8 @@ def test_nac_extinction_on_the_main_phase_is_bounded_and_unbiasing(
     assert result.statistics.rwp < 0.12
     a = ref.fitted_structure.phases[0].cell.a.value
     assert abs(a - 10.2510) < 2e-3, f"extinction biased the NAC cell to a={a:.5f}"
-    # CaF2 extinction was never freed, so it stays exactly off
-    assert ref.fitted_structure.phases[1].extinction.value == 0.0
+    # CaF2 never declared extinction, so it stays off
+    assert ref.fitted_structure.phases[1].extinction is None
     # the main-phase correction is physical, not a runaway
     min_e = _min_extinction_factor(ref.fitted_structure, ref.fitted_instrument, data, 0)
     assert min_e > 0.8, f"main-phase extinction attenuates {(1 - min_e) * 100:.0f}% — implausible"

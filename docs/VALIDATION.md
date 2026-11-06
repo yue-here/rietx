@@ -291,6 +291,16 @@ The absolute lab anchor. NIST's own SRM 660c certification measurement, refined 
 
 **Measured:** a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
+#### `test_srm660c_zero_apertures_report_names_axial_asymmetry`
+
+`characterisation` · dataset `srm660c`
+
+**Claims:** with both axial apertures at 0 the report names the one-sided low-angle residual as axial asymmetry, and no impurity phase leads
+
+**Referenced to:** the shape of a known systematic: the certification data carry axial divergence (the apertures refine to about 0.025 and 0.037 when declared), so the action must fire and its rationale name the zero apertures; no accuracy is asserted
+
+**Measured:** three gated regions below 40 deg read asymmetry +0.020 to +0.025 at 7-9 esd; refine_axial_asymmetry 0.50 first, increase_background_flexibility 0.49 (WP-2054)
+
 #### `test_srm660c_extinction_does_no_harm`
 
 `characterisation` `ceiling` · dataset `srm660c`
@@ -419,9 +429,9 @@ The only fixtures carrying **two** reference engines, and they disagree: 2668 pp
 
 **Referenced to:** the two engines' own answers for the same peak, from opposite ends: GSAS-II let it run to 8.77e10 deg 2theta at esd 0 (off the pattern, unmeasured) and TOPAS kept it at 1.63 deg with an esd 188x its own value.  Here it correlates with the low-order background at |rho| = 1 and its stage spends its budget.  A measured failure recorded as a result: the recipe is over-parameterised and no fit of it can say otherwise
 
-**Measured:** HIGH_CORRELATION on the peak against the background, and the last stage freeing it at max_iter: since WP-2002 that is the closing stage, and the declared extra_components stage converges at the intermediate tolerance (1.9.0: the extra_components stage at max_iter); GSAS-II's own committed position 8.77e10 with esd exactly 0
+**Measured:** HIGH_CORRELATION on the peak against the background, and the last stage freeing it, the closing stage since WP-2002, never meeting the solver's own convergence test: since WP-1334 the slow-descent rule stops it at 123 evaluations (STAGE_SLOW_DESCENT), the declared extra_components stage spending its 400 (STAGE_MAX_ITER); GSAS-II's own committed position 8.77e10 with esd exactly 0
 
-**Diagnostics:** `HIGH_CORRELATION`, `STAGE_MAX_ITER`
+**Diagnostics:** `HIGH_CORRELATION`, `STAGE_MAX_ITER`, `STAGE_SLOW_DESCENT`
 
 #### `test_the_written_tables_reproduce_the_answer_they_came_from`
 
@@ -775,23 +785,23 @@ A warm-started chain over the round robin: what changes when only the starting p
 
 `identity` `characterisation` · dataset `qarr`
 
-**Claims:** the reseed fence's accounting is exact, the escalation ladder is only ever climbed as a prefix, and a reseed never leaves the fit worse than the warm start it rejected
+**Claims:** the reseed ladder's accounting is exact, the escalation ladder is only ever climbed as a prefix, and a reseed never leaves the fit worse than the warm start it rejected
 
-**Referenced to:** internal consistency: the SEQUENTIAL_RESEED diagnostic count must equal the number of entries flagged reseeded, exactly; every entry's rungs_tried must be a prefix of the ladder and contain the rung it kept.  The fence never fired on the hostile series — the collapsed refit recovers a bad warm start within the fit — so it is insurance, pinned by unit tests rather than by this suite
+**Referenced to:** internal consistency: the SEQUENTIAL_RESEED diagnostic count must equal the number of entries flagged reseeded, exactly; every entry's rungs_tried must be a prefix of the ladder and contain the rung it kept.  The ladder never climbed on the hostile series — the collapsed refit recovers a bad warm start within the fit — so it is insurance, pinned by unit tests rather than by this suite
 
-**Measured:** exact accounting; zero reseeds on the hostile series, every pattern after the first kept on its warm rung, and no kept rung above the Rwp fence (2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same).  1.10.0's hostile series did not finish, spending over 50 CPU minutes in the closing stage that follows cpd-1b's warm rung (Rwp 0.760)
+**Measured:** exact accounting; zero reseeds on the hostile series, every pattern after the first kept on its warm rung, and no kept rung above the 1.25× Rwp fence the default then carried (2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same; the fence left the default in WP-2003).  1.10.0's hostile series did not finish, spending over 50 CPU minutes in the closing stage that follows cpd-1b's warm rung (Rwp 0.760)
 
-**Diagnostics:** `SEQUENTIAL_RESEED`, `SEQUENTIAL_UNRECOVERED`, `SEQUENTIAL_RWP_OUTLIER`
+**Diagnostics:** `SEQUENTIAL_RESEED`, `SEQUENTIAL_UNRECOVERED`
 
 #### `test_the_first_rung_bound_moves_no_accepted_value`
 
 `identity` · dataset `qarr`
 
-**Claims:** FIRST_RUNG_FACTOR is answer-invariant on the hostile series: the chain with WP-1127's first-rung bound and the chain without it report the same values, esds, rungs, fences and codes, and no kept first rung reaches the budget the bound would set
+**Claims:** A first-rung bound at 3.0 (WP-1127's factor, the default until WP-2003 C3 made it the caller's) is answer-invariant on the hostile series: the chain with it and the default chain without it report the same values, esds, rungs, fences and codes, and no kept first rung reaches the budget the bound sets
 
-**Referenced to:** the same chain with first_rung_factor=None, to the bit; the margin against FIRST_RUNG_FACTOR itself (WP-2003). It verifies the bound and validates nothing, the reference being rietx's own unbounded chain
+**Referenced to:** the default chain, first_rung_factor=None, to the bit; the margin against the factor itself (WP-2003). It verifies the bound and validates nothing, the reference being rietx's own unbounded chain
 
-**Measured:** bit-identical; kept first rungs past the armed point 0.064-0.080x the running maximum against a factor of 3.0 (2026-10-25, macOS arm64, after WP-2045; 0.34-0.39x on 2026-10-24, Linux x86-64, with cpd-1b's runaway in the chain)
+**Measured:** bit-identical; kept first rungs past the armed point 0.045-0.062x the running maximum of a converged rung's dearest stage, the quantity capped since C3, against a factor of 3.0 (2026-11-02, macOS arm64; 0.064-0.080x of the rung's summed stages on 2026-10-25)
 
 #### `test_the_hostile_pairs_warm_stage_stops_short_of_the_runaway`
 
@@ -1341,7 +1351,7 @@ A parameter that is exactly degenerate in one histogram and measurable in severa
 
 **Referenced to:** the esd the width column gives when taken in physical units and chained by dp/du, computed by WP-1929 at three softplus stopping points before WP-1938 refined in those units (0.0098437, 1e-4 relative), and the spread across four nudged starts under 1e-6 relative
 
-**Measured:** 0.0098437 at nudges 0, +-1e-14, 2e-14 (eight nudges spread 4e-8 relative, macOS arm64); y = 0 +- 0.018101, at_bound. The pre-1938 tree gives 0.00322, Linux's figure. Since WP-2002: 0.0102922 at four starts, spread 2.2e-9 (1.5e-9 when WP-2002 measured it), y = -0.0210949(191) off any bound
+**Measured:** 0.0098437 at nudges 0, +-1e-14, 2e-14 (eight nudges spread 4e-8 relative, macOS arm64); y = 0 +- 0.018101, at_bound. The pre-1938 tree gives 0.00322, Linux's figure. Since WP-2002: 0.0102922 at four starts, spread 2.2e-9 (1.5e-9 when WP-2002 measured it), y = -0.0210949(191) off any bound. Since WP-1944 (extinction opt-in, none declared here): 0.0103546 at four starts, spread 2.8e-9 on macOS arm64 and 1.5e-9 on Linux, y = -0.0216150(193) off any bound; declaring extinction returns 0.0102922 to every digit
 
 #### `test_a_width_on_its_floor_has_a_one_sided_profile_interval`
 

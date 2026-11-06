@@ -1,0 +1,3901 @@
+{
+ "platform": "Darwin arm64",
+ "python": "3.12.10",
+ "rietx": "1.11.0.dev0",
+ "venv": "worktree .venv, [dev]",
+ "routes": [
+  {
+   "arm": "default",
+   "seconds": 199.3,
+   "rows": [
+    {
+     "T": 6.778,
+     "rung": "cold",
+     "status": "converged",
+     "gof": 1.6708987149959578,
+     "a": [
+      7.7125661229536115,
+      0.0004934572716518287
+     ],
+     "b": [
+      8.542594873626525,
+      0.000796551934693168
+     ],
+     "c": [
+      8.53705296744906,
+      0.0008063499207044137
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0009477840612997716,
+       0.0006482855314271241
+      ],
+      "instrument.profile.u": [
+       0.0035989874637995327,
+       0.009869677591887607
+      ],
+      "instrument.profile.v": [
+       0.0005110085843357947,
+       0.002034458096123259
+      ],
+      "instrument.profile.w": [
+       1e-08,
+       0.00010375553061004115
+      ],
+      "instrument.profile.x": [
+       0.0020823074205122867,
+       0.002216318570143978
+      ],
+      "instrument.profile.y": [
+       0.055325146122174054,
+       0.022127145677003066
+      ]
+     }
+    },
+    {
+     "T": 16.702,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6641243848991698,
+     "a": [
+      7.712741862946369,
+      0.0004992671928640331
+     ],
+     "b": [
+      8.542648747715992,
+      0.0007758910046199293
+     ],
+     "c": [
+      8.537028153480112,
+      0.0007886152369916199
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0009761670409383906,
+       0.0006586505600185242
+      ],
+      "instrument.profile.u": [
+       0.002580381158048301,
+       0.009560584678087094
+      ],
+      "instrument.profile.v": [
+       0.0004989541713150802,
+       0.0019811540427452
+      ],
+      "instrument.profile.w": [
+       1e-08,
+       0.00010141083620248263
+      ],
+      "instrument.profile.x": [
+       0.002045145295558845,
+       0.0022597914071394057
+      ],
+      "instrument.profile.y": [
+       0.05570526052552856,
+       0.022505080656034814
+      ]
+     }
+    },
+    {
+     "T": 46.97,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6430978509641745,
+     "a": [
+      7.713650667105044,
+      0.0004281441497273523
+     ],
+     "b": [
+      8.542442330445727,
+      0.0006539347168774776
+     ],
+     "c": [
+      8.537098844189446,
+      0.0006611232811974982
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0008179958431600534,
+       0.000565332020279219
+      ],
+      "instrument.profile.u": [
+       0.001788353168832857,
+       0.00752031455276153
+      ],
+      "instrument.profile.v": [
+       0.00041406282869606634,
+       0.0015674163309875992
+      ],
+      "instrument.profile.w": [
+       1e-08,
+       8.059378811774409e-05
+      ],
+      "instrument.profile.x": [
+       0.0021228520764945275,
+       0.001951442381112371
+      ],
+      "instrument.profile.y": [
+       0.05369479328644447,
+       0.01935248477184037
+      ]
+     }
+    },
+    {
+     "T": 75.42,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.625058777104782,
+     "a": [
+      7.71637116686329,
+      0.0004084747957221187
+     ],
+     "b": [
+      8.541673793289108,
+      0.000650407906821464
+     ],
+     "c": [
+      8.537034216746148,
+      0.0006547877559262037
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0008190955621087192,
+       0.0005410348741033875
+      ],
+      "instrument.profile.u": [
+       0.0010986364420041876,
+       0.006610032504812216
+      ],
+      "instrument.profile.v": [
+       0.00035389317080649404,
+       0.001391398771474761
+      ],
+      "instrument.profile.w": [
+       1e-08,
+       7.20493183347538e-05
+      ],
+      "instrument.profile.x": [
+       0.0020757343798662115,
+       0.0018818287464318227
+      ],
+      "instrument.profile.y": [
+       0.05254164247770956,
+       0.018559715423119467
+      ]
+     }
+    },
+    {
+     "T": 98.89,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.637052565613642,
+     "a": [
+      7.720632579012884,
+      0.0003723965350635448
+     ],
+     "b": [
+      8.540423049134468,
+      0.0006747636897189007
+     ],
+     "c": [
+      8.53685689923235,
+      0.0006713820259170391
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0007381208603644031,
+       0.0004940991860527683
+      ],
+      "instrument.profile.u": [
+       -0.00012959528345717224,
+       0.0054470761421910666
+      ],
+      "instrument.profile.v": [
+       0.0003899162625534565,
+       0.001189970139772488
+      ],
+      "instrument.profile.w": [
+       1e-08,
+       6.330721818643366e-05
+      ],
+      "instrument.profile.x": [
+       0.001958486732721471,
+       0.0017315865918001228
+      ],
+      "instrument.profile.y": [
+       0.051405794441236316,
+       0.016871161210852657
+      ]
+     }
+    },
+    {
+     "T": 111.43,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6161844851360492,
+     "a": [
+      7.7251850342047454,
+      0.000327865039952213
+     ],
+     "b": [
+      8.538798019465874,
+      0.0008880841873936907
+     ],
+     "c": [
+      8.536880048058228,
+      0.0008966223355722035
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0006081583231244346,
+       0.00043623269274613904
+      ],
+      "instrument.profile.u": [
+       -0.0002502022458431438,
+       0.0042317390523181056
+      ],
+      "instrument.profile.v": [
+       0.000267155953068087,
+       0.0009420186124253567
+      ],
+      "instrument.profile.w": [
+       1.6927473291223005e-06,
+       5.089221088476917e-05
+      ],
+      "instrument.profile.x": [
+       0.0019663996756328346,
+       0.0015408528692944933
+      ],
+      "instrument.profile.y": [
+       0.04994129380215763,
+       0.014839027786335819
+      ]
+     }
+    },
+    {
+     "T": 122.73,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6447673977901567,
+     "a": [
+      7.730004478286717,
+      0.0003081754799125556
+     ],
+     "b": [
+      8.536725907799411,
+      0.02851477954331307
+     ],
+     "c": [
+      8.536723932021097,
+      0.028600697104400316
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0007823441293082577,
+       0.00041996005441363905
+      ],
+      "instrument.profile.u": [
+       1.2512823849924283e-05,
+       0.0035981616843436576
+      ],
+      "instrument.profile.v": [
+       0.0001447599465842518,
+       0.0008190609593261673
+      ],
+      "instrument.profile.w": [
+       4.960076478076458e-06,
+       4.51676677755917e-05
+      ],
+      "instrument.profile.x": [
+       0.0024886402911938957,
+       0.0014306788823446775
+      ],
+      "instrument.profile.y": [
+       0.044663291355208176,
+       0.013586723936748282
+      ]
+     }
+    },
+    {
+     "T": 134.02,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6565678022816264,
+     "a": [
+      7.735040887067305,
+      0.0003180686396564336
+     ],
+     "b": [
+      8.535733592783394,
+      0.02966185831185433
+     ],
+     "c": [
+      8.53573168121909,
+      0.029743375400106107
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0008370089483850434,
+       0.000436969978291973
+      ],
+      "instrument.profile.u": [
+       -0.0006585435843793242,
+       0.0034662960605783394
+      ],
+      "instrument.profile.v": [
+       0.00017060845363184608,
+       0.0007984225487647837
+      ],
+      "instrument.profile.w": [
+       4.807981532514127e-06,
+       4.4444405082268676e-05
+      ],
+      "instrument.profile.x": [
+       0.0019121735402978875,
+       0.0014996344539339444
+      ],
+      "instrument.profile.y": [
+       0.04926061842613525,
+       0.0142002357807849
+      ]
+     }
+    },
+    {
+     "T": 145.47,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6539465597971366,
+     "a": [
+      7.741221778845456,
+      0.00031745445809827557
+     ],
+     "b": [
+      8.53441746681441,
+      0.029443184760164928
+     ],
+     "c": [
+      8.534419093357076,
+      0.029524261482060755
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0006123353886163287,
+       0.00044163102392724164
+      ],
+      "instrument.profile.u": [
+       0.0004639624317539131,
+       0.0035942484077173785
+      ],
+      "instrument.profile.v": [
+       -8.263141937844757e-05,
+       0.0008319359510719558
+      ],
+      "instrument.profile.w": [
+       1.672152634418087e-05,
+       4.651147733926268e-05
+      ],
+      "instrument.profile.x": [
+       0.0021916723344917012,
+       0.0015011328388599685
+      ],
+      "instrument.profile.y": [
+       0.045793117437058106,
+       0.014065902208536981
+      ]
+     }
+    },
+    {
+     "T": 156.9,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6255802524288012,
+     "a": [
+      7.746285715319113,
+      0.0002913377865850655
+     ],
+     "b": [
+      8.533566731814501,
+      0.027160711595352584
+     ],
+     "c": [
+      8.533567887796,
+      0.027229455421859713
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0006076460258341123,
+       0.00040631968750375215
+      ],
+      "instrument.profile.u": [
+       -3.5735096227594235e-05,
+       0.0030863443068253832
+      ],
+      "instrument.profile.v": [
+       4.244054936554883e-05,
+       0.0007159677081650584
+      ],
+      "instrument.profile.w": [
+       8.372095481414171e-06,
+       4.002921453136602e-05
+      ],
+      "instrument.profile.x": [
+       0.002312271456323618,
+       0.001386637751575914
+      ],
+      "instrument.profile.y": [
+       0.0426137288067553,
+       0.012927811531583445
+      ]
+     }
+    },
+    {
+     "T": 168.43,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6065950007974596,
+     "a": [
+      7.749771936711366,
+      0.00027117977505791057
+     ],
+     "b": [
+      8.533054217155708,
+      0.025244153031910507
+     ],
+     "c": [
+      8.53305676348308,
+      0.025308749884263973
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0005534421571899437,
+       0.00038079006942773715
+      ],
+      "instrument.profile.u": [
+       0.00031087174742230655,
+       0.0028301426322144083
+      ],
+      "instrument.profile.v": [
+       -0.00011692065989607905,
+       0.0006656720943650241
+      ],
+      "instrument.profile.w": [
+       1.8166538457832408e-05,
+       3.777859128817005e-05
+      ],
+      "instrument.profile.x": [
+       0.002227364420876127,
+       0.0013008534058417006
+      ],
+      "instrument.profile.y": [
+       0.04324757182595115,
+       0.01201747855642516
+      ]
+     }
+    },
+    {
+     "T": 185.67,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6054875973454399,
+     "a": [
+      7.7543174162467805,
+      0.00029664081232929436
+     ],
+     "b": [
+      8.532561969667555,
+      0.028026716679346055
+     ],
+     "c": [
+      8.532563419494393,
+      0.028088481312598907
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0008162570050183622,
+       0.0004158164947279688
+      ],
+      "instrument.profile.u": [
+       -0.0005035099798627412,
+       0.002935120216552752
+      ],
+      "instrument.profile.v": [
+       0.00010747307698582373,
+       0.0006954888429672392
+      ],
+      "instrument.profile.w": [
+       5.464567051826178e-06,
+       3.9499886316509845e-05
+      ],
+      "instrument.profile.x": [
+       0.0023415241620931854,
+       0.0014282184792662649
+      ],
+      "instrument.profile.y": [
+       0.04026820387157706,
+       0.013137767301559971
+      ]
+     }
+    },
+    {
+     "T": 203.0,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.587104533267758,
+     "a": [
+      7.758600512477956,
+      0.000276207682686243
+     ],
+     "b": [
+      8.532180087844324,
+      0.025762040558226035
+     ],
+     "c": [
+      8.532179478190754,
+      0.02582459393906754
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0008409571494149125,
+       0.0003893194175274435
+      ],
+      "instrument.profile.u": [
+       0.0001346207011486966,
+       0.002687508316058348
+      ],
+      "instrument.profile.v": [
+       -6.91638037015422e-05,
+       0.0006370166098682949
+      ],
+      "instrument.profile.w": [
+       1.246985589308987e-05,
+       3.635249837246867e-05
+      ],
+      "instrument.profile.x": [
+       0.0025992310487184048,
+       0.0013424072356288872
+      ],
+      "instrument.profile.y": [
+       0.03811162656993953,
+       0.012257293573475539
+      ]
+     }
+    },
+    {
+     "T": 220.3,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.5595534561855664,
+     "a": [
+      7.762759983521999,
+      0.00031996565217312195
+     ],
+     "b": [
+      8.531956802503577,
+      0.02996409369331566
+     ],
+     "c": [
+      8.53196007982533,
+      0.03003397506140234
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0005628795800497855,
+       0.0004549000066723271
+      ],
+      "instrument.profile.u": [
+       -8.541785796363454e-05,
+       0.0030317152115911595
+      ],
+      "instrument.profile.v": [
+       -2.1230329584813703e-05,
+       0.0007264971371360485
+      ],
+      "instrument.profile.w": [
+       9.62871264299104e-06,
+       4.1823899709337674e-05
+      ],
+      "instrument.profile.x": [
+       0.002601324286082543,
+       0.0015748000650846312
+      ],
+      "instrument.profile.y": [
+       0.03706232993304073,
+       0.01429083914231754
+      ]
+     }
+    },
+    {
+     "T": 243.4,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.5508927488566502,
+     "a": [
+      7.76788930530514,
+      0.0003080379449507715
+     ],
+     "b": [
+      8.531726583799676,
+      0.028374105345570916
+     ],
+     "c": [
+      8.53173188938791,
+      0.028445597842261732
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0007340492355751015,
+       0.00044312345818076006
+      ],
+      "instrument.profile.u": [
+       0.0004013306599464426,
+       0.0025193598571916285
+      ],
+      "instrument.profile.v": [
+       -0.00016089848352745197,
+       0.0006514952045664377
+      ],
+      "instrument.profile.w": [
+       1.6133614007516326e-05,
+       3.925096982741965e-05
+      ],
+      "instrument.profile.x": [
+       0.0027833082151826802,
+       0.0015260953688766195
+      ],
+      "instrument.profile.y": [
+       0.03373991621087223,
+       0.013629312113148134
+      ]
+     }
+    },
+    {
+     "T": 266.9,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.5435035298278632,
+     "a": [
+      7.773293039515726,
+      0.00028524414241545224
+     ],
+     "b": [
+      8.531579774451718,
+      0.025865260331552894
+     ],
+     "c": [
+      8.53158622056053,
+      0.02593921709322853
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0006889003702515116,
+       0.0004139988879639838
+      ],
+      "instrument.profile.u": [
+       0.000306087361515953,
+       0.002247471166598618
+      ],
+      "instrument.profile.v": [
+       -0.000131877733530866,
+       0.0005796476475980737
+      ],
+      "instrument.profile.w": [
+       1.4214879237809224e-05,
+       3.5147452099396176e-05
+      ],
+      "instrument.profile.x": [
+       0.0028965880280853837,
+       0.0014181085852930876
+      ],
+      "instrument.profile.y": [
+       0.03099097035811444,
+       0.01266659252664611
+      ]
+     }
+    },
+    {
+     "T": 288.7,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.5384910684615587,
+     "a": [
+      7.77799886965637,
+      0.00027920842117928917
+     ],
+     "b": [
+      8.531445280905869,
+      0.02471027902261194
+     ],
+     "c": [
+      8.531452984403652,
+      0.024795070605196836
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       -0.0007997488660900487,
+       0.0004055710285044778
+      ],
+      "instrument.profile.u": [
+       0.00031341881906419634,
+       0.0021791123080624627
+      ],
+      "instrument.profile.v": [
+       -0.00012911755202700084,
+       0.0005650773556380113
+      ],
+      "instrument.profile.w": [
+       1.3307834288359187e-05,
+       3.430897102323548e-05
+      ],
+      "instrument.profile.x": [
+       0.003152425821866657,
+       0.0013770434719778263
+      ],
+      "instrument.profile.y": [
+       0.028533904091585804,
+       0.012292611388119946
+      ]
+     }
+    }
+   ],
+   "codes": [
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING"
+   ]
+  },
+  {
+   "arm": "cautious",
+   "seconds": 162.8,
+   "rows": [
+    {
+     "T": 6.778,
+     "rung": "cold",
+     "status": "converged",
+     "gof": 3.4001991107983893,
+     "a": [
+      7.713141740520642,
+      0.00018535726284786626
+     ],
+     "b": [
+      8.545118621538593,
+      0.0002537024376971244
+     ],
+     "c": [
+      8.536299152330855,
+      0.0002579700473472683
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 16.702,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 3.357963232626273,
+     "a": [
+      7.71330550076705,
+      0.0001681785316019982
+     ],
+     "b": [
+      8.545025342146197,
+      0.0002290396174914921
+     ],
+     "c": [
+      8.536387885519837,
+      0.00023179333228125047
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 46.97,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 3.237630147886767,
+     "a": [
+      7.714090250274665,
+      0.00016761842476685414
+     ],
+     "b": [
+      8.544570192429546,
+      0.00022598762548578803
+     ],
+     "c": [
+      8.536435322922435,
+      0.00022984411253635338
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 75.42,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 3.0981336481579413,
+     "a": [
+      7.716711492280849,
+      0.00015857708332980573
+     ],
+     "b": [
+      8.543745750225746,
+      0.00021629761639405874
+     ],
+     "c": [
+      8.536360579188662,
+      0.0002218087021469644
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 98.89,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.9647139932655726,
+     "a": [
+      7.721035471642989,
+      0.00015389861179497362
+     ],
+     "b": [
+      8.542562982041067,
+      0.0002097229519511306
+     ],
+     "c": [
+      8.53579063470031,
+      0.00021236681438884092
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 111.43,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.8030837429749074,
+     "a": [
+      7.7253894142344635,
+      0.00014410482450803838
+     ],
+     "b": [
+      8.541196118706264,
+      0.00020113260400200775
+     ],
+     "c": [
+      8.535456007814552,
+      0.00020244549019914716
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 122.73,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.777748820146391,
+     "a": [
+      7.7303222912413565,
+      0.00013790616171073034
+     ],
+     "b": [
+      8.539668310953108,
+      0.00020136149219684643
+     ],
+     "c": [
+      8.534897174682508,
+      0.00020412799194199278
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 134.02,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.7400765757567194,
+     "a": [
+      7.735371625228998,
+      0.00013814132664322632
+     ],
+     "b": [
+      8.538510804612267,
+      0.00020016185419646565
+     ],
+     "c": [
+      8.534098697794631,
+      0.00020408227977044963
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 145.47,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.6890322506730953,
+     "a": [
+      7.741480491763731,
+      0.0001452859629117812
+     ],
+     "b": [
+      8.536956849033237,
+      0.00020692113106934577
+     ],
+     "c": [
+      8.532685892792193,
+      0.00020927985413237064
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 156.9,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.5974952681668713,
+     "a": [
+      7.7465585209470085,
+      0.00014245652910319667
+     ],
+     "b": [
+      8.535983979913059,
+      0.00020271640898014196
+     ],
+     "c": [
+      8.53195936627295,
+      0.00020690612827193306
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 168.43,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.5313624991737123,
+     "a": [
+      7.7499918590733605,
+      0.00013456409962995933
+     ],
+     "b": [
+      8.535351379229853,
+      0.00019304970119529105
+     ],
+     "c": [
+      8.531468248735187,
+      0.0001978280415443814
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 185.67,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.496920907319416,
+     "a": [
+      7.754683834772316,
+      0.00014118933256935604
+     ],
+     "b": [
+      8.534924755082152,
+      0.0002064749838602525
+     ],
+     "c": [
+      8.53124947084361,
+      0.0002111734486317649
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 203.0,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.4385727153585894,
+     "a": [
+      7.758981560921749,
+      0.00013917893358445608
+     ],
+     "b": [
+      8.534448617574675,
+      0.00020681929424525196
+     ],
+     "c": [
+      8.530983570594056,
+      0.00021227208051315653
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 220.3,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.3684335665236063,
+     "a": [
+      7.762999691270875,
+      0.00014023637608488027
+     ],
+     "b": [
+      8.53399305270684,
+      0.0002109528030651926
+     ],
+     "c": [
+      8.53061403990495,
+      0.00021423803361948985
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 243.4,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.300000449701135,
+     "a": [
+      7.768220626943931,
+      0.00012732683332401893
+     ],
+     "b": [
+      8.533734789306983,
+      0.0001966904091241697
+     ],
+     "c": [
+      8.530622728048495,
+      0.0001998084824864856
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 266.9,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.2487264500573723,
+     "a": [
+      7.773575931471946,
+      0.00014903933731664614
+     ],
+     "b": [
+      8.533473402201816,
+      0.0002333997589340399
+     ],
+     "c": [
+      8.530563386833798,
+      0.00023638655099058044
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 288.7,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.245260066054609,
+     "a": [
+      7.778327846700971,
+      0.00013772802653850216
+     ],
+     "b": [
+      8.53330802202691,
+      0.0002201737702963249
+     ],
+     "c": [
+      8.530610807405909,
+      0.00022884791517018845
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    }
+   ],
+   "codes": [
+    "SEQUENTIAL_PERSISTENT_FINDING"
+   ]
+  },
+  {
+   "arm": "sample",
+   "seconds": 205.5,
+   "rows": [
+    {
+     "T": 6.778,
+     "rung": "cold",
+     "status": "converged",
+     "gof": 1.6590307955998802,
+     "a": [
+      7.713148172102204,
+      0.00027554237850201926
+     ],
+     "b": [
+      8.543263297753713,
+      0.0006367557186342663
+     ],
+     "c": [
+      8.537646700641535,
+      0.0006391046505752655
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 16.702,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6530864800416956,
+     "a": [
+      7.713338251308824,
+      0.0002815362558653998
+     ],
+     "b": [
+      8.543327629327276,
+      0.0006154952666985559
+     ],
+     "c": [
+      8.537648884187941,
+      0.0006198933638559644
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 46.97,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6293349126189773,
+     "a": [
+      7.714151450881308,
+      0.00024276454617710205
+     ],
+     "b": [
+      8.543018340441803,
+      0.0005140674457216708
+     ],
+     "c": [
+      8.537607065003664,
+      0.0005153753949067279
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 75.42,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6149512188665849,
+     "a": [
+      7.716870638521731,
+      0.00023181557280025592
+     ],
+     "b": [
+      8.542248285637685,
+      0.0005138346739167535
+     ],
+     "c": [
+      8.537541472951299,
+      0.0005157524543204456
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 98.89,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6238613423383428,
+     "a": [
+      7.721071399788163,
+      0.00021421565165269044
+     ],
+     "b": [
+      8.540953408994945,
+      0.0005482855471430355
+     ],
+     "c": [
+      8.537292586806826,
+      0.0005494301166702657
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 111.43,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6088725783495172,
+     "a": [
+      7.725552836192741,
+      0.00019391818422555122
+     ],
+     "b": [
+      8.539079621519113,
+      0.0009502119419292667
+     ],
+     "c": [
+      8.53737405031004,
+      0.0009469135212255654
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 122.73,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.648316654025302,
+     "a": [
+      7.730481933853768,
+      0.0001808334339655561
+     ],
+     "b": [
+      8.537206629335131,
+      0.025504935359171723
+     ],
+     "c": [
+      8.537223571484716,
+      0.025445935779890662
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 134.02,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6763077648301954,
+     "a": [
+      7.735528735428776,
+      0.00019462501985168163
+     ],
+     "b": [
+      8.536246845115073,
+      0.027655156833795984
+     ],
+     "c": [
+      8.53625717465117,
+      0.02758933854601565
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 145.47,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6648268138103566,
+     "a": [
+      7.741572870690286,
+      0.0001975558888515133
+     ],
+     "b": [
+      8.534789497734282,
+      0.02783808858739983
+     ],
+     "c": [
+      8.534797991711926,
+      0.027769353219370633
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 156.9,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6479800317369593,
+     "a": [
+      7.746632659987813,
+      0.00018620914128481895
+     ],
+     "b": [
+      8.533938972051287,
+      0.026264042130874344
+     ],
+     "c": [
+      8.5339465197183,
+      0.02619593502275718
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 168.43,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6377121912103536,
+     "a": [
+      7.750098042767571,
+      0.00017230511639215547
+     ],
+     "b": [
+      8.533382487226362,
+      0.024480523845613493
+     ],
+     "c": [
+      8.533390757460387,
+      0.02441675503680042
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 185.67,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6502159235973977,
+     "a": [
+      7.75476482913149,
+      0.00019005702716197096
+     ],
+     "b": [
+      8.533061777873645,
+      0.02689020941044508
+     ],
+     "c": [
+      8.533070942004148,
+      0.02681897364310157
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 203.0,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.651862388527104,
+     "a": [
+      7.759084187252347,
+      0.00017789277319006297
+     ],
+     "b": [
+      8.53268551673515,
+      0.024962343889373628
+     ],
+     "c": [
+      8.532694529848065,
+      0.02489586063815483
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 220.3,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6293833602538468,
+     "a": [
+      7.763084894852449,
+      0.00018096566743409123
+     ],
+     "b": [
+      8.532300663812382,
+      0.025920449755021592
+     ],
+     "c": [
+      8.53230785008232,
+      0.02585081771101695
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 243.4,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6622412930316122,
+     "a": [
+      7.768321995586783,
+      0.00016312702011190202
+     ],
+     "b": [
+      8.532169098173336,
+      0.022782886025385855
+     ],
+     "c": [
+      8.53217852235704,
+      0.022723850672583756
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 266.9,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6614625827491067,
+     "a": [
+      7.773684642183203,
+      0.00017067333329133999
+     ],
+     "b": [
+      8.532004027350707,
+      0.0231013861895365
+     ],
+     "c": [
+      8.53201401905361,
+      0.023044421114018544
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 288.7,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.677943692453944,
+     "a": [
+      7.778469603611755,
+      0.00017095175268488677
+     ],
+     "b": [
+      8.53192087771999,
+      0.022013389560682328
+     ],
+     "c": [
+      8.531932441892037,
+      0.021962783409819272
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    }
+   ],
+   "codes": [
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING"
+   ]
+  },
+  {
+   "arm": "cautious_cold_profile",
+   "seconds": 186.4,
+   "rows": [
+    {
+     "T": 6.778,
+     "rung": "cold",
+     "status": "converged",
+     "gof": 1.6705065007699251,
+     "a": [
+      7.712566126044523,
+      0.00028056117624070093
+     ],
+     "b": [
+      8.5425948731932,
+      0.0005633525319273455
+     ],
+     "c": [
+      8.537052961932964,
+      0.0005720787674783741
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 16.702,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6669346496423414,
+     "a": [
+      7.712758364212423,
+      0.0002926099426841785
+     ],
+     "b": [
+      8.542363817657112,
+      0.0006241302883292917
+     ],
+     "c": [
+      8.537329086682359,
+      0.0006352901169993236
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 46.97,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6690533434656158,
+     "a": [
+      7.713581940336971,
+      0.00026511401052517
+     ],
+     "b": [
+      8.541367532887675,
+      0.0007661770073666692
+     ],
+     "c": [
+      8.537934230719687,
+      0.0007731012655363638
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 75.42,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6967882200059319,
+     "a": [
+      7.716321703814717,
+      0.0002699044774995159
+     ],
+     "b": [
+      8.539214231977212,
+      0.0434773950465992
+     ],
+     "c": [
+      8.539220636864465,
+      0.04334955305182726
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 98.89,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.8046718691996952,
+     "a": [
+      7.720578276934852,
+      0.00026793369955229157
+     ],
+     "b": [
+      8.538398852245027,
+      0.04279328742801021
+     ],
+     "c": [
+      8.538396503050803,
+      0.04267095191574986
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 111.43,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.959068826900813,
+     "a": [
+      7.725069124388933,
+      0.00026438711632612195
+     ],
+     "b": [
+      8.537503536186644,
+      0.04135314906734404
+     ],
+     "c": [
+      8.537499327569929,
+      0.04123582872410003
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 122.73,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.0828968632903644,
+     "a": [
+      7.7301016525037625,
+      0.0002646237863809926
+     ],
+     "b": [
+      8.536477484510048,
+      0.039511559678734015
+     ],
+     "c": [
+      8.536476857534632,
+      0.03940103987313055
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 134.02,
+     "rung": "warm_staged",
+     "status": "converged",
+     "gof": 2.1719683654239144,
+     "a": [
+      7.735121747441359,
+      0.0003002541945716144
+     ],
+     "b": [
+      8.535520498832502,
+      0.04433158536224504
+     ],
+     "c": [
+      8.53551909093721,
+      0.04420495188434738
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 145.47,
+     "rung": "cold",
+     "status": "converged",
+     "gof": 2.193678306320853,
+     "a": [
+      7.741195522025064,
+      0.000303476492001738
+     ],
+     "b": [
+      8.53405467466766,
+      0.04350534556418061
+     ],
+     "c": [
+      8.534053065144716,
+      0.04337961252549661
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 156.9,
+     "rung": "cold",
+     "status": "converged",
+     "gof": 2.252359661060535,
+     "a": [
+      7.746258786851544,
+      0.0002927757970800875
+     ],
+     "b": [
+      8.533208030836871,
+      0.04125347885189791
+     ],
+     "c": [
+      8.533206486130254,
+      0.04113408614483141
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 168.43,
+     "rung": "cold",
+     "status": "converged",
+     "gof": 2.2681145968032945,
+     "a": [
+      7.749736053096009,
+      0.00028240805655974365
+     ],
+     "b": [
+      8.53265817227347,
+      0.039897342233777236
+     ],
+     "c": [
+      8.532656835750183,
+      0.03978352151995877
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 185.67,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.3101449442232664,
+     "a": [
+      7.754405057096848,
+      0.0003223770757157417
+     ],
+     "b": [
+      8.532345262375301,
+      0.045169866140937126
+     ],
+     "c": [
+      8.532345287576339,
+      0.045040697837243876
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 203.0,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.337918712474663,
+     "a": [
+      7.758769417333716,
+      0.00030463344392741746
+     ],
+     "b": [
+      8.531970766314249,
+      0.04226392153750264
+     ],
+     "c": [
+      8.531970894702118,
+      0.04214492179468282
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 220.3,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.352882823679883,
+     "a": [
+      7.762797569435966,
+      0.0003693563555888368
+     ],
+     "b": [
+      8.531608860429472,
+      0.05057453980013637
+     ],
+     "c": [
+      8.53160688064879,
+      0.050432746880984265
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 243.4,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.4231551129856577,
+     "a": [
+      7.768104438995981,
+      0.0003783930374095624
+     ],
+     "b": [
+      8.531455941444653,
+      0.051160142846816505
+     ],
+     "c": [
+      8.531454870756846,
+      0.05101828892902358
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 266.9,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.4612652587124044,
+     "a": [
+      7.773564893802412,
+      0.00036979722932698584
+     ],
+     "b": [
+      8.531275159946048,
+      0.049779429001376975
+     ],
+     "c": [
+      8.531273920950376,
+      0.04963950237147093
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 288.7,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.455160333827543,
+     "a": [
+      7.778432933256482,
+      0.0003698198809294908
+     ],
+     "b": [
+      8.531096940605929,
+      0.04903763895956413
+     ],
+     "c": [
+      8.53109847094348,
+      0.048895312921313244
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    }
+   ],
+   "codes": [
+    "SEQUENTIAL_RWP_OUTLIER",
+    "SEQUENTIAL_RWP_OUTLIER",
+    "SEQUENTIAL_RESEED",
+    "SEQUENTIAL_RWP_OUTLIER",
+    "SEQUENTIAL_RESEED",
+    "SEQUENTIAL_RWP_OUTLIER",
+    "SEQUENTIAL_RESEED",
+    "SEQUENTIAL_RWP_OUTLIER",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING",
+    "SEQUENTIAL_PERSISTENT_FINDING"
+   ]
+  },
+  {
+   "arm": "cautious_hot_profile",
+   "seconds": 93.4,
+   "rows": [
+    {
+     "T": 6.778,
+     "rung": "cold",
+     "status": "converged",
+     "gof": 2.4402227630375855,
+     "a": [
+      7.712652967616382,
+      0.00016497739717792742
+     ],
+     "b": [
+      8.544277791826165,
+      0.00023652265400591425
+     ],
+     "c": [
+      8.536015466010047,
+      0.00023687166767923768
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 16.702,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.379548746682017,
+     "a": [
+      7.712840755313394,
+      0.00016922070570623272
+     ],
+     "b": [
+      8.544159170868012,
+      0.0002420491946695462
+     ],
+     "c": [
+      8.53611653045966,
+      0.0002415214690718788
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 46.97,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.244972153191596,
+     "a": [
+      7.713599031349796,
+      0.00015497146519008895
+     ],
+     "b": [
+      8.543693000045373,
+      0.00022161599402511234
+     ],
+     "c": [
+      8.536216070649367,
+      0.00022180871143894895
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 75.42,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 2.1040252387836262,
+     "a": [
+      7.7162939588938295,
+      0.00015437699177911794
+     ],
+     "b": [
+      8.542822891399286,
+      0.00022307283651939436
+     ],
+     "c": [
+      8.536163378251583,
+      0.00022422992981575274
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 98.89,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.990826878330373,
+     "a": [
+      7.720559367156008,
+      0.00015182677951215232
+     ],
+     "b": [
+      8.541563030031597,
+      0.0002235717068114044
+     ],
+     "c": [
+      8.53577643360722,
+      0.00022335644364340876
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 111.43,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.8557887891628677,
+     "a": [
+      7.724993114724842,
+      0.0001442619523783617
+     ],
+     "b": [
+      8.540052526371628,
+      0.00022529661826691544
+     ],
+     "c": [
+      8.535520688037781,
+      0.000222814436142179
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 122.73,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.8500286206152377,
+     "a": [
+      7.729892118997769,
+      0.00013640841982556336
+     ],
+     "b": [
+      8.53843344222551,
+      0.00023782609525389452
+     ],
+     "c": [
+      8.535101453197832,
+      0.00023736022619161775
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 134.02,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.8192969342903011,
+     "a": [
+      7.73500424277955,
+      0.0001511080509057891
+     ],
+     "b": [
+      8.537189945077571,
+      0.00027586204686923254
+     ],
+     "c": [
+      8.534395193482638,
+      0.00027645448534077027
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 145.47,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.7904538722181127,
+     "a": [
+      7.741076193888335,
+      0.00015632785770412481
+     ],
+     "b": [
+      8.535662296874593,
+      0.0002844482643346861
+     ],
+     "c": [
+      8.532994036634214,
+      0.00028355879836423187
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 156.9,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.7257008775347082,
+     "a": [
+      7.74615293364006,
+      0.0001501098138371147
+     ],
+     "b": [
+      8.534667192089874,
+      0.0002838395027377326
+     ],
+     "c": [
+      8.532267476607085,
+      0.0002846557161666432
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 168.43,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6816225068030766,
+     "a": [
+      7.749600694438168,
+      0.00014231816626983327
+     ],
+     "b": [
+      8.53400599295374,
+      0.00028528672193625453
+     ],
+     "c": [
+      8.531827241326258,
+      0.0002867901961330821
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 185.67,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.6664155572833215,
+     "a": [
+      7.754318130529568,
+      0.00015915581932565405
+     ],
+     "b": [
+      8.533513554656396,
+      0.00035669579211293164
+     ],
+     "c": [
+      8.53165799834096,
+      0.0003574311387427093
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 203.0,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.624851425442141,
+     "a": [
+      7.758592612867412,
+      0.00015073284056057296
+     ],
+     "b": [
+      8.532938682578697,
+      0.000406652666691166
+     ],
+     "c": [
+      8.53150430650172,
+      0.00040717930986815465
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 220.3,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.5869594606156103,
+     "a": [
+      7.762610201105418,
+      0.00017942629909669004
+     ],
+     "b": [
+      8.532465536721228,
+      0.0005190055609977154
+     ],
+     "c": [
+      8.531168383418835,
+      0.0005184433598349657
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 243.4,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.5566151906421821,
+     "a": [
+      7.7678424644585595,
+      0.00018147522764925747
+     ],
+     "b": [
+      8.531652256208524,
+      0.007105108011925392
+     ],
+     "c": [
+      8.531735433898499,
+      0.007085474710108615
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 266.9,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.5442473902253726,
+     "a": [
+      7.773230831589134,
+      0.00017545975324927127
+     ],
+     "b": [
+      8.53151322836518,
+      0.024760276770413786
+     ],
+     "c": [
+      8.53151768608074,
+      0.024702000626214016
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    },
+    {
+     "T": 288.7,
+     "rung": "warm",
+     "status": "converged",
+     "gof": 1.538129933677597,
+     "a": [
+      7.777998869627135,
+      0.00017598745415954638
+     ],
+     "b": [
+      8.531445054336455,
+      0.023253706165287068
+     ],
+     "c": [
+      8.531453210555219,
+      0.023202015135600263
+     ],
+     "setup": {
+      "instrument.zero_shift": [
+       null,
+       null
+      ],
+      "instrument.profile.u": [
+       null,
+       null
+      ],
+      "instrument.profile.v": [
+       null,
+       null
+      ],
+      "instrument.profile.w": [
+       null,
+       null
+      ],
+      "instrument.profile.x": [
+       null,
+       null
+      ],
+      "instrument.profile.y": [
+       null,
+       null
+      ]
+     }
+    }
+   ],
+   "codes": [
+    "SEQUENTIAL_PERSISTENT_FINDING"
+   ]
+  }
+ ],
+ "seconds": 280.0,
+ "cold_check": [
+  {
+   "arm": "cautious_cold_profile",
+   "T": 75.42,
+   "status": "converged",
+   "start_gap": 0.006871999999999545,
+   "gap": -6.2816313786129285e-06,
+   "esd": 0.06141041096713605,
+   "chain_gap": -6.4048872534527845e-06
+  },
+  {
+   "arm": "cautious_cold_profile",
+   "T": 98.89,
+   "status": "converged",
+   "start_gap": 0.006871999999999545,
+   "gap": 2.529119655036993e-06,
+   "esd": 0.060425221880593585,
+   "chain_gap": 2.3491942240383423e-06
+  },
+  {
+   "arm": "cautious_cold_profile",
+   "T": 122.73,
+   "status": "converged",
+   "start_gap": 0.006871999999999545,
+   "gap": 7.082484074771855e-07,
+   "esd": 0.055797228942103455,
+   "chain_gap": 6.26975415585207e-07
+  },
+  {
+   "arm": "cautious_cold_profile",
+   "T": 156.9,
+   "status": "converged",
+   "start_gap": 0.006871999999999545,
+   "gap": 1.5447066168405854e-06,
+   "esd": 0.058256867066075566,
+   "chain_gap": 1.5447066168405854e-06
+  },
+  {
+   "arm": "cautious_hot_profile",
+   "T": 156.9,
+   "status": "converged",
+   "start_gap": 0.006871999999999545,
+   "gap": 0.0024006576352029185,
+   "esd": 0.00040150421450300825,
+   "chain_gap": 0.0023997154827881673
+  },
+  {
+   "arm": "cautious_hot_profile",
+   "T": 220.3,
+   "status": "converged",
+   "start_gap": 0.006871999999999545,
+   "gap": 0.0012974258540623396,
+   "esd": 0.0007336867519601677,
+   "chain_gap": 0.0012971533023922177
+  },
+  {
+   "arm": "cautious_hot_profile",
+   "T": 243.4,
+   "status": "converged",
+   "start_gap": 0.006871999999999545,
+   "gap": -8.340434933096219e-05,
+   "esd": 0.010009295115317791,
+   "chain_gap": -8.317768997478936e-05
+  },
+  {
+   "arm": "cautious_hot_profile",
+   "T": 266.9,
+   "status": "converged",
+   "start_gap": 0.006871999999999545,
+   "gap": -4.320084645570432e-06,
+   "esd": 0.03507051237690397,
+   "chain_gap": -4.457715560235442e-06
+  }
+ ]
+}

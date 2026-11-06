@@ -90,7 +90,7 @@ was built from. Then run a first fit, [in Python](first-fit.md) or in [the GUI](
 | `pydantic` ≥ 2.6 | the data models: validation, defaults, JSON round-trip |
 | `gemmi` ≥ 0.6.5 | CIF reading, space groups, symmetry operations |
 | `spglib` ≥ 2.8 | site symmetry, Wyckoff positions, cell reduction |
-| `rietx-kernels` ≥ 1.3, < 2 | the compiled peak kernels, one wheel per platform ({ref}`the-compiled-kernels`) |
+| `rietx-kernels` ≥ 1.4, < 2 | the compiled peak kernels, one wheel per platform ({ref}`the-compiled-kernels`) |
 | `matplotlib` ≥ 3.10 (≥ 3.10.5 on Python 3.14) | figures: `RefinementResult.plot`, `PatternData.plot` and the report figures |
 
 Those seven are the whole install, and nothing in that list is optional.
@@ -149,9 +149,8 @@ That directory is no longer read, and you can delete it.
 
 The structure figure draws with two more kernels from the same wheel, and the
 switch below reaches them too. The dichotomy indexing engine tests its boxes in
-the wheel as well, from `rietx-kernels` 1.3, the oldest wheel rietx accepts. On
-a monoclinic search of 161 705 grid boxes the grid took about 4 s of CPU,
-against 13.5 s on the numpy loop.
+the wheel as well, from `rietx-kernels` 1.3. On a monoclinic search of 161 705
+grid boxes the grid took about 4 s of CPU, against 13.5 s on the numpy loop.
 
 Turn the kernels off with `RIETX_COMPILED=0`, which needs no reinstall. Every
 kernel has the numpy expression it replaces standing behind it, so refinements
@@ -170,13 +169,13 @@ dichotomy search or `capabilities()` call:
 RuntimeWarning: rietx's compiled kernels did not load, because importing
 rietx_kernels raised ModuleNotFoundError (No module named 'rietx_kernels').
 Fits, structure figures and indexing run the numpy path, which is slower.
-Install the kernels with pip install "rietx-kernels>=1.3,<2", or set
+Install the kernels with pip install "rietx-kernels>=1.4,<2", or set
 RIETX_COMPILED=0 to choose the numpy path and silence this warning.
 ```
 
 The same warning names a wheel of another major version, whose kernel
-interface this rietx does not call. It also names a wheel older than 1.3, which
-lacks the dichotomy indexing engine's kernels.
+interface this rietx does not call. It also names a wheel older than 1.4, the
+oldest rietx accepts, which lacks the structure-solution engine's kernels.
 
 `capabilities()` answers the three questions in three fields, because they can
 disagree. `features["compiled_kernels"]` is whether the wheel loaded here.
