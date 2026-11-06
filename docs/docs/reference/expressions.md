@@ -101,6 +101,7 @@ Each refusal names the place in the text with a caret, and gives the error code 
 | `x = 1`, `x && y`, `(1 + 2` | `syntax` | `=` is not an operator, and `and`, `or` and `not` are words. |
 
 An expression is at most 4096 characters long, and nests at most 64 levels deep (`too_long`, `too_deep`).
+A chain such as `x1 + x2 + … + x65` counts one level per operator, so a sum of more than 64 terms is grouped in parentheses or split into intermediate equations.
 A name with no value when the expression is evaluated is `unbound`, and the message suggests the nearest bound name.
 
 ## Evaluation

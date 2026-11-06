@@ -141,6 +141,15 @@ def test_limits_on_length_and_depth():
         parse("(" * (MAX_DEPTH + 1) + "x" + ")" * (MAX_DEPTH + 1))
     assert info.value.code == "too_deep"
     parse("(" * (MAX_DEPTH // 2 - 1) + "x" + ")" * (MAX_DEPTH // 2 - 1))
+    # a flat chain is parsed in a loop but builds a tree as deep as it is long,
+    # and every walk of the tree recurses: 600 terms under MAX_LENGTH once
+    # raised RecursionError
+    flat = " + ".join(["x"] * 600)
+    assert len(flat) < MAX_LENGTH
+    with pytest.raises(ExpressionError) as info:
+        parse(flat)
+    assert info.value.code == "too_deep"
+    parse(" + ".join(["x"] * MAX_DEPTH))
 
 
 def test_an_error_quotes_the_text_with_a_caret_and_suggests_a_name():

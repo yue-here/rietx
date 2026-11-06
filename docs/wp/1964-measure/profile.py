@@ -17,12 +17,12 @@ import sys
 sys.path.insert(0, ".")
 sys.path.insert(0, "docs/wp/1964-measure")
 import numpy as np  # noqa: E402
+from coverage import CASES, truth_value  # noqa: E402
 
 import rietx as rx  # noqa: E402
 from rietx.multi import refine_multi  # noqa: E402
 from rietx.params.multi import SharingMap  # noqa: E402
 from rietx.schemas.parametric import CoordinateTable, ParametricEquation  # noqa: E402
-from coverage import CASES, truth_value  # noqa: E402
 from tests.test_sequential import _simulate, _start_models  # noqa: E402
 
 seed, var = int(sys.argv[1]), sys.argv[2]

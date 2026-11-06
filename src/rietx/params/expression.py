@@ -479,6 +479,21 @@ class _Parser:
         return Call(func, tuple(args))
 
 
+def _tree_depth(node) -> int:
+    """The nodes on the tree's longest root-to-leaf path, walked without recursion."""
+    deepest, stack = 0, [(node, 1)]
+    while stack:
+        n, d = stack.pop()
+        deepest = max(deepest, d)
+        if isinstance(n, (Neg, Not)):
+            stack.append((n.arg, d + 1))
+        elif isinstance(n, (BinOp, Compare, BoolOp)):
+            stack.extend(((n.left, d + 1), (n.right, d + 1)))
+        elif isinstance(n, Call):
+            stack.extend((a, d + 1) for a in n.args)
+    return deepest
+
+
 def parse(text: str):
     """The tree of ``text``; raises :class:`ExpressionError`.
 
@@ -494,6 +509,16 @@ def parse(text: str):
     if not text.strip():
         raise ExpressionError("syntax", "the expression is empty")
     node = _Parser(text).parse()
+    # The parser's depth counts its own recursion, and a flat chain such as
+    # x+x+…+x builds its tree in a loop, as deep as the chain is long.  Every
+    # walk of the tree (rewrite, evaluation, the printer) recurses once a
+    # level, so the tree itself is held to the same limit: 600 terms under
+    # MAX_LENGTH raised a RecursionError before (generality review, WP-1964).
+    if _tree_depth(node) > MAX_DEPTH:
+        raise ExpressionError("too_deep", f"the expression's tree is deeper than "
+                              f"{MAX_DEPTH} levels; group a long sum or product in "
+                              "parentheses, or split it into intermediate "
+                              "equations", text, 0)
     if _is_condition(node):
         raise ExpressionError("type", "the expression is a condition; an equation's "
                               "value is a number (a condition goes in if(…))", text, 0)

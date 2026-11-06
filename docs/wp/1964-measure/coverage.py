@@ -88,8 +88,9 @@ def run(name, seed):
     form = result.parametric_form[0] if result.parametric_form else None
     out["form"] = None if form is None else form.rejected
     if seed == 0:
-        from rietx.viz.plots import plot_result
         from pathlib import Path
+
+        from rietx.viz.plots import plot_result
         Path("tests/output").mkdir(exist_ok=True)
         for h in (0, len(cs) - 1):
             plot_result(result.for_histogram(h),

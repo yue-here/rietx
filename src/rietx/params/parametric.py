@@ -496,10 +496,11 @@ def expression_target_columns(expressions, bj, free_paths: list[str],
         if not live:
             continue
         gmat = np.vstack(rows)
-        s = lapack.svd(gmat, compute_uv=False)
-        # numpy's matrix_rank cut: every target needs a direction of its own
-        if len(live) > len(cols) or s[len(live) - 1] <= max(gmat.shape) * np.finfo(
-                float).eps * s[0]:
+        # Every target needs a direction of its own.  The cut is the linear
+        # basis's (RANK_RTOL, √PINV_RCOND), on rows scaled to unit length so
+        # two targets in different units (Å/K, °/K) are not read as one.
+        s = lapack.svd(gmat / np.linalg.norm(gmat, axis=1)[:, None], compute_uv=False)
+        if len(live) > len(cols) or s[len(live) - 1] <= RANK_RTOL * s[0]:
             continue
         local = {int(c): k for k, c in enumerate(bj.col_maps[h])}
         block = bj.blocks[h]
