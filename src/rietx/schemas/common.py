@@ -683,6 +683,13 @@ from .._nearmiss import did_you_mean
 #: test, so a stored node reads as what it ran, while ``StageSpec`` moved to
 #: 25 000 and 1e-7.  A stored plan naming ``lebail_cycles: 3`` reads that as a
 #: cap: it runs the same three cycles and reports ``LEBAIL_CYCLES_AT_CAP``.
+#: Also in 0.61 (WP-1998): ``ParameterCandidate.gain_unbounded`` and
+#: ``SuggestionResult.bound_limited``, both additive and defaulted (``None``
+#: and an empty list).  0.26 → 0.27 recorded the same kind of change on the
+#: same types (``delta_bic_raw_n``, ``n_effective``).  ``gain`` itself now
+#: means the gain the candidate's bounds let it reach, so a saved number does
+#: not compare with 1.11.0's.  An older build refuses a document carrying
+#: either new key.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

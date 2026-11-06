@@ -164,3 +164,12 @@ template line):
 - **2026-10-17** — filed from WP-1986's guide work. No open WP owns
   `suggest`: WP-1050 built it and is closed, and WP-1434's bound test is about
   results, not candidates.
+
+- **2026-11-06** — Review round (Yue, 2026-11-05). The milestone narrative moved
+  from `docs/milestones/v1.11.md` to `v1.12.md`, since 1.11.0 is cut and
+  `pyproject.version` is `1.12.0.dev0`. `docs/releases/1.12.0.md` now names the
+  `best_or_none()` change under § Code to check, the meaning of
+  `ParameterCandidate.gain`, and the two new fields. `schemas/common.py` carries
+  an `Also in 0.61 (WP-1998)` note and the pin's comment in
+  `tests/test_magnetic.py` lists it; the number stays 0.61. No code changed.
+
