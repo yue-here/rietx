@@ -158,7 +158,7 @@ def test_document_round_trip_including_infinite_bounds(tmp_path, pattern_file):
     project.save()
 
     raw = json.loads((project.path / PROJECT_JSON).read_text(encoding="utf-8"))
-    assert raw["format_version"] == "1.5"   # WP-2002 B1: the plan's phase_support_sigma
+    assert raw["format_version"] == "1.6"   # WP-2030: the indexing controls' formula
     assert raw["patterns"][0]["reader"] == "xy"
 
     reopened = rx.Project.open(project.path)
@@ -476,7 +476,10 @@ def test_a_unit_declared_later_is_no_range_to_restore(tmp_path, pattern_file):
     no unit: nothing is unbounded, so nothing is restored and no note blames
     issue #204 for a label no release before it could write."""
     def unitless_extinction(state):
-        state["structure"]["phases"][0]["extinction"]["unit"] = None
+        # every log before WP-1944 stored extinction; this tree writes None
+        state["structure"]["phases"][0]["extinction"] = {
+            "value": 0.0, "vary": False, "min": 0.0, "max": "Infinity",
+            "expr": None, "unit": None, "stderr": None}
     project = _create(tmp_path / "s.rex", pattern_file)
     _age_log(project, "0.34", unitless_extinction)
     reopened = rx.Project.open(project.path)
@@ -897,3 +900,26 @@ def test_a_project_reopens_on_the_scan_it_was_created_from(tmp_path):
     reopened = rx.Project.open(tmp_path / "high.rex")
     assert reopened.data.two_theta == [20.0, 20.5, 21.0]
     assert reopened.doc.patterns[0].fingerprint == ref.fingerprint
+
+
+@pytest.mark.parametrize("mode, expected", [
+    ("rietveld", "mccusker_default"),
+    ("lebail", "profile_only"),
+    ("pawley", "pawley_default"),
+])
+def test_a_preset_name_is_stored_through_the_projects_mode(tmp_path, pattern_file,
+                                                           mode, expected):
+    """``Project.create`` records the plan that will run (WP-2102), expanded
+    by ``resolve_plan`` as ``Refinement.fit`` and the GUI's preset route
+    expand it.  Looked up by hand, a Le Bail project created with the default
+    name stored and ran a scale stage the mode force-fixes."""
+    from rietx.schemas.plan import PlanSpec
+    from rietx.strategy.staged import PLAN_PRESETS
+
+    project = _create(tmp_path / f"{mode}.rex", pattern_file, mode=mode,
+                      plan="mccusker_default")
+    # compared as specs: ``pawley_default`` has ``profile_only``'s stages, so
+    # ``preset_name`` names the first of the two
+    want = PlanSpec.from_plan(PLAN_PRESETS[expected]())
+    assert project.doc.plan == want
+    assert rx.Project.open(project.path).doc.plan == want

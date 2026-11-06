@@ -60,7 +60,10 @@ from .plan import PlanSpec
 #: absent-phase hold's threshold.  Minor, as 1.4 was for ``lebail_passes``.
 #: Also in 1.5 (WP-2002, the sixth round's Q1 and Q2): ``closing_window_tol``,
 #: the closing stage's window area fraction, unreleased beside it.
-PROJECT_FORMAT_VERSION = "1.5"
+#: ``1.6`` (WP-2030): the stored indexing controls gained ``formula`` and
+#: ``temperature``, keys an older build's ``extra="forbid"`` refuses, written
+#: as null when unset.  Minor, as 1.4 was for ``lebail_passes``.
+PROJECT_FORMAT_VERSION = "1.6"
 
 
 def check_interval(kind: str, lo: float, hi: float) -> None:

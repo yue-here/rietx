@@ -190,6 +190,7 @@ from .schemas.common import Diagnostic, Mode, Provenance
 from .schemas.history import ReflectionState
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData, require_two_theta
+from .schemas.plan import PlanSpec
 from .schemas.results import RefinementResult
 from .schemas.sequential import (
     _NAMED_PATH,
@@ -479,11 +480,16 @@ def _collapse(plan: RefinementPlan) -> RefinementPlan:
         for glob in stage.turn_on:
             if glob not in turn_on:
                 turn_on.append(glob)
+    # the cap below is the plan's largest, which a fixed count would run in full,
+    # so one stage's stop keeps the collapsed stage stopping
+    stops = [s.lebail_tol for s in plan.stages if s.lebail_tol > 0.0]
     return RefinementPlan(
         stages=[Stage("warm_refit", turn_on,
                       max_iter=max((s.max_iter for s in plan.stages), default=100),
                       lebail_cycles=max((s.lebail_cycles for s in plan.stages),
-                                        default=3),
+                                        default=Stage.lebail_cycles),
+                      lebail_tol=min(stops, default=0.0 if plan.stages
+                                     else Stage.lebail_tol),
                       seed=0.0,
                       strain_seed=max((s.strain_seed for s in plan.stages),
                                       default=0.0))],
@@ -1247,7 +1253,7 @@ class SequentialRefinement:
             x_label: str = "index",
             labels: Sequence[str] | None = None,
             mode: Mode = "rietveld",
-            plan: RefinementPlan | str = "mccusker_default",
+            plan: RefinementPlan | PlanSpec | str = "mccusker_default",
             refit: str = "single",
             two_theta_limits: tuple[float, float] | None = None,
             direction: str = "forward",

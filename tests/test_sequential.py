@@ -765,6 +765,7 @@ def test_a_warm_refit_lifts_no_carried_floor_value():
     # and the table: a converged zero stays where the neighbour left it,
     # where the plan's own largest seed would have lifted it
     structure, ins = _start_models()
+    structure.phases[0].extinction = 0.0  # opt-in since WP-1944
     table = ParameterTable(structure, ins)
     table.set_vary(["*"], False)
     freed = table.set_vary(_collapse(plan).stages[0].turn_on, True)
@@ -1414,6 +1415,100 @@ def test_the_first_rung_bound_moves_no_accepted_value(thermal_series,
     ratios = first_rung_ratios(series, results)
     assert ratios, "the bound armed on no pattern, so nothing was tested"
     assert max(ratios) < _FACTOR
+
+
+#: `_CHEAP_WIDE` at twice its budget, so that `_CRAWL_FACTOR` times a first rung
+#: of about 9 evaluations lowers the budget and stays above the crawl's stop
+_CHEAP_ROOMY = staged.RefinementPlan(stages=[
+    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=200)])
+_CRAWL_FACTOR = 40.0
+
+
+def _crawl_the_closing_stage(runner, label, monkeypatch):
+    """Make ``label``'s closing stage crawl for nothing, in the real driver.
+
+    The start is moved by 1e-5 of each parameter, and the driver is handed a
+    Jacobian 100 times too large, the device of ``test_slow_descent.py``.  The
+    stage then recovers the small gap so slowly that the rule stops it at 204
+    evaluations, Rwp 0.543699 against 0.543697 for the unforged stage (macOS
+    arm64, ``[dev]`` venv, 2026-11-05).  At a factor of 300 it stops at 342,
+    18 short of the cap the test sets.
+
+    ``monkeypatch`` holds one forgery.  A second over it would call the first,
+    whose own label is stale, so a chain takes a fresh one.
+    """
+    from rietx.optimize import least_squares
+
+    current = {"label": None}
+    real_fit, real_outcome = runner._fit_one, least_squares._lm_outcome
+
+    def fit_one(*args, **kw):
+        current["label"] = args[1]
+        return real_fit(*args, **kw)
+
+    def outcome(residual, jacobian, x0, lo, hi, *, stage, **kw):
+        if current["label"] == label and stage == staged.CLOSING_STAGE_NAME:
+            return real_outcome(residual, lambda x: 100.0 * jacobian(x),
+                                x0 * (1.0 + 1e-5), lo, hi, stage=stage, **kw)
+        return real_outcome(residual, jacobian, x0, lo, hi, stage=stage, **kw)
+
+    runner._fit_one = fit_one
+    monkeypatch.setattr(least_squares, "_lm_outcome", outcome)
+
+
+def test_a_slow_descent_stop_below_the_bound_truncates_nothing(thermal_patterns,
+                                                               monkeypatch):
+    """The route WP-1334's series check could not reach on any fixture.
+
+    A bounded first rung's closing stage is stopped by the slow-descent rule
+    below the bound.  It reads ``converged`` by the ruling of 2026-11-03, so it
+    is no truncation: nothing forces an escalation and :func:`_prefer` ranks
+    it as complete.  Below the budget the rule reads only evaluations, so a
+    bound above the stop moves nothing and the chain with the bound answers
+    bit for bit as the chain without it.
+
+    The rung joins the bound's sample at its dearest stage, as any converged
+    first rung does (:func:`_first_rung_budget`).  Here 40 × 204 is past the
+    plan's budget, so p005 runs uncapped where a sample of 9-evaluation
+    stages would cap it.
+    """
+    from pathlib import Path
+
+    from rietx.optimize.least_squares import NFEV_PER_ITERATION
+    from rietx.viz.plots import plot_result
+
+    def chain(**kw):
+        runner = SequentialRefinement(*_start_models())
+        seen = _record_plans(runner)
+        results = {}
+        with monkeypatch.context() as patch:
+            _crawl_the_closing_stage(runner, "p004", patch)
+            series = runner.fit(thermal_patterns[:6], plan=_CHEAP_ROOMY,
+                                on_result=results.__setitem__, **kw)
+        return series, results, seen
+
+    bounded, results, seen = chain(first_rung_factor=_CRAWL_FACTOR)
+    unbounded, _, _ = chain()
+
+    budget = _CHEAP_ROOMY.stages[0].max_iter
+    cap = seen["p004"][0].stages[0].max_iter
+    closing = results[4].stages[-1]
+    assert closing.name == staged.CLOSING_STAGE_NAME
+    assert (closing.status, closing.termination) == ("converged", "slow_descent")
+    assert closing.n_iterations < cap * NFEV_PER_ITERATION
+    assert cap < budget, "the bound lowered nothing, so nothing was tested"
+
+    assert bounded[4].rungs_tried == ["warm"]
+    assert bounded[4].status == "converged"
+    assert "STAGE_SLOW_DESCENT" in [d.code for d in bounded[4].diagnostics]
+    assert chain_answer(bounded) == chain_answer(unbounded)
+
+    assert seen["p005"][0].stages[0].max_iter == budget
+
+    # house convention: obs/calc/diff PNGs to tests/output/ (gitignored)
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    plot_result(results[4], path=str(out / "sequential_slow_descent_p4.png"))
 
 
 def test_an_unrecovered_pattern_seeds_nothing_and_joins_no_median(

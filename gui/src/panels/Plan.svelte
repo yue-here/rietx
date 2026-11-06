@@ -84,6 +84,7 @@
   const FIELD_LABEL: Record<string, string> = {
     max_iter: "iter",
     lebail_cycles: "lebail",
+    lebail_tol: "lebail tol",
     strain_seed: "strain",
     restraint_weight_scale: "restraint",
     window_slack_deg: "slack",

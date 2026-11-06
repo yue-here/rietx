@@ -206,7 +206,7 @@ The correction needs a particle radius for every phase, and the pattern cannot g
 Set `Phase.particle_radius_um` on every phase from a micrograph or a particle-size measurement.
 Profile broadening measures a coherent domain size, which is not a particle size ([Size and strain](derived.md#size-and-strain)).
 With no radius on any phase the correction is not attempted.
-With a radius on some phases but not all, it is skipped, `QuantitativePhaseAnalysis.microabsorption_skipped` says why, and [`MICROABSORPTION_SKIPPED`](diagnostics-refinement.md#microabsorption_skipped) is reported.
+With a radius on some phases but not all, it is skipped, `QuantitativePhaseAnalysis.microabsorption_skipped` says why, and [`MICROABSORPTION_SKIPPED`](diagnostics-corrections.md#microabsorption_skipped) is reported.
 
 µ comes from the pattern's own radiation.
 An X-ray pattern reads the McMaster photoabsorption table by element, and a constant-wavelength neutron one reads the Sears (1992) cross-sections by nuclide, the same two tables the capillary µR estimate uses.
@@ -229,7 +229,7 @@ The corrected one inherits the uncertainty of the radii you supplied, which domi
 ### The Brindley regime
 
 Brindley's treatment is derived for fine to medium powders, µ·D ≤ 0.1 with D the particle diameter, so µ·R ≤ {{ BRINDLEY_MU_R_FENCE }}.
-Past that the expression is used outside what it was derived for, and [`BRINDLEY_OUTSIDE_REGIME`](diagnostics-refinement.md#brindley_outside_regime) names the phases.
+Past that the expression is used outside what it was derived for, and [`BRINDLEY_OUTSIDE_REGIME`](diagnostics-corrections.md#brindley_outside_regime) names the phases.
 `PhaseQuantity.mu_r` travels with the answer for that reason.
 
 Sample 4 of the round robin was designed to fail on microabsorption: corundum, magnetite and zircon, weighed at 50.46, 19.64 and 29.90 wt %.

@@ -162,7 +162,7 @@ f′ and f″ are constants of the element and the wavelength, looked up once wh
 An override key is a bare element symbol, because f′ and f″ are core-level effects.
 Near an absorption edge the table is wrong in principle, since f″ there depends on the compound.
 A wavelength inside an absorption-edge interval of the table raises, and an override lifts that refusal for its element.
-`dispersion=None` declines the correction, reproduces the numbers of versions before 1.0 exactly, and reports [`DISPERSION_NEGLECTED`](diagnostics-refinement.md#dispersion_neglected).
+`dispersion=None` declines the correction, reproduces the numbers of versions before 1.0 exactly, and reports [`DISPERSION_NEGLECTED`](diagnostics-corrections.md#dispersion_neglected).
 
 ## Neutron source
 
@@ -383,9 +383,9 @@ In the diamond structure of Si and Ge, a reflection on all-odd indices has its s
 | `Harmonic.wavelength_factor` | `float` | derived | 1/n, the factor on the fundamental wavelength |
 
 The weight starts at 1 %, below every value reported for a real beamline, so the fit has to move it to reach one.
-A weight that refines far above a few per cent says the peaks it fills are not harmonic peaks, and [`HARMONIC_FRACTION`](diagnostics-refinement.md#harmonic_fraction) reports it at `warning` above 15 %.
+A weight that refines far above a few per cent says the peaks it fills are not harmonic peaks, and [`HARMONIC_FRACTION`](diagnostics-corrections.md#harmonic_fraction) reports it at `warning` above 15 %.
 Free the weights with `instrument.source.lines.*.weight` once the profile and the scale are settled, never in the first stage.
-[`HARMONIC_FRACTION`](diagnostics-refinement.md#harmonic_fraction) reports the refined fraction.
+[`HARMONIC_FRACTION`](diagnostics-corrections.md#harmonic_fraction) reports the refined fraction.
 
 `Source.harmonics_supported` and `NeutronSource.harmonics_supported` say whether a radiation accepts a declaration at all: `False` and `True`.
 The refusal reads them, and so does `RadiationCapability.harmonic_contamination`, the answer `capabilities().radiations` gives.
@@ -499,8 +499,8 @@ Each is exactly no correction at its default values.
 | `RoughnessPitschke.tau` | 0.05 | [0, 0.3] | the dimensionless roughness τ |
 
 `RoughnessSuortti.b` gives the same loss at two values, one on each side of a peak, and past about 3 the correction does nothing.
-[`ROUGHNESS_UNCONSTRAINED`](diagnostics-refinement.md#roughness_unconstrained) reports either dead branch.
-[`ROUGHNESS_OUTSIDE_REGIME`](diagnostics-refinement.md#roughness_outside_regime) reports a τ above sin θ of the lowest fitted angle.
+[`ROUGHNESS_UNCONSTRAINED`](diagnostics-corrections.md#roughness_unconstrained) reports either dead branch.
+[`ROUGHNESS_OUTSIDE_REGIME`](diagnostics-corrections.md#roughness_outside_regime) reports a τ above sin θ of the lowest fitted angle.
 `RoughnessSuortti.kind` and `RoughnessPitschke.kind` name the model, so a saved instrument comes back as the model it was.
 
 ## Peak width
@@ -571,7 +571,7 @@ It does not make the penalty's cost independent of the counts: on a well-counted
 The air term is absent unless you declare it, for example with `Parameter(value=1e-3, min=0.0)`, or `auto_background` does.
 `auto_background` declares it only when the pattern diagnostics report the rise.
 Absent, it has no parameter name, so no plan can free it.
-A P-spline fit without it reports [`AIR_SCATTER_UNDECLARED`](diagnostics-refinement.md#air_scatter_undeclared) when its own residual says the term would have lowered χ².
+A P-spline fit without it reports [`AIR_SCATTER_UNDECLARED`](diagnostics-corrections.md#air_scatter_undeclared) when its own residual says the term would have lowered χ².
 
 `BackgroundPSpline.for_range` builds uniform knots over a 2θ range, about `knot_step_deg` apart (default 5°), with free coefficients and no air term.
 
@@ -709,7 +709,7 @@ Most presets free `instrument.background.*` in their first stage, and that patte
 `mccusker_structural` frees declared components in its `extra_components` stage, and nothing in the package adds one.
 `save_instrument_profile` leaves them out, because a component belongs to the specimen and its holder.
 
-A hump that refines narrower than {{ HUMP_MIN_WIDTH_MULT }} times the instrumental width at its position raises [`HUMP_TOO_NARROW`](diagnostics-refinement.md#hump_too_narrow).
+A hump that refines narrower than {{ HUMP_MIN_WIDTH_MULT }} times the instrumental width at its position raises [`HUMP_TOO_NARROW`](diagnostics-corrections.md#hump_too_narrow).
 At that width it is a reflection with no cell behind it, and its parameters cannot be quoted.
 
 :::{note}

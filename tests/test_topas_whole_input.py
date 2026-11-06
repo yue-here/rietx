@@ -69,7 +69,7 @@ def test_the_neutron_case_is_what_topas_computes():
     assert err < ORACLE_TOL
     # positive arm: without the extinction the file states, TOPAS is not matched
     s = ref.fitted_structure.model_copy(deep=True)
-    s.phases[0].extinction.value = 0.0
+    s.phases[0].extinction = 0.0
     _, _, arm = _oracle("nacl_neutron", rx.Refinement(s, ref.fitted_instrument,
                                                       history=False))
     assert arm > 4 * err          # measured 1.07e-2 against 2.2e-3
@@ -98,7 +98,7 @@ def test_the_xray_case_is_what_topas_computes():
 def _xray_extinction(value):
     ref, pattern = case_nacl_xray()
     s = ref.fitted_structure.model_copy(deep=True)
-    s.phases[0].extinction.value = value
+    s.phases[0].extinction = value
     return rx.Refinement(s, ref.fitted_instrument, history=False), pattern
 
 

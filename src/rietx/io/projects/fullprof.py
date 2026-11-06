@@ -4338,7 +4338,7 @@ def from_structure(structure: Structure, *,
                     f"'{param.value}' and FullProf does not parse — refused "
                     f"here rather than written into a file that fails in "
                     f"another program")
-        if phase.extinction.value != 0.0:
+        if phase.extinction is not None and phase.extinction.value != 0.0:
             raise ValueError(
                 f"phase {phase.name!r} has extinction = "
                 f"{phase.extinction.value!r}, and this writer writes no "

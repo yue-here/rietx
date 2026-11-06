@@ -61,7 +61,7 @@ F_new = F_old + a_j·(S_j,new − S_j,old), and :meth:`Scattering.refresh`
 recomputes them in full.  The orbit sums dispatch to the compiled kernels
 (:func:`~rietx.model.compiled.solve_orbit_sums`,
 :func:`~rietx.model.compiled.solve_orbit_sums_one`); where those decline
-(``RIETX_COMPILED=0``, or a wheel before 1.4.0) the numpy expression here
+(``RIETX_COMPILED=0``, or a declined wheel) the numpy expression here
 runs, and it is their oracle (``tests/test_solve_engine.py``).
 
 **The clash term** is chemistry's (:mod:`~rietx.solve.chemistry`): r₀ from
