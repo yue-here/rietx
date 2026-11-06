@@ -35,7 +35,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 2026-10-09 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) | A cell pays for the lines it predicts and the pattern lacks | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [1964](1964-a-parametric-equation-the-user-writes.md) | A parametric equation the user writes | 2026-11-05 | P2 | [parametric](#parametric) |
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | 2026-10-24 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) | Guides and Theory move over, and the old tree retires | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1988](1988-a-pr-put-up-for-review-is-watched.md) | A PR put up for review is watched by the session that opened it | 2026-10-23 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
@@ -483,7 +482,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [1325](1325-parametric-series.md) | Parametric series: a parameter as a function of each pattern's coordinates | 🔄 2026-11-04 | P2 | — ([1119](1119-named-variables.md) soft) |
-| [1964](1964-a-parametric-equation-the-user-writes.md) | A parametric equation the user writes | 🔄 2026-11-05 | P2 | [1804](1804-the-derived-block.md) ([1325](1325-parametric-series.md), [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
+| [1964](1964-a-parametric-equation-the-user-writes.md) | A parametric equation the user writes | ✅ 2026-11-06 | — | [1804](1804-the-derived-block.md) ([1325](1325-parametric-series.md), [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 | [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md) | A parametric equation declared by condition and glob | ⬜ | P3 | [1325](1325-parametric-series.md) ([1964](1964-a-parametric-equation-the-user-writes.md) soft) |
 | [1995](1995-soft-restraints-in-a-joint-fit.md) | Soft restraints in a joint fit | ⬜ | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
 | [2101](2101-the-parametric-surface-as-it-stands-in-the-manual.md) | The parametric surface as it stands, in the manual | ⬜ | P2 | — |
