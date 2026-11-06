@@ -1,6 +1,6 @@
 # WP-2116 — an extra component's columns cost no Bragg evaluation
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-06 — task 1 (the four-fixture cost) taken by Michael's side (#1418)
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-11-05 — a cost-only item with no user at the wall: 22 % of one acridine fit, on fits that declare `extra_components`
@@ -82,4 +82,5 @@ body's default plan.
 
 ## Handover log
 
+- **2026-11-06** — taken by Michael's side for task 1, the cost on LaB6, FAP, cpd-1a and NAC, measured on the Mac at `263227986` with acridine re-run as the positive arm. Nothing in `src/` changes in task 1. Next: the per-fixture table, then the stop rule.
 - **2026-11-05** — created, from the 2026-11-05 issue triage (issue #1418). Checked against the tree at `541f0daf7`: read the `fd_cols` loop and its comment at `least_squares.py:2131-2149`, which do what the issue says; the timings were not re-run; no open WP owns it: WP-2045 is the runaway stop, and WP-1806 is the acceptance fit. Next: the four-fixture cost, which decides whether the WP is worth building.
