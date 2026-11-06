@@ -1,6 +1,6 @@
 # WP-1468 — what the polyhedra still miss, and the controls a chemist would reach for
 
-Milestone: unscheduled · Status: ✅ 2026-11-02 — closed: 14 of 15 tasks landed, the 15th in part (PR #1342 the last); cluster polyhedra, the readings from WP-1504 and issue #1057 moved to issue #1371
+Milestone: unscheduled · Status: ✅ 2026-11-02 — closed: 14 of 15 tasks landed, the 15th in part (PR #1342 the last); cluster polyhedra, the readings from WP-1504 and issue #1057 moved to issue #1371, now WP-2111
 Track: Render what the fit already knows
 Depends on: 1466
 
@@ -231,7 +231,8 @@ about polyhedra: five readings WP-1957's reviewers made of the structure
 figure (forwarded by WP-1504), issue #1057's two ORTEP controls and its
 outline defect, and a cluster polyhedron that waits for a user to ask. No
 open WP owned them, so they moved to issue #1371 rather than being
-folded somewhere they do not belong. A new WP is the maintainer's to open. PR #1355, from a ghostshift runner,
+folded somewhere they do not belong. The maintainer's triage filed them as WP-2111 on
+2026-11-05. PR #1355, from a ghostshift runner,
 a close-only job: this session changed no code.
 
 *Done.*
@@ -254,7 +255,7 @@ a close-only job: this session changed no code.
   changes nothing on its surface, and WP-1536, 1537 and 1538, which add the
   SVG, ray-tracer and ambient-occlusion outputs. None owns a reading of the
   picture or a draw style.
-- The narrative moved to the v1.11 record, § How v1.11 is getting here.
+- The narrative moved to the v1.12 record, § How v1.12 is getting here (1.11.0 is cut).
 
 *Measured* (`[dev]` venv, darwin/arm64, on origin/main b0c79e12d plus this
 close). `tests/test_docs_consistency.py`: 25 passed. ruff clean.
@@ -266,7 +267,7 @@ close). `tests/test_docs_consistency.py`: 25 passed. ruff clean.
 `CLAUDE.md` edit, no lane, no `_audit.py` change and no new heuristic, so no
 generality judge. No full suite: nothing could move a measured number.
 
-*Next.* None here. Issue #1371: the label merge or the axis letters first, since
+*Next.* None here. WP-2111 (from issue #1371): the label merge or the axis letters first, since
 neither needs a ruling; the `DIM_BOUNDARY` shade waits on the maintainer, and
 the `auto` ranking on an agent round.
 
