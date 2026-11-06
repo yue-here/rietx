@@ -312,7 +312,7 @@ per-pattern one is an array.
 - [ ] **Real data.** The WO₃ Einstein equations and the ZrP₂O₇ calibration, local
   only, each against the TOPAS input's own answer under its protocol. The bars are
   in [the milestone's Acceptance](../milestones/parametric.md#acceptance).
-- [ ] **Manual.** The grammar reference, the equation with its *Source* line in
+- [x] **Manual.** The grammar reference, the equation with its *Source* line in
   the Theory tab, a guide on an Einstein cell with a shared θ, and a section in
   `switching/topas.md` and `switching/gsas2.md` translating their spelling line
   by line.
