@@ -3509,7 +3509,10 @@ ROWS: tuple[Row, ...] = (
         evidence=("answer-invariant: a refusal limit of the expression grammar (WP-1964), never a "
                   "setting of what an accepted expression means; an expression under it parses to "
                   "the same tree at any limit, and one over it is refused by name (too_deep), "
-                  "never truncated; tests/test_expression.py::test_limits_on_length_and_depth")),
+                  "never truncated. It bounds the built tree too, a flat chain counting a level "
+                  "a term, because every walk of the tree recurses (600 terms under MAX_LENGTH "
+                  "raised RecursionError before); "
+                  "tests/test_expression.py::test_limits_on_length_and_depth")),
     Row("rietx.params.expression.MAX_LENGTH", "constant", tier="invariant", value=4096,
         evidence=("answer-invariant: as MAX_DEPTH, a refusal limit in characters; an expression "
                   "under it parses identically at any limit, and a longer one is refused by name "
