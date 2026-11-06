@@ -37,7 +37,7 @@ from ..schemas.common import Parameter
 from ..schemas.instrument import Instrument
 from ..schemas.parametric import CoordinateTable, ParametricEquation
 from ..schemas.structure import Structure
-from .expression import RESERVED, Expression, names_in
+from .expression import RESERVED, Expression, ExpressionError, names_in
 from .parametric import ResolvedParametric, least_squares_start, resolve_parametric
 from .vector import (
     AffineTie,
@@ -668,7 +668,17 @@ class MultiParameterTable:
                         "an expression too)")
             feeds = {nm: defined[nm] for nm in written.names if nm in defined}
             named.update(feeds)
-            expr = written.inline(feeds) if feeds else written
+            try:
+                expr = written.inline(feeds) if feeds else written
+            except ExpressionError as exc:
+                # each equation passed alone; the inlined tree is the one too
+                # long or too deep, so the message names the equations, never
+                # text the user did not write
+                raise ValueError(
+                    f"parametric equation {name!r}: with {sorted(feeds)} written in, "
+                    f"its formula is {exc.code.replace('_', ' ')} ({exc.reason}); "
+                    "group long sums in parentheses or shorten the intermediates"
+                ) from exc
             # an intermediate has no patterns of its own: it is evaluated at
             # each later equation's, whose coordinate values are checked there
             patterns = ([] if equation.target is None

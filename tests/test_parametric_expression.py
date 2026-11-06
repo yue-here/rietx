@@ -605,8 +605,13 @@ def test_an_intermediate_round_trips_and_only_an_expression_can_be_one():
      "'T_true' has no target and no later expression equation names it"),
     ([_calibration(), _fed(expression="a0 + k*T_ture")], None,
      r"names 'T_ture', which is neither a variable.*did you mean 'T_true'"),
+    # each passes alone (51 and 16 levels); written in, the tree is 69 deep
+    ([_calibration(expression="T + " + " + ".join(["c0"] * 50)),
+      _fed(expression="a0" + " + k*T_true" * 15)], None,
+     r"parametric equation 'a': with \['T_true'\] written in, its formula is too "
+     "(deep|long)"),
 ], ids=["itself", "later", "later-target", "linear", "variable-name", "coordinate-name",
-        "reserved-name", "idle", "near-miss"])
+        "reserved-name", "idle", "near-miss", "inlined-too-deep"])
 def test_each_refusal_of_an_equation_feeding_another_names_its_fix(parametric, variables,
                                                                    fragment):
     with pytest.raises(ValueError, match=fragment):
