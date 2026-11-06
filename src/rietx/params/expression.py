@@ -410,12 +410,19 @@ class _Parser:
         return BinOp("^", base, exponent)
 
     def exponent(self):
+        self.depth += 1
+        if self.depth > MAX_DEPTH:
+            raise self.err("too_deep", f"the expression nests deeper than {MAX_DEPTH}",
+                           self.peek().col)
         t = self.peek()
         if t.kind == "op" and t.text in ("+", "-"):
             self.take()
             arg = self.exponent()
-            return Neg(arg) if t.text == "-" else arg
-        return self.atom()
+            node = Neg(arg) if t.text == "-" else arg
+        else:
+            node = self.atom()
+        self.depth -= 1
+        return node
 
     def atom(self):
         t = self.take()

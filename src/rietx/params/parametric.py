@@ -496,17 +496,28 @@ def expression_target_columns(expressions, bj, free_paths: list[str],
         if not live:
             continue
         gmat = np.vstack(rows)
+        if len(live) > len(cols):
+            continue
         # Every target needs a direction of its own.  The cut is the linear
         # basis's (RANK_RTOL, √PINV_RCOND), on rows scaled to unit length so
-        # two targets in different units (Å/K, °/K) are not read as one.
-        s = lapack.svd(gmat / np.linalg.norm(gmat, axis=1)[:, None], compute_uv=False)
-        if len(live) > len(cols) or s[len(live) - 1] <= RANK_RTOL * s[0]:
+        # two targets in different units (Å/K, °/K) are not read as one.  The
+        # largest entry goes first, so a row of 1e-170s (an Einstein term at
+        # θ/T ≈ 400) does not square to a zero norm.
+        big = np.abs(gmat).max(axis=1)
+        unit = gmat / big[:, None]
+        length = np.linalg.norm(unit, axis=1)
+        unit /= length[:, None]
+        scale = big * length
+        u, s, vt = lapack.svd(unit, full_matrices=False)
+        if s[-1] <= RANK_RTOL * s[0]:
             continue
         local = {int(c): k for k, c in enumerate(bj.col_maps[h])}
         block = bj.blocks[h]
         jv = np.column_stack([block[:, local[c]] if c in local else np.zeros(block.shape[0])
                               for c in cols])
-        targets = jv @ lapack.pinv(gmat)
+        # G = D·U with D the row scales, full row rank, so G⁺ = U⁺·D⁻¹; U⁺ is
+        # read off the SVD the cut was made on, so the two cannot disagree
+        targets = (jv @ ((vt.T / s) @ u.T)) / scale
         for a, i in enumerate(live):
             if h in skip.get(expressions[i].name, ()):
                 continue

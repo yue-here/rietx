@@ -428,6 +428,16 @@ def test_targets_sharing_a_variable_are_recovered_together():
     assert cols == [[None, None], [None, None]]
     assert expression_target_columns(exprs[:1], held, ["vars.b0"], values,
                                      [True, True], {}) == [None]
+    # a G row of ~1e-174 (exp(-th/T) at th/T = 400) squares to a zero norm;
+    # the cut is still made and the target still recovered
+    cold = [ResolvedExpression(
+        equation=exprs[0].equation, patterns=[0], expression=exprs[0].expression,
+        variables=["a0", "th"], coordinates=["T"], constants={0: {"T": 0.375}})]
+    g = -np.exp(-400.0) / 0.375
+    t = rng.standard_normal(40)
+    tiny = BlockJacobian([(t * g)[:, None]], [[0]], [40], [0], 1)
+    cols = expression_target_columns(cold, tiny, ["vars.th"], values, [True], {})
+    assert np.max(np.abs(cols[0][0][:, 0] - t)) < 1e-12
 
 
 # -- intervals and minima (task 9) --------------------------------------------

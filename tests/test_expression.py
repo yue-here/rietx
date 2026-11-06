@@ -150,6 +150,13 @@ def test_limits_on_length_and_depth():
         parse(flat)
     assert info.value.code == "too_deep"
     parse(" + ".join(["x"] * MAX_DEPTH))
+    with pytest.raises(ExpressionError) as info:
+        parse(" + ".join(["x"] * (MAX_DEPTH + 1)))
+    assert info.value.code == "too_deep"
+    # an exponent's signs recurse in the parser too: x^----…y
+    with pytest.raises(ExpressionError) as info:
+        parse("x^" + "-" * 2000 + "y")
+    assert info.value.code == "too_deep"
 
 
 def test_an_error_quotes_the_text_with_a_caret_and_suggests_a_name():
