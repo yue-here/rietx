@@ -136,8 +136,9 @@ def read_pdcif(path: str | Path, *, block: str | None = None,
                              f"The Poisson σ = √max(y, 1) is used instead."),
                     value=float(n_neg + n_null), where=["_pd_proc_ls_weight"]))
 
+    # σ = +∞ is the zero-weight marker above, so the finite-row check keeps it
     tt, y, sigma = ascending(tt, y, sigma, path=p, fmt=PDCIF,
-                             diagnostics=diagnostics)
+                             keep_infinite_sigma=True, diagnostics=diagnostics)
     used = np.ones(tt.size, dtype=bool)
     excluded: list[tuple[float, float]] = []
     if sigma is not None and np.isinf(sigma).any():

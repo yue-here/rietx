@@ -432,7 +432,8 @@ def _extinction_items(instrument, ip, phase, refined: RefinedSet) -> list:
     free.
     """
     path = _p(ip, "extinction")
-    if phase.extinction.value == 0.0 and not refined.is_free(path):
+    if phase.extinction is None or (phase.extinction.value == 0.0
+                                    and not refined.is_free(path)):
         return []
     refined.named.add(path)       # read back by name (topas_ties)
     ext = refined.affine(path, phase.extinction.value)
@@ -783,7 +784,7 @@ def whole_input(structure, *, refined: RefinedSet, scale: str, instrument=None,
             refined.affine(_p(ip, n), getattr(phase, n).value).terms
             or getattr(phase, n).value != 0.0
             for n in ("magnetic_lor_size", "magnetic_lor_strain"))
-        if mag_width and (phase.extinction.value != 0.0
+        if mag_width and phase.extinction is not None and (phase.extinction.value != 0.0
                           or refined.is_free(_p(ip, "extinction"))):
             raise ValueError(
                 f"phase {phase.name!r} cannot be written to a TOPAS `.inp`: it has a "
@@ -818,7 +819,8 @@ def whole_input(structure, *, refined: RefinedSet, scale: str, instrument=None,
                    if instrument is not None and part != "magnetic" else None)
             if ext:
                 notes.append(_extinction_note(phase.name))
-            if instrument is None and phase.extinction.value != 0.0:
+            if (instrument is None and phase.extinction is not None
+                    and phase.extinction.value != 0.0):
                 notes.append(f"phase {phase.name!r}: extinction "
                              f"{number(phase.extinction.value)} not written "
                              f"(a scale_pks term, written with instrument=)")

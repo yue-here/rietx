@@ -25,17 +25,14 @@ like one lacking any other kernel.
 
 From 1.4.0 it carries the structure-solution engine's two kernels as well
 (``solve_orbit_sums`` with its one-site twin ``solve_orbit_sums_one``, and
-``solve_clash``; #562, WP number pending): the replica-batched per-atom orbit
+``solve_clash``; #562, WP-1997): the replica-batched per-atom orbit
 sums of the structure factor and the minimum-image contact term.  Their oracle
 is a numpy expression written in ``tests/test_solve_kernels.py``, held to
-1e-13 relative for the orbit sums (they call ``cos`` and ``sin``); the
-engine's own numpy fallback, which a declined call runs, lands with its first
-caller (the numpy contact term is #1016's ``site_clash``).  Nothing in rietx
-calls them yet, so they are
-looked up beside :data:`KERNEL_NAMES` rather than in it: a 1.3 wheel lacks
-them, still loads, and :func:`solve_orbit_sums` and its two siblings decline.
-The engine's first caller moves them into :data:`KERNEL_NAMES` and raises
-:data:`KERNEL_FLOOR` to 1.4 in the same change.
+1e-13 relative for the orbit sums (they call ``cos`` and ``sin``).  The engine
+in ``solve/moves.py`` calls them through :func:`solve_orbit_sums` and its two
+siblings, and a declined call runs the engine's own numpy fallback (the numpy
+contact term is ``solve/chemistry.py``'s ``site_clash``).  A wheel without them
+is declined whole, like one lacking any other kernel.
 
 Why a compiled tier at all
 --------------------------
@@ -161,22 +158,18 @@ KERNEL_ABI = 1
 
 #: The oldest wheel this rietx calls: the F of ``pyproject``'s
 #: ``rietx-kernels>=F,<N+1`` pin.  It is the minor that added the newest name in
-#: :data:`KERNEL_NAMES`, 1.3 for the dichotomy's box test.
-KERNEL_FLOOR = "1.3"
+#: :data:`KERNEL_NAMES`, 1.4 for the structure-solution engine's three.
+KERNEL_FLOOR = "1.4"
 
 #: The kernels the wheel must export, under the names ``_KERNELS`` keys them
 #: by.  A wheel lacking one is declined like a wrong :data:`KERNEL_ABI`.  The
 #: first five are the model's, the next two the structure figure's (1.1.0),
-#: and the last two the dichotomy indexer's (1.3.0, WP-1959).
+#: the next two the dichotomy indexer's (1.3.0, WP-1959), and the last three
+#: the structure-solution engine's (1.4.0, WP-1997).
 KERNEL_NAMES = ("accum", "omega_sym", "omega_fcj", "bases_sym", "bases_fcj",
                 "render_rows", "id_plane",
-                "dichotomy_box_test", "dichotomy_child_key")
-
-#: The structure-solution engine's kernels, from 1.4.0 (#562).  Looked up
-#: beside :data:`KERNEL_NAMES` until a caller in rietx exists, so a 1.3 wheel
-#: still serves the model, the figure and the indexer, and the three entry
-#: points below decline on it.
-SOLVE_NAMES = ("solve_orbit_sums", "solve_orbit_sums_one", "solve_clash")
+                "dichotomy_box_test", "dichotomy_child_key",
+                "solve_orbit_sums", "solve_orbit_sums_one", "solve_clash")
 
 #: Ω spelled as :func:`~rietx.model.profiles.pseudovoigt.pseudo_voigt` — the
 #: forward model's own arithmetic.
@@ -270,8 +263,7 @@ def _load() -> tuple[dict | None, str | None]:
     if missing:
         return None, (f"rietx_kernels {version} lacks the kernel"
                       f"{'s' if len(missing) > 1 else ''} {', '.join(missing)}")
-    return {n: getattr(wheel, n) for n in KERNEL_NAMES + SOLVE_NAMES
-            if callable(getattr(wheel, n, None))}, None
+    return {n: getattr(wheel, n) for n in KERNEL_NAMES}, None
 
 
 def _kernels() -> dict | None:
@@ -597,10 +589,10 @@ def bases_fcj(omega: np.ndarray, d_pos: np.ndarray, d_gamma: np.ndarray,
 
 # --- the structure-solution engine's kernels (1.4.0, #562) ----------------
 #
-# Nothing in rietx calls these yet.  Each returns ``None`` where the compiled
-# path is off or the wheel predates 1.4.0; the numpy fallback its caller runs
-# lands with the engine's first caller, and the oracle the kernels are held to
-# is the expression in ``tests/test_solve_kernels.py``.
+# ``solve/moves.py`` calls these.  Each returns ``None`` where the compiled
+# path is off or the wheel was declined, and the caller then runs its numpy
+# fallback.  The oracle the kernels are held to is the expression in
+# ``tests/test_solve_kernels.py``.
 
 #: Serial nanoseconds per orbit image of the orbit sums (one ``cos`` and one
 #: ``sin``) and per image pair of the contact term.  Measured on darwin/arm64
@@ -612,12 +604,12 @@ _NS_PER_CONTACT = 1.0
 
 
 def _solve_kernel(name: str):
-    """The named solve kernel when the compiled path is on and the wheel has
-    it; ``None`` otherwise.  Fixed for the process, like :func:`enabled`."""
+    """The named solve kernel when the compiled path is on; ``None``
+    otherwise.  Fixed for the process, like :func:`enabled`."""
     if not enabled():
         return None
     kernels = _kernels()
-    return None if kernels is None else kernels.get(name)
+    return None if kernels is None else kernels[name]
 
 
 def _mean_images(q: np.ndarray, xyz: np.ndarray) -> float:

@@ -1210,8 +1210,12 @@ def normalize_space_group(symbol: str, cell: dict | None = None) -> str:
     atoms in a ``.pcr``.
 
     Every corpus R phase is hexagonal — two equal edges, a third that differs,
-    γ = 120° — so this case closes a gap rather than fixing a measured wrong
-    answer, and it is stated as a gap.
+    γ = 120°. FullProf itself reads a bare R symbol on hexagonal axes whatever
+    the cell says (#716, FullProf.2k 8.50), so a rhombohedral-axes cell beside
+    one is a file FullProf would refine as a different crystal. rietx's own
+    writer wrote such files before PR #733. The maintainer ruled on 2026-11-03
+    to read them on the axes the cell states and say so:
+    :func:`to_structure` reports ``FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED``.
 
     The case and origin preferences are *conventions*, so they are not left to
     be trusted: :func:`to_structure` re-derives every site's multiplicity under
@@ -3337,8 +3341,10 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
 
     Three more repairs are reported the same way where ``diagnostics=`` is
     passed: ``FULLPROF_ORIGIN_CHOICE`` where :func:`normalize_space_group` added
-    an origin or axes suffix the file did not write (``F D -3 M`` →
-    ``F d -3 m:2``), ``FULLPROF_OCCUPANCY_UNCHECKED`` where the occupancy-ratio
+    an origin suffix the file did not write (``F D -3 M`` → ``F d -3 m:2``),
+    ``FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED`` where it read a bare R symbol on
+    rhombohedral axes from the cell, which FullProf itself would read on
+    hexagonal axes, ``FULLPROF_OCCUPANCY_UNCHECKED`` where the occupancy-ratio
     test that licenses that choice had no discriminating power, and
     ``FULLPROF_TIE_DROPPED`` where a **cell** codeword tie the space group does
     not reproduce is lost (see :func:`cell_parameter_ties`). The cell case only
@@ -3463,8 +3469,11 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
     #: cell is built either way and the loss is the same whether or not a caller
     #: passed a list; this matches ``TOPAS_CELL_COUPLING_DROPPED`` one reader over.
     dropped_cell_ties: list[tuple[str, str]] = []
-    #: Origin/axes suffixes this reader added that the file did not write.
+    #: Origin suffixes this reader added that the file did not write.
     origin_choices: list[tuple[str, str, str]] = []
+    #: Bare R symbols read on rhombohedral axes from the cell, where FullProf
+    #: itself reads hexagonal axes: (phase path, raw, resolved, cell).
+    rhombohedral_axes: list[tuple[str, str, str, dict]] = []
     #: Phases whose occupancy-ratio cross-check could not discriminate.
     unchecked_occupancy: list[tuple[str, str]] = []
     for structure_index, ph in enumerate(model.nuclear_phases):
@@ -3513,8 +3522,19 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
         # this reader supplying a convention, which is what a caller has to be
         # able to see.
         if ":" in ph.space_group and ":" not in ph.space_group_raw:
-            origin_choices.append((f"phases.{structure_index}",
-                                   ph.space_group_raw.strip(), ph.space_group))
+            # The axes arm is reported apart from the origin arm, because here
+            # the program the file is for reads it the other way: FullProf
+            # takes a bare R symbol on hexagonal axes whatever the cell says
+            # (#716, FullProf.2k 8.50). The cell decides it, as
+            # `read_small_structure` decides it for a CIF (ruled 2026-11-03).
+            if ph.space_group.endswith(":R"):
+                rhombohedral_axes.append((
+                    f"phases.{structure_index}", ph.space_group_raw.strip(),
+                    ph.space_group, {k: v.value for k, v in ph.cell.items()}))
+            else:
+                origin_choices.append((f"phases.{structure_index}",
+                                       ph.space_group_raw.strip(),
+                                       ph.space_group))
 
         # A codeword tie is refused before anything is built only where its
         # restoring call would be a choice rather than a statement; the rest
@@ -3755,6 +3775,17 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
                 message=(f"Space group {raw!r} in {named} was read as "
                          f"{resolved!r}. The occupancy-ratio check accepted "
                          f"this setting."),
+                where=[f"{path}.space_group"]))
+        for path, raw, resolved, cell in rhombohedral_axes:
+            diagnostics.append(Diagnostic(
+                level="warning", code="FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED",
+                message=(f"Space group {raw!r} in {named} has no axes suffix. "
+                         f"Its cell is rhombohedral, with a = b = c = "
+                         f"{cell['a']:g} Å and α = β = γ = {cell['alpha']:g}°, "
+                         f"so it was read as {resolved!r}. FullProf reads a "
+                         f"bare R symbol on hexagonal axes and imposes "
+                         f"α = β = 90°, γ = 120°, so FullProf would refine "
+                         f"this file as a different cell."),
                 where=[f"{path}.space_group"]))
         for path, sg in unchecked_occupancy:
             diagnostics.append(Diagnostic(
@@ -4307,7 +4338,7 @@ def from_structure(structure: Structure, *,
                     f"'{param.value}' and FullProf does not parse — refused "
                     f"here rather than written into a file that fails in "
                     f"another program")
-        if phase.extinction.value != 0.0:
+        if phase.extinction is not None and phase.extinction.value != 0.0:
             raise ValueError(
                 f"phase {phase.name!r} has extinction = "
                 f"{phase.extinction.value!r}, and this writer writes no "

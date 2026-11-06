@@ -19,11 +19,11 @@ This runs two stages by hand on the GSAS-II tutorial fluorapatite pattern that s
 <!-- output of examples/guides/next.py -->
 ```text
 noise floor 693 | best: None
-instrument.profile.x, phases.0.lor_size       gain   322283  dBIC   +795  resolved False
-instrument.profile.y, phases.0.lor_strain     gain   189147  dBIC   +333  resolved False
-instrument.profile.w                          gain   156429  dBIC   +264  resolved True
-phases.0.gauss_size, instrument.profile.v     gain   129119  dBIC   +201  resolved False
-instrument.profile.u, phases.0.gauss_strain   gain    39436  dBIC    +45  resolved False
+instrument.profile.x, phases.0.lor_size       gain   322280  dBIC   +795  resolved False
+instrument.profile.y, phases.0.lor_strain     gain   189145  dBIC   +333  resolved False
+instrument.profile.w                          gain   156424  dBIC   +264  resolved True
+phases.0.gauss_size, instrument.profile.v     gain   129105  dBIC   +201  resolved False
+instrument.profile.u, phases.0.gauss_strain   gain    39429  dBIC    +45  resolved False
 ```
 
 Each group's `gain` is the fall in χ² that freeing the group would give, predicted from the derivatives at the current values.
@@ -68,7 +68,8 @@ The two occupancies are of sites that are full in fluorapatite.
 
 ## Narrow the question
 
-`include` and `exclude` take dot-path patterns, so `suggest` scores only the parameters you would consider freeing:
+`include` and `exclude` take dot-path patterns, so `suggest` scores only the parameters you would consider freeing.
+The structure declared extinction at the start, so it is among them: an undeclared correction has no parameter to score.
 
 ```{literalinclude} ../../../examples/guides/next.py
 :language: python

@@ -131,6 +131,8 @@ The phases, background, free set and mode come whole from the preferred side, so
 A project keeps the history in `history.jsonl`, and reopening it resumes at the last node ([About a project](../concepts/project.md)).
 Outside a project, `rx.Refinement(..., history="fit.jsonl")` appends each node to that file as it is committed.
 `rx.RefinementTree.load` reads one back, and `rx.Refinement.from_node(tree, "head")` opens a refinement at a node.
+A log holds one tree, so a file that already holds one raises `FileExistsError`.
+Continue it with `from_node`, or pass a new path.
 
 ## See also
 

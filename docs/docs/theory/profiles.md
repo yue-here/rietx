@@ -508,6 +508,9 @@ W(\xi) \;=\; \operatorname{clip}\bigl(s + h - \xi,\; 0,\; 2\min(s, h)\bigr),
 
 {source}`rietx.model.profiles.fcj`
 
+$W$ is unchanged when $s$ and $h$ swap values, so no pattern can tell the two
+ratios apart. The lab plans refine $s$ and hold $h$ at the value you set.
+
 As a density in $2\varphi$, the aberration diverges like
 $1/\sqrt{2\theta - 2\varphi}$ at the Bragg position. Naive sampling fails on
 that divergence. Substituting $\xi$ as the integration variable removes the

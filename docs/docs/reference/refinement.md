@@ -196,9 +196,9 @@ Freed after the profile and the scale have settled, it gets only the intensity n
 
 Three diagnostics report the outcome.
 
-- [`HARMONIC_FRACTION`](diagnostics-refinement.md#harmonic_fraction) gives the refined weight as a percentage of the fundamental with its esd. The fractions reported for real instruments are a few per cent. Above 15 % it is reported at `warning`, since a fraction that large usually means the line is absorbing something else: an unindexed impurity, a magnetic contribution or a background too stiff to follow.
-- [`HARMONIC_ABSENT`](diagnostics-refinement.md#harmonic_absent) means the weight refined below 0.1 % of the fundamental. The beam carries no measurable order-n component, as a monochromator whose nth order is extinct must give, and the declaration can be dropped.
-- [`HARMONIC_HELD`](diagnostics-refinement.md#harmonic_held) means the weight was never freed, so the reported fraction is the declared value and is not a result.
+- [`HARMONIC_FRACTION`](diagnostics-corrections.md#harmonic_fraction) gives the refined weight as a percentage of the fundamental with its esd. The fractions reported for real instruments are a few per cent. Above 15 % it is reported at `warning`, since a fraction that large usually means the line is absorbing something else: an unindexed impurity, a magnetic contribution or a background too stiff to follow.
+- [`HARMONIC_ABSENT`](diagnostics-corrections.md#harmonic_absent) means the weight refined below 0.1 % of the fundamental. The beam carries no measurable order-n component, as a monochromator whose nth order is extinct must give, and the declaration can be dropped.
+- [`HARMONIC_HELD`](diagnostics-corrections.md#harmonic_held) means the weight was never freed, so the reported fraction is the declared value and is not a result.
 
 `diagnose(data)` runs a related check before any fit ([Contamination](pattern-diagnostics.md#contamination)).
 It asks whether several strong reflections carry a Kβ or tungsten Lα line at one common ratio, and needs no structure.
@@ -357,12 +357,13 @@ import rietx as rx
 stage = rx.Stage("widths", ["instrument.profile.*"], max_iter=200)
 assert stage.max_iter == 200
 assert stage.seed == 0.0 and stage.strain_seed == 0.0
-assert stage.lebail_cycles == 3
+assert stage.lebail_cycles == 25000
+assert stage.lebail_tol == 1e-7
 ```
 
 `Stage.max_iter` bounds the solver's work.
 Both drivers count residual evaluations, so the bound is four evaluations per iteration, the measured worst case.
-A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER`](diagnostics-refinement.md#stage_max_iter), a result to read and not an exception.
+A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER`](diagnostics-stages.md#stage_max_iter), a result to read and not an exception.
 
 `Stage.ftol` overrides the plan's schedule for one stage: an early stage whose answer the next is unusually sensitive to, or a one-stage fit that must converge as hard as a last stage.
 
@@ -371,8 +372,9 @@ A stage that reaches it ends with status `max_iter` and reports [`STAGE_MAX_ITER
 - `Stage.seed` lifts each parameter the stage frees that sits exactly on a lower bound of 0 or above to the given value. A value already above its bound starts where it is, and a parameter that can go negative, such as Caglioti `U` and `V` or the zero shift, is never seeded. The surface-roughness stage seeds at 0.3, because Suortti roughness has no effect at b = 0 and the data see it best near b = 0.2 to 0.5. It is the only shipped stage that seeds. Extinction and the two magnetic widths are freed from 0 with no seed, since each one's column at 0 is its physical one. `StageResult.seeded` lists every row a stage lifted.
 - `Stage.strain_seed` puts a freed, all-zero Stephens block on a small isotropic microstrain, in ppm of ΔM/M. Those coefficients can go negative, so `Stage.seed` does not reach them, and at zero the square root in their width law has unbounded slope.
 
-`Stage.lebail_cycles` is the number of intensity-partitioning cycles run before and after each solve in Le Bail mode.
-In Pawley mode it sets the Le Bail partition that seeds the intensities when none were carried in, and Rietveld mode ignores it.
+`Stage.lebail_cycles` caps the Le Bail cycles run before and after each solve, and `Stage.lebail_tol` ends them early ([the stop](../theory/forward-model.md#le-bail-mode)).
+At `0.0` exactly `lebail_cycles` plain cycles run.
+`StageResult.lebail_cycles_run` and `StageResult.lebail_settled` record what ran. A cut in the last stage warns `LEBAIL_CYCLES_AT_CAP`.
 `Stage.restraint_weight_scale` weights the restraints against the data for the stage ([How to restrain a bond length or an angle](../guides/restrain.md)).
 `Stage.window_slack_deg` replaces the default capture margin in °2θ around each reflection's evaluation window.
 The indexing Le Bail validation sets it, because it holds a candidate cell fixed and a wrong candidate displaces peaks by whole degrees.
@@ -397,7 +399,7 @@ assert spec.correlation_guard == plan.correlation_guard
 
 `PlanSpec.from_plan` and `PlanSpec.to_plan` convert a plan, and `StageSpec.from_stage` and `StageSpec.to_stage` a stage.
 `PlanSpec.stages` is a list of `StageSpec`.
-A `StageSpec` carries every `Stage` field under the same name: `StageSpec.name`, `StageSpec.turn_on`, `StageSpec.max_iter`, `StageSpec.ftol`, `StageSpec.lebail_cycles`, `StageSpec.seed`, `StageSpec.strain_seed`, `StageSpec.restraint_weight_scale` and `StageSpec.window_slack_deg`.
+A `StageSpec` carries every `Stage` field under the same name: `StageSpec.name`, `StageSpec.turn_on`, `StageSpec.lebail_tol`, `StageSpec.max_iter`, `StageSpec.ftol`, `StageSpec.lebail_cycles`, `StageSpec.seed`, `StageSpec.strain_seed`, `StageSpec.restraint_weight_scale` and `StageSpec.window_slack_deg`.
 `PlanSpec.correlation_guard`, `PlanSpec.intermediate_ftol`, `PlanSpec.lebail_passes` and `PlanSpec.phase_support_sigma` carry the plan's four settings.
 
 Anything that takes one of the pair takes the other.
@@ -477,7 +479,7 @@ A pattern that matches no parameter is not an error, because that is how the shi
 
 A literal name, with no `*`, `?` or `[`, names one parameter.
 If the model has no such parameter the plan is wrong, through a typo or a renamed path.
-`StageResult.unknown_paths` lists it, and [`STAGE_PATH_UNKNOWN`](diagnostics-refinement.md#stage_path_unknown) reports it at `warning` with the nearest real name: `instrument.source.lines.0.wavelength` for a stage that names the wavelength without its line index.
+`StageResult.unknown_paths` lists it, and [`STAGE_PATH_UNKNOWN`](diagnostics-stages.md#stage_path_unknown) reports it at `warning` with the nearest real name: `instrument.source.lines.0.wavelength` for a stage that names the wavelength without its line index.
 It is a diagnostic and not an exception, because one plan runs every pattern of a series.
 A wrongly spelt family name inside a pattern looks like one that correctly matched nothing, so no rule can report it, and `freed` is the place to look.
 
@@ -489,7 +491,7 @@ A pattern under the instrument's `background_peaks`, the name up to v1.2, matche
 A literal phase name can also name a parameter the model will not free.
 An atom's coordinates refine along the directions its site symmetry allows, as `phases.0.atoms.2.dof.*`, and its `x`, `y` and `z` are each fixed or follow those directions.
 A cubic cell's `b` follows `a`.
-A stage naming such a parameter frees nothing for it, so [`STAGE_PATH_NOT_FREE`](diagnostics-refinement.md#stage_path_not_free) reports it at `warning` before the first stage runs, with the names that would free it.
+A stage naming such a parameter frees nothing for it, so [`STAGE_PATH_NOT_FREE`](diagnostics-stages.md#stage_path_not_free) reports it at `warning` before the first stage runs, with the names that would free it.
 For an oxygen on 16h in I4<sub>1</sub>/amd, `phases.0.atoms.2.x` is fixed at 0, and `y` and `z` follow `dof.0` and `dof.1`.
 A name you tied yourself is not reported, and neither is an instrument name: the shipped plans name `instrument.geometry.sample_displacement`, which a capillary geometry locks.
 A pattern can reach too far the other way: `phases.0.atoms.2.*` frees the site's `occ` and `biso` beside its directions, so write `phases.0.atoms.2.dof.*` for the position alone.

@@ -21,6 +21,17 @@ Biso 0.5 against 1.5 Å²          0.000        0.070 → 15.68  0.000  9.36 →
 axial sizing floor 0.02/0.05     0.003        0.138 → 0.010  n/a    0.007
 ===============================  ===========  =============  =====  ============
 
+On 2026-11-02 WP-2012 made LaB6's protocol free S/L alone, with H/L held at its
+declared 0.025, and LaB6's three readings became:
+
+===============================  ===========  =============  =====  ============
+start                            fluorapat.   cpd-1a         NAC    LaB6
+===============================  ===========  =============  =====  ============
+Biso 0.5 against 1.5 Å²                                             ≤ 0.1, passes
+``intermediate_ftol`` 1e-6/None                                     ≤ 0.1, passes
+axial sizing floor 0.02/0.05                                        0.582 on ``u``
+===============================  ===========  =============  =====  ============
+
 cpd-1a with zircon declared, a phase the sample lacks, reads 0.185 → 0.035 for the
 intermediate tolerance.  Since WP-2045 the last declared stage converges as the
 closing stage does, and the tolerance row reads 0.000, 0.000, 0.000 and 8.82, zircon
@@ -31,7 +42,9 @@ Linux, is one answer read under two labels.  The Finger-Cox-Jephcoat profile
 is symmetric in S/L and H/L, and rounding picks which way round an arm reports
 the pair.  Every comparison here orders the pair first (``_axial_pair_ordered``),
 after which both rows read 0.0068 plain esd or less at every one of 49 nudged
-start pairs (2026-11-02).
+start pairs (2026-11-02).  Since WP-2012 no protocol here frees H/L, so the
+ordering is a no-op, kept because ``docs/wp/2036-batch/lab6_axial_pairs.py``
+imports it.
 
 The axial sizing floor (``forward.AXIAL_SIZING_FLOOR``) sizes the windows and
 FCJ nodes of a stage that frees S/L or H/L from zero.  At 0.02 a stage reaching
@@ -42,7 +55,7 @@ closing stage recompiles at the ratios reached, where the floor no longer binds
 cpd-1a's 0.138 was its ``lines_axial`` stage freeing S/L from zero on a path one
 closing solve did not undo; with the width twin hold it is 0.010.
 
-Two rows fail, and each is a strict xfail with its reason.  cpd-1a's Biso start
+Two rows fail, and each is an xfail with its reason.  cpd-1a's Biso start
 is the width twin hold's cost (the maintainer's decision 1(a), 2026-10-23): its
 round-robin plan fits X and Y on the three-phase specimen before freeing the
 specimen widths, and 1/cosθ and tanθ are nearly collinear over a lab range, so
@@ -51,9 +64,11 @@ keeps.  Fluorite's ``lor_strain`` (phases.2) reads 0.0088 from one start and 0.0
 other, at Rwp 0.1631 and 0.1634.  Before the hold the closing stage re-refined
 the split, and the Y floor settled it.  No shipped plan frees an instrument width
 with its specimen twin, so only a plan written this way meets it.  LaB6's
-Biso starts reach two distinct minima that are nearly mirror images under the
-S/L and H/L exchange (WP-2012), 1.156 plain esd apart on ``u`` with the pair
-ordered.
+axial-floor row is the other.  With H/L held, the NIST protocol still has two
+minima in u, v and w, 0.24 % apart in χ², and the 0.05 floor's arm reaches the
+deeper while the shipped arm stays in the shallower (WP-2084).  LaB6's Biso row,
+1.156 plain esd on ``u`` before WP-2012 and read then as the S/L and H/L mirror,
+now passes; whether its two arms were in these two minima was not measured.
 
 The harmonic weight seed is measured on a synthetic constant-wavelength neutron
 corundum with a known λ/2 line, the one family a harmonic has (the held-out
@@ -94,9 +109,9 @@ OUT = Path(__file__).parent / "output"
 #: the ruled bar for a staged plan's start test, in plain esd
 ESD_BAR = 0.1
 
-_MIRRORED = ("LaB6's two Biso starts reach two distinct minima, nearly mirror images "
-             "under the S/L and H/L exchange (WP-2012): 1.156 esd on u with the axial "
-             "pair ordered (WP-2036, 2026-11-02; 9.36 on axial_sl before WP-2002)")
+_WIDTH_MINIMA = ("LaB6's NIST protocol has two minima in u, v and w, 0.24 % apart in "
+                 "chi2, and the 0.05 floor's arm reaches the deeper: 0.582 plain esd on "
+                 "u (WP-2084, 2026-11-02, macOS arm64; non-strict, one platform measured)")
 
 
 def _plotted(result, tag: str) -> dict:
@@ -164,7 +179,7 @@ def _assert_within_bar(a: dict, b: dict, what: str):
         "the width twin hold keeps the X/Y split cpd-1a's instrument-only stage "
         "lands on, which depends on the start: 15.68 esd on fluorite's lor_strain "
         "(WP-2002, decision 1(a), 2026-10-23)"))),
-    pytest.param("lab6", marks=pytest.mark.xfail(strict=True, reason=_MIRRORED))])
+    "lab6"])
 def test_the_biso_start_does_not_change_the_answer(family):
     """``Atom.biso``'s start of 0.5 Å² against 1.5 on every atom."""
     _assert_within_bar(_fit(family, biso=0.5), _fit(family, biso=1.5),
@@ -173,7 +188,8 @@ def test_the_biso_start_does_not_change_the_answer(family):
 
 # lab6 was a non-strict xfail here (WP-2036): its two arms took opposite
 # labellings of one S/L <-> H/L answer in 23 of 49 nudged pairs.  The pair is
-# compared ordered since 2026-11-02 (``_axial_pair_ordered``), and passes.
+# compared ordered since 2026-11-02 (``_axial_pair_ordered``), and since WP-2012
+# holds H/L there is no pair to order.
 @pytest.mark.parametrize("family", ["fap", "cpd1a", "nac", "lab6"])
 def test_the_intermediate_tolerance_does_not_change_the_answer(family):
     """``intermediate_ftol`` 1e-6 against every stage at the solver's 1e-9."""
@@ -181,7 +197,9 @@ def test_the_intermediate_tolerance_does_not_change_the_answer(family):
                        f"{family}, intermediate_ftol 1e-6 against None")
 
 
-@pytest.mark.parametrize("family", ["lab6", "fap", "cpd1a"])
+@pytest.mark.parametrize("family", [
+    pytest.param("lab6", marks=pytest.mark.xfail(strict=False, reason=_WIDTH_MINIMA)),
+    "fap", "cpd1a"])
 def test_the_axial_sizing_floor_does_not_change_the_answer(family, monkeypatch):
     """``AXIAL_SIZING_FLOOR`` 0.02 against 0.05, the value its domain test
     passes at (``tests/test_lab_instrument.py``), on the three lab protocols

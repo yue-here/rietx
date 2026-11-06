@@ -100,7 +100,7 @@ These rows are the correction's evidence, because Rwp is not.
 | `PhaseTexture.name` | the phase's name | the key, as on `PhaseAgreement` |
 | `PhaseTexture.texture_index` | J = 1 + Σ C²/(2l+1) | 1 for a random powder; a lower bound on the specimen's, because odd orders and those past the declared order are not measured |
 | `PhaseTexture.min_p_reflections` | the lowest multiplier P over the phase's fitted reflections | the default driver holds it at 0 or above |
-| `PhaseTexture.min_p_sphere` | the lowest P over directions sampled on the whole sphere, the reflections included | below zero, [`TEXTURE_NOT_POSITIVE`](diagnostics-refinement.md#texture_not_positive) fires and the coefficients are not a pole density |
+| `PhaseTexture.min_p_sphere` | the lowest P over directions sampled on the whole sphere, the reflections included | below zero, [`TEXTURE_NOT_POSITIVE`](diagnostics-corrections.md#texture_not_positive) fires and the coefficients are not a pole density |
 
 A joint fit leaves `RefinementResult.texture` empty, because its shared coefficients meet each histogram at its own sample angle.
 
@@ -427,7 +427,7 @@ A series prints its own view.
 
 The fourth deliverable is the series' own, because no single pattern carries a `SEQUENTIAL_*` row.
 `series.summary(deliverable="series")` adds the rows that decide a parameter measured against the series axis.
-They say whether the ordering was checked at all (`direction="both"`, or a plain statement that it was not), and list the persistent findings.
+They say whether the ordering was checked at all (`direction="both"`, or a plain statement that it was not), and name the widths that grew with a worsening fit.
 They give each step with what an independent cold pair reproduced, and the phases held for want of support.
 They also ask for the two things no diagnostic can supply: a stated 2θ-scale anchor and the split between precision and accuracy.
 The other three purposes are refused there by name, and `Refinement.summary(deliverable="series")` answers with where the series rows live:

@@ -14,6 +14,7 @@ from rietx.examples import examples_dir
 
 data = rx.read_pattern(examples_dir() / "FAP.XRA")
 structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
+structure.phases[0].extinction = 0.0  # opt-in: declared, so the plan frees it
 instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 instrument.background = rx.BackgroundChebyshev.with_terms(6)
 ref = rx.Refinement(structure, instrument)

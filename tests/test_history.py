@@ -303,6 +303,93 @@ def test_jsonl_round_trip(tmp_path, pattern):
     assert math.isinf(atom_x.max) and math.isinf(atom_x.min)
 
 
+def test_a_reused_history_path_is_refused_and_the_log_keeps_one_tree(tmp_path, pattern):
+    """A log holds one tree (WP-2031).
+
+    Until then a second ``Refinement`` on the same path appended a second
+    header and restarted the ids at ``n0000``, so ``load`` reported 4 nodes
+    where its dict held 2 and the summary drew ``n0001`` twice.
+    """
+    path = tmp_path / "fit.jsonl"
+    ref = rx.Refinement(*perturbed_models(), history=path)
+    ref.fit(pattern, plan=SHORT)
+    before = path.read_bytes()
+
+    with pytest.raises(FileExistsError, match=re.escape(str(path))):
+        rx.Refinement(*perturbed_models(), history=str(path))
+    with pytest.raises(FileExistsError, match="Refinement.from_node"):
+        rx.RefinementTree.for_data(pattern, path=path)
+    assert path.read_bytes() == before                   # nothing appended
+
+    loaded = rx.RefinementTree.load(path)
+    assert len(loaded) == len(loaded.nodes) == len(ref.history)
+    ids = re.findall(r"\bn\d{4}\b", loaded.summary())
+    assert len(ids) == len(set(ids)) == len(loaded)
+
+    # the documented way on: load, then open a refinement on the tree
+    resumed = rx.Refinement.from_node(loaded, "head")
+    resumed.run_stage(pattern, rx.Stage("zero", ["instrument.zero_shift"], max_iter=5))
+    again = rx.RefinementTree.load(path)
+    assert len(again) == len(again.nodes) == len(resumed.history) == len(ref.history) + 1
+
+
+def test_an_empty_history_file_holds_no_tree(tmp_path, pattern):
+    path = tmp_path / "empty.jsonl"
+    path.write_text("\n", encoding="utf-8")
+    ref = rx.Refinement(*perturbed_models(), history=path)
+    ref.run_stage(pattern, rx.Stage("scale", ["phases.*.scale"], max_iter=5))
+    assert len(rx.RefinementTree.load(path)) == len(ref.history) == 2
+
+
+def test_a_log_written_with_two_trees_loads_the_last_and_names_the_skipped_lines(
+        tmp_path, pattern):
+    """A release before WP-2031 could write one; it must still open.
+
+    Ruled by the maintainer 2026-11-03: the last tree loads, each earlier one
+    is said as ``HISTORY_EARLIER_TREE_SKIPPED`` with its lines, and a node
+    committed on the loaded tree reloads inside it.
+    """
+    first, second = tmp_path / "a.jsonl", tmp_path / "b.jsonl"
+    rx.Refinement(*perturbed_models(), history=first).run_stage(
+        pattern, rx.Stage("scale", ["phases.*.scale"], max_iter=5))
+    ref = rx.Refinement(*perturbed_models(), history=second)
+    for stage in ("scale", "zero"):
+        ref.run_stage(pattern, rx.Stage(stage, ["phases.*.scale"], max_iter=5))
+    n_first = len(first.read_text(encoding="utf-8").splitlines())
+    doubled = tmp_path / "doubled.jsonl"
+    doubled.write_text(first.read_text(encoding="utf-8") + second.read_text(encoding="utf-8"),
+                       encoding="utf-8")
+    before = doubled.read_bytes()
+
+    notes: list = []
+    tree = rx.RefinementTree.load(doubled, diagnostics=notes)
+    alone = rx.RefinementTree.load(second)
+    assert tree.order == alone.order and len(tree) == len(tree.nodes) == len(ref.history)
+    assert tree.header == alone.header and tree.head == alone.head
+    assert doubled.read_bytes() == before                # nothing rewritten
+
+    (note,) = notes
+    assert (note.code, note.level, note.value) == ("HISTORY_EARLIER_TREE_SKIPPED",
+                                                   "warning", 2.0)
+    assert f"lines 1-{n_first}" in note.message
+    assert f"from line {n_first + 1}" in note.message
+    assert f"lines 1-{n_first}" in note.suggestion
+
+    # the skipped tree is still there to read, by the suggestion's recipe
+    split = tmp_path / "split.jsonl"
+    split.write_text("".join(doubled.read_text(encoding="utf-8")
+                             .splitlines(keepends=True)[:n_first]), encoding="utf-8")
+    assert rx.RefinementTree.load(split).order == rx.RefinementTree.load(first).order
+
+    # a node committed on the loaded tree lands inside it on the next load
+    rx.Refinement.from_node(tree, "head").run_stage(
+        pattern, rx.Stage("zero", ["instrument.zero_shift"], max_iter=5))
+    again: list = []
+    reloaded = rx.RefinementTree.load(doubled, diagnostics=again)
+    assert len(reloaded) == len(reloaded.nodes) == len(alone) + 1 == len(tree)
+    assert [d.code for d in again] == ["HISTORY_EARLIER_TREE_SKIPPED"]
+
+
 def test_save_rewrites_an_in_memory_tree(tmp_path, fitted):
     ref, _ = fitted
     path = tmp_path / "saved.jsonl"
