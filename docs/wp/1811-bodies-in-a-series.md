@@ -17,6 +17,13 @@ quaternion and origin, never by its increment. This is chunk R11 of issue #561, 
 - The wrong rule, carrying the increment, is off by 0.0147° at 3° (WP-1803's record).
 - The trajectory is the quaternion.
 
+### Inherited
+
+- **2026-11-05, from the issue triage (issue #1390, item 1):** `_displace_body_rotations` writes
+  into held rotation entries too, so a body with one free turn direction starts its stage with a
+  nonzero held increment, and the esd re-charted at the first commit is approximate. WP-2114 owns
+  the fix. Read its Context before relying on a carried body's first-pattern esds.
+
 ## Non-goals
 
 - Bodies in a joint fit (`multi.py`).

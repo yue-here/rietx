@@ -1352,7 +1352,7 @@ A parameter that is exactly degenerate in one histogram and measurable in severa
 
 **Referenced to:** the esd the width column gives when taken in physical units and chained by dp/du, computed by WP-1929 at three softplus stopping points before WP-1938 refined in those units (0.0098437, 1e-4 relative), and the spread across four nudged starts under 1e-6 relative
 
-**Measured:** 0.0098437 at nudges 0, +-1e-14, 2e-14 (eight nudges spread 4e-8 relative, macOS arm64); y = 0 +- 0.018101, at_bound. The pre-1938 tree gives 0.00322, Linux's figure. Since WP-2002: 0.0102922 at four starts, spread 2.2e-9 (1.5e-9 when WP-2002 measured it), y = -0.0210949(191) off any bound
+**Measured:** 0.0098437 at nudges 0, +-1e-14, 2e-14 (eight nudges spread 4e-8 relative, macOS arm64); y = 0 +- 0.018101, at_bound. The pre-1938 tree gives 0.00322, Linux's figure. Since WP-2002: 0.0102922 at four starts, spread 2.2e-9 (1.5e-9 when WP-2002 measured it), y = -0.0210949(191) off any bound. Since WP-1944 (extinction opt-in, none declared here): 0.0103546 at four starts, spread 2.8e-9 on macOS arm64 and 1.5e-9 on Linux, y = -0.0216150(193) off any bound; declaring extinction returns 0.0102922 to every digit
 
 #### `test_a_width_on_its_floor_has_a_one_sided_profile_interval`
 
