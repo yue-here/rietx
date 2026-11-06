@@ -1,6 +1,6 @@
 # WP-2118 — one formula language for every constraint
 
-Milestone: parametric · Status: 🔄 2026-11-06 — claimed by ghostshift runner (@yue-here); task 1, the practice review
+Milestone: parametric · Status: 🔄 2026-11-06 — task 1 landed (PR #1444); waiting on the maintainer's rulings on design questions 1-3 (task 2)
 Depends on: 1964 (the grammar, `ParameterTable.add_expression`, the removal of `Parameter.expr`); 2103 soft (the joint fit's `tie`)
 Priority: P2 2026-11-05 — a feature the open milestone was opened for: the maintainer's ruling that one formula language serves single and parametric refinements; task 1 can start before 1964 lands
 
@@ -132,6 +132,105 @@ using only today's ties gives bit-identical numbers before and after.
 
 ## Handover log
 
+- **2026-11-06** — Task 1 is done, and the WP now waits on the maintainer. The review is in
+  `docs/practice.md` § The same language across a program. It found that most formula languages
+  name bare identifiers and bind them to the model separately, and that only GSAS-II and JuMP
+  keep linear constraints on their own route. It also found that GSAS-II's `sin` takes degrees
+  while TOPAS, Stan and every other language read take radians. So a GSAS-II expression ported
+  with a cell angle in it changes value without an error. The three design questions below are
+  briefed for the maintainer, and tasks 3-8 wait on the rulings. Session by a ghostshift runner,
+  PR #1444.
+  - *Done.* 8774ad3e7: the practice section, thirteen programs on the seven questions of task 1,
+    plus three sub-tables (angles, a minus sign before a power, the esd of a formula after a
+    fit). The lead read TOPAS's Technical Reference v9, the GSAS-II 5.8.4 source, the FullProf
+    8.20 manual and Stinton & Evans (2007). Two Sonnet agents read the cross-field
+    documentation. Their raw notes were scratch files and are not kept. Task 1 ticked.
+  - *WP-1964's two checks* (its Inherited note arrives with PR #1442; the next session deletes it
+    once that merges, because both are answered here). (1) TOPAS reads a minus sign after the
+    power. Its Table 3-1 is silent, and its §20.9.3 Voigt transform
+    `Exp(-(Pi FT_K gfwhm)^2 / (4 Ln(2)) - …)` decays only under that reading. This is an
+    inference from a documented example. TOPAS was not run, and its lexing of a literal `-2`
+    is not stated. Stan, Lepton, Modelica, PEtab v2, muParser and Python agree on −4. (2) The
+    esd of a curve with ΔT set to zero: TOPAS's answer is a formula the user writes after the
+    fit. `: 0` prints its value, and with `do_errors` its error through the whole covariance
+    (§2.9, §2.17). GSAS-II gives no curve esd. Stinton & Evans plot per-set values against the
+    refined temperature and report no curve esd. So the route that matches practice is a
+    general "evaluate this formula over the fitted variables, with its esd", and no argument
+    naming a per-pattern variable is needed. It falls under the third Inherited note: build it
+    when a case asks.
+  - *Repair.* 4055b690d (00:10 UTC today) added the third Inherited note, from WP-1964's reader
+    output, with no log entry. Reconstructed post hoc from the commit: it added that note and
+    nothing else. The diff does not say why no entry was written. This entry covers it.
+  - *Inherited.* The three notes stay. The first (degrees) is now backed by the angles table,
+    and the second and third bear on tasks 3 and 5.
+  - *Not run.* The handover's code review, since the branch is docs only. No tests were added, so
+    no counts moved. No lanes were dispatched; the two survey agents were not lanes.
+  - **Open question for the maintainer (task 2).** Three decisions. Each names something on the
+    main API surface, which is why they come to you.
+
+    **1. How a formula names a model parameter.** *Why it matters:* a formula is text such as
+    `B0 * debye(thD / T)`. Each name in it must resolve to a number at every evaluation. rietx
+    addresses a model parameter by a dot-path (`phases.0.atoms.3.biso`), and the grammar
+    allows only bare names, so the path cannot be written inside the text. If this is chosen
+    badly, users will either write long, fragile formulas or learn a second naming scheme.
+    Moderate. *Aim:* one rule for both kinds of fit. A joint fit's formulas already read only
+    named variables and coordinates. *Options.* (a) A formula reads only named variables
+    (`vars.<name>`, made by `add_variable`) and constants. To read a model parameter, the user
+    first ties it to a variable: `add_variable("zr", …)`, `tie("…atoms.0.occ", "vars.zr")`,
+    then `1 - zr` on the other site. Nothing new is learned, and this is the joint fit's rule.
+    It costs one extra call when a formula reads a model parameter. (b) The command takes a
+    binding, `variables={"zr": "phases.0.atoms.0.occ"}`, as `add_expression` does on the
+    table. It is flexible, and it adds a map to every call that reads the model. (c) Grammar
+    version 2 accepts dotted paths in the text. That means a grammar change and long formulas,
+    and globs still cannot appear. All three can be undone before release. Nothing was
+    measured. *Practice:* most languages bind bare names separately (GSAS-II's `assgnVars`,
+    Lepton's `addGlobalParameter`, RooFit's argument list). TOPAS names a parameter where it is
+    declared, which is closest to (a). Mantid (`f1.Sigma`) and CEL accept dotted names, and
+    PEtab v2 refuses them. *Recommendation:* (a), a lean. The crux is whether formulas often
+    read model parameters directly. TOPAS's practice of naming parameters suggests the extra
+    call is rare, and (a) adds no concept. Evidence that ported inputs mostly read model
+    parameters would flip it to (b), which can then be added without breaking (a).
+
+    **2. The command's spelling.** *Why it matters:* this is the verb users type. Today
+    `tie(path, source)` takes a path string as `source`, so a formula string passed there is
+    ambiguous. Minor. *Options.* (a) A keyword on the existing verb:
+    `tie(path, expression="B0 * debye(thD / T)")`. `untie`, the `set_tie` history node and
+    checkout's restore of ties serve both, so one record holds every user constraint. (b) A
+    new verb beside `tie`, such as `set_expression`. It is clearer to read on its own, and it
+    needs its own undo verb and record, or a shared one under two names. *Practice:* Mantid
+    calls formula constraints "ties", lmfit puts `expr` on the parameter, and TOPAS writes the
+    equation in place of the value. *Recommendation:* (a), a lean. The crux is rietx's
+    one-authority rule for user constraints (`Refinement._ties`), which (a) keeps. The name of
+    the keyword (`expression`, `formula` or `expr`) is yours. The grammar's page calls the text
+    an "expression".
+
+    **3. Whether a linear formula keeps today's linear route.** *Why it matters:* a tie today is
+    a row of a constant matrix that maps the free values to the tied ones. Symmetry checks,
+    the anchored-coordinate rebase and the "can this move" test all read that matrix. A formula
+    is evaluated as a tree at each step, and each derived row declares what it reaches. If
+    today's ties moved to the tree, every fit that uses one would change in the last digits,
+    and every consumer of the matrix would need a second reading. Moderate. *Options.* (a) Two
+    routes and no detection. `tie` and `tie_equal` stay on the matrix, and a text formula is
+    always a tree, even when it is linear. Old projects open unchanged, and the tie goldens
+    stay bit-identical by construction. (b) One stored form, text, with a detector that sends
+    a linear formula to the matrix. It needs a stored-format change and a proof that detection
+    reproduces the coefficients exactly. (c) One route, everything on the tree. Every tie golden
+    is re-pinned, and the matrix's consumers learn the tree. Speed was not measured. A tree of
+    a few nodes per step is small against a pattern evaluation. *Practice:* GSAS-II and
+    FullProf keep linear constraints apart, and JuMP keeps affine forms as their own type. TOPAS,
+    lmfit and Mantid run a linear tie as an ordinary formula. *Recommendation:* (a), a clear
+    call. The crux is accuracy and risk. (a) changes no existing number and no stored file. (b)
+    buys only one printed form, and a printer can render a matrix row as `x = 1 - y` without
+    changing the route. A ruling that stored constraints must be one text form would flip it to
+    (b). This also amends the Context paragraph's "a stored linear tie read as its formula",
+    which a session wrote and no ruling backs.
+
+    *Consent items* (I will do these unless you object). The grammar keeps radians with no
+    `sind`. Only GSAS-II offers degree functions, and only there are they the default. The
+    expressions page and the GSAS-II switching page will say that GSAS-II's `sin(x)` means
+    sin(x°), in task 7.
+  - *Next:* the maintainer rules on 1-3 and the consent items, and the rulings are recorded in
+    Context. Then task 3, the command, once WP-1964 (PR #1442) has merged.
 - **2026-11-05** — Filed at the maintainer's request, after the rulings above. No open WP
   owns a formula in a single refinement: 1070 and 1119 are closed, 1964 builds the grammar
   for joint fits, and 2103 gives a joint fit today's linear verbs. Task 1 is the practice
