@@ -439,20 +439,25 @@ def test_the_neutron_widths_leave_one_esd_at_every_start(solo_neutron):
     start nudged by 1e-14.  Refining in physical units (WP-1938) and behind the
     closing stage (WP-2002) it was 0.0102720 at four starts, spread 1.5e-8.
     Since WP-2002 removed Y's floor (2026-10-23), ``y`` refines to
-    −0.0210949(191), inside its own esd of 0, and ``x``'s esd is 0.0102922 at
-    the same four starts, spread 1.5e-9 (macOS arm64).  The floor's own case
-    is the next test's, with the floor declared.
+    −0.0210949(191), and ``x``'s esd was 0.0102922 at the same four starts,
+    spread 1.5e-9 (macOS arm64).  Since WP-1944 made extinction opt-in
+    (PR #1391, 2026-11-04) this phase declares none and the plan frees none.
+    ``y`` refines to −0.0216150(193), 1.1 esd below 0, and ``x``'s esd is
+    0.0103546 at the same four starts, spread 2.8e-9 (macOS arm64) and 1.5e-9
+    (Linux).  Declaring extinction returns 0.0102922 to every digit, so that
+    stage is the whole of the move.  The floor's own case is the next test's,
+    with the floor declared.
     """
     fits = [solo_neutron, *(_solo(1, k) for k in (1, -1, 2))]
     rows = [{p.path: p for p in fit.parameters} for fit in fits]
     x = [r["instrument.profile.x"].stderr for r in rows]
-    assert x == [pytest.approx(0.0102922, rel=1e-4)] * len(x)
+    assert x == [pytest.approx(0.0103546, rel=1e-4)] * len(x)
     assert max(x) / min(x) - 1.0 < 1e-6
     for r in rows:
         y = r["instrument.profile.y"]
-        assert y.value == pytest.approx(-0.0210949, rel=1e-4)
+        assert y.value == pytest.approx(-0.0216150, rel=1e-4)
         assert y.at_bound is False
-        assert y.stderr == pytest.approx(0.0190970, rel=1e-4)
+        assert y.stderr == pytest.approx(0.0192658, rel=1e-4)
 
 
 def test_a_width_on_its_floor_has_a_one_sided_profile_interval(

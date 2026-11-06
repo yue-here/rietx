@@ -152,6 +152,12 @@ inherits `rcond`'s tier, the 2 is tiered on its own evidence).
    they cannot see regress; where none exists the batch builds it before the row is
    recorded kept. Why not a measured consequence column: § Decisions, 2026-10-20.
 
+   **A solver constant ordinary fits barely reach closes the same way** (ruled 2026-11-05,
+   WP-2017 group A). An arm that changes nothing measures nothing, so three families on
+   either side cannot show such a constant holds. The row stays at tier 3 and names a
+   synthetic case that does reach it. A paper that tests a formula does not test the
+   numbers inside it, so a printed value is the row's source and does not move it to tier 2.
+
    **A caller pays in tokens and a fit in seconds**, so the default is the one that
    reaches a right answer in the fewest calls (DESIGN.md § Rules, 1). Where a rerun is
    expensive (an hour-long indexing search, a 200-pattern batch, a write into a project's
