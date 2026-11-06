@@ -98,6 +98,7 @@ from .optimize.least_squares import (
     DEFAULT_SOLVER,
     SOLVERS,
     STATIONARY_ANGLE_STEP,
+    _cancel_check,
     _jacobian_for,
     _longest_line_wavelength,
     covariance_estimates,
@@ -158,6 +159,7 @@ from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.plan import (
     CLOSING_WINDOW_TOL,
+    PlanSpec,
     check_closing_window_tol,
     check_phase_support_sigma,
 )
@@ -454,6 +456,11 @@ class _StageHold:
     #: asked of the table afterwards, for this carrier's own reason.
     reach: dict[str, list[str]] = dataclasses.field(default_factory=dict)
     blocked_by_hold: list[str] = dataclasses.field(default_factory=list)
+    #: ``StageResult.lebail_cycles_run`` (WP-1542): the cycles each partition
+    #: of this stage ran, which only the two ``lebail_update`` calls know
+    lebail_run: list[int] = dataclasses.field(default_factory=list)
+    #: ``StageResult.lebail_settled``, for the same reason
+    lebail_settled: bool | None = None
     #: the ``turn_on`` paths naming no entry (WP-1414), riding here
     #: for ``blocked_by_hold``'s reason: decided before the solve, unchanged
     #: by it, and delivered to the two ``StageResult`` call sites this way
@@ -4390,13 +4397,14 @@ class Refinement:
                 # they stay pending: the next *stage* consumes them, not this
                 _restore_lebail(self._pending_reflections, model)
                 carried = True
-            cycles = Stage("suggest", []).lebail_cycles
+            probe = Stage("suggest", [])
             if mode == "lebail":
-                model.lebail_update(table.decode(table.x0()), n_cycles=cycles)
+                model.lebail_update(table.decode(table.x0()),
+                                    n_cycles=probe.lebail_cycles, tol=probe.lebail_tol)
             elif mode == "pawley":
                 if not carried:
                     model.lebail_update(table.decode(table.x0()),
-                                        n_cycles=cycles)
+                                        n_cycles=_pawley_seed_cycles(probe))
                 model.build_pawley_restraint()
             x0 = table.x0()
             if model.pawley is not None:
@@ -4654,6 +4662,7 @@ class Refinement:
                       list(node.action.turn_on),
                       max_iter=node.action.max_iter,
                       lebail_cycles=node.action.lebail_cycles,
+                      lebail_tol=node.action.lebail_tol,
                       seed=node.action.seed, strain_seed=node.action.strain_seed,
                       restraint_weight_scale=node.action.restraint_weight_scale,
                       ftol=node.action.ftol,
@@ -4902,14 +4911,20 @@ class Refinement:
         self._pending_reflections = []
         model = new_model
 
+        lebail_run: list[int] = []
+        lebail_settled: bool | None = None
+        check = None if cancel is None else _cancel_check(cancel, stage.name)
         if mode == "lebail":
             values = table.decode(table.x0())
-            model.lebail_update(values, n_cycles=stage.lebail_cycles)
+            run, lebail_settled = model.lebail_update(
+                values, n_cycles=stage.lebail_cycles, tol=stage.lebail_tol, check=check)
+            lebail_run.append(run)
         elif mode == "pawley":
             if not carried:
                 # seed the intensity block from one Le Bail partition — a good
                 # warm start for the joint solve; refined values carry onward
-                model.lebail_update(table.decode(table.x0()), n_cycles=stage.lebail_cycles)
+                lebail_run.append(model.lebail_update(
+                    table.decode(table.x0()), n_cycles=_pawley_seed_cycles(stage))[0])
             # equal-split restraint on overlapped groups, scaled to the current
             # intensities (constant within the coming least-squares run)
             model.build_pawley_restraint()
@@ -5313,7 +5328,13 @@ class Refinement:
 
         if mode == "lebail" and outcome.non_finite is None:
             # a stopped stage changed nothing, its intensities included (WP-2048)
-            model.lebail_update(table.decode(outcome.theta), n_cycles=stage.lebail_cycles)
+            # the solve fitted against the first partition, so a settled second
+            # one does not undo a cut in it
+            run, settled = model.lebail_update(
+                table.decode(outcome.theta), n_cycles=stage.lebail_cycles,
+                tol=stage.lebail_tol, check=check)
+            lebail_run.append(run)
+            lebail_settled = settled if lebail_settled is None else lebail_settled and settled
 
         guard = check_guards(table, outcome, correlation_guard, model=model,
                              scan_exchangeability=stage_index == n_stages)
@@ -5364,10 +5385,11 @@ class Refinement:
             # Le Bail and Pawley read the screen alone, which the result
             # measures on its own compile as it always has
             significance=support if mode == "rietveld" else None,
-            window_loss=loss, rwp=stage_rwp)
+            window_loss=loss, rwp=stage_rwp, lebail_run=lebail_run,
+            lebail_settled=lebail_settled)
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
-            plan: RefinementPlan | str = "mccusker_default",
+            plan: RefinementPlan | PlanSpec | str = "mccusker_default",
             two_theta_limits: tuple[float, float] | None = None,
             events=None, cancel=None, telemetry=None, label: str | None = None,
             stage_reports: bool = False, progress=None) -> RefinementResult:
@@ -6030,6 +6052,8 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths,
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                lebail_cycles_run=hold.lebail_run,
+                lebail_settled=hold.lebail_settled,
                 termination=outcome.termination or None,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
@@ -6052,6 +6076,7 @@ class Refinement:
                 self._record(tree, NodeAction(
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
+                    lebail_tol=stage.lebail_tol,
                     seed=stage.seed, strain_seed=stage.strain_seed,
                     restraint_weight_scale=stage.restraint_weight_scale,
                     # the tolerance this stage *ran* at, not the one it declared
@@ -6351,6 +6376,8 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, unreached_histograms={},
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                lebail_cycles_run=hold.lebail_run,
+                lebail_settled=hold.lebail_settled,
                 termination=outcome.termination or None,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
@@ -6380,6 +6407,7 @@ class Refinement:
                 self._record(tree, NodeAction(
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
+                    lebail_tol=stage.lebail_tol,
                     seed=stage.seed, strain_seed=stage.strain_seed,
                     restraint_weight_scale=stage.restraint_weight_scale,
                     ftol=stage.ftol, window_slack_deg=stage.window_slack_deg,
@@ -6538,20 +6566,25 @@ class Refinement:
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
 
-    def report(self, *, plan: RefinementPlan | str | None = None, **kw):
+    def report(self, *, plan: RefinementPlan | PlanSpec | str | None = None, **kw):
         """The full :class:`~rietx.report.FitReport` for the last fit.
 
         Unlike ``build_report(result)``, this has the compiled model in hand,
         so Layers 1-2 (misfit attribution and typed suggested actions) are
         computed — subject to their gates.  ``plan`` supplies the Layer-2
-        strategy veto; pass the plan you ran (or its preset name).
+        strategy veto; pass the plan you ran, its ``PlanSpec`` or its preset
+        name.  A name is read for the result's mode, as the fit read it, so
+        ``"mccusker_default"`` on a Le Bail result is ``profile_only``.
         """
         from .report import build_report
 
         if self._model is None or self.result_ is None:
             raise RuntimeError("call fit() first")
-        if isinstance(plan, str):
-            plan = PLAN_PRESETS[plan]()
+        if plan is not None:
+            # read as the fit that made the result read it: a preset name
+            # through the mode's substitution, a ``PlanSpec`` converted
+            # (WP-2102)
+            plan = resolve_plan(plan, self.result_.mode)
         # the answer frozen with the result, never the live models: a later
         # cancelled fit keeps its completed stages and this result (WP-1421)
         answer = self._answer
@@ -6578,7 +6611,7 @@ class Refinement:
         return rigid_body_misfit(self, data, **kw)
 
     def summary(self, *, deliverable: str | None = None, plot: str | None = None,
-               plan: RefinementPlan | str | None = None,
+               plan: RefinementPlan | PlanSpec | str | None = None,
                report: FitReport | None = None,
                levels: dict[str, str] | None = None) -> str:
         """The termination view (WP-1302): "done, or not, and why" from one call.
@@ -9112,6 +9145,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     diagnostics = (diagnostics
                    + _far_from_data_diagnostics(model, y_calc, y_bkg, stats)
                    + _max_iter_diagnostics(stage_results)
+                   + _lebail_cap_diagnostics(stage_results)
                    + _slow_descent_diagnostics(stage_results))
 
     # Does the data support it (WP-1071): the observation/parameter ratio and
@@ -9132,11 +9166,6 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # reflection, and auto_background's trigger reads the envelope (#636).
     diagnostics = diagnostics + _air_scatter_undeclared_diagnostics(
         model, values, y_calc, stats)
-
-    # The extinction a structure did not declare (WP-1944): opt-in, so a plan
-    # cannot free it, and this is what keeps it findable from the residual.
-    diagnostics = diagnostics + _extinction_undeclared_diagnostics(
-        model, table, theta, values, y_calc, stats, structure)
 
     # What a declared sharp peak did, once the fit has an answer about it
     # (WP-1103).  Built after ``ticks`` because "is this component sitting on a
@@ -9201,6 +9230,10 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
 #: no more, has reached a fixed point.  Measured on WP-1323's baseline: cells
 #: exact 16.908 -> 16.908 (0), cells +0.3 % 16.969 -> 16.967 (1e-4).
 LEBAIL_CONVERGED_REL = 1e-4
+#: the most cycles a Pawley seed runs.  The solve refines every intensity
+#: jointly, so the seed only says where it starts, and how settled the seed is
+#: moves no answer and saves no evaluation (WP-1542's handover).
+PAWLEY_SEED_CYCLES = 3
 
 
 def _lebail_stop_diagnostic(reason: str, kept: int, rows: list[float],
@@ -9320,6 +9353,11 @@ def _copy_seeded_column(jac: np.ndarray, jac2: np.ndarray, i: int,
                 f"{path!r} reaches that block, so its seeded column cannot be "
                 f"carried into the current state; seed {path!r} off its floor "
                 f"yourself (set_values) and ask again")
+
+
+def _pawley_seed_cycles(stage: Stage) -> int:
+    """The fixed count a Pawley seed runs: a stage may ask for fewer."""
+    return min(stage.lebail_cycles, PAWLEY_SEED_CYCLES)
 
 
 def _carry_lebail(old: CompiledModel, new: CompiledModel) -> None:
@@ -10555,145 +10593,6 @@ def _air_scatter_undeclared_diagnostics(model: CompiledModel,
     )]
 
 
-#: the paths whose free columns the score test re-fits beside every phase's
-#: scale: those that change a phase's intensities without moving its lines,
-#: which is where extinction's correlations sit (ρ 0.97 with the scale, 0.87
-#: with Biso on LaB6,
-#: ``test_extinction_correlates_with_scale_and_biso_and_the_guard_fires``).
-#: Matched against what each free column *reaches* (``column_reach``), so a
-#: Biso tied across sites or driven by a ``vars.X`` is one column moving all
-#: of them.  Every atom parameter is one, as in ``least_squares._INTENSITY_ONLY``:
-#: a distortion mode or a rigid body reaches the coordinates themselves rather
-#: than a site DOF, and a moment changes the magnetic intensities.
-_EXTINCTION_PARTNER = re.compile(
-    r"phases\.\d+\.(atoms\.\d+\..+|preferred_orientation\.r|texture\..+)$")
-
-#: the coefficient (µm²) the score test's column is differenced at.  The
-#: forward difference's relative error is about x/2 at the probe, under 1e-4
-#: on the fits WP-1944 measured, far below what moves a score of 25
-#: (``test_the_extinction_probe_column_is_the_derivative_at_zero``).
-_EXTINCTION_PROBE = 1e-3
-
-
-def _extinction_undeclared_diagnostics(model: CompiledModel, table: ParameterTable,
-                                       theta: np.ndarray,
-                                       values: dict[str, float], y_calc, stats,
-                                       structure: Structure) -> list[Diagnostic]:
-    """``EXTINCTION_UNDECLARED``: a phase with no extinction declared, whose
-    strongest reflections the fit calculates stronger than it observes (WP-1944).
-
-    Extinction is opt-in, so no plan frees it on a phase that does not declare
-    it, and its row is absent from every listing.  This is the evidence-gated
-    pointer that keeps it findable.  It is the air-scatter screen's one-column
-    score test (``_air_scatter_undeclared_diagnostics``) on the extinction
-    column at 0: a = ∂y/∂ext, differenced at :data:`_EXTINCTION_PROBE` with
-    the extinction factor switched on for that phase alone, weighted and
-    projected off the background block, every phase's scale column and the
-    free intensity parameters (:data:`_EXTINCTION_PARTNER`: every atom
-    parameter, preferred orientation and texture, each free column of θ that
-    reaches one, through ``table.decode``).  Extinction and those all change the
-    strong lines, so the projection is what leaves only the part of the
-    signature none of them can draw.  It removes (a⊥·r)²/(a⊥·a⊥) of χ², a
-    Gauss-Newton step with those re-fitted and the positions held, which in
-    reduced-χ² units is the square of the significance the coefficient would
-    have if declared.  Measured (WP-1944): projected off the scale and the
-    background alone, the 11-BM NAC + CaF₂ fit scored 277 and 1945, where the
-    refit's own significances were 2.8σ and 0.5σ, the Biso absorbing the rest.
-    **One-sided**: the coefficient is bounded at 0, so a lean toward a negative
-    one does not fire.  Fires at :data:`AIR_SCATTER_UNDECLARED_SCORE` (5σ),
-    the level of the one test this is, in reduced-χ² units with the esd
-    inflation included.  Measured (WP-1944, gate off): a LaB6 synthetic with
-    ext 2.5 planted scores 230, and 0 or 0.5 planted leans the other way; the
-    11-BM NAC + CaF₂ fit scores 8.1 and 14.6, Si 640c 0.13, and FAP leans the
-    other way.  Over WP-1944's 69 structural-plan fits a freed extinction
-    without one planted reached at most 3.1σ, a score near 10.  Rietveld mode only, since Le Bail and Pawley fit the intensities.
-    """
-    if model.mode != "rietveld" or not (stats.chi2 > 0.0):
-        return []
-    w = 1.0 / model.sigma
-    r = (model.y_obs - np.asarray(y_calc)) * w
-    theta = np.asarray(theta[:len(table.free_paths)], dtype=np.float64)
-    n_phases = len(structure.phases)
-    out = []
-    block = None
-    at: list[np.ndarray] = []
-
-    def partners():
-        # every phase's scale column, and a forward-difference column for each
-        # free column of θ that reaches an intensity parameter (positions
-        # held).  In a mixture the fraction moves too, so one phase's scale is
-        # a partner of the other's extinction.  A column is moved through
-        # ``table.decode``, the residual's own map (C, then any derived
-        # block), so a tie, a variable or a rigid body is one column, never
-        # one site's share of it.  Only the phases it reaches are re-evaluated.
-        cols = list(model.bkg_design * w)
-        at.extend(np.asarray(model.phase_component(jp, values))
-                  for jp in range(n_phases))
-        cols += [a_jp * w for a_jp in at]
-        reach = table.column_reach()
-        for j, free in enumerate(table.free_paths):
-            if not any(_EXTINCTION_PARTNER.match(p) for p in reach[free]):
-                continue
-            touched = {m.group(1) for p in reach[free]
-                       if (m := re.match(r"phases\.(\d+)\.", p))}
-            phases = (sorted(int(i) for i in touched)
-                      if all(p.startswith("phases.") for p in reach[free])
-                      else range(n_phases))
-            step = 1e-6 * max(abs(float(theta[j])), 1.0)
-            nudged = theta.copy()
-            nudged[j] += step
-            moved = table.decode(nudged)
-            delta = sum(np.asarray(model.phase_component(jp, moved)) - at[jp]
-                        for jp in phases)
-            cols.append(delta / step * w)
-        return np.vstack(cols).T
-    for ip, phase in enumerate(structure.phases):
-        path = f"phases.{ip}.extinction"
-        if phase.extinction is not None:
-            continue
-        cp = model.phases[ip]
-        held = cp.skip_extinction
-        try:
-            cp.skip_extinction = False
-            base = np.asarray(model.phase_component(ip, {**values, path: 0.0}))
-            probe = np.asarray(model.phase_component(
-                ip, {**values, path: _EXTINCTION_PROBE}))
-        finally:
-            cp.skip_extinction = held
-        a = (probe - base) / _EXTINCTION_PROBE * w
-        block = partners() if block is None else block
-        beta, *_ = lapack.lstsq(block, a, rcond=None)
-        perp = a - block @ beta
-        norm = float(perp @ perp)
-        lean = float(perp @ r)
-        if not (norm > 0.0 and lean > 0.0):
-            continue
-        # in units of the reduced χ² the esds are quoted in, inflation
-        # included, so the score is the squared significance a declared
-        # coefficient would be reported at
-        score = lean * lean / norm / stats.chi2 / (stats.esd_inflation or 1.0) ** 2
-        if score < AIR_SCATTER_UNDECLARED_SCORE:
-            continue
-        out.append(Diagnostic(
-            level="warning", code="EXTINCTION_UNDECLARED", where=[path],
-            message=(
-                f"Phase {phase.name!r} declares no extinction, and its strongest "
-                "reflections are calculated stronger than observed. Freeing "
-                "extinction, with the scales, the background and the free "
-                "intensity parameters re-fitted and the line positions held, "
-                f"would remove {score:.0f}× this fit's "
-                "reduced χ² (a score test on the fit's own residual)."),
-            suggestion=(
-                f"Declare it with structure.phases[{ip}].extinction = 0.0, free "
-                f"phases.{ip}.extinction and refit. Preferred orientation "
-                f"(structure.phases[{ip}].preferred_orientation) and a wrong Biso "
-                "also change the strong lines, so read its esd and its "
-                "correlation with the scale before quoting it."),
-            value=score,
-        ))
-    return out
-
-
 def _quantify_phases(table: ParameterTable, theta: np.ndarray,
                      stderr_internal: np.ndarray | None,
                      correlation: np.ndarray | None, structure: Structure,
@@ -10866,6 +10765,26 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
         where=[],
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",
+    )]
+
+
+def _lebail_cap_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``LEBAIL_CYCLES_AT_CAP``: the answer's partition stopped on its cap (WP-1542).
+
+    Only the last stage's partitions are the answer's: the solve fitted against
+    the first and the result carries the second.  An earlier stage's run from
+    intensities the next solve moves, so a cap there costs nothing the next
+    partition keeps.
+    """
+    last = stage_results[-1] if stage_results else None
+    if last is None or last.lebail_settled is not False:
+        return []
+    return [Diagnostic(
+        level="warning", code="LEBAIL_CYCLES_AT_CAP",
+        message=(f"A Le Bail partition of stage {last.name!r} stopped at its cap of "
+                 f"{max(last.lebail_cycles_run)} cycles, before the intensities settled."),
+        where=[],
+        suggestion="Raise lebail_cycles on the stage.",
     )]
 
 
@@ -12071,7 +11990,8 @@ def estimate_mu_r(structure: Structure, instrument: Instrument) -> float | None:
 
 
 def refine(data: PatternData, structure: Structure, instrument: Instrument,
-           *, mode: Mode = "rietveld", plan: RefinementPlan | str = "mccusker_default",
+           *, mode: Mode = "rietveld",
+           plan: RefinementPlan | PlanSpec | str = "mccusker_default",
            two_theta_limits: tuple[float, float] | None = None,
            backend: str = "numpy", solver: str = DEFAULT_SOLVER,
            history: bool | str | Path | RefinementTree = False,

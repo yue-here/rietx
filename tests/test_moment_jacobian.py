@@ -1,8 +1,11 @@
 """WP-1327: the analytic moment Jacobian, held to exact oracles.
 
-Everything here is **synthetic** — one or two Mn sites on a small
+Almost everything here is **synthetic** — one or two Mn sites on a small
 orthorhombic or tetragonal cell, neutron CW, patterns from rietx's own
-forward model — so nothing about a real specimen is asserted.
+forward model — so nothing about a real specimen is asserted.  The
+exception is ``REAL_STATES``: the vendored LaMnO₃ 50 K pattern under its two
+candidate groups, where the columns are asked against real counts and σ
+(a derivative's correctness, still not a claim about the specimen).
 
 **What is new.**  ``_make_jacobian`` used to send every ``…moment.dof<k>``
 column to the peak-chain finite difference, which re-runs ``phase_peaks`` at
@@ -12,13 +15,16 @@ forward orbit sum of one atom at ∂m/∂d) chained through the same intensity
 factors as the coordinate columns.  The derivation is in the WP-1327
 PR #1206's description (and, once written, the WP-1327 handover).
 
-**Angles are built and checked here, and not dispatched.**  The derivative
-covers them (the same function returns their rows), and every test below
-holds the angle columns ``_moment_column`` builds to the same oracle.  The
-dispatch declines them by name (``_moment_reach_ok``'s docstring), because
-an exact angle column is zero at a symmetry-fixed seed and a solver cannot
-leave it where it is a maximum, which the forward difference escaped only by
-its truncation; ``test_an_exact_angle_column_cannot_leave_a_symmetric_seed``
+**Angles are built and checked here, and dispatched only on request.**  The
+derivative covers them (the same function returns their rows), and every
+test below holds the angle columns ``_moment_column`` builds to the same
+oracle.  ``_make_jacobian(..., moment_angles=True)`` lets the branch claim
+them, and ``test_a_dispatched_angle_column_meets_the_exact_oracle`` pins the
+dispatched column there, on synthetic and real data.  The default dispatch
+declines them by name (``_moment_reach_ok``'s docstring), because an exact
+angle column is zero at a symmetry-fixed seed and a solver cannot leave it
+where it is a maximum, which the forward difference escaped only by its
+truncation; ``test_an_exact_angle_column_cannot_leave_a_symmetric_seed``
 pins that measured reason, so the decline cannot outlive it unnoticed.
 
 **Why the oracle is exact, not a forward difference.**  F is linear in every
@@ -65,8 +71,16 @@ ANY = ("x,y,z,+1",)                     # {1}: any direction, n = 3
 ORACLE_BAR = 3e-13
 #: the bar against the package's own central differences (the cross-backend
 #: matrix's ``fd`` opinion, O(h²) truncation) on an **analytic** column.
-#: Measured worst 1.4e-9 (an angle of ``extinction_live``); ~10× margin.
+#: Measured worst 1.4e-9 on the synthetic states (an angle of
+#: ``extinction_live``), ~10× margin; 4.6e-9 on LaMnO₃ (2026-11-04,
+#: darwin/arm64, the Pnma azimuth), only ~4× — that error is the central
+#: difference's own O(h²) truncation, not the analytic column's, so a real
+#: state failing here first asks whether the reference's step is too coarse.
 CENTRAL_FD_BAR = 2e-8
+#: the exact-oracle bar on the real LaMnO₃ states (``REAL_STATES``).  Measured
+#: 2026-11-04 (darwin/arm64, [dev,jax]) at 1.1e-13 worst, the Pnma azimuth,
+#: whose column is the smallest; ~10× margin.  The peak chain sits at ≥ 7e-8.
+REAL_ORACLE_BAR = 1e-12
 
 
 def _atom(label, species, xyz, biso, moment=None):
@@ -186,12 +200,59 @@ def _state(name):
     if name == "split_extinction_live":
         return _build(_mnf2_width(extinction=0.8),
                       [f"{M0}.dof0", "phases.0.extinction", "phases.0.scale"])
+    if name.startswith("lamno3_"):
+        return _lamno3(name.removeprefix("lamno3_"))
     raise KeyError(name)
+
+
+#: the real-data states: LaMnO₃ at 50 K (BT-1, the GSAS-II tutorial
+#: ``Magnetic-I``, vendored by WP-1327) under each group the tutorial
+#: compares, with the Mn moment seeded off every direction either group fixes
+#: so neither angle column is zero by symmetry
+LAMNO3_SEEDS = {"62.448": (1.0, 0.4, 1.0), "62.441": (0.5, 0.4, 2.0)}
+
+
+def _lamno3(bns):
+    """The vendored pattern and CIF, the suite's instrument and limits, and
+    Mn2's moment free in all three DOFs beside the scale and one background
+    term.  Not fitted: the columns are asked at the tutorial's structure,
+    against the real counts and their σ, which is what makes it a real
+    fixture rather than a fourth synthetic one."""
+    from rietx.crystallography.cif import structure_from_cif
+    from tests.test_acceptance_magnetic_lamno3 import (
+        CONTAMINANT,
+        DATA,
+        LIMITS,
+        _instrument,
+    )
+
+    data = rx.read_pattern(DATA / "gsas2_bt1_lamno3_50K.gsas")
+    data = data.model_copy(update={"excluded_regions": [CONTAMINANT]})
+    structure = structure_from_cif(DATA / "gsas2_bt1_lamno3.cif")
+    structure.phases[0].magnetic_symmetry = bns
+    mn = structure.phases[0].atoms[1]
+    assert mn.label == "Mn2"
+    mn.moment = Moment.from_values(LAMNO3_SEEDS[bns], "Mn3+", vary=True)
+    structure = rx.Structure.model_validate(structure.model_dump())
+    ins = _instrument()
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for path in (f"{M1}.dof0", f"{M1}.dof1", f"{M1}.dof2", "phases.0.scale",
+                 "instrument.background.c0"):
+        assert table.set_vary([path], True), path
+    table.apply_to_models(structure, ins)
+    model = compile_model(structure, ins, data, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          two_theta_limits=LIMITS)
+    return model, table
 
 
 #: states where y is linear in |F_⊥|², so the oracle below is exact
 EXACT_STATES = ["n1_mnf2", "n2_plane", "n3_any", "two_sites_tied", "split"]
 ALL_STATES = [*EXACT_STATES, "extinction_live", "split_extinction_live"]
+REAL_STATES = [f"lamno3_{bns}" for bns in LAMNO3_SEEDS]
+#: every state with a free moment angle where the oracle is exact
+ANGLE_EXACT_STATES = ["n2_plane", "n3_any", "two_sites_tied", *REAL_STATES]
 
 
 def _moment_columns(table):
@@ -269,12 +330,15 @@ def _oracle_errors(name):
 
 # ======================================================== the branch is taken
 
-@pytest.mark.parametrize("name", ALL_STATES)
-def test_the_dispatch_takes_the_branch_exactly_where_it_claims(name):
+@pytest.mark.parametrize("angles", [False, True], ids=["default", "angles"])
+@pytest.mark.parametrize("name", [*ALL_STATES, *REAL_STATES])
+def test_the_dispatch_takes_the_branch_exactly_where_it_claims(name, angles):
     """Which columns the analytic branch claims, asserted — not inferred
-    from agreement, which a peak-chain column would also give: every
-    modulus column of a supported phase, no angle, nothing on a split draw
-    with live extinction.  And a claimed column *is* the built one."""
+    from agreement, which a peak-chain column would also give: by default
+    every modulus column of a supported phase and no angle; with
+    ``moment_angles`` every moment column, angles included; nothing on a
+    split draw with live extinction either way.  And a claimed column *is*
+    the built one."""
     model, table = _cached(name)
     supported = model.moment_grad_supported(0)
     assert supported is (name != "split_extinction_live")
@@ -289,11 +353,12 @@ def test_the_dispatch_takes_the_branch_exactly_where_it_claims(name):
 
     lsq._moment_column = spy
     try:
-        J = _make_jacobian(model, table)(table.x0())
+        J = _make_jacobian(model, table, moment_angles=angles)(table.x0())
     finally:
         lsq._moment_column = real
     cols = _moment_columns(table)
-    want = [c for c, kind, _ in cols if kind == "modulus"] if supported else []
+    want = ([c for c, kind, _ in cols if angles or kind == "modulus"]
+            if supported else [])
     assert sorted(taken) == want, (taken, want)
     for c, _kind, reach in cols:
         if c in want:
@@ -331,6 +396,66 @@ def test_the_replaced_peak_chain_column_fails_the_same_oracle():
         print(f"{table.free_paths[c]}: built {e_new:.1e}, peak chain {e_old:.1e}")
         assert e_new < ORACLE_BAR
         assert e_old > 1e3 * ORACLE_BAR
+
+
+# ======================================================== the dispatched angle
+
+def _angle_columns(table):
+    return [(c, reach) for c, kind, reach in _moment_columns(table)
+            if kind == "angle"]
+
+
+@pytest.mark.parametrize("name", ANGLE_EXACT_STATES)
+def test_a_dispatched_angle_column_meets_the_exact_oracle(name):
+    """The analytic angle branch, pinned where it is dispatched: every angle
+    column of ``_make_jacobian(..., moment_angles=True)`` meets the exact
+    oracle, on the synthetic states and on the two real LaMnO₃ ones.
+
+    The bar is the one the *peak chain* cannot meet, so this test fails the
+    moment the branch stops claiming an angle (the default dispatch, asserted
+    below as the positive arm, sits at ≥ 7e-8 on every column here).
+    Measured worst (darwin/arm64, ``[dev,jax]``, 2026-11-04): 2.6e-14 on the
+    synthetic states, 1.1e-13 on LaMnO₃ (the Pnma azimuth, the smallest
+    column); the real-data bar is ``REAL_ORACLE_BAR``, ~10× that.
+    """
+    model, table = _cached(name)
+    theta = table.x0()
+    residual = _make_residual(model, table)
+    cols = _angle_columns(table)
+    assert cols, "no free moment angle in the state — the test would prove nothing"
+    bar = REAL_ORACLE_BAR if name in REAL_STATES else ORACLE_BAR
+    J_on = _make_jacobian(model, table, moment_angles=True)(theta)
+    J_off = _make_jacobian(model, table)(theta)
+    for c, _reach in cols:
+        truth = _oracle_column(residual, theta, c, "angle")
+        e_on, e_off = _rel(truth, J_on[:, c]), _rel(truth, J_off[:, c])
+        print(f"{name} {table.free_paths[c]}: dispatched {e_on:.1e}, "
+              f"default (peak chain) {e_off:.1e}")
+        assert e_on < bar, (table.free_paths[c], e_on)
+        assert e_off > 1e3 * bar, (table.free_paths[c], e_off)
+    # the rows below the data, which a moment reaches nowhere, are untouched
+    np.testing.assert_array_equal(J_on[len(model.tt):], J_off[len(model.tt):])
+
+
+@pytest.mark.parametrize("name", ["extinction_live", *REAL_STATES])
+def test_a_dispatched_angle_column_meets_central_differences(name):
+    """The dispatched angle column against the cross-backend matrix's ``fd``
+    opinion: the check where the exact oracle is not exact (live extinction)
+    and a second, independent one on the real data.  Measured worst
+    (darwin/arm64, ``[dev,jax]``, 2026-11-04): 1.4e-9 on ``extinction_live``,
+    4.6e-9 on LaMnO₃ (the Pnma azimuth), under ``CENTRAL_FD_BAR``.  This is
+    the matrix's O(h²) opinion, not the exact oracle above, so its bar is
+    the looser one."""
+    model, table = _cached(name)
+    theta = table.x0()
+    fd = _central_fd_jacobian(name, model, table)(theta)
+    J_on = _make_jacobian(model, table, moment_angles=True)(theta)
+    cols = _angle_columns(table)
+    assert cols
+    for c, _reach in cols:
+        err = _rel(fd[:, c], J_on[:, c])
+        print(f"{name} {table.free_paths[c]}: dispatched vs central {err:.1e}")
+        assert err < CENTRAL_FD_BAR, (table.free_paths[c], err)
 
 
 @pytest.mark.parametrize("name", ALL_STATES)
@@ -450,10 +575,14 @@ def test_an_exact_angle_column_cannot_leave_a_symmetric_seed():
     norm = np.linalg.norm(_built_column(model, table, theta, modulus,
                                         cols[modulus]))
     fd = _make_jacobian(model, table)(theta)[:, azimuth]
+    dispatched = _make_jacobian(model, table, moment_angles=True)(theta)[:, azimuth]
     print(f"azimuth/modulus: exact {np.linalg.norm(built) / norm:.1e}, "
           f"peak chain {np.linalg.norm(fd) / norm:.1e}")
     assert np.linalg.norm(built) < 1e-13 * norm
     assert np.linalg.norm(fd) > 1e-9 * norm
+    # asked for, the branch hands the solver that exact zero column
+    np.testing.assert_array_equal(dispatched[:len(model.tt)],
+                                  built[:len(model.tt)])
 
 
 # ======================================================== a whole fit

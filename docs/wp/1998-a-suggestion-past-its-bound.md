@@ -64,6 +64,19 @@ template line):
   the criterion defines), action: *abstain*, the conservative direction —
   `None` names nothing, and the groups stay for a caller who reads them.
 
+- **From WP-2102 (2026-11-05): the report's Layer 2 suggests a parameter the
+  mode force-fixes.** A sibling of this WP's defect in the FitReport rather
+  than in `suggest`. On a Le Bail fit of a synthetic LaB6 pattern (the
+  `two_patterns[0]` fixture of `tests/test_multi_histogram.py`, Rwp 0.042),
+  `ref.report()` offers `refine_scale` (`phases.*.scale`) and `refine_biso`
+  (`phases.*.atoms.*.biso`) as active actions. Both paths are held "force-fixed
+  by the intensity mode", so freeing either moves nothing. Before WP-2102,
+  `report(plan="mccusker_default")` hid the scale one by accident: the
+  hand-read preset's scale stage vetoed it as "already refined by the staged
+  plan". `apply_strategy_veto` (`report/layer2.py`) sees the plan and the free
+  paths only, never the mode-fixed ones. Fold it here, or file it as its own WP
+  if the mechanism differs from the bounded gain.
+
 ## Non-goals
 
 - The frozen-window gap that moves the minimum (WP-1421 owns it).
