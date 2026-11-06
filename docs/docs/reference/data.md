@@ -343,6 +343,27 @@ The CIF reader has one, so it corrects a small deviation and reports [`CIF_CELL_
 
 `Cell.cubic` builds all six from one length, and `Cell.lengths_angles` returns the six values as a tuple.
 
+### Parent cell
+
+A child phase can state its cell as its parent's carried through the transform, instead of as six parameters of its own.
+That is how a child whose group names no tabulated type in the child's axes, such as a C-centred type in a primitive doubled cell, gets a metric at all.
+The phase's `parent_cell` field holds a `ParentCell`, and `None`, the default, leaves the cell as above.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `ParentCell.space_group` | `str` | the parent's space group, whose constraints the parent's cell refines under |
+| `ParentCell.transform` | `str` | the parent → child transform (P, p) |
+| `ParentCell.cell` | `Cell` | the parent's cell, the refined lengths and angles |
+| `ParentCell.strain` | list of `Parameter` | one dimensionless amplitude per lattice strain the child's group allows and the parent's does not |
+
+The child's metric is $G' = P^\mathsf{T}(G_\mathrm{p} + 2LEL)P$, with $G_\mathrm{p}$ the parent's, $L$ the parent's edge lengths on the diagonal and $E$ the Green–Lagrange strain the amplitudes build in the parent's axes (Campbell et al., 2006).
+The child's own six cell parameters are then derived and locked.
+A stored child cell that disagrees with the one its parent and strains give is refused, because the table cannot tell which side was edited.
+Move the parent through `Refinement.set_values` on the parent's cell or a strain, which re-derives the child's cell.
+A bound stated on the parent's cell carries over to the child's `parent_cell.cell`, and a freed strain is held where the child's metric stays positive definite (derivation in [Peak positions](../theory/peak-positions.md)).
+`phases.*.cell.*` frees the parent's edges and never a strain, so a strain is freed only by naming its own path under the phase's `parent_cell`; a stage that frees the edges while a strain stays held reports [`PARENT_STRAIN_HELD`](diagnostics-refinement.md#parent_strain_held).
+`rietx.crystallography.magnetic.supercell.magnetic_supercell` writes this field where the child needs it, or for every child with `parent_cell=True`.
+
 ## Atom
 
 `Atom` is one site in the asymmetric unit.

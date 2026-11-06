@@ -89,7 +89,9 @@ DEFERRED_PATH = TESTS_DIR / "api_surface_deferred.txt"
 #: on this line.  Each release cut lowers it to the bucket's size then
 #: (docs/RELEASING.md step 2), which is where the list is read.  Raising it is
 #: a reviewed edit with a reason in its commit (WP-1981, 2026-10-16).
-DEFERRED_CEILING = 36
+#: 37 on 2026-10-24: `Phase.parent_cell` (WP-1419, #1108) is a technique field kept out
+#: of `api.md` and deferred like `Phase.rigid_bodies`, until the technique index lands.
+DEFERRED_CEILING = 37
 
 
 # --- what is off the surface, and why -------------------------------------

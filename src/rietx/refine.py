@@ -1952,10 +1952,14 @@ def _cell_runaway_withheld(table: ParameterTable,
     """The paths whose esd a result withholds, given the paths one stage's
     ``CELL_RUNAWAY`` finding names (its ``where``).
 
-    Every cell path named, and every entry tied to one of them, transitively:
-    a tie inherits its source's blindness (root CLAUDE.md, the covariance
-    clause), so a cubic ``b``/``c`` following a withheld ``a`` cannot report
-    the esd ``a`` lost.  A ``vars.X`` driver the finding names is not a cell
+    Every cell path named, and every entry tied to one of them or written by a
+    derived block reading one, transitively: a tie inherits its source's
+    blindness (root CLAUDE.md, the covariance clause), so a cubic ``b``/``c``
+    following a withheld ``a`` cannot report the esd ``a`` lost.  A derived
+    entry is the same case without the tie: a ``Phase.parent_cell`` child's
+    six cell entries are computed from the parent's, and are the cell the
+    pattern uses, so they lose the esd the parent edge lost (WP-1419, review
+    of #1108).  A ``vars.X`` driver the finding names is not a cell
     and keeps its esd; the cells it drives are named themselves.  Which
     stage's finding is the caller's to decide (:func:`_build_result`).
     """
@@ -1968,6 +1972,11 @@ def _cell_runaway_withheld(table: ParameterTable,
                     and any(src in withheld for src, _ in e.tie.terms)):
                 withheld.add(e.path)
                 grew = True
+        for block in table.derived:
+            if (any(src in withheld for src in block.inputs)
+                    and not withheld.issuperset(block.outputs)):
+                withheld.update(block.outputs)
+                grew = True
     return withheld
 
 
@@ -1979,7 +1988,7 @@ def _cell_runaway_withheld(table: ParameterTable,
 _ANGLE_CELL_NAMES = ("alpha", "beta", "gamma")
 
 #: a cell path's phase index, bare or scoped ``hist.h.`` by a joint fit
-_CELL_PHASE = re.compile(r"phases\.(\d+)\.cell\.")
+_CELL_PHASE = re.compile(r"phases\.(\d+)\.(?:parent_cell\.)?cell\.")
 
 
 def _cell_runaway_diagnostic(
@@ -5766,6 +5775,8 @@ class Refinement:
                 [(sr.name, sr.n_degenerate_cell_probes) for sr in stage_results]))
             diagnostics.extend(_hold_diagnostics(stage_results,
                                                  table.origin_holds))
+            diagnostics.extend(_parent_strain_held_diagnostics(
+                stage_results, table.free_paths, self.structure))
             diagnostics.extend(_origin_diagnostics(table, stage_results,
                                                    origins=origins))
             diagnostics.extend(_unknown_path_diagnostics(
@@ -6361,6 +6372,8 @@ class Refinement:
             # before the node, so the node carries what the result carries
             diagnostics.extend(_hold_diagnostics([stage_result],
                                                  table.origin_holds))
+            diagnostics.extend(_parent_strain_held_diagnostics(
+                [stage_result], table.free_paths, self.structure))
             diagnostics.extend(_origin_diagnostics(
                 table, [stage_result], origins=[(stage.name, hold.origin)]))
             diagnostics.extend(_unknown_path_diagnostics(
@@ -7976,6 +7989,72 @@ def _hold_diagnostics(stage_results: list[StageResult],
     )]
 
 
+#: a joint fit's histogram scope, stripped to compare a path with the model's
+_HIST_SCOPE = re.compile(r"^hist\.\d+\.")
+
+
+def _parent_strain_held_diagnostics(stage_results: list[StageResult],
+                                    free: Iterable[str],
+                                    structure: Structure) -> list[Diagnostic]:
+    """``PARENT_STRAIN_HELD`` — a parent cell's edges refined with a Γ strain held.
+
+    ``phases.*.cell.*`` reaches the parent's cell edges of a
+    ``Phase.parent_cell`` phase and never a strain (WP-1419): while the
+    child's atoms and moments keep the parent's symmetry a strain at zero is a
+    stationary point, and a distortion gives it only a small gradient there
+    (measured 2e-3 of the peak at a 0.01 coordinate; 8e-14 on the parent's
+    positions), so a plan written for an ordinary phase
+    should refine the cell the way a user expects.  A competent refiner can
+    still want the strain freed, so the hold is said aloud, as a hold is
+    (:func:`_hold_diagnostics`, DESIGN.md § Rules, 1): one finding per phase
+    whose edges were free in some stage while one of its strains was not,
+    naming the held strain paths and the verbs that free them.  ``info``: the
+    run did what its plan said.
+
+    ``free`` is the answer's free paths and the stages' ``freed`` lists add
+    what an earlier stage freed, so an edge freed and later held is still
+    counted; a joint fit's ``hist.h.`` scope is stripped.
+    """
+    def bare(path: str) -> str:
+        return _HIST_SCOPE.sub("", path)
+
+    freed = {bare(p) for p in free}
+    for sr in stage_results:
+        freed.update(bare(p) for p in sr.freed)
+    out: list[Diagnostic] = []
+    for ip, phase in enumerate(structure.phases):
+        declared = phase.parent_cell
+        if declared is None or not declared.strain:
+            continue
+        edges = [f"phases.{ip}.parent_cell.cell.{n}"
+                 for n in ("a", "b", "c", "alpha", "beta", "gamma")]
+        if not any(e in freed for e in edges):
+            continue
+        held = [f"phases.{ip}.parent_cell.strain.{j}"
+                for j in range(len(declared.strain))
+                if f"phases.{ip}.parent_cell.strain.{j}" not in freed]
+        if not held:
+            continue
+        n = len(held)
+        values = [declared.strain[int(p.rsplit(".", 1)[1])].value for p in held]
+        out.append(Diagnostic(
+            level="info", code="PARENT_STRAIN_HELD",
+            message=(f"phase {ip}'s parent cell was refined with {n} Γ strain"
+                     f"{'' if n == 1 else 's'} held at "
+                     f"{', '.join(repr(v) for v in values)}: {', '.join(held)}.  "
+                     f"The cell glob never frees a strain, so the child's cell "
+                     f"is the parent's carried through the transform with no "
+                     f"shear beyond the held value."),
+            where=held, value=float(n),
+            suggestion=("To test for a strain, seed it off zero with set_values "
+                        "(zero is a stationary point while the atoms keep the "
+                        "parent's symmetry, and a distortion gives it only a "
+                        "small gradient there), then free "
+                        "'phases.*.parent_cell.strain.*' in a stage's turn_on."),
+        ))
+    return out
+
+
 #: an atom's coordinate, which a site-symmetry table drives through
 #: ``….dof.k`` rather than freeing directly
 _COORDINATE_PATH = re.compile(r"^(phases\.\d+\.atoms\.\d+)\.[xyz]$")
@@ -8116,7 +8195,7 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
 
 
 #: the fixed leading segments of a glob that names one site
-_SITE_GLOB = re.compile(r"^(phases\.\d+\.atoms\.\d+)\.")
+_SITE_GLOB = re.compile(r"^(phases\.\d+\.(?:atoms\.\d+|cell))\.")
 
 
 def _frees_for_request(entry, turn_on, user_ties) -> bool:
@@ -8152,7 +8231,10 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
     was already reported by :func:`_fixed_literal_diagnostics`.
 
     **Only a glob whose fixed leading segments name one existing site**
-    (``phases.<i>.atoms.<j>.``).  WP-1414 kept every other pattern that matches
+    (``phases.<i>.atoms.<j>.``) **or one existing phase's cell**
+    (``phases.<i>.cell.``, #1108: a parent-cell phase's cell glob reaches only
+    derived rows, and ``phases.0.cell.al*`` on a cubic phase only
+    symmetry-fixed ones, while the literal was already reported).  WP-1414 kept every other pattern that matches
     nothing silent, because the shipped plans free families some models lack
     (``phases.*.microstrain.dof.*``), and no preset names a concrete index.
     A glob with a concrete site is the caller's claim about that site, so it
@@ -8205,6 +8287,24 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
         which = subject or _stage_list(names)
         site = _SITE_GLOB.match(glob).group(1)
         matched = [e.path for e in entries if fnmatch.fnmatchcase(e.path, glob)]
+        if site.endswith(".cell"):
+            ip = int(site.split(".")[1])
+            what = (f"matches only rows the model fixes or ties "
+                    f"({', '.join(matched)})" if matched
+                    else "matches no parameter")
+            parent = any(e.path.startswith(f"phases.{ip}.parent_cell.cell.")
+                         for e in entries)
+            why = (f" Phase {ip}'s cell is stated through its parent, so its "
+                   "own cell rows are derived and never free." if parent else "")
+            fix = (f"Free phases.{ip}.parent_cell.cell.* (the parent's edges) "
+                   "instead." if parent else
+                   "Read held_because for these rows in ref.parameters().")
+            out.append(Diagnostic(
+                level="warning", code="STAGE_PATH_NOT_FREE",
+                message=(f"{which[:1].upper()}{which[1:]} asked for {glob}, "
+                         f"which {what}, so nothing was freed for it.{why}"),
+                where=[glob], suggestion=fix))
+            continue
         dofs = [e.path for e in entries if e.path.startswith(f"{site}.dof.")]
         coords = [by_path.get(f"{site}.{axis}") for axis in "xyz"]
         reaches = any(fnmatch.fnmatchcase(f"{site}.{tail}", glob)

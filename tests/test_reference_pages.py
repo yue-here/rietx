@@ -90,8 +90,9 @@ def test_notation_renders_outside_code_spans(text, rendered):
 
 
 def test_the_map_shows_every_entry_once_with_its_unit():
-    """One table row and one definition per registry entry."""
-    text = reference_pages.parameter_map()
+    """One table row and one definition per registry entry, across the map's pages."""
+    text = "\n".join(reference_pages.parameter_map(stem)
+                     for stem in ("parameters", *reference_pages.PARAMETER_PAGES))
     for entry in help_registry()["parameters"]:
         first = f"`{entry['paths'][0]}`"
         assert text.count(f"| {first}") == 1, entry["paths"]
@@ -99,6 +100,17 @@ def test_the_map_shows_every_entry_once_with_its_unit():
         if entry["unit"]:
             row = next(line for line in text.splitlines() if line.startswith(f"| {first}"))
             assert f"| {reference_pages._notation(entry['unit'])} |" in row, row
+
+
+def test_the_time_of_flight_group_is_on_its_own_page_and_no_group_on_two():
+    """The map was 88 characters over the 50 000 cap with #1108's strain row, so
+    the time-of-flight group has its own page; every group is on exactly one."""
+    main = reference_pages.parameter_map()
+    tof = reference_pages.parameter_map("parameters-tof")
+    assert "\n## Time of flight\n" in tof and "\n## Time of flight\n" not in main
+    assert "\n## Cell and structure\n" in main and "\n## Cell and structure\n" not in tof
+    for heading, _lead, _leaves in reference_pages.PARAMETER_GROUPS:
+        assert (f"\n## {heading}\n" in main) != (f"\n## {heading}\n" in tof), heading
 
 
 # ----------------------------------------------------------------------
@@ -226,6 +238,39 @@ def test_the_index_reaches_the_shapes_a_keyword_walk_misses(tmp_path):
     # A table that only lists a code raised elsewhere does not raise it.
     assert index["KW_CODE"]["files"] == {"rietx/a.py"}
     assert index["TYPED_CODE"]["files"] == {"rietx/c.py"}
+
+
+def _misfiled_links(text: str, index: dict, where: str) -> list[str]:
+    """Each link into a diagnostic page whose page is not the one that files its code."""
+    link = re.compile(r"(diagnostics(?:-[a-z]+)*)(?:\.md|\.html)?#([A-Za-z0-9_-]+)")
+    breaches = []
+    for stem, anchor in link.findall(text):
+        code = anchor.upper().replace("-", "_")
+        if code in index and reference_pages.diagnostic_group(index[code]["files"], code) != stem:
+            breaches.append(f"{where}: {stem}#{anchor}")
+    return breaches
+
+
+def test_every_link_into_a_diagnostic_page_names_the_page_that_files_the_code():
+    """A code that changes page leaves its links in the manual and the tutorials
+    on the old one, and a link to a page that no longer holds the anchor opens
+    at the page's top.  Sphinx sees the manual's links; only this sees the
+    tutorials' absolute ones."""
+    index = reference_pages.diagnostic_index()
+    root = DOCS_DIR.parent
+    paths = [*sorted((DOCS_DIR / "docs").rglob("*.md")),
+             *sorted((root / "examples" / "tutorials").glob("*.py"))]
+    paths = [p for p in paths if "_generated" not in p.parts and "_build" not in p.parts]
+    breaches = [b for p in paths
+                for b in _misfiled_links(p.read_text(encoding="utf-8"), index,
+                                         p.relative_to(root).as_posix())]
+    assert not breaches, "\n".join(breaches)
+    # the check can fail: a link on the page a code left, in both spellings
+    stale = ("[a](diagnostics-refinement.md#stage_max_iter) "
+             "[b](https://x/docs/stable/reference/diagnostics-series.html#stage-max-iter)")
+    assert _misfiled_links(stale, index, "t.md") == [
+        "t.md: diagnostics-refinement#stage_max_iter",
+        "t.md: diagnostics-series#stage-max-iter"]
 
 
 # ----------------------------------------------------------------------

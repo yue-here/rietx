@@ -15,7 +15,7 @@ Most of them are built from the code that owns their facts, so they match the ve
 - [Files written for other programs](foreign-writers.md) gives what the TOPAS, FullProf, GSAS and GSAS-II writers put in a file, and what each refuses.
 - [Models of other programs' files](foreign-models.md) gives the fields of `TopasModel`, `FullProfModel`, `GsasModel` and `Gsas2Model`.
 - [Pattern diagnostics](pattern-diagnostics.md) gives each field `diagnose` measures on a pattern before a fit, and the two low-angle checks a fit adds.
-- [Parameter map](parameters.md) lists every refinable parameter, grouped by what it does.
+- [Parameter map](parameters.md) lists every refinable parameter, grouped by what it does, with the time-of-flight ones on [their own page](parameters-tof.md).
 - [The parameter table](parameter-table.md) gives the fields of a `ParameterRow`, why a row cannot be freed, ties and restraints, the bounds a fit runs in, what `set_vary` and `set_values` return and refuse, the rows a result reports, and the profile interval.
 - [Stage settings, flags and options](settings.md) lists the other names rietx uses: stage settings, peak flags, peak origins, reader options, instrument preset fields and indexing search settings.
 - [Plan presets](plans.md) draws each preset's stages.
