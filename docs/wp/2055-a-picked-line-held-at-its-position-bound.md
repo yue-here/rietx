@@ -59,28 +59,60 @@ every pick, so the C3 screen and the driven set are re-measured.
 practice (what other pickers do) or a measurement on several families. Holding a declared
 weight is the caller's choice and changes nothing.
 
-### Inherited
+### Findings, 2026-11-06 (task 1, re-run on `a84379aac`)
 
-- 2026-10-31, from the issue triage (issue #1166): the reporter ran this WP's
-  first task, the direction test, on `main` `2cf637372` (picker and
-  `qarr_instrument()` byte-identical to `c0e32ab29`), with arms and a reading
-  rule written down before the run. The 16 Oct census and direction reproduce
-  exactly (87 at bound, 24 usable above the bar, 19 below 90°; 17 lower : 2
-  higher below 90°, p = 0.0007). Declaring each pattern's own fitted Kα2
-  weight gives 79 / 19 / 14 and a split of 10 : 4 (p = 0.18), but the drop is
-  in the population, not the direction: the 10 low-angle components on the
-  bound in both arms move 8 : 2 in both, and the 10 that leave all moved low
-  when freed (five shoulders 0.09–0.12° below a line 5–14× stronger become
-  `not_separable`; three change their group's count; one becomes `weak_line`).
-  Fitted weights range 0.256–0.462, and brucite's fit drives it to 0, which is
-  not physical for a Cu tube. Positive arm, synthetic corundum: holding 0.5
-  against a true 0.44 shifts Kα1 by about −0.003°, a tenth of the median freed
-  move on the real patterns (−0.023°); only a gross mismatch (0.5 held against
-  0) puts usable lines on the bound. Their reading: the numbers count against
-  the Kα2 weight as the main cause and do not identify the cause; eight of the
-  17 declared-arm movers carry `axial_tail`, yet the aperture-fitted arm still
-  gives 11 : 5. The task-2 survey of other pickers is still owed. Checked
-  against the tree at d87c8cc91: no change to the picker since 2026-10-26.
+Measured on `a84379aac` (`[dev]`, macOS arm64) with an independent harness kept outside the
+tree (`~/.cache/ghostshift/rietx/wp-2055/direction.py`). The second solve starts from each
+group's converged state with every position box re-centred on the converged positions, and
+keeps the new fit only if it converges, χ² does not rise and no two components swap order.
+The population is the usable components above the false-discovery bar that end on their
+position bound. Distance to the lattice is to the nearest Kα1 line of the pattern's own
+phases (the `test_acceptance_qpa_roundrobin` cells), after a zero and cos θ shift fitted to
+the usable lines of groups with no bound hit. The picker has not changed behaviour since
+`c0e32ab29`; WP-2030 only added the `instrument_undeclared` field.
+
+| arm | at bound | usable, above the bar | below 90° | freed below 90°, lower : higher | p | toward : away from the lattice | median freed move |
+|---|---|---|---|---|---|---|---|
+| declared (`qarr_instrument()`) | 87 | 24 | 19 | 17 : 2 | 0.0007 | 8 : 11 | −0.023° |
+| each pattern's fitted Kα2 weight | 79 | 19 | 14 | 10 : 4 | 0.18 | 9 : 4 | −0.015° |
+| same, brucite left at 0.5 | 79 | 21 | 16 | 12 : 4 | 0.077 | 10 : 5 | −0.019° |
+| one Kα2 weight for all, 0.40 | 73 | 22 | 17 | 11 : 6 | 0.33 | 10 : 7 | −0.009° |
+| apertures S/L = H/L = 0.02 | 82 | 21 | 16 | 15 : 0 | 0.00006 | 7 : 10 | −0.023° |
+
+The fitted weights are the reporter's (issue #1166, 2026-10-27, the `lines_axial` stage of
+the QPA plan): 0.441–0.449 on sample 1, 0.371–0.462 elsewhere, 0.256 on magnetite and 0 on
+brucite. Every census and every direction count reproduces the reporter's to the digit. The
+toward : away column differs from theirs by one or two, because the lattice shift here is
+fitted independently.
+
+**What the 24 are** (declared arm), read component by component and drawn in
+`tests/output/wp2055_bound_held_vs_freed.png`:
+
+- **8 shoulders on the low-angle tail of a 4–23× stronger line.** Seven carry `axial_tail`
+  and sit 0.076–0.144° from any lattice line of their pattern, so the nearest line is the
+  strong neighbour itself (fluorite 46.918°, three sample-1/2 copies at 46.90–46.95°, zircon
+  43.645° and 67.674°, brucite 68.034°). They are the strong line's tail, not lines. Freed,
+  all seven move further from the lattice. The eighth (cpd-1f 68.763°) moves onto a
+  lattice line when freed.
+- **2 components at the edge of their window** (cpd-1b 86.482°, cpd-1c 56.821°), each 0.5
+  seed FWHM outside the window's first point. The drawn one, cpd-1b's, fits the tail of a
+  line in the neighbouring group. Across all 16 patterns, 120 of 1056 components sit within
+  0.25 FWHM of a window edge or outside it. All 120 are re-seeds, 56 carry `duplicate_line`,
+  and 53 are usable.
+- **9 real lines** within 0.05° of a lattice line. Freed, they move −0.024° to +0.057°: five
+  closer to the lattice, three further and one unchanged.
+- **5 isolated broad components** at 86–142°, 0.08–0.26° from any lattice line.
+
+**Reading.** Declaring each pattern's fitted Kα2 weight removes all seven tail shoulders from
+the population: they move into the strong line and come out `not_separable`, which is
+unusable. That is the right outcome for those seven. But the same arm adds five new bound-held
+components, all 0.08–0.30° from any lattice line, so the count falls only from 24 to
+19. Declaring the axial apertures instead makes the low-angle pull stronger (15 : 0). In no arm
+does freeing a component bring it closer to the lattice, so the bound is not hiding better
+positions. The fitted weight is not an instrument property either: 0 on brucite and 0.256 on
+magnetite, on one diffractometer with one Cu tube, mean the weight is absorbing profile shape
+the model lacks. The reporter's synthetic corundum arm (not re-run here) agrees: a weight held
+at 0.5 against a true 0.44 moves Kα1 by −0.003°, a tenth of the median freed move.
 
 ## Non-goals
 
@@ -90,7 +122,7 @@ weight is the caller's choice and changes nothing.
 
 ## Tasks
 
-- [ ] Re-run the direction test on this tree: a second solve that re-centres each bound,
+- [x] Re-run the direction test on this tree: a second solve that re-centres each bound,
       recording each freed component's move and its distance to the pattern's own lattice,
       at the declared Kα2 weight and at a per-pattern fitted one.
 - [ ] Survey what other peak pickers hold for the doublet ratio and asymmetry (GSAS-II's
