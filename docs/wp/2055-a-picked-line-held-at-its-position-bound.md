@@ -206,6 +206,16 @@ records why holding the declared shape is right and the census stands.
   *Measured* (`[dev]`, macOS arm64): the table in § Findings; window-edge census 120 of
   1056 components. Gates: see the PR body.
 
+  *Review.* `/code-review high --fix` raised nine findings. Seven landed as one commit: the
+  toward : away reading now matches the table (the three arms that change the Kα2 weight do
+  move more lines towards the lattice, on a weight only a Rietveld fit supplies); the help
+  names the tail's side flip at 90° and says the shape carries part of the tail when
+  apertures are declared; the survey names the shipped presets that refine the ratio and
+  limits "GSAS-II alone" to the three programs read. Its "usually" became "often", since the
+  7 of 8 is one diffractometer. Declined: moving the harness into the tree. It is
+  measurement scaffolding for one decision, and WP-2120 task 1 re-measures on another
+  instrument anyway.
+
   *For Yue.* The help text is reader-facing (the GUI chip and the manual's reference page
   show it), so it waits on your approval before merge.
 
