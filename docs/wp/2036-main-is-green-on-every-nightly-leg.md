@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-02 — the 11-01 nightly's three red rows and two cancelled nights answered (PR #1309); WP-2050 merged, so a green nightly waits on #1309 alone
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
-Priority: P3 2026-11-02 — every task here is done; a green nightly waits on PR #1309 merging
+Priority: P2 2026-11-05 — was P3: the `full` job is red on main again, on one pin WP-1944 moved (issue #1424), and the repin is small
 
 ## Goal
 
@@ -135,6 +135,28 @@ and 2045 on 2026-10-25):
   quotes the order, so nothing fails.
 
 ### Inherited
+
+- **2026-11-05, from the issue triage (issue #1424, its wavelength row): the row is a stale
+  pin on every platform, so the nightly is red on main.** The issue reads it as Mac-only, by
+  contrast with the two nightlies of 2026-11-04. Both of those predate the cause. The
+  2026-11-05 nightly (run 42037632923, `d4839e02e`) failed its `full` job on this one row,
+  with `1 failed, 14933 passed, 171 skipped, 53 xfailed` on Linux, `[dev,jax]`. Its value
+  there is 0.010354633004, and an arm64 Mac reads 0.010354633028.
+
+  Bisected over main's merges: passes at `c2da9ae93`, fails from `85ce3f287`, which merged
+  #1391 (WP-1944, extinction opt-in). WP-1944's handover predicted this move: "a pinned width
+  goes from 0.0102922 to 0.0103546". The fast selection does not run the row, so #1391 merged
+  without the repin.
+
+  `tests/test_acceptance_wavelength.py::test_the_neutron_widths_leave_one_esd_at_every_start`
+  needs three pins and its docstring, read on an arm64 Mac at `541f0daf7`, four starts:
+  x's esd 0.0103546 (was 0.0102922), y −0.0216150 (was −0.0210949), y's esd 0.0192658 (was
+  0.0190970). The spread of x's esd across starts is 2.8e-9, so that bar still holds. The
+  test stops at its first assert, so only the first of the three shows in the log.
+
+  PR #1425 closes this WP on the reading that both rows are Mac-only. That reading does not
+  hold for this row. PR #1429 carries the same three pins, and holds for the maintainer
+  because it moves an acceptance number.
 
 ## Non-goals
 

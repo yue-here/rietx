@@ -125,6 +125,50 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
+- **2026-11-05, from the issue triage (issue #1424, its two-site row): `solve_magnetic`
+  chooses between two site assignments by a χ² gap smaller than its own stop scatter, and
+  says nothing.** This is M-9's ranking and abstention, so it sits here. Decisions on it
+  are Michael's under the magnetic-path split (#1075, 2026-11-03 and 11-04).
+
+  *The symptom.* `tests/test_pair_diagnostic_class.py::test_the_two_site_winner_finds_each_site_its_own_moment`
+  fails on arm64 Mac at `541f0daf7`, `[dev]` venv: m1 reads 0.6995 against 3.5 ± 0.01. It
+  passed the Linux `full` job of 2026-11-05 at `d4839e02e`. The nightly's macOS job runs the
+  fast selection, so no CI covers the row there.
+
+  *The area.* `strategy/magnetic.py`: `_starts` runs three starts for this class (flat, Mn1
+  only, Mn2 only), and `_best_start` takes the lowest absolute χ². Mn1 and Mn2 are related by
+  c/2, so the pattern measures m₁ + m₂ and m₁ − m₂. Swapping the moduli leaves both sizes
+  unchanged, and the swap is a second minimum. The test's docstring has said so since
+  WP-1930. It is a powder degeneracy, not a platform defect.
+
+  *Measured at `541f0daf7`* (arm64 Mac, `[dev]`, compiled tier on and off give the same
+  digits). The test's own draw:
+
+  | start | χ² (absolute) | Rwp | m(Mn1), m(Mn2) |
+  |---|---|---|---|
+  | flat | 3708.764 | 0.0137416 | 0.702, 3.499 (the swap) |
+  | Mn1 only, released | 3708.835 | 0.0137417 | 3.498, 0.700 (the truth) |
+  | Mn2 only, released | 3708.941 | 0.0137419 | 0.700, 3.498 (the swap) |
+
+  The swap wins by 0.071. Two starts on the same swapped minimum differ by 0.177, so the
+  gap is smaller than the stop scatter. Over eight noise draws (the test's seed plus 1-7),
+  the truth won six and the swap two, each of the two by under 0.15. The three starts ended
+  in two moduli pairs on all eight. `n_minima` read 1 on three draws, 2 on four and 3 on one,
+  because `SOLVE_MINIMUM_RTOL` compares Rwp at 1e-4 relative and these differ by about 1e-5.
+  So `_best_start` reports one minimum on the test's draw, no caveat is written, and the moduli
+  come back with esds of 0.002 μ_B. `MOMENT_PAIR_DEGENERATE` does not fire on the winner.
+
+  *What flipped it.* Bisected over main's merges: passes at `d2b48dd49`, fails from
+  `99fe3f149`, which merged #1366 (WP-1334, the stop rule). That PR moved a stop. It did not
+  cause the tie. Issue #820 and #865 are earlier readings of this set moving with the
+  platform.
+
+  *To decide.* Whether the sweep reports two assignments when two starts end on different
+  moduli at a χ² gap it cannot resolve, for example by comparing the moduli and not Rwp. Then
+  what the test may assert, since one noise draw on one platform cannot pin the site
+  assignment. `SOLVE_MINIMUM_RTOL` is an `_audit` tier-3 row with "no stated source, never
+  measured", so that row may move with it.
+
 - **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: the maximal-subgroup list this WP wanted now exists.** `rietx.crystallography.representation.subgroups.maximal(group, kind, max_index)` returns every maximal t- and k-subgroup of a space group, each with its conjugacy class and its (P, p) checked exactly (PR #1189). `strategy/magnetic.py` `_maximal_subgroups` is still maximal only among the classes enumerated at the winner's k, so the descent audit can take its nuclear part from the new list. Wyckoff splittings come from `wyckoff_splitting(group, sub)` (PR #1239).
 
 - **2026-10-23, from [1326](1326-satellites-without-a-moment.md)'s close

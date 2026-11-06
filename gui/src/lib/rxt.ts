@@ -46,8 +46,8 @@ export const PAIRS = ["min", "max", "esd"];
 
 /** The words a `stage` line carries: `free`, then `textdoc.STAGE_KEYS` — which
  * is derived from `StageSpec`, so a new field lands here and nowhere else. */
-export const STAGE_WORDS = ["free", "max_iter", "ftol", "lebail_cycles", "seed",
-  "strain_seed", "restraint_weight_scale", "window_slack_deg"];
+export const STAGE_WORDS = ["free", "max_iter", "ftol", "lebail_cycles", "lebail_tol",
+  "seed", "strain_seed", "restraint_weight_scale", "window_slack_deg"];
 
 /** Of those, the ones `StageSpec` types as `int`. `textdoc.STAGE_INT_KEYS`. */
 export const STAGE_INT_WORDS = ["max_iter", "lebail_cycles"];
