@@ -713,8 +713,8 @@ The function is linear in its coefficients, so it is exactly one affine tie of
 {eq}`par-affine` per pattern, with $C_k = \Phi_k$ and $d = 0$. The tie needs no
 derivative of its own: what each coefficient's column moves is read off $C$, as
 for any tie. A function with a coefficient inside a power or an exponential (an
-Arrhenius rate, an order-parameter exponent) is not of this form and cannot be
-declared. A basis whose columns are collinear over the subset is refused before
+Arrhenius rate, an order-parameter exponent) is not of this form. It is a
+formula equation ({ref}`par-formula-section`). A basis whose columns are collinear over the subset is refused before
 any solve: pivoted QR on the column-normalised $\Phi$ names the dependent terms,
 with its cut at $\sqrt{\mathrm{rcond}}$ of the leading diagonal, since an
 eigenvalue of $\Phi^\top\Phi$ below the covariance's own cut would leave a
@@ -822,3 +822,73 @@ cannot check how a form carries through the patterns where the target is
 invisible. On synthetic ramps whose minor phase faded out, or was broad and
 overlapped, a bent truth was not rejected in 20 seeds of 20, as it did under a
 full untied refit, and no straight truth was rejected in 40.
+
+(par-formula-section)=
+### A formula equation
+
+A formula equation sets the target in pattern $k$ to a function the caller
+writes in the grammar of [Expressions](../reference/expressions.md):
+
+```{math}
+:label: par-formula
+
+p_k \;=\; f(v, z_k),
+\qquad
+\frac{\partial r}{\partial v_i} \;=\; \sum_k
+  \frac{\partial r}{\partial p_k}\,\frac{\partial f}{\partial v_i}(v, z_k),
+```
+
+{source}`rietx.params.derived.ExpressionBlock`
+
+where $v$ are the variables and $z_k$ the pattern's coordinates. A variable is
+one refined column, shared by every formula that names it, so $f$ may be
+nonlinear in it. A variable the sharing map makes per-histogram is one column
+per pattern instead, Stinton and Evans's temperature offset {cite}`stinton2007`.
+In each pattern the target is a derived row, written from the variables at
+each evaluation, and $\partial f/\partial v_i$ is exact: the grammar has one
+derivative rule per operator, checked against the complex-step derivative over
+random trees. A formula that names an earlier formula has that formula's tree
+inlined, so a temperature calibration feeding three cell edges is one function
+of the variables per edge.
+
+The equation is evaluated anywhere through its gradient in the variables at the
+answer $\hat v$:
+
+```{math}
+:label: par-formula-esd
+
+\sigma\bigl(f(\hat v, z)\bigr) \;=\; \sqrt{g\,\Sigma_v\,g^{\top}},
+\qquad
+g \;=\; \frac{\partial f}{\partial v}\bigg|_{\hat v,\, z},
+```
+
+{source}`rietx.schemas.parametric.RefinedParametricEquation.evaluate`
+
+with $\Sigma_v$ the variables' covariance from the joint solve. A held variable
+has a zero row and column. At a pattern's own coordinates this is that
+pattern's target row, value and esd. On two synthetic twelve-pattern ramps,
+an order parameter through $T_c$ and an Avrami fraction against time, the
+value ± 2 esd covered every true variable in 96 to 100 of 100 noise seeds.
+
+The form test {eq}`par-parametric-form` needs each pattern's own target column,
+which a formula's variables carry only in combination. In pattern $k$ the
+variables' columns are $J_{V,k} = T_k G_k$, with $T_k$ the targets' columns and
+
+```{math}
+:label: par-formula-form
+
+T_k \;=\; J_{V,k}\, G_k^{+},
+\qquad
+(G_k)_{ij} \;=\; \frac{\partial f_i}{\partial v_j}(\hat v, z_k),
+```
+
+{source}`rietx.params.parametric.expression_target_columns`
+
+where $G_k^{+}$ is the pseudo-inverse. One variable may feed several targets,
+so they are recovered together. A pattern where $G_k$ has fewer independent
+rows than targets gives none of them, and neither does one where a variable
+moves a row no formula writes. The alternative then drops only the variables
+no other formula reads. Written as a polynomial and as a formula, one straight
+line gave the same statistic to $7 \times 10^{-11}$ relative. A line written
+over a cell that followed an Einstein function read 17 222 against a cut of
+7.8, and the Einstein formula read 1.2.
