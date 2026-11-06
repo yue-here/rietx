@@ -444,7 +444,7 @@ def target_columns(resolved: ResolvedParametric, bj, free_paths: list[str],
 
 def expression_target_columns(expressions, bj, free_paths: list[str],
                               values: dict[str, float], usable: list[bool],
-                              skip: dict[str, frozenset[int]]
+                              skip: dict[str, frozenset[int]], scope=None
                               ) -> list[list[np.ndarray | None] | None]:
     """Each ``expression`` equation's own target column per pattern (WP-1964).
 
@@ -460,11 +460,19 @@ def expression_target_columns(expressions, bj, free_paths: list[str],
     G row is zero (every variable it reads held) gets none either.  ``skip``
     is :func:`target_columns`'.  ``None`` for an equation with no free
     variable, whose target no column of θ moves.
+
+    ``scope(h, path)`` names a variable's column in pattern h, and ``values``
+    is keyed by that name: a per-pattern variable is a column per pattern,
+    and its value there is that pattern's.  ``None`` names every variable by
+    its own path, one shared column.
     """
     index = {p: i for i, p in enumerate(free_paths)}
-    cols = sorted({index[p] for r in expressions for p in r.paths if p in index})
+    name = (lambda _h, p: p) if scope is None else scope
+    cols = sorted({index[name(h, p)] for r in expressions for h in r.patterns
+                   for p in r.paths if name(h, p) in index})
     out: list[list[np.ndarray | None] | None] = [
-        [None] * bj.n_blocks if any(p in index for p in r.paths) else None
+        [None] * bj.n_blocks
+        if any(name(h, p) in index for h in r.patterns for p in r.paths) else None
         for r in expressions]
     where = {c: j for j, c in enumerate(cols)}
     for h in range(bj.n_blocks):
@@ -474,13 +482,14 @@ def expression_target_columns(expressions, bj, free_paths: list[str],
         for i, r in enumerate(expressions):
             if out[i] is None or h not in r.patterns:
                 continue
-            bindings = {n: values[p] for n, p in zip(r.variables, r.paths, strict=True)}
+            bindings = {n: values[name(h, p)]
+                        for n, p in zip(r.variables, r.paths, strict=True)}
             bindings.update(r.constants[h])
             _, grad = r.expression.gradient(bindings, r.variables)
             g = np.zeros(len(cols))
             for p, d in zip(r.paths, grad, strict=True):
-                if p in index:
-                    g[where[index[p]]] += float(d)
+                if name(h, p) in index:
+                    g[where[index[name(h, p)]]] += float(d)
             if np.any(g):
                 rows.append(g)
                 live.append(i)
@@ -508,7 +517,7 @@ def expression_target_columns(expressions, bj, free_paths: list[str],
 def form_tests(resolved: list[ResolvedParametric], bj, resid: np.ndarray, n_data: int,
                free_paths: list[str], skip: dict[str, frozenset[int]], hold,
                expressions=(), values: dict[str, float] | None = None,
-               usable: list[bool] | None = None
+               usable: list[bool] | None = None, scope=None
                ) -> tuple[list[ParametricFormTest], ParametricFormReading | None]:
     """Each declaration's lack-of-fit test at the answer (WP-1325).
 
@@ -555,7 +564,9 @@ def form_tests(resolved: list[ResolvedParametric], bj, resid: np.ndarray, n_data
     are :func:`expression_target_columns`' over ``values`` (each variable's
     value at the answer) and ``usable``, and the alternative drops the free
     variables no other expression reads, so a shared θ stays in it and keeps
-    driving the other targets.
+    driving the other targets.  ``scope`` is
+    :func:`expression_target_columns`', so a per-pattern variable counts as
+    a column per pattern here too.
 
     Returns the tests in declaration order, the linear equations first, and
     the joint reading, ``None`` unless two or more equations were tested.
@@ -570,9 +581,12 @@ def form_tests(resolved: list[ResolvedParametric], bj, resid: np.ndarray, n_data
     if expressions:
         tested += expression_target_columns(
             expressions, bj, free_paths, values or {},
-            [True] * bj.n_blocks if usable is None else usable, skip)
+            [True] * bj.n_blocks if usable is None else usable, skip, scope=scope)
     # an expression's alternative drops only the variables no other one reads
-    readers = Counter(p for r in expressions for p in dict.fromkeys(r.paths))
+    name = (lambda _h, p: p) if scope is None else scope
+    columns_of = [list(dict.fromkeys(name(h, p) for h in r.patterns for p in r.paths))
+                  for r in expressions]
+    readers = Counter(q for qs in columns_of for q in qs)
     # the held side is one projection for every alternative tested here
     null = None
     readings: list[ParametricFormReading | None] = []
@@ -588,8 +602,8 @@ def form_tests(resolved: list[ResolvedParametric], bj, resid: np.ndarray, n_data
         if null is None:
             null = held_projection(bj, resid, hold)
         drop = ([index[p] for p in r.paths] if i < len(resolved) else
-                [index[p] for p in dict.fromkeys(r.paths)
-                 if p in index and readers[p] == 1])
+                [index[q] for q in columns_of[i - len(resolved)]
+                 if q in index and readers[q] == 1])
         swaps.append((cols, drop))
         gains[i] = added_columns_gain(bj, resid, cols, drop, hold, null=null)
         readings.append(_reading(*gains[i], scale))

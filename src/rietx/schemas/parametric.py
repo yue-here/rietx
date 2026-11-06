@@ -539,7 +539,9 @@ class RefinedParametricEquation(Base):
         exact gradient in the variables.  Its coefficients are the
         variables' rows of ``RefinementResult.parametric``, in that order,
         and ``definitions`` the intermediates it names, as
-        ``RefinementResult.parametric_equations`` lists them.
+        ``RefinementResult.parametric_equations`` lists them.  An expression
+        reading a per-pattern variable is refused: it has a value at each
+        pattern, the target's own row there, and none between them.
         """
         equation = self.equation
         paths = [c.path for c in coefficients]
@@ -611,6 +613,13 @@ class RefinedParametricEquation(Base):
         if wrong:
             raise ValueError(f"equation {equation.name!r} takes its own variables' rows; "
                              f"{wrong} belong to another equation")
+        local = [c.path for c in coefficients if c.path.startswith("hist.")]
+        if local:
+            raise ValueError(
+                f"equation {equation.name!r} reads a per-pattern variable ({local[0]}), "
+                "which has a value at each pattern and none between them, so the "
+                f"equation is not evaluated anywhere else; its value at pattern h is "
+                f"the result row hist.h.{equation.target}, with its esd")
         if self.covariance is not None and len(self.covariance) != len(coefficients):
             raise ValueError(f"equation {equation.name!r} takes {len(self.covariance)} "
                              f"variables' rows, in result.parametric's order; got "

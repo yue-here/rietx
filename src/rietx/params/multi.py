@@ -577,8 +577,8 @@ class MultiParameterTable:
         Refused, each naming its fix: a variable that is not a ``Parameter``,
         whose name is not an identifier or is a reserved word of the grammar,
         that a coordinate column shadows, whose ``vars.{name}`` already exists
-        (in the model or as a linear equation's coefficient), that the sharing
-        map makes per-histogram, or that no expression names; an expression
+        (in the model or as a linear equation's coefficient), or that no
+        expression names; an expression
         naming something that is neither a variable nor a coordinate; a
         coordinate it names with no value at a pattern of its subset; and
         every target refusal the linear path makes (:meth:`_install_linear`).
@@ -624,11 +624,6 @@ class MultiParameterTable:
                 raise ValueError(
                     f"variable {name!r}: {path} already exists (a parametric "
                     "equation's coefficient or a model parameter); rename the variable")
-            if not self.sharing.is_shared(path):
-                raise ValueError(
-                    f"variable {name!r}: the sharing map makes {path} per-histogram "
-                    "(a per_histogram glob matches it), but a variable is one number "
-                    "across the patterns; narrow the glob so vars.* stays shared")
         own = [e.name for e in declared]
         # a linear equation's name can collide only where an expression exists
         for nm in (*own, *(linear_names if declared else [])):
@@ -760,14 +755,26 @@ class MultiParameterTable:
         Each variable is added to **every** table as ``vars.{name}``, fixed
         until a stage frees it, so it folds onto one shared column
         (``_rebuild_columns`` asserts the shared free sets agree), with its
-        value, bounds and unit from the ``Parameter``.  What follows each
+        value, bounds and unit from the ``Parameter``.  A variable the sharing
+        map makes per-histogram (``SharingMap.per_histogram`` naming
+        ``vars.{name}``, an ordinary glob) is a column per pattern, Stinton &
+        Evans's (2007) ΔT, and is added only to the tables of the patterns
+        whose expressions read it: anywhere else it would be a column no
+        residual moves.  Each starts at the ``Parameter``'s value.  What follows each
         target becomes per-histogram with it, as on the linear path, and the
         target in each subset histogram becomes the expression's derived row
         at that pattern's coordinates (``ParameterTable.add_expression``).
         """
+        readers: dict[str, set[int]] = {}
+        for r in resolved:
+            for path in r.paths:
+                readers.setdefault(path, set()).update(r.patterns)
         for name, param in variables.items():
             path = f"vars.{name}"
-            for table in self.tables:
+            where = (range(self.n_histograms) if self.sharing.is_shared(path)
+                     else sorted(readers.get(path, ())))
+            for h in where:
+                table = self.tables[h]
                 table.add_parameter(path, float(param.value), vary=False,
                                     lo=param.min, hi=param.max, unit=param.unit)
             if not param.vary:
@@ -999,14 +1006,35 @@ class MultiParameterTable:
         so the glob alone would free nothing; its coefficients, or the
         variables its expression names, are what carry it.  A variable
         declared ``vary=False`` is left out: reaching a target never frees it,
-        and only a glob naming ``vars.{name}`` itself does.
+        and only a glob naming ``vars.{name}`` itself does.  Each is named as
+        :meth:`_canonical` names it, so a per-pattern variable is reached in
+        the patterns whose target the glob matched, and nowhere else.
         """
         out: set[str] = set()
         for r in (*self.parametric, *self.expressions):
-            names = {r.target, *(f"hist.{h}.{r.target}" for h in r.patterns)}
-            if any(fnmatch.fnmatchcase(name, g) for name in names for g in path_globs):
-                out.update(p for p in r.paths if p not in self._fixed_variables)
+            hit = [h for h in r.patterns
+                   if any(fnmatch.fnmatchcase(name, g)
+                          for name in (r.target, f"hist.{h}.{r.target}")
+                          for g in path_globs)]
+            out.update(self._canonical(h, p) for h in hit for p in r.paths
+                       if p not in self._fixed_variables)
         return out
+
+    def variable_rows(self, r) -> list[str]:
+        """The joint rows of a declaration's coefficients or variables, in order.
+
+        A shared one is its bare ``vars.`` path, once.  A per-pattern
+        variable (WP-1964) is ``hist.{h}.vars.{name}`` for each pattern of
+        the subset, in pattern order, so the list is what the joint result
+        prints and ``free_paths`` spells.
+        """
+        out: dict[str, None] = {}
+        for p in r.paths:
+            if self.sharing.is_shared(p):
+                out[p] = None
+            else:
+                out.update((f"hist.{h}.{p}", None) for h in r.patterns)
+        return list(out)
 
     def _check_moment_frames_shared(self) -> None:
         """Refuse a shared moment DOF over a per-histogram cell or position.
@@ -1077,7 +1105,7 @@ class MultiParameterTable:
                 if e.tie is not None or e.locked:
                     continue
                 canon = self._canonical(h, e.path)
-                if e.path in coupled or any(
+                if canon in coupled or any(
                         fnmatch.fnmatchcase(canon, g)
                         or fnmatch.fnmatchcase(e.path, g) for g in path_globs):
                     matched.append(e.path)

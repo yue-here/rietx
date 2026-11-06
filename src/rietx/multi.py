@@ -735,7 +735,7 @@ def _constant_link_reach(mtable) -> list[set[str]]:
                for r in mtable.parametric if r.equation.basis != "constant"
                for j in range(len(r.labels))}
     # an expression's variable is no constant link either (WP-1964)
-    blocked |= {p for r in mtable.expressions for p in r.paths}
+    blocked |= {q for r in mtable.expressions for q in mtable.variable_rows(r)}
     return [set(moved) for column, moved in _joint_column_reach(mtable).items()
             if column not in blocked]
 
@@ -2568,7 +2568,7 @@ class MultiHistogramRefinement:
         # bound test found on a bound (WP-1325, FIT)
         parametric_form, form_joint = _parametric_form_tests(models, mt, at_bounds,
                                                              weights, unseen)
-        coefficients = self._parametric_rows(esd_hist0)
+        coefficients = self._parametric_rows(esd_hist0, per_esds)
         diagnostics = diagnostics + _parametric_form_diagnostics(mt, parametric_form,
                                                                  form_joint)
         if stage_results:
@@ -2730,6 +2730,15 @@ class MultiHistogramRefinement:
         t0 = mt.tables[0]
         esd = {c.path: c.esd for c in coefficients}
         for r in (*mt.intermediates, *mt.expressions):
+            if any(not mt.sharing.is_shared(p) for p in r.paths):
+                # a per-pattern variable has a value at each pattern and none
+                # between them, so the equation has no covariance to evaluate
+                # with; ``evaluate`` says where each pattern's value is
+                out.append(RefinedParametricEquation(
+                    equation=r.equation,
+                    unit=None if r.target is None else _display_unit(r.target),
+                    span={}, covariance=None))
+                continue
             # a held variable is a constant of the answer: its row and column
             # are zero, so the esd is the free variables' alone
             free = [j for j, p in enumerate(r.paths) if t0.entries[t0._paths[p]].vary]
@@ -2750,14 +2759,17 @@ class MultiHistogramRefinement:
                 span=span, covariance=covariance))
         return out
 
-    def _parametric_rows(self, esd0: dict[str, float]):
+    def _parametric_rows(self, esd0: dict[str, float],
+                         per_esds: list[dict[str, float]] | None = None):
         """Every declared coefficient, in user units at the reference.
 
         ``None`` when no parametric equation was declared, the honest empty state.
         A coefficient's value is histogram 0's entry (every table holds the
         same shared one), its esd ``esd0``'s, which omits a row the covariance
         marks unmeasured (``ParameterTable.stderr_physical``): no pattern in
-        the subset carried gradient for it.
+        the subset carried gradient for it.  A per-pattern variable (WP-1964)
+        is one row per pattern of the subset, ``path`` its ``hist.{h}.`` row,
+        read off that pattern's table and ``per_esds[h]``.
         """
         mt = self.mtable
         if not (mt.parametric or mt.expressions):
@@ -2775,12 +2787,18 @@ class MultiHistogramRefinement:
         # equations read is listed under each.
         for r in mt.expressions:
             for name, path in zip(r.variables, r.paths, strict=True):
-                e = t0.entries[t0._paths[path]]
-                esd = esd0.get(path) if e.vary else None
-                rows.append(ParametricCoefficient(
-                    equation=r.name, target=r.target, term=name, path=path,
-                    value=float(e.value), esd=None if esd is None else float(esd),
-                    vary=bool(e.vary), unit=t0._units.get(path), reference=None))
+                if mt.sharing.is_shared(path):
+                    where = [(t0, esd0, path)]
+                else:
+                    where = [(mt.tables[h], per_esds[h] if per_esds else {},
+                              f"hist.{h}.{path}") for h in r.patterns]
+                for table, esds, row in where:
+                    e = table.entries[table._paths[path]]
+                    esd = esds.get(path) if e.vary else None
+                    rows.append(ParametricCoefficient(
+                        equation=r.name, target=r.target, term=name, path=row,
+                        value=float(e.value), esd=None if esd is None else float(esd),
+                        vary=bool(e.vary), unit=table._units.get(path), reference=None))
         return rows
 
     def _parameters(self, thetas, stderr, corr, at_bounds, esd0,
@@ -3157,7 +3175,8 @@ def _equation_rows(mtable) -> dict[str, list[str]]:
                     written[q] = rows
         for r in mtable.expressions:
             for path in r.paths:
-                mark(h, path, r.name)
+                if path in table._paths:     # a per-pattern variable is not everywhere
+                    mark(h, path, r.name)
             if h in r.patterns:
                 for q in written.get(r.target, (r.target,)):
                     mark(h, q, r.name)
@@ -3341,9 +3360,12 @@ def _parametric_form_tests(models, mtable, at_bounds, weights,
     x = mtable.x0()
     index = {p: i for i, p in enumerate(mtable.free_paths)}
     hold = sorted({index[p] for f in at_bounds for p in f.paths if p in index})
-    t0 = mtable.tables[0]
     variables = {p for r in mtable.expressions for p in r.paths}
-    values = {p: float(t0.entries[t0._paths[p]].value) for p in variables}
+    # each variable's value at the answer, by its joint row: a per-pattern one
+    # has a row per pattern (WP-1964)
+    values = {mtable._canonical(h, p): float(
+        mtable.tables[h].entries[mtable.tables[h]._paths[p]].value)
+        for r in mtable.expressions for h in r.patterns for p in r.paths}
     usable = []
     for h, table in enumerate(mtable.tables):
         targets = {r.target for r in mtable.expressions if h in r.patterns}
@@ -3357,7 +3379,7 @@ def _parametric_form_tests(models, mtable, at_bounds, weights,
         usable.append(all(set(reach.get(p, ())) <= written for p in variables))
     return form_tests(mtable.parametric, jacobian(x), residual(x), n_data,
                       mtable.free_paths, unseen, hold, expressions=mtable.expressions,
-                      values=values, usable=usable)
+                      values=values, usable=usable, scope=mtable._canonical)
 
 
 def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
@@ -3376,7 +3398,10 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
     rejection beside another says its verdict is provisional
     (``ParametricFormTest.provisional_on``), and each tells the reader to
     read the other equations again after the refit."""
-    paths = {r.name: r.paths for r in (*mtable.parametric, *mtable.expressions)}
+    # an expression's rows by their joint names: a per-pattern variable has one
+    # per pattern (WP-1964); a linear coefficient is always shared
+    paths = {r.name: list(r.paths) for r in mtable.parametric}
+    paths.update({r.name: mtable.variable_rows(r) for r in mtable.expressions})
     written = {r.name for r in mtable.expressions}
     out: list[Diagnostic] = []
     for t in tests or []:

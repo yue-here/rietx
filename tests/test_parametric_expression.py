@@ -128,8 +128,6 @@ def test_a_malformed_expression_equation_is_refused_at_construction(kw, fragment
      r"names 'grd', which is neither a variable.*did you mean 'grad'"),
     (lambda: _table(coordinates=CoordinateTable(columns={"T": [300.0, None, 500.0]})),
      "pattern 1 has no value for coordinate 'T'"),
-    (lambda: _table(sharing=SharingMap(per_histogram=["vars.*"])),
-     "makes vars.zero_a per-histogram"),
     (lambda: _table(parametric=[_expression(target="phases.0.cell.b")]),
      r"is tied: = 1·phases.0.cell.a"),
     (lambda: _table(parametric=[_expression(target="phases.0.cell.q")]),
@@ -141,7 +139,7 @@ def test_a_malformed_expression_equation_is_refused_at_construction(kw, fragment
         name="b", target="phases.0.cell.a", basis="constant", patterns=[2])]),
      "both drive phases.0.cell.a on pattern 2"),
 ], ids=["reserved", "identifier", "shadow", "unused", "no-equation", "not-parameter",
-        "path-exists", "unbound", "coordinate-hole", "sharing", "tied-target",
+        "path-exists", "unbound", "coordinate-hole", "tied-target",
         "unknown-target", "locked-target", "subset-range", "table-length", "clash"])
 def test_each_refusal_of_a_variable_or_an_expression_names_its_fix(build, fragment):
     with pytest.raises(ValueError, match=fragment):
@@ -773,3 +771,164 @@ def test_a_preview_covers_a_linear_equation_too():
     assert row.target == "phases.0.cell.a"
     assert row.variables == ["vars.a_0", "vars.a_1"] and row.coordinates == ["T"]
     assert row.intermediates == [] and len(row.values) == 3
+
+
+# -- a variable per pattern (task 11) ----------------------------------------
+
+def test_a_per_histogram_glob_makes_a_variable_a_column_per_pattern():
+    """``SharingMap.per_histogram`` naming ``vars.zero_a`` is an ordinary glob
+    (the maintainer's ruling of 2026-11-05): the variable becomes one column
+    per pattern that reads it, and a glob on the target frees it there only."""
+    mt = _table(sharing=SharingMap(per_histogram=["vars.zero_a"]))
+    mt.set_vary(["*"], False)
+    freed = mt.set_vary(["phases.*.cell.*"], True)
+    assert sorted(freed) == ["hist.0.vars.zero_a", "hist.1.vars.zero_a",
+                             "hist.2.vars.zero_a", "vars.grad"]
+    assert mt.shared_paths == ["vars.grad"]
+    mt.set_vary(["*"], False)
+    # scoped to one pattern, the glob frees that pattern's column and the shared one
+    assert sorted(mt.set_vary(["hist.1.phases.0.cell.a"], True)) == [
+        "hist.1.vars.zero_a", "vars.grad"]
+    # a subset: only the patterns whose equation reads the variable carry it
+    sub = _table(parametric=[_expression(patterns=[1, 2])],
+                 sharing=SharingMap(per_histogram=["vars.*"]))
+    assert ["vars.zero_a" in t._paths for t in sub.tables] == [False, True, True]
+    (r,) = sub.expressions
+    assert sub.variable_rows(r) == [f"hist.{h}.vars.{v}" for v in ("zero_a", "grad", "theta")
+                                    for h in (1, 2)]
+
+
+GS_STD, B0_SMP, GB_SMP = 3.0e-5, 4.40, 6.0e-5
+TEMPS_SE = [300.0, 400.0, 500.0, 600.0, 700.0, 800.0]
+DT_SE = [3.0, -5.0, 8.0, -2.0, 6.0, -4.0]
+
+
+def _two_cells(a: float, b: float, scale: float) -> rx.Structure:
+    from tests.test_schemas import make_lab6
+
+    structure = make_lab6()
+    sample = structure.phases[0].model_copy(deep=True)
+    sample.name = "sample"
+    structure.phases.append(sample)
+    for phase, edge in zip(structure.phases, (a, b), strict=True):
+        for k in "abc":
+            getattr(phase.cell, k).value = edge
+        phase.scale.value = scale
+    return structure
+
+
+def _simulate_two(a: float, b: float, seed: int) -> rx.PatternData:
+    """One pattern of a standard (cell ``a``) beside a sample (cell ``b``),
+    under :func:`tests.test_sequential._simulate`'s instrument and noise."""
+    from rietx.model.forward import compile_model
+    from rietx.params.vector import ParameterTable
+    from rietx.schemas.instrument import BackgroundChebyshev
+    from tests.test_sequential import TRUE_BKG, TRUE_SCALE, TRUE_W, TRUE_ZERO, WAVELENGTH
+
+    structure = _two_cells(a, b, TRUE_SCALE)
+    for phase in structure.phases:
+        for atom in phase.atoms:
+            atom.biso.value = 0.4
+    ins = rx.Instrument.debye_scherrer(wavelength=WAVELENGTH)
+    ins.zero_shift.value = TRUE_ZERO
+    ins.profile.w.value = TRUE_W
+    ins.background = BackgroundChebyshev(
+        coefficients=[rx.Parameter(value=v) for v in TRUE_BKG])
+    tt = np.arange(3.0, 24.0, 0.005)
+    blank = rx.PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    model = compile_model(structure, ins, blank, mode="rietveld")
+    table = ParameterTable(structure, ins)
+    y = model.evaluate(table.decode(table.x0()))
+    y = np.random.default_rng(seed).poisson(np.maximum(y, 1.0)).astype(float)
+    return rx.PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
+
+
+def _stinton_evans(seed: int):
+    """Stinton & Evans's (2007) first method on a synthetic ramp: a standard
+    whose expansion is known and a sample whose is not, each cell an equation
+    in T + ΔT, with ΔT one free number per pattern."""
+    from rietx.schemas.instrument import BackgroundChebyshev
+    from tests.test_sequential import A0, TRUE_SCALE, TRUE_W, WAVELENGTH
+
+    patterns = [_simulate_two(A0 + GS_STD * (t + d - 300.0),
+                              B0_SMP + GB_SMP * (t + d - 300.0), seed * 100 + k)
+                for k, (t, d) in enumerate(zip(TEMPS_SE, DT_SE, strict=True))]
+    structure = _two_cells(A0, B0_SMP * 1.0005, TRUE_SCALE * 1.5)
+    ins = rx.Instrument.debye_scherrer(wavelength=WAVELENGTH)
+    ins.zero_shift.value = 0.0
+    ins.profile.w.value = TRUE_W * 1.5
+    ins.background = BackgroundChebyshev.with_terms(3)
+    variables = {"as0": rx.Parameter(value=A0, vary=False),
+                 "gs": rx.Parameter(value=GS_STD, vary=False),
+                 "b0": rx.Parameter(value=B0_SMP * 1.0005, vary=True),
+                 "gb": rx.Parameter(value=GB_SMP * 0.8, vary=True),
+                 "dT": rx.Parameter(value=0.0, vary=True, min=-50.0, max=50.0)}
+    equations = [
+        ParametricEquation(name="std", target="phases.0.cell.a", basis="expression",
+                           expression="as0 + gs*(T + dT - 300)"),
+        ParametricEquation(name="smp", target="phases.1.cell.a", basis="expression",
+                           expression="b0 + gb*(T + dT - 300)")]
+    ref = MultiHistogramRefinement(
+        structure, [ins] * len(TEMPS_SE),
+        sharing=SharingMap(shared=["instrument.zero_shift", "instrument.profile.*"],
+                           per_histogram=["vars.dT"]),
+        coordinates=CoordinateTable(columns={"T": TEMPS_SE}, units={"T": "K"}),
+        variables=variables, parametric=equations)
+    return ref.fit(patterns, plan="mccusker_default")
+
+
+def _z_scores(result: rx.RefinementResult) -> dict[str, float]:
+    rows = {p.path: p for p in result.parameters}
+    truth = {**{f"hist.{k}.vars.dT": d for k, d in enumerate(DT_SE)},
+             "vars.b0": B0_SMP, "vars.gb": GB_SMP}
+    return {path: (rows[path].value - t) / rows[path].stderr for path, t in truth.items()}
+
+
+@pytest.mark.xdist_group("parametric-expression")
+def test_a_temperature_offset_per_pattern_feeds_two_cell_equations():
+    """Six patterns, a ΔT per pattern read by both phases' cell equations.
+    Measured (macOS arm64, ``[dev,jax,torch]``): 2.4-2.9 s, every ΔT and the
+    sample's two coefficients within 0.9 esd of the truth on seed 0."""
+    result = _stinton_evans(seed=0)
+    _plot(result, "parametric_expression_delta_t", (0, len(TEMPS_SE) - 1))
+    assert result.status == "converged"
+    z = _z_scores(result)
+    assert max(abs(v) for v in z.values()) < 2.0, z
+    rows = {p.path: p for p in result.parameters}
+    cell = next(st for st in result.stages if st.name == "cell")
+    assert cell.freed == ["vars.b0", "vars.gb",
+                          *(f"hist.{k}.vars.dT" for k in range(len(TEMPS_SE)))]
+    # each pattern's cells are the two equations at its own T + ΔT
+    for k, temp in enumerate(TEMPS_SE):
+        dt = rows[f"hist.{k}.vars.dT"].value
+        assert rows[f"hist.{k}.phases.1.cell.a"].value == pytest.approx(
+            rows["vars.b0"].value + rows["vars.gb"].value * (temp + dt - 300.0), rel=1e-13)
+        assert rows[f"hist.{k}.vars.dT"].equations == ["std", "smp"]
+    # result.parametric: a per-pattern variable is a row per pattern of its equation
+    smp = [c for c in result.parametric if c.equation == "smp"]
+    assert [c.path for c in smp] == ["vars.b0", "vars.gb", *(
+        f"hist.{k}.vars.dT" for k in range(len(TEMPS_SE)))]
+    assert all(c.term == "dT" and c.esd == rows[c.path].stderr for c in smp[2:])
+    # no value between patterns, so evaluate says where each pattern's is
+    eq = next(e for e in result.parametric_equations if e.equation.name == "smp")
+    assert eq.covariance is None
+    with pytest.raises(ValueError, match="hist.h.phases.1.cell.a"):
+        eq.evaluate(smp, coordinates={"T": 450.0})
+    # with ΔT free in every pattern, neither equation alone has a direction to
+    # test once the other's targets are freed; the joint reading tests the pair
+    assert [f.rejected for f in result.parametric_form] == [None, None]
+    assert result.parametric_form_joint.dof == 4
+    assert result.parametric_form_joint.rejected is False
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("parametric-expression")
+def test_a_temperature_offset_per_pattern_is_unbiased_over_twelve_seeds():
+    """The WP's acceptance bar: over 12 pinned seeds, each ΔT and each shared
+    coefficient it feeds has a mean z-score under 0.5 in size.  Measured
+    (macOS arm64): every mean within 0.13, every |z| under 2 in 96 of 96,
+    the z spread 0.46-0.88 (the esds carry the Bérar-Lelann factor)."""
+    zs = [_z_scores(_stinton_evans(seed)) for seed in range(12)]
+    for path in zs[0]:
+        mean = float(np.mean([z[path] for z in zs]))
+        assert abs(mean) < 0.5, (path, mean)
