@@ -648,9 +648,10 @@ the axial apertures per pattern before fitting lines.
   recorded under Sources below).
 
 So no program surveyed refines the doublet ratio of a peak fit by default. GSAS-II and
-WinPLOTR both offer it as a flag the user sets, and GSAS-II alone applies a nonzero axial term
-by default. rietx refines the ratio only in a Rietveld plan that names it (the QPA plan's
-`lines_axial` stage). WP-2055 measured why the picker should not: on the 16 IUCr round-robin
+WinPLOTR both offer it as a flag the user sets. Of the three programs read, GSAS-II alone
+applies a nonzero axial term by default. rietx refines the ratio only in a Rietveld plan that
+names it: the `lines_axial` stage of the `lab_bragg_brentano` and `lab_calibrate` presets, and
+of the round-robin QPA test's own plan. WP-2055 measured why the picker should not: on the 16 IUCr round-robin
 patterns the fitted ratio runs from 0 to 0.462 on one tube and one diffractometer, so it is
 absorbing profile shape, not measuring the tube.
 

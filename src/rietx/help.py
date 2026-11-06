@@ -1385,9 +1385,10 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
             "The fitted position reached the limit on how far it could move from its "
             "starting value. The reported position is the limit itself, and the fit did "
             "not find a minimum there. The component may not be a line of its own. A "
-            "shoulder on the low-angle tail of a much stronger line ends here too, "
-            "because the peak shape does not carry that tail. One also flagged "
-            "axial_tail usually is such a shoulder."
+            "shoulder on the axial-divergence tail of a much stronger line ends here "
+            "too, because the peak shape does not carry all of that tail. That tail is "
+            "on the low-2θ side below 90° and the high-2θ side above it. One also "
+            "flagged `axial_tail` often is such a shoulder."
         ),
     ),
     "asymmetry_unmodelled": HelpEntry(

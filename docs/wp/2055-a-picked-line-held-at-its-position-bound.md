@@ -106,9 +106,11 @@ fitted independently.
 the population: they move into the strong line and come out `not_separable`, which is
 unusable. That is the right outcome for those seven. But the same arm adds five new bound-held
 components, all 0.08–0.30° from any lattice line, so the count falls only from 24 to
-19. Declaring the axial apertures instead makes the low-angle pull stronger (15 : 0). In no arm
-does freeing a component bring it closer to the lattice, so the bound is not hiding better
-positions. The fitted weight is not an instrument property either: 0 on brucite and 0.256 on
+19. Declaring the axial apertures instead makes the low-angle pull stronger (15 : 0). At the
+declared shape, freeing moves more components away from the lattice than towards it (8 : 11),
+so there the bound is not hiding better positions. In the three arms that change the Kα2
+weight more move towards it (9 : 4, 10 : 5, 10 : 7), but each holds a weight taken from a
+Rietveld fit of the known phases, which the picker does not have before indexing. The fitted weight is not an instrument property either: 0 on brucite and 0.256 on
 magnetite, on one diffractometer with one Cu tube, mean the weight is absorbing profile shape
 the model lacks. The reporter's synthetic corundum arm (not re-run here) agrees: a weight held
 at 0.5 against a true 0.44 moves Kα1 by −0.003°, a tenth of the median freed move.
@@ -135,8 +137,9 @@ at 0.5 against a true 0.44 moves Kα1 by −0.003°, a tenth of the median freed
       tier line, the practice survey and the task-1 measurement. A per-pattern weight is
       a default action, and no surveyed picker refines the ratio by default (GSAS-II and
       WinPLOTR leave it to a flag the user sets). The measurement gives no reason to
-      depart: in no arm does freeing a component bring it closer to the lattice, the
-      fitted weight runs from 0 to 0.462 on one tube, and the aperture arm strengthens the
+      depart: at the declared shape freeing moves 8 components towards the lattice and 11
+      away, the arms where more move towards it (9 : 4 to 10 : 7) hold a weight only a
+      Rietveld fit of the known phases supplies, the fitted weight runs from 0 to 0.462 on one tube, and the aperture arm strengthens the
       low-angle pull. Declaring the fitted weight did move seven tail shoulders out of
       `usable()`, but it added five new off-lattice components on the bound. What the
       measurement did change is the flag's help text, which named detection as the cause;
@@ -147,7 +150,7 @@ at 0.5 against a true 0.44 moves Kα1 by −0.003°, a tenth of the median freed
       indexing acceptance has nothing new to answer; the census is task 1's table. What
       landed is the cause the flag names: `help.py`'s `position_at_bound` entry said
       detection had misplaced the seed, and now says the component may be a tail shoulder
-      of a stronger line, which one also flagged `axial_tail` usually is (7 of 8 here).
+      of a stronger line, which one also flagged `axial_tail` often is (7 of 8 here).
       The two developer comments that said the same (`schemas/indexing.py`,
       `peakfit._GroupModel.bounds`) are corrected with it.
 - [x] Tests + obs/calc/diff PNGs of three bound-held lines before and after to
