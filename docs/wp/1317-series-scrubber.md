@@ -1,6 +1,6 @@
 # WP-1317 — scrub the series along its own trace
 
-Milestone: unscheduled · Status: 🔄 2026-10-21 — #218's `forward_` and `moved_paths` merged from outside as #903, and the planted-events series fixture as #1011; the scrubber is unstarted
+Milestone: unscheduled · Status: 🔄 2026-11-04 — trace and scrubbing landed; the annotations ruling and the screenshots (#1397) left
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-09-23 — a view over what the series already knows
@@ -218,13 +218,17 @@ screenshots come from `docs/manual/make_screenshots.py`.
 
 ## Tasks
 
-- [ ] The vocabulary: enumerate the marker set from `SeriesResult`'s own
+- [x] The vocabulary: enumerate the marker set from `SeriesResult`'s own
       findings and per-pattern flags; write it down once, view and docs both
-      quoting it.
-- [ ] The trace: T/t vs index from series metadata, markers placed, owned
-      by a panel decided here.
-- [ ] Scrubbing: drag updates the linked pattern+fit view at interactive
-      speed; the drill-down stays one click away.
+      quoting it. *(2026-11-04: `rietx.gui.series.TRACE_VOCABULARY`, served by
+      `/api/series/result` as `trace.vocabulary`; the GUI guide's table is held
+      to it both ways by `tests/test_gui_series_trace.py`.)*
+- [x] The trace: T/t vs index from series metadata, markers placed, owned
+      by a panel decided here. *(The Series panel owns it, above its plot:
+      `rxplot.trace`, fed by `series.trace`.)*
+- [x] Scrubbing: drag updates the linked pattern+fit view at interactive
+      speed; the drill-down stays one click away. *(Curves cached per answer,
+      the member figure updated in place with the zoom kept; History button.)*
 - [ ] External annotations decided (schema vs view-side) and, if schema, the
       minimal addition with its round-trip test.
 - [ ] GUI manual chapter + screenshots via `make_screenshots.py`; vitest
@@ -256,6 +260,87 @@ still open, since its surviving residual lands here.
 - `gui/CLAUDE.md` — the panel, route and manual-partition rules.
 
 ## Handover log
+
+- **2026-11-04** — the scrubber, less its screenshots and the annotations
+  decision. An in-situ series can now be read on its own axis in the GUI: a
+  strip above the Series panel's plot draws the coordinate against the
+  pattern index, marks every pattern a series fence names, bars each
+  pattern's own findings and shades the shown parameter's largest step.
+  Dragging along it shows each pattern's own fit with the zoom kept, so a
+  peak can be watched splitting across a ramp. Every mark is read from the
+  series answer through one table, so the trace, the trajectory and the
+  guide cannot name a pattern two ways. PR #1395.
+  *Done.* `rietx.gui.series.TRACE_VOCABULARY` is the vocabulary, written
+  once: three series verdicts read from `SeriesResult.diagnostics` whose
+  `where` names a pattern (`SERIES_PATTERN_FAILED`, `…_UNRECOVERED`,
+  `…_RESEED`; any other such code is drawn as a tick under
+  its own name, since the codes are open), the pattern's own codes from
+  `SeriesEntry.diagnostics` (counted), and each path's largest step, its
+  first measured row of `SeriesResult.steps` (a rank, as
+  `tests/planted_series.largest_steps` reads it). Series-level rows naming
+  no pattern stay the banner and Fences strip. `series.trace()` builds the
+  points (failed patterns included, placed by the staged members' `x`) and
+  `/api/series/result` serves it as `trace`; no new route. `rxplot.trace` is
+  the figure: one pane, glyphs stacked from the top, findings bars from the
+  bottom, a cursor and a band; a drag scrubs (capture-phase press, as
+  alt-drag's) and never zooms, the wheel still zooms. The panel owns it,
+  above its plot (task 2's decision); a scrub updates the member figure in
+  place through `setCurves(…, keep)`, each member's curves are cached per
+  answer, the arrow keys and Home/End step and skip a pattern with nothing
+  to show, and a History button keeps the tree one click away. The
+  trajectory's rings and crosses now come from the same trace. (The hollow
+  square for `SEQUENTIAL_RWP_OUTLIER` this WP first planned went with the
+  code, which WP-2003 C1 removed; the glyph was deleted rather than left
+  without a writer.) GUI guide § Series › The trace
+  carries the table, held to the vocabulary both ways by
+  `tests/test_gui_series_trace.py`.
+  *Decisions recorded.* Which panel owns the trace: the Series panel.
+  Animation, export of a film and 2-D film/waterfall views: out (the
+  Non-goals already ruled film views out of this WP; nothing here needs
+  them, and the trace's own export buttons are not wired, see below).
+  *Open — a decision for the maintainer, not taken here:* **external
+  annotations, schema or view-side.** Nothing in the WP or #133's thread
+  settles it, so no field was added. The options and what each costs:
+  (a) *view-side* — annotations typed in the panel and kept in the
+  project's `ui` keys or the browser: no schema change, but the library,
+  `to_table`, `plot_trajectory` and `rietx events` never see them, the GUI
+  becomes a second authority on the series' vocabulary (the rule this WP
+  exists to keep), and since a GUI series is session-scoped the marks
+  outlive the series they annotate; (b) *schema* — a caller-supplied
+  `annotations=` on `SequentialRefinement.fit`/`refine_sequential`, carried
+  as `SeriesResult.annotations` (kind, label, an index or `x` interval):
+  one vocabulary everywhere and a round-trip test, at the cost of a
+  `SCHEMA_VERSION` bump, a `rietx._audit` row (a new `SeriesResult` field
+  trips `test_audit_table.py`; tier `caller`, since the user supplies it),
+  a `help.py` entry and a Part 1 manual entry; (c) *defer to the persisted
+  series* — a GUI series lives only in the session until WP-1003's document
+  question is answered, so the GUI half of (b) has nowhere durable to keep
+  what is typed; decide both together. The trace already draws an unknown
+  code as a named tick, so (b) would reach the panel with one vocabulary
+  row and no new figure code.
+  *Not done.* Screenshots: no shipped example is a series and the driver
+  has no phase that runs one; filed as #1397 with a way forward. A real
+  browser pass: this machine has no playwright and no cached chromium, so
+  the drag was exercised only through vitest's uPlot stub (press, drag,
+  release, keys, cache, in-place update); the first browser session should
+  drag across a real series once. The trace has no export buttons of its
+  own (the plot's still export the plot). The inherited WP-2003 item is
+  half done: the trace now shades the shown parameter's largest step from
+  `SeriesResult.steps`, but `trajectoryNote`'s `discontinuous` caption is
+  still the old wording and still never fires in the GUI.
+  *Fixed on the way:* `/api/series/curves` and `/history` indexed `results_`
+  by position and the staged members by index, which disagree after a failed
+  pattern, so every member after one showed its neighbour's fit. Both now
+  look the member up by its index; filed as #1396 and closed by this PR, with
+  `test_a_failed_pattern_does_not_shift_the_members_after_it`.
+  *Gates* (macOS arm64, worktree `.venv` `[dev]`): vitest 599 passed (24
+  files); `svelte-check` 0 errors 0 warnings; fast `-m "not slow"` 13 765 passed, 318 skipped, 34 xfailed, on this branch with `origin/main` `dd55ec4f5` merged in (12 tests added: 9 in `test_gui_series_trace.py`, 2 in `test_gui_server.py`, 1 in `test_planted_series.py`, 0.02 s together in that run's junit).
+  GUI build reproduces the committed dist; ruff clean; Vale 0 errors.
+  `tests.reader_output` exit 0, unchanged. `/code-review high --fix` applied six of its ten findings (4574840a7: the member a failed pattern shifts, the same fix in the history route, focus, the curve cache, `col-resize` on the plot's overlay); declined, with reasons: the per-answer curve cache is unbounded (~100 MB at 125 patterns × 20k points), kept because a series is session-scoped and a scrub must not refetch; a scrub does not check the busy flag, harmless since it only reads; the previous trace figure is kept when an answer carries no trace, and a destroy mid-drag can leave the window listeners until the next release.
+  *Review round 1 (Yue, 2026-11-05):* a scrub leaves the history unloaded, so the row's button now opens it (it closed to the trajectory) and shows ▸ until the tree is there; `scrubNote` clears on a new answer, the trajectory view and a row open; the `square` glyph went from `rxplot`, its type, the legend type and CSS, since no vocabulary row draws it after WP-2003 C1; the dead `SEQUENTIAL_RWP_OUTLIER` assertion in `test_planted_series.py` now asserts the transition alone is marked nowhere; 1.12.0's notes carry the trace and #1396. New vitest case: the scrubbed row opens its history (fails on the old guard).
+  Next: rule on annotations (a/b/c above); then #1397's screenshots and a
+  browser drag, which close the last task; then `Closes #133` and `#141`
+  ride the PR that ticks it.
 
 - **2026-10-21** — the planted-events series this WP's acceptance asks for
   merged from outside. PR #1011 (head `82cf9600`) merged as `58ccce44` by

@@ -307,6 +307,133 @@ def setup_payload(setup: SeriesSetup, *, running: bool, has_result: bool,
 
 
 # ----------------------------------------------------------------------
+# the trace's vocabulary (WP-1317)
+# ----------------------------------------------------------------------
+#: Every mark the series trace draws, and what it reads, written **once**.
+#:
+#: The rule this table keeps is issue #141's: the flag list and the event
+#: markers are one vocabulary, read from the :class:`SeriesResult`, never a
+#: second set invented view-side.  So each row names the field it is read from,
+#: and :func:`trace` is the only code that reads it; the route serves the table
+#: beside the trace, the panel draws what it is told, and the GUI guide's table
+#: is held to these rows both ways by ``tests/test_gui_series_trace.py``.
+#:
+#: Three sources, in order of how much the library has already judged:
+#:
+#: - a **series verdict on a pattern**: a ``SeriesResult.diagnostics`` row whose
+#:   ``where`` names one pattern, as the per-pattern fences all do
+#:   (``where=[entry.label or str(entry.index)]``).  The codes are an open
+#:   vocabulary (root ``CLAUDE.md``, Guards), so a code this table has no row for
+#:   is still drawn, with :data:`OTHER_MARK` and its own name.  A series-level
+#:   row with no pattern in ``where`` (``SEQUENTIAL_PERSISTENT_FINDING``,
+#:   ``…_CANCELLED``) stays the panel's banner and
+#:   Fences strip: it says something about the chain, not about a point of it.
+#: - the **pattern's own findings**: each ``SeriesEntry.diagnostics`` code,
+#:   counted per pattern.  A count and not a glyph per code, because a fit's own
+#:   codes include the ones that fire on every pattern, and those raise every
+#:   bar alike while a cluster still stands out above them.
+#: - the **largest step** of the parameter on show: its first row in
+#:   ``SeriesResult.steps``, which is sorted largest first.  A rank, not a
+#:   threshold — the field calls no step a jump (WP-2003), so neither does the
+#:   trace; it says where that parameter moved most.
+TRACE_VOCABULARY: tuple[dict[str, str], ...] = (
+    {"key": "SERIES_PATTERN_FAILED", "mark": "bar", "label": "failed",
+     "source": "SeriesResult.diagnostics",
+     "means": "every rung of the ladder raised, so this pattern has no fit and "
+              "no point on any trajectory"},
+    {"key": "SEQUENTIAL_UNRECOVERED", "mark": "cross", "label": "unrecovered",
+     "source": "SeriesResult.diagnostics",
+     "means": "the fit diverged on every rung: its values are not a "
+              "measurement, and it seeded no successor"},
+    {"key": "SEQUENTIAL_RESEED", "mark": "ring", "label": "reseeded",
+     "source": "SeriesResult.diagnostics",
+     "means": "a good fit reached from the initial model, not from its "
+              "neighbour, so it is no evidence the trajectory is continuous here"},
+    {"key": "findings", "mark": "count", "label": "findings",
+     "source": "SeriesEntry.diagnostics",
+     "means": "how many codes this pattern's own fit raised; a cluster of tall "
+              "bars is where the fits changed character"},
+    {"key": "largest_step", "mark": "band", "label": "largest step",
+     "source": "SeriesResult.steps",
+     "means": "the pair of patterns between which the parameter on show moved "
+              "most, in its esds; a rank, never a verdict"},
+)
+
+#: The mark a series verdict gets when :data:`TRACE_VOCABULARY` has no row for
+#: its code: drawn and named by its code rather than dropped.
+OTHER_MARK = "tick"
+
+
+def trace(series: SeriesResult,
+          coordinates: list[float | None] | None = None) -> dict:
+    """The series on its own axis: one point per pattern, with its marks.
+
+    Every pattern the chain was given is a point, a failed one included, in
+    index order — the order the chain is numbered in, which is the scrubber's
+    axis.  ``x`` is the pattern's series coordinate, the entry's own
+    (``SeriesEntry.x``), and for a failed pattern, which has no entry, the
+    one ``coordinates`` (the staged members' ``x``) gives at its index, or
+    ``None``.  ``marks`` are the codes of the series verdicts naming the
+    pattern, and ``findings`` its own fit's codes with their worst level,
+    both as :data:`TRACE_VOCABULARY` says.
+
+    The largest steps are served per path, so the panel marks the parameter
+    on show without a round trip when the reader picks another.  A path with
+    no esd on any step has none, as ``steps`` ranks only measured ones first.
+    """
+    points: dict[int, dict] = {}
+    names: dict[str, int] = {}
+    for entry in series.entries:
+        stats = entry.statistics
+        levels: dict[str, str] = {}
+        for d in entry.diagnostics:
+            if _LEVEL_RANK[d.level] > _LEVEL_RANK.get(levels.get(d.code, ""), -1):
+                levels[d.code] = d.level
+        points[entry.index] = {
+            "index": entry.index, "label": entry.label, "x": entry.x,
+            "status": entry.status,
+            "rwp": stats.rwp if stats is not None else None,
+            "marks": [],
+            "findings": [{"code": c, "level": v} for c, v in sorted(levels.items())]}
+        names[entry.label or str(entry.index)] = entry.index
+    for failure in series.failures:
+        at = (coordinates[failure.index]
+              if coordinates is not None and failure.index < len(coordinates)
+              else None)
+        points.setdefault(failure.index, {
+            "index": failure.index, "label": failure.label, "x": at,
+            "status": "failed", "rwp": None, "marks": [], "findings": []})
+        names.setdefault(failure.label or str(failure.index), failure.index)
+    for d in series.diagnostics:
+        if d.where and d.where[0] in names:
+            point = points[names[d.where[0]]]
+            # ``direction="both"`` adds the backward chain's failures here too,
+            # naming a pattern whose reported (forward) fit stands: that one
+            # has a point on every trajectory, so "failed" would be false of it
+            if d.code == "SERIES_PATTERN_FAILED" and point["status"] != "failed":
+                continue
+            if d.code not in point["marks"]:
+                point["marks"].append(d.code)
+    largest: dict[str, dict] = {}
+    for s in series.steps or []:
+        if s.size_esd is not None and s.path not in largest:
+            largest[s.path] = {"indices": list(s.indices),
+                               "size_esd": s.size_esd,
+                               "cold_ratio": s.cold_ratio}
+    return {
+        "x_label": series.x_label,
+        "points": [points[i] for i in sorted(points)],
+        "largest_steps": largest,
+        "vocabulary": [dict(row) for row in TRACE_VOCABULARY],
+        "other_mark": OTHER_MARK,
+    }
+
+
+#: a diagnostic level's rank, for keeping a code's worst level per pattern
+_LEVEL_RANK = {"info": 0, "warning": 1, "error": 2}
+
+
+# ----------------------------------------------------------------------
 # the answer
 # ----------------------------------------------------------------------
 def trajectories(series: SeriesResult,
@@ -381,8 +508,10 @@ def trajectories(series: SeriesResult,
 def result_payload(series: SeriesResult, backward: SeriesResult | None, *,
                    running: bool, curves: list[bool],
                    relative: frozenset[str] = frozenset(),
-                   angles: frozenset[str] = frozenset()) -> dict:
-    """The series answer as a client needs it: entries, trajectories, fences.
+                   angles: frozenset[str] = frozenset(),
+                   coordinates: list[float | None] | None = None) -> dict:
+    """The series answer as a client needs it: entries, trajectories, fences,
+    and the trace the panel scrubs along (:func:`trace`).
 
     ``curves`` says per entry whether this session still holds that pattern's
     full :class:`~rietx.schemas.results.RefinementResult` — a
@@ -403,11 +532,13 @@ def result_payload(series: SeriesResult, backward: SeriesResult | None, *,
 
     ``relative`` is the runner's ``sequential._relative_paths``, and
     ``angles`` its ``sequential._angle_paths``, both passed on to
-    :func:`trajectories`.
+    :func:`trajectories`.  ``coordinates`` are the staged members' ``x``, which
+    place a failed pattern on the trace (:func:`trace`).
     """
     return {
         "result": series.model_dump(mode="json"),
         "trajectories": trajectories(series, backward, relative, angles),
+        "trace": trace(series, coordinates),
         "has_backward": backward is not None,
         "n_iterations": series.n_iterations,
         "curves": list(curves),
