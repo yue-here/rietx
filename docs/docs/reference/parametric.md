@@ -23,18 +23,18 @@ These figures come from synthetic LaB6 ramps of ten patterns at 300-1200 K, each
 
 ### Intervals of an expression's variables
 
-An `"expression"` equation's variables can enter it nonlinearly, so their esds were measured as intervals.
+An `"expression"` equation can be nonlinear in its variables, so their esds were measured as intervals.
 Two synthetic LaB6 ramps of twelve patterns each had a known truth, and each was fitted over 100 noise seeds with every variable free.
-The first was an order parameter through a transition, a(T) = a0 + k·(T − 300) + A·(1 − T/T_c)<sup>2β</sup> below T_c = 830 K.
+The first was an order parameter through a transition, a(T) = a0 + k·(T − 300) + A·(1 − T/T<sub>c</sub>)<sup>2β</sup> below T<sub>c</sub> = 830 K.
 The second was an Avrami fraction against time, the phase's scale S·(1 − exp(−(k·t)<sup>n</sup>)).
 
-- The value ± 2 esd covered the true T_c and the true β in 97 of 100 seeds each, and the other three variables in 96 to 97.
+- The value ± 2 esd covered the true T<sub>c</sub> and the true β in 97 of 100 seeds each, and the other three variables in 96 to 97.
   On the Avrami ramp it covered k and n in 100 of 100 and S in 99.
   The esds carry the fit's Bérar-Lelann factor, 1.12-1.14 here; without it the coverage was 93 to 99 of 100.
 - A profile interval adds nothing on these ramps.
-  Pinning T_c or β at 1, 2 and 3 esd either side and refitting gave a χ² profile within 5 % of a parabola out to 3 esd, so its ends are the esd's.
+  Pinning T<sub>c</sub> or β at 1, 2 and 3 esd either side and refitting gave a χ² profile within 5 % of a parabola out to 3 esd, so its ends are the esd's.
 - A start on the wrong side of a pattern can find another minimum.
-  With T_c 10 K above the last ordered pattern and started below it, one fit stopped at T_c = 782 K, with a0 80 esd from the truth (one seed, with Biso started 0.1 Å² off its truth).
+  With T<sub>c</sub> 10 K above the last ordered pattern and started below it, one fit stopped at T<sub>c</sub> = 782 K, with a0 80 esd from the truth (one seed, with Biso started 0.1 Å² off its truth).
   The form test rejected that fit.
   Started above the truth, or with the truth 40 K from the nearest pattern, every fit recovered it.
 

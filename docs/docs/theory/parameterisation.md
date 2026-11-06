@@ -848,7 +848,7 @@ In each pattern the target is a derived row, written from the variables at
 each evaluation, and $\partial f/\partial v_i$ is exact: the grammar has one
 derivative rule per operator, checked against the complex-step derivative over
 random trees. A formula that names an earlier formula has that formula's tree
-inlined, so a temperature calibration feeding three cell edges is one function
+substituted in, so a temperature calibration feeding three cell edges is one function
 of the variables per edge.
 
 The equation is evaluated anywhere through its gradient in the variables at the

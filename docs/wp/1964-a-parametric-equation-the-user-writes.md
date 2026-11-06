@@ -614,6 +614,12 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
     is itself a subagent, and the tool reads transcripts from `~/.claude/projects`, where
     this machine keeps none.
   - *Fast selection.* 14599 passed, 56 skipped, 36 xfailed, 0 failed, 8:58, on 7d4cc9372 (origin/main merged at a63d9fd36), `[dev,jax,torch]`, darwin/arm64, through ghostshift's serial queue, alone. Against the 14596 passed and 56 skipped at 880c1cf6a, +3 passed: the per-pattern glob test, the fast two-cell offset test, the stored-`expr` test and the inlined-too-deep refusal row are four, less the removed sharing refusal row; the 12-seed test is `slow`. Added tests' cost (local junit, `tests.added_test_times`): 25.3 s over 46, of which test_parametric_expression.py 19.8 s; the slowest are the order-parameter (4.3 s) and Avrami (3.8 s) recoveries, each a fit over a synthetic ramp and the acceptance bar's own single-seed check
+  - *CI (PR #1442).* The `lint` job's Vale step failed on 29 spelling errors in three
+    new pages. Fixed by rewording: formulas moved into `$…$` math, `jax`, `torch`,
+    `mpmath` and `Tc` into code spans, the conformance table's `nan` spelt NaN (the test
+    reads it through `float`), "nonlinearly" and "inlined" reworded. Abramowitz, Stegun,
+    Avrami and Stinton joined `docs/vale/terms.txt` as cited names. Vale over the manual
+    and the tutorials, run as CI runs it: 0 errors.
   - *Next.* Nothing on this WP's checklist. WP-2118 (one formula command for a single fit)
     and WP-2103 (the joint fit's verbs, which the full WO₃ protocol needs) build on it.
 - **2026-11-05 (third build session, a ghostshift runner)** — Task 10 closed, and tasks 9, 12

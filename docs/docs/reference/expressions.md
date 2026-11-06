@@ -66,11 +66,11 @@ To work in degrees, multiply by `pi / 180`.
 | `abs(x)` | \|x\| | the sign of x, 0 at 0 |
 | `min(a, b, …)`, `max(a, b, …)` | two or more arguments | the derivative of the chosen argument; on a tie, the first |
 | `if(c, a, b)` | `a` where the condition `c` holds, else `b` | the derivative of the chosen branch |
-| `debye(x)` | the first Debye function D₁(x) = (1/x)∫₀ˣ t/(eᵗ − 1) dt, with D₁(0) = 1 | 1/(eˣ − 1) − D₁(x)/x, which is −1/4 at 0 |
+| `debye(x)` | the first Debye function $D_1(x) = \frac{1}{x}\int_0^x \frac{t}{e^t - 1}\,dt$, with D₁(0) = 1 | 1/(eˣ − 1) − D₁(x)/x, which is −1/4 at 0 |
 
 `debye(x)` follows Abramowitz and Stegun § 27.1.
-A Debye temperature θ_D enters as `debye(theta_D / T)`.
-Below |x| = 10 it is a 32-point Gauss-Legendre rule on ∫₀¹ g(xu) du, with g(s) = s/(eˢ − 1).
+A Debye temperature $\theta_D$ enters as `debye(theta_D / T)`.
+Below |x| = 10 it is a 32-point Gauss-Legendre rule on $\int_0^1 g(xu)\,du$, with $g(s) = s/(e^s - 1)$.
 From x = 10 up it is the tail series (π²/6 − Σ e⁻ᵏˣ(x/k + 1/k²))/x.
 Both agree with a 50-digit quadrature to 4 × 10⁻¹⁵ or better.
 
@@ -81,7 +81,7 @@ A condition appears only as the first argument of `if`.
 An expression whose value is a condition is refused, because an equation's value is a number.
 
 A condition carries no derivative.
-`if(T < Tc, a * (1 - T / Tc)^beta, 0)` is therefore differentiable in `a`, `Tc` and `beta` on each side of T_c, and its derivative in T_c jumps at T = T_c.
+`if(T < Tc, a * (1 - T / Tc)^beta, 0)` is therefore differentiable in `a`, `Tc` and `beta` on each side of $T_c$, and its derivative in `Tc` jumps at $T = T_c$.
 Nothing is smoothed.
 A smoothed step is written out, for example with `atan`.
 
@@ -91,7 +91,7 @@ Each refusal names the place in the text with a caret, and gives the error code 
 
 | Written | Code | Why |
 |---|---|---|
-| `x^y^z`, `2^-x^2` | `power_chain` | TOPAS reads `x^y^z` as (x^y)^z and python as x^(y^z). Write the parentheses. |
+| `x^y^z`, `2^-x^2` | `power_chain` | TOPAS reads `x^y^z` as `(x^y)^z` and python as `x^(y^z)`. Write the parentheses. |
 | `2x`, `x y`, `2(x)` | `implied_multiplication` | `Tc` and `T c` would differ by a space. Write the `*`. |
 | `a < b < c` | `comparison_chain` | Write `a < b and b < c`. |
 | `ln(x)`, `Exp(x)` | `unknown_function` | The message suggests the nearest function. TOPAS's capitalised names are not aliases. |
@@ -124,17 +124,17 @@ The text you wrote is kept and printed unchanged.
 
 Every derivative is exact.
 On the numpy path each operator has one rule, the third column of {ref}`expr-functions` and the rules of the arithmetic operators.
-The jax and torch backends differentiate the same evaluation by forward-mode automatic differentiation.
+The `jax` and `torch` backends differentiate the same evaluation by forward-mode automatic differentiation.
 
-In `x^y`, the term x^y·ln x·∂y enters only where `y` depends on a refined name.
+In `x^y`, the term $x^y \ln x \, \partial y$ enters only where `y` depends on a refined name.
 So `x^2` has the derivative 2x for negative x, where ln x is undefined.
 
 ## Conformance table
 
-Every evaluator in rietx answers every row of this table, on numpy, jax and torch.
-A number matches to a relative 10⁻¹³, and `inf` and `nan` match exactly.
+Every evaluator in rietx answers every row of this table, on the `numpy`, `jax` and `torch` backends.
+A number matches to a relative 10⁻¹³, and `inf` and NaN match exactly.
 An error row expects the code shown.
-The expected values were computed with mpmath at 50 digits, independently of rietx.
+The expected values were computed with `mpmath` at 50 digits, independently of rietx.
 
 The table is the test: `tests/test_expression.py` reads it from this page.
 
@@ -157,10 +157,10 @@ The table is the test: `tests/test_expression.py` reads it from this page.
 | `pi` | none | 3.141592653589793 |
 | `x * y` | x=2, y=3 | 6.0 |
 | `1 / 0` | none | inf |
-| `0 / 0` | none | nan |
-| `log(-1)` | none | nan |
-| `sqrt(-1)` | none | nan |
-| `x ^ 0.5` | x=-1 | nan |
+| `0 / 0` | none | NaN |
+| `log(-1)` | none | NaN |
+| `sqrt(-1)` | none | NaN |
+| `x ^ 0.5` | x=-1 | NaN |
 | `exp(1)` | none | 2.718281828459045 |
 | `expm1(1e-10)` | none | 1.00000000005e-10 |
 | `exp(1e-10) - 1` | none | 1.00000000005e-10 |
@@ -183,7 +183,7 @@ The table is the test: `tests/test_expression.py` reads it from this page.
 | `if(not x > 0 or x == 5, 1, 2)` | x=5 | 1.0 |
 | `if(x != 0, 1 / x, 0)` | x=0 | 0.0 |
 | `if(x >= 0, sqrt(x), -1)` | x=-4 | -1.0 |
-| `if(x <= 1, log(x), 0)` | x=-2 | nan |
+| `if(x <= 1, log(x), 0)` | x=-2 | NaN |
 | `debye(0)` | none | 1.0 |
 | `debye(1)` | none | 0.7775046341122482 |
 | `debye(20)` | none | 0.08224670117820002 |
