@@ -156,7 +156,7 @@ of issue #561, sized M.
   a full one. A simulated pattern's known answer is recovered, and a
   regular-hexagon template fails it. Nothing yet says whether the body is
   right about the deposit. That is Part 2, the free-atom control.
-  Handover filed in PR #PR_NUMBER by a ghostshift runner.
+  Handover filed in PR #1443 by a ghostshift runner.
 
   *Done.* `tests/test_acceptance_acridine_ix.py` holds the four Part 1 checks
   under the authors' profile read from the paper. FCJ H/L is held at 0.01,
