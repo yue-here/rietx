@@ -69,6 +69,11 @@ declare formulas on parameters; practice.md). No new judgement is added.
   construction, `refine_multi(variables={…})`, while a single refinement uses the
   `add_variable` command. WP-2103 gives a joint fit the single fit's commands. The
   command built here should keep the two routes one convention, or say why they differ.
+- **2026-11-06, from WP-1964 (the reader output).** A formula's general surfaces are
+  `vars.*` rows in `result.parameters` and `RefinedParameter.equations`, and a
+  single-refinement formula here reuses both unchanged. The joint fit's
+  `preview_equations()` and `result.parametric_equations`/`evaluate()` are joint-fit
+  calls today; extend them to a single refinement only when a case needs it.
 
 ## Non-goals
 
