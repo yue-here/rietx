@@ -96,12 +96,13 @@ The coordinates need not be compositions or temperatures: a position on the subs
 
 `ParametricEquation.coefficient_paths` lists the coefficients' dot-paths, `ParametricEquation.n_coefficients` counts them, and `ParametricEquation.coordinates_used` names the coordinates the terms use.
 
-The three bases cover different cases.
+The four bases cover different cases.
 `"constant"` is one coefficient, the same in every pattern of the subset: a parameter shared over part of the fit.
 Over every pattern it reproduces a plain shared parameter bit for bit, including its esd.
 `"polynomial"` is a sum of monomials in the coordinates.
 `"design"` is your own matrix, for a spline, a mixture form or anything else linear in its coefficients.
 Its columns are in units only you know, so its coefficients are reported as you defined them, with no unit.
+`"expression"` is a formula you write, which may be nonlinear in what it refines ([Formula equations](#formula-equations)).
 
 The subset keeps an equation inside a phase field.
 A property varies smoothly within a field and not across its boundary, so name the patterns the equation holds over.
@@ -149,6 +150,49 @@ assert library.n_patterns == 8
 assert surface.n_coefficients == 5
 assert surface.coordinates_used() == ["x", "y"]
 ```
+
+## Formula equations
+
+An `"expression"` equation is a formula in the grammar of [Expressions](expressions.md).
+It names variables, coordinate columns and earlier formula equations.
+The variables are the refined numbers, declared by the `variables` keyword of `MultiHistogramRefinement` and `refine_multi` as a dict of `Parameter`.
+
+- Each variable is one column of the fit, `vars.<name>`, however many formulas name it.
+  A Debye temperature read by a cell formula and a Biso formula is one number.
+- A stage that frees a formula's target frees the variables it names.
+  A variable declared `vary=False` stays fixed there, and a glob naming `vars.<name>` frees it.
+- A variable may not share its name with a coordinate column, and a variable no formula names is refused.
+- A formula equation with `target=None` drives nothing.
+  It is an intermediate that a later formula names, such as a temperature calibration that the cell formulas read.
+  Declare it before the formulas that name it.
+
+A variable named in `SharingMap.per_histogram` is one free number per pattern.
+This is Stinton and Evans's temperature offset, refined in every pattern and fed to each phase's cell formula {cite}`stinton2007`.
+The name is matched as a glob, like every other path in the map, so `vars.*` makes every variable per-pattern.
+Each pattern's value is the row `hist.<h>.vars.<name>`.
+
+<!-- api-doc: no-exec — it refines the reader's own patterns -->
+```python
+variables = {"as0": rx.Parameter(value=4.1566), "gs": rx.Parameter(value=3e-5),
+             "b0": rx.Parameter(value=4.40, vary=True),
+             "gb": rx.Parameter(value=5e-5, vary=True),
+             "dT": rx.Parameter(value=0.0, vary=True, min=-50.0, max=50.0)}
+equations = [
+    rx.ParametricEquation(name="std", target="phases.0.cell.a", basis="expression",
+                          expression="as0 + gs*(T + dT - 300)"),
+    rx.ParametricEquation(name="smp", target="phases.1.cell.a", basis="expression",
+                          expression="b0 + gb*(T + dT - 300)"),
+]
+result = refine_multi(patterns, structure, instruments, plan="mccusker_default",
+                      coordinates=coords, variables=variables, parametric=equations,
+                      sharing=rx.SharingMap(per_histogram=["vars.dT"]))
+```
+
+Here phase 0 is an internal standard whose expansion is known, so its two variables stay fixed.
+On a synthetic six-pattern ramp, fitted over twelve noise seeds, each pattern's ΔT and the sample's two variables came back unbiased.
+Each one's mean z-score over the seeds was within 0.13, and every value lay within 2 esd of its truth.
+A per-pattern variable has a value at each pattern and none between them.
+So `RefinedParametricEquation.evaluate` refuses a formula that reads one, and each pattern's target row carries the value and its esd.
 
 ## Reference and scale
 
@@ -271,7 +315,7 @@ The rest need the patterns:
 | two declarations with one name, a coefficient path that already exists, or two declarations on one target with overlapping subsets | a name each, and disjoint `patterns` per target |
 | a list of starting structures whose length is not the instrument count, or which differ in phases, space group or atoms | one `Structure`, or one per histogram of one model |
 | starting structures that disagree on a shared path | one value, a per-histogram override, or a declaration on that path |
-| a `SharingMap` that makes a coefficient per-histogram | keep `vars.*` shared |
+| a `SharingMap` that makes a linear equation's coefficient per-histogram | keep its `vars.<name>_<j>` shared; a formula's variable may be per-pattern |
 
 The coefficients are unbounded, unless the basis is `"constant"`, whose one coefficient carries the target's own bounds.
 A sum of terms has no box that holds every pattern's target, so a target can leave its own range on some pattern.
@@ -318,6 +362,11 @@ Read the coefficients here, and not off `RefinementResult.parameters`.
 The `vars.` rows there are in the table's own units, per unit of the scaled coordinate.
 On the seven-pattern synthetic ramp of [How to fit a temperature series](../guides/series.md), at 300-900 K, the slope's row read 0.0062323, in Å per 300 K, where its coefficient read 2.07744 × 10⁻⁵ Å/K, the same number divided by the scale.
 A loop over `parameters` can tell those rows by their `RefinedParameter.equations` and their `vars.` path.
+
+A formula equation has no terms, so its rows here are its variables.
+`ParametricCoefficient.term` is the variable's name, the value and esd are the variable's own in its own unit, and `ParametricCoefficient.reference` is `None`.
+A variable that two formulas read is listed under each, and a per-pattern variable once per pattern of the subset.
+So count the free parameters from `RefinementResult.parameters`, never from this table.
 
 An esd of `None` has one of two causes, and `ParametricCoefficient.vary` says which.
 Either the coefficient was not free in the last stage, or the joint covariance gave it none because no pattern of the subset carried gradient for it.

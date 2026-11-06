@@ -330,6 +330,15 @@ class ParametricCoefficient(Base):
     units, and ``None`` unless the target's and every such coordinate's unit
     is recorded (a ``design`` coefficient's is the caller's, so never).
 
+    An ``expression`` equation has no terms, so its rows are its variables
+    (WP-1964).  ``term`` is the variable's name and ``path`` its row,
+    ``vars.<name>``.  ``value`` and ``esd`` are the variable's own, in the
+    variable's ``unit``, and ``reference`` is ``None``.  A variable two
+    formulas read is listed under each, once per equation.  A per-pattern
+    variable (one ``SharingMap.per_histogram`` names) has a row per pattern
+    of the subset, ``path`` its ``hist.<h>.vars.<name>`` row.  So this table
+    does not count free parameters; ``RefinementResult.parameters`` does.
+
     ``equation`` was ``tie`` in 1.9.0 (schema 0.55), whose results still open:
     the old key is read as ``equation`` and only ``equation`` is written.
     """
