@@ -1170,6 +1170,14 @@ class StageResult(Base):
     #: stage with no Bragg intensity to compare.  Writers: the three runners
     #: that build a ``StageResult``.
     window_loss: float | None = None
+    #: the Le Bail cycles this stage's partitions ran, in order: before the
+    #: solve, then after it (a Pawley seed is the one entry).  A stage the
+    #: solve stopped has only the partition before it.  Empty where none ran:
+    #: a Rietveld stage, or a Pawley stage that carried its intensities in.
+    lebail_cycles_run: list[int] = Field(default_factory=list)
+    #: did every partition of this Le Bail stage meet ``lebail_tol`` under its
+    #: cap?  ``None`` where nothing was asked: another mode, or a fixed count.
+    lebail_settled: bool | None = None
     #: the stage's Rwp at the values it ended on, measured on its own frozen
     #: compile: the number the ``stage_end`` event carries, so a caller keeping
     #: the best stage reads it here rather than from the event log (WP-1334).

@@ -5214,6 +5214,40 @@ describe("the series panel", () => {
     expect(fetched()).toEqual(["1", "0"]);
   });
 
+  it("opens a scrubbed pattern's history from its row, which a scrub left unopened", async () => {
+    // review of #1395: a scrub selects a pattern and leaves its tree unloaded, so
+    // the row's button must open it (it read the selection as "already open" and
+    // closed back to the trajectory) and must not show the open glyph meanwhile
+    const stub = await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: SERIES_ANSWER }),
+      "/api/series/curves": fitCurves({ header: { index: 1, label: "T400", x: 400 } }),
+      "/api/series/history": () => ({ body: { index: 1, label: "T400",
+        checkout: false, tree_id: "t2", head: "n0000", root: "n0000",
+        n_nodes: 1, nodes: [
+          { id: "n0000", parents: [], label: "root", kind: "root", name: "",
+            action: {}, api_call: "", status: null, n_iterations: 0, rwp: null,
+            gof: null, n_free: null, n_diagnostics: 0, diagnostics: [],
+            tags: [], children: [], scores: {}, notes: {} }] } }),
+    });
+    seriesPane("trace").over.dispatchEvent(new MouseEvent("mousedown",
+      { clientX: 1000, button: 0, bubbles: true }));
+    window.dispatchEvent(new MouseEvent("mouseup", { clientX: 1000, button: 0 }));
+    await flush();
+    expect(host.textContent).toContain("Pattern 1 — T400");
+    expect(stub.calls.some((c) => c.path === "/api/series/history")).toBe(false);
+    expect(icons("▾")).toHaveLength(0);
+    icons("▸").at(-1)!.click();
+    await flush();
+    expect(stub.calls.some((c) => c.path === "/api/series/history")).toBe(true);
+    expect(host.textContent).toContain("History — T400");
+    expect(icons("▾")).toHaveLength(1);
+    // and a second click closes it, as before
+    icons("▾")[0].click();
+    await flush();
+    expect(host.textContent).not.toContain("History — T400");
+  });
+
   it("lists the steps between neighbouring patterns, largest first, and calls none a jump", async () => {
     await openSeries({
       "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),

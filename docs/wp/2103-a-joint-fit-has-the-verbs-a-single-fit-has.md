@@ -48,6 +48,16 @@ The seams:
 [WP-2081](2081-how-a-series-holds-what-the-setup-fixes.md) is a design discussion about
 the chain, and its answer on what "held" means should govern here. Read it first.
 
+### Inherited
+
+- **From WP-2102 (2026-11-05): the soft dependency is discharged.**
+  `MultiHistogramRefinement.fit` and `.report` read every plan through
+  `resolve_plan`, as `Refinement` does, and `multi.py` no longer imports
+  `PLAN_PRESETS`. A verb added here that takes a plan or a stage calls the same
+  authority, never a preset lookup of its own. `_cheap_joint_plan` and the
+  `plan_and_spec_fits` fixture at the end of `tests/test_multi_histogram.py`
+  give a converged joint fit in about 2 s for a verb's test.
+
 ## Non-goals
 
 - A history DAG for a joint fit.

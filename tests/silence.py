@@ -756,6 +756,23 @@ def _windows_stale(axial_to: float | None) -> list:
         cost_final=1.0, window_loss=loss)])
 
 
+def _lebail_cap(*settled: bool | None) -> list:
+    """``refine._lebail_cap_diagnostics`` on stages whose last partitions read
+    ``settled``, in order."""
+    from rietx.refine import _lebail_cap_diagnostics
+    from rietx.schemas.results import StageResult
+
+    return _lebail_cap_diagnostics([StageResult(
+        name="s", status="converged", n_iterations=1, cost_initial=1.0, cost_final=1.0,
+        lebail_cycles_run=[5, 5], lebail_settled=reading) for reading in settled])
+
+
+def _lebail_settled_or_unasked() -> list:
+    """Every state near the fault: settled, a fixed count, no stage at all, and
+    a cap on an earlier stage, whose intensities the next solve moves."""
+    return [*_lebail_cap(True), *_lebail_cap(None), *_lebail_cap(), *_lebail_cap(False, True)]
+
+
 def _held_moment(plan: str, *, moment: bool = True) -> list:
     """``refine._held_moment_diagnostics`` on the #1081 synthetic child's
     start (moment 3.6 against 3.0 μ_B), read off the table before any stage,
@@ -930,15 +947,6 @@ def _unsupported_silent() -> list:
                 path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
 
 
-def _undeclared_extinction(ext_true: float, *, declare: bool = False) -> list:
-    """``EXTINCTION_UNDECLARED`` on a LaB6 synthetic with ``ext_true`` planted
-    (WP-1944): 2.5 µm² scores about 230, none planted leans negative, and a
-    phase that declares extinction is never pointed at it."""
-    from tests.test_extinction import _undeclared_fit
-
-    return _undeclared_fit(ext_true, declare=declare)
-
-
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -949,10 +957,6 @@ SILENCE: dict[str, Pair] = {
     "EXTINCTION_SCREEN_UNRELIABLE": Pair(
         _screen_unreliable_fires, _screen_unreliable_silent,
         "tests/test_extinction_gate.py (stub screens: the gate's fits are 20 s each)"),
-    "EXTINCTION_UNDECLARED": Pair(
-        lambda: _undeclared_extinction(2.5),
-        lambda: _undeclared_extinction(0.0) + _undeclared_extinction(2.5, declare=True),
-        "tests/test_extinction.py (a whole short fit: the score needs a converged one)"),
     "FLOOR_HIT": Pair(
         _floor_fires, _floor_silent, "tests/test_bound_hit_at_convergence.py"),
     "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED": Pair(
@@ -964,6 +968,9 @@ SILENCE: dict[str, Pair] = {
         _profile_set_fires, _profile_set_silent, "tests/test_gsas_prm.py"),
     "HISTORY_EARLIER_TREE_SKIPPED": Pair(
         _earlier_tree_fires, _earlier_tree_silent, "tests/test_history.py"),
+    "LEBAIL_CYCLES_AT_CAP": Pair(
+        functools.partial(_lebail_cap, False), _lebail_settled_or_unasked,
+        "tests/test_lebail_cycles.py"),
     "MOMENT_UNSUPPORTED": Pair(
         _unsupported_fires, _unsupported_silent, "tests/test_modulus_interval.py"),
     "PARAMETRIC_OUT_OF_RANGE": Pair(

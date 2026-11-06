@@ -1617,6 +1617,13 @@ class GuiSession:
             controls = p.doc.indexing
             run_engines = (tuple(controls.engines)
                            if controls.engines else None)
+            # the specimen's formula reaches the call as `rietx index
+            # --formula` hands it over: no temperature reads at the table's
+            # 298 K (WP-2030)
+            from ..crystallography.atomic_volume import TABLE_TEMPERATURE
+
+            temperature = (TABLE_TEMPERATURE if controls.temperature is None
+                           else controls.temperature)
 
             def call(stream, token):
                 from ..indexing.workflow import index_pattern
@@ -1629,6 +1636,7 @@ class GuiSession:
                     engines=run_engines,
                     validate=controls.validate_candidates,
                     check_top=controls.check_top,
+                    formula=controls.formula, temperature=temperature,
                     two_theta_limits=limits, events=stream, cancel=token)
                 with self._cond:
                     self._index_result = result
