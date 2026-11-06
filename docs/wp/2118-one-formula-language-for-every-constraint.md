@@ -74,6 +74,15 @@ declare formulas on parameters; practice.md). No new judgement is added.
   single-refinement formula here reuses both unchanged. The joint fit's
   `preview_equations()` and `result.parametric_equations`/`evaluate()` are joint-fit
   calls today; extend them to a single refinement only when a case needs it.
+- **2026-11-06, from WP-1964 (the generality review).** Two checks for task 1's
+  practice review. First, `-2^2` reads as −4 here (`_audit` row `_UNARY_POWER`, Python's
+  and Fortran's reading). Whether TOPAS reads it the same way was not checked, and a
+  ported input that differs gives a wrong number without a word. Second,
+  `RefinedParametricEquation.evaluate` refuses a formula that reads a per-pattern
+  variable (a ΔT per pattern), since the variable has no value between patterns. So no
+  call gives the esd of the curve with ΔT set to zero, which is what Stinton and Evans
+  plot. If a case asks for it, the route is an argument fixing the variable's value,
+  and it names something on the main surface, so it goes to the maintainer.
 
 ## Non-goals
 
