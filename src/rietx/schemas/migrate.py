@@ -17,7 +17,10 @@ same ``mode="before"`` validator cannot tell a stored document from a caller's
 constructor call.  So a reader of stored models validates with the
 :data:`~rietx.schemas.common.STORED_DOCUMENT` context, and the validator fills
 the old placeholder only under it (:data:`STORED_DOCUMENT_READ_POINTS`).
-``HumpComponent.position`` (schema 0.60, WP-2013) is the one such field.
+``HumpComponent.position`` (schema 0.60, WP-2013) is one such field.
+``Geometry.kind`` (schema 0.61, WP-2015) is the other, a default that moved
+rather than one that went: a stored geometry without the key, or an
+instrument without a geometry, reads ``debye_scherrer`` as it was written.
 
 **The rename is textual on purpose.**  A dot-path is not confined to
 one schema field: it is a value in a history node's ``free_paths``, a glob in a

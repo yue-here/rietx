@@ -445,7 +445,13 @@ def contents_signature(trends: list[TrendAnalysis],
 #: parameter was.  WP-1003 settled the split 1073 left open: the shape stays
 #: here, and layer 2's action map carries no entry for it, so the trend is
 #: reported with no suggestion rather than naming a force-fixed parameter.
+#:
+#: ``unstated`` (WP-2015) offers all five: with no geometry stated every cause
+#: is possible, so each shape is reported as the shape it is, and layer 2
+#: maps only the two that exist on every instrument (the zero and the cell).
 POSITION_TEMPLATES: dict[str, tuple[str, ...]] = {
+    "unstated": ("constant", "cos_theta", "sin_2theta", "cos_2theta",
+                 "tan_theta"),
     "bragg_brentano": ("constant", "cos_theta", "sin_2theta", "tan_theta"),
     "debye_scherrer": ("constant", "sin_2theta", "cos_2theta", "tan_theta"),
     "flat_plate_transmission": ("constant", "cos_theta", "sin_2theta",

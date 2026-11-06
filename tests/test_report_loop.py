@@ -39,7 +39,7 @@ import rietx as rx
 from rietx.report import predict_then_verify
 from rietx.report.apply import recipe
 from rietx.report.schemas import FitReport, VerificationOutcome
-from rietx.strategy.staged import RefinementPlan, Stage
+from rietx.strategy.staged import PLAN_PRESETS, RefinementPlan, Stage
 from tests.test_fitreport_layers import _result_for, _truth
 
 _OUT = Path(__file__).parent / "output"
@@ -362,13 +362,17 @@ def test_e1_zero_shift_baseline(truth):
     """``mccusker_default`` recovers the same start too (its ``zero`` stage
     frees exactly the planted parameter) — the contrast with the loop is
     localisation, not capability: the preset also frees scale, cell and the
-    whole profile block on a state where those were already at truth."""
+    whole profile block on a state where those were already at truth.
+
+    The preset is passed as an object: by name, a Bragg-Brentano instrument
+    also frees the displacement beside the zero (WP-2015), and this baseline
+    is about the preset's own ``zero`` stage."""
     structure, ins, data = truth
     start = ins.model_copy(deep=True)
     start.zero_shift.value = 0.008
 
     ref = rx.Refinement(structure, start)
-    ref.fit(data, plan="mccusker_default")
+    ref.fit(data, plan=PLAN_PRESETS["mccusker_default"]())
     assert ref.fitted_instrument.zero_shift.value == pytest.approx(0.0, abs=0.002)
 
 
@@ -413,13 +417,17 @@ def test_e2_sample_displacement_baseline(truth):
     compensating zero_shift ≈ −0.011° (truth 0) while the displacement stays
     wrong — so the fit *looks* as good as the loop's while carrying two wrong
     parameters.  Rwp alone cannot distinguish them; the parameter values do.
+
+    Since WP-2015 the *name* ``"mccusker_default"`` on a Bragg-Brentano
+    instrument frees the displacement with the zero, which closes this miss;
+    the preset object, which runs as given, is what is measured here.
     """
     structure, ins, data = truth
     start = ins.model_copy(deep=True)
     start.geometry.sample_displacement.value = -0.02
 
     ref = rx.Refinement(structure, start)
-    ref.fit(data, plan="mccusker_default")
+    ref.fit(data, plan=PLAN_PRESETS["mccusker_default"]())
     assert ref.fitted_instrument.geometry.sample_displacement.value == -0.02
     # the compensation is real: zero was dragged off truth to cover for it
     assert abs(ref.fitted_instrument.zero_shift.value) > 0.005
@@ -454,16 +462,20 @@ def test_e2_one_json_call_names_the_cause(truth):
     In the pilot the second half existed and reached nobody — no agent ever
     generated a state where the report could say it.  One call that asks
     carries it.
+
+    The preset runs as an object, as in the baseline above: by name, a
+    Bragg-Brentano instrument frees the displacement too (WP-2015).
     """
     structure, ins, data = truth
     start = ins.model_copy(deep=True)
     start.geometry.sample_displacement.value = -0.02
 
     ref = rx.Refinement(structure, start)
-    result = ref.fit(data, plan="mccusker_default", stage_reports=True)
+    plan = PLAN_PRESETS["mccusker_default"]()
+    result = ref.fit(data, plan=plan, stage_reports=True)
     out = {
         "result": result.model_dump(mode="json"),
-        "report": ref.report(plan="mccusker_default").model_dump(mode="json"),
+        "report": ref.report(plan=plan).model_dump(mode="json"),
         "trajectory": [rung.model_dump(mode="json")
                        for rung in ref.stage_reports_],
     }
