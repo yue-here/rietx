@@ -57,8 +57,12 @@ def test_parameter_bounds_validated():
         Parameter(value=0.5, min=1.0, max=0.0)
 
 
-def test_parameter_expr_reserved():
-    with pytest.raises(ValidationError):
+def test_a_stored_expr_null_reads_and_a_formula_there_is_refused():
+    """``Parameter.expr`` left at schema 0.61 (WP-1964): every file before
+    stored ``null``, which reads as nothing; text there is refused by name."""
+    old = Parameter.model_validate({"value": 1.0, "vary": False, "expr": None})
+    assert old == Parameter(value=1.0) and "expr" not in old.model_dump()
+    with pytest.raises(ValidationError, match="removed at schema 0.61"):
         Parameter(value=1.0, expr="2*a")
 
 

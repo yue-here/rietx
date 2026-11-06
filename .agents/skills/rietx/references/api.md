@@ -41,7 +41,7 @@ Readers and constructors. `rx.read_pattern` opens every format `rx.capabilities(
 Every refinable quantity is a `rx.Parameter` (`value`, `vary`, bounds), addressed by a dot-path such as `phases.0.cell.a` or `instrument.profile.w`; `rx.help_for(path)` says what any of them is. Each class below is its own constructor — the fields are the keyword arguments, a field with no default is required.
 
 - `rx.Parameter` — A single refinable scalar.
-  Fields: `value: float`, `vary: bool = False`, `min: float = -inf`, `max: float = inf`, `expr: str | None = None`, `unit: str | None = None`, `stderr: float | None = None`
+  Fields: `value: float`, `vary: bool = False`, `min: float = -inf`, `max: float = inf`, `unit: str | None = None`, `stderr: float | None = None`
 - `rx.Structure` — The phases refined against one pattern.
   Fields: `phases: list[Phase]`
 - `rx.Phase` — A crystalline phase: symmetry, cell, atoms, scale, sample broadening.

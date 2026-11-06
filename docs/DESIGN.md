@@ -404,8 +404,9 @@ number. A sentence that nobody would use to make a choice does not belong here.
 
 ## Parameter system
 
-lmfit-style `Parameter{value, vary, min, max, expr, transform}` on every
-refinable scalar. Compile: tree → partition free/tied/fixed → flat fp64 θ.
+lmfit-style `Parameter{value, vary, min, max}` on every refinable scalar.
+`expr` left the schema at 0.61 (WP-1964): a formula is declared where it is
+evaluated, as an equation, never as a field on the parameter it sets. Compile: tree → partition free/tied/fixed → flat fp64 θ.
 Symmetry and linear ties are one affine map p_phys = C·θ + d (constant
 matmul — exact under autodiff); v0.1 implements the identity-tie subset
 (crystal-system cell constraints), v0.3 generalizes to Wyckoff constraints.

@@ -4416,7 +4416,7 @@ ROWS: tuple[Row, ...] = (
         evidence=("GSAS-II 5.8.4's constant-wavelength peak is the Thompson, Cox & Hastings (1987) "
                   "pseudo-Voigt with the FCJ asymmetry (GSASIIpwd.getFWHM :916, getFCJVoigt3 "
                   ":1316; checked); 'voigt' is the opt-in true Voigt")),
-    Row("rietx.schemas.instrument.ProfileTCHZ:u", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -32400.0, "max": 32400.0, "expr": None, "unit": "deg^2", "stderr": None},
+    Row("rietx.schemas.instrument.ProfileTCHZ:u", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -32400.0, "max": 32400.0, "unit": "deg^2", "stderr": None},
         evidence=("TCHZ_DEFAULTS' seed 0 and TCHZ_BOUNDS' box, dicts the constant walk cannot see; the "
                   "seed is start-invariant for a freed width (tests/test_seed_invariance.py, LaB6, CPD "
                   "and 11-BM NAC within 1.3e-4 esd) and is the held value of an uncalibrated one; the "
@@ -4431,7 +4431,7 @@ ROWS: tuple[Row, ...] = (
                  "floors'; B9, no chosen limit on a quantity that stays physical); the far bound and "
                  "the ceiling are TCHZ_CEILING_DEG's (the sixth round's Q7, ruled 2026-10-21)."),
         approved="2026-10-23"),
-    Row("rietx.schemas.instrument.ProfileTCHZ:v", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -32400.0, "max": 32400.0, "expr": None, "unit": "deg^2", "stderr": None},
+    Row("rietx.schemas.instrument.ProfileTCHZ:v", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -32400.0, "max": 32400.0, "unit": "deg^2", "stderr": None},
         evidence=("TCHZ_DEFAULTS' seed 0 and TCHZ_BOUNDS' box, as ProfileTCHZ:u; the public D1B Co3O4 "
                   "model's V = -0.501, under the old X-ray floor of -0.5, now builds on every preset, "
                   "which retired TCHZ_BOUNDS_COARSE; no per-coefficient floor: a finite bound at -180^2 "
@@ -4444,7 +4444,7 @@ ROWS: tuple[Row, ...] = (
                  "floors'; B9, no chosen limit on a quantity that stays physical); the far bound and "
                  "the ceiling are TCHZ_CEILING_DEG's (the sixth round's Q7, ruled 2026-10-21)."),
         approved="2026-10-23"),
-    Row("rietx.schemas.instrument.ProfileTCHZ:w", "default", tier=3, ambiguity=1, value={"value": 0.001, "vary": False, "min": 1e-08, "max": 32400.0, "expr": None, "unit": "deg^2", "stderr": None},
+    Row("rietx.schemas.instrument.ProfileTCHZ:w", "default", tier=3, ambiguity=1, value={"value": 0.001, "vary": False, "min": 1e-08, "max": 32400.0, "unit": "deg^2", "stderr": None},
         evidence=("TCHZ_DEFAULTS' seed 1e-3 deg^2, start-invariant for a freed width from 1e-6 "
                   "to 1.0 on LaB6 (tests/test_seed_invariance.py), a start too wide losing NAC's "
                   "phase at w = x = 1e-2; the floor is caglioti._MIN_GAMMA_G2 and the ceiling "
@@ -4453,7 +4453,7 @@ ROWS: tuple[Row, ...] = (
                  "TCHZ_CEILING_DEG, the sixth round's Q7, ruled 2026-10-21); the seed is "
                  "start-invariant on the side the default sits on."),
         approved="2026-10-21"),
-    Row("rietx.schemas.instrument.ProfileTCHZ:x", "default", tier=3, ambiguity=1, value={"value": 0.001, "vary": False, "min": 0.0, "max": 180.0, "expr": None, "unit": "deg", "stderr": None},
+    Row("rietx.schemas.instrument.ProfileTCHZ:x", "default", tier=3, ambiguity=1, value={"value": 0.001, "vary": False, "min": 0.0, "max": 180.0, "unit": "deg", "stderr": None},
         evidence=("TCHZ_DEFAULTS' seed 1e-3 deg: start-invariant on LaB6 except starts at x = "
                   "0.02-0.03, which land 0.38 esd away in u on a mirrored S/L-H/L minimum (WP-2012); "
                   "FAP's GSAS protocol holds x at it, and x = 0 instead moves lor_size 0.69 esd at "
@@ -4464,7 +4464,7 @@ ROWS: tuple[Row, ...] = (
         grounds=("Its ceiling is TCHZ_CEILING_DEG's (the sixth round's Q7, ruled 2026-10-21); its "
                  "floor is a width's own, which the ruling of 2026-10-23 kept."),
         approved="2026-10-23"),
-    Row("rietx.schemas.instrument.ProfileTCHZ:y", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -180.0, "max": 180.0, "expr": None, "unit": "deg", "stderr": None},
+    Row("rietx.schemas.instrument.ProfileTCHZ:y", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -180.0, "max": 180.0, "unit": "deg", "stderr": None},
         evidence=("TCHZ_DEFAULTS' seed 0, start-invariant for a freed width "
                   "(tests/test_seed_invariance.py); the ceiling TCHZ_CEILING_DEG; a negative Y is "
                   "physical as a coefficient: a constant positive Lorentzian width projected onto "
@@ -4640,7 +4640,7 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.schemas.instrument.Source:kind", "default", tier=1, ambiguity=1, value="xray_cw",
         evidence="arithmetic: a union tag, no value judgement"),
-    Row("rietx.schemas.instrument.Source:polarization", "default", tier=3, ambiguity=3, value={"value": 0.5, "vary": False, "min": 0.0, "max": 1.0, "expr": None, "unit": None, "stderr": None},
+    Row("rietx.schemas.instrument.Source:polarization", "default", tier=3, ambiguity=3, value={"value": 0.5, "vary": False, "min": 0.0, "max": 1.0, "unit": None, "stderr": None},
         evidence=("physics: K = 0.5 is the unpolarised beam (docstring; GSAS POLA convention); a "
                   "monochromated lab beam or a synchrotron (K ~ 0.99) built without K is fitted at "
                   "0.5, and a wrong K moved Biso by 12 sigma at near-unchanged Rwp (WP-1311); "
