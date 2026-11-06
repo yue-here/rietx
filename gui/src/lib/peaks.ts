@@ -250,6 +250,8 @@ export interface Candidate {
   centring: string;
   lattice_group: string;
   volume: number;
+  /** formula units the volume holds, when the run read a formula (WP-2030) */
+  formula_units?: number | null;
   n_indexed: number;
   n_lines: number;
   fom: Array<{ name: string; value: number; n_lines: number; blind_spot: string }>;

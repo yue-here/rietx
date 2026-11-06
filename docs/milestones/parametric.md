@@ -21,6 +21,11 @@ TOPAS. A primitive is designed on rietx's own terms and tested against a known t
 never against matching a TOPAS keyword. Where an input does not import directly, a user
 with a decent agent ports it from the documentation.
 
+The maintainer's ruling of 2026-11-05: one formula language for constraints and
+restraints, in single and parametric refinements. WP-1964's grammar is that language. A
+single refinement declares a formula with a command in the `tie` family, never with a
+field on the parameter, so `Parameter.expr` is removed in 1964 and the command is 2118.
+
 The aim the milestone tests: such a user ports their own refinement to rietx with the
 manual, the skill and their agent. A missing primitive blocks them, and a missing check
 does not. So the milestone ranks what an expert cannot express above any new correctness
@@ -35,6 +40,7 @@ the user writes, surveyed across fields on 2026-11-03.
 | [2102](../wp/2102-a-joint-fit-takes-a-planspec.md) | `refine_multi(plan=PlanSpec(...))` stops crashing |
 | [1964](../wp/1964-a-parametric-equation-the-user-writes.md) | the grammar, equations as text, shared variables, one equation feeding another, exact derivatives |
 | [2103](../wp/2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) | hold, tie, set values, a restart from a result, a profile interval, on a joint fit |
+| [2118](../wp/2118-one-formula-language-for-every-constraint.md) | a formula in the grammar declared in a single refinement, today's ties as its shorthand, and a practice review of formula languages |
 | [1995](../wp/1995-soft-restraints-in-a-joint-fit.md) | restraints in a joint fit, and a penalty written in the grammar |
 | [2104](../wp/2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) | a shared cell across Le Bail or Pawley patterns |
 | [2107](../wp/2107-an-equation-over-a-reflection.md) | a width, position or intensity set by an equation over a reflection |
@@ -67,7 +73,7 @@ The documentation comes first because it needs no machinery and tells a user tod
 what they can already do. 2102 is small and removes a crash on the way in. 2103 needs
 nothing else for its verbs, and it gives 1964 the tie that the WO₃ protocol needs. 1964
 is the piece the rest stands on. 1995's penalty, 2104's equation on a cell, 2106 and 2107
-all use its grammar. 2108's first task needs 1964 too. 1325's two tasks stand alone and can land at any point, and the
+all use its grammar. 2108's first task needs 1964 too. 2118 brings the grammar to a single refinement after 1964, and its practice review can run at any point. 1325's two tasks stand alone and can land at any point, and the
 joint path they harden already exists. 1965 is sugar and comes last. Each WP's
 `Priority:` line outranks this paragraph.
 
