@@ -207,9 +207,13 @@ every route.
   `wp1991-series-atom-key` (PR #1360). Both PRs are merged. Removing them is the
   maintainer's call.
 
-  *Verified.* VERIFIED_PLACEHOLDER
+  *Verified.* This WP's commit is prose only. The PR also carries WP-2045's
+  edit to four evidence strings in `_audit.py`, which that WP's entry covers. On macOS arm64, worktree venv `[dev]`, `test_docs_consistency.py` and
+  `test_audit_table.py` together: 48 passed. Ruff is clean, `tests.reader_output` exits 0,
+  and `session_start.py` flags neither WP. No count can move, so neither the fast nor the
+  full selection ran. `main` had not moved from `0babe783f`, where the branch forked.
 
-  Recorded in PR #PRNUM.
+  Recorded in PR #1440.
 
   **Next.** None here.
 

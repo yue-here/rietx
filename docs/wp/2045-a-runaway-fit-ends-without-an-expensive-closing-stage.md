@@ -330,7 +330,7 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
 
 ## Handover log
 
-- **2026-11-06** — ghostshift runner, closing entry on PR #PRNUM. This WP closes. Its last
+- **2026-11-06** — ghostshift runner, closing entry on PR #1440. This WP closes. Its last
   acceptance line was a nightly `full` job that completes on `main`, and two did on
   2026-11-04, both green. A runaway warm fit in a series no longer hands the closing stage
   an answer that costs an hour to polish, and the nightly finishes again. The 2026-11-05
@@ -445,7 +445,12 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
   No number was measured in this close, which ran no fit. The rerun is the one named under
   *Deliberately not generalised*.
 
-  *Verified.* VERIFIED_PLACEHOLDER
+  *Verified.* The branch changes prose and the text of four evidence strings in
+  `_audit.py`. `/code-review` did not run: no code path changed, and the judge above read
+  the four strings. On macOS arm64, worktree venv `[dev]`, `test_docs_consistency.py` and
+  `test_audit_table.py` together: 48 passed. Ruff is clean, `tests.reader_output` exits 0,
+  and `session_start.py` flags neither WP. No count can move, so neither the fast nor the
+  full selection ran. `main` had not moved from `0babe783f`, where the branch forked.
 
   **Next.** None here.
 

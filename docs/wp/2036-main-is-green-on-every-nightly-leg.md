@@ -136,7 +136,7 @@ and 2045 on 2026-10-25):
 
 ### Inherited
 
-- **2026-11-06, from WP-2045 (closed in PR #PRNUM): this WP's dependency on 2045 is met.**
+- **2026-11-06, from WP-2045 (closed in PR #1440): this WP's dependency on 2045 is met.**
   The `full` job completed green on `main` twice on 2026-11-04: run 41837816600
   (`ba3719f06`, 1:35:41) and run 41874118202 (`b1741da64`, 2:47:18). WP-2045 counted the
   2026-11-05 red row as this WP's, as the bullet below does.
