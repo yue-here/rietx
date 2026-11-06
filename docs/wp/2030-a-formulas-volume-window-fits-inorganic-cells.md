@@ -1,6 +1,6 @@
 # WP-2030 — A formula's volume window fits inorganic cells, and a hydrate parses
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — parts 1 and 2 merged from outside (PRs #1123, #1253, #1237) and the stale `duplicate_line` marks fixed (PR #1344); the GUI formula is settled as two optional `IndexingControls` fields (2026-11-02 rulings entry) and not built yet; #1121 stays open for it
+Milestone: unscheduled · Status: 🔄 2026-11-06 — parts 1 and 2 merged from outside (PRs #1123, #1253, #1237) and the stale `duplicate_line` marks fixed (PR #1344); part 3, the GUI formula as two optional `IndexingControls` fields, merged from outside (PR #1351, 2026-11-06); closing #1121 is the maintainer's
 Track: Data and metadata in, a structure out
 Depends on: — (1510 soft, closed 2026-10-23: the window, the Z check and the review findings this carries)
 Priority: P2 2026-10-23 — a defect that fires wrongly: the skill sends an agent through `SearchSpec.from_formula` before its first search, and the window excludes the true cell of 7 of 8 inorganic solids measured (fluorapatite abstained where the unwindowed search ranked the truth first); indexing is a path few fits run
@@ -156,12 +156,12 @@ to the table arrives tiered (CI's `tests/audit_delta.py`).
 - [x] Hydrate: `CuSO4.5H2O` is refused, naming `·`, or read as a hydrate.
       `Mg0.5SiO3` still reads 0.5 Mg and `CuSO4·5H2O` is unchanged. Test all
       three.
-- [ ] `formula` and `temperature` recorded on `IndexingResult`, with the
+- [x] `formula` and `temperature` recorded on `IndexingResult`, with the
       writer named (root CLAUDE.md: a declared name is a claim). `formula`
       reaches the CLI and the GUI's indexing call. (The result fields and the
-      CLI landed in part 1. Where the GUI stores the formula is settled:
-      optional `formula`/`temperature` fields on `IndexingControls`, see the
-      2026-11-02 rulings entry. The build is the next step.)
+      CLI landed in part 1. The GUI stores the formula in optional
+      `formula`/`temperature` fields on `IndexingControls`, as the 2026-11-02
+      rulings entry settled, built in part 3.)
 - [x] The instrument-first lead fires only on a lab source. Decide whether
       `PeakList` records its instrument so `index_pattern(peaks)` sees the
       lead. Test both.
@@ -207,6 +207,48 @@ unwindowed one does, and `CuSO4.5H2O` never reads as 4.5 O.
   that need no ruling, then the window rule once it is chosen).
 
 ## Handover log
+
+- **2026-11-06** (`/pr-review`) — part 3 merged from outside as PR #1351 (`544dff21`), adding to the contributor's own entry and ticks, which stand as written. `IndexingControls` now stores `formula` and `temperature`, and the GUI's Peaks panel sends them. The stored format changed, and the maintainer approved that on 2026-11-06 ("Yes, run #1351"). The 2026-11-02 entries say 1.10 and 1.11. The releases that apply are 1.11.0 and 1.12: 1.11.0 refuses any project 1.12 has saved. A bookkeeping sync (`f711a92e8`) kept both notes under schema 0.61, this PR's and WP-1542's, and rebuilt the dist. Merged tree, `[dev]`, macOS arm64: `-m slow` 939 passed, 19 skipped, 19 xfailed, 1 failed. The failure is `test_the_two_site_winner_finds_each_site_its_own_moment`, the Mac-only row of #1424 placed under WP-1418, which this PR's files do not reach. CI and the GUI build were green on that head. Closing #1121 and this WP stays the maintainer's. The PR carries no closing keyword.
+
+- **2026-11-02** — Part 3 (#1121): the GUI stores the specimen's formula,
+  built as the rulings entry below settled it. `IndexingControls.formula` and
+  `.temperature` are `None` when unset. One function,
+  `crystallography.atomic_volume.check_formula_input`, refuses what `rietx
+  index` refuses, and the CLI and a model validator both call it. So a
+  project file, an assignment and the GUI's settings verb refuse in the CLI's
+  sentence. The GUI's index run passes both fields, unset reading as the CLI
+  reads it: no formula, at `TABLE_TEMPERATURE` (298 K).
+  `tests/test_search_controls.py` moves the two from `CALL_TIME_INPUTS` to
+  `CONTROL_TO_KWARG`. The form puts both beside the volume limits, with the
+  temperature box disabled until a formula is given. The candidate table gains
+  a `Z` column (`formula_units`) when the run read a formula, its header
+  explained by the formula's help entry, since no help arm covers
+  `CellCandidate`. The dist is rebuilt. The manual's GUI guide § Indexing, the
+  controls table of `reference/indexing.md` and the staged notes say so.
+
+  *Decisions.* The CLI's sentence for a temperature without a formula lost its
+  flag names so that one sentence serves every surface; neither form has
+  shipped. `PROJECT_FORMAT_VERSION` is 1.6. `Project.save` writes every field,
+  so a project this release saves carries both keys as null when unset, and
+  1.10.0 refuses any project 1.11 has saved, not only one carrying a formula.
+  That follows 1.10.0's note ("even where its value is null"); the narrower
+  cost the ruling named would need the keys written only when set. The twin of
+  `reference/indexing.md` sat at its 50 000-character cap, so three sentences
+  of its controls subsection were tightened to pay for the two rows; the page
+  needs a split before it grows again. No audit row: `IndexingControls` is
+  not a default seat or a record schema, and `tests.audit_delta` reports no
+  change.
+
+  *Measured.* Fast suite on pearl at `b43573cb4` (main `e8d210278`; Linux,
+  Python 3.12, `-n 8`): 13 729 passed, 171 skipped, 34 xfailed, 0 failed,
+  479 s. Vitest 24 files, 593 passed; svelte-check 0 errors. Manual `-W`
+  build, Vale (0 errors) and `tests.reader_output` (unchanged) clean. Each new
+  or changed Python test fails on main's `src` (14 failed; the 6 passes are
+  CLI cases whose words did not change), and `controls.test.ts` fails 3 of 10
+  on main's `controls.ts`.
+
+  *Next.* Closing #1121 is the maintainer's. `solve.chemistry.in_volume_window`
+  is flagged separately and untouched here.
 
 - **2026-11-02** (rulings, PR #1349) — Where the GUI stores the
   specimen's formula is settled: two optional fields, `formula` and

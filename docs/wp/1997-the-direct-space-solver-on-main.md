@@ -1,6 +1,6 @@
 # WP-1997 — the direct-space solver on main: site classes, kernels, chemistry, engine and entry point
 
-Milestone: structure-solution · Status: 🔄 2026-10-24 — the site classes (PR #1013), the solve kernels' crate source (PR #1015) and the chemistry terms (PR #1016) landed from outside; the `kernels-v1.4.0` tag, the engine and the entry point remain
+Milestone: structure-solution · Status: 🔄 2026-11-05 — the site classes (PR #1013), the solve kernels' crate source (PR #1015) and the chemistry terms (PR #1016) landed from outside; `rietx-kernels` 1.4.0 is published and the floor raised (PR #1419); the engine and the entry point remain
 Depends on: 1902 (shipped, the cost); 1901 soft (the map, needed only by completion); 1940 (shipped, the kernel crate)
 Priority: P2 2026-10-17 — a feature the open milestone was opened for, and three outside PRs (#1013, #1015, #1016) wait on this number
 
@@ -135,7 +135,7 @@ Each item is one PR off `main`. Check off as they land.
 - [x] Site classes (#1013): `crystallography/site_classes.py`, `site_classes()`,
       `site_assignments()`, an exact count and a named refusal past
       `MAX_SITE_ASSIGNMENTS`, checked across all 564 gemmi settings
-- [ ] Solve kernels (#1015): `kernels/src/solve.rs`, rietx-kernels 1.4.0, three
+- [x] Solve kernels (#1015): `kernels/src/solve.rs`, rietx-kernels 1.4.0, three
       entry points in `model/compiled.py`, `tests/test_solve_kernels.py`; after
       merge, the `kernels-v1.4.0` tag
 - [x] Chemistry terms (#1016): `solve/chemistry.py`, `Composition`, the
@@ -198,6 +198,8 @@ cancelled run returns what it has.
   against the paper's text before they become constants.
 
 ## Handover log
+
+- **2026-11-05** — PR #1419 raises the `rietx-kernels` pin and `KERNEL_FLOOR` to 1.4, now that 1.4.0 is on PyPI, moves `SOLVE_NAMES` into `KERNEL_NAMES` and adds the release note. That clears those clauses of the Engine task, and the rest of that task stays open.
 
 - **2026-10-31** (`/pr-review`, a ruling on #1262, S2b) — **the assignment race ships as successive halving, approved at tier 2, and racing follows.** #1262's `race_assignments` runs every site assignment one unit at `race_sweeps`, keeps the better half by best J, and doubles the sweeps each round, warm-starting each survivor (successive halving; Karnin et al. 2013, Jamieson & Talwalkar 2016). `_assemble` builds candidates only for the winner, so a dropped true assignment makes every structure in the answer wrong. Measured on NAC by the PR: round 0 decisive, J 1.2-1.4 against ≥ 8.4. Not measured: a composition where round 0 is close. Halving drops half every round whatever the margin, and the race runs one seed per assignment, so no run-to-run spread exists to judge a margin against. Yue approved the action row `RaceRecord.winner` at tier 2 with that risk named in its `grounds`, and made racing the next solver PR's first task (§ Tasks) rather than holding #1262 for it; `solve_structure` stays unexported until then. Asked whether hyperparameter-tuning libraries such as TPE apply: no, since TPE chooses which configuration to try next and every assignment is tried; the survey is `docs/practice.md` § Dropping candidates in a search race. Also ruled on #1262: a checkpoint resume is refused across any package-version difference.
 

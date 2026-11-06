@@ -1,6 +1,6 @@
 # WP-1327 — a magnetic structure: state it, refine it, report what the powder cannot see
 
-Milestone: magnetic · Status: 🔄 2026-10-07 — the k = 0 moment (PR #433), the operation-list phase (PR #448), k ≠ 0's magnetic supercell (PR #477), the LaMnO₃ second dataset and #612's refusals (PR #787) have landed; the analytic moment branch remains
+Milestone: magnetic · Status: 🔄 2026-11-04 — every task but the Jacobian's has landed; the analytic angle branch exists on request (PR #1403), and turning it on in the solve path waits on issue #1404's design questions
 Depends on: 1326 (the satellite reflection list)
 Priority: P2 2026-09-23 — the open milestone's core; the moment and its hold start without 1326's list
 
@@ -139,6 +139,19 @@ on the atoms of the same phase, the magnetic supercell for k ≠ 0), Jana2020
 rule above applies to the form factors.
 
 ### Inherited
+
+- **2026-11-05, from the issue triage (issue #1404): turning the analytic angle columns on in
+  the solve path is Michael's ruling, and it waits there.** PR #1403 lands the branch as
+  machinery and no solve asks for it. Issue #1404 holds what is left: the escape from a
+  symmetry-fixed start (a seed like `SEED_TILT`, the curvature-sign step #1207 would allow, or
+  the forward difference kept for such a start), the evidence that choice owes, and whether a
+  solve reaches the branch unconditionally or through a visible option. These are magnetic-path
+  decisions, Michael's since #1075 (Yue's offer 2026-11-03, accepted 2026-11-04, which names
+  #1404 as the next ruling). The issue's comment of 2026-11-04 adds a condition: the escape must
+  also reach the modulus profile's refits and a start exactly on the direction. The issue's own
+  numbers run on the PR's head, so they were not re-run in this triage. On main at `541f0daf7`
+  there is no `moment_angles` keyword yet. Nothing here waits on Yue, except a stored-format or
+  release consequence if the ruling has one.
 
 - **From WP-2068 (2026-11-02), for the PR that returns the angle seed with the analytic angle
   columns.** That PR owes "a comparison with the curvature-sign step #1207 would allow". WP-2068's
@@ -513,7 +526,13 @@ rule above applies to the form factors.
       **FD and the cross-backend `magnetic` row landed. A magnetic phase's
       structural columns take the peak-chain FD column by declared
       exclusion (`structural_grad_supported`), and the traced backends
-      decline it by name. No analytic moment branch yet.**
+      decline it by name. No analytic moment branch yet.** 2026-11-04 (PR
+      #1403): the moduli are analytic (PR #1206), and so are the angles on
+      request (`_make_jacobian(..., moment_angles=True)`), pinned to the exact
+      oracle on synthetic states and LaMnO₃, with the cross-backend
+      `magnetic_angles_analytic` row; the traced twin declines both by name.
+      Open: no solve asks for the angle branch yet, which waits on the escape
+      from a symmetry-fixed maximum (issue #1404, a design question).
 - [x] The report: moment magnitudes and esds in the parameter table, the
       unmeasured direction named, the approximation named, the hold named;
       QPA untouched, asserted.
@@ -579,6 +598,15 @@ rule above applies to the form factors.
   [1312](1312-neutron-followthrough.md) the joint-fit audit this term joins.
 
 ## Handover log
+
+- **2026-11-05** (post-merge record) — PR #1403 merged at `2adc98c70`. Its own entry is below and lacked the sha. Status stays 🔄, and the Jacobian task stays unticked until a solve uses the branch.
+
+- **2026-11-04** (ghostshift runner, PR #1403) — the analytic Jacobian for a moment's *angles* now exists and is proved exact, but no fit uses it yet. A caller who builds the Jacobian can ask for exact angle columns, and on the vendored LaMnO₃ pattern they meet the exact oracle where the forward difference every fit still uses is off by 7e-8 to 1e-6. Switching it on for every fit still breaks one test the way #1206 found: a fit that starts exactly on a direction the symmetry fixes stays on a maximum. Fixing that needs an escape mechanism (a seeded tilt, a curvature step or something else), and that is a design choice the maintainer asked Michael to own (#1075, 3 Nov). So the switch is off, nothing any fit returns has moved, and the choice is filed as open questions in issue #1404.
+  *Done.* `least_squares._moment_reach_ok(..., angles=False)` and `_make_jacobian(..., moment_angles=False)`: with the flag on, `_moment_column` claims any column whose reach is moment DOFs of one phase, angles and mixed modulus/angle reach included. The reach is still read off `_column_extras`. No caller passes the flag (grep), so the default dispatch is byte-for-byte the old one. `backend/traced.py`'s decline comment now covers both arms, and the twin still declines every magnetic model by name. Tests: `test_moment_jacobian` gains the LaMnO₃ BT-1 states (`REAL_STATES`, 62.448 and 62.441, Mn2 free in all three DOFs at a seed off every fixed direction, unfitted, real counts and σ). It also gains `test_a_dispatched_angle_column_meets_the_exact_oracle` (three synthetic states and the two real ones, each asserting the default dispatch fails the same bar), `test_a_dispatched_angle_column_meets_central_differences`, an `angles` arm of the dispatch-claim test, and the dispatched zero column at the symmetric seed. `test_cross_backend` gains the `magnetic_angles_analytic` config, whose numpy reference is the angle branch (`MOMENT_ANGLE_CONFIGS`, through `_jacobian_for(..., moment_angles=True)`, so the precision-policy exit is the shipped one), with a spy test asserting that the matrix's own reference claims all three moment columns and with the traced decline row.
+  *Measured* (macOS arm64, `[dev,jax]`, Python 3.12, base `dd55ec4f5`). Dispatched angle column against the exact oracle: 8.7e-15 to 2.6e-14 on synthetic, 2.8e-14 to 1.1e-13 on LaMnO₃ (bar `REAL_ORACLE_BAR` 1e-12), against 7.4e-8 to 1.8e-6 for the default forward difference. Against central differences: 1.4e-9 (`extinction_live`) and 1.1e-9 to 4.6e-9 (LaMnO₃), bar 2e-8. Positive arm: with the dispatch patched to `angles=False` and then restored, all 9 new pinning rows failed, synthetic and real. Probe with angles forced on for every solve: the 7 failures in the magnetic fast files are the 4 dispatch-claim rows that assert the decline, the symmetric-seed row, and `test_magnetic_moment_frame`'s `[101.1]`/`[103.0]` at |m| 3.1804 and 3.1766 against 3.1772(5), #1206's stall to the digit. Cr₂WO₆ 4 K/150 K and LaMnO₃ acceptance (5 rows) still passed. Reader output (`tests.reader_output`): exit 0, unchanged. `tests.audit_delta`: no row or declaration changed, so the generality judge was not dispatched. No `_audit` change, and the new defaulted flag reproduces the existing dispatch, so it adds no heuristic. Fast suite on the final tree (`-m "not slow"`, `-n auto --dist loadgroup`): 13 877 passed, 235 skipped, 34 xfailed. The branch adds 29 fast items, 24 passing and 5 skipping by declaration: the new config's jax and torch rows (no traced twin) and its axial row. `tests.added_test_times` on this run's junit gives 0.33 s over the three new test functions (0.25 s for the exact-oracle rows), so nothing joins the slow tail. The full suite did not run: no default changed, so no measured number can move. Every solve dispatches exactly as before, and the converged magnetic fits are unchanged by construction. WP acceptance (`test_magnetic.py`, `test_cross_backend.py`) and ruff: green.
+  *Review* (`/code-review high --fix`, 8 findings, 4 fixed in `899c7a7f9`). Fixed: the spy test watched a Jacobian it built itself, so emptying `MOMENT_ANGLE_CONFIGS` left it green (it now spies `_analytic_jacobian` and fails under that sabotage); `_for_backend` re-implemented `_jacobian_for`'s exit (now a `moment_angles` keyword there); `_moment_column`'s docstring said moduli only; `CENTRAL_FD_BAR`'s comment claimed ~10× margin where LaMnO₃ gives ~4×. Declined: `REAL_ORACLE_BAR`'s margin is measured on darwin/arm64 only (CI's Linux legs settle it; widening without a number would be a guess); no solve reaches the flag (the design question of issue #1404, recorded rather than decided); the FD-oracle tests read the default Jacobian on the new config (a coverage note, now said in the `MOMENT_ANGLE_CONFIGS` comment); the new bit-identity asserts compare two arms in one process, so the compiled-kernel path cannot differ between them.
+  *Gotchas.* The exact oracle's two-step sinc solve is exact only where y is linear in |F_⊥|² (no extinction). The real states run with extinction at its CIF value of 0. An angle column at a symmetry-fixed start is an exact zero under the branch, which is the stall's mechanism, not a defect in the column.
+  Next: Michael answers issue #1404 (which escape, if any, and whether a solve reaches the branch through a visible option). The PR that turns the branch on then re-runs WP-2068's six deep-maximum starts with the angles on and adds the whole-fit either-way comparison. The task stays unticked until a solve uses the branch.
 
 - **2026-11-01** (ghostshift close-batch, PR #1287) — no work on the moment this session. WP-1329 closed and its three unfinished notes were folded into this WP's `### Inherited`: the joint-fit hold of a per-histogram moment, the powder-twin reading of path dependence in the series fences, and the provisional declaration for `MagneticTrajectory` and `MagneticOnset`. The maintainer ruled the fold on 2026-11-01. This WP was chosen because it owns the moment and its hold, and no session or open pull request holds it. Nothing else in the WP moved, and the code of the three notes was read, not run.
   Next: unchanged (the analytic moment branch); the three notes wait in `### Inherited`, and note (1) should be run on a two-histogram moment before it is fixed.

@@ -21,7 +21,9 @@ import {
   parsePriorCell,
   priorCellText,
   searchHelp,
+  setFormula,
   statedFieldNames,
+  textOrNull,
   type IndexingControls,
 } from "./controls";
 
@@ -119,6 +121,7 @@ describe("the collapsed digest", () => {
       max_candidates: 12, seed: 0, prior_cells: null, prior_spacegroups: null,
     },
     engines: null, validate_candidates: true, check_top: null,
+    formula: null, temperature: null,
   };
 
   it("names the preset that will govern, custom budgets and priors", () => {
@@ -133,6 +136,46 @@ describe("the collapsed digest", () => {
     steered.validate_candidates = false;
     expect(controlsDigest(steered, "quick")).toBe(
       "quick · 1 engine · 2 systems · 1 prior · no validation");
+  });
+
+  it("names the specimen's formula, and its temperature when one is set", () => {
+    const withFormula = structuredClone(base);
+    withFormula.formula = "C7H6O2";
+    expect(controlsDigest(withFormula, "quick")).toBe("quick · C7H6O2");
+    withFormula.temperature = 100;
+    expect(controlsDigest(withFormula, "quick")).toBe("quick · C7H6O2 at 100 K");
+  });
+});
+
+describe("the formula field", () => {
+  const stored = (): IndexingControls => ({
+    search: {} as IndexingControls["search"],
+    engines: null, validate_candidates: true, check_top: null,
+    formula: null, temperature: null,
+  });
+
+  it("sends an empty box as null, the package's no-formula", () => {
+    expect(textOrNull("")).toBeNull();
+    expect(textOrNull("   ")).toBeNull();
+    expect(textOrNull(" CuSO4·5H2O ")).toBe("CuSO4·5H2O");
+  });
+
+  it("clears the temperature with the formula, so one edit is accepted", () => {
+    const c = stored();
+    c.formula = "ZnO";
+    c.temperature = 120;
+    setFormula(c, "  ");
+    expect(c.formula).toBeNull();
+    expect(c.temperature).toBeNull();
+  });
+
+  it("leaves the temperature alone while a formula remains", () => {
+    const c = stored();
+    c.formula = "ZnO";
+    c.temperature = 120;
+    setFormula(c, "C7H6O2");
+    expect(c.formula).toBe("C7H6O2");
+    expect(c.temperature).toBe(120);
   });
 });
 

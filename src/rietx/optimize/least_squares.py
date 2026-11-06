@@ -1479,7 +1479,8 @@ def _moment_column(model: CompiledModel, table: ParameterTable,
                    bases: DerivativeBases, values: dict[str, float], c: int,
                    ip: int, reach: list[str],
                    grads: dict[tuple[int, int], np.ndarray]) -> np.ndarray:
-    """∂y/∂θ_c for a column moving moment moduli of phase ip only (WP-1327).
+    """∂y/∂θ_c for a column moving moment DOFs of phase ip only (WP-1327):
+    moduli by default, any DOF where ``_moment_reach_ok``'s ``angles`` asks.
 
     The moment enters only p²⟨|F_⊥|²⟩, so only the intensity scalar moves.
     ``grads`` is :meth:`CompiledModel.moment_f2_grads` for the phase at this
@@ -1511,18 +1512,29 @@ def _moment_column(model: CompiledModel, table: ParameterTable,
     return _accumulate(len(model.tt), parts)
 
 
-def _moment_reach_ok(path: str, extra: list[str]) -> bool:
-    """Whether ``_moment_column`` claims this column: moduli of one phase only.
+def _moment_reach_ok(path: str, extra: list[str], *,
+                     angles: bool = False) -> bool:
+    """Whether ``_moment_column`` claims this column: moduli of one phase only,
+    or, with ``angles``, any moment DOF of one phase.
 
     Its reach is moment **moduli** (``dof0``) of one phase, any atom — the
     affine block can tie two sites' moduli or drive them from a variable, and
     the branch sums those.  Anything else (a cell, a coordinate, another
     phase's moment) takes the peak-chain column.
 
-    **An angle is declined by name, and the reason is measured, not a gap in
-    the derivative** (``d_magnetic_f2_d_dofs`` returns the angle rows, held to
-    the same exact oracle).  A moment seeded on a direction the symmetry fixes
-    — (2.5, 0, 2.5) on P 1 2/m 1 puts the azimuth at exactly 0 — sits where
+    ``angles`` widens the claim to every moment DOF of the phase, the angles
+    (``dof1``, ``dof2``) beside the moduli, and to a column mixing the two.
+    ``_moment_column`` needs nothing more for them: a column is Σ_k C[k, c]·
+    ∂(p²⟨|F_⊥|²⟩)/∂d_k over the DOFs it reaches, the DOFs are affine in θ
+    however non-affine the moment is in an angle, and
+    ``d_magnetic_f2_d_dofs`` returns every DOF's row.  It is the caller's to
+    ask for (``_make_jacobian``'s ``moment_angles``); no solve asks today,
+    for the reason below.
+
+    **By default an angle is declined by name, and the reason is measured,
+    not a gap in the derivative** (``d_magnetic_f2_d_dofs`` returns the angle
+    rows, held to the same exact oracle).  A moment seeded on a direction the
+    symmetry fixes — (2.5, 0, 2.5) on P 1 2/m 1 puts the azimuth at exactly 0 — sits where
     the pattern is even in the angle, so its exact column is zero up to
     round-off (2.3e-16 of the modulus column there).  Where that direction is
     a *maximum* along the angle, whether the solver leaves it depends on that
@@ -1534,14 +1546,17 @@ def _moment_reach_ok(path: str, extra: list[str]) -> bool:
     anyone chose; the analytic angle column waits on one that is — an angle
     seeded off its stationary point before the stage that frees it,
     ``moments.tilted_seed``'s shape for the same stationary point, in its own
-    PR.  The decline stands on either platform.  A modulus has no such point a
-    fit can start at: a varied moment of zero is refused by the schema.
+    PR.  The decline stands on either platform, and it is a default, not a
+    gap: re-measured 2026-11-04 (darwin/arm64) with ``angles`` forced on for
+    every solve, those two fits still end at |m| 3.1804 and 3.1766 against
+    the pinned 3.1772(5).  A modulus has no such point a fit can start at: a
+    varied moment of zero is refused by the schema.
     """
     m = _MOMENT_PATH.match(path)
-    if m is None or m.group(3) != "0":
+    if m is None or not (angles or m.group(3) == "0"):
         return False
     prefix = f"phases.{m.group(1)}.atoms."
-    return all((n := _MOMENT_PATH.match(q)) and n.group(3) == "0"
+    return all((n := _MOMENT_PATH.match(q)) and (angles or n.group(3) == "0")
                and q.startswith(prefix) for q in extra)
 
 
@@ -2104,12 +2119,21 @@ def _chained_columns(model: CompiledModel, table: ParameterTable,
         J[:n_data, [cols[i] for i in members]] = -sqrt_w[:, None] * (D @ coeffs)
 
 
-def _make_jacobian(model: CompiledModel, table: ParameterTable):
+def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
+                   moment_angles: bool = False):
     """Mixed analytic/FD Jacobian of the residual w.r.t. the internal vector.
 
     In Pawley mode the vector is [table θ | intensities]; the table columns are
     built exactly as for Rietveld/Le Bail, then the intensity block gets its own
     exact linear columns (:func:`_pawley_intensity_columns`).
+
+    ``moment_angles`` lets the analytic moment branch claim a moment
+    **angle** column as well as a modulus (``_moment_reach_ok``, WP-1327).
+    Off, an angle takes the peak chain's forward difference, which is what
+    every solve in the package builds: the exact column is zero at a start
+    the symmetry fixes, and a fit started on a maximum there then cannot
+    leave it (the decline's docstring has the measurement).  On, the angle
+    column is exact; nothing above this function asks for it yet.
     """
     sqrt_w = 1.0 / model.sigma
     free = table.free_paths
@@ -2225,7 +2249,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
                     int(dof.group(1)), int(dof.group(2)), rows, grad)
             elif ((mom := _MOMENT_PATH.match(path))
                     and model.moment_grad_supported(int(mom.group(1)))
-                    and _moment_reach_ok(path, extra)):
+                    and _moment_reach_ok(path, extra, angles=moment_angles)):
                 ip = int(mom.group(1))
                 J[:n_data, c] = -sqrt_w * _moment_column(
                     model, table, get_bases(), values, c, ip, [path, *extra],
@@ -2322,7 +2346,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
     return jacobian
 
 
-def _jacobian_for(model, table, backend: str):
+def _jacobian_for(model, table, backend: str, *, moment_angles: bool = False):
     """The Jacobian callable for ``backend`` (lazy import keeps numpy pure).
 
     Every autodiff callable produces the same fp64 host array in the same
@@ -2337,6 +2361,10 @@ def _jacobian_for(model, table, backend: str):
     per column if (and only if) a policy asked for it.  With the default fp64
     policy the wrapper is a plain ``np.asarray``, so the numpy path is
     unchanged.
+
+    ``moment_angles`` is :func:`_make_jacobian`'s, passed to the numpy
+    assembly; a traced backend declines every magnetic model by name, so it
+    has no moment angle to claim.
     """
     if backend == "jax":
         from ..backend.jax_backend import make_jax_jacobian
@@ -2347,7 +2375,7 @@ def _jacobian_for(model, table, backend: str):
 
         inner = make_torch_jacobian(model, table, device=TORCH_DEVICES[backend])
     elif backend == "numpy":
-        inner = _make_jacobian(model, table)
+        inner = _make_jacobian(model, table, moment_angles=moment_angles)
     else:
         raise ValueError(f"unknown backend {backend!r}; "
                          f"available: numpy, jax, {', '.join(TORCH_DEVICES)}")

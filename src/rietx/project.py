@@ -189,7 +189,7 @@ class Project:
                 tuple(r) for r in excluded_regions
                 if tuple(r) not in data.excluded_regions]
 
-        plan_spec = _as_plan_spec(plan)
+        plan_spec = _as_plan_spec(plan, mode)
         doc = ProjectDoc(
             package_version=_VERSION,
             created_utc=_utcnow(),
@@ -470,19 +470,19 @@ def fitted_mask(data: PatternData,
     return np.asarray(mask, dtype=bool)
 
 
-def _as_plan_spec(plan: Any) -> PlanSpec | None:
-    """A ``PlanSpec`` from a preset name, a ``RefinementPlan`` or a spec."""
+def _as_plan_spec(plan: Any, mode: Mode) -> PlanSpec | None:
+    """A ``PlanSpec`` from a preset name, a ``RefinementPlan`` or a spec.
+
+    A preset name is expanded through ``mode``, by ``resolve_plan``: a project
+    records the plan that will run, verbatim (``PlanSpec.preset_name``), so
+    ``"mccusker_default"`` in a Le Bail project is ``profile_only``'s stages,
+    as ``Refinement.fit`` and the GUI's preset route read it (WP-2102).
+    """
     if plan is None or isinstance(plan, PlanSpec):
         return plan
-    if isinstance(plan, str):
-        from .strategy.staged import PLAN_PRESETS
+    from .strategy.staged import resolve_plan
 
-        try:
-            plan = PLAN_PRESETS[plan]()
-        except KeyError:
-            raise ValueError(f"unknown plan preset {plan!r}; available: "
-                             f"{sorted(PLAN_PRESETS)}") from None
-    return PlanSpec.from_plan(plan)
+    return PlanSpec.from_plan(resolve_plan(plan, mode))
 
 
 def _data_ref(path: Path, data: PatternData, reader: str,
