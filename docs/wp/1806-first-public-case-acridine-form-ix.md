@@ -1,13 +1,13 @@
 # WP-1806 — first public case: acridine form IX
 
-Milestone: rigid-bodies · Status: 🔄 2026-10-25 — the pdCIF reader merged (PR #1006); open: the data file, the authors' profile, the acceptance test
+Milestone: rigid-bodies · Status: 🔄 2026-11-05 — the pdCIF reader merged (PR #1006); the bar is a free-atom control (Yue, 2026-11-05); open: the data file, the authors' profile, the acceptance test
 Depends on: 1805
 Priority: P3 2026-10-23 — the first real-data proof of the body; 1810 closed without it (PR #955), and 1989 waits on it soft for its public case and pdCIF reader
 
 ## Goal
 
 A rigid body over acridine form IX's 14 non-H atoms refines against the deposited
-pattern and lands every body atom within the published coordinate esds. This is chunk R4
+pattern and agrees with a free-atom fit of the same data in rietx. This is chunk R4
 of issue #561, sized M.
 
 ## Context
@@ -16,7 +16,7 @@ of issue #561, sized M.
   orientation free, no torsions.
 - The deposited intensities are background-subtracted, so the test holds the background
   at zero and says so.
-- **The bar stays the published esds** (re-affirmed 2026-10-06). An outside spike,
+- The bar was the published esds until 2026-11-05 (`### Inherited`). An outside spike,
   reported on #561 on 2026-10-06, found two obstacles. This WP clears both first:
   1. The pdCIF reader refuses this file's `_pd_proc_intensity_net` with
      `_pd_proc_ls_weight` columns. The fix lands in `io/` under that subtree's rules
@@ -32,7 +32,19 @@ of issue #561, sized M.
 
 ### Inherited
 
-- **Decided 2026-10-16 (maintainer, from the issue triage, #561): the bar is
+- **Decided 2026-11-05 (Yue, #561): the bar is a free-atom control in rietx.**
+  This is the brief's option C, and it replaces the 2026-10-16 bar below. The same
+  model refines with the heavy atoms free, under the same data, profile and
+  background as the body. Restraints may hold the free atoms stable, and the test
+  says which. The deposited coordinates cannot judge the body, because they are
+  another model's answer under another protocol (Rule 2). The per-atom table
+  against them stays as a record and asserts nothing. If the free atoms show the
+  body's shift along c, the body is cleared. If they land on the deposited z values
+  and the body does not, the body owns the shift and the WP stops to investigate.
+  The ruling names no number for "the same shift". Part 2 reads it off the
+  control's own esds and brings it to Yue if the reading is not clear.
+
+- **Superseded 2026-11-05. Decided 2026-10-16 (maintainer, from the issue triage, #561): the bar is
   option (c), and the body may be built from the deposited coordinates.** Each
   body atom passes within the larger of its published esd and rietx's own esd
   for that atom. The published esds come from a free-atom refinement with a
@@ -91,6 +103,19 @@ of issue #561, sized M.
   d87c8cc91: the acceptance task is unticked and no acridine acceptance test
   exists. The reporter's figures were not re-run.
 
+- **2026-11-05, settled by Claude under Yue's instruction to action clear
+  calls: the acceptance may land in two parts.** Options B and C of the
+  decision brief on this WP's bar both take the split, so it holds whichever
+  Yue picks. Part 1 lands now. It holds the perturbed-start check, the
+  intra-body and inter-body distance esds, and the simulated known-answer test
+  where a regular-hexagon template must fail. The per-atom table goes to
+  `tests/output/` as a record and asserts nothing. Part 2 stays Yue's and
+  undecided: what the miss along c means for the 16 October bar, and whether
+  the assertion stays. The brief's option C, not ruled, replaces the assertion
+  with a free-atom control fit under the same profile. Acceptance is unchanged
+  because the bar is not ruled. Part 1's items are unticked Tasks below. Filed
+  in PR #1414.
+
 ## Non-goals
 
 - Hydrogens (WP-1810), torsions (WP-1808).
@@ -101,12 +126,17 @@ of issue #561, sized M.
 - [ ] The data file and a provenance row in `tests/data/README.md`
 - [ ] The authors' profile; the template-superposition floor, measured and recorded
 - [ ] The acceptance test + obs/calc/diff PNGs to `tests/output/`
+- [ ] Part 1: a 10° / 0.3 Å perturbed start returns to the same minimum
+- [ ] Part 1: an intra-body distance reports `None`, and an inter-body one reports a full esd
+- [ ] Part 1: a simulated known answer is recovered, and a regular-hexagon template fails
+- [ ] Part 1: the per-atom table goes to `tests/output/` as a record
+- [ ] Part 2: the free-atom control under the same profile and background, compared with the body atom by atom
 - [ ] Skill: none expected; say why at handover
 
 ## Acceptance
 
-- Every body atom lies within the published coordinate esds, and the cell matches the
-  published cell.
+- The body agrees with the free-atom control of `### Inherited` (2026-11-05), and the
+  cell matches the published cell.
 - An intra-body distance reports `None` (through `VARIANCE_CANCELLATION_FLOOR`), and an
   inter-body one reports a full esd.
 - The provenance row exists.
@@ -137,3 +167,10 @@ of issue #561, sized M.
   guide's code path is identical to #939's head, which passed it. Skill: the
   three codes have rows in `references/diagnostics-reading.md`. *Next:* the
   data file and its provenance row, then the authors' profile.
+- **2026-11-05** — PR #1414 records that the acceptance may land in two parts
+  (`### Inherited`, same date) and adds Part 1's items to Tasks. No test lands
+  with it, and the Acceptance section is unchanged. *Next:* as above, then
+  Part 1. Part 2 waits on Yue's ruling on the bar.
+- **2026-11-05** — Yue ruled on the bar: option C, a free-atom control in rietx
+  (`### Inherited`). Goal, Context, Acceptance and Tasks now say so, and Part 2 is that
+  control. Filed in PR #1423. *Next:* Part 1 in PR #1416, then the control.

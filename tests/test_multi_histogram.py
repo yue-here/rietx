@@ -1232,3 +1232,133 @@ def test_the_joint_runner_withholds_an_esd_by_the_single_histogram_rule(
             assert row.stderr is not None, f"early: {row.path}"
         assert rows[1].stderr == pytest.approx(rows[0].stderr)
         assert rows[2].stderr == pytest.approx(rows[0].stderr)
+
+
+# --- WP-2102: a joint fit takes every form of plan a single fit takes --------
+
+def _cheap_joint_plan() -> RefinementPlan:
+    return RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"],
+              max_iter=8),
+        Stage("cell", ["phases.*.cell.*", "instrument.zero_shift"], max_iter=8),
+        Stage("width", ["instrument.profile.w"], max_iter=8),
+    ])
+
+
+def _joint_answer(result) -> tuple:
+    """Every number a joint fit answers with, for a bit-identity comparison."""
+    return (result.status,
+            [(p.path, p.value, p.stderr) for p in result.parameters],
+            result.statistics.rwp,
+            [s.name for s in result.stages],
+            [h.statistics.rwp for h in result.histograms],
+            [tuple(result.for_histogram(h).y_calc)
+             for h in range(len(result.histograms))])
+
+
+@pytest.fixture(scope="module")
+def plan_and_spec_fits(two_patterns):
+    """One joint fit driven by a plan, one by the ``PlanSpec`` mirroring it."""
+    from rietx.schemas.plan import PlanSpec
+
+    plan = _cheap_joint_plan()
+    spec = PlanSpec.from_plan(plan)
+    fits = {}
+    for key, given in (("plan", plan), ("spec", spec)):
+        structure, instruments = perturbed_inputs()
+        ref = MultiHistogramRefinement(structure, instruments)
+        fits[key] = (ref, ref.fit(two_patterns, plan=given, telemetry=False))
+    OUT.mkdir(exist_ok=True)
+    for h in range(2):
+        fits["spec"][1].for_histogram(h).plot(OUT / f"multihist_planspec_h{h}.png")
+    return plan, spec, fits
+
+
+def test_a_joint_fit_driven_by_a_spec_answers_as_its_plan_does(plan_and_spec_fits):
+    """``refine_multi(plan=PlanSpec(...))`` raised ``AttributeError`` until
+    the joint fit crossed the mirror at ``resolve_plan`` (WP-2102).  The spec
+    and the plan it was built from drive one fit, so every number agrees to
+    the bit."""
+    _, _, fits = plan_and_spec_fits
+    by_plan, by_spec = fits["plan"][1], fits["spec"][1]
+    assert by_plan.status == "converged"
+    assert _joint_answer(by_spec) == _joint_answer(by_plan)
+
+
+def test_refine_multi_takes_a_spec(two_patterns, plan_and_spec_fits):
+    """The functional wrapper is the entry the WP was filed on."""
+    _, spec, fits = plan_and_spec_fits
+    structure, instruments = perturbed_inputs()
+    result = refine_multi(two_patterns, structure, instruments, plan=spec,
+                          telemetry=False)
+    OUT.mkdir(exist_ok=True)
+    for h in range(2):
+        result.for_histogram(h).plot(OUT / f"multihist_refine_multi_spec_h{h}.png")
+    assert _joint_answer(result) == _joint_answer(fits["plan"][1])
+
+
+def test_a_joint_fit_refuses_an_unknown_preset_by_name():
+    structure, instruments = perturbed_inputs()
+    ref = MultiHistogramRefinement(structure, instruments)
+    dummy = PatternData(two_theta=[10.0, 11.0], intensity=[1.0, 1.0])
+    with pytest.raises(ValueError, match="unknown plan preset 'no_such_plan'"):
+        ref.fit([dummy, dummy], plan="no_such_plan")
+
+
+def _capture_report_plan(monkeypatch) -> list:
+    """Record the ``plan`` every report hands ``build_report``."""
+    import rietx.report as report_module
+
+    seen = []
+    real = report_module.build_report
+
+    def spy(*args, **kw):
+        seen.append(kw.get("plan"))
+        return real(*args, **kw)
+
+    monkeypatch.setattr(report_module, "build_report", spy)
+    return seen
+
+
+def test_a_joint_report_hands_on_a_plan_whatever_it_was_given(
+        plan_and_spec_fits, monkeypatch):
+    """The mirror is crossed in ``report`` too, never left to ``build_report``
+    to read by shape (WP-1110's rule).  A spec, the plan and a preset name
+    each arrive as a ``RefinementPlan``, and the spec reports as its plan."""
+    plan, spec, fits = plan_and_spec_fits
+    ref = fits["plan"][0]
+    seen = _capture_report_plan(monkeypatch)
+    by_plan = ref.report(0, plan=plan)
+    by_spec = ref.report(0, plan=spec)
+    ref.report(1, plan="mccusker_default")
+    assert all(isinstance(p, RefinementPlan) for p in seen), seen
+    assert by_spec.model_dump(mode="json") == by_plan.model_dump(mode="json")
+
+
+def test_a_single_report_reads_a_preset_name_for_the_results_mode(
+        two_patterns, monkeypatch):
+    """``Refinement.report`` reads a preset name as the fit that made the
+    result read it, through ``resolve_plan``'s mode substitution
+    (WP-2102).  A Le Bail fit given ``"mccusker_default"`` ran
+    ``profile_only``, so its report under either name is one report.  Read
+    by hand, the name's scale stage vetoed a scale suggestion as "already
+    refined by the staged plan" on a fit where the scale is force-fixed."""
+    from rietx.strategy.staged import PLAN_PRESETS
+
+    structure, instruments = perturbed_inputs()
+    ref = Refinement(structure, instruments[0], history=False)
+    result = ref.fit(two_patterns[0], mode="lebail", plan=RefinementPlan(stages=[
+        Stage("bkg", ["instrument.background.*"], max_iter=8),
+        Stage("cell", ["phases.*.cell.*", "instrument.zero_shift"], max_iter=8),
+        Stage("width", ["instrument.profile.w"], max_iter=8),
+    ]), telemetry=False)
+    OUT.mkdir(exist_ok=True)
+    result.plot(OUT / "single_lebail_report_plan.png")
+    seen = _capture_report_plan(monkeypatch)
+    by_name = ref.report(plan="mccusker_default")
+    by_substitute = ref.report(plan="profile_only")
+    expected = PLAN_PRESETS["profile_only"]()
+    assert [(s.name, s.turn_on) for s in seen[0].stages] == [
+        (s.name, s.turn_on) for s in expected.stages]
+    assert (by_name.model_dump(mode="json")
+            == by_substitute.model_dump(mode="json"))

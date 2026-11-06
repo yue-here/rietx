@@ -1915,6 +1915,13 @@ class IndexingControls(Base):
     same fields, and ``tests/test_search_controls.py`` holds all three to
     ``index_pattern``'s own signature.  ``two_theta_limits`` is deliberately
     absent: the project document already owns it (one authority per fact).
+
+    ``formula`` and ``temperature`` are the specimen's, stored here because
+    they are search settings that sit beside the volume limits (WP-2030, the
+    2026-11-02 ruling).  The GUI's indexing form writes them, and its index run
+    passes them to ``index_pattern``.  A bad pair is refused in the words
+    ``rietx index`` uses (:func:`~rietx.crystallography.atomic_volume.check_formula_input`),
+    on load and on assignment alike.
     """
 
     search: SearchSpecSpec = Field(default_factory=SearchSpecSpec)
@@ -1931,6 +1938,13 @@ class IndexingControls(Base):
         "ambiguity + Le Bail validation); None = the package default plus "
         "every candidate the gate could promote, which never removes a "
         "candidate that might grade high"))
+    formula: str | None = Field(None, description=(
+        "the specimen's chemical formula; each candidate then records the "
+        "formula units its volume holds (formula_units). It never narrows "
+        "the search; None = no formula"))
+    temperature: float | None = Field(None, description=(
+        "the pattern's temperature in K, for the formula's volumes; None = "
+        "298 K. Needs a formula"))
 
     @field_validator("engines")
     @classmethod
@@ -1942,6 +1956,13 @@ class IndexingControls(Base):
                 raise ValueError(f"unknown indexing engine {name!r}; "
                                  f"available: {', '.join(engine_names())}")
         return v
+
+    @model_validator(mode="after")
+    def _readable_formula(self):
+        from ..crystallography.atomic_volume import check_formula_input
+
+        check_formula_input(self.formula, self.temperature)
+        return self
 
 
 class CaveatEvidence(Base):

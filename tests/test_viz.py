@@ -509,7 +509,8 @@ def _pixels(fig) -> np.ndarray:
 
 
 def _series():
-    """A four-pattern series carrying a reseeded, a diverged and an outlier mark."""
+    """A four-pattern series: a reseeded and a diverged mark, and a high Rwp
+    over the median, which carries none (WP-2003)."""
     from rietx.schemas.results import RefinedParameter, Statistics
     from rietx.schemas.sequential import SeriesEntry, SeriesResult
 
@@ -523,7 +524,7 @@ def _series():
 
     return SeriesResult(entries=[entry(0), entry(1, reseeded=True, rung="cold"),
                                  entry(2, status="diverged"),
-                                 entry(3, rwp_fence=0.05)])
+                                 entry(3, rwp_over_median=4.0)])
 
 
 def _two_phases(result):

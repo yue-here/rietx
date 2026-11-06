@@ -193,9 +193,9 @@ series = rx.refine_sequential(
 series
 
 # %% [markdown]
-# Every pattern converged.
-# Both diagnostics are [`SEQUENTIAL_PERSISTENT_FINDING`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-persistent-finding), a per-pattern finding that fired on every pattern of the series.
-# Such a finding describes the model rather than any one fit.
+# Every pattern converged, and the series reports no finding of its own.
+# [`series.code_counts`](https://rietx.org/docs/stable/reference/series.html#per-pattern-codes-counted) counts each per-pattern diagnostic over the series, and the summary names the largest counts.
+# Both codes here fired on every pattern, so they describe the model rather than any one fit.
 # [Read the diagnostics first](https://rietx.org/docs/stable/guides/series.html#read-the-diagnostics-first) explains these two.
 #
 # Each entry records [which attempt](https://rietx.org/docs/stable/reference/series.html#restart-ladder) gave its values.
@@ -243,7 +243,7 @@ series.plot("phases.0.cell.a")
 # Each answer depends on the one before it.
 # An error in one fit can therefore travel down the chain and still draw a smooth curve.
 # [`direction="both"`](https://rietx.org/docs/stable/reference/series.html#forward-and-backward-chains) fits the chain from cold to hot and again from hot to cold, and compares the two.
-# A parameter they disagree on is flagged [`SEQUENTIAL_PATH_DEPENDENT`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-path-dependent).
+# `both.direction_gaps` lists each parameter's gap between the two at each pattern, in esds, largest first.
 #
 # [`summary(deliverable="series")`](https://rietx.org/docs/stable/reference/result.html#printing-a-result) prints the rows that decide whether a trajectory can be quoted.
 
@@ -261,7 +261,7 @@ both = rx.refine_sequential(
 print(both.summary(deliverable="series"))
 
 # %% [markdown]
-# The `ordering artefact` row says the comparison ran and no parameter disagreed.
+# The `ordering artefact` row says the comparison ran and names the largest gap.
 # The `2θ-scale anchor` row and the two after it are yours to answer.
 # Nothing in a pattern file says what pins the 2θ scale.
 #
@@ -317,10 +317,11 @@ series_jump.trajectory("phases.0.cell.a")
 [entry.rung for entry in series_jump]
 
 # %% [markdown]
-# Every pattern after the first took its values from the plain [`warm`](https://rietx.org/docs/stable/reference/series.html#restart-ladder) attempt, the 700 K one included.
+# The 700 K pattern took its values from the plain [`warm`](https://rietx.org/docs/stable/reference/series.html#restart-ladder) attempt.
 # Started from the 600 K answer, that fit reached the cell 2 % larger on its own.
+# A step of 2 % sits near the limit of what a warm start reaches: over 100 noise draws of a series like this one, it reached the cell 99 times at 2 %, 81 times at 2.25 % and 42 times at 2.5 %.
 # When a warm start fails, the series fits the pattern again with the whole plan from the same start.
-# That attempt is `warm_staged`, and this list is where it would show.
+# That attempt is `warm_staged`, and this list shows it wherever it ran.
 #
 # ## A pattern the chain cannot fit
 #
@@ -341,17 +342,23 @@ series_broken = rx.refine_sequential(
 series_broken
 
 # %% [markdown]
-# [`SEQUENTIAL_RWP_OUTLIER`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-rwp-outlier) names the 700 K pattern.
-# The row's message is in `series_broken.diagnostics`.
-# It says every attempt left its Rwp far above the fence, the limit the series sets from the patterns accepted before it.
-# The series kept the best attempt and moved on.
+# The 700 K row reads Rwp 0.97 against 0.04 for its neighbours, and [`SEQUENTIAL_UNRECOVERED`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-unrecovered) names it.
+# Its fit converged, but every attempt the ladder made carries an error-level finding, which says not to read the values for any purpose.
+# So the pattern is [quarantined](https://rietx.org/docs/stable/reference/series.html#quarantine): it seeds no successor, and its Rwp stays out of the median.
+# The entry still records how far the Rwp sits above the median of the patterns accepted before it.
+
+# %%
+series_broken[4].rwp_over_median
+
+# %% [markdown]
+# A high ratio is not yet a bad fit, since a pattern with fewer counts has a higher Rwp too.
 # Read that pattern's own diagnostics.
 
 # %%
 series_broken[4].diagnostics
 
 # %% [markdown]
-# The best attempt put the LaB₆ scale on its floor of zero ([`FLOOR_HIT`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#floor-hit)).
+# The fit put the LaB₆ scale on its floor of zero ([`FLOOR_HIT`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#floor-hit)).
 # [`MODEL_FAR_FROM_DATA`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#model-far-from-data) says not to read any of this pattern's values.
 # [`PHASE_UNCONSTRAINED`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#phase-unconstrained) says the cell was held, because a phase with no scale does not constrain it.
 # A held value is not a measurement, so the trajectory has no 700 K point.
@@ -362,9 +369,13 @@ series_broken.trajectory("phases.0.cell.a")
 # %% [markdown]
 # The other six points match the clean series to every printed digit.
 #
-# A fit that diverges on every attempt goes one step further.
-# [`SEQUENTIAL_UNRECOVERED`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-unrecovered) names it, and the pattern is [quarantined](https://rietx.org/docs/stable/reference/series.html#quarantine): it seeds no successor, and its Rwp stays out of the median that sets the fence.
-# The 700 K fit here converged, so it still seeded the 800 K fit.
+# The 800 K fit started from the 600 K answer, the last pattern the chain accepted, and `seeded_from` records it.
+
+# %%
+series_broken[5].seeded_from
+
+# %% [markdown]
+# A fit that diverges on every attempt is quarantined the same way.
 #
 # A hold or a tie belongs to one refinement, so a series declares it per pattern.
 # [Keep a parameter fixed or tied on every pattern](https://rietx.org/docs/stable/guides/series.html#keep-a-parameter-fixed-or-tied-on-every-pattern) shows how.

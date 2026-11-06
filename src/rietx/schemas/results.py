@@ -1170,6 +1170,14 @@ class StageResult(Base):
     #: stage with no Bragg intensity to compare.  Writers: the three runners
     #: that build a ``StageResult``.
     window_loss: float | None = None
+    #: the Le Bail cycles this stage's partitions ran, in order: before the
+    #: solve, then after it (a Pawley seed is the one entry).  A stage the
+    #: solve stopped has only the partition before it.  Empty where none ran:
+    #: a Rietveld stage, or a Pawley stage that carried its intensities in.
+    lebail_cycles_run: list[int] = Field(default_factory=list)
+    #: did every partition of this Le Bail stage meet ``lebail_tol`` under its
+    #: cap?  ``None`` where nothing was asked: another mode, or a fixed count.
+    lebail_settled: bool | None = None
     #: the stage's Rwp at the values it ended on, measured on its own frozen
     #: compile: the number the ``stage_end`` event carries, so a caller keeping
     #: the best stage reads it here rather than from the event log (WP-1334).
@@ -1574,7 +1582,7 @@ def _stage_lines(stages: list[StageResult], max_shift_over_esd: float | None) ->
 #: Above this many *distinct* pairs, a printed diagnostics list stops growing
 #: and names the rest as one count instead (WP-1302). Display-only: it caps
 #: what `_diagnostic_lines` renders, never `RefinementResult.diagnostics`
-#: itself — `sequential._persistent_diagnostics` counts `HIGH_CORRELATION`
+#: itself — `sequential._code_counts` counts `HIGH_CORRELATION`
 #: occurrences across a whole series from that stored list, and a pair
 #: ranked just outside the top ten in every pattern must still be countable
 #: as "N of M" there even though no single pattern's *printed* view shows it.

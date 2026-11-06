@@ -2006,6 +2006,11 @@ def from_structure(structure, *,
         # stored one may already name its setting, and that is exactly the
         # phase whose setting the bare tag cannot carry.
         taken, others = setting_alternatives(bare)
+        # An R symbol's two settings are axis choices, and GSAS-II reads the
+        # bare symbol on hexagonal axes as gemmi does (`SpcGroup("R -3 c")`
+        # gives three centring vectors in 5.8.4, black box). A `:R` phase was
+        # restated above, so only an origin choice is read two ways (#716).
+        others = tuple(s for s in others if s.rpartition(":")[2] not in {"H", "R"})
         if others:
             ambiguous.append(f"{phase.name} is {resolved} and {bare} alone "
                              f"reads as {taken} here")
