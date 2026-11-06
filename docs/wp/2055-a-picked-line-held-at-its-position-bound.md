@@ -142,8 +142,15 @@ at 0.5 against a true 0.44 moves Kα1 by −0.003°, a tenth of the median freed
       `usable()`, but it added five new off-lattice components on the bound. What the
       measurement did change is the flag's help text, which named detection as the cause;
       task 4 corrects it.
-- [ ] Land it, with `tests/test_acceptance_indexing.py` green and the census table
+- [x] Land it, with `tests/test_acceptance_indexing.py` green and the census table
       re-measured.
+      The decision changes no picker behaviour, so no engine or picker code moved and the
+      indexing acceptance has nothing new to answer; the census is task 1's table. What
+      landed is the cause the flag names: `help.py`'s `position_at_bound` entry said
+      detection had misplaced the seed, and now says the component may be a tail shoulder
+      of a stronger line, which one also flagged `axial_tail` usually is (7 of 8 here).
+      The two developer comments that said the same (`schemas/indexing.py`,
+      `peakfit._GroupModel.bounds`) are corrected with it.
 - [ ] Tests + obs/calc/diff PNGs of three bound-held lines before and after to
       `tests/output/`.
 - [ ] Skill: the `PEAK_POSITION_AT_BOUND` reference row, if what it means changes; else
