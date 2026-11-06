@@ -1,6 +1,6 @@
 # WP-1964 — a parametric equation the user writes
 
-Milestone: parametric · Status: ✅ 2026-11-06 — all fifteen tasks landed; the mirrored WO₃ protocol is WP-2103's (PR #PRNUM)
+Milestone: parametric · Status: ✅ 2026-11-06 — all fifteen tasks landed; the mirrored WO₃ protocol is WP-2103's (PR #1442)
 Depends on: 1804 (the derived block); 1325 soft (the joint path, its equations and its form test have landed, and its open tasks are separate); 2103 soft (the tie the WO₃ protocol needs)
 
 ## Goal
@@ -329,7 +329,7 @@ shared coefficients it feeds have a mean z-score under 0.5 in size.
   temperature offset, by naming its variable in the sharing map. `Parameter.expr` has left
   the schema, so the only way to write a formula is the equation that evaluates it. The
   manual has the formula equation in its Theory tab, a guide, and line-by-line TOPAS and
-  GSAS-II spellings. Both Durham inputs were run as formulas: the ZrP₂O₇ formulas reproduce the cells TOPAS stores to the printed digits, and on WO₃ the formula text and the built-in Einstein equations give the same fit to 3e-8 of an esd, while θ itself is not determined by 11 patterns on WP-1325's protocol. PR #PRNUM.
+  GSAS-II spellings. Both Durham inputs were run as formulas: the ZrP₂O₇ formulas reproduce the cells TOPAS stores to the printed digits, and on WO₃ the formula text and the built-in Einstein equations give the same fit to 3e-8 of an esd, while θ itself is not determined by 11 patterns on WP-1325's protocol. PR #1442.
   - *Task 11, a variable per pattern* (decision (c)). A `vars.<name>` path that a
     `SharingMap.per_histogram` glob matches is one column per pattern that reads it, and
     exists only in those patterns' tables, so no column lacks a residual. A glob on the
