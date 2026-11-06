@@ -104,6 +104,7 @@ from rietx.optimize.least_squares import (
     run_least_squares,
 )
 from rietx.params.vector import VAR_PREFIX, AffineTie, ParameterTable
+from rietx.refine import _pawley_seed_cycles
 from rietx.strategy.staged import Stage
 from tests.test_backend_shim import STATES
 from tests.test_schemas import make_lab6
@@ -1946,10 +1947,10 @@ def _stage_boundaries(data, structure, instrument, stages, *, mode="rietveld",
         model = fresh
         if mode == "lebail":
             model.lebail_update(table.decode(table.x0()),
-                                n_cycles=stage.lebail_cycles)
+                                n_cycles=stage.lebail_cycles, tol=stage.lebail_tol)
         elif mode == "pawley" and not carried:
             model.lebail_update(table.decode(table.x0()),
-                                n_cycles=stage.lebail_cycles)
+                                n_cycles=_pawley_seed_cycles(stage))
             model.build_pawley_restraint()
 
         before = _frozen_signature(model)
@@ -1960,7 +1961,7 @@ def _stage_boundaries(data, structure, instrument, stages, *, mode="rietveld",
         table.commit(outcome.theta)
         if mode == "lebail":
             model.lebail_update(table.decode(outcome.theta),
-                                n_cycles=stage.lebail_cycles)
+                                n_cycles=stage.lebail_cycles, tol=stage.lebail_tol)
         prev_free = list(table.free_paths)
         table.apply_to_models(structure, instrument)
 

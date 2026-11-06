@@ -109,7 +109,7 @@ different laboratory, instrument and material:
 | N. Hand rows | Le Bail and Pawley intensity seed, `refine._FLAT_AXIS_TEST_DIRECTIONS`, `arpls`'s `max_iter` and `tol`, `vector.FLOOR_SEEDS` | a test for each claim of invariance | named by each test | open |
 | O. Domain tests | `interval.PARAMETER_INTERVAL_*` (five), `fraction.FRACTION_PROFILE_FWHM_MIN`, `_N_FWHM`, `_FWHM_MAX_SPAN` | state a domain, then 0.1 σ of a point and 0.1 esd | the two-site Pnma fixtures; `fap`, `cpd1a` | open |
 | P. Window numerics | `forward.AXIAL_SIZING_FLOOR`, `REFLECTION_MARGIN_DEG`, `STAGE_WINDOWS_STALE`, `report.NOMINAL_AXIAL_APERTURE` | each side | the four; a second and third family that runs away | open |
-| Q. Le Bail passes | `refine.LEBAIL_CONVERGED_REL` | each side | LaB₆ + cBN, `fap`, `cpd1a` | open |
+| Q. Le Bail passes | `refine.LEBAIL_CONVERGED_REL`, `StageSpec:lebail_tol`, `report.schemas.LEBAIL_GAP_CYCLES` | each side | LaB₆ + cBN, `fap`, `cpd1a` | open |
 | R. Width terms | `StageResult.width_twins_held`, `ProfileTCHZ:y` unfloored | see below | a real multi-phase fit freeing a twin pair; SRM 660c | open |
 | S. Tier-2 citations | `SCHERRER_K`, `BOND_SLACK_ANG`, `STEPS_PER_FWHM_*` | read each citation | none: they stay at tier 2 unless a source fails | open |
 
@@ -168,6 +168,12 @@ and have no free factor to measure, so this file's old list named them without c
 - **P, from WP-2054 (PR #1430).** `NOMINAL_AXIAL_APERTURE` (0.02) needs a third family. On SRM
   660c the action fires at 0.005, 0.01 and 0.02 and not at 0.05, and cpd-1a, -1c and -1f behave
   the same way at 0.02. It is a separate row from `AXIAL_SIZING_FLOOR` and no longer reads it.
+- **Q, from WP-1542 (PR #1434).** The held SNIP on PbSO₄ and #726 was not re-measured with
+  settled partitions. `StageSpec:lebail_tol` (1e-7) joined the audit table at tier 3 on five
+  families of six patterns, with FAP as its stated failing case (a pair 1e-4 Å apart, 1.23 σ at
+  that peak). Neither bar reads the split of such a pair. `report.schemas.LEBAIL_GAP_CYCLES`
+  (5 plain cycles from flat) was left alone and now sits beside a partition that runs to a
+  tolerance. Both are this WP's to weigh in its second pass.
 - **R.** `width_twins_held` has one real two-phase family, 11-BM LaB₆ + cBN. Y's floor went on a
   physical argument with one synthetic cost (Y −0.0059 against 0, `lor_size` 55 % low). The test:
   SRM 660c with Y free and with Y ≥ 0, read on the certified cell and a sample's size and strain.
