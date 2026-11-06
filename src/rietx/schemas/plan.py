@@ -203,7 +203,12 @@ class StageSpec(Base):
         "(intermediate_ftol for every declared stage but the last, the "
         "solver's 1e-9 for the last declared stage and for the closing stage "
         "when the plan has one)"))
-    lebail_cycles: int = 3
+    lebail_cycles: int = Field(25000, description=(
+        "the most intensity-partitioning cycles run before and after the "
+        "solve in lebail mode, and for the seed in pawley mode"))
+    lebail_tol: float = Field(1e-7, ge=0.0, description=(
+        "the share of the Bragg counts a cycle may still move and end the "
+        "partition; 0 runs exactly lebail_cycles"))
     seed: float = Field(0.0, description=(
         "start at this value every parameter this stage frees that sits "
         "exactly on a lower bound of 0 or above (e.g. surface roughness, "
@@ -233,7 +238,7 @@ class StageSpec(Base):
     def from_stage(cls, stage: Any) -> "StageSpec":
         return cls(name=stage.name, turn_on=list(stage.turn_on),
                    max_iter=stage.max_iter, ftol=stage.ftol,
-                   lebail_cycles=stage.lebail_cycles,
+                   lebail_cycles=stage.lebail_cycles, lebail_tol=stage.lebail_tol,
                    seed=stage.seed, strain_seed=stage.strain_seed,
                    restraint_weight_scale=stage.restraint_weight_scale,
                    window_slack_deg=stage.window_slack_deg)
@@ -243,7 +248,7 @@ class StageSpec(Base):
 
         return Stage(name=self.name, turn_on=list(self.turn_on),
                      max_iter=self.max_iter, ftol=self.ftol,
-                     lebail_cycles=self.lebail_cycles,
+                     lebail_cycles=self.lebail_cycles, lebail_tol=self.lebail_tol,
                      seed=self.seed, strain_seed=self.strain_seed,
                      restraint_weight_scale=self.restraint_weight_scale,
                      window_slack_deg=self.window_slack_deg)

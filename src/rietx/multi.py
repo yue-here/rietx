@@ -313,6 +313,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "worst histogram's loss (WP-2047)"),
     "_max_iter_diagnostics": (
         (FIT,), "a stage's budget is spent by the one joint solve"),
+    "_lebail_cap_diagnostics": (
+        (ABSENT,), "a joint fit is Rietveld-only, so it runs no partition"),
     "_slow_descent_diagnostics": (
         (FIT,), "the slow-descent rule reads the one joint solve's cost"),
     "_frozen_compile_diagnostics": (

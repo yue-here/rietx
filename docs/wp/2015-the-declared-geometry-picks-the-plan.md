@@ -95,6 +95,24 @@ that it did not.
 
 ### Inherited
 
+- **2026-11-05, from the issue triage (issue #1409): ten leftovers from PR #1405.** The issue
+  holds each in full, by number. Most describe the PR's head, so they were read, not run.
+  Checked at `541f0daf7`:
+  - **Items 1 and 6, joint fits.** Item 1 is stale in part. `multi.py` no longer runs
+    `PLAN_PRESETS[name]()`: WP-2102 (#1413) moved both call sites to `resolve_plan(plan, mode)`,
+    at lines 1667 and 1784, so a joint fit now takes the mode substitution. What stays open is
+    the geometry addition, which is a per-histogram fact, and `assumed_instrument`, which
+    `multi.py` still never writes. WP-2103 (the joint fit's verbs) touches the same call sites.
+  - **Items 3, 4 and 5.** These are cases (4), (1) and (2) of the Mike Gaultois entry below.
+    PR #1405 left them open.
+  - **Items 2 and 8 ask for a ruling.** Item 2: whether the importers that assume a geometry
+    read `unstated` instead, which changes what a stored calibration opens as. Item 8: whether
+    an explicitly named preset that frees the zero also gains the displacement on Bragg-Brentano.
+    Both travel with PR #1405's seven provisional choices.
+  - **Items 7, 9 and 10** stand on the PR's code: a stored plan keeps the geometry it was stored
+    under, Le Bail and Pawley fits list a held polarisation they do not rest on, and a texture
+    block on an unstated geometry is refused at compile and not at build.
+
 - **From WP-2002 (2026-10-21, 5th session, PR #1085).** Every preset now ends in a closing stage that frees the union of its globs at 1e-3 windows (`RefinementPlan.closing_stage`); a geometry-picked preset inherits it with nothing to add, and its stage-list tests count it (`plan.run_stages()`).
 - **Renumbered 2026-10-20.** Filed on WP-2002's branch as WP-2013 while main gave 2013 to
   the stale-text WP; this file is the same WP under its new number.
