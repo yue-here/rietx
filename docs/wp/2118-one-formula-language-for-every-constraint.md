@@ -86,7 +86,7 @@ declare formulas on parameters; practice.md). No new judgement is added.
 
 ## Tasks
 
-- [ ] **Practice review: what a formula language does well across a program.** Extend
+- [x] **Practice review: what a formula language does well across a program.** Extend
       `docs/practice.md` § A parameter set by an equation the user writes, which covered
       the form of one parametric equation, with the language-level questions: one grammar
       for constraints, restraints and equations (TOPAS, OpenMM's Lepton, Stan, JuMP);
