@@ -128,9 +128,20 @@ at 0.5 against a true 0.44 moves Kα1 by −0.003°, a tenth of the median freed
 - [x] Survey what other peak pickers hold for the doublet ratio and asymmetry (GSAS-II's
       peak fit, FullProf's WinPLOTR, DICVOL's input lists, TOPAS's peak-fit mode); add a
       `docs/practice.md` section.
-- [ ] Decide, from the two above, whether the picker refines the Kα2 weight (or an
+- [x] Decide, from the two above, whether the picker refines the Kα2 weight (or an
       aperture) per pattern before fitting lines, or reports the bound as today. Record
       as `Decided YYYY-MM-DD:`.
+      **Decided 2026-11-06:** the picker holds the declared shape and reports the bound
+      as today, and the census stands at 87 / 24 / 19. Settled by Claude under this WP's
+      tier line, the practice survey and the task-1 measurement. A per-pattern weight is
+      a default action, and no surveyed picker refines the ratio by default (GSAS-II and
+      WinPLOTR leave it to a flag the user sets). The measurement gives no reason to
+      depart: in no arm does freeing a component bring it closer to the lattice, the
+      fitted weight runs from 0 to 0.462 on one tube, and the aperture arm strengthens the
+      low-angle pull. Declaring the fitted weight did move seven tail shoulders out of
+      `usable()`, but it added five new off-lattice components on the bound. What the
+      measurement did change is the flag's help text, which named detection as the cause;
+      task 4 corrects it.
 - [ ] Land it, with `tests/test_acceptance_indexing.py` green and the census table
       re-measured.
 - [ ] Tests + obs/calc/diff PNGs of three bound-held lines before and after to
