@@ -1,6 +1,6 @@
 # WP-2055 — the picker holds a line shape the lab pattern does not have
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-06 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-26 — a diagnostic that says less than it could: 24 usable lines on 16 round-robin patterns report their position bound as their position, flagged `info`, and no case yet moves a cell
