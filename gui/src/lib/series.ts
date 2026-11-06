@@ -295,7 +295,7 @@ export interface LegendEntry {
   id: string;
   label: string;
   ink: string;
-  mark: "line" | "dash" | "dot" | "ring" | "cross" | "square";
+  mark: "line" | "dash" | "dot" | "ring" | "cross";
   /** Why the mark cannot be drawn, when it cannot: its entry is listed and
    *  disabled, never dropped (`CurveToggle.absent`). */
   absent?: string;

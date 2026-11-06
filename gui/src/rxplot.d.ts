@@ -102,7 +102,7 @@ declare module "rxplot" {
   export function trajectory(uPlot: any, host: HTMLElement, traj: TrajectoryData,
                              spec: TrajectorySpec): TrajectoryFigure;
 
-  export type TraceGlyph = "bar" | "cross" | "square" | "ring" | "tick";
+  export type TraceGlyph = "bar" | "cross" | "ring" | "tick";
 
   export interface TraceData {
     index: readonly number[];

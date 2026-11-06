@@ -201,9 +201,14 @@ def test_the_gui_trace_marks_each_event_the_result_carries(planted,
     def marked(result, code):
         return [p["index"] for p in trace(result)["points"] if code in p["marks"]]
 
-    # the Rwp fence's code is gone (WP-2003, C1): the trace marks only what the
-    # result carries as a series verdict, so no pattern is marked by it
-    assert marked(transition_alone, "SEQUENTIAL_RWP_OUTLIER") == []
+    # the Rwp fence's code is gone (WP-2003, C1): the trace draws only what the
+    # result carries as a series verdict, and the transition planted alone
+    # carries none, so no pattern wears a glyph (measured on seed 0) and the
+    # cell's largest step is not the transition's, as _ALONE says
+    alone = trace(transition_alone)
+    assert [p["index"] for p in alone["points"] if p["marks"]] == []
+    cell = alone["largest_steps"]["phases.0.cell.a"]["indices"]
+    assert cell != [EVENT_AT["transition"] - 1, EVENT_AT["transition"]]
     got = trace(planted)
     bg = EVENT_AT["background"]
     assert got["largest_steps"]["instrument.background.c0"]["indices"] == [bg - 1, bg]

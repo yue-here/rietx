@@ -255,9 +255,9 @@ still open, since its surviving residual lands here.
   series answer through one table, so the trace, the trajectory and the
   guide cannot name a pattern two ways. PR #1395.
   *Done.* `rietx.gui.series.TRACE_VOCABULARY` is the vocabulary, written
-  once: four series verdicts read from `SeriesResult.diagnostics` whose
+  once: three series verdicts read from `SeriesResult.diagnostics` whose
   `where` names a pattern (`SERIES_PATTERN_FAILED`, `…_UNRECOVERED`,
-  `…_RWP_OUTLIER`, `…_RESEED`; any other such code is drawn as a tick under
+  `…_RESEED`; any other such code is drawn as a tick under
   its own name, since the codes are open), the pattern's own codes from
   `SeriesEntry.diagnostics` (counted), and each path's largest step, its
   first measured row of `SeriesResult.steps` (a rank, as
@@ -272,9 +272,10 @@ still open, since its surviving residual lands here.
   place through `setCurves(…, keep)`, each member's curves are cached per
   answer, the arrow keys and Home/End step and skip a pattern with nothing
   to show, and a History button keeps the tree one click away. The
-  trajectory's rings and crosses now come from the same trace, and it gains
-  the hollow square for `SEQUENTIAL_RWP_OUTLIER` that `plot_trajectory`
-  already drew (WP-1469's inherited gap). GUI guide § Series › The trace
+  trajectory's rings and crosses now come from the same trace. (The hollow
+  square for `SEQUENTIAL_RWP_OUTLIER` this WP first planned went with the
+  code, which WP-2003 C1 removed; the glyph was deleted rather than left
+  without a writer.) GUI guide § Series › The trace
   carries the table, held to the vocabulary both ways by
   `tests/test_gui_series_trace.py`.
   *Decisions recorded.* Which panel owns the trace: the Series panel.

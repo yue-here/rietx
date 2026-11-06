@@ -1382,7 +1382,7 @@ export function trajectory(uPlot, host, traj, spec) {
 // ---------------------------------------------------------------- the trace
 
 /** The glyphs a trace can draw for a series verdict, as `marks` names them. */
-const TRACE_GLYPHS = ["bar", "cross", "square", "ring", "tick"];
+const TRACE_GLYPHS = ["bar", "cross", "ring", "tick"];
 
 /**
  * A series on the experiment's own axis, for scrubbing (WP-1317): the series
@@ -1396,7 +1396,7 @@ const TRACE_GLYPHS = ["bar", "cross", "square", "ring", "tick"];
  * - `y`: each pattern's coordinate, null where it has none, or null for a
  *   series on its index alone, whose trace is then the marks over a bare axis.
  * - `marks`: per pattern, the glyphs to draw, each one of "bar", "cross",
- *   "square", "ring" and "tick", stacked down from the top in that order.
+ *   "ring" and "tick", stacked down from the top in that order.
  * - `findings`: per pattern, a count, drawn as a bar up from the bottom whose
  *   height is its share of the largest count.
  *
@@ -1487,7 +1487,6 @@ export function trace(uPlot, host, data, spec) {
           return;
         }
         if (g === "ring") ctx.arc(cx, cy, d, 0, 2 * Math.PI);
-        else if (g === "square") ctx.rect(cx - d, cy - d, 2 * d, 2 * d);
         else if (g === "cross") {
           ctx.moveTo(cx - d, cy - d); ctx.lineTo(cx + d, cy + d); ctx.moveTo(cx - d, cy + d); ctx.lineTo(cx + d, cy - d);
         } else { ctx.moveTo(cx, cy - d); ctx.lineTo(cx, cy + d); }

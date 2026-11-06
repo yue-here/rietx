@@ -192,6 +192,7 @@
   }
 
   async function loadAnswer() {
+    scrubNote = "";
     try {
       answer = await api.seriesResult();
       if (!selectedPath && answer.trajectories?.length) {
@@ -317,7 +318,9 @@
 
   /** Walk into one pattern: its own history tree, and the plot follows. */
   async function openPattern(index: number) {
-    if (selectedPattern === index) {
+    scrubNote = "";
+    // a scrub selects a pattern without its history: that row opens, not closes
+    if (selectedPattern === index && memberHistory) {
       selectedPattern = null;
       memberHistory = null;
       draw();
@@ -389,6 +392,7 @@
     selectedPath = path;
     selectedPattern = null;
     memberHistory = null;
+    scrubNote = "";
     draw();
   }
 
@@ -969,7 +973,7 @@ different starting point could not fix">hard</span>
                 <button class="ghost" disabled={busy || !answer.curves[i]}
                   title="this pattern's own fit and its own history tree"
                   onclick={() => openPattern(i)}>
-                  {selectedPattern === i ? "▾" : "▸"}
+                  {selectedPattern === i && memberHistory ? "▾" : "▸"}
                 </button>
               </td>
             </tr>
@@ -1187,12 +1191,6 @@ different starting point could not fix">hard</span>
     background:
       linear-gradient(45deg, transparent 43%, var(--ink) 43% 57%, transparent 57%),
       linear-gradient(-45deg, transparent 43%, var(--ink) 43% 57%, transparent 57%);
-  }
-
-  .legend i.square, .key i.square {
-    width: 8px;
-    height: 8px;
-    border: 1.5px solid var(--ink);
   }
 
   /* The trace's host: short, because it is a map of the series and the plot
