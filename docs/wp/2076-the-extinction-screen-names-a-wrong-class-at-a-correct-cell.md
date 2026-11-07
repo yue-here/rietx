@@ -414,7 +414,13 @@ classes differ. The NAC timing that gated the ruling costs nothing worth asking 
 - Manual's real data: FAP ranks `P 63 - -` first and abstains, 3.4 s; corundum 20-90° `R - c -`
   at ΔBIC −45.9 (was −3435), `profile_rwp` 0.134 (was 0.259); corundum 5-150° on the declared
   widths now returns `R - c -` at −74.6, `profile_rwp` 0.137, where the Le Bail screen refuted it.
-- Test counts: TESTCOUNTS
+- Test counts, on the tree merged with `main` at b17d28273 (`[dev]` venv, macOS arm64, each through
+  the serial queue). Fast selection: 14283 passed, 416 skipped, 32 xfailed, 1 failed in 9:04; the
+  failure was this entry's own headings (`test_docs_consistency`), fixed and re-run green (25
+  passed). The seven extinction files, slow rows included: 133 passed, 1 xfailed. The indexing
+  acceptance file: 45 passed in 14:42. Added tests' local cost (`tests.added_test_times`): 19.9 s
+  over four, the FAP abstention rows 10.8 s of it (five cases, ~2 s each). They stay in the fast
+  tier beside the margin file's other real-data held rows, which pin the same edge.
 
 *Not done, in order.*
 1. The tightening the ruling deferred, now an open task: measure option (c)'s allowance (2·ln N
@@ -443,7 +449,7 @@ and PbSO₄ ×0.99 reads 0.30 (was 0.45).
 
 *Generality* (the `generality-review` agent, pasted unedited).
 
-#### rietx.indexing.extinction.SCREEN_LEBAIL_CYCLES (changed row, tier 3, value 3)
+**rietx.indexing.extinction.SCREEN_LEBAIL_CYCLES (changed row, tier 3, value 3)**
 
 **weak.** The case against keeping the row as written is stronger. Its `grounds` still say the 3 is kept "until WP-2062 moves the screen to Pawley", and this change has now done that for every fit the screen compares. The one fit the 3 still governs, the cell-free prefit, has no measurement of its own.
 
@@ -461,7 +467,7 @@ and PbSO₄ ×0.99 reads 0.30 (was 0.45).
 
 Evidence that would change the verdict: a run of the prefit with a settled partition against 3 cycles, on the screen's real rows (corundum, FAP, PbSO₄, NAC), showing whether any returned class or prefit cell moves. A rewrite of `grounds` to the prefit's own reason would also be needed, with a fresh approval date.
 
-#### SCREEN_MODE = "pawley" (flagged; the table cannot see it)
+**SCREEN_MODE = "pawley" (flagged; the table cannot see it)**
 
 **holds.** The case for acting is stronger. ΔBIC (difference in Bayesian information criterion) and Hamilton's test (a ratio test of whether removed parameters were needed) both assume each compared χ² is a minimum. A Le Bail partition is not a minimum, and a Pawley fit is. The maintainer ruled the move on 2026-11-07, and accepted its costs: FAP and Si now abstain, and PbSO₄ is now named wrongly.
 
@@ -477,7 +483,7 @@ Evidence that would change the verdict: a run of the prefit with a settled parti
 
 Evidence that would change the verdict: an explanation of the 29 class fits still below their reference, for example Pawley's equal-split restraint on overlapped groups making the data χ² not a minimum. If that cause holds, nesting is approximate by construction, and the ln N per position arithmetic loses part of its footing.
 
-#### Testable-only scoring (flagged; the table cannot see it)
+**Testable-only scoring (flagged; the table cannot see it)**
 
 **holds.** The case for acting is stronger. Scoring each class on the lattice less exactly the lines its ΔBIC charges for makes the χ² comparison match the BIC's parameter count. Pawley without it lost certified corundum. Two inputs stay open: which lines count is decided by an unaudited 3σ threshold, and the consistent alternative was not measured.
 
@@ -495,7 +501,7 @@ Evidence that would change the verdict: an explanation of the 29 class fits stil
 
 Evidence that would change the verdict: the alternative (own fit, charge all `n_absent`) run on the 1082 rows and on corundum. If it did as well, the choice between them would become a ranking judgement rather than arithmetic.
 
-#### A scoring refit that raises refutes the class (flagged; the table cannot see it)
+**A scoring refit that raises refutes the class (flagged; the table cannot see it)**
 
 **weak.** The case against is stronger. A numerical failure of a model that is not the class becomes a refutation. A refuted class leaves the margin comparison in `best_or_none`, so a failure on the leader or its runner-up can let a rival through as a confident answer. The package's own rule for an unasked question is to abstain.
 
@@ -511,7 +517,7 @@ Evidence that would change the verdict: the alternative (own fit, charge all `n_
 
 Evidence that would change the verdict: an injected raise in the scoring refit, with a test showing what `best_or_none` returns. Alternatively, treat the class as unscored and not refuted, so `best_or_none` abstains, and show that this costs nothing on the existing rows.
 
-#### `_undecided_positions(a, b, limit=4)` in `indexing/diagnostics.py` (flagged; display cap)
+**`_undecided_positions(a, b, limit=4)` in `indexing/diagnostics.py` (flagged; display cap)**
 
 **holds.** The case for is stronger. The cap only shortens a message. The message counts what it leaves out, and the full lists stay on the two classes' records.
 
