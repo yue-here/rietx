@@ -1,6 +1,6 @@
 # WP-2076 — The extinction screen names a wrong class at a correct cell
 
-Milestone: unscheduled · Status: 🔄 2026-11-07 — the ruled repair landed (PR #1460); measuring the margin tightening is next
+Milestone: unscheduled · Status: 🔄 2026-11-07 — the ruled repair merged (PR #1460); a raised fit now abstains, and the prefit's 3 Le Bail cycles were re-measured and kept; measuring the margin tightening is next
 Track: What fires, and what stays silent
 Depends on: — (1910 soft: its second screen agrees with the wrong class here; 2062 soft: its decision 2 moves the screen's fits to Pawley)
 Priority: P2 2026-11-07 — a silent wrong answer on a path few fits run: at a prefit cell within 600 ppm the default screen names a class excluding the true group on 318 of 1082 synthetic rows (41 groups), and nothing fires. Yue ruled the repair on 2026-11-07, so it is ready to build
@@ -339,6 +339,12 @@ measurements are in the entry of 2026-11-05.
       classes differ at, so the package's own output carries the guidance, and
       the `EXTINCTION_FORBIDDEN_INTENSITY` row's stale Le Bail and held-cell
       wording was corrected.
+- [x] A class fit or scoring fit that raises leaves its class unscored, not
+      refuted, so the screen abstains and names the error. Consented 2026-11-07
+      (shift bundle item 3). `tests/test_extinction_symbol.py`.
+- [x] Re-measure `SCREEN_LEBAIL_CYCLES` on the prefit alone and rewrite its lapsed
+      `_audit` grounds (shift bundle item 4). Kept at 3; the new grounds await
+      the maintainer's approval.
 - [ ] Measure option (c)'s allowance (2·ln N plus an allowance derived from the
       count of silent positions) and real patterns from the eleven groups that
       abstain on every row at margin 18, then bring the allowance's `_audit` row
@@ -371,6 +377,113 @@ position named, and PbSO₄ names `P c - a`: the known wrong answer the ruling o
   WP-2062 (Le Bail against Pawley).
 
 ## Handover log
+
+### 2026-11-07 (fourth session) — a raised fit abstains; the prefit's 3 cycles re-measured
+
+The screen no longer treats a solver failure as evidence against a class. If a class's fit, or
+the refit that scores it, raises, the class stays unrefuted and unscored, and the screen
+declines to name a class and says which fit raised. Before, a crash refuted the class. That
+could hand a rival a confident answer. One exception keeps evidence: when only the scoring
+refit raises, the class's own fit still stands, and its forbidden intensity can still refute
+it. Separately, the prefit's 3 Le Bail cycles were measured against a settled partition. The
+measurement does not separate them. Settling recovers a synthetic cell that 3 cycles lose, and
+it moves FAP's cell by up to 1474 ppm. So the count stays at 3, and its rewritten grounds go to
+Yue for approval.
+
+**Done.**
+- Shift bundle item 3 (consented 2026-11-07): `determine_extinction_symbol` records a raised
+  class fit or scoring refit in a per-screen map and sets `screened=False`. Then
+  `best_or_none` abstains, and `EXTINCTION_SYMBOL_AMBIGUOUS` names the first error and counts
+  the rest. When the error is the only reason, its suggestion becomes "Run the screen again".
+  A raised scoring refit is cached like a fit, so a class sharing its line set does not
+  repeat it. The absence test still runs on the class's own fit. Schema docstrings for
+  `screened`, `n_testable`, `chi2` and `refuted`, and the manual's extinction page, now say
+  this. Test: `test_a_class_fit_that_raises_leaves_the_class_unscored[class|scoring]`
+  injects a `LinAlgError`. It fails on `main` and passes here.
+- Shift bundle item 4: `SCREEN_LEBAIL_CYCLES` evidence and grounds were rewritten in
+  `_audit.py`, and its comment in `extinction.py` was updated. `approved` still reads
+  2026-11-05, and the grounds say the text awaits approval. WP-2062's `### Inherited` note no
+  longer says that WP retires the constant.
+
+**Measured** (`[dev]` venv, macOS arm64, alone on the machine). Prefit at 3 fixed cycles
+against settled (25 000 cycles to `lebail_tol` 1e-7), eleven screens:
+
+| pattern | start | 3 cycles: answer, prefit cell | settled: answer, prefit cell |
+|---|---|---|---|
+| corundum | ×0.995/×1/×1.005 | `R - c -` ×3, dBIC −45.9 | same, cells agree ≤ 10 ppm |
+| FAP | ×0.995 | None, −33 ppm | None, +313 ppm (prefit Rwp 0.22 vs 0.12) |
+| FAP | ×1.005 | None, −6 ppm | None, −1474 ppm (Rwp 0.54 vs 0.11) |
+| synthetic P 1 21/c 1 | ×0.995 | None (`unreliable`): cell lost, a = 6.83 Å | `P 1 21 1`, wrong, at a cell 0.07 % short |
+| synthetic | ×1 | `P 1 21/c 1`, −127.87 | same, −127.77 |
+| synthetic | ×1.005 | `P 1 21/c 1`, a 1034 ppm off | same, 65 ppm off |
+| PbSO₄ | ×0.99/×1 | `P c - a` (known wrong) | same |
+
+The settled ×0.995 wrong class is the Pawley margin failing near the right cell. The third
+session found `P 1 21 1` at a held ×0.9994, so this belongs to the open margin task.
+Wall time is the same in both arms (0.3-29 s a screen). The eight `tests/test_extinction*.py`
+files gave 176 passed, 2 skipped, 1 xfailed in both arms. Fast suite on the final tree, main
+`b6ff8e71f` merged: 14 292 passed, 416 skipped, 32 xfailed, 1 failed in 8:23. The failure was
+the indexing `CLAUDE.md` line cap, from this session's rule edit; trimmed, and
+`test_docs_consistency.py` then gave 25 passed. This session added 2 test cases, 1.12 s in all
+(local junit). No base count was measured on this main, so the +2 is not checked against one.
+
+**Review.** `/code-review high --fix` reported nine findings. Fixed: a raised scoring refit
+was repeated per class (now cached); the manual's "a fit that raised refutes"; the `screened`
+and `n_testable` meanings; the unapproved-grounds provenance. The generality judge's two
+gaps also landed: the absence test before the abstention, and the solver-failure suggestion.
+Declined: the GUI's "not screened" tooltip in `gui/src/panels/Peaks.svelte` still says "cap or
+cancel". Fixing it means rebuilding the committed GUI dist under node 22, and this machine has
+node 24. The path is reached by no dataset. Also declined: a per-class error field, which is a
+schema change; the first error plus a count rides the screen's message instead. And the
+unreachable "every class was refuted" branch, because `extinction_diagnostics` can be handed a
+hand-built screen.
+
+*Generality* (the `generality-review` agent, pasted unedited).
+
+**rietx.indexing.extinction.SCREEN_LEBAIL_CYCLES (changed row, tier 3, value 3)**
+
+**holds, but its grounds need two corrections before approval.** The case for keeping 3 is stronger. On the eleven screens, settling the partition improved no answer and cost the same time. The grounds misread the one row where the arms differ. They also leave out the case where 3 cycles fails.
+
+(The prefit: the cell-free Le Bail fit that refines the candidate cell and peak widths before any extinction class is fitted. A partition is one Le Bail redistribution of observed intensity among overlapping reflections. The reference gate is `REFERENCE_NET_RWP_MAX`, 0.7071: above it, the absence-free fit's background-subtracted Rwp sets status `unreliable` and `best_or_none` (the screen's pick verb) returns None. WP-1542 is the change that made rietx's Le Bail partition run until it settles.)
+
+| Question | Author's answer, and where | What I found | Verdict |
+|---|---|---|---|
+| 1. What it decides | `_audit.py` evidence: "this count governs the cell-free Le Bail prefit alone". Comment at `extinction.py:929-931`: "Settling it was measured on eleven screens". | Confirmed. `_prefit` runs `_fixed_partition(...)` at `extinction.py:1083`, which sets 3 cycles with `lebail_tol=0.0`, so nothing stops it early. The prefit runs by default (`refine_cell=True`, `extinction.py:1160`). Its cell and widths are what every class is then compared at. The package's own default elsewhere is a settled partition: `StageSpec` `lebail_cycles=25000`, `lebail_tol=1e-7` (`strategy/staged.py:143,147`). | holds |
+| 2. Kind of ambiguity | Not stated (constant rows carry no `ambiguity` field). | A numerical setting of a fit that feeds a kind-2 ranking (the classes ranked by ΔBIC, the difference in Bayesian information criterion). It is not a verdict of its own. | n/a |
+| 3. Case against (keeping 3) | Grounds: "it is the pre-WP-1542 default … The count has no published source". | From the raw output (`p4_fixed.jsonl`, `p4_settled.jsonl`). **Synthetic P 1 21/c 1 at ×0.995: 3 cycles lost the cell.** It landed at a = 6.826, b = 8.734, c = 6.298 Å against the true 8, 10, 7 (10-15 % off), with prefit Rwp 0.85 and net Rwp 0.996. The screen abstained only because the reference gate caught that failure. Settled, the cell came back to within 506-759 ppm of the truth. **At ×1.005**, 3 cycles left a 1034 ppm off and settled 65 ppm. Everywhere else in rietx the partition settles. The practice survey (`docs/practice.md:536-544`, the repository's survey; I did not check the programs) says every program with Le Bail stops on convergence (GSAS-II and FullProf at a 1e-3 relative change in χ²). It also cites Le Bail (2005) that "one pass is not enough to reach the minimum Rwp". | real, partly unstated |
+| 4. Case for (keeping 3) | Grounds: "a settled prefit partition gave one confident wrong class and no right answer the 3-cycle prefit missed"; "no competent caller depends on it settling". | **The facts are right but the attribution is wrong.** Settled at ×0.995, the synthetic screen named `P 1 21 1` (ΔBIC −23.6), which excludes the true group. That happened at a prefit cell about 0.07 % short. The third session's held-cell scan already found `P 1 21 1` at ×0.9994. So the wrong class is the Pawley screen's margin failing near the right cell, which is the open option-(c) task (the margin-allowance measurement). It is not settling that misleads. The comment's "a cell 0.5 % short" is the starting cell, not the cell the classes were screened at. Supporting facts that hold: (a) 10 of 11 answers are identical, and at ×1.0 ΔBIC moves by ≤ 0.10 (synthetic −127.87 against −127.77). (b) FAP's settled cells are further from the ×1.0 answer at both offsets: +313 ppm against −33 ppm at ×0.995 (prefit Rwp 0.22 against 0.12), and −1474 ppm against −6 ppm at ×1.005 (Rwp 0.54 against 0.11). The row quotes only the second. (c) Time is the same (0.28-28.8 s in both arms). (d) `armA.log`/`armB.log`: 176 passed, 2 skipped, 1 xfailed in both arms. So WP-1542's "a settled partition failed 10 rows" no longer holds for the prefit alone. The evidence keeps that sentence without saying it is superseded. | stronger, on the answers |
+| 5. Tier | 3; "no published source and was not tuned to these rows". | Tier 3 is honest. The survey offers a partial anchor the row does not cite: GSAS-II caps a refinement at 3 cycles by default, `DoLeBail` runs a fixed 10, and MAUD runs up to 5. So 3 lies at the low end of the programs' extraction counts. Those programs also stop on χ² and move the model only one least-squares iteration per extraction, so it is not the same choice made by default. From `docs/practice.md`; I did not check the programs. | holds |
+| 6. Dataset families | "SRM 676a corundum, GSAS-II FAP and the synthetic P 1 21/c 1 … and GSAS-II PbSO4". | Four families: three real (NIST corundum from the IUCr round robin; GSAS-II tutorial fluorapatite; GSAS-II tutorial PbSO₄) and one synthetic (rietx's own forward model). References, which the row does not name: for the class, the known space group of each specimen; for the synthetic cell, the truth by construction; for FAP's cell, GSAS-II's converged fit (cross-code, so it only verifies). Corundum's certified cell was not compared; the two arms agree on it to ≤ 10 ppm. **All four are development data** (the screen's own test rows), and the row does not say so. NAC, named in the last review's request, was not run. PbSO₄ ×0.99: both arms leave the cell about 3400 ppm off and name `P c - a`, so no difference there. | holds, with omissions |
+| 7. What reports it | none given | `ExtinctionScreen.prefit_rwp` and `.cell` show the outcome. No field records the cycle count or whether the partition settled. Unchanged from the last review. | weak |
+
+Evidence that would change the verdict: a prefit row where settling changes the class at a cell the Pawley margin is known to handle (outside ×0.9994-×1.0012 on the synthetic). For approval, the grounds should say three things: the ×0.995 wrong class arises at a near-correct cell (the open margin task), 3 cycles lost that cell, and FAP's ×0.995 prefit got worse when settled.
+
+**Fallback: a raised class fit or scoring refit leaves the class unscored, not refuted (flagged; the table cannot see it)**
+
+**holds.** The case for abstaining is stronger. A solver failure carries no information about absences, and the package already abstains on a question it left unasked. One branch still throws away a refutation it could have made, and the advice the abstention prints does not fit a solver failure.
+
+(`EXTINCTION_SYMBOL_AMBIGUOUS`: the warning the screen raises when it declines to name a class. The scoring refit is the Pawley fit of the lattice minus only the forbidden lines this class can be tested on.)
+
+| Question | Author's answer, and where | What I found | Verdict |
+|---|---|---|---|
+| 1. What the caller must now decide | `diagnostics.py:1027-1029`: "Such a class is unscored rather than refuted, and the abstention names the error, since a solver failure is no evidence about the absences." | Confirmed at `extinction.py:1447-1451` and `:1485-1492`. Any raise in either fit now makes `best_or_none` return None (`schemas/indexing.py:2642`). Before, it would have ranked the survivors. The caller must decide whether to rerun, or how to work around the failed class. No verb rescores one class. | holds |
+| 2. Kind of ambiguity | Schema text, `schemas/indexing.py` `screened`: "A raised fit is no evidence about the absences, so the class is left unscored rather than refuted". | Kind 2: a ranking that picks only on a clean result, in the pick verb. The old rule ("raised, so refuted") claimed kind 1 and failed unanimity in the last review. There is no row, so nothing records the kind. | holds |
+| 3. Case against acting (for abstaining) | Test docstring, `test_extinction_symbol.py`: "Before this either raise marked the class refuted, which took it out of `best_or_none`'s margin test and could hand a rival a confident answer." | Strong. An unscored class could be the true one, since classes do not nest in general. `best_or_none` already abstains for a `max_classes` cap or a cancel, for the same reason. | strong |
+| 4. Case for acting (for refuting, or for ranking anyway) | none given | **One real cost.** In the scoring-refit branch the class's own fit has succeeded, and the absence test reads that fit (`extinction.py:1505-1507`), not the refit. The `continue` at `:1492` skips that test. So a class whose own fit shows forbidden intensity, and would be refuted on evidence, now blocks every answer. The old code refuted it, for the wrong reason but with the right outcome. Running the absence test before the `continue` would keep the abstention and lose nothing. How often this happens: no case on disk reaches either branch. Both arms of the prefit measurement pass the same 176 tests, and the only case is the injected `LinAlgError`. **The printed advice misleads:** the code's `suggestion=` is fixed ("Count longer at the forbidden positions … or extend the 2θ range", `diagnostics.py:1188-1189`), which is the wrong next step after a solver failure. | some, unmeasured |
+| 5. Tier | none given | No row: the table cannot see a fallback. "A failed fit carries no evidence" is arithmetic (tier 1). I found nothing in `docs/practice.md` on how any program treats a failed class fit. | holds |
+| 6. Dataset families | Test `test_a_class_fit_that_raises_leaves_the_class_unscored[class\|scoring]`. | Only an injected raise on the synthetic monoclinic. generality.md accepts an injected case for a guard ordinary fits never reach. The test asserts abstention, no refutation, and the error text in the message. | holds |
+| 7. What reports it | `EXTINCTION_SYMBOL_AMBIGUOUS` message: "N class(es) could not be scored … : {error}". | Only the first error's text appears ("(and N more)"). No per-class field carries the error: `refuted_reason` is now None. A cap and a raise both read as `screened=False`, so with two or more failures an agent cannot tell from the record which classes raised. In the scoring branch, `screened=False` sits beside a set `n_testable`, `rwp` and `tested_hkl`. The schema documents this. It departs from the indexing rulebook's "`n_testable` is `None` until `screened`". `EXTINCTION_SYMBOL_AMBIGUOUS`'s own row is still `unaudited` (`_audit.py:688`, on the baseline). | weak |
+
+Evidence that would change the verdict: a case where a raised scoring refit sits on a class the absence test refutes. Running the absence test before the `continue`, plus a per-class error field, would remove both weak rows.
+
+Author's answers. Row 1's "grounds need two corrections": both landed in the evidence and the
+grounds (the wrong class is the margin's, 3 cycles lose the synthetic cell, FAP ×0.995 named).
+Item 2's weak rows 4 and 7: the absence test now runs before the abstention; a per-class error
+field is declined above.
+
+**Next.** Yue approves or rejects the rewritten `SCREEN_LEBAIL_CYCLES` grounds. On approval,
+set `approved` to that date and drop the grounds' last sentence. Then the margin task: measure
+option (c)'s allowance, and include the synthetic ×0.995 settled row as a case it should fix.
 
 ### 2026-11-07 (third session) — the repair landed, PR #1460
 
