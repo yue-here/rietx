@@ -1,8 +1,7 @@
 # WP-2109 — the solve cost at a stated March-Dollase r
 
-Milestone: structure-solution · Status: 🔄 2026-11-05 — finished: every task ticked and PR #1420 merged at `c1596ff82`, χ², s and ∂χ²/∂r at a stated (r, axis); waits on Yue to close it, since closing a WP is the maintainer's
+Milestone: structure-solution · Status: ✅ 2026-11-07 — closed by Yue; PR #1420 (`c1596ff82`) gives χ², s and ∂χ²/∂r at a stated March-Dollase (r, axis); nothing calls it until S9 (#677)
 Depends on: 1902 (shipped, the cost)
-Priority: P3 2026-11-05 — no user is at the wall: nothing in the package calls this until S9 (#677) is cut, and the contributor's search carries r outside the package today
 
 ## Goal
 
@@ -163,6 +162,17 @@ is owed yet. The form goes in `solve/cost.py`'s docstring.
 - WP-1902 (the cost), WP-1515 (the scoping), WP-1997 (the engine).
 
 ## Handover log
+
+- **2026-11-07** (rulings, PR #PRNUM) — closed. Decided 2026-11-07 (Yue): close it. The
+  solve cost can now say what χ² would be at a stated March-Dollase r and axis, and how
+  fast it changes with r. No search in the package moves r yet. That waits on S9 (#677).
+  *Checked before closing:* all six tasks are ticked, and PR #1420 merged on 2026-11-05.
+  The file had no `### Inherited` section. The `Priority:` line is deleted, and the
+  narrative moved to `docs/milestones/v1.12.md`. No WP depends on this one.
+  *Carried to S9:* the two review points in the entry below (orbit layouts built at every
+  extraction, and the redundant `group=`) still have no ruling. No S9 WP exists, so they
+  moved to WP-1515's `### Inherited`, the open WP that cuts S9.
+  *Next:* none here.
 
 - **2026-11-05** (post-merge record) — PR #1420 merged at `c1596ff82`. Every task
   was already ticked, so this entry ticks nothing. The merge makes χ² and ∂χ²/∂r
