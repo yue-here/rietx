@@ -134,7 +134,7 @@ using only today's ties gives bit-identical numbers before and after.
 
 - **2026-11-07** — Task 2 is done. The maintainer ruled design questions 1-3 and the two
   consent items in a session with the shift lead, after the brief in the 2026-11-06 entry.
-  Task 3 is next, and nothing waits on the maintainer.
+  Task 3 is next, and nothing waits on the maintainer. PR #1453.
   - *Ruling 1, how a formula names a model parameter: (a).* A formula reads only named
     variables (`vars.<name>`, made by `add_variable`) and constants. To read a model
     parameter, the user first ties it to a variable. The maintainer asked which option was
