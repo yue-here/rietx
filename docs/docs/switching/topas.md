@@ -50,12 +50,13 @@ A stage that tried to free a held parameter reports it as `HOLD_BLOCKED_PLAN`, a
 ### Shared names are ties
 
 TOPAS ties parameters by giving them one name, or by writing an equation.
-rietx has three calls for the same jobs:
+rietx has three calls for the same jobs, `tie` taking either a source or an expression:
 
 | TOPAS | rietx |
 | --- | --- |
 | one name on several sites: `beq O5_biso` | `Refinement.tie_equal` |
 | an equation: `b = 2*a + 1;` | `Refinement.tie(path, source, scale=2, offset=1)` |
+| a nonlinear equation in named parameters: `beq = B0 * Exp(-k/T);` | `Refinement.tie(path, expression="B0 * exp(-k/T)")`, with `B0` and `k` from `add_variable` and `T` a number |
 | a named parameter: `prm w 0.1` | `Refinement.add_variable` |
 
 The three oxygen sites of fluorapatite share one displacement parameter in TOPAS like this (lines from a file rietx wrote, with each number cut to six significant figures):

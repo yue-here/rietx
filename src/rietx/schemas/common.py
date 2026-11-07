@@ -698,6 +698,11 @@ from .._nearmiss import did_you_mean
 #: ``.tested_two_theta``, the testable forbidden positions a class was scored
 #: on.  Additive and defaulted to empty, the 0.25 → 0.26 rule; an older build
 #: refuses a screen carrying either key.
+#: Also in 0.61 (WP-2118): ``TieSpec.expression``, a user tie declared as a
+#: formula over named variables (``Refinement.tie(path, expression=...)``).
+#: Additive and defaulted to ``None``, a linear tie, the 0.25 → 0.26 rule; so
+#: every stored tie opens as the linear tie it was.  An older build refuses a
+#: document carrying the key.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

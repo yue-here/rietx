@@ -103,7 +103,7 @@ What an operator must know, all measured:
   one you built yourself fits one pattern and nothing after it — there is no
   `carry` glob for it either, since a tie lives in no model.  Pass
   `constrain=lambda index, ref: ...` to `fit`/`refine_sequential` and call
-  `ref.add_variable(...)` / `ref.tie_equal(...)` inside it, against that
+  `ref.add_variable(...)` / `ref.tie(...)` inside it, against that
   pattern's own table.  It fires once per **fit** and not once per pattern —
   every escalation rung and the `verify_steps` refit get it — so a
   hook that counts its own calls counts fits.  The variable's *value* then
