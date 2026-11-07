@@ -1,0 +1,20 @@
+t9_order.jsonl n 100 errors 0 converged 100 form rejected 15 wall 2.0-3.4 f 1.12-1.14
+  a0    n=100 cover2=97 raw cover2=93 mean z=+0.07 sd z=0.93 max|z|=3.0
+  k     n=100 cover2=96 raw cover2=93 mean z=-0.07 sd z=0.94 max|z|=3.1
+  A     n=100 cover2=97 raw cover2=95 mean z=-0.11 sd z=0.93 max|z|=3.1
+  Tc    n=100 cover2=97 raw cover2=94 mean z=-0.13 sd z=0.85 max|z|=2.4
+  beta  n=100 cover2=97 raw cover2=96 mean z=-0.16 sd z=0.82 max|z|=2.2
+t9_avrami.jsonl n 100 errors 0 converged 100 form rejected 2 wall 1.7-2.8 f 1.13-1.14
+  S     n=100 cover2=99 raw cover2=96 mean z=+0.12 sd z=0.86 max|z|=2.0
+  kr    n=100 cover2=100 raw cover2=96 mean z=-0.08 sd z=0.88 max|z|=2.0
+  n     n=100 cover2=100 raw cover2=99 mean z=-0.15 sd z=0.84 max|z|=1.8
+t9_order_misfit.jsonl n 40 errors 0 converged 40 form rejected 5 wall 1.8-3.5 f 1.25-1.28
+  a0    n=40 cover2=40 raw cover2=37 mean z=+0.11 sd z=0.80 max|z|=1.7
+  k     n=40 cover2=40 raw cover2=37 mean z=-0.10 sd z=0.83 max|z|=2.0
+  A     n=40 cover2=39 raw cover2=38 mean z=-0.09 sd z=0.80 max|z|=2.1
+  Tc    n=40 cover2=39 raw cover2=39 mean z=-0.02 sd z=0.71 max|z|=2.1
+  beta  n=40 cover2=40 raw cover2=39 mean z=-0.05 sd z=0.64 max|z|=1.8
+t9_avrami_misfit.jsonl n 47 errors 0 converged 47 form rejected 2 wall 1.4-3.1 f 1.21-1.24
+  S     n=47 cover2=0 raw cover2=0 mean z=+26.70 sd z=0.82 max|z|=28.4
+  kr    n=47 cover2=47 raw cover2=46 mean z=-0.17 sd z=0.76 max|z|=1.8
+  n     n=47 cover2=47 raw cover2=47 mean z=-0.24 sd z=0.72 max|z|=1.5

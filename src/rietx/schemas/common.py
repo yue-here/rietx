@@ -1,6 +1,6 @@
 """Common schema primitives: the refinable :class:`Parameter` and provenance.
 
-The ``Parameter`` model (``value``/``vary``/``min``/``max``/``expr``) follows the
+The ``Parameter`` model (``value``/``vary``/``min``/``max``) follows the
 design popularised by *lmfit* (BSD-3-Clause); no lmfit code is used, only the
 interface convention.  See ``ATTRIBUTION.md``.
 """
@@ -683,6 +683,17 @@ from .._nearmiss import did_you_mean
 #: test, so a stored node reads as what it ran, while ``StageSpec`` moved to
 #: 25 000 and 1e-7.  A stored plan naming ``lebail_cycles: 3`` reads that as a
 #: cap: it runs the same three cycles and reports ``LEBAIL_CYCLES_AT_CAP``.
+#: Also in 0.61 (WP-1964, the maintainer's rulings of 2026-11-05):
+#: ``ParametricEquation.basis`` gains ``"expression"``, with
+#: ``ParametricEquation.expression``, the formula's text, and
+#: ``ParametricEquation.target`` may be ``None``, an intermediate a later
+#: formula names.  Additive and defaulted, the 0.25 → 0.26 rule.  And
+#: ``Parameter.expr``, which only ever held ``None``, leaves the schema: a
+#: stored ``"expr": null`` is dropped at read (``Parameter``'s ``mode="before"``
+#: validator), so every file written before opens unchanged.  A parameter
+#: written here carries no ``expr`` key, which 1.11 reads as ``None``; a
+#: result or project declaring a formula does not open in 1.11 or earlier.
+#: ``PROJECT_FORMAT_VERSION`` does not move: the ``.rex`` layout is unchanged.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
@@ -833,21 +844,6 @@ class Parameter(Base):
         value in these units (WP-1938).  A ``transform`` written before
         schema 0.46 is folded into them on read
         (:func:`legacy_transform_bounds`).
-    expr:
-        Reserved for nonlinear constraint expressions; **not implemented** —
-        must be ``None``. The design (a tiny AST-whitelisted DSL emitted as
-        backend ops, because asteval cannot run on autodiff tracers) is in
-        DESIGN.md's "Parameter system"; linear/symmetry ties do not need it and
-        go through the affine constraint block instead.
-
-        **Kept deliberately** (WP-1110 item 5, decided 2026-08-21).  A declared
-        field that can only ever raise is the shape WP-1076 removes, and this
-        one was costed for removal: ``model_dump`` writes ``"expr": null`` into
-        every persisted parameter, so under ``extra="forbid"`` it needs a
-        ``mode="before"`` migration and ``SCHEMA_VERSION`` 0.2 → 0.3.  It stays
-        because it is the carrier for the nonlinear half of WP-1119's named
-        variables, whose linear half the affine block above already computes —
-        removing it now would buy one bump and cost another to undo.
     stderr:
         Estimated standard deviation, filled in by the refinement.
     """
@@ -856,9 +852,30 @@ class Parameter(Base):
     vary: bool = False
     min: float = -math.inf
     max: float = math.inf
-    expr: str | None = None
     unit: str | None = None
     stderr: float | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_expr(cls, data: object) -> object:
+        """Read a stored ``"expr": null`` as nothing (WP-1964).
+
+        The field left the schema at 0.61.  It only ever held ``None``, any
+        other value having raised, and every parameter written before carries
+        that ``null``, so a file opens unchanged.  A formula is declared where
+        it is evaluated: ``ParametricEquation(basis="expression")`` in a joint
+        fit, never a field on the parameter it sets.
+        """
+        if not isinstance(data, dict) or "expr" not in data:
+            return data
+        if data["expr"] is not None:
+            raise ValueError(
+                "Parameter.expr was removed at schema 0.61 and only ever held None: "
+                "a formula is declared as rx.ParametricEquation(basis='expression', "
+                "expression=...) in a joint fit")
+        data = dict(data)
+        del data["expr"]
+        return data
 
     @model_validator(mode="before")
     @classmethod
@@ -898,14 +915,6 @@ class Parameter(Base):
         if not (self.min <= self.value <= self.max):
             raise ValueError(
                 f"value {self.value} lies outside bounds [{self.min}, {self.max}]"
-            )
-        if self.expr is not None:
-            raise ValueError(
-                "Parameter.expr (nonlinear constraint expressions) is not "
-                "implemented; set expr=None.  Symmetry and linear ties do not "
-                "need it — they are applied as the affine constraint block in "
-                "params/vector.py (crystal-system cell ties, Wyckoff coordinate "
-                "DOFs, site-symmetry ADP patterns)."
             )
         return self
 

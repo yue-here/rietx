@@ -192,8 +192,10 @@ above, which come from lab and synchrotron single-phase patterns
   score must drop only the lines a class is charged for, which is one extra fit per class. WP-2076
   § Findings has the numbers and `~/.cache/ghostshift/rietx/wp-2076/candidate.diff` the patch. That patch
   also counts `n_free_parameters` alone, this WP's Hamilton-count task. A Pawley screen read the same
-  on two rows at pattern and σ × 5 × 10⁻⁵, so the unit-dependence task does not reach it there. Whether
-  WP-2076 lands this first is the maintainer's question, in its newest handover entry.
+  on two rows at pattern and σ × 5 × 10⁻⁵, so the unit-dependence task does not reach it there.
+  Answered 2026-11-07 (Yue): WP-2076 lands it first, once the screen times under 30 s on NAC. So
+  WP-2076 takes this WP's Hamilton-count task and its A2 row. Tick them here when WP-2076 merges;
+  if the NAC timing sends it back to Yue, they stay here.
 
 - **From WP-2011, 2026-10-28: Pawley's cost on large patterns, re-measured
   with option (c) built** (WP-2011 § Option (c) probed, commit e39b8c19d on
