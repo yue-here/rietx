@@ -28,7 +28,7 @@ from typing import ClassVar, Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from .common import Base, Parameter, _InheritsDeclaredDefaults, declared_fills
+from .common import Base, Parameter, _InheritsDeclaredDefaults
 
 
 def _declared_extinction() -> Parameter:
@@ -1553,26 +1553,16 @@ class Phase(_InheritsDeclaredDefaults):
         ``phase.extinction = 0.0`` is the declaration a user writes, so it
         must not need the unit and the bound spelled out.  A ``Parameter`` or
         a dict that leaves ``min``, ``max`` or ``unit`` unset inherits them
-        from ``_declared_optional``, the rule every declared field follows
-        (issue #204).  The fill is made here as well as in
-        ``_inherit_declared_bounds``, because an assignment
-        (``phase.extinction = Parameter(value=0.0, vary=True)``, the other
-        way to declare it) runs this validator and not that one, and would
-        otherwise leave the coefficient unbounded below.
+        from ``_declared_optional`` in
+        :class:`~rietx.schemas.common._InheritsDeclaredDefaults`, on
+        construction and on assignment alike (issue #204, WP-2088).
         """
         if isinstance(value, bool):
             raise ValueError("extinction takes a number (µm²) or a Parameter; "
                              "declare it with phase.extinction = 0.0")
         if isinstance(value, numbers.Real):
             return _declared_extinction().model_copy(update={"value": float(value)})
-        if isinstance(value, Parameter):
-            present, base = value.model_fields_set, value.model_dump()
-        elif isinstance(value, dict):
-            present, base = value.keys(), value
-        else:
-            return value
-        fills = declared_fills(_declared_extinction(), set(present))
-        return Parameter(**{**base, **fills}) if fills else value
+        return value
 
     @field_validator("symmetry_operations", mode="before")
     @classmethod

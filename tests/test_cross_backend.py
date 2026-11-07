@@ -427,6 +427,40 @@ def _state_families_variable():
     return model, table, {}
 
 
+def _state_expression():
+    """Two targets set by **expressions the user wrote** (WP-1964).
+
+    An expression block is a derived block whose map is a parsed tree, so it is
+    a new derivative path: the numpy column comes from the tree's own
+    forward-mode rules chained through ``local_jacobian``, and the traced
+    backends differentiate the same tree's evaluation.  Two shapes: the
+    Einstein cell edge, whose block also writes the cubic ``b`` and ``c``
+    (the followers it takes over from C), and a Debye Biso inside an ``if``,
+    whose dead branch carries a guarded logarithm.  Three variables are shared
+    between them, so a column reaches both blocks.
+    """
+    structure, ins, pattern = _lab_state()
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for name, value in (("zero_a", 4.155), ("grad", 0.02), ("theta", 150.0),
+                        ("b1", 0.6)):
+        table.add_parameter(f"{VAR_PREFIX}{name}", value, vary=True)
+    table.add_expression("phases.0.cell.a", "zero_a + grad/(exp(theta/T) - 1)",
+                         variables={n: f"{VAR_PREFIX}{n}"
+                                    for n in ("zero_a", "grad", "theta")},
+                         constants={"T": 300.0})
+    table.add_expression("phases.0.atoms.0.biso",
+                         "if(T > 0, b1*debye(theta/T), log(T))",
+                         variables={n: f"{VAR_PREFIX}{n}" for n in ("b1", "theta")},
+                         constants={"T": 300.0})
+    assert table.set_vary(["instrument.background.c0"], True)
+    table.apply_to_models(structure, ins)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
 def _state_centroid_origin():
     """The origin restraint of a ``"centroid"`` polar phase (WP-1912).
 
@@ -1272,6 +1306,7 @@ CONFIGS = {"families": _state_families,
            "sharp_widths": _state_sharp_widths,
            "families_tied": _state_families_tied,
            "families_variable": _state_families_variable,
+           "expression": _state_expression,
            "centroid_origin": _state_centroid_origin,
            "toy_body": _state_toy_body,
            "toy_planarity": _state_toy_planarity,
@@ -1312,6 +1347,7 @@ CONFIG_PARAMS = [
     _config("sharp_widths"),
     _config("families_tied"),
     _config("families_variable"),
+    _config("expression"),
     _config("centroid_origin"),
     _config("toy_body"),
     _config("toy_planarity"),

@@ -381,9 +381,12 @@ PEAK_WIDTH_CENSUS_N = 12
 #: A component's position is bounded to ±this fraction of its seed FWHM.  The
 #: analogue of Layer 1's ``VALIDITY_RADIUS_FWHM = 0.4``, and the reasoning is
 #: the same one rank down: a fit that wants to move a component further than
-#: half a FWHM is reporting a *detection* failure, not a small offset, and
-#: should come back at its bound with a flag rather than converge somewhere
-#: unrelated.
+#: half a FWHM is not reporting a small offset, and should come back at its
+#: bound with a flag rather than converge somewhere unrelated.  The cause is
+#: not always detection: on the 16 IUCr round-robin patterns, 8 of the 24
+#: usable components on this bound were shoulders on the low-angle tail of a
+#: 4-23x stronger line, and freeing the bound moved seven of the eight further
+#: from any lattice line (WP-2055).
 PEAK_POSITION_BOUND_FWHM = 0.5
 #: Bounds on each fitted **component** FWHM (Γ_G, Γ_L separately), as multiples
 #: of the group's seed combined Γ.  The lower one is a *positivity floor*, not a
@@ -718,8 +721,8 @@ PEAK_ASSUMED_ESD_DEG = 0.02
 #: seed, not a measurement.  ``sigma_assumed`` — σ(2θ) was supplied, not fitted.
 #: ``unresolved_shoulder`` — a component kept in a group where it never
 #: separated from its neighbour by half a FWHM.  ``position_at_bound`` — the fit
-#: pushed to :data:`PEAK_POSITION_BOUND_FWHM`, i.e. detection put the seed in
-#: the wrong place.  ``asymmetry_unmodelled`` — see
+#: pushed to :data:`PEAK_POSITION_BOUND_FWHM`: a misplaced seed, or a component
+#: absorbing profile shape the fit does not carry.  ``asymmetry_unmodelled`` — see
 #: :data:`PEAK_ASYMMETRY_MIN_SIGMA`.  ``background_extrapolated`` — the line
 #: stands where the background envelope was extrapolated rather than measured
 #: (WP-1028 §(i)): its prominence is over a level nobody observed, so it is

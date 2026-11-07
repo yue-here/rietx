@@ -136,6 +136,11 @@ and 2045 on 2026-10-25):
 
 ### Inherited
 
+- **2026-11-06, from WP-2045 (closed in PR #1440): this WP's dependency on 2045 is met.**
+  The `full` job completed green on `main` twice on 2026-11-04: run 41837816600
+  (`ba3719f06`, 1:35:41) and run 41874118202 (`b1741da64`, 2:47:18). WP-2045 counted the
+  2026-11-05 red row as this WP's, as the bullet below does.
+
 - **2026-11-05, from the issue triage (issue #1424, its wavelength row): the row is a stale
   pin on every platform, so the nightly is red on main.** The issue reads it as Mac-only, by
   contrast with the two nightlies of 2026-11-04. Both of those predate the cause. The
