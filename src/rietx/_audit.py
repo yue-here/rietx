@@ -895,11 +895,22 @@ ROWS: tuple[Row, ...] = (
                   "one angle tested alone passes below the one-sided cut 2.706 and so nearly "
                   "always lies inside its 95 % interval (cut 3.84): the test's linearised "
                   "refit can sit up to 1.5 from the full refit the interval walks, more "
-                  "than the 1.13 between the cuts, so 'excludes' stays reachable"),
+                  "than the 1.13 between the cuts, so 'excludes' stays reachable; #1075 "
+                  "(Mike, N = 400): a weak modulus beside the zeroed angles covered 0.82 "
+                  "with its esd and 0.93-0.98 with its profile; a profile withheld on a "
+                  "drop of a full cut, 13-14 of 400 fits, where the esd covered 3 of 20; the "
+                  "collinear reading (the moment along the direction, its esd) covered 0.970 "
+                  "on moments truly along it and 0.47 on a weak one truly tilted 0.08 rad, "
+                  "where the profile covered 0.975 (N = 40-200)"),
         grounds=("The column leaves the covariance by the package's own act, so the finding "
                  "says so, with each angle's distance from the direction and its profile "
-                 "interval (B2 option 2, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                 "interval (B2 option 2, ruled 2026-10-19), and quotes each site's modulus "
+                 "by its profile interval, withheld with a pointer to refit where the "
+                 "profile dropped a full cut below the fit (WP-2060, ruled by Mike on "
+                 "#1075, 2026-11-04 and 2026-11-05). Rare feature: the modulus coverage and "
+                 "the withhold rule rest on one family, the simulated two-site Pnma set, "
+                 "and are untested beyond it."),
+        approved="2026-11-05"),
     Row("MOMENT_PAIR_DEGENERATE", "code"),
     Row("MOMENT_UNSUPPORTED", "code", tier=1, ambiguity=1, response="warning",
         responds=("quote no value ± esd for the named moduli; read each moment as "
@@ -2409,7 +2420,9 @@ ROWS: tuple[Row, ...] = (
         evidence=("the fixed 3 of StageSpec:lebail_cycles before WP-1542, kept for the fits the "
                   "extinction screen compares; its gates and margins are measured at this count, "
                   "and a settled partition failed 10 rows of tests/test_extinction_margin.py and "
-                  "test_extinction_gate.py (WP-1542, 2026-11-05); no stated source for the 3"),
+                  "test_extinction_gate.py (WP-1542, 2026-11-05); no stated source for the 3. "
+                  "Since WP-2076 (2026-11-07) the compared fits are Pawley and this count "
+                  "governs the cell-free Le Bail prefit alone"),
         grounds=("Kept until WP-2062 moves the screen to Pawley, as the row it comes from was "
                  "kept until WP-1542 (B11, ruled 2026-10-19); re-measuring the screen's margins "
                  "for a method it is about to leave buys nothing.  B11 did not exempt the "
@@ -2424,7 +2437,11 @@ ROWS: tuple[Row, ...] = (
                   "(x0.99), NAC (x0.99, x1.02) and PbSO4 (x1.02), but PbSO4 at x0.99 reads 0.45 "
                   "and passes. Fails on an unmodelled second phase carrying half the net power, "
                   "by arithmetic on weak data (S < N), and where the envelope rides into a "
-                  "continuum of lines."),
+                  "continuum of lines. Those readings are of the Le Bail reference; re-measured "
+                  "on WP-2076's Pawley reference (2026-11-07, default path) right cells read "
+                  "0.11-0.16 (NAC, FAP, PbSO4, SRM 676a), SRM 676a x1.02 and FAP x0.99 read 1.00, "
+                  "PbSO4 x1.02 0.80 and PbSO4 x0.99 0.30; Si, NAC's wrong cells and the held "
+                  "arm were not re-run."),
         grounds="Kept on both grounds, ruled 2026-10-21 (PR #939).",
         approved="2026-10-21"),
     Row("rietx.indexing.extinction._MODULI", "constant", value=(2, 3, 4, 6)),
@@ -5246,11 +5263,17 @@ ROWS: tuple[Row, ...] = (
     Row("MODEL_FAR_FROM_DATA.suggestion", "suggestion", value=1),
     Row("MOMENT_ANGLE_STATIONARY.suggestion", "suggestion", tier=3, ambiguity=1, value=1,
         evidence=("LaMnO3 BT-1 (WP-1929): an angle 5.2 deg off 90 whose interval includes the "
-                  "direction, Delta chi2 0.56 against the interval's 3.84"),
+                  "direction, Delta chi2 0.56 against the interval's 3.84; #1075 (two-site "
+                  "Pnma, N = 400): a weak modulus's esd covered 0.82, its profile 0.93-0.98, "
+                  "and a withheld profile's esd 3 of 20"),
         grounds=("Says what the interval means: one that includes the direction cannot tell "
                  "the moment from one along it, one that excludes it measures the tilt "
-                 "(B2 option 2, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                 "(B2 option 2, ruled 2026-10-19). No longer says to quote the moment along "
+                 "the direction: the modulus is the length at the kept tilt, so it is "
+                 "quoted by its own interval, and a withheld one after a refit (WP-2060, "
+                 "ruled by Mike on #1075, 2026-11-04 condition 3). Rare feature: one "
+                 "family, the simulated two-site Pnma set, untested beyond it."),
+        approved="2026-11-05"),
     Row("MOMENT_UNSUPPORTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("physics: an esd is no interval where the column vanishes; the profile "
                   "interval is the likelihood statement, kept at m >= 0 where the sign is "

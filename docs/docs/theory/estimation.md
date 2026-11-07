@@ -517,6 +517,10 @@ distance either side at which $\chi^2$, with every other parameter held, rises
 by $\chi^2_{\mathrm{red}} \cdot S''/S$. On the one-site set both angles'
 intervals include the direction, after 24 refits each.
 
+Each such site's modulus gets one, since its esd assumes the angles sit on
+the direction. Where a refit finds $\chi^2$ a whole cut lower, the fit
+missed its minimum and the interval is withheld.
+
 {source}`rietx.strategy.parameter_interval.attach_stationary_intervals`
 
 ## A scale and a B the range cannot separate

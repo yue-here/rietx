@@ -461,6 +461,38 @@ def _state_expression():
     return model, table, {}
 
 
+def _state_tie_expression():
+    """A formula tie declared on a **single refinement** (WP-2118).
+
+    ``expression`` builds its blocks on a bare table; this row builds them the
+    way a caller does, through ``Refinement.tie(path, expression=...)``, so the
+    table is the one ``_apply_ties`` rebuilds: the linear ties first, then the
+    formula.  One variable is the source of a linear tie *and* an input of the
+    formula, as the maintainer's ruling of 2026-11-07 has a model parameter
+    read (tie it to a variable, name the variable), so its column reaches an
+    affine row and a derived row at once.  The second variable reaches the
+    formula alone, through a Debye function.
+    """
+    from rietx.refine import Refinement
+
+    structure, ins, pattern = _lab_state()
+    ref = Refinement(structure, ins)
+    ref.add_variable("B_La", 0.4, vary=True, min=0.0, max=25.0)
+    ref.add_variable("thD", 900.0, vary=True, min=100.0, max=3000.0)
+    ref.tie("phases.0.atoms.0.biso", "vars.B_La")
+    ref.tie("phases.0.atoms.1.biso",
+            expression="B_La * debye(thD / 300) + 1062.9 * 300 / thD^2")
+    table = ref._working_table()
+    table.set_vary(["*"], False)
+    for path in ("vars.*", "phases.0.cell.a", "instrument.background.c0"):
+        assert table.set_vary([path], True), path
+    table.apply_to_models(structure, ins)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
 def _state_centroid_origin():
     """The origin restraint of a ``"centroid"`` polar phase (WP-1912).
 
@@ -1307,6 +1339,7 @@ CONFIGS = {"families": _state_families,
            "families_tied": _state_families_tied,
            "families_variable": _state_families_variable,
            "expression": _state_expression,
+           "tie_expression": _state_tie_expression,
            "centroid_origin": _state_centroid_origin,
            "toy_body": _state_toy_body,
            "toy_planarity": _state_toy_planarity,
@@ -1348,6 +1381,7 @@ CONFIG_PARAMS = [
     _config("families_tied"),
     _config("families_variable"),
     _config("expression"),
+    _config("tie_expression"),
     _config("centroid_origin"),
     _config("toy_body"),
     _config("toy_planarity"),
