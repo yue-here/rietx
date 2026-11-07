@@ -924,14 +924,6 @@ def _model_is_quiet(two_theta: np.ndarray, y_calc: np.ndarray,
 # ----------------------------------------------------------------------
 # the screen
 # ----------------------------------------------------------------------
-#: The fixed Le Bail cycles of the cell-free prefit (WP-1542), the one Le Bail
-#: fit the screen still runs.  The prefit's cell is measured at this count, so a
-#: partition that settled would move it.  Settling it was measured on eleven
-#: screens (WP-2076, 2026-11-07): it recovers a synthetic cell 3 cycles lose and
-#: moves FAP's, and changes no answer the margin does not own.  The ``_audit``
-#: row has the numbers.
-SCREEN_LEBAIL_CYCLES = 3
-
 #: The decomposition of every fit the screen **compares**: the shared profile
 #: fit, the reference and each class (WP-2076).  A Pawley fit minimises χ² over
 #: the intensities, so a class whose reflections are a subset of the reference's
@@ -941,12 +933,6 @@ SCREEN_LEBAIL_CYCLES = 3
 #: fitted below the reference on 2410 of 14 788 class fits and named a class
 #: excluding the true group on 318 of 1082 rows at a correct cell.
 SCREEN_MODE = "pawley"
-
-
-def _fixed_partition(plan):
-    """The screen's partition: :data:`SCREEN_LEBAIL_CYCLES`, with no stop on the intensities."""
-    return replace(plan, stages=[replace(stage, lebail_cycles=SCREEN_LEBAIL_CYCLES, lebail_tol=0.0)
-                                 for stage in plan.stages])
 
 
 def _screen_plan(instrument: Instrument | None = None):
@@ -1080,9 +1066,11 @@ def _prefit(data: PatternData, candidate: CellCandidate, instrument: Instrument,
                      ins, history=False)
     # the prefit's answer is the cell and widths every class is then compared
     # at, so it pays for no closing stage either (WP-2002, the sixth round's
-    # Q1 and Q2; the screen's own fits and the validation's run without one)
-    plan = _fixed_partition(replace(resolve_plan("profile_only", "lebail"),
-                                    closing_window_tol=None))
+    # Q1 and Q2; the screen's own fits and the validation's run without one).
+    # Its partition settles like every other Le Bail fit's: three fixed cycles
+    # were measured against it on eleven screens and separated nothing
+    # (WP-2076, 2026-11-07)
+    plan = replace(resolve_plan("profile_only", "lebail"), closing_window_tol=None)
     result = ref.fit(data, mode="lebail", plan=plan,
                      two_theta_limits=two_theta_limits, telemetry=False,
                      cancel=cancel if hasattr(cancel, "is_set") else None)

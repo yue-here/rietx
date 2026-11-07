@@ -2397,39 +2397,6 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.engines._INDEX_MIN_DEFECT", "constant", value=1e-06),
     Row("rietx.indexing.engines._INDEX_MIN_ROWS", "constant", value=15000),
     Row("rietx.indexing.extinction.DECISIVE_DELTA_BIC", "constant", value=10.0),
-    Row("rietx.indexing.extinction.SCREEN_LEBAIL_CYCLES", "constant", tier=3, value=3,
-        evidence=("the fixed 3 of StageSpec:lebail_cycles before WP-1542, kept for the fits the "
-                  "extinction screen compares; its gates and margins are measured at this count, "
-                  "and a settled partition failed 10 rows of tests/test_extinction_margin.py and "
-                  "test_extinction_gate.py (WP-1542, 2026-11-05); no stated source for the 3. "
-                  "Since WP-2076 (2026-11-07) the compared fits are Pawley and this count "
-                  "governs the cell-free Le Bail prefit alone, so WP-1542's 10 failed rows "
-                  "no longer bear on it.  Re-measured on that prefit (WP-2076, 2026-11-07): "
-                  "3 fixed cycles against a settled partition (the StageSpec default, 25000 "
-                  "cycles to lebail_tol 1e-7) on eleven screens, SRM 676a corundum, GSAS-II "
-                  "FAP and a synthetic P 1 21/c 1 at starting cells x0.995/x1/x1.005, and "
-                  "GSAS-II PbSO4 at x0.99/x1, all development data.  At x1 the four answers "
-                  "agree and dBIC moves by at most 0.1; corundum and PbSO4 agree everywhere.  "
-                  "The prefit cells split by pattern: settled, the synthetic cell comes back "
-                  "within 760 ppm from x0.995, where 3 cycles lose it (10-15 % off, caught by "
-                  "the reference gate), and within 65 ppm from x1.005 against 1034; FAP's "
-                  "lands +313 ppm from x0.995 against -33, and -1474 ppm from x1.005 against "
-                  "-6.  One answer differs: settled, the synthetic x0.995 screen names "
-                  "P 1 21 1, excluding the true group, at a cell 0.07 % short, which is the "
-                  "Pawley margin's known failure near the right cell (P 1 21 1 at x0.9994, "
-                  "WP-2076's open margin task) and not the partition's.  Time is the same.  "
-                  "The eight tests/test_extinction*.py files: 176 passed in both arms"),
-        grounds=("Kept at 3 because the measurement does not separate the two: settling "
-                 "recovers the synthetic cell and costs FAP's, and changes no answer the "
-                 "open margin task does not own.  Moving it would move FAP's cell and every "
-                 "pinned screen row for no measured gain.  The count has no published source "
-                 "and was not tuned to these rows; it is the pre-WP-1542 default, at the low "
-                 "end of the programs' extraction counts in docs/practice.md (GSAS-II "
-                 "DoLeBail 10, MAUD up to 5), all of which also stop on chi2.  Revisit "
-                 "after the margin task, on rows where that margin holds.  Rewritten by "
-                 "Claude on 2026-11-07 (WP-2076); `approved` still dates the 2026-11-05 "
-                 "settlement until the maintainer approves this text."),
-        approved="2026-11-05"),
     Row("rietx.indexing.extinction.REFERENCE_NET_RWP_MAX", "constant", tier=3, value=0.7071,
         evidence=("Statistic: Toby (2006)'s background-subtracted Rwp over the picker's "
                   "envelope (the envelope is rietx's own). Right or nearly right cells read "

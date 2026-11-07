@@ -1,6 +1,6 @@
 # WP-2076 — The extinction screen names a wrong class at a correct cell
 
-Milestone: unscheduled · Status: 🔄 2026-11-07 — the ruled repair merged (PR #1460); a raised fit now abstains, and the prefit's 3 Le Bail cycles were re-measured and kept; measuring the margin tightening is next (PR #1461 open)
+Milestone: unscheduled · Status: 🔄 2026-11-07 — the ruled repair merged (PR #1460); a raised fit now abstains, and the prefit's partition settles like every Le Bail fit's; measuring the margin tightening is next (PR #1461 open)
 Track: What fires, and what stays silent
 Depends on: — (1910 soft: its second screen agrees with the wrong class here; 2062 soft: its decision 2 moves the screen's fits to Pawley)
 Priority: P2 2026-11-07 — a silent wrong answer on a path few fits run: at a prefit cell within 600 ppm the default screen names a class excluding the true group on 318 of 1082 synthetic rows (41 groups), and nothing fires. Yue ruled the repair on 2026-11-07, so it is ready to build
@@ -342,9 +342,10 @@ measurements are in the entry of 2026-11-05.
 - [x] A class fit or scoring fit that raises leaves its class unscored, not
       refuted, so the screen abstains and names the error. Consented 2026-11-07
       (shift bundle item 3). `tests/test_extinction_symbol.py`.
-- [x] Re-measure `SCREEN_LEBAIL_CYCLES` on the prefit alone and rewrite its lapsed
-      `_audit` grounds (shift bundle item 4). Kept at 3; the new grounds await
-      the maintainer's approval.
+- [x] Re-measure `SCREEN_LEBAIL_CYCLES` on the prefit alone (shift bundle item 4).
+      The measurement separated nothing, and the constant was removed: the prefit's
+      partition now settles like every other Le Bail fit's. Settled by Claude under
+      Yue's delegation of 2026-11-07 ("whatever best fits our design ethos").
 - [ ] Measure option (c)'s allowance (2·ln N plus an allowance derived from the
       count of silent positions) and real patterns from the eleven groups that
       abstain on every row at margin 18, then bring the allowance's `_audit` row
@@ -378,7 +379,7 @@ position named, and PbSO₄ names `P c - a`: the known wrong answer the ruling o
 
 ## Handover log
 
-### 2026-11-07 (fourth session) — a raised fit abstains; the prefit's 3 cycles re-measured
+### 2026-11-07 (fourth session) — a raised fit abstains; the prefit's partition settles
 
 The screen no longer treats a solver failure as evidence against a class. If a class's fit, or
 the refit that scores it, raises, the class stays unrefuted and unscored, and the screen
@@ -387,8 +388,9 @@ could hand a rival a confident answer. One exception keeps evidence: when only t
 refit raises, the class's own fit still stands, and its forbidden intensity can still refute
 it. Separately, the prefit's 3 Le Bail cycles were measured against a settled partition. The
 measurement does not separate them. Settling recovers a synthetic cell that 3 cycles lose, and
-it moves FAP's cell by up to 1474 ppm. So the count stays at 3, and its rewritten grounds go to
-Yue for approval.
+it moves FAP's cell by up to 1474 ppm. Shown that, Yue delegated the call to the design ethos.
+The prefit now settles its partition like every other Le Bail fit in rietx, and the constant is
+gone. No test that reaches the screen moved.
 
 **Done.**
 - Shift bundle item 3 (consented 2026-11-07): `determine_extinction_symbol` records a raised
@@ -400,10 +402,14 @@ Yue for approval.
   `screened`, `n_testable`, `chi2` and `refuted`, and the manual's extinction page, now say
   this. Test: `test_a_class_fit_that_raises_leaves_the_class_unscored[class|scoring]`
   injects a `LinAlgError`. It fails on `main` and passes here.
-- Shift bundle item 4: `SCREEN_LEBAIL_CYCLES` evidence and grounds were rewritten in
-  `_audit.py`, and its comment in `extinction.py` was updated. `approved` still reads
-  2026-11-05, and the grounds say the text awaits approval. WP-2062's `### Inherited` note no
-  longer says that WP retires the constant.
+- Shift bundle item 4: `SCREEN_LEBAIL_CYCLES` and `_fixed_partition` are removed, with the
+  constant's `_audit` row. The prefit runs `profile_only` at the `StageSpec` defaults (25 000
+  cycles to `lebail_tol` 1e-7). Yue answered the brief with "whatever best fits our design
+  ethos" (2026-11-07). Settled by Claude on four grounds. rietx's convention since WP-1542 is
+  a settled partition, and one rule beats a rule with an exception. Practice stops Le Bail on
+  convergence (`docs/practice.md`). And the measurement below separated nothing. An earlier
+  commit on this branch had rewritten the row's grounds to keep 3; that lean is superseded.
+  WP-2062's `### Inherited` note says the constant is gone.
 
 **Measured** (`[dev]` venv, macOS arm64, alone on the machine). Prefit at 3 fixed cycles
 against settled (25 000 cycles to `lebail_tol` 1e-7), eleven screens:
@@ -476,14 +482,18 @@ Evidence that would change the verdict: a prefit row where settling changes the 
 
 Evidence that would change the verdict: a case where a raised scoring refit sits on a class the absence test refutes. Running the absence test before the `continue`, plus a per-class error field, would remove both weak rows.
 
-Author's answers. Row 1's "grounds need two corrections": both landed in the evidence and the
-grounds (the wrong class is the margin's, 3 cycles lose the synthetic cell, FAP ×0.995 named).
+Author's answers. Row 1's "grounds need two corrections": both landed, and then the row was
+deleted when the constant went (see *Done*). The judge's review of the deletion follows.
 Item 2's weak rows 4 and 7: the absence test now runs before the abstention; a per-class error
 field is declined above.
 
-**Next.** Yue approves or rejects the rewritten `SCREEN_LEBAIL_CYCLES` grounds. On approval,
-set `approved` to that date and drop the grounds' last sentence. Then the margin task: measure
-option (c)'s allowance, and include the synthetic ×0.995 settled row as a case it should fix.
+After the removal, `tests/test_extinction*.py`, `test_gui_peaks.py`, `test_tof_axis.py`,
+`test_audit_table.py` and `test_docs_consistency.py` gave 351 passed, 2 skipped, 1 xfailed,
+slow rows included (`[dev]`, macOS arm64).
+
+**Next.** The margin task: measure option (c)'s allowance. Include the synthetic P 2₁/c at a
+start ×0.995 as a case it should fix: with the settled prefit the screen now names `P 1 21 1`
+there, at a cell 0.07 % short, where 3 cycles lost the cell and abstained.
 
 ### 2026-11-07 (third session) — the repair landed, PR #1460
 
