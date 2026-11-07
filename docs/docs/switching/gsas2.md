@@ -95,6 +95,7 @@ The formula's text follows [Expressions](../reference/expressions.md), which is 
 | one label in two equations | one variable named in both formulas |
 | `exp`, `log`, `sqrt` | `exp`, `log`, `sqrt` |
 | `sind`, `cosd`, `tand` in degrees | `sin(pi*x/180)`: rietx's trigonometry is in radians |
+| `sin`, `cos`, `tan`, which GSAS-II's expressions also read in degrees | `sin(pi*x/180)` as well: copied unchanged, the formula gives a different value with no error |
 
 ### A project is a directory
 

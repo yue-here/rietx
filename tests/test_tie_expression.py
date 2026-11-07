@@ -329,3 +329,13 @@ def test_a_series_redeclares_the_formula_at_each_pattern_s_temperature():
         assert abs(thd.value - TRUE_THD) < 2.0 * thd.stderr, (t, thd.value, thd.stderr)
         assert values[B_BISO].value == pytest.approx(debye_b(thd.value, t), rel=1e-12)
         _plot(runner.results_[k], f"series_{int(t)}K")
+
+
+def test_the_topas_writer_refuses_a_formula_rather_than_writing_zero(ref):
+    """A formula tie has no terms, so read as a linear one it is the constant 0."""
+    from rietx.io.projects.topas import from_structure
+
+    ref.add_variable("thD", 900.0, min=100.0, max=3000.0)
+    ref.tie(B_BISO, expression=debye_text(300.0))
+    with pytest.raises(ValueError, match=f"{B_BISO} follows the formula"):
+        from_structure(ref.structure, free=ref)
