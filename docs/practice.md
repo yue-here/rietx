@@ -623,6 +623,38 @@ Neither program estimates a volume from the formula, so the volume range is alwa
 `from_formula`'s ceiling therefore rests on no program default; its audit row is tier 2 on
 Hofmann's citation and the 21 published cells it was checked against.
 
+## The doublet ratio and asymmetry a peak picker holds
+
+Surveyed 2026-11-06 for WP-2055, on whether `pick_peaks` should refine the Kα2/Kα1 ratio or
+the axial apertures per pattern before fitting lines.
+
+- GSAS-II 5.8.4, checked in source. The peak fit (`DoPeakFit`, `GSASIIpwd.py:2651`) takes the
+  ratio `I(L2)/I(L1)` from the instrument parameters, at 0.5 in the default lab Cu Kα file
+  (`defaultIparms.py:35`), with the axial term `SH/L` at 0.002 (`defaultIparms.py:36`).
+  Both are on the list a peak fit may vary (`GSASIIpwd.py:2789-2790`), but only when their
+  refine flag is set, and a file read from a GSAS instrument file arrives with every flag
+  off (`GSASIIfiles.py:258-259`).
+- FullProf's WinPLOTR, checked in its manual (`WINPLOTR.pdf`). The radiation block takes λ1,
+  λ2 and the ratio Iλ2/Iλ1, defaulting to Cu Kα at 0.5. A profile fit started from the
+  automatic peak search fits **single** peaks (`JOBT = 2`) with the asymmetry at 0 and the
+  positions held, refining intensities and background. A fit read from a `.PIK` file can fit
+  Kα1/Kα2 pairs (`JOBT = 1`), and there the ratio is global profile parameter 1, with a refine
+  flag the user sets.
+- DICVOL06, checked in its manual (`dicvol06.pdf`). It reads positions only, with one
+  wavelength (Cu Kα1 by default) and an absolute 2θ error `EPS`, 0.02-0.03° recommended. The
+  doublet is the picker's problem upstream.
+- TOPAS, not read this session. An emission profile's line areas are fixed numbers unless
+  given a name, by the Technical Reference's rule that only named parameters refine (§2.1,
+  recorded under Sources below).
+
+So no program surveyed refines the doublet ratio of a peak fit by default. GSAS-II and
+WinPLOTR both offer it as a flag the user sets. Of the three programs read, GSAS-II alone
+applies a nonzero axial term by default. rietx refines the ratio only in a Rietveld plan that
+names it: the `lines_axial` stage of the `lab_bragg_brentano` and `lab_calibrate` presets, and
+of the round-robin QPA test's own plan. WP-2055 measured why the picker should not: on the 16 IUCr round-robin
+patterns the fitted ratio runs from 0 to 0.462 on one tube and one diffractometer, so it is
+absorbing profile shape, not measuring the tube.
+
 ## Machinery and the heuristics that drive it
 
 Surveyed 2026-10-30 by the lead for issue #1224, which proposes landing machinery (what an
