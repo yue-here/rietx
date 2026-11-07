@@ -98,9 +98,10 @@ declare formulas on parameters; practice.md). No new judgement is added.
       session (memory rule: every survey goes to practice.md).
 - [x] **Brief the maintainer** on design questions 1-3 above, with task 1's practice and
       measurements where a question turns on cost. Record each ruling here.
-- [ ] **The single-refinement command.** Declares a formula for one parameter, auto-commits
+- [x] **The single-refinement command.** Declares a formula for one parameter, auto-commits
       a node, is restored by checkout and replay, and is refused on a symmetry-fixed or
-      symmetry-tied path by name.
+      symmetry-tied path by name. `Refinement.tie(path, expression=...)`, stored as
+      `TieSpec.expression`; `tests/test_tie_expression.py`.
 - [ ] **Today's ties as formulas.** `tie`, `tie_equal` and `add_variable` keep working as
       shorthand. Old projects open, and every golden that uses a tie is bit-identical, or
       the WP says which moved and why.
