@@ -1185,8 +1185,11 @@ def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
                for c in rivals[1:3]]
             + [f"excluded by the prior: {c.symbol} (ΔBIC {c.delta_bic:+.1f})"
                for c in contradicting[:2]],
-            suggestion=("Count longer at the forbidden positions where the "
-                        "leading classes disagree, or extend the 2θ range.")))
+            suggestion=(("Count longer at the forbidden positions where the "
+                         "leading classes disagree, or extend the 2θ range.")
+                        if not failed or len(reasons) > 1 else
+                        ("Run the screen again. If the same fit raises, check "
+                         "the cell and 2θ range it ran at."))))
     return out
 
 

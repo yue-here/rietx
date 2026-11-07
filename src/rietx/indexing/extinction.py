@@ -927,8 +927,9 @@ def _model_is_quiet(two_theta: np.ndarray, y_calc: np.ndarray,
 #: The fixed Le Bail cycles of the cell-free prefit (WP-1542), the one Le Bail
 #: fit the screen still runs.  The prefit's cell is measured at this count, so a
 #: partition that settled would move it.  Settling it was measured on eleven
-#: screens (WP-2076, 2026-11-07): one confident wrong class at a cell 0.5 % short,
-#: and no answer the 3-cycle prefit missed.  The ``_audit`` row has the numbers.
+#: screens (WP-2076, 2026-11-07): it recovers a synthetic cell 3 cycles lose and
+#: moves FAP's, and changes no answer the margin does not own.  The ``_audit``
+#: row has the numbers.
 SCREEN_LEBAIL_CYCLES = 3
 
 #: The decomposition of every fit the screen **compares**: the shared profile
@@ -1486,20 +1487,17 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                 except Exception as exc:          # noqa: BLE001
                     scoring_fits[lines] = exc
             scored = scoring_fits[lines]
-            if isinstance(scored, Exception):
-                entry.screened = False
-                fit_errors[entry.symbol] = (
-                    f"the {SCREEN_MODE} fit of {symbol} without the "
-                    f"{entry.n_testable} testable forbidden line(s) of "
-                    f"{entry.symbol} raised {type(scored).__name__}: "
-                    f"{str(scored).rstrip('.')}")
-                continue
-        entry.chi2 = _chi2_absolute(scored.statistics)
-        entry.delta_bic = delta_bic(entry.chi2, screen.reference_chi2,
-                                    screen.n_points, entry.n_testable)
-        entry.absences_rejected = hamilton_justified(
-            entry.chi2, screen.reference_chi2, screen.n_points,
-            int(scored.statistics.n_free_parameters), entry.n_testable)
+        # a raised scoring refit leaves no score, but this class's own fit
+        # stands, so the absence test below still reads it: a refutation on
+        # evidence holds, and only a class it leaves standing is unscored
+        raised = scored if isinstance(scored, Exception) else None
+        if raised is None:
+            entry.chi2 = _chi2_absolute(scored.statistics)
+            entry.delta_bic = delta_bic(entry.chi2, screen.reference_chi2,
+                                        screen.n_points, entry.n_testable)
+            entry.absences_rejected = hamilton_justified(
+                entry.chi2, screen.reference_chi2, screen.n_points,
+                int(scored.statistics.n_free_parameters), entry.n_testable)
 
         if not entry.n_testable:
             continue
@@ -1525,6 +1523,13 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                 f"position(s) carry intensity this class cannot account for, "
                 f"first {entry.forbidden_hkl[0]} at "
                 f"{entry.forbidden_two_theta[0]:.3f}°")
+        elif raised is not None:
+            entry.screened = False
+            fit_errors[entry.symbol] = (
+                f"the {SCREEN_MODE} fit of {symbol} without the "
+                f"{entry.n_testable} testable forbidden line(s) of "
+                f"{entry.symbol} raised {type(raised).__name__}: "
+                f"{str(raised).rstrip('.')}")
 
     screen.n_screened = sum(1 for e in entries if e.screened)
     if cancel is not None and bool(cancel) and screen.status != "unreliable":

@@ -434,6 +434,12 @@ def test_a_class_fit_that_raises_leaves_the_class_unscored(which, monkeypatch):
     assert ambiguous and "LinAlgError: injected" in ambiguous[0].message, (
         [str(d) for d in screen.diagnostics])
     assert "never fitted" not in ambiguous[0].message
+    if which == "scoring":
+        # the class's own fit stood, so a refutation on its evidence holds
+        refuted = [c for c in screen.candidates if c.refuted]
+        assert refuted and all("testable forbidden" in c.refuted_reason
+                               for c in refuted)
+        assert "Run the screen again" in ambiguous[0].suggestion
 
 
 def test_a_screen_that_cannot_run_reports_rather_than_raises():
