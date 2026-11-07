@@ -855,6 +855,117 @@ What they agree on.
 Not reached: `Topas.inc`, the Jana2020
 and MAUD manuals, the HS3 expression appendix, and MathOptInterface's nonlinear pages.
 
+### The same language across a program
+
+Surveyed 2026-11-06 for WP-2118, by the lead and two agents. The table above asks how one
+parametric equation is written. This one asks what a formula language does across a whole
+program. The lead read the TOPAS Technical Reference (version 9), the GSAS-II 5.8.4 source, the
+FullProf 8.20 manual and Stinton & Evans (2007). The agents read the other programs' pages through a
+summarising tool, so wording in those rows is unverified. Lepton's `Parser.cpp`, JuMP's changelog
+and muParser's `muParserDef.h` were read as files. "Checked" means read this session, "search" means
+a search-result excerpt only, and "recall" means not read. No closed or GPL code was read.
+
+The columns are the seven questions of WP-2118's first task.
+
+- **Grammar.** Does one language serve constraints (a parameter set by a formula), restraints
+  (a penalty on a formula) and model equations?
+- **Names.** How does a formula name a model quantity?
+- **Declared.** Is the formula stored on the parameter, in a separate list, or made by a command?
+- **Linear.** Is a linear constraint kept on a separate, faster route?
+- **Version.** Is the grammar or its stored text versioned, and how is old text upgraded?
+- **Error.** Does an error point at a place in the user's text?
+- **Units.** Are physical units checked?
+
+| Program | Grammar | Names | Declared | Linear | Version | Error | Units | Status |
+|---|---|---|---|---|---|---|---|---|
+| TOPAS | one: an equation can stand for any parameter's value (§2.4, "linear and non-linear constraints"), for its `min` and `max` (§2.3), and for a `penalty` (§5.6) | a parameter is named where it is declared, `beq b1 0.5` (§2.1). Names are identifiers with no dots, and `local` scopes one to its `str` or `xdd` (§2.2) | on the parameter: the equation replaces the value, `occ Ti+4 = 1-zr;` (§2.4) | none. Linear and nonlinear equations take one route through computer algebra (§2.4; Coelho 2018) | none stated. Macro meanings changed between program versions, for example `Ramp` after Version 4 (§4.1.6) | not stated in the Reference; the earlier rows record `topas.log` | none | checked |
+| GSAS-II 5.8.4 | two: linear constraints in their own records (`GSASIImapvars`: equivalence, `Constr`, `New Var`, hold), and Python expressions (`ExpressionObj`) for general restraints, pseudo-variables and fits to the sequential table (`GSASIIobj.py:1697-1703`) | bare labels, each bound to a GSAS-II variable name by a table (`assgnVars`), since those names hold colons (`0::A0`) | separate lists: the Constraints and Restraints trees, and the sequential table's equation list | yes. Linear constraints are solved apart by `GSASIImapvars`, and expressions never constrain | none on the expression; the project is a pickle | Python's `SyntaxError` lines, which carry a caret (`GSASIIobj.py:1886-1893`) | none | checked |
+| FullProf 8.20 | linear codewords only, C = sign(a)(10p + a) (manual, § Rietveld refinement) | a parameter number p | in the `.pcr` file, beside each parameter | the codeword is the only route | n/a | n/a | none | checked |
+| OpenMM's Lepton | one syntax across the custom forces, restraints included. Holonomic constraints are a separate mechanism | bare names, declared by `addGlobalParameter` or `addPerParticleParameter` | a command: the formula is a constructor argument | none | no grammar version. The XML serializer versions each force and refuses a mismatch, with no migration | a message that echoes the whole formula, with no position (`Parser.cpp`) | none; the host API's units are implied | checked |
+| Stan | one language for model statements, transformed parameters and generated quantities. Bounds are a transform on the declaration | bare names of declared variables. `pi()` is a function | in typed blocks of the program | none | no version flag. Each deprecation names its replacement and its removal version; the compiler warns, then errors; `stanc --print-canonical` rewrites old code | file, line and column range | none (recall) | checked |
+| JuMP / MathOptInterface | one Julia expression tree for objectives and constraints since JuMP 1.15. Before that `@NLconstraint` was a second language | host objects (`VariableRef`) | a command (`@constraint`, `@expression`) | yes, by design: affine and quadratic forms are built as their own types, and only the rest is nonlinear (`ScalarAffineFunction`, `ScalarNonlinearFunction`) | MathOptFormat files carry a major and minor version and a JSON schema. The legacy `@NL` macros were kept unchanged | Julia's own errors; a MathOptFormat file error names the JSON path | none (recall) | checked |
+| CasADi | one symbolic graph for constraints, objectives and model equations | host objects; the string is only a display name | a command (`opti.subject_to`) | opt-in (`Opti('conic')`, `detect_simple_bounds`) | `Function.save` since 3.5.5, with no cross-version promise found | Python and C++ tracebacks | none (recall) | checked, serialization search |
+| lmfit | constraints only. Restraints are terms the user adds to the residual | bare parameter names, Python identifiers, so no dots | on the parameter, `Parameter(expr=...)` | none: `expr='b'` is a formula like any other (recall) | none | a message kept in `interp.error`, with no position | none | checked |
+| Mantid | ties are muParser expressions. Bounds are a separate mini-language (`4.0 < c < 4.2`) applied as a penalty | bare names in one function; `f1.Sigma` in a composite, so a dot prefix names the member function | a fit property (`Ties`) or inside the function string | none: `f1.Sigma=f0.Sigma` is an expression | not found | muParser carries a position (`GetPos`); Mantid surfacing it was not found | not found | checked; muParser use search |
+| RooFit | one TFormula grammar for a derived value and a pdf. A constraint penalty is a separate pdf (recall) | by name, or by position `@0` in a list passed with the formula | a command: `RooFormulaVar(name, formula, args)` | linear forms have their own classes, such as `RooPolyVar` (recall) | none found | a message naming the unknown name, with no position | none (recall) | checked |
+| CEL | one language; hosts embed it for every use | dotted names are part of the language, resolved by a written lookup order | the host binds the names | n/a | no grammar version; one change is dated to spec v0.7.0 | line and column in cel-go (recall) | none | checked |
+| PEtab v1 → v2 | v1 left the formula language unwritten, and tools disagreed on precedence. v2 writes one grammar for observable, noise and condition formulas | identifiers without dots; a model name with a dot is aliased through a mapping table | separate tables and a YAML file | no ties at all | a required `format_version`, and a converter from v1 to v2 (`petab1to2`) | not found | none | checked; converter search |
+| SBML, CellML, Modelica | | | | | | | SBML: optional, inconsistency warns (recall). CellML 2.0: mandatory (recall). Modelica: a `unit` attribute, checking left to the tool (checked) | as marked |
+
+#### Angles
+
+| Program | Trigonometry | A degree route |
+|---|---|---|
+| TOPAS | radians; the reserved `Th` is in radians (§2.19) | `Deg` as a multiplier in the Reference's examples, `Sin(X Deg / 2)` and `r Sin(60 Deg)`. Its definition was not on the pages read |
+| GSAS-II | **degrees** in expressions: `sin`, `cos` and `tan` are defined there as degree functions, beside `sind`, `cosd`, `tand` (`GSASIIobj.py:1640-1642`) | the default |
+| Stan, Lepton, Modelica, JuMP | radians | none. Julia's `sind` exists outside JuMP (recall) |
+| lmfit (asteval) | radians | `radians()` and `degrees()` converters |
+| CasADi, muParser, PEtab v2, RooFit | not stated | none found |
+
+So two diffraction programs take opposite conventions, and GSAS-II's `sin(x)` means sin(x°). A
+formula ported from a GSAS-II expression with a cell angle in it gives a different number in TOPAS
+or in rietx, with no error. Only GSAS-II offers degree functions, and only there are they the
+default.
+
+#### A minus sign before a power
+
+TOPAS Table 3-1 states that `x^y^z` is (x^y)^z, and says nothing of a minus sign before a power. The
+§20.9.3 example writes the Fourier transform of a Voigt as
+`Exp(-(Pi FT_K gfwhm)^2 / (4 Ln(2)) - Pi FT_K lfwhm)`. That transform decays with k only if
+`-(u)^2` is read as −(u²), so TOPAS reads the minus after the power, as rietx does. This is an
+inference from a documented example. TOPAS was not run, and how it lexes a literal `-2` is not
+stated.
+
+Everything else that defines the case reads `-2^2` as −4: Stan (precedence table), Lepton
+(`Parser.cpp`), Modelica and PEtab v2 (their precedence tables), muParser (a source comment, not
+run), and Python's `-2**2`. CEL has no power operator. In GSAS-II's Python syntax `^` is a bitwise
+XOR, which the earlier rows record.
+
+#### The value of a formula and its esd after a fit
+
+WP-1964 left a gap: no call gives the esd of a curve with a per-pattern ΔT set to zero.
+
+- TOPAS reports any equation's value by writing `: 0` after it (§2.9). With `do_errors` set, it
+  reports the equation's error too, propagated through the whole covariance and scaled by the GoF
+  (§2.17). A user who wants the curve at 300 K writes it as a dependent `prm` with ΔT left out.
+- GSAS-II's fit to the sequential table gives each coefficient's esd from the covariance's diagonal
+  (`DoParEqFit`, `GSASIIseqGUI.py:924-990`). It gives no esd of the fitted curve. A
+  pseudo-variable has an esd at each pattern, from numerical derivatives with a step of a tenth
+  of each esd (`EvalPSvarDeriv`, `:837-846`).
+- Stinton & Evans (2007) § 4.2 plot cell parameters against the refined temperature (Fig. 6), and
+  ΔT per data set beside its polynomial (Fig. 7). The passages read report no esd of a curve.
+
+So TOPAS's route is a formula the user writes after the fit, whose value and esd the program
+reports. It is general and needs no argument naming a per-pattern variable.
+
+#### What the rows add up to
+
+- **One grammar.** Every program that defines a formula language uses it for more than one job.
+  Where it stops short, a separate linear mechanism (GSAS-II, FullProf) or bound syntax (Stan,
+  Mantid) sits beside it. TOPAS alone runs constraints, bounds and penalties through one
+  grammar. PEtab's move from v1 to v2 is the cost of not writing the grammar down: tools had
+  disagreed on precedence.
+- **Names.** A text grammar names bare identifiers, and a separate binding maps them to the
+  model: GSAS-II's `assgnVars`, Lepton's `addGlobalParameter`, RooFit's argument list. Dotted
+  names appear in Mantid as a member prefix and in CEL with a written lookup order. PEtab v2
+  refuses them and aliases a dotted name through a table. TOPAS avoids the question by naming a
+  parameter where it is declared.
+- **Declared.** Text formats store the formula on the parameter (TOPAS, lmfit). Programs with an
+  API make it with a command (Lepton, JuMP, RooFit, CasADi). GSAS-II and PEtab keep lists.
+- **Linear.** The diffraction programs that separate linear constraints (GSAS-II, FullProf)
+  have no nonlinear constraint. JuMP keeps affine forms as their own type because solvers
+  exploit them. TOPAS, lmfit and Mantid run a linear tie as an ordinary formula.
+- **Versions.** Stan's practice is the most complete. Each deprecation names its replacement and
+  removal version, the compiler warns and then errors, and a canonicaliser rewrites old text.
+  PEtab and MathOptFormat put a version on the file. No program surveyed stores a grammar version
+  beside each formula.
+- **Errors.** Stan gives line and column, Python and muParser a position, and the rest a message.
+- **Units.** Only the model-exchange formats (CellML mandatory, SBML and Modelica optional) check
+  them. No fitting program surveyed does.
+
+Not reached: the SBML and CellML specification pages, Mantid's error output, and TOPAS's lexing of
+a signed literal.
+
 ## An equation over a reflection
 
 Surveyed 2026-11-04 for WP-2107. This is about a value that differs between reflections, set by
