@@ -172,7 +172,7 @@ The screen's diagnostics say what the answer is and why it may not be one.
 
 `ExtinctionScreen.best_or_none` returns the leading class only when all of these hold:
 
-- no class that is not refuted was left unscored, since a `max_classes` cap, a cancelled run or a class fit that raised leaves a question unasked, which must not read as a clean answer;
+- no class that is not refuted was left without a score, since a `max_classes` cap, a cancelled run or a class fit that raised leaves a question unasked, which must not read as a clean answer;
 - the class was fitted and is not refuted;
 - it rests on at least one absence the data could test, or is the absence-free class itself, whose claim is that there is nothing to see;
 - it leads the next surviving class by at least the decisive ΔBIC margin, 10 (`rietx.indexing.extinction.DECISIVE_DELTA_BIC`).
@@ -247,7 +247,7 @@ A class whose extra absences all hide under allowed neighbours would otherwise w
 Refutation is one-sided by construction.
 A class asserts absences, so intensity where it forbids one contradicts it; a class claiming too few absences asserts nothing the data can falsify, and is outranked rather than refuted.
 A fit that raised refutes nothing, since a solver failure is no evidence about the absences.
-It leaves its class unscored (`screened` is `False`), and `EXTINCTION_SYMBOL_AMBIGUOUS` names the error.
+It leaves its class without a score (`screened` is `False`), and `EXTINCTION_SYMBOL_AMBIGUOUS` names the error.
 A testable position carrying intensity refutes a class whatever its ΔBIC.
 A single refuting position can still be an impurity line rather than a violated absence, so check it against the candidate's unmatched observed lines (`LeBailValidation.unmatched_observed_two_theta`) before dropping the class.
 
