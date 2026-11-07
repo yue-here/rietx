@@ -163,7 +163,7 @@ is owed yet. The form goes in `solve/cost.py`'s docstring.
 
 ## Handover log
 
-- **2026-11-07** (rulings, PR #PRNUM) — closed. Decided 2026-11-07 (Yue): close it. The
+- **2026-11-07** (rulings, PR #1455) — closed. Decided 2026-11-07 (Yue): close it. The
   solve cost can now say what χ² would be at a stated March-Dollase r and axis, and how
   fast it changes with r. No search in the package moves r yet. That waits on S9 (#677).
   *Checked before closing:* all six tasks are ticked, and PR #1420 merged on 2026-11-05.

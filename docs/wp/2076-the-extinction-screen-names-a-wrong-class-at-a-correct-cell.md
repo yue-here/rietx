@@ -362,7 +362,7 @@ corundum, FAP, NAC and PbSO₄ rows keep their classes.
 
 ## Handover log
 
-- **2026-11-07** (rulings, PR #PRNUM) — Yue answered both questions. The repair lands in this WP,
+- **2026-11-07** (rulings, PR #1455) — Yue answered both questions. The repair lands in this WP,
   at today's margin, once a timing on the largest suite pattern says it is affordable. A user of the
   screen then gets a wrong class on 10 of the 1082 synthetic rows instead of 318. FAP and Si stop
   naming a class, and PbSO₄ stays confidently wrong for now. A tighter bar comes only after it is

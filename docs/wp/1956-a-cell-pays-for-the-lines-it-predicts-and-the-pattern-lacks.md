@@ -261,7 +261,7 @@ absences; Si, corundum and magnetite keep their correct cells.
 
 ## Handover log
 
-- **2026-11-07** (rulings, PR #PRNUM) — task 5 ruled, and every task is now ticked. Decided
+- **2026-11-07** (rulings, PR #1455) — task 5 ruled, and every task is now ticked. Decided
   2026-11-07 (Yue): `fom_panel_disagrees` stays as it is (issue #916). The flag keeps capping the
   truth's grade on 15 of the 19 #916 arms. In exchange, it holds down the wrong cells that rise above
   `low` on 7 of the 19 arms without it.

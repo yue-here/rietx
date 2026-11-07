@@ -207,7 +207,7 @@ unwindowed one does, and `CuSO4.5H2O` never reads as 4.5 O.
 
 ## Handover log
 
-- **2026-11-07** (rulings, PR #PRNUM) — closed. Decided 2026-11-07 (Yue): close it. A
+- **2026-11-07** (rulings, PR #1455) — closed. Decided 2026-11-07 (Yue): close it. A
   formula's volume window now holds the true cell of an inorganic solid as well as an organic
   one, because it is a ceiling only. A hydrate written with a full stop that reads two ways is
   refused instead of read 39 % low. The GUI's indexing form stores the formula and temperature

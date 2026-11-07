@@ -73,7 +73,7 @@ Repro 2's seeds 3, 4 and 8 give intervals of non-zero width that contain m = 0; 
 
 ## Handover log
 
-- **2026-11-07** (rulings, PR #PRNUM) — task 1's modulus half is ruled, by Mike rather than Yue. On
+- **2026-11-07** (rulings, PR #1455) — task 1's modulus half is ruled, by Mike rather than Yue. On
   2026-11-04 Mike accepted the design decisions on the magnetic path (issue #1075, 05:08Z): "the
   physics, defaults, diagnostics, names, reader output and magCIF reading". Anything that reaches a
   non-magnetic fit stays with Yue, as do releases, stored formats and deletions. His rulings are headed
