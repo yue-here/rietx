@@ -215,6 +215,7 @@ The coexistence case, a second phase beside the parent, transfers weakly and is 
 
 A rigid body can converge to a good pose with the wrong shape, and nothing in the report names the body.
 `Refinement.check_rigid_bodies(data)` refits each body twice from the fitted state: as the body, and as free atoms held near the template by soft restraints on every template bond and bonded angle.
+In the released refit a riding hydrogen keeps riding: its coordinates are tied to its parent's, so only the other atoms add parameters, 3 per atom less the body's own.
 Both refits run under the refinement's own 2θ limits, ties, holds, backend and solver.
 It compares them on the data χ² with Hamilton's R-factor ratio test {cite}`hamilton1965` and with ΔBIC {cite}`schwarz1978`, both at the effective observation count.
 It warns ([`RIGID_BODY_MISFIT`](diagnostics-refinement.md#rigid_body_misfit)) only when both prefer the released atoms.
@@ -248,3 +249,41 @@ Each message names the three template bonds or angles the released refit moved f
 
 A template bond wrong by more than the bonding criterion's slack is not found as a bond, so the check cannot see it.
 A tie or hold on the released body, or on a later body of its phase whose index the release shifts, is dropped from the released refit and listed in `dropped`.
+
+### The released arm by hand
+
+`Refinement.released_arm(body)` builds the released refit the check runs, so you can fit it yourself or free other atoms.
+It works on the refinement's current structure, so call it after `fit`, as the check does.
+It returns a `rietx.report.body_misfit.ReleasedArm`:
+
+| Field | Is |
+|---|---|
+| `ReleasedArm.structure` | the structure with the body removed and the restraints added |
+| `ReleasedArm.phase_index`, `ReleasedArm.body` | which phase, and the body's name |
+| `ReleasedArm.freed` | the member atoms whose coordinates the refit frees |
+| `ReleasedArm.riders` | each riding hydrogen that rides, and the parent it follows |
+| `ReleasedArm.restraints` | the bond and angle restraints added, at the geometry the body placed |
+| `ReleasedArm.free` | the coordinate globs of the freed atoms, for a stage |
+| `ReleasedArm.ties` | each rider coordinate and its source, for `Refinement.tie` |
+
+<!-- api-doc: no-exec — it needs a refinement of a rigid-body phase that has run -->
+```python
+arm = ref.released_arm("acridine")
+released = rx.Refinement(arm.structure, ref.instrument)
+for path, source in arm.ties.items():
+    released.tie(path, source)
+released.fit(pattern, plan=rx.RefinementPlan(stages=[
+    rx.Stage("released", ["phases.*.scale", "instrument.background.*", *arm.free])]))
+```
+
+The check's refit also carries your own ties, holds and 2θ limits; one built this way carries what you declare on it.
+By default every member that is not a riding hydrogen is freed.
+`freed=` names the members to free instead; a riding hydrogen it names is freed with them, and one it leaves out still rides.
+A member that is neither freed nor riding stays where the body placed it.
+`phase=` names the phase when two phases carry a body of that name, and `bond_sigma` and `angle_sigma` are the restraint widths, as in the check.
+
+A riding hydrogen's parent is the nearest template atom that does not ride.
+The tie gives the hydrogen its parent's every shift, so at a held cell the parent–hydrogen vector stays exactly as the body placed it.
+At a refined cell the vector follows the cell, as a fractional offset does.
+The hydrogen does not turn when its neighbours do, which the body's hydrogen does; re-placing it from its neighbours is riding on a free atom, which rietx does not do yet.
+A bond or angle with a riding hydrogen in it is not restrained.
