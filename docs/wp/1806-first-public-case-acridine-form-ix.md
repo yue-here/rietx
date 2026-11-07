@@ -160,7 +160,7 @@ of issue #561, sized M.
   carries a measured spread (`tests/CLAUDE.md` § Budgets in tests), and none is measured.
   Part 1's test already asserts nothing about the cell; it uses the published cell only to
   build its synthetic pattern. What would reopen a gate: the authors' own input file, so the
-  test can mirror their protocol. Part 2 gains the record-row task.
+  test can mirror their protocol. Part 2 gains the record-row task. PR #1454.
 
 - **2026-11-06** — Part 1 is on main. Mike's PR #1416 merged as `fd6232320`
   (PR head `170dee168`, main `263227986`), after two review rounds at heads
