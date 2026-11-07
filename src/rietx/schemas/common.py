@@ -13,7 +13,7 @@ from functools import lru_cache
 from types import MappingProxyType
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .._nearmiss import did_you_mean
 
@@ -1019,15 +1019,28 @@ class _InheritsDeclaredDefaults(Base):
     reference, and ``Base``'s ``validate_assignment=True`` meant the
     ``setattr`` that filled the gaps wrote to the caller's object and grew
     *its own* ``model_fields_set`` — so one ``Parameter`` reused for two fields
-    leaked the first field's range into the second.  ``data`` is copied once
-    for the same reason (``model_validate`` may be handed the caller's dict).
+    leaked the first field's range into the second.  A dict is read and never
+    written, for the same reason (``model_validate`` may be handed the
+    caller's dict).
 
-    **The replacement is a ``Parameter``, never the merged dict**:
-    ``validate_assignment=True`` re-runs this validator on every assignment to
-    an already-built model, with ``data`` built from its current field values,
-    so this branch fires for fields the assignment never touched; pydantic
-    does not re-validate those, so a dict placed here would reach the model as
-    a dict (measured on ``Atom`` after ``atom.aniso = AnisoU(...)``).
+    **Construction and assignment each have a seam, and both call
+    :meth:`_inherit_declared`** (WP-2088).  Construction's is the
+    ``model_validator(mode="before")``.  Assignment's is ``__setattr__``,
+    because a model validator's output for the assigned field never lands:
+    pydantic validates that field from the value it was handed.  So until
+    WP-2088, ``phase.lor_size = Parameter(value=0.01, vary=True)`` landed at
+    ``(-inf, inf)`` with no unit, while the same ``Parameter`` handed to the
+    constructor inherited the range.  Measured 2026-11-07, 70 of the 72
+    declared fields lost their range on assignment.  A
+    ``field_validator("*", mode="before")`` would be one seam for both, but
+    pydantic refuses a before validator on a discriminator field, and
+    ``Source.kind`` is one.
+
+    **The replacement is a ``Parameter``, never the merged dict**: on
+    assignment pydantic re-runs the model validator with ``data`` built from
+    the model's current field values, and does not re-validate the fields the
+    assignment never touched.  A dict placed there would reach the model as a
+    dict (measured on ``Atom`` after ``atom.aniso = AnisoU(...)``).
 
     Detected with ``model_fields_set`` (for a raw dict, its keys) rather than
     by comparing with the bare defaults, since an explicit ``min=-inf`` is
@@ -1059,56 +1072,70 @@ class _InheritsDeclaredDefaults(Base):
     @model_validator(mode="before")
     @classmethod
     def _inherit_declared_bounds(cls, data: object) -> object:
+        """Construction's half of the seam: each field handed in inherits."""
         if not isinstance(data, dict):
             return data
-        data = dict(data)
-        for name in cls.model_fields:
-            factory = cls._declared_default(name)
-            if factory is None:
-                continue
-            if name not in data:
-                continue  # omitted: default_factory already carries the range
-            raw = data[name]
-            if isinstance(raw, Parameter):
-                present, base = raw.model_fields_set, raw.model_dump()
-            elif isinstance(raw, dict):
-                present, base = raw.keys(), raw
-            else:
-                continue  # not a shape that carries attribute presence
-            if BARE_PARAMETER_ATTRS.keys() <= set(present):
-                continue  # every attribute stated (every reload): nothing to inherit
-            # an attribute left unset replaces the caller's object even where
-            # the declared value is the one it holds anyway: one Parameter passed
-            # to every atom's ``occ`` must become one Parameter per atom, or the
-            # write-back leaves the last site's value in all of them (PR #206's
-            # behaviour, kept).  Sharing *on purpose* states every attribute —
-            # ``Harmonic.weight``'s default does, being its line's by reference
-            fills = declared_fills(factory(), set(present))
-            if not fills:
-                continue
+        return {name: cls._inherit_declared(name, raw) if name in cls.model_fields
+                else raw for name, raw in data.items()}
+
+    def __setattr__(self, name: str, value: object) -> None:
+        """Assignment's half of the seam (WP-2088): the value inherits first."""
+        cls = type(self)
+        if name in cls.model_fields:
             try:
-                data[name] = Parameter(**{**base, **fills})
+                value = cls._inherit_declared(name, value)
+            except ValidationError:
+                pass  # broken without the fills too: pydantic's own error names it
             except ValueError as exc:
-                try:
-                    Parameter(**base)
-                except ValueError:
-                    raise exc from None  # broken without the fills too: not ours to name
-                value = base.get("value")
-                # a JSON-mode dict spells an infinite bound "-Infinity"
-                lo = float(fills.get("min", base.get("min", -math.inf)))
-                hi = float(fills.get("max", base.get("max", math.inf)))
-                what = (f"bounds [{lo}, {hi}] are empty: one is yours and the other "
-                        f"is the one this field declares" if lo > hi else
-                        f"value {value!r} lies outside bounds [{lo}, {hi}], the "
-                        f"range this field declares")
-                raise ValueError(
-                    f"{cls.__name__}.{name}: {what}, which a "
-                    f"Parameter leaving min or max unset inherits (issue #204). "
-                    f"State the range you mean on the Parameter itself, e.g. "
-                    f"Parameter(value={value!r}, min=..., max=...)"
-                    + (f", or {cls._declared_escape}" if cls._declared_escape else "")
-                ) from exc
-        return data
+                raise ValidationError.from_exception_data(cls.__name__, [{
+                    "type": "value_error", "loc": (name,), "input": value,
+                    "ctx": {"error": exc}}]) from None
+        super().__setattr__(name, value)
+
+    @classmethod
+    def _inherit_declared(cls, name: str, raw: object) -> object:
+        """``raw``, handed to field ``name``, with what it left out of the
+        field's declared range and unit filled in."""
+        factory = cls._declared_default(name)
+        if factory is None:
+            return raw
+        if isinstance(raw, Parameter):
+            present, base = raw.model_fields_set, raw.model_dump()
+        elif isinstance(raw, dict):
+            present, base = raw.keys(), raw
+        else:
+            return raw  # not a shape that carries attribute presence
+        if BARE_PARAMETER_ATTRS.keys() <= set(present):
+            return raw  # every attribute stated (every reload): nothing to inherit
+        # an attribute left unset replaces the caller's object even where
+        # the declared value is the one it holds anyway: one Parameter passed
+        # to every atom's ``occ`` must become one Parameter per atom, or the
+        # write-back leaves the last site's value in all of them (PR #206's
+        # behaviour, kept).  Sharing *on purpose* states every attribute —
+        # ``Harmonic.weight``'s default does, being its line's by reference
+        fills = declared_fills(factory(), set(present))
+        try:
+            return Parameter(**{**base, **fills})
+        except ValueError as exc:
+            try:
+                Parameter(**base)
+            except ValueError:
+                raise exc from None  # broken without the fills too: not ours to name
+            value = base.get("value")
+            # a JSON-mode dict spells an infinite bound "-Infinity"
+            lo = float(fills.get("min", base.get("min", -math.inf)))
+            hi = float(fills.get("max", base.get("max", math.inf)))
+            what = (f"bounds [{lo}, {hi}] are empty: one is yours and the other "
+                    f"is the one this field declares" if lo > hi else
+                    f"value {value!r} lies outside bounds [{lo}, {hi}], the "
+                    f"range this field declares")
+            raise ValueError(
+                f"{cls.__name__}.{name}: {what}, which a "
+                f"Parameter leaving min or max unset inherits (issue #204). "
+                f"State the range you mean on the Parameter itself, e.g. "
+                f"Parameter(value={value!r}, min=..., max=...)"
+                + (f", or {cls._declared_escape}" if cls._declared_escape else "")
+            ) from exc
 
 
 Fraction = Annotated[float, Field(ge=0.0, le=1.0)]

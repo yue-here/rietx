@@ -57,12 +57,22 @@ issue #204 and WP-1321.
 
 ## Tasks
 
-- [ ] A test over every inheriting class and every declared field: build
+- [x] A test over every inheriting class and every declared field: build
   with defaults, assign `Parameter(value=<in range>, vary=True)`, assert the
   declared `min`/`max`/`unit` hold; and assign one stating `min=-inf`,
   assert it wins. It fails today on `Phase.lor_size` and `Atom.occ`.
-- [ ] The class-level seam; drop `Phase._declare_extinction`'s own fill if
-  the seam covers it.
+  (2026-11-07: `test_an_assigned_parameter_inherits_its_declared_range_on_every_class`
+  assigns a `Parameter` and a dict to all 72 declared fields of 21 classes,
+  and failed on 70 of them before the seam. It leaves `vary` unset, since
+  `Phase.magnetic_lor_size` refuses `vary=True` without a magnetic structure;
+  the `min=-inf` case is `test_an_assigned_parameter_keeps_the_bound_it_states`,
+  on named fields, since `PeakComponent` refuses an unbounded `fwhm`.)
+- [x] The class-level seam; drop `Phase._declare_extinction`'s own fill if
+  the seam covers it. (2026-11-07: `_InheritsDeclaredDefaults.__setattr__`
+  beside the construction validator, both through `_inherit_declared`. The
+  `field_validator("*")` this WP proposed is refused by pydantic on a
+  discriminator field, `Source.kind`. The extinction fill is dropped; its
+  number-to-declaration branch stays.)
 - [ ] Skill: none. An agent writes models both ways and needs no rule once
   both inherit.
 
