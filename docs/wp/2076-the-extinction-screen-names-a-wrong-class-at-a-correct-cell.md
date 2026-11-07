@@ -1,9 +1,9 @@
 # WP-2076 — The extinction screen names a wrong class at a correct cell
 
-Milestone: unscheduled · Status: 🔄 2026-11-05 — tasks 1-4 measured, the repair waits on the maintainer's two questions (§ Questions for the maintainer)
+Milestone: unscheduled · Status: 🔄 2026-11-07 — tasks 1-4 measured; Yue ruled both questions (the repair lands here, at margin 10, after a NAC timing under 30 s); task 5 is next
 Track: What fires, and what stays silent
 Depends on: — (1910 soft: its second screen agrees with the wrong class here; 2062 soft: its decision 2 moves the screen's fits to Pawley)
-Priority: P2 2026-11-05 — a silent wrong answer on a path few fits run: at a prefit cell within 600 ppm the default screen names a class excluding the true group on 318 of 1082 synthetic rows (41 groups), and nothing fires. The repair measured here changes what the screen returns, so it waits on the maintainer
+Priority: P2 2026-11-07 — a silent wrong answer on a path few fits run: at a prefit cell within 600 ppm the default screen names a class excluding the true group on 318 of 1082 synthetic rows (41 groups), and nothing fires. Yue ruled the repair on 2026-11-07, so it is ready to build
 
 ## Goal
 
@@ -292,8 +292,8 @@ diagnosed further. WP-1077's fence covers that test.
 
 ## Questions for the maintainer
 
-Two questions, in § Handover log's newest entry with their measurements. The repair stays off the
-branch until they are answered, because each one changes what a user of the screen receives.
+Both answered by Yue on 2026-11-07, in § Handover log's newest entry. The questions and their
+measurements are in the entry of 2026-11-05.
 
 ## Non-goals
 
@@ -327,6 +327,10 @@ branch until they are answered, because each one changes what a user of the scre
       The corundum, FAP, NAC and PbSO₄ rows of `tests/test_extinction_symbol.py`,
       `tests/test_extinction_margin.py` and `tests/test_extinction_gate.py` keep
       their classes.
+      *Decided 2026-11-07 (Yue): land the candidate here at margin 10, once the
+      screen times under 30 s on NAC. At margin 10 FAP and Si give None and PbSO₄
+      names `P c - a`, so the rows' clause is rewritten to that. Measure option
+      (c)'s allowance before any tightening. Handover entry of 2026-11-07.*
 - [ ] Tests: the five synthetic groups as rows, built in-test from rietx's
       forward model (no data file), with obs/calc/diff PNGs to `tests/output/`.
 - [ ] Skill: a row in `references/diagnostics-indexing.md` if a code is added,
@@ -357,6 +361,44 @@ corundum, FAP, NAC and PbSO₄ rows keep their classes.
   WP-2062 (Le Bail against Pawley).
 
 ## Handover log
+
+- **2026-11-07** (rulings, PR #PRNUM) — Yue answered both questions. The repair lands in this WP,
+  at today's margin, once a timing on the largest suite pattern says it is affordable. A user of the
+  screen then gets a wrong class on 10 of the 1082 synthetic rows instead of 318. FAP and Si stop
+  naming a class, and PbSO₄ stays confidently wrong for now. A tighter bar comes only after it is
+  measured.
+
+  **Question 1.** Decided 2026-11-07 (Yue): (b). The Pawley-scored repair lands in WP-2076, ahead of
+  WP-2062's order. One condition comes first. Before landing, time the screen on NAC, the largest
+  pattern in the suite. If the screen takes more than 30 s there, bring it back to Yue.
+
+  **Question 2.** Decided 2026-11-07 (Yue): the middle path. Land at margin 10, today's
+  `DECISIVE_DELTA_BIC` and Kass & Raftery's band. Measured on the 1082 rows: wrong 318 → 10, right
+  731 → 914, none 33 → 158. PbSO₄ stays confidently wrong, named `P c - a` over the true `P c - n`.
+  Then measure two things before tightening. One is option (c)'s allowance: 2·ln N plus a small
+  allowance, derived from the count of silent positions, never tuned to rows. It gets an `_audit` row
+  that goes to Yue for approval. The other is real patterns from the eleven groups that abstain on
+  every row at margin 18 (§ Findings lists them). Yue weighed (c) a lean and chose to measure first.
+
+  *Next*, in order, for a runner starting task 5:
+  1. Port `~/.cache/ghostshift/rietx/wp-2076/candidate.diff` onto a branch. It was never committed,
+     so if the file is gone, rebuild it from § Findings.
+  2. Time `determine_extinction_symbol` on NAC under the candidate and on main, at the protocol of
+     NAC's row in the extinction test files. Quote both as ranges with machine and venv. Over 30 s
+     under the candidate: stop, record the numbers here and bring them to Yue.
+  3. Under 30 s: land the candidate at margin 10. Name the undecided position in the finding (task
+     5's open half). Rewrite the acceptance clause and the certified rows to the ruled outcome:
+     corundum and NAC keep their classes, FAP and Si give None, PbSO₄ names `P c - a`. State
+     PbSO₄'s row as the known wrong answer this ruling accepts, citing this entry, so the tightening
+     can flip it.
+  4. Tasks 6 and 7: the five synthetic rows with their PNGs, and the skill row or "none". Run the
+     three extinction files and `tests/test_acceptance_indexing.py`. Show the `tests.reader_output`
+     diff to Yue.
+  5. Then measure (c)'s allowance and the eleven groups' real patterns, and bring the allowance's
+     `_audit` row to Yue before any margin moves.
+
+  *Forward.* WP-2062's `### Inherited` entry from this WP now records the answer, since this WP takes
+  in its Hamilton-count task and its A2 row (the screen's fits).
 
 - **2026-11-05** — Tasks 1-4 are measured, and nothing in `src` changed. The screen's wrong answers
   have one main cause. A Le Bail fit does not minimise χ², so a class with fewer lines can fit better
