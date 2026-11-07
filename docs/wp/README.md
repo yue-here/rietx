@@ -55,7 +55,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2109](2109-the-solve-cost-at-a-stated-march-dollase-r.md) | The solve cost at a stated March-Dollase r | 2026-11-05 | P3 | [structure-solution](#structure-solution) |
-| [2118](2118-one-formula-language-for-every-constraint.md) | One formula language for every constraint | 2026-11-06 | P2 | [parametric](#parametric) |
+| [2118](2118-one-formula-language-for-every-constraint.md) | One formula language for every constraint | 2026-11-07 | P2 | [parametric](#parametric) |
 
 ## Next, by priority
 
@@ -492,7 +492,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2106](2106-an-equation-fitted-to-a-series-trajectory.md) | An equation fitted to a series trajectory | ⬜ | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
 | [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | ⬜ | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
 | [2108](2108-a-pawley-phase-beside-a-rietveld-phase.md) | A Pawley phase beside a Rietveld phase | ⬜ | P3 | [1964](1964-a-parametric-equation-the-user-writes.md) ([2104](2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) soft) |
-| [2118](2118-one-formula-language-for-every-constraint.md) | One formula language for every constraint | 🔄 2026-11-06 | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
+| [2118](2118-one-formula-language-for-every-constraint.md) | One formula language for every constraint | 🔄 2026-11-07 | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 
 ## <a id="unscheduled"></a>Unscheduled
 

@@ -1,6 +1,6 @@
 # WP-2118 — one formula language for every constraint
 
-Milestone: parametric · Status: 🔄 2026-11-06 — task 1 landed (PR #1444); waiting on the maintainer's rulings on design questions 1-3 (task 2)
+Milestone: parametric · Status: 🔄 2026-11-07 — tasks 1-2 done; design questions 1-3 ruled; task 3 next
 Depends on: 1964 (the grammar, `ParameterTable.add_expression`, the removal of `Parameter.expr`); 2103 soft (the joint fit's `tie`)
 Priority: P2 2026-11-05 — a feature the open milestone was opened for: the maintainer's ruling that one formula language serves single and parametric refinements; task 1 can start before 1964 lands
 
@@ -74,15 +74,6 @@ declare formulas on parameters; practice.md). No new judgement is added.
   single-refinement formula here reuses both unchanged. The joint fit's
   `preview_equations()` and `result.parametric_equations`/`evaluate()` are joint-fit
   calls today; extend them to a single refinement only when a case needs it.
-- **2026-11-06, from WP-1964 (the generality review).** Two checks for task 1's
-  practice review. First, `-2^2` reads as −4 here (`_audit` row `_UNARY_POWER`, Python's
-  and Fortran's reading). Whether TOPAS reads it the same way was not checked, and a
-  ported input that differs gives a wrong number without a word. Second,
-  `RefinedParametricEquation.evaluate` refuses a formula that reads a per-pattern
-  variable (a ΔT per pattern), since the variable has no value between patterns. So no
-  call gives the esd of the curve with ΔT set to zero, which is what Stinton and Evans
-  plot. If a case asks for it, the route is an argument fixing the variable's value,
-  and it names something on the main surface, so it goes to the maintainer.
 
 ## Non-goals
 
@@ -105,7 +96,7 @@ declare formulas on parameters; practice.md). No new judgement is added.
       text; whether units are checked. A row per program, cited, marked checked or recall,
       and the practice the rows add up to. Run it before task 2, and save it the same
       session (memory rule: every survey goes to practice.md).
-- [ ] **Brief the maintainer** on design questions 1-3 above, with task 1's practice and
+- [x] **Brief the maintainer** on design questions 1-3 above, with task 1's practice and
       measurements where a question turns on cost. Record each ruling here.
 - [ ] **The single-refinement command.** Declares a formula for one parameter, auto-commits
       a node, is restored by checkout and replay, and is refused on a symmetry-fixed or
@@ -140,6 +131,39 @@ using only today's ties gives bit-identical numbers before and after.
 - `docs/practice.md` § A parameter set by an equation the user writes.
 
 ## Handover log
+
+- **2026-11-07** — Task 2 is done. The maintainer ruled design questions 1-3 and the two
+  consent items in a session with the shift lead, after the brief in the 2026-11-06 entry.
+  Task 3 is next, and nothing waits on the maintainer. PR #1453.
+  - *Ruling 1, how a formula names a model parameter: (a).* A formula reads only named
+    variables (`vars.<name>`, made by `add_variable`) and constants. To read a model
+    parameter, the user first ties it to a variable. The maintainer asked which option was
+    easiest for agents, which was closest to TOPAS and which fitted the design ethos, then
+    chose (a). Grounds: it extends a rietx convention (WP-1119's variables, and the
+    2026-11-06 ruling that a joint fit's formulas read them) and adds no concept, so one rule
+    holds in every fit. It is closer to TOPAS, which names a parameter where it is declared,
+    than a per-call name map. The pull towards a name map for agent ease is answered by the
+    same consistency, since agents already use variable plus tie in a joint fit. A name map
+    can be added later without breaking (a), if a measured case shows formulas mostly read
+    model parameters directly. A fourth option, naming a model parameter in place
+    (`name(path, "zr")`, TOPAS's exact form), was raised and not chosen, because it adds a
+    second naming layer beside variables.
+  - *Ruling 2, the spelling: a keyword on the existing verb,*
+    `tie(path, expression="...")`. `untie`, the `set_tie` node and checkout serve both kinds,
+    and `Refinement._ties` stays the one record of user constraints. The keyword is
+    `expression`, rietx's own term (`ParametricEquation(basis="expression", expression=...)`
+    and the grammar's reference page). Recall puts "expression" as the commonest noun
+    (GSAS-II, Lepton, muParser, OpenMM, COPASI) and `expr` as the commonest keyword in Python
+    fitting libraries (lmfit), so lmfit users type four more letters.
+  - *Ruling 3, linear ties: (a), two routes and no detection.* `tie` with a path source and
+    `tie_equal` stay on the constant matrix. `tie(path, expression=...)` always runs as a
+    formula, even when it is linear. No stored file or tie golden moves.
+  - *Consent items, both stand.* The grammar keeps radians with `pi` and gains no `sind`. The
+    manual warns that GSAS-II's expression `sin`, `cos` and `tan` take degrees
+    (`GSASIIobj.py:1640-1642`), so a ported GSAS-II formula with an angle changes value
+    without an error. That warning lands with task 7.
+  - *Inherited.* The fourth note (WP-1964's generality review) is deleted: #1442 merged on
+    2026-11-06, and the 2026-11-06 entry answers both of its checks. The other three stay.
 
 - **2026-11-06** — Task 1 is done, and the WP now waits on the maintainer. The review is in
   `docs/practice.md` § The same language across a program. It found that most formula languages
