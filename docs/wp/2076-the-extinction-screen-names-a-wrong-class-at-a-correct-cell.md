@@ -1,6 +1,6 @@
 # WP-2076 — The extinction screen names a wrong class at a correct cell
 
-Milestone: unscheduled · Status: 🔄 2026-11-07 — claimed by ghostshift runner (MacBook-Air-9db21f); tasks 5-7, the ruled repair
+Milestone: unscheduled · Status: 🔄 2026-11-07 — the ruled repair landed (PR #1460); measuring the margin tightening is next
 Track: What fires, and what stays silent
 Depends on: — (1910 soft: its second screen agrees with the wrong class here; 2062 soft: its decision 2 moves the screen's fits to Pawley)
 Priority: P2 2026-11-07 — a silent wrong answer on a path few fits run: at a prefit cell within 600 ppm the default screen names a class excluding the true group on 318 of 1082 synthetic rows (41 groups), and nothing fires. Yue ruled the repair on 2026-11-07, so it is ready to build
@@ -371,6 +371,62 @@ position named, and PbSO₄ names `P c - a`: the known wrong answer the ruling o
   WP-2062 (Le Bail against Pawley).
 
 ## Handover log
+
+### 2026-11-07 (third session) — the repair landed, PR #1460
+
+The ruled repair is in. The extinction screen now compares Pawley fits, and it scores each class
+on the lattice less only the forbidden lines it can test, so a class can no longer fit better than
+the model that contains it. On the five synthetic specimens this WP was opened on, the screen now
+returns a class containing the true group, where it named a wrong class on all five. As ruled, FAP
+and synthetic Si now abstain, and PbSO₄ names `P c - a` where the specimen is `P c - n`. When the
+screen abstains on the margin, its message now names the tested positions where the two leading
+classes differ. The NAC timing that gated the ruling costs nothing worth asking about: about 0.05 s.
+
+*Done.*
+- `model.forward._omitting_reflections`: a private, context-scoped compile seam that drops named
+  hkl from each phase's nuclear reflection list. It is the one way to fit "the lattice less these
+  lines", a reflection set no space group describes. It replaces the candidate's monkey-patch of
+  `generate_reflections`.
+- `extinction.SCREEN_MODE = "pawley"` for the shared profile fit, the reference and every class.
+  The cell-free prefit stays Le Bail at `SCREEN_LEBAIL_CYCLES`; its `_audit` evidence says so now.
+  A class with 0 < `n_testable` < `n_absent` gets a second fit of the lattice less its testable
+  lines; `n_testable == 0` scores as the reference (ΔBIC 0). Hamilton's restricted parameter count
+  is the scored fit's own `n_free_parameters` (Pawley counts its intensities).
+- `ExtinctionCandidate.tested_hkl` / `tested_two_theta` (new fields), and `chi2` documented as the
+  scored χ². `EXTINCTION_SYMBOL_AMBIGUOUS`'s margin reason appends "and the two differ at the
+  tested position(s) …" (no new code, so no audit row and no skill row).
+- Rows rewritten to the ruling: FAP abstains (`P 63 - -` leads on one testable line, (0 0 5) at
+  68.0°, ΔBIC −8.2); Si and the halo rows lead with `F d - -` and abstain; PbSO₄'s row pins
+  `P c - a` as the accepted wrong answer. WP-1910's four strict xfails pass and became plain rows.
+  #726's held arm (corundum ×1.0012) now returns `R - c -`, so that row says so.
+- `tests/test_extinction_nesting.py`: the five specimens built in-test, ten rows (acceptance and
+  nesting), ~5 s in the fast tier. All ten fail on `main` before this branch, with the five wrong
+  classes the sweep found. PNGs `tests/output/extinction_nesting_*_true.png`, looked at.
+- Manual `reference/extinction.md`: Pawley pipeline, the scored χ², the new fields, the one-line
+  limit of the margin, and the real-data paragraph re-measured (below).
+
+*Measured* (macOS arm64, `[dev]` venv of this worktree, compiled tier on).
+- NAC, the test file's protocol (2-24°, I cubic, dispersion declined), 3 runs each in one process,
+  through the shift's serial queue: `main` 0.92-0.97 s, this branch 0.97-1.04 s. Both `I - - -`.
+- Held-cell margins (`edge_scan`): corundum returns `R - c -` at every factor from ×0.995 to ×1.002
+  (Le Bail: ×0.998 to ×1.0004); the monoclinic from ×0.9996 to at least ×1.0012, and `P 1 21 1`
+  at ×0.9994; FAP abstains at ×0.999, ×1.0 and ×1.001.
+- Manual's real data: FAP ranks `P 63 - -` first and abstains, 3.4 s; corundum 20-90° `R - c -`
+  at ΔBIC −45.9 (was −3435), `profile_rwp` 0.134 (was 0.259); corundum 5-150° on the declared
+  widths now returns `R - c -` at −74.6, `profile_rwp` 0.137, where the Le Bail screen refuted it.
+- Test counts: TESTCOUNTS
+
+*Not done, in order.*
+1. The tightening the ruling deferred, now an open task: measure option (c)'s allowance (2·ln N
+   plus an allowance derived from the count of silent positions), and real patterns from the
+   eleven groups that abstain on every row at margin 18. Its `_audit` row goes to Yue before any
+   margin moves. PbSO₄'s row flips when it lands.
+2. The default-prefit margin table in `tests/test_extinction_margin.py`'s docstring is the Le Bail
+   screen's record; only the rows below it were re-measured. Re-scan the 24 factors if a later
+   change needs the default margin as a number.
+
+*Gotchas.* A test that patches `extinction._fit_class` must accept `omit=` and keep only the
+calls without it, or it records the scoring refit as the class's fit (both patching tests do).
 
 - **2026-11-07** (rulings, PR #1455) — Yue answered both questions. The repair lands in this WP,
   at today's margin, once a timing on the largest suite pattern says it is affordable. A user of the

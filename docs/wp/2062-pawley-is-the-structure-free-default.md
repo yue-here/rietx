@@ -196,6 +196,9 @@ above, which come from lab and synchrotron single-phase patterns
   Answered 2026-11-07 (Yue): WP-2076 lands it first, once the screen times under 30 s on NAC. So
   WP-2076 takes this WP's Hamilton-count task and its A2 row. Tick them here when WP-2076 merges;
   if the NAC timing sends it back to Yue, they stay here.
+  2026-11-07, WP-2076's third session: NAC timed at 0.97-1.04 s against 0.92-0.97 s on `main`, so
+  PR #1460 carries both. The shared, reference and class fits are Pawley; the cell-free prefit
+  stays Le Bail at `SCREEN_LEBAIL_CYCLES`, whose `_audit` row now says it governs the prefit alone.
 
 - **From WP-2011, 2026-10-28: Pawley's cost on large patterns, re-measured
   with option (c) built** (WP-2011 § Option (c) probed, commit e39b8c19d on
