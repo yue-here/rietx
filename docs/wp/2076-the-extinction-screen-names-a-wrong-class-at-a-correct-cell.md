@@ -435,11 +435,12 @@ against settled (25 000 cycles to `lebail_tol` 1e-7), eleven screens:
 The settled ×0.995 wrong class is the Pawley margin failing near the right cell. The third
 session found `P 1 21 1` at a held ×0.9994, so this belongs to the open margin task.
 Wall time is the same in both arms (0.3-29 s a screen). The eight `tests/test_extinction*.py`
-files gave 176 passed, 2 skipped, 1 xfailed in both arms. Fast suite on the final tree, main
-`b6ff8e71f` merged: 14 292 passed, 416 skipped, 32 xfailed, 1 failed in 8:23. The failure was
-the indexing `CLAUDE.md` line cap, from this session's rule edit; trimmed, and
-`test_docs_consistency.py` then gave 25 passed. This session added 2 test cases, 1.12 s in all
-(local junit). No base count was measured on this main, so the +2 is not checked against one.
+files gave 176 passed, 2 skipped, 1 xfailed in both arms. Fast suite on the final tree (main
+`b6ff8e71f`, which the branch contains): 14 294 passed, 416 skipped, 32 xfailed, 0 failed, in
+8:42 with this session alone on the machine. An earlier run, before the cap test, gave 14 292
+passed and 1 failed (the indexing `CLAUDE.md` line cap, since trimmed), so the cap test is the
++1. This session added 3 test cases; the first two cost 1.12 s in all (local junit). No base
+count was measured on this main, so the +3 is not checked against one.
 
 **Review.** `/code-review high --fix` reported nine findings. Fixed: a raised scoring refit
 was repeated per class (now cached); the manual's "a fit that raised refutes"; the `screened`
