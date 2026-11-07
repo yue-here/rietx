@@ -1,9 +1,9 @@
 # WP-2060 — the likelihood interval where an esd cannot be read as one
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 2-7 built in PR #1322; task 1's modulus half awaits the maintainer
+Milestone: unscheduled · Status: 🔄 2026-11-07 — tasks 2-7 built in PR #1322; task 1's modulus half ruled by Mike on #1075 (2026-11-04, amended 2026-11-05): the interval computed unasked on flagged sites, with four conditions; task 8 builds it
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-26 — two wrong statements with nothing fired: a weak modulus beside a zeroed angle covers 0.83 at a nominal 0.95, and a modulus on a dead column reads ± 10⁴ μ_B while `profile_interval` returns a zero-width interval; both on the magnetic path few fits run
+Priority: P2 2026-11-07 — a wrong statement with nothing fired: a weak modulus beside a zeroed angle covers 0.82 at a nominal 0.95, on the magnetic path few fits run; the dead-column half shipped in PR #1322, and Mike's ruling leaves only the build
 
 ## Goal
 
@@ -48,7 +48,8 @@ What it says: where the flag fires and the model is right, every rule covers, so
 
 ## Tasks
 
-- [ ] Rule with the maintainer: default intervals on bound rows of phase scale, occupancy and moment modulus (yes / no / modulus only), and whether a modulus beside a zeroed angle takes the interval by default or `MOMENT_ANGLE_STATIONARY` says its modulus is conditional and points at `profile_interval`. — *2026-11-02: scale and occupancy settled by Claude as **no** under the reporter's measurement (every rule covers there, so a default interval fixes no coverage). The modulus half is built as the pointer (no interval unasked; `MOMENT_UNSUPPORTED` and `MOMENT_ANGLE_STATIONARY` name `profile_interval`) and goes to the maintainer at the PR, under the reader-output rule: a modulus profile measured 7-58 s on 1-8 s two-site fits.*
+- [x] Rule with the maintainer: default intervals on bound rows of phase scale, occupancy and moment modulus (yes / no / modulus only), and whether a modulus beside a zeroed angle takes the interval by default or `MOMENT_ANGLE_STATIONARY` says its modulus is conditional and points at `profile_interval`. — *2026-11-02: scale and occupancy settled by Claude as **no** under the reporter's measurement (every rule covers there, so a default interval fixes no coverage). The modulus half is built as the pointer (no interval unasked; `MOMENT_UNSUPPORTED` and `MOMENT_ANGLE_STATIONARY` name `profile_interval`) and goes to the maintainer at the PR, under the reader-output rule: a modulus profile measured 7-58 s on 1-8 s two-site fits.* *Ruled by Mike on #1075 (2026-11-04, amended 2026-11-05), under the magnetic-path split he accepted that day: option 2, the interval computed unasked on flagged sites, with four conditions. Handover entry of 2026-11-07.*
+- [ ] Build Mike's ruling (handover entry of 2026-11-07): a modulus profile unasked on each site `MOMENT_ANGLE_STATIONARY` flags, through `attach_stationary_intervals`, with conditions 1-4 and the 2026-11-05 amendment; tests for each condition; the stationary message, help, skill row and audit rows it moves. Bring Yue's three parts (below) to Yue at the PR.
 - [x] `profile_interval` holds the fit's own free set along its path: a pinned refit freezes WP-1301's held paths as the fit held them.
 - [x] `profile_interval`'s first step from the profile's curvature when the esd is orders above the value, and a modulus profile kept at m ≥ 0; never a zero-width interval where the walk found no end.
 - [x] A modulus on its dead column says so in `result.diagnostics` (or the existing `supported=False` verdict reaches the result), with its `_audit` row. — *`MOMENT_UNSUPPORTED` (warning), the report's verdict through `report.magnetic.moment_supported`; tier 1.*
@@ -71,6 +72,95 @@ Repro 2's seeds 3, 4 and 8 give intervals of non-zero width that contain m = 0; 
 - Issue #1075 and its two repro scripts; WP-1929 (the stationary-angle test); WP-2002 B2 (`docs/wp/2002-batch/rulings.md`).
 
 ## Handover log
+
+- **2026-11-07** (rulings, PR #PRNUM) — task 1's modulus half is ruled, by Mike rather than Yue. On
+  2026-11-04 Mike accepted the design decisions on the magnetic path (issue #1075, 05:08Z): "the
+  physics, defaults, diagnostics, names, reader output and magCIF reading". Anything that reaches a
+  non-magnetic fit stays with Yue, as do releases, stored formats and deletions. His rulings are headed
+  "Ruled by Mike". He ruled option 2: a moment's modulus beside an angle the stationary test zeroed
+  gets its likelihood interval computed unasked. A reader of a weak moment then gets a range that
+  covers the truth about 94 % of the time, where today's esd covers 82 %. Nothing is built yet. Task 8
+  builds it.
+
+  **Ruled by Mike, 2026-11-04 (05:02Z, #1075): option 2 confirmed after review, with four conditions.**
+  Quoted from the comment:
+  > For a moment's modulus on a site whose angles the stationary test zeroed
+  > (`MOMENT_ANGLE_STATIONARY`), rietx computes `profile_interval` unasked, on those sites only. It
+  > runs through the hook the angles already use under B2 (`attach_stationary_intervals`): the answer
+  > fit, and the attempt a sequential series keeps, never a trial or a rung.
+  >
+  > 1. **A site with `MOMENT_UNSUPPORTED` is one of these sites.** Its modulus gets #1322's one-sided
+  >    interval from 0, and the message does not read that site's angle intervals as a direction.
+  > 2. **A profile that finds χ² below the fit is still quoted, unless the drop reaches the interval's
+  >    own cut.** `fit_is_minimum=False` fired on 32 of 80 of these two-site profiles (8 of 20 in
+  >    #1322), by 0.07–2.2 χ²_red·f², and those intervals still covered the truth on 31 of the 32. So
+  >    the finding gives the drop and says the interval is measured from the fit. Where the lowest
+  >    point lies a full cut or more below the fit (7 of 400 fits on a refit with the angles on the
+  >    direction), the fit is not at its minimum. Then the interval is not quoted as the modulus's
+  >    uncertainty, and the finding gives the lowest point. A side with no end says why, as the angle
+  >    intervals already do.
+  > 3. **`MOMENT_ANGLE_STATIONARY` no longer tells readers to "quote the moment along that
+  >    direction".** The modulus it prints is the moment's length at the tilt where the fit stopped
+  >    (the angle values are kept), which is never shorter than the moment along the direction. It
+  >    quotes the modulus's interval instead.
+  > 4. **The guards live in the magnetic path** (`attach_stationary_intervals` and the diagnostic),
+  >    not in `profile_interval`, which non-magnetic fits share.
+
+  His measurement, on main `dd55ec4f5`, two-site set, N = 400: the weak site's esd covers 0.823
+  [0.781, 0.859]. Centred on the moment's component along **a**, the same esd covers 0.970, so the
+  misses come from the value. The profile covers 0.925 and 0.975 in the two cells it was run on
+  (N = 40 each). A modulus profile takes a median of 5.1-5.4 s (range 2.5-11.8 s) on two-site fits
+  of about 0.6 s, so about 10 s for both moduli, and 9.4 s on an 8.8 s fit of the LaMnO₃ BT-1
+  tutorial data. The flag fired on 400 of 400 of these fits. A sequential series pays the cost once
+  per pattern. His first ruling of that day (03:57Z) asked for a hold until 17:00 CET for a review.
+  The 05:02Z comment ends the hold: "The build can go ahead now on the text above."
+
+  **Ruled by Mike, 2026-11-04 (07:17Z, #1075): a pointer.** "The WP-2060 task 1 ruling above stands
+  for today's code." One condition for turning on #1403's analytic angle columns now sits on #1404:
+  "whichever escape it picks must also reach the refits of the modulus profile this ruling runs
+  unasked, and a fit started exactly on a symmetry-fixed direction." That condition binds #1403's
+  work, and this WP's build need not wait for it.
+
+  **Ruled by Mike, 2026-11-05 (07:29Z, #1075): block D result and one amendment.** On main
+  `da5e7aa36`, weak moduli of 0.05-0.2 μ_B at ×1 and ×0.1 counts, N = 400 a cell. The number a reader
+  received covered 0.875 (D1, 0.05 μ_B) and 0.897 (D2, 0.1 μ_B), under the 0.90 bar he set on 11-04.
+  The profile alone covered at least 0.917 in every cell. The shortfall came only from fits where the
+  profile was withheld and the esd was given instead, and near zero that esd covers 3 of 20 (D1) and
+  4 of 18 (D2). Quoted:
+  > **The amendment.** On a site the stationary test flagged, when the profile is withheld, the
+  > reader gets the pointer (the fit did not reach its minimum; refit), not the esd. Everything else
+  > in the 4 Nov ruling and its four conditions stands.
+  >
+  > **For the build:** one change to the 4 Nov text. On a flagged site whose profile is withheld
+  > (condition 2's case, where the finding gives the lowest point), the reader gets the pointer to
+  > refit, not the esd. The other three conditions and everything else stand.
+
+  Rerun on fresh seeds after the amendment was chosen (1000-1399, same commit, bar fixed before
+  launch): D1 0.938 [0.909, 0.960] and D2 0.943 [0.915, 0.964], with the pointer on 13 and 14 of
+  400. Sides with no end: 5 and 3 of 400. Every miss lay above the truth. Not covered by his runs:
+  tilted weak moments at ×1 counts, and a profile of the strong site.
+
+  **Yue's, and not decided by this ruling.** The 05:02Z comment names three parts on Yue's side.
+  (1) `RefinedParameter.interval` is a stored field (schema 0.59) whose docstring names moment angles
+  and one writer. Writing it on moduli widens that meaning, and no new field is needed. (2) Each
+  stored interval carries its refit points (15-38 per modulus), so a flagged two-site result grows by
+  two such lists. (3) magCIF keeps `magnitude` as the length at the kept tilt and `magnitude_su` as
+  the conditional esd. Whether the exchange file carries anything else is a stored-format question.
+  The release note is Yue's too.
+
+  *Next* (task 8, for a runner):
+  1. Build the ruling in the magnetic path: `attach_stationary_intervals` runs `profile_interval` on
+     the modulus of each flagged site, on the answer fit and on the attempt a series keeps, never on
+     a trial or a rung. A `MOMENT_UNSUPPORTED` site is flagged too, with #1322's one-sided interval.
+  2. Condition 2 with the amendment: a drop below the fit under the cut is quoted with the drop
+     named. A drop of a full cut or more withholds the interval, and the reader gets the lowest point
+     and the pointer to refit, never the esd.
+  3. Condition 3: rewrite `MOMENT_ANGLE_STATIONARY`'s message to quote the modulus's interval. Then
+     update the help entry, the skill row in `references/magnetic.md` and the audit rows it moves.
+  4. Tests for each condition, revert-checked, on the two-site set in
+     `tests/test_stationary_moment_angle.py`. Run `tests.reader_output`.
+  5. At the PR, bring Yue's three parts above and the release note to Yue. Then close.
+  Optional, unchanged from the 2026-11-02 entry: `MOMENT_UNSUPPORTED` for joint fits.
 
 - **2026-11-02** — tasks 2-7, PR #1322. A moment refined to zero now gets an honest uncertainty. Before, the fit reported m ≈ 0 with an error of 10 000-200 000 μ_B and no warning, and asking for the likelihood interval returned a zero-width answer. Now the result carries a warning that the data do not support the moment, and the interval runs from 0 to about 0.06 μ_B. The interval also stopped refitting a model larger than the fit: a weak phase's held cell stays held while its scale is profiled. The maintainer still has one choice: whether a modulus beside an angle the stationary test zeroed should get its interval computed unasked. This branch only points at the call, because each such interval costs 7-58 s on a fit of 1-8 s.
   *Done.* `profile_interval` (`strategy/parameter_interval.py`): every refit freezes the answer stage's `StageResult.held`; a first probe already past the threshold steps back in, each step from a fresh trial at the fit, then solves the end in log distance; a step back that does not lower Δχ² stops the side on `"error"` with a message; a modulus whose sign the data cannot see (`_sign_is_unseen`: one moment block in the phase, or free angles) keeps its sign, so 0 is a bound and a modulus within 0.01 esd of it is one-sided. `MOMENT_UNSUPPORTED` (warning) on `result.diagnostics`, from `report.magnetic.moment_supported`, the same function behind `MomentEvidence.supported`. `MOMENT_ANGLE_STATIONARY` names its sites' moduli as conditional and points at `profile_interval`. Audit rows (tier 1), help entry, skill rows, theory and guide paragraphs. Task 1: scale and occupancy settled by Claude as no default interval, under the reporter's measurement that every rule covers there.
