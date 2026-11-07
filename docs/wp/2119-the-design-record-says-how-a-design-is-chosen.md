@@ -87,14 +87,14 @@ a choice, and check the draft against past milestones before presenting it.
 
 ## Tasks
 
-- [ ] The maintainer polishes the draft: the wording, and whether it is a new Rule 5 or
+- [x] The maintainer polishes the draft: the wording, and whether it is a new Rule 5 or
       folds into Rule 4 and § Why this package exists.
-- [ ] Check the polished text against past decisions before it lands: WP-1964's decisions
+- [x] Check the polished text against past decisions before it lands: WP-1964's decisions
       (a) and (c), WP-1303's deletion of the second integration surface, and the 2026-11-04
       ruling that rietx takes no TOPAS aliases. Each should come out as it was decided,
       or the draft changes.
-- [ ] Apply it to `docs/DESIGN.md`, with a § History line if it supersedes a sentence.
-- [ ] Skill: none. The rule governs changing the package, not driving it.
+- [x] Apply it to `docs/DESIGN.md`, with a § History line if it supersedes a sentence.
+- [x] Skill: none. The rule governs changing the package, not driving it.
 
 ## Acceptance
 
