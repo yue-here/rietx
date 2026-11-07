@@ -405,11 +405,19 @@ gone. No test that reaches the screen moved.
 - Shift bundle item 4: `SCREEN_LEBAIL_CYCLES` and `_fixed_partition` are removed, with the
   constant's `_audit` row. The prefit runs `profile_only` at the `StageSpec` defaults (25 000
   cycles to `lebail_tol` 1e-7). Yue answered the brief with "whatever best fits our design
-  ethos" (2026-11-07). Settled by Claude on four grounds. rietx's convention since WP-1542 is
-  a settled partition, and one rule beats a rule with an exception. Practice stops Le Bail on
-  convergence (`docs/practice.md`). And the measurement below separated nothing. An earlier
-  commit on this branch had rewritten the row's grounds to keep 3; that lean is superseded.
-  WP-2062's `### Inherited` note says the constant is gone.
+  ethos" (2026-11-07). Settled by Claude on three grounds. rietx's convention since WP-1542 is
+  a settled partition (Yue's ruling B11), and one rule beats a rule with an exception. The 3
+  had no source, and its stated term ("until the screen moves to Pawley") had run out. And
+  the measurement below is a draw on cells. Practice does not decide it: no surveyed program
+  settles a partition at a fixed model, and GSAS-II's `DoLeBail` runs a fixed 10
+  (`docs/practice.md`). The one answer that changed went against settling, inside the margin
+  task's known failure. An earlier commit on this branch had rewritten the row's grounds to
+  keep 3; that lean is superseded. WP-2062's `### Inherited` note says the constant is gone.
+- The prefit's partition can now hit its 25 000-cycle cap, and the screen dropped the fit's
+  `LEBAIL_CYCLES_AT_CAP`. It now carries it onto `ExtinctionScreen.diagnostics`, prefixed as
+  the prefit's and pointing at `refine_cell=False`, since the caller has no stage to raise.
+  The judge found this. Test: `test_a_prefit_partition_stopped_on_its_cap_is_reported_on_the_screen`,
+  which fails without the hand-off.
 
 **Measured** (`[dev]` venv, macOS arm64, alone on the machine). Prefit at 3 fixed cycles
 against settled (25 000 cycles to `lebail_tol` 1e-7), eleven screens:
@@ -486,6 +494,36 @@ Author's answers. Row 1's "grounds need two corrections": both landed, and then 
 deleted when the constant went (see *Done*). The judge's review of the deletion follows.
 Item 2's weak rows 4 and 7: the absence test now runs before the abstention; a per-class error
 field is declined above.
+
+*Generality, second dispatch* (the deletion; the `generality-review` agent, pasted unedited).
+
+**rietx.indexing.extinction.SCREEN_LEBAIL_CYCLES (deleted row, was tier 3, value 3)**
+
+**Verdict: holds.** The case for the deletion is stronger. It rests on the maintainer's own ruling, not on the measurement. The stated reason for the exception has lapsed. The measurement is a draw on cells. Its one answer change goes against settling. That change is the open margin problem's, and the handover records it honestly. Three of the author's claims are overstated: "separated nothing", the practice ground, and the record of what fired.
+
+Terms used below:
+- **The prefit** is the cell-free Le Bail fit that refines the candidate cell and widths before any extinction class is fitted.
+- **A partition** is one Le Bail redistribution of the observed intensity among overlapping reflections.
+- **A settled partition** repeats until the intensities stop changing, at `StageSpec` (the stage schema) defaults `lebail_cycles` 25 000 and `lebail_tol` 1e-7.
+- **B11** is the maintainer's ruling of 2026-10-19: "repeat until the intensities stop changing, with a cap".
+- **WP-1542** is the change that made rietx's partition settle.
+- **The margin task** is this WP's open work on how far from the true cell the Pawley-based class screen stays right.
+- **`best_or_none`** is the screen's pick verb.
+- **The reference gate** is `REFERENCE_NET_RWP_MAX`, 0.7071. Above it the screen reads `unreliable` and picks nothing.
+
+| Question | Author's answer, and where | What I found | Verdict |
+|---|---|---|---|
+| 1. What the deletion leaves to whom | WP-2076 handover, fourth session: "The prefit runs `profile_only` at the `StageSpec` defaults (25 000 cycles to `lebail_tol` 1e-7)." | Confirmed at `extinction.py:1073`. `staged.py:143,147` holds those defaults, and no stage of `profile_only` overrides them. The package still decides how far the partition runs. It now uses its package-wide rule instead of a special count, so the caller is handed nothing new. This is a change of rule, not a demotion. No dangling reference to `SCREEN_LEBAIL_CYCLES` or `_fixed_partition` is left outside `docs/wp/`. | holds |
+| 2. Kind of ambiguity | none given. Constant rows carry no `ambiguity` field. The governing row `StageSpec:lebail_tol` states `ambiguity=1`. | This is a numerical setting: how far an iterative solve is taken. It feeds a kind-2 ranking (classes ranked by ΔBIC, the difference in Bayesian information criterion). It is no verdict of its own. Kind 1 under `lebail_tol`'s row is consistent. | holds |
+| 3. Case against the deletion (for keeping 3) | Handover table (`docs/wp/2076-…md:417-428`): FAP's settled prefit cell is +313 ppm (prefit Rwp 0.22 against 0.12) and −1474 ppm (0.54 against 0.11). Synthetic ×0.995 settled: "`P 1 21 1`, wrong, at a cell 0.07 % short". Attributed: "this belongs to the open margin task." | Checked against `p4_fixed.jsonl` and `p4_settled.jsonl`. **(a) One answer changed, toward a confident wrong class.** Synthetic P 2₁/c started at ×0.995 went from 3-cycle `None` (status `unreliable`, net Rwp 0.996) to settled `P 1 21 1` (status `converged`, ΔBIC −23.6). A user would see an abstention become a named wrong class. The attribution is fair: the third session's held-cell scan found `P 1 21 1` at ×0.9994, and the settled cell sits in that zone. But 3 cycles reached the abstention only by losing the cell (a = 6.83 Å against 8). So neither arm is right on that row, and until the margin task lands this release ships the wrong name there. **(b) FAP's cell moved away from its ×1.0 answer at both offsets.** That answer is a cross-code reference, so this measures drift only. FAP is also the declared failing case of `StageSpec:lebail_tol` (`_audit.py:4613`, "a pair 1e-4 A apart … that 3000 more cycles swap"). That could be the same cause. I did not test it. **(c)** The code comment's "separated nothing" (`extinction.py:1070-1072`) is true of the cells on balance (two better, two worse). It is not true of the answers, where the one difference goes against settling. | real, bounded |
+| 4. Case for the deletion (for settling) | Handover: "rietx's convention since WP-1542 is a settled partition, and one rule beats a rule with an exception. Practice stops Le Bail on convergence (`docs/practice.md`). And the measurement below separated nothing." | **The rule ground is strong.** The deleted row's own grounds gave the 3 a term: "Kept until WP-2062 moves the screen to Pawley" (WP-2062 is the WP that owns the Le Bail-to-Pawley move). It also said: "B11 did not exempt the screen: the exemption was settled by Claude". This WP moved every compared fit to Pawley, so the term has run out. The deletion returns the prefit to a maintainer ruling from a Claude-settled exemption. The 3 had "no stated source". The tests WP-1542 said a settled partition failed now pass in both arms: 176 passed, 2 skipped, 1 xfailed across `tests/test_extinction*.py`. Settling also recovers the synthetic cell that 3 cycles lose (×0.995 lost against ~0.07 % short; ×1.005 at 1034 against 65 ppm). Wall time is the same (0.28-28.8 s against 0.27-28.7 s). **The practice ground is overstated.** `docs/practice.md:536-541` says "No surveyed program stops on the extracted intensities at a fixed model". GSAS-II's `DoLeBail` runs "a fixed `cycles=10`". Inside a refinement the programs stop the *refinement* on χ². So practice does not settle a fixed-model partition either way. | stronger, on the rules |
+| 5. Tier, with source | Deleted row: tier 3, "no stated source for the 3". Governing rows: `StageSpec:lebail_cycles` is tier `invariant` (`_audit.py:4592`); `StageSpec:lebail_tol` is tier 3, approved 2026-11-05 (`_audit.py:4606`). | Tier 3 for the 3 was honest. The heuristic now sits under rows already audited and approved. The `invariant` row names its test, `tests/test_lebail_cycles.py::test_the_tolerance_meets_its_bar`, which asserts a 2× margin on "six patterns from four kinds of instrument, the largest 329 reflections". **That domain was measured on refinements, not on prefits.** A prefit of a large low-symmetry candidate in its lattice group could exceed 329 reflections. No measurement covers that. GSAS-II's fixed 10 comes from `docs/practice.md` (source checked there). I did not check the programs myself. | holds, domain unshown for the prefit |
+| 6. Dataset families | Handover: corundum, FAP, synthetic P 1 21/c 1, PbSO₄; "eleven screens". | Four families: NIST corundum, the GSAS-II tutorial FAP, the GSAS-II tutorial PbSO₄, and one synthetic made with rietx's own forward model. References: the known space group for the class; the construction for the synthetic cell; GSAS-II's answer for FAP's cell (verifies only); corundum's certified cell not compared (both arms agree within 10 ppm). **All four are development data** (the screen's own test rows), and the handover does not say so. NAC was not run. | holds, with omissions |
+| 7. What reports it | none given | **Weaker than before.** With a cap the partition can now be cut short. When it is, the fit raises `LEBAIL_CYCLES_AT_CAP` (the code for a partition that hit its cycle cap) and sets `StageResult.lebail_settled`. But `_prefit` returns only the instrument, the candidate and the Rwp (`extinction.py:1077-1080`), so the screen drops both. A prefit that hit the cap would pass silently. Only `ExtinctionScreen.prefit_rwp` and `.cell` show the outcome. | weak |
+
+Evidence that would change the verdict: a prefit row where settling changes the class at a cell the Pawley margin is known to handle (outside ×0.9994 to ×1.0012 on the synthetic). Or a large low-symmetry prefit that hits the 25 000-cycle cap, since nothing would report it.
+
+Author's answers. Row 3(c) and row 4's practice: the comment and the entry now say what the judge found. Row 7: the prefit's `LEBAIL_CYCLES_AT_CAP` now reaches the screen (see *Done*). Row 5's domain (no prefit above 329 reflections measured) stays open, and the cap warning is what would show it.
 
 After the removal, `tests/test_extinction*.py`, `test_gui_peaks.py`, `test_tof_axis.py`,
 `test_audit_table.py` and `test_docs_consistency.py` gave 351 passed, 2 skipped, 1 xfailed,

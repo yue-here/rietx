@@ -1067,17 +1067,24 @@ def _prefit(data: PatternData, candidate: CellCandidate, instrument: Instrument,
     # the prefit's answer is the cell and widths every class is then compared
     # at, so it pays for no closing stage either (WP-2002, the sixth round's
     # Q1 and Q2; the screen's own fits and the validation's run without one).
-    # Its partition settles like every other Le Bail fit's: three fixed cycles
-    # were measured against it on eleven screens and separated nothing
-    # (WP-2076, 2026-11-07)
+    # Its partition settles like every other Le Bail fit's (WP-2076, 2026-11-07).
+    # Three fixed cycles were measured against it on eleven screens: two prefit
+    # cells better each way, and one answer changed, inside the margin's known
+    # failure near the right cell.  A partition stopped on its cap is reported
+    # on the screen, since the caller has no stage to raise it on
     plan = replace(resolve_plan("profile_only", "lebail"), closing_window_tol=None)
     result = ref.fit(data, mode="lebail", plan=plan,
                      two_theta_limits=two_theta_limits, telemetry=False,
                      cancel=cancel if hasattr(cancel, "is_set") else None)
     cell = tuple(float(v) for v in
                  ref.fitted_structure.phases[0].cell.lengths_angles())
+    capped = [d.model_copy(update={
+        "message": "The extinction screen's cell-free prefit: " + d.message,
+        "suggestion": ("Refine the cell with a Le Bail fit of your own and pass it "
+                       "with refine_cell=False.")})
+        for d in result.diagnostics if d.code == "LEBAIL_CYCLES_AT_CAP"]
     return (ref.fitted_instrument, candidate.model_copy(update={"cell": cell}),
-            float(result.statistics.rwp))
+            float(result.statistics.rwp), capped)
 
 
 def _reference_net_rwp(result) -> tuple[float | None, float | None]:
@@ -1264,10 +1271,11 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     # rather than as a traceback, the same way ``validate_by_lebail`` reports a
     # candidate the physics refuses.
     which = "reference"
+    prefit_capped: list[Diagnostic] = []
     try:
         if refine_cell:
             which = "cell-free prefit"
-            ins, candidate, screen.prefit_rwp = _prefit(
+            ins, candidate, screen.prefit_rwp, prefit_capped = _prefit(
                 data, candidate, ins, symbol, two_theta_limits, cancel)
             screen.cell = candidate.cell
             which = "reference"
@@ -1537,7 +1545,7 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     screen.candidates = sorted(
         entries, key=lambda e: (e.refuted, not e.screened, e.delta_bic,
                                 e.n_absent))
-    screen.diagnostics = extinction_diagnostics(screen, fit_errors)
+    screen.diagnostics = extinction_diagnostics(screen, fit_errors) + prefit_capped
     return screen
 
 

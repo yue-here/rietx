@@ -442,6 +442,30 @@ def test_a_class_fit_that_raises_leaves_the_class_unscored(which, monkeypatch):
         assert "Run the screen again" in ambiguous[0].suggestion
 
 
+def test_a_prefit_partition_stopped_on_its_cap_is_reported_on_the_screen(monkeypatch):
+    """The prefit settles its Le Bail partition like every fit (WP-2076), so its
+    cap can bind; the caller has no stage to raise it on, so the screen says so."""
+    from dataclasses import replace
+
+    from rietx.strategy import staged
+
+    real = staged.resolve_plan
+
+    def one_cycle(*args, **kw):
+        plan = real(*args, **kw)
+        return replace(plan, stages=[replace(s, lebail_cycles=1) for s in plan.stages])
+
+    monkeypatch.setattr(staged, "resolve_plan", one_cycle)
+    structure, instrument = _mono_models()
+    screen = determine_extinction_symbol(
+        _pattern(structure, instrument), _candidate(MONO_CELL, "monoclinic"),
+        instrument, two_theta_limits=MONO_RANGE)
+    capped = [d for d in screen.diagnostics if d.code == "LEBAIL_CYCLES_AT_CAP"]
+    assert len(capped) == 1, [str(d) for d in screen.diagnostics]
+    assert capped[0].message.startswith("The extinction screen's cell-free prefit")
+    assert "refine_cell=False" in capped[0].suggestion
+
+
 def test_a_screen_that_cannot_run_reports_rather_than_raises():
     """A cell with no reflections in range fails *every* class identically, so it
     is a statement about the input — reported as a failed screen with a reason,
