@@ -24,17 +24,42 @@ generated skill reference and manual section. This is chunk R10 of issue #561, s
 ### Inherited
 
 - **2026-11-06, from the issue triage (issue #1417): the manual owes a
-  paragraph on where a body's origin goes.** Moving the origin changes no atom,
-  no χ² and no atom esd, only the origin's own esds and its correlations with
-  the rotation. The unit-weight centroid default is fine for a light-atom
-  molecule. With one heavy atom the decorrelating point can sit several Å away
-  (3.8 Å for a synthetic Br-acridine, as the reporter measured it), and an
-  f²- or b²-weighted centroid lands near it. The paragraph says when to move
-  the origin and shows the route that exists today: compute the weighted
-  centroid and pass it as the fractional `origin=` point. Whether a reading
-  of the best origin, or new arguments, come with it is
-  [2120](2120-where-a-body-turns-about.md)'s open question; write the paragraph
-  after it is answered.
+  paragraph on where a body's origin goes. Ruled by Yue, 2026-11-07: docs
+  only.** A body's origin is the point it turns about.
+  `body_from_atoms(phase, labels, name, *, origin=None)` puts it at the atoms'
+  unit-weight centroid, and `origin` may also be an atom label or a fractional
+  point (`crystallography/bodies.py`); `add_body(..., centre=True)` centres the
+  template the same way. Moving the origin by d is an exact
+  reparameterisation of the pose (t′ = t − [d]×ω, ω′ = ω). So χ², every atom
+  and every atom esd are unchanged. Only the origin's own esds and its
+  correlations with the rotation move. *Checked against the tree at
+  `a84379aac`:* both functions and both defaults are as the issue says.
+  The reporter fitted one body with its origin at seven points on three
+  patterns (rietx `ba3719f06`; not reproduced here). Distance of each origin
+  from the decorrelating point P_opt, and the largest origin–rotation
+  correlation:
+
+  | origin | acridine IX, measured (COD 2242872) | acridine, synthetic neutron | Br-acridine, synthetic X-ray |
+  |---|---|---|---|
+  | unit centroid (default) | 0.50 Å, 0.25 | 0.23 Å, 0.20 | 3.8 Å, 0.59 |
+  | Z² (X-ray) or b² (neutron) weighted centroid | 0.49 Å, 0.24 | 0.16 Å, 0.08 | 0.2 Å, 0.24 |
+
+  Across the arms χ² agreed to 0.002, atoms to 2.4e-6 Å and atom esds to 5e-5
+  relative; no convergence effect was seen. **The ruling.** The paragraph says
+  the default is fine for light atoms, and that when a heavy atom dominates
+  and the origin's esd will be quoted, the caller passes its Z²- (X-ray) or
+  b²- (neutron) weighted centroid to the existing `origin=`, with the few
+  lines that compute it. Declined until a user quotes a rigid body's origin
+  esd, or a badly placed origin is measured to slow convergence: a reported
+  P_opt, an `origin_weights=` argument, and a label-list `origin=`. Grounds:
+  the origin is a parameterisation choice that moves no atom, esd or χ²;
+  `origin=` already takes the weighted or subset centroid as a point; GSAS-II
+  5.8.4 places a residue body's origin on a reference atom or the unit
+  centroid and reports nothing about it (`GSASIIconstrGUI.py:3728-3753`,
+  checked), TOPAS and FullProf not checked. Quote no number in the manual
+  before reproducing one row of the table (acridine IX is WP-1806's fixture).
+  The ruling folded here a separate WP the triage branch had filed for the
+  three-part proposal, before any of it merged.
 
 - **2026-10-23, from [1810](1810-hydrogens-riding-on-a-body.md) (closed): the
   riding hydrogens have no user-facing call yet.** `RigidBody.riding` and
@@ -69,6 +94,8 @@ generated skill reference and manual section. This is chunk R10 of issue #561, s
 - [ ] Textdoc: a body block and its round trip
 - [ ] Skill: the generated per-shape reference and its routing row
 - [ ] Manual: Part 1 chapter, Part 2 frame section
+- [ ] Manual: the origin paragraph in the Part 1 chapter (issue #1417, Ruled by
+      Yue 2026-11-07; Inherited)
 - [ ] GUI: a body shown in the parameter and structure panels
 
 ## Acceptance
