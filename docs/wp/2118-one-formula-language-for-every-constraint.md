@@ -52,8 +52,10 @@ place declares what a parameter follows, and one command can serve both kinds of
 `_apply_ties` enforces it today. A tie onto an anchored coordinate DOF needs
 `rebase_anchored_dofs` (root CLAUDE.md § Conventions, WP-1432). An analytic Jacobian
 branch must declare what a formula's column reaches (root CLAUDE.md § Invariants). A
-stored formula is text, so it moves `SCHEMA_VERSION`, and old projects must open, with a
-stored linear tie read as its formula.
+stored formula is text, so it moves `SCHEMA_VERSION`, and old projects must open.
+(Superseded in part, 2026-11-07: ruling 3 keeps a stored linear tie linear, so it is not
+read as a formula. `TieSpec.expression` is additive in schema 0.61, which is unreleased, so
+`SCHEMA_VERSION` stays at 0.61.)
 
 **Tier.** The command and the shorthand are named practice (TOPAS, lmfit and Mantid
 declare formulas on parameters; practice.md). No new judgement is added.
@@ -102,12 +104,17 @@ declare formulas on parameters; practice.md). No new judgement is added.
       a node, is restored by checkout and replay, and is refused on a symmetry-fixed or
       symmetry-tied path by name. `Refinement.tie(path, expression=...)`, stored as
       `TieSpec.expression`; `tests/test_tie_expression.py`.
-- [ ] **Today's ties as formulas.** `tie`, `tie_equal` and `add_variable` keep working as
+- [x] **Today's ties as formulas.** `tie`, `tie_equal` and `add_variable` keep working as
       shorthand. Old projects open, and every golden that uses a tie is bit-identical, or
-      the WP says which moved and why.
-- [ ] **A series and a joint fit.** The command re-declares per pattern in a series as a
-      tie does, and a joint fit takes the same command (with 2103).
-- [ ] Tests: unit and property tests, a `test_cross_backend.py` row for a single-fit
+      the WP says which moved and why. Under ruling 3 the linear route is unchanged, so this
+      is a check: the eleven test files that tie and assert bit-identity, plus the backend
+      goldens, the textdoc and the series, pass unchanged (1049 passed).
+- [x] **A series and a joint fit.** The command re-declares per pattern in a series as a
+      tie does, and a joint fit takes the same command (with 2103). The series half runs
+      through the `constrain` hook with no change to `sequential.py`. The joint-fit half is
+      WP-2103's: a joint fit has no `tie` verb yet, so the rule for its `expression=` is
+      handed to 2103's Inherited section.
+- [x] Tests: unit and property tests, a `test_cross_backend.py` row for a single-fit
       formula, and obs/calc/diff PNGs to `tests/output/`.
 - [ ] Manual: the constraints guide and the expressions reference show the command.
 - [ ] Skill: the reference row for the command, keyed by its name.
