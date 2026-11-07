@@ -1,6 +1,6 @@
 # WP-2003 — The chain actions: what a series decides between patterns
 
-Milestone: generality · Status: 🔄 2026-11-03 — the batch ruled by the maintainer 2026-11-03 and landed but for C8, C11, C2's rung fields and C10 q1; the demoted codes are record fields, the joint hold reads the single fit's significance; the GUI wording and the joint moves await the maintainer's review; the agent run owed
+Milestone: generality · Status: 🔄 2026-11-04 — C8's onset split and C11's invariant arms landed (draft PR #1410, handover paused); owed on #1411: the hold code's tier, C2's rung fields, C10 q1, the X14 rows
 Track: The audits
 Depends on: 2002, 2037
 Priority: P2 2026-10-24 — 2037 closed, so its clause 1 and the response column this WP's first demotion takes are in place; the maintainer's next after 2037; the seam the maintainer's own example (a series discontinuity) lives in
@@ -293,9 +293,15 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
       (`SeriesResult.direction_gaps`, the path check split into `…_NOT_RUN` and
       `…_INCOMPLETE`), C2 q2-q3 (the ranking), C9 q1-q2 approved with the carry invariance
       test, C10 q2 (the joint hold on `_answer_significance`), and the GUI series panel on
-      the new fields (`steps` plotted). Owed: C8 (split the onset code), C11's three
-      invariant arms, the tiers of `SeriesEntry.rungs_tried`/`.rungs_raised` and
-      `fit:refit` (C2), C10 q1's hand rows, and the rows waiting on X14.
+      the new fields (`steps` plotted). Landed 2026-11-04 (seventh session): C8's split,
+      `SEQUENTIAL_MOMENT_ONSET` always `info` (the bracket, tier 1) and
+      `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` at `warning` (every reason not to quote it,
+      tier 1 argued against the batch's tier 3, for the maintainer to rule);
+      `SEQUENTIAL_MOMENT_HOLD` names every floored pattern. C11: `fit:x`, `fit:x_label`
+      and `fit:labels` `invariant`, their arms in `test_answer_invariant_defaults.py`
+      (`labels` compared blind to the names). Owed: `SEQUENTIAL_MOMENT_HOLD`'s tier (C8 q1, approval owed), the tiers
+      of `SeriesEntry.rungs_tried`/`.rungs_raised` and `fit:refit` (C2), C10 q1's hand
+      rows, and the rows waiting on X14.
 - [ ] Goldens re-pinned only if no further from reference. A series golden's first
       reference is the cold-fit chain, rietx's own result on the same data, so it
       verifies and does not validate (DESIGN.md § Rules, 2). Where a series member has a
@@ -327,6 +333,28 @@ summary).
 - Root CLAUDE.md § Series.
 
 ## Handover log
+
+### 2026-11-04 (seventh session) — C8's onset split and C11's invariant arms landed, handover paused
+
+The onset of a magnetic series is now two codes at fixed levels: `SEQUENTIAL_MOMENT_ONSET`
+states the bracket at `info`, and `SEQUENTIAL_MOMENT_ONSET_UNRESOLVED` gives every reason not to
+quote it at `warning`. The hold message names every floored pattern. `fit:x`, `fit:x_label` and
+`fit:labels` are `invariant`, with their arms. A ghostshift runner paused this session on the
+usage window before the handover finished, so this entry is short.
+
+*Done.* Draft PR #1410; issue #1411 holds what is owed. Commits `3315d5f`, `4cb3c5c` (C8),
+`11fdabd` (C11), `cd68970` (code review: four of seven findings fixed), `34efa05` (generality
+judge: wording, `fit:x` evidence, `labels` both ways). The judge's verdicts and the full draft
+entry are in the runner's scratch (`~/.cache/ghostshift/rietx-src/wp-2003/entry.md`).
+
+*Measured* (darwin arm64, worktree venv `[dev]`): magnetic series with its slow rows, the preset
+and audit-table files, 93 passed before the review fixes; touched files green after. The
+fast selection was started on `34efa05` and had not finished at the pause. Pearl was unreachable.
+
+*Next*, in order: read the fast suite's count; finish `/wp-handover` (this entry expanded from
+the scratch draft, steps 10-11); `gh pr ready` on #1410. Questions for the maintainer: is the
+split's added row welcome; tier 1 against the batch's tier 3 for the unresolved code; the hold
+code's tier.
 
 - **2026-11-04** — The sixth session past midnight. CI on Linux x86-64 py3.11 failed the flat
   X-ray plus neutron pin added in `d8f0da7` (background constant 2931.21 against 1.0, twice), so

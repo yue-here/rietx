@@ -45,7 +45,7 @@ import pytest
 
 import rietx as rx
 from rietx.report.schemas import MOMENT_SUPPORT_SIGMA, MomentEvidence
-from rietx.schemas.common import Parameter
+from rietx.schemas.common import Diagnostic, Parameter
 from rietx.schemas.results import Statistics
 from rietx.schemas.sequential import (
     MagneticOnset,
@@ -692,6 +692,7 @@ def test_the_ramp_reports_both_codes_with_the_counts_and_the_bracket(ramp):
     assert onset.value == pytest.approx(67.5)
     assert "60 → 75" in onset.message
     assert "set by the spacing of the patterns" in onset.message
+    assert "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED" not in codes
 
 
 @pytest.mark.xdist_group("wp1329-ramp")
@@ -740,6 +741,8 @@ def test_both_directions_agree_on_the_onset_and_the_row_says_so():
     # the comparison has been made, so the row no longer asks for it
     assert "direction='both'" not in row.suggestion
     assert "Quote the bracket" in row.suggestion
+    assert not any(d.code == "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED"
+                   for d in series.diagnostics)
     # the reverse pass carries its own reading, not the forward one's
     assert any(d.code == "SEQUENTIAL_MOMENT_ONSET"
                for d in series.backward.diagnostics)
@@ -760,11 +763,27 @@ def _verdicts(flags) -> SeriesResult:
                         for x, ok in zip(_AXIS, flags, strict=True)])
 
 
-def _agreement(forward_flags, backward_flags):
+_BRACKET = "SEQUENTIAL_MOMENT_ONSET"
+_UNRESOLVED = "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED"
+
+
+def _onset_rows(rows) -> dict[str, Diagnostic]:
+    """The one site's onset rows, by code: at most one of each (WP-2003 C8)."""
+    out = {}
+    for d in rows:
+        if d.code in (_BRACKET, _UNRESOLVED):
+            assert d.code not in out, f"two {d.code} rows on one site"
+            out[d.code] = d
+    for code, level in ((_BRACKET, "info"), (_UNRESOLVED, "warning")):
+        if code in out:
+            assert out[code].level == level, (code, out[code].level)
+    return out
+
+
+def _agreement(forward_flags, backward_flags) -> dict[str, Diagnostic]:
     forward, back = _verdicts(forward_flags), _verdicts(backward_flags)
-    rows = _with_onset_agreement(_moment_diagnostics(forward), forward,
-                                 back)
-    return [d for d in rows if d.code == "SEQUENTIAL_MOMENT_ONSET"]
+    return _onset_rows(_with_onset_agreement(_moment_diagnostics(forward),
+                                             forward, back))
 
 
 def test_a_backward_bracket_is_reported_when_the_forward_chain_wrote_no_onset():
@@ -774,21 +793,22 @@ def test_a_backward_bracket_is_reported_when_the_forward_chain_wrote_no_onset():
     moment, so a fold over the forward rows alone had nothing to fold the
     backward bracket into and the disagreement vanished.
     """
-    (row,) = _agreement(_EVERYWHERE, _BRACKETED)
-    assert row.level == "warning"
-    assert row.value == pytest.approx(67.5)
+    rows = _agreement(_EVERYWHERE, _BRACKETED)
+    assert set(rows) == {_UNRESOLVED}       # the forward chain has no bracket
+    row = rows[_UNRESOLVED]
+    assert row.value is None
     assert "the backward chain brackets the onset 60 → 75" in row.message
     assert "the forward chain located none" in row.message
     assert "every one of the 5 pattern(s) supports a moment" in row.message
 
     # and an interleaved backward verdict is a disagreement too
-    (row,) = _agreement(_EVERYWHERE, _INTERLEAVED)
-    assert row.level == "warning" and row.value is None
+    row = _agreement(_EVERYWHERE, _INTERLEAVED)[_UNRESOLVED]
+    assert row.value is None
     assert "has no single onset" in row.message
 
     # while two chains that both read "supported everywhere" say nothing
-    assert _agreement(_EVERYWHERE, _EVERYWHERE) == []
-    assert _agreement(_NOWHERE, _NOWHERE) == []
+    assert _agreement(_EVERYWHERE, _EVERYWHERE) == {}
+    assert _agreement(_NOWHERE, _NOWHERE) == {}
 
 
 @pytest.mark.parametrize("forward_flags, backward_flags, first, second", [
@@ -806,8 +826,10 @@ def test_a_total_disagreement_between_the_chains_is_reported(
     ``SEQUENTIAL_PATH_DEPENDENT`` (which divided by the held point's esd) said
     it anywhere else.
     """
-    (row,) = _agreement(forward_flags, backward_flags)
-    assert row.level == "warning" and row.value is None
+    rows = _agreement(forward_flags, backward_flags)
+    assert set(rows) == {_UNRESOLVED}
+    row = rows[_UNRESOLVED]
+    assert row.value is None
     assert f"the backward chain {first}" in row.message
     assert f"the forward chain {second}" in row.message
     # one side is a floor that never climbed, not only a carried moment
@@ -822,28 +844,31 @@ def test_the_mixed_onset_row_blames_the_chain_that_located_none():
     chain located no onset at all", quoting the backward chain's own
     successful-bracket sentence as the reason.
     """
-    (row,) = _agreement(_INTERLEAVED, _BRACKETED)
-    assert row.level == "warning"
+    rows = _agreement(_INTERLEAVED, _BRACKETED)
+    assert set(rows) == {_UNRESOLVED}       # no forward bracket to state
+    row = rows[_UNRESOLVED]
     assert "located no onset" not in row.message
     assert "backward chain brackets it 60 → 75 (67.5 ± 7.5)" in row.message
     assert "switches 3 times" in row.message
 
-    (row,) = _agreement(_BRACKETED, _EVERYWHERE)
-    assert row.level == "warning"
+    rows = _agreement(_BRACKETED, _EVERYWHERE)
+    assert set(rows) == {_BRACKET, _UNRESOLVED}
+    row = rows[_UNRESOLVED]
+    assert "the forward chain brackets the onset 60 → 75" in row.message
     assert "backward chain located no onset at all" in row.message
     assert "every one of the 5 pattern(s) supports a moment" in row.message
 
     # an interleaved backward chain has boundaries, just not one of them
-    (row,) = _agreement(_BRACKETED, _INTERLEAVED)
+    row = _agreement(_BRACKETED, _INTERLEAVED)[_UNRESOLVED]
     assert "located no onset at all" not in row.message
     assert "backward chain located no single onset" in row.message
 
-    (row,) = _agreement(_INTERLEAVED, _INTERLEAVED)
-    assert row.level == "warning"
+    row = _agreement(_INTERLEAVED, _INTERLEAVED)[_UNRESOLVED]
     assert "backward chain located no single onset either" in row.message
 
-    (row,) = _agreement(_BRACKETED, _BRACKETED)
-    assert row.level == "info" and "the onset is the data's" in row.message
+    rows = _agreement(_BRACKETED, _BRACKETED)
+    assert set(rows) == {_BRACKET}
+    assert "the onset is the data's" in rows[_BRACKET].message
 
 
 _RISES = (False, False, False, True, True)          # 60 → 75, other side
@@ -856,11 +881,14 @@ def test_brackets_in_one_place_agree_only_when_they_order_the_same_side(
     """Two chains bracketing 60 → 75, one reading the moment supported below
     it and the other above, overlap and still disagree about which side is
     ordered; the row called that agreement (#522 review, follow-up 2)."""
-    (row,) = _agreement(_BRACKETED, backward_flags)
+    rows = _agreement(_BRACKETED, backward_flags)
+    assert (_UNRESOLVED not in rows) is agrees
+    row = rows[_BRACKET] if agrees else rows[_UNRESOLVED]
     assert "backward chain brackets it 60 → 75" in row.message
-    assert (row.level == "info") is agrees
     assert ("the onset is the data's" in row.message) is agrees
     assert ("disagree about which side is ordered" in row.message) is not agrees
+    # the bracket row keeps its level whatever the fold found (WP-2003 C8)
+    assert rows[_BRACKET].level == "info"
 
 
 @pytest.mark.parametrize("forward_flags, backward_flags", [
@@ -878,12 +906,18 @@ def test_a_folded_onset_row_never_asks_for_the_run_that_just_ran(
     series direction='both'"; folded, it is the answer to that run.  An
     interleaved forward row's advice never asked for it and is kept.
     """
-    (row,) = _agreement(forward_flags, backward_flags)
-    assert "direction='both'" not in row.suggestion
-    if forward_flags == _INTERLEAVED:     # its own advice, which never asked
-        assert row.suggestion.startswith(_OPEN_THE_SWITCHES)
-    elif row.level == "warning":
-        assert "series.backward.magnetic_trajectory()" in row.suggestion
+    rows = _agreement(forward_flags, backward_flags)
+    for row in rows.values():
+        assert "direction='both'" not in row.suggestion, row.code
+    if _UNRESOLVED not in rows:
+        assert rows[_BRACKET].suggestion.startswith("Quote the bracket")
+    elif forward_flags == _INTERLEAVED:   # its own advice, which never asked
+        assert rows[_UNRESOLVED].suggestion.startswith(_OPEN_THE_SWITCHES)
+    else:
+        assert ("series.backward.magnetic_trajectory()"
+                in rows[_UNRESOLVED].suggestion)
+        # and the bracket points at the row that says why not to quote it
+        assert _UNRESOLVED in rows[_BRACKET].suggestion
 
 
 def _quiet(flags) -> SeriesResult:
@@ -902,10 +936,9 @@ def _early(flags) -> SeriesResult:
                                  for i in range(len(_AXIS))])
 
 
-def _fold(forward: SeriesResult, back: SeriesResult):
-    rows = _with_onset_agreement(_moment_diagnostics(forward), forward,
-                                 back)
-    return [d for d in rows if d.code == "SEQUENTIAL_MOMENT_ONSET"]
+def _fold(forward: SeriesResult, back: SeriesResult) -> dict[str, Diagnostic]:
+    return _onset_rows(_with_onset_agreement(_moment_diagnostics(forward),
+                                             forward, back))
 
 
 @pytest.mark.parametrize("forward, back, silent", [
@@ -922,12 +955,14 @@ def test_a_chain_that_gave_no_verdict_is_said_to_and_gets_no_cause(
     "disagree on every pattern they both judged", when they judged none in
     common, and blamed a warm start or a floor that nothing checked (review
     round 3, item 1)."""
-    (row,) = _fold(forward(), back())
+    rows = _fold(forward(), back())
+    row = rows[_UNRESOLVED]
     assert f"{silent} chain gave no verdict on any pattern" in row.message
     for cause in ("warm start", "never climbed", "disagree on every pattern"):
         assert cause not in row.message, cause
-    assert "series.backward.magnetic_trajectory()" not in row.suggestion
-    assert "direction='both'" not in row.suggestion
+    for row in rows.values():
+        assert "series.backward.magnetic_trajectory()" not in row.suggestion
+        assert "direction='both'" not in row.suggestion
 
 
 def test_an_overlap_with_one_unquotable_bracket_names_it_and_asks_for_max_iter():
@@ -935,18 +970,27 @@ def test_an_overlap_with_one_unquotable_bracket_names_it_and_asks_for_max_iter()
     its cap: the row warns, and it used to say "the onset is the data's, not
     the ordering's" and hand out the carried-moment advice.  The reason is
     the stopped fit, and the fix is ``max_iter`` (review round 3, item 2)."""
-    (row,) = _fold(_verdicts(_BRACKETED), _early(_BRACKETED))
-    assert row.level == "warning"
+    rows = _fold(_verdicts(_BRACKETED), _early(_BRACKETED))
+    assert "the onset is the data's" not in rows[_BRACKET].message
+    row = rows[_UNRESOLVED]
     assert "the onset is the data's" not in row.message
     assert "the backward bracket" in row.message
     assert "stopped early" in row.message
     assert "max_iter" in row.suggestion
     assert "series.backward.magnetic_trajectory()" not in row.suggestion
     # the forward one unquotable: its own max_iter advice stands, named too
-    (row,) = _fold(_early(_BRACKETED), _verdicts(_BRACKETED))
-    assert row.level == "warning" and "max_iter" in row.suggestion
+    rows = _fold(_early(_BRACKETED), _verdicts(_BRACKETED))
+    row = rows[_UNRESOLVED]
+    assert "max_iter" in row.suggestion
+    assert "Do not quote it" in row.message      # the forward pass's reason
     assert "the forward bracket" in row.message
     assert "the onset is the data's" not in row.message
+    # one pass alone: the bracket points at the row saying why, never at the
+    # reverse chain, which cannot finish the stopped fit
+    alone = _onset_rows(_moment_diagnostics(_early(_BRACKETED)))
+    assert set(alone) == {_BRACKET, _UNRESOLVED}
+    assert _UNRESOLVED in alone[_BRACKET].suggestion
+    assert "direction='both'" not in alone[_BRACKET].suggestion
 
 
 _OPEN_THE_SWITCHES = "Open the patterns either side of each switch"
@@ -958,10 +1002,11 @@ def test_an_interleaved_forward_row_keeps_its_own_advice(backward_flags):
     the fold has nothing to replace there: with the same interleaved verdicts
     on both chains, "the pattern one chain supports and the other holds" does
     not exist (review round 3, item 3)."""
-    (forward_row,) = [d for d in _moment_diagnostics(_verdicts(_INTERLEAVED))
-                      if d.code == "SEQUENTIAL_MOMENT_ONSET"]
+    forward_rows = _onset_rows(_moment_diagnostics(_verdicts(_INTERLEAVED)))
+    assert set(forward_rows) == {_UNRESOLVED}
+    forward_row = forward_rows[_UNRESOLVED]
     assert forward_row.suggestion.startswith(_OPEN_THE_SWITCHES)
-    (row,) = _agreement(_INTERLEAVED, backward_flags)
+    row = _agreement(_INTERLEAVED, backward_flags)[_UNRESOLVED]
     assert row.suggestion == forward_row.suggestion
 
 
@@ -1047,18 +1092,34 @@ def test_a_starved_chain_reports_a_supported_moment_above_the_transition_and_is_
     assert starved_traj.value[1] > 0.1
     assert tuple(starved_traj.onset.bracket) != (10.0, 70.0)
     assert starved_traj.onset.bracket_verdicts_final is False
-    starved_row = next(d for d in starved.diagnostics
-                       if d.code == "SEQUENTIAL_MOMENT_ONSET")
-    assert starved_row.level == "warning"
-    assert "Do not quote it" in starved_row.message
+    starved_rows = _onset_rows(starved.diagnostics)
+    assert set(starved_rows) == {_BRACKET, _UNRESOLVED}
+    assert "Do not quote it" in starved_rows[_UNRESOLVED].message
+    assert "max_iter" in starved_rows[_UNRESOLVED].suggestion
 
     # fed: the boundary is at the first pattern above the transition, and quiet
     assert fed_traj.supported == [True, False, False, False], fed_traj.value
     assert tuple(fed_traj.onset.bracket) == (10.0, 70.0)
     assert fed_traj.onset.bracket_verdicts_final is True
-    fed_row = next(d for d in fed.diagnostics
-                   if d.code == "SEQUENTIAL_MOMENT_ONSET")
-    assert fed_row.level == "info"
+    assert set(_onset_rows(fed.diagnostics)) == {_BRACKET}
+
+
+def test_the_hold_names_every_floored_pattern_off_the_record():
+    """``SEQUENTIAL_MOMENT_HOLD`` reads ``SeriesEntry.floored`` and names every
+    pattern on it (WP-2003 C8, X7): the list used to stop at four labels and
+    an ellipsis, leaving the rest to the record it was read from."""
+    series = _hand_built([(10.0 * i, 4.0 if i == 0 else 0.01,
+                           0.05 if i == 0 else 0.4, i == 0) for i in range(8)])
+    (site,) = series.magnetic_sites()
+    floored = [f"p{i}" for i in range(2, 8)]          # six successors
+    for entry in series.entries:
+        if entry.label in floored:
+            entry.floored = [site]
+    (hold,) = [d for d in _moment_diagnostics(series)
+               if d.code == "SEQUENTIAL_MOMENT_HOLD"]
+    assert f"on {len(floored)} successor pattern(s) ({', '.join(floored)};" in (
+        hold.message)
+    assert "…" not in hold.message
 
 
 def test_an_unsupported_pattern_reseeds_its_successor_to_the_floor():
@@ -1605,7 +1666,8 @@ def test_ba2fesbse5_ramp_the_moment_grows_below_the_onset_both_ways(
         assert d < 3.0 * float(np.hypot(fwd.stderr[i], bwd.stderr[i])), (BA_TEMPS[i], d)
     onset_rows = [d for d in series.diagnostics
                   if d.code == "SEQUENTIAL_MOMENT_ONSET"]
-    assert onset_rows and all(d.level != "warning" for d in onset_rows)
+    assert onset_rows and not any(
+        d.code == "SEQUENTIAL_MOMENT_ONSET_UNRESOLVED" for d in series.diagnostics)
 
     # along b, whatever the two Fe orbits' split (tied equal, as published)
     row = series.entries[0].moment(site)
