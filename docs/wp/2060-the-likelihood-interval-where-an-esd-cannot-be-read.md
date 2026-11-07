@@ -1,6 +1,6 @@
 # WP-2060 — the likelihood interval where an esd cannot be read as one
 
-Milestone: unscheduled · Status: 🔄 2026-11-07 — tasks 2-7 built in PR #1322; task 1's modulus half ruled by Mike on #1075 (2026-11-04, amended 2026-11-05): the interval computed unasked on flagged sites, with four conditions; task 8 builds it
+Milestone: unscheduled · Status: 🔄 2026-11-07 — claimed by ghostshift (task 8, the build of Mike's ruling); tasks 2-7 built in PR #1322
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-07 — a wrong statement with nothing fired: a weak modulus beside a zeroed angle covers 0.82 at a nominal 0.95, on the magnetic path few fits run; the dead-column half shipped in PR #1322, and Mike's ruling leaves only the build
