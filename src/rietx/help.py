@@ -3261,7 +3261,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "estimate assumes the angles sit on the direction. Quote the size by that "
             "interval. Where the profile found a fit better than the answer by a whole "
             "threshold or more, the fit did not reach its minimum: the message gives "
-            "the better point, and the size is quoted only after a refit from it."
+            "the better point, and the size is quoted only after a refit from it. "
+            "The size's coverage and that threshold were measured on one family, a "
+            "simulated two-site Pnma set, and are untested beyond it."
         ),
     ),
     "MOMENT_UNSUPPORTED": HelpEntry(

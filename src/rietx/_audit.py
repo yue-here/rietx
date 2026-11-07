@@ -898,13 +898,18 @@ ROWS: tuple[Row, ...] = (
                   "than the 1.13 between the cuts, so 'excludes' stays reachable; #1075 "
                   "(Mike, N = 400): a weak modulus beside the zeroed angles covered 0.82 "
                   "with its esd and 0.93-0.98 with its profile; a profile withheld on a "
-                  "drop of a full cut, 13-14 of 400 fits, where the esd covered 3 of 20"),
+                  "drop of a full cut, 13-14 of 400 fits, where the esd covered 3 of 20; the "
+                  "collinear reading (the moment along the direction, its esd) covered 0.970 "
+                  "on moments truly along it and 0.47 on a weak one truly tilted 0.08 rad, "
+                  "where the profile covered 0.975 (N = 40-200)"),
         grounds=("The column leaves the covariance by the package's own act, so the finding "
                  "says so, with each angle's distance from the direction and its profile "
                  "interval (B2 option 2, ruled 2026-10-19), and quotes each site's modulus "
                  "by its profile interval, withheld with a pointer to refit where the "
                  "profile dropped a full cut below the fit (WP-2060, ruled by Mike on "
-                 "#1075, 2026-11-04 and 2026-11-05)."),
+                 "#1075, 2026-11-04 and 2026-11-05). Rare feature: the modulus coverage and "
+                 "the withhold rule rest on one family, the simulated two-site Pnma set, "
+                 "and are untested beyond it."),
         approved="2026-11-05"),
     Row("MOMENT_PAIR_DEGENERATE", "code"),
     Row("MOMENT_UNSUPPORTED", "code", tier=1, ambiguity=1, response="warning",
@@ -5220,13 +5225,16 @@ ROWS: tuple[Row, ...] = (
     Row("MODEL_FAR_FROM_DATA.suggestion", "suggestion", value=1),
     Row("MOMENT_ANGLE_STATIONARY.suggestion", "suggestion", tier=3, ambiguity=1, value=1,
         evidence=("LaMnO3 BT-1 (WP-1929): an angle 5.2 deg off 90 whose interval includes the "
-                  "direction, Delta chi2 0.56 against the interval's 3.84"),
+                  "direction, Delta chi2 0.56 against the interval's 3.84; #1075 (two-site "
+                  "Pnma, N = 400): a weak modulus's esd covered 0.82, its profile 0.93-0.98, "
+                  "and a withheld profile's esd 3 of 20"),
         grounds=("Says what the interval means: one that includes the direction cannot tell "
                  "the moment from one along it, one that excludes it measures the tilt "
                  "(B2 option 2, ruled 2026-10-19). No longer says to quote the moment along "
                  "the direction: the modulus is the length at the kept tilt, so it is "
                  "quoted by its own interval, and a withheld one after a refit (WP-2060, "
-                 "ruled by Mike on #1075, 2026-11-04 condition 3)."),
+                 "ruled by Mike on #1075, 2026-11-04 condition 3). Rare feature: one "
+                 "family, the simulated two-site Pnma set, untested beyond it."),
         approved="2026-11-05"),
     Row("MOMENT_UNSUPPORTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("physics: an esd is no interval where the column vanishes; the profile "
