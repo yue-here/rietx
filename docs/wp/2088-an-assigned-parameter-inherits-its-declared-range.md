@@ -1,6 +1,6 @@
 # WP-2088 — An assigned Parameter inherits its declared range
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-07 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-04 — a silent unbounded parameter on a path few fits run (assignment after construction); construction is already right
