@@ -93,6 +93,15 @@ Widen the dependent's limit if the source needs more room.
 - a parameter the current intensity mode fixes, such as an atom's Biso when the fit is in Le Bail or Pawley mode;
 - a tie whose value would fall outside the dependent's own limits.
 
+With `expression=`, `tie` also refuses:
+
+- a name in the formula that is not a declared variable;
+- a formula that reads no variable, which `set_values` does instead;
+- a formula whose value is not finite at the variables' present values, such as the logarithm of a negative number;
+- a site's coordinate degree of freedom or a rigid body's origin or rotation, which hold a step from where the fit began rather than a value.
+
+A formula that cannot be parsed raises `ExpressionError`, a `ValueError` that points at the column it stopped at.
+
 ## Release a tie
 
 `Refinement.untie` takes the names of the tied parameters and returns the ones it released.
@@ -153,8 +162,57 @@ rows = {row.path: row for row in ref.parameters()}
 assert rows["vars.B_total"].held_because == "tied: = 1·vars.B_base + 1·vars.B_extra"
 ```
 
-Every relation is a sum of coefficient × source plus a constant.
-There is no expression language, and a string such as `"2*A + 0.5"` is not accepted anywhere.
+Each of these relations is a sum of coefficient × source plus a constant.
+The next section covers a relation that is not.
+
+## Tie to a formula
+
+Pass `expression=` to `tie` to set a parameter by a formula, such as the Debye model of a displacement parameter.
+The formula's text follows [Expressions](../reference/expressions.md).
+Each name in it is a variable you declared with `add_variable`, and every other value is a number written in the text.
+
+The Debye model gives B = 6h²T/(m k<sub>B</sub> θ<sub>D</sub>²) [D₁(θ<sub>D</sub>/T) + θ<sub>D</sub>/4T] {cite}`willis1975`.
+Here D₁ is the first Debye function, `debye(x)`, and 6h²/(m k<sub>B</sub>) is 718.1 Å² K for oxygen, of molar mass 16.00 g/mol.
+This ties the three phosphate oxygens of fluorapatite to one Debye temperature at 295 K:
+
+```python
+import rietx as rx
+from rietx.examples import examples_dir
+
+structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
+ref = rx.Refinement(structure, rx.Instrument.bragg_brentano(radiation="CuKa"))
+ref.add_variable("thD", 600.0, vary=True, min=100.0, max=3000.0)
+for j in (4, 5, 6):
+    ref.tie(f"phases.0.atoms.{j}.biso",
+            expression="718.1 * 295 / thD^2 * (debye(thD / 295) + thD / (4 * 295))")
+
+row = {r.path: r for r in ref.parameters()}["phases.0.atoms.4.biso"]
+assert round(row.value, 4) == 0.6534
+assert row.held_because == (
+    "tied: = 718.1 * 295 / thD^2 * (debye(thD / 295) + thD / (4 * 295))")
+```
+
+The fit refines `vars.thD` and reports its esd.
+Each Biso is reported too, at the formula's value, with an esd carried from `thD`.
+`untie` releases a formula tie, and a history checkout restores one, as for any tie.
+
+A formula reads variables and numbers only, so a model parameter enters through a variable.
+Tie the parameter to a variable, then name the variable in the formula:
+
+<!-- api-doc: no-exec — it needs a structure with two species on one site -->
+```python
+ref.add_variable("x_Fe", 0.5, vary=True, min=0.0, max=1.0)
+ref.tie("phases.0.atoms.0.occ", "vars.x_Fe")
+ref.tie("phases.0.atoms.1.occ", expression="1 - x_Fe")
+```
+
+A formula always runs as a formula, even when it is linear, as `1 - x_Fe` is.
+`tie` with a source path and `tie_equal` keep the linear route they always had, so the numbers of a fit using them do not change.
+The two routes give the same value for a linear relation, to within 4 × 10⁻¹⁶ relative.
+
+Trigonometric functions take radians, and rietx stores every angle in degrees.
+Write a cell angle as `cos(beta * pi / 180)`.
+GSAS-II's expressions read `sin`, `cos` and `tan` in degrees, so a GSAS-II formula copied unchanged gives a different value with no error.
 
 ## Tie parameters across a series
 
@@ -162,6 +220,22 @@ A tie belongs to one `Refinement`, and a sequential refinement builds a new one 
 Declare the tie inside the function you pass as `SequentialRefinement.fit`'s `constrain` argument, which rietx calls with each pattern's index and `Refinement` before that pattern's fit.
 A variable belongs to one `Refinement` too, so call `add_variable` in the same function.
 Its value is then carried from one pattern to the next like any other parameter's.
+
+A formula tie is declared the same way.
+Write a number that changes from pattern to pattern, such as the temperature, into the formula's text:
+
+<!-- api-doc: no-exec — a fragment; tests/test_tie_expression.py runs the series -->
+```python
+temperatures = [300.0, 600.0]
+
+def constrain(index, ref):
+    T = temperatures[index]
+    ref.add_variable("thD", 800.0, vary=True, min=100.0, max=3000.0)
+    ref.tie("phases.0.atoms.1.biso",
+            expression=f"1062.9 * {T} / thD^2 * (debye(thD / {T}) + thD / (4 * {T}))")
+```
+
+A variable would not do for the temperature, since its value is carried from the previous pattern.
 
 ## See also
 

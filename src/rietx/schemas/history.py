@@ -195,6 +195,10 @@ class NodeAction(Base):
         if self.kind == "set_tie":
             parts = []
             for path, spec in self.ties.items():
+                if spec.expression is not None:
+                    # a formula tie (WP-2118) is declared by the same verb
+                    parts.append(f"ref.tie({path!r}, expression={spec.expression!r})")
+                    continue
                 if not spec.terms:
                     # a derived tie with no sources is not something a verb
                     # declares, so the log says what it is rather than
