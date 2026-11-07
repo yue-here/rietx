@@ -1,9 +1,8 @@
 # WP-2060 — the likelihood interval where an esd cannot be read as one
 
-Milestone: unscheduled · Status: 🔄 2026-11-07 — claimed by ghostshift (task 8, the build of Mike's ruling); tasks 2-7 built in PR #1322
+Milestone: unscheduled · Status: ✅ 2026-11-07 — a flagged site's modulus carries its profile interval unasked (PR #1459); the dead-column half shipped in PR #1322
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-11-07 — a wrong statement with nothing fired: a weak modulus beside a zeroed angle covers 0.82 at a nominal 0.95, on the magnetic path few fits run; the dead-column half shipped in PR #1322, and Mike's ruling leaves only the build
 
 ## Goal
 
@@ -37,8 +36,6 @@ What it says: where the flag fires and the model is right, every rule covers, so
 
 **Tier.** A default interval on a bound row is a new automatic action (DESIGN § Rules 1 and 4), and its trigger is new judgement: name the families. The moduli-beside-zeroed-angles rule follows from B2's own ruling (its effect on the other esds), so it re-opens B2's consequence and needs the maintainer. A modulus flag for "esd orders above the value" is tier 1 if stated as a fact (the column is dead at m = 0, Hamilton 1965's linearisation does not hold there).
 
-### Inherited
-
 ## Non-goals
 
 - The FCJ aperture stall (#1075's repro 1): WP-1955.
@@ -49,7 +46,7 @@ What it says: where the flag fires and the model is right, every rule covers, so
 ## Tasks
 
 - [x] Rule with the maintainer: default intervals on bound rows of phase scale, occupancy and moment modulus (yes / no / modulus only), and whether a modulus beside a zeroed angle takes the interval by default or `MOMENT_ANGLE_STATIONARY` says its modulus is conditional and points at `profile_interval`. — *2026-11-02: scale and occupancy settled by Claude as **no** under the reporter's measurement (every rule covers there, so a default interval fixes no coverage). The modulus half is built as the pointer (no interval unasked; `MOMENT_UNSUPPORTED` and `MOMENT_ANGLE_STATIONARY` name `profile_interval`) and goes to the maintainer at the PR, under the reader-output rule: a modulus profile measured 7-58 s on 1-8 s two-site fits.* *Ruled by Mike on #1075 (2026-11-04, amended 2026-11-05), under the magnetic-path split he accepted that day: option 2, the interval computed unasked on flagged sites, with four conditions. Handover entry of 2026-11-07.*
-- [x] Build Mike's ruling (handover entry of 2026-11-07): a modulus profile unasked on each site `MOMENT_ANGLE_STATIONARY` flags, through `attach_stationary_intervals`, with conditions 1-4 and the 2026-11-05 amendment; tests for each condition; the stationary message, help, skill row and audit rows it moves. Bring Yue's three parts (below) to Yue at the PR. — *Built in PR #1459; Yue's parts ruled 2026-11-07 (second handover entry of that date).*
+- [x] Build Mike's ruling (handover entry of 2026-11-07): a modulus profile unasked on each site `MOMENT_ANGLE_STATIONARY` flags, through `attach_stationary_intervals`, with conditions 1-4 and the 2026-11-05 amendment; tests for each condition; the stationary message, help, skill row and audit rows it moves. Bring Yue's three parts (below) to Yue at the PR. — *Built in PR #1459; Yue's parts ruled 2026-11-07 (the 2nd-session handover entry of that date).*
 - [x] `profile_interval` holds the fit's own free set along its path: a pinned refit freezes WP-1301's held paths as the fit held them.
 - [x] `profile_interval`'s first step from the profile's curvature when the esd is orders above the value, and a modulus profile kept at m ≥ 0; never a zero-width interval where the walk found no end.
 - [x] A modulus on its dead column says so in `result.diagnostics` (or the existing `supported=False` verdict reaches the result), with its `_audit` row. — *`MOMENT_UNSUPPORTED` (warning), the report's verdict through `report.magnetic.moment_supported`; tier 1.*
@@ -72,6 +69,76 @@ Repro 2's seeds 3, 4 and 8 give intervals of non-zero width that contain m = 0; 
 - Issue #1075 and its two repro scripts; WP-1929 (the stationary-angle test); WP-2002 B2 (`docs/wp/2002-batch/rulings.md`).
 
 ## Handover log
+
+- **2026-11-07** (2nd session, ghostshift runner, PR #1459) — task 8 built, and the WP closes. A
+  moment whose angles the stationary test left out now carries a likelihood interval on its size,
+  computed unasked, beside the esd it keeps. Mike's runs put that interval's coverage at 0.93-0.98
+  for a weak moment, where the esd covered 0.82. Where the interval's own refits find a clearly
+  better fit (a drop of a whole Δχ² cut or more), the fit did not reach its minimum: the size then
+  gets no interval, and the message gives the better point and says to refit. A site whose moment
+  the data do not support is profiled too, and its angles are no longer read as a direction. The
+  cost is 2.5-11.8 s a modulus, only on fits where the test fires.
+
+  **Ruled by Yue 2026-11-07** (the three parts the 2026-11-04 ruling left on her side, and one
+  more), under WP-2119's decision framework:
+  (a) magCIF: no change to the file. It keeps the value and the standard `magnitude_su` (the
+  conditional least-squares esd), with no interval items and no new `_rietx_` private tags.
+  Grounds: Direction (no use case reads an interval from magCIF; the round trip goes through the
+  result), Convention (rietx's private `_rietx_` tags carry model inputs lost on reload, such as
+  ion and g), Practice (value(su)).
+  (b) Widen the `RefinedParameter.interval` docstring to cover moduli as well as angles. No new
+  field, no schema bump.
+  (c) Keep the refit points in the stored interval (2.2-5.2 kB per modulus).
+  (d) The parameter row's `stderr` keeps the covariance esd; the interval rides beside it.
+
+  *Done.* `attach_stationary_intervals` (`strategy/parameter_interval.py`) profiles each flagged
+  angle with a half-width, then the modulus of each flagged site (`report.magnetic.flagged_moduli`),
+  on the answer fit and on the attempt a series keeps; a trial and a rung still skip it
+  (`_auto_intervals`). Condition 2 with the amendment: `report.magnetic.modulus_profile_withheld`
+  (drop ≥ `delta_chi2_cut`) leaves the row's `interval` `None`, and the finding gives the lowest
+  point and "Refit with it started at …"; a smaller drop is quoted with the drop named. Condition 1:
+  an angle on a site `moment_supported` calls unsupported prints its interval without
+  "includes/excludes the direction", and one sentence names the site. Condition 3: the suggestion
+  no longer says to quote the moment along the direction; the message quotes each modulus by its
+  interval, to three figures of the interval's width. Condition 4: no line of `profile_interval`
+  changed. Help entry, both audit rows (approved 2026-11-05, Mike's ruling in the grounds), the
+  skill row, the reference and theory pages, the guide (its example prints the modulus interval:
+  3.47 to 3.65 μ_B against 3.56 ± 0.04), and the `RefinedParameter.interval` docstring under (b).
+  Reading of condition 1: Mike's "on those sites only" limits the profile to sites the stationary
+  test flagged, so an unsupported moment whose angles were not flagged gets no unasked interval;
+  its `MOMENT_UNSUPPORTED` suggestion still names `profile_interval`.
+  *Measured* (macOS arm64, `[dev]`, this worktree's venv). Probe, two-site set with Mn2 simulated
+  at 0 (`~/.cache/ghostshift/rietx/wp-2060/probe8/`): seed 0 ends Mn2 at 0.085 ± 0.038 μ_B, both
+  polar angles left out, `MOMENT_UNSUPPORTED`; its modulus interval 0.012 to 0.152 μ_B, 36
+  refits, 45.7 s for fit and four profiles. Seed 2 withholds Mn2's modulus (drop 5.26 against a
+  cut of 4.885, lowest point 0.0723 μ_B) and quotes Mn1's with a drop of 4.07 named; 59.2 s.
+  Seed 4 (both moments along **a**, 3.5 and 0.7 μ_B): both moduli covered, 3.4973-3.5038 and
+  0.6991-0.7098, 26 and 30 refits; 63.3 s against the angles-only fit. Stored size of one modulus
+  interval 2.0-3.0 kB here (`model_dump_json`). Serial test cost: `test_a_stop_beside_…` 18.1 s
+  on base `597f96d09`, 27.1 s here; `test_a_left_out_angle_…` 5.2 → 7.0 s. `tests.reader_output`:
+  unchanged (its standard fit has no moment); the seed-4 diff of what a reader receives is in
+  the PR body. Revert checks: each condition's mechanism patched out in turn (unsupported angle
+  branch, the withhold test, the drop sentence, the old suggestion, the moduli in the hook), and
+  each made its own test fail. Fast selection on `71eccc2fa` (macOS arm64, `[dev]`, through the shift's suite lock, 9:44): 14249 passed, 411 skipped, 36 xfailed, 1 failed. The failure was this branch's: the theory page's twin ran 217 characters over its 50 000 cap, fixed in a later commit and re-run alone green. `b1dfe1ad5` changed only audit and help strings after that run; the help, audit and GUI-help guards re-ran green (54 passed). Added to the fast selection: 7 tests, 1.40 s in all (`tests.added_test_times`, local junit); none slow. The base count was not measured, so the +7 is not checked against it. The full selection did not run.
+  *Review.* `/code-review high --fix`, 8 findings, 5 fixed in `71eccc2fa`: a one-sided modulus
+  interval now says its other end is the limit to quote; a tied modulus is no longer pointed at
+  `profile_interval`, which refuses it; both committed skill copies re-synced; shared helpers for
+  the modulus path and the missing ends. Declined: a withheld modulus is not machine-readable (its
+  `interval` is `None` like "not computed", and `where` names only angles), since the ruling sets
+  the field's shape and the finding is the carrier; the angle intervals' sibling of the withhold
+  rule (forwarded, below); the series cost, now one line on the reference page; an unguarded
+  `size.interval` in the guide example, which runs on fixed simulated data.
+  *Generality.* The judge's full sections are in the PR body. Verdicts: `MOMENT_ANGLE_STATIONARY` code row **weak** (no rare-feature wording; the collinear reading, along-direction moment ± esd at 0.970, not addressed); its suggestion row **weak** (evidence cited none of #1075's modulus numbers); the unasked modulus profile **holds** (one family, cost only); `modulus_profile_withheld` **weak** (a withheld interval has no record field and `interval = None` reads like "not computed"; whether the advised refit resolves the withheld fits is unmeasured); condition 1 **weak** (its gate is the unaudited 3σ `MOMENT_SUPPORT_SIGMA` on the esd that under-covers); the width formatting **holds**.
+  Author: fixed in `b1dfe1ad5`, both rows' grounds and the help entry now carry the rare-feature wording (one family, the simulated two-site Pnma set, untested beyond it), the code row's evidence carries Mike's reason against the collinear reading (it covered 0.47 on a weak moment truly tilted 0.08 rad, where the profile covered 0.975), and the suggestion row cites #1075's modulus coverage. Not changed: the withheld state's record field and the gate of condition 1 are the ruling's shape and Mike's to reopen; `MOMENT_SUPPORT_SIGMA`'s audit is its own row's work, as the 2026-11-02 entry said.
+  *Deliberately not generalised.* The withhold-and-refit rule is the moduli's alone, as Mike ruled
+  it. The angle intervals beside them can come from the same fit that missed its minimum (seed 2:
+  drops of 5.10 and 5.31 against a cut of 4.89, still quoted); forwarded to WP-1327's Inherited
+  for Michael. `MOMENT_UNSUPPORTED` for joint fits stays optional and unbuilt.
+  *Forward.* WP-1327 § Inherited: the angle sibling above, and the undiagnosed χ² mismatch of a
+  refit of a fit whose angles the test zeroed (the 2026-11-02 entry's seed-15 gotcha, open there
+  rather than here). WP-2114: its pointer to this WP now says it is closed.
+  *Next.* None in this WP. Yue writes the release note at the cut (a draft is in the PR body).
+  *Gotchas.* `docs/docs/theory/estimation.md` sits at its twin's 50 000-character cap (`tests/test_manual.py`), so the next paragraph there needs a split or a cut.
 
 - **2026-11-07** (rulings, PR #1455) — task 1's modulus half is ruled, by Mike rather than Yue. On
   2026-11-04 Mike accepted the design decisions on the magnetic path (issue #1075, 05:08Z): "the
