@@ -1,6 +1,6 @@
 # WP-2119 — the design record says how a design is chosen
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-07 — claimed by @yue-here
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-11-05 — the maintainer stated how designs are chosen and DESIGN.md does not yet say it; sessions apply it today only through the maintainer's questions
