@@ -65,12 +65,12 @@ Four steps, each on the same pattern and range:
    Every class is then fitted with that instrument frozen, so no class can make up for a missing reflection with a wider neighbour.
 2. The reference fit: the absence-free class under the same one-stage protocol as every other class, so all the χ² values compare.
 3. One Pawley fit per class, fewest absences first, freeing the background and every declared hump and nothing else.
-   A class some of whose forbidden lines are untestable gets a second fit: the lattice group less only its testable forbidden lines, which is what the class is scored on.
+   A class some of whose forbidden lines cannot be tested gets a second fit: the lattice group less only its testable forbidden lines, which is what the class is scored on.
 4. The absence test at each class's testable forbidden positions, read against that class's own calculated pattern: a position carrying intensity the class cannot account for refutes it, with the reflection named.
 
 Each class is scored against the reference by ΔBIC {cite}`schwarz1978` and by Hamilton's ratio test {cite}`hamilton1965`, with the class's testable absences as the parameters removed.
 The ranking is a nested comparison and not lowest Rwp, because a class with fewer absences has more reflections and always fits at least as well.
-That holds only for fits that minimise χ², so every fit the screen compares is a Pawley fit; the cell-free prefit alone stays Le Bail.
+That holds only for fits that minimise χ², so every fit the screen compares is a Pawley fit; only the cell-free fit that refines the cell first stays Le Bail.
 A Le Bail partition hands a weak line in a gap the noise of its whole window, and on a synthetic sweep of 41 space groups at a correct cell the Le Bail screen named a class excluding the true group on 318 of 1082 patterns, against 10 now.
 Scoring on the testable lines alone keeps the comparison to the absences the BIC counts: scored on its own fit, a class gained or lost by lines it was never charged for.
 [Which parameter to free next](../theory/estimation.md#which-parameter-to-free-next) derives both; the screen takes N as the fitted channel count, `ExtinctionScreen.n_points`.
