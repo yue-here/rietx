@@ -34,7 +34,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 2026-11-03 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 2026-10-09 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) | A cell pays for the lines it predicts and the pattern lacks | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) | A cell pays for the lines it predicts and the pattern lacks | 2026-11-07 | P4 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | 2026-10-24 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) | Guides and Theory move over, and the old tree retires | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1988](1988-a-pr-put-up-for-review-is-watched.md) | A PR put up for review is watched by the session that opened it | 2026-10-23 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
@@ -46,15 +46,13 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | 2026-11-05 | P2 | [generality](#generality-the-audits) |
 | [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 2026-11-06 | P2 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2041](2041-a-tutorial-shows-the-indexer-abstain.md) | A tutorial shows the indexer abstain | 2026-10-24 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 2026-11-01 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
-| [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2109](2109-the-solve-cost-at-a-stated-march-dollase-r.md) | The solve cost at a stated March-Dollase r | 2026-11-05 | P3 | [structure-solution](#structure-solution) |
 | [2118](2118-one-formula-language-for-every-constraint.md) | One formula language for every constraint | 2026-11-07 | P2 | [parametric](#parametric) |
 
 ## Next, by priority
@@ -440,7 +438,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1901](1901-the-difference-fourier-map.md) | The difference-Fourier map: a missing atom shows as a peak | ⬜ | P3 | — |
 | [1902](1902-the-solve-cost-as-a-quadratic-form.md) | The solve cost as a quadratic form, and the doublet question first | ✅ 2026-10-03 | — | — |
 | [1997](1997-the-direct-space-solver-on-main.md) | The direct-space solver on main: site classes, kernels, chemistry, engine and entry point | 🔄 2026-11-05 | P2 | [1902](1902-the-solve-cost-as-a-quadratic-form.md), [1940](1940-the-kernel-tier-in-a-wheel.md) ([1901](1901-the-difference-fourier-map.md) soft) |
-| [2109](2109-the-solve-cost-at-a-stated-march-dollase-r.md) | The solve cost at a stated March-Dollase r | 🔄 2026-11-05 | P3 | [1902](1902-the-solve-cost-as-a-quadratic-form.md) |
+| [2109](2109-the-solve-cost-at-a-stated-march-dollase-r.md) | The solve cost at a stated March-Dollase r | ✅ 2026-11-07 | — | [1902](1902-the-solve-cost-as-a-quadratic-form.md) |
 
 ## <a id="generality"></a>generality — every decision rietx makes holds beyond the data it was tuned on
 
@@ -600,7 +598,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1952](1952-the-xy-reader-says-what-it-skipped.md) | The xy reader says what it skipped | ⬜ | P3 | — |
 | [1953](1953-a-large-pawley-stage-converges-under-the-default-driver.md) | A large Pawley stage converges under the default driver | ✅ 2026-10-13 | — | — |
 | [1955](1955-a-column-at-a-zero-aperture-and-a-column-the-matrix-cannot-see.md) | A column at a zero aperture, and a column the agreement matrix cannot see | 🔄 2026-11-02 | P2 | — |
-| [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) | A cell pays for the lines it predicts and the pattern lacks | 🔄 2026-11-02 | P2 | — ([1449](1449-rank-on-what-the-screen-determined.md), [1511](1511-which-cell-does-this-powder-support.md) soft) |
+| [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) | A cell pays for the lines it predicts and the pattern lacks | 🔄 2026-11-07 | P4 | — ([1449](1449-rank-on-what-the-screen-determined.md), [1511](1511-which-cell-does-this-powder-support.md) soft) |
 | [1958](1958-a-phase-with-no-reflection-walks-its-scale-under-trf.md) | A phase with no reflection in range walks its scale under TRF | ✅ 2026-10-31 | — | — |
 | [1968](1968-the-picker-offers-no-line-the-data-cannot-support.md) | The picker offers no line the data cannot support | ✅ 2026-11-01 | — | — ([1909](1909-a-line-on-a-falling-flank.md) soft) |
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | 🔄 2026-10-24 | P2 | — ([1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) soft) |
@@ -624,7 +622,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2053](2053-a-split-site-the-data-cannot-tell-says-so.md) | A split site the data cannot tell from one elongated atom says so | ⬜ | P3 | — ([2052](2052-a-fit-keeps-each-sites-multiplicity.md) soft) |
 | [2054](2054-the-report-names-asymmetry-with-fcj-off.md) | The report names an asymmetric residual the model cannot draw | ✅ 2026-11-05 | — | — ([1977](1977-a-flank-lobe-read-as-an-unindexed-peak.md), [2004](2004-the-fitreport-reasons-for-the-caller.md) soft) |
 | [2055](2055-a-picked-line-held-at-its-position-bound.md) | The picker holds a line shape the lab pattern does not have | ✅ 2026-11-06 | — | — |
-| [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | 🔄 2026-11-02 | P2 | — |
+| [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | 🔄 2026-11-07 | P2 | — |
 | [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | ⬜ | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) |
 | [2063](2063-the-panel-scored-after-the-clock-spends-the-validation-reserve.md) | The FoM panel scored after the clock spends the validation reserve | ✅ 2026-11-02 | — | — |
 | [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) | A complete dichotomy search holds every centred lattice and polishes its truth leaf | ✅ 2026-11-03 | — | — ([1924](1924-a-monoclinic-search-inside-its-ceiling.md) soft) |
@@ -632,7 +630,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2068](2068-the-stationary-angle-test-reads-the-curvature-s-sign.md) | The stationary-angle test builds its angle block analytically | ✅ 2026-11-02 | — | — ([1327](1327-magnetic-structure.md) soft) |
 | [2071](2071-a-peak-list-refuses-a-q-esd-its-two-theta-esd-does-not-give.md) | A peak list refuses a q_esd that its two_theta_esd does not give | ✅ 2026-11-01 | — | — |
 | [2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) | The result records its fit range, and what lies outside it | ⬜ | P3 | — ([2005](2005-refine-py-codes-and-literals.md) soft) |
-| [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 🔄 2026-11-05 | P2 | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) |
+| [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 🔄 2026-11-07 | P2 | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md), [2062](2062-pawley-is-the-structure-free-default.md) soft) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 🔄 2026-11-05 | P2 | — ([1969](1969-an-exhaustive-search-that-ends-in-no-cell.md), [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) soft) |
 | [2079](2079-a-non-finite-count-is-dropped-and-said.md) | A non-finite count or σ in a pattern file is dropped, and the reader says so | ✅ 2026-11-03 | — | — |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 🔄 2026-11-02 | P2 | [2003](2003-the-chain-actions.md) |
@@ -743,7 +741,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1967](1967-what-the-chemist-declares-reaches-the-extinction-screen.md) | What the chemist declares reaches the extinction screen | ✅ 2026-10-23 | — | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) |
 | [1992](1992-nw2-magnetic-superspace-groups.md) | N-W2 (group half): magnetic superspace groups generated from the operators | ✅ 2026-11-01 | — | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) |
 | [1993](1993-nw3-satellites-at-a-real-q.md) | N-W3: satellites at a real q, to order m, with (h k l m) rows | ⬜ | P3 | — ([1992](1992-nw2-magnetic-superspace-groups.md) soft) |
-| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 🔄 2026-11-06 | P2 | — ([1510](1510-what-the-chemist-knows-reaches-the-search.md) soft) |
+| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | ✅ 2026-11-07 | — | — ([1510](1510-what-the-chemist-knows-reaches-the-search.md) soft) |
 | [2033](2033-a-declared-z-filters-the-extinction-class.md) | A declared Z or density filters an extinction class's members | ✅ 2026-11-02 | — | — ([1967](1967-what-the-chemist-declares-reaches-the-extinction-screen.md), [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) soft) |
 | [2069](2069-every-displacive-child-of-a-parent-in-a-stated-cell.md) | Every displacive child of a parent in a stated cell, several irreps included | ⬜ | P3 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md), [1919](1919-maximal-subgroups-generated-from-the-operators.md) soft) |
 | [2085](2085-a-phase-in-its-standardized-description.md) | A phase in its standardized description: the Parthé–Gelato Γ rule and the standardized CIF | ⬜ | P3 | #1332, [1452](1452-spglib-to-moyo.md) |
