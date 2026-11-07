@@ -17,6 +17,7 @@ the fit has one variable to recover and the data can determine it.
 from __future__ import annotations
 
 import math
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -41,6 +42,8 @@ from tests.test_refine_synthetic import (
 from tests.test_schemas import make_lab6
 
 OUT = Path(__file__).parent / "output"
+#: the module, which ``rietx.refine`` (the function) shadows as an attribute
+refine_module = sys.modules["rietx.refine"]
 
 B_BISO = "phases.0.atoms.1.biso"
 LA_BISO = "phases.0.atoms.0.biso"
@@ -197,6 +200,17 @@ def test_a_formula_target_refuses_a_second_tie_and_a_value(ref):
         ref.remove_variable("thD")
 
 
+def test_a_held_target_takes_a_formula_as_it_takes_a_linear_tie(ref):
+    """A rebuild declares ties before holds, so the verb must not refuse a
+    held target that every later build would accept."""
+    ref.add_variable("thD", 900.0, min=100.0, max=3000.0)
+    ref.hold(B_BISO)
+    ref.tie(B_BISO, expression="thD / 2000")
+    row = _rows(ref)[B_BISO]
+    assert row.value == pytest.approx(0.45, rel=1e-15)
+    assert row.held and row.tie.expression == "thD / 2000"
+
+
 # ------------------------------------------------------------------ history
 def test_untie_releases_a_formula_and_holds_its_last_value(ref):
     ref.add_variable("thD", 900.0, min=100.0, max=3000.0)
@@ -235,6 +249,50 @@ def test_checkout_restores_a_formula_and_the_node_renders_a_call_that_runs(
     replay.add_variable("thD", 900.0, vary=True, min=100.0, max=3000.0)
     eval(compile(call, "<api_call>", "eval"), {"ref": replay})
     assert _rows(replay)[B_BISO].value == _rows(ref)[B_BISO].value
+
+
+def test_replay_evaluates_a_formula_at_the_node_rather_than_at_zero(
+        tmp_path, monkeypatch):
+    """``replay`` builds its own table from the node's state, so it declares
+    the formula too; read as an affine row of no terms, the target was 0."""
+    data = synthesize_at(300.0, 3)
+    ref = rx.Refinement(*perturbed_models(), history=str(tmp_path / "r.jsonl"))
+    ref.fit(data, plan=rx.RefinementPlan(stages=[
+        rx.Stage("scale", ["phases.*.scale"], max_iter=5)]))
+    ref.add_variable("thD", 900.0, vary=True, min=100.0, max=3000.0)
+    ref.tie(B_BISO, expression=debye_text(300.0))
+    ref.fit(data, plan=rx.RefinementPlan(stages=[
+        rx.Stage("debye", ["vars.*"], max_iter=5)]))
+    node = ref.history.head
+    expected = ref.history[node].state.structure.phases[0].atoms[1].biso.value
+    seen = {}
+    real = refine_module._build_result
+
+    def spy(model, table, x, **kw):
+        seen.update(table.decode(x))
+        return real(model, table, x, **kw)
+
+    monkeypatch.setattr(refine_module, "_build_result", spy)
+    rx.replay(ref.history, node, data)
+    assert seen[B_BISO] == pytest.approx(expected, rel=1e-12)
+    assert expected > 0.0
+
+
+def test_the_project_document_reads_back_a_formula_with_its_own_spacing(ref):
+    """The ``.rxt`` row prints ``= <formula>`` and its parser splits on
+    whitespace, so a formula declared with a double space must still compare
+    equal when the document comes back unedited."""
+    from rietx.gui import textdoc
+
+    ref.add_variable("thD", 900.0, min=100.0, max=3000.0)
+    ref.tie(B_BISO, expression="thD  /  2000")
+    row = _rows(ref)[B_BISO]
+    errors = []
+    body = f"atoms.1.biso {row.value} {textdoc._render_annotations(row)}"
+    parsed = textdoc._parse_row(1, body, "phases.0.", body,
+                                lambda *a: errors.append(a))
+    assert not errors
+    assert parsed.annotations["tie"] == textdoc.annotations_of(row)["tie"]
 
 
 def test_a_linear_tie_stored_before_the_field_opens_as_a_linear_tie():

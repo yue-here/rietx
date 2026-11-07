@@ -3977,7 +3977,15 @@ class Refinement:
                     "read a model parameter tie it to that variable"
                     + (f"; {hint}" if hint else ""))
         before = {e.path: e.value for e in table.entries}
+        # a build declares the ties before the holds (``_working_table``), so a
+        # caller's hold on the target cannot refuse here what every rebuild
+        # accepts; a linear tie accepts a held target too
+        held = path in self._user_holds
+        if held:
+            table.set_held([path], False)
         _add_formula(table, path, expr)
+        if held:
+            table.set_held([path], True)
         moved = [e for e in table.entries if e.value != before[e.path]
                  or e.path == path]
         for e in moved:
@@ -3994,14 +4002,7 @@ class Refinement:
                 f"{self._owner_label(e.path)}, outside its bounds "
                 f"[{e.lo:g}, {e.hi:g}]{more}; loosen that bound or set the "
                 "variables nearer")
-        spec = TieSpec(expression=text, user=True)
-        previous = dict(self._ties)
-        self._ties[path] = spec
-        try:
-            self._commit_tie_edit(table, ties={path: spec}, untied=[])
-        except BaseException:
-            self._ties = previous
-            raise
+        self._register_ties(table, {path: TieSpec(expression=text, user=True)})
         return path
 
     def tie_equal(self, paths: list[str] | str, *,
@@ -4391,6 +4392,12 @@ class Refinement:
                 f"{self._owner_label(e.path)}, outside its bounds "
                 f"[{e.lo:g}, {e.hi:g}]{more}; loosen that bound or change "
                 "the tie")
+        self._register_ties(table, specs)
+        return list(spec)
+
+    def _register_ties(self, table: ParameterTable,
+                       specs: dict[str, TieSpec]) -> None:
+        """Add ``specs`` to the register and commit ``table``, as one move."""
         previous = dict(self._ties)
         self._ties.update(specs)
         try:
@@ -4400,7 +4407,6 @@ class Refinement:
             # failure, and a retry would meet "already follows" (#246)
             self._ties = previous
             raise
-        return list(spec)
 
     def _owner_label(self, path: str) -> str:
         """`` (atom O1 of phase X)`` for an atom's path, else ``""``."""
@@ -12056,6 +12062,8 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
         # the user constraints the node was recorded under: without them the
         # replayed model has a different parameter count from the one whose
         # statistics this call exists to reproduce (WP-1070)
+        if spec.expression is not None:
+            continue  # a formula has no terms; declared after the rebase, below
         tie = AffineTie(terms=tuple((p, float(c)) for p, c in spec.terms),
                         const=float(spec.const))
         # A node recorded before WP-1804 can hold a tie whose source a later
@@ -12069,11 +12077,6 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
             continue
         table.set_tie(path, tie)
         applied_ties[path] = spec
-    if dropped:
-        warnings.warn(
-            f"{len(dropped)} user tie(s) recorded on this node no longer apply "
-            f"to its model and were dropped: {'; '.join(dropped)}.",
-            UserWarning, stacklevel=2)
     # and the anchors, for ``_apply_ties``' reason (WP-1432): this table is
     # built from the node's *own* structure, whose coordinates already carry
     # whatever the recorded tie displaced them by.  Un-rebased, replay
@@ -12081,6 +12084,20 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
     # asked about — 0.2174 against the recorded 0.2084 — and nothing in the
     # answer said so.
     table.rebase_anchored_dofs(applied_ties)
+    # formula ties last, in register order, as ``_apply_ties`` declares them
+    # (WP-2118); read as affine rows they would set each target to 0
+    for path, spec in state.ties.items():
+        if spec.expression is None:
+            continue
+        try:
+            _add_formula(table, path, spec.expression)
+        except ValueError as exc:
+            dropped.append(f"{path} ({exc})")
+    if dropped:
+        warnings.warn(
+            f"{len(dropped)} user tie(s) recorded on this node no longer apply "
+            f"to its model and were dropped: {'; '.join(dropped)}.",
+            UserWarning, stacklevel=2)
     table.refresh_ties()
     for path in state.free_paths:
         table.set_vary([path], True)
