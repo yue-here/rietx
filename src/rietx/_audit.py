@@ -2407,7 +2407,11 @@ ROWS: tuple[Row, ...] = (
                   "(x0.99), NAC (x0.99, x1.02) and PbSO4 (x1.02), but PbSO4 at x0.99 reads 0.45 "
                   "and passes. Fails on an unmodelled second phase carrying half the net power, "
                   "by arithmetic on weak data (S < N), and where the envelope rides into a "
-                  "continuum of lines."),
+                  "continuum of lines. Those readings are of the Le Bail reference; re-measured "
+                  "on WP-2076's Pawley reference (2026-11-07, default path) right cells read "
+                  "0.11-0.16 (NAC, FAP, PbSO4, SRM 676a), SRM 676a x1.02 and FAP x0.99 read 1.00, "
+                  "PbSO4 x1.02 0.80 and PbSO4 x0.99 0.30; Si, NAC's wrong cells and the held "
+                  "arm were not re-run."),
         grounds="Kept on both grounds, ruled 2026-10-21 (PR #939).",
         approved="2026-10-21"),
     Row("rietx.indexing.extinction._MODULI", "constant", value=(2, 3, 4, 6)),
