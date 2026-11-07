@@ -2390,7 +2390,9 @@ ROWS: tuple[Row, ...] = (
         evidence=("the fixed 3 of StageSpec:lebail_cycles before WP-1542, kept for the fits the "
                   "extinction screen compares; its gates and margins are measured at this count, "
                   "and a settled partition failed 10 rows of tests/test_extinction_margin.py and "
-                  "test_extinction_gate.py (WP-1542, 2026-11-05); no stated source for the 3"),
+                  "test_extinction_gate.py (WP-1542, 2026-11-05); no stated source for the 3. "
+                  "Since WP-2076 (2026-11-07) the compared fits are Pawley and this count "
+                  "governs the cell-free Le Bail prefit alone"),
         grounds=("Kept until WP-2062 moves the screen to Pawley, as the row it comes from was "
                  "kept until WP-1542 (B11, ruled 2026-10-19); re-measuring the screen's margins "
                  "for a method it is about to leave buys nothing.  B11 did not exempt the "

@@ -993,7 +993,7 @@ def extinction_class_diagnostics(cand) -> list[Diagnostic]:
             level="warning", code="EXTINCTION_FORBIDDEN_INTENSITY",
             message=(f"{cand.n_present} of the {cand.n_testable} forbidden "
                      "position(s) this class could be tested at carry intensity "
-                     "its own Le Bail fit cannot account for."),
+                     "its own Pawley fit cannot account for."),
             where=where + [pairs],
             suggestion=("Check those 2θ positions against IndexingResult's "
                         "unmatched_observed for an impurity line before you "
@@ -1137,9 +1137,12 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
     contradicting = [c for c in alive if not c.space_groups
                      and top.delta_bic - c.delta_bic >= DECISIVE_DELTA_BIC]
     if len(rivals) > 1 and rivals[1].delta_bic - top.delta_bic < DECISIVE_DELTA_BIC:
+        undecided = _undecided_positions(top, rivals[1])
         reasons.append(f"{rivals[1].symbol} is within ΔBIC "
                        f"{rivals[1].delta_bic - top.delta_bic:.1f} of it "
-                       f"(decisive is {DECISIVE_DELTA_BIC:g})")
+                       f"(decisive is {DECISIVE_DELTA_BIC:g})"
+                       + (f", and the two differ at the tested position(s) "
+                          f"{undecided}" if undecided else ""))
     if contradicting:
         reasons.append(f"the data prefer {contradicting[0].symbol}, which the "
                        "declared prior excludes, by ΔBIC "
@@ -1173,6 +1176,21 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
             suggestion=("Count longer at the forbidden positions where the "
                         "leading classes disagree, or extend the 2θ range.")))
     return out
+
+
+def _undecided_positions(a, b, limit: int = 4) -> str:
+    """The tested forbidden positions one of two classes has and the other lacks.
+
+    These are the positions the margin between them rests on (WP-2076), so
+    they are where counting longer would separate the two.
+    """
+    seen_a = set(a.tested_two_theta)
+    seen_b = set(b.tested_two_theta)
+    pairs = sorted({(t, tuple(h)) for c, other in ((a, seen_b), (b, seen_a))
+                    for h, t in zip(c.tested_hkl, c.tested_two_theta)
+                    if t not in other})
+    text = ", ".join(f"{h} at {t:.3f}°" for t, h in pairs[:limit])
+    return text + (f" and {len(pairs) - limit} more" if len(pairs) > limit else "")
 
 
 def _prior_diagnostic(screen, alive, top) -> Diagnostic:

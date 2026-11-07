@@ -89,6 +89,18 @@ restricted model, and the reported ``delta_bic`` is BIC(class) − BIC(absence-f
 lattice): negative favours the class, and the difference between two classes'
 values is itself a ΔBIC because both share the reference.
 
+**Nested only if each χ² is a minimum, and only over the lines it is charged
+for** (WP-2076).  A Le Bail partition is not a minimum: a weak line in a gap
+takes the rectified noise of its whole window, so the reference paid for false
+peaks a class forbidding the line did not, and on a 1082-row synthetic sweep at
+a correct cell main named a class excluding the true group on 318.  So every
+compared fit is a Pawley (:data:`SCREEN_MODE`), and a class is scored on the
+lattice less only its *testable* forbidden lines — the ``n_added`` its ΔBIC
+counts.  Both halves were needed: Pawley alone lost certified corundum's
+``R - c -``, because the reference's four untestable lines soaked up
+neighbouring tails that the BIC did not charge for.  Under both, the wrong count
+fell to 10 and corundum keeps its class at ΔBIC −46.
+
 **Refutation is one-sided, and that is not a gap in the evidence.**  An extinction
 symbol asserts *absences* and nothing else, so intensity at a forbidden position
 contradicts it — while a class claiming **too few** absences asserts nothing that
@@ -912,10 +924,20 @@ def _model_is_quiet(two_theta: np.ndarray, y_calc: np.ndarray,
 # ----------------------------------------------------------------------
 # the screen
 # ----------------------------------------------------------------------
-#: The fixed Le Bail cycles of every fit the screen compares (WP-1542).  Its gates
-#: and margins are measured at this count, so a partition that settled would
-#: move them.  WP-2062 moves the screen to Pawley, which retires this.
+#: The fixed Le Bail cycles of the cell-free prefit (WP-1542), the one Le Bail
+#: fit the screen still runs.  The prefit's cell is measured at this count, so a
+#: partition that settled would move it.
 SCREEN_LEBAIL_CYCLES = 3
+
+#: The decomposition of every fit the screen **compares**: the shared profile
+#: fit, the reference and each class (WP-2076).  A Pawley fit minimises χ² over
+#: the intensities, so a class whose reflections are a subset of the reference's
+#: can never fit better than it, and ΔBIC reads the absences.  A Le Bail
+#: partition does not minimise χ²: a weak or forbidden line in a gap takes the
+#: rectified noise of its whole window, so on the sweep behind WP-2076 the class
+#: fitted below the reference on 2410 of 14 788 class fits and named a class
+#: excluding the true group on 318 of 1082 rows at a correct cell.
+SCREEN_MODE = "pawley"
 
 
 def _fixed_partition(plan):
@@ -959,8 +981,7 @@ def _screen_plan(instrument: Instrument | None = None):
                   if COMPONENT_AGGREGATE.get(c.kind) == "background"]
     # one class's screen fit among several fitted alike: no closing stage
     # (WP-2002, the sixth round's Q1 and Q2)
-    return _fixed_partition(RefinementPlan(stages=[Stage("bkg", paths)],
-                                           closing_window_tol=None))
+    return RefinementPlan(stages=[Stage("bkg", paths)], closing_window_tol=None)
 
 
 def _with_background_width_humps(instrument: Instrument) -> Instrument:
@@ -993,17 +1014,20 @@ def _with_background_width_humps(instrument: Instrument) -> Instrument:
 
 
 def _fit_class(candidate: CellCandidate, data: PatternData, instrument: Instrument,
-               symbol: str, two_theta_limits):
+               symbol: str, two_theta_limits, omit=None):
+    """One class's screen fit: ``symbol``'s reflections, less any ``omit`` hkl."""
+    from ..model.forward import _omitting_reflections
     from ..refine import Refinement
 
     instrument = _with_background_width_humps(instrument)
     ref = Refinement(structure_from_candidate(candidate, space_group=symbol),
                      instrument, history=False)
-    # ``telemetry=False``: the screen fits one Le Bail per candidate class, and
+    # ``telemetry=False``: the screen fits one model per candidate class, and
     # a recorder on each would write a dozen run directories for one screen
     # (WP-1403).  The job a reader wants listed is the indexing run.
-    result = ref.fit(data, mode="lebail", plan=_screen_plan(instrument),
-                     two_theta_limits=two_theta_limits, telemetry=False)
+    with _omitting_reflections(() if omit is None else omit):
+        result = ref.fit(data, mode=SCREEN_MODE, plan=_screen_plan(instrument),
+                         two_theta_limits=two_theta_limits, telemetry=False)
     return ref, result
 
 
@@ -1136,7 +1160,9 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                                 cancel=None) -> ExtinctionScreen:
     """Rank the extinction classes of a lattice.
 
-    2θ only: every step below is a Le Bail fit, which is the forward model.
+    2θ only: every step below is a whole-pattern fit, which is the forward
+    model.  The cell-free prefit is a Le Bail; every fit the screen compares is
+    a Pawley (:data:`SCREEN_MODE`, WP-2076).
 
     The pipeline, and the reason for each step:
 
@@ -1147,8 +1173,13 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     2. **the reference fit**: the absence-free class under the same one-stage
        protocol as every other class, which is what makes the χ² values
        comparable;
-    3. **one Le Bail fit per class**, weakest claim first, scored by ΔBIC and
-       Hamilton against the reference (see the module docstring);
+    3. **one Pawley fit per class**, weakest claim first, and its score: ΔBIC
+       and Hamilton against the reference, read off a fit of the lattice less
+       only the forbidden lines this class can be tested at (a second fit,
+       when some of its forbidden lines are untestable).  Scoring the class's
+       own fit charged it, or credited it, for lines its ``n_testable`` does
+       not count: on certified corundum the reference's untestable lines soak
+       up neighbouring tails, and Pawley alone then lost ``R - c -`` (WP-2076);
     4. **the absence test** at each class's own testable forbidden positions,
        read against **that class's own calculated pattern** — one position
        carrying intensity the class cannot account for refutes it, with the hkl
@@ -1201,9 +1232,9 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     declaration leaves a member in, and abstains when the data decisively prefer
     one it emptied.
 
-    Cost is one refinement per surviving class (~0.1 s each on a 3750-point
-    pattern), after **two** profile Le Bail fits: the cell-free prefit and the
-    shared one (the pair took about 1 s on SRM 676a's 7251 points, numpy, warm
+    Cost is one or two refinements per surviving class (~0.1 s each on a
+    3750-point pattern), after **two** profile fits: the cell-free Le Bail
+    prefit and the shared Pawley one (the pair took about 1 s on SRM 676a's 7251 points, numpy, warm
     Apple-silicon Mac; ``refine_cell=False`` skips the first).  ``max_classes`` caps it; the classes left
     unfitted are reported with ``screened=False`` and, because an unasked question
     must not read as a clean answer, :meth:`ExtinctionScreen.best_or_none` then
@@ -1254,8 +1285,8 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         tt_max = float(np.max(data.tt()))
         if two_theta_limits is not None:
             tt_max = min(tt_max, float(two_theta_limits[1]))
-        plan = _fixed_partition(validation_plan(candidate, ins, two_theta_max=tt_max))
-        profile = pre.fit(data, mode="lebail", plan=plan,
+        plan = validation_plan(candidate, ins, two_theta_max=tt_max)
+        profile = pre.fit(data, mode=SCREEN_MODE, plan=plan,
                           two_theta_limits=two_theta_limits,
                           telemetry=False)      # the screen's own, not a run
         screen.profile_rwp = float(profile.statistics.rwp)
@@ -1271,7 +1302,7 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         screen.status = "failed"
         screen.diagnostics = [Diagnostic(
             level="error", code="EXTINCTION_SCREEN_FAILED",
-            message=(f"The {which} Le Bail fit of the lattice group {symbol} "
+            message=(f"The {which} fit of the lattice group {symbol} "
                      f"raised {type(exc).__name__}: {str(exc).rstrip('.')}, so no class could be "
                      "screened against it."),
             where=[f"{candidate.system} {candidate.centring}, cell "
@@ -1388,9 +1419,9 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         # already says about every other number on the row.
         entries.append(entry)
         evidence.append({"keep": keep, "tt": tt_forbidden, "fwhm": fwhm_forbidden,
-                         "first": first_of_line})
+                         "first": first_of_line, "lines": forbidden})
 
-    # 3b — one Le Bail fit per class, weakest claim first, and the absence test
+    # 3b — one Pawley fit per class, weakest claim first, and the absence test
     # read against **that class's own** calculated pattern
     budget = len(entries) if max_classes is None else max(int(max_classes), 1)
     order = sorted(range(len(entries)),
@@ -1410,13 +1441,12 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                 entry.screened = True
                 entry.refuted = True
                 entry.refuted_reason = (
-                    f"the Le Bail fit of {entry.representative} raised "
+                    f"the {SCREEN_MODE} fit of {entry.representative} raised "
                     f"{type(exc).__name__}: {exc}")
                 continue
         entry.screened = True
         entry.rwp = float(result.statistics.rwp)
         entry.gof = float(result.statistics.gof)
-        entry.chi2 = _chi2_absolute(result.statistics)
         # testability is settled here, not in 3a: a position is evidence only
         # where *this class's* fitted pattern leaves the window below the
         # detection threshold, so nothing but the absence can trip the test
@@ -1428,12 +1458,32 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                 np.asarray(result.y_background), np.asarray(result.sigma),
                 ev["tt"][keep], ev["fwhm"][keep], k_sigma=k_sigma)
         entry.n_testable = int(keep.sum())
+        tested = np.flatnonzero(keep)
+        entry.tested_two_theta = [round(float(ev["tt"][j]), 4) for j in tested]
+        entry.tested_hkl = [tuple(int(v) for v in hkl_ref[ev["first"][j]])
+                            for j in tested]
+        # the score: the lattice less only the lines this class is charged for
+        scored = result
+        if entry.n_testable == 0:
+            scored = ref_result
+        elif entry.n_testable < entry.n_absent:
+            charged = np.isin(labels, ev["lines"][keep])
+            try:
+                _fit, scored = _fit_class(candidate, data, frozen, symbol,
+                                          two_theta_limits, omit=hkl_ref[charged])
+            except Exception as exc:              # noqa: BLE001
+                entry.refuted = True
+                entry.refuted_reason = (
+                    f"the {SCREEN_MODE} fit of {symbol} without this class's "
+                    f"{entry.n_testable} testable forbidden line(s) raised "
+                    f"{type(exc).__name__}: {exc}")
+                continue
+        entry.chi2 = _chi2_absolute(scored.statistics)
         entry.delta_bic = delta_bic(entry.chi2, screen.reference_chi2,
                                     screen.n_points, entry.n_testable)
         entry.absences_rejected = hamilton_justified(
             entry.chi2, screen.reference_chi2, screen.n_points,
-            entry.n_lines + int(result.statistics.n_free_parameters),
-            entry.n_testable)
+            int(scored.statistics.n_free_parameters), entry.n_testable)
 
         if not entry.n_testable:
             continue
