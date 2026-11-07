@@ -126,6 +126,35 @@ For any other format, read the temperatures from your own log.
 A hold, a tie or a named variable belongs to one pattern's refinement, so declare it in a `constrain=` function that the series calls before each fit.
 [How to keep a parameter fixed whatever the plan frees](hold.md) and [How to tie parameters together](tie.md) show the function.
 
+## Start a subgroup off its parent's cell
+
+A distortion product is often modelled as a subgroup of the parent phase, started at the group–subgroup identity point: for a face-centred cubic parent and its body-centred tetragonal subgroup, a<sub>t</sub> = a<sub>c</sub>/√2 and c<sub>t</sub> = a<sub>c</sub>.
+At that point every subgroup line sits under a parent line, so the data cannot judge the subgroup on its own.
+Its scale is collinear with the parent's, so whether it counts as seen, and is held, depends on where along that ridge the fit stands rather than on whether the specimen contains it.
+In one of the series below it was refined in patterns where it was absent, with no [`PHASE_UNCONSTRAINED`](../reference/diagnostics-refinement.md#phase_unconstrained).
+What named it there was `HIGH_CORRELATION` and `FLAT_DIRECTION` on the two scales, at ρ = −1.000.
+
+A fit started at the identity point has to leave it in one direction or the other, and on the series below it chose the wrong direction every time.
+The series is synthetic: a Cu parent, and its `I 4/m m m` subgroup present from the fifth of eight patterns with c/(a√2) − 1 = +6.0 × 10<sup>−3</sup>, at 0.15, 0.25 and 0.40 of the parent's scale, over seven noise draws.
+A single fit of a pattern with the subgroup present, started at the identity point, ended on the wrong side in 42 of 42 fits.
+With the distortion's sign reversed in the data, it ended on the wrong side in 42 of 42 again, so the data pulled the fit away from the truth rather than leaving the choice to chance.
+The chain ended on the wrong side in 17 of 21 forward chains and 21 of 21 backward ones.
+In 17 of the 21 series both directions agreed on the wrong side, so [`SEQUENTIAL_PATH_DEPENDENT`](../reference/diagnostics-series.md#sequential_path_dependent) named nothing on the subgroup's cell.
+The subgroup was not held in any pattern where it was present, so the hold played no part in the failure.
+
+Choose the side by fitting, not by chaining:
+
+1. Take one pattern where the subgroup is present, and fit it twice, starting each fit a few parts per thousand off the identity point, one on each side.
+2. Keep the fit with the lower Rwp. On the series above it was the true side in 84 of 84 pairs, 42 for each sign of the distortion. The wrong side's Rwp was 2–3 %, 5–8 % and 14–17 % higher at the three fractions.
+3. Chain outward from that pattern, carrying the kept fit's cell.
+
+A start off the identity point given to the chain's first pattern need not survive the patterns where the subgroup is absent, because its cell can drift there.
+Two forward chains, one from each side, kept both sides in 10 of the 21 series, and the lower Rwp of the pair was the true side in 13 of 21.
+
+This was measured on one parent–subgroup pair, with one distortion size, one instrument and one start offset (c/(a√2) − 1 = ±3 × 10<sup>−3</sup>), and it is untested beyond that.
+It applies to a distortion with one symmetry-breaking direction whose two sides are different structures.
+Where the two sides are the same structure, such as a and b exchanging in an orthorhombic subgroup of a tetragonal parent, both starts give the same Rwp and there is nothing to choose.
+
 ## See also
 
 - [How to check a series for path dependence](path.md) runs the chain both ways and refits a suspicious step on its own.
