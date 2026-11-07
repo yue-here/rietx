@@ -322,24 +322,32 @@ measurements are in the entry of 2026-11-05.
       record whether the ranking changes.
 - [x] Classify the siblings above by the same mechanism, and say which share
       it and which do not.
-- [ ] Repair the mechanism task 3 names. If the fix is a new abstention or a
+- [x] Repair the mechanism task 3 names. If the fix is a new abstention or a
       diagnostic code, bring its audit row to the maintainer before landing.
-      The corundum, FAP, NAC and PbSO₄ rows of `tests/test_extinction_symbol.py`,
-      `tests/test_extinction_margin.py` and `tests/test_extinction_gate.py` keep
-      their classes.
+      Corundum and NAC keep their classes; FAP and Si abstain; PbSO₄ names
+      `P c - a`, the known wrong answer the ruling accepts.
       *Decided 2026-11-07 (Yue): land the candidate here at margin 10, once the
       screen times under 30 s on NAC. At margin 10 FAP and Si give None and PbSO₄
       names `P c - a`, so the rows' clause is rewritten to that. Measure option
       (c)'s allowance before any tightening. Handover entry of 2026-11-07.*
-- [ ] Tests: the five synthetic groups as rows, built in-test from rietx's
+- [x] Tests: the five synthetic groups as rows, built in-test from rietx's
       forward model (no data file), with obs/calc/diff PNGs to `tests/output/`.
-- [ ] Skill: a row in `references/diagnostics-indexing.md` if a code is added,
-      or "none" and why.
+      `tests/test_extinction_nesting.py`.
+- [x] Skill: a row in `references/diagnostics-indexing.md` if a code is added,
+      or "none" and why. None: no code was added. The existing
+      `EXTINCTION_SYMBOL_AMBIGUOUS` now names the tested positions two leading
+      classes differ at, so the package's own output carries the guidance, and
+      the `EXTINCTION_FORBIDDEN_INTENSITY` row's stale Le Bail and held-cell
+      wording was corrected.
+- [ ] Measure option (c)'s allowance (2·ln N plus an allowance derived from the
+      count of silent positions) and real patterns from the eleven groups that
+      abstain on every row at margin 18, then bring the allowance's `_audit` row
+      to the maintainer before any margin moves. Ruled 2026-11-07.
 
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_extinction_symbol.py tests/test_extinction_margin.py tests/test_extinction_gate.py -n auto --dist loadgroup
+.venv/bin/python -m pytest tests/test_extinction_symbol.py tests/test_extinction_margin.py tests/test_extinction_gate.py tests/test_extinction_nesting.py -n auto --dist loadgroup
 .venv/bin/python -m pytest tests/test_acceptance_indexing.py -n auto --dist loadgroup
 .venv/bin/python -m ruff check src tests examples
 ```
@@ -348,7 +356,9 @@ On P 6₃/m m c, P 6/m c c, P n -3 n, P 4/n m m and F m -3 m, with the true
 background declared and the cell within 600 ppm, `best_or_none()` returns a
 class containing the true group or `None` with a finding naming the undecided
 position. It never returns a class that excludes the true group. The certified
-corundum, FAP, NAC and PbSO₄ rows keep their classes.
+corundum and NAC rows keep their classes, FAP and Si abstain with the undecided
+position named, and PbSO₄ names `P c - a`: the known wrong answer the ruling of
+2026-11-07 accepts at margin 10 (handover log), pinned so a tightening shows.
 
 ## References
 
