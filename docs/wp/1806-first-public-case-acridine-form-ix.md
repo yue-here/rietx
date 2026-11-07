@@ -131,12 +131,13 @@ of issue #561, sized M.
 - [x] Part 1: a simulated known answer is recovered, and a regular-hexagon template fails
 - [x] Part 1: the per-atom table goes to `tests/output/` as a record
 - [ ] Part 2: the free-atom control under the same profile and background, compared with the body atom by atom
+- [ ] Part 2: the cell joins the per-atom record table (|Δ|, published esd, rietx esd, ratio), asserting nothing
 - [ ] Skill: none expected; say why at handover
 
 ## Acceptance
 
-- The body agrees with the free-atom control of `### Inherited` (2026-11-05), and the
-  cell matches the published cell.
+- The body agrees with the free-atom control of `### Inherited` (2026-11-05). The cell
+  is compared with the published cell in the record table and asserts nothing (2026-11-07).
 - An intra-body distance reports `None` (through `VARIANCE_CANCELLATION_FLOOR`), and an
   inter-body one reports a full esd.
 - The provenance row exists.
@@ -147,6 +148,19 @@ of issue #561, sized M.
 - Issue #561; PR #596.
 
 ## Handover log
+
+- **2026-11-07** — Yue ruled on Acceptance's "the cell matches the published cell": it
+  goes, and the cell joins the per-atom record table, asserting nothing. Grounds, from the
+  maintainer's question sequence run by the shift lead: the published cell is Stephens et
+  al.'s refined answer under their own profile, so it is another model's answer under
+  another protocol (Rule 2), as the coordinates were on 2026-11-05. rietx gates a cross-code
+  cell only where the test mirrors that code's protocol (the FAP suite's ±300 ppm against
+  GSAS's `.EXP`), and this test reads the authors' profile from the paper. A tolerance
+  between two separately converged fits also senses where each solver stopped unless it
+  carries a measured spread (`tests/CLAUDE.md` § Budgets in tests), and none is measured.
+  Part 1's test already asserts nothing about the cell; it uses the published cell only to
+  build its synthetic pattern. What would reopen a gate: the authors' own input file, so the
+  test can mirror their protocol. Part 2 gains the record-row task.
 
 - **2026-11-06** — Part 1 is on main. Mike's PR #1416 merged as `fd6232320`
   (PR head `170dee168`, main `263227986`), after two review rounds at heads
