@@ -230,7 +230,83 @@ _STOP_WORDS = {
 }
 
 
-def moment_angle_stationary_diagnostics(stage, parameters=None) -> list[Diagnostic]:
+def flagged_moduli(paths) -> list[str]:
+    """The modulus of each site with an angle among ``paths``, in their order.
+
+    A moment block's DOFs are ``…moment.dof0`` (the modulus) and
+    ``…moment.dof1``/``dof2`` (the angles).  The one list the stationary
+    finding and :func:`~rietx.strategy.parameter_interval.attach_stationary_intervals`
+    read, so the moduli profiled are the moduli quoted (WP-2060).
+    """
+    return list(dict.fromkeys(p.rsplit(".dof", 1)[0] + ".dof0" for p in paths))
+
+
+def modulus_profile_withheld(interval) -> bool:
+    """Whether a flagged site's modulus profile is withheld (WP-2060).
+
+    Ruled by Mike on #1075 (2026-11-04, condition 2): a profile that found the
+    data χ² below the fit is still quoted, unless the drop reaches the
+    interval's own cut, ``delta_chi2_cut``.  Then the fit is not at its
+    minimum, and an interval measured from it is not the modulus's
+    uncertainty.  A drop under the cut changed little: such intervals covered
+    the truth on 31 of 32 two-site fits.  Withheld, the reader gets the lowest
+    point and the pointer to refit, never the esd (the 2026-11-05 amendment:
+    near zero that esd covered 3 of 20).  A test of the magnetic path, never of
+    :func:`~rietx.strategy.parameter_interval.profile_interval`, which every
+    fit shares (condition 4).
+    """
+    return interval.chi2_fit - interval.chi2_lowest >= interval.delta_chi2_cut
+
+
+def _lowest_point(interval):
+    """The probe that reached ``interval.chi2_lowest``."""
+    return min((p for p in interval.points if p.chi2 is not None),
+               key=lambda p: p.chi2)
+
+
+def _modulus_line(path: str, row, withheld) -> str | None:
+    """A flagged site's modulus in the finding, or ``None`` without a profile.
+
+    Quoted by its interval, withheld with the pointer to refit, and never by
+    its esd, which assumes the angles sit on the direction (WP-2060).
+    """
+    if withheld is not None:
+        low = _lowest_point(withheld)
+        return (f" The profile of {path} found the data chi2 "
+                f"{withheld.chi2_fit - withheld.chi2_lowest:.3g} below the fit, at "
+                f"{low.value:.4g} μ_B, a full cut of {withheld.delta_chi2_cut:.3g} or "
+                f"more. The fit did not reach its minimum, so no interval is quoted "
+                f"for {path}, and its esd is not its uncertainty either. Refit with "
+                f"it started at {low.value:.4g} μ_B before quoting it.")
+    interval = row.interval if row is not None else None
+    if interval is None:
+        return None
+    level = f"{100 * interval.level:g} %"
+    if interval.lower is None or interval.upper is None:
+        missing = [f"no {side} end ({_STOP_WORDS.get(stop, stop)})"
+                   for side, end, stop in (
+            ("lower", interval.lower, interval.lower_stop),
+            ("upper", interval.upper, interval.upper_stop)) if end is None]
+        found = [f"its {side} end is {end:.4g} μ_B" for side, end in (
+            ("lower", interval.lower), ("upper", interval.upper)) if end is not None]
+        line = (f" {path} is {row.value:.4g} μ_B. Its {level} profile interval has "
+                f"{' and '.join(missing)}" + (f", and {found[0]}." if found else "."))
+    else:
+        # to three figures of the interval's width, so its ends read apart
+        width = interval.upper - interval.lower
+        places = max(0, 2 - math.floor(math.log10(width))) if width > 0.0 else 4
+        line = (f" {path} is {row.value:.{places}f} μ_B, with the {level} profile "
+                f"interval {interval.lower:.{places}f} to {interval.upper:.{places}f} μ_B.")
+    if not interval.fit_is_minimum:
+        line += (f" The profile found the data chi2 "
+                 f"{interval.chi2_fit - interval.chi2_lowest:.3g} below the fit, under "
+                 f"the cut of {interval.delta_chi2_cut:.3g}, so the interval is "
+                 f"measured from the fit.")
+    return line
+
+
+def moment_angle_stationary_diagnostics(stage, parameters=None, *,
+                                        withheld=None) -> list[Diagnostic]:
     """``MOMENT_ANGLE_STATIONARY`` (info): the moment angles a stage's
     covariance left out at a direction the symmetry fixes (WP-1929).
 
@@ -247,6 +323,16 @@ def moment_angle_stationary_diagnostics(stage, parameters=None) -> list[Diagnost
     (``RefinedParameter.interval``, WP-2002): the ends, and whether they
     include the direction.  An angle with no interval on its row says so,
     since a joint fit, an internal trial and a cancelled run compute none.
+
+    **Each of these sites' moduli is quoted by its interval** (WP-2060, ruled
+    by Mike on #1075).  Its esd assumes the angles sit on the direction, and
+    the modulus printed is the moment's length at the tilt where the fit
+    stopped, so the finding no longer tells a reader to quote the moment
+    along the direction.  ``withheld`` maps a modulus to the profile
+    :func:`modulus_profile_withheld` held back, which the finding quotes by
+    its lowest point and a pointer to refit, never by the esd.  An angle on a
+    site whose modulus is unsupported (:func:`moment_supported`) is not read
+    as a direction: with no moment, an angle points nowhere the data see.
     """
     from ..optimize.least_squares import STATIONARY_ANGLE_LEVEL
 
@@ -254,6 +340,7 @@ def moment_angle_stationary_diagnostics(stage, parameters=None) -> list[Diagnost
     passed = next((t for t in tests if t.zeroed), None)
     if passed is None:
         return []
+    withheld = withheld or {}
     k = len(passed.paths)
     kept = [p for p in dict.fromkeys(q for t in tests for q in t.paths)
             if p not in passed.paths]
@@ -269,6 +356,9 @@ def moment_angle_stationary_diagnostics(stage, parameters=None) -> list[Diagnost
         f"so {'it carries' if k == 1 else 'they carry'} no esd. "
         f"The values are kept.")
     rows = {r.path: r for r in (parameters or [])}
+    moduli = [m for m in flagged_moduli(passed.paths) if m in rows or m in withheld]
+    unsupported = {m for m in moduli if m in rows
+                   and moment_supported(abs(rows[m].value), rows[m].stderr) is False}
     without = []
     for path in passed.paths:
         row, at = rows.get(path), passed.stationary_at.get(path)
@@ -289,22 +379,39 @@ def moment_angle_stationary_diagnostics(stage, parameters=None) -> list[Diagnost
                 ("upper", interval.upper, interval.upper_stop)) if end is None]
             line += (f" Its {100 * interval.level:g} % profile interval has "
                      f"{' and '.join(missing)}.")
+        elif path.rsplit(".dof", 1)[0] + ".dof0" in unsupported:
+            # condition 1: no moment, so no direction to include or exclude
+            line += (f" Its {100 * interval.level:g} % profile interval is "
+                     f"{_rad(interval.lower)} to {_rad(interval.upper)}.")
         else:
             inside = interval.lower <= at <= interval.upper
             line += (f" Its {100 * interval.level:g} % profile interval, "
                      f"{_rad(interval.lower)} to {_rad(interval.upper)}, "
                      f"{'includes' if inside else 'excludes'} the direction.")
         message += line
-    # the moduli beside them (WP-2060): their esds are read with these angle
-    # columns out, so they hold only if the angles sit on the direction, and
-    # a weak one covered 0.83 at a nominal 0.95 (#1075).  None is computed
-    # unasked: a modulus profile cost 7-58 s on 1-8 s two-site fits.
-    moduli = [m for m in dict.fromkeys(p.rsplit(".dof", 1)[0] + ".dof0"
-                                       for p in passed.paths)
-              if m in rows and rows[m].stderr is not None]
-    if moduli:
-        message += (f" The esd of {', '.join(moduli)} assumes the angles sit on "
-                    f"the direction.")
+    if unsupported:
+        names = ", ".join(m for m in moduli if m in unsupported)
+        message += (f" The data do not support the moment of {names} "
+                    f"(MOMENT_UNSUPPORTED), so its angles give no direction.")
+    # the moduli beside them (WP-2060, ruled by Mike on #1075): their esds
+    # are read with these angle columns out, so they hold only if the angles
+    # sit on the direction, and a weak one covered 0.82 at a nominal 0.95
+    quoted = False
+    for m in moduli:
+        line = _modulus_line(m, rows.get(m), withheld.get(m))
+        if line is None:
+            if rows[m].stderr is not None:
+                without.append(m)
+            continue
+        quoted = quoted or m not in withheld
+        message += line
+    if quoted:
+        message += (" A modulus keeps its esd, which assumes the angles sit on "
+                    "the direction. Its interval does not assume it.")
+    unprofiled = [m for m in without if m in moduli]
+    if unprofiled:
+        message += (f" The esd of {', '.join(unprofiled)} assumes the angles sit "
+                    f"on the direction.")
     if without:
         message += (f" No profile interval was computed for "
                     f"{', '.join(without)}. On a single fit, "
@@ -318,15 +425,16 @@ def moment_angle_stationary_diagnostics(stage, parameters=None) -> list[Diagnost
         suggestion=("Quote each of these angles by its profile interval "
                     "(RefinedParameter.interval), not by an esd. Where the "
                     "interval includes the symmetry direction, the data cannot "
-                    "tell the moment from one along it, so quote the moment "
-                    "along that direction. One angle tested alone nearly always "
-                    "lands here, because it passed the test below the interval's "
-                    "cut. Where an interval excludes "
-                    "the direction, the data measure that tilt, so quote the "
-                    "angle with its interval. For a modulus of these sites on a "
-                    "single fit, Refinement.profile_interval(data, path) gives the "
-                    "interval "
-                    "that does not assume the angles sit on the direction."))]
+                    "tell the moment from one along it. One angle tested alone "
+                    "nearly always lands here, because it passed the test below "
+                    "the interval's cut. Where an interval excludes the "
+                    "direction, the data measure that tilt, so quote the angle "
+                    "with its interval. Quote each of these sites' moduli by "
+                    "its interval too, not by its esd. Where the message "
+                    "withholds a modulus's interval, refit from the value it "
+                    "gives before quoting the modulus. A modulus with no "
+                    "interval on a single fit gets one from "
+                    "Refinement.profile_interval(data, path)."))]
 
 
 def moment_supported(modulus: float, sigma: float | None) -> bool | None:

@@ -501,15 +501,32 @@ def profile_interval(refinement, data, path: str, *,
 
 
 def attach_stationary_intervals(refinement, data, *, cancel=None) -> None:
-    """Each moment angle the answer stage left out, its interval onto its row.
+    """Each moment angle the answer stage left out, and its site's modulus,
+    their intervals onto their rows.
 
     The stationary-angle test (WP-1929) leaves an angle at a direction the
     symmetry fixes out of the answer stage's covariance, so the angle has no
     esd.  Under WP-2002's B2 ruling (2026-10-19) it carries its profile
     interval instead.  :func:`profile_interval` runs for each angle of the
     passing round that has a half-width to step from, at the default level,
-    and the answer lands on ``RefinedParameter.interval``.  The
-    ``MOMENT_ANGLE_STATIONARY`` finding is then rebuilt from the rows in
+    and the answer lands on ``RefinedParameter.interval``.
+
+    **The modulus of each such site gets its interval too** (WP-2060, ruled
+    by Mike on #1075, 2026-11-04 and 2026-11-05).  Its esd is read with the
+    angle columns out, so it holds only if the angles sit on the direction: a
+    weak modulus beside them covered 0.82 at a nominal 0.95, and its profile
+    0.93-0.98.  The row keeps that esd (``stderr``), and the interval rides
+    beside it.  A site whose modulus is unsupported (``MOMENT_UNSUPPORTED``)
+    is one of these sites, and its profile keeps m ≥ 0 where the sign is
+    unseen.  **A profile that found the data χ² a full cut or more below the
+    fit is withheld** (:func:`~rietx.report.magnetic.modulus_profile_withheld`):
+    the fit did not reach its minimum, so neither that interval nor the esd is
+    the modulus's uncertainty, and the row keeps ``interval`` ``None`` while
+    the finding gives the lowest point and says to refit.  A smaller drop is
+    quoted, with the drop named.  These guards are the magnetic path's and
+    never :func:`profile_interval`'s, which every fit shares.
+
+    The ``MOMENT_ANGLE_STATIONARY`` finding is then rebuilt from the rows in
     place, so it quotes the intervals.
 
     The refits are the package's own, so they run on a copy of the models
@@ -517,10 +534,15 @@ def attach_stationary_intervals(refinement, data, *, cancel=None) -> None:
     not move.  Only a fit whose test passed pays.  Measured on the two-site
     Pnma fixtures (``tests/test_stationary_moment_angle.py``, macOS arm64),
     two to four angles cost 2.6-16.7 s on fits of 0.2-1.2 s, 20-32 refits an
-    angle.  ``cancel`` is the fit's token: a stop ends the run between
-    refits, and an angle it had not finished keeps ``None``.
+    angle, and a modulus 2.5-11.8 s more (#1075, after WP-2068).  ``cancel``
+    is the fit's token: a stop ends the run between refits, and a row it had
+    not finished keeps ``None``.
     """
-    from ..report.magnetic import moment_angle_stationary_diagnostics
+    from ..report.magnetic import (
+        flagged_moduli,
+        modulus_profile_withheld,
+        moment_angle_stationary_diagnostics,
+    )
 
     result = refinement.result_
     stage = result.stages[-1] if result is not None and result.stages else None
@@ -529,24 +551,33 @@ def attach_stationary_intervals(refinement, data, *, cancel=None) -> None:
     if passed is None:
         return
     rows = {r.path: r for r in result.parameters}
-    for path in passed.paths:
+    # the angles with a half-width to step from (none means no curvature
+    # either, ``_half_widths``, and so no scale to step the profile in), then
+    # each flagged site's modulus, which steps from its esd
+    paths = [p for p in passed.paths if p in passed.half_widths]
+    paths += [m for m in flagged_moduli(passed.paths) if m in rows and rows[m].vary]
+    withheld = {}
+    for path in paths:
         row = rows.get(path)
-        # no half-width means no curvature either (``_half_widths``), and so
-        # no scale to step the profile in
-        if row is None or path not in passed.half_widths:
+        if row is None:
             continue
         try:
-            row.interval = profile_interval(refinement, data, path,
-                                            record=False, cancel=cancel)
+            interval = profile_interval(refinement, data, path,
+                                        record=False, cancel=cancel)
         except RefinementCancelled:
             break
         except ValueError:
             # a precondition :func:`profile_interval` refuses (a row no longer
             # free, no step to walk in): the fit already returned its answer,
-            # so this angle keeps ``None`` and the finding says none was
+            # so this row keeps ``None`` and the finding says none was
             # computed, rather than the finished fit raising
             continue
-    (rebuilt,) = moment_angle_stationary_diagnostics(stage, result.parameters)
+        if row.path.endswith(".dof0") and modulus_profile_withheld(interval):
+            withheld[path] = interval
+        else:
+            row.interval = interval
+    (rebuilt,) = moment_angle_stationary_diagnostics(stage, result.parameters,
+                                                     withheld=withheld)
     diagnostics = list(result.diagnostics)
     at = next((i for i, d in enumerate(diagnostics)
                if d.code == "MOMENT_ANGLE_STATIONARY"), None)

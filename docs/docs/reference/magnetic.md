@@ -241,8 +241,18 @@ Such an angle carries its profile interval in place of an esd ([How to quote a p
 After the last stage, a single-pattern fit runs `Refinement.profile_interval` for each angle the test left out, stepping from its half-width, and stores the answer on the row as `RefinedParameter.interval`.
 `MOMENT_ANGLE_STATIONARY` then gives each angle's distance from the direction and says whether the interval includes it.
 Where it does, the data cannot tell the moment from one along that direction.
+
+The modulus of each such site gets its profile interval too, on its own row.
+Its esd stays on the row, and it assumes the angles sit on the direction.
+On a two-site test set a weak modulus's esd covered the truth 82 % of the time at a nominal 95 %, and its profile interval 93-98 % (issue #1075).
+The message quotes each modulus by its interval.
+Where the profile found the data χ² below the fit, the message gives the drop and says the interval is measured from the fit.
+Where that drop reaches the interval's own cut, the fit did not reach its minimum.
+The row then keeps no interval, and the message gives the lowest point and says to refit from it.
+A site whose modulus the data do not support (`MOMENT_UNSUPPORTED`) is profiled too, but the message does not read its angles as a direction.
+
 The refits run on a copy of the models, so the history gains no node.
-They are the only cost, and only a fit whose test passed pays it: 20-32 refits an angle, 2.6-16.7 s on the two-site test fits of 0.2-1.2 s.
+They are the only cost, and only a fit whose test passed pays it: 20-32 refits an angle, 2.6-16.7 s on the two-site test fits of 0.2-1.2 s, and 22-36 refits a modulus, 2.5-11.8 s each.
 A joint fit computes no interval, and its rows read `None`.
 
 (sec-magnetic-width)=

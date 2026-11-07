@@ -895,11 +895,17 @@ ROWS: tuple[Row, ...] = (
                   "one angle tested alone passes below the one-sided cut 2.706 and so nearly "
                   "always lies inside its 95 % interval (cut 3.84): the test's linearised "
                   "refit can sit up to 1.5 from the full refit the interval walks, more "
-                  "than the 1.13 between the cuts, so 'excludes' stays reachable"),
+                  "than the 1.13 between the cuts, so 'excludes' stays reachable; #1075 "
+                  "(Mike, N = 400): a weak modulus beside the zeroed angles covered 0.82 "
+                  "with its esd and 0.93-0.98 with its profile; a profile withheld on a "
+                  "drop of a full cut, 13-14 of 400 fits, where the esd covered 3 of 20"),
         grounds=("The column leaves the covariance by the package's own act, so the finding "
                  "says so, with each angle's distance from the direction and its profile "
-                 "interval (B2 option 2, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                 "interval (B2 option 2, ruled 2026-10-19), and quotes each site's modulus "
+                 "by its profile interval, withheld with a pointer to refit where the "
+                 "profile dropped a full cut below the fit (WP-2060, ruled by Mike on "
+                 "#1075, 2026-11-04 and 2026-11-05)."),
+        approved="2026-11-05"),
     Row("MOMENT_PAIR_DEGENERATE", "code"),
     Row("MOMENT_UNSUPPORTED", "code", tier=1, ambiguity=1, response="warning",
         responds=("quote no value ± esd for the named moduli; read each moment as "
@@ -5217,8 +5223,11 @@ ROWS: tuple[Row, ...] = (
                   "direction, Delta chi2 0.56 against the interval's 3.84"),
         grounds=("Says what the interval means: one that includes the direction cannot tell "
                  "the moment from one along it, one that excludes it measures the tilt "
-                 "(B2 option 2, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                 "(B2 option 2, ruled 2026-10-19). No longer says to quote the moment along "
+                 "the direction: the modulus is the length at the kept tilt, so it is "
+                 "quoted by its own interval, and a withheld one after a refit (WP-2060, "
+                 "ruled by Mike on #1075, 2026-11-04 condition 3)."),
+        approved="2026-11-05"),
     Row("MOMENT_UNSUPPORTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("physics: an esd is no interval where the column vanishes; the profile "
                   "interval is the likelihood statement, kept at m >= 0 where the sign is "
