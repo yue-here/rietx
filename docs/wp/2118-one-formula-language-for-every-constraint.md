@@ -127,6 +127,25 @@ using only today's ties gives bit-identical numbers before and after.
 
 ## Handover log
 
+- **2026-11-07** — Steward pass on PR #1456 after the maintainer's review. Ruled by Yue
+  2026-11-07: (1) refuse a stored tie with both expression and terms; (2) merge approved,
+  adding stored field TieSpec.expression under schema 0.61. Session by a ghostshift runner.
+  - *Merge.* `origin/main` merged in (WP-2088, #1458). Only the v1.12 milestone record
+    conflicted; both sections are kept. `schemas/common.py` merged clean, and both
+    `TieSpec.expression`'s history note and WP-2088's `_inherit_declared` seam survive.
+    `SCHEMA_VERSION` stays 0.61, since neither side has shipped.
+  - *Ruling 1 landed.* `TieSpec._one_form` refuses `expression` beside non-empty `terms`, and
+    beside a nonzero `const` too. The message names both fields. The `const` half is the same
+    contradiction (the verb writes the text alone, terms empty and const 0), so it was closed
+    with the class. Two cases in `tests/test_tie_expression.py`. The 2026-11-07 entry's
+    declined item on this validator is answered.
+  - *Counts:* `[dev]` venv, darwin/arm64, fast selection on the merged tree, run alone
+    through the machine queue: 14275 passed, 416 skipped, 36 xfailed in 7:29. Added: 2 cases.
+    `test_docs_consistency.py` 25 passed; ruff clean; reader output unchanged against the
+    merge-base (`tests.reader_output` exit 0). The cross-backend row was not re-run here
+    (no jax or torch in this venv), as the change touches no traced path.
+  - *Next:* merge once CI is green on this head (ruling 2).
+
 - **2026-11-07** — Tasks 3-8 are done and the WP closes (second session of the day). A single
   refinement can now set a parameter by a formula: `tie(path, expression="...")`, over
   variables declared with `add_variable` and numbers. A Debye-model Biso refined on a

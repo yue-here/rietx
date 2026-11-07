@@ -303,6 +303,16 @@ def test_a_linear_tie_stored_before_the_field_opens_as_a_linear_tie():
     assert spec.sources == ["vars.B"] and spec.describe() == "0.1 + 2·vars.B"
 
 
+
+@pytest.mark.parametrize("extra, field", [
+    ({"terms": [["vars.B", 2.0]]}, "terms"),
+    ({"const": 0.1}, "const"),
+])
+def test_a_stored_tie_carrying_a_formula_and_a_linear_part_is_refused(extra, field):
+    """The maintainer's ruling of 2026-11-07: the verb never writes both forms."""
+    with pytest.raises(ValueError, match=rf"'expression'.*'{field}'"):
+        rx.TieSpec.model_validate({"expression": "2 * B", "user": True, **extra})
+
 # ------------------------------------------------------------------ a formula against a linear tie
 def test_a_linear_formula_meets_the_matrix_tie_to_rounding(ref):
     """The two routes give one answer where both apply, and stay two routes.

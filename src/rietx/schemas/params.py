@@ -37,7 +37,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .common import Base
 
@@ -68,6 +68,26 @@ class TieSpec(Base):
     const: float = 0.0
     user: bool = False
     expression: str | None = None
+
+    @model_validator(mode="after")
+    def _one_form(self) -> "TieSpec":
+        """Refuse a stored tie that is a formula and a linear tie at once.
+
+        ``Refinement.tie(path, expression=...)`` writes the text alone, so a
+        document carrying ``expression`` beside ``terms`` (or beside a nonzero
+        ``const``) was written by something else, and either reading would
+        drop half of what it says.  The maintainer's ruling of 2026-11-07.
+        """
+        if self.expression is not None:
+            if self.terms:
+                raise ValueError(
+                    "a tie carries both 'expression' and 'terms'; a formula tie's "
+                    "text is the whole tie, so store one or the other")
+            if self.const:
+                raise ValueError(
+                    "a tie carries both 'expression' and a nonzero 'const'; a "
+                    "formula tie's text is the whole tie, so store one or the other")
+        return self
 
     @classmethod
     def _from_tie(cls, tie: Any, *, user: bool = False) -> "TieSpec":
