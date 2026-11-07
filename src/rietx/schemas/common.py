@@ -694,6 +694,11 @@ from .._nearmiss import did_you_mean
 #: written here carries no ``expr`` key, which 1.11 reads as ``None``; a
 #: result or project declaring a formula does not open in 1.11 or earlier.
 #: ``PROJECT_FORMAT_VERSION`` does not move: the ``.rex`` layout is unchanged.
+#: Also in 0.61 (WP-2118): ``TieSpec.expression``, a user tie declared as a
+#: formula over named variables (``Refinement.tie(path, expression=...)``).
+#: Additive and defaulted to ``None``, a linear tie, the 0.25 → 0.26 rule; so
+#: every stored tie opens as the linear tie it was.  An older build refuses a
+#: document carrying the key.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

@@ -1,8 +1,7 @@
 # WP-2118 — one formula language for every constraint
 
-Milestone: parametric · Status: 🔄 2026-11-07 — tasks 1-2 done; design questions 1-3 ruled; task 3 next
+Milestone: parametric · Status: ✅ 2026-11-07 — `tie(path, expression=...)` in a single refinement and a series; the joint fit's half is WP-2103's
 Depends on: 1964 (the grammar, `ParameterTable.add_expression`, the removal of `Parameter.expr`); 2103 soft (the joint fit's `tie`)
-Priority: P2 2026-11-05 — a feature the open milestone was opened for: the maintainer's ruling that one formula language serves single and parametric refinements; task 1 can start before 1964 lands
 
 ## Goal
 
@@ -52,28 +51,13 @@ place declares what a parameter follows, and one command can serve both kinds of
 `_apply_ties` enforces it today. A tie onto an anchored coordinate DOF needs
 `rebase_anchored_dofs` (root CLAUDE.md § Conventions, WP-1432). An analytic Jacobian
 branch must declare what a formula's column reaches (root CLAUDE.md § Invariants). A
-stored formula is text, so it moves `SCHEMA_VERSION`, and old projects must open, with a
-stored linear tie read as its formula.
+stored formula is text, so it moves `SCHEMA_VERSION`, and old projects must open.
+(Superseded in part, 2026-11-07: ruling 3 keeps a stored linear tie linear, so it is not
+read as a formula. `TieSpec.expression` is additive in schema 0.61, which is unreleased, so
+`SCHEMA_VERSION` stays at 0.61.)
 
 **Tier.** The command and the shorthand are named practice (TOPAS, lmfit and Mantid
 declare formulas on parameters; practice.md). No new judgement is added.
-
-### Inherited
-
-- **2026-11-05, from WP-1964 (consent item 2).** The grammar's trigonometry is in
-  radians only, with `pi`, and GSAS-II's `sind` was left out. rietx gives every angle in
-  degrees, cell angles included. Once a formula here can read a cell angle, `cos(beta)`
-  would treat 95° as 95 radians without a word. Task 1's review asks how other programs
-  meet this, and the fix if a case needs it is additive (`sind`, `cosd`, `tand`).
-- **2026-11-05, from WP-1964 (consent item 6).** A joint fit declares its variables at
-  construction, `refine_multi(variables={…})`, while a single refinement uses the
-  `add_variable` command. WP-2103 gives a joint fit the single fit's commands. The
-  command built here should keep the two routes one convention, or say why they differ.
-- **2026-11-06, from WP-1964 (the reader output).** A formula's general surfaces are
-  `vars.*` rows in `result.parameters` and `RefinedParameter.equations`, and a
-  single-refinement formula here reuses both unchanged. The joint fit's
-  `preview_equations()` and `result.parametric_equations`/`evaluate()` are joint-fit
-  calls today; extend them to a single refinement only when a case needs it.
 
 ## Non-goals
 
@@ -98,18 +82,29 @@ declare formulas on parameters; practice.md). No new judgement is added.
       session (memory rule: every survey goes to practice.md).
 - [x] **Brief the maintainer** on design questions 1-3 above, with task 1's practice and
       measurements where a question turns on cost. Record each ruling here.
-- [ ] **The single-refinement command.** Declares a formula for one parameter, auto-commits
+- [x] **The single-refinement command.** Declares a formula for one parameter, auto-commits
       a node, is restored by checkout and replay, and is refused on a symmetry-fixed or
-      symmetry-tied path by name.
-- [ ] **Today's ties as formulas.** `tie`, `tie_equal` and `add_variable` keep working as
+      symmetry-tied path by name. `Refinement.tie(path, expression=...)`, stored as
+      `TieSpec.expression`; `tests/test_tie_expression.py`.
+- [x] **Today's ties as formulas.** `tie`, `tie_equal` and `add_variable` keep working as
       shorthand. Old projects open, and every golden that uses a tie is bit-identical, or
-      the WP says which moved and why.
-- [ ] **A series and a joint fit.** The command re-declares per pattern in a series as a
-      tie does, and a joint fit takes the same command (with 2103).
-- [ ] Tests: unit and property tests, a `test_cross_backend.py` row for a single-fit
+      the WP says which moved and why. Under ruling 3 the linear route is unchanged, so this
+      is a check: the eleven test files that tie and assert bit-identity, plus the backend
+      goldens, the textdoc and the series, pass unchanged (1049 passed).
+- [x] **A series and a joint fit.** The command re-declares per pattern in a series as a
+      tie does, and a joint fit takes the same command (with 2103). The series half runs
+      through the `constrain` hook with no change to `sequential.py`. The joint-fit half is
+      WP-2103's: a joint fit has no `tie` verb yet, so the rule for its `expression=` is
+      handed to 2103's Inherited section.
+- [x] Tests: unit and property tests, a `test_cross_backend.py` row for a single-fit
       formula, and obs/calc/diff PNGs to `tests/output/`.
-- [ ] Manual: the constraints guide and the expressions reference show the command.
-- [ ] Skill: the reference row for the command, keyed by its name.
+- [x] Manual: the constraints guide and the expressions reference show the command.
+      `guides/tie.md` § Tie to a formula, `reference/expressions.md`,
+      `reference/parameter-table.md` (`TieSpec.expression`), both switching pages with the
+      GSAS-II degree warning (consent item); the TOPAS writer refuses a formula tie.
+- [x] Skill: the reference row for the command, keyed by its name. The generated
+      `api.md` row carries `expression=` and the radians trap in its first line;
+      `series.md`'s `constrain=` row names `ref.tie`.
 
 ## Acceptance
 
@@ -131,6 +126,79 @@ using only today's ties gives bit-identical numbers before and after.
 - `docs/practice.md` § A parameter set by an equation the user writes.
 
 ## Handover log
+
+- **2026-11-07** — Tasks 3-8 are done and the WP closes (second session of the day). A single
+  refinement can now set a parameter by a formula: `tie(path, expression="...")`, over
+  variables declared with `add_variable` and numbers. A Debye-model Biso refined on a
+  synthetic LaB6 pattern recovers its Debye temperature within 2 esd, and today's linear ties
+  are untouched, so no stored file or golden moved. The joint-fit half of task 5 is WP-2103's,
+  because a joint fit has no `tie` verb yet. Session by a ghostshift runner, PR #1456.
+  - *Done.* 69f3a31e8: `Refinement.tie(path, source=None, *, scale, offset, expression=None)`;
+    `TieSpec.expression` (additive, schema 0.61, recorded in `common.py`'s history);
+    `_apply_ties` declares formula ties after every linear tie, through
+    `refine._add_formula` → `ParameterTable.add_expression`; `parameters()` reads a formula's
+    target as `tied: = <text>` and the rows its block took over (a cubic `b`, `c`; a user's
+    linear follower) as the linear ties they are; `untie`, `set_values`, `remove_variable`
+    and `_tie_entry` know a formula's rows; the `set_tie` node renders
+    `ref.tie(path, expression=...)`. a98f94466: `test_cross_backend.py` row `tie_expression`.
+    8536aef05: manual (`guides/tie.md` § Tie to a formula, `reference/expressions.md`,
+    `reference/parameter-table.md`, both switching pages with the GSAS-II degree warning, the
+    consent item); `willis1975` in the bibliography; the TOPAS writer refuses a formula row,
+    which it would otherwise have written as the constant 0. 744e01265: the skill's generated
+    `api.md` row and `series.md`.
+  - *Refusals*, each by name: a name that is not a declared variable; a formula reading no
+    variable (`set_values`); a value off the target's bounds or not finite at the variables'
+    present values; a site DOF or rigid-body increment (a step from where the fit began, which
+    no formula can set absolutely); `source` and `expression` together; `scale`/`offset` with
+    `expression`; plus every existing target refusal (symmetry-fixed, symmetry-tied,
+    mode-fixed, already tied).
+  - *Measured* (`[dev,jax,torch]` venv, darwin/arm64). Acceptance: θ_D = 1291.7 ± 113.5 K
+    against the true 1100 K on seed 7 (1.69 esd), 1090 ± 67 (seed 8, −0.14), 1160 ± 80
+    (seed 9, 0.75); Rwp 0.040-0.041, GoF 0.98-1.03. A linear formula and the matrix tie agree
+    to 4e-16 relative in value and 1e-10 of the column's scale in the analytic Jacobian.
+    `tie_expression` passes fd, jax and torch. The eleven test files that tie and assert
+    bit-identity, plus backend goldens, textdoc and sequential: 1049 passed.
+  - *Finding: the WP's acceptance formula as written is degenerate.* `B0 * debye(thD/T)` at one
+    T gives one Biso, so B0 and θ_D cannot both be recovered. The test uses the Debye model's
+    full form (James 1962; Willis & Pryor 1975), B = 6h²T/(m k θ_D²)[D₁(θ_D/T) + θ_D/4T], with
+    θ_D the one free variable. The Willis & Pryor citation is from recall and was not checked
+    against the book; the formula's two limits were checked by derivation (high T:
+    6h²T/(m k θ²); T → 0: 3h²/(2 m k θ)).
+  - *Series.* No change to `sequential.py`: the `constrain` hook declares a formula as it
+    declares a tie. A per-pattern number (the temperature) goes into the text, because a
+    variable is carried from the previous pattern under `carry=["*"]`.
+  - *Collision.* `multi.py` and `params/multi.py` untouched. WP-2103's Inherited gains the
+    joint-fit keyword's rules.
+  - *Gotcha.* A formula target is a derived row the table holds `locked`; every refusal that
+    read `locked` as "structurally fixed" now checks the user register first.
+  - *Review* (`/code-review high --fix`, 10 findings, 4 fixed in 6a12399d6). Fixed: `replay`
+    read a formula tie as an affine row with no terms and set its target to 0 (a sibling the
+    `spec.terms` sweep missed); the `.rxt` document printed a formula with its own spacing and
+    re-parsed it collapsed, so an unedited save read as an edit; a held target refused a
+    formula that a rebuild accepts; the register-and-commit block was duplicated
+    (`_register_ties`). Also `body_misfit` now drops a tie by `sources`, not `terms`.
+    Declined: the table still holds a formula's rows `locked` with no tie, and only
+    `parameters()` reads them as ties, so `STAGE_PATH_NOT_FREE` calls a cubic `b` under a
+    formula-set `a` "fixed by symmetry or by the model", and `_cell_runaway_withheld` does not
+    carry a withheld `a` to `b` and `c` (a table-level "written by a block" flag reaches into
+    WP-1964's code; a follow-up if a case shows it). `set_values` on a user follower of a
+    formula target says "set the variables it reads", which names the wrong fix there.
+    `TieSpec` accepts `expression` beside non-empty `terms` (a validator narrows a stored
+    format, which is the maintainer's). `TieSpec.sources` re-parses the text per call.
+  - *Inherited.* All three notes were consumed: the degrees note became the manual's warning
+    (consent item); the joint fit's convention is handed to WP-2103's Inherited; the reader
+    surfaces (`vars.*` rows, `RefinedParameter.equations`) are reused unchanged, with
+    `equations=[]` on a single fit as before.
+  - *Counts* (`[dev,jax,torch]` venv, darwin/arm64, fast selection, run alone through the
+    machine queue): 14659 passed, 57 skipped, 36 xfailed in 9:48. Added: 27 cases in
+    `tests/test_tie_expression.py` (3.69 s in all, the series test the slowest at 1.49 s), and
+    the `tie_expression` row's 8 cases in `test_cross_backend.py` (1 skip: no axial columns).
+    The full suite was not run: no measured number can move, since the linear route is
+    unchanged. Reader output: unchanged against the merge-base (`tests.reader_output` exit 0).
+  - *Generality.* Not dispatched: `_audit.py` is untouched and the WP adds refusals only, no
+    threshold, fallback or automatic action.
+  - *Next:* merge. Then WP-2103 builds the joint fit's `tie` with `expression=` from its
+    Inherited note.
 
 - **2026-11-07** — Task 2 is done. The maintainer ruled design questions 1-3 and the two
   consent items in a session with the shift lead, after the brief in the 2026-11-06 entry.

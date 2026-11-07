@@ -3,7 +3,12 @@
 This page gives the grammar a parametric equation is written in: the numbers and names, the operators and their order, the functions, the conditions, the spellings it refuses, how an expression is evaluated and differentiated, and a conformance table.
 
 An expression is text such as `zero_a + grad / (exp(theta / T) - 1)`.
-Its names are refined variables, coordinates from the `CoordinateTable`, or equations declared before it.
+Two calls take one.
+
+- `rx.ParametricEquation(basis="expression", expression=...)` sets a parameter in every pattern of a joint fit ([Parametric refinement](parametric.md#formula-equations)).
+  Its names are refined variables, coordinates from the `CoordinateTable`, or equations declared before it.
+- `Refinement.tie(path, expression=...)` sets one parameter of a single refinement ([How to tie parameters together](../guides/tie.md#tie-to-a-formula)).
+  Its names are variables declared with `Refinement.add_variable`.
 The grammar is rietx's own.
 It reads no TOPAS or GSAS-II file, and a translation from either program's spelling is in [Switching](../switching/index.md).
 
@@ -53,6 +58,8 @@ An exponent is a signed number, name, call or parenthesised expression, so `x^-(
 Every function is called with parentheses, as in `exp(x)`.
 Trigonometric functions take and return radians.
 To work in degrees, multiply by `pi / 180`.
+rietx stores every angle in degrees, cell angles included, so a formula reading one writes `cos(beta * pi / 180)`.
+GSAS-II's expressions read `sin`, `cos` and `tan` in degrees (GSAS-II 5.8.4, `GSASIIobj.py`), so a GSAS-II formula with an angle in it gives a different value here, with no error.
 
 | Function | Value | Derivative used |
 |---|---|---|
