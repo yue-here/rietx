@@ -2403,12 +2403,24 @@ ROWS: tuple[Row, ...] = (
                   "and a settled partition failed 10 rows of tests/test_extinction_margin.py and "
                   "test_extinction_gate.py (WP-1542, 2026-11-05); no stated source for the 3. "
                   "Since WP-2076 (2026-11-07) the compared fits are Pawley and this count "
-                  "governs the cell-free Le Bail prefit alone"),
-        grounds=("Kept until WP-2062 moves the screen to Pawley, as the row it comes from was "
-                 "kept until WP-1542 (B11, ruled 2026-10-19); re-measuring the screen's margins "
-                 "for a method it is about to leave buys nothing.  B11 did not exempt the "
-                 "screen: the exemption was settled by Claude under the maintainer's delegation "
-                 "of 2026-11-05, and the date is that settlement's."),
+                  "governs the cell-free Le Bail prefit alone.  Re-measured on that prefit "
+                  "(WP-2076, 2026-11-07): 3 fixed cycles against a settled partition (the "
+                  "StageSpec default, 25000 cycles to lebail_tol 1e-7) on eleven screens, "
+                  "SRM 676a corundum, GSAS-II FAP and the synthetic P 1 21/c 1 at cells "
+                  "x0.995/x1/x1.005, and GSAS-II PbSO4 at x0.99/x1.  At the correct cell all "
+                  "four answers agree and dBIC moves by at most 0.1.  Settled, the synthetic "
+                  "pattern at x0.995 names P 1 21 1, a class excluding the true group, where 3 "
+                  "cycles abstain through the reference gate; FAP's prefit cell lands 0.15 % "
+                  "off at x1.005 (Rwp 0.54 against 0.11); the synthetic x1.005 cell lands "
+                  "closer settled (8.0005 against 8.0083 A), the answer right in both.  The "
+                  "eight tests/test_extinction*.py files: 176 passed in both arms"),
+        grounds=("Kept at 3 on a measurement: on the eleven screens a settled prefit "
+                 "partition gave one confident wrong class and no right answer the 3-cycle "
+                 "prefit missed.  The count has no published source and was not tuned to "
+                 "these rows; it is the pre-WP-1542 default, and the measurement is the "
+                 "reason not to move it.  A caller who wants a converged Le Bail of the "
+                 "lattice runs one; the prefit's only product is the cell and widths the "
+                 "classes are compared at, so no competent caller depends on it settling."),
         approved="2026-11-05"),
     Row("rietx.indexing.extinction.REFERENCE_NET_RWP_MAX", "constant", tier=3, value=0.7071,
         evidence=("Statistic: Toby (2006)'s background-subtracted Rwp over the picker's "

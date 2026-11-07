@@ -926,7 +926,9 @@ def _model_is_quiet(two_theta: np.ndarray, y_calc: np.ndarray,
 # ----------------------------------------------------------------------
 #: The fixed Le Bail cycles of the cell-free prefit (WP-1542), the one Le Bail
 #: fit the screen still runs.  The prefit's cell is measured at this count, so a
-#: partition that settled would move it.
+#: partition that settled would move it.  Settling it was measured on eleven
+#: screens (WP-2076, 2026-11-07): one confident wrong class at a cell 0.5 % short,
+#: and no answer the 3-cycle prefit missed.  The ``_audit`` row has the numbers.
 SCREEN_LEBAIL_CYCLES = 3
 
 #: The decomposition of every fit the screen **compares**: the shared profile
