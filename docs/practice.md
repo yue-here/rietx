@@ -595,7 +595,7 @@ holds neither ExtSym paper, so the ExtSym row rests on its abstract and its cata
 
 | Program | What the ranking reads | How a weak line enters |
 |---|---|---|
-| rietx (main) | a Le Bail χ² per class against an absence-free reference, as ΔBIC | a testable forbidden position counts ln N in the class's favour, and a window test at 3σ refutes |
+| rietx (main) | a Pawley χ² per class (the lattice less its testable forbidden lines, WP-2076) against an absence-free Pawley reference, as ΔBIC | a testable forbidden position counts ln N in the class's favour, and a window test at 3σ refutes |
 | ExtSym (Markvardsen et al. 2001, 2008) | integrated intensities and their errors, from a Pawley-type fit. Validated on TF12LS output, then on DASH, FullProf, GSAS, PRODD and TOPAS output | a probability per symbol. The abstract says the result depends heavily on the accuracy of the error estimates |
 | GSAS-II 5.8.4 | no extinction-symbol ranking found. The Unit Cells tab lists space groups for a cell with M20 and X20 (`GSASIIpwdGUI.py:737-768`) | not applicable |
 | TOPAS, FullProf | not checked | not checked |

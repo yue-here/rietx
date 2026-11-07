@@ -2478,10 +2478,25 @@ class ExtinctionCandidate(Base):
     #: the refuting reflections, so the refutation can be checked in the pattern
     forbidden_hkl: list[tuple[int, int, int]] = Field(default_factory=list)
     forbidden_two_theta: list[float] = Field(default_factory=list)
-    #: whole-pattern Le Bail fit of this class; ``inf`` when the class was never
-    #: fitted (:attr:`screened` False) or its fit raised
+    #: the :attr:`n_testable` forbidden positions themselves, one reflection
+    #: each, so a reader can see where two classes the screen could not
+    #: separate disagree (``EXTINCTION_SYMBOL_AMBIGUOUS`` names them).  Empty
+    #: until :attr:`screened`
+    tested_hkl: list[tuple[int, int, int]] = Field(default_factory=list)
+    tested_two_theta: list[float] = Field(default_factory=list)
+    #: whole-pattern Pawley fit of this class (WP-2076; Le Bail before it);
+    #: ``inf`` when the class was never fitted (:attr:`screened` False) or its
+    #: fit raised
     rwp: float = float("inf")
     gof: float = float("inf")
+    #: the absolute χ² the ranking reads: a Pawley fit of the lattice less only
+    #: this class's :attr:`n_testable` forbidden lines (WP-2076), so the
+    #: comparison with :attr:`ExtinctionScreen.reference_chi2` is nested and
+    #: charges the class for exactly the absences it is counted for.  It is this
+    #: class's own fit when every forbidden line is testable, and the
+    #: reference's when none is.  Stays ``inf`` when that second fit raised,
+    #: and the class is then refuted with its own fit's :attr:`rwp` and
+    #: :attr:`n_testable` kept
     chi2: float = float("inf")
     #: BIC(this class) − BIC(the absence-free lattice), from
     #: ``report.layer2.delta_bic``: **negative favours this class**.  Differences
@@ -2492,14 +2507,14 @@ class ExtinctionCandidate(Base):
     #: restoring the forbidden reflections is *justified*, i.e. the class's
     #: absences are contradicted by the fit
     absences_rejected: bool = False
-    #: was the Le Bail screen actually run for this class?  False only when
+    #: was the screen fit actually run for this class?  False only when
     #: ``max_classes`` truncated the screen or ``cancel`` stopped it first; the
     #: absence test reads this class's own fit, so it never runs before one
     screened: bool = False
     #: **One-sided by construction.** A class asserts *absences*, so intensity at
     #: a position it forbids contradicts it — while a class claiming too *few*
     #: absences asserts nothing the data can falsify and is outranked rather than
-    #: refuted.  The one other way in is a Le Bail fit that raised, which
+    #: refuted.  The one other way in is a screen fit that raised, which
     #: :attr:`refuted_reason` names as such: with no χ² it cannot be the answer.
     refuted: bool = False
     refuted_reason: str | None = None
@@ -2530,7 +2545,7 @@ class ExtinctionScreen(Base):
     #: fitted 2θ range the classes were enumerated and judged over.  It is part
     #: of the answer: two classes differing only outside it are one class here.
     two_theta_range: tuple[float, float] = (0.0, 0.0)
-    #: classes enumerated / classes whose Le Bail fit was run
+    #: classes enumerated / classes whose screen fit was run
     n_classes: int = 0
     n_screened: int = 0
     #: the absence-free class's own screen fit — the reference model

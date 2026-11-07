@@ -27,6 +27,7 @@ detail the test never states.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import gemmi
@@ -509,33 +510,43 @@ def fap_screen():
 
 
 @pytest.mark.slow
-def test_fap_returns_the_p63_class_with_its_groups_listed(fap_screen):
-    """The acceptance criterion: the right class first, its groups **listed**.
+def test_fap_leads_with_the_p63_class_and_abstains_on_one_position(fap_screen):
+    """The class leads the list with its groups **listed**, and the screen
+    abstains, because one testable position cannot reach the margin.
 
-    P 6₃/m is the answer the tutorial refines, and it is *not* what this returns —
-    what it returns is ``P 63 - -``, the class {P 6₃, P 6₃/m, P 6₃22}, because a
-    powder cannot tell those three apart.  The mirror and the two-folds produce no
-    absences, so no counting time separates them; the diagnostic says so and names
-    the alternative arbiter.
+    P 6₃/m is the answer the tutorial refines.  What leads here is ``P 63 - -``,
+    the class {P 6₃, P 6₃/m, P 6₃22}, because a powder cannot tell those three
+    apart: the mirror and the two-folds produce no absences.  The class forbids
+    one line the data can test, (0 0 5) at 68.0° ((0 0 3) sits in a stronger
+    neighbour's tail), and since WP-2076 its score is a nested
+    comparison: removing one line buys ΔBIC ln N = 8.2 at most, under
+    ``DECISIVE_DELTA_BIC`` = 10.  Before WP-2076 the Le Bail screen read −84 on
+    that one position, more than its count can buy, so the answer rested on a
+    fit-path difference rather than on the absence.  Ruled by the maintainer on
+    2026-11-07 (WP-2076's handover log): the screen abstains here, and says
+    where the leading classes differ.
     """
     best = fap_screen.best_or_none()
-    assert best is not None, [(c.symbol, c.refuted_reason)
-                              for c in fap_screen.candidates]
-    assert best.symbol == "P 63 - -"
-    assert best.space_groups == ["P 63", "P 63/m", "P 63 2 2"]
-    assert best.conditions == ["00l: l = 2n"]
-    assert not best.refuted and best.n_testable >= 1
-    assert best.delta_bic < -DECISIVE_DELTA_BIC
+    assert best is None, best
+    top = fap_screen.candidates[0]
+    assert top.symbol == "P 63 - -"
+    assert top.space_groups == ["P 63", "P 63/m", "P 63 2 2"]
+    assert top.conditions == ["00l: l = 2n"]
+    assert not top.refuted and top.n_testable == 1
+    assert -math.log(fap_screen.n_points) - 0.1 <= top.delta_bic < 0.0
 
     note = next(d for d in fap_screen.diagnostics
                 if d.code == "EXTINCTION_GROUPS_NOT_SEPARABLE")
-    for group in best.space_groups:
+    for group in top.space_groups:
         assert group in note.where[0]
     assert note.level == "info"
+    ambiguous = next(d for d in fap_screen.diagnostics
+                     if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS")
+    assert str(top.tested_hkl[0]) in ambiguous.message, ambiguous.message
 
     # every other class is refuted, and by named reflections
     others = [c for c in fap_screen.candidates if c.symbol not in
-              (best.symbol, "P - - -")]
+              (top.symbol, "P - - -")]
     assert others and all(c.refuted and c.forbidden_hkl for c in others)
 
 
