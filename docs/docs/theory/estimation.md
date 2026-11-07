@@ -517,12 +517,9 @@ distance either side at which $\chi^2$, with every other parameter held, rises
 by $\chi^2_{\mathrm{red}} \cdot S''/S$. On the one-site set both angles'
 intervals include the direction, after 24 refits each.
 
-The modulus of each such site gets the same interval, stepping from its esd.
-That esd is read with the angle columns out, so it holds only where the angles
-sit on the direction. The profile's refits can find $\chi^2$ below the
-fit's. A drop under the cut is quoted with the
-interval. A drop of a whole cut or more means the fit did not reach its
-minimum, so the interval is withheld and the fit points at a refit.
+Each such site's modulus gets one, since its esd assumes the angles sit on
+the direction. Where a refit finds $\chi^2$ a whole cut lower, the fit
+missed its minimum and the interval is withheld.
 
 {source}`rietx.strategy.parameter_interval.attach_stationary_intervals`
 
