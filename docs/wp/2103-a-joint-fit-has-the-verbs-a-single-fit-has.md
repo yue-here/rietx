@@ -74,6 +74,18 @@ the chain, and its answer on what "held" means should govern here. Read it first
   predicate False (generality review, WP-1964's entry). Once the tie lands, add a joint
   fit with a tie onto `vars.X` beside a formula reading X, and assert that the formula's
   test drops that pattern.
+- **From WP-2118 (2026-11-07): the joint fit's `tie` takes `expression=` too.** The
+  maintainer ruled on 2026-11-07 that one command serves both kinds of fit. A single
+  refinement now has `Refinement.tie(path, expression="...")`: a formula over named
+  variables only (`vars.<name>`) and numbers, stored as `TieSpec.expression` in the one
+  register of user ties, re-declared after the linear ties on every table build through
+  `ParameterTable.add_expression` (`refine._add_formula` binds each name to `vars.<name>`),
+  and released by `untie`. A formula always runs as a formula, and a linear tie stays on the
+  constant matrix (ruling 3). When this WP gives a joint fit `tie`, give it the same keyword
+  with the same refusals (`tests/test_tie_expression.py` lists them), and say how a
+  per-histogram target meets the formula: once per histogram on each table, as
+  `_install_parametric` does for a `ParametricEquation`. WP-2118 left `multi.py` and
+  `params/multi.py` untouched.
 
 ## Non-goals
 
