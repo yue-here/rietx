@@ -13,7 +13,7 @@ from functools import lru_cache
 from types import MappingProxyType
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, model_validator
 
 from .._nearmiss import did_you_mean
 
@@ -1036,11 +1036,18 @@ class _InheritsDeclaredDefaults(Base):
     pydantic refuses a before validator on a discriminator field, and
     ``Source.kind`` is one.
 
-    **The replacement is a ``Parameter``, never the merged dict**: on
-    assignment pydantic re-runs the model validator with ``data`` built from
-    the model's current field values, and does not re-validate the fields the
-    assignment never touched.  A dict placed there would reach the model as a
-    dict (measured on ``Atom`` after ``atom.aniso = AnisoU(...)``).
+    **On assignment the model validator returns ``data`` untouched.**
+    pydantic re-runs it with ``data`` built from the model's current field
+    values, and it does not re-validate the fields the assignment never
+    touched, so whatever the validator returns for them lands as it is.  A
+    dict landed as a dict (measured on ``Atom`` after
+    ``atom.aniso = AnisoU(...)``).  A fresh ``Parameter`` replaced every
+    default whose declaration leaves ``max`` unset, so after
+    ``phase.lor_size = ...`` the object a caller held as ``phase.gauss_size``
+    was no longer the model's, and a change made to it reached nothing
+    (WP-2088's code review).  ``info.field_name`` names the assigned field on
+    that pass and is ``None`` on construction, which is how the validator
+    tells the two apart.
 
     Detected with ``model_fields_set`` (for a raw dict, its keys) rather than
     by comparing with the bare defaults, since an explicit ``min=-inf`` is
@@ -1071,10 +1078,10 @@ class _InheritsDeclaredDefaults(Base):
 
     @model_validator(mode="before")
     @classmethod
-    def _inherit_declared_bounds(cls, data: object) -> object:
+    def _inherit_declared_bounds(cls, data: object, info: ValidationInfo) -> object:
         """Construction's half of the seam: each field handed in inherits."""
-        if not isinstance(data, dict):
-            return data
+        if not isinstance(data, dict) or info.field_name is not None:
+            return data  # an assignment's pass: ``__setattr__`` has filled it
         return {name: cls._inherit_declared(name, raw) if name in cls.model_fields
                 else raw for name, raw in data.items()}
 
@@ -1085,7 +1092,7 @@ class _InheritsDeclaredDefaults(Base):
             try:
                 value = cls._inherit_declared(name, value)
             except ValidationError:
-                pass  # broken without the fills too: pydantic's own error names it
+                pass  # broken without the fills too: validating the value raises it
             except ValueError as exc:
                 raise ValidationError.from_exception_data(cls.__name__, [{
                     "type": "value_error", "loc": (name,), "input": value,
@@ -1114,13 +1121,17 @@ class _InheritsDeclaredDefaults(Base):
         # behaviour, kept).  Sharing *on purpose* states every attribute —
         # ``Harmonic.weight``'s default does, being its line's by reference
         fills = declared_fills(factory(), set(present))
+        # ``model_validate``, not ``Parameter(**...)``: a dict with a non-string
+        # key raises pydantic's error rather than a bare TypeError
         try:
-            return Parameter(**{**base, **fills})
-        except ValueError as exc:
+            return Parameter.model_validate({**base, **fills})
+        except ValidationError as exc:
             try:
-                Parameter(**base)
-            except ValueError:
-                raise exc from None  # broken without the fills too: not ours to name
+                Parameter.model_validate(base)
+            except ValidationError as own:
+                # broken without the fills too: not ours to name, and the
+                # caller's own error quotes the input they wrote, not ours
+                raise own from None
             value = base.get("value")
             # a JSON-mode dict spells an infinite bound "-Infinity"
             lo = float(fills.get("min", base.get("min", -math.inf)))

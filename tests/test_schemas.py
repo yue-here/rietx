@@ -516,13 +516,32 @@ def test_an_assigned_parameter_keeps_the_bound_it_states():
     assert (a.occ.min, a.occ.max) == (0.0, 1.0)
 
 
+def test_an_assignment_leaves_the_other_fields_objects_in_place():
+    """WP-2088's code review: pydantic re-runs the construction validator on
+    every assignment, over the model's current fields, and what it returns
+    for a field the assignment never touched lands as it is.  It used to
+    return a fresh copy of every default leaving ``max`` unset, so a
+    ``Parameter`` a caller held stopped being the model's.  Fails on the
+    parent commit."""
+    phase = make_lab6().phases[0]
+    held = {name: getattr(phase, name) for name in ("gauss_size", "scale", "lor_strain")}
+    phase.lor_size = Parameter(value=0.01, vary=True)
+    for name, obj in held.items():
+        assert getattr(phase, name) is obj, name
+    held["gauss_size"].vary = True
+    assert phase.gauss_size.vary
+
+
 def test_an_assigned_parameter_outside_the_declared_range_is_refused_by_name():
     """The construction refusal, reached by assignment: it names the field and
-    the range, and the model keeps the value it had."""
+    the range, and the model keeps the value it had.  The location is the
+    field: before WP-2088 the same text arrived from the model validator with
+    no location, so the message alone would pass on the parent commit."""
     a = _atom()
     with pytest.raises(ValidationError, match=r"Atom\.occ: value -0\.5 lies "
-                       r"outside bounds \[0\.0, inf\]"):
+                       r"outside bounds \[0\.0, inf\]") as refused:
         a.occ = Parameter(value=-0.5, vary=True)
+    assert [e["loc"] for e in refused.value.errors()] == [("occ",)]
     assert a.occ.value == 1.0
 
 
