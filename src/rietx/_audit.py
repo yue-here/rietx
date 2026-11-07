@@ -2420,7 +2420,9 @@ ROWS: tuple[Row, ...] = (
                  "these rows; it is the pre-WP-1542 default, and the measurement is the "
                  "reason not to move it.  A caller who wants a converged Le Bail of the "
                  "lattice runs one; the prefit's only product is the cell and widths the "
-                 "classes are compared at, so no competent caller depends on it settling."),
+                 "classes are compared at, so no competent caller depends on it settling.  "
+                 "Rewritten by Claude on 2026-11-07 (WP-2076); `approved` still dates the "
+                 "2026-11-05 settlement until the maintainer approves this text."),
         approved="2026-11-05"),
     Row("rietx.indexing.extinction.REFERENCE_NET_RWP_MAX", "constant", tier=3, value=0.7071,
         evidence=("Statistic: Toby (2006)'s background-subtracted Rwp over the picker's "

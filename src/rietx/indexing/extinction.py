@@ -1475,20 +1475,24 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
             # two classes differing only in untestable lines are scored on one
             # reflection set, so the refit is shared rather than repeated
             lines = frozenset(int(v) for v in ev["lines"][keep])
-            try:
-                if lines not in scoring_fits:
+            if lines not in scoring_fits:
+                # a raise is cached too, so a class sharing this line set
+                # neither repeats a failing refit nor reads it as a fit
+                try:
                     charged = np.isin(labels, ev["lines"][keep])
                     scoring_fits[lines] = _fit_class(
                         candidate, data, frozen, symbol, two_theta_limits,
                         omit=hkl_ref[charged])[1]
-                scored = scoring_fits[lines]
-            except Exception as exc:              # noqa: BLE001
+                except Exception as exc:          # noqa: BLE001
+                    scoring_fits[lines] = exc
+            scored = scoring_fits[lines]
+            if isinstance(scored, Exception):
                 entry.screened = False
                 fit_errors[entry.symbol] = (
                     f"the {SCREEN_MODE} fit of {symbol} without the "
                     f"{entry.n_testable} testable forbidden line(s) of "
-                    f"{entry.symbol} raised {type(exc).__name__}: "
-                    f"{str(exc).rstrip('.')}")
+                    f"{entry.symbol} raised {type(scored).__name__}: "
+                    f"{str(scored).rstrip('.')}")
                 continue
         entry.chi2 = _chi2_absolute(scored.statistics)
         entry.delta_bic = delta_bic(entry.chi2, screen.reference_chi2,

@@ -2464,8 +2464,9 @@ class ExtinctionCandidate(Base):
     #: forbidden line coinciding with an allowed one never was an independently
     #: determined intensity, so removing it costs no parameter.
     #:
-    #: ``None`` until :attr:`screened` (and after a fit that raised, which
-    #: leaves no pattern to ask), and that is not bookkeeping.  The third
+    #: ``None`` until this class's own fit has run (and after that fit raised,
+    #: which leaves no pattern to ask), and that is not bookkeeping.  A class
+    #: whose scoring fit raised keeps its count while :attr:`screened` is False.  The third
     #: clause is a question about the class's *fit* — a window filled by a
     #: neighbour's tail measures the profile model rather than the absence
     #: (WP-1077) — so before the fit the count is unknown rather than zero, and

@@ -208,7 +208,7 @@ A returned class still lists every space group it admits, and nothing in the pac
 | `ExtinctionCandidate.chi2` | the raw χ² the class is scored on: the lattice group less only its testable forbidden lines, which is its own fit when every forbidden line is testable and the reference's when none is |
 | `ExtinctionCandidate.delta_bic` | BIC of this class minus BIC of the absence-free reference; negative favours this class, and `0.0` for a class never fitted |
 | `ExtinctionCandidate.absences_rejected` | `True` when Hamilton's test finds restoring the forbidden reflections justified, so the absences are contradicted |
-| `ExtinctionCandidate.screened` | whether this class's fit ran |
+| `ExtinctionCandidate.screened` | whether this class was scored: `False` when a cap or a stop left it unfitted, or when its own fit or its scoring fit raised |
 | `ExtinctionCandidate.refuted`, `ExtinctionCandidate.refuted_reason` | refuted, and why, naming the first refuting reflection |
 | `ExtinctionCandidate.diagnostics` | findings about this class |
 
@@ -246,7 +246,8 @@ A class whose extra absences all hide under allowed neighbours would otherwise w
 
 Refutation is one-sided by construction.
 A class asserts absences, so intensity where it forbids one contradicts it; a class claiming too few absences asserts nothing the data can falsify, and is outranked rather than refuted.
-The one other way a class is refuted is a fit that raised, which `ExtinctionCandidate.refuted_reason` says.
+A fit that raised refutes nothing, since a solver failure is no evidence about the absences.
+It leaves its class unscored (`screened` is `False`), and `EXTINCTION_SYMBOL_AMBIGUOUS` names the error.
 A testable position carrying intensity refutes a class whatever its ΔBIC.
 A single refuting position can still be an impurity line rather than a violated absence, so check it against the candidate's unmatched observed lines (`LeBailValidation.unmatched_observed_two_theta`) before dropping the class.
 
