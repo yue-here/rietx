@@ -3263,7 +3263,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "threshold or more, the fit did not reach its minimum: the message gives "
             "the better point, and the size is quoted only after a refit from it. "
             "The size's coverage and that threshold were measured on one family, a "
-            "simulated two-site Pnma set, and are untested beyond it."
+            "simulated two-site `Pnma` set, and are untested beyond it."
         ),
     ),
     "MOMENT_UNSUPPORTED": HelpEntry(
