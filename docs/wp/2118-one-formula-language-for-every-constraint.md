@@ -1,6 +1,6 @@
 # WP-2118 — one formula language for every constraint
 
-Milestone: parametric · Status: 🔄 2026-11-07 — tasks 1-2 done; design questions 1-3 ruled; task 3 next
+Milestone: parametric · Status: 🔄 2026-11-07 — claimed by ghostshift runner (tasks 3-8)
 Depends on: 1964 (the grammar, `ParameterTable.add_expression`, the removal of `Parameter.expr`); 2103 soft (the joint fit's `tie`)
 Priority: P2 2026-11-05 — a feature the open milestone was opened for: the maintainer's ruling that one formula language serves single and parametric refinements; task 1 can start before 1964 lands
 
