@@ -152,6 +152,16 @@ def test_a_stop_beside_the_symmetry_direction_leaves_the_angles_out():
     assert all(rows[p].interval.lower <= only.stationary_at[p] <= rows[p].interval.upper
                for p in ANGLES)
     assert finding.message.count("includes the direction") == len(ANGLES)
+    # and each site's modulus carries its interval beside the esd it keeps
+    # (WP-2060, ruled by Mike on #1075): both cover the truth here, 3.5 and
+    # 0.7 μ_B, and the finding quotes them rather than the esds
+    for modulus, truth in ((f"{MN1}.dof0", 3.5), (f"{MN2}.dof0", 0.7)):
+        iv = rows[modulus].interval
+        assert iv is not None and iv.stderr == rows[modulus].stderr
+        assert iv.lower < truth < iv.upper
+        assert f"{modulus} is " in finding.message
+        assert "μ_B, with the 95 % profile interval" in finding.message
+    assert "along that direction" not in finding.suggestion
 
 
 @pytest.fixture(scope="module")
@@ -322,8 +332,11 @@ def test_a_left_out_angle_carries_its_interval_and_the_history_gains_no_node():
         assert iv.lower_stop == iv.upper_stop == "threshold"
         assert iv.lower <= passed.stationary_at[path] <= iv.upper
         assert all(p.node_id is None for p in iv.points)
+    # the site's modulus too (WP-2060), and no other row
+    modulus = f"{MN1}.dof0"
+    assert rows[modulus].interval.lower < rows[modulus].value < rows[modulus].interval.upper
     assert all(r.interval is None for r in result.parameters
-               if r.path not in passed.paths)
+               if r.path not in [*passed.paths, modulus])
     assert all(r.interval is None for r in off.parameters)
     # nothing else the fit returns moved
     assert [(r.path, r.value, r.stderr) for r in result.parameters] == [
@@ -476,3 +489,222 @@ def test_a_chain_pays_the_interval_once_a_pattern_on_the_attempt_it_keeps(
     assert [r.statistics.rwp for r in asked] == [e.statistics.rwp for e in series]
     # and each kept attempt has angles left out for the interval to be about
     assert all(any(t.zeroed for t in r.stages[-1].moment_angle_tests) for r in asked)
+
+
+# ---------------------------------------------------------------------------
+# The moduli of the flagged sites (WP-2060 task 8, ruled by Mike on #1075,
+# 2026-11-04 with four conditions, amended 2026-11-05).  The finding's words
+# are pinned on built records, since a fit that lands each case costs a
+# minute; the wiring is pinned on one real fit with the profile stubbed.
+# ---------------------------------------------------------------------------
+
+SITE_ANGLES = [f"{MN1}.dof1", f"{MN2}.dof1"]
+
+
+def _interval(path, value, lower, upper, *, drop=0.0, cut=4.9, lowest_at=None):
+    """A built profile interval, its lowest point ``drop`` below the fit."""
+    from rietx.schemas.interval import ParameterInterval, ParameterIntervalPoint
+
+    points = [ParameterIntervalPoint(value=lowest_at if lowest_at is not None else lower,
+                                     runs=1, chi2=100.0 - drop, delta_chi2=-drop)]
+    return ParameterInterval(
+        path=path, value=value, stderr=0.04, at_bound=False, level=0.95,
+        one_sided=False, quantile=3.84, delta_chi2_cut=cut, lower=lower, upper=upper,
+        lower_stop="threshold", upper_stop="threshold", chi2_fit=100.0,
+        chi2_lowest=100.0 - drop, fit_is_minimum=drop <= 0.01 * cut, points=points,
+        n_refits=20)
+
+
+def _stage():
+    from types import SimpleNamespace
+
+    from rietx.schemas.results import MomentAngleTest
+
+    test = MomentAngleTest(paths=SITE_ANGLES, reached=True, statistic=0.01, cut=4.23,
+                           zeroed=True, stationary_at={p: math.pi / 2 for p in SITE_ANGLES},
+                           half_widths={p: 0.01 for p in SITE_ANGLES})
+    return SimpleNamespace(moment_angle_tests=[test])
+
+
+def _row(path, value, stderr, interval=None):
+    from rietx.schemas.results import RefinedParameter
+
+    return RefinedParameter(path=path, value=value, stderr=stderr, vary=True,
+                            interval=interval)
+
+
+def _message(rows, withheld=None):
+    from rietx.report.magnetic import moment_angle_stationary_diagnostics
+
+    (finding,) = moment_angle_stationary_diagnostics(_stage(), rows, withheld=withheld)
+    return finding
+
+
+def test_a_flagged_modulus_is_quoted_by_its_interval_and_the_drop_under_the_cut():
+    """Conditions 2 and 3: a modulus by its interval, a small drop named.
+
+    Mn1's profile came back to the fit; Mn2's found χ² 2.1 below it, under
+    the cut of 4.9, so its interval is quoted and the finding says it is
+    measured from the fit.  The suggestion no longer tells a reader to quote
+    the moment along the direction: the modulus printed is the length at the
+    kept tilt, which is never shorter than the moment along it.
+    """
+    a1, a2, m1, m2 = (*SITE_ANGLES, f"{MN1}.dof0", f"{MN2}.dof0")
+    rows = [_row(a1, 1.5708, None, _interval(a1, 1.5708, 1.56, 1.58)),
+            _row(a2, 1.60, None, _interval(a2, 1.60, 1.50, 1.70)),
+            _row(m1, 3.5, 0.0015, _interval(m1, 3.5, 3.497, 3.504)),
+            _row(m2, 0.75, 0.0011, _interval(m2, 0.75, 0.62, 0.81, drop=2.1))]
+    finding = _message(rows)
+    message = finding.message
+    assert f"{m1} is 3.50000 μ_B, with the 95 % profile interval 3.49700 to 3.50400 μ_B." in message
+    assert f"{m2} is 0.750 μ_B, with the 95 % profile interval 0.620 to 0.810 μ_B." in message
+    assert message.count("below the fit") == 1
+    assert ("found the data chi2 2.1 below the fit, under the cut of 4.9, so the "
+            "interval is measured from the fit") in message
+    # each modulus keeps its esd on the row, and the finding does not quote it
+    assert "0.0011" not in message and "0.0015" not in message
+    assert "assumes the angles sit on the direction" in message
+    assert "No profile interval was computed" not in message
+    assert message.count("includes the direction") == 2
+    assert "along that direction" not in finding.suggestion
+    assert "moduli by its interval" in finding.suggestion
+
+
+def test_a_withheld_modulus_gets_the_lowest_point_and_the_pointer_never_the_esd():
+    """Condition 2 with the 2026-11-05 amendment.
+
+    A drop of a full cut or more means the fit did not reach its minimum:
+    the interval is not the modulus's uncertainty, and near zero the esd
+    covered 3 of 20 (#1075, block D).  The finding gives the lowest point and
+    says to refit from it, and quotes neither the interval nor the esd.
+    """
+    from rietx.report.magnetic import modulus_profile_withheld
+
+    a1, a2, m1, m2 = (*SITE_ANGLES, f"{MN1}.dof0", f"{MN2}.dof0")
+    held = _interval(m2, 0.75, 0.31, 0.92, drop=5.3, lowest_at=0.4321)
+    assert modulus_profile_withheld(held)
+    # the boundary is the cut itself, reached
+    assert modulus_profile_withheld(_interval(m2, 0.75, 0.6, 0.8, drop=4.9))
+    assert not modulus_profile_withheld(_interval(m2, 0.75, 0.6, 0.8, drop=4.89))
+    rows = [_row(a1, 1.5708, None, _interval(a1, 1.5708, 1.56, 1.58)),
+            _row(a2, 1.60, None, _interval(a2, 1.60, 1.50, 1.70)),
+            _row(m1, 3.5, 0.0015, _interval(m1, 3.5, 3.497, 3.504)),
+            _row(m2, 0.75, 0.0123)]
+    message = _message(rows, withheld={m2: held}).message
+    assert (f"The profile of {m2} found the data chi2 5.3 below the fit, at 0.4321 μ_B, "
+            f"a full cut of 4.9 or more.") in message
+    assert "Refit with it started at 0.4321 μ_B before quoting it." in message
+    assert "0.0123" not in message and "0.31" not in message and "0.92" not in message
+    # withheld is not "none computed": the generic pointer stays off it
+    assert "No profile interval was computed" not in message
+
+
+def test_an_unsupported_flagged_site_does_not_read_its_angles_as_a_direction():
+    """Condition 1: a ``MOMENT_UNSUPPORTED`` site is one of these sites.
+
+    Its modulus is profiled like any other, and the finding quotes it, but
+    with no moment the angle points nowhere the data see, so its interval is
+    not read as including or excluding the direction.  The supported site
+    beside it still is.
+    """
+    a1, a2, m1, m2 = (*SITE_ANGLES, f"{MN1}.dof0", f"{MN2}.dof0")
+    rows = [_row(a1, 1.5708, None, _interval(a1, 1.5708, 1.56, 1.58)),
+            _row(a2, 1.44, None, _interval(a2, 1.44, 0.58, 2.56)),
+            _row(m1, 3.5, 0.0015, _interval(m1, 3.5, 3.497, 3.504)),
+            _row(m2, 0.085, 0.038, _interval(m2, 0.085, 0.012, 0.152))]
+    message = _message(rows).message
+    assert message.count("includes the direction") == 1
+    assert "excludes the direction" not in message
+    assert (f"{a2} is 0.1308 rad (7.49 deg) from the direction at 1.5708. Its 95 % "
+            f"profile interval is 0.5800 to 2.5600.") in message
+    assert (f"The data do not support the moment of {m2} (MOMENT_UNSUPPORTED), so its "
+            f"angles give no direction.") in message
+    assert f"{m2} is 0.085 μ_B, with the 95 % profile interval 0.012 to 0.152 μ_B." in message
+
+
+def test_a_modulus_without_a_profile_keeps_the_pointer():
+    """A joint fit, an internal trial or a cancelled run computes none: the
+    finding then says the esd assumes the direction and names the verb."""
+    a1, a2, m1, m2 = (*SITE_ANGLES, f"{MN1}.dof0", f"{MN2}.dof0")
+    message = _message([_row(a1, 1.5708, None), _row(a2, 1.6, None),
+                        _row(m1, 3.5, 0.0015), _row(m2, 0.75, 0.0011)]).message
+    assert f"The esd of {m1}, {m2} assumes the angles sit on the direction." in message
+    assert (f"No profile interval was computed for {a1}, {a2}, {m1}, {m2}. On a single "
+            f"fit, Refinement.profile_interval(data, path) computes one.") in message
+
+
+def test_the_fit_profiles_each_flagged_modulus_and_withholds_on_a_full_cut(monkeypatch):
+    """The wiring, on a real fit with the profile stubbed.
+
+    Mn2 simulated with no moment: seed 0 ends with Mn1's and Mn2's polar
+    angles left out and Mn2 unsupported (0.085 ± 0.038 μ_B; macOS arm64),
+    each azimuth kept with an esd.  ``attach_stationary_intervals`` profiles
+    the two angles and both moduli and nothing else (condition 4's hook, on
+    the flagged sites only).  A modulus profile that dropped a full cut is
+    withheld: its row keeps ``interval`` ``None`` and its esd, and the
+    finding gives the lowest point.
+    """
+    import rietx.strategy.parameter_interval as pi
+
+    T = _solve()
+    mag = _magnetic()
+    instrument = T.neutron()
+    data = T.simulate(T.two_site(m1=Moment.from_values(_vec(3.5, 0.0), "Mn3+"), m2=None,
+                                 magnetic=mag), instrument, seed=0)
+    start = T.two_site(m1=Moment.from_values(_vec(3.3, 0.04, 0.03), "Mn3+", vary=True),
+                       m2=Moment.from_values(_vec(0.75, 0.03, 0.03), "Mn3+", vary=True),
+                       magnetic=mag)
+    ref = rx.Refinement(rx.Structure(phases=[start]), instrument)
+    ref._auto_intervals = False
+    result = ref.fit(data, plan=_plan(), telemetry=False)
+    (passed,) = [t for t in result.stages[-1].moment_angle_tests if t.zeroed]
+    assert passed.paths == SITE_ANGLES
+    m1, m2 = f"{MN1}.dof0", f"{MN2}.dof0"
+    assert "MOMENT_UNSUPPORTED" in {d.code for d in result.diagnostics}
+
+    asked = []
+
+    def stub(refinement, data, path, *, record=True, cancel=None):
+        asked.append((path, record))
+        value = next(r.value for r in result.parameters if r.path == path)
+        return _interval(path, value, value - 0.1, value + 0.1,
+                         drop=6.0 if path == m2 else 0.0)
+
+    monkeypatch.setattr(pi, "profile_interval", stub)
+    stderr = {r.path: r.stderr for r in result.parameters}
+    pi.attach_stationary_intervals(ref, data)
+    assert asked == [(p, False) for p in [*SITE_ANGLES, m1, m2]]
+    rows = _rows(result)
+    assert rows[m1].interval is not None and rows[m2].interval is None
+    assert {r.path: r.stderr for r in result.parameters} == stderr
+    (finding,) = [d for d in result.diagnostics if d.code == "MOMENT_ANGLE_STATIONARY"]
+    assert f"The profile of {m2} found the data chi2 6 below the fit" in finding.message
+    assert "Refit with it started at" in finding.message
+    assert f"The data do not support the moment of {m2}" in finding.message
+
+
+def test_a_one_sided_modulus_interval_reads_as_a_limit():
+    """A modulus on 0 gets a one-sided interval whose lower end is the bound
+    (WP-2060), so the finding says which end is a measurement."""
+    a1, a2, m1, m2 = (*SITE_ANGLES, f"{MN1}.dof0", f"{MN2}.dof0")
+    floor = _interval(m2, 0.0, 0.0, 0.052).model_copy(
+        update={"one_sided": True, "lower_stop": "bound"})
+    message = _message([_row(a1, 1.5708, None), _row(a2, 1.6, None),
+                        _row(m1, 3.5, 0.0015, _interval(m1, 3.5, 3.497, 3.504)),
+                        _row(m2, 0.0, 0.03, floor)]).message
+    assert ("Its lower end is a bound, so the interval is one-sided: quote its upper "
+            "end as a limit.") in message
+    assert message.count("interval is one-sided") == 1
+
+
+def test_a_tied_modulus_without_a_profile_is_not_sent_to_the_verb():
+    """``profile_interval`` refuses a tied row, so the pointer leaves it out;
+    its esd still assumes the angles sit on the direction."""
+    from rietx.schemas.results import RefinedParameter
+
+    a1, a2, m1, m2 = (*SITE_ANGLES, f"{MN1}.dof0", f"{MN2}.dof0")
+    tied = RefinedParameter(path=m2, value=3.5, stderr=0.0015, vary=False)
+    message = _message([_row(a1, 1.5708, None), _row(a2, 1.6, None),
+                        _row(m1, 3.5, 0.0015), tied]).message
+    assert f"The esd of {m1}, {m2} assumes the angles sit on the direction." in message
+    assert f"No profile interval was computed for {a1}, {a2}, {m1}. On a single" in message

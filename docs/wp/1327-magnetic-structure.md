@@ -140,6 +140,17 @@ rule above applies to the form factors.
 
 ### Inherited
 
+- **From WP-2060 (2026-11-07, PR #1459): an angle's unasked interval can come from a fit that
+  missed its minimum, and nothing says so.** Mike's ruling on #1075 withholds a flagged site's
+  *modulus* profile when its refits find the data χ² a whole cut or more below the fit; the
+  angle intervals beside it carry no such guard, since the ruling is about moduli. One probe
+  shows the sibling: two-site set with Mn2 simulated at 0, seeds 0 and 2, macOS arm64, on
+  the branch. On seed 2 both polar-angle profiles found χ² 5.10 and 5.31 below the fit against a cut
+  of 4.89, and their intervals are still quoted. Whether an angle's interval takes the same
+  withhold-and-refit rule is a magnetic-path decision, so it is Michael's. Also open from
+  WP-2060's 2026-11-02 entry: a refit of a fit whose angles the test zeroed does not reproduce
+  that fit's χ² (8 of 20 seeds there; 32 of 80 in Mike's runs), not diagnosed.
+
 - **2026-11-05, from the issue triage (issue #1404): turning the analytic angle columns on in
   the solve path is Michael's ruling, and it waits there.** PR #1403 lands the branch as
   machinery and no solve asks for it. Issue #1404 holds what is left: the escape from a
