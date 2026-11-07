@@ -253,6 +253,7 @@ A site whose modulus the data do not support (`MOMENT_UNSUPPORTED`) is profiled 
 
 The refits run on a copy of the models, so the history gains no node.
 They are the only cost, and only a fit whose test passed pays it: 20-32 refits an angle, 2.6-16.7 s on the two-site test fits of 0.2-1.2 s, and 22-36 refits a modulus, 2.5-11.8 s each.
+A sequential series pays it once a pattern, on the attempt it keeps.
 A joint fit computes no interval, and its rows read `None`.
 
 (sec-magnetic-width)=

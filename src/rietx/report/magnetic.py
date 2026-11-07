@@ -238,7 +238,20 @@ def flagged_moduli(paths) -> list[str]:
     finding and :func:`~rietx.strategy.parameter_interval.attach_stationary_intervals`
     read, so the moduli profiled are the moduli quoted (WP-2060).
     """
-    return list(dict.fromkeys(p.rsplit(".dof", 1)[0] + ".dof0" for p in paths))
+    return list(dict.fromkeys(_modulus_of(p) for p in paths))
+
+
+def _modulus_of(path: str) -> str:
+    """The modulus DOF of the moment block ``path`` belongs to."""
+    return path.rsplit(".dof", 1)[0] + ".dof0"
+
+
+def _missing_ends(interval) -> list[str]:
+    """Each side of ``interval`` with no end, in the words the finding prints."""
+    return [f"no {side} end ({_STOP_WORDS.get(stop, stop)})"
+            for side, end, stop in (
+                ("lower", interval.lower, interval.lower_stop),
+                ("upper", interval.upper, interval.upper_stop)) if end is None]
 
 
 def modulus_profile_withheld(interval) -> bool:
@@ -283,20 +296,26 @@ def _modulus_line(path: str, row, withheld) -> str | None:
         return None
     level = f"{100 * interval.level:g} %"
     if interval.lower is None or interval.upper is None:
-        missing = [f"no {side} end ({_STOP_WORDS.get(stop, stop)})"
-                   for side, end, stop in (
-            ("lower", interval.lower, interval.lower_stop),
-            ("upper", interval.upper, interval.upper_stop)) if end is None]
         found = [f"its {side} end is {end:.4g} μ_B" for side, end in (
             ("lower", interval.lower), ("upper", interval.upper)) if end is not None]
         line = (f" {path} is {row.value:.4g} μ_B. Its {level} profile interval has "
-                f"{' and '.join(missing)}" + (f", and {found[0]}." if found else "."))
+                f"{' and '.join(_missing_ends(interval))}"
+                + (f", and {found[0]}." if found else "."))
     else:
         # to three figures of the interval's width, so its ends read apart
         width = interval.upper - interval.lower
         places = max(0, 2 - math.floor(math.log10(width))) if width > 0.0 else 4
         line = (f" {path} is {row.value:.{places}f} μ_B, with the {level} profile "
                 f"interval {interval.lower:.{places}f} to {interval.upper:.{places}f} μ_B.")
+        # a modulus on 0 (or on a declared limit) is one-sided: that end is
+        # the bound, not a measurement, so the other end reads as a limit
+        bounded = [side for side, stop in (("lower", interval.lower_stop),
+                                           ("upper", interval.upper_stop))
+                   if stop == "bound"]
+        if interval.one_sided and bounded:
+            other = "upper" if bounded[0] == "lower" else "lower"
+            line += (f" Its {bounded[0]} end is a bound, so the interval is "
+                     f"one-sided: quote its {other} end as a limit.")
     if not interval.fit_is_minimum:
         line += (f" The profile found the data chi2 "
                  f"{interval.chi2_fit - interval.chi2_lowest:.3g} below the fit, under "
@@ -373,13 +392,9 @@ def moment_angle_stationary_diagnostics(stage, parameters=None, *,
         if interval is None:
             without.append(path)
         elif interval.lower is None or interval.upper is None:
-            missing = [f"no {side} end ({_STOP_WORDS.get(stop, stop)})"
-                       for side, end, stop in (
-                ("lower", interval.lower, interval.lower_stop),
-                ("upper", interval.upper, interval.upper_stop)) if end is None]
             line += (f" Its {100 * interval.level:g} % profile interval has "
-                     f"{' and '.join(missing)}.")
-        elif path.rsplit(".dof", 1)[0] + ".dof0" in unsupported:
+                     f"{' and '.join(_missing_ends(interval))}.")
+        elif _modulus_of(path) in unsupported:
             # condition 1: no moment, so no direction to include or exclude
             line += (f" Its {100 * interval.level:g} % profile interval is "
                      f"{_rad(interval.lower)} to {_rad(interval.upper)}.")
@@ -397,18 +412,23 @@ def moment_angle_stationary_diagnostics(stage, parameters=None, *,
     # are read with these angle columns out, so they hold only if the angles
     # sit on the direction, and a weak one covered 0.82 at a nominal 0.95
     quoted = False
+    unprofiled = []
     for m in moduli:
         line = _modulus_line(m, rows.get(m), withheld.get(m))
         if line is None:
             if rows[m].stderr is not None:
-                without.append(m)
+                unprofiled.append(m)
+                # a tied modulus has no profile of its own: profile_interval
+                # refuses it, so the pointer below would send a reader to a
+                # call that raises
+                if rows[m].vary:
+                    without.append(m)
             continue
         quoted = quoted or m not in withheld
         message += line
     if quoted:
         message += (" A modulus keeps its esd, which assumes the angles sit on "
                     "the direction. Its interval does not assume it.")
-    unprofiled = [m for m in without if m in moduli]
     if unprofiled:
         message += (f" The esd of {', '.join(unprofiled)} assumes the angles sit "
                     f"on the direction.")

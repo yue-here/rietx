@@ -554,8 +554,8 @@ def attach_stationary_intervals(refinement, data, *, cancel=None) -> None:
     # the angles with a half-width to step from (none means no curvature
     # either, ``_half_widths``, and so no scale to step the profile in), then
     # each flagged site's modulus, which steps from its esd
-    paths = [p for p in passed.paths if p in passed.half_widths]
-    paths += [m for m in flagged_moduli(passed.paths) if m in rows and rows[m].vary]
+    moduli = [m for m in flagged_moduli(passed.paths) if m in rows and rows[m].vary]
+    paths = [p for p in passed.paths if p in passed.half_widths] + moduli
     withheld = {}
     for path in paths:
         row = rows.get(path)
@@ -572,7 +572,7 @@ def attach_stationary_intervals(refinement, data, *, cancel=None) -> None:
             # so this row keeps ``None`` and the finding says none was
             # computed, rather than the finished fit raising
             continue
-        if row.path.endswith(".dof0") and modulus_profile_withheld(interval):
+        if path in moduli and modulus_profile_withheld(interval):
             withheld[path] = interval
         else:
             row.interval = interval

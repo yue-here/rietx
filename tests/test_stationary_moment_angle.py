@@ -681,3 +681,30 @@ def test_the_fit_profiles_each_flagged_modulus_and_withholds_on_a_full_cut(monke
     assert f"The profile of {m2} found the data chi2 6 below the fit" in finding.message
     assert "Refit with it started at" in finding.message
     assert f"The data do not support the moment of {m2}" in finding.message
+
+
+def test_a_one_sided_modulus_interval_reads_as_a_limit():
+    """A modulus on 0 gets a one-sided interval whose lower end is the bound
+    (WP-2060), so the finding says which end is a measurement."""
+    a1, a2, m1, m2 = (*SITE_ANGLES, f"{MN1}.dof0", f"{MN2}.dof0")
+    floor = _interval(m2, 0.0, 0.0, 0.052).model_copy(
+        update={"one_sided": True, "lower_stop": "bound"})
+    message = _message([_row(a1, 1.5708, None), _row(a2, 1.6, None),
+                        _row(m1, 3.5, 0.0015, _interval(m1, 3.5, 3.497, 3.504)),
+                        _row(m2, 0.0, 0.03, floor)]).message
+    assert ("Its lower end is a bound, so the interval is one-sided: quote its upper "
+            "end as a limit.") in message
+    assert message.count("interval is one-sided") == 1
+
+
+def test_a_tied_modulus_without_a_profile_is_not_sent_to_the_verb():
+    """``profile_interval`` refuses a tied row, so the pointer leaves it out;
+    its esd still assumes the angles sit on the direction."""
+    from rietx.schemas.results import RefinedParameter
+
+    a1, a2, m1, m2 = (*SITE_ANGLES, f"{MN1}.dof0", f"{MN2}.dof0")
+    tied = RefinedParameter(path=m2, value=3.5, stderr=0.0015, vary=False)
+    message = _message([_row(a1, 1.5708, None), _row(a2, 1.6, None),
+                        _row(m1, 3.5, 0.0015), tied]).message
+    assert f"The esd of {m1}, {m2} assumes the angles sit on the direction." in message
+    assert f"No profile interval was computed for {a1}, {a2}, {m1}. On a single" in message
