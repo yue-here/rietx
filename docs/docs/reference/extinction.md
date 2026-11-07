@@ -200,7 +200,7 @@ A returned class still lists every space group it admits, and nothing in the pac
 | `ExtinctionCandidate.conditions_complete` | `False` when the conditions leave some absence unnamed; the absence set is what the screen uses either way |
 | `ExtinctionCandidate.n_lines` | distinct lines this class predicts in range |
 | `ExtinctionCandidate.n_absent` | lines of the lattice group this class forbids |
-| `ExtinctionCandidate.n_testable` | of those, the ones the data can check; `None` when the class was not fitted or its fit raised |
+| `ExtinctionCandidate.n_testable` | of those, the ones the data can check; `None` when the class was not fitted or its own fit raised |
 | `ExtinctionCandidate.n_present` | testable forbidden positions carrying intensity: the refutation |
 | `ExtinctionCandidate.forbidden_hkl`, `ExtinctionCandidate.forbidden_two_theta` | which reflections those are, and where, ° 2θ to four decimals |
 | `ExtinctionCandidate.tested_hkl`, `ExtinctionCandidate.tested_two_theta` | every testable forbidden position, one reflection each, so a reader can see where two classes differ; empty before the class is fitted |

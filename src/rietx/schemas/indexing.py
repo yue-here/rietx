@@ -2494,7 +2494,9 @@ class ExtinctionCandidate(Base):
     #: comparison with :attr:`ExtinctionScreen.reference_chi2` is nested and
     #: charges the class for exactly the absences it is counted for.  It is this
     #: class's own fit when every forbidden line is testable, and the
-    #: reference's when none is
+    #: reference's when none is.  Stays ``inf`` when that second fit raised,
+    #: and the class is then refuted with its own fit's :attr:`rwp` and
+    #: :attr:`n_testable` kept
     chi2: float = float("inf")
     #: BIC(this class) − BIC(the absence-free lattice), from
     #: ``report.layer2.delta_bic``: **negative favours this class**.  Differences

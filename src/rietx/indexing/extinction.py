@@ -1426,6 +1426,7 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     budget = len(entries) if max_classes is None else max(int(max_classes), 1)
     order = sorted(range(len(entries)),
                    key=lambda i: (entries[i].n_absent, entries[i].symbol))
+    scoring_fits: dict[frozenset, object] = {}      # charged lines → its fit
     for rank, i in enumerate(order):
         entry, ev = entries[i], evidence[i]
         if rank >= budget or (cancel is not None and bool(cancel)):
@@ -1467,10 +1468,16 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         if entry.n_testable == 0:
             scored = ref_result
         elif entry.n_testable < entry.n_absent:
-            charged = np.isin(labels, ev["lines"][keep])
+            # two classes differing only in untestable lines are scored on one
+            # reflection set, so the refit is shared rather than repeated
+            lines = frozenset(int(v) for v in ev["lines"][keep])
             try:
-                _fit, scored = _fit_class(candidate, data, frozen, symbol,
-                                          two_theta_limits, omit=hkl_ref[charged])
+                if lines not in scoring_fits:
+                    charged = np.isin(labels, ev["lines"][keep])
+                    scoring_fits[lines] = _fit_class(
+                        candidate, data, frozen, symbol, two_theta_limits,
+                        omit=hkl_ref[charged])[1]
+                scored = scoring_fits[lines]
             except Exception as exc:              # noqa: BLE001
                 entry.refuted = True
                 entry.refuted_reason = (
