@@ -1021,8 +1021,12 @@ def extinction_class_diagnostics(cand) -> list[Diagnostic]:
     return out
 
 
-def extinction_diagnostics(screen) -> list[Diagnostic]:
+def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
     """Screen-level messages: what the answer is, and why it may not be one.
+
+    ``fit_errors`` maps a class's symbol to the error one of its fits raised.
+    Such a class is unscored rather than refuted, and the abstention names the
+    error, since a solver failure is no evidence about the absences.
 
     ``EXTINCTION_GROUPS_NOT_SEPARABLE`` fires whenever the leading class holds
     more than one space group — **always**, not only when the data are weak.
@@ -1157,10 +1161,18 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
                        + " on this cell")
     if top.n_absent and top.n_testable == 0:
         reasons.append("none of its absences is testable in this range")
-    if unscreened:
-        reasons.append(f"{len(unscreened)} class(es) were never fitted, so their "
+    errors = fit_errors or {}
+    unasked = [c for c in unscreened if c.symbol not in errors]
+    if unasked:
+        reasons.append(f"{len(unasked)} class(es) were never fitted, so their "
                        "standing is unknown")
-    if not alive:
+    failed = [c for c in unscreened if c.symbol in errors]
+    if failed:
+        reasons.append(f"{len(failed)} class(es) could not be scored, so their "
+                       f"standing is unknown: {errors[failed[0].symbol]}"
+                       + (f" (and {len(failed) - 1} more)" if len(failed) > 1
+                          else ""))
+    if not alive and not unscreened:
         reasons.append("every class was refuted, including the absence-free "
                        "lattice, so the fit itself failed")
     if reasons:

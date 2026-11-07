@@ -396,6 +396,46 @@ def test_a_cancelled_screen_abstains_and_says_which_classes_it_reached():
         "a cancelled screen has refuted nothing — it asked nothing")
 
 
+@pytest.mark.parametrize("which", ["class", "scoring"])
+def test_a_class_fit_that_raises_leaves_the_class_unscored(which, monkeypatch):
+    """A solver failure is no evidence about the absences, so the class it hit
+    stays unrefuted and unscored, and the screen abstains naming the error.
+
+    ``which`` picks the fit that raises: a class's own fit, or the refit of the
+    lattice less its testable forbidden lines that scores it (WP-2076).  Before
+    this either raise marked the class refuted, which took it out of
+    ``best_or_none``'s margin test and could hand a rival a confident answer.
+    """
+    from rietx.indexing import extinction
+
+    real = extinction._fit_class
+    hit = []
+
+    def flaky(candidate, data, instrument, symbol, limits, omit=None):
+        scoring = omit is not None
+        own = not scoring and symbol != "P 1 2/m 1"   # not the reference
+        if (which == "scoring" and scoring) or (which == "class" and own):
+            hit.append(symbol)
+            raise np.linalg.LinAlgError("injected")
+        return real(candidate, data, instrument, symbol, limits, omit=omit)
+
+    monkeypatch.setattr(extinction, "_fit_class", flaky)
+    structure, instrument = _mono_models()
+    screen = determine_extinction_symbol(
+        _pattern(structure, instrument), _candidate(MONO_CELL, "monoclinic"),
+        instrument, two_theta_limits=MONO_RANGE, refine_cell=False)
+    assert hit, "the injected raise was never reached"
+    unscored = [c for c in screen.candidates if not c.screened]
+    assert unscored
+    assert all(not c.refuted and c.refuted_reason is None for c in unscored)
+    assert screen.best_or_none() is None
+    ambiguous = [d for d in screen.diagnostics
+                 if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS"]
+    assert ambiguous and "LinAlgError: injected" in ambiguous[0].message, (
+        [str(d) for d in screen.diagnostics])
+    assert "never fitted" not in ambiguous[0].message
+
+
 def test_a_screen_that_cannot_run_reports_rather_than_raises():
     """A cell with no reflections in range fails *every* class identically, so it
     is a statement about the input — reported as a failed screen with a reason,

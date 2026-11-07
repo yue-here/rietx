@@ -172,7 +172,7 @@ The screen's diagnostics say what the answer is and why it may not be one.
 
 `ExtinctionScreen.best_or_none` returns the leading class only when all of these hold:
 
-- no class that is not refuted was left unfitted, since a `max_classes` cap or a cancelled run leaves a question unasked, which must not read as a clean answer;
+- no class that is not refuted was left unscored, since a `max_classes` cap, a cancelled run or a class fit that raised leaves a question unasked, which must not read as a clean answer;
 - the class was fitted and is not refuted;
 - it rests on at least one absence the data could test, or is the absence-free class itself, whose claim is that there is nothing to see;
 - it leads the next surviving class by at least the decisive ΔBIC margin, 10 (`rietx.indexing.extinction.DECISIVE_DELTA_BIC`).

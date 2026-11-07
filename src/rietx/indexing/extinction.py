@@ -1427,6 +1427,10 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     order = sorted(range(len(entries)),
                    key=lambda i: (entries[i].n_absent, entries[i].symbol))
     scoring_fits: dict[frozenset, object] = {}      # charged lines → its fit
+    # a fit that raised says nothing about the absences, so its class stays
+    # unrefuted and unscored and the screen abstains naming the error, as it
+    # does on a class a cap or a stop left unasked
+    fit_errors: dict[str, str] = {}
     for rank, i in enumerate(order):
         entry, ev = entries[i], evidence[i]
         if rank >= budget or (cancel is not None and bool(cancel)):
@@ -1439,11 +1443,9 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                                           entry.representative,
                                           two_theta_limits)
             except Exception as exc:                  # noqa: BLE001
-                entry.screened = True
-                entry.refuted = True
-                entry.refuted_reason = (
+                fit_errors[entry.symbol] = (
                     f"the {SCREEN_MODE} fit of {entry.representative} raised "
-                    f"{type(exc).__name__}: {exc}")
+                    f"{type(exc).__name__}: {str(exc).rstrip('.')}")
                 continue
         entry.screened = True
         entry.rwp = float(result.statistics.rwp)
@@ -1479,11 +1481,12 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                         omit=hkl_ref[charged])[1]
                 scored = scoring_fits[lines]
             except Exception as exc:              # noqa: BLE001
-                entry.refuted = True
-                entry.refuted_reason = (
-                    f"the {SCREEN_MODE} fit of {symbol} without this class's "
-                    f"{entry.n_testable} testable forbidden line(s) raised "
-                    f"{type(exc).__name__}: {exc}")
+                entry.screened = False
+                fit_errors[entry.symbol] = (
+                    f"the {SCREEN_MODE} fit of {symbol} without the "
+                    f"{entry.n_testable} testable forbidden line(s) of "
+                    f"{entry.symbol} raised {type(exc).__name__}: "
+                    f"{str(exc).rstrip('.')}")
                 continue
         entry.chi2 = _chi2_absolute(scored.statistics)
         entry.delta_bic = delta_bic(entry.chi2, screen.reference_chi2,
@@ -1535,7 +1538,7 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     screen.candidates = sorted(
         entries, key=lambda e: (e.refuted, not e.screened, e.delta_bic,
                                 e.n_absent))
-    screen.diagnostics = extinction_diagnostics(screen)
+    screen.diagnostics = extinction_diagnostics(screen, fit_errors)
     return screen
 
 
