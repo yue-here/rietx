@@ -116,8 +116,13 @@ declare formulas on parameters; practice.md). No new judgement is added.
       handed to 2103's Inherited section.
 - [x] Tests: unit and property tests, a `test_cross_backend.py` row for a single-fit
       formula, and obs/calc/diff PNGs to `tests/output/`.
-- [ ] Manual: the constraints guide and the expressions reference show the command.
-- [ ] Skill: the reference row for the command, keyed by its name.
+- [x] Manual: the constraints guide and the expressions reference show the command.
+      `guides/tie.md` § Tie to a formula, `reference/expressions.md`,
+      `reference/parameter-table.md` (`TieSpec.expression`), both switching pages with the
+      GSAS-II degree warning (consent item); the TOPAS writer refuses a formula tie.
+- [x] Skill: the reference row for the command, keyed by its name. The generated
+      `api.md` row carries `expression=` and the radians trap in its first line;
+      `series.md`'s `constrain=` row names `ref.tie`.
 
 ## Acceptance
 

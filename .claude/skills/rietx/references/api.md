@@ -91,7 +91,7 @@ Every refinable quantity is a `rx.Parameter` (`value`, `vary`, bounds), addresse
 - `rx.Refinement.parameters(*, mode: Mode | None = None) -> list[ParameterRow]` — Every parameter as data, with fixed, locked and tied rows included.
 - `rx.Refinement.set_vary(path_globs: list[str] | str, vary: bool = True) -> list[str]` — Free (or hold) every parameter matching `path_globs`.
 - `rx.Refinement.set_values(values: dict[str, float])` — Set parameter values by dot-path, recording a `set_value` node.
-- `rx.Refinement.tie(path: str, source: str | dict[str, float] | Sequence[tuple[str, float]], *, scale: float = 1.0, offset: float = 0.0) -> str` — Constrain `path` to `scale·source + offset`, recording a node.
+- `rx.Refinement.tie(path: str, source: str | dict[str, float] | Sequence[tuple[str, float]] | None = None, *, scale: float = 1.0, offset: float = 0.0, expression: str | None = None) -> str` — Constrain `path` to `scale·source + offset`, or to `expression=`: a formula over `add_variable` names, trig in radians.
 - `rx.Refinement.tie_equal(paths: list[str] | str, *, source: str | None = None) -> list[str]` — Make every parameter matching `paths` one parameter.
 - `rx.Refinement.untie(paths: list[str] | str) -> list[str]` — Release user ties, recording a `set_tie` node.
 - `rx.Refinement.add_variable(name: str, value: float, *, vary: bool = False, min: float = -inf, max: float = inf, unit: str | None = None) -> str` — Declare a named variable other parameters can follow.
