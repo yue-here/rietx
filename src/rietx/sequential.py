@@ -2106,17 +2106,17 @@ class SequentialRefinement:
             # the hook edits a copy of the declared structure, whose restraints
             # still number its atoms as declared (WP-2121); the message names
             # no pattern, so a hook that does this to every pattern warns once
-            structure, dropped = carry_restraints(self.structure, structure)
-            if dropped:
-                warnings.warn("after prepare: " + restraints_dropped_message(dropped),
-                              UserWarning, stacklevel=2)
-            # the checks a list changed in place skipped, as ``Refinement.edit``
-            # runs them, so a broken hook is named here and not at the fit
+            # and then the checks a list changed in place skipped, as
+            # ``Refinement.edit`` runs them, so a broken hook is named here
             try:
+                structure, dropped = carry_restraints(self.structure, structure)
                 structure.check_atom_references()
             except ValueError as exc:
                 raise ValueError(
                     f"pattern {index} ({label!r}), after prepare: {exc}") from None
+            if dropped:
+                warnings.warn("after prepare: " + restraints_dropped_message(dropped),
+                              UserWarning, stacklevel=2)
         with _refined_state():
             ref = Refinement(structure, instrument, backend=self._backend,
                              solver=self._solver,

@@ -183,15 +183,60 @@ def test_the_swapped_bond_restrains_the_distance_it_was_written_for(pbso4):
 
 def test_a_restraint_written_for_the_new_numbering_is_taken_as_written(pbso4):
     """A restraint the old phase did not hold was written against the new atom
-    list, so it is read as written while the carried one beside it moves."""
+    list, so it is read as written while the carried one beside it moves.
+
+    The fresh row is equal to the carried one in every field: an S–O bond at the
+    same 1.47 Å, as a polyhedral set holds four of.  Matched by content, it was
+    read as carried and moved onto S2–O5, which was then restrained twice and
+    S2–O3 not at all.  Its place after the carried rows says it is new."""
     carried = _restraint("bond", ["S2", "O5"])
     ref = _refinement(pbso4, carried)
     candidate = _swapped(ref, "O3", "O5")
-    fresh = BondRestraint(atom_i=1, atom_j=4, target=1.48, sigma=0.01)     # S2-O3, new list
+    fresh = BondRestraint(atom_i=1, atom_j=4, target=1.47, sigma=0.01)     # S2-O3, new list
+    assert fresh == carried
     candidate.phases[0].restraints.append(fresh)
     _edit_quietly(ref, candidate)
     phase = ref.structure.phases[0]
     assert [_named(phase, r) for r in phase.restraints] == [["S2", "O5"], ["S2", "O3"]]
+
+
+def test_a_restraint_renumbered_by_hand_in_the_same_edit_refuses_it(pbso4):
+    """A caller who worked around the old defect renumbered the rows themselves.
+    Each row now differs from the one held at its place, and its numbers name other
+    atoms in the two numberings, so which list it was written against cannot be told,
+    and the edit is refused with the way to split it."""
+    s2_o3, s2_o5 = _restraint("bond", ["S2", "O3"]), _restraint("bond", ["S2", "O5"])
+    ref = _refinement(pbso4, s2_o3, s2_o5)
+    candidate = _swapped(ref, "O3", "O5")
+    candidate.phases[0].restraints = [s2_o5, s2_o3]                    # renumbered by hand
+    with pytest.raises(ValueError, match="refused rather than recorded.*restraint 0.*"
+                                         "Make the atom change alone"):
+        ref.edit(structure=candidate)
+    assert [a.label for a in ref.structure.phases[0].atoms] == LABELS  # untouched
+
+
+def test_a_restraint_edited_in_the_same_edit_that_moves_its_atoms_refuses_it(pbso4):
+    """A tightened σ on the carried S2–O5 bond makes the row differ from the old one,
+    and read as written it would restrain S2–O3: the original defect, unless refused."""
+    ref = _refinement(pbso4, _restraint("bond", ["S2", "O5"]))
+    candidate = _swapped(ref, "O3", "O5")
+    candidate.phases[0].restraints[0] = candidate.phases[0].restraints[0].model_copy(
+        update={"sigma": 0.005})
+    with pytest.raises(ValueError, match="could mean either atom list"):
+        ref.edit(structure=candidate)
+
+
+def test_a_restraint_edited_on_atoms_that_did_not_move_is_taken_as_written(pbso4):
+    """Pb1 and S2 keep their numbers when O3 and O5 swap, so a σ tightened on a
+    Pb1–S2 row reads the same atoms in either numbering and is no ambiguity."""
+    ref = _refinement(pbso4, _restraint("bond", ["Pb1", "S2"]), _restraint("bond", ["S2", "O5"]))
+    candidate = _swapped(ref, "O3", "O5")
+    candidate.phases[0].restraints[0] = candidate.phases[0].restraints[0].model_copy(
+        update={"sigma": 0.005})
+    _edit_quietly(ref, candidate)
+    phase = ref.structure.phases[0]
+    assert [_named(phase, r) for r in phase.restraints] == [["Pb1", "S2"], ["S2", "O5"]]
+    assert phase.restraints[0].sigma == 0.005
 
 
 def test_an_edit_that_moves_no_atom_leaves_the_restraints_alone(pbso4):
@@ -241,19 +286,27 @@ def test_a_value_restraint_follows_its_phase_when_a_phase_is_inserted_ahead(pbso
 
 
 @pytest.mark.parametrize("kind", ["tether", "anti-bump"])
-def test_a_one_sided_restraint_out_of_range_is_refused_when_built(pbso4, kind):
-    """``Phase`` checked bond, angle, planarity and torsion indices, and not these two."""
-    phase = pbso4.model_copy(deep=True)
-    r = _restraint(kind, ["S2", "O5"]).model_copy(update={"atom_j": 7})
-    with pytest.raises(ValueError, match="atom_j=7"):
-        rx.Phase.model_validate({**phase.model_dump(), "restraints": [r.model_dump()]})
+def test_a_one_sided_restraint_out_of_range_refuses_the_edit(pbso4, kind):
+    """``Phase`` checked bond, angle, planarity and torsion indices when built, and not
+    these two.  The edit now checks them.  Construction still does not, so a saved
+    history whose node holds one, which an edit accepted before, still opens."""
+    ref = _refinement(pbso4)
+    candidate = ref.structure.model_copy(deep=True)
+    candidate.phases[0].restraints.append(
+        _restraint(kind, ["S2", "O5"]).model_copy(update={"atom_j": 7}))
+    with pytest.raises(ValueError, match="refused rather than recorded.*atom_j=7"):
+        ref.edit(structure=candidate)
+    rx.Phase.model_validate(candidate.phases[0].model_dump())          # still opens
 
 
-def test_a_value_restraint_on_an_atom_the_phase_lacks_is_refused_when_built(pbso4):
-    phase = pbso4.model_copy(deep=True)
-    with pytest.raises(ValueError, match="phases.0.atoms.9.biso"):
-        Structure(phases=[phase.model_copy(update={"restraints": [
-            ValueRestraint(path="phases.0.atoms.9.biso", target=0.5, sigma=0.1)]})])
+def test_a_value_restraint_on_an_atom_the_model_lacks_refuses_the_edit(pbso4):
+    ref = _refinement(pbso4)
+    candidate = ref.structure.model_copy(deep=True)
+    candidate.phases[0].restraints.append(
+        ValueRestraint(path="phases.0.atoms.9.biso", target=0.5, sigma=0.1))
+    with pytest.raises(ValueError, match="refused rather than recorded.*phases.0.atoms.9.biso"):
+        ref.edit(structure=candidate)
+    Structure.model_validate(candidate.model_dump())                    # still opens
 
 
 # ------------------------------------------------------------ the other atom-indexed records

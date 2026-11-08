@@ -440,10 +440,17 @@ def carry_restraints(old: Structure, new: Structure) -> tuple[Structure, list[st
     A restraint names atoms by index (``atom_i``…, ``atoms``, or the atom in a
     ``ValueRestraint.path``), so a structure with an atom removed, inserted or
     reordered names other atoms by the same numbers, as a hold did (#1264).
-    Atoms and phases are matched as :func:`atom_moves` matches them.  Only a
-    restraint **equal to one the old partner phase held** is read through the
-    move: it was carried over, so it reads the old numbering.  Any other was
-    written for ``new`` and is left as written, for the caller's validation.
+    Atoms and phases are matched as :func:`atom_moves` matches them.
+
+    Which numbering a restraint of ``new`` reads is decided by its place in the
+    list.  One **equal to the restraint the old partner phase held at the same
+    place** was carried over, so it reads the old numbering and is renumbered.
+    One appended after the old list's length was written for ``new``, and so
+    was one whose numbers name the same atoms in both numberings: each is left
+    as written, for the caller's validation.  Any other changed in the same
+    edit that renumbered its atoms, and could mean either, so it raises
+    ``ValueError``.  Matching by content alone misread a fresh row equal to an
+    old one, which polyhedral sets hold routinely (four S–O bonds at 1.47 Å).
     A carried restraint on an atom ``new`` lacks is dropped; the second value
     names each one for the caller's warning.
 
@@ -476,41 +483,57 @@ def carry_restraints(old: Structure, new: Structure) -> tuple[Structure, list[st
         before, after = old.phases[io], new.phases[pn]
         n_new = len(after.atoms)
         labels = [a.label for a in before.atoms]
-        # keyed by kind and content: pydantic equality per pair would cost
-        # n × m comparisons on an anti-bump list of thousands of rows
-        carried = {(type(r).__name__, r.model_dump_json()) for r in before.restraints}
 
         def local(j: int) -> int | None:
             path = renumber_path(f"phases.{io}.atoms.{j}", atoms)
             jn = None if path is None else int(path.rsplit(".", 1)[1])
             return jn if jn is not None and jn < n_new else None
 
-        restraints = []
-        for r in after.restraints:
-            if (type(r).__name__, r.model_dump_json()) not in carried:
-                restraints.append(r)                  # written for this structure
-                continue
+        def read_old(r):
+            """``r`` read in the old numbering and written in the new: (restraint or
+            None where its atom is gone, the restraint as the drop message names it)."""
             kind = _RESTRAINT_KIND[type(r).__name__]
             if isinstance(r, ValueRestraint):
                 path = renumber_path(r.path, atoms)
+                ip, j = _atom_index(r.path) or (0, -1)
+                named = (f" ({old.phases[ip].atoms[j].label})"
+                         if ip < len(old.phases) and 0 <= j < len(old.phases[ip].atoms)
+                         else "")
+                said = f"the {kind} restraint on {r.path}{named} of phase {after.name!r}"
                 if not atom_exists(path):
-                    ip, j = _atom_index(r.path) or (0, -1)
-                    named = (f" ({old.phases[ip].atoms[j].label})"
-                             if ip < len(old.phases) and 0 <= j < len(old.phases[ip].atoms)
-                             else "")
-                    dropped.append(f"the {kind} restraint on {r.path}{named} of phase "
-                                   f"{after.name!r}")
-                    continue
-                restraints.append(r if path == r.path
-                                  else r.model_copy(update={"path": path}))
-                continue
+                    return None, said
+                return (r if path == r.path else r.model_copy(update={"path": path})), said
             olds = _restraint_atoms(r)
+            names = "–".join(labels[j] if j < len(labels) else str(j) for j in olds)
+            said = f"the {kind} restraint {names} of phase {after.name!r}"
             news = [local(j) for j in olds]
             if any(j is None for j in news):
-                names = "–".join(labels[j] if j < len(labels) else str(j) for j in olds)
-                dropped.append(f"the {kind} restraint {names} of phase {after.name!r}")
-                continue
-            restraints.append(r if news == olds else _with_atoms(r, news))
+                return None, said
+            return (r if news == olds else _with_atoms(r, news)), said
+
+        restraints = []
+        for k, r in enumerate(after.restraints):
+            prior = before.restraints[k] if k < len(before.restraints) else None
+            moved, said = read_old(r)
+            if prior is not None and r == prior:
+                # still where the old phase held it: carried, so old-numbered
+                if moved is None:
+                    dropped.append(said)
+                else:
+                    restraints.append(moved)
+            elif prior is None or moved == r:
+                # appended, or reading the same atoms in either numbering
+                restraints.append(r)
+            else:
+                # changed in the same edit that renumbered its atoms: both
+                # readings are a restraint the caller could mean (WP-2121)
+                raise ValueError(
+                    f"restraint {k} of phase {after.name!r} differs from the one the "
+                    f"phase held there, and this change also renumbers the atoms it "
+                    f"names, so its numbers could mean either atom list. Make the "
+                    f"atom change alone, which carries every restraint onto its "
+                    f"atoms, then change the restraints; a restraint appended after "
+                    f"the carried ones is read in the new numbering")
         update: dict = {}
         if restraints != list(after.restraints):
             update["restraints"] = restraints

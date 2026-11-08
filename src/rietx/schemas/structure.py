@@ -1817,6 +1817,18 @@ class Phase(_InheritsDeclaredDefaults):
 
     @model_validator(mode="after")
     def _valid_restraints(self) -> "Phase":
+        self._check_restraint_indices(every_kind=False)
+        return self
+
+    def _check_restraint_indices(self, *, every_kind: bool) -> None:
+        """Each restraint's atom indices name an atom of this phase.
+
+        Construction checks the bond, angle, planarity and torsion kinds it
+        always checked.  ``every_kind`` adds the tether and anti-bump kinds,
+        which :meth:`check_atom_references` checks at an edit (WP-2121).  They
+        stay out of construction so that a saved history whose node holds
+        one, which an edit accepted before 1.12, still opens.
+        """
         n = len(self.atoms)
 
         def check(idx: int, label: str) -> None:
@@ -1825,8 +1837,10 @@ class Phase(_InheritsDeclaredDefaults):
                     f"phase {self.name!r} restraint references {label}={idx}, "
                     f"but the phase has {n} atom(s) (indices 0..{n - 1})")
 
+        pairs = ((BondRestraint, TetherRestraint, AntiBumpRestraint) if every_kind
+                 else (BondRestraint,))
         for r in self.restraints:
-            if isinstance(r, (BondRestraint, TetherRestraint, AntiBumpRestraint)):
+            if isinstance(r, pairs):
                 check(r.atom_i, "atom_i")
                 check(r.atom_j, "atom_j")
             elif isinstance(r, AngleRestraint):
@@ -1836,7 +1850,6 @@ class Phase(_InheritsDeclaredDefaults):
             elif isinstance(r, (PlanarityRestraint, TorsionRestraint)):
                 for k, idx in enumerate(r.atoms):
                     check(idx, f"atoms[{k}]")
-        return self
 
     def check_atom_references(self) -> None:
         """Re-run every check that a record naming this phase's atoms still names one.
@@ -1848,7 +1861,7 @@ class Phase(_InheritsDeclaredDefaults):
         caller builds the structure it hands to ``Refinement.edit`` (WP-2121).
         Raises ``ValueError`` naming the first record that no longer fits.
         """
-        self._valid_restraints()
+        self._check_restraint_indices(every_kind=True)
         self._bodies_name_their_atoms()
         self._modes_cover_the_atoms()
 
@@ -1886,12 +1899,13 @@ class Structure(Base):
 
     phases: list[Phase]
 
-    @model_validator(mode="after")
-    def _value_restraints_name_atoms_it_has(self) -> "Structure":
+    def _value_restraints_name_atoms_it_has(self) -> None:
         """A ``ValueRestraint`` path on an atom names a phase and an atom this structure has.
 
         The path is a whole-model dot-path, so only the structure can check it;
-        a path on an atom it lacks failed only at the next fit (WP-2121).
+        a path on an atom it lacks failed only at the next fit (WP-2121).  Run
+        by :meth:`check_atom_references`, never at construction, for the
+        reason :meth:`Phase._check_restraint_indices` gives.
         """
         for phase in self.phases:
             for r in phase.restraints:
@@ -1904,7 +1918,6 @@ class Structure(Base):
                     raise ValueError(
                         f"phase {phase.name!r} restraint references {r.path}, but "
                         f"the structure has no such atom")
-        return self
 
     def check_atom_references(self) -> None:
         """:meth:`Phase.check_atom_references` on every phase, then the value paths.

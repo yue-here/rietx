@@ -3097,10 +3097,12 @@ class Refinement:
         is its index, so a structure with an atom removed, inserted or
         reordered numbers the others differently.  Each hold and tie is read
         into the new numbering (#1264), and so is each restraint the new
-        structure carried over unchanged from the current one
-        (:func:`~.crystallography.twins.carry_restraints`, WP-2121).  A
-        restraint the current structure did not hold was written for the new
-        one and is read as written.  One on an atom the edit removed is
+        structure still holds unchanged at its place in the list
+        (:func:`~.crystallography.twins.carry_restraints`, WP-2121).  One
+        appended after those was written for the new structure and is read as
+        written.  One changed in the same edit that renumbers its atoms could
+        mean either atom list, so it refuses the edit: change the atoms alone,
+        then the restraints.  One on an atom the edit removed is
         dropped, and a warning names it.  A restraint, rigid body or
         distortion-mode record that names an atom the new structure lacks
         refuses the edit, since a list changed in place re-ran no check.
@@ -3120,8 +3122,8 @@ class Refinement:
             # A restraint names atoms by index and lives on the structure, out
             # of reach of the registers ``_carry_twin_moves`` renumbers below,
             # and a list changed in place re-ran no phase validator (WP-2121).
-            candidate, restraints_dropped = carry_restraints(self.structure, candidate)
             try:
+                candidate, restraints_dropped = carry_restraints(self.structure, candidate)
                 candidate.check_atom_references()
             except ValueError as exc:
                 raise ValueError(
