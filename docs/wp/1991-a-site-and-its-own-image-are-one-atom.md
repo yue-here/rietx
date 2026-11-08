@@ -1,9 +1,8 @@
 # WP-1991 — a site and its own image are one atom on every route
 
-Milestone: unscheduled · Status: 🔄 2026-11-03 — every task done in PR #1360; waits for Yue (a stored-format and series-output change)
+Milestone: unscheduled · Status: ✅ 2026-11-06 — every task landed (PRs #1014, #1223, #1274, #1360); Yue merged #1360 by hand on 2026-11-03, approving its stored-format change
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-16 — a doubled composition with nothing firing, but only on a stored, hand-edited or code-built coordinate; a refined coordinate cannot drift there, and the CIF route already merges it
 
 ## Goal
 
@@ -177,6 +176,46 @@ level up, and the two should share one matcher.
 - Issues #1007, #765, #876, #215.
 
 ## Handover log
+
+### 2026-11-06 — closed: Yue merged PR #1360, which approves its stored-format change
+
+This WP closes. Every task was ticked in PR #1360, and the only thing left was Yue's
+approval of a change to what a series stores and returns. Yue merged #1360 by hand on
+2026-11-03, and that merge is the approval. The four calls the 2026-11-03 entry settled for
+Yue to reverse, (a) to (d), stand, since none was reversed. A series result now follows each
+atom by its phase's name and its own label, and a site and its own image are one atom on
+every route.
+
+  *The approval, checked.* `gh pr view 1360 --json mergedBy` gives `yue-here`, merged at
+  2026-11-03 09:37 UTC. The ghostshift log for that day shows the shift handing #1360 to Yue
+  as a stored-format change and never merging it. Its own merge attempt on the sibling
+  #1369 was refused that morning. Yue then said to merge both, and had already merged
+  #1360. So no shift merged it, and the approval is Yue's own act.
+
+  *Closed and moved.* The `Priority:` line is deleted. The WP had no `### Inherited`
+  section. The narrative is in `docs/milestones/v1.12.md`. No open WP depends on this one;
+  WP-2052, which named it as a soft dependency, closed on 2026-11-01. The four limits under
+  the 2026-11-03 entry's *Deliberately not generalised* stay stated limits with no owner:
+  per-pattern diagnostics keep their own paths, rigid bodies are not renumbered, stage globs
+  naming a literal index are not rewritten, and the GUI's series views were not checked by
+  eye. Nobody has asked for any of them.
+
+  *Worktrees.* Two dormant worktrees from this WP's earlier sessions remain and were not
+  touched: `toasty-wishing-balloon/.claude/worktrees/agent-a8bddecd2f29d3798` on branch
+  `wp1991-series-carry-atom-index` (PR #1274), and
+  `tranquil-puzzling-spring/.claude/worktrees/agent-ad35f4200c583f802` on branch
+  `wp1991-series-atom-key` (PR #1360). Both PRs are merged. Removing them is the
+  maintainer's call.
+
+  *Verified.* This WP's commit is prose only. The PR also carries WP-2045's
+  edit to four evidence strings in `_audit.py`, which that WP's entry covers. On macOS arm64, worktree venv `[dev]`, `test_docs_consistency.py` and
+  `test_audit_table.py` together: 48 passed. Ruff is clean, `tests.reader_output` exits 0,
+  and `session_start.py` flags neither WP. No count can move, so neither the fast nor the
+  full selection ran. `main` had not moved from `0babe783f`, where the branch forked.
+
+  Recorded in PR #1440.
+
+  **Next.** None here.
 
 ### 2026-11-03 — PR #1360: ADP DOFs renumber, phases match by name, series trajectories follow their atom
 

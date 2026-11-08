@@ -174,8 +174,8 @@ structural test would have certified that accident.
 
 **`capabilities()`** (WP-1007, `capabilities.py`) — the one call saying what a build can do:
 backends *with whether each optional dependency imports here*, solvers, plans from `PLAN_INFO`,
-modes, anodes, formats `read_pattern` opens, and the **six** versioned contracts (schema /
-report-thresholds / event-schema / project-format / textdoc-format / indexing-thresholds), in
+modes, anodes, formats `read_pattern` opens, and the **seven** versioned contracts (schema / report-thresholds /
+event-schema / project-format / textdoc-format / indexing-thresholds / expression-grammar), in
 the arm and not prose — a client reads the field list, and a meta-test fails on a `*_version`
 field that is not the constant it claims to quote. **Every arm is quoted from a live registry;
 a meta-test fails on a member missing from its arm.** `features` flags are *derived predicates*

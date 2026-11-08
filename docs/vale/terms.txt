@@ -168,7 +168,9 @@ Rwp
 Uiso
 
 # Methods and functions named after people.
+Abramowitz
 Altomare
+Avrami
 Borda
 Brentano
 Brindley
@@ -224,6 +226,8 @@ Rodrigues
 Scherrer
 Schwarzenbach
 Shirane
+Stegun
+Stinton
 Suortti
 Thomlinson
 Villars

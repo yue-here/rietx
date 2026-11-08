@@ -57,6 +57,35 @@ the chain, and its answer on what "held" means should govern here. Read it first
   authority, never a preset lookup of its own. `_cheap_joint_plan` and the
   `plan_and_spec_fits` fixture at the end of `tests/test_multi_histogram.py`
   give a converged joint fit in about 2 s for a verb's test.
+- **From WP-1964 (2026-11-06): the mirrored WO₃ run is this WP's.** The milestone's
+  WO₃ row asks for the input's own protocol: one B per pattern tied across every atom,
+  and the W coordinates and strains shared as `parametric_06.inp` shares them. That needs
+  the tie this WP gives a joint fit. `docs/wp/1964-measure/wo3_formula.py` runs WP-1325's
+  protocol instead (B held at the chain's, coordinates at TOPAS's, strains per pattern),
+  with arms for the design equations, the same equations as text, θ free and θ pinned.
+  Extend it with the tie rather than writing a second script. On TOPAS's 11 patterns
+  the text arm matched the design arm to 2.9e-8 esd, and θ free went to 9.6 ± 1954 K,
+  so θ is not determined on that protocol. The milestone asks the session that runs the
+  mirrored protocol to set the gate on the gap to TOPAS, which is still unset.
+- **From WP-1964 (2026-11-06): the tie owes the form test a case.** A formula's form
+  test leaves out any pattern where a variable reaches a row no formula writes
+  (`usable` in `multi._parametric_form_tests`), since its recovered column would be
+  wrong there. No joint fit can tie a path onto `vars.X` today, so no test makes that
+  predicate False (generality review, WP-1964's entry). Once the tie lands, add a joint
+  fit with a tie onto `vars.X` beside a formula reading X, and assert that the formula's
+  test drops that pattern.
+- **From WP-2118 (2026-11-07): the joint fit's `tie` takes `expression=` too.** The
+  maintainer ruled on 2026-11-07 that one command serves both kinds of fit. A single
+  refinement now has `Refinement.tie(path, expression="...")`: a formula over named
+  variables only (`vars.<name>`) and numbers, stored as `TieSpec.expression` in the one
+  register of user ties, re-declared after the linear ties on every table build through
+  `ParameterTable.add_expression` (`refine._add_formula` binds each name to `vars.<name>`),
+  and released by `untie`. A formula always runs as a formula, and a linear tie stays on the
+  constant matrix (ruling 3). When this WP gives a joint fit `tie`, give it the same keyword
+  with the same refusals (`tests/test_tie_expression.py` lists them), and say how a
+  per-histogram target meets the formula: once per histogram on each table, as
+  `_install_parametric` does for a `ParametricEquation`. WP-2118 left `multi.py` and
+  `params/multi.py` untouched.
 
 ## Non-goals
 

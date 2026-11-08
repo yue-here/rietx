@@ -1383,9 +1383,12 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
         label="at bound",
         description=(
             "The fitted position reached the limit on how far it could move from its "
-            "starting value. That means peak detection put the starting value in the "
-            "wrong place. The reported position is the limit itself, and the fit did "
-            "not find a minimum there."
+            "starting value. The reported position is the limit itself, and the fit did "
+            "not find a minimum there. The component may not be a line of its own. A "
+            "shoulder on the axial-divergence tail of a much stronger line ends here "
+            "too, because the peak shape does not carry all of that tail. That tail is "
+            "on the low-2θ side below 90° and the high-2θ side above it. One also "
+            "flagged `axial_tail` often is such a shoulder."
         ),
     ),
     "asymmetry_unmodelled": HelpEntry(
@@ -3270,9 +3273,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "error estimate, a single-pattern fit computes the angle's profile interval "
             "and stores it in `RefinedParameter.interval`. The message gives the angle's "
             "distance from "
-            "the direction and whether the interval includes it. Where it does, quote "
-            "the moment as lying along the symmetry direction. Where it does not, quote "
-            "the angle with its interval."
+            "the direction and whether the interval includes it. Where it does, the "
+            "data cannot tell the moment from one along that direction. Where it does "
+            "not, quote the angle with its interval. The fit also computes the profile "
+            "interval of each such site's moment size, because the size's error "
+            "estimate assumes the angles sit on the direction. Quote the size by that "
+            "interval. Where the profile found a fit better than the answer by a whole "
+            "threshold or more, the fit did not reach its minimum: the message gives "
+            "the better point, and the size is quoted only after a refit from it. "
+            "The size's coverage and that threshold were measured on one family, a "
+            "simulated two-site `Pnma` set, and are untested beyond it."
         ),
     ),
     "MOMENT_UNSUPPORTED": HelpEntry(
