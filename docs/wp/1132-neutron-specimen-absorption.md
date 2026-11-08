@@ -111,7 +111,7 @@ estimation off.
 
 ## Handover log
 
-- **2026-11-08** — closed (ghostshift runner, PR #PRNUM; no code changed). What this WP set
+- **2026-11-08** — closed (ghostshift runner, PR #1469; no code changed). What this WP set
   out to give is shipped: a neutron capillary or flat plate with a declared size now gets an
   absorption correction estimated from the Sears table, a source with no table is refused
   rather than given the X-ray number, and the Brindley correction reads the neutron µ. What
