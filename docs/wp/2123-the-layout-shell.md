@@ -1,6 +1,6 @@
 # WP-2123 — the layout shell
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-08 — claimed by a ghostshift runner
 Depends on: —
 Priority: P2 2026-11-08 — the first piece of the open gui-overhaul milestone; pieces 2-5 build inside it
 
