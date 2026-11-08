@@ -48,8 +48,15 @@ never by a bare `IndexError` at the next fit.
 - **The tier of each rule this WP adds.** The renumbering is tier 1: it follows from the
   dot-path convention and does what ties already do. The "equal to an old restraint ⇒ carried"
   reading is new judgement, an automatic action whose ambiguity is *which numbering the caller
-  wrote in*. It errs only on a fresh restraint identical to an old one, which reads the same atoms
-  whenever their labels did not move.
+  wrote in*. As [DESIGN § Rules](../DESIGN.md#rules) rule 4 asks, it is kind 1 with one named
+  dissenter: a caller who reorders atoms and rewrites a restraint with the very indices an old
+  one had, meaning the atoms now at those numbers. That restraint is read as carried and moved.
+  It records nothing when it fires, matching the hold and tie carry it sits beside (rule 5,
+  convention); only a drop warns.
+- **Practice.** TOPAS (`Distance_Restrain`, `Flatten`) and GSAS-II restraints name atoms by site
+  label, so a reorder cannot move them (recall, not re-checked in either manual). rietx names
+  them by index, the dot-path convention. Keying restraints by label would end this class of
+  defect, and it is a stored-format change, so it is the maintainer's to decide.
 
 ## Non-goals
 
@@ -59,16 +66,16 @@ never by a bare `IndexError` at the next fit.
 
 ## Tasks
 
-- [ ] `twins.carry_restraints(old, new)`: each carried restraint read into the new numbering, one
+- [x] `twins.carry_restraints(old, new)`: each carried restraint read into the new numbering, one
       on a removed atom dropped and named; distortion-mode rows permuted on a pure reorder.
-- [ ] `Refinement.edit` applies it before the table check, re-runs the phase's restraint, body
+- [x] `Refinement.edit` applies it before the table check, re-runs the phase's restraint, body
       and mode validators on the candidate, and warns as the tie drop does.
-- [ ] The series `prepare` hook's structure goes through the same carry.
-- [ ] `_valid_restraints` checks tether and anti-bump indices and a `ValueRestraint`'s atom.
-- [ ] The text document's tie refusal names the right source for a user tie.
-- [ ] Tests: reorder and delete on each restraint kind, distortion modes, a rigid-body atom removed,
+- [x] The series `prepare` hook's structure goes through the same carry.
+- [x] `_valid_restraints` checks tether and anti-bump indices and a `ValueRestraint`'s atom.
+- [x] The text document's tie refusal names the right source for a user tie.
+- [x] Tests: reorder and delete on each restraint kind, distortion modes, a rigid-body atom removed,
       a fresh restraint taken as written, the series hook.
-- [ ] Skill: none. The warning names what was dropped and an agent need not act before the edit.
+- [x] Skill: none. The warning names what was dropped and an agent need not act before the edit.
 
 ## Acceptance
 

@@ -23,7 +23,13 @@ import numpy as np
 
 from ..schemas.common import Diagnostic
 from ..schemas.params import TieSpec
-from ..schemas.structure import Structure
+from ..schemas.structure import (
+    AngleRestraint,
+    PlanarityRestraint,
+    Structure,
+    TorsionRestraint,
+    ValueRestraint,
+)
 from .adp import U_NAMES, tensor_from_voigt, voigt_from_tensor
 from .symmetry import (
     TWIN_COORD_TOL,
@@ -390,6 +396,134 @@ def atom_moves(old: Structure | CoordinateSnapshot,
                 out[f"phases.{io}.atoms.{jo}"] = (None if jn is None
                                                   else f"phases.{pn}.atoms.{jn}")
     return out
+
+
+#: A restraint kind as its drop message names it.
+_RESTRAINT_KIND = {"BondRestraint": "bond", "AngleRestraint": "angle",
+                   "ValueRestraint": "value", "TetherRestraint": "tether",
+                   "AntiBumpRestraint": "anti-bump", "PlanarityRestraint": "planarity",
+                   "TorsionRestraint": "torsion"}
+
+
+def _restraint_atoms(r) -> list[int]:
+    """The atom indices restraint ``r`` names, in its own order (none for a value)."""
+    if isinstance(r, ValueRestraint):
+        return []
+    if isinstance(r, (PlanarityRestraint, TorsionRestraint)):
+        return list(r.atoms)
+    if isinstance(r, AngleRestraint):
+        return [r.atom_i, r.atom_j, r.atom_k]
+    return [r.atom_i, r.atom_j]
+
+
+def _with_atoms(r, new: list[int]):
+    """``r`` naming the atoms ``new``, in the order :func:`_restraint_atoms` reads them."""
+    if isinstance(r, (PlanarityRestraint, TorsionRestraint)):
+        return r.model_copy(update={"atoms": new})
+    if isinstance(r, AngleRestraint):
+        return r.model_copy(update=dict(zip(("atom_i", "atom_j", "atom_k"), new, strict=True)))
+    return r.model_copy(update=dict(zip(("atom_i", "atom_j"), new, strict=True)))
+
+
+def carry_restraints(old: Structure, new: Structure) -> tuple[Structure, list[str]]:
+    """``new`` with each restraint it carried from ``old`` read into its own atom numbering.
+
+    A restraint names atoms by index (``atom_i``…, ``atoms``, or the atom in a
+    ``ValueRestraint.path``), so a structure with an atom removed, inserted or
+    reordered names other atoms by the same numbers, as a hold did (#1264).
+    Atoms and phases are matched as :func:`atom_moves` matches them.  Only a
+    restraint **equal to one the old partner phase held** is read through the
+    move: it was carried over, so it reads the old numbering.  Any other was
+    written for ``new`` and is left as written, for the caller's validation.
+    A carried restraint on an atom ``new`` lacks is dropped; the second value
+    names each one for the caller's warning.
+
+    A distortion-mode record (one ``base`` row and one ``vectors`` row per
+    atom, in order, WP-1419) carried unchanged is permuted with its atoms where
+    the atoms were only reordered; any other change to the atom list leaves it
+    to the phase's own check, which refuses a count that differs.  Rigid bodies
+    name atoms by label and need nothing.
+
+    Returns ``new`` itself when nothing moved, and never mutates it.
+    """
+    so, sn = coordinate_snapshot(old), coordinate_snapshot(new)
+    atoms = atom_moves(so, sn)
+    dropped: list[str] = []
+    phases = list(new.phases)
+    changed = False
+
+    def atom_exists(path: str | None) -> bool:
+        m = _ATOM_PATH.match(path or "")
+        if m is None:
+            return path is not None
+        ip, j = (int(k) for k in m.group(1).split(".")[1::2])
+        return ip < len(phases) and j < len(phases[ip].atoms)
+
+    for io, pn in _phase_pairs(so, sn):
+        before, after = old.phases[io], new.phases[pn]
+        n_new = len(after.atoms)
+        labels = [a.label for a in before.atoms]
+
+        def local(j: int) -> int | None:
+            path = renumber_path(f"phases.{io}.atoms.{j}", atoms)
+            jn = None if path is None else int(path.rsplit(".", 1)[1])
+            return jn if jn is not None and jn < n_new else None
+
+        restraints = []
+        for r in after.restraints:
+            if r not in before.restraints:
+                restraints.append(r)                  # written for this structure
+                continue
+            kind = _RESTRAINT_KIND[type(r).__name__]
+            if isinstance(r, ValueRestraint):
+                path = renumber_path(r.path, atoms)
+                if not atom_exists(path):
+                    m = _ATOM_PATH.match(r.path)
+                    ip, j = (int(k) for k in m.group(1).split(".")[1::2]) if m else (0, -1)
+                    named = (f" ({old.phases[ip].atoms[j].label})"
+                             if ip < len(old.phases) and 0 <= j < len(old.phases[ip].atoms)
+                             else "")
+                    dropped.append(f"the {kind} restraint on {r.path}{named} of phase "
+                                   f"{after.name!r}")
+                    continue
+                restraints.append(r if path == r.path
+                                  else r.model_copy(update={"path": path}))
+                continue
+            olds = _restraint_atoms(r)
+            news = [local(j) for j in olds]
+            if any(j is None for j in news):
+                names = "–".join(labels[j] if j < len(labels) else str(j) for j in olds)
+                dropped.append(f"the {kind} restraint {names} of phase {after.name!r}")
+                continue
+            restraints.append(r if news == olds else _with_atoms(r, news))
+        update: dict = {}
+        if restraints != list(after.restraints):
+            update["restraints"] = restraints
+        modes = after.distortion_modes
+        order = [local(j) for j in range(len(before.atoms))]
+        if (modes is not None and modes == before.distortion_modes
+                and None not in order and order != list(range(n_new))
+                and sorted(order) == list(range(n_new))):
+            src = {jn: jo for jo, jn in enumerate(order)}
+            update["distortion_modes"] = modes.model_copy(update={
+                "base": [modes.base[src[j]] for j in range(n_new)],
+                "modes": [m.model_copy(update={
+                    "vectors": [m.vectors[src[j]] for j in range(n_new)]})
+                    for m in modes.modes]})
+        if update:
+            # unvalidated, as merge_site_twins writes: the caller checks the
+            # whole structure once (``Structure.check_atom_references``)
+            phases[pn] = after.model_copy(update=update)
+            changed = True
+    if not changed:
+        return new, dropped
+    return new.model_copy(update={"phases": phases}), dropped
+
+
+def restraints_dropped_message(dropped: Sequence[str]) -> str:
+    """The warning for :func:`carry_restraints`' drops, in the tie drop's words (#1264)."""
+    return (f"{len(dropped)} restraint(s) named an atom this model no longer has and "
+            f"were dropped: {'; '.join(dropped)}.")
 
 
 def coordinate_snapshot(structure: Structure) -> CoordinateSnapshot:

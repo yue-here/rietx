@@ -1826,7 +1826,7 @@ class Phase(_InheritsDeclaredDefaults):
                     f"but the phase has {n} atom(s) (indices 0..{n - 1})")
 
         for r in self.restraints:
-            if isinstance(r, BondRestraint):
+            if isinstance(r, (BondRestraint, TetherRestraint, AntiBumpRestraint)):
                 check(r.atom_i, "atom_i")
                 check(r.atom_j, "atom_j")
             elif isinstance(r, AngleRestraint):
@@ -1837,6 +1837,24 @@ class Phase(_InheritsDeclaredDefaults):
                 for k, idx in enumerate(r.atoms):
                     check(idx, f"atoms[{k}]")
         return self
+
+    def check_atom_references(self) -> None:
+        """Re-run every check that a record naming this phase's atoms still names one.
+
+        Restraints name atoms by index, rigid bodies by label, and a mode record
+        holds one row per atom.  Each is checked when the phase is built or its
+        ``atoms`` assigned, but not after an in-place change to the list
+        (``del phase.atoms[j]``, a swap) or a ``model_copy``, which is how a
+        caller builds the structure it hands to ``Refinement.edit`` (WP-2121).
+        Raises ``ValueError`` naming the first record that no longer fits.
+        """
+        self._valid_restraints()
+        self._bodies_name_their_atoms()
+        self._modes_cover_the_atoms()
+
+
+#: A ``ValueRestraint`` path on an atom: its phase and atom index.
+_VALUE_ATOM_PATH = re.compile(r"^phases\.(\d+)\.atoms\.(\d+)(?=\.|$)")
 
 
 class Structure(Base):
@@ -1867,6 +1885,36 @@ class Structure(Base):
     """
 
     phases: list[Phase]
+
+    @model_validator(mode="after")
+    def _value_restraints_name_atoms_it_has(self) -> "Structure":
+        """A ``ValueRestraint`` path on an atom names a phase and an atom this structure has.
+
+        The path is a whole-model dot-path, so only the structure can check it;
+        a path on an atom it lacks failed only at the next fit (WP-2121).
+        """
+        for phase in self.phases:
+            for r in phase.restraints:
+                m = (_VALUE_ATOM_PATH.match(r.path) if isinstance(r, ValueRestraint)
+                     else None)
+                if m is None:
+                    continue
+                ip, j = int(m.group(1)), int(m.group(2))
+                if not (ip < len(self.phases) and j < len(self.phases[ip].atoms)):
+                    raise ValueError(
+                        f"phase {phase.name!r} restraint references {r.path}, but "
+                        f"the structure has no such atom")
+        return self
+
+    def check_atom_references(self) -> None:
+        """:meth:`Phase.check_atom_references` on every phase, then the value paths.
+
+        For a structure changed in place or built by ``model_copy``, which runs
+        no validator (WP-2121).
+        """
+        for phase in self.phases:
+            phase.check_atom_references()
+        self._value_restraints_name_atoms_it_has()
 
     @classmethod
     def from_cif(cls, path: str | os.PathLike[str], *, phase_name: str | None = None,
