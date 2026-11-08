@@ -1729,7 +1729,6 @@ def test_a_gof_step_climbs_to_warm_staged_and_never_cold(thermal_patterns):
     assert series[0].warm_gof_over_seed is None            # no warm start
     assert stepped.rungs_tried == ["warm", "warm_staged"]
     assert stepped.escalated_on_gof and not stepped.reseeded
-    assert stepped.rung in ("warm", "warm_staged")
     assert stepped.warm_gof_over_seed == pytest.approx(2.0)
     assert stepped.rwp_warm is not None                    # the ladder ran
     assert {d.code for d in series.diagnostics}.isdisjoint(
@@ -1752,6 +1751,20 @@ def test_the_gof_step_is_recorded_where_it_does_not_act(thermal_patterns, gof, k
     first = "warm_staged" if kw.get("refit") == "stages" else "warm"
     assert series[1].rungs_tried == [first]
     assert series[1].warm_gof_over_seed == pytest.approx(gof)
+    assert not series[1].escalated_on_gof
+
+
+def test_a_caller_fence_past_the_gof_step_is_not_called_a_gof_escalation(
+        thermal_patterns):
+    """A first rung over the caller's ``reseed_factor`` climbs on the fence,
+    so the GoF step it also crosses is recorded and not credited."""
+    structure, ins = _start_models()
+    script = {"p000": [("converged", 0.10)], "p001": [("converged", 0.30)]}
+    runner = _dictate(SequentialRefinement(structure, ins), script)
+    runner = _dictate_gof(runner, {"p000": [1.0], "p001": [3.0]})
+    series = runner.fit(thermal_patterns[:2], plan=_CHEAP, reseed_factor=1.25)
+    assert series[1].rungs_tried[:2] == ["warm", "warm_staged"]
+    assert series[1].warm_gof_over_seed == pytest.approx(3.0)
     assert not series[1].escalated_on_gof
 
 
@@ -1887,8 +1900,9 @@ def test_issue_1214s_warm_fit_in_a_wrong_basin_climbs_and_lands_on_the_truth():
         [p0, p1], x=[0.0, 1.0], plan=_W_PLAN)
 
     entry = series[1]
+    from rietx.sequential import GOF_STEP_FACTOR
     assert entry.warm_gof_over_seed is not None
-    if entry.warm_gof_over_seed > 1.25:
+    if entry.warm_gof_over_seed > GOF_STEP_FACTOR:
         assert entry.escalated_on_gof
         assert entry.rungs_tried == ["warm", "warm_staged"]
         assert entry.rung == "warm_staged" and not entry.reseeded

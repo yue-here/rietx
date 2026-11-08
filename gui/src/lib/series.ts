@@ -117,6 +117,11 @@ export interface SeriesEntry {
   n_iterations: number;
   reseeded: boolean;
   rwp_warm: number | null;
+  /** the collapsed warm refit's GoF over its seed pattern's, and whether that
+   *  step alone sent it to the staged plan (WP-2080); absent in a document
+   *  written before the fields */
+  warm_gof_over_seed?: number | null;
+  escalated_on_gof?: boolean;
   /** which attempt of the escalation ladder produced these values (WP-1051);
    *  the first pattern of a chain is always `"cold"`, having nothing to warm
    *  from, so this is *not* the same question as `reseeded` */

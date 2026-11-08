@@ -1,9 +1,8 @@
 # WP-2080 — A warm fit that stopped in a wrong basin is kept, and nothing escalates it
 
-Milestone: unscheduled · Status: 🔄 2026-11-08 — claimed by @mustachefeeling (option B ruled; PR #1310 merged, the trigger lands now)
+Milestone: unscheduled · Status: ✅ 2026-11-08 — option B landed: the GoF step climbs a warm first rung to warm_staged (PR #1473)
 Track: What fires, and what stays silent
 Depends on: 2003 (C1's ruling removes the Rwp fence this case slips under; PR #1310 lands `_rejected`, the predicate a trigger would join)
-Priority: P2 2026-11-02 — a silent wrong answer on a path every warm series runs: 2 of 20 noise draws of the reporter's synthetic chain keep a cell 0.34 Å and 0.072 Å off its true value, with no warning that separates it from a good fit; the workaround (`refit="stages"`) is cheap once known
 
 ## Goal
 
@@ -95,8 +94,6 @@ in the nine families WP-2003 measured, bar the three the retrospective below nam
 rietx's own and tier 3 (generality record § The rule). GSAS-II's sequential results
 table shows each pattern's fit statistics for the user to read (recall, not checked
 this session).
-
-### Inherited
 
 ## Non-goals
 

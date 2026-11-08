@@ -176,12 +176,15 @@ class SeriesEntry(Base):
     #: both set means a cold restart rescued the pattern, ``rwp_warm`` alone
     #: means the ladder escalated but a warm attempt was still the best of the
     #: ones tried — worth seeing, since it marks a pattern the series found
-    #: hard for a reason no restart could fix.  ``None`` when that first
+    #: hard for a reason no restart could fix, unless :attr:`escalated_on_gof`
+    #: says the climb was the GoF step's, which often finds nothing to
+    #: rescue (WP-2080).  ``None`` when that first
     #: attempt raised rather than returned: it reached no Rwp, and
     #: :attr:`rungs_raised` says what it raised.
     rwp_warm: float | None = None
     #: Which attempt produced the values on this entry (WP-1051).  The chain
-    #: escalates only on failure: ``"warm"`` is the collapsed warm refit
+    #: escalates on failure, and to ``"warm_staged"`` also on the GoF step
+    #: (:attr:`escalated_on_gof`, WP-2080): ``"warm"`` is the collapsed warm refit
     #: (``refit="single"``'s first rung), ``"warm_staged"`` the full staged plan
     #: from the warm state, ``"cold"`` the full staged plan from the initial
     #: models.  The **first** pattern of a chain is always ``"cold"`` — it has

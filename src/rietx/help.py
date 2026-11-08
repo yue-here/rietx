@@ -6069,7 +6069,9 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "Whether the GoF step alone sent this pattern from the collapsed warm refit "
             "to the staged plan from the same start: `warm_gof_over_seed` was above "
-            "1.25 while the attempt was not rejected. The step never reaches the cold "
+            "1.25 while nothing else would have climbed: the attempt was not "
+            "rejected, not over your `reseed_factor` and not cut by the first-rung "
+            "bound. The step never reaches the cold "
             "restart, so it never sets `reseeded`. `rung` says which attempt won."
         ),
     ),

@@ -578,7 +578,8 @@ def _ladder(base_plan: RefinementPlan, warm_plan: RefinementPlan, *,
     warm-staged, 2863 cold.  So the pre-WP-1051 fallback — straight from the
     first rung to the last — paid roughly triple to discard a starting point
     that had not been shown to be the problem.  A rung is reached only when the
-    trigger still fires on the *best attempt so far* (:func:`_reseed_needed`),
+    trigger still fires on the *best attempt so far* (:func:`_reseed_needed`;
+    the middle rung also on the GoF step, :data:`GOF_STEP_FACTOR`),
     which is what makes the escalation stop at the first one that works:
     :func:`_prefer` ranks an attempt the quarantine accepts above a rejected
     one, so once any attempt clears the trigger the best one does too.
@@ -2047,7 +2048,9 @@ class SequentialRefinement:
             # been fenced against, a record with no threshold (WP-2003, C1)
             entry.rwp_over_median = _rwp_over_median(best, accepted_rwp)
             entry.warm_gof_over_seed = gof_ratio
-            entry.escalated_on_gof = gof_escalated
+            # set only once the climb it caused was attempted: a cancel
+            # before the warm_staged rung leaves an entry that never escalated
+            entry.escalated_on_gof = gof_escalated and "warm_staged" in tried
 
             entries[k] = entry
             results[k] = best
@@ -2529,7 +2532,8 @@ def _gof_over_seed(result: RefinementResult | None,
     if result is None or result.statistics is None or seed_gof is None:
         return None
     gof = float(result.statistics.gof)
-    if not (np.isfinite(gof) and np.isfinite(seed_gof) and seed_gof > 0):
+    if not (np.isfinite(gof) and gof > 0 and np.isfinite(seed_gof)
+            and seed_gof > 0):
         return None
     return gof / float(seed_gof)
 
