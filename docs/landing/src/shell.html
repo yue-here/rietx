@@ -39,8 +39,14 @@ p{margin:0}
    has none left here, so without it the brand and the first link butt together and read
    as one word ("rietxManual", measured at 390 px and below). A gap is a minimum. */
 .top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;height:56px}
-.brand{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:1.05rem;color:var(--ink);border:0}
-.brand svg{width:22px;height:22px;fill:var(--accent)}
+/* The lockup is set on the wordmark's type (WP-2122): one mark unit is 0.510/12.5 em, so the
+   Kα2 tip lands on the x-height (0.510 em) and the bar is the SemiBold stem. The svg's
+   bottom sits on the baseline (a box with no baseline gets one at its bottom edge), and
+   `top` lowers it 6.5 units so the bar's top edge is the baseline. The gap leaves one
+   x-height of ink to the r's stem, less the box's 1.5-unit margin and r's 0.0667 em side
+   bearing. The manual's `.rietx-brand` (docs/docs/_static/custom.css) is the same lockup. */
+.brand{--u:calc(.51em / 12.5);display:inline-flex;align-items:baseline;gap:calc(.51em - 1.5 * var(--u) - .0667em);font-weight:600;font-size:1.05rem;color:var(--ink);border:0}
+.brand svg{width:calc(32 * var(--u));height:calc(32 * var(--u));position:relative;top:calc(6.5 * var(--u));flex:none;fill:var(--accent)}
 .top nav{display:flex;align-items:center;gap:22px;font-size:.95rem}
 .top nav a{color:var(--ink-2);border:0}
 .top nav a:hover{color:var(--accent-ink)}

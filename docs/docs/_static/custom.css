@@ -135,30 +135,52 @@ nav.bd-links p.bd-links__title,
 .bd-header .bd-header__inner {
   padding-top: 0;
   padding-bottom: 0;
+  min-height: var(--pst-header-height);
 }
 
 .bd-header .navbar-brand {
   padding: 0;
 }
 
+/* The lockup is set on the wordmark's type (WP-2122), so every length is in its em and the
+ * font-size sits on the link rather than the `<p>`, where the mark's em could not see it.
+ * Instrument Sans SemiBold measures x-height 0.510, stem 0.1267 and `r` left side bearing
+ * 0.0667 em.  One mark unit is 0.510/12.5 em, which puts the Kα2 tip (12.5 units above the
+ * bar) on the x-height and makes the 3.1-unit bar the stem's thickness.  Baseline
+ * alignment puts the svg's bottom on the baseline, since a box with no baseline of its own
+ * gets one at its bottom edge; `top` then lowers it the 6.5 units below the bar's top, so
+ * the bar's top edge is the baseline.  The gap leaves one x-height of ink from the bar's
+ * end to the `r`'s stem, less the box's 1.5-unit margin and the side bearing.
+ * pydata makes the brand the bar's height, and baseline alignment would then put the
+ * lockup at the top of that box, so the link takes its content's height and the bar's
+ * own centring places it.  The brand was all that gave the bar its height, so
+ * `.bd-header__inner` above now holds it at `--pst-header-height`.  `docs/landing/src/shell.html`'s `.brand` is the same lockup. */
+.bd-header .navbar-brand.rietx-brand {
+  height: auto;
+}
+
 .rietx-brand {
+  --mark-unit: calc(0.51em / 12.5);
   display: inline-flex;
-  align-items: center;
-  gap: 9px;
+  align-items: baseline;
+  gap: calc(0.51em - 1.5 * var(--mark-unit) - 0.0667em);
+  font-size: 1.05rem;
   color: var(--ink);
   text-decoration: none;
 }
 
 .rietx-brand .rietx-mark {
-  width: 22px;
-  height: 22px;
+  width: calc(32 * var(--mark-unit));
+  height: calc(32 * var(--mark-unit));
+  position: relative;
+  top: calc(6.5 * var(--mark-unit));
   flex: none;
   fill: var(--accent);
 }
 
 .rietx-brand .rietx-wordmark {
   font-family: var(--sans);
-  font-size: 1.05rem;
+  font-size: 1em;
   font-weight: 600;
   color: var(--ink);
   margin: 0;

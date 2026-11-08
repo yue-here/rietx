@@ -70,8 +70,8 @@ automatic action.
 - [x] Measure the served font (`_static/fonts/`) with fontTools: x-height, SemiBold stem,
   `r` left side bearing; recompute the lockup if they differ, keeping the four rules
 - [x] Redraw the bar in the favicon and both inline copies; favicon comment if it describes the bar
-- [ ] Re-set both headers' lockup CSS
-- [ ] Measure the built pages at 16.8 px in both themes: bar top on baseline, Kα2 tip on
+- [x] Re-set both headers' lockup CSS
+- [x] Measure the built pages at 16.8 px in both themes: bar top on baseline, Kα2 tip on
   x-height, error in px; look at the favicon at 16 and 32 px and the header at desktop and 390 px
 - [ ] Tests: `tests/test_manual.py`, `tests/test_landing.py`
 - [ ] Skill: none — the mark is not something an agent driving rietx reads
