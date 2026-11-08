@@ -1,6 +1,6 @@
 # WP-2080 — A warm fit that stopped in a wrong basin is kept, and nothing escalates it
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — option B ruled (settled by Claude under Yue's delegation); the trigger waits on PR #1310
+Milestone: unscheduled · Status: 🔄 2026-11-08 — claimed by @mustachefeeling (option B ruled; PR #1310 merged, the trigger lands now)
 Track: What fires, and what stays silent
 Depends on: 2003 (C1's ruling removes the Rwp fence this case slips under; PR #1310 lands `_rejected`, the predicate a trigger would join)
 Priority: P2 2026-11-02 — a silent wrong answer on a path every warm series runs: 2 of 20 noise draws of the reporter's synthetic chain keep a cell 0.34 Å and 0.072 Å off its true value, with no warning that separates it from a good fit; the workaround (`refit="stages"`) is cheap once known
