@@ -1341,9 +1341,13 @@ def test_a_quoted_bracketed_k_is_read(tmp_path):
                      f"loop_\n_parent_propagation_vector.kxkykz\n"
                      f"_parent_propagation_vector.id\n{k} k1\n"):
             assert magcif.propagation_vectors(text) == (("1/2", "0", "0"),)
+    path = _fixture(tmp_path, "LaMnO3", k="1/2 0 0")
+    text = path.read_text(encoding="utf-8")
+    assert "k1 [1/2 0 0]" in text
+    path.write_text(text.replace("k1 [1/2 0 0]", "k1 '[1/2 0 0]'"),
+                    encoding="utf-8")
     with pytest.raises(magcif.MagCifError, match="magnetic supercell"):
-        _read(tmp_path, "LaMnO3",
-              extra="\n_parent_propagation_vector.kxkykz '[1/2 0 0]'\n")
+        structure_from_cif(str(path), moment_ions=_IONS["LaMnO3"])
     # the dictionary's tag still takes no bare quoted list
     assert magcif.propagation_vectors(
         "_parent_propagation_vector.kxkykz '1/2 0 0'\n") == ()
