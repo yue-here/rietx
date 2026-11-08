@@ -161,12 +161,14 @@ class Cell(Base):
     runaway window on that side, and
     :meth:`~rietx.params.vector.ParameterTable.bounds` is ordered so that
     nothing makes a side finite ahead of it.  A box here would therefore act
-    on every free cell.  Scipy's TRF scales its trust region by the distance
-    to the bounds, so a box changes the step even when it is never reached
-    (windowing every phase took the IUCr ``cpd-1c`` refit from 82 iterations
-    to its 400 budget, and its corundum fraction from 6.30 to 9.04 wt %).
-    It would also show in ``ParameterRow`` and the ``.rxt`` document as a
-    claim the user never made.  The limit lives in the solver instead: a
+    on every free cell and switch off the runaway window on its side.  It would
+    also show in ``ParameterRow`` and the ``.rxt`` document as a claim the user
+    never made.  Under ``solver="trf"`` there is a third ground: scipy scales
+    its trust region by the distance to the bounds, so a box changes the step
+    even when it is never reached (windowing every phase took the IUCr
+    ``cpd-1c`` refit from 82 iterations to its 400 budget, and its corundum
+    fraction from 6.30 to 9.04 wt %; those figures are TRF measurements).  The
+    default ``solver="lm"`` reads a box only when a step reaches it.  The limit lives in the solver instead: a
     window frozen at each stage's start for phases the data cannot see
     (``freeze_cell_windows``), and the post-solve
     :func:`~rietx.refine.reset_cell_runaway`, which puts a runaway phase's

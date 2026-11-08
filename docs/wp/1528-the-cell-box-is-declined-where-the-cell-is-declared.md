@@ -68,8 +68,10 @@ not a bound.
 - **2026-11-03** — `Cell`'s docstring now says, in a few sentences, why
   the cell's six parameters carry no default box. A finite stored bound is
   read as the caller's own claim, so a box in the schema would act on every
-  free cell: it changes the solver's step even when never reached, and it
-  would show to a reader as a limit nobody set. The docstring names where the
+  free cell: it switches off the runaway window on its side, and it would show
+  to a reader as a limit nobody set. Under `solver="trf"` it also changes the
+  solver's step even when never reached; the default `lm` reads a box only when
+  a step reaches it (Yue's review, 2026-11-05). The docstring names where the
   limit lives instead. Issue #283 was already closed; this closes the WP. PR
   #1365.
 
