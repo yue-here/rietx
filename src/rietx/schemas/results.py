@@ -1709,8 +1709,12 @@ def _cap_one_code(diagnostics: list[Diagnostic], code: str, omitted_code: str,
         value=float(len(omitted)),
         message=f"{len(omitted)} more {noun}(s) below the "
                 f"{HIGH_CORRELATION_MAX} shown here, weaker than all of them.",
-        suggestion="Read result.identifiability for the full correlation "
-                   "matrix and top_correlations list.",
+        # every name here is a declared field (WP-1990's test resolves them),
+        # and the joint fit's gap is said rather than left to read as a None
+        suggestion="Read every pair's correlation in "
+                   "result.identifiability.correlation, the full matrix, or "
+                   "the worst few in result.identifiability.top_correlations; "
+                   "a joint multi-histogram fit carries neither yet.",
     )]
     return out
 

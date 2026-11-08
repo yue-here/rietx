@@ -97,8 +97,12 @@ disagree.
   re-exported at the top level, which would have grown the skill's `api.md`.
 - [ ] The text FitReport's printed block, if the maintainer wants it on by
   default: rows with at least one off-diagonal |ρ| over the guard only.
-- [ ] Correct the `HIGH_CORRELATION_OMITTED` suggestion to name the new
+- [x] Correct the `HIGH_CORRELATION_OMITTED` suggestion to name the new
   field, with a test that the named attribute exists.
+  The suggestion (shared with `FLAT_DIRECTION_OMITTED`) now names
+  `result.identifiability.correlation` and `.top_correlations`, and says a
+  joint fit carries neither; the test resolves every `result.…` name it
+  quotes through the declared fields, and failed on the old text.
 - [ ] Tests (round-trip, the field equal to `LSQOutcome.correlation`, `None`
   on a joint fit)
 - [ ] Skill: the reference row for `HIGH_CORRELATION_OMITTED` names the

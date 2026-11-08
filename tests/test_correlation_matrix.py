@@ -24,6 +24,7 @@ from rietx.schemas.results import (
     Identifiability,
     RefinementResult,
     Statistics,
+    _cap_high_correlation,
 )
 
 PATHS = ["phases.0.scale", "phases.0.cell.a", "instrument.zero_shift"]
@@ -93,6 +94,49 @@ def test_a_result_that_carries_no_matrix_is_refused_by_name():
         correlation_table_csv(_bare_result())
     with pytest.raises(ValueError, match="not measured"):
         correlation_table_csv(_bare_result(Identifiability()))
+
+
+def _resolve(dotted: str) -> None:
+    """Walk ``result.a.b`` through the schema's declared fields, so a name
+    that exists only on a populated result still has to be declared."""
+    import typing
+
+    from pydantic import BaseModel
+
+    cls = RefinementResult
+    for attr in dotted.split(".")[1:]:
+        assert cls is not None and attr in cls.model_fields, (
+            f"{dotted}: {attr!r} is not a field of {getattr(cls, '__name__', cls)}")
+        ann = cls.model_fields[attr].annotation
+        models = [a for a in (typing.get_args(ann) or (ann,))
+                  if isinstance(a, type) and issubclass(a, BaseModel)]
+        cls = models[0] if models else None
+
+
+def test_the_omitted_rows_suggestion_names_a_field_that_exists():
+    """The defect WP-1990 was filed for: the suggestion said
+    ``result.identifiability`` carried a full correlation matrix, and it
+    carried five pairs.  Each omitted-count row must now name the matrix by
+    its field, and every attribute it names must be declared."""
+    import re
+
+    diags = [_corr_diag(f"a{i}", f"b{i}", 0.9 + i * 0.001) for i in range(12)]
+    rows = [d for d in _cap_high_correlation(diags)
+            if d.code.endswith("_OMITTED")]
+    assert rows
+    for row in rows:
+        named = re.findall(r"result(?:\.\w+)+", row.suggestion)
+        assert "result.identifiability.correlation" in named, row.suggestion
+        for dotted in named:
+            _resolve(dotted)
+
+
+def _corr_diag(a: str, b: str, rho: float):
+    from rietx.schemas.common import Diagnostic
+
+    return Diagnostic(level="warning", code="HIGH_CORRELATION",
+                      message=f"{a} ~ {b} (ρ={rho:+.3f})", where=[a, b], value=rho,
+                      suggestion="consider fixing one of the correlated parameters")
 
 
 # --- one real fit ----------------------------------------------------------

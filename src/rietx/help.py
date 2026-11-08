@@ -2795,7 +2795,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "values are less reliable. The list shows only the strongest pairs, to stay "
             "readable. This entry counts the weaker pairs left out. The fit used all of "
             "them. The identifiability record on the result holds the full correlation "
-            "matrix."
+            "matrix, except after a joint fit of several patterns."
         ),
     ),
     "HISTORY_EARLIER_TREE_SKIPPED": HelpEntry(
