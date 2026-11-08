@@ -998,7 +998,7 @@ def extinction_class_diagnostics(cand) -> list[Diagnostic]:
             level="warning", code="EXTINCTION_FORBIDDEN_INTENSITY",
             message=(f"{cand.n_present} of the {cand.n_testable} forbidden "
                      "position(s) this class could be tested at carry intensity "
-                     "its own Le Bail fit cannot account for."),
+                     "its own Pawley fit cannot account for."),
             where=where + [pairs],
             suggestion=("Check those 2θ positions against IndexingResult's "
                         "unmatched_observed for an impurity line before you "
@@ -1026,8 +1026,12 @@ def extinction_class_diagnostics(cand) -> list[Diagnostic]:
     return out
 
 
-def extinction_diagnostics(screen) -> list[Diagnostic]:
+def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
     """Screen-level messages: what the answer is, and why it may not be one.
+
+    ``fit_errors`` maps a class's symbol to the error one of its fits raised.
+    Such a class is unscored rather than refuted, and the abstention names the
+    error, since a solver failure is no evidence about the absences.
 
     ``EXTINCTION_GROUPS_NOT_SEPARABLE`` fires whenever the leading class holds
     more than one space group — **always**, not only when the data are weak.
@@ -1142,9 +1146,12 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
     contradicting = [c for c in alive if not c.space_groups
                      and top.delta_bic - c.delta_bic >= DECISIVE_DELTA_BIC]
     if len(rivals) > 1 and rivals[1].delta_bic - top.delta_bic < DECISIVE_DELTA_BIC:
+        undecided = _undecided_positions(top, rivals[1])
         reasons.append(f"{rivals[1].symbol} is within ΔBIC "
                        f"{rivals[1].delta_bic - top.delta_bic:.1f} of it "
-                       f"(decisive is {DECISIVE_DELTA_BIC:g})")
+                       f"(decisive is {DECISIVE_DELTA_BIC:g})"
+                       + (f", and the two differ at the tested position(s) "
+                          f"{undecided}" if undecided else ""))
     if contradicting:
         reasons.append(f"the data prefer {contradicting[0].symbol}, which the "
                        "declared prior excludes, by ΔBIC "
@@ -1159,10 +1166,18 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
                        + " on this cell")
     if top.n_absent and top.n_testable == 0:
         reasons.append("none of its absences is testable in this range")
-    if unscreened:
-        reasons.append(f"{len(unscreened)} class(es) were never fitted, so their "
+    errors = fit_errors or {}
+    unasked = [c for c in unscreened if c.symbol not in errors]
+    if unasked:
+        reasons.append(f"{len(unasked)} class(es) were never fitted, so their "
                        "standing is unknown")
-    if not alive:
+    failed = [c for c in unscreened if c.symbol in errors]
+    if failed:
+        reasons.append(f"{len(failed)} class(es) could not be scored, so their "
+                       f"standing is unknown: {errors[failed[0].symbol]}"
+                       + (f" (and {len(failed) - 1} more)" if len(failed) > 1
+                          else ""))
+    if not alive and not unscreened:
         reasons.append("every class was refuted, including the absence-free "
                        "lattice, so the fit itself failed")
     if reasons:
@@ -1175,9 +1190,27 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
                for c in rivals[1:3]]
             + [f"excluded by the prior: {c.symbol} (ΔBIC {c.delta_bic:+.1f})"
                for c in contradicting[:2]],
-            suggestion=("Count longer at the forbidden positions where the "
-                        "leading classes disagree, or extend the 2θ range.")))
+            suggestion=(("Count longer at the forbidden positions where the "
+                         "leading classes disagree, or extend the 2θ range.")
+                        if not failed or len(reasons) > 1 else
+                        ("Run the screen again. If the same fit raises, check "
+                         "the cell and 2θ range it ran at."))))
     return out
+
+
+def _undecided_positions(a, b, limit: int = 4) -> str:
+    """The tested forbidden positions one of two classes has and the other lacks.
+
+    These are the positions the margin between them rests on (WP-2076), so
+    they are where counting longer would separate the two.
+    """
+    seen_a = set(a.tested_two_theta)
+    seen_b = set(b.tested_two_theta)
+    pairs = sorted({(t, tuple(h)) for c, other in ((a, seen_b), (b, seen_a))
+                    for h, t in zip(c.tested_hkl, c.tested_two_theta)
+                    if t not in other})
+    text = ", ".join(f"{h} at {t:.3f}°" for t, h in pairs[:limit])
+    return text + (f" and {len(pairs) - limit} more" if len(pairs) > limit else "")
 
 
 def _prior_diagnostic(screen, alive, top) -> Diagnostic:

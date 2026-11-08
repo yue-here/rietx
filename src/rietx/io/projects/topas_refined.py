@@ -169,6 +169,14 @@ def _rows_from(free: Any, structure=None
         return None, set(items), False
     rows: dict[str, _Row] = {}
     for r in items:
+        if r.tie is not None and getattr(r.tie, "expression", None) is not None:
+            # a formula tie (WP-2118) has no terms, so read as an affine row it
+            # would be written as the constant 0; refused while the value is
+            # in hand, as every value the file cannot state is
+            raise ValueError(
+                f"{r.path} follows the formula {r.tie.expression!r}, which this "
+                "writer states only as a linear equation; untie it before "
+                "writing, or pass the fit's result as free= to write its value")
         tie = None if r.tie is None else ([(p, float(c)) for p, c in r.tie.terms],
                                           float(r.tie.const))
         lo = -math.inf if r.lo is None else float(r.lo)

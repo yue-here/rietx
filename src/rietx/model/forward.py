@@ -38,6 +38,8 @@ from __future__ import annotations
 import functools
 import math
 from collections.abc import Callable
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 
 import numpy as np
@@ -4120,6 +4122,43 @@ def orbit_split_of(model: CompiledModel) -> list:
     return [list(cp.sites.ops) for cp in model.phases]
 
 
+#: hkl every compile in the current context leaves out of each phase's nuclear
+#: reflection list, or ``None``.  The extinction screen's one seam (WP-2076):
+#: it scores a class on the lattice **minus only the forbidden lines it can
+#: test**, a reflection set no space group describes.  Private and scoped by
+#: :func:`_omitting_reflections`, so no stored model and no other caller can
+#: carry it.
+_OMITTED_HKL: ContextVar[frozenset | None] = ContextVar("_OMITTED_HKL",
+                                                        default=None)
+
+
+@contextmanager
+def _omitting_reflections(hkl):
+    """Compile every model inside the block without these hkl (WP-2076).
+
+    The set is frozen at each compile like the rest of the reflection list,
+    so a stage never sees it change (frozen-per-stage discreteness).
+    """
+    token = _OMITTED_HKL.set(frozenset(tuple(int(v) for v in h) for h in hkl))
+    try:
+        yield
+    finally:
+        _OMITTED_HKL.reset(token)
+
+
+def _omit_reflections(refl):
+    """``refl`` without the context's omitted hkl; ``refl`` itself when none."""
+    omitted = _OMITTED_HKL.get()
+    if not omitted or refl.satellite_order is not None:
+        return refl
+    keep = np.array([tuple(h) not in omitted for h in refl.hkl.tolist()],
+                    dtype=bool)
+    if keep.all():
+        return refl
+    return replace(refl, hkl=refl.hkl[keep],
+                   multiplicity=refl.multiplicity[keep], d=refl.d[keep])
+
+
 def compile_model(structure: Structure, instrument: Instrument, pattern: PatternData,
                   *, mode: Mode = "rietveld",
                   two_theta_limits: tuple[float, float] | None = None,
@@ -4308,8 +4347,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         # label.  ``None`` is exactly the old path, so every other phase
         # enumerates the identical list in the identical order.
         group = resolve_group(phase.space_group, phase.symmetry_operations)
-        refl = generate_reflections(group, cell, lam_gen,
-                                    two_theta_max=hi_eff, two_theta_min=gen_min)
+        refl = _omit_reflections(generate_reflections(
+            group, cell, lam_gen, two_theta_max=hi_eff, two_theta_min=gen_min))
         # WP-1326: a declared propagation vector adds the satellites at
         # Q = H ± k as a second ReflectionSet, frozen here with the nuclear one
         # and merged into a single list (see ``CompiledPhase.satellites``).

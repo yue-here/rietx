@@ -124,6 +124,19 @@ down.
 
 ### Inherited
 
+- **2026-11-06, from the issue triage (issue #1439): a proposal to fix the
+  free set at the first frame, which would end re-entry by design.** The
+  reporter saw the absent-phase hold switch a minor phase's cell on and off
+  between frames near its 3σ line, so two fits of one frame stopped being
+  nested and the trajectory gained steps from the threshold. They propose
+  that the cold first frame resolve the free set and every warm refit free
+  exactly that set, with the per-frame support verdict recorded and not acted
+  on. That is the opposite of this WP's Goal for a phase that appears late.
+  Folded into [2081](2081-how-a-series-holds-what-the-setup-fixes.md) (its
+  question 1, what a series frees after the first frame), where the evidence
+  and the code check at `a84379aac` are written out. Decide this WP's options
+  and #1439 together. The issue also names #1402 (re-entry of a held phase)
+  as related.
 - **2026-10-13 (2nd), from WP-1523's close: a subgroup at its parent's
   identity point is held only while its scale is near zero.** The scale
   significance is now conditional on every other phase's scale. So a phantom

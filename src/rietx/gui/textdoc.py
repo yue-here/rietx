@@ -321,7 +321,10 @@ def annotations_of(row) -> dict[str, Any]:
     """
     out: dict[str, Any] = {}
     if row.tie is not None:
-        out["tie"] = row.tie.describe()      # the schema's own words
+        # the schema's own words, its whitespace as the parser's ``split``
+        # leaves it: a formula tie (WP-2118) keeps the caller's spacing, and
+        # an unedited document must compare equal
+        out["tie"] = " ".join(row.tie.describe().split())
     if row.lo != float("-inf"):
         out["min"] = float(_fmt(row.lo))
     if row.hi != float("inf"):
