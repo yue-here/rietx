@@ -1,9 +1,8 @@
 # WP-2112 — an engine's first cell stays in the reported list
 
-Milestone: unscheduled · Status: 🔄 2026-11-08 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: ✅ 2026-11-08 — closed on the re-run: on main at a 300 s ceiling, svd's rank-1 devitrite cell is the reported list's rank 1
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-11-05 — a ranking defect on one synthetic list, seen before WP-2079 and WP-2082 changed the ranking key and not re-run; a caller's workaround is a larger `max_candidates`
 
 ## Goal
 
@@ -48,11 +47,11 @@ known-cell corpus as its family and each row's truth as its reference. Nothing h
 
 ## Tasks
 
-- [ ] Re-run devitrite on current main with the published cell, at a 300 s ceiling with the 30 s slice, and record each engine's rank 1 and the reported list. If the cell is reported, close this WP on that measurement.
-- [ ] If it is still dropped: measure how often an engine's rank 1 falls outside the reported 12 on the known-cell corpus (`tests/test_acceptance_indexing.py`'s lists and `tests.bethanechol_benchmark`'s).
-- [ ] Decide between a seat per engine, and a sentence in `INDEX_CANDIDATES_TRUNCATED` naming the engine whose first choice went. The second changes no answer.
-- [ ] Tests: a synthetic list that fills the cap with corroborated cells, with the single finder's rank 1 asserted in the list or named in the diagnostic.
-- [ ] Skill: the `INDEX_CANDIDATES_TRUNCATED` row if its text changes, or "none" if the re-run closes this.
+- [x] Re-run devitrite on current main with the published cell, at a 300 s ceiling with the 30 s slice, and record each engine's rank 1 and the reported list. If the cell is reported, close this WP on that measurement. (2026-11-08: reported, rank 1 of 1; numbers in the handover entry)
+- [x] ~~If it is still dropped: measure how often an engine's rank 1 falls outside the reported 12 on the known-cell corpus~~ — **not needed**: task 1 reported the cell.
+- [x] ~~Decide between a seat per engine, and a sentence in `INDEX_CANDIDATES_TRUNCATED`~~ — **not needed**: no list on hand shows the drop, so neither change has a case.
+- [x] ~~Tests: a synthetic list that fills the cap with corroborated cells~~ — **not needed**: nothing changed to test.
+- [x] Skill: none. The re-run closes this and no text changes.
 
 ## Acceptance
 
@@ -66,5 +65,37 @@ known-cell corpus as its family and each row's truth as its reference. Nothing h
 - Issues #1375 and #780 (the reporter's 2026-10-14 table); WP-1046; WP-1924; WP-2079; WP-2082.
 
 ## Handover log
+
+- **2026-11-08** — closed on task 1's re-run, PR #1470. On current main, devitrite's true cell is
+  in the reported list: svd builds it and ranks it first, and the merged list reports it at rank 1.
+  It is the only candidate, so the cap of 12 never bites, and it grades `low` because one engine
+  found it. The drop from 2026-10-14 does not reproduce. Nothing in the package changed. The seam
+  the Context describes is unchanged: a corroborated cell still ranks above every single-finder
+  cell (WP-1046's key), so a list with 12 or more corroborated cells would still report no
+  single-finder cell. No list on hand does that, so this WP builds nothing for it.
+  - *Measured.* Tree `63d7c120a` (origin/main; this branch differs only in this file and the WP
+    index). `.venv` built in this worktree, CPython 3.12, `[dev]`, macOS arm64, 10 cores, load
+    average 4.6 at start. The list is `tests.test_indexing_engines.synthetic_peaks` with
+    `sg="P -1"`, the COD 1535730 cell (Ihara 1984: 10.123, 10.569, 7.117 Å, 109.71°, 98.24°,
+    78.15°) and `two_theta_max=30.0` at Cu Kα1: **57 lines**, 8.95-30.01°. The issue's list had 48
+    lines, and how its author thinned it is not recorded. The call was
+    `index_pattern(peaks, spec=SearchSpec(total_budget_seconds=300.0))`, so `budget_seconds` 30 s,
+    `max_candidates` 12, preset `custom`, no profile validation. A spy on `consensus` recorded each
+    engine's own list. Wall 271 s.
+  - *Each engine's rank 1.* svd: the true lattice (V 699.29 Å³), its only candidate; its
+    triclinic unit completed and its orthorhombic and monoclinic units were cut by the slice.
+    trial_error: no candidate, every system from orthorhombic down cut. dichotomy: no candidate,
+    orthorhombic complete, monoclinic and triclinic cut.
+  - *The reported list.* One candidate, triclinic P, V 699.29 Å³, `found_by=['svd']`, grade `low`.
+    `INDEX_CANDIDATES_TRUNCATED` did not fire, because one lattice was merged. The diagnostics were
+    `INDEX_SEARCH_INCOMPLETE` (7), `INDEX_ABSTAINED`, `INDEX_NOT_VALIDATED`,
+    `INDEX_SHIFT_FROM_PAIRS`, `INDEX_CELL_SYSTEMATIC_UNQUANTIFIED`, `PEAK_POSITION_PRECISION`.
+  - *Gotcha.* `synthetic_peaks` keys its defaults by system, and `CASES` has no `"triclinic"` row.
+    Pass `"monoclinic"` with `sg=` and `cell=` overriding both.
+  - *Not done, on purpose.* Tasks 2-4 were conditional on the drop and are not needed. No
+    follow-up issue was filed: the WP made the seat-per-engine question conditional on a list that
+    shows the drop, and none does.
+  - Next: none. If a list ever shows an engine's rank 1 cut by the cap, file it as a new issue
+    with that list. Task 2 of this WP is the measurement to start from.
 
 - **2026-11-05** — created, from the 2026-11-05 issue triage (issue #1375). Checked against the tree at `541f0daf7`: read the seam above, and did not re-run the list, whose cell is not in the tree; no open WP owns it: WP-1924 closes without it in PR #1373, WP-2110 fences it, and WP-2078 is about lines the host does not own. Next: the re-run, which may close this.
