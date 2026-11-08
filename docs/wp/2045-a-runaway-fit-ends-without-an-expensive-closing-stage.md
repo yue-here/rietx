@@ -1,9 +1,8 @@
 # WP-2045 — A runaway fit ends without an expensive closing stage
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — built and measured, merged as PR #1161 on 2026-10-25; the four audit rows re-approved on cost-only grounds (2026-11-01), their net saving measured on today's schedule (1.06-1.58×, 2026-11-02); open for a nightly `full` job that completes on `main`, red every night since 2026-10-24 for reasons WP-2036 owns
+Milestone: unscheduled · Status: ✅ 2026-11-06 — the fix shipped in #1161; the nightly `full` job completed green on `main` twice on 2026-11-04, and the four audit rows no longer call LaB6's tolerance row an xfail
 Track: A long run is not one fit
 Depends on: —
-Priority: P2 2026-11-02 — the fix shipped to `main` in #1161; what stays open is one nightly reading, and the `full` job's other failures are WP-2036's
 
 ## Goal
 
@@ -263,10 +262,6 @@ climb to the 512 cap, and each new count misses the `leggauss` cache
 `chained_all`-shaped chain in the same `qpa-sample1` group. Both chains cost
 1 h 17 min on that machine, so the nightly's 150-minute limit counts both.
 
-### Inherited
-
-- **From WP-2036 (2026-10-25): the first nightly after #1161 is in, and it is this WP's last acceptance line.** Run 40184228951 on `deff4c301`: the Linux `full` job completed in 2:05:47 (4 failed / 12 157 passed / 218 skipped / 41 xfailed), and `test_acceptance_sequential.py` is absent from the 25 slowest rows. Two of the four red rows moved with #1161 on Linux and were reproduced on an arm64 Mac by 1e-14 nudges. (a) The planted series' blank frame now sometimes accepts its warm rung and refines zero shift and U..Y against noise, which flags a zero-shift step at 86→87: filed as WP-2049. (b) The alarm pin this WP re-wrote on the Mac reads +0.75 warnings per result on Linux: all six extra are brucite's `HIGH_CORRELATION` against a flat triple (`gauss_size`, `gauss_strain`, `w`, esds about 1124), a count rounding moves from 35 to 42, filed as WP-2050. Neither is a reason to revisit option 5. The pin cannot be re-written to hold on both platforms until WP-2050 lands.
-
 ## Non-goals
 
 - Restoring the 0.2 ceilings, or any limit B9 removed. That was ruled.
@@ -334,6 +329,146 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
 `stage_start`/`stage_end` events.
 
 ## Handover log
+
+- **2026-11-06** — ghostshift runner, closing entry on PR #1440. This WP closes. Its last
+  acceptance line was a nightly `full` job that completes on `main`, and two did on
+  2026-11-04, both green. A runaway warm fit in a series no longer hands the closing stage
+  an answer that costs an hour to polish, and the nightly finishes again. The 2026-11-05
+  nightly failed one row, and that row has nothing to do with this WP's fix.
+
+  *Measured* (GitHub's Linux runner, `[dev,jax]`, read from the job logs).
+  - Run 41837816600 (scheduled, `ba3719f06`): `full` job 14 815 passed, 252 skipped,
+    53 xfailed in 1:35:41. That is inside the 150-minute limit this WP's goal named,
+    which WP-2036 has since raised to 300.
+  - Run 41874118202 (manual dispatch, `b1741da64`): 14 839 passed, 252 skipped,
+    53 xfailed in 2:47:18.
+  - In both, `test_acceptance_sequential.py` is absent from the 25 slowest rows.
+
+  *The 2026-11-05 failure, and why it does not hold this WP open.* Run 42037632923 on
+  `d4839e02e` completed its `full` job in 1:46:25 with 1 failed, 14 933 passed. The one
+  failure is `test_acceptance_wavelength.py::test_the_neutron_widths_leave_one_esd_at_every_start`,
+  a pinned esd that moved from 0.0102922 to 0.0103546. #1391 (WP-1944) moved it by making
+  extinction opt-in, as WP-2036's `### Inherited` bisects. The job completed, so this WP's
+  condition held that night too. WP-1944's `8aa2a2f0f` moved the pins on `main` the same day.
+
+  *Done.* Item (3) of the 2026-11-02 entry. The four `_audit.py` rows for the intermediate
+  tolerance (`INTERMEDIATE_FTOL`, `PlanSpec:intermediate_ftol`, `StageSpec:ftol`,
+  `StageResult.ftol`) said SRM 660c "fails" at 8.82 esd, "an xfail made non-strict". Since
+  WP-2012 held H/L on that protocol (`9ecd68a36`, 2026-11-03), the LaB6 tolerance row has
+  no xfail mark and passes the 0.1-esd bar. The evidence now says the row read 8.82 esd and
+  passes since WP-2012. Tier, value, grounds and approval date are unchanged.
+  `tests.audit_delta` reports 4 changed and 0 new at `unaudited`.
+
+  *Deliberately not generalised.* The `INTERMEDIATE_FTOL` comment in `schemas/plan.py`, the
+  grounds of the four rows and the manual's "Cost of the loose schedule" table still quote
+  LaB6's 8.82 esd. Each quotes probe 7's dated run of 2026-11-02, so each stays true as a
+  record. No one has re-measured LaB6's shift with H/L held. That would be a probe-7 rerun
+  of one protocol.
+
+  *Closed and moved.* The `### Inherited` section is deleted. Its two red rows are WP-2049
+  and WP-2050, both closed. The `Priority:` line is deleted. The narrative is in
+  `docs/milestones/v1.12.md`. WP-2036's `### Inherited` notes that its dependency on this WP
+  is met.
+
+  *Generality.* The `generality-review` judge read the four changed rows. Its
+  report, unedited:
+
+  **rietx.schemas.plan.INTERMEDIATE_FTOL**
+
+  **holds.** The case for the loose 1e-6 tolerance is the stronger one, and the edit removes a stale clause without overstating what replaced it.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | Unchanged by this edit. It is the stopping tolerance for every stage except the last declared one and the closing stage (row value 1e-06). | Same. Only the evidence text moved. | holds |
+  | 2. Ambiguity kind | This constant row carries no `ambiguity` field. Its twins at rows 2 and 3 say 1. | Kind 1: a refiner could reasonably stop intermediate stages at 1e-9 instead. The field is missing here, but that predates this edit. | holds (not this change's) |
+  | 3. Case against acting | Old text: "fails on SRM 660c, 8.82 esd … an xfail made non-strict". New text: "read 8.82 esd on axial_sl, its mirrored S/L and H/L minima (WP-2012), and passes since WP-2012 held H/L on that protocol" (`_audit.py` l.4004-4006). `axial_sl` is LaB6's axial-divergence S/L ratio. | I checked `tests/test_staged_start_invariance.py`. At l.193 `test_the_intermediate_tolerance_does_not_change_the_answer` is parametrised over `["fap","cpd1a","nac","lab6"]` with no xfail mark. The comment at l.189-192 and the docstring table at l.31 ("≤ 0.1, passes") agree. The 8.82 was a labelling flip between two mirror-image answers, not a different answer: compared in a fixed order, the two arms differed by 0.0068 esd or less over 49 nudged start pairs (docstring l.40-45). Against the loose tolerance: none found. | holds |
+  | 4. Case for acting | Grounds (unchanged): "Cost only (ruled 2026-11-01) … 1.06-1.58x fewer evaluations … within 0.0004 plain esd" (l.4014-4024). | The new text is consistent with the grounds, which already called the 8.82 "the S/L and H/L mirror, not an accuracy loss". | holds |
+  | 5. Tier and source | Tier 3, kept on the maintainer's cost-only ruling (2026-11-01, upheld 2026-11-02 per the WP's 2026-11-03 entry). | Unchanged. No tier-2 claim is made. Not applicable: `invariant`. | holds |
+  | 6. Dataset families | FAP, cpd-1a, 11-BM NAC, SRM 660c, plus cpd-1a with an absent zircon declared. | Four unrelated families: the GSAS-II tutorial lab pattern (fluorapatite), the IUCr CPD round robin (cpd-1a, three phases), the APS 11-BM synchrotron (NAC), and NIST LaB6. All four are development fixtures. The reference is the same fit with every stage at 1e-9, so this is a self-consistency check. It verifies the code and validates nothing about accuracy. That suffices for a cost-only setting. One gap: LaB6 is quoted as "passes" with no number, unlike the other four readings. | holds; minor gap |
+  | 7. Record field | — | `StageResult.ftol` (row 4 below). | holds |
+
+  What would change the verdict: a nightly or local run in which the `lab6` case of that test goes red. A LaB6 reading quoted as a number would close the gap in row 6.
+
+  **rietx.schemas.plan.PlanSpec:intermediate_ftol**
+
+  **holds.** The text is identical to item 1, and so are the findings. This is the plan-level default for the same 1e-6.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | It is the default intermediate tolerance a plan carries (`_audit.py` l.4452). | Unchanged. | holds |
+  | 2. Ambiguity kind | `ambiguity=1` | Agrees. | holds |
+  | 3. Case against acting | Same edit, l.4457-4459. | As item 1: the test carries no xfail mark (l.193). Against: none found. | holds |
+  | 4. Case for acting | Cost-only grounds, unchanged. | As item 1. | holds |
+  | 5. Tier and source | Tier 3, cost-only ruling. | Unchanged. | holds |
+  | 6. Dataset families | Same four. | As item 1, including the unquantified LaB6 "passes". | holds |
+  | 7. Record field | — | `StageResult.ftol`. | holds |
+
+  What would change the verdict: the same as item 1.
+
+  **rietx.schemas.plan.StageSpec:ftol**
+
+  **holds.** The edit is identical. The default `None` means a stage takes its tolerance from the plan's schedule.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | Default `None` (l.4522): the stage inherits the schedule from `stage_ftols()`. | Unchanged. | holds |
+  | 2. Ambiguity kind | `ambiguity=1` | Agrees. | holds |
+  | 3. Case against acting | Same edit, l.4527-4529. | As item 1. Against: none found. | holds |
+  | 4. Case for acting | Cost-only grounds, unchanged. | As item 1. | holds |
+  | 5. Tier and source | Tier 3. | Unchanged. | holds |
+  | 6. Dataset families | Same four. | As item 1. | holds |
+  | 7. Record field | — | `StageResult.ftol`. | holds |
+
+  What would change the verdict: the same as item 1.
+
+  **rietx.schemas.results.StageResult.ftol**
+
+  **holds.** This is the field that records the action, and its evidence text changed exactly as in the other three rows.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | It reports the tolerance each stage actually ran at (`_audit.py` l.1623, kind `action`). | Unchanged. | holds |
+  | 2. Ambiguity kind | `ambiguity=1` | Agrees with the action it reports. | holds |
+  | 3. Case against acting | Same edit, l.1628-1630. | As item 1. Against: none found. | holds |
+  | 4. Case for acting | Cost-only grounds, unchanged. | As item 1. | holds |
+  | 5. Tier and source | Tier 3. | Unchanged. | holds |
+  | 6. Dataset families | Same four. | As item 1. | holds |
+  | 7. Record field | It is the record field. | It is. | holds |
+
+  What would change the verdict: the same as item 1.
+
+  Common to all four rows:
+  - I did not check the two nightly runs the dispatch cites (41837816600 and 41874118202), because I run nothing. The "passes" claim rests on the test file as it stands in this worktree.
+  - Nearby but outside the items: the test docstring at `tests/test_staged_start_invariance.py` l.37 still says "the tolerance row reads … 8.82". In context that sentence is the 2026-10-25 history, and l.24-31 give the current reading.
+
+  *Author's answer to the row-6 gap.* LaB6's "passes" is the test's bar of 0.1 plain esd.
+  No number was measured in this close, which ran no fit. The rerun is the one named under
+  *Deliberately not generalised*.
+
+  *Verified.* The branch changes prose and the text of four evidence strings in
+  `_audit.py`. `/code-review` did not run: no code path changed, and the judge above read
+  the four strings. On macOS arm64, worktree venv `[dev]`, `test_docs_consistency.py` and
+  `test_audit_table.py` together: 48 passed. Ruff is clean, `tests.reader_output` exits 0,
+  and `session_start.py` flags neither WP. No count can move, so neither the fast nor the
+  full selection ran. `main` had not moved from `0babe783f`, where the branch forked.
+
+  **Next.** None here.
+
+- **2026-11-03** — the maintainer ruled on 2026-11-02 that the cost-only
+  ruling on `intermediate_ftol` stands on the re-measured saving. The loose
+  intermediate tolerance stays the default because it is cheaper, and the
+  saving that justifies it is today's: 1.06-1.58× fewer evaluations on FAP,
+  11-BM NAC and cpd-1a, at 0.0004 plain esd or less, and 3.9× in evaluations
+  (2.2× in seconds) on cpd-1a with an absent zircon. What a warm series
+  answers on this schedule is still unmeasured, and the ruling does not
+  rest on it. This answers item (1) of the 2026-11-02 entry below. Recorded
+  in PR #1369, a ghostshift runner's branch that carries the 2026-11-02
+  rulings for four WPs; nothing in this WP's code or rows moved.
+
+  *Next.* Item (3) below is open now: #1309 merged on 2026-11-02, so the
+  "non-strict xfail" clause can leave the four `_audit.py` rows. This branch
+  left them alone, its brief being the ruling's record only. Item (4): the
+  first nightly `full` job that completes on `main` closes this WP.
 
 - **2026-11-02** — the three places that still quoted the intermediate
   tolerance's old saving now quote probe 7's. The root `CLAUDE.md`

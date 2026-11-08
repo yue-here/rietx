@@ -1,6 +1,6 @@
 """Common schema primitives: the refinable :class:`Parameter` and provenance.
 
-The ``Parameter`` model (``value``/``vary``/``min``/``max``/``expr``) follows the
+The ``Parameter`` model (``value``/``vary``/``min``/``max``) follows the
 design popularised by *lmfit* (BSD-3-Clause); no lmfit code is used, only the
 interface convention.  See ``ATTRIBUTION.md``.
 """
@@ -8,10 +8,12 @@ interface convention.  See ``ATTRIBUTION.md``.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Annotated, ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, model_validator
 
 from .._nearmiss import did_you_mean
 
@@ -328,7 +330,7 @@ from .._nearmiss import did_you_mean
 #: header says 0.35 or later is never walked.
 #: 0.35 → 0.36 (WP-1469, issue #481): ``SeriesEntry.rwp_fence`` — the Rwp
 #: limit the chain's fence set at the pattern, so the verdict on a kept
-#: attempt still above it (``SEQUENTIAL_RWP_OUTLIER``) is read off the entry —
+#: attempt still above it (``SEQUENTIAL_RWP_OUTLIER``, gone in 0.60) is read off the entry —
 #: and ``SeriesResult.discontinuities`` (``list[SeriesStep]``), the pair each
 #: ``SEQUENTIAL_DISCONTINUITY`` names in prose.  Both additive and defaulted to
 #: ``None``, the rule of 0.25 → 0.26: a series from before this may have had
@@ -583,6 +585,25 @@ from .._nearmiss import did_you_mean
 #: cannot be rebuilt as every step, so a document's ``discontinuities`` key is
 #: dropped at read (``SeriesResult``'s ``mode="before"`` validator) and its
 #: ``steps`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2003, C1): ``SeriesEntry.rwp_fence`` replaced by
+#: ``SeriesEntry.rwp_over_median``, the kept attempt's Rwp over the accepted
+#: median with no threshold.  Not additive: the factor that scaled the old
+#: limit is not on the entry, so an entry's ``rwp_fence`` key is dropped at
+#: read (``SeriesEntry``'s ``mode="before"`` validator) and its
+#: ``rwp_over_median`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2003, C6): ``SeriesResult.code_counts``, a
+#: ``SeriesCodeCount`` per per-pattern code and path with its count, the
+#: series length and the worst level.  Additive and defaulted to ``None``,
+#: "not recorded", the 0.25 → 0.26 rule; ``SequentialRefinement.fit`` writes
+#: it on every series.  ``SEQUENTIAL_PERSISTENT_FINDING``, the threshold it
+#: replaces, is gone, so a document carrying one still reads.
+#: Also in 0.60 (WP-2003, C5): ``SeriesResult.direction_gaps``, a
+#: ``DirectionGap`` per path and pattern under ``direction="both"``.  Additive
+#: and defaulted to ``None``, "not compared"; ``SequentialRefinement.fit``
+#: writes it whenever the two chains were compared.
+#: ``SEQUENTIAL_PATH_DEPENDENT`` is gone, and ``SEQUENTIAL_PATH_CHECK_NOT_RUN``
+#: takes the ``warning`` half of ``SEQUENTIAL_PATH_CHECK_INCOMPLETE``; a stored
+#: INCOMPLETE at ``warning`` still reads as not run.
 #: Also in 0.60 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
 #: formula and temperature read, and ``PeakList.instrument_undeclared``,
 #: the instrument blocks the picker found at default on a lab source.  Additive
@@ -629,7 +650,60 @@ from .._nearmiss import did_you_mean
 #: its own frozen compile, the number ``stage_end`` already emitted.  Additive
 #: and defaulted to ``None``, "a result stored before the field", the 0.25 →
 #: 0.26 rule; all three runners write it on every stage.
-SCHEMA_VERSION = "0.60"
+#: Also in 0.60 (WP-1334): ``StageResult.termination``, which test ended the
+#: solve, the token ``stage_end`` already emitted; ``slow_descent`` is the LM
+#: driver's new one (``optimize.lm.SLOW_DESCENT_ESD``).  Additive and
+#: defaulted to ``None``, the same rule.
+#: Also in 0.60 (WP-1991, Yue's ruling of 2026-11-01): a ``SeriesResult``'s
+#: paths read one series numbering, matched by phase name and atom label
+#: (``SeriesResult.phase_names``/``.atom_labels``), and
+#: ``SeriesEntry.pattern_paths`` names each pattern's own path where it
+#: differs.  Additive and defaulted to ``None``: a document written before the
+#: fields stores each pattern's own paths, and nothing stored the names to
+#: translate them, so it opens as written.
+#: Also in 0.60 (WP-2013): ``HumpComponent.position`` is required of a caller,
+#: where it defaulted to 0.0.  A stored document that omits it still opens, at
+#: that 0.0, through the readers ``migrate.STORED_DOCUMENT_READ_POINTS`` names.
+#: 0.60 → 0.61 (WP-1944): ``Phase.extinction`` is ``Parameter | None`` and
+#: defaults to ``None``, "not declared", where it defaulted to a ``Parameter``
+#: at 0.  ``None`` has no table entry, so no plan can free it.  A file written
+#: before 0.61 opens unchanged: its stored block reads as a declaration, and
+#: the structural plan's extinction stage still frees it.  A phase that
+#: declares none now stores ``null``, which 1.11.0 refuses:
+#: ``Phase`` raises a ``ValidationError``, and ``Project.open`` stops at
+#: "malformed history record".  So a structure or a ``.rex`` project written
+#: here does not open there.
+#: Also in 0.61 (WP-2030 part 3): ``IndexingControls.formula`` and
+#: ``.temperature``, the specimen's formula a project stores for its indexing
+#: run.  Additive and defaulted to ``None``; an older build refuses a document
+#: carrying either key.
+#: Also in 0.61 (WP-1542): ``StageSpec.lebail_tol``, ``NodeAction.lebail_tol``,
+#: ``StageResult.lebail_cycles_run`` and ``StageResult.lebail_settled``, all
+#: additive.  ``NodeAction``'s two Le Bail defaults stay at three cycles and no
+#: test, so a stored node reads as what it ran, while ``StageSpec`` moved to
+#: 25 000 and 1e-7.  A stored plan naming ``lebail_cycles: 3`` reads that as a
+#: cap: it runs the same three cycles and reports ``LEBAIL_CYCLES_AT_CAP``.
+#: Also in 0.61 (WP-1964, the maintainer's rulings of 2026-11-05):
+#: ``ParametricEquation.basis`` gains ``"expression"``, with
+#: ``ParametricEquation.expression``, the formula's text, and
+#: ``ParametricEquation.target`` may be ``None``, an intermediate a later
+#: formula names.  Additive and defaulted, the 0.25 → 0.26 rule.  And
+#: ``Parameter.expr``, which only ever held ``None``, leaves the schema: a
+#: stored ``"expr": null`` is dropped at read (``Parameter``'s ``mode="before"``
+#: validator), so every file written before opens unchanged.  A parameter
+#: written here carries no ``expr`` key, which 1.11 reads as ``None``; a
+#: result or project declaring a formula does not open in 1.11 or earlier.
+#: ``PROJECT_FORMAT_VERSION`` does not move: the ``.rex`` layout is unchanged.
+#: Also in 0.61 (WP-2076): ``ExtinctionCandidate.tested_hkl`` and
+#: ``.tested_two_theta``, the testable forbidden positions a class was scored
+#: on.  Additive and defaulted to empty, the 0.25 → 0.26 rule; an older build
+#: refuses a screen carrying either key.
+#: Also in 0.61 (WP-2118): ``TieSpec.expression``, a user tie declared as a
+#: formula over named variables (``Refinement.tie(path, expression=...)``).
+#: Additive and defaulted to ``None``, a linear tie, the 0.25 → 0.26 rule; so
+#: every stored tie opens as the linear tie it was.  An older build refuses a
+#: document carrying the key.
+SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
@@ -779,21 +853,6 @@ class Parameter(Base):
         value in these units (WP-1938).  A ``transform`` written before
         schema 0.46 is folded into them on read
         (:func:`legacy_transform_bounds`).
-    expr:
-        Reserved for nonlinear constraint expressions; **not implemented** —
-        must be ``None``. The design (a tiny AST-whitelisted DSL emitted as
-        backend ops, because asteval cannot run on autodiff tracers) is in
-        DESIGN.md's "Parameter system"; linear/symmetry ties do not need it and
-        go through the affine constraint block instead.
-
-        **Kept deliberately** (WP-1110 item 5, decided 2026-08-21).  A declared
-        field that can only ever raise is the shape WP-1076 removes, and this
-        one was costed for removal: ``model_dump`` writes ``"expr": null`` into
-        every persisted parameter, so under ``extra="forbid"`` it needs a
-        ``mode="before"`` migration and ``SCHEMA_VERSION`` 0.2 → 0.3.  It stays
-        because it is the carrier for the nonlinear half of WP-1119's named
-        variables, whose linear half the affine block above already computes —
-        removing it now would buy one bump and cost another to undo.
     stderr:
         Estimated standard deviation, filled in by the refinement.
     """
@@ -802,9 +861,30 @@ class Parameter(Base):
     vary: bool = False
     min: float = -math.inf
     max: float = math.inf
-    expr: str | None = None
     unit: str | None = None
     stderr: float | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_expr(cls, data: object) -> object:
+        """Read a stored ``"expr": null`` as nothing (WP-1964).
+
+        The field left the schema at 0.61.  It only ever held ``None``, any
+        other value having raised, and every parameter written before carries
+        that ``null``, so a file opens unchanged.  A formula is declared where
+        it is evaluated: ``ParametricEquation(basis="expression")`` in a joint
+        fit, never a field on the parameter it sets.
+        """
+        if not isinstance(data, dict) or "expr" not in data:
+            return data
+        if data["expr"] is not None:
+            raise ValueError(
+                "Parameter.expr was removed at schema 0.61 and only ever held None: "
+                "a formula is declared as rx.ParametricEquation(basis='expression', "
+                "expression=...) in a joint fit")
+        data = dict(data)
+        del data["expr"]
+        return data
 
     @model_validator(mode="before")
     @classmethod
@@ -845,14 +925,6 @@ class Parameter(Base):
             raise ValueError(
                 f"value {self.value} lies outside bounds [{self.min}, {self.max}]"
             )
-        if self.expr is not None:
-            raise ValueError(
-                "Parameter.expr (nonlinear constraint expressions) is not "
-                "implemented; set expr=None.  Symmetry and linear ties do not "
-                "need it — they are applied as the affine constraint block in "
-                "params/vector.py (crystal-system cell ties, Wyckoff coordinate "
-                "DOFs, site-symmetry ADP patterns)."
-            )
         return self
 
     @classmethod
@@ -892,6 +964,21 @@ def legacy_transform_bounds(kind: str, lo: float, hi: float) -> tuple[float, flo
 #: only trace an omission left once it was serialized.
 BARE_PARAMETER_ATTRS: dict[str, object] = {
     "min": -math.inf, "max": math.inf, "unit": None}
+
+
+#: The pydantic validation context a reader of a **stored document** passes,
+#: at each reader :data:`rietx.schemas.migrate.STORED_DOCUMENT_READ_POINTS`
+#: names.  A field a release made required is filled there with the
+#: placeholder its old default held, and raises everywhere else: old files
+#: open, old code does not (``HumpComponent.position``, WP-2013).  Read only
+#: through :func:`reading_stored_document`.
+STORED_DOCUMENT = MappingProxyType({"stored_document": True})
+
+
+def reading_stored_document(info) -> bool:
+    """Whether this validation is a stored document's read (:data:`STORED_DOCUMENT`)."""
+    context = info.context
+    return isinstance(context, Mapping) and bool(context.get("stored_document"))
 
 
 def declared_fills(declared: Parameter, present) -> dict[str, object]:
@@ -941,15 +1028,35 @@ class _InheritsDeclaredDefaults(Base):
     reference, and ``Base``'s ``validate_assignment=True`` meant the
     ``setattr`` that filled the gaps wrote to the caller's object and grew
     *its own* ``model_fields_set`` — so one ``Parameter`` reused for two fields
-    leaked the first field's range into the second.  ``data`` is copied once
-    for the same reason (``model_validate`` may be handed the caller's dict).
+    leaked the first field's range into the second.  A dict is read and never
+    written, for the same reason (``model_validate`` may be handed the
+    caller's dict).
 
-    **The replacement is a ``Parameter``, never the merged dict**:
-    ``validate_assignment=True`` re-runs this validator on every assignment to
-    an already-built model, with ``data`` built from its current field values,
-    so this branch fires for fields the assignment never touched; pydantic
-    does not re-validate those, so a dict placed here would reach the model as
-    a dict (measured on ``Atom`` after ``atom.aniso = AnisoU(...)``).
+    **Construction and assignment each have a seam, and both call
+    :meth:`_inherit_declared`** (WP-2088).  Construction's is the
+    ``model_validator(mode="before")``.  Assignment's is ``__setattr__``,
+    because a model validator's output for the assigned field never lands:
+    pydantic validates that field from the value it was handed.  So until
+    WP-2088, ``phase.lor_size = Parameter(value=0.01, vary=True)`` landed at
+    ``(-inf, inf)`` with no unit, while the same ``Parameter`` handed to the
+    constructor inherited the range.  Measured 2026-11-07, 70 of the 72
+    declared fields lost their range on assignment.  A
+    ``field_validator("*", mode="before")`` would be one seam for both, but
+    pydantic refuses a before validator on a discriminator field, and
+    ``Source.kind`` is one.
+
+    **On assignment the model validator returns ``data`` untouched.**
+    pydantic re-runs it with ``data`` built from the model's current field
+    values, and it does not re-validate the fields the assignment never
+    touched, so whatever the validator returns for them lands as it is.  A
+    dict landed as a dict (measured on ``Atom`` after
+    ``atom.aniso = AnisoU(...)``).  A fresh ``Parameter`` replaced every
+    default whose declaration leaves ``max`` unset, so after
+    ``phase.lor_size = ...`` the object a caller held as ``phase.gauss_size``
+    was no longer the model's, and a change made to it reached nothing
+    (WP-2088's code review).  ``info.field_name`` names the assigned field on
+    that pass and is ``None`` on construction, which is how the validator
+    tells the two apart.
 
     Detected with ``model_fields_set`` (for a raw dict, its keys) rather than
     by comparing with the bare defaults, since an explicit ``min=-inf`` is
@@ -963,59 +1070,92 @@ class _InheritsDeclaredDefaults(Base):
     _declared_since: ClassVar[str] = "0.35"
     #: A class-specific way out, appended to the out-of-range refusal.
     _declared_escape: ClassVar[str] = ""
+    #: An opt-in ``Parameter | None`` field has no default to carry its range,
+    #: so it names one here (``Phase.extinction``, WP-1944): field name → a
+    #: factory for the ``Parameter`` whose range and unit a declaration inherits.
+    _declared_optional: ClassVar[dict] = {}
+
+    @classmethod
+    def _declared_default(cls, name: str):
+        """The factory whose ``Parameter`` carries field ``name``'s declared
+        range, or ``None`` where the field declares none.  One answer for
+        construction and for the history reader's repair."""
+        info = cls.model_fields[name]
+        if info.annotation is Parameter and info.default_factory is not None:
+            return info.default_factory
+        return cls._declared_optional.get(name)
 
     @model_validator(mode="before")
     @classmethod
-    def _inherit_declared_bounds(cls, data: object) -> object:
-        if not isinstance(data, dict):
-            return data
-        data = dict(data)
-        for name, info in cls.model_fields.items():
-            if info.annotation is not Parameter or info.default_factory is None:
-                continue
-            if name not in data:
-                continue  # omitted: default_factory already carries the range
-            raw = data[name]
-            if isinstance(raw, Parameter):
-                present, base = raw.model_fields_set, raw.model_dump()
-            elif isinstance(raw, dict):
-                present, base = raw.keys(), raw
-            else:
-                continue  # not a shape that carries attribute presence
-            if BARE_PARAMETER_ATTRS.keys() <= set(present):
-                continue  # every attribute stated (every reload): nothing to inherit
-            # an attribute left unset replaces the caller's object even where
-            # the declared value is the one it holds anyway: one Parameter passed
-            # to every atom's ``occ`` must become one Parameter per atom, or the
-            # write-back leaves the last site's value in all of them (PR #206's
-            # behaviour, kept).  Sharing *on purpose* states every attribute —
-            # ``Harmonic.weight``'s default does, being its line's by reference
-            fills = declared_fills(info.default_factory(), set(present))
-            if not fills:
-                continue
+    def _inherit_declared_bounds(cls, data: object, info: ValidationInfo) -> object:
+        """Construction's half of the seam: each field handed in inherits."""
+        if not isinstance(data, dict) or info.field_name is not None:
+            return data  # an assignment's pass: ``__setattr__`` has filled it
+        return {name: cls._inherit_declared(name, raw) if name in cls.model_fields
+                else raw for name, raw in data.items()}
+
+    def __setattr__(self, name: str, value: object) -> None:
+        """Assignment's half of the seam (WP-2088): the value inherits first."""
+        cls = type(self)
+        if name in cls.model_fields:
             try:
-                data[name] = Parameter(**{**base, **fills})
+                value = cls._inherit_declared(name, value)
+            except ValidationError:
+                pass  # broken without the fills too: validating the value raises it
             except ValueError as exc:
-                try:
-                    Parameter(**base)
-                except ValueError:
-                    raise exc from None  # broken without the fills too: not ours to name
-                value = base.get("value")
-                # a JSON-mode dict spells an infinite bound "-Infinity"
-                lo = float(fills.get("min", base.get("min", -math.inf)))
-                hi = float(fills.get("max", base.get("max", math.inf)))
-                what = (f"bounds [{lo}, {hi}] are empty: one is yours and the other "
-                        f"is the one this field declares" if lo > hi else
-                        f"value {value!r} lies outside bounds [{lo}, {hi}], the "
-                        f"range this field declares")
-                raise ValueError(
-                    f"{cls.__name__}.{name}: {what}, which a "
-                    f"Parameter leaving min or max unset inherits (issue #204). "
-                    f"State the range you mean on the Parameter itself, e.g. "
-                    f"Parameter(value={value!r}, min=..., max=...)"
-                    + (f", or {cls._declared_escape}" if cls._declared_escape else "")
-                ) from exc
-        return data
+                raise ValidationError.from_exception_data(cls.__name__, [{
+                    "type": "value_error", "loc": (name,), "input": value,
+                    "ctx": {"error": exc}}]) from None
+        super().__setattr__(name, value)
+
+    @classmethod
+    def _inherit_declared(cls, name: str, raw: object) -> object:
+        """``raw``, handed to field ``name``, with what it left out of the
+        field's declared range and unit filled in."""
+        factory = cls._declared_default(name)
+        if factory is None:
+            return raw
+        if isinstance(raw, Parameter):
+            present, base = raw.model_fields_set, raw.model_dump()
+        elif isinstance(raw, dict):
+            present, base = raw.keys(), raw
+        else:
+            return raw  # not a shape that carries attribute presence
+        if BARE_PARAMETER_ATTRS.keys() <= set(present):
+            return raw  # every attribute stated (every reload): nothing to inherit
+        # an attribute left unset replaces the caller's object even where
+        # the declared value is the one it holds anyway: one Parameter passed
+        # to every atom's ``occ`` must become one Parameter per atom, or the
+        # write-back leaves the last site's value in all of them (PR #206's
+        # behaviour, kept).  Sharing *on purpose* states every attribute —
+        # ``Harmonic.weight``'s default does, being its line's by reference
+        fills = declared_fills(factory(), set(present))
+        # ``model_validate``, not ``Parameter(**...)``: a dict with a non-string
+        # key raises pydantic's error rather than a bare TypeError
+        try:
+            return Parameter.model_validate({**base, **fills})
+        except ValidationError as exc:
+            try:
+                Parameter.model_validate(base)
+            except ValidationError as own:
+                # broken without the fills too: not ours to name, and the
+                # caller's own error quotes the input they wrote, not ours
+                raise own from None
+            value = base.get("value")
+            # a JSON-mode dict spells an infinite bound "-Infinity"
+            lo = float(fills.get("min", base.get("min", -math.inf)))
+            hi = float(fills.get("max", base.get("max", math.inf)))
+            what = (f"bounds [{lo}, {hi}] are empty: one is yours and the other "
+                    f"is the one this field declares" if lo > hi else
+                    f"value {value!r} lies outside bounds [{lo}, {hi}], the "
+                    f"range this field declares")
+            raise ValueError(
+                f"{cls.__name__}.{name}: {what}, which a "
+                f"Parameter leaving min or max unset inherits (issue #204). "
+                f"State the range you mean on the Parameter itself, e.g. "
+                f"Parameter(value={value!r}, min=..., max=...)"
+                + (f", or {cls._declared_escape}" if cls._declared_escape else "")
+            ) from exc
 
 
 Fraction = Annotated[float, Field(ge=0.0, le=1.0)]

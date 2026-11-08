@@ -13,7 +13,7 @@ description: >-
 license: MIT
 compatibility: Requires the rietx Python package (pip install rietx) and Python 3.11+. Works offline — this file and its references ship in the wheel; the user manual it names is hosted at https://rietx.org.
 metadata:
-  version: "1.11.0.dev0"
+  version: "1.12.0.dev0"
   homepage: "https://rietx.org"
 ---
 
@@ -70,8 +70,8 @@ Free parameters in groups, cumulatively, each group converged before the next (M
 | Plan | When |
 |---|---|
 | `mccusker_default` | a known structure's first fit, and the reset when one goes wrong: scale, background, zero, cell, widths |
-| `mccusker_structural` | the same, then coordinates, Biso and ADPs, PO, extinction, roughness. The worked default (§10) |
-| `lab_bragg_brentano` | zero and sample displacement free together (rule 6), with Kα2 ratio and axial divergence. Only where something outside the fit pins one of the two |
+| `mccusker_structural` | the same, then coordinates, Biso and ADPs, declared PO, extinction, roughness. The worked default (§10) |
+| `lab_bragg_brentano` | zero and sample displacement free together (rule 6), with Kα2 ratio and axial S/L. Only where something outside the fit pins one of the two |
 | `lab_calibrate` | a standard, its certified cell held; then `rx.save_instrument_profile` |
 | `lab_sample_refine` | a specimen after `rx.load_instrument_profile`, the only plan whose size and strain are the sample's |
 | `profile_only` | cell and widths with no structural model (Le Bail) |
@@ -136,7 +136,7 @@ Non-ideal data moves no bar. It changes which rows decide. Declare the deliverab
 |---|---|---|
 | Phase ID | `report.unmatched` (`unmatched_obs`); `report.lebail_gap.ratio`, Rietveld Rwp over Le Bail Rwp: ≫ 1 means every line is indexed and the intensity model is what misfits | no strong unmatched observed peak, at any Rwp. `abstained_kind="resolution_limited"` does not block it |
 | QPA | `result.qpa.phases` (`weight_fraction`, `zmv`); `report.background` absorption first, then absorption geometry, then impossible values. A large gap ratio means wrong fractions | fractions stable under a change of background flexibility, `worst_absorption` under its threshold, no unresolved scale or ZMV code, no trace-phase `ref.profile_fraction` finding. Never "Rwp stopped falling" |
-| Trajectory | `SEQUENTIAL_PATH_DEPENDENT`, `SEQUENTIAL_PERSISTENT_FINDING`, `series.steps`, `PHASE_UNCONSTRAINED`; 2θ anchor, precision/accuracy split, QPA check at every point (§9b) | each quoted number names the one thing that would make it wrong, and that thing is checked |
+| Trajectory | `series.direction_gaps`, `series.code_counts`, `series.steps`, `PHASE_UNCONSTRAINED`; 2θ anchor, precision/accuracy split, QPA check at every point (§9b) | each quoted number names the one thing that would make it wrong, and that thing is checked |
 | Microstructure | `result.microstructure`: size (Å), Δd/d, `size_agreement`; the report's `separable`; `SIZE_UNUSUALLY_SMALL`, `STRAIN_UNUSUALLY_LARGE`, `BOUND_HIT` | `separable` is not `False` and the readings agree. Quote the size as an order of magnitude with its `scherrer_k`. `False` asks for a wider 2θ range |
 | Structure | all of §4, plus `report.texture`, `report.strain`, restraint tension, ADP positive-definiteness, `report.identifiability.exchanges` | the three stop conditions (§10), with every `exchangeable` row swapped (rule 14) |
 | Cell | `report.identifiability.exchanges` with zero, displacement | exchanges settled (rule 14); an absolute only against a standard |

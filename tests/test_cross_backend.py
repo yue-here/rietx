@@ -104,6 +104,7 @@ from rietx.optimize.least_squares import (
     run_least_squares,
 )
 from rietx.params.vector import VAR_PREFIX, AffineTie, ParameterTable
+from rietx.refine import _pawley_seed_cycles
 from rietx.strategy.staged import Stage
 from tests.test_backend_shim import STATES
 from tests.test_schemas import make_lab6
@@ -418,6 +419,72 @@ def _state_families_variable():
     table.set_tie("phases.0.atoms.1.dof.0", AffineTie.identity(f"{VAR_PREFIX}D"))
     table.refresh_ties()
     for path in ("phases.0.cell.a", "instrument.background.c0"):
+        assert table.set_vary([path], True), path
+    table.apply_to_models(structure, ins)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
+def _state_expression():
+    """Two targets set by **expressions the user wrote** (WP-1964).
+
+    An expression block is a derived block whose map is a parsed tree, so it is
+    a new derivative path: the numpy column comes from the tree's own
+    forward-mode rules chained through ``local_jacobian``, and the traced
+    backends differentiate the same tree's evaluation.  Two shapes: the
+    Einstein cell edge, whose block also writes the cubic ``b`` and ``c``
+    (the followers it takes over from C), and a Debye Biso inside an ``if``,
+    whose dead branch carries a guarded logarithm.  Three variables are shared
+    between them, so a column reaches both blocks.
+    """
+    structure, ins, pattern = _lab_state()
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for name, value in (("zero_a", 4.155), ("grad", 0.02), ("theta", 150.0),
+                        ("b1", 0.6)):
+        table.add_parameter(f"{VAR_PREFIX}{name}", value, vary=True)
+    table.add_expression("phases.0.cell.a", "zero_a + grad/(exp(theta/T) - 1)",
+                         variables={n: f"{VAR_PREFIX}{n}"
+                                    for n in ("zero_a", "grad", "theta")},
+                         constants={"T": 300.0})
+    table.add_expression("phases.0.atoms.0.biso",
+                         "if(T > 0, b1*debye(theta/T), log(T))",
+                         variables={n: f"{VAR_PREFIX}{n}" for n in ("b1", "theta")},
+                         constants={"T": 300.0})
+    assert table.set_vary(["instrument.background.c0"], True)
+    table.apply_to_models(structure, ins)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
+    return model, table, {}
+
+
+def _state_tie_expression():
+    """A formula tie declared on a **single refinement** (WP-2118).
+
+    ``expression`` builds its blocks on a bare table; this row builds them the
+    way a caller does, through ``Refinement.tie(path, expression=...)``, so the
+    table is the one ``_apply_ties`` rebuilds: the linear ties first, then the
+    formula.  One variable is the source of a linear tie *and* an input of the
+    formula, as the maintainer's ruling of 2026-11-07 has a model parameter
+    read (tie it to a variable, name the variable), so its column reaches an
+    affine row and a derived row at once.  The second variable reaches the
+    formula alone, through a Debye function.
+    """
+    from rietx.refine import Refinement
+
+    structure, ins, pattern = _lab_state()
+    ref = Refinement(structure, ins)
+    ref.add_variable("B_La", 0.4, vary=True, min=0.0, max=25.0)
+    ref.add_variable("thD", 900.0, vary=True, min=100.0, max=3000.0)
+    ref.tie("phases.0.atoms.0.biso", "vars.B_La")
+    ref.tie("phases.0.atoms.1.biso",
+            expression="B_La * debye(thD / 300) + 1062.9 * 300 / thD^2")
+    table = ref._working_table()
+    table.set_vary(["*"], False)
+    for path in ("vars.*", "phases.0.cell.a", "instrument.background.c0"):
         assert table.set_vary([path], True), path
     table.apply_to_models(structure, ins)
     model = compile_model(structure, ins, pattern, mode="rietveld",
@@ -787,6 +854,32 @@ def _state_magnetic_angles_tied():
                     variables=[("PHI", 0.7), ("MU", 0.4)]), {})
 
 
+def _state_magnetic_angles_analytic():
+    """WP-1327's analytic moment branch with the angle columns claimed.
+
+    The reference of this config is ``_make_jacobian(..., moment_angles=True)``
+    (``MOMENT_ANGLE_CONFIGS``), so the angle columns every row meets are the
+    analytic ones, a derivative path ``magnetic_angles_tied`` (whose angles
+    the default dispatch declines) never reaches.  The shapes: site 0 free in
+    all three DOFs (modulus, polar, azimuth, n = 3); site 1's polar angle
+    following site 0's by an affine tie (−1, + 0.4), so one angle column
+    reaches two sites; the scale, a background term and the zero shift beside
+    them, the last the row's peak-chain column.  The traced rows decline by
+    name, as on every magnetic config.  ``test_moment_jacobian`` pins the
+    dispatched angle column to the exact oracle, which this row's central
+    differences are not.
+    """
+    from tests.test_moment_jacobian import ANY, M0, M1, _build, _ortho
+
+    return (*_build(_ortho([(2.0, 1.0, 0.7), (-1.0, 1.5, 0.4)], ANY),
+                    [f"{M0}.dof0", f"{M0}.dof1", f"{M0}.dof2",
+                     "phases.0.scale", "instrument.background.c0",
+                     "instrument.zero_shift"],
+                    ties=[(f"{M1}.dof1",
+                           AffineTie(terms=((f"{M0}.dof1", -1.0),),
+                                     const=0.4))]), {})
+
+
 def _state_satellites():
     """WP-1326: coordinate and ADP columns of a phase carrying a propagation vector.
 
@@ -1112,7 +1205,7 @@ def _state_extinction_strong():
 
     structure = make_aniso_rutile()
     structure.phases[0].scale.value = 1e-3
-    structure.phases[0].extinction.value = 30.0
+    structure.phases[0].extinction = 30.0
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.source.dispersion = None    # declined, not inherited
     ins.profile.w.value = 1e-2
@@ -1211,6 +1304,8 @@ CONFIGS = {"families": _state_families,
            "sharp_widths": _state_sharp_widths,
            "families_tied": _state_families_tied,
            "families_variable": _state_families_variable,
+           "expression": _state_expression,
+           "tie_expression": _state_tie_expression,
            "centroid_origin": _state_centroid_origin,
            "toy_body": _state_toy_body,
            "toy_planarity": _state_toy_planarity,
@@ -1221,6 +1316,7 @@ CONFIGS = {"families": _state_families,
            "magnetic": _state_magnetic,
            "magnetic_width": _state_magnetic_width,
            "magnetic_angles_tied": _state_magnetic_angles_tied,
+           "magnetic_angles_analytic": _state_magnetic_angles_analytic,
            "satellites": _state_satellites,
            "extinction_strong": _state_extinction_strong,
            "stephens_over_lor_strain": _state_stephens_over_lor_strain, **STATES}
@@ -1250,6 +1346,8 @@ CONFIG_PARAMS = [
     _config("sharp_widths"),
     _config("families_tied"),
     _config("families_variable"),
+    _config("expression"),
+    _config("tie_expression"),
     _config("centroid_origin"),
     _config("toy_body"),
     _config("toy_planarity"),
@@ -1260,6 +1358,7 @@ CONFIG_PARAMS = [
     _config("magnetic"),
     _config("magnetic_width"),
     _config("magnetic_angles_tied"),
+    _config("magnetic_angles_analytic"),
     _config("satellites"),
     _config("bodies"),
     _config("extinction_strong"),
@@ -1324,10 +1423,21 @@ def _kink_paths(model, table) -> frozenset[str]:
 _JACOBIAN_CACHE: dict[tuple[str, str], object] = {}
 
 
+#: configs whose numpy reference lets the analytic moment branch claim the
+#: moment **angle** columns (``_make_jacobian(..., moment_angles=True)``,
+#: WP-1327), so every row of ``test_jacobian_matches_analytic`` meets that
+#: branch rather than the default dispatch's forward difference.  The FD-oracle
+#: tests further down build their own default Jacobian and so still read the
+#: forward-difference angle columns here, as on ``magnetic_angles_tied``
+MOMENT_ANGLE_CONFIGS = frozenset({"magnetic_angles_analytic"})
+
+
 def _for_backend(config: str, model, table, name: str):
     key = (config, name)
     if key not in _JACOBIAN_CACHE:
-        _JACOBIAN_CACHE[key] = _jacobian_for(model, table, name)
+        _JACOBIAN_CACHE[key] = _jacobian_for(
+            model, table, name,
+            moment_angles=name == "numpy" and config in MOMENT_ANGLE_CONFIGS)
     return _JACOBIAN_CACHE[key]
 
 
@@ -1513,7 +1623,8 @@ def test_jacobian_matches_analytic(method, config):
 
 
 @pytest.mark.parametrize("config", ["magnetic", "magnetic_width",
-                                    "magnetic_angles_tied"])
+                                    "magnetic_angles_tied",
+                                    "magnetic_angles_analytic"])
 def test_the_magnetic_config_declines_the_traced_backends_by_name(config):
     """The skip in ``_backend_jacobian`` above, made a measured fact.
 
@@ -1539,6 +1650,37 @@ def test_the_magnetic_config_declines_the_traced_backends_by_name(config):
             _jacobian_for(model, table, name)
     if not asked:
         pytest.skip("no autodiff backend installed")
+
+
+@pytest.mark.xdist_group("xb-magnetic_angles_analytic")
+def test_the_angle_config_s_reference_claims_every_moment_column(monkeypatch):
+    """``magnetic_angles_analytic``'s reference is the analytic angle branch,
+    asserted rather than assumed: every column moving a moment DOF goes
+    through ``_moment_column``, the angles and the tied angle included.  A
+    reference that silently fell back to the default dispatch would hand the
+    matrix the peak chain's angle columns and still agree with the ``fd`` row
+    at its bar, which is the guard going quiet this test exists against — so
+    the spy is asked of the matrix's own reference (``_analytic_jacobian``),
+    never of a ``_make_jacobian`` built here."""
+    from rietx.optimize import least_squares as lsq
+
+    config = "magnetic_angles_analytic"
+    model, table = _state(config)
+    taken: list[int] = []
+    real = lsq._moment_column
+
+    def spy(*args, **kwargs):
+        taken.append(args[4])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(lsq, "_moment_column", spy)
+    _analytic_jacobian(config, model, table)(_theta(model, table))
+    extras = lsq._column_extras(table)
+    moment = [c for c, p in enumerate(table.free_paths)
+              if any(lsq._MOMENT_PATH.match(q) for q in [p, *extras[c]])]
+    assert len(moment) == 3, table.free_paths
+    assert sorted(taken) == moment, (taken, moment)
+    assert MOMENT_ANGLE_CONFIGS <= set(CONFIGS)
 
 
 #: S/L on its bound of zero beside a positive H/L: the mirror of
@@ -1875,10 +2017,10 @@ def _stage_boundaries(data, structure, instrument, stages, *, mode="rietveld",
         model = fresh
         if mode == "lebail":
             model.lebail_update(table.decode(table.x0()),
-                                n_cycles=stage.lebail_cycles)
+                                n_cycles=stage.lebail_cycles, tol=stage.lebail_tol)
         elif mode == "pawley" and not carried:
             model.lebail_update(table.decode(table.x0()),
-                                n_cycles=stage.lebail_cycles)
+                                n_cycles=_pawley_seed_cycles(stage))
             model.build_pawley_restraint()
 
         before = _frozen_signature(model)
@@ -1889,7 +2031,7 @@ def _stage_boundaries(data, structure, instrument, stages, *, mode="rietveld",
         table.commit(outcome.theta)
         if mode == "lebail":
             model.lebail_update(table.decode(outcome.theta),
-                                n_cycles=stage.lebail_cycles)
+                                n_cycles=stage.lebail_cycles, tol=stage.lebail_tol)
         prev_free = list(table.free_paths)
         table.apply_to_models(structure, instrument)
 

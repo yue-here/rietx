@@ -340,10 +340,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Finger-Cox-Jephcoat axial-divergence ratio S/L. It is the illuminated "
             "specimen length divided by the goniometer radius. It sets how strongly "
-            "low-angle peaks lean toward low 2θ. Fit it on a standard together with "
-            "`axial_hl`. The two are strongly correlated and are usually reported as a "
-            "pair. With both at zero and either refined, the peaks are computed with "
-            "windows and integration points sized for a ratio of 0.02 (see `axial_hl`)."
+            "low-angle peaks lean toward low 2θ. Refine it on a standard and hold "
+            "`axial_hl`: swapping the two gives the same pattern. With both at zero and "
+            "either refined, the peaks are computed with windows and integration points "
+            "sized for a ratio of 0.02 (see `axial_hl`)."
         ),
         unit=None, default="0.0",
         typical="0.01-0.05",
@@ -354,9 +354,10 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The Finger-Cox-Jephcoat axial-divergence ratio H/L. It is the "
             "receiving-slit height divided by the goniometer radius. It is the second "
-            "half of the axial asymmetry. It is so strongly correlated with `axial_sl` "
-            "that refining one and holding the other is a common protocol. One ratio "
-            "alone still smears the peaks. Only both at zero switch the asymmetry off. "
+            "half of the axial asymmetry. Swapping it with `axial_sl` gives the same "
+            "pattern, so set it from the instrument and hold it, as the lab plans do. "
+            "One ratio alone still smears the peaks. Only both at zero switch the "
+            "asymmetry off. "
             "With both at zero and either refined, the peaks are computed with windows "
             "and integration points sized for a ratio of 0.02, so the curve differs from the same model with "
             "both held by up to about 5e-5 of the strongest peak."
@@ -779,14 +780,15 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         description=(
             "The centre, in °2θ, of an explicit Gaussian background term, such as a "
             "diffuse or amorphous hump or a cryostat or sample-container contribution. "
-            "It has no default bounds. It is not a Bragg position, so only the data "
+            "It has no default value and no default bounds. It is not a Bragg "
+            "position, so only the data "
             "constrain it. Set min and max if you know the fitted range. A declared "
             "term is inert (`vary=False`, height 0) until a stage frees it, and nothing "
             "in the package adds one on its own. Freeing position, height and width "
             "together amounts to a reflection with no cell behind it. `HUMP_TOO_NARROW` "
             "flags a fitted width near the instrumental resolution."
         ),
-        unit="deg 2θ", default="0.0",
+        unit="deg 2θ", default=None,
         typical="wherever the diffuse feature sits, for example 14.4 on NIST BT-1",
         anchor="theory/background.html#explicit-humps",
     ),
@@ -907,11 +909,11 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         title="Primary extinction",
         description=(
             "The Sabine primary-extinction coefficient, a squared mosaic-block size. A "
-            "powder has no secondary extinction. The coefficient attenuates the strong "
-            "low-angle reflections of a well-crystallised specimen. At 0 there is no "
-            "correction, so a phase that does not free it is unaffected. The calculated "
-            "pattern still responds to it at 0, so the staged plans free it from 0 "
-            "without a seed."
+            "powder has no secondary extinction. It attenuates the strong low-angle "
+            "reflections of a well-crystallised specimen. No plan frees it until "
+            "`phase.extinction = 0.0` declares it. Declare it where those reflections "
+            "stay calculated above observed. At 0 there is no correction, yet the "
+            "pattern responds, so a plan needs no seed to free it."
         ),
         unit="µm²", default="0.0",
         typical="0 for a ground powder; 0.1 to 100 (blocks of 0.3 to 10 µm) "
@@ -1381,9 +1383,12 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
         label="at bound",
         description=(
             "The fitted position reached the limit on how far it could move from its "
-            "starting value. That means peak detection put the starting value in the "
-            "wrong place. The reported position is the limit itself, and the fit did "
-            "not find a minimum there."
+            "starting value. The reported position is the limit itself, and the fit did "
+            "not find a minimum there. The component may not be a line of its own. A "
+            "shoulder on the axial-divergence tail of a much stronger line ends here "
+            "too, because the peak shape does not carry all of that tail. That tail is "
+            "on the low-2θ side below 90° and the high-2θ side above it. One also "
+            "flagged `axial_tail` often is such a shoulder."
         ),
     ),
     "asymmetry_unmodelled": HelpEntry(
@@ -1638,6 +1643,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "peak-shape misfit leaks into those channels at every order. Check whether "
             "the background absorbs peak intensity, or switch to the penalised spline "
             "background."
+        ),
+    ),
+    "BACKGROUND_SMOOTHING_AT_FLEXIBLE_END": HelpEntry(
+        title="Baseline smoothing stopped at its most flexible setting",
+        description=(
+            "The scan for the arPLS baseline's smoothing strength tried every "
+            "candidate from stiff to flexible. None left the peak-free channels "
+            "with a serially uncorrelated residual, so the data did not choose the "
+            "strength, and the most flexible candidate was returned. Hold that "
+            "baseline fixed only knowing it is the grid's end, not a choice. The "
+            "alternatives are a strength of your own, a co-refined background, or a "
+            "measured blank."
         ),
     ),
     "BISO_NEGATIVE": HelpEntry(
@@ -2250,11 +2267,24 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "FULLPROF_ORIGIN_CHOICE": HelpEntry(
         title="A FullProf space group setting was chosen",
         description=(
-            "FullProf writes a space group symbol with no origin choice or axes suffix. "
-            "The reader added one: origin choice 2 where the bare symbol allows two, and "
-            "rhombohedral axes where the cell shows them. A wrong choice moves the "
-            "special positions and changes the multiplicities, so the structure would be "
-            "a different one. The choice is tested against the site occupancies."
+            "FullProf writes a space group symbol with no origin choice suffix. The "
+            "reader added one: origin choice 2 where the bare symbol allows two. A wrong "
+            "choice moves the special positions and changes the multiplicities, so the "
+            "structure would be a different one. The choice is tested against the site "
+            "occupancies."
+        ),
+    ),
+    "FULLPROF_RHOMBOHEDRAL_AXES_ASSUMED": HelpEntry(
+        title="A FullProf R phase was read on rhombohedral axes",
+        description=(
+            "The file states an R space group symbol with no axes suffix beside a "
+            "rhombohedral cell, with three equal edges and three equal angles. The "
+            "reader took the cell's word and read the phase on rhombohedral axes. "
+            "FullProf reads a bare R symbol on hexagonal axes and imposes 90°, 90° and "
+            "120° as the angles, so in FullProf the same file is a different cell. "
+            "Older rietx versions wrote such files. Check the cell against the "
+            "structure you meant, and treat any value FullProf refined from this file "
+            "as belonging to the hexagonal reading."
         ),
     ),
     "FULLPROF_RHOMBOHEDRAL_RESTATED": HelpEntry(
@@ -2768,6 +2798,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "matrix."
         ),
     ),
+    "HISTORY_EARLIER_TREE_SKIPPED": HelpEntry(
+        title="Earlier tree in a history file skipped",
+        description=(
+            "A history file holds one refinement's tree. Releases before 1.11 "
+            "appended a second refinement to a reused history file, so an old file "
+            "can hold two or more trees. Loading it returns the last tree, the most "
+            "recent run, and skips each earlier one. A refinement continued from the "
+            "loaded tree adds its nodes to the last tree. Nothing was deleted, and the "
+            "skipped tree's lines are still in the file."
+        ),
+    ),
     "HOLD_BLOCKED_PLAN": HelpEntry(
         title="A hold overrode part of the plan",
         description=(
@@ -3104,6 +3145,15 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "best one. Check the cell and the background, or allow more passes."
         ),
     ),
+    "LEBAIL_CYCLES_AT_CAP": HelpEntry(
+        title="A Le Bail partition hit its cap",
+        description=(
+            "The partition repeats until the intensities stop moving, under the cap "
+            "`lebail_cycles`. A partition in the last stage reached the cap first, so "
+            "the intensities and any width that depends on them are not settled. "
+            "Raise `lebail_cycles` on the stage."
+        ),
+    ),
     "LOW_ANGLE_UNMODELLED": HelpEntry(
         title="Unexplained signal below the first reflection",
         description=(
@@ -3204,9 +3254,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "error estimate, a single-pattern fit computes the angle's profile interval "
             "and stores it in `RefinedParameter.interval`. The message gives the angle's "
             "distance from "
-            "the direction and whether the interval includes it. Where it does, quote "
-            "the moment as lying along the symmetry direction. Where it does not, quote "
-            "the angle with its interval."
+            "the direction and whether the interval includes it. Where it does, the "
+            "data cannot tell the moment from one along that direction. Where it does "
+            "not, quote the angle with its interval. The fit also computes the profile "
+            "interval of each such site's moment size, because the size's error "
+            "estimate assumes the angles sit on the direction. Quote the size by that "
+            "interval. Where the profile found a fit better than the answer by a whole "
+            "threshold or more, the fit did not reach its minimum: the message gives "
+            "the better point, and the size is quoted only after a refit from it. "
+            "The size's coverage and that threshold were measured on one family, a "
+            "simulated two-site `Pnma` set, and are untested beyond it."
         ),
     ),
     "MOMENT_UNSUPPORTED": HelpEntry(
@@ -3383,13 +3440,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "PATTERN_ROWS_DROPPED": HelpEntry(
-        title="Some numeric rows were not read as data",
+        title="Some rows were not read as data",
         description=(
-            "The reader takes the most common number of values per line as the file's "
-            "layout, and it skipped numeric lines with a different count. A header table "
-            "or a limits row usually causes this. If a skipped line was a real "
-            "measurement, the file mixes layouts. Re-export it with the same number of "
-            "values on every row."
+            "The reader dropped rows from the file, for one of two reasons, and the "
+            "message says which. Every reader drops a point whose 2θ, count or error "
+            "estimate is NaN or infinite, and names the dropped points by their 2θ. "
+            "On a time-of-flight pattern, flight time takes the place of 2θ. "
+            "A NaN is what a reduction writes where it divided by a zero monitor or "
+            "detector efficiency, so these points hold no measurement. Left in, one "
+            "such point made every statistic of the fit NaN. The two- and "
+            "three-column text reader also takes the most common number of values "
+            "per line as the file's layout, and it skips numeric lines with a "
+            "different count, naming them by line. A header table or a limits row "
+            "usually causes this. If a skipped line was a real measurement, the file "
+            "mixes layouts. Re-export it with the same number of values on every row."
         ),
     ),
     "PATTERN_SCAN_REVERSED": HelpEntry(
@@ -3689,10 +3753,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the specimen and belongs out of the model, or the range must cover a "
             "reflection of it. With no reflection in range, the scale is held too, the "
             "phase has no weight fraction, and the other fractions are relative to the "
-            "phases seen in range. When no phase is seen at all, the instrument terms "
-            "that act only through the peaks are held as well, for example the zero "
-            "shift, the specimen displacement and the profile widths. The message "
-            "names every one."
+            "phases seen in range. When no phase is seen at all and the residual is "
+            "noise (Durbin-Watson d at or above Hill and Flack's Q), the instrument "
+            "terms that act only through the peaks are held as well, for example the "
+            "zero shift, the specimen displacement and the profile widths. With no line "
+            "of any phase in range they are held whatever d reads. The message names "
+            "every one. A low d says the residual has structure, so they stay free: "
+            "either the model missed the peaks or the background cannot follow the data."
         ),
     ),
     "PLAN_FREES_NO_MOMENT": HelpEntry(
@@ -4052,34 +4119,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "SEQUENTIAL_PATH_CHECK_INCOMPLETE": HelpEntry(
-        title="The forward and backward comparison was partial",
+        title="The forward and backward comparison covered part of the series",
         description=(
-            "The check that compares the forward and backward chains either did not run "
-            "or covered less than the whole series. Zero path-dependent findings is a "
-            "clean result only when the check ran in full. A chain may have stopped, a "
-            "pattern may have failed, or a parameter may have had no esd in both chains. "
-            "Rerun in both directions to completion before you quote per-pattern esds as "
-            "the uncertainty."
+            "The comparison of the forward and backward chains ran, on less than the "
+            "whole series. A pattern may have failed in one chain, or a parameter may "
+            "have had no esd in both chains on any pattern. The named patterns and "
+            "parameters are unchecked, and every other gap in `direction_gaps` stands."
         ),
     ),
-    "SEQUENTIAL_PATH_DEPENDENT": HelpEntry(
-        title="A trajectory depends on the refinement order",
+    "SEQUENTIAL_PATH_CHECK_NOT_RUN": HelpEntry(
+        title="The forward and backward comparison did not run",
         description=(
-            "A parameter takes different values when the series is refined forward and "
-            "backward, by more than their esds allow. The data alone do not determine "
-            "it, so the path of the chain decides the value. Its per-pattern esd "
-            "understates the uncertainty. Hold the parameter, restrain it, or report the "
-            "spread between the two directions."
-        ),
-    ),
-    "SEQUENTIAL_PERSISTENT_FINDING": HelpEntry(
-        title="A per-pattern finding recurs across the series",
-        description=(
-            "The same diagnostic fired in most of the patterns. One occurrence says a "
-            "pattern has a problem. Most of the series says the model or the plan has "
-            "it. Refitting the individual patterns reproduces the finding. Change the "
-            "model or the plan instead. The per-pattern diagnostics carry each "
-            "occurrence."
+            "You asked for both directions, and the comparison of the two chains did "
+            "not run. The forward chain may have been cancelled, or the backward chain "
+            "cancelled or raised. `direction_gaps` is then `None`, and no trajectory has "
+            "been checked against its refinement order. Rerun in both directions to "
+            "completion before you quote per-pattern esds as the uncertainty."
         ),
     ),
     "SEQUENTIAL_RESEED": HelpEntry(
@@ -4089,29 +4144,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "refitted from the initial model. Its starting values did not come from its "
             "neighbour, so it is no evidence that the trajectory is continuous at this "
             "point. Check whether the specimen or the model changed there. If the same "
-            "pattern also carries an outlier or a finding the chain did not recover "
-            "from, read that first."
-        ),
-    ),
-    "SEQUENTIAL_RWP_OUTLIER": HelpEntry(
-        title="A pattern fits much worse than its neighbours",
-        description=(
-            "Even its best attempt left this pattern's Rwp well above that of the "
-            "patterns accepted before it. Compare its GoF and expected Rwp with an "
-            "accepted neighbour. A higher GoF means the model has been outgrown, by a "
-            "missing phase or a bad frame. A similar GoF with a higher expected Rwp "
-            "means fewer counts, and the fit may be sound. If restarts were switched "
-            "off, a cold start may still help."
+            "pattern also carries a finding the chain did not recover from, read that "
+            "first."
         ),
     ),
     "SEQUENTIAL_UNRECOVERED": HelpEntry(
         title="A pattern failed every restart",
         description=(
-            "The fit diverged on this pattern and stayed diverged after every restart "
-            "the chain tried. Its values are not a measurement, so do not interpolate "
-            "across it. It seeded no later pattern and was left out of the series "
-            "median, so its neighbours are unaffected. Fit the pattern on its own to "
-            "find out why."
+            "The fit on this pattern was still rejected after every restart the chain "
+            "tried: it diverged, or it carries an error-level finding such as "
+            "`MODEL_FAR_FROM_DATA`, and the message names which. Its values are not a "
+            "measurement, so do not interpolate across it. It seeded no later pattern "
+            "and was left out of the series median, so its neighbours are unaffected. "
+            "Fit the pattern on its own to find out why."
         ),
     ),
     "SEQUENTIAL_WIDTH_GROWTH": HelpEntry(
@@ -4160,7 +4205,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "holds the coupled direction, the one direction that moves x; a free path "
             "follows only where every coordinate that direction moves was free; a tie, "
             "which needs a single direction, is dropped. One on a direction the position "
-            "fixes is dropped. The message names every one that followed and every one "
+            "fixes is dropped. "
+            "The message names every one that followed and every one "
             "that was dropped. Nothing was moved: "
             "this is the bookkeeping of a site whose symmetry changed without a merge, "
             "for instance onto a mirror within 5e-5, after a fit wrote the coordinate "
@@ -4338,6 +4384,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "stays silent, because some models lack a component. Correct the name, or "
             "use a wildcard if the stage should reach a component that only some models "
             "declare."
+        ),
+    ),
+    "STAGE_SLOW_DESCENT": HelpEntry(
+        title="A stage stopped while still falling slowly",
+        description=(
+            "The stage's cost was still falling when it stopped, but so slowly that "
+            "another 300 evaluations would have moved its parameters by less than one "
+            "esd. The stage counts as converged. The stop says how fast the cost was "
+            "falling, not how far the minimum is, so a crawl along a shallow or "
+            "constrained direction can stop well above it. A high correlation or a "
+            "bound hit reported for the same parameters names such a direction, and "
+            "its own entry gives the remedies."
         ),
     ),
     "STAGE_WINDOWS_STALE": HelpEntry(
@@ -4647,14 +4705,27 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
     "lebail_cycles": HelpEntry(
         title="Le Bail cycles",
         description=(
-            "How many cycles of intensity partitioning run before each solve in "
-            "`lebail` mode. In `pawley` mode the same partition seeds the intensities "
-            "on a stage that carries none in, and the solve then refines them. The "
-            "setting is ignored in `rietveld` mode, where the intensities come from "
-            "the structure."
+            "The most cycles of intensity partitioning that run before and after each "
+            "solve in `lebail` mode. The partition stops earlier once a cycle meets "
+            "`lebail_tol`, and at 0 it runs exactly this many. In `pawley` mode the "
+            "partition seeds the intensities on a stage that carries none in, in at "
+            "most three cycles, and the solve then refines them. The setting is "
+            "ignored in `rietveld` mode, where the intensities come from the structure."
         ),
-        default="3",
-        typical="3",
+        default="25000",
+        typical="leave as it is; set 3 with a tolerance of 0 for the fixed count of "
+                "earlier releases",
+        anchor="theory/forward-model.html#three-intensity-models",
+    ),
+    "lebail_tol": HelpEntry(
+        title="Le Bail stop",
+        description=(
+            "The share of the Bragg counts a partition cycle may still move and end "
+            "the partition. Each reflection counts by the area it lays on the pattern. "
+            "0 switches the test off, so the partition runs exactly `lebail_cycles`."
+        ),
+        default="1e-7",
+        typical="leave as it is",
         anchor="theory/forward-model.html#three-intensity-models",
     ),
     "seed": HelpEntry(
@@ -4910,7 +4981,7 @@ INSTRUMENT_FIELD_HELP: dict[str, HelpEntry] = {
 
 #: One entry per control :class:`~rietx.schemas.indexing.IndexingControls`
 #: carries, flattened one level: the eighteen fields of its ``search`` block
-#: plus the three beside it.  These are search settings, not refined
+#: plus the five beside it.  These are search settings, not refined
 #: quantities, so ``default`` is the schema's own value rendered as JSON and
 #: ``tests/test_help.py`` crosses every one of them.
 #:
@@ -5160,6 +5231,28 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
         ),
         typical="empty",
         anchor="reference/indexing.html#the-whole-profile-test",
+    ),
+    "formula": HelpEntry(
+        title="Specimen formula",
+        description=(
+            "The specimen's chemical formula, written as a chemist writes it, with `·` "
+            "before water of crystallisation. Each candidate then shows Z, the formula "
+            "units its volume holds by Hofmann's (2002) average atomic volumes. Z moves "
+            "no search and no rank. A correct inorganic cell reads 0.4 to 0.9 of its "
+            "true Z, so read Z as a guide rather than a test."
+        ),
+        typical="empty",
+        anchor="reference/indexing.html#a-volume-window-from-the-formula",
+    ),
+    "temperature": HelpEntry(
+        title="Pattern temperature",
+        description=(
+            "The temperature the pattern was measured at, which scales the formula's "
+            "volumes for thermal expansion. Empty reads 298 K. It needs a formula."
+        ),
+        unit="K",
+        typical="empty at room temperature",
+        anchor="reference/indexing.html#a-volume-window-from-the-formula",
     ),
 }
 
@@ -5531,6 +5624,23 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         ),
         anchor="theory/estimation.html#convergence",
     ),
+    "StageResult.lebail_cycles_run": HelpEntry(
+        title="Le Bail cycles run",
+        description=(
+            "The cycles each partition of the stage ran, in order: before the solve, "
+            "then after it. A Pawley seed is the one entry. A stage whose solve "
+            "stopped has only the partition before it. It is empty where none ran: a "
+            "Rietveld stage, or a Pawley stage that carried its intensities in."
+        ),
+    ),
+    "StageResult.lebail_settled": HelpEntry(
+        title="Le Bail partition settled",
+        description=(
+            "Whether each of the stage's partitions met `lebail_tol` under its cap of "
+            "`lebail_cycles`. It is empty where nothing was asked: another mode, or "
+            "a fixed count."
+        ),
+    ),
     "StageResult.n_iterations": HelpEntry(
         title="Residual evaluations",
         description=(
@@ -5607,6 +5717,24 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "that fit different ranges or modes cannot be compared by it. `None` "
             "means a result stored before the field."
         ),
+    ),
+    "StageResult.termination": HelpEntry(
+        title="Stage stopping test",
+        description=(
+            "Which test ended the stage's solve, where `status` says only whether it "
+            "converged. The default solver writes `ftol_runs`, `no_descent` or "
+            "`exhausted_fp64` when it met its own convergence test. It writes "
+            "`slow_descent` when the cost was still falling, but so slowly that "
+            "another 300 evaluations would have moved the parameters by less than "
+            "one esd. Both have `status` `converged`, and `STAGE_SLOW_DESCENT` names "
+            "a stage stopped the second way. It writes `max_nfev`, with `status` "
+            "`max_iter`, when the budget ran out. `solver=\"trf\"` writes "
+            "scipy's `ftol`, `xtol`, `gtol`, `ftol+xtol` and `max_nfev`. A model "
+            "that stopped being finite writes `non_finite_residual` or "
+            "`non_finite_jacobian`, with `status` `diverged`. `None` means "
+            "a result stored before the field, or a stage with nothing free."
+        ),
+        anchor="theory/estimation.html#convergence",
     ),
     "StageResult.n_constraint_truncations": HelpEntry(
         title="Steps held on a constraint",
@@ -5792,7 +5920,9 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The solver's exit for the attempt kept on this pattern. `diverged` after "
             "the last rung of the ladder means the pattern is quarantined: it seeds no "
-            "successor and joins no median, and `SEQUENTIAL_UNRECOVERED` says so."
+            "successor and joins no median, and `SEQUENTIAL_UNRECOVERED` says so. A "
+            "`converged` or `max_iter` attempt carrying an error-level finding is "
+            "quarantined the same way."
         ),
     ),
     "SeriesEntry.statistics": HelpEntry(
@@ -5878,7 +6008,11 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "Which attempt produced this entry's values: `warm`, a one-stage refit from "
             "the neighbour; `warm_staged`, the full plan from the warm state; or "
             "`cold`, the full plan from the initial models. The first pattern is always "
-            "`cold`, having no neighbour to start from."
+            "`cold`, having no neighbour to start from. Of several attempts the entry "
+            "keeps one that neither diverged nor carries an `error` code, then one the "
+            "first-rung bound did not cut, then the one with the lower least-squares "
+            "cost, which Rwp replaces where the two attempts minimised different "
+            "objectives."
         ),
     ),
     "SeriesEntry.rungs_tried": HelpEntry(
@@ -5897,13 +6031,22 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "as past a diverged one. Empty wherever no rung raised."
         ),
     ),
-    "SeriesEntry.rwp_fence": HelpEntry(
-        title="Rwp fence",
+    "SeriesEntry.rwp_over_median": HelpEntry(
+        title="Rwp over the median",
         description=(
-            "The Rwp limit the chain set at this pattern, from `reseed_factor` and the "
-            "Rwp of the patterns accepted before it (`sequential._rwp_fence`). An "
-            "attempt above it climbs the ladder. `None` where no earlier pattern had "
-            "been accepted, so no fence judged it."
+            "This pattern's Rwp divided by the median Rwp of the patterns accepted "
+            "before it in the walk. A record, not a verdict: no threshold reads it "
+            "unless you pass `reseed_factor`, which escalates a warm fit above that "
+            "ratio. No code flags a pattern for its misfit, so read this ratio and "
+            "the GoF down the series and inspect the entries well above their "
+            "neighbours. The first patterns are compared against a median of one or two "
+            "values, so an early ratio says as much about its neighbours: accepted Rwp "
+            "0.30 and 0.10 give a median of 0.20, against 0.10 for 0.10 and 0.10. Rwp "
+            "tracks the expected Rwp, so a ratio above 1 can be falling counts under a "
+            "right model. Compare GoF and the expected Rwp with an accepted neighbour "
+            "to tell them apart. A blank frame read GoF 1.00 against 1.06 with expected "
+            "Rwp 0.159 against 0.040, a right model over counts fallen 4x a similar GoF, "
+            "and an unmodelled phase GoF 16.7. `None` for the first pattern walked."
         ),
     ),
     "SeriesEntry.seeded_from": HelpEntry(
@@ -5923,6 +6066,16 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "floor, because the pattern it warm-started from did not support them. "
             "Empty when the kept attempt started cold and on a series with no moment. "
             "`SEQUENTIAL_MOMENT_HOLD` names these patterns."
+        ),
+    ),
+    "SeriesEntry.pattern_paths": HelpEntry(
+        title="This pattern's own paths",
+        description=(
+            "This pattern's own dot-path for each path of the entry that its model numbers "
+            "differently, keyed by the entry's path. Every path of a series reads one "
+            "numbering, so a trajectory follows one phase by name and one atom by label "
+            "where a `prepare` hook added or removed either. `{}` where the two agree; "
+            "`None` in a series saved before 1.11, whose paths are each pattern's own."
         ),
     ),
     "SeriesEntry.node_id": HelpEntry(
@@ -5970,23 +6123,24 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "Which way the chain ran: `forward`, `backward`, or `both`, which runs it "
             "each way and compares the two trajectories. Under `both` the entries are "
-            "the forward chain's and the comparison is `SEQUENTIAL_PATH_DEPENDENT`."
+            "the forward chain's and the comparison is `direction_gaps`."
         ),
     ),
     "SeriesResult.backward": HelpEntry(
         title="Reverse chain",
         description=(
             "The reverse chain's own series result when `direction` is `both`, so the "
-            "trajectory a path-dependence finding is about can be read. `None` for a "
-            "one-way run."
+            "trajectory each gap in `direction_gaps` compares against can be read. "
+            "`None` for a one-way run."
         ),
     ),
     "SeriesResult.diagnostics": HelpEntry(
         title="Series findings",
         description=(
-            "Findings about the series as a whole, such as path dependence, reseeds "
-            "and patterns that failed. Each pattern's own findings stay on its entry, "
-            "and the steps between patterns are `steps`, not findings."
+            "Findings about the series as a whole, such as reseeds and patterns that "
+            "failed. Each pattern's own findings stay on its entry and are counted in "
+            "`code_counts`. The steps between patterns are `steps`, and the gaps "
+            "between the two directions `direction_gaps`, not findings."
         ),
     ),
     "SeriesResult.steps": HelpEntry(
@@ -6005,6 +6159,35 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "document written before the field."
         ),
     ),
+    "SeriesResult.direction_gaps": HelpEntry(
+        title="Gaps between the two directions",
+        description=(
+            "Under `direction=\"both\"`, every parameter's forward minus backward value "
+            "at every pattern both chains fitted, in combined esds, largest first, with "
+            "the attempt each chain kept beside each gap. The size is `None` where "
+            "either chain measured no esd. rietx sets no threshold on it. Where a gap is "
+            "large against its esds, the data alone do not fix that parameter, and the "
+            "chain's order decides it. Hold the parameter, restrain it, or quote the "
+            "spread between the two directions as its uncertainty. A gap whose two "
+            "chains kept different attempts measures the restart ladder as well as the "
+            "order. A parameter near zero with an esd near zero can show thousands of "
+            "esds with no physical size, so read the two values too. `None` when the "
+            "comparison did not run, or in a document written before the field."
+        ),
+    ),
+    "SeriesResult.code_counts": HelpEntry(
+        title="Per-pattern codes counted",
+        description=(
+            "Every per-pattern diagnostic code and path, with the number of patterns "
+            "it fired on and the worst level it carried, largest count first. One "
+            "occurrence says a pattern has a problem. The same code on most of the "
+            "series says the model or the plan has it, and refitting single patterns "
+            "reproduces it. rietx sets no threshold on the count. Read the top rows "
+            "against the series: a count that starts at one pattern and holds to the "
+            "end can mark where the sample changed. Each occurrence stays on its "
+            "entry. `None` means a document written before the field."
+        ),
+    ),
     "SeriesResult.relative_paths": HelpEntry(
         title="Paths that are steps",
         description=(
@@ -6019,6 +6202,23 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The moment angle DOFs, whose differences across patterns are taken modulo "
             "a full turn. Recorded as `relative_paths` is, and `None` means the same."
+        ),
+    ),
+    "SeriesResult.phase_names": HelpEntry(
+        title="Series phase names",
+        description=(
+            "The phase each path of the series names by number: phase `i` is "
+            "`phase_names[i]`. The series' own structure's phases, then each phase a "
+            "`prepare` hook added, in the order the walk met it. `None` in a series "
+            "saved before 1.11."
+        ),
+    ),
+    "SeriesResult.atom_labels": HelpEntry(
+        title="Series atom labels",
+        description=(
+            "The atom each path of the series names by number: atom `j` of phase `i` is "
+            "`atom_labels[i][j]`, numbered as `phase_names` is. `None` in a series saved "
+            "before 1.11."
         ),
     ),
     "SeriesResult.failures": HelpEntry(

@@ -116,16 +116,9 @@ def _p(v):
     return rx.Parameter(value=float(v))
 
 
-def _has_solve_kernels() -> bool:
-    try:
-        import rietx_kernels as rk
-    except ImportError:
-        return False
-    return all(callable(getattr(rk, n, None)) for n in compiled.SOLVE_NAMES)
-
-
 PATHS = [pytest.param(True, id="compiled", marks=pytest.mark.skipif(
-    not _has_solve_kernels(), reason="no rietx-kernels with the solve kernels (1.4.0)")),
+    not compiled.available(),
+    reason=f"the rietx-kernels wheel did not load: {compiled.unavailable()}")),
     pytest.param(False, id="numpy")]
 
 
@@ -308,7 +301,7 @@ def test_f2_is_the_forward_models(radiation, on):
         assert np.max(np.abs(got - want)) <= 1e-13 * np.max(want)
 
 
-@pytest.mark.skipif(not _has_solve_kernels(), reason="no rietx-kernels solve kernels")
+@pytest.mark.skipif(not compiled.available(), reason="the rietx-kernels wheel did not load")
 def test_compiled_and_numpy_orbit_sums_agree_within_the_kernels_bound(nac, acr):
     """The engine's two paths, held to the kernels' stated bound: 1e-13 of
     each site's image count (``tests/test_solve_kernels.py``); and the
@@ -405,7 +398,7 @@ def test_clash_paths_and_the_one_site_identity(nac):
     rng = np.random.default_rng(2)
     u = sp.random(rng, 3)
     xyz = sp.xyz(u)
-    for on in ([True, False] if _has_solve_kernels() else [False]):
+    for on in ([True, False] if compiled.available() else [False]):
         compiled.set_enabled(on)
         tot = clash.total(xyz)
         want = [clash_energy(sp.images(xyz[r:r + 1])[0], sp.site_of_image, sp.g, clash.r0,

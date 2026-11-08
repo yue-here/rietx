@@ -4795,15 +4795,47 @@ def _magnetic_group_line(phase, *, ion_species_ok: bool = False) -> str | None:
         raise ValueError(f"{where}: {exc}") from exc
     nuclear = resolve_group(phase.space_group, phase.symmetry_operations)
     if _operation_set(family) != _operation_set(nuclear):
+        # The test is the groups; the message names the orbits it costs,
+        # since a phase read from a magCIF lists every orbit whole (#715).
+        from ...crystallography.magcif import _orbit_size
+
+        nuclear_ops = list(nuclear.operations())
+        family_ops = list(family.operations())
+        # The family group need not be the smaller one: a phase under P 1
+        # with a P2₁/c magnetic group gains positions rather than losing them.
+        split, grown = [], []
+        for atom in phase.atoms:
+            xyz = (atom.x.value, atom.y.value, atom.z.value)
+            n_nuclear = _orbit_size(nuclear_ops, xyz)
+            n_family = _orbit_size(family_ops, xyz)
+            if n_family < n_nuclear:
+                split.append(f"{atom.label!r} ({n_family} of {n_nuclear})")
+            elif n_family > n_nuclear:
+                grown.append(f"{atom.label!r} ({n_family} against {n_nuclear})")
+        under = (f"(positions under the magnetic operators, against those "
+                 f"under {phase.space_group!r})")
+        clauses = []
+        if split:
+            clauses.append(f"these sites would each generate only part of "
+                           f"their orbit {under}: {', '.join(split)}")
+        if grown:
+            clauses.append(f"these sites would each generate positions the "
+                           f"fitted model does not hold {under}: "
+                           f"{', '.join(grown)}")
+        cost = (
+            f", so {'; and '.join(clauses)}. List one site for each orbit of "
+            f"the magnetic group and"
+            if clauses else
+            ". Every listed site keeps its orbit, but TOPAS would refine the "
+            "positions under the magnetic group's site symmetry, a different "
+            "model from the one fitted. To accept that,")
         raise _GroupIdentityRefusal(
             f"{where}: its positions refine under {phase.space_group!r} and "
             f"its moments under BNS {number}, whose family group (its "
             f"operations with time reversal dropped) is {family.xhm()!r}. A "
             f"TOPAS magnetic `str` generates its atoms with the magnetic "
-            f"operators alone, so the sites listed for the larger group would "
-            f"each generate only part of their orbit. List the sites of each "
-            f"parent orbit the magnetic group splits and state the phase "
-            f"under {family.xhm()!r} yourself (a CIF round trip with "
+            f"operators alone{cost} state the phase under "
+            f"{family.xhm()!r} yourself (a CIF round trip with "
             f"nuclear_group='file' keeps the parent's sites and does not "
             f"restate them), or export a magCIF (Structure.to_cif)")
     for atom in moments:
@@ -5275,7 +5307,8 @@ def _not_written_diagnostics(structure: Structure, *,
     for i, phase in enumerate(structure.phases):
         here = []
         for name, what in () if whole else _PHASE_TERMS_NOT_WRITTEN:
-            if getattr(phase, name).value != 0.0:
+            term = getattr(phase, name)  # extinction is opt-in: None
+            if term is not None and term.value != 0.0:
                 here.append((name, what))
         po = phase.preferred_orientation
         if po is not None and po.r.value != 1.0:
