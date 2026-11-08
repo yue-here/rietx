@@ -426,8 +426,12 @@ def _k_statements(text: str, name: re.Pattern, single: re.Pattern
         end = _K_ROWS_END.search(text, loop.end())
         rows = text[loop.end():end.start() if end else len(text)]
         tokens = _K_VALUE.findall(rows)
+        # a text field leaves its two ``;`` lines as tokens, which cannot be
+        # counted as one value: such a loop is read as a malformed one
+        text_field = any(t[0] == ";" for t in tokens)
         for column in columns:
-            values = (tokens[column::len(tags)] if len(tokens) % len(tags) == 0
+            values = (tokens[column::len(tags)]
+                      if len(tokens) % len(tags) == 0 and not text_field
                       else [t for t in tokens if t[0] in _CLOSING])
             found.append((loop.start(), values,
                           rows if column == len(tags) - 1 else ""))
@@ -445,6 +449,10 @@ def _k_components(value: str, openings: str) -> tuple[str, str, str] | None:
     ``openings`` are the delimiters a reader accepts: ``[`` for the
     dictionary's tag, which defines a list, and ``['"`` for the draft's.
     """
+    if len(value) >= 2 and value[0] in "'\"" and value[-1] == value[0]:
+        inner = value[1:-1].strip()
+        if inner[:1] == "[" and inner[-1:] == "]":
+            value = inner          # a quoted bracketed k: one level of quotes off
     if len(value) < 2 or value[0] not in openings or value[-1] != _CLOSING[value[0]]:
         return None
     parts = value[1:-1].replace(",", " ").split()

@@ -1328,6 +1328,39 @@ def test_a_k_on_a_text_field_s_opening_line_is_not_a_k(tmp_path):
     assert magcif._without_text_fields(";a tag\nprose\n; after") == ";\n\n; after"
 
 
+def test_a_quoted_bracketed_k_is_read(tmp_path):
+    """First review of #1378, item 1: ``main`` searched the whole value for the
+    bracket, so ``'[1/2 0 0]'`` (the quoted form CIF 1.1 asks of a value with
+    spaces) read as k; the new value pattern took it as one quoted token and
+    ``_k_components`` rejected its opening quote, so the k read as Γ.  One level
+    of quotes comes off first."""
+    for k in ("'[1/2 0 0]'", '"[1/2 0 0]"'):
+        for text in (f"_parent_propagation_vector.kxkykz {k}\n",
+                     f"loop_\n_parent_propagation_vector.id\n"
+                     f"_parent_propagation_vector.kxkykz\nk1 {k}\n",
+                     f"loop_\n_parent_propagation_vector.kxkykz\n"
+                     f"_parent_propagation_vector.id\n{k} k1\n"):
+            assert magcif.propagation_vectors(text) == (("1/2", "0", "0"),)
+    with pytest.raises(magcif.MagCifError, match="magnetic supercell"):
+        _read(tmp_path, "LaMnO3",
+              extra="\n_parent_propagation_vector.kxkykz '[1/2 0 0]'\n")
+    # the dictionary's tag still takes no bare quoted list
+    assert magcif.propagation_vectors(
+        "_parent_propagation_vector.kxkykz '1/2 0 0'\n") == ()
+
+
+def test_a_loop_holding_a_text_field_never_hides_a_k(tmp_path):
+    """First review of #1378, item 2: a text field leaves its two ``;`` lines
+    as tokens, so a row count that came out whole by accident lost the second k.
+    A loop holding one is read as a malformed loop, where every quoted or
+    bracketed value counts."""
+    text = ("loop_\n_parent_propagation_vector.kxkykz\n"
+            "_parent_propagation_vector.note\n[0 0 0]\n;\nfirst\n;\n"
+            "[1/2 0 0]\n;\nsecond\n;\n")
+    assert magcif.propagation_vectors(text) == (
+        ("0", "0", "0"), ("1/2", "0", "0"))
+
+
 def test_an_incommensurate_k_is_refused_with_its_own_sentence(tmp_path):
     """A k that is not a rational has no commensurate cell to be read in at
     all, which is a different refusal from the supercell one and says so."""
