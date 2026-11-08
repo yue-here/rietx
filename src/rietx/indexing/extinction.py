@@ -1320,6 +1320,29 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         # it up as the reason.  Now that an empty range is answered rather than
         # raised, this branch is the live one — and a "failed" status carrying no
         # diagnostic is a state with no writer for its reason, so it says why.
+        #
+        # The gate is read first.  A prefit outside its basin can blow the
+        # widths up until no peak keeps its area in range (FAP at ×0.99: W at
+        # its 32 400 deg² bound), and which reflections survive the window
+        # filter then flips on rounding.  That is a reference that models
+        # nothing, the gate's verdict, never "this cell predicts no lines"
+        # (WP-2076; Linux CI and 6 of 12 nudged starts on macOS).  Only a
+        # lattice that does predict lines in range reaches the gate here.
+        from ..crystallography.symmetry import generate_reflections
+
+        tt_data = np.asarray(ref_result.two_theta, dtype=np.float64)
+        screen.two_theta_range = (float(tt_data.min()), float(tt_data.max()))
+        predicted = len(generate_reflections(
+            symbol, tuple(candidate.cell), wavelength, screen.two_theta_range[1],
+            screen.two_theta_range[0]).hkl)
+        screen.reference_rwp = float(ref_result.statistics.rwp)
+        screen.reference_rwp_net, screen.perfect_fit_rwp_net = _reference_net_rwp(
+            ref_result)
+        if predicted and (screen.reference_rwp_net is None
+                          or not screen.reference_rwp_net <= REFERENCE_NET_RWP_MAX):
+            screen.status = "unreliable"
+            screen.diagnostics = extinction_diagnostics(screen) + prefit_capped
+            return screen
         screen.status = "failed"
         screen.diagnostics = [Diagnostic(
             level="error", code="EXTINCTION_SCREEN_FAILED",

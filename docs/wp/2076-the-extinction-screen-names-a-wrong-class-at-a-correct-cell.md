@@ -379,6 +379,24 @@ position named, and PbSO₄ names `P c - a`: the known wrong answer the ruling o
 
 ## Handover log
 
+- **2026-11-08** — CI on PR #1461 failed one row on both Linux legs: FAP at a start ×0.99 read
+  `failed` where the gate test expects `unreliable`. The cause predates this branch. Outside the
+  prefit's basin the prefit runs W to its 32 400 deg² bound, and whether any reflection then
+  survives the window filter flips on rounding. With none, the screen took the "this cell
+  predicts no reflections" branch, whose advice (the cell is far too small) is wrong there.
+  Measured on macOS arm64 over 12 relative nudges of the start (±1e-14 to ±1e-4): 6 of 12 hit
+  it with the settled prefit, 1 of 12 with three cycles, so main's CI was lucky on the row.
+  *Done.* When the reference kept no reflection but the lattice group predicts some in range
+  (`generate_reflections`), the screen now reads the reference gate first, and a reference
+  past `REFERENCE_NET_RWP_MAX` gives `unreliable` with `EXTINCTION_SCREEN_UNRELIABLE`, as at any
+  other cell outside the basin. A lattice that predicts nothing in range still gives `failed`.
+  All 12 nudges now read `unreliable`. Test:
+  `test_extinction_gate.py::test_a_prefit_whose_widths_left_no_reflection_reads_unreliable`,
+  five nudges, each failing without the fix. Every test reaching the screen, slow rows
+  included: 357 passed, 2 skipped, 1 xfailed (`[dev]`, macOS arm64). The generality judge was
+  not re-dispatched: this reorders two existing verdicts (the gate before the empty-table
+  failure) and adds no threshold. *Next:* unchanged, the margin task.
+
 ### 2026-11-07 (fourth session) — a raised fit abstains; the prefit's partition settles
 
 The screen no longer treats a solver failure as evidence against a class. If a class's fit, or
