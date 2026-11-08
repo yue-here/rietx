@@ -136,7 +136,7 @@ floors.
 
 ## Tasks
 
-- [ ] `.segmented` redrawn app-wide: a sunken track with one raised option, from two new surface
+- [x] `.segmented` redrawn app-wide: a sunken track with one raised option, from two new surface
   tokens (`--sunken`, `--raised`) in `theme.py`, `tokens.css` regenerated.
 - [ ] The top bar: the graphs' collapse button first and the model panel's last, in a row whose
   middle wraps while the two buttons keep their places; `Split | Full` retired, since collapsing

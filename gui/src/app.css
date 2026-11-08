@@ -191,25 +191,35 @@ button:disabled {
 }
 
 /* One choice among N, where the options *are* the control.  The buttons inside
-   take the register's geometry above; only their chrome changes. */
+   take the register's geometry above; only their chrome changes.  A choice is
+   a sunken track with one raised option, so it never looks like an action: the
+   filled `button` above is what an action looks like (the maintainer's ruling
+   of 2026-11-07, WP-2123).  The track's 1 px of padding stands where its 1 px
+   border stood, so the control is as tall as it was and no row moves. */
 .segmented {
   display: flex;
-  border: 1px solid var(--line);
+  gap: 1px;
+  padding: 1px;
   border-radius: var(--r-control);
-  overflow: hidden;
+  background: var(--sunken);
 }
 
 .segmented button {
   border: 0;
-  border-radius: 0;
+  border-radius: calc(var(--r-control) - 1px);
   background: transparent;
   color: var(--muted);
   font-weight: 400;
 }
 
+.segmented button:hover:not(:disabled):not(.on) {
+  color: var(--fg);
+}
+
 .segmented button.on {
-  background: var(--accent);
-  color: var(--panel);
+  background: var(--raised);
+  color: var(--fg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
 }
 
 /* One choice among N *panels*.  A tab is not a segmented option: it names
