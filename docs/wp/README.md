@@ -810,6 +810,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2065](2065-a-hung-fast-job-names-its-test.md) | A hung fast job names its test, and the hang is fixed | ✅ 2026-11-01 | — | — |
 | [2077](2077-the-workflow-sees-ghostshift-runners.md) | The WP workflow sees ghostshift's runners | ✅ 2026-11-02 | — | — |
 | [2119](2119-the-design-record-says-how-a-design-is-chosen.md) | The design record says how a design is chosen | ✅ 2026-11-07 | — | — |
+| [2122](2122-the-mark-redrawn.md) | The mark's bar redrawn, and the header lockup set on the type | ✅ 2026-11-08 | — | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
