@@ -324,6 +324,46 @@ cold rung. Any default for later frames falls under Rule 4 of `docs/DESIGN.md` �
 
 ### Inherited
 
+- **2026-11-06, from the issue triage (issue #1439): the free set can change
+  from frame to frame on its own, through the absent-phase hold.** A design
+  proposal from the recurring contributor, from a private multiphase in-situ
+  series fitted by their own driver, not by `refine_sequential`. They refitted
+  the series with two instrument parameters held and compared the two fits of
+  each frame by ΔBIC. In a few percent of frames the two fits refined different
+  parameters beyond the declared holds: a minor phase's cell, strain and size.
+  The cause was the absent-phase hold (WP-1301; a phase whose scale is under 3σ
+  of its counting-noise esd has its structural paths held for the stage,
+  `phase_support_sigma`). A minor phase near 3σ fell either side depending on
+  the rest of the fit. So the two fits were not nested, and along a chain the
+  gate can switch a phase's cell on and off and put steps in its trajectory.
+  *Checked against the tree at `a84379aac`:* `sequential._collapse` passes
+  `phase_support_sigma` into the collapsed warm plan (the WP-2002 B1 comment
+  there), so the hold decides afresh on every warm refit. Each entry records
+  what its last stage held (`sequential.py` reads `result.stages[-1].held`).
+  The effect has **not** been measured in `rietx.sequential`; the reporter
+  offers a synthetic reproduction. The proposal: the cold first frame resolves
+  the free set, gates included; every warm refit frees exactly that set; the
+  support test still runs per frame and a disagreement is recorded, not acted
+  on, as WP-2003 records steps; `SeriesResult` records the set once. A
+  companion check compares two `SeriesResult`s of the same frames, one a
+  declared restriction of the other, and reports per frame (a) free sets that
+  differ beyond the declared holds and (b) a larger model ending at a higher χ²
+  than the restricted one, which cannot happen at a true minimum. The reporter
+  says (b) found every local minimum they met (a magnetic moment stuck at zero
+  from a fixed start). **Where it lands here:** it is question 1 one rank down.
+  "What a series frees after the first frame" covers frees decided by a gate
+  as well as by the plan, and options b and c above fix the set by a caller's
+  statement, where #1439 fixes it by frame 0's own gates. **It pulls against
+  WP-1420**, whose goal is that a phase held in one frame gets back in when a
+  later frame supports it. A set fixed at frame 0 keeps a late-appearing
+  phase's structure held for the whole series, its scale alone free. Decide the
+  two together. **Prior art, corrected:** the issue says GSAS-II stops when the
+  vary list changes between histograms. GSAS-II 5.8.4 prints the variables
+  added and removed and carries on (`GSASIIstrMain.py:1038-1058`, the stop is
+  commented out; `docs/practice.md` § Sequential refinement already says so).
+  The issue's wider point stands: no program surveyed switches refine flags per
+  pattern on a significance test.
+
 ## Open questions for the discussion
 
 None is ruled. Rwp is inadmissible as evidence for any default here (Rule 4). Admissible

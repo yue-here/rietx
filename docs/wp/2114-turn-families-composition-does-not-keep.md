@@ -51,8 +51,8 @@ on `"error"`, with the refusal as its reason. #1388 pins that with
 interval off refits whose esds were re-charted by the deleted projection. A profile reads only χ², so the
 re-chart was never used for it. What remains is the held direction's drift at each fold: from the
 2026-10-08 probe, 0.05 esd from 10° off, and small near the answer. To decide: exempt a profile refit from
-the refusal, or ask a turn's interval another way. WP-2060 owns `profile_interval` and is still open, so
-read its handover first.
+the refusal, or ask a turn's interval another way. WP-2060 owned `profile_interval` and closed on
+2026-11-07 (PR #1459) without changing it again, so its handover log is the record to read first.
 
 **The instrument.** `tests/test_rigid_body.py`'s `_recharted_and_fresh` measures a re-chart against a fresh
 solve at the committed values. Items 1-3 need it before anything changes.
