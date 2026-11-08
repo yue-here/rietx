@@ -152,7 +152,7 @@ absences; Si, corundum and magnetite keep their correct cells.
 
 ## Handover log
 
-- **2026-11-08** — closed (ghostshift runner, PR #PRNUM; no code changed). The repair this WP
+- **2026-11-08** — closed (ghostshift runner, PR #1469; no code changed). The repair this WP
   asked for is on `main`: a wrong indexing cell can no longer buy a count of zero missing lines
   by refitting its background, because the count is now read at the peak list's widths against
   the picker's background, and the correct cell's glide absences are not charged. Yue ruled

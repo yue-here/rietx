@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-10-24 — example found (a 45° cut); held until WP-1956 lands, by the maintainer's choice
 Track: The repo's own process
 Depends on: 1956
-Priority: P4 2026-11-08 — teaching content; WP-1956, its one blocker, closed on 2026-11-08 (PR #PRNUM)
+Priority: P4 2026-11-08 — teaching content; WP-1956, its one blocker, closed on 2026-11-08 (PR #1469)
 
 ## Goal
 
@@ -52,7 +52,7 @@ the verdict line and the `INDEX_ABSTAINED` diagnostic off that output.
 
 ### Inherited
 
-- **2026-11-08, from WP-1956 (closed, PR #PRNUM): the grades on record after the repair, not
+- **2026-11-08, from WP-1956 (closed, PR #1469): the grades on record after the repair, not
   re-measured.** WP-1956's repair is complete on `main` (PRs #941, #1177, #1302; #1353 and
   the 2026-11-07 ruling changed no code). Neither cut was re-run for that close, so this is
   what the record holds, with its tree. *Full range:* the committed notebook, built by
