@@ -103,10 +103,14 @@ disagree.
   `result.identifiability.correlation` and `.top_correlations`, and says a
   joint fit carries neither; the test resolves every `result.…` name it
   quotes through the declared fields, and failed on the old text.
-- [ ] Tests (round-trip, the field equal to `LSQOutcome.correlation`, `None`
+- [x] Tests (round-trip, the field equal to `LSQOutcome.correlation`, `None`
   on a joint fit)
-- [ ] Skill: the reference row for `HIGH_CORRELATION_OMITTED` names the
+  `tests/test_correlation_matrix.py` (11), plus the joint `None` asserted on
+  the fit `tests/test_joint_report.py` already runs.
+- [x] Skill: the reference row for `HIGH_CORRELATION_OMITTED` names the
   field, or "none" if the package's own suggestion now carries it
+  The suggestion carries it, so both `*_OMITTED` rows now point at the
+  suggestion rather than restating a field (−58 B on `diagnostics.md`).
 
 ## Acceptance
 
