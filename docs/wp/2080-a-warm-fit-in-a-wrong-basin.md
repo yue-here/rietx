@@ -167,8 +167,14 @@ this session).
         `off`, nearer the reference's on every pattern (e.g. 1d 1.307, off
         1.341, reference 1.320), and their worst `instrument.profile.v` distance
         to the reference falls from 2.4-5.2 to 0.7-2.1 esd; but one
-        `lor_strain` per pattern now sits 4.8-6.1 esd off the reference, which,
-        like `off`, has it on its floor. Family total 728 → 1144 evaluations.
+        `lor_strain` per pattern now sits 4.8-7.9 esd off the reference: 0.053
+        to 0.091 where the reference has 0 (1c, 1e, 1f, on the floor) or about
+        0.018 (1d, 1g, 1h), and `off` 0 to 0.018. With the GoF below the
+        reference's on 1d-1h, the chain sits in a lower minimum than the
+        independent fits did, a strain-against-width trade the data rank by
+        χ² alone; read it as a second basin, not as an error B introduced.
+        This is the declared no-closing-stage variant; plain `cpd` does not
+        fire. Family total 728 → 1144 evaluations.
 
 ## Acceptance
 
