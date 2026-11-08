@@ -1308,6 +1308,10 @@ class GuardReport:
     measured_top_correlations: list = field(default_factory=list)
     measured_soft_modes: list = field(default_factory=list)
     measured_exchangeability: list = field(default_factory=list)
+    #: the whole matrix ``measured_top_correlations`` is cut from, packed as
+    #: a :class:`~rietx.schemas.results.CorrelationMatrix` (WP-1990); ``None``
+    #: where no correlation was formed
+    measured_correlation: object = None
 
     def findings(self) -> list[GuardFinding]:
         """Every finding, in the order the diagnostics are emitted in
@@ -2270,6 +2274,7 @@ def check_guards(table, outcome, threshold: float,
         extra_peak_absorption,
         roughness_absorption,
     )
+    from ..schemas.results import CorrelationMatrix
 
     report = GuardReport()
     report.nonpositive_adps = check_adp_positive_definite(table)
@@ -2303,6 +2308,9 @@ def check_guards(table, outcome, threshold: float,
             _correlation_findings(corr, free, threshold))
         # measured once (WP-1056): the same matrix the loop above thresholds
         report.measured_top_correlations = top_correlations(corr, free)
+        if corr.shape == (len(free), len(free)):
+            # and the whole of it, which top_correlations cuts to five (WP-1990)
+            report.measured_correlation = CorrelationMatrix.from_square(free, corr)
 
     if outcome.jac is not None and len(free) > 1:
         # measured once: the screened table travels to the result (WP-1055)

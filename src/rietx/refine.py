@@ -7226,6 +7226,15 @@ class Refinement:
             raise RuntimeError("no QPA on this result (Rietveld fits only)")
         write_qpa_table(self.result_.qpa, path, **kw)
 
+    def write_correlation_table(self, path, **kw) -> None:
+        """Write the last fit's full parameter correlation matrix to CSV/TSV
+        (WP-1990; see :func:`rietx.io.exporters.write_correlation_table`)."""
+        from .io.exporters import write_correlation_table
+
+        if self.result_ is None:
+            raise RuntimeError("call fit() first")
+        write_correlation_table(self.result_, path, **kw)
+
     @property
     def fitted_structure(self) -> Structure:
         return self.structure
@@ -9392,13 +9401,15 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                               or guard.measured_extra_peak_absorption
                               or guard.measured_top_correlations
                               or guard.measured_soft_modes
-                              or guard.measured_exchangeability):
+                              or guard.measured_exchangeability
+                              or guard.measured_correlation is not None):
         identifiability = Identifiability(
             background_absorption=dict(guard.measured_background_absorption),
             extra_peak_absorption=dict(guard.measured_extra_peak_absorption),
             top_correlations=list(guard.measured_top_correlations),
             soft_modes=list(guard.measured_soft_modes),
-            exchangeability=list(guard.measured_exchangeability))
+            exchangeability=list(guard.measured_exchangeability),
+            correlation=guard.measured_correlation)
 
     return RefinementResult(
         status=status, mode=mode,

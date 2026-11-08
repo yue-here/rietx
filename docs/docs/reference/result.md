@@ -191,16 +191,26 @@ Rwp and the residual differ, because anyone can recompute them from the arrays a
 | `Identifiability.top_correlations` | the pairs with the largest \|ρ\|, each a `CorrelationPair`, worst first | which two refined parameters moved together |
 | `Identifiability.soft_modes` | the softest directions of the scale-normalised normal matrix, each a `SoftMode` | the same problem where it involves three parameters or more, which no pairwise list can show |
 | `Identifiability.exchangeability` | one `ExchangeRow` per held parameter screened | whether a parameter you held could have been absorbed by the ones you refined |
+| `Identifiability.correlation` | the whole correlation matrix, a `CorrelationMatrix`, or `None` where it was not measured | every pair's ρ, of which `top_correlations` and the `HIGH_CORRELATION` rows are the worst few |
 
 | Field | Is |
 |---|---|
 | `CorrelationPair.path_a`, `CorrelationPair.path_b` | the two dot-paths |
 | `CorrelationPair.rho` | their signed correlation, from the final Jacobian the `HIGH_CORRELATION` check read, so the two always agree |
+| `CorrelationMatrix.paths` | the free parameters' dot-paths, in table order |
+| `CorrelationMatrix.lower` | the lower triangle, diagonal included, packed row by row as ρ(0,0), ρ(1,0), ρ(1,1), ρ(2,0), ρ(2,1), ρ(2,2) …; `None` is a pair the data does not determine |
 | `SoftMode.eigenvalue` | an eigenvalue of ĴᵀĴ with every column normalised to unit length, so it is dimensionless; for a single pair with correlation ρ it is 1 − \|ρ\|, and 0 is exact degeneracy |
 | `SoftMode.loadings` | dot-path → component of the unit eigenvector, kept above 0.1 and signed so the largest is positive |
 | `ExchangeRow.held` | the held parameter's dot-path |
 | `ExchangeRow.r2` | the block projection R² of its column onto the span of the free ones, evaluated at the converged values with the candidate freed on a copy of the vary set and never refined |
 | `ExchangeRow.partners` | dot-path → signed loading of the reconstruction, kept above 0.05: which fitted values absorb the held parameter's signature |
+
+`CorrelationMatrix.matrix` unpacks the triangle into the symmetric P × P array, with NaN where a pair is not determined.
+`CorrelationMatrix.rho` returns one pair's value by dot-path, and `CorrelationMatrix.from_square` packs a square array.
+The matrix is the one `top_correlations` is cut from, so a pair quoted there has the same value here.
+It is carried on the result and never on a history node, because at 300 free parameters the triangle is 45 150 numbers.
+`Refinement.write_correlation_table` writes it to a file ([Exports and derived tables](exports.md)).
+A joint multi-histogram fit leaves it `None`, as it leaves the other parameter-space tables empty.
 
 The two absorption tables partition the declared extra components by kind.
 A hump is in the background span and a declared sharp peak in its own.

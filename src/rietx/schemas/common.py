@@ -703,6 +703,11 @@ from .._nearmiss import did_you_mean
 #: Additive and defaulted to ``None``, a linear tie, the 0.25 → 0.26 rule; so
 #: every stored tie opens as the linear tie it was.  An older build refuses a
 #: document carrying the key.
+#: Also in 0.61 (WP-1990): ``Identifiability.correlation``, the full parameter
+#: correlation matrix at the answer as a ``CorrelationMatrix`` (paths in table
+#: order, packed lower triangle).  Additive and defaulted to ``None``, "not
+#: measured", the 0.25 → 0.26 rule; an older build refuses a result carrying
+#: the key.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

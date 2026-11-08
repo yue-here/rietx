@@ -86,10 +86,15 @@ disagree.
   result it is 0.5 % at P = 15 and comparable to the curves the result
   already carries at P = 300. A node stores state, not curves, and the
   matrix is evidence about one answer, which is what the result is.
-- [ ] `Identifiability.correlation` (paths in table order, packed lower
+- [x] `Identifiability.correlation` (paths in table order, packed lower
   triangle), `None` where not measured; `SCHEMA_VERSION` bump under WP-1117.
-- [ ] An export: a labelled table and a CSV writer beside the existing
-  exports.
+  Landed as a `CorrelationMatrix` (`paths`, `lower`; `matrix()`, `rho()`,
+  `from_square()`), filled from `GuardReport.measured_correlation`; 0.61 is
+  unreleased, so it is an "Also in 0.61" entry, not a new number.
+- [x] An export: a labelled table and a CSV writer beside the existing
+  exports. `rietx.io.exporters.correlation_table_csv` /
+  `write_correlation_table` and `Refinement.write_correlation_table`; not
+  re-exported at the top level, which would have grown the skill's `api.md`.
 - [ ] The text FitReport's printed block, if the maintainer wants it on by
   default: rows with at least one off-diagonal |ρ| over the guard only.
 - [ ] Correct the `HIGH_CORRELATION_OMITTED` suggestion to name the new

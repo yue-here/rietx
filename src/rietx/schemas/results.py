@@ -302,6 +302,78 @@ class CorrelationPair(Base):
     rho: float
 
 
+class CorrelationMatrix(Base):
+    """The full parameter correlation matrix at the answer (WP-1990).
+
+    ``paths`` are the free parameters in table order; ``lower`` is the
+    matrix's lower triangle, diagonal included, packed row by row:
+    ρ(0,0), ρ(1,0), ρ(1,1), ρ(2,0), … — P(P+1)/2 entries for P paths.  It is
+    the matrix :class:`CorrelationPair` is cut from and the
+    ``HIGH_CORRELATION`` guard thresholds, so the three cannot disagree: the
+    solver's final one, with any direction the Jacobian cannot resolve
+    projected out (WP-2050,
+    :func:`~rietx.optimize.statistics.resolved_correlation`).  ``None`` is a
+    pair the data does not determine, never a number standing in for one.
+
+    ρ rather than the covariance, because it is unitless and χ²_red and the
+    Bérar-Lelann factor cancel in it.  It is carried on the result only,
+    never on a history node: at P = 300 the triangle is 45 150 numbers,
+    about 120 history nodes' worth (WP-1990's storage measurement).
+    """
+
+    paths: list[str]
+    lower: list[float | None]
+
+    @model_validator(mode="after")
+    def _triangle_fits(self) -> CorrelationMatrix:
+        n = len(self.paths)
+        if len(self.lower) != n * (n + 1) // 2:
+            raise ValueError(
+                f"a packed lower triangle over {n} paths holds {n * (n + 1) // 2} "
+                f"entries, not {len(self.lower)}")
+        return self
+
+    @classmethod
+    def from_square(cls, paths: list[str], matrix) -> CorrelationMatrix:
+        """Pack a P×P matrix over ``paths``; ``nan`` becomes ``None``.
+
+        Each entry ρ(i, j), i ≥ j, is read from ``matrix[j, i]``, the upper
+        half: a correlation formed in floating point is symmetric only to an
+        ulp or so, and the upper half is the one the guard and
+        :func:`~rietx.optimize.identifiability.top_correlations` read, so a
+        pair quoted there is this entry bit for bit."""
+        m = np.asarray(matrix, dtype=float)
+        n = len(paths)
+        if m.shape != (n, n):
+            raise ValueError(f"a {m.shape} matrix over {n} paths")
+        rows, cols = np.tril_indices(n)
+        return cls(paths=list(paths),
+                   lower=[float(v) if np.isfinite(v) else None
+                          for v in m[cols, rows]])
+
+    def matrix(self) -> np.ndarray:
+        """The symmetric P×P array, ``nan`` where a pair is not determined."""
+        n = len(self.paths)
+        out = np.empty((n, n))
+        rows, cols = np.tril_indices(n)
+        vals = np.array([np.nan if v is None else v for v in self.lower], dtype=float)
+        out[rows, cols] = vals
+        out[cols, rows] = vals
+        return out
+
+    def rho(self, path_a: str, path_b: str) -> float | None:
+        """ρ between two free paths, ``None`` where the data does not
+        determine it.  Raises ``KeyError`` naming a path that was not free."""
+        try:
+            i, j = self.paths.index(path_a), self.paths.index(path_b)
+        except ValueError:
+            missing = path_a if path_a not in self.paths else path_b
+            raise KeyError(f"{missing!r} was not a free parameter at the answer") from None
+        if i < j:
+            i, j = j, i
+        return self.lower[i * (i + 1) // 2 + j]
+
+
 class SoftMode(Base):
     """One near-null direction of the scale-normalised normal matrix.
 
@@ -429,6 +501,12 @@ class Identifiability(Base):
     top_correlations: list[CorrelationPair] = Field(default_factory=list)
     soft_modes: list[SoftMode] = Field(default_factory=list)
     exchangeability: list[ExchangeRow] = Field(default_factory=list)
+    #: The whole matrix ``top_correlations`` is cut from (WP-1990).  ``None``
+    #: where it was not measured: fewer than two free parameters, no
+    #: correlation formed, or a joint multi-histogram fit, whose
+    #: parameter-space screens do not run (see above).  Export it with
+    #: :func:`rietx.io.exporters.write_correlation_table`.
+    correlation: CorrelationMatrix | None = None
 
 
 class PhaseQuantity(Base):
