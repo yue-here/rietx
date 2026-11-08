@@ -27,6 +27,7 @@ detail the test never states.
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import gemmi
@@ -395,6 +396,76 @@ def test_a_cancelled_screen_abstains_and_says_which_classes_it_reached():
         "a cancelled screen has refuted nothing — it asked nothing")
 
 
+@pytest.mark.parametrize("which", ["class", "scoring"])
+def test_a_class_fit_that_raises_leaves_the_class_unscored(which, monkeypatch):
+    """A solver failure is no evidence about the absences, so the class it hit
+    stays unrefuted and unscored, and the screen abstains naming the error.
+
+    ``which`` picks the fit that raises: a class's own fit, or the refit of the
+    lattice less its testable forbidden lines that scores it (WP-2076).  Before
+    this either raise marked the class refuted, which took it out of
+    ``best_or_none``'s margin test and could hand a rival a confident answer.
+    """
+    from rietx.indexing import extinction
+
+    real = extinction._fit_class
+    hit = []
+
+    def flaky(candidate, data, instrument, symbol, limits, omit=None):
+        scoring = omit is not None
+        own = not scoring and symbol != "P 1 2/m 1"   # not the reference
+        if (which == "scoring" and scoring) or (which == "class" and own):
+            hit.append(symbol)
+            raise np.linalg.LinAlgError("injected")
+        return real(candidate, data, instrument, symbol, limits, omit=omit)
+
+    monkeypatch.setattr(extinction, "_fit_class", flaky)
+    structure, instrument = _mono_models()
+    screen = determine_extinction_symbol(
+        _pattern(structure, instrument), _candidate(MONO_CELL, "monoclinic"),
+        instrument, two_theta_limits=MONO_RANGE, refine_cell=False)
+    assert hit, "the injected raise was never reached"
+    unscored = [c for c in screen.candidates if not c.screened]
+    assert unscored
+    assert all(not c.refuted and c.refuted_reason is None for c in unscored)
+    assert screen.best_or_none() is None
+    ambiguous = [d for d in screen.diagnostics
+                 if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS"]
+    assert ambiguous and "LinAlgError: injected" in ambiguous[0].message, (
+        [str(d) for d in screen.diagnostics])
+    assert "never fitted" not in ambiguous[0].message
+    if which == "scoring":
+        # the class's own fit stood, so a refutation on its evidence holds
+        refuted = [c for c in screen.candidates if c.refuted]
+        assert refuted and all("testable forbidden" in c.refuted_reason
+                               for c in refuted)
+        assert "Run the screen again" in ambiguous[0].suggestion
+
+
+def test_a_prefit_partition_stopped_on_its_cap_is_reported_on_the_screen(monkeypatch):
+    """The prefit settles its Le Bail partition like every fit (WP-2076), so its
+    cap can bind; the caller has no stage to raise it on, so the screen says so."""
+    from dataclasses import replace
+
+    from rietx.strategy import staged
+
+    real = staged.resolve_plan
+
+    def one_cycle(*args, **kw):
+        plan = real(*args, **kw)
+        return replace(plan, stages=[replace(s, lebail_cycles=1) for s in plan.stages])
+
+    monkeypatch.setattr(staged, "resolve_plan", one_cycle)
+    structure, instrument = _mono_models()
+    screen = determine_extinction_symbol(
+        _pattern(structure, instrument), _candidate(MONO_CELL, "monoclinic"),
+        instrument, two_theta_limits=MONO_RANGE)
+    capped = [d for d in screen.diagnostics if d.code == "LEBAIL_CYCLES_AT_CAP"]
+    assert len(capped) == 1, [str(d) for d in screen.diagnostics]
+    assert capped[0].message.startswith("The extinction screen's cell-free prefit")
+    assert "refine_cell=False" in capped[0].suggestion
+
+
 def test_a_screen_that_cannot_run_reports_rather_than_raises():
     """A cell with no reflections in range fails *every* class identically, so it
     is a statement about the input — reported as a failed screen with a reason,
@@ -509,33 +580,43 @@ def fap_screen():
 
 
 @pytest.mark.slow
-def test_fap_returns_the_p63_class_with_its_groups_listed(fap_screen):
-    """The acceptance criterion: the right class first, its groups **listed**.
+def test_fap_leads_with_the_p63_class_and_abstains_on_one_position(fap_screen):
+    """The class leads the list with its groups **listed**, and the screen
+    abstains, because one testable position cannot reach the margin.
 
-    P 6₃/m is the answer the tutorial refines, and it is *not* what this returns —
-    what it returns is ``P 63 - -``, the class {P 6₃, P 6₃/m, P 6₃22}, because a
-    powder cannot tell those three apart.  The mirror and the two-folds produce no
-    absences, so no counting time separates them; the diagnostic says so and names
-    the alternative arbiter.
+    P 6₃/m is the answer the tutorial refines.  What leads here is ``P 63 - -``,
+    the class {P 6₃, P 6₃/m, P 6₃22}, because a powder cannot tell those three
+    apart: the mirror and the two-folds produce no absences.  The class forbids
+    one line the data can test, (0 0 5) at 68.0° ((0 0 3) sits in a stronger
+    neighbour's tail), and since WP-2076 its score is a nested
+    comparison: removing one line buys ΔBIC ln N = 8.2 at most, under
+    ``DECISIVE_DELTA_BIC`` = 10.  Before WP-2076 the Le Bail screen read −84 on
+    that one position, more than its count can buy, so the answer rested on a
+    fit-path difference rather than on the absence.  Ruled by the maintainer on
+    2026-11-07 (WP-2076's handover log): the screen abstains here, and says
+    where the leading classes differ.
     """
     best = fap_screen.best_or_none()
-    assert best is not None, [(c.symbol, c.refuted_reason)
-                              for c in fap_screen.candidates]
-    assert best.symbol == "P 63 - -"
-    assert best.space_groups == ["P 63", "P 63/m", "P 63 2 2"]
-    assert best.conditions == ["00l: l = 2n"]
-    assert not best.refuted and best.n_testable >= 1
-    assert best.delta_bic < -DECISIVE_DELTA_BIC
+    assert best is None, best
+    top = fap_screen.candidates[0]
+    assert top.symbol == "P 63 - -"
+    assert top.space_groups == ["P 63", "P 63/m", "P 63 2 2"]
+    assert top.conditions == ["00l: l = 2n"]
+    assert not top.refuted and top.n_testable == 1
+    assert -math.log(fap_screen.n_points) - 0.1 <= top.delta_bic < 0.0
 
     note = next(d for d in fap_screen.diagnostics
                 if d.code == "EXTINCTION_GROUPS_NOT_SEPARABLE")
-    for group in best.space_groups:
+    for group in top.space_groups:
         assert group in note.where[0]
     assert note.level == "info"
+    ambiguous = next(d for d in fap_screen.diagnostics
+                     if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS")
+    assert str(top.tested_hkl[0]) in ambiguous.message, ambiguous.message
 
     # every other class is refuted, and by named reflections
     others = [c for c in fap_screen.candidates if c.symbol not in
-              (best.symbol, "P - - -")]
+              (top.symbol, "P - - -")]
     assert others and all(c.refuted and c.forbidden_hkl for c in others)
 
 

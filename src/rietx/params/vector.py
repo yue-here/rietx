@@ -3007,6 +3007,97 @@ class ParameterTable:
                     "while its record moves, so only an increment of the same "
                     "kind can follow one (or be followed by one)")
 
+    def add_expression(self, target: str, expression, *,
+                       variables: Mapping[str, str],
+                       constants: Mapping[str, float] | None = None):
+        """Set ``target`` by an expression the user wrote (WP-1964).
+
+        ``expression`` is text in the grammar of ``params.expression`` (or a
+        parsed :class:`~rietx.params.expression.Expression`).  Each of its names
+        is a **variable**, ``variables`` mapping it to an entry of this table
+        (``"zero_a" → "vars.zero_a"``), or a **constant**, ``constants`` giving
+        its number here (a pattern's coordinate).  A name in neither, or in
+        both, is refused, and so is a variable or constant the expression does
+        not use.
+
+        The target becomes a derived row (:class:`~rietx.params.derived.
+        ExpressionBlock`), locked with no tie.  So does every entry whose tie
+        reads the target alone, such as a cubic ``b`` and ``c``: the block
+        writes it from the same tie, after the target, where an affine row
+        would read the target's stale value.  An entry tied to the target
+        *and* to something else is refused by name, since the block cannot
+        carry the other half.  Returns the block.
+        """
+        from .derived import ExpressionBlock
+        from .expression import RESERVED, Expression, ExpressionError
+
+        expr = expression if isinstance(expression, Expression) else Expression(expression)
+        constants = dict(constants or {})
+        variables = dict(variables)
+        both = sorted(set(variables) & set(constants))
+        if both:
+            raise ValueError(f"{both[0]!r} is both a variable and a constant; "
+                             "a name has one meaning")
+        for name in (*variables, *constants):
+            if name in RESERVED:
+                raise ValueError(f"{name!r} is a reserved word of the expression "
+                                 "grammar; rename it")
+        known = {**variables, **constants}
+        for name in expr.names:
+            if name not in known:
+                from .._nearmiss import did_you_mean
+                hint = did_you_mean(name, known)
+                raise ExpressionError(
+                    "unbound", f"{target}: the expression names {name!r}, which is "
+                    "neither a variable nor a coordinate" + (f"; {hint}" if hint else ""))
+        unused = sorted(set(known) - set(expr.names))
+        if unused:
+            raise ValueError(f"{target}: {unused[0]!r} is declared but the expression "
+                             f"{expr.text!r} does not use it")
+        i = self._paths.get(target)
+        if i is None:
+            raise ValueError(f"unknown parameter {target!r}")
+        e = self.entries[i]
+        if e.tie is not None:
+            sources = ", ".join(src for src, _ in e.tie.terms)
+            raise ValueError(f"{target!r} is tied to {sources}, so an expression "
+                             f"cannot set it; set {sources} instead")
+        if e.locked or e.held:
+            raise ValueError(f"{target!r} is {'locked' if e.locked else 'held'}, "
+                             "so an expression cannot set it")
+        for name, path in variables.items():
+            if path not in self._paths:
+                raise ValueError(f"variable {name!r} names unknown parameter {path!r}")
+            if path == target:
+                raise ValueError(f"{target!r} cannot be a variable of its own expression")
+        followers: list[tuple[str, float, float]] = []
+        for f in self.entries:
+            if f.tie is None or f.path == target:
+                continue
+            terms, const = self._flatten(f.tie, (f.path,))
+            if not any(j == i for j, _ in terms):
+                continue
+            coeff = sum(c for j, c in terms if j == i)
+            if any(j != i and c != 0.0 for j, c in terms):
+                raise ValueError(
+                    f"{f.path!r} is tied to {target!r} and to another parameter "
+                    f"(= {f.tie}); an expression's block can carry a follower of "
+                    "the target alone")
+            followers.append((f.path, coeff, const))
+        e.vary = False
+        e.locked = True
+        for path, _, _ in followers:
+            fe = self.entries[self._paths[path]]
+            fe.tie = None
+            fe.vary = False
+            fe.locked = True
+        block = ExpressionBlock(expr, target, {n: variables[n] for n in expr.names
+                                               if n in variables},
+                                {n: constants[n] for n in expr.names if n in constants},
+                                followers)
+        self.add_derived(block)
+        return block
+
     def set_held(self, paths: str | Iterable[str], held: bool) -> list[str]:
         """Mark entries as the caller's declared hold.  Returns the ones that exist.
 

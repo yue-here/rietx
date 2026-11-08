@@ -53,6 +53,22 @@ screenshots come from `docs/manual/make_screenshots.py`.
 
 ### Inherited
 
+- **2026-11-05, from the issue triage (issue #1397): the screenshots need a series example and
+  a driver phase.** Checked at `541f0daf7`: `docs/docs/make_screenshots.py` line 101 reads
+  `PHASES = ("empty", "opened", "fitted", "forked")`, and the driver opens one example project.
+  `tests/planted_series.py` is the fixture with a known transition, and it does not ship. The
+  issue's way forward: generate a short planted series at screenshot time (seeded, about
+  twelve patterns), upload it through the session, add a `series` phase after `fitted`, and
+  declare two shots, the trace with its marks and the scrubbed pattern view under it.
+  `tests/test_gui_manual.py` checks that every shot names a phase the driver walks. The machine
+  running the driver needs playwright and a cached chromium.
+- **2026-11-05, from the issue triage (issue #1396): in PR #1395.** The defect reads as the
+  issue says at `541f0daf7`: `GuiSession._series_member_result` takes `runner.results_[index]`
+  and `series_curves` takes `entry["data"][index]`, numbered differently once a pattern has
+  failed. The issue found this by reading, and this triage did not run it either. PR #1395's
+  head looks the member up by its index on both routes, with a regression test, and its body
+  carries the keyword that ends the issue at merge. Nothing is owed here beyond that merge.
+
 - **2026-10-26, from WP-2003 (fourth session): the series panel's "discontinuous" mark has no writer left; plot `SeriesResult.steps` instead.** WP-2003 removed `SEQUENTIAL_DISCONTINUITY` (no threshold survives) and added `SeriesResult.steps`: every refined path's step between consecutive patterns, in esds of the later fit, largest first, with `cold_ratio` set only on steps a caller re-measured with `fit(verify_steps=k)`. `src/rietx/gui/series.py` keeps the route's `discontinuous` key, now true only for such a verified step, and the GUI never passes `verify_steps`, so it is always false there. The client still reads it and still captions it "a step far larger than this parameter's own scatter" (`gui/src/lib/series.ts:65`, `:151`, `:196`; `gui/src/panels/Series.svelte:613`). WP-2037's mock-up (`docs/wp/2037-attention/examples.md` § 5) has the panel plot `series.steps` beside the trajectory. That change and its dist rebuild are owed, and the scrubber is where the series panel is being rebuilt.
 - **2026-10-24, from WP-2003 (PR #1150): the planted fixture's `signals.json` is stale in its one unpinned list.** WP-2003 reran the planted-events series on the current tree (`docs/wp/2003-batch/measure_reseed.py --family planted`, all 248 patterns, default arm) and found 49 reseeds where `tests/data/planted_series/signals.json` lists 20. Nothing fails, because `tests/test_planted_series.py` pins every signal but that list. The other lists were not compared. The reseed fence's ruling (WP-2003's batch) may change the count again, so regenerate it after that lands, or pin it now and let the ruling move it on purpose.
 - **2026-10-19, from WP-1986.** The GUI chapters moved to the new manual tree:
