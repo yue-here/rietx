@@ -1,6 +1,6 @@
 # WP-2121 — A restraint follows its atoms through an edit
 
-Milestone: unscheduled · Status: 🔄 2026-11-08 — every task landed on the branch; not pushed, and the PR waits for the maintainer's approval to post
+Milestone: unscheduled · Status: 🔄 2026-11-08 — every task landed; the PR is open for review, and three decisions wait for the maintainer
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-08 — a silent wrong answer on a path few fits run: an edit that reorders atoms leaves a bond restraint on two other atoms, and the next fit pulls them to the old target with nothing said
@@ -222,10 +222,29 @@ refuse with the way to split the edit. Case (b) is covered by the same rule: a r
 rows differ at their places refuses where its numbers would read other atoms. The judge did not
 re-run on the redesign. *Answer to item 4.* The three checks left construction (same commit).
 
-*Next.* (1) The maintainer approves posting: push and mark the PR ready (`/wp-handover` step 11).
-(2) Two questions for the maintainer: whether the renumbering should record that it fired
-(Rule 4 against the hold and tie carry's convention), and whether restraints should name atoms by
-label as TOPAS and GSAS-II do, a stored-format change that would end this class of defect.
+*Next*, in order. The maintainer approved posting on 2026-11-08, and the PR is open for review.
+
+1. **Review and merge the PR.** CI is the gate (ruff, the fast suite on every supported Python,
+   a `[dev,jax]` job). The full selection did not run here; the change moves no measured number,
+   so the nightly is its first full run.
+2. **Decide whether the renumbering records that it fired.** DESIGN rule 4 asks a kind-1 action
+   to record that it fired, and `SITE_DOFS_RENUMBERED` does so for coordinate directions. The hold
+   and tie carry (#1264) records nothing, and this WP matched it. A yes adds a warning
+   `Diagnostic` (a code, its help entry and skill row, an audit row) for holds, ties and
+   restraints together, as its own WP.
+3. **Decide whether restraints name atoms by label**, as TOPAS and GSAS-II do (recall, not checked
+   in their manuals). It would end this class of defect, including the ambiguity this WP refuses.
+   It is a stored-format change, so it needs a schema version and a reader for index-keyed files.
+4. **Decide whether construction checks tether, anti-bump and value-path atoms.** Today only the
+   edit does (Context). Checking at construction would also refuse a saved history holding such a
+   node; nobody has measured whether one exists.
+5. **Follow-ups, each its own WP after the fold check.** (a) `edit()` given the very object
+   `ref.structure` renumbers nothing, for holds, ties or restraints: needs a snapshot of the last
+   committed structure (proposed as a session card on 2026-11-08). (b) A restraint's `op_index`
+   is not re-read when an edit moves its atom onto or off a special position. (c) The GUI's
+   structure upload validates on arrival, so removing the last-listed restrained atom there is
+   refused instead of dropped with a warning. (d) Optionally, re-run the generality judge on the
+   redesigned rule (commit `09001aa00`); it judged the first design only.
 
 - **2026-11-08** — created. No open WP owns restraints across an edit: WP-1991 (✅) fixed the
   registers the `Refinement` holds and names rigid-body paths as not generalised, and WP-1995 is
