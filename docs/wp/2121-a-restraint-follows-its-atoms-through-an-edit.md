@@ -103,6 +103,32 @@ never by a bare `IndexError` at the next fit.
 
 ## Handover log
 
+### 2026-11-08 (2nd session) — the review's two refusal messages
+
+A `/pr-review` re-gate of PR #1463 found the logic sound and two refusals worded wrongly. Both now
+say what happened. An edit refused because a restraint's numbering is ambiguous no longer opens
+with "this model names an atom it does not have", which was false there. And removing an atom
+together with the restraint on it, when that restraint is not last, is still refused, but the
+message now says why: each later restraint moved up a place, so it reads as changed. Next: the
+maintainer merges, and settles the three decisions under *Next* below.
+
+*Done.* `Refinement.edit` wraps `carry_restraints` and `_check_atom_references` separately, so
+only the second refusal carries the missing-atom sentence. The ambiguity message in
+`twins.carry_restraints` adds the sentence on deletion and is split into one clause per sentence.
+The 1.12.0 *Code to check* note adds the same sentence. Tests: the σ-edit case asserts the refusal
+no longer says "does not have"; a new case removes O3 and the S2–O3 bond in one edit, expects the
+refusal, then removes O3 alone and gets S2–O5 kept with a warning.
+
+*Measured.* Before these edits, on the merged tree `a723b0eea` (macOS arm64, Python 3.12,
+`[dev,jax]`, nothing else running): fast selection 14 522 passed, 243 skipped, 32 xfailed;
+`tests/test_acceptance_sequential.py -m slow` 16 passed; `tests.audit_delta` no row changed;
+`tests.reader_output` unchanged. After them: `tests/test_restraint_renumbering.py` and
+`tests/test_sequential.py` 195 passed. The full `-m slow` suite was not run.
+
+*Not changed, deliberately.* The rule itself: a deletion inside the restraint list still refuses
+when atoms renumber. Matching an order-preserving subsequence of the old list would accept it, but
+that is the content matching the generality judge failed (a fresh row can equal an old one).
+
 ### 2026-11-08 — every task landed; the PR waits for approval
 
 A restraint now stays on the atoms it was written for when an edit reorders, inserts or removes

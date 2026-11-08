@@ -3122,8 +3122,15 @@ class Refinement:
             # A restraint names atoms by index and lives on the structure, out
             # of reach of the registers ``_carry_twin_moves`` renumbers below,
             # and a list changed in place re-ran no phase validator (WP-2121).
+            # The two refusals say different things: the first that a
+            # restraint's numbering is ambiguous, the second that a record
+            # names an atom the structure lacks.
             try:
                 candidate, restraints_dropped = carry_restraints(self.structure, candidate)
+            except ValueError as exc:
+                raise ValueError(
+                    f"the edit is refused rather than recorded: {exc}") from None
+            try:
                 candidate._check_atom_references()
             except ValueError as exc:
                 raise ValueError(

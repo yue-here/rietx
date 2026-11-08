@@ -529,11 +529,13 @@ def carry_restraints(old: Structure, new: Structure) -> tuple[Structure, list[st
                 # readings are a restraint the caller could mean (WP-2121)
                 raise ValueError(
                     f"restraint {k} of phase {after.name!r} differs from the one the "
-                    f"phase held there, and this change also renumbers the atoms it "
-                    f"names, so its numbers could mean either atom list. Make the "
-                    f"atom change alone, which carries every restraint onto its "
-                    f"atoms, then change the restraints; a restraint appended after "
-                    f"the carried ones is read in the new numbering")
+                    f"phase held at that place. This change also renumbers the atoms "
+                    f"it names, so its numbers could mean either atom list. Deleting "
+                    f"a restraint counts as changing every one after it, since each "
+                    f"moves up a place. Make the atom change alone, which carries "
+                    f"every restraint onto its atoms, and then change the restraints. "
+                    f"A restraint appended after the carried ones is read in the new "
+                    f"numbering")
         update: dict = {}
         if restraints != list(after.restraints):
             update["restraints"] = restraints

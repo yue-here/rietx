@@ -222,8 +222,27 @@ def test_a_restraint_edited_in_the_same_edit_that_moves_its_atoms_refuses_it(pbs
     candidate = _swapped(ref, "O3", "O5")
     candidate.phases[0].restraints[0] = candidate.phases[0].restraints[0].model_copy(
         update={"sigma": 0.005})
-    with pytest.raises(ValueError, match="could mean either atom list"):
+    with pytest.raises(ValueError, match="could mean either atom list") as caught:
         ref.edit(structure=candidate)
+    # every atom the restraint names exists, so the refusal must not say otherwise
+    assert "does not have" not in str(caught.value)
+
+
+def test_deleting_a_restraint_beside_an_atom_removal_says_the_rows_shifted(pbso4):
+    """Removing O3 and the S2–O3 bond in one edit moves the S2–O5 bond up a place,
+    so it differs from the row held there.  The refusal says why, since the caller
+    changed nothing in that row; removing the atom alone drops S2–O3 with a warning."""
+    ref = _refinement(pbso4, _restraint("bond", ["S2", "O3"]),
+                      _restraint("bond", ["S2", "O5"]))
+    candidate = _removed(ref, "O3")
+    del candidate.phases[0].restraints[0]
+    with pytest.raises(ValueError, match="Deleting a restraint counts as changing every "
+                                         "one after it"):
+        ref.edit(structure=candidate)
+    with pytest.warns(UserWarning, match="no longer has"):
+        ref.edit(structure=_removed(ref, "O3"))
+    assert [_named(ref.structure.phases[0], r) for r in ref.structure.phases[0].restraints] \
+        == [["S2", "O5"]]
 
 
 def test_a_restraint_edited_on_atoms_that_did_not_move_is_taken_as_written(pbso4):
