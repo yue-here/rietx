@@ -405,6 +405,15 @@ _RESTRAINT_KIND = {"BondRestraint": "bond", "AngleRestraint": "angle",
                    "TorsionRestraint": "torsion"}
 
 
+def _atom_index(path: str) -> tuple[int, int] | None:
+    """(phase, atom) of a path on an atom (``phases.i.atoms.j…``), else ``None``."""
+    m = _ATOM_PATH.match(path)
+    if m is None:
+        return None
+    ip, j = (int(k) for k in m.group(1).split(".")[1::2])
+    return ip, j
+
+
 def _restraint_atoms(r) -> list[int]:
     """The atom indices restraint ``r`` names, in its own order (none for a value)."""
     if isinstance(r, ValueRestraint):
@@ -449,20 +458,27 @@ def carry_restraints(old: Structure, new: Structure) -> tuple[Structure, list[st
     so, sn = coordinate_snapshot(old), coordinate_snapshot(new)
     atoms = atom_moves(so, sn)
     dropped: list[str] = []
+    pairs = _phase_pairs(so, sn)
+    if not atoms and len(old.phases) == len(new.phases) and all(
+            io == pn and len(old.phases[io].atoms) == len(new.phases[pn].atoms)
+            for io, pn in pairs):
+        return new, dropped               # every number names the atom it named
     phases = list(new.phases)
     changed = False
 
     def atom_exists(path: str | None) -> bool:
-        m = _ATOM_PATH.match(path or "")
-        if m is None:
+        at = _atom_index(path or "")
+        if at is None:
             return path is not None
-        ip, j = (int(k) for k in m.group(1).split(".")[1::2])
-        return ip < len(phases) and j < len(phases[ip].atoms)
+        return at[0] < len(phases) and at[1] < len(phases[at[0]].atoms)
 
-    for io, pn in _phase_pairs(so, sn):
+    for io, pn in pairs:
         before, after = old.phases[io], new.phases[pn]
         n_new = len(after.atoms)
         labels = [a.label for a in before.atoms]
+        # keyed by kind and content: pydantic equality per pair would cost
+        # n × m comparisons on an anti-bump list of thousands of rows
+        carried = {(type(r).__name__, r.model_dump_json()) for r in before.restraints}
 
         def local(j: int) -> int | None:
             path = renumber_path(f"phases.{io}.atoms.{j}", atoms)
@@ -471,15 +487,14 @@ def carry_restraints(old: Structure, new: Structure) -> tuple[Structure, list[st
 
         restraints = []
         for r in after.restraints:
-            if r not in before.restraints:
+            if (type(r).__name__, r.model_dump_json()) not in carried:
                 restraints.append(r)                  # written for this structure
                 continue
             kind = _RESTRAINT_KIND[type(r).__name__]
             if isinstance(r, ValueRestraint):
                 path = renumber_path(r.path, atoms)
                 if not atom_exists(path):
-                    m = _ATOM_PATH.match(r.path)
-                    ip, j = (int(k) for k in m.group(1).split(".")[1::2]) if m else (0, -1)
+                    ip, j = _atom_index(r.path) or (0, -1)
                     named = (f" ({old.phases[ip].atoms[j].label})"
                              if ip < len(old.phases) and 0 <= j < len(old.phases[ip].atoms)
                              else "")

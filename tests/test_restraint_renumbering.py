@@ -223,6 +223,23 @@ def test_a_value_restraint_off_any_atom_passes_unchanged(pbso4):
     assert ref.structure.phases[0].restraints[0].path == "phases.0.scale"
 
 
+def test_a_value_restraint_follows_its_phase_when_a_phase_is_inserted_ahead(pbso4):
+    """A value restraint's path is a whole-model path.  A second phase put ahead of
+    PbSO₄ makes it phase 1, matched by name, and the path moves with it, while the
+    bond restraint's atom indices, local to the phase, stay as they were."""
+    value = ValueRestraint(path="phases.0.atoms.4.biso", target=0.5, sigma=0.1)
+    ref = _refinement(pbso4, value, _restraint("bond", ["S2", "O5"]))
+    other = pbso4.model_copy(update={"name": "PBSO4-B", "restraints": []}, deep=True)
+    candidate = ref.structure.model_copy(deep=True)
+    candidate.phases.insert(0, other)
+    _edit_quietly(ref, candidate)
+    moved = ref.structure.phases[1]
+    assert moved.name == pbso4.name
+    assert moved.restraints[0].path == "phases.1.atoms.4.biso"
+    assert _named(moved, moved.restraints[1]) == ["S2", "O5"]
+    assert ref.structure.phases[0].restraints == []
+
+
 @pytest.mark.parametrize("kind", ["tether", "anti-bump"])
 def test_a_one_sided_restraint_out_of_range_is_refused_when_built(pbso4, kind):
     """``Phase`` checked bond, angle, planarity and torsion indices, and not these two."""
