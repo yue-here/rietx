@@ -1,6 +1,6 @@
 # WP-2076 — The extinction screen names a wrong class at a correct cell
 
-Milestone: unscheduled · Status: 🔄 2026-11-07 — the ruled repair merged (PR #1460); a raised fit now abstains, and the prefit's partition settles like every Le Bail fit's; measuring the margin tightening is next (PR #1461 open)
+Milestone: unscheduled · Status: 🔄 2026-11-08 — claimed by @mustachefeeling; measuring option (c)'s margin allowance
 Track: What fires, and what stays silent
 Depends on: — (1910 soft: its second screen agrees with the wrong class here; 2062 soft: its decision 2 moves the screen's fits to Pawley)
 Priority: P2 2026-11-07 — a silent wrong answer on a path few fits run: at a prefit cell within 600 ppm the default screen names a class excluding the true group on 318 of 1082 synthetic rows (41 groups), and nothing fires. Yue ruled the repair on 2026-11-07, so it is ready to build
