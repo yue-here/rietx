@@ -1,6 +1,6 @@
 # WP-1990 — the correlation matrix reaches the result
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-08 — claimed by @mustachefeeling
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-10-16 — a view over what the fit already computes; the one defect in it is a suggestion naming a field that does not exist, which misleads but changes no number
