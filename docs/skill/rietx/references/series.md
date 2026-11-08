@@ -74,8 +74,6 @@ What an operator must know, all measured:
   **escalates one rung at a time** — the full staged plan from the
   warm state, then the full staged plan cold — and keeps the best attempt
   (not rejected, then not cut by the bound, then the lower full cost).
-  A clean collapsed warm fit at over 1.25× its seed pattern's GoF climbs to
-  the staged warm rung only (`entry.escalated_on_gof`).
   `entry.rung` says which one produced the values and `entry.rungs_tried` says
   what else was tried; `entry.reseeded` still means only the cold rung won, so
   a `"warm_staged"` point is one whose chain is unbroken.  **A collapse every
@@ -433,7 +431,6 @@ The two moment codes, `SEQUENTIAL_MOMENT_HOLD` and `SEQUENTIAL_MOMENT_ONSET`, ar
 |---|---|
 | `SEQUENTIAL_RESEED` | Read this point of a series as evidence that the trajectory is continuous. With `SEQUENTIAL_UNRECOVERED` on the same pattern the cold rung was only the least bad attempt, not a good fit |
 | `entry.rwp_over_median` | Read a high ratio as a measurement before opening its fit, or a low one on the first patterns as clean (a median of one or two). No threshold reads it unless you pass `reseed_factor`. Compare GoF and Rexp with an accepted neighbour: GoF up is a model the pattern outgrew, GoF level with Rexp up is fewer counts. (Measured: #481, a blank frame fitted perfectly, GoF 1.00 against 1.06, Rexp 0.159 against 0.040.) Not quarantined (WP-1469) |
-| `entry.escalated_on_gof` | Read a converged warm fit with no code as its pattern's answer: a collapsed warm rung can stop in a wrong basin. `True` means its GoF exceeded 1.25× its seed pattern's (`entry.warm_gof_over_seed`), so the staged plan from the same start ran and the better fit was kept. Never sends a pattern cold (Measured: #1214, a minor phase's c 0.34 Å off at ratio 2.01; `warm_staged` landed within 1e-4 Å) |
 | `series.code_counts` | Read a per-pattern code as one pattern's problem before reading its count here: each `SeriesCodeCount` gives `code`, `path`, `count` of `n_patterns` and the worst `level`, largest first. On most of the series it is the model or the plan, and refitting single patterns reproduces it. No threshold reads it. (Measured: WP-1110, 425 unread `BOUND_HIT`s were one cell edge pinned in 42 of 68 patterns.) |
 | `series.steps` | Report a large step as physics without opening that pattern's own fit; it is equally the signature of a chain failure, and no threshold says which. `fit(verify_steps=k)` opens the *k* largest for you: both patterns refitted cold and independently, and `cold_ratio` is what that pair reproduces (1.0 in the data, 0 the chain's own); measured cost 5 % of a 68-pattern chain. Each `SeriesStep` carries `path`, `indices` and `size_esd`. Steps into or out of an unrecovered pattern are not listed |
 | `series.direction_gaps` | Read a top row as "the per-pattern esd is enough"; where the gap is large against its esds, quote the between-chain spread, which is the honest uncertainty |

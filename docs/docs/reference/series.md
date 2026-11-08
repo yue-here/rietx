@@ -548,6 +548,7 @@ So a first attempt whose GoF is more than 1.25 times the GoF of the pattern its 
 `SeriesEntry.warm_gof_over_seed` records that ratio on every warm pattern, and `SeriesEntry.escalated_on_gof` says when the step alone sent a pattern up.
 The step never sends a pattern to the cold attempt and never quarantines one, so it never sets `reseeded` and the chain stays unbroken there.
 It compares GoF, which divides the misfit by the pattern's own noise, and not Rwp, which moves with the counts.
+GoF moves with the counts too once a systematic misfit dominates, so a pattern counted much longer than its seed can climb with no wrong minimum, at the cost of one fit.
 It compares against the seed and not a median of the accepted patterns, because on a series where an unmodelled phase appears part-way a median of GoFs fired on 115 of 247 patterns, and the seed on one.
 Over the 537 warm fits of nine measured series it fired 3 times, and the largest ratio kept without need was 1.126.
 `reseed=False` turns it off with the rest of the ladder, and under `refit="stages"` it has nothing to climb to.

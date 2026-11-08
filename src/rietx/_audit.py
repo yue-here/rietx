@@ -4218,11 +4218,24 @@ ROWS: tuple[Row, ...] = (
                   "Retrospectively over the 537 warm fits of WP-2003's nine series (the off "
                   "arms, Linux x86-64; 2080-batch/retro_ratio.py) it fires on 3: cpd-noclose "
                   "1b (1.279; warm_staged reached Rwp 0.13928 from 0.16333, the independent "
-                  "fit's 0.13932), planted T186 (an unmodelled phase; nothing to rescue) and "
-                  "tut05-broken scan12 (26.0; _rejected already escalates it). The largest "
-                  "ratio kept without need is 1.126 (cpd), so 1.25 sits 2 % under the weakest "
-                  "rescue; measured on the issue's synthetic family and the nine, untested "
-                  "beyond them"),
+                  "fit's 0.13932), planted T186 (1.861, the cubic-to-tetragonal transition, "
+                  "the rock-salt phase unmodelled since T124; nothing to rescue, values moved "
+                  "3e-6 esd for 36 -> 108 evaluations) and tut05-broken scan12 (26.0; "
+                  "_rejected already escalates it); re-measured in-chain on this tree "
+                  "2026-11-08, macOS arm64, the same 3. Knock-on on cpd-noclose: the rescued 1b "
+                  "seeds 1c-1h to a GoF 0.025-0.042 lower than without the step and nearer the "
+                  "independent fits' on every pattern, with profile.v nearer them (2.4-5.2 -> "
+                  "0.7-2.1 esd) and one lor_strain each further (4.8-7.9 esd; 0.053-0.091 where "
+                  "they hold 0-0.018), a second basin the data rank by chi2 alone; 728 -> 1144 "
+                  "evaluations. The largest ratio kept without need is 1.126 (cpd); the "
+                  "smallest a rescue followed is 1.279 in the declared no-closing-stage "
+                  "variant and 2.01 under default settings, so 1.25 sits 2 % under the weakest "
+                  "rescue; measured on the issue's synthetic family and the nine, all "
+                  "development data, none sealed, untested beyond them. Named dissent, "
+                  "arithmetic and not measured: at a fixed relative misfit GoF grows as the "
+                  "square root of the counts once systematic error dominates, so a pattern "
+                  "with 1.56x its seed's counts (a ramp-and-dwell protocol) can cross 1.25 in a "
+                  "right basin, a cost of one fit and no answer, the better being kept"),
         grounds=("A step in GoF against the pattern's own seed is a property of this "
                  "pattern's fit, readable when it finishes, that a different start can fix, "
                  "and the escalation can only lower the pattern's chi2, since the better "
@@ -5001,14 +5014,17 @@ ROWS: tuple[Row, ...] = (
                   "made the caller's, 3 165 evaluations against the removed fence's 13 034, "
                   "and every other family not at all (2003-batch/batch.md, C1; clashes.md "
                   "X16); on this tree with no bound, the default since C3, planted escalates "
-                  "nothing in 3 111 evaluations (2026-11-02, macOS arm64)"),
+                  "nothing in 3 111 evaluations (2026-11-02, macOS arm64), and since WP-2080 "
+                  "one pattern, T186, on the GoF step, in 3 183 (2026-11-08, macOS arm64)"),
         grounds=("Trying a colder start on a rejected fit and keeping the better is what a "
                  "refiner does by hand, though none of the seven programs restarts a pattern "
                  "by itself (practice.md); a max_iter fit is not a trigger (C1). It rescues "
                  "the path guide's 800 K pattern (warm Rwp 0.917, cold 0.040) and the "
                  "magnetic blank frame on this tree. The escalation never keeps a worse "
                  "attempt (_prefer); tiered with C2's ladder. Settled by Claude 2026-10-26; ruled by the maintainer 2026-11-03 "
-                 "(2003-batch/batch.md, C1)."),
+                 "(2003-batch/batch.md, C1). The GoF step's climb to warm_staged, which is "
+                 "neither a colder start nor a rejected fit, has its own grounds and approval "
+                 "on GOF_STEP_FACTOR's row (WP-2080)."),
         approved="2026-11-03"),
     Row("rietx.sequential.SequentialRefinement.fit:reseed_factor", "default", tier="caller",
         ambiguity=1, value=None,

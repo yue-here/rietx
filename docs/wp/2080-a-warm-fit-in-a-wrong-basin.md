@@ -155,7 +155,7 @@ this session).
         | family · pattern | GoF/seed | rungs (default) | evaluations off → default | kept GoF off → default | read |
         |---|---|---|---|---|---|
         | cpd-noclose · 1b | 1.279 | warm, warm_staged | 430 → 501 | 1.786 → 1.524 | rescued: Rwp 0.16333 → 0.13928, the independent fit's 0.13932; worst Δ/esd against it 10 (scale) → 4.4 |
-        | planted · T186 | 1.861 | warm, warm_staged | 36 → 108 | 5.486 → 5.486 | nothing to rescue (an unmodelled phase); values move 3e-6 esd |
+        | planted · T186 | 1.861 | warm, warm_staged | 36 → 108 | 5.486 → 5.486 | nothing to rescue (the cubic-to-tetragonal transition; Context's retrospective calls it the unmodelled phase, which starts at T124); values move 3e-6 esd |
         | tut05-broken · scan12 | 26.0 | warm, warm_staged, cold | 5 → 19 | 26.33 → 26.33 | `_rejected` climbs it anyway; values identical |
 
         cpd, cpd-ftolnone, planted-null, trigger, cr2wo6 and tut05-jump: no

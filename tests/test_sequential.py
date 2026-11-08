@@ -1780,6 +1780,21 @@ def test_a_rejected_rung_past_the_gof_step_is_not_called_a_gof_escalation(
     assert not series[1].escalated_on_gof
 
 
+def test_the_gof_steps_factor_is_the_one_its_prose_quotes():
+    """The help entries and the series guide spell the factor; a retune of
+    ``GOF_STEP_FACTOR`` fails here until they say the new number."""
+    from pathlib import Path
+
+    from rietx.help import help_registry
+    from rietx.sequential import GOF_STEP_FACTOR
+    factor = f"{GOF_STEP_FACTOR:g}"
+    fields = help_registry()["result_fields"]
+    assert factor in fields["SeriesEntry.warm_gof_over_seed"]["description"]
+    assert factor in fields["SeriesEntry.escalated_on_gof"]["description"]
+    guide = Path(__file__).parents[1] / "docs" / "docs" / "reference" / "series.md"
+    assert f"more than {factor} times the GoF" in guide.read_text(encoding="utf-8")
+
+
 #: Issue #1214's chain (contributor mustachefeeling, its ``repro.py``): a
 #: wurtzite-type AB phase and its orthohexagonal Cmc2_1 subgroup, both
 #: simulated by rietx with Poisson noise; pattern 1 moves and broadens the
