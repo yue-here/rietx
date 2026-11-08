@@ -50,12 +50,13 @@ A stage that tried to free a held parameter reports it as `HOLD_BLOCKED_PLAN`, a
 ### Shared names are ties
 
 TOPAS ties parameters by giving them one name, or by writing an equation.
-rietx has three calls for the same jobs:
+rietx has three calls for the same jobs, `tie` taking either a source or an expression:
 
 | TOPAS | rietx |
 | --- | --- |
 | one name on several sites: `beq O5_biso` | `Refinement.tie_equal` |
 | an equation: `b = 2*a + 1;` | `Refinement.tie(path, source, scale=2, offset=1)` |
+| a nonlinear equation in named parameters: `beq = B0 * Exp(-k/T);` | `Refinement.tie(path, expression="B0 * exp(-k/T)")`, with `B0` and `k` from `add_variable` and `T` a number |
 | a named parameter: `prm w 0.1` | `Refinement.add_variable` |
 
 The three oxygen sites of fluorapatite share one displacement parameter in TOPAS like this (lines from a file rietx wrote, with each number cut to six significant figures):
@@ -75,6 +76,29 @@ ref.tie_equal(["phases.0.atoms.4.biso", "phases.0.atoms.5.biso", "phases.0.atoms
 
 The space group ties the lattice parameters in both programs.
 A tie you declare never overrides a tie the symmetry sets.
+
+### A parametric equation is a formula
+
+TOPAS refines a series of files in one input by giving them a shared `prm` and writing each cell edge as an equation in it.
+rietx writes the same thing as a joint fit with a formula equation ([Parametric refinement](../reference/parametric.md#formula-equations)).
+The formula's text follows [Expressions](../reference/expressions.md), which takes python's lowercase function names.
+Each line of a TOPAS parametric input has its rietx spelling:
+
+| TOPAS | rietx |
+| --- | --- |
+| `#list Files T_val` and one `xdd` per file | one pattern per file, and `rx.CoordinateTable(columns={"T": [...]})` in the same order |
+| `prm zero_a 4.1566` | `variables={"zero_a": rx.Parameter(value=4.1566, vary=True)}` |
+| `prm !theta 125.37` | `rx.Parameter(value=125.37)`, which `vary=False` holds |
+| `prm !theta_b = theta_a;` | the name `theta_a` in both formulas, which is one refined number |
+| `a = zero_a + grad_a/(Exp(theta_a/T) - 1);` | `rx.ParametricEquation(name="a", target="phases.0.cell.a", basis="expression", expression="zero_a + grad_a/(exp(theta_a/T) - 1)")` |
+| `Exp`, `Ln`, `Sqrt`, `ArcTan` | `exp`, `log`, `sqrt`, `atan` |
+| `local dT 0` read by each phase's cell equation | `variables={"dT": rx.Parameter(value=0.0, vary=True)}` with `rx.SharingMap(per_histogram=["vars.dT"])` |
+| `prm !calib = T + b*(T - 738)/369;` read by the cell equations | `rx.ParametricEquation(name="calib", target=None, basis="expression", expression="T + b*(T - 738)/369")`, declared before the formulas that name `calib` |
+| `min` and `max` on a `prm` | `rx.Parameter(min=..., max=...)` |
+
+A formula is evaluated in radians, and `pi` is the constant.
+`MultiHistogramRefinement.preview_equations` evaluates every formula at its starting values before any fit.
+Comparing that with the cells a TOPAS input stores checks a port line by line.
 
 ### Coordinates are refined along the symmetry directions
 

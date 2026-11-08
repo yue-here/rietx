@@ -171,3 +171,64 @@ class DerivedBlock(ABC):
     def reach_pattern(self) -> np.ndarray:
         """Declared dependence, bool (n_out, n_in): True where an output can
         move with an input anywhere in the map's domain."""
+
+
+class ExpressionBlock(DerivedBlock):
+    """A target set by an expression the user wrote (WP-1964).
+
+    The map is one :class:`~rietx.params.expression.Expression` evaluated at
+    the current values of its variables (the inputs, entry paths) and this
+    table's fixed numbers (``constants``: a pattern's coordinates).  Its outputs
+    are the target and the target's **followers**: an entry whose symmetry tie
+    reads the target alone (a cubic ``b`` and ``c`` follow ``a``) is written by
+    the block as ``coeff·target + const``.  An affine tie applied before the
+    block would read the target's stale value (``ParameterTable.decode`` runs
+    C·θ + d first), so the block carries the tie instead.  The symmetry is the
+    same; only the place it is applied moves.
+
+    Every input is a name the tree uses, so the declared reach is every output
+    on every input.  A name that sits only in a dead ``if`` branch at this θ
+    still reaches the target, because θ can move the condition.
+    """
+
+    def __init__(self, expression, target: str, variables, constants,
+                 followers=()):
+        from .expression import Expression
+
+        self.expression = (expression if isinstance(expression, Expression)
+                           else Expression(expression))
+        #: expression name → entry path, in the order the inputs use
+        self.variables: dict[str, str] = dict(variables)
+        self.constants: dict[str, float] = {k: float(v) for k, v in constants.items()}
+        #: (path, coeff, const) per follower
+        self.followers: tuple[tuple[str, float, float], ...] = tuple(
+            (p, float(c), float(k)) for p, c, k in followers)
+        self.target = target
+        self.inputs = tuple(self.variables.values())
+        self.outputs = (target, *(p for p, _, _ in self.followers))
+        self._names = tuple(self.variables)
+        self._coeffs = np.array([1.0, *(c for _, c, _ in self.followers)])
+        self._consts = np.array([0.0, *(k for _, _, k in self.followers)])
+
+    def _bindings(self, x) -> dict:
+        return {**self.constants, **dict(zip(self._names, x, strict=True))}
+
+    def evaluate(self, x: np.ndarray) -> np.ndarray:
+        v = float(self.expression.evaluate(self._bindings(np.asarray(x, dtype=np.float64))))
+        return self._coeffs * v + self._consts
+
+    def jacobian(self, x: np.ndarray) -> np.ndarray:
+        _, grads = self.expression.gradient(
+            self._bindings(np.asarray(x, dtype=np.float64)), self._names)
+        row = np.array([float(g) for g in grads], dtype=np.float64)
+        return np.outer(self._coeffs, row)
+
+    def evaluate_traced(self, x: Sequence) -> list:
+        xp = get_backend()
+        v = self.expression.evaluate(self._bindings(list(x)), xp)
+        # python floats on the left: a numpy scalar there fails on torch
+        return [v if c == 1.0 and k == 0.0 else float(c) * v + float(k)
+                for c, k in zip(self._coeffs, self._consts, strict=True)]
+
+    def reach_pattern(self) -> np.ndarray:
+        return np.ones((len(self.outputs), len(self.inputs)), dtype=bool)
