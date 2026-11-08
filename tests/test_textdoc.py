@@ -468,6 +468,29 @@ def test_the_plan_renders_as_its_preset_name_and_can_be_swapped(project):
     assert _changes(rendered, project)[0].is_empty()
 
 
+@pytest.mark.parametrize("mode_line, expected", [
+    (None, "profile_only"),          # the project is already Le Bail
+    ("mode lebail", "profile_only"),  # the mode changes in the same edit
+])
+def test_a_preset_is_stored_through_the_projects_mode(tmp_path, pattern_file,
+                                                      mode_line, expected):
+    """A project's plan runs verbatim, so a preset name is stored expanded
+    through the mode, as the GUI's preset route stores it (WP-2102).  Looked
+    up by hand, ``mccusker_default`` in a Le Bail project stored a scale stage
+    the mode force-fixes, and ran it."""
+    start = "rietveld" if mode_line else "lebail"
+    project = _project(tmp_path / "mode.rex", pattern_file, mode=start,
+                       plan="profile_only")
+    text = _edit(td.render(project), "plan", "plan mccusker_default")
+    if mode_line:
+        text = _edit(text, "mode", mode_line)
+    delta, errors = _changes(text, project)
+    assert errors == []
+    td.apply(project, delta)
+    assert project.doc.plan.preset_name() == expected
+    assert f"plan {expected}" in td.render(project)
+
+
 def test_changing_the_preset_and_the_stages_at_once_is_refused(project):
     """Precedence would silently discard the lines the user is looking at."""
     text = td.render(project)
@@ -601,7 +624,7 @@ def test_a_stage_line_round_trips_every_key_stage_spec_has(project):
     from rietx.schemas.plan import StageSpec
 
     assert set(td.STAGE_KEYS) | {"name", "turn_on"} == set(StageSpec.model_fields)
-    non_default = {"max_iter": 40, "ftol": 1e-06, "lebail_cycles": 5,
+    non_default = {"max_iter": 40, "ftol": 1e-06, "lebail_cycles": 5, "lebail_tol": 0.0,
                    "seed": 0.0001, "strain_seed": 1e-06,
                    "restraint_weight_scale": 25.0, "window_slack_deg": 2.5}
     assert set(non_default) == set(td.STAGE_KEYS), "a key has no value to try"

@@ -20,29 +20,51 @@ FAP, ``P 63 - -``       ×0.9996 to ×1.001     ×1.000 to ×1.005, and ×0.9925
 P 2₁/c, ``P 1 21/c 1``  ×0.9998 to ×1.0002    ×0.9995 to ×1.001
 ======================  ====================  =================================
 
-Outside those ranges the screen mostly abstains (``EXTINCTION_SCREEN_UNRELIABLE``
-past about ±2 %, or the prefit fails).  But at some offsets the prefit's screen
-names a **wrong class** (eight of the 72 default rows): what crosses from the
-prefit besides the cell (its widths, zero and seeded background) refutes the
-true class.  Carrying the cell alone is no cure, because PbSO₄'s X-ray histogram
-needs the prefit's seeded background to get ``P c - n`` at all
-(``test_extinction_gate.py``).  So, as ruled on #1178 (2026-10-26), a second
-screen at the prefit's cell, held, from the declared instrument checks every
-class the default names, and two different classes make the screen name neither
-(``EXTINCTION_SCREENS_DISAGREE``).  Re-measured on ``main`` 3defa3b6 plus this
-check (pearl, ``ws_jobs/m1910i1``): it catches six of the eight (``CAUGHT``) and
-fires on none of the rows where the default is right on these three patterns
-and 11-BM NAC, and on five PbSO₄ X-ray rows from the all-zero preset background
-(#1286 round 2: the held screen's background is seeded, which costs those).  The other two are
-strict ``xfail`` rows: the prefit's own cell is off there (corundum ×0.985 lands
-1611 ppm short, the monoclinic ×0.9975 586 ppm on a), and both screens name the
-same wrong class.
+Outside those ranges the screen mostly abstained (``EXTINCTION_SCREEN_UNRELIABLE``
+past about ±2 %, or the prefit failed).  But at some offsets it returned a **wrong
+class confidently** (eight of the 72 default rows), four of them pinned as strict
+``xfail`` rows of WP-1910.
 
-Measured beside it and not built: (b), the prefit's cell held with the prefit's
-fitted background carried and the widths and zero re-fitted from the declared
-instrument.  It returns the true class on three of the six caught rows, keeps
-the wrong ``P 1 - 1`` on the other three, and names ``P c - -`` on PbSO₄ X-ray at
-×0.975 where the default abstains.
+**WP-2076 moved every number above, and the table is kept as the Le Bail
+screen's record.**  The screen's compared fits are Pawley now, and a class is
+scored on the lattice less only its testable forbidden lines.  What that changed
+here, re-measured 2026-11-07 on macOS arm64:
+
+* The four confident misses return the true class or abstain, so they are plain
+  rows below.
+* The held margin widened.  Corundum returns ``R - c -`` at every held factor
+  scanned, ×0.995 to ×1.002.  The monoclinic returns ``P 1 21/c 1`` from ×0.9996
+  to at least ×1.0012, and at ×0.9994 ``P 1 21 1`` instead, its true class
+  refuted.
+* FAP abstains at every factor, held or not.  ``P 63 - -`` leads unrefuted on
+  one testable position, (0 0 5) at 68.0°, and one position buys ΔBIC ln N = 8.2 at most,
+  under the margin of 10.  Ruled by the maintainer on 2026-11-07 (WP-2076's
+  handover log).
+
+**The second screen (WP-1910, ruled on #1178).**  Before WP-2076 the default
+named a wrong class at eight of the 72 rows, because what crosses from the prefit
+besides the cell (its widths, zero and seeded background) refuted the true class.
+A second screen at the prefit's cell, held, from the declared instrument checks
+every class the default names, and two different classes make the screen name
+neither (``EXTINCTION_SCREENS_DISAGREE``).  It caught six of the eight (corundum
+×0.995, FAP ×1.0075, the monoclinic ×0.998, ×0.999, ×1.002 and ×1.0025) and fired
+on none where the default was right; the other two (corundum ×0.985, the
+monoclinic ×0.9975) have the prefit's own cell off, so both screens name one wrong
+class.  From the preset's all-zero background the held screen seeds its own, as the
+prefit does (#1286 round 2).  That cost PbSO₄'s X-ray histogram eleven of the
+twelve right rows the default had (×0.999 to ×1.015, measured by hand; the strict
+``xfail`` at ×1.0 alone ran in the suite).
+
+**WP-2076 left the second screen nothing to catch on these three patterns.**
+Re-measured 2026-11-08 on ``main`` 1d054085 (macOS arm64): at 25 factors over
+×0.97-1.03 per pattern, with the true and with the all-zero declared background
+(150 rows), the screens disagree on none.  The six rows above now return the true
+class or abstain, except the monoclinic ×0.998, which both screens read ``P 1 21 1``
+(a wrong class they agree on, like ×0.9975 and ×0.995).  On PbSO₄ X-ray the default
+names ``P c - a`` at 13 of 14 scales (×0.99-1.015; nothing at ×1.0125) and the held
+screen names ``P c - a`` or nothing, so the eleven withheld rows are gone with the right answers
+that made them a cost.  The rows below pin that state, and one built split pins the
+check's own behaviour.
 """
 
 from __future__ import annotations
@@ -94,9 +116,11 @@ def _screen(patterns, name, factor, monkeypatch=None, **kw):
     if monkeypatch is not None:
         real = extinction._fit_class
 
-        def keep(candidate, data, instrument, symbol, two_theta_limits):
-            ref, result = real(candidate, data, instrument, symbol, two_theta_limits)
-            fits[symbol] = result
+        def keep(candidate, data, instrument, symbol, two_theta_limits, omit=None):
+            ref, result = real(candidate, data, instrument, symbol, two_theta_limits,
+                               omit=omit)
+            if omit is None:        # a class's own fit, never a scoring refit
+                fits[symbol] = result
             return ref, result
 
         monkeypatch.setattr(extinction, "_fit_class", keep)
@@ -143,9 +167,8 @@ def _says(screen):
 # the held cell: the margin is a few hundred ppm, and it is not symmetric
 # ----------------------------------------------------------------------
 @pytest.mark.parametrize("name,factor", [
-    ("corundum", 0.998), ("corundum", 1.0004),
-    ("fap", 0.9996), ("fap", 1.001),
-    ("mono", 0.9998), ("mono", 1.0002),
+    ("corundum", 0.995), ("corundum", 1.002),
+    ("mono", 0.9996), ("mono", 1.0012),
 ])
 def test_a_held_cell_inside_its_patterns_margin_returns_the_true_class(
         patterns, name, factor):
@@ -154,15 +177,11 @@ def test_a_held_cell_inside_its_patterns_margin_returns_the_true_class(
     assert best is not None and TRUE[name][0] in best.space_groups, _says(screen)
 
 
-@pytest.mark.parametrize("name,factor", [
-    ("corundum", 0.9975), ("corundum", 1.0006),
-    ("fap", 0.9994), ("fap", 1.0012),
-    ("mono", 0.9996), ("mono", 1.0004),
-])
+@pytest.mark.parametrize("name,factor", [("mono", 0.9994)])
 def test_a_held_cell_one_step_outside_its_margin_does_not(patterns, name, factor):
-    """One scan step past each edge.  Corundum's +0.06 % is the row WP-1910 was
-    opened on.  Past FAP's edges the gate abstains; past corundum's and the
-    monoclinic's a subgroup's class comes back instead."""
+    """One scan step past the monoclinic's low edge, where ``P 1 21 1`` comes
+    back.  Corundum's edges lie outside the held scan since WP-2076, and its
+    +0.06 % row, the one WP-1910 was opened on, now returns ``R - c -``."""
     screen, _ = _screen(patterns, name, factor, refine_cell=False)
     best = screen.best_or_none()
     assert best is None or TRUE[name][0] not in best.space_groups, _says(screen)
@@ -173,7 +192,6 @@ def test_a_held_cell_one_step_outside_its_margin_does_not(patterns, name, factor
 # ----------------------------------------------------------------------
 @pytest.mark.parametrize("name,factor", [
     ("corundum", 0.9975), ("corundum", 1.0), ("corundum", 1.015),
-    ("fap", 1.0), ("fap", 1.005),
     ("mono", 0.9995), ("mono", 1.001),
 ])
 def test_the_default_returns_the_true_class_across_its_patterns_margin(
@@ -187,48 +205,84 @@ def test_the_default_returns_the_true_class_across_its_patterns_margin(
     assert "EXTINCTION_SCREENS_DISAGREE" not in {d.code for d in screen.diagnostics}
 
 
-#: the default's confident misses the held second screen catches: the prefit
-#: lands within 400 ppm, and the same cell held, from the declared instrument,
-#: names the true class (WP-1910, ruled on #1178)
+#: the rows WP-1910's second screen was built for.  Before WP-2076 the default
+#: named a wrong class at each (the prefit landed within 400 ppm, and the same
+#: cell held, from the declared instrument, named the true one: the two
+#: disagreed, six of the eight confident misses).  WP-2076's nested comparison
+#: moved the default off every one of them
 CAUGHT = [("corundum", 0.995), ("fap", 1.0075), ("mono", 0.998), ("mono", 0.999),
           ("mono", 1.002), ("mono", 1.0025)]
 
 
 @pytest.mark.parametrize("name,factor", CAUGHT)
-def test_the_default_never_returns_a_wrong_class_confidently(
+def test_the_second_screen_has_nothing_left_to_catch_on_its_six_rows(
         patterns, name, factor, monkeypatch):
-    """The open half of WP-1910's acceptance: return the class, or abstain with
-    a finding.  After the prefit ``R - - -``, ``P - - -`` or ``P 1 - 1`` leads,
-    refuting the true class on one to four forbidden positions; the second
-    screen, at the prefit's cell held from the declared instrument, names the
-    true class.  Two classes sharing no group cannot both be right, so the
-    screen names neither and keeps both rankings."""
+    """Re-measured 2026-11-08 on ``main`` 1d054085 (macOS arm64): the six rows
+    WP-1910's second screen caught before WP-2076 no longer split the two
+    screens.  The held screen runs and names what the default names (or both
+    name nothing), so ``best_or_none()`` is the default's own answer and no
+    ``EXTINCTION_SCREENS_DISAGREE`` is raised.  Pinned so that a change which
+    makes the second screen veto a right answer shows here."""
     screen, fits = _screen(patterns, name, factor, monkeypatch)
     _draw(name, factor, "default", screen, fits)
-    assert screen.best_or_none() is None, _says(screen)
-    assert screen.screens_disagree()
-    own, held = screen._own_best(), screen.held_screen.best_or_none()
-    assert TRUE[name][0] not in own.space_groups, _says(screen)
-    assert TRUE[name][0] in held.space_groups, _says(screen.held_screen)
-    assert tuple(screen.held_screen.cell) == tuple(screen.cell)
-    found = [d for d in screen.diagnostics if d.code == "EXTINCTION_SCREENS_DISAGREE"]
-    assert len(found) == 1 and own.symbol in found[0].message
-    assert held.symbol in found[0].message
+    own = screen._own_best()
+    # the held screen runs only when the first names a class (FAP abstains here)
+    assert (screen.held_screen is not None) == (own is not None)
+    assert not screen.screens_disagree(), _says(screen)
+    assert screen.best_or_none() is own
+    assert "EXTINCTION_SCREENS_DISAGREE" not in {d.code for d in screen.diagnostics}
 
 
-@pytest.mark.parametrize("name,factor", [("corundum", 0.985), ("mono", 0.9975)])
+def test_two_screens_that_name_disjoint_classes_abstain_and_say_so(patterns):
+    """The positive arm.  No fixture splits the two screens since WP-2076, so the
+    split is built: corundum's screen (``R - c -``) gets the monoclinic's
+    (``P 1 21/c 1``) as its held screen, two classes that share no group.
+    ``best_or_none`` then names neither, the diagnostic names both with a
+    suggestion, and the two notes that describe the default's class and say to
+    pass its groups on (``EXTINCTION_GROUPS_NOT_SEPARABLE``,
+    ``LAUE_CLASS_NOT_SEPARABLE``) are silent.  Without a held screen both are
+    present: the silence is the disagreement's."""
+    from rietx.indexing.diagnostics import extinction_diagnostics
+
+    corundum, _ = _screen(patterns, "corundum", 1.0)
+    mono, _ = _screen(patterns, "mono", 1.0)
+    own, theirs = corundum._own_best(), mono._own_best()
+    assert own.symbol == "R - c -" and theirs.symbol == "P 1 21/c 1"
+
+    def codes(screen):
+        return {d.code: d for d in extinction_diagnostics(screen, {})}
+
+    corundum.held_screen = None
+    alone = codes(corundum)
+    assert "EXTINCTION_GROUPS_NOT_SEPARABLE" in alone      # the arm that can fail
+    assert "EXTINCTION_SCREENS_DISAGREE" not in alone
+
+    corundum.held_screen = mono
+    assert corundum.screens_disagree() and corundum.best_or_none() is None
+    split = codes(corundum)
+    found = split["EXTINCTION_SCREENS_DISAGREE"]
+    assert own.symbol in found.message and theirs.symbol in found.message
+    assert "(an all-zero background seeded first)" in found.message
+    assert found.suggestion and "refuted_reason" in found.suggestion
+    assert [w.split(":")[0] for w in found.where] == [
+        "after the cell-free fit", "held second screen"]
+    assert "EXTINCTION_GROUPS_NOT_SEPARABLE" not in split
+    assert "LAUE_CLASS_NOT_SEPARABLE" not in split
+
+
 @pytest.mark.xfail(strict=True, reason=(
-    "WP-1910: prefit cell off — the prefit lands 1611 ppm (corundum) and 586 ppm "
-    "(mono, a) from the specimen's cell, and the held second screen at that cell "
-    "names the same wrong class, so there is no disagreement to report (ruled on "
-    "#1178, 2026-10-26)"))
-def test_a_prefit_cell_that_is_off_is_not_caught(patterns, name, factor):
-    """Both screens name one wrong class: ``R - - -`` at corundum ×0.985 and
-    ``P 1 - 1`` at the monoclinic ×0.9975.  Pinned strict, so a fix shows as a
-    pass."""
-    screen, _ = _screen(patterns, name, factor)
+    "WP-1910: prefit cell off — the prefit lands 586 ppm from the specimen's a "
+    "and the held second screen at that cell names the same wrong class, "
+    "`P 1 21 1`, so there is no disagreement to report (ruled on #1178, "
+    "2026-10-26)"))
+def test_a_prefit_cell_that_is_off_is_not_caught(patterns):
+    """Both screens name one wrong class, ``P 1 21 1`` at the monoclinic ×0.9975
+    (``P 1 - 1`` before WP-2076).  Pinned strict, so a fix shows as a pass.
+    Corundum ×0.985, the other row of this test before WP-2076, now returns
+    ``R - c -``."""
+    screen, _ = _screen(patterns, "mono", 0.9975)
     best = screen.best_or_none()
-    assert best is None or TRUE[name][0] in best.space_groups, _says(screen)
+    assert best is None or TRUE["mono"][0] in best.space_groups, _says(screen)
 
 
 def _zero_background(patterns, name):
@@ -248,7 +302,11 @@ def test_a_held_screen_from_a_zero_background_does_not_veto_a_right_default(
     nothing won it by elimination (``P 1 - 1`` at ×1.001), so the check fired
     needlessly.  The held screen's background is seeded as the prefit's is
     (round 2), and the outcome is what counts: the screens agree and
-    ``best_or_none`` names the true class."""
+    ``best_or_none`` names the true class.  This row cannot show the seed since
+    WP-2076: the nested comparison moved the base screen, and re-measured
+    2026-11-08 the held reference fit from the all-zero background reads
+    chi2 2851.95 seeded against 2853.40 unseeded here (2865.81 from the true
+    background), a 0.05 % difference.  Round 2's sweep tables, which show the seed, predate WP-2076."""
     zero = _zero_background(patterns, "mono")
     screen, _ = _screen(zero, "mono", 1.001)
     assert not screen.screens_disagree()
@@ -257,19 +315,28 @@ def test_a_held_screen_from_a_zero_background_does_not_veto_a_right_default(
     assert "EXTINCTION_SCREENS_DISAGREE" not in {d.code for d in screen.diagnostics}
 
 
-def test_a_better_fitting_held_screen_still_flags_from_a_zero_background(patterns):
-    """The positive arm: at ×0.999 the default names ``P 1 - 1`` and the held
-    screen, whose reference fit is *better* than the default's, names another
-    class from the same all-zero background, so the check still fires."""
-    zero = _zero_background(patterns, "mono")
-    screen, _ = _screen(zero, "mono", 0.999)
-    assert screen.held_screen.reference_chi2 < screen.reference_chi2
-    assert screen.screens_disagree() and screen.best_or_none() is None, _says(screen)
-
-
 def test_a_held_cell_runs_no_second_screen(patterns):
     """``refine_cell=False`` has no prefit to check, so ``held_screen`` stays
     None and the answer is the held screen's own."""
     screen, _ = _screen(patterns, "corundum", 1.0, refine_cell=False)
     assert screen.held_screen is None and not screen.screens_disagree()
     assert screen.best_or_none() is not None
+
+
+@pytest.mark.parametrize("held,factor", [
+    (True, 0.9996), (True, 1.001), (False, 1.0), (False, 1.005), (False, 1.0075),
+])
+def test_fap_abstains_on_its_one_testable_position(patterns, held, factor):
+    """FAP's class forbids one line the data can test, so it cannot reach the
+    margin: ``P 63 - -`` leads unrefuted, ``best_or_none`` abstains, and the
+    finding names (0 0 5).  The known cost of the nested comparison, ruled by
+    the maintainer on 2026-11-07 (WP-2076)."""
+    screen, _ = _screen(patterns, "fap", factor,
+                        **({"refine_cell": False} if held else {}))
+    assert screen.best_or_none() is None, _says(screen)
+    top = screen.candidates[0]
+    assert top.symbol == TRUE["fap"][1] and not top.refuted, _says(screen)
+    assert top.n_testable == 1
+    ambiguous = next(d for d in screen.diagnostics
+                     if d.code == "EXTINCTION_SYMBOL_AMBIGUOUS")
+    assert "(0, 0, 5)" in ambiguous.message, ambiguous.message

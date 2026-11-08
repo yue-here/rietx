@@ -1,9 +1,8 @@
 # WP-1467 — a Stephens block on a frozen floor, and a clamp the solver leans on
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-02 — a block replaces lor_strain; the guard names the clamped share (PR #1323)
 Track: What fires, and what stays silent
 Depends on: — (1318 soft: its strain surface would draw the region the clamp covers)
-Priority: P2 2026-09-25 — a block declared over a nonzero `lor_strain` cannot narrow below it and under `solver="lm"` nothing fires; a path few fits run
 
 ## Goal
 
@@ -37,6 +36,17 @@ reproduced to the digit. Worktree venv `[dev]`, macOS.
 | 41, two phases | 1.381 | 1.286 | 1.427 | phase 3: 92 of 378 (25 %); phase 4: 192 of 234 (84 %) |
 
 The isotropic fits are identical under both solvers on all three patterns.
+
+**Superseded in part, 2026-11-02** (re-run on `0d735f5e5`, the review's own
+`cone_probe.py`/`floor_probe.py`, worktree venv `[dev]`, macOS arm64). The
+tree moved the numbers. χ² isotropic / TRF / lm: pattern 0 1.935 / 1.794 /
+1.838, pattern 16 3.404 / 2.314 / 2.006, pattern 41 1.325 / 1.253 / 1.294. The
+clamp zeroed under TRF: pattern 0, 55 of 94 (50.5 %); pattern 16, phase 0 36
+of 94 (34.6 %) and phase 1 **none**, so the 0.5 % finding no longer fires;
+pattern 41, phase 3 158 of 378 (38.9 %) and phase 4 234 of 234 (100 %). The
+pattern 41 lm fit already sat below the isotropic one (1.294 against 1.325)
+with the floor kept. The floor variants: keep 1.253 / 1.294, zero 1.156 /
+1.170, fold 1.476 / 1.112 (TRF / lm).
 
 **Defect 1: the block stacks on the width it locks.** A declared block
 force-fixes `phases.i.lor_strain` (`params/vector.py`, commented "the
@@ -173,54 +183,6 @@ finding counts fitted points, so defect 3 might. Whether TRF leans on that
 floor is not measured. `ADP_NOT_POSITIVE_DEFINITE` is not a sibling. The
 Debye-Waller factor is not floored, so there is no hinge to lean on.
 
-### Inherited
-
-- **From WP-2002 (2026-10-23, 8th session, PR #1113): a joint fit ignores `Stage.strain_seed`.** `MultiHistogramRefinement.fit`'s stage loop calls only `seed_floored` (`multi.py` ~1371-1373), never `seed_stephens`, so a joint fit through `lab_sample_refine` starts a freed all-zero Stephens block at S ≡ 0, where the width's square root has unbounded slope, and nothing says so. The single runner records its seed in `StageResult.seeded` since 2002's B14; the joint runner's docstring now states the gap. Fixing it moves joint fits that seed a block.
-
-- **From WP-2002 (2026-10-21, 5th session, PR #1085).** Every plan now ends in a closing stage at 1e-3 windows, and on SRM 660c LaB6 its answer sits 0.908 plain esd from the converged-tails answer in `profile.u`. At that answer the highest-angle reflections' Gaussian variance U·tan²θ + V·tanθ + W is under the clamp floor, a second recompile moves u by 1 esd and a third by 0.002. `tests/test_window_domain.py::test_the_closing_stage_meets_the_bar[lab6]` is a strict xfail citing this WP, and turns green when the clamp stops moving u.
-- **2026-10-11, from WP-1938 (2nd session): LM is the default on that
-  branch, and the stall is the model's edge.** Once 1938 merges, a
-  single-histogram fit holds the cone by default. So
-  `STEPHENS_STRAIN_NOT_POSITIVE` fires only under `solver="trf"` and in a
-  joint fit, and this WP's "names `solver="lm"`" suggestion becomes "the
-  default holds the cone". Brucite + Stephens under LM (D8's exact step) ends
-  with 6 of 43 reflections exactly on σ² = 0, with zero strain width at the
-  edge rather than outside it. Lifting any of them raises the cost as √h,
-  and LM stops with one face set at costs 4e-5 apart (χ²_red 7.7177-7.7202
-  over five starts). 1938 recorded that as an exception (its D9), and
-  WP-1946 owns a formulation that cannot go negative. The intensity in
-  reflections the clamp leaves at zero width, which this WP's finding is to
-  report, now also arises on the cone's face under LM.
-
-- **2026-10-10, from WP-1937: the flip to `solver="lm"` moved to WP-1938.**
-  This WP's suggestion that names `solver="lm"` changes shape only when 1938
-  makes it the default. Measured there, in physical coordinates: brucite +
-  Stephens under LM stalls against the cone (χ²_red spread 1.6e-6 over five
-  starts nudged by 1e-14, 8 truncated steps in `sample_broadening`).
-  WP-1938 owns that stall as a task.
-
-- **2026-09-28, from [1338](1338-the-skills-own-gates.md): `references/diagnostics.md` is closed to growth.**
-  Every skill file now has a ceiling and a budget below it
-  (`tests/skill_caps.py`), and the budget fails a change that grows a file
-  past it. `diagnostics.md` (35 111 B) and `diagnostics-indexing.md`
-  (35 124 B) sit over their 34 600 B budget, so a row this WP adds there
-  comes with an equal cut in the same change, or goes to the file a reader
-  meets the code in (the criterion in the `REFERENCE_MAX_BYTES` comment).
-  CI's lint job reports each changed file's headroom on the draft PR.
-- **2026-10-09, from WP-1929 (2nd session): `solver="lm"` may become the
-  default.** WP-1937 replaces the LM driver's BCCG step with an exact
-  bounded solve (BVLS) and, once its statuses and budgets match TRF's, makes
-  it the default. The Stephens cone stays a linear inequality around that
-  step. If 1937 lands first, the suggestion task here ("names `solver="lm"`
-  first") becomes a statement that the default already enforces the cone,
-  and the measured TRF-versus-LM table should be re-run under the new step.
-  On brucite aniso (WP-1929's grid, physical coordinates) LM reached χ²_red
-  8.0006 against TRF's 7.636, which carries `STEPHENS_STRAIN_NOT_POSITIVE`.
-
-- **From WP-2002 (2026-10-19, PR #1050).** Batch class B3. GSAS-II starts a new histogram's generalised strain coefficients at 0.01 each (`GSASIIddataGUI.py:1432-1433`); 1000 µstrain on the isotropic ray is its Reset button, a user's act. So `lab_sample_refine`'s 1000 ppm seed matches GSAS-II's isotropic default only. The batch keeps that seed at tier 3 until a second family compares starts, and this WP's start comparison is the obvious one.
-
-- **From WP-2002 (2026-10-21, PR #1085).** The Γ_G² floor is leaned on, under LM. This WP's sibling paragraph says whether a fit leans on `_MIN_GAMMA_G2` was not measured. It is: the SRM 660c and cpd-1a protocol answers end with high-angle reflections on the floor (`CONSTRAINT_ACTIVE`; a Kα2 reflection near 149.7° on LaB6, corundum past 150° on cpd-1a). There the FD width column is 2.2e-2 off the right derivative, because the step moves Γ_G² by about 0.7 of the floor, and a polish under a 5e-7 FD step or a 1e-10 floor stops 1.2 plain esd away on `profile.u` at χ² 0.25 % worse. An FD step of 1e-8 does not cure it. A candidate fix is analytic width scalars at the clamp (`optimize/least_squares.py:1873-1970`, the clamp at `caglioti.py:292`, the width step at `least_squares.py:1112-1121`). Tests: `tests/test_gaussian_width_floor.py`, and `tests/test_cross_backend.py::test_fd_columns_hold_at_every_protocol_answer` (strict xfails on lab6 and cpd1a).
-
 ## Non-goals
 
 - The Gaussian/Lorentzian split itself. WP-0503's fence stands, and this WP
@@ -233,7 +195,7 @@ Debye-Waller factor is not floored, so there is no hinge to lean on.
 
 ## Tasks
 
-- [ ] Defect 1: a declared block replaces `lor_strain`. The Lorentzian width
+- [x] Defect 1: a declared block replaces `lor_strain`. The Lorentzian width
       stops reading `phases.i.lor_strain` when the phase carries a block, as
       the Debye-Waller factor stops reading `biso` for an anisotropic site.
       The lock stays, so the path still exists for globs and write-back. Reach
@@ -241,44 +203,53 @@ Debye-Waller factor is not floored, so there is no hinge to lean on.
       configs with it. `microstructure.py` stops reporting a locked
       `lor_strain` as a reading. A fixture that declares a block over a
       nonzero `lor_strain` moves, and every other golden stays bit-identical.
-- [ ] The seed. Compare the 1000 ppm `strain_seed` with a start at the
+      *Done 2026-11-02*: `CompiledModel.lor_strain_term` is 0 under a block, read by `_width_block` (both components), the width memo key and the compile-time window sizing. Four readers the list above missed take it too: the Γ_L ≥ 0 rows of `lorentzian_width_inequalities` (they read the stored value through `d`), `report/strain.py`, `STRAIN_UNUSUALLY_LARGE` (which flagged a width the model no longer draws), and the TOPAS writer's `_width_lines` (which wrote both terms). `microstructure_table` drops the term. New cross-backend config `stephens_over_lor_strain`. No golden declares a block over a nonzero `lor_strain`, so none moved. On pattern 41 "keep" now equals "zero" to every printed digit (TRF 1.156, lm 1.170). Not generalised: the FullProf and TOPAS-input writers refuse a block outright, so they had nothing to drop.
+- [x] The seed. Compare the 1000 ppm `strain_seed` with a start at the
       `lor_strain` the phase carried, folded onto the isotropic ray, on the brucite acceptance fixture
       (`tests/test_acceptance_stephens.py`) and on patterns 0, 16 and 41 with
       the probe. Pattern 41 favoured 1000 ppm. Change the default only if the
       measurements agree, and write the result beside the manual's seed
       paragraph.
-- [ ] Defect 3: `check_stephens_positive` computes each phase's share of
+      *Done 2026-11-02*, default unchanged. Brucite acceptance protocol (`seed_brucite.py` in the session scratch, isotropic fit's `lor_strain` 29 ppm): LM χ² 7.8943 (1000 ppm), 7.8945 (800), 7.8939 (fold), all inside the cone; TRF 7.9267, 7.8034, 7.7965, 23/19/19 of 43 outside. Pattern 41 (floor fixed): LM 1.170 against fold 1.112 with the two phase fractions swapped (86.5/12.9 % against 9.5/89.6 %), TRF 1.156 against 1.476. Patterns 0 and 16 carry no `lor_strain` above 1e-100, so fold has no start to take there. The measurements disagree, so the default stays; written beside the manual's seed paragraph, at `STRAIN_SEED_PPM` and in its audit row.
+- [x] Defect 3: `check_stephens_positive` computes each phase's share of
       intensity in reflections below the cone tolerance, over the fitted
       range. It rides in `GuardFinding.detail`, `str(finding)` stays
       byte-identical, and `detail`'s docstring names the second writer.
       Rietveld reads `structure_intensity_partition`; Le Bail and Pawley read
       `hkl_intensity`.
-- [ ] The suggestion names `solver="lm"` first. It says `lm` makes the
+      *Done 2026-11-02*: `staged.stephens_clamp_share`, in `detail`. Rietveld weighs m·|F|² through `_total_f2`, the I_calc half of `structure_intensity_partition` without its profile loop, over reflections whose frozen window reaches the fitted data. Agrees with the review's probe to 0.4 points on patterns 0, 16 and 41 (50.3/34.9/51.5/19.4 % against 50.5/34.6/51.6/19.6 %; the probe cut at Bragg 2θ, the guard at the window).
+- [x] The suggestion names `solver="lm"` first. It says `lm` makes the
       coefficients admissible, not measured, so vary the start. It keeps "do
       not report the S_HKL", and says the fit's other numbers leaned on the
       zeroed reflections in proportion to the share. The Laue-class remedy is
       conditioned on a wrong declared symmetry, or dropped.
-- [ ] The reading, at every place listed under defects 1 and 2:
+      *Done 2026-11-02*, in the shape the inherited WP-1938 note predicted: LM is the default, so the suggestion says to refit under it when the fit ran `trf`, and to fit each histogram alone for a joint fit (no cone under either driver). The Laue-class and fit-range remedies are dropped; "restart from the isotropic limit" too, since every staged plan seeds there.
+- [x] The reading, at every place listed under defects 1 and 2:
       `microstructure.md` (the block paragraph and the guard section),
       `using/data.md`, `help.py`, root CLAUDE.md, skill `diagnostics.md` and
       `abstention.md`. `abstention.md` drops "at a *higher* Rwp" as a general
       claim and says the direction varies, without naming the series.
       Re-sync with `rietx skill --install . --copy`.
-- [ ] The manual states the fence: Λ is purely Lorentzian here, TOPAS's `eta`
+      *Done 2026-11-02*: `theory/microstructure.md` (block paragraph and guard section), `reference/data.md` (the WP's `using/data.md`), `reference/refinement.md`, `concepts/plans.md`, `help.py` (three entries), root CLAUDE.md, skill `diagnostics.md` and `abstention.md`, re-synced.
+- [x] The manual states the fence: Λ is purely Lorentzian here, TOPAS's `eta`
       and GSAS-II's `Mustrain;mx` split it, and a protocol using the split
       cannot be mirrored. Read Stephens (1999) before attributing the
       parameter to him. It also states TOPAS's clamp, so a TOPAS Stephens fit
       carries no evidence that σ² stayed positive.
-- [ ] The sibling. On the fixture of `tests/test_walking_bounds.py`'s
+      *Done 2026-11-02*. Stephens (1999) eq. 6 calls the mixing parameter ζ, not ξ as WP-0503 has it, and refined it to 0.404 and 0.558 in his two examples. Corrected in the manual only; WP-0503 is a closed record.
+- [x] The sibling. On the fixture of `tests/test_walking_bounds.py`'s
       `test_the_collapsed_resolution_function_is_reported`, with U, V, W free, measure the share of Bragg intensity at points under
       the floor. If TRF leans on it, carry the same share in `detail`. If not,
       record the numbers here and leave it.
-- [ ] Tests: a block over a synthetic `lor_strain` of 0.3 and over 0 give the
+      *Done 2026-11-02*, left. The fixture is a flat pattern, so the measurement used LaB6 synthesised at `HEALTHY_NEGATIVE_V` and started from `COLLAPSED` (`sibling_probe.py`, session scratch). Both drivers end with all 20 on-data reflections under the floor (share 1.0), χ² 6.34 against 1.01 from the true start: TRF moved U, V, W and stayed under it, LM did not move. That is a stall on a zero gradient, not a hinge the fit benefits from, and the finding already counts every fitted point. The floor's other problem, the FD column at the clamp (the WP-2002 inherited entries), is not this task.
+- [x] Tests: a block over a synthetic `lor_strain` of 0.3 and over 0 give the
       same pattern;
       the share on the synthetic brucite block `test_stephens.py` already
       drives out of the cone; the suggestion names `lm`; the rendering pin is
       unchanged.
-- [ ] Skill: the `diagnostics.md` and `abstention.md` rows in the reading task.
+      *Done 2026-11-02*: `test_stephens.py` (+4), `test_strain_cap.py` (+1), `test_projects_topas.py` (one case), `test_cross_backend.py` (one config).
+- [x] Skill: the `diagnostics.md` and `abstention.md` rows in the reading task.
+      *Done 2026-11-02* with the reading task.
 
 ## Acceptance
 
@@ -289,10 +260,12 @@ With the tests on synthetic fixtures and the series numbers from the probe:
   isotropic fit's 1.381.
 - On pattern 16 under TRF, `STEPHENS_STRAIN_NOT_POSITIVE` reports a share near
   25 % for phase 0 and under 1 % for phase 1, and names `solver="lm"`.
+  *Superseded in part 2026-11-02*: on the current tree phase 1 stays inside the
+  cone and phase 0 reports 34.9 %; the review's probe gives 34.6 %.
 - Each hit of the grep below also says the fit leaned on the clamp.
 
 ```sh
-grep -rn "not quotable" docs/manual src/rietx/help.py CLAUDE.md docs/skill/rietx
+grep -rn "not quotable" docs/docs src/rietx/help.py CLAUDE.md docs/skill/rietx
 .venv/bin/python -m pytest tests/test_stephens.py tests/test_capabilities.py tests/test_acceptance_stephens.py tests/test_cross_backend.py -q
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 .venv/bin/python -m ruff check src tests examples
@@ -310,6 +283,194 @@ grep -rn "not quotable" docs/manual src/rietx/help.py CLAUDE.md docs/skill/rietx
   ends of its field).
 
 ## Handover log
+
+- **2026-11-02** — closing. A Stephens anisotropic strain block now replaces
+  the isotropic strain width it locks, instead of sitting on top of a frozen
+  copy of it. Before, a block declared after an isotropic fit could not make
+  any reflection narrower than the old isotropic width, and on one operando
+  pattern that left the anisotropic fit worse than the isotropic one it
+  contains. When the trust-region driver walks the coefficients outside the
+  physical set, the warning now says how much of the phase's intensity sits
+  in the reflections it left with no strain width (19-52 % on the four phases
+  probed), and its advice leads with the default driver, which cannot leave
+  that set. The fixed 1000 ppm starting strain was compared with a start at
+  the carried isotropic strain and kept, because the two drivers ranked the
+  two starts differently. PR #1323.
+
+  *Done.* All nine tasks (their notes above). Defect 1 reached four readers
+  the WP's list missed (the Γ_L ≥ 0 inequality rows, `report/strain.py`,
+  `STRAIN_UNUSUALLY_LARGE`, the TOPAS writer), and `/code-review high --fix`
+  found two more (the CIF profile text in `io/exporters.py` and the
+  peak-list widths in `io/recipe.py`, `c21ccfbcb`). The review also corrected
+  the manual's seed agreement (5 in 10⁵, not 4 in 10⁴) and moved "29 ppm"
+  in the `STRAIN_SEED_PPM` row next to the strain it describes. Declined
+  review findings: a joint fit keeps the first firing histogram's share
+  (`_stephens_once`; changing it means changing how `multi.py` merges
+  findings, which WP-1946 owns with the joint seed); the Lp-free weight (the
+  docstring states it, and the label now says m·|F|²); passing `values` into
+  `stephens_clamp_share` (one extra decode a firing). Stephens' mixing
+  parameter is ζ (eq. 6), not ξ as WP-0503 wrote; the manual says ζ.
+
+  *Measured* (`[dev]`, macOS arm64; probes against `0d735f5e5` snapshots):
+  pattern 41 "keep" equals "zero" after the fix (TRF 1.156, LM 1.170); the
+  guard's shares against the review's probe 50.3/34.9/51.5/19.4 % against
+  50.5/34.6/51.6/19.6 %; the brucite seed comparison and the Γ_G² sibling are
+  in the task notes. Gates: fast suite on the final tree with main merged (`d07426026` plus
+  the two cap trims), 13302 passed, 315 skipped, 32 xfailed, 2 failed, in
+  21:32 beside another session's suite. The failures: `test_display`'s
+  kernel test (a Jupyter kernel spec pointing at a deleted venv, the same
+  on the pre-merge run), and `test_manual`'s twin cap, which this WP's text
+  pushed 178 and 63 characters over on `reference/refinement` and
+  `reference/parameters`; both trimmed, the test and `test_help` then
+  27 passed. The pre-merge run (1 failed, 13294 passed, 315 skipped) is not
+  comparable, since main moved between the two. Acceptance selection
+  (`test_stephens`, `test_capabilities`, `test_acceptance_stephens`,
+  `test_cross_backend`): 266 passed, 158 skipped (the jax/torch rows of a
+  `[dev]` venv), 2 xfailed. `sphinx -W` exit 0; ruff clean;
+  `python -m tests.reader_output` reports the standard fit unchanged. The
+  full suite did not run: no golden or acceptance fixture declares a block
+  over a nonzero `lor_strain` (the brucite fixture declares an all-zero
+  block on a fresh phase, whose `lor_strain` defaults to 0).
+  Added tests (local junit, the run above): six new functions,
+  0.52 s together, the slowest 0.11 s; `test_stephens.py` +5 (0.51 s),
+  `test_strain_cap.py` +1 (0.01 s). The cross-backend config and the TOPAS
+  case are rows inside existing tests. None joins the slow tail.
+
+  *Reader-output changes* (Yue's approval before merge): the
+  `STEPHENS_STRAIN_NOT_POSITIVE` message gains the share sentence and its
+  suggestion is rewritten; three `rietx.help` entries change;
+  `microstructure_table` omits `lor_strain` (and `strain_agreement` is None)
+  for a phase with a block; `STRAIN_UNUSUALLY_LARGE` no longer fires on a
+  `lor_strain` under a block; the TOPAS writer, the refinement CIF's profile
+  text and the peak-list CSV widths omit it too; fitted numbers move for any
+  block declared over a nonzero `lor_strain`, including a saved project
+  replayed.
+
+  *Forwarded.* WP-1955 (`### Inherited`): the Gaussian-width floor's FD
+  column and the LaB6 closing-stage xfail, with the six code citations
+  repointed there. WP-1946 (`### Inherited`, Depends line): the joint fit's
+  unseeded block and the seed comparison. WP-1946's priority is unchanged:
+  its P3 rests on brucite's S_HKL being unquotable, which this WP did not
+  move.
+
+  *Generality* (the judge's report: the first and fourth sections verbatim,
+  the others condensed; the author's answers follow).
+
+  **`rietx.strategy.staged.STRAIN_SEED_PPM`** — **Verdict: weak.** Keeping
+  1000 ppm has the stronger case. The row argues it from χ² wins, but the new
+  numbers do not show those wins under the default LM driver. The real reason
+  is not written in the row.
+
+  | Question | Author's answer (where) | What I found | On this question |
+  |---|---|---|---|
+  | 1. What it decides | "lab_sample_refine's strain_seed, 1000 ppm on the isotropic ray" (`_audit.py`, row evidence) | It decides which minimum the fit reaches, so it can change a quoted result. On operando pattern 41 the two starts ended at phase fractions of 86.5/12.9 % and 9.5/89.6 % (WP file, Tasks, the seed note). | answered |
+  | 2. Kind | Constant rows carry no `ambiguity` field: **none given** | That some start is needed is kind 1, because the width's square root has unbounded slope at zero. Which start to use is kind 2: the starts can be listed and χ² scores them. But χ² here only ranks two basins of one model, and those basins disagree on composition with nothing to judge them against. | none given |
+  | 3. Case against | "The starts disagree by driver, so the fixed seed stands" (row evidence, added) | Under the default LM driver, fold was equal or lower both times: brucite 7.8939 against 7.8943, pattern 41 1.112 against 1.170. 1000 ppm won once, under TRF on pattern 41 (1.156 against 1.476), and lost under TRF on brucite (7.7965 against 7.9267). The pattern-41 LM comparison also flipped between source trees. On `95c2cae8` it was 1.196 (1000 ppm) against 1.488 (fold), per the WP's first table and the row's older clause "1.160 … against 1.482". On `0d735f5e5` it is 1.170 against 1.112. GSAS-II starts the generalised coefficients at 0.01 each, per the row's own evidence. That is a named dissent. | real, partial |
+  | 4. Case for | "Some start is forced … the second compared them on 2026-10-20 and favoured 1000 ppm" (row grounds, unchanged) | The strongest case is one the row does not make: fold often has no start to use. Patterns 0 and 16 carry no `lor_strain` above 1e-100 (WP Tasks). On brucite, fold from 0.35 ppm "left the block at the singularity", χ² 8.3241 against 7.7662 (`SUGGEST_SEED_STEPHENS` row). After this WP a block replaces `lor_strain`, so a phase that has a block from the start carries 0 and fold is undefined. The grounds' "favoured 1000 ppm" is now contradicted under LM by evidence in the same row. | strong, but argued on the wrong evidence |
+  | 5. Tier | tier 3, approved 2026-10-19 (B3) | Tier 3 is right. 1000 µstrain is GSAS-II's isotropic default; the row says this was checked in the source (`GSASIIddataGUI.py:180-190, :1432`), and I did not re-check it. Stephens strain is named in generality.md § The rule's "Where three families do not exist" clause, so the judgement ground alone suffices. | holds |
+  | 6. Families and reference | CPD brucite, CPD corundum, operando pattern 41 (row evidence) | The row gives no laboratory or instrument for the two CPD sets, so I could not count them as unrelated. All three are development data: brucite is the acceptance fixture, and this WP was reworked on the operando series. The only reference is χ². Nothing independent stands beside pattern 41's swapped fractions to show which start lands nearer the truth. DESIGN.md Rule 4 bars an Rwp comparison as evidence, and a χ² comparison between basins is that comparison. | weak |
+  | 7. Record field | not stated in the row | `StageResult.seeded` records it (`refine.py:4698-4702`, "second writer (WP-2002, B14)"). A joint fit never seeds the block; that finding was forwarded to WP-1946. | holds |
+
+  What would change the verdict: grounds that state the real reason (fold has
+  no start on a fresh phase) and give the 2026-11-02 numbers as they fall
+  under LM, or a weighed composition for pattern 41 that says which of the two
+  basins is right.
+
+  **`rietx.schemas.plan.CLOSING_WINDOW_TOL`** — **Verdict: holds.** The change
+  only moves the owner of the row's stated failing case from WP-1467 to
+  WP-1955, and WP-1955 now carries that case. (Evidence only; value, tier and
+  content unchanged; the same repoint landed in `plan.py`, the
+  `test_window_domain.py` strict-xfail reason and `validation_matrix.py`; no
+  `WP-1467` citation for this case is left in `src` or `tests`.) What would
+  change the verdict: WP-1955 closing without taking the LaB6 case.
+
+  **`rietx.schemas.plan.PlanSpec:closing_window_tol`** — **Verdict: holds.**
+  The same repoint (`_audit.py:3893`); tier 2, its ambiguity, grounds and
+  BGMN/RIETAN-FP/MAUD evidence untouched. What would change the verdict: as
+  for `CLOSING_WINDOW_TOL`.
+
+  **`staged.stephens_clamp_share`** (a heuristic the table cannot see) —
+  **Verdict: weak.** Reporting a share and stopping is the right kind of
+  response, and nothing acts on the number. The weakness is the meaning
+  printed beside it: its label and its "in proportion" sentence claim more
+  than the number measures.
+
+  | Question | Author's answer (where) | What I found | On this question |
+  |---|---|---|---|
+  | 1. What it decides | "The weight of a reflection is its own integrated intensity with the scale and every angle-dependent correction left out: m·\|F\|² in Rietveld mode … the extracted per-hkl intensity … under Le Bail and Pawley" (`staged.py`, `stephens_clamp_share` docstring) | It decides which reflections count (any whose frozen window holds one fitted point, counted in full even if only a tail clips the range edge) and how each is weighted. The message calls the result "the phase's intensity on the fitted data", but Lorentz-polarisation, absorption and texture are left out. What it computes is a multiplicity times \|F\|² share, not a share of what the pattern shows. In a joint fit, `_stephens_once` keeps the first histogram's finding (`multi.py:2560-2564`), so the share describes one histogram only. | label overstates |
+  | 2. Kind | **none given.** It is not a table row, and the code row `STEPHENS_STRAIN_NOT_POSITIVE` sits on `UNAUDITED_BASELINE` (`_audit.py:4988`). | Kind 3: it reports a number and acts on nothing. | holds, unrecorded |
+  | 3. Case against | "the fit's other numbers leaned on them in that proportion" (message suggestion; also help.py, reference/refinement.md, skill `diagnostics.md`) | On the weight: a competent alternative weights by what the fit sees, the calculated counts or the χ² share on the reflection's points. The sibling `RESOLUTION_NOT_POSITIVE` counts fitted points. No program computes this share (practice.md's new Stephens section: TOPAS clamps and reports nothing, GSAS-II has no clamp). On "in proportion": **none given.** No measurement links the share to how far cells or fractions moved. The nearest is pattern 0, where the cone-enforced fit keeps 42 % of TRF's χ² gain (WP Context), and that is χ², not a result number. | real |
+  | 4. Case for | "29 of 96 and 1 of 463 fired at one level on one pattern, carrying 25 % and 0.5 %" (`check_stephens_positive` docstring) | The case is strong: the reflection count could not separate those two findings. On the current tree the 0.5 % case no longer fires, and the four firing phases carry 19-52 % (WP Tasks; the WP-1946 note). The number moves no answer, so carrying it costs nothing. | strong |
+  | 5. Tier | **none given** | The statistic is rietx's own. It has no threshold. The cone test reuses `STEPHENS_CONE_TOL` (tier 1). | none given |
+  | 6. Families and reference | "Agrees with the review's probe to 0.4 points … 50.3/34.9/51.5/19.4 % against 50.5/34.6/51.6/19.6 %" (WP Tasks) | One family: the private operando series, development data. The probe used the same m·\|F\|² definition (WP Context, "used I_calc over the in-range reflections"), so the agreement verifies the code against a second implementation and validates nothing. `test_stephens.py::test_the_finding_carries_the_intensity_share_the_clamp_zeroed` checks the complement identity and the Le Bail arithmetic on synthetic brucite. | verifies only |
+  | 7. Record field | `GuardFinding.detail`, then `Diagnostic.message` (`staged.py:1041-1048`) | Text only. `Diagnostic.value` stays the worst σ². An agent gets the share by parsing a sentence, whereas generality.md § Attention is a cost, clause 1, puts a number in a result field. | weak |
+
+  What would change the verdict: a label naming what is computed ("share of
+  the phase's m·\|F\|²"), or a weight that includes Lorentz-polarisation and
+  texture; a measurement across the four phases tying the share to how far
+  cells or fractions moved, or else dropping "in proportion"; and the share in
+  a numeric field.
+
+  **A declared Stephens block replaces `lor_strain`
+  (`CompiledModel.lor_strain_term`)** — **Verdict: holds.** The case for it is
+  arithmetic plus a measured χ² anomaly, and I found no competent refiner who
+  wants a frozen isotropic floor under a block. (Kind 1, physics. Case
+  against: none found; FullProf's `cuf1k.pcr` refines Y beside the Stephens
+  terms, and rietx keeps `instrument.profile.y` under a block. Case for:
+  strong, the `Atom.aniso` precedent and pattern 41's 1.427 against the
+  isotropic 1.381. Tier 1 with six tests. Two readers still add `lor_strain`,
+  `topas_input.py:392` and `fullprof.py:4148`; the WP says both refuse a block
+  outright, not verified by the judge. A saved project with a block over a
+  nonzero `lor_strain` replays to a different curve, which belongs in the
+  release notes. Minor gap: `Refinement.parameters()` lists the stored value
+  as a locked row and nothing on that row says the value is unused.) What
+  would change the verdict: a competent protocol that holds a fixed
+  per-phase isotropic strain beneath a Stephens block.
+
+  **`STEPHENS_STRAIN_NOT_POSITIVE.suggestion`** — **Verdict: weak.** "Refit
+  under LM" and "compare a few starts" are well supported. But the rewrite
+  drops two remedies a competent refiner would try, its joint-fit advice
+  abandons the joint fit, and its "in proportion" sentence is unmeasured.
+  (Case against, real: (a) fewer free terms, as the sibling
+  `TEXTURE_NOT_POSITIVE` row advises "hold the highest terms"; (b) a wider fit
+  range measures more directions, and the motivating case cut at 2θ ≤ 35°;
+  (c) "fit each histogram alone" gives up the shared crystallite size, and
+  keeping the joint fit while reducing or dropping the block is the competent
+  alternative, nor does the suggestion say a joint firing may come from the
+  S ≡ 0 start; (d) "in proportion": none given. Case for, strong for what it
+  kept: LM holds the cone, 0 of 43 against 19-23 under TRF on brucite, and
+  starts matter on pattern 41.) What would change the verdict: restoring
+  "hold the highest-order coefficients" and a conditioned "extend the fit
+  range where you cut it"; a measurement backing "in proportion", or the
+  sentence cut; or a maintainer ruling that a joint fit firing this guard
+  should be split.
+
+  Author's answers. `STRAIN_SEED_PPM` (weak): the row's evidence now gives
+  the reason the judge names (fold has no start on a phase without a carried
+  `lor_strain`, including any phase given its block at the outset) and states
+  the 2026-11-02 numbers as they fall by driver; its grounds clause is older
+  and left. `stephens_clamp_share` (weak): the message, `help.py`, the theory
+  page, `reference/refinement.md` and the skill row now name what is computed
+  (the phase's m·|F|² over the reflections in the fitted range) and drop "in
+  proportion", which no measurement backs; a numeric field for the share is
+  not added, since `Diagnostic.value` already carries the worst σ² and a
+  second number there would need a schema field. The suggestion (weak): "in
+  proportion" dropped, and a joint fit may drop the block instead of being
+  split. Declined: "hold the highest-order terms" has no analogue, since all
+  fifteen S_HKL are one order; "extend the fit range" is unmeasured here.
+
+
+  *Gotchas.* The worktree Bash guard refuses `cd`, inline `PYTHONPATH=` and
+  computed variables, so probes ran from scripts in the ghostshift scratch
+  directory against `git archive` snapshots. `ParameterTable` takes no
+  `mode=`; a Le Bail test builds a plain table.
+
+  Next: none in this WP. Yue's call on the reader-output changes above, then
+  merge. WP-1955 and WP-1946 hold the two follow-ups.
+
+  Steward (2026-11-02): CI's lint job failed on Vale's spelling rule at
+  "his eq. 6" in the microstructure theory page. It now reads "his
+  equation 6".
 
 - **2026-09-25** — created by a review of the second agent session on
   `in-situ series 1`, asked whether rietx presents Stephens correctly. Every

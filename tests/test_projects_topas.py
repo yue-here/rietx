@@ -3558,8 +3558,9 @@ def test_every_macro_has_one_stance_and_is_no_keyword_or_read_macro():
             seen[name] = feat.name
     assert set(seen) == set(coverage.MACROS)
     assert not coverage.MACROS & coverage.PHASE_SCOPE
-    read = set(T._CELL_MACROS) | set(T._UNDEFINED_CELL_MACROS) | {
-        "A1", "A2", "A3", "STR", "Get", "Radius", "LP_Factor"}
+    read = (set(T._CELL_MACROS) | set(T._UNDEFINED_CELL_MACROS)
+            | set(T._READ_MACROS) | set(T._DATA_FILE_MACROS) | {"Get"})
+    assert {"A1", "A2", "A3", "STR", "Radius", "LP_Factor"} <= read
     assert not coverage.MACROS & read
     assert not [m for m in coverage.MACROS if re.fullmatch(r"\w+Ka\d?", m)]
     # Report-only: every macro row says what a caller loses.
@@ -3588,6 +3589,13 @@ _XDD = 'xdd "a.xy"\n  bkg @ 10 0 0\n'
     ("Specimen_Displacement(@, 0.05)", "xdd", "2θ corrections"),
     ("SD(@, 0.05)", "xdd", "2θ corrections"),
     ("Absorption(@, 50)", "xdd", "specimen corrections"),
+    # WP-1530: the reference's §22.1 macros that had no row and read as unread.
+    ("CuKa4_Holzer(0.0001)", "xdd", "emission profile"),
+    ("CuKb4_Holzer(0.0001)", "xdd", "emission profile"),
+    ("MVW(0, 0, 0)", "str", "cell mass, volume and weight percent"),
+    ("Distance_Restrain(A1 A1, 2.0, 2.0, 0.1, 1)", "str",
+     "restraints and penalties"),
+    ("Cylindrical_I_Correction(0.5)", "xdd", "specimen corrections"),
 ])
 def test_a_library_macro_is_named_as_a_partial_import(
         tmp_path, line, where, feature_name):
@@ -4233,6 +4241,41 @@ def test_write_topas_inp_refuses_a_nuclear_group_above_the_family_group():
         "space_group": "P n m a",
         "cell": _magnetic_phase("orthorhombic").cell})
     _refused(phase, r"family group .* is 'P 1 21/c 1'")
+    # the message names the orbits the groups' difference costs (#715)
+    _refused(phase, r"only part of their orbit .*'Fe1' \(4 of 8\), 'O1' \(4 of 8\)")
+
+
+def test_the_family_group_refusal_says_when_no_orbit_is_split():
+    """The refusal tests the groups, and its message used to claim lost
+    orbits whatever the sites. On Pnma's mirror (y = 1/4) each site has four
+    positions under both groups, so nothing would vanish, and the message
+    says what would differ instead: the site symmetry TOPAS refines under."""
+    base = _magnetic_phase("monoclinic")
+    phase = base.model_copy(update={
+        "space_group": "P n m a",
+        "cell": _magnetic_phase("orthorhombic").cell,
+        "atoms": [a.model_copy(update={"y": a.y.model_copy(update={"value": 0.25})})
+                  for a in base.atoms]})
+    with pytest.raises(ValueError) as refused:
+        from_structure(rx.Structure(phases=[phase]))
+    message = str(refused.value)
+    assert "Every listed site keeps its orbit" in message
+    assert "only part of their orbit" not in message
+    assert "'P 1 21/c 1'" in message
+
+
+def test_the_family_group_refusal_names_gained_positions_under_a_smaller_group():
+    """The refusal is a groups inequality, so the nuclear group can be the
+    smaller one. Under P 1 each site is one position and P2₁/c's magnetic
+    operators make four, so the message names positions gained, never an
+    orbit lost."""
+    phase = _magnetic_phase("monoclinic").model_copy(update={"space_group": "P 1"})
+    with pytest.raises(ValueError) as refused:
+        from_structure(rx.Structure(phases=[phase]))
+    message = str(refused.value)
+    assert "only part of their orbit" not in message
+    assert re.search(r"positions the fitted model does not hold .*'Fe1' "
+                     r"\(4 against 1\), 'O1' \(4 against 1\)", message)
 
 
 def test_the_family_group_refusal_does_not_name_a_remedy_that_loops(tmp_path):
@@ -4397,6 +4440,96 @@ def test_a_defined_macro_a_read_macro_and_an_equation_are_not_unread_calls(tmp_p
                'prm t = Sin(1) + Max(1, 2);\n'
                'site A1 x 0 y 0 z 0 occ Na+1 1 beq b 0.5\n')
     assert read_topas_inp(inp).coverage.unread_calls == ()
+
+
+@pytest.mark.parametrize("name", sorted(coverage.STANDARD_MACROS
+                                        | coverage.EQUATION_FUNCTIONS))
+def test_no_reference_macro_or_function_is_an_unread_call(name):
+    """WP-1530: `LP_Factor(26.4)` and the reference's other library macros read
+    as "called and not read", so the report named things that are no typo.
+    Every macro §22.1 lists with arguments, and every Table 3-1 function, is
+    accounted for: a registry row, a read, or the model-free list."""
+    from rietx.io.projects import topas as T
+
+    text = f"{name}(1)\n"
+    assert T._unread_calls(text, text) == ()
+
+
+def test_the_allowlist_is_the_reference_s_and_every_reference_macro_has_a_place():
+    """The partition behind the test above, both ways. A model-free name comes
+    from the index and from nowhere else; a standard macro the reader neither
+    reads nor allowlists has a registry row, so it is *named* when called."""
+    from rietx.io.projects import topas as T
+
+    assert coverage.MODEL_FREE_MACROS <= coverage.STANDARD_MACROS
+    assert not coverage.MODEL_FREE_MACROS & coverage.MACROS
+    read = (set(T._CELL_MACROS) | set(T._READ_MACROS)
+            | set(T._DATA_FILE_MACROS))
+    rest = coverage.STANDARD_MACROS - read - coverage.MODEL_FREE_MACROS
+    unrowed = {m for m in rest - coverage.MACROS
+               if not T._EMISSION_MACRO.fullmatch(m)}
+    assert unrowed == set()
+    # §22.1.1's xdd macros, plus the two the #616 report's index added.
+    assert set(T._DATASET_MACROS) == {
+        "RAW", "DAT", "XDD", "XY", "XYE", "SCR", "SHELX_HKL4", "BRML", "SST"}
+
+
+@pytest.mark.parametrize("line", [
+    "Rp_Peak(0.1)",        # in no index of the version 9 reference
+    "Atan(0.5)",           # Table 3-1 spells it ArcTan
+    "lor_fwhmm(0.1)",
+])
+def test_a_name_outside_the_reference_is_still_an_unread_call(tmp_path, line):
+    """The negative arm: the allowlist did not become a catch-all."""
+    model = read_topas_inp(_inp(tmp_path, "outside.inp",
+                                f'xdd "a.xye"\n{line}\n' + _ONE_PHASE))
+    assert model.coverage.unread_calls == (line.split("(")[0],)
+
+
+def test_a_macro_opened_dataset_names_its_file(tmp_path):
+    """WP-1530: `RAW(a)` counted as a dataset but `data_files` read `[]`. Each
+    opener contributes the file it names, in file order: a macro's first
+    argument as written (§22.1.1's `path_no_ext` stays without one), a bare
+    `xdd` path as one token rather than the rest of its line."""
+    text = ('RAW(..\\pbso4)\n' + _ONE_PHASE
+            + 'XY("b c", 0.01)\n' + _ONE_PHASE.replace('"A"', '"B"')
+            + 'xdd d.xy x_calculation_step 0.01\n'
+            + _ONE_PHASE.replace('"A"', '"C"')
+            + 'xdd "e f.xye"\n' + _ONE_PHASE.replace('"A"', '"D"')
+            + 'SHELX_HKL4(g)\n' + _ONE_PHASE.replace('"A"', '"E"'))
+    model = read_topas_inp(_inp(tmp_path, "files.inp", text))
+    assert model.n_datasets == 5
+    assert model.data_files == ["..\\pbso4", "b c", "d.xy", "e f.xye", "g"]
+    assert [ph.dataset for ph in model.phases] == [0, 1, 2, 3, 4]
+
+
+def test_a_bare_macro_path_may_hold_parentheses(tmp_path):
+    model = read_topas_inp(_inp(tmp_path, "paren.inp",
+                                'RAW(C:\\d (old)\\a, 1)\n' + _ONE_PHASE))
+    assert model.data_files == ["C:\\d (old)\\a"]
+
+
+def test_an_xdd_naming_no_file_records_none(tmp_path):
+    """A bare path is the opener's own line: the next line's `bkg` is no file."""
+    model = read_topas_inp(_inp(tmp_path, "nofile.inp",
+                                'xdd\n  bkg @ 1 2\n' + _ONE_PHASE))
+    assert model.n_datasets == 1 and model.data_files == []
+
+
+def test_a_time_of_flight_macro_names_its_file(tmp_path):
+    model = read_topas_inp(_inp(tmp_path, "tof.inp",
+                                'TOF_XYE(bank1.xye, 0.5)\n' + _ONE_PHASE))
+    assert model.data_files == ["bank1.xye"]
+
+
+@pytest.mark.parametrize("macro", ["SCR", "SHELX_HKL4", "BRML"])
+def test_every_data_macro_refuses_an_unexpandable_loop(tmp_path, macro):
+    """One list feeds the openers and the loop refusal, so a data macro added
+    to one reaches the other (`SCR` and `SHELX_HKL4` are new to both)."""
+    with pytest.raises(TopasInpError, match=f"through `{macro}`"):
+        read_topas_inp(_inp(tmp_path, "loop.inp",
+                            f'{macro}(a)\n' + _ONE_PHASE
+                            + 'for strs { lor_fwhm 0.1 }\n'))
 
 
 # --------------------------- a moment component its site symmetry forbids
@@ -4612,6 +4745,10 @@ def test_the_written_width_lines_are_the_ones_topas_ran(tmp_path):
         # 1500 ppm isotropic strain, as `lor_strain` alone
         (_rutile_with(lor_strain=rx.Parameter(value=0.08594366926962348, min=0.0)),
          ["  lor_fwhm = 0.08594366926962348*Tan(Th);"]),
+        # a block replaces the lor_strain it locks (WP-1467): Λ alone
+        (_rutile_with(microstrain=block,
+                      lor_strain=rx.Parameter(value=0.3, min=0.0)),
+         [f"  lor_fwhm = {_LAMBDA}*Tan(Th);"]),
     ]
     for structure, expected in cases:
         diags: list = []

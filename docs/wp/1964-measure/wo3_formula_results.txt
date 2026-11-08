@@ -1,0 +1,56 @@
+WP-1964 task 13: the WO3 ramp's Einstein equations as formula text (Durham TOPAS 9.3/9.4)
+rietx     1.12.0.dev0; subset topas11: 11 patterns [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99]
+protocol  WP-1325's: B held at the chain's, coordinates at TOPAS's, strains per pattern; angles quadratic in T
+          the input's one B per pattern tied across atoms needs WP-2103 (not landed): not built
+text      zero_m_a + grad_m_a/(exp(theta/T) - 1)  (one per edge; theta shared by all nine)
+
+fit design θ  125.3704:   190.0 s (load 46.6); converged; iters [2, 6, 13, 20, 19]; Rwp 13.771 %; χ² 152098.3 with 209 free; χ²r 2.3738; diagnostics ['BISO_NEGATIVE', 'BOUND_HIT', 'FLOOR_HIT', 'HIGH_CORRELATION', 'PARAMETRIC_FORM_REJECTED', 'STAGE_WINDOWS_STALE']
+fit free   θ  125.3704:   255.4 s (load 19.1); converged; iters [2, 6, 14, 109, 23]; Rwp 13.771 %; χ² 152085.3 with 210 free; χ²r 2.3736; diagnostics ['BISO_NEGATIVE', 'BOUND_HIT', 'FLAT_DIRECTION', 'FLOOR_HIT', 'HIGH_CORRELATION', 'PARAMETRIC_FORM_REJECTED', 'STAGE_WINDOWS_STALE']
+fit pin    θ   30.0000:   297.2 s (load 32.5); converged; iters [2, 6, 13, 22, 21]; Rwp 13.771 %; χ² 152086.4 with 209 free; χ²r 2.3736; diagnostics ['BISO_NEGATIVE', 'BOUND_HIT', 'FLOOR_HIT', 'HIGH_CORRELATION', 'PARAMETRIC_FORM_REJECTED', 'STAGE_WINDOWS_STALE']
+fit pin    θ   71.4700:   290.5 s (load 32.2); converged; iters [2, 6, 13, 22, 19]; Rwp 13.771 %; χ² 152089.0 with 209 free; χ²r 2.3736; diagnostics ['BISO_NEGATIVE', 'BOUND_HIT', 'FLOOR_HIT', 'HIGH_CORRELATION', 'PARAMETRIC_FORM_REJECTED', 'STAGE_WINDOWS_STALE']
+fit pin    θ  200.0000:   291.6 s (load 32.2); converged; iters [2, 6, 14, 20, 20]; Rwp 13.773 %; χ² 152128.8 with 209 free; χ²r 2.3742; diagnostics ['BISO_NEGATIVE', 'BOUND_HIT', 'FLOOR_HIT', 'PARAMETRIC_FORM_REJECTED', 'STAGE_WINDOWS_STALE']
+fit pin    θ  400.0000:   287.8 s (load 32.7); converged; iters [2, 6, 14, 20, 20]; Rwp 13.784 %; χ² 152372.9 with 209 free; χ²r 2.3780; diagnostics ['BISO_NEGATIVE', 'BOUND_HIT', 'FLOOR_HIT', 'PARAMETRIC_FORM_REJECTED', 'STAGE_WINDOWS_STALE']
+fit text   θ  125.3704:   193.2 s (load 46.6); converged; iters [2, 6, 13, 20, 19]; Rwp 13.771 %; χ² 152098.3 with 209 free; χ²r 2.3738; diagnostics ['BISO_NEGATIVE', 'BOUND_HIT', 'FLOOR_HIT', 'HIGH_CORRELATION', 'PARAMETRIC_FORM_REJECTED', 'STAGE_WINDOWS_STALE']
+
+GATE: text against design, θ held at 125.370423 K
+  rows in both 345; design-only 18, text-only 18; 31 kinds, the worst six:
+  worst |text - design|/esd among phases.*.lor_strain 2.85e-08 at hist.4.phases.0.lor_strain
+  worst |text - design|/esd among phases.*.gauss_strain 2.60e-08 at hist.4.phases.0.gauss_strain
+  worst |text - design|/esd among phases.*.scale 2.52e-08 at hist.4.phases.0.scale
+  worst |text - design|/esd among instrument.geometry.sample_displacement 2.30e-08 at hist.8.instrument.geometry.sample_displacement
+  worst |text - design|/esd among phases.*.cell.c 1.91e-08 at hist.8.phases.2.cell.c
+  worst |text - design|/esd among phases.*.cell.b 1.72e-08 at hist.8.phases.2.cell.b
+  worst coefficient: zero_m_b design 7.50436895 ± 0.00146, text 7.50436895 ± 0.00146, 1.24e-08 esd; esd ratio text/design 1.000000
+  coefficient esd ratio text/design over all 18: 1.000000 to 1.000000
+  Δχ² text - design -0.0000; Rwp 13.7714 % and 13.7714 %
+  GATE (every reported parameter within 0.01 esd): worst 2.85e-08 esd: PASS
+
+θ FREE
+  θ 9.640 ± 1953.684 K (bounds [1, 2000] K, 8.64 K from the nearer); at_bound False; TOPAS 05 125.370 K, TOPAS 06 71.473 K
+  Rwp 13.771 %; χ² 152085.3, -13.0 against θ held at TOPAS 05's
+
+PROFILE: θ pinned, everything else refitted (χ² of the whole joint fit)
+  θ     9.640 K  χ²     152085.3  Δχ²      0.0  (free)
+  θ    30.000 K  χ²     152086.4  Δχ²      1.1  (pin)
+  θ    71.470 K  χ²     152089.0  Δχ²      3.7  (pin)
+  θ   125.370 K  χ²     152098.3  Δχ²     13.0  (text)
+  θ   200.000 K  χ²     152128.8  Δχ²     43.5  (pin)
+  θ   400.000 K  χ²     152372.9  Δχ²    287.5  (pin)
+
+GAP TO TOPAS per cell parameter (no gate)
+  ppm = 1e6 · max over the 100 temperatures of |x - TOPAS 05| / TOPAS 05
+             text θ held   text θ free      TOPAS 06
+  m_a                206           215           189
+  m_b                154           213           393
+  m_c                274           239           203
+  m_beta             557           530           138
+  t_a                795           832            31
+  t_b                395           371            80
+  t_c                299           313           217
+  t_alpha            616           622           118
+  t_beta             170           165           850
+  t_gamma           1007          1027           339
+  p_a                571           531            94
+  p_b                163           171            48
+  p_c                320           247           190
+  p_beta             159           171          1150

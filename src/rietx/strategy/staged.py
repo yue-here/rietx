@@ -138,7 +138,13 @@ class Stage:
     #: is unusually sensitive to, or a one-stage validation fit that must
     #: converge as hard as an endpoint.
     ftol: float | None = None
-    lebail_cycles: int = 3  # intensity-partitioning refreshes (lebail mode)
+    #: the most intensity-partitioning cycles run before and after the solve
+    #: (lebail mode), and the seed's (pawley mode)
+    lebail_cycles: int = 25000
+    #: the share of the Bragg counts a cycle may still move and end the
+    #: partition (``CompiledModel.lebail_update``).  0 runs exactly
+    #: ``lebail_cycles``.
+    lebail_tol: float = 1e-7
     #: start every row this stage frees that sits exactly on a lower bound of
     #: 0 or above at this value, before solving
     #: (``ParameterTable.seed_floored``; recorded in ``StageResult.seeded``).
@@ -226,7 +232,12 @@ _ROUGHNESS_STAGE = (
 #: The microstrain, in ppm of ΔM/M, that ``lab_sample_refine`` puts an all-zero
 #: Stephens block at before solving (``Stage.strain_seed``): the width's square
 #: root has unbounded slope at zero, so some start is forced.  1000 ppm is
-#: GSAS-II's isotropic microstrain default, on the isotropic ray (WP-1467).
+#: GSAS-II's isotropic microstrain default, on the isotropic ray.  WP-1467
+#: compared it with a start at the ``lor_strain`` the phase carried, folded onto
+#: the ray: equal on brucite under LM (χ² 7.8943 against 7.8939), and on one
+#: two-phase operando pattern lower under LM (1.112 against 1.170, the phase
+#: fractions swapped) and higher under TRF (1.476 against 1.156).  The
+#: measurements disagree, so the fixed seed stands.
 STRAIN_SEED_PPM = 1000.0
 
 
@@ -390,7 +401,7 @@ class RefinementPlan:
         last = self.stages[-1]
         globs = list(dict.fromkeys(g for s in self.stages for g in s.turn_on))
         return Stage(CLOSING_STAGE_NAME, globs, max_iter=last.max_iter, ftol=last.ftol,
-                     lebail_cycles=last.lebail_cycles,
+                     lebail_cycles=last.lebail_cycles, lebail_tol=last.lebail_tol,
                      restraint_weight_scale=last.restraint_weight_scale,
                      window_slack_deg=last.window_slack_deg)
 
@@ -509,7 +520,9 @@ class RefinementPlan:
             Stage("preferred_orientation", ["phases.*.preferred_orientation.r",
                                             "phases.*.texture.*"]),
             # primary extinction (WP-0506, named secondary until WP-1451)
-            # comes *after* the displacement stage on purpose: ext, Biso and
+            # frees only a phase that declares it (``Phase.extinction``,
+            # opt-in since WP-1944, as PO and roughness are).  It comes
+            # *after* the displacement stage on purpose: ext, Biso and
             # the ADPs all attenuate high-Q intensity, so letting the
             # structure/ADPs settle first leaves extinction with only its
             # (different, low-angle-weighted) signature to fit.  The
@@ -584,10 +597,14 @@ class RefinementPlan:
     @classmethod
     def lab_bragg_brentano(cls) -> "RefinementPlan":
         """Lab flat-plate plan: adds sample displacement (with zero), then the
-        Kα2/Kα1 intensity ratio and FCJ axial-divergence parameters last —
-        the McCusker ordering extended by the v0.2 lab-instrument physics.
+        Kα2/Kα1 intensity ratio and the FCJ axial ratio S/L last — the
+        McCusker ordering extended by the v0.2 lab-instrument physics.
         Sample transparency stays fixed (free it explicitly for low-absorbing
-        samples)."""
+        samples).
+
+        **H/L stays at its declared value** (WP-2012): the FCJ weight is
+        symmetric under S/L ↔ H/L, so two free ratios have two mirrored
+        minima and a fit reports whichever it reached as two measurements."""
         return cls(stages=[
             Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
             Stage("zero_disp", ["instrument.zero_shift",
@@ -597,8 +614,7 @@ class RefinementPlan:
             Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                               "instrument.profile.x", "instrument.profile.y"]),
             Stage("lines_axial", ["instrument.source.lines.*.weight",
-                                  "instrument.geometry.axial_sl",
-                                  "instrument.geometry.axial_hl"]),
+                                  "instrument.geometry.axial_sl"]),
             *_ROUGHNESS_STAGE,
         ])
 
@@ -609,8 +625,14 @@ class RefinementPlan:
         what pins the dispersion axis and decorrelates the otherwise-sloppy
         {zero (const), displacement (cosθ), cell (tanθ)} triple — while zero,
         displacement, the resolution function, the Kα2 ratio and the axial
-        ratios refine.  Export the result with ``save_instrument_profile``;
+        ratio S/L refine.  Export the result with ``save_instrument_profile``;
         refine unknowns against it with the ``lab_sample_refine`` plan.
+
+        **H/L stays at its declared value**, the receiving slit's height over
+        the goniometer radius (WP-2012, the maintainer's ruling of
+        2026-11-01).  The FCJ weight is symmetric under S/L ↔ H/L, so a
+        pattern cannot tell the two apart; left at 0 it gives a one-ratio
+        model, close to GSAS-II's single SH/L.
 
         **No roughness stage here, deliberately.**  A certified line-profile
         standard is a carefully prepared specimen, and this plan's job is to
@@ -626,8 +648,7 @@ class RefinementPlan:
             Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                               "instrument.profile.x", "instrument.profile.y"]),
             Stage("lines_axial", ["instrument.source.lines.*.weight",
-                                  "instrument.geometry.axial_sl",
-                                  "instrument.geometry.axial_hl"]),
+                                  "instrument.geometry.axial_sl"]),
             Stage("biso", list(_DISPLACEMENT_GLOBS)),
         ])
 
@@ -893,9 +914,11 @@ PLAN_INFO: dict[str, PlanInfo] = {
     "lab_bragg_brentano": PlanInfo(
         title="Lab diffractometer (one pass)",
         description=(
-            "Bragg-Brentano flat-plate order. The specimen displacement and "
-            "transparency corrections join the zero shift. The axial "
-            "(Finger-Cox-Jephcoat) apertures refine with the widths."),
+            "Bragg-Brentano flat-plate order. The specimen displacement joins "
+            "the zero shift. The transparency stays fixed. The axial "
+            "(Finger-Cox-Jephcoat) ratio S/L refines with the emission-line "
+            "weights. H/L stays at the value you set, because swapping the two "
+            "ratios leaves the pattern unchanged."),
         modes=("rietveld",),
         when_to_use=(
             "A lab pattern where something outside the fit pins the zero shift "
@@ -914,7 +937,10 @@ PLAN_INFO: dict[str, PlanInfo] = {
             "profile and the position corrections on a line-position standard "
             "with its certified lattice parameters held fixed. Holding them "
             "fixed decorrelates the zero shift, the specimen displacement and "
-            "the lattice parameters from one another."),
+            "the lattice parameters from one another. Of the two axial ratios "
+            "only S/L refines. Set H/L to the receiving slit's height over the "
+            "goniometer radius first, because swapping the two ratios leaves "
+            "the pattern unchanged."),
         modes=("rietveld",),
         when_to_use=(
             "A standard (LaB6, Si or corundum), once per instrument "
@@ -1036,9 +1062,11 @@ class GuardFinding:
     #: rendered form, identical to the pre-v1.0 list entry
     message: str
     #: a clause a *diagnostic* appends to its own sentence, already rendered.
-    #: Written only by :meth:`at_bound` and read only where ``BOUND_HIT`` and
-    #: ``FLOOR_HIT`` build their ``Diagnostic`` (WP-1434 gives that finding
-    #: evidence to carry; WP-1076 wants both ends of a new field named).  It
+    #: Two writers, each read only where its own code builds the
+    #: ``Diagnostic`` (WP-1076 wants both ends of a field named):
+    #: :meth:`at_bound`, read by ``BOUND_HIT`` and ``FLOOR_HIT`` (WP-1434 gives
+    #: that finding evidence to carry), and :meth:`nonpositive_strain`, read by
+    #: ``STEPHENS_STRAIN_NOT_POSITIVE`` (the intensity share, WP-1467).  It
     #: is deliberately not part of :meth:`__str__`, which is the pre-v1.0 text
     #: byte for byte and is what the other diagnostics are built from.
     detail: str = ""
@@ -1099,10 +1127,19 @@ class GuardFinding:
 
     @classmethod
     def nonpositive_strain(cls, path: str, n_bad: int, n_total: int,
-                           worst: float, hkl: str) -> "GuardFinding":
+                           worst: float, hkl: str,
+                           share: float | None = None) -> "GuardFinding":
+        """``share`` is the fraction of the phase's m·|F|² (no Lp, absorption
+        or texture) over the reflections in the fitted range that sits in the reflections the clamp left with no strain width
+        (:func:`stephens_clamp_share`, WP-1467).  It rides in ``detail``, so
+        the rendered finding is the pre-v1.0 text byte for byte."""
+        detail = ("" if share is None else
+                  f" The width law gives those reflections no strain width, "
+                  f"and they carry {100.0 * share:.3g} % of the phase's "
+                  f"m·|F|² over the reflections in the fitted range.")
         return cls("STEPHENS_STRAIN_NOT_POSITIVE", (path,), float(worst),
                    f"{path} ({n_bad} of {n_total} reflections, "
-                   f"worst σ²(M) {worst:+.2e} at {hkl})")
+                   f"worst σ²(M) {worst:+.2e} at {hkl})", detail=detail)
 
     @classmethod
     def nonpositive_texture(cls, path: str, n_bad: int, n_total: int,
@@ -1495,6 +1532,14 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
     cone condition off the measured directions is unobservable, and flagging it
     would be a claim the data cannot support.  Needs the compiled model for
     that list, so it returns ``[]`` when none is supplied.
+
+    **The finding carries the share of intensity the clamp zeroed** (WP-1467),
+    in ``detail``: the reflections outside the cone get no strain width at all,
+    so a solver can lean on that set as a free hinge, and the count alone
+    cannot say whether it did.  29 of 96 and 1 of 463 fired at one level on
+    one pattern, carrying 25 % and 0.5 % of their phases' intensity.  The share
+    is :func:`stephens_clamp_share`'s, over the reflections whose frozen window
+    reaches the fitted data.  ``str(finding)`` is unchanged.
     """
     import numpy as np
 
@@ -1517,8 +1562,45 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
             k = int(np.argmin(sigma2))
             hkl = reflection_label(cp.reflections.hklm[k])
             out.append(GuardFinding.nonpositive_strain(
-                base, int(bad.sum()), len(sigma2), float(sigma2[k]), hkl))
+                base, int(bad.sum()), len(sigma2), float(sigma2[k]), hkl,
+                share=stephens_clamp_share(model, ip, table, bad)))
     return out
+
+
+def stephens_clamp_share(model, ip: int, table, bad) -> float | None:
+    """Phase ip's share of intensity in the reflections ``bad`` marks (WP-1467).
+
+    The weight of a reflection is its own integrated intensity with the scale
+    and every angle-dependent correction left out: m·|F|² in Rietveld mode,
+    the same I_calc :meth:`~rietx.model.forward.CompiledModel.structure_intensity_partition`
+    returns, and the extracted per-hkl intensity (``hkl_intensity``) under Le
+    Bail and Pawley, where no structure factor exists.  Summed over the
+    reflections whose frozen window reaches the fitted data, so a reflection
+    the pattern does not show weighs nothing.
+
+    ``None`` where the phase carries no intensity on the data at all, since a
+    share of nothing is not zero.
+    """
+    import numpy as np
+
+    from ..crystallography.lattice import d_spacings
+
+    cp = model.phases[ip]
+    on = (np.asarray(cp.win[..., 1]) > np.asarray(cp.win[..., 0])).any(axis=0)
+    if model.mode == "rietveld":
+        values = table.decode(table.x0())
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        f2 = np.asarray(model._total_f2(ip, d, values, cell), dtype=np.float64)
+        weight = np.asarray(cp.reflections.multiplicity, dtype=np.float64) * f2
+    else:
+        weight = np.asarray(cp.hkl_intensity, dtype=np.float64)
+    weight = np.where(on, np.abs(weight), 0.0)
+    total = float(weight.sum())
+    if not total > 0.0:
+        return None
+    return float(weight[np.asarray(bad, dtype=bool)].sum()) / total
 
 
 def check_texture_positive(table, model) -> list[GuardFinding]:
@@ -2160,7 +2242,7 @@ def _correlation_findings(corr, free: list[str], threshold: float
                 # correlation, and saying so in the same vocabulary as
                 # ρ = 0.96 undersells it.  Reported *beside* the
                 # correlation rather than instead of it: the
-                # SEQUENTIAL_PERSISTENT_FINDING precedent, where the
+                # series code-count precedent (WP-1110), where the
                 # sharper finding rides alongside the ones it sharpens,
                 # so no existing consumer loses a row it counts on.
                 if abs(corr[i, j]) >= FLAT_DIRECTION_RHO:

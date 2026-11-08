@@ -42,6 +42,9 @@ So the seam does not need FPA. FPA would change how a size convolves, not which 
 
 ### Inherited
 
+- 2026-11-04, from WP-2107: if a peak equation lands, a user can write an anisotropic
+  size by hand without this WP's symmetry-derived subspace. This WP still owns that
+  subspace. Read 2107's rule on a non-invariant equation before designing the block.
 - 2026-10-31, from the issue triage (issue #1065): the reporter (2026-10-28)
   answered the issue's questions 1 and 2 for this WP's first task. Question 1
   (leaving WP-1131's "with FPA at v2+") is settled by this WP's placement, and

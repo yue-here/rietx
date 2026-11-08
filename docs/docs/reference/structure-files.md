@@ -68,6 +68,11 @@ A β of 90.002(3) under `P m m m` is an experimenter quoting a refined number.
 Past `rietx.crystallography.cif.CIF_ANGLE_CORRECT_MAX_DEG` the symbol and the angle contradict each other, and one of the two is wrong.
 Choosing between them is yours, so the value is left byte for byte and the read raises.
 
+An anisotropic tensor read with `aniso=True` that misses the form its site symmetry allows only by the file's rounding is moved onto that form, and reported as [`CIF_ADP_SYMMETRY_PROJECTED`](diagnostics-structures.md#cif_adp_symmetry_projected).
+ZnO printed with U11 = 0.0123 and U12 = 0.0062 is U12 = U11/2 rounded to four decimals.
+Each component moves by at most half a unit in its last printed digit, and a component printed as zero, such as `0` or `0.0`, does not move.
+A tensor that misses by more is left as written, and the parameter table refuses it, naming the site and the component furthest from the allowed form.
+
 A Biso of any value is kept as the file states it, because `Atom.biso` has no default bound.
 Published structures carry values a range would refuse.
 The methylammonium C in COD 4335638 sits at 26.8 Å², and a light atom is sometimes refined slightly negative.
@@ -92,7 +97,7 @@ A site within 5e-4 (fractional, per coordinate) of a special position, further o
 The gate is the same at every boundary, readers included: the occupancy at the position, summed over the atoms sharing it and each × (images before / images after), must be above 1.
 A CIF read says a merge with [`CIF_SITE_TWINS_MERGED`](diagnostics-structures.md#cif_site_twins_merged); the project readers' `to_structure` say `SITE_TWINS_MERGED` on their own `diagnostics=`; `RefinementTree.load` and `Refinement` construction, `edit`, `set_values` and `checkout` say it on `RefinementTree.load`'s `diagnostics=` or on the next `fit` or `run_stage` result.
 Where the product is 1 or below, the stated numbers read both as one atom off its position and as a split pair of part-atoms, so the site is left as stored and `SITE_TWINS_KEPT` gives both readings and the occupancy each implies.
-A hold, user tie or free path on a coordinate degree of freedom follows its direction when a site's symmetry changes (onto or off a special position), on every route that moves the site (a fit's write-back, `set_values`, `edit`, a branch, a stored history); where the position couples coordinates, as (x, 2x, z) in P 6₃/mmc does x and y, a hold on x holds the coupled direction, the one direction that moves x. One on a direction the position fixes, and a tie on a coupled one, is dropped, and `SITE_TWINS_MERGED` or `SITE_DOFS_RENUMBERED` names it. A stored history's recorded actions (a stage's `turn_on`, a `set_value`'s values) follow the same renumbering on load, and a series' `constrain=` hook runs against the DOF numbering of the series' own structure.
+A hold, user tie or free path on a coordinate degree of freedom (`dof.k`), or on an anisotropic ADP pattern (`adp.k`), follows its direction when a site's symmetry changes (onto or off a special position), on every route that moves the site (a fit's write-back, `set_values`, `edit`, a branch, a stored history); where the position couples coordinates, as (x, 2x, z) in P 6₃/mmc does x and y, a hold on x holds the coupled direction, the one direction that moves x. One on a direction the position fixes, and a tie on a coupled one, is dropped, and `SITE_TWINS_MERGED` or `SITE_DOFS_RENUMBERED` names it. A stored history's recorded actions (a stage's `turn_on`, a `set_value`'s values) follow the same renumbering on load, and a series' `constrain=` hook runs against the DOF numbering of the series' own structure.
 A merged site's coordinates that the position fixes lose `vary`, and an anisotropic tensor is projected onto the tensors the position allows, so the merged model still builds its table.
 `Phase` itself stays strict: a phase built in code with a twin site is held as stated until it enters one of those.
 The merge keeps the occupancy, so the site's atoms per cell change with its multiplicity, and each message gives both counts (multiplicity × occupancy).

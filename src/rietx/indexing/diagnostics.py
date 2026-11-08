@@ -993,7 +993,7 @@ def extinction_class_diagnostics(cand) -> list[Diagnostic]:
             level="warning", code="EXTINCTION_FORBIDDEN_INTENSITY",
             message=(f"{cand.n_present} of the {cand.n_testable} forbidden "
                      "position(s) this class could be tested at carry intensity "
-                     "its own Le Bail fit cannot account for."),
+                     "its own Pawley fit cannot account for."),
             where=where + [pairs],
             suggestion=("Check those 2θ positions against IndexingResult's "
                         "unmatched_observed for an impurity line before you "
@@ -1021,8 +1021,12 @@ def extinction_class_diagnostics(cand) -> list[Diagnostic]:
     return out
 
 
-def extinction_diagnostics(screen) -> list[Diagnostic]:
+def extinction_diagnostics(screen, fit_errors=None) -> list[Diagnostic]:
     """Screen-level messages: what the answer is, and why it may not be one.
+
+    ``fit_errors`` maps a class's symbol to the error one of its fits raised.
+    Such a class is unscored rather than refuted, and the abstention names the
+    error, since a solver failure is no evidence about the absences.
 
     ``EXTINCTION_GROUPS_NOT_SEPARABLE`` fires whenever the leading class holds
     more than one space group — **always**, not only when the data are weak.
@@ -1082,21 +1086,27 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
                         "weak data (counting longer helps; re-indexing does "
                         "not), the range, the wavelength, the width law")))
     held = getattr(screen, "held_screen", None)
-    if held is not None and screen.screens_disagree():
+    disagree = held is not None and screen.screens_disagree()
+    if disagree:
         mine, theirs = screen._own_best(), held.best_or_none()
         out.append(Diagnostic(
             level="warning", code="EXTINCTION_SCREENS_DISAGREE",
-            message=(f"the screen after the cell-free prefit names {mine.symbol}, and "
-                     f"a second screen at the same cell, held, from the declared "
-                     f"instrument names {theirs.symbol}; the two classes share no "
-                     "space group, so at most one is right, and best_or_none() "
-                     "abstains.  What differs between them is the profile every "
-                     "class is compared at (the prefit's widths, zero and "
-                     "background, or the declared ones), not the cell.  Both "
-                     "rankings are kept: candidates, and held_screen.candidates"),
-            where=[f"after the prefit: {mine.symbol} ({', '.join(mine.space_groups)})",
-                   f"held, declared instrument: {theirs.symbol} "
-                   f"({', '.join(theirs.space_groups)})"]))
+            message=(f"the screen after the cell-free Le Bail fit names "
+                     f"{mine.symbol}, and a second screen at the same cell, "
+                     "held, from the declared instrument (an all-zero "
+                     f"background seeded first) names {theirs.symbol}.  The two "
+                     "classes share no space group, so at most one is right, and "
+                     "best_or_none() abstains.  The screens differ in the "
+                     "profile every class is compared at, not in the cell.  "
+                     "Both rankings are kept: candidates and "
+                     "held_screen.candidates"),
+            where=[f"after the cell-free fit: {mine.symbol} "
+                   f"({', '.join(mine.space_groups)})",
+                   f"held second screen: {theirs.symbol} "
+                   f"({', '.join(theirs.space_groups)})"],
+            suggestion=("Read the refuting positions each class names "
+                        "(refuted_reason).  Then fit the zero and the width "
+                        "law on a standard and screen again.")))
     alive = [c for c in screen.candidates if not c.refuted and c.screened]
     # the classes a declared prior leaves a member in; every class without one
     admissible = [c for c in alive if c.space_groups]
@@ -1123,7 +1133,9 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
            else alive[0] if alive else screen.candidates[0])
     if screen.prior is not None:
         out.append(_prior_diagnostic(screen, alive, top))
-    if len(top.laue_classes) > 1:
+    # both describe the default's class, which a disagreement says to quote
+    # none of; the second even says to pass any of its groups on
+    if len(top.laue_classes) > 1 and not disagree:
         out.append(Diagnostic(
             level="info", code="LAUE_CLASS_NOT_SEPARABLE",
             message=(f"the groups {top.symbol} admits fall in "
@@ -1137,7 +1149,7 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
                         "per group: the members of one Laue class differ only "
                         "in elements a solution can try cheaply, the Laue "
                         "classes in which intensities are equivalent")))
-    if len(top.space_groups) > 1:
+    if len(top.space_groups) > 1 and not disagree:
         out.append(Diagnostic(
             level="info", code="EXTINCTION_GROUPS_NOT_SEPARABLE",
             message=(f"Extinction symbol {top.symbol} is compatible with "
@@ -1153,9 +1165,12 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
     contradicting = [c for c in alive if not c.space_groups
                      and top.delta_bic - c.delta_bic >= DECISIVE_DELTA_BIC]
     if len(rivals) > 1 and rivals[1].delta_bic - top.delta_bic < DECISIVE_DELTA_BIC:
+        undecided = _undecided_positions(top, rivals[1])
         reasons.append(f"{rivals[1].symbol} is within ΔBIC "
                        f"{rivals[1].delta_bic - top.delta_bic:.1f} of it "
-                       f"(decisive is {DECISIVE_DELTA_BIC:g})")
+                       f"(decisive is {DECISIVE_DELTA_BIC:g})"
+                       + (f", and the two differ at the tested position(s) "
+                          f"{undecided}" if undecided else ""))
     if contradicting:
         reasons.append(f"the data prefer {contradicting[0].symbol}, which the "
                        "declared prior excludes, by ΔBIC "
@@ -1170,10 +1185,18 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
                        + " on this cell")
     if top.n_absent and top.n_testable == 0:
         reasons.append("none of its absences is testable in this range")
-    if unscreened:
-        reasons.append(f"{len(unscreened)} class(es) were never fitted, so their "
+    errors = fit_errors or {}
+    unasked = [c for c in unscreened if c.symbol not in errors]
+    if unasked:
+        reasons.append(f"{len(unasked)} class(es) were never fitted, so their "
                        "standing is unknown")
-    if not alive:
+    failed = [c for c in unscreened if c.symbol in errors]
+    if failed:
+        reasons.append(f"{len(failed)} class(es) could not be scored, so their "
+                       f"standing is unknown: {errors[failed[0].symbol]}"
+                       + (f" (and {len(failed) - 1} more)" if len(failed) > 1
+                          else ""))
+    if not alive and not unscreened:
         reasons.append("every class was refuted, including the absence-free "
                        "lattice, so the fit itself failed")
     if reasons:
@@ -1186,9 +1209,27 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
                for c in rivals[1:3]]
             + [f"excluded by the prior: {c.symbol} (ΔBIC {c.delta_bic:+.1f})"
                for c in contradicting[:2]],
-            suggestion=("Count longer at the forbidden positions where the "
-                        "leading classes disagree, or extend the 2θ range.")))
+            suggestion=(("Count longer at the forbidden positions where the "
+                         "leading classes disagree, or extend the 2θ range.")
+                        if not failed or len(reasons) > 1 else
+                        ("Run the screen again. If the same fit raises, check "
+                         "the cell and 2θ range it ran at."))))
     return out
+
+
+def _undecided_positions(a, b, limit: int = 4) -> str:
+    """The tested forbidden positions one of two classes has and the other lacks.
+
+    These are the positions the margin between them rests on (WP-2076), so
+    they are where counting longer would separate the two.
+    """
+    seen_a = set(a.tested_two_theta)
+    seen_b = set(b.tested_two_theta)
+    pairs = sorted({(t, tuple(h)) for c, other in ((a, seen_b), (b, seen_a))
+                    for h, t in zip(c.tested_hkl, c.tested_two_theta)
+                    if t not in other})
+    text = ", ".join(f"{h} at {t:.3f}°" for t, h in pairs[:limit])
+    return text + (f" and {len(pairs) - limit} more" if len(pairs) > limit else "")
 
 
 def _prior_diagnostic(screen, alive, top) -> Diagnostic:
@@ -1203,7 +1244,8 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
     answer's class kept at a Z′ that is not whole with the special positions it
     needs, and each kept member whose orbits cannot hold the declared count with
     that statement.  A density that fits several whole Z is said to, and only
-    declares nothing.
+    declares nothing; a ``z`` with no formula says it filters nothing and why,
+    rather than counting the groups it removed, none.
     """
     prior = screen.prior
     declared = ", ".join(f"{k}={v}" for k, v in prior.declared().items())
@@ -1214,6 +1256,14 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
     n_removed = sum(len(c.excluded_groups) for c in removed)
     message = (f"the declared prior ({declared}) removed {n_removed} space "
                f"group(s) from {len(removed)} class(es)")
+    if prior.z is not None and prior.formula is None:
+        # a z alone has no atoms per cell to count against a member's orbits
+        why = ("with no formula there are no atoms per cell to count against "
+               "a member's orbits, so it names only the special positions a "
+               "Z′ that is not whole needs (declare the formula to count them)")
+        message = (f"the declared z={prior.z} filters no group: {why}"
+                   if set(prior.declared()) == {"z"}
+                   else f"{message}; z={prior.z} filtered none of them: {why}")
     if contradicted:
         message = (f"the declared density and formula put "
                    f"{screen.z_from_density:.2f} formula units in this cell, "
@@ -1249,7 +1299,8 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
         message=message + ".  A filter on the members, never evidence: no ΔBIC "
                           "moved and every class was fitted",
         where=[f"{c.symbol}: excluded {_named(c)}" for c in removed]
-        + _special_lines(top, screen.z) + _count_lines(top),
+        + _special_lines(top, screen.z) + _count_lines(top)
+        + _uncounted_lines(prior, screen.z),
         suggestion=("check the declaration before the answer: a class it "
                     "emptied that leads on the data is either chemistry doing "
                     "what a powder cannot, or a wrong declaration (a racemate "
@@ -1260,16 +1311,40 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
 
 
 def _special_lines(top, z) -> list[str]:
-    """The Z′ statements of the answer's class, one per member — or one line
-    when every member needs special positions, as an ionic solid's do, since
-    the statement then tells no member from another."""
+    """The Z′ statements of the answer's class, one per member — or, when
+    every member carries one, one line per kind of note, as an ionic solid's
+    all need special positions, since the statement then tells no member of
+    that kind from another.  The two kinds say different things: a member
+    holds Z with formula units on special positions, or Z is no sum of its
+    orbit multiplicities and no member of the formula unit sits whole
+    (:func:`~rietx.indexing.extinction.special_site_note`).  A kind held by one
+    member keeps that member's own note."""
+    from .extinction import _places_no_whole_unit
+
     notes = top.special_positions
     if not notes:
         return []
-    if len(top.space_groups) > 1 and len(notes) == len(top.space_groups):
-        return [f"{top.symbol}: every member holds Z = {z} only with formula "
-                "units on special positions (special_positions names them)"]
-    return [f"{top.symbol}: {note}" for note in notes.values()]
+    if len(top.space_groups) < 2 or len(notes) != len(top.space_groups):
+        return [f"{top.symbol}: {note}" for note in notes.values()]
+    no_sum = [g for g, note in notes.items() if _places_no_whole_unit(note)]
+    special = [g for g in notes if g not in no_sum]
+    every = not no_sum or not special
+    out = []
+    if len(special) > 1:
+        who = ("every member holds" if every
+               else f"{', '.join(special)} hold")
+        out.append(f"{top.symbol}: {who} Z = {z} only with formula units on "
+                   "special positions (special_positions names them)")
+    elif special:
+        out.append(f"{top.symbol}: {notes[special[0]]}")
+    if len(no_sum) > 1:
+        who = ("no member" if every else f"none of {', '.join(no_sum)}")
+        out.append(f"{top.symbol}: {who} holds Z = {z} as whole formula units, "
+                   "Z being no sum of its orbit multiplicities, so the formula "
+                   "unit is not one molecule (special_positions gives them)")
+    elif no_sum:
+        out.append(f"{top.symbol}: {notes[no_sum[0]]}")
+    return out
 
 
 def _count_lines(top) -> list[str]:
@@ -1278,6 +1353,20 @@ def _count_lines(top) -> list[str]:
     return [f"{top.symbol}: {g} kept though {why} (a disordered model shares "
             "a site; ExtinctionPrior(ordered=True) removes it)"
             for g, why in top.count_notes.items()]
+
+
+def _uncounted_lines(prior, z) -> list[str]:
+    """The elements an ordered count could not test: their atoms per cell are
+    not whole, so no group was removed for them and none was counted."""
+    if not (prior.ordered and prior.formula and z is not None):
+        return []
+    from ..crystallography.atomic_volume import formula_counts
+    from .extinction import uncounted_elements
+
+    skipped = uncounted_elements(z, formula_counts(prior.formula))
+    return [f"ordered: {el} not counted, {per_cell:g} atoms per cell at z={z} "
+            "is not whole, so no ordered model holds it (the other elements "
+            "were counted)" for el, per_cell in skipped.items()]
 
 
 def _cell_str(cell) -> str:

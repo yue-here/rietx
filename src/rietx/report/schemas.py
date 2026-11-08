@@ -447,14 +447,15 @@ COLLECT_DATA_CONFIDENCE = 0.5
 
 #: Le Bail gap (WP-1057) — the structural-vs-profile triage statistic.
 #: ``LEBAIL_GAP_CYCLES`` partition cycles at the frozen converged state: the
-#: fixed point is reached by cycle 2-3 on the LaB₆ pore-proxy fixture
-#: (Rwp_lebail 0.01713 after one cycle, 0.01700 from two onward, 2026-08-12),
+#: fixed point is reached by cycle 2 on the LaB₆ pore-proxy fixture
+#: (Rwp_lebail 0.01708 after one cycle, 0.01706 from two onward, 2026-11-02),
 #: so 5 is margin, not tuning.  ``LEBAIL_GAP_NOTABLE`` is the ratio above
 #: which the summary quotes the gap; measured separation on the same fixtures:
-#: 2.38 on the pore proxy (guest scatterer in truth only — intensity model
-#: wrong) against ≤ 1.00 on every position/profile control (+0.4 % cell 1.00,
-#: broad+0.05° zero 1.00, broad clean 1.00, sharp+0.008° zero 0.96) and 0.79
-#: on the converged clean fit — the partition is *not* a noise-floor
+#: 2.36 on the pore proxy (re-measured 2026-11-02; guest scatterer in truth
+#: only — intensity model wrong) against ≤ 1.00 on every position/profile
+#: control (2026-08-12: +0.4 % cell 1.00, broad+0.05° zero 1.00, broad clean
+#: 1.00, sharp+0.008° zero 0.96) and 0.79 on the converged clean fit — the
+#: partition is *not* a noise-floor
 #: estimator (its net = max(y_obs − bkg, 0) clip and profile-share weighting
 #: put its own floor above a converged least-squares fit), which is why the
 #: notable test is on the ratio, never on rwp_lebail alone.
@@ -949,18 +950,19 @@ class LeBailGap(Base):
     and profile* alone support, not a Le Bail fit (a fit would also relax
     the background and cell).  The partition is not a noise-floor estimator
     either: its ``max(y_obs − bkg, 0)`` clip and profile-share weighting
-    leave it above a converged least-squares fit (measured 0.0172 against a
-    converged Rwp of 0.0137 on clean LaB₆ data), which is why ``ratio`` — not
-    ``rwp_lebail`` — is the statistic.
+    leave it above a converged least-squares fit (measured 2026-11-02: 0.0174
+    against a converged Rwp of 0.0137 on clean LaB₆ data), which is why
+    ``ratio`` — not ``rwp_lebail`` — is the statistic.
 
     **Reading it.**  ``ratio`` ≫ 1 means the partition, free to reassign
     every intensity, removes most of the misfit: every line is indexed and
     the profile is right — the *intensity model* (structure, contents,
     occupancies) is what is wrong, and phase ID is safe at any absolute Rwp.
     Measured on the LaB₆ pore-proxy fixture (guest scatterer in the data
-    only): 2.38, against ≤ 1.00 on every position/profile control — a wrong
-    cell or zero displaces the partition's peaks identically, so the gap
-    stays flat and cannot be confused with position error.  ``ratio`` ≲ 1
+    only): 2.36 (2026-11-02), against ≤ 1.00 on every position/profile
+    control — a wrong cell or zero displaces the partition's peaks
+    identically, so the gap stays flat and cannot be confused with position
+    error.  ``ratio`` ≲ 1
     says intensities are not where the remaining misfit lives — it never
     says the fit is good (both Rwp may be terrible together).
     """
@@ -1216,7 +1218,7 @@ class SuggestedAction(Base):
     And it is **not a bound on what applying the action achieves**: it bounds the
     misfit the linear model attributes inside the *gated* regions, while the
     refinement also moves regions that failed a gate and stretches no region entry
-    covers (measured: 16.19 predicted against 16.33 observed for ``refine_cell``).
+    covers (measured: 16.16 predicted against 16.30 observed for ``refine_cell``).
     ``predict_then_verify`` in :mod:`.layer2` measures the real one and rolls back
     if it disagrees.  ``vetoed_by`` is set when the staged plan already refines the
     parameter, or when a guard forbids it.
@@ -1410,7 +1412,7 @@ class SplitFamily(Base):
     hkls: list[list[int]]
     #: which emission line's image, 0 the shortest wavelength; children are
     #: assigned within one line
-    emission_line: int = 0
+    emission_line: int
     #: its tick in the higher-symmetry fit, deg 2θ
     two_theta: float
     #: how many of the lower fit's ticks were assigned to it
@@ -1461,8 +1463,8 @@ class SplitLocalisation(Base):
     unsplit_point_share: float
     elsewhere_share: float | None = None
     elsewhere_point_share: float
-    #: the lower fit's ticks with no higher-fit reflection within two local
-    #: widths (superstructure reflections): counted, never windowed
+    #: the lower fit's ticks in range with no higher-fit reflection within two
+    #: local widths (superstructure reflections): counted, never windowed
     n_unmatched: int = 0
     families: list[SplitFamily] = Field(default_factory=list)
 

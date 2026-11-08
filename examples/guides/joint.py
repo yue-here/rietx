@@ -44,7 +44,7 @@ for path in ("phases.0.atoms.0.z", "phases.0.atoms.1.x"):
 
 from _corundum_pair import CELL, NEUTRON_TRUE, TRUTH  # noqa: E402
 
-# 2026-10-21, darwin/arm64.
+# 2026-11-04, darwin/arm64 (extinction undeclared since WP-1944).
 cells = [r.parameter("phases.0.cell.a") for r in alone]
 assert [rx.format_su(p.value, p.stderr) for p in cells] == ["4.7588824(41)", "4.757487(31)"]
 assert round((cells[1].value / cells[0].value - 1) * 1e6) == -293  # "293 ppm short"
@@ -64,8 +64,8 @@ for path in ("phases.0.atoms.0.z", "phases.0.atoms.1.x"):
 esd = {path: [r.parameter(path).stderr for r in (*alone, result)]
        for path in ("phases.0.atoms.0.z", "phases.0.atoms.1.x")}
 (x_al, n_al, j_al), (x_o, n_o, j_o) = esd.values()
-assert round(n_al / x_al, 1) == 3.6 and round(n_o / x_o, 2) == 0.95
-assert round(j_al / x_al, 2) == 0.96 and round(j_o / x_o, 2) == 0.67
+assert round(n_al / x_al, 1) == 3.4 and round(n_o / x_o, 2) == 0.89
+assert round(j_al / x_al, 2) == 0.95 and round(j_o / x_o, 2) == 0.66
 # The page: with the neutron wavelength held, a ends 2.6 esd off and both
 # coordinates' esds are worse than the X-ray pattern's alone, with nothing said.
 held = rx.MultiHistogramRefinement(corundum(), [xray, neutron]).fit(patterns, plan="mccusker_structural")

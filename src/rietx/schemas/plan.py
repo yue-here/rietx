@@ -59,10 +59,16 @@ from .common import Base
 #: it, WP-1123 made it the default and re-measured).  Both figures are
 #: properties of the tree as much as of the schedule — 1113 measured 1.5-1.7×
 #: and 0.02 esd before a Jacobian column changed underneath — so re-measure
-#: rather than inherit them.  **The bound is for one fit**: in a warm *chain*
+#: rather than inherit them.  Re-measured on 2026-11-02 behind the closing
+#: stage, with the last declared stage converged (WP-2045,
+#: ``docs/wp/2045-batch/probe7.py``): 1.06-1.58× fewer evaluations on the
+#: fluorapatite, 11-BM NAC and cpd-1a protocols, answers within 0.0004 esd;
+#: 1.29× on SRM 660c, whose 8.82 esd is its mirrored axial minima (WP-2012).
+#: **The bound is for one fit**: in a warm *chain*
 #: each pattern seeds the next, and the effect there is unbounded and not even
 #: fixed in sign.  Looser is a real choice and not a silly one — 1e-5 and 1e-4
-#: buy 1.9-2.2× at 0.01-0.2 esd — which is why this is a number a plan carries
+#: bought 1.9-2.2× at 0.01-0.2 esd before the closing stage (WP-1113) — which
+#: is why this is a number a plan carries
 #: and not a mode with two positions.
 INTERMEDIATE_FTOL = 1e-6
 
@@ -156,7 +162,7 @@ def check_phase_support_sigma(value: Any) -> float | None:
 #: 0.1 plain esd of the converged tails' on three of them
 #: (``tests/test_window_domain.py``).  SRM 660c LaB6 misses by 0.9 esd on U,
 #: from the Gaussian-variance clamp its high-angle reflections sit on, which
-#: moves U at any window (WP-1467).
+#: moves U at any window (WP-1955).
 CLOSING_WINDOW_TOL = 1e-3
 
 
@@ -197,7 +203,12 @@ class StageSpec(Base):
         "(intermediate_ftol for every declared stage but the last, the "
         "solver's 1e-9 for the last declared stage and for the closing stage "
         "when the plan has one)"))
-    lebail_cycles: int = 3
+    lebail_cycles: int = Field(25000, description=(
+        "the most intensity-partitioning cycles run before and after the "
+        "solve in lebail mode, and for the seed in pawley mode"))
+    lebail_tol: float = Field(1e-7, ge=0.0, description=(
+        "the share of the Bragg counts a cycle may still move and end the "
+        "partition; 0 runs exactly lebail_cycles"))
     seed: float = Field(0.0, description=(
         "start at this value every parameter this stage frees that sits "
         "exactly on a lower bound of 0 or above (e.g. surface roughness, "
@@ -227,7 +238,7 @@ class StageSpec(Base):
     def from_stage(cls, stage: Any) -> "StageSpec":
         return cls(name=stage.name, turn_on=list(stage.turn_on),
                    max_iter=stage.max_iter, ftol=stage.ftol,
-                   lebail_cycles=stage.lebail_cycles,
+                   lebail_cycles=stage.lebail_cycles, lebail_tol=stage.lebail_tol,
                    seed=stage.seed, strain_seed=stage.strain_seed,
                    restraint_weight_scale=stage.restraint_weight_scale,
                    window_slack_deg=stage.window_slack_deg)
@@ -237,7 +248,7 @@ class StageSpec(Base):
 
         return Stage(name=self.name, turn_on=list(self.turn_on),
                      max_iter=self.max_iter, ftol=self.ftol,
-                     lebail_cycles=self.lebail_cycles,
+                     lebail_cycles=self.lebail_cycles, lebail_tol=self.lebail_tol,
                      seed=self.seed, strain_seed=self.strain_seed,
                      restraint_weight_scale=self.restraint_weight_scale,
                      window_slack_deg=self.window_slack_deg)
@@ -260,8 +271,9 @@ class PlanSpec(Base):
             "the tolerance every declared stage but the last stops at, unless it "
             "declares its own ftol; null = the solver default (1e-9) "
             "everywhere, i.e. the fully-converged schedule.  1e-6 is "
-            "1.2-1.6x fewer whole-plan evaluations for answers within "
-            "0.03 esd on a single fit (WP-1113/1123)"))
+            "1.06-1.58x fewer whole-plan evaluations for answers within "
+            "0.0004 esd on a single fit, behind the closing stage, on the "
+            "fluorapatite, 11-BM NAC and cpd-1a protocols (WP-2045)"))
     lebail_passes: int = Field(
         1, ge=1, description=(
             "the cap on Le Bail passes: under mode='lebail' the plan is run "

@@ -24,10 +24,10 @@ Each preset is a constructor on `RefinementPlan`, and `Refinement.fit` also take
 | Constructor | Frees, in order |
 |---|---|
 | `RefinementPlan.mccusker_default` | scale and background, zero shift, cell, the constant width W, then U, V, X and Y; no structure |
-| `RefinementPlan.mccusker_structural` | the same, then declared extra components, coordinates, displacement parameters, preferred orientation, extinction and surface roughness |
+| `RefinementPlan.mccusker_structural` | the same, then declared extra components, coordinates, displacement parameters, and the preferred orientation, extinction and surface roughness the model declares |
 | `RefinementPlan.magnetic_structural` | scale and background, the magnetic moment moduli, every moment degree of freedom, then the `mccusker_structural` order with the moments still free |
-| `RefinementPlan.lab_bragg_brentano` | the `mccusker_default` order with the specimen displacement beside the zero shift, then the emission-line weights and axial divergence, then surface roughness |
-| `RefinementPlan.lab_calibrate` | the instrument on a standard: scale and background, zero shift and specimen displacement, the widths, line weights and axial divergence, then displacement parameters; never the cell, which stays at the standard's certified value |
+| `RefinementPlan.lab_bragg_brentano` | the `mccusker_default` order with the specimen displacement beside the zero shift, then the emission-line weights and the axial-divergence ratio S/L, then surface roughness |
+| `RefinementPlan.lab_calibrate` | the instrument on a standard: scale and background, zero shift and specimen displacement, the widths, line weights and the axial-divergence ratio S/L, then displacement parameters; never the cell, which stays at the standard's certified value |
 | `RefinementPlan.lab_sample_refine` | a specimen against a calibrated instrument: scale and background, specimen displacement, cell, the specimen's size and strain widths, displacement parameters and surface roughness |
 | `RefinementPlan.profile_only` | background, zero shift, cell and widths, for a Le Bail fit or a Rietveld fit that leaves the structure alone |
 | `RefinementPlan.pawley_default` | the same groups for a Pawley fit |
@@ -63,6 +63,6 @@ Preferred orientation, extinction and surface roughness rescale intensities as a
 Freed early, a correction takes intensity that belongs to the structure.
 
 Anisotropic strain is freed in the same stage as the isotropic size and strain widths, never after it.
-A Stephens block locks `Phase.lor_strain`, because the block's isotropic direction is that same column ([Anisotropic strain](../reference/data.md#anisotropic-strain)).
+A Stephens block locks `Phase.lor_strain` and replaces it, because the block's isotropic direction is that same column ([Anisotropic strain](../reference/data.md#anisotropic-strain)).
 `lab_sample_refine` frees `phases.*.microstrain.dof.*` beside the size and strain widths for that reason.
 A stage after it would leave the isotropic width unrefined until the block's correlated coefficients, up to fifteen of them, turned on at once.

@@ -93,7 +93,7 @@
 <section class="block" id="example"><div class="wrap">
   <div class="sec-head">
     <h2>Simple and flexible Python API</h2>
-    <p>A straightforward Python interface for scripting or Jupyter notebooks. Get started <a href="https://rietx.org/using/quickstart.html">here</a>.</p>
+    <p>A straightforward Python interface for scripting or Jupyter notebooks. Get started <a href="https://rietx.org/docs/stable/start/first-fit.html">here</a>.</p>
   </div>
   <div class="two">
     <div class="codebox"><div class="bar"><span>02_simple_rietveld.py</span></div>
@@ -113,10 +113,8 @@ result = ref.fit(data, plan=<span class="s">"mccusker_structural"</span>, two_th
 <pre class="out">RefinementResult: <span class="g">converged</span> (rietveld)
   stage scale_bkg: converged (2 evals, ftol=1e-06)
   …
-  diagnostics: 3 rows, 0 errors; no deliverable given,
+  diagnostics: 2 rows, 0 errors; no deliverable given,
     so none is printed in full
-    <span class="w">FLOOR_HIT</span> at phases.0.extinction:
-      warning under qpa, structure, magnetic
     <span class="w">RESOLUTION_UNCONSTRAINED</span> at instrument.profile.u,
       .v, .w: warning under microstructure, calibration
     <span class="w">PATTERN_UNDERSAMPLED</span>: warning under qpa,
@@ -137,7 +135,7 @@ result = ref.fit(data, plan=<span class="s">"mccusker_structural"</span>, two_th
 <section class="block" id="gui"><div class="wrap">
   <div class="sec-head">
     <h2>The GUI</h2>
-    <p><code>rietx</code> ships with a comprehensive <a href="https://rietx.org/using/gui-quickstart.html">GUI</a> for interactive refinement. There are several quality-of-life features not found in other Rietveld interfaces, including pre-rolled <a href="https://rietx.org/using/gui-guide.html">automatic refinement plans</a> that sequentially release parameters, and the <a href="https://rietx.org/using/history.html">refinement history</a> panel shown below: a <code>git</code>-style tree of refinement checkpoints can be easily loaded and compared.</p>
+    <p><code>rietx</code> ships with a comprehensive <a href="https://rietx.org/docs/stable/start/gui-quickstart.html">GUI</a> for interactive refinement. There are several quality-of-life features not found in other Rietveld interfaces, including pre-rolled <a href="https://rietx.org/docs/stable/reference/gui-guide.html#plan">automatic refinement plans</a> that sequentially release parameters, and the <a href="https://rietx.org/docs/stable/reference/history.html">refinement history</a> panel shown below: a <code>git</code>-style tree of refinement checkpoints can be easily loaded and compared.</p>
   </div>
   <figure class="shot">
     <img class="only-light" src="%%IMG:gui-light%%" alt="The rietx GUI with the fluorapatite fit on the left and the history panel on the right, reading 24 nodes in 3 lanes" width="2880" height="1800">
@@ -148,22 +146,22 @@ result = ref.fit(data, plan=<span class="s">"mccusker_structural"</span>, two_th
 <section class="block" id="features"><div class="wrap">
   <div class="sec-head"><h2>Features</h2></div>
   <ul class="feat">
-    <li><strong>Rietveld, Le Bail and Pawley</strong><span>Multi-phase, X-ray and constant-wavelength neutron. <a href="https://rietx.org/using/concepts.html">Concepts</a></span></li>
-    <li><strong>Magnetic structures</strong><span>Moments refined on constant-wavelength neutron data, read and written as magCIF. In progress. <a href="https://rietx.org/using/refining.html">Magnetic</a></span></li>
-    <li><strong>Reads common file formats</strong><span>.xy/.xye, GSAS, pdCIF, .chi, Rigaku .ras/.rasx, Bruker .uxd/.brml/.raw, PANalytical .xrdml/.udf, Philips .rd/.sd. <a href="https://rietx.org/using/files.html">Files</a></span></li>
-    <li><strong>Speaks other languages</strong><span>Reads and writes TOPAS, FullProf, GSAS and PowderLine formats. (Rietica, XND, etc. in progress) <a href="https://rietx.org/using/files.html">Formats</a> · <a href="https://rietx.org/using/recipe.html">PowderLine</a></span></li>
-    <li><strong>Phase quantification</strong><span>Weight fractions with esds propagated through the full covariance, and a flag when a phase is not determined by the data. <a href="https://rietx.org/using/qpa.html">QPA</a></span></li>
-    <li><strong>Series</strong><span>Designed from the ground up for robust sequential refinement. <a href="https://rietx.org/using/series.html">Series</a></span></li>
-    <li><strong>Joint refinement</strong><span>Several patterns in one fit with shared parameters, including X-ray and neutron together. <a href="https://rietx.org/using/series.html">Joint fits</a></span></li>
-    <li><strong>Reporting beyond Rwp</strong><span>Common refinement heuristics reported in words alongside numbers. This helps both humans and agents interpret refinement results. <a href="https://rietx.org/using/report.html">FitReport</a></span></li>
-    <li><strong>History tree</strong><span>Every refinement stage is a restorable checkpoint. You can fork, compare, merge. <a href="https://rietx.org/using/history.html">History</a></span></li>
-    <li><strong>Live run viewer</strong><span>Every fit records itself. <code>rietx watch</code> shows a running fit in the browser and can stop it. <a href="https://rietx.org/using/refining.html">Watching a run</a></span></li>
-    <li><strong>Structure figures</strong><span>Draw a structure to a PNG from Python, with polyhedra and any view direction. <a href="https://rietx.org/using/exports.html">Figures</a></span></li>
-    <li><strong>Indexing</strong><span>Robust automatic peak picking and three available indexing engines. <a href="https://rietx.org/using/indexing.html">Indexing</a></span></li>
-    <li><strong>Corrections</strong><span>Axial divergence, displacement and transparency, absorption, preferred orientation, anisotropic displacement and strain, anomalous dispersion. <a href="https://rietx.org/using/model.html">Model</a></span></li>
-    <li><strong>Constraints and restraints</strong><span>Ties, holds, named variables, and restraints on bond lengths and angles. <a href="https://rietx.org/using/constraints.html">Constraints</a></span></li>
-    <li><strong>Solvers and backends</strong><span>Very fast compiled kernel; trust-region and Levenberg–Marquardt on an analytic Jacobian; optional JAX and PyTorch backends for fully differentiable refinements. <a href="https://rietx.org/estimation.html">Estimation</a></span></li>
-    <li><strong>For agents</strong><span>Ships with an agent skill summarising refinement heuristics and <code>rietx</code> features. Works with most coding agents. <code>rietx skill --install</code>. <a href="#quickstart">Quickstart</a> · <a href="https://rietx.org/using/agents.html">Agents</a></span></li>
+    <li><strong>Rietveld, Le Bail and Pawley</strong><span>Multi-phase, X-ray and constant-wavelength neutron. <a href="https://rietx.org/docs/stable/concepts/fit.html">Concepts</a></span></li>
+    <li><strong>Magnetic structures</strong><span>Moments refined on constant-wavelength neutron data, read and written as magCIF. In progress. <a href="https://rietx.org/docs/stable/reference/magnetic.html">Magnetic</a></span></li>
+    <li><strong>Reads common file formats</strong><span>.xy/.xye, GSAS, pdCIF, .chi, Rigaku .ras/.rasx, Bruker .uxd/.brml/.raw, PANalytical .xrdml/.udf, Philips .rd/.sd. <a href="https://rietx.org/docs/stable/reference/pattern-files.html">Files</a></span></li>
+    <li><strong>Speaks other languages</strong><span>Reads and writes TOPAS, FullProf, GSAS and PowderLine formats. (Rietica, XND, etc. in progress) <a href="https://rietx.org/docs/stable/reference/foreign-files.html">Formats</a> · <a href="https://rietx.org/docs/stable/reference/recipe.html">PowderLine</a></span></li>
+    <li><strong>Phase quantification</strong><span>Weight fractions with esds propagated through the full covariance, and a flag when a phase is not determined by the data. <a href="https://rietx.org/docs/stable/reference/qpa.html">QPA</a></span></li>
+    <li><strong>Series</strong><span>Designed from the ground up for robust sequential refinement. <a href="https://rietx.org/docs/stable/reference/series.html">Series</a></span></li>
+    <li><strong>Joint refinement</strong><span>Several patterns in one fit with shared parameters, including X-ray and neutron together. <a href="https://rietx.org/docs/stable/reference/joint.html">Joint fits</a></span></li>
+    <li><strong>Reporting beyond Rwp</strong><span>Common refinement heuristics reported in words alongside numbers. This helps both humans and agents interpret refinement results. <a href="https://rietx.org/docs/stable/concepts/report.html">FitReport</a></span></li>
+    <li><strong>History tree</strong><span>Every refinement stage is a restorable checkpoint. You can fork, compare, merge. <a href="https://rietx.org/docs/stable/reference/history.html">History</a></span></li>
+    <li><strong>Live run viewer</strong><span>Every fit records itself. <code>rietx watch</code> shows a running fit in the browser and can stop it. <a href="https://rietx.org/docs/stable/guides/watch.html">Watching a run</a></span></li>
+    <li><strong>Structure figures</strong><span>Draw a structure to a PNG from Python, with polyhedra and any view direction. <a href="https://rietx.org/docs/stable/reference/figures.html">Figures</a></span></li>
+    <li><strong>Indexing</strong><span>Robust automatic peak picking and three available indexing engines. <a href="https://rietx.org/docs/stable/reference/indexing.html">Indexing</a></span></li>
+    <li><strong>Corrections</strong><span>Axial divergence, displacement and transparency, absorption, preferred orientation, anisotropic displacement and strain, anomalous dispersion. <a href="https://rietx.org/docs/stable/theory/corrections.html">Model</a></span></li>
+    <li><strong>Constraints and restraints</strong><span>Ties, holds, named variables, and restraints on bond lengths and angles. <a href="https://rietx.org/docs/stable/reference/parameter-table.html#ties">Constraints</a></span></li>
+    <li><strong>Solvers and backends</strong><span>Very fast compiled kernel; trust-region and Levenberg–Marquardt on an analytic Jacobian; optional JAX and PyTorch backends for fully differentiable refinements. <a href="https://rietx.org/docs/stable/theory/estimation.html">Estimation</a></span></li>
+    <li><strong>For agents</strong><span>Ships with an agent skill summarising refinement heuristics and <code>rietx</code> features. Works with most coding agents. <code>rietx skill --install</code>. <a href="#quickstart">Quickstart</a> · <a href="https://rietx.org/docs/stable/reference/agents.html">Agents</a></span></li>
   </ul>
 </div></section>
 

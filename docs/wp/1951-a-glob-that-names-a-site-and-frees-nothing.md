@@ -1,9 +1,8 @@
 # WP-1951 — a glob that names a site and frees nothing
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-02 — a stage glob naming one site that frees nothing is reported, set_vary raises on an unknown literal, the verbs name the nearest path; PR #1304, both open questions settled under delegation
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-10-11 — a request to free one site's coordinates, or an unknown path on `set_vary`, frees nothing and says nothing; the caller can read `freed` or the return value
 
 ## Goal
 
@@ -69,6 +68,11 @@ set_vary("instrument.zero")` returns `[]` silently, while `hold` raises
 'unknown parameter path' with no near-miss. Both are one call to
 `rietx._nearmiss` away, and are unowned."
 
+**The tier of each rule this WP adds** (written 2026-11-01). The site-glob
+branch of `STAGE_PATH_NOT_FREE` is tier 1, ambiguity 1: it is arithmetic on
+the table (does any matched row move?), with no threshold. `set_vary`'s
+warning and the verbs' near-miss are the same tests on a second surface.
+
 ## Non-goals
 
 - A `held_by` enum on `ParameterRow`. The row's fields already say it.
@@ -80,20 +84,38 @@ set_vary("instrument.zero")` returns `[]` silently, while `hold` raises
 
 ## Tasks
 
-- [ ] Read 1414's two pinned tests and say whether any case is a
+- [x] Read 1414's two pinned tests and say whether any case is a
       concrete-site glob. If one is, put the question to the maintainer and
       record the answer as `Decided YYYY-MM-DD:`.
-- [ ] `STAGE_PATH_NOT_FREE` (or a sibling code) for a concrete-site glob
+      *Done 2026-11-01:* the `dof-glob` case (`phases.0.atoms.1.dof.*` on
+      LaB6) is a concrete-site glob, but it matches B's free `dof.0` and is
+      the test's positive arm. The rule fires only when the glob frees
+      nothing, so that case still passes unchanged. The `pattern` case and
+      the hump test have no numeric segment. No question for the maintainer.
+- [x] `STAGE_PATH_NOT_FREE` (or a sibling code) for a concrete-site glob
       that matches no row, naming the site and why (site symmetry, from the
       same text the literal case uses).
-- [ ] `Refinement.set_vary` and `hold` on an unknown literal: the
+      *Done:* `refine._site_glob_diagnostics`, the same code. It fires when
+      no row the glob matches can move (`_frees_for_request`), which also
+      covers a glob matching only locked or symmetry-tied rows.
+- [x] `Refinement.set_vary` and `hold` on an unknown literal: the
       near-miss message `STAGE_PATH_UNKNOWN` gives a stage. `set_vary`
       warns. Whether `hold` keeps raising is recorded.
-- [ ] Tests: rutile Ti's `dof.*` fires, `phases.*.atoms.*.dof.*` on the same
+      *Done:* `set_vary` warns (`UserWarning`) on an unknown literal, and
+      when freeing on a declined phase literal or site glob, with the
+      stage's text. `hold` keeps raising, since it always has and a hold on
+      nothing is a claim; the refusal now names the nearest path, as do
+      `unhold`, `untie`, `tie`, `set_values` and `profile_interval`.
+- [x] Tests: rutile Ti's `dof.*` fires, `phases.*.atoms.*.dof.*` on the same
       model stays silent, every preset on the acceptance fixtures fires
       nothing new.
-- [ ] Skill: `surprises.md` § 8.28 gains the concrete-site case. The
+      *Done:* `tests/test_params_surface.py`. The preset half is structural
+      (`test_no_preset_names_one_site`): the rule needs a concrete site
+      index, and no preset glob has one.
+- [x] Skill: `surprises.md` § 8.28 gains the concrete-site case. The
       diagnostics reference row if the code is new.
+      *Done:* § 8.28, trimmed to stay inside the file's byte budget. The
+      code is not new, so the row stands; `help.py`'s entry gains the case.
 
 ## Acceptance
 
@@ -113,6 +135,243 @@ Every shipped preset fires nothing new on the acceptance fixtures.
 
 ## Handover log
 
+- **2026-11-02 (rework)** — PR #1304. `Refinement.set_vary` now raises
+  `ValueError` on a literal path the model lacks, as `hold`, `tie`, `untie`,
+  `set_values` and `profile_interval` already did. The message names the
+  nearest real path. Every literal in the call is checked before anything is
+  applied, so a list with one wrong name leaves the model and the history as
+  they were. A pattern that matches nothing stays silent (WP-1414). The
+  warning on a declined phase literal or a one-site pattern stays a warning.
+
+  *Settled by Claude under delegation (Yue, 2026-11-02).* Yue delegated the
+  PR's two open questions ("your understanding of aim is correct. think about
+  how people and agents use the software, and make the most appropriate
+  judgement"), and the ghostshift lead settled both.
+  (1) A fully fixed site keeps the `warning` level under
+  `STAGE_PATH_NOT_FREE`, as built. Grounds: the caller asked for something
+  that will not happen, and the literal case has fired at warning since
+  WP-1414. Alternative not chosen: an `info` sibling code, moving the literal
+  case with it, which is GSAS-II 5.8.4's silent "Fixed by symmetry" practice.
+  (2) `set_vary` raises on an unknown literal. Grounds: an agent always reads
+  an exception, while a `UserWarning` can scroll past or show once per call
+  site; a person fixes the name and reruns at low cost; the four sibling verbs
+  raise; pandas raises `KeyError` on a missing column label. Alternative not
+  chosen: the warning this PR first built, which never breaks an existing
+  script. This is a behaviour break, recorded in `docs/releases/1.11.0.md`
+  under Code to check.
+
+  *Done:* `set_vary` checks literals first and raises through a new
+  `_unknown_paths_error`. One unknown path gives the sibling verbs' sentence
+  (`unknown parameter path: 'instrument.zero'; did you mean
+  'instrument.zero_shift'?`). Several give `unknown parameter paths: 'a',
+  'b'` with a hint for each, so one rerun fixes every typo. The warning for a
+  retired-spelling pattern that matches nothing is kept. Tests: the two
+  warning cases for an unknown literal became
+  `test_set_vary_refuses_an_unknown_literal_before_changing_anything`
+  (freeing and fixing; the exact message, the table and the history node
+  count untouched), and `set_vary` joined the near-miss refusal test. Docs:
+  the docstring, the manual's parameter-table page, the skill's `surprises.md` § 8.28 (both committed
+  copies re-synced), the v1.11 record and the 1.11.0 release note. No audit
+  row records `set_vary`'s response, so `_audit.py` is unchanged and no
+  generality pass was owed. The first judge's "weak" verdict on the warning
+  is answered by the raise.
+
+  *Caller audit* (every package caller of `Refinement.set_vary`, for a literal
+  that could now raise): history replay and `checkout` restore a stored
+  `set_vary` node from its state snapshot and never call the verb, so an old
+  history file opens and replays as before. `gui/session.py`'s `PATCH
+  /api/params` catches `ValueError` into a `GuiError` (a 400 naming the
+  path); the client sends a row's own path or a glob (`asGlob` wraps a bare
+  word as `*word*`), so only a stale row can reach it. The route applied
+  each key in turn after the values, so the review's fix makes it check
+  every key first. `gui/textdoc.py` applies only rows `changes` already
+  checked against the table ("unknown parameter" at parse).
+  `io/projects/topas_ties.py` passes only paths `usable` found in the row
+  table. `refine.py`'s own call is the glob `vars.*`. The internal trials
+  (`report/layer2.compare_rivals`, `strategy/fraction_profile`,
+  `strategy/parameter_interval`) pass paths of the fitted model, or a
+  caller's pair whose unknown member `set_values` already refused within the
+  same call; it now raises one line earlier. `io/recipe`, `viz/compare.py`,
+  `sequential.py` and `multi.py` call only `ParameterTable.set_vary`, which
+  is unchanged. The examples, the manual's code blocks and the skill name
+  existing paths or patterns. No caller passes a literal the model lacks, so
+  none can newly raise. One test sent the literal `nothing.at.all` as "a
+  glob nobody matches" (`tests/test_gui_server.py`); it now sends
+  `nothing.at.*` and checks the literal's 400 separately.
+
+  *Caps:* the skill's § 8.28 was tightened to stay inside
+  `tests/skill_caps.py`'s budget for `surprises.md` (3 B of room before this
+  rework). A sentence on `set_vary` in `help.py`'s `STAGE_PATH_UNKNOWN`
+  entry pushed the manual's generated refinement-diagnostics page to 50 037
+  characters against its 50 000 cap, so it was dropped; the exception text
+  carries the same fact.
+
+  *Reader-facing text* (new): the `ValueError` above, which replaces the
+  `UserWarning` for an unknown literal. `python -m tests.reader_output`:
+  exit 0, unchanged against the merge-base `a4a7187dc`. Yue's 2026-11-01 ruling sends every reader-output change to
+  him before merge; this one is listed in the PR body.
+
+  *Merged origin/main* four times, last at `a4a7187dc`: conflicts in `docs/milestones/v1.11.md`
+  (both sections kept) and `tests/silence.py` (WP-1951's `_site_glob` and
+  main's `_moduli` helpers, both kept); `docs/wp/README.md` regenerated,
+  unchanged.
+
+  *Review:* `/code-review high --fix 9de664d7f..HEAD` (the rework commits only) found six; four fixed in `5d07325f`. `PATCH /api/params` called `set_vary` per key after `set_values` had committed, so one typo left earlier nodes behind; it now refuses every vary key's literals first (`Refinement._refuse_unknown_literals`), with a test. The docstring and the manual now name the retired-pattern warning. A joined retired-spelling hint no longer reads `.;`. Declined: folding `set_values`' plural message into the new helper, which would change that verb's documented text; and the stale WP status line, which this entry updates.
+
+  *Measured:* `[dev]` venv, macOS arm64, Python 3.12, under ghostshift's
+  `serial.py` lock (no other pytest). Fast suite 13 600 passed, 319 skipped, 34 xfailed, none failed, on the tree merged with origin/main at `a4a7187dc` (the fourth merge). Each earlier merge was green too: 13 563 at `4e08411e5`, equal in passed+skipped to the discovery run before the three fixes, whose three red cases became passes; 13 580 at `e76818310`, main's 17 new `tests/test_report_cost.py` cases; 13 591 at `e8d210278`; skips held at 319 throughout.
+  The 13 237 + 310 of the previous entry was on main at `985da7ef`, so the
+  totals are not comparable across the merge. Full suite not run: no
+  measured number can move.
+
+  *Next:* none on this WP. The maintainer reads the new `ValueError` text in
+  the PR body (reader-output rule).
+
+  *CI (steward, 2026-11-02):* `lint` was red on `b4ee0d36f` and `d41c3d0f9`
+  for one cause. Vale's `Vale.Terms` rule raised two errors on the generated
+  refinement-diagnostics page, because the `STAGE_PATH_NOT_FREE` help text
+  in `src/rietx/help.py` spelled `phases.0.atoms.0.dof.*` and `dof.*` as bare
+  prose. Both are now in backticks, as the rest of `help.py` writes a path.
+
+- **2026-11-02** — PR #1304. A stage that asks to refine one atom's position
+  by a pattern, where the atom sits on a fully fixed special position (Ti on
+  rutile's 2a), now says so, where it used to freeze the atom without a word.
+  `set_vary` now warns when a call changes nothing it named, and every verb
+  that refuses an unknown path names the nearest real one. Wildcard patterns
+  stay silent, as WP-1414 decided, and no shipped plan can trigger the new
+  report. A joint fit does not get it yet (WP-2028 inherits that).
+
+  *Done:* all five tasks (ticked above with what did each).
+  `refine._site_glob_diagnostics` adds a branch to the existing
+  `STAGE_PATH_NOT_FREE`: a glob whose fixed segments name an existing site
+  (`phases.<i>.atoms.<j>.`) and that frees no row by `_frees_for_request`. It
+  says why when the glob reached the coordinates: site symmetry fixes every
+  one (no suggestion, as for the literal), a rigid body places them, or they
+  move through `dof` rows (named). A biso freed by the same request answers a
+  one-site `adp.*` (the displacement stages' pair, copied per atom).
+  `Refinement.set_vary` warns (`UserWarning`) on an unknown literal with the
+  nearest path, and when freeing on a declined phase literal or site glob,
+  through the same two builders, after the call has committed. `hold`,
+  `unhold`, `untie`, `tie`, `set_values` and `profile_interval` keep raising
+  and name the nearest path (`_path_hint`, retired spellings first). The audit
+  row for `STAGE_PATH_NOT_FREE` gets tier 1, ambiguity 1, response `warning`;
+  its `.suggestion` row counts 2 sites and stays unaudited.
+
+  *Reader-facing text* (new; `python -m tests.reader_output` exit 0, the
+  standard fit unchanged, since it names no site):
+  `Stage 'only' asked for phases.0.atoms.0.dof.*, which matches no
+  parameter, so nothing was freed for it. Every coordinate of
+  phases.0.atoms.0 is fixed by its site symmetry, so the site has no dof
+  rows.`, and as a warning `set_vary freed nothing for 'instrument.zero',
+  which names no parameter of this model. Did you mean
+  'instrument.zero_shift'?`.
+
+  *Review:* `/code-review high --fix` found seven; three fixed in
+  `85a1aac5`: the census test `test_multi_diagnostics` was red for the new
+  helper (now an `ABSENT` row in `multi.DIAGNOSTIC_SCOPES`),
+  `profile_interval`'s hint now goes through `_path_hint`, `set_vary` passes
+  a real `Stage`. Its warning-order finding was fixed after the judge's pass
+  (warn after commit). Declined: the joint fit (waits on PR #1270, forwarded
+  to WP-2028); the GUI not surfacing `set_vary`'s warnings (a design choice,
+  below); the package-built site globs (`report/body_misfit`'s released arm,
+  an internal trial whose findings are not surfaced, and `io/recipe`'s
+  flagged coordinates, which can name a fixed site only after a caller ran
+  `fix_special_positions` on a stored plan, and then the report is true);
+  the audit evidence now names both. A second runner merged origin/main
+  (one conflict, WP-2028's `### Inherited`, both entries kept) and added
+  `STAGE_PATH_NOT_FREE`'s pair to `tests/silence.py`, which main's
+  WP-2037 rule asks of every code whose audit row says `warning`; the
+  fast suite was red on its absence until then.
+
+  *Generality* (judge re-run on the final merged tree, since the first
+  pass's verbatim text was lost with the earlier runner's context; pasted
+  unedited):
+
+  ### STAGE_PATH_NOT_FREE (code)
+
+  **Verdict: holds** on tier 1 and ambiguity 1. The evidence for reporting is stronger. The `warning` level is contested for one case: a site that symmetry fixes completely.
+
+  | Question | Author's answer | Found | Verdict |
+  |---|---|---|---|
+  | 1 What it decides | It treats a glob naming one concrete site that frees nothing as the caller's claim (WP file, Context) | It fires only on a `phases.<i>.atoms.<j>.` glob. No preset names one (`test_no_preset_names_one_site`). | holds |
+  | 2, 5 Kind and tier | "arithmetic on the table … no threshold" (WP file, tier paragraph) | Agrees: the test is whether any matched row can move. Pinned by `test_a_glob_naming_one_site_that_frees_nothing_says_why`, `test_a_site_glob_that_frees_something_or_names_no_site_stays_silent` and `test_ti_on_rutile_reports_its_site_symmetry` (`tests/test_params_surface.py`). | holds |
+  | 3 Case against | none given | GSAS-II 5.8.4 accepts an X flag (its "refine position" box) on a fully fixed atom. It holds each coordinate as "Fixed by symmetry" and lists it in a printed hold list. It gives no warning (`GSASIIstrIO.py:1775-1791`, `GSASIImapvars.py:1587-1591`, read on disk in rietx-bench). A script that loops over every site gets one warning per fixed site. | bears on the level only |
+  | 4 Case for | issue #896: the stage froze the site in silence | A user who ticked one site got no answer. The other cases name a real fix. | holds |
+  | 7 What records it | `where=[glob]` | Yes. A joint fit does not report it yet, deferred to WP-2028 (`multi.DIAGNOSTIC_SCOPES`). | holds |
+  | Level | `responds`: "…or none where the site symmetry fixes every coordinate" | That clause names no action, and a coordinate fixed by symmetry is exact. The record says two consequences get two codes (generality.md, Attention is a cost, clause 2). WP-1414's literal case (`phases.0.atoms.0.z`) already warns, so a split needs a sibling `info` code covering both. | maintainer's call. I lean towards an `info` sibling as a follow-up. |
+
+  What would change it: a ruling on whether "the plan did not reach what it asked" covers a site with nothing to reach.
+
+  ### STAGE_PATH_NOT_FREE.suggestion
+
+  **Verdict: weak.** The new site's advice is mostly arithmetic. But the row stays unaudited while the code row's `responds` now relies on it.
+
+  | Question | Author's answer | Found | Verdict |
+  |---|---|---|---|
+  | Baseline | none given | The name was already on the list, so no rule is broken | holds |
+  | 3 Case against | none given | The rigid-body advice frees `phases.*.rigid_bodies.*…`: every body in every phase, wider than the one site asked about (`refine._site_glob_diagnostics`). | finding |
+  | 4 Case for | none given | "Free <site>.dof.*" is what any refiner would do | holds |
+
+  What would change it: auditing this row in the same change, with the body glob narrowed to the owning body.
+
+  ### set_vary warning and the near-miss in the verbs (outside the table)
+
+  **Verdict: weak.** The near-miss holds. Warning rather than raising on an unknown literal is the weak part.
+
+  | Question | Author's answer | Found | Verdict |
+  |---|---|---|---|
+  | 1 What it decides | "the return value already says what changed and a glob that declines rows is how plans work" (`set_vary` docstring) | That reason covers globs. An unknown literal has no healthy reading, and `hold` and `set_values` raise on the same fact. DESIGN Rule 4 asks a new API for "a raise on failure". | weak |
+  | 4 Case for warning | It returns the same list as before (1.11.0 notes) | No caller breaks | holds |
+  | Near-miss | "the same tests on a second surface" (WP file) | It shows one nearest path (difflib, 0.6 cutoff, in `_nearmiss`, which the audit does not walk). The caller decides. This matches STAGE_PATH_UNKNOWN. | holds |
+  | 7 What records it | none given | Only the UserWarning. The history node records `turn_on=[]` and nothing of the miss. | finding |
+
+  What would change it: a maintainer ruling on whether `set_vary` raises on an unknown literal, which would be a breaking change.
+
+  *Author's answers.* Level: kept at `warning`, beside WP-1414's literal
+  case; the split is the maintainer's question below. Suggestion: the
+  rigid-body glob repeats the wording of `hold`'s refusal (WP-1805), so
+  narrowing it to the owning body is one change for both sites, forwarded to
+  WP-1805's `### Inherited`; the row stays unaudited. `set_vary`: it warns
+  because raising would break a caller that passes a list mixing a typo with
+  good paths, which today gets the good ones freed; whether to break that is
+  the maintainer's, below.
+
+  *Open question for the maintainer (warning or info).* A fully fixed site
+  leaves the reader nothing to do. At `warning` (this PR), the sentence sits
+  among the fit's warnings beside the literal `phases.0.atoms.0.z`, which has
+  warned since WP-1414. At `info` under a new code, it sits below the
+  warnings and does not mark the fit as needing attention; the literal case
+  should move with it, which changes WP-1414's output. GSAS-II says nothing.
+  Recommendation, a lean: keep `warning`, since the caller asked for a
+  refinement that will not happen. If you prefer `info`, move both cases
+  under one sibling code. A second, smaller question: `set_vary` warns on an
+  unknown literal where `hold` raises; keep warning (lean), since raising is
+  a breaking change for mixed lists.
+
+  *Measured* (`[dev]` venv, macOS arm64, Python 3.12, alone on the machine
+  via `serial.py`): fast suite 13 237 passed, 310 skipped, 32 xfailed, none
+  failed, 15:26 wall, on this branch merged with origin/main at
+  `985da7ef`. On the previous merge (main at `e5d2d035`) it read 13 224
+  passed and 310 skipped: 13 534, one more than the run before the
+  silence pair (13 533, that one test red), the one case it adds. The
+  27 cases in `test_params_surface.py` cost 2.82 s over 8 functions,
+  1.51 s the most (7 cases, each a five-iteration fit); none joins the
+  slow tail. Added 28 tests: 27 in
+  `tests/test_params_surface.py`, one silence pair in `tests/test_silence.py`. Full suite not run: the change moves no
+  measured number (diagnostics and warnings only).
+
+  *Not generalised, on purpose:* a glob with a concrete site index the model
+  lacks (`phases.0.atoms.7.dof.*`) stays silent, being an index typo that
+  `STAGE_PATH_UNKNOWN`'s shared rule would have to own; a concrete phase
+  index on another family (`phases.0.microstrain.dof.*`) stays silent, each
+  family needing its own reason; the symmetry subject from
+  `gui.symmetry.held_causes` was not imported into the literal message (not a
+  one-liner from `refine.py`).
+
+  *Next:* the maintainer rules on the new reader text (PR #1304 body), on
+  the warning-or-info question above, and on `set_vary` warning rather
+  than raising. Then merge. After PR #1270 merges, WP-2028 wires the site builder into the
+  joint fit.
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issue #896).
   Checked against the tree at `d80ca5f4`: `held_because` and the row's fields
   already give the reason, Ti on rutile has no `dof` rows, and a glob naming

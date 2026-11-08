@@ -119,12 +119,13 @@ def test_phase_extinction_defaults_off_and_round_trips():
     from tests.test_schemas import make_lab6
 
     phase = make_lab6().phases[0]
-    # off by default: value 0, not varying, bounded at zero
-    assert phase.extinction.value == 0.0
-    assert phase.extinction.vary is False
-    assert phase.extinction.min == 0.0
+    # opt-in since WP-1944: undeclared, and absent from the table
+    assert phase.extinction is None
+    assert Phase.model_validate_json(phase.model_dump_json()).extinction is None
 
-    phase.extinction.value = 0.004
+    # a number declares it, bounded at its floor and in its unit
+    phase.extinction = 0.004
+    assert phase.extinction.min == 0.0 and phase.extinction.unit == "um^2"
     phase.extinction.vary = True
     back = Phase.model_validate_json(phase.model_dump_json())
     assert back.extinction.value == pytest.approx(0.004)
@@ -142,7 +143,7 @@ def test_extinction_param_wiring_and_routing():
     from tests.test_schemas import make_lab6
 
     structure = make_lab6()
-    structure.phases[0].extinction.value = 0.004
+    structure.phases[0].extinction = 0.004
     table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
     table.set_vary(["*"], False)
     assert table.set_vary(["phases.*.extinction"], True) == ["phases.0.extinction"]
@@ -172,6 +173,61 @@ def test_mccusker_structural_frees_extinction_after_displacement():
     assert ext.seed == 0.0
 
 
+def test_the_extinction_stage_frees_only_a_phase_that_declares_it():
+    """WP-1944's acceptance: two phases, one declared and one not, and the
+    structural plan's extinction stage frees the declared one alone, as its
+    preferred-orientation stage frees only a declared block."""
+    from fnmatch import fnmatch
+
+    from rietx import Instrument
+    from rietx.params.vector import ParameterTable
+    from rietx.strategy.staged import RefinementPlan
+    from tests.test_schemas import make_lab6
+
+    structure = make_lab6()
+    second = structure.phases[0].model_copy(deep=True)
+    second.name = "LaB6 again"
+    structure.phases.append(second)
+    structure.phases[1].extinction = 0.0
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    stage = next(s for s in RefinementPlan.mccusker_structural().stages
+                 if s.name == "extinction")
+    freed = [e.path for e in table.entries
+             if any(fnmatch(e.path, g) for g in stage.turn_on)]
+    assert freed == ["phases.1.extinction"]
+
+
+#: every opt-in correction's table paths: a block or field a model must
+#: declare before an entry exists (WP-1944 ruling 2, part 3)
+OPT_IN_PATHS = ("*.extinction", "*.preferred_orientation.*", "*.texture.*",
+                "*.surface_roughness.*", "*.atoms.*.adp.*", "*.microstrain.*",
+                "instrument.extra_components.*", "*.atoms.*.moment.*",
+                "*.distortion_modes.*", "instrument.background.air*")
+
+
+def test_no_preset_frees_a_correction_the_model_does_not_declare():
+    """Every preset, every stage, every glob against a model declaring no
+    opt-in correction: nothing opt-in is freed, because nothing opt-in has an
+    entry.  A preset that started freeing a correction by default, as the
+    structural plan did with extinction until WP-1944, fails here."""
+    from fnmatch import fnmatch
+
+    from rietx import Instrument
+    from rietx.params.vector import ParameterTable
+    from rietx.strategy.staged import PLAN_PRESETS
+    from tests.test_schemas import make_lab6
+
+    structure = make_lab6()
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    paths = [e.path for e in table.entries]
+    assert not [p for p in paths if any(fnmatch(p, o) for o in OPT_IN_PATHS)]
+    for name, build in PLAN_PRESETS.items():
+        for stage in build().stages:
+            freed = [p for p in paths if any(fnmatch(p, g) for g in stage.turn_on)]
+            opt_in = [p for p in freed if any(fnmatch(p, o) for o in OPT_IN_PATHS)]
+            assert not opt_in, f"{name}/{stage.name} frees {opt_in}"
+
+
 def test_the_stage_seed_lifts_a_zero_coefficient_off_its_floor():
     """A caller's ``Stage.seed`` reaches the coefficient through its bounds
     (WP-1938): it is free, bounded below at 0, and on that floor."""
@@ -179,7 +235,9 @@ def test_the_stage_seed_lifts_a_zero_coefficient_off_its_floor():
     from rietx.params.vector import ParameterTable
     from tests.test_schemas import make_lab6
 
-    table = ParameterTable(make_lab6(), Instrument.debye_scherrer(wavelength=1.5406))
+    structure = make_lab6()
+    structure.phases[0].extinction = 0.0  # declared, at its floor
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
     table.set_vary(["*"], False)
     freed = table.set_vary(["phases.*.extinction"], True)
     e = next(x for x in table.entries if x.path == "phases.0.extinction")
@@ -214,7 +272,7 @@ def _lab6_model(ext: float):
 
     structure = make_lab6()
     structure.phases[0].scale.value = 5e-3
-    structure.phases[0].extinction.value = ext
+    structure.phases[0].extinction = ext
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.profile.w.value = 1e-2
     tt = np.arange(12.0, 120.0, 0.02)
@@ -284,7 +342,7 @@ def test_jacobian_dof_adp_extinction_columns_match_fd_with_extinction_on():
 
     structure = make_aniso_rutile()
     structure.phases[0].scale.value = 1e-3
-    structure.phases[0].extinction.value = 2.0  # large ⇒ |G − 1| ≫ tolerance
+    structure.phases[0].extinction = 2.0  # large ⇒ |G − 1| ≫ tolerance
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.profile.w.value = 1e-2
     grid = np.arange(10.0, 90.0, 0.02)
@@ -692,7 +750,7 @@ def _synthesize_extinct_lab6(ext_true: float, *, noise_seed: int = 5):
 
     structure = make_lab6()
     structure.phases[0].scale.value = 5e-3
-    structure.phases[0].extinction.value = ext_true
+    structure.phases[0].extinction = ext_true
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.profile.w.value = 8e-3
     tt = np.arange(15.0, 120.0, 0.02)
@@ -718,7 +776,8 @@ def test_injected_extinction_is_recovered_within_esds():
     ext_true = 2.5
     pattern = _synthesize_extinct_lab6(ext_true)
 
-    structure = make_lab6()  # extinction starts at 0
+    structure = make_lab6()
+    structure.phases[0].extinction = 0.0  # declared, starting at 0
     structure.phases[0].scale.value = 4e-3
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.profile.w.value = 1.1e-2
@@ -769,7 +828,7 @@ def test_extinction_correlates_with_scale_and_biso_and_the_guard_fires():
     pattern = _synthesize_extinct_lab6(2.5)
     structure = make_lab6()
     structure.phases[0].scale.value = 5e-3
-    structure.phases[0].extinction.value = 1.0
+    structure.phases[0].extinction = 1.0
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.profile.w.value = 9e-3
 
@@ -810,7 +869,7 @@ def _gate_case(ext_value: float, free: tuple[str, ...], *,
 
     structure = make_lab6()
     structure.phases[0].scale.value = 5e-3
-    structure.phases[0].extinction.value = ext_value
+    structure.phases[0].extinction = ext_value
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.profile.w.value = 9e-3
     tt = np.arange(15.0, 120.0, 0.05)
@@ -942,6 +1001,8 @@ def _nac_and_fluorite():
         name="CaF2", space_group="F m -3 m", cell=rx.Cell.cubic(5.4631),
         atoms=[site("Ca", "Ca2+", (0, 0, 0), 0.6),
                site("F", "F1-", (0.25, 0.25, 0.25), 0.9)]))
+    for phase in structure.phases:  # the guide's model as it stood before WP-1944
+        phase.extinction = 0.0
     instrument = rx.Instrument.debye_scherrer(wavelength=0.4139090)
     instrument.profile.w.value = 2e-5
     instrument.profile.x.value = 2e-3

@@ -127,7 +127,7 @@ IZA database, and a less dense one lies above). Declare a candidate cell in
 **These names are provisional, and the answers they return are versioned.**
 Indexing is under active development, so everything under `rietx.indexing` and
 every answer type in `rietx.schemas.indexing` may change in any release — the
-[compatibility promise](https://rietx.org/using/compatibility.html)
+[compatibility promise](https://rietx.org/docs/stable/reference/compatibility.html#provisional-by-declaration)
 has the detail, § Provisional by declaration. Two things do not move with them:
 `capabilities().indexing_thresholds_version`, which is what the gates below are
 versioned by, and the serialized shape of an `IndexingResult`. So a tool loop
@@ -263,7 +263,7 @@ shows. Same split as §7c: a refutation lives on the class it refutes.
 |---|---|
 | `EXTINCTION_GROUPS_NOT_SEPARABLE` | (info) Pick one of the listed space groups and call it the answer. Carry the list; `structure_from_candidate(cand, space_group=…)` accepts any member. |
 | `EXTINCTION_SYMBOL_AMBIGUOUS` | Read the ranked first class as the answer. The message says which reason applies. Only a runner-up inside the decisive ΔBIC margin is fixed by better data at the same setting. |
-| `EXTINCTION_FORBIDDEN_INTENSITY` | Keep this class. A position it forbids carries intensity its own Le Bail fit cannot account for (hkl and 2θ named). A held cell (`refine_cell=False`) off by ~10⁻³ refutes the *true* class; the default refines it first. Two things it is not: a position under a neighbour's tail (untestable, WP-1077), and necessarily a violated absence — it can be an impurity line, so check the indexing result's `unmatched_observed`. A good ΔBIC does not excuse it: a testable position carrying intensity refutes the class however well it scores |
+| `EXTINCTION_FORBIDDEN_INTENSITY` | Keep this class. A position it forbids carries intensity its own fit cannot account for (hkl and 2θ named). A held cell (`refine_cell=False`) off by a few 10⁻⁴ can refute the *true* class; the default refines it first. Two things it is not: a position under a neighbour's tail (untestable, WP-1077), and necessarily a violated absence — it can be an impurity line, so check the indexing result's `unmatched_observed`. A good ΔBIC does not excuse it: a testable position carrying intensity refutes the class however well it scores |
 | `EXTINCTION_CONDITIONS_PARTIAL` | (info) Read `conditions` as the complete condition list for this class. Read `space_groups`. |
 | `EXTINCTION_SCREEN_FAILED` | (error) Read the empty ranking, or any class's absence from it, as evidence about the symmetry. `screen.status` is `failed`. Validate the cell first (`index_pattern` with `data=`, §7d's sequence). |
 

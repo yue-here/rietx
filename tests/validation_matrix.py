@@ -237,6 +237,17 @@ DATASETS: dict[str, Dataset] = {
         "relative intensities on another instrument, not this texture, so "
         "every row referenced to it is cross-code",
         "cross_code"),
+    "acridine_ix": Dataset(
+        "cod_2242872.cif",
+        "Acridine form IX, C13H9N, P2_1/n, Stephens, Schur, Lapidus & "
+        "Bernstein (2019) Acta Cryst. E75, 489: synchrotron capillary data "
+        "at lambda 0.699789 A deposited with the structure in one CC0 COD "
+        "file.  A molecular crystal refined as one rigid body; no row asserts "
+        "against the deposited coordinates or their esds, which are another "
+        "model's answer under another protocol (docs/DESIGN.md Rule 2), so "
+        "every row referenced to it is about the body machinery, not the "
+        "structure's accuracy",
+        "characterisation"),
 }
 
 
@@ -508,6 +519,21 @@ CLAIMS: tuple[Claim, ...] = (
                  "reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %",
     ),
     Claim(
+        "test_acceptance_srm660c",
+        "test_srm660c_zero_apertures_report_names_axial_asymmetry",
+        "srm660c", ("characterisation",),
+        "with both axial apertures at 0 the report names the one-sided "
+        "low-angle residual as axial asymmetry, and no impurity phase leads",
+        reference="the shape of a known systematic: the certification data "
+                  "carry axial divergence (the apertures refine to about "
+                  "0.025 and 0.037 when declared), so the action must fire "
+                  "and its rationale name the zero apertures; no accuracy "
+                  "is asserted",
+        measured="three gated regions below 40 deg read asymmetry +0.020 to "
+                 "+0.025 at 7-9 esd; refine_axial_asymmetry 0.50 first, "
+                 "increase_background_flexibility 0.49 (WP-2054)",
+    ),
+    Claim(
         "test_acceptance_srm660c", "test_srm660c_extinction_does_no_harm",
         "srm660c", ("characterisation", "ceiling"),
         "primary extinction freed on a specimen that has none refines to "
@@ -712,12 +738,13 @@ CLAIMS: tuple[Claim, ...] = (
                   "as a result: the recipe is over-parameterised and no fit "
                   "of it can say otherwise",
         measured="HIGH_CORRELATION on the peak against the background, and "
-                 "the last stage freeing it at max_iter: since WP-2002 that is "
-                 "the closing stage, and the declared extra_components stage "
-                 "converges at the intermediate tolerance (1.9.0: the "
-                 "extra_components stage at max_iter); GSAS-II's own "
+                 "the last stage freeing it, the closing stage since WP-2002, "
+                 "never meeting the solver's own convergence test: since "
+                 "WP-1334 the slow-descent rule stops it at 123 evaluations "
+                 "(STAGE_SLOW_DESCENT), the declared extra_components stage "
+                 "spending its 400 (STAGE_MAX_ITER); GSAS-II's own "
                  "committed position 8.77e10 with esd exactly 0",
-        diagnostics=("HIGH_CORRELATION", "STAGE_MAX_ITER"),
+        diagnostics=("HIGH_CORRELATION", "STAGE_MAX_ITER", "STAGE_SLOW_DESCENT"),
     ),
     Claim(
         "test_acceptance_powderline", "test_the_written_tables_reproduce_the_answer_they_came_from",
@@ -1211,41 +1238,43 @@ CLAIMS: tuple[Claim, ...] = (
         "test_acceptance_sequential",
         "test_the_hostile_series_exercises_the_reseed_fence", "qarr",
         ("identity", "characterisation"),
-        "the reseed fence's accounting is exact, the escalation ladder is "
+        "the reseed ladder's accounting is exact, the escalation ladder is "
         "only ever climbed as a prefix, and a reseed never leaves the fit "
         "worse than the warm start it rejected",
         reference="internal consistency: the SEQUENTIAL_RESEED diagnostic "
                   "count must equal the number of entries flagged reseeded, "
                   "exactly; every entry's rungs_tried must be a prefix of the "
-                  "ladder and contain the rung it kept.  The fence never fired "
+                  "ladder and contain the rung it kept.  The ladder never climbed "
                   "on the hostile series — the collapsed refit recovers a bad "
                   "warm start within the fit — so it is insurance, pinned by "
                   "unit tests rather than by this suite",
         measured="exact accounting; zero reseeds on the hostile series, "
                  "every pattern after the first kept on its warm rung, and no "
-                 "kept rung above the Rwp fence (2026-10-25, macOS arm64, "
-                 "after WP-2045; 1.9.0 the same).  1.10.0's hostile series did "
+                 "kept rung above the 1.25× Rwp fence the default then carried "
+                 "(2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same; the "
+                 "fence left the default in WP-2003).  1.10.0's hostile series did "
                  "not finish, spending over 50 CPU minutes in the closing "
                  "stage that follows cpd-1b's warm rung (Rwp 0.760)",
-        diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED",
-                     "SEQUENTIAL_RWP_OUTLIER"),
+        diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED"),
     ),
     Claim(
         "test_acceptance_sequential",
         "test_the_first_rung_bound_moves_no_accepted_value", "qarr",
         ("identity",),
-        "FIRST_RUNG_FACTOR is answer-invariant on the hostile series: the "
-        "chain with WP-1127's first-rung bound and the chain without it "
-        "report the same values, esds, rungs, fences and codes, and no kept "
-        "first rung reaches the budget the bound would set",
-        reference="the same chain with first_rung_factor=None, to the bit; "
-                  "the margin against FIRST_RUNG_FACTOR itself (WP-2003). "
+        "A first-rung bound at 3.0 (WP-1127's factor, the default until "
+        "WP-2003 C3 made it the caller's) is answer-invariant on the hostile "
+        "series: the chain with it and the default chain without it report "
+        "the same values, esds, rungs, fences and codes, and no kept first "
+        "rung reaches the budget the bound sets",
+        reference="the default chain, first_rung_factor=None, to the bit; "
+                  "the margin against the factor itself (WP-2003). "
                   "It verifies the bound and validates nothing, the "
                   "reference being rietx's own unbounded chain",
         measured="bit-identical; kept first rungs past the armed point "
-                 "0.064-0.080x the running maximum against a factor of 3.0 "
-                 "(2026-10-25, macOS arm64, after WP-2045; 0.34-0.39x on "
-                 "2026-10-24, Linux x86-64, with cpd-1b's runaway in the chain)",
+                 "0.045-0.062x the running maximum of a converged rung's "
+                 "dearest stage, the quantity capped since C3, against a "
+                 "factor of 3.0 (2026-11-02, macOS arm64; 0.064-0.080x of the "
+                 "rung's summed stages on 2026-10-25)",
     ),
     Claim(
         "test_acceptance_sequential",
@@ -2309,7 +2338,11 @@ CLAIMS: tuple[Claim, ...] = (
                  "4e-8 relative, macOS arm64); y = 0 +- 0.018101, at_bound. "
                  "The pre-1938 tree gives 0.00322, Linux's figure. Since "
                  "WP-2002: 0.0102922 at four starts, spread 2.2e-9 (1.5e-9 "
-                 "when WP-2002 measured it), y = -0.0210949(191) off any bound",
+                 "when WP-2002 measured it), y = -0.0210949(191) off any bound. "
+                 "Since WP-1944 (extinction opt-in, none declared here): "
+                 "0.0103546 at four starts, spread 2.8e-9 on macOS arm64 and "
+                 "1.5e-9 on Linux, y = -0.0216150(193) off any bound; declaring "
+                 "extinction returns 0.0102922 to every digit",
     ),
     Claim(
         "test_acceptance_wavelength",
@@ -2462,11 +2495,15 @@ CLAIMS: tuple[Claim, ...] = (
         reference="NIST SRM 640c certificate a = 5.4311946 +- 0.0000092 A at "
                   "22.5 C.  Held, not refined: holding a certified cell is what "
                   "turns a free lambda into a calibration measurement.  The "
-                  "cubic ties (b<-a, c<-a) carry the source's value, so this is "
-                  "an identity bar (exact) and the absent esd shows nothing was "
-                  "refined.  XND held 5.4311948, 0.4 ppm above, negligible "
-                  "against every band here and stated in the docstring",
-        measured="cell.b and cell.c both exactly 5.4311946 A, esd None",
+                  "answer lists no cell row, since a result carries only what "
+                  "the fit could move (WP-1999); no stage's free set holds a "
+                  "cell path, and the parameter table ties b and c to a, so "
+                  "this is an identity bar (exact).  XND held 5.4311948, 0.4 "
+                  "ppm above, negligible against every band here and stated "
+                  "in the docstring",
+        measured="no cell row in the answer and none in any stage's free "
+                 "set; cell.a, cell.b and cell.c in the parameter table all "
+                 "exactly 5.4311946 A, b and c tied to a",
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2837,6 +2874,66 @@ CLAIMS: tuple[Claim, ...] = (
                  "(ratio 9.7, bar 5); 0.3562, 0.1146, 46.07 and 4.77 before "
                  "the closing stage",
     ),
+    # ---- acridine form IX: the rigid body's own checks (WP-1806 part 1) ----
+    Claim(
+        "test_acceptance_acridine_ix", "test_the_deposited_body_reproduces_the_deposited_atoms",
+        "acridine_ix", ("identity",),
+        "a body built from the 14 deposited heavy atoms and placed by its own "
+        "map puts every atom back where the CIF has it",
+        reference="the deposited fractional coordinates; the template is "
+                  "built from them, so the floor is zero by construction",
+        measured="worst fractional difference 5.6e-17 (bar 1e-9)",
+    ),
+    Claim(
+        "test_acceptance_acridine_ix", "test_a_perturbed_start_reaches_the_same_minimum",
+        "acridine_ix", ("own_result", "ceiling"),
+        "the deposited pose and one turned 10 deg and shifted 0.3 A (atoms "
+        "up to 0.89 A off) reach one minimum on the real pattern",
+        reference="the deposited-start fit of the same pattern under the same "
+                  "protocol",
+        measured="worst heavy-atom Cartesian gap 1.6e-6 A (bar 1e-3 A); "
+                 "Rwp 0.058424 from both, differing by 1.7e-9 (bar 1e-5)",
+        starts=2,
+    ),
+    Claim(
+        "test_acceptance_acridine_ix", "test_an_intra_body_distance_has_no_esd_and_an_inter_body_one_has_a_full_esd",
+        "acridine_ix", ("identity", "ceiling"),
+        "a distance inside the rigid body is held exactly, so it reports no "
+        "esd rather than a small one; a contact to another molecule reports a "
+        "full one",
+        reference="the body's construction: an intra-body distance is constant "
+                  "under every free parameter, so its propagated variance "
+                  "cancels below VARIANCE_CANCELLATION_FLOOR and the honest "
+                  "answer is absent (WP-1072)",
+        measured="212 intra-body rows, all None; 112 inter-body rows, all with "
+                 "an esd; the full esd differs from the diagonal-only one by more than "
+                 "1 % on 100 of the 112 (ratio 0.81 to 1.13); shortest "
+                 "heavy-atom contact N1...C7 3.4824(36) A, diagonal-only 0.0038",
+    ),
+    Claim(
+        "test_acceptance_acridine_ix", "test_a_simulated_known_answer_is_recovered_from_the_perturbed_start",
+        "acridine_ix", ("own_result", "ceiling"),
+        "a pattern simulated from the deposited coordinates at the real fit's "
+        "profile, with Gaussian noise at the deposit's own sigma, is refitted "
+        "from the perturbed start and returns the planted coordinates within "
+        "four of rietx's own esds, every component",
+        reference="the planted (deposited) coordinates; four esds over 42 "
+                  "components is a 0.3 % union false-alarm rate under "
+                  "Gaussian errors",
+        measured="worst |delta|/esd 0.64 over 42 components (bar 4); "
+                 "Rwp 0.0282, GoF 0.995",
+    ),
+    Claim(
+        "test_acceptance_acridine_ix", "test_a_regular_hexagon_template_fails_the_known_answer_bound",
+        "acridine_ix", ("characterisation", "ceiling"),
+        "the positive arm: the same simulated pattern refitted with a regular "
+        "hexagon template (C-C 1.39, C-N 1.34 A, floor 0.064 A RMS) breaks the "
+        "bound above, so that bound can fail",
+        reference="the known-answer row's own bound on the identical pattern "
+                  "and start",
+        measured="worst |delta|/esd 38.7, 29 of 42 components over 4; "
+                 "Rwp 0.0389 against 0.0282, GoF 1.37",
+    ),
 )
 
 
@@ -2910,7 +3007,7 @@ INTERMEDIATE_FTOL_DEFAULT = 1e-6
 #: * *What it costs.*  1.05-2.05x the fit time on those three and SRM 660c,
 #:   the fluorapatite the dearest (two runs each, interleaved, 2026-10-21).
 #: * *Where it fails.*  SRM 660c LaB6 stays 0.9 esd from the converged answer
-#:   in U, its Gaussian variance on the clamp floor at high angle (WP-1467),
+#:   in U, its Gaussian variance on the clamp floor at high angle (WP-1955),
 #:   and its two Biso starts land in mirrored axial minima (WP-2012).
 #: * *Why the suites here ride it.*  As for the schedule above: they say what
 #:   the shipped package reproduces, and each names the setting.
@@ -3040,6 +3137,19 @@ GAPS: tuple[tuple[str, str], ...] = (
 #: Suite-level narrative, keyed by module.  The per-row prose is in the
 #: ``Claim`` objects; this is the sentence that says what the *dataset* is for.
 SUITE_INTROS: dict[str, str] = {
+    "test_acceptance_acridine_ix": (
+        "WP-1806 part 1: what the rigid body itself owns, on acridine form IX "
+        "(COD 2242872, CC0), whose synchrotron pattern is deposited with the "
+        "structure.  The body is the 14 deposited heavy atoms plus 9 riding H, "
+        "and only its pose refines, under the authors' profile as read from "
+        "the paper.  Four checks: the template round trip; start-independence "
+        "on the real data; the esd rules (an intra-body distance is absent, an "
+        "inter-body one is full); and a simulated known answer whose positive "
+        "arm, a regular-hexagon template, must fail.  The per-atom table "
+        "against the deposit is written to tests/output/ as a record and "
+        "asserts nothing; part 2's bar is a free-atom control in rietx "
+        "(WP-1806 Inherited)."
+    ),
     "test_acceptance_extra_peaks": (
         "WP-1103's design case on real data: the SRM 660c protocol, "
         "contaminated by injecting a two-line holder doublet **onto** two LaB6 "

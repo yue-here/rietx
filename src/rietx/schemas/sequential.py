@@ -20,6 +20,7 @@ of each pattern stays reachable in memory on the
 from __future__ import annotations
 
 import math
+import re
 from typing import ClassVar, Literal
 
 from pydantic import Field, model_validator
@@ -36,6 +37,41 @@ from .results import (
     _diagnostic_lines,
     _parametric_lines,
 )
+
+
+def _rejected(fit) -> bool:
+    """Whether ``fit`` is a fit the chain reads no value from (WP-2003, C2 q5).
+
+    ``fit`` is anything with ``status`` and ``diagnostics``: a
+    :class:`~rietx.schemas.results.RefinementResult` while the ladder is asking
+    about its best attempt so far, a :class:`SeriesEntry` everywhere after,
+    whose diagnostics are the kept result's copied whole, so a series reloaded
+    from JSON derives the same answer as the run that wrote it.  ``True`` is
+    two facts, either of them: the solver ``"diverged"``, or a diagnostic
+    carries level ``"error"``.  The second is how the package already reads an
+    error-level code, "do not read the values, for any purpose"
+    (``docs/milestones/generality.md`` § Attention is a cost, clause 2;
+    :attr:`~rietx.schemas.results.RefinementResult.usable` is ``False``
+    there), and warm-starting a successor reads them: on the path guide's
+    jumped ramp (``examples/guides/path.py``) the 800 K pattern kept a
+    ``converged`` warm fit at Rwp 0.917 under ``MODEL_FAR_FROM_DATA`` once the
+    Rwp fence had gone (C1), and seeded the 900 K pattern into the same
+    collapse.
+    Settled by Claude 2026-10-26 and ruled by the maintainer 2026-11-03: the
+    ladder climbs past such an attempt, and one still rejected after its last
+    rung is quarantined, by this one test in both places.  Any ``error``-level
+    code a later change adds becomes a ladder and a quarantine trigger the
+    day it lands.
+
+    An expression over the level, never a list of codes, for ``usable``'s
+    reason: an error-level code written later counts the day it lands.  It is
+    not ``not usable``: ``"max_iter"`` is left out, since an attempt the
+    *plan's* own budget stopped can be the closing stage's last iterations at
+    a good answer (C2 question 3), and a first rung a caller's WP-1127 bound
+    cut short escalates at its own site in ``SequentialRefinement._chain``.
+    """
+    return (fit.status == "diverged"
+            or any(d.level == "error" for d in fit.diagnostics))
 
 
 class SeriesEntry(Base):
@@ -82,7 +118,7 @@ class SeriesEntry(Base):
     #: The nearer measurement is ``PHASE_UNCONSTRAINED`` — the phase scale's
     #: significance, its value over its esd against counting noise (WP-1523),
     #: reaching an entry through :attr:`diagnostics` and aggregating over the
-    #: chain as ``SEQUENTIAL_PERSISTENT_FINDING``.  It answers "is this phase
+    #: chain on :attr:`SeriesResult.code_counts`.  It answers "is this phase
     #: real" only while no other phase in the model can produce the same
     #: intensity: with a parent and its subgroup both refined on a one-phase
     #: synthetic Cu pattern, it read low on whichever of the two the start
@@ -138,7 +174,7 @@ class SeriesEntry(Base):
     #: Rwp the **first** (warm) attempt reached, set whenever the ladder
     #: escalated at all.  With ``reseeded`` it says how the escalation ended:
     #: both set means a cold restart rescued the pattern, ``rwp_warm`` alone
-    #: means the fence fired but a warm attempt was still the best of the
+    #: means the ladder escalated but a warm attempt was still the best of the
     #: ones tried — worth seeing, since it marks a pattern the series found
     #: hard for a reason no restart could fix.  ``None`` when that first
     #: attempt raised rather than returned: it reached no Rwp, and
@@ -172,18 +208,20 @@ class SeriesEntry(Base):
     #: ``SequentialRefinement._chain``; empty — which is true — wherever no
     #: rung raised.
     rungs_raised: dict[str, str] = Field(default_factory=dict)
-    #: The Rwp limit the chain's fence set at this pattern: ``reseed_factor`` ×
-    #: the median Rwp of the patterns accepted before it (WP-1469).  Recorded
-    #: rather than re-derived because the median is the *chain's* state, and
-    #: every fence here is read off the entry so a reloaded
-    #: :class:`SeriesResult` reports what the run did; :attr:`above_fence` is
-    #: the verdict.  Recorded whatever ``reseed`` says, as the quarantine is:
-    #: the limit is a fact about the pattern, not about how hard the chain
-    #: tried.  ``None`` where no median existed — the first pattern walked, or
-    #: every pattern before it quarantined — and in a document written before
-    #: the field: no fence judged it.  Written by
-    #: ``SequentialRefinement._chain``.
-    rwp_fence: float | None = None
+    #: The kept attempt's Rwp over the median Rwp of the patterns accepted
+    #: before it **in walk order** (WP-2003, batch C1), quarantined patterns
+    #: never joining that median.  A record with no threshold: the package
+    #: escalates on no Rwp comparison by default, and a caller's own
+    #: ``reseed_factor`` is a fence on exactly this ratio.  Two readings keep
+    #: it from being a verdict.  The first patterns walked are compared
+    #: against a median of one or two values, so an early high ratio can be
+    #: its neighbour's low Rwp rather than its own high one.  And Rwp tracks
+    #: Rexp, so a ratio above 1 can be falling counts under a right model;
+    #: :attr:`statistics`' GoF and Rexp against the neighbours' tell them
+    #: apart (WP-1469).  ``None`` for the first pattern walked, while nothing
+    #: had been accepted, and in a document written before the field.
+    #: Written by ``SequentialRefinement._chain``.
+    rwp_over_median: float | None = None
     #: The series index of the pattern whose fitted state seeded this
     #: pattern's warm rungs (WP-2003): the last pattern accepted before it in
     #: the walk.  That is not the pattern walked just before it when that one
@@ -205,29 +243,38 @@ class SeriesEntry(Base):
     #: written before the field.  ``SEQUENTIAL_MOMENT_HOLD`` reads it.  Written
     #: by ``SequentialRefinement._chain``.
     floored: list[str] = Field(default_factory=list)
+    #: This pattern's own dot-path for each path of the entry that the series
+    #: numbering names differently, keyed by the series path (WP-1991).  Every
+    #: path of the entry reads the series numbering
+    #: (:attr:`SeriesResult.phase_names`), which is the pattern's own unless a
+    #: ``prepare`` hook added or removed a phase or an atom ahead of it; this
+    #: is how to find the parameter in that pattern's model.  ``{}`` where the
+    #: two numberings agree.  ``None`` in a document written before the field,
+    #: whose paths are the pattern's own: nothing recorded the names to
+    #: translate them, so such a document opens as written.  Written by
+    #: ``sequential._into_series_numbering``.
+    pattern_paths: dict[str, str] | None = None
 
     #: Where this pattern's own history lives (one tree per pattern — a tree is
     #: pinned to one pattern by its data fingerprint).
     node_id: str | None = None
     tree_id: str | None = None
 
-    @property
-    def above_fence(self) -> bool:
-        """The kept attempt is still above :attr:`rwp_fence` (WP-1469).
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_rwp_fence(cls, data: object) -> object:
+        """Drop the ``rwp_fence`` key an entry written before WP-2003 carries.
 
-        Every rung the chain tried came back above the limit, so the best of
-        them is kept but is not like its neighbours: a specimen change the
-        model lacks, a bad frame, or fewer counts (a blank frame is the last,
-        its Rwp risen with its Rexp).  ``SEQUENTIAL_RWP_OUTLIER`` says so and
-        quotes the GoF and Rexp that tell them apart.  The pattern is not
-        quarantined — it seeds its successor and joins the median, since a
-        lasting change must be able to become the new normal.  False on a
-        ``"diverged"`` entry, which ``SEQUENTIAL_UNRECOVERED`` already covers,
-        and wherever no fence applied.
+        It held ``reseed_factor`` × the accepted median, the limit of a
+        default fence that no longer exists, and the factor that scaled it is
+        not on the entry, so nothing maps onto :attr:`rwp_over_median`: that
+        entry opens with it ``None``, "not recorded", and its old diagnostics
+        stay as written.  Without this the schema's ``extra="forbid"`` refuses
+        every series saved before.
         """
-        return (self.status != "diverged" and self.rwp_fence is not None
-                and self.statistics is not None
-                and self.statistics.rwp > self.rwp_fence)
+        if isinstance(data, dict) and "rwp_fence" in data:
+            data = {k: v for k, v in data.items() if k != "rwp_fence"}
+        return data
 
     def value(self, path: str) -> float | None:
         for p in self.parameters:
@@ -289,6 +336,23 @@ class Trajectory(Base):
     #: exists to remove.  Positional rather than ``SeriesEntry.index``, since
     #: the row being filled is a position.
     positions: list[int] = Field(default_factory=list)
+    #: The phase and atom ``path`` follows, by name (WP-1991): a trajectory
+    #: is keyed by phase name, atom label and parameter, and ``path`` is that
+    #: key in the series numbering (:attr:`SeriesResult.phase_names`).
+    #: ``None`` where the path is on no phase (or no atom), and in a series
+    #: written before the numbering was recorded.  Filled by
+    #: :meth:`SeriesResult.trajectory`, and ``phase`` by every trajectory of
+    #: one phase (a weight fraction, an agreement index, a moment).
+    phase: str | None = None
+    atom: str | None = None
+    #: Each point's dot-path in its own pattern's model, aligned with
+    #: ``value``: ``path`` itself except where a ``prepare`` hook added or
+    #: removed a phase or an atom ahead of this one (WP-1991).  Filled by
+    #: :meth:`SeriesResult.trajectory` and :meth:`SeriesResult.magnetic_trajectory`;
+    #: empty on the trajectories that are not of a dot-path
+    #: (:meth:`SeriesResult.qpa_trajectory`,
+    #: :meth:`SeriesResult.agreement_trajectory`).
+    pattern_paths: list[str] = Field(default_factory=list)
 
     def __len__(self) -> int:
         return len(self.value)
@@ -347,6 +411,10 @@ class QPATrajectory(Trajectory):
                 notes.append(f"  {label or f'point {k}'}: relative to the phases "
                              f"seen; {', '.join(u)} not measured")
         return "\n".join([text, *notes])
+
+
+#: A phase, and an atom of it, at the start of a dot-path.
+_NAMED_PATH = re.compile(r"^phases\.(\d+)(?:\.atoms\.(\d+))?(?=\.|$)")
 
 
 def _unservable(series: "SeriesResult", path: str) -> str:
@@ -425,6 +493,70 @@ class SeriesStep(Base):
     cold_ratio: float | None = None
 
 
+class DirectionGap(Base):
+    """One path's gap between the forward and backward chains at one pattern
+    (WP-2003, C5).
+
+    A row of :attr:`SeriesResult.direction_gaps`, written by
+    ``sequential._direction_gaps`` under ``direction="both"``.  It asserts
+    nothing about the gap.  The removed ``SEQUENTIAL_PATH_DEPENDENT`` called a
+    path path-dependent above 3 combined esds, a number no measurement set, and
+    a series of n paths and m patterns met that bar by chance.  The help entry
+    of ``SeriesResult.direction_gaps`` carries the reading.
+
+    Each walk's kept rung rides beside the gap.  One pattern can be kept cold
+    in one walk and warm in the other, and the gap then measures the ladder as
+    well as the order.
+    """
+
+    path: str
+    #: the pattern's label, the key both chains share
+    label: str
+    #: its :attr:`SeriesEntry.index`
+    index: int
+    #: the path's value in each chain
+    forward: float
+    backward: float
+    #: forward minus backward, **signed**, and modulo a turn on a moment angle
+    #: path, so a moment either side of the azimuth's cut is no gap
+    gap: float
+    #: :attr:`gap` over the combined esd, √(σ_f² + σ_b²), signed.  ``None``
+    #: where either chain measured no esd at this pattern: a gap against one
+    #: side's esd is a significance the other side never earned.  0 under the
+    #: trajectory's noise floor (``sequential.NOISE_FLOOR_REL``).  The list
+    #: sorts ``None`` after every number.
+    gap_esd: float | None = None
+    #: :attr:`SeriesEntry.rung` of this pattern in each chain
+    forward_rung: Literal["warm", "warm_staged", "cold"]
+    backward_rung: Literal["warm", "warm_staged", "cold"]
+
+
+class SeriesCodeCount(Base):
+    """How many patterns one per-pattern code fired on, at one path (WP-2003).
+
+    A row of :attr:`SeriesResult.code_counts`, written by
+    ``sequential._code_counts``.  It counts and judges nothing.  One
+    ``BOUND_HIT`` is a pattern that hit a bound.  The same code on most of a
+    series is a model whose bound is wrong, and only a count across the
+    patterns shows that (WP-1110: 425 unread ``BOUND_HIT`` findings were one
+    cell edge pinned in 42 of 68 patterns).  Until WP-2003 a row existed only
+    above half the series, as the removed ``SEQUENTIAL_PERSISTENT_FINDING``.
+    """
+
+    #: the per-pattern diagnostic code
+    code: str
+    #: one ``where`` path of it, read into the series numbering
+    #: (:attr:`SeriesResult.phase_names`); ``None`` where the code named no
+    #: path, so a row about the whole fit is never keyed on an empty string
+    path: str | None = None
+    #: the patterns it fired on at this path, each pattern counted once
+    count: int
+    #: the patterns in the series (``len(entries)``), so a row reads alone
+    n_patterns: int
+    #: the worst level any occurrence carried
+    level: Literal["info", "warning", "error"]
+
+
 class SeriesFailure(Base):
     """One pattern the chain could not fit at all.
 
@@ -432,11 +564,11 @@ class SeriesFailure(Base):
     of :meth:`~rietx.refine.Refinement.fit` on **every** rung of the ladder
     (WP-1333: a rung that raises escalates, so a pattern a later rung rescued
     is an entry with ``rungs_raised`` instead), not a converged-but-bad result
-    (that is ``SeriesEntry.status == "diverged"``, a different thing: a
-    fit that ran to completion and landed somewhere the reseed fence
-    rejected).  This is the fit never finishing — ``LinAlgError: SVD did not
-    converge``, and anything else a solver can raise on a genuinely
-    near-singular Jacobian.
+    (that is an entry :func:`_rejected` holds for — diverged, or carrying
+    an ``error``-level code — a different thing: a fit that ran to
+    completion and landed somewhere the ladder rejected).  This is the fit
+    never finishing — ``LinAlgError: SVD did not converge``, and anything
+    else a solver can raise on a genuinely near-singular Jacobian.
 
     ``index``/``label`` place it in the series exactly as
     :class:`SeriesEntry` does; ``exception`` is ``repr(exc)`` (the type and
@@ -530,7 +662,7 @@ class MagneticOnset(Base):
     #: * And the failure this catches is real: with ``max_iter=1`` on every
     #:   stage, the modulus above the transition came back **supported** and
     #:   the onset moved to a confident, wrong bracket — while neither the
-    #:   reseed fence nor the floor carry fired, because Rwp was fine and no
+    #:   ladder nor the floor carry fired, because Rwp was fine and no
     #:   pattern ever came back unsupported
     #:   (``test_a_starved_chain_reports_a_supported_moment_above_the_``
     #:   ``transition_and_is_flagged``).
@@ -582,17 +714,17 @@ class MagneticTrajectory(Trajectory):
     #: the row has no esd to take the ratio against — the modulus was stated
     #: and held, or the pattern did not see the phase and WP-1301 held its
     #: structural paths for the stage, a closed-shutter frame being the plain
-    #: case — and where the fit ``"diverged"`` and was quarantined.  **Not**
-    #: where the kept fit stayed above the chain's Rwp fence
-    #: (:attr:`SeriesEntry.above_fence`): that fence reports and does not
-    #: judge (WP-1469), and on the starved-chain ramp of
-    #: ``tests/test_magnetic_series.py``, fed 20 iterations, it fires on a
+    #: case — and where the fit was quarantined (diverged, or carrying an
+    #: ``error``-level code: :func:`_rejected`, WP-2003 C2 q5).  **Not**
+    #: where the kept fit's Rwp sat high over the chain's accepted median
+    #: (:attr:`SeriesEntry.rwp_over_median`): that ratio is a record and not a
+    #: verdict (WP-1469, WP-2003), and on the starved-chain ramp of
+    #: ``tests/test_magnetic_series.py``, fed 20 iterations, it is high on a
     #: converged, correct pattern — the first above the transition, Rwp 0.0166
-    #: against a limit of 0.0151 set by the one ordered pattern before it.
+    #: against 0.0121 on the one ordered pattern before it, a ratio of 1.37.
     #: Withholding that verdict widened the right bracket, 10 → 70 K, to
     #: 10 → 80 K.  A bad frame that still sees its phase keeps a verdict
-    #: against its own covariance, and ``SEQUENTIAL_RWP_OUTLIER`` names it on
-    #: the same series.  Such a
+    #: against its own covariance.  Such a
     #: point is neither released nor held by the data: it is plotted, its
     #: ``supported`` is False and its esd ``None``, and :func:`locate_onset`
     #: leaves it out.  Counting it as held put a confident bracket one
@@ -775,27 +907,47 @@ class SeriesResult(Base):
     #: ``"forward"``/``"backward"``: the chain direction whose fits are
     #: reported in :attr:`entries`.  ``"both"`` means the series was run twice
     #: and the two trajectories compared — the reported entries are the forward
-    #: ones, and the comparison is in :attr:`diagnostics`.
+    #: ones, and the comparison is in :attr:`direction_gaps`.
     direction: Literal["forward", "backward", "both"] = "forward"
     #: the reverse chain, present iff ``direction == "both"`` (WP-1076).
     #: Its own ``backward`` is always ``None``: it is one extra level, not a
     #: cycle.  Without it a caller of :func:`~rietx.refine_sequential` received
-    #: the ``SEQUENTIAL_PATH_DEPENDENT`` diagnostics and had no way to reach
-    #: the trajectory they are about — the comparison was reachable only from
-    #: ``SequentialRefinement.backward_``, which the one-shot API never
-    #: returns.
+    #: the comparison and had no way to reach the trajectory it is about: that
+    #: trajectory was reachable only from ``SequentialRefinement.backward_``,
+    #: which the one-shot API never returns.
     backward: "SeriesResult | None" = None
     diagnostics: list[Diagnostic] = Field(default_factory=list)
     #: Every refined path's change between consecutive patterns, as a
     #: :class:`SeriesStep`, largest :attr:`SeriesStep.size_esd` in magnitude
     #: first and the rows with no size last (WP-2003).  No threshold and no
     #: diagnostic: the help entry carries the reading.  A step into or out of
-    #: a pattern the fence rejected (``"diverged"``, or above the Rwp fence) is
-    #: not a row, and neither is a relative path (:attr:`relative_paths`).
+    #: a quarantined pattern (:func:`_rejected`) is not a row, and neither is a
+    #: relative path (:attr:`relative_paths`).
     #: Written by ``SequentialRefinement.fit`` on the reported chain and on
     #: :attr:`backward`; ``None`` in a document written before the field —
     #: "not recorded", never "no step"; ``[]`` on a series of one pattern.
     steps: list[SeriesStep] | None = None
+    #: Every per-pattern code and ``where`` path the series' entries carry,
+    #: with the number of patterns it fired on and its worst level, as a
+    #: :class:`SeriesCodeCount`, largest count first (WP-2003, ruled by the
+    #: maintainer 2026-11-03).  No threshold and no diagnostic: the help entry
+    #: carries the reading.  ``sequential.NOT_A_SERIES_FINDING``'s codes are
+    #: not counted.  Written by ``SequentialRefinement.fit`` on the reported
+    #: chain and on :attr:`backward`; ``None`` in a document written before
+    #: the field, "not recorded", never "nothing recurred"; ``[]`` on a series
+    #: whose entries carry no counted code.
+    code_counts: list[SeriesCodeCount] | None = None
+    #: Under ``direction="both"``, every path's gap between the forward and
+    #: backward chains at every pattern both fitted, in combined esds, as a
+    #: :class:`DirectionGap` with each walk's kept rung, largest
+    #: :attr:`DirectionGap.gap_esd` in magnitude first and the rows with no
+    #: size last (WP-2003, C5).  No threshold and no diagnostic: the help
+    #: entry carries the reading.  A relative path
+    #: (:attr:`relative_paths`) is not a row.  Written by
+    #: ``SequentialRefinement.fit`` when both chains completed; ``None`` when
+    #: the comparison did not run (a one-way chain, a cancel, a backward chain
+    #: that raised) and in a document written before the field.
+    direction_gaps: list[DirectionGap] | None = None
     #: The paths whose values are **steps, not positions** (WP-1317): a
     #: coordinate DOF measured from where its fit began, a rigid body's
     #: rotation DOF (``sequential._relative_paths``, WP-1333).  Nothing in an
@@ -822,6 +974,16 @@ class SeriesResult(Base):
     #: the same reason ``StageResult.n_degenerate_cell_probes`` sits beside a
     #: guard that could otherwise only be read by counting diagnostics.
     n_failed: int = 0
+    #: The series numbering every path of :attr:`entries` reads (WP-1991,
+    #: Yue's ruling of 2026-11-01): phase ``i`` of a path is
+    #: ``phase_names[i]`` and its atom ``j`` is ``atom_labels[i][j]``.  It is
+    #: the series' own structure's numbering, extended by each phase or atom
+    #: a ``prepare`` hook added, in the order the walk met them, so a
+    #: trajectory follows one atom by name whatever each pattern's model
+    #: numbers it.  ``None`` in a document written before the fields.  Written
+    #: by ``SequentialRefinement.fit``.
+    phase_names: list[str] | None = None
+    atom_labels: list[list[str]] | None = None
     provenance: Provenance | None = None
 
     @model_validator(mode="before")
@@ -880,6 +1042,11 @@ class SeriesResult(Base):
     def trajectory(self, path: str) -> Trajectory:
         """One parameter's trajectory across the series.
 
+        ``path`` reads the series numbering (:attr:`phase_names`), so the
+        trajectory follows one phase and one atom by name, and each point
+        carries the path that pattern's own model gives it
+        (:attr:`Trajectory.pattern_paths`, WP-1991).
+
         Patterns where the path is absent are skipped rather than filled — a
         gap in a trajectory is a real thing (a phase that was not in the model
         yet, a stage that did not run) and inventing a value for it would be
@@ -887,6 +1054,7 @@ class SeriesResult(Base):
         against.
         """
         traj = Trajectory(path=path, x_label=self.x_label)
+        traj.phase, traj.atom = self._names_of(path)
         for i, (e, xv) in enumerate(zip(self.entries, self.x, strict=True)):
             found = next((p for p in e.parameters if p.path == path), None)
             if found is None:
@@ -896,7 +1064,22 @@ class SeriesResult(Base):
             traj.stderr.append(found.stderr)
             traj.labels.append(e.label)
             traj.positions.append(i)
+            traj.pattern_paths.append((e.pattern_paths or {}).get(path, path))
         return traj
+
+    def _names_of(self, path: str) -> tuple[str | None, str | None]:
+        """The phase name and atom label a series path names, where recorded."""
+        m = _NAMED_PATH.match(path)
+        if m is None or self.phase_names is None:
+            return None, None
+        i = int(m.group(1))
+        if i >= len(self.phase_names):
+            return None, None
+        if m.group(2) is None or self.atom_labels is None:
+            return self.phase_names[i], None
+        labels = self.atom_labels[i] if i < len(self.atom_labels) else []
+        j = int(m.group(2))
+        return self.phase_names[i], labels[j] if j < len(labels) else None
 
     def paths(self, *, varied_only: bool = False) -> list[str]:
         """Every parameter path present in the series, in first-seen order.
@@ -922,7 +1105,7 @@ class SeriesResult(Base):
         """A phase's weight fraction (as a percentage) across the series,
         with the phases each point leaves out of its basis
         (:attr:`QPATrajectory.unmeasured`)."""
-        traj = QPATrajectory(path=f"qpa.{phase}", x_label=self.x_label)
+        traj = QPATrajectory(path=f"qpa.{phase}", x_label=self.x_label, phase=phase)
         for i, (e, xv) in enumerate(zip(self.entries, self.x, strict=True)):
             if e.qpa is None:
                 continue
@@ -965,7 +1148,8 @@ class SeriesResult(Base):
         if metric not in ("r_bragg", "r_f"):
             raise ValueError(
                 f"metric must be 'r_bragg' or 'r_f', got {metric!r}")
-        traj = Trajectory(path=f"{metric}.{phase}", x_label=self.x_label)
+        traj = Trajectory(path=f"{metric}.{phase}", x_label=self.x_label,
+                          phase=phase)
         for i, (e, xv) in enumerate(zip(self.entries, self.x, strict=True)):
             row = next((r for r in e.phase_agreement if r.name == phase), None)
             if row is None:
@@ -1030,10 +1214,10 @@ class SeriesResult(Base):
             if row is None:
                 continue
             traj.path = row.path or site
-            traj.atom, traj.ion = row.atom, row.ion
+            traj.phase, traj.atom, traj.ion = row.phase, row.atom, row.ion
             traj.x.append(xv)
             traj.value.append(float(row.magnitude))
-            measured = row.supported is not None and e.status != "diverged"
+            measured = row.supported is not None and not _rejected(e)
             traj.stderr.append(row.magnitude_esd
                                if measured and row.supported else None)
             traj.supported.append(bool(row.supported) and measured)
@@ -1041,6 +1225,7 @@ class SeriesResult(Base):
             traj.status.append(e.status)
             traj.labels.append(e.label)
             traj.positions.append(i)
+            traj.pattern_paths.append((e.pattern_paths or {}).get(row.path, row.path))
         traj.onset = locate_onset(traj)
         return traj
 
@@ -1128,8 +1313,9 @@ class SeriesResult(Base):
 
         **Movement** is a path's peak-to-peak spread over the series divided by
         the median of its esds, both over the points that are measurements: a
-        point with an esd, on a pattern that did not diverge (a quarantined fit,
-        ``SEQUENTIAL_UNRECOVERED``, is not a measurement).  Measured in its own
+        point with an esd, on a pattern the chain did not quarantine (a fit
+        that diverged or carries an ``error``-level code, ``_rejected``, named
+        by ``SEQUENTIAL_UNRECOVERED``, is not a measurement).  Measured in its own
         esd, a cell edge moving 0.002 Å on 1e-4 Å (20σ) ranks above a scale
         moving 2 % on an esd of 0.2 % (10σ), whatever their units.  A path
         ranks only if it moved at least ``min_sigma`` esds.
@@ -1177,7 +1363,7 @@ class SeriesResult(Base):
                                                  traj.positions, strict=True)
                       if s is not None and math.isfinite(s) and s > 0.0
                       and math.isfinite(v)
-                      and self.entries[i].status != "diverged"]
+                      and not _rejected(self.entries[i])]
             if not points:
                 continue
             curve = tuple(points)
@@ -1350,6 +1536,29 @@ class SeriesResult(Base):
             lines.append(f"    largest step {largest.path} {largest.size_esd:.1f}σ "
                          f"at {largest.labels[0]}→{largest.labels[1]} "
                          f"(series.steps)")
+        # the forward-backward gaps' one line (WP-2003, C5): the largest gap
+        # of each of the three paths that lead the field
+        named: list[DirectionGap] = []
+        for g in self.direction_gaps or []:
+            if g.gap_esd is None or len(named) == 3:
+                break
+            if all(g.path != n.path for n in named):
+                named.append(g)
+        if named:
+            top = ", ".join(f"{g.path} {abs(g.gap_esd):.1f}σ at {g.label} "
+                            f"({g.forward_rung}/{g.backward_rung})"
+                            for g in named)
+            lines.append(f"    largest forward-backward gaps: {top} "
+                         f"(series.direction_gaps)")
+        # and the counts' one line (WP-2003, C6): the three largest, read
+        # off the field, which is sorted largest first
+        if self.code_counts:
+            top = ", ".join(
+                f"{c.code}{'' if c.path is None else ' on ' + c.path} "
+                f"{c.count} of {c.n_patterns}" for c in self.code_counts[:3])
+            lines.append(f"    most frequent per-pattern codes: {top}"
+                         f"{', …' if len(self.code_counts) > 3 else ''} "
+                         f"(series.code_counts)")
         shown = (list(range(n)) if n <= 2 * max_entries else
                 [*range(max_entries), None, *range(n - max_entries, n)])
         for i in shown:
@@ -1399,29 +1608,48 @@ class SeriesResult(Base):
             by_code.setdefault(d.code, []).append(d)
         lines = ["  deliverable: series (a parameter against the series axis)"]
 
-        depend = by_code.get("SEQUENTIAL_PATH_DEPENDENT", [])
         # `direction` is what was *asked for*; the comparison exists only when
         # the reverse chain actually completed.  A cancel takes the backward
         # pass out (forward-cancelled: it is never started, so `backward` stays
         # None despite direction="both"; backward-cancelled: the pass is
-        # recorded but `_path_dependence_diagnostics` is not run) — and an
-        # empty `depend` then reads as "checked, nothing disagreed", which is
-        # the confident wrong answer this row exists to avoid.
+        # recorded but `_direction_gaps` is not run), and a row reading
+        # "measured" would then be the confident wrong answer this row exists
+        # to avoid.
         interrupted = any(d.code == "SEQUENTIAL_CANCELLED"
                           for d in self.diagnostics)
         # WP-1333's record of the comparison, which is the authority where it
-        # exists: ``warning`` is "did not run" and says why (a backward pass
-        # that *raised* is not a cancel, and the row must not call it one),
-        # ``info`` is "ran on less than the series".  A series stored before
-        # schema 0.25 carries neither, and the cancel test above still speaks.
+        # exists: SEQUENTIAL_PATH_CHECK_NOT_RUN says why it did not run (a
+        # backward pass that *raised* is not a cancel, and the row must not
+        # call it one), SEQUENTIAL_PATH_CHECK_INCOMPLETE that it ran on less
+        # than the series.  Before WP-2003 split them, one code carried both
+        # at two levels, so a stored series' INCOMPLETE at ``warning`` is a
+        # NOT_RUN.  A series stored before schema 0.25 carries neither, and
+        # the cancel test above still speaks.
         incomplete = by_code.get("SEQUENTIAL_PATH_CHECK_INCOMPLETE", [])
-        not_run = [d for d in incomplete if d.level == "warning"]
+        not_run = by_code.get("SEQUENTIAL_PATH_CHECK_NOT_RUN", []) + [
+            d for d in incomplete if d.level == "warning"]
         partial = [d for d in incomplete if d.level != "warning"]
         if self.direction == "both" and self.backward is not None \
                 and not interrupted and not not_run:
-            paths = ", ".join(p for d in depend for p in d.where) or "none"
-            lines.append(f"    ordering artefact: measured both ways, "
-                         f"{len(depend)} parameter(s) disagree ({paths})")
+            largest = next((g for g in self.direction_gaps or []
+                            if g.gap_esd is not None), None)
+            if self.direction_gaps is None:
+                # a series written before the field: its diagnostics carry
+                # the removed 3σ verdicts, as written
+                depend = by_code.get("SEQUENTIAL_PATH_DEPENDENT", [])
+                lines.append(f"    ordering artefact: measured both ways, "
+                             f"before SeriesResult.direction_gaps; "
+                             f"{len(depend)} parameter(s) past the removed "
+                             f"3σ test")
+            elif largest is None:
+                lines.append("    ordering artefact: measured both ways, and "
+                             "no pattern has an esd in both chains for any "
+                             "path (series.direction_gaps)")
+            else:
+                lines.append(f"    ordering artefact: measured both ways, "
+                             f"largest gap {largest.path} "
+                             f"{abs(largest.gap_esd):.1f}σ at {largest.label} "
+                             f"(series.direction_gaps)")
             # a message is a sentence of its own (WP-1985): spliced into this
             # one, it loses its capital and its full stop
             for d in partial:
@@ -1430,18 +1658,13 @@ class SeriesResult(Base):
             why = (_clause(not_run[0].message) if not_run else
                    "direction='both' was asked for but the chain was "
                    "cancelled before the two directions could be compared")
-            lines.append(f"    ordering artefact: NOT measured — {why}, so an "
-                         f"empty disagreement list is silence, not agreement")
+            lines.append(f"    ordering artefact: NOT measured — {why}, so "
+                         f"no gap was measured")
         else:
             lines.append(f"    ordering artefact: NOT measured — this chain ran "
                          f"{self.direction} only, and direction='both' is the "
                          f"one check that separates a trajectory from the order "
                          f"it was refined in")
-
-        persistent = by_code.get("SEQUENTIAL_PERSISTENT_FINDING", [])
-        lines.append(f"    persistent findings: {len(persistent)}")
-        for d in persistent[:5]:
-            lines.append(f"      {d.message}")
 
         # a width that grew while the fit got worse (WP-1465): the one reading
         # of a trajectory that says a phase stood in for something missing

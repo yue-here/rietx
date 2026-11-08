@@ -16,7 +16,7 @@ A change is announced in the release notes, and the data contracts a consumer pa
 
 ## Running the screen
 
-<!-- api-doc: no-exec — it runs one Le Bail fit per extinction class -->
+<!-- api-doc: no-exec — it runs one Pawley fit per extinction class -->
 ```python
 import rietx as rx
 
@@ -50,7 +50,7 @@ screen = rx.determine_extinction_symbol(data, idx.candidates[0], ins, peaks=peak
 | `cancel` | `None` | a cancel token, read before each class's fit |
 
 Every argument after `instrument` is keyword-only.
-Two things raise before anything is fitted: a pattern whose axis is not 2θ, since every step is a Le Bail fit, and a `restrict` that does not validate as an `ExtinctionPrior`.
+Two things raise before anything is fitted: a pattern whose axis is not 2θ, since every step is a whole-pattern fit, and a `restrict` that does not validate as an `ExtinctionPrior`.
 A prior declaring none of its three facts is no prior, and the screen records `None`.
 
 Two failures come back as an answer instead of an exception, because every class would inherit them.
@@ -64,11 +64,15 @@ Four steps, each on the same pattern and range:
 1. One shared profile fit of the absence-free lattice group, as the whole-profile test runs it ([The whole-profile test](indexing.md#the-whole-profile-test)): the background, one peak-position parameter, then `W`, then `U`, `V`, `X` and `Y`.
    Every class is then fitted with that instrument frozen, so no class can make up for a missing reflection with a wider neighbour.
 2. The reference fit: the absence-free class under the same one-stage protocol as every other class, so all the χ² values compare.
-3. One Le Bail fit per class, fewest absences first, freeing the background and every declared hump and nothing else.
+3. One Pawley fit per class, fewest absences first, freeing the background and every declared hump and nothing else.
+   A class some of whose forbidden lines cannot be tested gets a second fit: the lattice group less only its testable forbidden lines, which is what the class is scored on.
 4. The absence test at each class's testable forbidden positions, read against that class's own calculated pattern: a position carrying intensity the class cannot account for refutes it, with the reflection named.
 
 Each class is scored against the reference by ΔBIC {cite}`schwarz1978` and by Hamilton's ratio test {cite}`hamilton1965`, with the class's testable absences as the parameters removed.
 The ranking is a nested comparison and not lowest Rwp, because a class with fewer absences has more reflections and always fits at least as well.
+That holds only for fits that minimise χ², so every fit the screen compares is a Pawley fit; only the cell-free fit that refines the cell first stays Le Bail.
+A Le Bail partition hands a weak line in a gap the noise of its whole window, and on a synthetic sweep of 41 space groups at a correct cell the Le Bail screen named a class excluding the true group on 318 of 1082 patterns, against 10 now.
+Scoring on the testable lines alone keeps the comparison to the absences the BIC counts: scored on its own fit, a class gained or lost by lines it was never charged for.
 [Which parameter to free next](../theory/estimation.md#which-parameter-to-free-next) derives both; the screen takes N as the fitted channel count, `ExtinctionScreen.n_points`.
 
 The candidate's `CellCandidate.system` is taken as given rather than screened again.
@@ -104,14 +108,18 @@ So when the default screen names a class, it screens again at the same cell, hel
 The two fail differently, through the prefit's profile or through the declared one.
 When both name a class and the classes differ, `ExtinctionScreen.screens_disagree` is true, [`EXTINCTION_SCREENS_DISAGREE`](diagnostics-indexing.md#extinction_screens_disagree) says so, and `ExtinctionScreen.best_or_none` returns `None`; both rankings are kept, `candidates` and `held_screen.candidates`.
 A held screen that names no class changes nothing.
-On SRM 676a corundum, the GSAS-II fluorapatite and the synthetic P 2₁/c, each cell scaled by ×0.97 to ×1.03, the default named a wrong class at eight offsets: the check caught six and fired at none where the default was right.
+Before WP-2076 (measured on `main` `da8fc28f`), on SRM 676a corundum, the GSAS-II fluorapatite and the synthetic P 2₁/c, each cell scaled by ×0.97 to ×1.03, the default named a wrong class at eight offsets: the check caught six and fired at none where the default was right.
 At the other two (corundum ×0.985, P 2₁/c ×0.9975) the prefit's own cell is off, both screens name the same wrong class, and nothing here can see it.
+WP-2076's nested comparison moved the default off those six wrong classes.
+Re-measured on `main` `1d054085` (2026-11-08, macOS arm64), the check fires on none of 150 rows (these three patterns at 25 scales from ×0.97 to ×1.03, with the true and with the all-zero declared background): the held screen names what the default names, or both name nothing.
+Those patterns therefore show no case the check changes today; the test that it still abstains and says so builds the split.
 When the instrument's background is the preset's all-zero start, which is what the GUI passes, the held screen seeds its background as the cell-free fit does.
 Unseeded, its reference fit is poor and the class that forbids nothing wins by elimination, so the check fires on right answers.
 On a synthetic sweep from the all-zero background (41 space groups, three cell offsets, four arms, 492 rows), `best_or_none()` names the true class, a wrong class or no class on 322, 141 and 29 rows with no second screen, 224, 117 and 151 with an unseeded held screen, and 315, 69 and 108 with the seeded one.
 On 17 committed real patterns (51 rows, from the all-zero preset) the unseeded held screen gave 19, 18 and 14, and the seeded one 28, 16 and 7.
-The seeding costs right answers on one real pattern, the GSAS-II PbSO₄ X-ray histogram: at ×0.9995, ×1.0, ×1.002, ×1.005 and ×1.0075 the default names the true `P c - n`, the seeded held screen names `P c - -`, and the check abstains.
-At ×1.0125 the default names `P c - -` and the held screen nothing, so this check cannot see that row.
+The seeding cost right answers on one real pattern before WP-2076, the GSAS-II PbSO₄ X-ray histogram: at ×0.999, ×0.9995, ×1.0, ×1.0005, ×1.001, ×1.002, ×1.0025, ×1.005, ×1.0075, ×1.01 and ×1.015, eleven of the twelve offsets where the default named the true `P c - n`, the seeded held screen named `P c - -` and the check abstained.
+At ×1.0125 the default named `P c - -` and the held screen nothing, so the check could not see that row.
+Since WP-2076 the default names `P c - a` at 13 of 14 scales from ×0.99 to ×1.015 (nothing at ×1.0125), the ruled wrong answer of that WP, and the held screen names it too or nothing, so the check withholds no PbSO₄ answer.
 A gate on the held reference fit does not separate these cases: the caught corundum row's held fit is the poorer one.
 Where both screens name the same wrong class at a well-refined cell (P6₃/mmc, P6/mcc, Pn-3n, P4/nmm and Fm-3m in the synthetic sweep, and magnetite, Nd₂Ru₂O₇ and SRM 1976a corundum in the real one), nothing here can see it; that is the first screen's behaviour and WP-2076's.
 The second screen costs about a third to a half again of the screen's time.
@@ -160,7 +168,7 @@ Even that returns a class, which lists its space groups, so the type cannot expr
 | `ExtinctionScreen.wavelength` | the primary emission line's wavelength, Å |
 | `ExtinctionScreen.two_theta_range` | the fitted channels' first and last 2θ, which is part of the answer |
 | `ExtinctionScreen.n_classes` | classes enumerated |
-| `ExtinctionScreen.n_screened` | classes whose Le Bail fit ran |
+| `ExtinctionScreen.n_screened` | classes whose fit ran |
 | `ExtinctionScreen.reference_rwp`, `ExtinctionScreen.reference_chi2` | the absence-free class's own fit, the reference model; χ² is the raw sum Σw·Δ², not divided by N − P |
 | `ExtinctionScreen.reference_lines` | distinct lines the lattice group predicts in range |
 | `ExtinctionScreen.n_points` | channels in the fitted range, the N of every ΔBIC |
@@ -188,11 +196,14 @@ The screen's diagnostics say what the answer is and why it may not be one.
 
 `ExtinctionScreen.best_or_none` returns the leading class only when all of these hold:
 
-- no class that is not refuted was left unfitted, since a `max_classes` cap or a cancelled run leaves a question unasked, which must not read as a clean answer;
+- no class that is not refuted was left without a score, since a `max_classes` cap, a cancelled run or a class fit that raised leaves a question unasked, which must not read as a clean answer;
 - the class was fitted and is not refuted;
 - it rests on at least one absence the data could test, or is the absence-free class itself, whose claim is that there is nothing to see;
 - it leads the next surviving class by at least the decisive ΔBIC margin, 10 (`rietx.indexing.extinction.DECISIVE_DELTA_BIC`).
 - the second screen, when one ran, was not stopped and names no other class (`ExtinctionScreen.screens_disagree`).
+
+Removing one testable line can buy a class ΔBIC ln N at most, about 8 at a few thousand channels, so a class resting on a single testable position never clears the margin.
+When the runner-up is inside it, `EXTINCTION_SYMBOL_AMBIGUOUS` names the tested positions the two classes differ at, which is where counting longer would separate them.
 
 Otherwise it returns `None`, with the reason in `ExtinctionScreen.diagnostics`.
 With a declared prior, only classes it leaves a member in can be returned and the margin is taken to the next such class; a class the prior emptied that the data prefer by the decisive margin makes it abstain.
@@ -214,13 +225,15 @@ A returned class still lists every space group it admits, and nothing in the pac
 | `ExtinctionCandidate.conditions_complete` | `False` when the conditions leave some absence unnamed; the absence set is what the screen uses either way |
 | `ExtinctionCandidate.n_lines` | distinct lines this class predicts in range |
 | `ExtinctionCandidate.n_absent` | lines of the lattice group this class forbids |
-| `ExtinctionCandidate.n_testable` | of those, the ones the data can check; `None` when the class was not fitted or its fit raised |
+| `ExtinctionCandidate.n_testable` | of those, the ones the data can check; `None` when the class was not fitted or its own fit raised |
 | `ExtinctionCandidate.n_present` | testable forbidden positions carrying intensity: the refutation |
 | `ExtinctionCandidate.forbidden_hkl`, `ExtinctionCandidate.forbidden_two_theta` | which reflections those are, and where, ° 2θ to four decimals |
-| `ExtinctionCandidate.rwp`, `ExtinctionCandidate.gof`, `ExtinctionCandidate.chi2` | the class's own Le Bail fit, χ² the raw sum; infinite when it was not fitted or its fit raised |
+| `ExtinctionCandidate.tested_hkl`, `ExtinctionCandidate.tested_two_theta` | every testable forbidden position, one reflection each, so a reader can see where two classes differ; empty before the class is fitted |
+| `ExtinctionCandidate.rwp`, `ExtinctionCandidate.gof` | the class's own Pawley fit; infinite when it was not fitted or its fit raised |
+| `ExtinctionCandidate.chi2` | the raw χ² the class is scored on: the lattice group less only its testable forbidden lines, which is its own fit when every forbidden line is testable and the reference's when none is |
 | `ExtinctionCandidate.delta_bic` | BIC of this class minus BIC of the absence-free reference; negative favours this class, and `0.0` for a class never fitted |
 | `ExtinctionCandidate.absences_rejected` | `True` when Hamilton's test finds restoring the forbidden reflections justified, so the absences are contradicted |
-| `ExtinctionCandidate.screened` | whether this class's Le Bail fit ran |
+| `ExtinctionCandidate.screened` | whether this class was scored: `False` when a cap or a stop left it unfitted, or when its own fit or its scoring fit raised |
 | `ExtinctionCandidate.refuted`, `ExtinctionCandidate.refuted_reason` | refuted, and why, naming the first refuting reflection |
 | `ExtinctionCandidate.diagnostics` | findings about this class |
 
@@ -258,7 +271,8 @@ A class whose extra absences all hide under allowed neighbours would otherwise w
 
 Refutation is one-sided by construction.
 A class asserts absences, so intensity where it forbids one contradicts it; a class claiming too few absences asserts nothing the data can falsify, and is outranked rather than refuted.
-The one other way a class is refuted is a Le Bail fit that raised, which `ExtinctionCandidate.refuted_reason` says.
+A fit that raised refutes nothing, since a solver failure is no evidence about the absences.
+It leaves its class without a score (`screened` is `False`), and `EXTINCTION_SYMBOL_AMBIGUOUS` names the error.
 A testable position carrying intensity refutes a class whatever its ΔBIC.
 A single refuting position can still be an impurity line rather than a violated absence, so check it against the candidate's unmatched observed lines (`LeBailValidation.unmatched_observed_two_theta`) before dropping the class.
 
@@ -280,7 +294,7 @@ print(prior.declared())          # {'sohncke': True}
 | `ExtinctionPrior.polar` | `True`: only the polar groups, whose point group leaves a direction fixed (a pyroelectric response); `False`: only the others |
 | `ExtinctionPrior.z` | formula units per cell; with `formula` and `ordered`, removes the groups whose orbits cannot hold that content, otherwise names them |
 | `ExtinctionPrior.density` | measured density in g/cm³, which fixes Z through the formula weight and the screened cell's volume; needs `formula` |
-| `ExtinctionPrior.formula` | the formula unit, written as a chemist writes it (`"Cu12Sb4S13"`); a fractional count declares a shared site |
+| `ExtinctionPrior.formula` | the formula unit, written as a chemist writes it (`"Cu12Sb4S13"`); a fractional count declares a shared site, unless `ordered` |
 | `ExtinctionPrior.ordered` | `True`: every site is one element at full occupancy, so a group whose orbits cannot hold the declared content is removed; needs `formula` |
 | `ExtinctionPrior.declared` | the method returning the facts actually declared, by name |
 
@@ -291,7 +305,7 @@ The prior filters members and nothing else.
 Every class is still fitted and ranked on the data, `ExtinctionCandidate.excluded_groups` names what it removed, and `EXTINCTION_PRIOR_APPLIED` reports it, as a warning when it emptied the class the data rank first.
 A class the prior empties stays in the ranking, so a declaration the data contradict is visible: a P 2₁/c specimen declared enantiopure gets no chiral answer, because `best_or_none` abstains.
 
-<!-- api-doc: no-exec — it runs one Le Bail fit per extinction class -->
+<!-- api-doc: no-exec — it runs one Pawley fit per extinction class -->
 ```python
 screen = rx.determine_extinction_symbol(data, candidate, ins,
                                         restrict={"sohncke": True})
@@ -306,11 +320,14 @@ The orbits are derived from the group's operators (*International Tables for Cry
 This is the test of an ordered model, and the group stays: `ExtinctionCandidate.count_notes` states the failed count.
 A disordered alloy written with whole counts (`CuAu`, `Cu3Au`) fails it on its true `F m -3 m`, which a refiner of a disordered alloy would not remove.
 Declare `ordered=True` and the group is removed instead, with `exclusion_reasons` saying so.
-An element written with a fractional count (`Cu0.5Au0.5`) shares a site, and is not counted either way.
+An element written with a fractional count (`Cu0.5Au0.5`) shares a site and is not counted, unless the model is declared `ordered`.
+Then no site is shared, so the fraction belongs to the formula unit, as the `0.5` of `CaSO4·0.5H2O` does, and the element is counted whenever its atoms per cell, count × Z, are a whole number.
+Where they are not (`Fe0.95O` at Z = 4 is 3.8 Fe per cell), the element is not counted either way.
 Where Z is not a whole multiple of a kept member's general multiplicity (Z′ below one, or 3/2), the member stays and `ExtinctionCandidate.special_positions` names the special positions a formula unit then sits on.
 A molecule there must carry that site's symmetry, which nothing declared says, so this is a statement and never an exclusion: a P 2₁ salt at Z = 2 keeps P 2₁/m, with each formula unit on an inversion centre or a mirror.
 Where no sum of the group's orbit multiplicities makes Z at all (P 2₁/m at Z = 3), the note says that instead of listing positions.
 `ExtinctionCandidate.exclusion_reasons` names the fact each removed group fails.
+A `z` with no `formula` has no atoms per cell to count, so it removes no group and names only the special positions, and `EXTINCTION_PRIOR_APPLIED` says so.
 
 A `density` gives Z = ρ·V·N_A / M on the screened cell, `ExtinctionScreen.z_from_density`.
 It must sit within {{ DENSITY_Z_TOLERANCE_PCT }} % of the declared `z`, the agreement *International Tables* Vol. C asks of a measured density, or, with none declared, of exactly one whole number, and `ExtinctionScreen.z` is the Z the filter used.
@@ -320,20 +337,22 @@ A screen that never computed a Z (cancelled, failed) does not say the density co
 
 ## On real data
 
-On the GSAS-II fluorapatite tutorial pattern over 15–90°, the screen enumerates seven classes and fits all seven in under two seconds.
-It returns `P 63 - -`, whose members are `P 63`, `P 63/m` and `P 63 2 2`, with one condition, `00l: l = 2n`, one testable absence and ΔBIC −15.7 against the absence-free class; every other class but `P - - -` is refuted by named reflections.
-That is a complete answer rather than a hedge.
-The mirror and the twofold axes that separate those three produce no absences, so no counting time distinguishes them, and both `EXTINCTION_GROUPS_NOT_SEPARABLE` and `LAUE_CLASS_NOT_SEPARABLE` say so, the last because `P 63 2 2` sits in a different Laue class from the other two.
-Declared enantiopure, the same screen returns `P 63 - -` holding `P 63` and `P 63 2 2`.
+On the GSAS-II fluorapatite tutorial pattern over 15–90°, the screen enumerates seven classes and fits all seven in about three seconds.
+It ranks `P 63 - -` first, whose members are `P 63`, `P 63/m` and `P 63 2 2`, with one condition, `00l: l = 2n`; every other class but `P - - -` is refuted by named reflections.
+`best_or_none` returns `None`.
+The class rests on one testable absence, (0 0 5) at 68.0°, since (0 0 3) sits in a stronger neighbour's tail, and one line can move ΔBIC by ln N = 8.2 at most, under the margin of 10.
+`EXTINCTION_SYMBOL_AMBIGUOUS` names that position, where counting longer would decide.
+The mirror and the twofold axes that separate the three members produce no absences, so no counting time distinguishes them, and both `EXTINCTION_GROUPS_NOT_SEPARABLE` and `LAUE_CLASS_NOT_SEPARABLE` say so, the last because `P 63 2 2` sits in a different Laue class from the other two.
+Declared enantiopure, the same screen ranks `P 63 - -` first holding `P 63` and `P 63 2 2`.
 
 α-Al₂O₃ is certified `R -3 c`.
-On the round-robin corundum pattern over 20–90°, with the widths seeded from the peak list, the screen returns `R - c -` = {`R 3 c`, `R -3 c`} at ΔBIC −3435, with six of its ten forbidden lines testable and all six absent: the certified group listed, never chosen, beside the non-centrosymmetric partner no counting time separates from it.
-`ExtinctionScreen.profile_rwp` reads 0.259 there.
+On the round-robin corundum pattern over 20–90°, with the widths seeded from the peak list, the screen returns `R - c -` = {`R 3 c`, `R -3 c`} at ΔBIC −45.9, with six of its ten forbidden lines testable and all six absent: the certified group listed, never chosen, beside the non-centrosymmetric partner no counting time separates from it.
+`ExtinctionScreen.profile_rwp` reads 0.134 there.
+Over the whole 5–150° range with the round-robin instrument's declared widths it returns `R - c -` too, at ΔBIC −74.6 on nine testable lines, with `ExtinctionScreen.profile_rwp` 0.137.
 
 Read `ExtinctionScreen.profile_rwp` before believing a refutation anyway.
 Every class is fitted with the shared instrument frozen, so a poor shared fit is a poor screen, and the quiet-model rule bounds what a neighbour can do rather than what a wrong profile can.
-Same specimen and certified cell over the whole 5–150° range with the round-robin instrument's declared widths: the shared fit reaches 0.262, four forbidden positions read as occupied, the certified class is refuted, and `best_or_none` returns `R - - -`, whose members exclude `R -3 c`.
-The two arms' Rwp, 0.259 and 0.262, do not tell them apart.
+Before the screen's fits moved to Pawley, that 5–150° arm refuted the certified class at four positions and returned `R - - -`, whose members exclude `R -3 c`, at a shared-fit Rwp that did not tell it apart from the 20–90° arm.
 Give the screen a range and a width law its profile fit can match, and read `ExtinctionScreen.profile_rwp` to check that it did.
 
 What to do with each answer, as a procedure, is the agent skill's §7e ([For agents](agents.md) says how to get it).

@@ -57,6 +57,7 @@ from ..crystallography.symmetry import (
 )
 from ..crystallography.wyckoff import (
     adp_basis,
+    adp_projection,
     axial_basis,
     coordinate_basis,
     floating_origin_basis,
@@ -1332,7 +1333,8 @@ class ParameterTable:
                 else:
                     self._add(f"{base}.cell.{name}", p)
             self._add(f"{base}.scale", phase.scale)
-            self._add(f"{base}.extinction", phase.extinction)
+            if phase.extinction is not None:
+                self._add(f"{base}.extinction", phase.extinction)
             if phase.preferred_orientation is not None:
                 self._add(f"{base}.preferred_orientation.r",
                           phase.preferred_orientation.r)
@@ -1340,7 +1342,8 @@ class ParameterTable:
             self._add(f"{base}.lor_size", phase.lor_size)
             # a Stephens block owns the tanθ Lorentzian channel outright: its
             # isotropic direction is the same column, so lor_strain is locked
-            # (the Atom.aniso ⇒ biso bargain, one level up)
+            # and the width law reads zero for it (the Atom.aniso ⇒ biso
+            # bargain, one level up; CompiledModel.lor_strain_term, WP-1467)
             self._add(f"{base}.lor_strain", phase.lor_strain,
                       force_fixed=phase.microstrain is not None)
             self._add(f"{base}.gauss_size", phase.gauss_size)
@@ -2091,15 +2094,16 @@ class ParameterTable:
         xyz = np.array([atom.x.value, atom.y.value, atom.z.value])
         basis = adp_basis(stabilizer_rotations(sg, xyz))  # (n_free, 6)
         u0 = np.array(atom.aniso.values(), dtype=np.float64)
-        coef, *_ = lapack.lstsq(basis.T.astype(np.float64), u0, rcond=None)
-        residual = basis.T @ coef - u0
-        scale = max(float(np.abs(u0).max()), 1e-6)
-        if float(np.abs(residual).max()) > 1e-6 * scale:
+        coef, nearest, compatible = adp_projection(basis, u0)
+        if not compatible:
+            worst = int(np.argmax(np.abs(nearest - u0)))
             raise ValueError(
-                f"{base}: the anisotropic tensor {u0.tolist()} is not "
-                f"compatible with the site symmetry, which allows only "
+                f"{base}: the anisotropic tensor of {atom.label!r}, {u0.tolist()}, "
+                f"is not compatible with the site symmetry, which allows only "
                 f"{basis.tolist()} in (U11, U22, U33, U12, U13, U23); the "
-                f"nearest allowed tensor is {(basis.T @ coef).tolist()}")
+                f"nearest allowed tensor is {nearest.tolist()}, "
+                f"{U_NAMES[worst]} furthest from it by "
+                f"{abs(float(nearest[worst] - u0[worst])):.3g} A^2")
         dof_paths = [f"{base}.adp.{k}" for k in range(len(basis))]
         want_vary = any(getattr(atom.aniso, n).vary for n in U_NAMES)
         for v, name in enumerate(U_NAMES):
@@ -2637,8 +2641,9 @@ class ParameterTable:
         writes: the block is that row's only writer, as the space group is a
         locked coordinate's.  Every input must exist and must not be written
         by this block or a later one, so the blocks apply in one pass in
-        declaration order.  The outputs' values are written from the map at
-        once, so the table never holds a derived row that disagrees with it.
+        declaration order.  Every frame input must be an input.  The outputs'
+        values are written from the map at once, so the table never holds a
+        derived row that disagrees with it.
         """
         for q in (*block.inputs, *block.outputs):
             if q not in self._paths:
@@ -2665,6 +2670,13 @@ class ParameterTable:
         for q in block.inputs:
             if q in own:
                 raise ValueError(f"derived block reads its own output {q!r}")
+        # the data-support count drops a frame input from the atoms it reaches
+        # (statistics.structural_free_paths); a name outside the inputs would
+        # drop nothing and read as declared (WP-2067)
+        for q in block.frame_inputs:
+            if q not in block.inputs:
+                raise ValueError(
+                    f"derived block's frame input {q!r} is not one of its inputs")
         # an earlier block has already been evaluated on its inputs, so a later
         # block may not write one of them: the earlier block would hold a value
         # computed from the input's state before this write
@@ -2994,6 +3006,97 @@ class ParameterTable:
                     "torsion and origin increments restart at zero at every build "
                     "while its record moves, so only an increment of the same "
                     "kind can follow one (or be followed by one)")
+
+    def add_expression(self, target: str, expression, *,
+                       variables: Mapping[str, str],
+                       constants: Mapping[str, float] | None = None):
+        """Set ``target`` by an expression the user wrote (WP-1964).
+
+        ``expression`` is text in the grammar of ``params.expression`` (or a
+        parsed :class:`~rietx.params.expression.Expression`).  Each of its names
+        is a **variable**, ``variables`` mapping it to an entry of this table
+        (``"zero_a" → "vars.zero_a"``), or a **constant**, ``constants`` giving
+        its number here (a pattern's coordinate).  A name in neither, or in
+        both, is refused, and so is a variable or constant the expression does
+        not use.
+
+        The target becomes a derived row (:class:`~rietx.params.derived.
+        ExpressionBlock`), locked with no tie.  So does every entry whose tie
+        reads the target alone, such as a cubic ``b`` and ``c``: the block
+        writes it from the same tie, after the target, where an affine row
+        would read the target's stale value.  An entry tied to the target
+        *and* to something else is refused by name, since the block cannot
+        carry the other half.  Returns the block.
+        """
+        from .derived import ExpressionBlock
+        from .expression import RESERVED, Expression, ExpressionError
+
+        expr = expression if isinstance(expression, Expression) else Expression(expression)
+        constants = dict(constants or {})
+        variables = dict(variables)
+        both = sorted(set(variables) & set(constants))
+        if both:
+            raise ValueError(f"{both[0]!r} is both a variable and a constant; "
+                             "a name has one meaning")
+        for name in (*variables, *constants):
+            if name in RESERVED:
+                raise ValueError(f"{name!r} is a reserved word of the expression "
+                                 "grammar; rename it")
+        known = {**variables, **constants}
+        for name in expr.names:
+            if name not in known:
+                from .._nearmiss import did_you_mean
+                hint = did_you_mean(name, known)
+                raise ExpressionError(
+                    "unbound", f"{target}: the expression names {name!r}, which is "
+                    "neither a variable nor a coordinate" + (f"; {hint}" if hint else ""))
+        unused = sorted(set(known) - set(expr.names))
+        if unused:
+            raise ValueError(f"{target}: {unused[0]!r} is declared but the expression "
+                             f"{expr.text!r} does not use it")
+        i = self._paths.get(target)
+        if i is None:
+            raise ValueError(f"unknown parameter {target!r}")
+        e = self.entries[i]
+        if e.tie is not None:
+            sources = ", ".join(src for src, _ in e.tie.terms)
+            raise ValueError(f"{target!r} is tied to {sources}, so an expression "
+                             f"cannot set it; set {sources} instead")
+        if e.locked or e.held:
+            raise ValueError(f"{target!r} is {'locked' if e.locked else 'held'}, "
+                             "so an expression cannot set it")
+        for name, path in variables.items():
+            if path not in self._paths:
+                raise ValueError(f"variable {name!r} names unknown parameter {path!r}")
+            if path == target:
+                raise ValueError(f"{target!r} cannot be a variable of its own expression")
+        followers: list[tuple[str, float, float]] = []
+        for f in self.entries:
+            if f.tie is None or f.path == target:
+                continue
+            terms, const = self._flatten(f.tie, (f.path,))
+            if not any(j == i for j, _ in terms):
+                continue
+            coeff = sum(c for j, c in terms if j == i)
+            if any(j != i and c != 0.0 for j, c in terms):
+                raise ValueError(
+                    f"{f.path!r} is tied to {target!r} and to another parameter "
+                    f"(= {f.tie}); an expression's block can carry a follower of "
+                    "the target alone")
+            followers.append((f.path, coeff, const))
+        e.vary = False
+        e.locked = True
+        for path, _, _ in followers:
+            fe = self.entries[self._paths[path]]
+            fe.tie = None
+            fe.vary = False
+            fe.locked = True
+        block = ExpressionBlock(expr, target, {n: variables[n] for n in expr.names
+                                               if n in variables},
+                                {n: constants[n] for n in expr.names if n in constants},
+                                followers)
+        self.add_derived(block)
+        return block
 
     def set_held(self, paths: str | Iterable[str], held: bool) -> list[str]:
         """Mark entries as the caller's declared hold.  Returns the ones that exist.
@@ -4613,7 +4716,8 @@ class ParameterTable:
             for name in ("a", "b", "c", "alpha", "beta", "gamma"):
                 put(getattr(phase.cell, name), f"{base}.cell.{name}")
             put(phase.scale, f"{base}.scale")
-            put(phase.extinction, f"{base}.extinction")
+            if phase.extinction is not None:
+                put(phase.extinction, f"{base}.extinction")
             if phase.preferred_orientation is not None:
                 put(phase.preferred_orientation.r, f"{base}.preferred_orientation.r")
             if phase.texture is not None:
