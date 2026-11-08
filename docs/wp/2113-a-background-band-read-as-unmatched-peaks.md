@@ -1,6 +1,6 @@
 # WP-2113 — a background band read as unmatched peaks
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-08 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-05 — the count moves no ranking and the fit's residual plot shows the band, but the reader's impurity evidence says 72 on a pure phase
