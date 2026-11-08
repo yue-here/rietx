@@ -222,6 +222,29 @@ class SeriesEntry(Base):
     #: had been accepted, and in a document written before the field.
     #: Written by ``SequentialRefinement._chain``.
     rwp_over_median: float | None = None
+    #: The **first** warm attempt's GoF over the GoF of the pattern its warm
+    #: start came from (:attr:`seeded_from`), the fact the GoF step reads
+    #: (WP-2080).  Above ``sequential.GOF_STEP_FACTOR`` (1.25) a collapsed
+    #: warm rung climbs to ``"warm_staged"`` and the better attempt is kept,
+    #: so on an escalated entry this is the ratio that sent it up, not the
+    #: kept attempt's (that one is :attr:`statistics`' GoF over the seed
+    #: entry's).  GoF and not Rwp because it divides the misfit by the
+    #: pattern's own noise: issue #1214's first rung sat under the Rwp fence at
+    #: 2.01 times its seed's GoF, with a minor phase's ``c`` 0.34 Å off.
+    #: Recorded under ``refit="stages"`` and ``reseed=False`` too, where the
+    #: step cannot act.  ``None`` where there was no warm start, where the
+    #: first attempt raised, and in a document written before the field.
+    #: Written by ``SequentialRefinement._chain``.
+    warm_gof_over_seed: float | None = None
+    #: True when the GoF step alone sent this pattern from the collapsed warm
+    #: rung to ``"warm_staged"`` (WP-2080): :attr:`warm_gof_over_seed` was
+    #: above ``sequential.GOF_STEP_FACTOR`` while the attempt was neither
+    #: rejected nor over a caller's ``reseed_factor`` nor cut by the first-rung
+    #: bound, any of which would have climbed anyway.  It says why the ladder
+    #: ran; :attr:`rung` says which attempt won.  ``False`` where the step did
+    #: not fire or was not what escalated, and in a document written before
+    #: the field.  Written by ``SequentialRefinement._chain``.
+    escalated_on_gof: bool = False
     #: The series index of the pattern whose fitted state seeded this
     #: pattern's warm rungs (WP-2003): the last pattern accepted before it in
     #: the walk.  That is not the pattern walked just before it when that one

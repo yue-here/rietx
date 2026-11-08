@@ -703,6 +703,11 @@ from .._nearmiss import did_you_mean
 #: Additive and defaulted to ``None``, a linear tie, the 0.25 → 0.26 rule; so
 #: every stored tie opens as the linear tie it was.  An older build refuses a
 #: document carrying the key.
+#: Also in 0.61 (WP-2080): ``SeriesEntry.warm_gof_over_seed`` and
+#: ``SeriesEntry.escalated_on_gof``, the GoF step's ratio and whether it sent
+#: the pattern to ``"warm_staged"``.  Additive and defaulted to ``None`` and
+#: ``False``, the 0.25 → 0.26 rule; an older build refuses an entry carrying
+#: either key.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

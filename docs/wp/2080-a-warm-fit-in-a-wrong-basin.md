@@ -114,13 +114,18 @@ this session).
       factor if B. Option B at 1.25, settled by Claude under Yue's delegation,
       2026-11-02 (handover entry of that date). The tier-3 audit row task 3 lands is
       approved under the same delegation.
-- [ ] After PR #1310 merges: land the ruled option on `schemas.sequential._rejected`'s
+- [x] After PR #1310 merges: land the ruled option on `schemas.sequential._rejected`'s
       seam. Under B: the trigger joins the ladder's escalation test only (never the
       quarantine), escalates to `warm_staged` and not to `cold`, names the fact in a
       record field on `SeriesEntry` (the GoF ratio and whether it fired), an `_audit`
       row at tier 3 with its approval, a `help.py` entry, the manual's series guide
       and a skill row. Under A: the record field, its help entry and the guide's
-      paragraph, no trigger.
+      paragraph, no trigger. *Landed 2026-11-08:* `sequential.GOF_STEP_FACTOR`
+      and `_gof_over_seed`, joined beside `_reseed_needed` in `_chain` for the
+      climb to `warm_staged` only; `SeriesEntry.warm_gof_over_seed` and
+      `.escalated_on_gof`; three `_audit` rows (the constant and the flag at
+      tier 3, approved 2026-11-02; the ratio at tier 1); two `help.py` entries;
+      the series guide's § Restart ladder; a skill row; a release note.
 - [ ] Tests: the issue's seed-2 chain as a fixture (two patterns, about 3 s), asserting
       the kept rung and the hex `cell.c` within its esd of the truth; a planted-null
       chain asserting no escalation.

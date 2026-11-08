@@ -1715,6 +1715,24 @@ ROWS: tuple[Row, ...] = (
                   "ruled by the maintainer 2026-11-03: inspecting each pattern's metrics "
                   "is part of reading any series, so a ranked line would be noise "
                   "(2003-batch/batch.md, decision 2)")),
+    Row("rietx.schemas.sequential.SeriesEntry.warm_gof_over_seed", "action", tier=1,
+        ambiguity=3,
+        evidence=("arithmetic: the first warm attempt's GoF over the GoF of the pattern its "
+                  "warm start came from (sequential.py _gof_over_seed), recorded on every warm "
+                  "pattern whether or not the step can act (refit='stages', reseed=False); the "
+                  "threshold that reads it is GOF_STEP_FACTOR, tiered on its own row "
+                  "(WP-2080)")),
+    Row("rietx.schemas.sequential.SeriesEntry.escalated_on_gof", "action", tier=3,
+        ambiguity=1,
+        evidence=("records that the GoF step alone sent the pattern from the collapsed warm "
+                  "rung to warm_staged (sequential.py _chain): its first rung was above "
+                  "GOF_STEP_FACTOR while neither rejected, over a caller's reseed_factor nor "
+                  "cut by the first-rung bound; on issue #1214's family set on draws 2 and 18 "
+                  "of 20, on WP-2003's nine series on 3 of 537 warm fits (2080-batch/)"),
+        grounds=("The record of the escalation, tiered with it (GOF_STEP_FACTOR). Settled "
+                 "by Claude under the maintainer's delegation of 2026-11-02 (WP-2080 "
+                 "handover log)."),
+        approved="2026-11-02"),
     Row("rietx.schemas.sequential.SeriesResult.code_counts", "action", tier=1, ambiguity=3,
         evidence=("arithmetic: every per-pattern (code, where path) pair counted once per "
                   "pattern, with the series length and the worst level, largest count "
@@ -4187,6 +4205,34 @@ ROWS: tuple[Row, ...] = (
                  "approved by the maintainer 2026-11-03 on a consent line "
                  "(2003-batch/batch.md, C3)."),
         approved="2026-11-03"),
+    Row("rietx.sequential.GOF_STEP_FACTOR", "constant", tier=3, value=1.25,
+        evidence=("the GoF step (WP-2080, option B): a collapsed warm first rung whose GoF "
+                  "exceeds 1.25x the GoF of the pattern its warm start came from climbs to "
+                  "warm_staged only, never cold or the quarantine, and the better attempt is "
+                  "kept (_prefer). Issue #1214's two-phase chain, pattern-1 noise draws 2-21 "
+                  "(macOS arm64, [dev], compiled tier on; 2080-batch/measure_trigger.py): it "
+                  "fires on draws 2 and 18 (ratio 2.01), whose first rung kept the hexagonal "
+                  "c 0.34 A off at GoF 2.05, and warm_staged takes both to GoF 1.049 and 1.026 "
+                  "with c within 1e-4 A of the truth; the other 18 keep their first rung at "
+                  "0.994-1.034; +217 iterations over the 20 chains, all on the two that fire. "
+                  "Retrospectively over the 537 warm fits of WP-2003's nine series (the off "
+                  "arms, Linux x86-64; 2080-batch/retro_ratio.py) it fires on 3: cpd-noclose "
+                  "1b (1.279; warm_staged reached Rwp 0.13928 from 0.16333, the independent "
+                  "fit's 0.13932), planted T186 (an unmodelled phase; nothing to rescue) and "
+                  "tut05-broken scan12 (26.0; _rejected already escalates it). The largest "
+                  "ratio kept without need is 1.126 (cpd), so 1.25 sits 2 % under the weakest "
+                  "rescue; measured on the issue's synthetic family and the nine, untested "
+                  "beyond them"),
+        grounds=("A step in GoF against the pattern's own seed is a property of this "
+                 "pattern's fit, readable when it finishes, that a different start can fix, "
+                 "and the escalation can only lower the pattern's chi2, since the better "
+                 "attempt is kept. Against the seed and not a median of accepted patterns, "
+                 "which fired on 115 of 247 planted patterns, the cost WP-2003 C1 removed "
+                 "the Rwp fence for. No program restarts a pattern by itself (practice.md "
+                 "§ Sequential refinement), so tier 3. Option B at 1.25 settled by Claude "
+                 "under the maintainer's delegation of 2026-11-02 (WP-2080 handover log); "
+                 "a second family with kept fits near 1.2 reopens the factor."),
+        approved="2026-11-02"),
     Row("rietx.sequential.NOISE_FLOOR_REL", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: a step or a between-chain gap under 1e-9 of the parameter's "
                   "magnitude (never under 1e-9 absolute, sequential.py:2290) is about 4.5e6 "
@@ -4947,7 +4993,8 @@ ROWS: tuple[Row, ...] = (
         value=True,
         evidence=("switches on the ladder's escalation, which since WP-2003 fires on a "
                   "rejected (diverged, or an error-level code: C2 q5, settled by Claude 2026-10-26) or "
-                  "raised warm rung and on the caller's reseed_factor only; under "
+                  "raised warm rung, on the caller's reseed_factor, and to warm_staged "
+                  "only on the GoF step (GOF_STEP_FACTOR, WP-2080); under "
                   "False each pattern keeps its first rung, uncut, no first-rung budget "
                   "applying there since C3 (clashes.md X2); on main with the status-only "
                   "trigger planted escalated once, T087, forced by the first-rung bound C3 "
