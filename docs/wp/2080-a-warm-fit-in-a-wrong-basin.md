@@ -126,9 +126,16 @@ this session).
       `.escalated_on_gof`; three `_audit` rows (the constant and the flag at
       tier 3, approved 2026-11-02; the ratio at tier 1); two `help.py` entries;
       the series guide's § Restart ladder; a skill row; a release note.
-- [ ] Tests: the issue's seed-2 chain as a fixture (two patterns, about 3 s), asserting
+- [x] Tests: the issue's seed-2 chain as a fixture (two patterns, about 3 s), asserting
       the kept rung and the hex `cell.c` within its esd of the truth; a planted-null
-      chain asserting no escalation.
+      chain asserting no escalation. *Landed 2026-11-08:* in
+      `tests/test_sequential.py`, three dictated-GoF rows (the climb stops at
+      `warm_staged`; recorded but inert at 1.25 exactly, under `reseed=False`
+      and under `refit="stages"`; a diverged first rung is not a GoF
+      escalation) and issue #1214's draw-2 chain; in
+      `tests/test_planted_series.py`, the 24-pattern null takes no step. With
+      the factor set to 1e9 the climb row and the #1214 row fail (the positive
+      arm).
 - [ ] Re-measure on the tree with the ruling in: the issue's 20 seeds and the
       nine families' `off` arm via `2003-batch/measure_reseed.py`, the table judged
       per pattern (WP-1124).
