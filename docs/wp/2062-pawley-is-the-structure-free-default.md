@@ -199,6 +199,12 @@ above, which come from lab and synchrotron single-phase patterns
   2026-11-07, WP-2076's third session: NAC timed at 0.97-1.04 s against 0.92-0.97 s on `main`, so
   PR #1460 carries both. The shared, reference and class fits are Pawley; the cell-free prefit
   stays Le Bail at `SCREEN_LEBAIL_CYCLES`, whose `_audit` row now says it governs the prefit alone.
+  2026-11-07, WP-2076's fourth session: the constant is gone, so this WP has nothing to retire.
+  Re-measured on the prefit alone over eleven screens, settling the partition recovers a
+  synthetic cell that three cycles lose and moves FAP's cell up to 1474 ppm, and changes no
+  answer WP-2076's open margin task does not own. The prefit now settles like every Le Bail
+  fit. Moving the prefit itself to Pawley would be a new question, with those eleven screens
+  as its bar.
 
 - **From WP-2011, 2026-10-28: Pawley's cost on large patterns, re-measured
   with option (c) built** (WP-2011 § Option (c) probed, commit e39b8c19d on
