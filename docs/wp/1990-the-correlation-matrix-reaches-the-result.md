@@ -38,6 +38,22 @@ What the tree holds, checked at `138d55dc`:
   sentence changes.
 - A joint multi-histogram fit runs no parameter-space screens yet
   (`multi.py`), so the field stays `None` there and means "not measured".
+- **Superseded in part, 2026-11-08 (checked at `63d7c120`):** since
+  WP-2050 the `HIGH_CORRELATION` guard no longer reads
+  `LSQOutcome.correlation` verbatim in a single fit. `check_guards`
+  (`strategy/staged.py`) projects out every direction the Jacobian cannot
+  resolve (`statistics.resolved_correlation`), so a pair with one
+  unresolved member is `nan` and the resolved pairs can differ from the
+  solver's. The field carries **that** matrix, the one the guard and
+  `top_correlations` read, which is this WP's own reason for choosing ρ; it
+  equals `LSQOutcome.correlation` wherever nothing is unresolved, and an
+  undetermined pair is `None` rather than a number. Line numbers above have
+  drifted (`LSQOutcome.correlation` at 216, `Identifiability` at 353, the
+  suggestion in `_cap_one_code`), the facts not.
+- The tier of each rule this WP adds: none. The field carries a statistic
+  (ρ, arithmetic, tier 1) the fit already computes, and the export is a
+  call the caller makes; no flag, threshold or automatic action is added or
+  moved.
 
 Why ρ and not the covariance or JᵀWJ, per the issue: ρ is unitless, χ²_red
 and the Bérar–Lelann factor cancel in it, and it is the matrix the
@@ -56,9 +72,20 @@ disagree.
 
 ## Tasks
 
-- [ ] Decide storage: on the final answer only, or on every history node.
+- [x] Decide storage: on the final answer only, or on every history node.
   Measure first: the packed lower triangle of P = 300 is ~45k floats, and a
   history node is ~10 kB today (root CLAUDE.md § Conventions).
+  **Decided 2026-11-08: the final answer only** (`RefinementResult`, never a
+  `HistoryNode`). Measured on the five-stage LaB6 fit of
+  `tests/test_high_correlation_dedup.py` (P = 15 at the answer, 4750
+  points; `.venv` `[dev]`, macOS arm64): a node is 5.7-8.5 kB of JSON
+  (median 7.8 kB), the result 481 kB. The packed triangle, diagonal
+  included, is 2.3 kB at P = 15, 9.3 kB at P = 30, 102 kB at P = 100 and
+  922 kB at P = 300 (45 150 floats). On a node that is +30 % at P = 15,
+  ×2 at P = 30 and ×120 at P = 300, on every stage of every plan; on the
+  result it is 0.5 % at P = 15 and comparable to the curves the result
+  already carries at P = 300. A node stores state, not curves, and the
+  matrix is evidence about one answer, which is what the result is.
 - [ ] `Identifiability.correlation` (paths in table order, packed lower
   triangle), `None` where not measured; `SCHEMA_VERSION` bump under WP-1117.
 - [ ] An export: a labelled table and a CSV writer beside the existing
