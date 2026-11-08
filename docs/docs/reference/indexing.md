@@ -204,17 +204,18 @@ Two settings of one lattice, such as an acute and an obtuse monoclinic angle, co
 
 #### The controls a project stores
 
-`IndexingControls` is the same surface one level up: everything a run is asked with that is not the data.
-It is what `ProjectDoc.indexing` persists, so a run can be repeated from a stored setting rather than from a call site.
+`IndexingControls` is what `ProjectDoc.indexing` persists: everything a run is asked with but the data.
 
 | Field | Default | Holds |
 |---|---|---|
 | `IndexingControls.search` | every default | the `SearchSpecSpec` |
-| `IndexingControls.engines` | `None`, every registered engine | which engines to run; an unknown name raises `ValidationError` |
+| `IndexingControls.engines` | `None`, every engine | which engines to run; an unknown name raises `ValidationError` |
 | `IndexingControls.validate_candidates` | `True` | whether to run the whole-profile test |
 | `IndexingControls.check_top` | `None`, three | how many top candidates get the expensive checks, at least 1 |
+| `IndexingControls.formula` | `None` | the specimen's formula, for `formula_units` |
+| `IndexingControls.temperature` | `None`, 298 K | its temperature in K |
 
-`two_theta_limits` is deliberately not a field: the project document already owns the range.
+`two_theta_limits` is not a field: the project document owns it.
 
 ### A volume window from the formula
 

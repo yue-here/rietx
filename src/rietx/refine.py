@@ -61,7 +61,7 @@ from .crystallography.twins import (
 )
 from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
-from .history.store import fingerprint
+from .history.store import fingerprint, refuse_existing_log
 from .history.tree import RefinementTree
 from .model.absorption import (
     CYLINDER_MU_R_MAX,
@@ -98,6 +98,7 @@ from .optimize.least_squares import (
     DEFAULT_SOLVER,
     SOLVERS,
     STATIONARY_ANGLE_STEP,
+    _cancel_check,
     _jacobian_for,
     _longest_line_wavelength,
     covariance_estimates,
@@ -120,6 +121,7 @@ from .optimize.statistics import (
     berar_lelann_factor,
     compute_statistics,
     data_support,
+    residual_is_noise,
     structure_r_factors,
 )
 from .params.multi import _unscoped
@@ -157,6 +159,7 @@ from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.plan import (
     CLOSING_WINDOW_TOL,
+    PlanSpec,
     check_closing_window_tol,
     check_phase_support_sigma,
 )
@@ -453,6 +456,11 @@ class _StageHold:
     #: asked of the table afterwards, for this carrier's own reason.
     reach: dict[str, list[str]] = dataclasses.field(default_factory=dict)
     blocked_by_hold: list[str] = dataclasses.field(default_factory=list)
+    #: ``StageResult.lebail_cycles_run`` (WP-1542): the cycles each partition
+    #: of this stage ran, which only the two ``lebail_update`` calls know
+    lebail_run: list[int] = dataclasses.field(default_factory=list)
+    #: ``StageResult.lebail_settled``, for the same reason
+    lebail_settled: bool | None = None
     #: the ``turn_on`` paths naming no entry (WP-1414), riding here
     #: for ``blocked_by_hold``'s reason: decided before the solve, unchanged
     #: by it, and delivered to the two ``StageResult`` call sites this way
@@ -517,6 +525,20 @@ class _StageHold:
     window_loss: float | None = None
     #: ``StageResult.rwp`` (WP-1334), the same frozen model at the same answer
     rwp: float | None = None
+
+
+def _add_formula(table: ParameterTable, path: str, expression) -> None:
+    """Set ``path`` on ``table`` by a user's formula tie (WP-2118).
+
+    Every name of the formula is a named variable, bound to its ``vars.``
+    path, so the one binding rule lives here and both the declaration and
+    every rebuild (:meth:`Refinement._apply_ties`) go through it.
+    """
+    from .params.expression import Expression
+
+    expr = expression if isinstance(expression, Expression) else Expression(expression)
+    table.add_expression(path, expr,
+                         variables={n: f"{VAR_PREFIX}{n}" for n in expr.names})
 
 
 def _tie_terms(source: "str | dict[str, float] | Sequence[tuple[str, float]]",
@@ -632,6 +654,14 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     leaves their columns identically zero, so with every phase lineless they
     are held from the start.
 
+    **Unseen is not flat until the residual says so.**  A zero scale says these
+    peaks are not in the data, which a blank frame and a phase whose peaks
+    missed both say.  The second leaves every real peak in the residual, and
+    its zero shift and widths are how it reaches them: on tutorial 05's 2 %
+    step, U climbing to 6 deg² took the scale from 2.47σ to 83σ and the cell
+    home.  So the hold at an answer also needs a residual with no structure,
+    :func:`_peak_columns_flat_at_answer`.
+
     ``tried`` is what the previous stage's answer held.  A column there was
     free for that stage's first solve, and the phases were judged unseen with
     it free, so this stage holds it from its start: WP-1523's prior, one
@@ -653,7 +683,8 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     # and with every phase unseen, an instrument column reaching the pattern
     # through phase peaks alone is as flat as their cells (WP-2049)
     tried = set(tried)
-    every = _every_phase_unseen(model, absent if at_answer else lineless)
+    every = (_peak_columns_flat_at_answer(model, table, absent, lineless)
+             if at_answer else _every_phase_unseen(model, lineless))
     prior = not every and bool(tried) and _every_phase_unseen(model, absent)
 
     def flat(p: str) -> bool:
@@ -1593,6 +1624,30 @@ def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
         path in _AXIAL_PATHS or model.scalar_chain_supported(path))
 
 
+def _residual_is_noise(model: CompiledModel, table: ParameterTable) -> bool:
+    """:func:`~rietx.optimize.statistics.residual_is_noise` of the fitted
+    channels at the table's values.  A channel an excluded region removed is
+    not in ``model.y_obs``, so it cannot read as structure.  One forward
+    evaluation, spent only where every phase is already unseen."""
+    y = np.asarray(model.evaluate(table.decode(table.x0())), dtype=np.float64)
+    delta = (np.asarray(model.y_obs, dtype=np.float64) - y) / np.asarray(
+        model.sigma, dtype=np.float64)
+    return residual_is_noise(delta, len(table.free_paths))
+
+
+def _peak_columns_flat_at_answer(model: CompiledModel, table: ParameterTable,
+                                 absent: set[int], lineless: set[int]) -> bool:
+    """Whether the instrument's peak-only columns are flat at a stage's answer:
+    every phase is unseen, and either none has a line in range, so the columns
+    are identically zero, or the residual is noise and nothing is left for them
+    to find (Hill & Flack's d ≥ Q).  A declined hold leaves d on the record: on
+    ``RefinementResult.statistics`` beside N and P where the fit ended at that
+    answer, and on the stage's history node
+    (``HistoryNode.metrics.statistics``) where it went on to find the peaks."""
+    return _every_phase_unseen(model, absent) and (
+        _every_phase_unseen(model, lineless) or _residual_is_noise(model, table))
+
+
 def _every_phase_unseen(model: CompiledModel, absent: set[int]) -> bool:
     """Whether ``absent`` holds every phase of ``model`` (and there is one)."""
     n = len(model.phases)
@@ -2431,7 +2486,9 @@ class Refinement:
     down a different branch with :meth:`run_stage`.
 
     Pass ``history=False`` for the light path: no snapshots, no per-stage
-    statistics, no serialisation.
+    statistics, no serialisation.  A ``history`` path that already holds a log
+    raises ``FileExistsError`` here, because a log holds one tree (WP-2031);
+    continue one with :meth:`from_node` on the loaded tree.
     """
 
     def __init__(self, structure: Structure, instrument: Instrument, *,
@@ -2557,6 +2614,10 @@ class Refinement:
         if isinstance(history, RefinementTree):
             self.history = history
             self._head_id = history.head
+        elif isinstance(history, str | Path):
+            # before any fit is paid for; ``RefinementTree.for_data`` asks
+            # again when the tree is made, for a file written in between
+            refuse_existing_log(history)
 
         # carried across calls so a checkout can be continued
         self._mode: Mode = "rietveld"
@@ -3194,11 +3255,42 @@ class Refinement:
         reach = table.entry_reach()
         owned = table.body_rows()
         origin = table.origin_holds
-        return [_parameter_row(
+        rows = [_parameter_row(
             e, tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
                     if e.tie is not None else None),
             esd=esd.get(e.path), mode=mode, blocked=blocked, reach=reach,
             owned=owned, origin=origin) for e in table.entries]
+        return self._formula_rows(table, rows)
+
+    def _formula_rows(self, table: ParameterTable,
+                      rows: list[ParameterRow]) -> list[ParameterRow]:
+        """The rows a user's formula writes, read as ties rather than as locked.
+
+        A formula's block owns its rows the way the space group owns a fixed
+        coordinate, so the table holds them locked with no tie
+        (``ParameterTable.add_expression``).  A row is a reading for the
+        caller, who can lift the formula with :meth:`untie`, so its target
+        reads ``tied: = <the formula>`` and each follower the linear tie the
+        block carries for it (a cubic ``b`` on ``a``) (WP-2118).
+        """
+        from .params.derived import ExpressionBlock
+
+        over: dict[str, TieSpec] = {}
+        for block in table.derived:
+            if not isinstance(block, ExpressionBlock):
+                continue
+            spec = self._ties.get(block.target)
+            if (spec is None or spec.expression is None
+                    or block.target not in self._applied_ties):
+                continue
+            over[block.target] = spec.model_copy(deep=True)
+            for path, coeff, const in block.followers:
+                over[path] = TieSpec(terms=[(block.target, coeff)], const=const,
+                                     user=path in self._applied_ties)
+        if not over:
+            return rows
+        return [r.model_copy(update={"tie": over[r.path], "locked": False})
+                if r.path in over else r for r in rows]
 
     def set_vary(self, path_globs: list[str] | str, vary: bool = True) -> list[str]:
         """Free (or hold) every parameter matching ``path_globs``.
@@ -3365,6 +3457,12 @@ class Refinement:
                 if (h := _path_hint(p, by_path))))
         for path, value in values.items():
             e = by_path[path]
+            user = (self._ties.get(path) if path in self._applied_ties else None)
+            if e.locked and user is not None:
+                # a row a user's formula writes (WP-2118)
+                raise ValueError(
+                    f"{path!r} follows {user.describe()} (a user tie); set "
+                    "the variables it reads instead, or untie it")
             if e.locked:
                 raise ValueError(
                     f"{path!r} is structurally fixed (symmetry, or a "
@@ -3488,6 +3586,8 @@ class Refinement:
         by_path = {e.path: e for e in table.entries}
         dropped: list[str] = []
         for path, spec in self._ties.items():
+            if spec.expression is not None:
+                continue  # after every linear tie, below
             entry = by_path.get(path)
             missing = [p for p, _ in spec.terms if p not in by_path]
             if entry is None:
@@ -3518,6 +3618,31 @@ class Refinement:
         # second time, once per table build (WP-1432), so the anchors are
         # corrected here — on the fresh table, before anything reads it.
         table.rebase_anchored_dofs(self._applied_ties)
+        # Formula ties last (WP-2118): a formula's block takes over every row
+        # whose linear tie reads its target alone, a user's included, so those
+        # ties must be on the table before the block is declared.  Register
+        # order is declaration order, which is the order blocks may read each
+        # other's targets in.
+        for path, spec in self._ties.items():
+            if spec.expression is None:
+                continue
+            entry = by_path.get(path)
+            if entry is None:
+                dropped.append(f"{path} (no such parameter)")
+            elif entry.tie is not None:
+                dropped.append(f"{path} (now tied by symmetry to "
+                               f"{', '.join(p for p, _ in entry.tie.terms)})")
+            elif entry.locked:
+                dropped.append(f"{path} (now structurally fixed)")
+            else:
+                try:
+                    _add_formula(table, path, spec.expression)
+                except ValueError as exc:
+                    # a variable removed under it, or a follower the block
+                    # cannot carry after a model edit: a build must not stop
+                    dropped.append(f"{path} ({exc})")
+                    continue
+                self._applied_ties.add(path)
         if dropped:
             warnings.warn(
                 f"{len(dropped)} user tie(s) no longer apply to this model and "
@@ -3569,6 +3694,20 @@ class Refinement:
         entry = by_path.get(path)
         if entry is None:
             raise _unknown_path_error(path, by_path)
+        user = (self._ties.get(path) if path in self._applied_ties else None)
+        if user is not None and entry.locked:
+            # a formula's block writes this row: its own target, or a row
+            # whose user tie read the target alone (WP-2118).  The table
+            # holds it locked, which is how a block owns a row, and
+            # "structurally fixed" would send the caller to the wrong fix
+            if role == "source":
+                raise ValueError(
+                    f"{path!r} follows {user.describe()} (a user tie), so it "
+                    "carries no freedom of its own; name a variable that "
+                    "formula reads, or write this tie as a formula too")
+            raise ValueError(
+                f"{path!r} already follows {user.describe()} (a user tie); "
+                "untie it first")
         if entry.locked:
             raise ValueError(
                 f"{path!r} is structurally fixed (symmetry, or a representation "
@@ -3690,7 +3829,7 @@ class Refinement:
                 f"{sorted(self._variables) or 'none'}")
         path = f"{VAR_PREFIX}{name}"
         dependents = sorted(p for p, spec in self._ties.items()
-                            if any(src == path for src, _ in spec.terms))
+                            if path in spec.sources)
         if dependents:
             raise ValueError(
                 f"{path!r} still has {len(dependents)} dependent(s) "
@@ -3722,9 +3861,11 @@ class Refinement:
             state=self.snapshot())
         self._head_id = node.id
 
-    def tie(self, path: str, source: "str | dict[str, float] | Sequence[tuple[str, float]]",
-            *, scale: float = 1.0, offset: float = 0.0) -> str:
-        """Constrain ``path`` to ``scale·source + offset``, recording a node.
+    def tie(self, path: str,
+            source: "str | dict[str, float] | Sequence[tuple[str, float]] | None" = None,
+            *, scale: float = 1.0, offset: float = 0.0,
+            expression: str | None = None) -> str:
+        """Constrain ``path`` to ``scale·source + offset``, or to ``expression=``: a formula over ``add_variable`` names, trig in radians.
 
         The general affine form, of which :meth:`tie_equal` is the ``scale=1,
         offset=0`` case.  Complementary occupancies on a shared site are the
@@ -3760,11 +3901,109 @@ class Refinement:
         the one-entry case of the many-source one and neither is a special
         path through the code.
 
+        ``expression`` sets ``path`` by a formula in the grammar of
+        ``docs/docs/reference/expressions.md`` instead (WP-2118)::
+
+            ref.add_variable("B0", 0.5, vary=True, min=0.0)
+            ref.add_variable("thD", 400.0, vary=True, min=50.0)
+            ref.tie("phases.0.atoms.0.biso", expression="B0 * debye(thD / 300)")
+
+        A formula reads **named variables and numbers only**, each name a
+        variable from :meth:`add_variable` (the maintainer's ruling of
+        2026-11-07).  To read a model parameter, tie it to a variable first and
+        name the variable.  It always runs as a formula, linear or not, while
+        ``source`` stays the constant matrix, so no linear tie changes value.
+        Trigonometry is in radians (``pi`` is a constant) and every angle rietx
+        stores is in degrees, so a cell angle enters as ``cos(beta * pi/180)``.
+        :meth:`untie` releases it like any tie, checkout restores it, and the
+        target's row in :meth:`parameters` reads ``tied: = <the formula>``.
+        Refused, besides the target refusals above: a name that is not a
+        declared variable, a formula that reads none (that is
+        :meth:`set_values`), a value off the target's bounds or not finite at
+        the variables' present values, and a target that is a displacement
+        from where the fit began (a site DOF or a rigid-body increment), which
+        no formula can set absolutely.
+
         Returns ``path``.  Like :meth:`set_vary`, the node is recorded only
         once the history tree exists.
         """
+        if expression is not None:
+            if source is not None:
+                raise TypeError("tie() takes a source or an expression, not both")
+            if scale != 1.0 or offset != 0.0:
+                raise ValueError(
+                    "scale and offset apply to a source; write them into the "
+                    "expression instead")
+            return self._declare_expression(path, expression)
+        if source is None:
+            raise TypeError("tie() needs a source path or an expression=")
         return self._declare_ties({path: (_tie_terms(source, float(scale)),
                                           float(offset))})[0]
+
+    def _declare_expression(self, path: str, text: str) -> str:
+        """Validate and apply one formula tie as one move (WP-2118).
+
+        The formula's own refusals come from the table
+        (``ParameterTable.add_expression``), so a declaration and a rebuild
+        refuse the same things; what is checked here first is what only the
+        refinement knows: which names are variables, and the caller's
+        bounds at the values the variables hold now.
+        """
+        from .params.expression import Expression
+
+        if not isinstance(text, str):
+            raise TypeError(f"expression must be text, got {type(text).__name__}")
+        table = self._working_table()
+        self._tie_entry(table, path, role="target")
+        if path in table.anchored_dof_paths or table._body_increment_kind(path):
+            raise ValueError(
+                f"{path!r} is a displacement from where the fit began (a site "
+                "DOF or a rigid-body increment), so a formula cannot set it "
+                "absolutely; set the quantity it moves by a parameter that is "
+                "absolute, or tie it linearly")
+        expr = Expression(text)
+        if not expr.names:
+            raise ValueError(
+                f"the expression {text!r} reads no variable, so it fixes "
+                f"{path!r} at a number; that is set_values, and it says so in "
+                "the history")
+        for name in expr.names:
+            if name not in self._variables:
+                hint = did_you_mean(name, self._variables, n=1)
+                raise ValueError(
+                    f"the expression for {path!r} reads {name!r}, which is not "
+                    "a declared variable.  A formula reads named variables and "
+                    f"numbers only: add_variable({name!r}, value) first, and to "
+                    "read a model parameter tie it to that variable"
+                    + (f"; {hint}" if hint else ""))
+        before = {e.path: e.value for e in table.entries}
+        # a build declares the ties before the holds (``_working_table``), so a
+        # caller's hold on the target cannot refuse here what every rebuild
+        # accepts; a linear tie accepts a held target too
+        held = path in self._user_holds
+        if held:
+            table.set_held([path], False)
+        _add_formula(table, path, expr)
+        if held:
+            table.set_held([path], True)
+        moved = [e for e in table.entries if e.value != before[e.path]
+                 or e.path == path]
+        for e in moved:
+            if not math.isfinite(e.value):
+                raise ValueError(
+                    f"the expression {text!r} gives {e.path}={e.value} at the "
+                    "variables' present values; set them where it is defined")
+        broken = [e for e in moved if not (e.lo <= e.value <= e.hi)]
+        if broken:
+            e = broken[0]
+            more = f" ({len(broken)} parameters in all)" if len(broken) > 1 else ""
+            raise ValueError(
+                f"tying {path} to {text} implies {e.path}={e.value:g}"
+                f"{self._owner_label(e.path)}, outside its bounds "
+                f"[{e.lo:g}, {e.hi:g}]{more}; loosen that bound or set the "
+                "variables nearer")
+        self._register_ties(table, {path: TieSpec(expression=text, user=True)})
+        return path
 
     def tie_equal(self, paths: list[str] | str, *,
                   source: str | None = None) -> list[str]:
@@ -3840,12 +4079,16 @@ class Refinement:
             raise ValueError(f"{glob!r} is not tied")
         if not hits:
             return []
+        derived = table.derived_paths()
         for path in hits:
             del self._ties[path]
-            if path in self._applied_ties:
+            if path in self._applied_ties and path not in derived:
                 # a register entry symmetry has since taken over is dropped from
                 # the register and left alone on the table: releasing it there
-                # would strip the space group's tie for one build
+                # would strip the space group's tie for one build.  A row a
+                # formula's block writes is left too: the commit writes the
+                # value the block last gave it, and the next build, without
+                # the register entry, holds it there (WP-2118)
                 table.set_tie(path, None)
         self._commit_tie_edit(table, ties={}, untied=hits)
         return hits
@@ -4149,6 +4392,12 @@ class Refinement:
                 f"{self._owner_label(e.path)}, outside its bounds "
                 f"[{e.lo:g}, {e.hi:g}]{more}; loosen that bound or change "
                 "the tie")
+        self._register_ties(table, specs)
+        return list(spec)
+
+    def _register_ties(self, table: ParameterTable,
+                       specs: dict[str, TieSpec]) -> None:
+        """Add ``specs`` to the register and commit ``table``, as one move."""
         previous = dict(self._ties)
         self._ties.update(specs)
         try:
@@ -4158,7 +4407,6 @@ class Refinement:
             # failure, and a retry would meet "already follows" (#246)
             self._ties = previous
             raise
-        return list(spec)
 
     def _owner_label(self, path: str) -> str:
         """`` (atom O1 of phase X)`` for an atom's path, else ``""``."""
@@ -4340,13 +4588,14 @@ class Refinement:
                 # they stay pending: the next *stage* consumes them, not this
                 _restore_lebail(self._pending_reflections, model)
                 carried = True
-            cycles = Stage("suggest", []).lebail_cycles
+            probe = Stage("suggest", [])
             if mode == "lebail":
-                model.lebail_update(table.decode(table.x0()), n_cycles=cycles)
+                model.lebail_update(table.decode(table.x0()),
+                                    n_cycles=probe.lebail_cycles, tol=probe.lebail_tol)
             elif mode == "pawley":
                 if not carried:
                     model.lebail_update(table.decode(table.x0()),
-                                        n_cycles=cycles)
+                                        n_cycles=_pawley_seed_cycles(probe))
                 model.build_pawley_restraint()
             x0 = table.x0()
             if model.pawley is not None:
@@ -4588,6 +4837,7 @@ class Refinement:
                       list(node.action.turn_on),
                       max_iter=node.action.max_iter,
                       lebail_cycles=node.action.lebail_cycles,
+                      lebail_tol=node.action.lebail_tol,
                       seed=node.action.seed, strain_seed=node.action.strain_seed,
                       restraint_weight_scale=node.action.restraint_weight_scale,
                       ftol=node.action.ftol,
@@ -4836,14 +5086,20 @@ class Refinement:
         self._pending_reflections = []
         model = new_model
 
+        lebail_run: list[int] = []
+        lebail_settled: bool | None = None
+        check = None if cancel is None else _cancel_check(cancel, stage.name)
         if mode == "lebail":
             values = table.decode(table.x0())
-            model.lebail_update(values, n_cycles=stage.lebail_cycles)
+            run, lebail_settled = model.lebail_update(
+                values, n_cycles=stage.lebail_cycles, tol=stage.lebail_tol, check=check)
+            lebail_run.append(run)
         elif mode == "pawley":
             if not carried:
                 # seed the intensity block from one Le Bail partition — a good
                 # warm start for the joint solve; refined values carry onward
-                model.lebail_update(table.decode(table.x0()), n_cycles=stage.lebail_cycles)
+                lebail_run.append(model.lebail_update(
+                    table.decode(table.x0()), n_cycles=_pawley_seed_cycles(stage))[0])
             # equal-split restraint on overlapped groups, scaled to the current
             # intensities (constant within the coming least-squares run)
             model.build_pawley_restraint()
@@ -5247,7 +5503,13 @@ class Refinement:
 
         if mode == "lebail" and outcome.non_finite is None:
             # a stopped stage changed nothing, its intensities included (WP-2048)
-            model.lebail_update(table.decode(outcome.theta), n_cycles=stage.lebail_cycles)
+            # the solve fitted against the first partition, so a settled second
+            # one does not undo a cut in it
+            run, settled = model.lebail_update(
+                table.decode(outcome.theta), n_cycles=stage.lebail_cycles,
+                tol=stage.lebail_tol, check=check)
+            lebail_run.append(run)
+            lebail_settled = settled if lebail_settled is None else lebail_settled and settled
 
         guard = check_guards(table, outcome, correlation_guard, model=model,
                              scan_exchangeability=stage_index == n_stages)
@@ -5298,10 +5560,11 @@ class Refinement:
             # Le Bail and Pawley read the screen alone, which the result
             # measures on its own compile as it always has
             significance=support if mode == "rietveld" else None,
-            window_loss=loss, rwp=stage_rwp)
+            window_loss=loss, rwp=stage_rwp, lebail_run=lebail_run,
+            lebail_settled=lebail_settled)
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
-            plan: RefinementPlan | str = "mccusker_default",
+            plan: RefinementPlan | PlanSpec | str = "mccusker_default",
             two_theta_limits: tuple[float, float] | None = None,
             events=None, cancel=None, telemetry=None, label: str | None = None,
             stage_reports: bool = False, progress=None) -> RefinementResult:
@@ -5964,6 +6227,9 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths,
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                lebail_cycles_run=hold.lebail_run,
+                lebail_settled=hold.lebail_settled,
+                termination=outcome.termination or None,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
                 # checked, trivially: one histogram has no elsewhere
@@ -5985,6 +6251,7 @@ class Refinement:
                 self._record(tree, NodeAction(
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
+                    lebail_tol=stage.lebail_tol,
                     seed=stage.seed, strain_seed=stage.strain_seed,
                     restraint_weight_scale=stage.restraint_weight_scale,
                     # the tolerance this stage *ran* at, not the one it declared
@@ -6284,6 +6551,9 @@ class Refinement:
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, unreached_histograms={},
                 window_loss=hold.window_loss, rwp=hold.rwp,
+                lebail_cycles_run=hold.lebail_run,
+                lebail_settled=hold.lebail_settled,
+                termination=outcome.termination or None,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
                 moment_angle_tests=outcome.moment_angle_tests)
@@ -6312,6 +6582,7 @@ class Refinement:
                 self._record(tree, NodeAction(
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
+                    lebail_tol=stage.lebail_tol,
                     seed=stage.seed, strain_seed=stage.strain_seed,
                     restraint_weight_scale=stage.restraint_weight_scale,
                     ftol=stage.ftol, window_slack_deg=stage.window_slack_deg,
@@ -6470,20 +6741,25 @@ class Refinement:
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
 
-    def report(self, *, plan: RefinementPlan | str | None = None, **kw):
+    def report(self, *, plan: RefinementPlan | PlanSpec | str | None = None, **kw):
         """The full :class:`~rietx.report.FitReport` for the last fit.
 
         Unlike ``build_report(result)``, this has the compiled model in hand,
         so Layers 1-2 (misfit attribution and typed suggested actions) are
         computed — subject to their gates.  ``plan`` supplies the Layer-2
-        strategy veto; pass the plan you ran (or its preset name).
+        strategy veto; pass the plan you ran, its ``PlanSpec`` or its preset
+        name.  A name is read for the result's mode, as the fit read it, so
+        ``"mccusker_default"`` on a Le Bail result is ``profile_only``.
         """
         from .report import build_report
 
         if self._model is None or self.result_ is None:
             raise RuntimeError("call fit() first")
-        if isinstance(plan, str):
-            plan = PLAN_PRESETS[plan]()
+        if plan is not None:
+            # read as the fit that made the result read it: a preset name
+            # through the mode's substitution, a ``PlanSpec`` converted
+            # (WP-2102)
+            plan = resolve_plan(plan, self.result_.mode)
         # the answer frozen with the result, never the live models: a later
         # cancelled fit keeps its completed stages and this result (WP-1421)
         answer = self._answer
@@ -6510,7 +6786,7 @@ class Refinement:
         return rigid_body_misfit(self, data, **kw)
 
     def summary(self, *, deliverable: str | None = None, plot: str | None = None,
-               plan: RefinementPlan | str | None = None,
+               plan: RefinementPlan | PlanSpec | str | None = None,
                report: FitReport | None = None,
                levels: dict[str, str] | None = None) -> str:
         """The termination view (WP-1302): "done, or not, and why" from one call.
@@ -9039,7 +9315,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # solver and false of the answer (WP-1028 §§(c),(d)).
     diagnostics = (diagnostics
                    + _far_from_data_diagnostics(model, y_calc, y_bkg, stats)
-                   + _max_iter_diagnostics(stage_results))
+                   + _max_iter_diagnostics(stage_results)
+                   + _lebail_cap_diagnostics(stage_results)
+                   + _slow_descent_diagnostics(stage_results))
 
     # Does the data support it (WP-1071): the observation/parameter ratio and
     # the step size, both reported and neither gating.  Built before the
@@ -9123,6 +9401,10 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
 #: no more, has reached a fixed point.  Measured on WP-1323's baseline: cells
 #: exact 16.908 -> 16.908 (0), cells +0.3 % 16.969 -> 16.967 (1e-4).
 LEBAIL_CONVERGED_REL = 1e-4
+#: the most cycles a Pawley seed runs.  The solve refines every intensity
+#: jointly, so the seed only says where it starts, and how settled the seed is
+#: moves no answer and saves no evaluation (WP-1542's handover).
+PAWLEY_SEED_CYCLES = 3
 
 
 def _lebail_stop_diagnostic(reason: str, kept: int, rows: list[float],
@@ -9242,6 +9524,11 @@ def _copy_seeded_column(jac: np.ndarray, jac2: np.ndarray, i: int,
                 f"{path!r} reaches that block, so its seeded column cannot be "
                 f"carried into the current state; seed {path!r} off its floor "
                 f"yourself (set_values) and ask again")
+
+
+def _pawley_seed_cycles(stage: Stage) -> int:
+    """The fixed count a Pawley seed runs: a stage may ask for fewer."""
+    return min(stage.lebail_cycles, PAWLEY_SEED_CYCLES)
 
 
 def _carry_lebail(old: CompiledModel, new: CompiledModel) -> None:
@@ -10632,6 +10919,9 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
     is now ``max_iter ×`` :data:`~rietx.optimize.least_squares.NFEV_PER_ITERATION`,
     sized from the measured worst-case rejection rate, so a stage that stalls
     reports it roughly 30x sooner with its answer unchanged.
+
+    A stage the slow-descent rule stopped (WP-1334) is ``converged`` and
+    never reaches this code: :func:`_slow_descent_diagnostics` names it.
     """
     hit = [s.name for s in stage_results if s.status == "max_iter"]
     if not hit:
@@ -10646,6 +10936,66 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
         where=[],
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",
+    )]
+
+
+def _lebail_cap_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``LEBAIL_CYCLES_AT_CAP``: the answer's partition stopped on its cap (WP-1542).
+
+    Only the last stage's partitions are the answer's: the solve fitted against
+    the first and the result carries the second.  An earlier stage's run from
+    intensities the next solve moves, so a cap there costs nothing the next
+    partition keeps.
+    """
+    last = stage_results[-1] if stage_results else None
+    if last is None or last.lebail_settled is not False:
+        return []
+    return [Diagnostic(
+        level="warning", code="LEBAIL_CYCLES_AT_CAP",
+        message=(f"A Le Bail partition of stage {last.name!r} stopped at its cap of "
+                 f"{max(last.lebail_cycles_run)} cycles, before the intensities settled."),
+        where=[],
+        suggestion="Raise lebail_cycles on the stage.",
+    )]
+
+
+def _slow_descent_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``STAGE_SLOW_DESCENT``: the stages the slow-descent rule stopped.
+
+    The rule (WP-1334, ``optimize.lm.SLOW_DESCENT_ESD``) ends a stage whose
+    cost is still falling, but so slowly that the next
+    :data:`~rietx.optimize.lm._SLOW_DESCENT_HORIZON` evaluations would move
+    its parameters by less than one esd.  Such a stage reports ``converged``
+    (Yue's ruling of 2026-11-03), since more iterations would not change the
+    answer by an esd, which is McCusker et al. (1999) §7's test.  So this
+    code is ``info`` and only names the stages, read off
+    ``StageResult.termination``, so a reader can tell a slow crawl from a
+    stage that met the solver's own tests.  It states and gates nothing.
+    """
+    from .optimize import lm
+
+    slow = [s.name for s in stage_results if s.termination == "slow_descent"]
+    if not slow:
+        return []
+    esd = lm.SLOW_DESCENT_ESD
+    esds = "one esd" if esd in (None, 1.0) else f"{esd:g} esd"
+    one = len(slow) == 1
+    return [Diagnostic(
+        level="info", code="STAGE_SLOW_DESCENT",
+        message=(("Stage " if one else "Stages ")
+                 + ", ".join(repr(n) for n in slow)
+                 + " stopped while " + ("its" if one else "their")
+                 + " χ² was still falling slowly. At that rate, another "
+                 f"{lm._SLOW_DESCENT_HORIZON} evaluations would have moved "
+                 + ("its" if one else "their")
+                 + f" parameters by less than {esds}, so the "
+                 + ("stage counts" if one else "stages count")
+                 + " as converged."),
+        where=[],
+        suggestion="Quote the stage's answer as converged. A high correlation "
+                   "or a bound hit reported for the same parameters names a "
+                   "shallow direction the descent may have crawled along, "
+                   "and its own suggestion names the remedies.",
     )]
 
 
@@ -11712,6 +12062,8 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
         # the user constraints the node was recorded under: without them the
         # replayed model has a different parameter count from the one whose
         # statistics this call exists to reproduce (WP-1070)
+        if spec.expression is not None:
+            continue  # a formula has no terms; declared after the rebase, below
         tie = AffineTie(terms=tuple((p, float(c)) for p, c in spec.terms),
                         const=float(spec.const))
         # A node recorded before WP-1804 can hold a tie whose source a later
@@ -11725,11 +12077,6 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
             continue
         table.set_tie(path, tie)
         applied_ties[path] = spec
-    if dropped:
-        warnings.warn(
-            f"{len(dropped)} user tie(s) recorded on this node no longer apply "
-            f"to its model and were dropped: {'; '.join(dropped)}.",
-            UserWarning, stacklevel=2)
     # and the anchors, for ``_apply_ties``' reason (WP-1432): this table is
     # built from the node's *own* structure, whose coordinates already carry
     # whatever the recorded tie displaced them by.  Un-rebased, replay
@@ -11737,6 +12084,20 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
     # asked about — 0.2174 against the recorded 0.2084 — and nothing in the
     # answer said so.
     table.rebase_anchored_dofs(applied_ties)
+    # formula ties last, in register order, as ``_apply_ties`` declares them
+    # (WP-2118); read as affine rows they would set each target to 0
+    for path, spec in state.ties.items():
+        if spec.expression is None:
+            continue
+        try:
+            _add_formula(table, path, spec.expression)
+        except ValueError as exc:
+            dropped.append(f"{path} ({exc})")
+    if dropped:
+        warnings.warn(
+            f"{len(dropped)} user tie(s) recorded on this node no longer apply "
+            f"to its model and were dropped: {'; '.join(dropped)}.",
+            UserWarning, stacklevel=2)
     table.refresh_ties()
     for path in state.free_paths:
         table.set_vary([path], True)
@@ -11811,7 +12172,8 @@ def estimate_mu_r(structure: Structure, instrument: Instrument) -> float | None:
 
 
 def refine(data: PatternData, structure: Structure, instrument: Instrument,
-           *, mode: Mode = "rietveld", plan: RefinementPlan | str = "mccusker_default",
+           *, mode: Mode = "rietveld",
+           plan: RefinementPlan | PlanSpec | str = "mccusker_default",
            two_theta_limits: tuple[float, float] | None = None,
            backend: str = "numpy", solver: str = DEFAULT_SOLVER,
            history: bool | str | Path | RefinementTree = False,

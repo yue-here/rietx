@@ -38,7 +38,13 @@ from ..schemas.migrate import (
     schema_key,
 )
 from ..schemas.pattern import PatternData
-from .store import append_record, fingerprint, read_records, write_records
+from .store import (
+    append_record,
+    fingerprint,
+    read_numbered_records,
+    refuse_existing_log,
+    write_records,
+)
 
 HEAD = "head"
 
@@ -108,6 +114,23 @@ def _merge_stored_twins(pending: Sequence[Any]) -> list[Diagnostic]:
     return out
 
 
+def _earlier_tree_skipped(path: str | Path, n_trees: int, loaded_from: int,
+                          header: TreeHeader, first: int, last: int,
+                          n: int) -> Diagnostic:
+    """The ``HISTORY_EARLIER_TREE_SKIPPED`` note for one tree ``load`` skipped."""
+    when = f", recorded {header.created_utc}" if header.created_utc else ""
+    nodes = f"{n} node" + ("" if n == 1 else "s")
+    lines = f"line {first}" if first == last else f"lines {first}-{last}"
+    return Diagnostic(
+        level="warning", code="HISTORY_EARLIER_TREE_SKIPPED",
+        message=(f"{path} holds {n_trees} trees; loaded the last, from line "
+                 f"{loaded_from}, and skipped the tree at {lines} "
+                 f"({nodes}{when})."),
+        suggestion=(f"To read the skipped tree, copy {lines} into a "
+                    "file of their own and load that file with RefinementTree.load."),
+        value=float(n))
+
+
 class RefinementTree:
     """A record of every state a refinement passed through, and how.
 
@@ -127,6 +150,14 @@ class RefinementTree:
     @classmethod
     def for_data(cls, data: PatternData, *, path: str | Path | None = None,
                  plan: Any = None, package_version: str = "") -> "RefinementTree":
+        """A new tree pinned to ``data``, its header appended to ``path`` if given.
+
+        A ``path`` that already holds a log raises ``FileExistsError`` naming
+        it, because a log holds one tree (WP-2031).  Appending a second header
+        restarted the node ids at ``n0000``, and the reload held each id twice.
+        """
+        if path is not None:
+            refuse_existing_log(path)
         created = _utcnow()
         # The pattern's abscissa **as measured** — ``x()`` rather than
         # ``two_theta``, which is ``None`` on a time-of-flight histogram.  The
@@ -180,16 +211,33 @@ class RefinementTree:
         after it, and a log written by a plain ``fit`` — which appends nodes and
         no annotation at all — reloaded with **no HEAD**, so ``tree["head"]``
         raised and there was nothing to resume from.
+
+        A log holds one tree (WP-2031), and a release before that rule could write
+        a second one after it by appending a rerun to a reused ``history=``
+        path.  Such a file still opens: the **last** tree is loaded, and each
+        earlier one is skipped and said once as ``HISTORY_EARLIER_TREE_SKIPPED``
+        with its line range.  The last because the store only appends: a node
+        committed on the loaded tree lands at the end of the file, inside the
+        last tree, so only that choice reloads with the node in it.  Merging
+        the trees, as those releases read them, held each restarted id twice.
         """
         header: TreeHeader | None = None
+        header_line = 0
         pending: list[HistoryNode | Annotation] = []
-        for rec in read_records(path):
+        earlier: list[tuple[TreeHeader, int, int, int]] = []
+        last_line = 0
+        for lineno, rec in read_numbered_records(path):
             if rec.record == "header" and rec.header is not None:
-                header = rec.header
+                if header is not None:
+                    earlier.append((header, header_line, last_line, sum(
+                        isinstance(r, HistoryNode) for r in pending)))
+                    pending = []
+                header, header_line = rec.header, lineno
             elif rec.record == "node" and rec.node is not None:
                 pending.append(rec.node)
             elif rec.record == "annotation" and rec.annotation is not None:
                 pending.append(rec.annotation)
+            last_line = lineno
         if header is None:
             raise ValueError(f"{path}: no header record; not a history log")
 
@@ -208,7 +256,9 @@ class RefinementTree:
                                       (item.state.instrument, "instrument.")):
                     for c in declared_range_repairs(model, at, prefix):
                         found.setdefault(c["path"], []).append((item.id, c))
-        notes = restore_declared_ranges(found, "this history")
+        notes = [_earlier_tree_skipped(path, len(earlier) + 1, header_line, *tree)
+                 for tree in earlier]
+        notes.extend(restore_declared_ranges(found, "this history"))
         notes.extend(_merge_stored_twins(pending))
         if diagnostics is not None:
             diagnostics.extend(notes)

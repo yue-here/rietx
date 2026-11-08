@@ -62,7 +62,7 @@ fap.pcr fullprof_pcr
 ```
 
 - `rx.write_topas_inp` writes an input TOPAS runs as it stands, with the data beside it as `fap.xye`. `free=ref` makes the file refine the parameters the fit refined, with its ties.
-- `rx.write_fullprof_pcr` writes a `.pcr`. It refuses a non-zero zero shift unless `write_zero_shift=True`, and refuses any other position correction, because the file would put every peak somewhere else. It also refuses extinction, preferred orientation, texture, absorption and surface roughness away from their off states, because it writes none of them. The fit here can be written because its extinction ended at 0.
+- `rx.write_fullprof_pcr` writes a `.pcr`. It refuses a non-zero zero shift unless `write_zero_shift=True`, and refuses any other position correction, because the file would put every peak somewhere else. It also refuses extinction, preferred orientation, texture, absorption and surface roughness away from their off states, because it writes none of them. The fit here declares no extinction, so the writer has none to refuse.
 - `rx.write_gsas2_phase_cif` writes a CIF that GSAS-II's phase import reads, and `rx.write_gsas2_instprm` writes the instrument as a GSAS-II `.instprm`. rietx has no writer for a `.gpx`.
 
 `rx.identify_project_format` says which format a file is without reading the model.

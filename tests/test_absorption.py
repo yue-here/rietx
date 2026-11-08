@@ -408,7 +408,7 @@ def _capillary_model(mu_r: float, *, kind: str = "debye_scherrer"):
     structure.phases[0].scale.value = 1e-3
     # lift extinction off the softplus floor so its column is alive; 2.0 keeps
     # every reflection below the x = 1 Laue-branch step (test_extinction.py)
-    structure.phases[0].extinction.value = 2.0
+    structure.phases[0].extinction = 2.0
     if kind == "debye_scherrer":
         ins = Instrument.debye_scherrer(wavelength=1.5406, mu_r=mu_r)
     else:
@@ -457,7 +457,7 @@ def test_forward_model_leaves_intensities_untouched_at_mu_r_zero():
 
     structure = make_aniso_rutile()
     structure.phases[0].scale.value = 1e-3
-    structure.phases[0].extinction.value = 2.0
+    structure.phases[0].extinction = 2.0
     unset = Instrument.debye_scherrer(wavelength=1.5406)     # mu_r stays None
     unset.profile.w.value = 1e-2
     grid = np.arange(10.0, 90.0, 0.02)

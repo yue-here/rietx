@@ -259,6 +259,14 @@ Three things to understand before reading an answer:
 - State what you already know. A prior cell or space group narrows the search
   honestly, where widening the tolerances does not.
 
+Beside the volume limits, `formula` takes the specimen's chemical formula and
+`temperature (K)` the temperature the pattern was measured at, and the project
+stores both. The temperature box waits for a formula, since a temperature only
+scales the formula's volumes. Emptying the formula box clears the temperature with it. A run with a formula adds a `Z` column to the
+candidate table: the formula units each cell's volume holds by Hofmann's average
+atomic volumes. Z moves no search and no rank. A correct inorganic cell reads
+0.4 to 0.9 of its true Z, so read it as a guide rather than a test.
+
 `Screen extinctions` lives in a candidate's expanded row: one row per extinction
 class, every space group in the class listed, and the reflections that refute it
 named. The teaching point is the package's own. The extinction symbol is what a
@@ -445,17 +453,30 @@ The panel states those rather than offering them, because one protocol over N
 specimens is what makes their trajectories comparable.
 
 Run it both ways once. `direction="both"` refines the chain forwards and
-backwards and flags the parameters the two passes disagree about. It is the only
-check that separates a measured trajectory from an ordering artefact, and a
-smooth curve is exactly what a poisoned chain produces. The panel banners the
-disagreement and draws the backward chain beside the forward one. Then decide
-whether you need to keep paying for the second pass.
+backwards and records how far the two passes differ. It is the only check that
+separates a measured trajectory from an ordering artefact, and a smooth curve is
+exactly what a poisoned chain produces. The panel opens with one line giving the
+largest gap in esds (the two chains' esds combined) and the parameter and
+pattern it sits at; click the parameter to plot it. Every trajectory is listed
+with its own largest gap, in the series' own order, and the panel opens on the
+first. The "largest gap first" control reorders the list. On a series whose two chains
+agree, the gaps are noise and that order means nothing. The backward chain is
+drawn beside the forward one. No parameter is
+called path-dependent, because no gap size separates a real dependence from
+chance across many parameters and patterns. You decide which size matters for
+your specimen. Where the two chains kept different attempts at that pattern (one
+warm, the other cold), the caption says so, and the gap then measures the
+escalation ladder as well as the order. Then decide whether you need to keep
+paying for the second pass.
 
 The status column carries four chips, best learnt as two pairs. `restaged` and
 `reseeded` are both recoveries, the first still from the neighbour's answer so
 the chain is unbroken, the second only from a cold start. `hard` means nothing
 rescued it but a warm attempt was still the best available, and `unrecovered`
-means it diverged on every attempt: it seeded no successor and joined no median.
+means the chain kept a fit it rejected after its last attempt: the solver
+diverged, or the fit carries an error-level diagnostic. A fit can converge and
+still be rejected, so the chip can sit beside `converged`, and its tooltip names
+the reason. A rejected pattern seeded no successor and joined no median.
 On the trajectory plot a ring marks a reseed and a cross marks an `unrecovered`
 point. They say opposite things: a ring is a good fit from a different starting
 model, a cross is not a measurement.
@@ -467,6 +488,16 @@ pattern's row plots that pattern's own fit instead. The chart has the pattern
 plot's four export buttons, between its legend and the plot. On the trajectory,
 `copy data` gives each pattern in view with its x, its value and its esd, and
 the backward chain's value when there is one.
+
+Under the plot, Steps lists the change in each parameter between neighbouring
+patterns, later minus earlier, with its size in the later pattern's esds. It is
+the series' `steps` field, largest first. It shows the selected parameter, or
+every parameter with the switch beside it, capped at the largest 60 rows. No
+step is called a jump, because what a jump is (a transition, a sample shift, a
+beam dump, a wrong model) depends on the sample's history, which no pattern
+records. When the series ran with `verify_steps`, a column gives the cold ratio
+of the largest steps: the same two patterns refitted cold and independently,
+over the step. Near 1 the step is in the data, and near 0 the chain made it.
 
 A series does not persist. Its patterns are staged uploads and its answer lives
 in the session, so closing the window loses the staged list. Say what you need

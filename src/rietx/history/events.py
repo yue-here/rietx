@@ -299,6 +299,50 @@ def read_events(path: str | Path) -> list[EventRecord]:
     return out
 
 
+class StageClock:
+    """A named stage's elapsed time, from the event stream (WP-2031).
+
+    The one rule both readers of a stage's wall clock call:
+    :func:`~rietx.history.aggregate.summarize_events` and
+    :func:`progress_writer`.  A stage is timed from its ``stage_start`` to
+    its ``stage_end``.  A WP-1301 phase release emits a second
+    ``stage_start`` before re-solving, marked by its ``released`` field
+    (``resumed=True`` here), and that one keeps the first start, so the
+    stage's time includes both solves.  Any other ``stage_start`` replaces an
+    open start of its name: a stage that raised or was abandoned emitted no
+    ``stage_end``, and its start must not time the next run of that name.
+    ``fit_start`` alone cannot say so, because ``Refinement.run_stage`` emits
+    none and one stream may carry several of its calls.  Every ``fit_start``
+    still forgets the open starts.  One progress writer serves a whole
+    series, so without these rules a stale start crossed patterns.
+    """
+
+    def __init__(self) -> None:
+        self._open: dict[str, float] = {}
+
+    def observe(self, kind: str | None, stage: str | None,
+                t: float | None, *, resumed: bool = False) -> float | None:
+        """Feed one event; a ``stage_end`` returns its stage's seconds.
+
+        ``resumed`` marks a ``stage_start`` that continues an open stage of
+        its name: the one a release emits, whose ``data`` has ``released``.
+        """
+        if kind == "fit_start":
+            self._open.clear()
+        elif stage is None:
+            return None
+        elif kind == "stage_start":
+            if t is not None and resumed:
+                self._open.setdefault(stage, t)
+            elif t is not None:
+                self._open[stage] = t
+        elif kind == "stage_end":
+            start = self._open.pop(stage, None)
+            if start is not None and t is not None:
+                return t - start
+        return None
+
+
 def progress_writer(sink) -> Any:
     """Turn ``progress=`` into an ``events=`` callback (WP-1302): one text
     line per ``stage_end``, and per pattern under a series (the ``series_*``
@@ -325,24 +369,18 @@ def progress_writer(sink) -> Any:
     # own stream owns its newline translation, as they own its encoding.
     fh = (open(sink, "a", encoding="utf-8", newline="\n")
           if owns_fh else sink)
-    #: the *first* stage_start seen for a name, not the most recent — a
-    #: WP-1301 phase release emits a second stage_start before re-solving,
-    #: and the elapsed time a caller reads on the stage_end wants the whole
-    #: named stage's wall clock, both solves included, not just the second's
-    #: (unlike ``values``, which does want the most recent alignment; see
-    #: this module's docstring — a different question, a different answer).
-    first_start: dict[str, float] = {}
+    #: a release's second stage_start keeps the first one's time (unlike
+    #: ``values``, which wants the most recent alignment; see this module's
+    #: docstring — a different question, a different answer)
+    clock = StageClock()
 
     def _write(event: dict) -> None:
         kind = event.get("kind")
         data = event.get("data", {})
         stage = data.get("stage")
-        if stage is None:
-            return
-        if kind == "stage_start":
-            first_start.setdefault(stage, event["t"])
-            return
-        if kind != "stage_end":
+        elapsed = clock.observe(kind, stage, event.get("t"),
+                                resumed="released" in data)
+        if stage is None or kind != "stage_end":
             return
         parts = []
         if "series_index" in data and "series_n" in data:
@@ -353,9 +391,8 @@ def progress_writer(sink) -> Any:
         parts.append(str(data.get("status", "?")))
         if data.get("rwp") is not None:
             parts.append(f"Rwp {data['rwp']:.4f}")
-        start_t = first_start.pop(stage, None)
-        if start_t is not None:
-            parts.append(f"{event['t'] - start_t:.0f}s")
+        if elapsed is not None:
+            parts.append(f"{elapsed:.0f}s")
         fh.write(" ".join(parts) + "\n")
         fh.flush()
 

@@ -55,7 +55,7 @@ closing ['phases.0.cell.a', 'phases.0.cell.c']
 The lattice parameter `a` ends at the value the CIF gave it.
 `StageResult.blocked_by_hold` names what each stage tried to free and could not.
 The closing stage that ends every plan names every parameter the plan's stages named, so the hold blocks it too.
-The fit also reports [`HOLD_BLOCKED_PLAN`](../reference/diagnostics-refinement.md#hold_blocked_plan) at level `info`.
+The fit also reports [`HOLD_BLOCKED_PLAN`](../reference/diagnostics-stages.md#hold_blocked_plan) at level `info`.
 Nothing is wrong when it appears.
 It records that your hold overrode the plan.
 
@@ -64,7 +64,7 @@ The figure differs between platforms by tens of ppm, so the script prints the fl
 
 <!-- output of examples/guides/hold.py -->
 ```text
-without the hold: a moves by more than 250 ppm
+without the hold: a moves by more than 150 ppm
 ```
 
 The full script is `examples/guides/hold.py`.

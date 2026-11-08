@@ -1,9 +1,8 @@
 """The structure-solution engine's kernels (``rietx-kernels`` 1.4.0, #562)
 against the numpy expressions they replace.
 
-The kernels are reached through ``model.compiled``'s three entry points, which
-nothing in rietx calls yet.  So each oracle is written here, in numpy, as the
-engine computes it:
+The kernels are reached through ``model.compiled``'s three entry points.  Each
+oracle is written here, in numpy, as the engine computes it:
 
 * the **orbit sums** S_j(h) = Σ_m exp(2πi (Q·x_j + HT)) call ``cos`` and
   ``sin``, numpy's own vectorised routines on one side and the C library's on
@@ -40,10 +39,9 @@ from rietx.model import compiled
 
 rk = pytest.importorskip("rietx_kernels")
 
-HAS_SOLVE = all(callable(getattr(rk, n, None)) for n in compiled.SOLVE_NAMES)
 needs_solve = pytest.mark.skipif(
-    not HAS_SOLVE,
-    reason=f"rietx-kernels {rk.__version__} predates the solve kernels (1.4.0)")
+    not compiled.available(),
+    reason=f"the rietx-kernels wheel did not load: {compiled.unavailable()}")
 
 ORBIT_BAR = 1e-13
 EPS = np.finfo(np.float64).eps
@@ -534,24 +532,27 @@ def test_the_switch_sends_every_solve_call_to_the_numpy_path(monkeypatch):
     assert [f() for f in _calls()] == [None, None, None]
 
 
-def test_a_wheel_without_the_solve_kernels_still_serves_the_rest(monkeypatch):
-    """A 1.3 wheel lacks the three, and nothing in rietx calls them yet, so it
-    loads whole, the model, figure and indexer kernels run, and only the solve
-    entry points decline.  Their caller raises :data:`KERNEL_FLOOR` to 1.4 and
-    moves them into :data:`KERNEL_NAMES`."""
+def test_a_wheel_without_the_solve_kernels_is_declined_whole(monkeypatch):
+    """A 1.3 wheel lacks the three and sits under :data:`KERNEL_FLOOR`, so it
+    does not load, the model, figure and indexer kernels stand down with the
+    solve entry points, and one numpy path runs in the process."""
     import rietx_kernels as real
 
     fake = types.ModuleType("rietx_kernels")
+    solve = ("solve_orbit_sums", "solve_orbit_sums_one", "solve_clash")
     for name in ("__version__", "KERNEL_ABI", *compiled.KERNEL_NAMES):
-        setattr(fake, name, getattr(real, name))
+        if name not in solve:
+            setattr(fake, name, getattr(real, name))
     fake.__version__ = "1.3.0"
     monkeypatch.setattr(compiled, "_KERNELS", None)
     monkeypatch.setattr(compiled, "_UNAVAILABLE", None)
     monkeypatch.setitem(sys.modules, "rietx_kernels", fake)
-    assert not set(compiled.SOLVE_NAMES) & set(compiled.KERNEL_NAMES)
-    assert compiled.available() and compiled.unavailable() is None
+    assert set(solve) <= set(compiled.KERNEL_NAMES)
+    assert not compiled.available()
+    assert compiled.unavailable() == (
+        "rietx_kernels 1.3.0 lacks the kernels " + ", ".join(solve))
     compiled.set_enabled(True)
-    assert compiled.dichotomy_kernels() is not None
+    assert compiled.dichotomy_kernels() is None
     assert [f() for f in _calls()] == [None, None, None]
 
 

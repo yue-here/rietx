@@ -62,8 +62,8 @@ scaffold, imported rather than restated), predictor cost, per-pattern wall /
 iterations / rung, escalation and quarantine counts, and **endpoint agreement**
 against the copy arm in esd units — because a seed that changes the answer has
 not made the same fit faster.  ``--direction both`` adds the path-dependence
-read-out: a predictor changes the path, and ``SEQUENTIAL_PATH_DEPENDENT`` must
-not worsen under it.
+read-out: a predictor changes the path, and the largest forward-backward gap
+(``SeriesResult.direction_gaps``) must not worsen under it.
 
 Wall clock is a range over ``--repeats``; run it idle and alone
 (``bench_refinement``'s four rules apply here unchanged).
@@ -285,6 +285,19 @@ class ArmRun:
     diagnostics: list[str] = field(default_factory=list)
     #: path -> (value, esd) for every pattern, for the agreement read-out
     endpoints: list[dict[str, tuple[float, float | None]]] = field(default_factory=list)
+    #: the largest forward-backward gap in combined esds, ``direction="both"``
+    gap: float | None = None
+
+
+def largest_gap(series) -> float | None:
+    """The series' largest forward-backward gap in combined esds, or ``None``.
+
+    Read off ``SeriesResult.direction_gaps`` (WP-2003, C5), which replaced the
+    ``SEQUENTIAL_PATH_DEPENDENT`` code this read-out once counted.
+    """
+    sized = [abs(g.gap_esd) for g in series.direction_gaps or []
+             if g.gap_esd is not None]
+    return max(sized) if sized else None
 
 
 def _series_setup(refit: str, n: int, ppm: float):
@@ -363,7 +376,8 @@ def _run_arm(arm: str, setup, direction: str) -> ArmRun:
     return ArmRun(wall, counts.nfev, counts.njev,
                   pred.wall, pred.nfev, pred.njev,
                   list(pred.applied), list(pred.rejected), per,
-                  [d.code for d in series.diagnostics], endpoints)
+                  [d.code for d in series.diagnostics], endpoints,
+                  largest_gap(series))
 
 
 #: The trigger case's one exactly degenerate family — the instrument Lorentzian
