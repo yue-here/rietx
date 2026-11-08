@@ -1206,6 +1206,24 @@ _ANNOTATION_REASONS = {
     "esd": "an esd is a result of a fit, not an input to one",
 }
 
+#: The tie reasons that depend on where the row's tie came from: a user tie
+#: (WP-1070) was made by no symmetry, and a row with none can still take one.
+_TIE_REASONS = {
+    "user": "this tie was declared with ref.tie(); ref.untie() takes it back and "
+            "ref.tie() declares it again",
+    "none": "a tie comes from the crystal system, the site symmetry or ref.tie(), "
+            "and this document cannot add one",
+}
+
+
+def _annotation_reason(key: str, live) -> str:
+    """Why annotation ``key`` cannot be edited on ``live``'s row."""
+    if key == "tie" and live.tie is None:
+        return _TIE_REASONS["none"]
+    if key == "tie" and live.tie.user:
+        return _TIE_REASONS["user"]
+    return _ANNOTATION_REASONS.get(key, "this is read-only")
+
 
 def _check_annotations(row: Row, live, fail, kept) -> None:
     """Annotations are read-only, and only a *differing* one is an error.
@@ -1220,15 +1238,14 @@ def _check_annotations(row: Row, live, fail, kept) -> None:
     current = annotations_of(live)
     for key, typed in row.annotations.items():
         if key not in current:
-            fail(row.line, f"{row.path} is not {key!r} — "
-                           f"{_ANNOTATION_REASONS.get(key, 'this is read-only')}",
+            fail(row.line, f"{row.path} is not {key!r} — {_annotation_reason(key, live)}",
                  row.path, row.text)
         elif current[key] != typed and not (
                 key in ("min", "max") and key in kept()
                 and float(_fmt(kept()[key])) == current[key]):
             shown = current[key] if current[key] is not True else key
             fail(row.line, f"{key} on {row.path} is {shown}, and cannot be "
-                           f"edited here: {_ANNOTATION_REASONS[key]}",
+                           f"edited here: {_annotation_reason(key, live)}",
                  row.path, row.text)
 
 
