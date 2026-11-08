@@ -1,6 +1,6 @@
 # WP-2112 — an engine's first cell stays in the reported list
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-08 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-11-05 — a ranking defect on one synthetic list, seen before WP-2079 and WP-2082 changed the ranking key and not re-run; a caller's workaround is a larger `max_candidates`
