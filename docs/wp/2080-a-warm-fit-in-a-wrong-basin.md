@@ -251,7 +251,7 @@ the step says, and the review checked it in code.
 
 *Generality* (the judge's sections, unedited; author's lines marked "Answer"):
 
-#### rietx.sequential.GOF_STEP_FACTOR (constant, tier 3, 1.25)
+**rietx.sequential.GOF_STEP_FACTOR (constant, tier 3, 1.25)**
 
 **weak.** The case for the action is the stronger side. The threshold's case is not yet earned: only one dataset family has a fire checked against a true value, and that family is development data.
 
@@ -267,7 +267,7 @@ the step says, and the review checked it in code.
 
 Evidence that would change the verdict: a second and third unrelated family, at least one of them sealed, where the step fires on a fit a validating reference rejects. Also any family whose kept fits sit near 1.2. Separately, the row should name T186 as the cubic → tetragonal transition and record the cpd-noclose `lor_strain` knock-on.
 
-#### rietx.schemas.sequential.SeriesEntry.warm_gof_over_seed (action, tier 1, ambiguity 3)
+**rietx.schemas.sequential.SeriesEntry.warm_gof_over_seed (action, tier 1, ambiguity 3)**
 
 **holds.** The ratio is arithmetic, recorded without a verdict, and it follows the `rwp_over_median` precedent (tier 1, ambiguity 3). One sentence of its help text overstates what a jump means.
 
@@ -283,7 +283,7 @@ Evidence that would change the verdict: a second and third unrelated family, at 
 
 Evidence that would change the verdict: none expected for the tier. Help text that names the count-time case would remove the wording issue.
 
-#### rietx.schemas.sequential.SeriesEntry.escalated_on_gof (action, tier 3, ambiguity 1, approved 2026-11-02)
+**rietx.schemas.sequential.SeriesEntry.escalated_on_gof (action, tier 3, ambiguity 1, approved 2026-11-02)**
 
 **holds.** As the record of the GoF-step escalation, the case for acting is the stronger side. Its tier rides on `GOF_STEP_FACTOR`, and that row's weakness carries over.
 
@@ -299,7 +299,7 @@ Evidence that would change the verdict: none expected for the tier. Help text th
 
 Evidence that would change the verdict: a case where the flag reads True while `needed` or `forced` also held. None found in the code or tests.
 
-#### rietx.sequential.SequentialRefinement.fit:reseed (default; evidence changed)
+**rietx.sequential.SequentialRefinement.fit:reseed (default; evidence changed)**
 
 **weak.** The added clause is accurate, but the row's existing measured sentence is now false on this tree, and the grounds do not cover the new branch.
 
@@ -315,7 +315,7 @@ Evidence that would change the verdict: a case where the flag reads True while `
 
 Evidence that would change the verdict: the planted sentence updated to this tree's measurement (T186 escalated, evaluations re-counted), and the grounds pointing to `GOF_STEP_FACTOR` for the non-rejected branch.
 
-#### Skill: `entry.escalated_on_gof` row and body sentence (docs/skill/rietx/references/series.md)
+**Skill: `entry.escalated_on_gof` row and body sentence (docs/skill/rietx/references/series.md)**
 
 **holds.** The row names a field, which is what DESIGN.md § Rules, 4 asks of a new skill row. Two wording and staleness points.
 
