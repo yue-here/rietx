@@ -550,7 +550,7 @@ def carry_restraints(old: Structure, new: Structure) -> tuple[Structure, list[st
                     for m in modes.modes]})
         if update:
             # unvalidated, as merge_site_twins writes: the caller checks the
-            # whole structure once (``Structure.check_atom_references``)
+            # whole structure once (``Structure._check_atom_references``)
             phases[pn] = after.model_copy(update=update)
             changed = True
     if not changed:

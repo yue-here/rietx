@@ -3124,7 +3124,7 @@ class Refinement:
             # and a list changed in place re-ran no phase validator (WP-2121).
             try:
                 candidate, restraints_dropped = carry_restraints(self.structure, candidate)
-                candidate.check_atom_references()
+                candidate._check_atom_references()
             except ValueError as exc:
                 raise ValueError(
                     f"this model names an atom it does not have, so the edit is "

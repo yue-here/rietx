@@ -2110,7 +2110,7 @@ class SequentialRefinement:
             # ``Refinement.edit`` runs them, so a broken hook is named here
             try:
                 structure, dropped = carry_restraints(self.structure, structure)
-                structure.check_atom_references()
+                structure._check_atom_references()
             except ValueError as exc:
                 raise ValueError(
                     f"pattern {index} ({label!r}), after prepare: {exc}") from None

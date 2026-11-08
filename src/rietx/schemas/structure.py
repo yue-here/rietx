@@ -1825,7 +1825,7 @@ class Phase(_InheritsDeclaredDefaults):
 
         Construction checks the bond, angle, planarity and torsion kinds it
         always checked.  ``every_kind`` adds the tether and anti-bump kinds,
-        which :meth:`check_atom_references` checks at an edit (WP-2121).  They
+        which :meth:`_check_atom_references` checks at an edit (WP-2121).  They
         stay out of construction so that a saved history whose node holds
         one, which an edit accepted before 1.12, still opens.
         """
@@ -1851,7 +1851,7 @@ class Phase(_InheritsDeclaredDefaults):
                 for k, idx in enumerate(r.atoms):
                     check(idx, f"atoms[{k}]")
 
-    def check_atom_references(self) -> None:
+    def _check_atom_references(self) -> None:
         """Re-run every check that a record naming this phase's atoms still names one.
 
         Restraints name atoms by index, rigid bodies by label, and a mode record
@@ -1904,7 +1904,7 @@ class Structure(Base):
 
         The path is a whole-model dot-path, so only the structure can check it;
         a path on an atom it lacks failed only at the next fit (WP-2121).  Run
-        by :meth:`check_atom_references`, never at construction, for the
+        by :meth:`_check_atom_references`, never at construction, for the
         reason :meth:`Phase._check_restraint_indices` gives.
         """
         for phase in self.phases:
@@ -1919,14 +1919,14 @@ class Structure(Base):
                         f"phase {phase.name!r} restraint references {r.path}, but "
                         f"the structure has no such atom")
 
-    def check_atom_references(self) -> None:
-        """:meth:`Phase.check_atom_references` on every phase, then the value paths.
+    def _check_atom_references(self) -> None:
+        """:meth:`Phase._check_atom_references` on every phase, then the value paths.
 
         For a structure changed in place or built by ``model_copy``, which runs
         no validator (WP-2121).
         """
         for phase in self.phases:
-            phase.check_atom_references()
+            phase._check_atom_references()
         self._value_restraints_name_atoms_it_has()
 
     @classmethod
