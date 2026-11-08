@@ -75,6 +75,7 @@ The first stage frees the moment with the scale and background only, and the sec
 ```text
 Mn2 (Mn3+): |m| = 3.56 ± 0.04 μB, supported
 polar angle: esd None, 95 % interval includes 90°: True
+modulus: 95 % interval 3.47 to 3.65 μB
 ['MOMENT_ANGLE_STATIONARY']
 ```
 
@@ -91,8 +92,11 @@ In its place the fit computes the angle's 95 % profile interval, which runs abou
 [`MOMENT_ANGLE_STATIONARY`](../reference/diagnostics-structures.md#moment_angle_stationary) reports both, and its message gives the angle's distance from 90° and the interval's ends.
 
 The interval includes 90°, so the data cannot tell this moment from one along a.
-Quote it as 3.56(4) μ<sub>B</sub> along a.
-The modulus esd assumes the angle sits at 90°, which the message also says.
+The modulus esd of 0.04 μ<sub>B</sub> assumes the angle sits at 90°.
+So the fit also computes the modulus's 95 % profile interval, 3.47 to 3.65 μ<sub>B</sub>, which does not assume it.
+Quote the modulus by that interval.
+The modulus is the moment's length at the angle where the fit stopped, so it is never shorter than the moment along a.
+The message gives both intervals.
 
 The full script is `examples/guides/magnetic.py`.
 
