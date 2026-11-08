@@ -1804,7 +1804,7 @@ def test_the_gof_steps_factor_is_the_one_its_prose_quotes():
     fields = help_registry()["result_fields"]
     assert factor in fields["SeriesEntry.warm_gof_over_seed"]["description"]
     assert factor in fields["SeriesEntry.escalated_on_gof"]["description"]
-    guide = Path(__file__).parents[1] / "docs" / "docs" / "reference" / "series.md"
+    guide = Path(__file__).parents[1] / "docs" / "docs" / "reference" / "series-ladder.md"
     assert f"more than {factor} times the GoF" in guide.read_text(encoding="utf-8")
 
 
