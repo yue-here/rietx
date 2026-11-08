@@ -189,6 +189,170 @@ this session).
 
 ## Handover log
 
+### 2026-11-08 — option B landed; the WP closes (PR #1473)
+
+A series no longer keeps a warm fit that converged clean in a wrong minimum when the staged
+plan from the same start would find the right one. When the quick warm refit ends at more than
+1.25 times the GoF of the pattern it started from, the series tries the staged plan from the
+same start and keeps the better fit. It never restarts from the initial models and never
+quarantines on this. On the reporter's chain both bad noise draws now land within an esd of the
+true cell. On WP-2003's nine series the step fires 3 times in 537 warm fits. One of those rescues
+a pattern, and its successors then sit in a lower-χ² minimum with a different strain. What it
+cost: one extra staged fit where it fires, and a 1.25 resting on development data only, which
+issue #1474 carries.
+
+*Done.*
+- `sequential.GOF_STEP_FACTOR` (1.25) and `_gof_over_seed`. They join `_chain`'s escalation test
+  for the climb to `warm_staged` only. `_reseed_needed` and `_rejected` are unchanged, so the
+  cold rung and the quarantine are untouched. Under `reseed=False` and `refit="stages"` the step
+  cannot act.
+- `SeriesEntry.warm_gof_over_seed` (the first warm rung's ratio) and `.escalated_on_gof` (the
+  step alone climbed, and `warm_staged` was attempted). Schema note under 0.61, additive.
+- `_audit` rows: the constant and the flag at tier 3, approved 2026-11-02 under the delegation;
+  the ratio at tier 1. `fit:reseed`'s row is re-measured.
+- `help.py` entries for both fields. The series guide's restart-ladder text moves to a new page,
+  `reference/series-ladder.md`: `reference/series.md` sat at 49 998 of its 50 000-character
+  cap. Stubs under the old headings keep `#restart-ladder` and `#quarantine` landing (tutorial
+  05 links them on the stable docs). Also `docs/practice.md`'s rietx row, a 1.12.0 release
+  note, the regenerated API index, and the Vale accept list (`GoF`, with the two `GOF` spellings
+  in `theory/estimation.md` aligned).
+- GUI Series panel: the `restaged` and `hard` chips say when the GoF step climbed (`hard`
+  becomes a plain `GoF step` chip there). There is no new `title=`, since `help.test.ts`
+  ratchets them. Dist rebuilt; vitest 607 passed, svelte-check 0 errors.
+- No skill row. The row and body sentence put `references/series.md` 540 B over its budget
+  (CI lint, flagged by the shift lead), and they restated `help.py`. A test ties the 1.25 quoted
+  in help and in the guide to the constant.
+- Tests: four dictated-GoF rows in `tests/test_sequential.py` (the climb stops at
+  `warm_staged`; inert at exactly 1.25, under `reseed=False` and under `refit="stages"`; not
+  credited when a diverged rung or a caller's `reseed_factor` climbs anyway), the factor-prose
+  row, issue #1214's draw-2 chain, and the planted null taking no step. Positive arm: with the
+  factor at 1e9 the climb row and the #1214 row fail.
+
+*Measured.* Task 5's tables above (macOS arm64, `[dev]`, compiled tier on; pearl did not
+answer two wake attempts, so the Mac with two processes). Suites on `6adf0b1f8`, equal to
+`origin/main` 63d7c120a merged (main had not moved), macOS arm64, `[dev]`, Python 3.12, `-n 4
+--dist loadgroup`: full suite 15 293 passed, 424 skipped, 51 xfailed, 2 failed in 41 min. One failure was this branch's own factor-prose row, which read the guide sentence from the page the split had emptied. It is fixed in `e49a26c77` and passes alone. The other, `test_pair_diagnostic_class.py::test_the_two_site_winner_finds_each_site_its_own_moment` (a magnetic two-site solve, moment 0.6995 against 3.5), fails identically on `origin/main` 63d7c120a in a detached tree. It predates this branch and no series code reaches it. Added tests' cost (`tests.added_test_times`, that run's junit
+on this Mac): 2.80 s over the 7 added tests, the #1214 chain 1.19 s the largest; per file `test_sequential.py` 2.80 s (6), `test_planted_series.py` 0.00 s (1, on the module's shared null fixture). Touched selections: `tests/test_sequential.py` 156 passed before the
+new rows; `test_audit_table`, `test_help`, `test_gui_help`, `test_gui_dist` 69 passed;
+`test_manual`, `test_manual_api`, `test_vale`, `test_docs_consistency` 128 passed;
+`tests.skill_caps` exit 0; `python -m tests.reader_output` exit 0 (unchanged).
+
+*Review.* `/code-review high --fix` ran from the session's start directory, the main checkout on
+a stale local branch, and reviewed that branch rather than this one. It left uncommitted fixes in
+a new worktree, `worktrees/review-vt-patches-fixes` (branch `review/vt-patches-fixes`), which this
+session did not touch. This diff was reviewed by an Opus agent instead. It confirmed the
+escalation logic in every case (forced, raised rungs, cold after `warm_staged`, quarantined
+seeds, `on_error`, the backward chain, JSON round trip) and found:
+the flag set before `warm_staged` ran, so a cancel there left a flag no other field showed
+(fixed); the GUI chips' wording (fixed); three docstrings (fixed); help text missing the fence
+and the bound (fixed); a GoF of 0 not refused (fixed); the #1214 row hard-coding 1.25 (fixed).
+Declined: a test for the first-rung bound's `forced` case. `forced` implies the climb whatever
+the step says, and the review checked it in code.
+
+*Generality* (the judge's sections, unedited; author's lines marked "Answer"):
+
+#### rietx.sequential.GOF_STEP_FACTOR (constant, tier 3, 1.25)
+
+**weak.** The case for the action is the stronger side. The threshold's case is not yet earned: only one dataset family has a fire checked against a true value, and that family is development data.
+
+| Question | Author's answer (where) | What I found | Verdict |
+|---|---|---|---|
+| 1. What it decides unasked | Row `evidence`: "a collapsed warm first rung whose GoF exceeds 1.25x the GoF of the pattern its warm start came from climbs to warm_staged only, never cold or the quarantine, and the better attempt is kept (_prefer)". (GoF is goodness of fit, Rwp/Rexp. The collapsed warm rung is one combined stage started from the previous pattern's values. `warm_staged` is the full staged plan from the same start. `_prefer` is the function that picks which attempt is kept.) | Matches the code (diff of `sequential.py`, `_chain`). `step` is tested only at `rung == "warm_staged"` and only under `reseed=True`. The ratio is the first warm attempt's GoF over the kept GoF of the last accepted pattern. The step spends one extra staged fit per firing pattern, and it can change which minimum is kept. | clear |
+| 2. Kind of ambiguity | The GoF-step action is filed as kind 1 on the `escalated_on_gof` row (`ambiguity=1`). This constant row has no ambiguity field. | Kind 1 fits the action, because the extra fit can only lower that pattern's χ². The number 1.25 is a tier-3 threshold placed on top of a kind-1 act. | agrees |
+| 3. Case against acting | Handover 2026-11-02, "What would reopen it": "A second family with kept fits near 1.2 reopens the factor." Row: planted T186 is "an unmodelled phase; nothing to rescue". | Two situations a competent refiner would face differently. **(a) A count-time step.** GoF² is χ²/(N−P) with w = 1/σ², so at a fixed relative misfit GoF grows as √counts once systematic error dominates. A scan with ≥1.56× the counts of its seed can therefore cross 1.25 with no wrong basin. An example is a ramp-and-dwell protocol, where short ramp scans alternate with long dwell scans. No family measured has such a step; this is arithmetic, not measured. The cost is compute, since the better fit is kept. **(b) A real transition.** T186 in `tests/planted_series.py` is the cubic → tetragonal transition, with the unmodelled rock-salt phase present since T124 (`2003-batch/batch.md` family table). The row and the WP name only the unmodelled phase. At a transition a refiner changes the model, not the start. Measured cost: 36 → 108 evaluations, values moved 3e-6 esd. **(c) A downstream knock-on missing from the row.** On cpd-noclose (the CPD round-robin tray with the closing stage off) the rescued 1b seeds 1c-1h. There one `lor_strain` per pattern moves 4.8-7.9 esd away from the independent-fit reference, while `profile.v` moves nearer (WP task 5). The handover reads this as a second, lower-χ² basin. The rule's clause that the action leaves the number no further from its reference is not met on `lor_strain`. That reference is rietx's own independent fit, so it only verifies. | substantive, cost-only for (a) and (b); (c) belongs in the row |
+| 4. Case for acting | Grounds: "the escalation can only lower the pattern's chi2, since the better attempt is kept". Measured in WP Context: issue #1214's draws 2 and 18 were kept with hexagonal c 0.34 Å off at GoF 2.05. Escalated, they reach GoF 1.049 and 1.026 with c within 1e-4 Å of the synthetic truth (esd 1.1e-4). Cost +217 iterations over 20 chains, all of them on the two that fired. | Confirmed by the committed test `test_issue_1214s_warm_fit_in_a_wrong_basin_climbs_and_lands_on_the_truth`, which asserts c within its esd of the truth. With the factor at 1e9 it fails (positive arm, per WP task 4). Leaving it to the caller costs a silent wrong cell that seeds every later pattern, and no code separates it (WP Context: no non-info code tells seeds 2 and 18 from good fits). Fires on 3 of 537 warm fits. | strong |
+| 5. Tier and source | "No program restarts a pattern by itself (practice.md § Sequential refinement), so tier 3." | Checked in this repository: `docs/practice.md` § Sequential refinement, "When a fit goes wrong". GSAS-II, EasyDiffraction and MAUD restart none (marked checked in source). TOPAS and BGMN are inferred. FullProf and RIETAN-FP are "not established". So tier 3 is right. That table's rietx row still lists only divergence, raise and error codes as triggers, so it is stale after this change. | holds |
+| 6. Unrelated families | Row: "measured on the issue's synthetic family and the nine, untested beyond them". | **Firing where the fault is:** one family with a validating reference, #1214's synthetic two-phase chain, which is the family the trigger was designed on. Plus CPD (IUCr CPD sample 1, lab Cu Kα), but only in a declared non-default variant with the closing stage off, and only against rietx's own independent fit, which verifies. **Silent where no fault:** CPD (default; max ratio 1.126), Cr₂WO₆ (HB-2A neutron; one warm fit), and the synthetic planted-null, trigger and tut05-jump families. **Stated failure case:** planted T186 (misdescribed, see row 3). **All development data:** 1.25 was placed inside the 1.126-1.279 gap measured on these same series, and no sealed family exists. Under default settings the smallest ratio a rescue followed is 2.01. The 1.279 bound comes from the non-default variant. The three-family bar is not met on the firing side, and this is not a rare feature, so the rare-feature exception does not apply. | short of the bar |
+| 7. Record that it fired | `SeriesEntry.escalated_on_gof`, `SeriesEntry.warm_gof_over_seed` | Both are written in `_chain`. No diagnostic code, which is right for an action record under "Attention is a cost", clause 1. | holds |
+
+Evidence that would change the verdict: a second and third unrelated family, at least one of them sealed, where the step fires on a fit a validating reference rejects. Also any family whose kept fits sit near 1.2. Separately, the row should name T186 as the cubic → tetragonal transition and record the cpd-noclose `lor_strain` knock-on.
+
+#### rietx.schemas.sequential.SeriesEntry.warm_gof_over_seed (action, tier 1, ambiguity 3)
+
+**holds.** The ratio is arithmetic, recorded without a verdict, and it follows the `rwp_over_median` precedent (tier 1, ambiguity 3). One sentence of its help text overstates what a jump means.
+
+| Question | Author's answer (where) | What I found | Verdict |
+|---|---|---|---|
+| 1. What it decides unasked | Row: "arithmetic: the first warm attempt's GoF over the GoF of the pattern its warm start came from … recorded on every warm pattern whether or not the step can act". | It decides nothing. `_gof_over_seed` returns `None` for a missing attempt, a missing seed, or a non-finite or non-positive GoF. On an escalated entry it holds the first attempt's ratio, not the kept one's, and the schema docstring says so. | clear |
+| 2. Kind | `ambiguity=3` | A reported statistic. The threshold that acts on it sits on its own row. | agrees |
+| 3. Case against | none given | For a kind-3 field: it reports and stops. The help entry (`help.py`, `SeriesEntry.warm_gof_over_seed`) says "a jump here is a worse fit and not fewer counts". The manual (`docs/docs/reference/series.md:550`) contrasts GoF with "Rwp, which moves with the counts". By the arithmetic in the first item's row 3, GoF also moves with counts once systematic misfit dominates, so a jump can mean more counts at the same misfit. | wording issue only |
+| 4. Case for | Schema docstring: "GoF and not Rwp because it divides the misfit by the pattern's own noise: issue #1214's first rung sat under the Rwp fence at 2.01 times its seed's GoF". | Leaving the field out would hide the one number that separated the #1214 fits. Measured: 2.01 on the bad fits against 0.994-1.034 on the 18 good ones. | strong |
+| 5. Tier | tier 1, "arithmetic" | Correct: a quotient with no free factor. | holds |
+| 6. Families | not applicable (no threshold) | — | — |
+| 7. Record | itself; also asserted under `refit="stages"` and `reseed=False` by `test_the_gof_step_is_recorded_where_it_does_not_act` | — | holds |
+
+Evidence that would change the verdict: none expected for the tier. Help text that names the count-time case would remove the wording issue.
+
+#### rietx.schemas.sequential.SeriesEntry.escalated_on_gof (action, tier 3, ambiguity 1, approved 2026-11-02)
+
+**holds.** As the record of the GoF-step escalation, the case for acting is the stronger side. Its tier rides on `GOF_STEP_FACTOR`, and that row's weakness carries over.
+
+| Question | Author's answer (where) | What I found | Verdict |
+|---|---|---|---|
+| 1. What it decides unasked | Row: "records that the GoF step alone sent the pattern from the collapsed warm rung to warm_staged … neither rejected, over a caller's reseed_factor nor cut by the first-rung bound". | The code sets it as `gof_escalated or (step and not needed and not forced)`, so it is False when another trigger would have climbed anyway. `test_a_rejected_rung_past_the_gof_step_is_not_called_a_gof_escalation` pins that. | clear |
+| 2. Kind | `ambiguity=1` | The act is: one more fit from the same warm start, keeping the lower-cost result. Kind 1 is defensible, since a refiner shown a pattern at twice its neighbour's GoF would not keep it unexamined. | agrees |
+| 3. Case against | Handover: B "departs from practice as the ladder already does". | Dissenter: a refiner who holds one protocol for every pattern so that trajectories stay comparable (FullProf's cyclic mode, "same refinement conditions for every pattern", practice.md, marked inferred). The ladder already breaks that homogeneity, and this flag makes each break visible. Also the count-step and transition cases from the first item. | weak dissent; cost-only |
+| 4. Case for | Grounds: "The record of the escalation, tiered with it". | Without the flag a reader cannot tell a GoF-step climb from a rejection climb. `rungs_tried` alone does not say why. | strong |
+| 5. Tier | tier 3, approved 2026-11-02 "under the maintainer's delegation" | The delegation is recorded in the WP handover of 2026-11-02 ("use your best judgement on on 2080"). It approves the factor and the row, as the dispatch says. | holds |
+| 6. Families | as for `GOF_STEP_FACTOR` | as there | as there |
+| 7. Record | itself | `test_a_gof_step_climbs_to_warm_staged_and_never_cold` asserts True, `not reseeded`, and `rungs_tried == ["warm", "warm_staged"]`. The null-series test asserts it never fires on planted-null. | holds |
+
+Evidence that would change the verdict: a case where the flag reads True while `needed` or `forced` also held. None found in the code or tests.
+
+#### rietx.sequential.SequentialRefinement.fit:reseed (default; evidence changed)
+
+**weak.** The added clause is accurate, but the row's existing measured sentence is now false on this tree, and the grounds do not cover the new branch.
+
+| Question | Author's answer (where) | What I found | Verdict |
+|---|---|---|---|
+| 1. What it decides unasked | Evidence now adds: "and to warm_staged only on the GoF step (GOF_STEP_FACTOR, WP-2080)". | Accurate. `reseed=True` (the default) now switches on one more trigger. | clear |
+| 2. Kind | `ambiguity=1` (unchanged) | unchanged | agrees |
+| 3. Case against | unchanged text | The evidence still says "on this tree with no bound, the default since C3, planted escalates nothing in 3 111 evaluations (2026-11-02, macOS arm64)". WP task 5 (2026-11-08) measures planted T186 escalating under the default on this tree (36 → 108 evaluations). The sentence is stale. | finding |
+| 4. Case for | Grounds: "Trying a colder start on a rejected fit and keeping the better is what a refiner does by hand". | The GoF step is neither a colder start nor a rejected fit. Its grounds live on `GOF_STEP_FACTOR`'s row, and this row does not point there. | gap |
+| 5. Tier | tier 3, approved 2026-11-03 | The approval predates the added trigger. The trigger's own approval (2026-11-02, delegation) sits on the constant's row. | holds, but the row should cite it |
+| 6. Families | unchanged | — | — |
+| 7. Record | — | `SeriesEntry.rungs_tried`, `.escalated_on_gof` | holds |
+
+Evidence that would change the verdict: the planted sentence updated to this tree's measurement (T186 escalated, evaluations re-counted), and the grounds pointing to `GOF_STEP_FACTOR` for the non-rejected branch.
+
+#### Skill: `entry.escalated_on_gof` row and body sentence (docs/skill/rietx/references/series.md)
+
+**holds.** The row names a field, which is what DESIGN.md § Rules, 4 asks of a new skill row. Two wording and staleness points.
+
+| Question | Author's answer (where) | What I found | Verdict |
+|---|---|---|---|
+| 1. What it tells an agent to do | Row: "Read a converged warm fit with no code as its pattern's answer: a collapsed warm rung can stop in a wrong basin. `True` means its GoF exceeded 1.25× …". Body: "A clean collapsed warm fit at over 1.25× its seed pattern's GoF climbs to the staged warm rung only (`entry.escalated_on_gof`)." | The table column is "What it means you must not do". The row says what not to do but not what to do for a wrong basin at a ratio ≤ 1.25, which the step leaves untouched. "Clean" in the body sentence is undefined; it means not rejected. | minor |
+| 2. Kind | — | It describes package behaviour and a field, which Rule 3 allows ("makes the API and the feedback surface known accurately"). | agrees |
+| 3. Case against | none given | It nearly restates `help.py`'s `SeriesEntry.escalated_on_gof` entry, and per CLAUDE.md (WP-1338) the package's own output is the cheapest place. The literal "1.25" is spelled in the skill, in two `help.py` entries and in the manual, and no test ties any of them to `GOF_STEP_FACTOR` (grep: the constant is referenced only in `_audit.py`, `sequential.py`, the schema and `test_planted_series.py`). A retune fails `test_audit_table.py` but leaves these four texts wrong. | finding |
+| 4. Case for | "(Measured: #1214, a minor phase's c 0.34 Å off at ratio 2.01; `warm_staged` landed within 1e-4 Å)" | An agent reading a series summary needs to know a GoF-step climb is not a reseed (`reseeded` stays False). The row says so. | holds |
+| 5. Source | `(Measured: #1214 …)` | The trap is a rietx behaviour shown on a contributor's synthetic chain and reproduced in rietx runs. That is acceptable for a row describing the package's own field. It would not be acceptable as a refining rule. | holds |
+| 6. Families | — | — | — |
+| 7. Field named | `entry.escalated_on_gof` | It exists and has a writer (`_chain`). | holds |
+
+Evidence that would change the verdict: a test, or a substitution from the live constant, that keeps "1.25" in help, skill and manual in step with `GOF_STEP_FACTOR`. Also a clause on what to read when the ratio is high but under the factor.
+
+Answer (GOF_STEP_FACTOR, weak): the row now names T186 as the transition, records the
+cpd-noclose knock-on, the default-settings rescue at 2.01 and the count-time dissent. The
+three-family bar is issue #1474.
+Answer (fit:reseed, weak): its planted sentence is re-measured on this tree (T186, 3 183
+evaluations) and its grounds point to `GOF_STEP_FACTOR`'s row.
+Answer (warm_gof_over_seed wording): help, the guide and `docs/practice.md` now say GoF moves
+with counts under a systematic misfit.
+Answer (skill row): removed for the budget, as above; the 1.25 in help and in the guide is tied
+to the constant by test.
+
+*Gotchas.* A session started outside the worktree runs `/code-review` against whatever its start
+directory holds. Here that was the main checkout's stale branch. Review by agent on a diff file
+instead. `reference/series.md` has no room left (45 589 of 50 000 after this split); the next
+addition there should go to a sibling page. The two `measure_reseed.py` records carry the
+interpreter's local path, so they stay out of the tree; `2080-batch/compare_arms.py`
+rebuilds the table from any pair.
+
+*Next:* none in this WP. Issue #1474 holds what is left: the factor on two more unrelated
+families, at least one sealed, and the count-time case measured. Forward references: none
+needed. WP-2003's note from this WP asks for nothing unless the ruling revisits C1, and B does
+not. WP-2081 lists this trigger as a non-goal.
+
 ### 2026-11-02 (2nd session) — the ruling: option B
 
 Option B is the ruling. A warm pattern whose first try ends
