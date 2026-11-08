@@ -136,9 +136,39 @@ this session).
       `tests/test_planted_series.py`, the 24-pattern null takes no step. With
       the factor set to 1e9 the climb row and the #1214 row fail (the positive
       arm).
-- [ ] Re-measure on the tree with the ruling in: the issue's 20 seeds and the
+- [x] Re-measure on the tree with the ruling in: the issue's 20 seeds and the
       nine families' `off` arm via `2003-batch/measure_reseed.py`, the table judged
-      per pattern (WP-1124).
+      per pattern (WP-1124). *Measured 2026-11-08* on `3f9215121`, macOS arm64,
+      `[dev]`, compiled tier on, `OPENBLAS_NUM_THREADS=1` (pearl did not answer,
+      so the Mac, two processes):
+      - **Issue #1214, seeds 2-21** (`2080-batch/measure_tree.py`, output
+        `seeds20.jsonl`): the step fires on seeds 2 and 18 (ratio 2.012, 2.009),
+        both kept `warm_staged` at GoF 1.049 and 1.026 with hex `c` −6.3e-5 and
+        −1.0e-4 Å from the truth (esd 1.1e-4); the 18 others keep `warm` at
+        0.994-1.034; 883 evaluations over the 20 chains. Identical to the
+        patched `gof_seed` arm in Context.
+      - **The nine families**, `off` against `status_nobound` (the package
+        default), both run here (`2080-batch/compare_arms.py`; the records stay
+        out of the tree, since they carry local interpreter paths). The ratio is
+        over 1.25 on 3 of 537 warm fits, the three the retrospective named:
+
+        | family · pattern | GoF/seed | rungs (default) | evaluations off → default | kept GoF off → default | read |
+        |---|---|---|---|---|---|
+        | cpd-noclose · 1b | 1.279 | warm, warm_staged | 430 → 501 | 1.786 → 1.524 | rescued: Rwp 0.16333 → 0.13928, the independent fit's 0.13932; worst Δ/esd against it 10 (scale) → 4.4 |
+        | planted · T186 | 1.861 | warm, warm_staged | 36 → 108 | 5.486 → 5.486 | nothing to rescue (an unmodelled phase); values move 3e-6 esd |
+        | tut05-broken · scan12 | 26.0 | warm, warm_staged, cold | 5 → 19 | 26.33 → 26.33 | `_rejected` climbs it anyway; values identical |
+
+        cpd, cpd-ftolnone, planted-null, trigger, cr2wo6 and tut05-jump: no
+        ladder or value differs, evaluations equal. **One knock-on, judged per
+        pattern:** on cpd-noclose the rescued 1b seeds 1c, whose collapsed warm
+        rung from there reached GoF 158 and climbed on rejection (not on the
+        step) to `warm_staged` at GoF 1.589 (reference 1.586; 52 → 381
+        evaluations). 1d-1h then keep `warm` at a GoF 0.025-0.042 lower than
+        `off`, nearer the reference's on every pattern (e.g. 1d 1.307, off
+        1.341, reference 1.320), and their worst `instrument.profile.v` distance
+        to the reference falls from 2.4-5.2 to 0.7-2.1 esd; but one
+        `lor_strain` per pattern now sits 4.8-6.1 esd off the reference, which,
+        like `off`, has it on its floor. Family total 728 → 1144 evaluations.
 
 ## Acceptance
 
