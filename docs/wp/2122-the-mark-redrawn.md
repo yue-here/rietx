@@ -1,9 +1,8 @@
 # WP-2122 — The mark's bar redrawn, and the header lockup set on the type
 
-Milestone: unscheduled · Status: 🔄 2026-11-08 — claimed by @yue-here
+Milestone: unscheduled · Status: ✅ 2026-11-08 — square-ended stem-thick bar; both headers set the lockup on the baseline and x-height to 0.01 px; the favicon parses as XML again
 Track: The repo's own process
 Depends on: —
-Priority: P4 2026-11-08 — brand drawing; changes no number and no decision
 
 ## Goal
 
@@ -73,8 +72,8 @@ automatic action.
 - [x] Re-set both headers' lockup CSS
 - [x] Measure the built pages at 16.8 px in both themes: bar top on baseline, Kα2 tip on
   x-height, error in px; look at the favicon at 16 and 32 px and the header at desktop and 390 px
-- [ ] Tests: `tests/test_manual.py`, `tests/test_landing.py`
-- [ ] Skill: none — the mark is not something an agent driving rietx reads
+- [x] Tests: `tests/test_manual.py`, `tests/test_landing.py`
+- [x] Skill: none — the mark is not something an agent driving rietx reads
 
 ## Acceptance
 
@@ -90,5 +89,49 @@ Instrument Sans (OFL), `docs/docs/_static/fonts/`.
 
 ## Handover log
 
+- **2026-11-08** — closed. The site's mark now has a square-ended bar as thick as the
+  wordmark's stem. In both headers the mark is set on the text: the bar's top edge is the
+  baseline, the smaller peak reaches the x-height, and one x-height of ink separates bar and
+  word. Measured in Chromium, every one of those errors is 0.01 px or less. In passing, the
+  favicon turned out to have been invalid XML since WP-2021 (22 Oct), because its comment
+  held a double hyphen. No browser drew it on either page for 17 days. It parses now, and
+  the mark test fails on the old file.
+
+  *Done.* Bar redrawn in `favicon.svg` and both inline copies (`rx` dropped, height 3 →
+  3.1). The lockup's lengths are three tokens in `docs/landing/src/tokens.css`
+  (`--mark-unit` = 0.510/12.5 em, `--mark-drop` = 6.5 units, `--mark-gap` = 0.510 em less
+  1.5 units less 0.0667 em). Both headers read them: `align-items: baseline` puts the svg's
+  bottom on the text baseline, and `position: relative; top: var(--mark-drop)` lowers it.
+  In the manual pydata sizes the brand link to the bar's height, so baseline alignment put
+  the lockup at the top of the bar. The link now takes its content's height, and
+  `.bd-header__inner` holds the bar at `--pst-header-height`, since the brand was all that
+  had given it its 56 px. `test_the_site_draws_one_mark` now parses the favicon with
+  `ElementTree` first; it failed on the old file with its own message.
+
+  *Measured.* Served font (Fontsource 5.3.0 woff2, wght 600, fontTools): x-height 0.510,
+  stem 0.1267, `r` left side bearing 0.0667 em, the spec's numbers, so nothing was
+  recomputed. Google Fonts' copy on the landing page reads the same through canvas
+  `measureText`. Chromium (playwright, chromium-1223) at 16.8 px, light and dark, 1280 and
+  390 px wide, both pages: bar top − baseline 0.00 px; Kα2 tip − x-height −0.01 px; ink gap
+  − x-height −0.01 px; bar 2.124 px against a 2.129 px stem; Kα1 tip 0.898 em; box 21.93 px.
+  Lockup ink centred in the bar to +0.46 px (landing) and −0.36 px (manual). No horizontal
+  scroll at 390 px. Favicon drawn at 16 and 32 px, DSF 1 and 2, light and dark.
+  `tests/test_manual.py` + `tests/test_landing.py`: 102 passed. Fast suite (`-m "not slow"`, `[dev]`
+  venv, darwin/arm64, no other suite running): 14338 passed, 416 skipped, 32 xfailed, in
+  about 9 min. No test was added (one existing test gained a check), so passed+skipped
+  should not move. The full suite did not run: the branch is docs, CSS and one test, and
+  moves no measured number.
+
+  *Review.* `/code-review high --fix`: the lockup's lengths were spelled in both
+  stylesheets with nothing holding them equal, so they moved to `tokens.css` (fixed,
+  re-measured unchanged). Skipped: the manual's brand link is now about 31 px tall
+  instead of 56 px. That matches the landing page's 29 px and is above WCAG 2.2's 24 px
+  target minimum. No other SVG is committed, so the XML guard stays on the favicon.
+
+  *Gotchas.* An XML comment may not hold `--`, and a regex-read test cannot see it. The
+  desktop app's browser pane runs no `requestAnimationFrame` while hidden, so a probe
+  awaiting one times out. Only Chromium was measured; Safari and Firefox were not.
+
+  *Next.* None in this WP. The maintainer reviews PR #1465.
 - **2026-11-08** — created. No open WP owns the mark: WP-2021, which made the favicon its
   authority, is ✅, and WP-1986 (🔄) is about the guides.
