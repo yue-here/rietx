@@ -39,8 +39,11 @@ p{margin:0}
    has none left here, so without it the brand and the first link butt together and read
    as one word ("rietxManual", measured at 390 px and below). A gap is a minimum. */
 .top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;height:56px}
-.brand{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:1.05rem;color:var(--ink);border:0}
-.brand svg{width:22px;height:22px;fill:var(--accent)}
+/* The lockup's lengths are `tokens.css`'s `--mark-*` (WP-2122). A box with no baseline of
+   its own gets one at its bottom edge, so baseline alignment sets the svg on the text's
+   baseline and `--mark-drop` lowers it from there. */
+.brand{display:inline-flex;align-items:baseline;gap:var(--mark-gap);font-weight:600;font-size:1.05rem;color:var(--ink);border:0}
+.brand svg{width:calc(32 * var(--mark-unit));height:calc(32 * var(--mark-unit));position:relative;top:var(--mark-drop);flex:none;fill:var(--accent)}
 .top nav{display:flex;align-items:center;gap:22px;font-size:.95rem}
 .top nav a{color:var(--ink-2);border:0}
 .top nav a:hover{color:var(--accent-ink)}
@@ -268,7 +271,7 @@ footer .note{flex-basis:100%;margin-top:8px;font-size:.82rem;color:var(--faint)}
 
 <header class="top"><div class="wrap">
   <a class="brand" href="https://rietx.org/" aria-label="rietx home">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M2 26 C7 26 9 23 11.5 3.5 C14 23 16 26 21 26 Z"/><path d="M17 26 C20 26 21.5 24 23 13 C24.5 24 26 26 29 26 Z"/><rect x="1.5" y="25.5" width="29" height="3" rx="1.5"/></svg>
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M2 26 C7 26 9 23 11.5 3.5 C14 23 16 26 21 26 Z"/><path d="M17 26 C20 26 21.5 24 23 13 C24.5 24 26 26 29 26 Z"/><rect x="1.5" y="25.5" width="29" height="3.1"/></svg>
     rietx
   </a>
   <nav>

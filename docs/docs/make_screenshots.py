@@ -121,8 +121,9 @@ SHOTS: tuple[Shot, ...] = (
     ),
     Shot(
         "first-fit",
-        "The whole window after one run: the header carrying Rwp, the pattern "
-        "on the left, the panel column on the right.",
+        "The whole window after one run: the pattern on the left under its "
+        "title line carrying Rwp, the panel column on the right above its "
+        "action bar.",
         selector="body",
     ),
     Shot(
@@ -229,8 +230,12 @@ def _set_theme(page, theme: str) -> None:
 
 
 def _run_once(page) -> None:
-    """Run the plan and wait for the run state to come back to idle."""
-    page.get_by_role("button", name="Run", exact=True).click()
+    """Run the plan and wait for the run state to come back to idle.
+
+    The action bar's primary, with its default choice, the staged plan
+    (WP-2123 retired the header's Run).
+    """
+    page.click(".actions button.refine")
     pill = 'header .pill[data-state="idle"]'
     page.wait_for_selector('header .pill[data-state="running"]', timeout=30_000)
     page.wait_for_selector(pill, timeout=600_000)
