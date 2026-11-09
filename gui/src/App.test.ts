@@ -803,14 +803,29 @@ function refineButton(): HTMLButtonElement | null {
 }
 
 function rowsInDom(): HTMLElement[] {
-  return [...host.querySelectorAll<HTMLElement>(".row")];
+  return [...host.querySelectorAll<HTMLElement>(".params .row")];
 }
 
-/** The editable cell of the row whose leaf is `leaf` — by name, because the
- *  positions shift: a tied row renders a span rather than an input. */
-function cell(leaf: string): HTMLInputElement {
-  const row = rowsInDom().find((r) => r.querySelector(".path")?.textContent?.trim() === leaf);
-  return row!.querySelector<HTMLInputElement>("input.value")!;
+/** The Parameters panel's row whose label reads `label` (WP-2126). */
+function rowLabelled(label: string): HTMLElement {
+  return rowsInDom().find((r) => r.querySelector(".label")?.textContent?.trim() === label)!;
+}
+
+/** The number a parameter is drawn as: a button that opens the editor. */
+function numberAt(path: string): HTMLElement {
+  return host.querySelector<HTMLElement>(`.params .ink[data-path="${path}"]`)!;
+}
+
+/** Type a value the way a person does in the Parameters panel: press the
+ *  number, type into the editor that floats over it, press Enter. */
+async function editValue(path: string, text: string) {
+  numberAt(path).click();
+  await flush();
+  const editor = document.querySelector<HTMLInputElement>("input.editor")!;
+  editor.value = text;
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+  editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await flush();
 }
 
 async function type(selector: string, value: string) {
@@ -985,45 +1000,60 @@ describe("the shell", () => {
 });
 
 // ----------------------------------------------------------------------
-// the parameter table (WP-1011)
+// the parameter table (WP-1011; the Parameters panel since WP-2126)
 // ----------------------------------------------------------------------
 const ADVANCED = { ...PROJECT, doc: { ...PROJECT.doc, ui: { simple: false } } };
 
 describe("the parameter table", () => {
-  it("groups rows and gives a held row no checkbox at all", async () => {
+  it("groups the rows under the phase and the instrument, and folds what the setting holds", async () => {
     vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // one heading per dot-path prefix, in the server's order
-    const groups = [...host.querySelectorAll(".group")].map((g) => g.textContent?.trim());
-    expect(groups?.[0]).toContain("phases.0.cell");
-    expect(groups.some((g) => g?.includes("instrument.profile"))).toBe(true);
+    // grouping B (WP-2126): one band per phase and one for the instrument,
+    // the phase's space group typeset beside its name
+    const bands = [...host.querySelectorAll(".params .band .title")].map((b) => b.textContent);
+    expect(bands).toEqual(["LaB6", "Instrument"]);
+    expect(host.querySelector(".params .band .sg")?.getAttribute("aria-label")).toBe("P m -3 m");
+    const groups = [...host.querySelectorAll(".params .head .ht")]
+      .map((g) => g.textContent?.replace("›", "").trim());
+    expect(groups).toContain("Cell");
+    expect(groups).toContain("Peak shape");
 
-    expect(rowsInDom().length).toBe(PARAMS.parameters.length);
-    // three of the six rows cannot be freed, and a checkbox that errors on click
-    // is worse than no checkbox — so there are exactly three
-    const boxes = host.querySelectorAll('.row input[type="checkbox"]');
-    expect(boxes.length).toBe(3);
-    // …and each held row says which of the three reasons holds it
+    // the Cell group shows `a` and folds b and α into the crystallographer's line
+    expect(rowsInDom().map((r) => r.querySelector(".label")?.textContent?.trim()))
+      .toEqual(["Scale", "a", "w"]);
+    const fold = host.querySelector<HTMLElement>(".params .fold")!;
+    expect(fold.textContent).toContain("a = b = c, α = β = γ = 90°");
+    fold.click();
+    await flush();
+    expect(rowsInDom().length).toBe(5);
+
+    // a checkbox only beside a parameter it controls: the two folded rows are
+    // held, so they carry the reason's mark and no box
     const held = rowsInDom().filter((row) => row.classList.contains("held"));
-    expect(held.map((row) => row.dataset.held).sort()).toEqual(["locked", "mode", "tied"]);
-    // …and the reason is reachable rather than hovered: WP-1203 moved it off
-    // `title=` onto the glyph itself, which a keyboard can get to
-    const glyph = host.querySelector<HTMLElement>('[data-held="tied"] .vary .help')!;
+    expect(held.map((r) => r.querySelector(".label")?.textContent?.trim())).toEqual(["b", "α"]);
+    expect(held.every((r) => !r.querySelector("input"))).toBe(true);
+    const glyph = held[0].querySelector<HTMLElement>(".mark .help")!;
     expect(glyph.getAttribute("tabindex")).toBe("0");
     glyph.click();
     await flush();
     expect(host.querySelector(".popover")?.textContent).toContain("tied: =");
   });
 
-  it("hides held rows in Simple mode and says how many", async () => {
-    vi.stubGlobal("fetch", server(boot()).fetcher);   // ui.simple defaults true
+  it("puts each atom on one row of its own table", async () => {
+    vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    expect(rowsInDom().length).toBe(3);
-    expect(host.textContent).toContain("3 held hidden");   // a count, not a silent cut
+    const row = host.querySelector<HTMLElement>(".params table.atomtab tbody tr")!;
+    expect(row.dataset.atom).toBe("phases.0.atoms.0");
+    expect(row.querySelector(".aname")?.textContent).toBe("La");
+    // the Biso is mode-fixed: its value is drawn, and its box is the mark
+    // saying why it is held, never a checkbox that would error on click
+    expect(numberAt("phases.0.atoms.0.biso").textContent?.trim()).toBe("0.5");
+    expect(row.querySelector("input[type=checkbox]")).toBeNull();
+    expect(row.querySelector(".mark .help")).toBeTruthy();
   });
 
   it("shows a value to the precision its esd justifies", async () => {
@@ -1031,9 +1061,7 @@ describe("the parameter table", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const value = host.querySelector<HTMLInputElement>(".row input.value");
-    expect(value?.value).toBe("4.1568");                   // 4.1568(2), not 4.15678
-    expect(host.textContent).toContain("(2)");
+    expect(numberAt("phases.0.cell.a").textContent?.replace(/\s+/g, "")).toBe("4.1568(2)");
   });
 
   it("sends the glob for a bulk free — one round trip, one history node", async () => {
@@ -1064,7 +1092,9 @@ describe("the parameter table", () => {
     await flush();
 
     await type("#param-filter", "cell");
-    expect(rowsInDom().length).toBe(3);                    // a, b, alpha
+    // a, b and alpha match: the Cell group alone is left, under its phase
+    expect([...host.querySelectorAll(".params .band")].length).toBe(1);
+    expect([...host.querySelectorAll(".params .head")].length).toBe(1);
     button("Free 0")?.click();                             // disabled: none freeable
     await flush();
     expect(stub.calls.some((call) => call.method === "PATCH")).toBe(false);
@@ -1076,13 +1106,11 @@ describe("the parameter table", () => {
     app = mount(App, { target: host });
     await flush();
 
-    for (const [leaf, text] of [["a", "4.157"], ["scale", "1.05"]] as const) {
-      const input = cell(leaf);
-      input.value = text;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-    await flush();
+    await editValue("phases.0.cell.a", "4.157");
+    await editValue("phases.0.scale", "1.05");
     expect(host.textContent).toContain("2 pending edits");
+    // an edited number is marked where it is drawn
+    expect(numberAt("phases.0.cell.a").classList.contains("edited")).toBe(true);
 
     button("Apply")!.click();
     await flush();
@@ -1091,6 +1119,90 @@ describe("the parameter table", () => {
       values: { "phases.0.cell.a": 4.157, "phases.0.scale": 1.05 },
       vary: {},
     });
+  });
+
+  it("treats a value typed back as it was drawn as no edit", async () => {
+    vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    // WP-1009's rule: the drawn value is compared, so a click in and out of a
+    // cell cannot truncate a parameter
+    await editValue("phases.0.cell.a", "4.1568");
+    expect(host.textContent).not.toContain("pending edit");
+  });
+
+  it("edits every picked value at once, and ranges a shift-press within a column", async () => {
+    const stub = server(boot(ADVANCED));
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    // a modifier press picks rather than opens: scale, then a shift-press on
+    // `a` takes the plain rows between them
+    const down = (path: string, init: MouseEventInit) => {
+      numberAt(path).dispatchEvent(new MouseEvent("mousedown", { bubbles: true, ...init }));
+      numberAt(path).click();
+    };
+    down("phases.0.scale", { metaKey: true });
+    down("phases.0.cell.a", { shiftKey: true });
+    await flush();
+    expect(numberAt("phases.0.scale").classList.contains("picked")).toBe(true);
+    expect(numberAt("phases.0.cell.a").classList.contains("picked")).toBe(true);
+
+    // a press on a picked value edits all of them
+    await editValue("phases.0.cell.a", "2");
+    expect(host.textContent).toContain("2 pending edits");
+  });
+
+  it("holds and releases a value through the padlock in its box's place", async () => {
+    const heldParams = { ...PARAMS, parameters: PARAMS.parameters.map((p) =>
+      p.path === "phases.0.scale"
+        ? { ...p, vary: false, held: true, refinable: false, held_because: "held by hold()" }
+        : p) };
+    const stub = server({ ...boot(ADVANCED), "/api/params": () => ({ body: heldParams }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const lock = rowLabelled("Scale").querySelector<HTMLButtonElement>("button.lock")!;
+    expect(lock.getAttribute("aria-pressed")).toBe("true");
+    lock.click();
+    await flush();
+    expect(host.textContent).toContain("1 pending edit");
+    button("Apply")!.click();
+    await flush();
+    const patch = stub.calls.find((call) => call.method === "PATCH");
+    expect(patch?.body).toEqual({ values: {}, vary: {}, hold: { "phases.0.scale": false } });
+  });
+
+  it("sets limits and a restraint from the popover, in one PATCH", async () => {
+    const stub = server(boot(ADVANCED));
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    numberAt("phases.0.scale").click();
+    await flush();
+    const pop = document.getElementById("value-popover")!;
+    const lower = pop.querySelector<HTMLInputElement>('[aria-label="lower limit"]')!;
+    lower.value = "0.5";
+    lower.dispatchEvent(new Event("change", { bubbles: true }));
+    // the word is the box's label, so pressing the word ticks it
+    const restrain = [...pop.querySelectorAll("label")].find((l) => l.textContent?.includes("Restrain"))!;
+    restrain.click();
+    await flush();
+    expect(pop.querySelector<HTMLInputElement>('[aria-label="restraint target"]')?.value).toBe("1.02");
+    document.querySelector<HTMLInputElement>("input.editor")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flush();
+
+    button("Apply")!.click();
+    await flush();
+    const patch = stub.calls.find((call) => call.method === "PATCH")!;
+    expect(patch.body.limits).toEqual({ "phases.0.scale": [0.5, null] });
+    expect(Object.keys(patch.body.restraints)).toEqual(["phases.0.scale"]);
+    expect(patch.body.restraints["phases.0.scale"].target).toBe(1.02);
   });
 
   it("applies the pending edits before it refines, in either refine choice", async () => {
@@ -1104,10 +1216,7 @@ describe("the parameter table", () => {
     expect(refineButton()?.textContent).toContain("Refine");
     expect(host.querySelector('[aria-label="refine"] button.on')?.textContent?.trim())
       .toBe("Staged plan");
-    const input = cell("a");
-    input.value = "4.157";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await flush();
+    await editValue("phases.0.cell.a", "4.157");
     expect(refineButton()?.textContent).toContain("Apply and refine");
 
     refineButton()!.click();
@@ -1133,11 +1242,8 @@ describe("the parameter table", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const w = [...host.querySelectorAll<HTMLInputElement>(".row input.value")].at(-1)!;
-    w.value = "2";                                          // instrument.profile.w is [0, 1]
-    w.dispatchEvent(new Event("input", { bubbles: true }));
-    await flush();
-
+    await editValue("instrument.profile.w", "2");          // instrument.profile.w is [0, 1]
+    const w = numberAt("instrument.profile.w");
     expect(w.classList.contains("bad")).toBe(true);
     expect(w.title).toContain("upper bound");
     // Apply is blocked, not silently partial — and Revert is still offered,
@@ -1169,10 +1275,7 @@ describe("the parameter table", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const input = host.querySelector<HTMLInputElement>(".row input.value")!;
-    input.value = "4.2";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await flush();
+    await editValue("phases.0.cell.a", "4.2");
     button("Apply")!.click();
     await flush();
 
@@ -1659,7 +1762,6 @@ describe("disclosure and the command palette", () => {
     const post = stub.calls.find((call) => call.method === "POST" && call.path === "/api/project");
     // settings persist on the verb, not on a later save (WP-1005/1008)
     expect(post?.body).toEqual({ ui: { simple: false } });
-    expect(rowsInDom().length).toBe(PARAMS.parameters.length);  // held rows are back
   });
 
   it("opens on Cmd-K and shows the API call behind every command", async () => {
@@ -2098,10 +2200,7 @@ describe("disclosure and the command palette", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const input = cell("a");
-    input.value = "4.157";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await flush();
+    await editValue("phases.0.cell.a", "4.157");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
     await flush();
     const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
@@ -2112,10 +2211,7 @@ describe("disclosure and the command palette", () => {
     expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
 
     // an invalid edit blocks `r` as it disables the button
-    const bad = cell("a");
-    bad.value = "abc";
-    bad.dispatchEvent(new Event("input", { bubbles: true }));
-    await flush();
+    await editValue("phases.0.cell.a", "abc");
     const runs = stub.calls.filter((c) => c.path === "/api/run").length;
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
     await flush();
@@ -5497,11 +5593,9 @@ describe("the search controls (WP-1045)", () => {
 });
 
 describe("the help popover", () => {
-  /** The `.help` term inside the row whose leaf is `leaf`. */
-  function term(leaf: string): HTMLElement {
-    const row = rowsInDom().find(
-      (r) => r.querySelector(".path")?.textContent?.trim() === leaf);
-    return row!.querySelector<HTMLElement>(".path .help")!;
+  /** The `.help` term naming the row labelled `label`. */
+  function term(label: string): HTMLElement {
+    return rowLabelled(label).querySelector<HTMLElement>(".label .help")!;
   }
 
   const popover = () => host.querySelector<HTMLElement>(".popover");
@@ -5543,7 +5637,7 @@ describe("the help popover", () => {
     await openTable();
     // `phases.*.scale` is a live family the fixture corpus does not carry —
     // exactly the shape of a key the corpus has not caught up with
-    term("scale").click();
+    term("Scale").click();
     await flush();
     expect(popover()!.textContent).toContain("Not described yet");
   });
@@ -5552,7 +5646,7 @@ describe("the help popover", () => {
     await openTable();
     term("a").click();
     await flush();
-    term("scale").click();
+    term("Scale").click();
     await flush();
     expect(host.querySelectorAll(".popover").length).toBe(1);
     expect(popover()!.textContent).toContain("Not described yet");
@@ -5595,7 +5689,7 @@ describe("the help popover", () => {
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
-    const trigger = host.querySelector<HTMLElement>(".path .help")!;
+    const trigger = host.querySelector<HTMLElement>(".params .label .help")!;
     trigger.click();
     await flush();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -5661,9 +5755,10 @@ describe("the help popover", () => {
 
   it("carries a held row's reason, which is the verb's own words", async () => {
     await openTable();
-    const row = rowsInDom().find(
-      (r) => r.querySelector(".path")?.textContent?.trim() === "alpha")!;
-    row.querySelector<HTMLElement>(".vary .help")!.click();
+    // α is held by the setting, so it sits behind the Cell group's fold line
+    host.querySelector<HTMLElement>(".params .fold")!.click();
+    await flush();
+    rowLabelled("α").querySelector<HTMLElement>(".mark .help")!.click();
     await flush();
     // no corpus can hold this: it is about one row, not about one name
     expect(popover()!.textContent).toContain("structurally fixed by symmetry");
