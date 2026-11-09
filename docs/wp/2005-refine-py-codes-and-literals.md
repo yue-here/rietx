@@ -27,6 +27,14 @@ second review: `< 0.7` in the flat-plate thickness test (`ABSORPTION_PLATE_THICK
 verdict into a named constant with its value in the table, or records why it is tier 1 (a
 count, a dimension, a physical limit).
 
+*Superseded in part, 2026-11-09 (part 1, at `5ae35232c`):* `refine.py` is 12 241 lines and
+raises 69 codes, so with the five below the WP covers 74. Of 34 numeric literals in the
+raising functions and the same-file functions they call, 5 are thresholds, 4 of them in
+`refine.py`: the two above (now ~lines 8889 and 10696), the two-FWHM edge of the low-angle
+region (~10672) and the half of sin θ_min that sets `ROUGHNESS_OUTSIDE_REGIME`'s info band
+(~11905). The other 29 are units, arithmetic, counts, listing caps and numerical floors.
+`2005-batch/README.md` has the counts and what the walk cannot see.
+
 **Five codes no seam names come here too**, since each is raised beside a fit rather than
 in a reader or a report: `BACKGROUND_ORDER_AT_CAP` (`background/select.py`),
 `BRINDLEY_OUTSIDE_REGIME` and `MICROABSORPTION_SKIPPED` (`optimize/qpa.py`),
@@ -110,11 +118,13 @@ its tier.
 
 ## Tasks
 
-- [ ] Inventory: the 61 codes with raise site, `level`, the threshold or condition, the
+- [x] Inventory: the 61 codes with raise site, `level`, the threshold or condition, the
       explanation's claim, the kind of ambiguity its verdict has (DESIGN.md § Rules, 1),
-      and how many tests touch it.
+      and how many tests touch it. 74 codes on 2026-11-09: `2005-batch/inventory.json`.
 - [ ] The inline literals: each lifted to a named constant (table row with value) or
-      recorded tier 1 with the reason.
+      recorded tier 1 with the reason. The 29 tier-1 literals are recorded with their
+      reasons in `2005-batch/judgements.json`; the 4 thresholds in `refine.py` wait for
+      their tiers, since a new constant enters the table tiered.
 - [ ] Tier each code per part, with evidence and families.
 - [ ] The batch to the maintainer; rulings dated into the table.
 - [ ] Approved demotions: `level` to `info`, or, where the threshold was the trigger, the
