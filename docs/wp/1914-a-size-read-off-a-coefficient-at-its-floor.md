@@ -1,9 +1,8 @@
 # WP-1914 — a size read off a coefficient at its floor
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: ✅ 2026-11-09 — a width on its floor reads at_zero under either driver
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-10-07 — a derived number that reads as a finding on every lab_sample_refine fit of a purely Lorentzian specimen; the reading's own esd flags it, the agreement ratio beside it does not
 
 ## Goal
 
@@ -119,6 +118,39 @@ zero as no broadening.
 ```
 
 ## Handover log
+
+- **2026-11-09** — closed by a ghostshift runner (PR #1506). A width the fit
+  drives to zero now reads as "no broadening" in `result.microstructure`
+  under either solver. The default solver already landed such a width exactly
+  on zero, so notebook 04 and every default fit read the same as before. The
+  alternative solver (`solver="trf"`) stopped a hair above zero, and the table
+  turned that into a domain size of 4×10¹³ Å and a size ratio of 10¹¹. The
+  fix reads the package's one bound test, so the table, the `FLOOR_HIT`
+  warning and the parameter rows' `at_bound` flag can no longer disagree.
+  - *Done.* `microstructure_table(floors=)` reads a path in the `FLOOR_HIT`
+    set as `at_zero` whatever it stores. `refine._build_result` passes the
+    answer stage's findings; `multi._hist0_floors` translates the joint
+    spelling for histogram 0. `at_zero` is reused, so no vocabulary member is
+    new. The schema docstring and the manual's absences table
+    (`reference/derived.md`) name the floor case.
+  - *Measured* (macOS arm64, `[dev]`, notebook 04's CeO₂, before → after):
+    TRF `gauss_size` 3.4×10⁻²⁴ deg² read 4.3×10¹³ Å ± 4.6×10³³ →
+    `at_zero`; `size_agreement` 1.4×10¹¹ → `None`; `strain_agreement`
+    5.4×10⁻⁵ → `None`. LM rows and the uncalibrated fit (no floor) are
+    unchanged to every printed digit. `tests.reader_output` exit 0
+    (unchanged). Three tests added in `tests/test_microstructure.py`: the
+    floor set from both sides, the joint spelling, and an end-to-end LaB6 fit
+    under both drivers that also requires TRF to stop above zero on a floored
+    row, so it fails if it loses its case.
+  - *Settled by Claude* under the maintainer's 2026-10-09 ruling ("read the
+    flag"): the floor is `FLOOR_HIT`, not an esd-over-value significance test.
+    The alternative would also blank the uncalibrated fit's `gauss_size`
+    (6020 Å ± 12 350, off its floor), which notebook 04 teaches from, and
+    WP-1944 keeps a general esd-over-value rule out of scope.
+  - *Left.* `report/magnetic._width_support_findings`'s 1e-12 proximity floor
+    (Mike's path, #1075); a coefficient tied to a floored source (no plan ties
+    sample widths). Both are in the task notes above.
+  - *Next:* none in this WP.
 
 - **2026-10-07** — filed from WP-1545. No open WP owns the microstructure
   report: 1131 and 1336, which built it, are closed, and 1467 is about the
