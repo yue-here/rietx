@@ -1,6 +1,6 @@
 # WP-2005 — `refine.py`'s codes and its inline literals
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
 Track: The audits
 Depends on: 2002
 Priority: P3 2026-10-23 — 2002 closed, its last item touching no code here; codes, not actions; a verdict here is a flag the caller reads, and the workaround is to read past it
