@@ -1,6 +1,6 @@
 # WP-2130 — the Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — filed and started by a ghostshift runner
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the coverage line and Adopt on every row are in; the peak-mark colour waits on the maintainer
 Depends on: 2123, 2124 (the shell it draws in, and the adopt arm's `picked` and `why`)
 Priority: P2 2026-11-09 — three of the gui-overhaul record's "owed to the port" defects, all in the existing Peaks panel
 
@@ -125,7 +125,8 @@ Not here, left for the piece that redraws the Peaks panel or a WP of its own:
   complete, and every run-level diagnostic with its `where`, so `INDEX_BUDGET_EXHAUSTED`'s
   "not reached: …" reaches the screen. Vitest: a result with candidates still shows them.
 - [x] 2. Adopt on every row, reading `picked` and `why`. The `best_or_none()` badge follows
-  `picked`; a row it does not pick shows the server's `why` beside Adopt; the extinction
+  `picked`; a row it does not pick shows the server's `why` under its grade, in the same row
+  as Adopt (beside the button it widened the table past the side panel); the extinction
   table's space-group buttons are enabled for any screened candidate. `index_result` drops
   `allowed`. Vitest and `test_gui_peaks.py` updated.
 - [ ] 3. The peak-mark colour: measured above; goes to the maintainer. If ruled, change it in
@@ -135,9 +136,61 @@ Not here, left for the piece that redraws the Peaks panel or a WP of its own:
   test whose landmarks it reuses: a served indexing answer, real clicks on the Peaks tab, a
   row's disclosure and Adopt, with the coverage line and the history node asserted, and no
   shell landmark moved.
-- [ ] Tests: `npm --prefix gui test`, `npm --prefix gui run check`, the dist rebuilt,
-  `tests/test_gui_manual.py` (screenshots where changed), `tests/test_gui_palette.py`.
+- [x] Tests: `npm --prefix gui test`, `npm --prefix gui run check`, the dist rebuilt,
+  `tests/test_gui_manual.py` (no manual screenshot shows the Peaks panel, so none changed),
+  `tests/test_gui_palette.py`.
 - [x] Manual: the GUI guide's indexing section says any row can be adopted.
+
+## Decision for the maintainer: the peak-mark colour
+
+**The decision.** Which colour the picked-peak marks take on the Peaks tab. It comes to the
+maintainer because a measurement contradicts his ruling of 2026-11-08, and it is a visual
+question.
+
+**Why it matters.** The marks are the dots the picker puts on each line it found; on the
+Peaks tab a person clicks, drags and removes them. Today they are purple, and the fitted
+peak profiles and their residual are a lighter magenta of the same hue, so in the dense
+high-angle region the marks merge into the fit lines (seen on FAP's 183 picked lines). The
+ruled blue separates them from the fit. But in rietx's palette blue is already taken: the
+difference curve and the chrome accent (buttons, links) are blue. A plot mark that shares a
+hue with another plot colour is the defect WP-1210 was written to remove, and
+`tests/test_gui_palette.py` fails on it (table in § Context). Importance: minor. It changes
+how one layer on one tab reads, and every option is a two-line change to undo.
+
+**Aim.** The marks read at a glance in a peak forest, for a person editing a peak list, without
+being mistaken for another layer.
+
+**Options.**
+
+- **A. The ruled values**, `#0072B2` light and `#56B4E9` dark, with the palette test naming the
+  three collisions as exceptions. The marks stand out from the grey points and the magenta fit
+  (screenshots below). Light: 0.053 from the difference curve, which on the Peaks tab is in the
+  lower pane and is the peak-fit residual (magenta) until a fit exists. Dark: the same colour as
+  the third phase's reflection ticks, which share the plot after a fit with three phases.
+- **B. The ruled light value, and a dark blue chosen off the phase palette.** Removes the exact
+  dark collision; the dark mark is still near the accent (any blue is). Needs one more colour
+  chosen, which is itself a visual call.
+- **C. Keep purple**, and get the visibility from the mark's shape: the lens, larger and higher
+  above the peak, which round 11c built together with the colour. That is the Peaks redesign's
+  piece, not this WP. The palette test stays as it is.
+- Dropped: moving the difference curve to grey as the workshop draws it. It clears only the light
+  collision, not the accent or the dark phase tick, and recolours a curve on all three browser
+  surfaces.
+
+**Practice** (recall, not checked against the programs' docs): no common convention for picked-
+peak marks; difference curves are grey in TOPAS, cyan in GSAS-II and blue in FullProf's
+WinPLOTR, so rietx's blue difference curve is one of several conventions.
+
+**Recommendation.** Lean B, close call. The crux is whether a blue dot over the data can be
+mistaken for the blue difference curve or a link. They are in different panes and are
+different marks, so the light collision costs little; the dark mark being the exact colour of
+a phase's ticks costs more, because round 11b asks the marks to echo the ticks in shape. If the
+FAP screenshots show the blue marks reading as chrome, C wins.
+
+Screenshots of FAP's picked peaks in both colours and both themes were taken in chromium with
+the colour overridden on the page; the drawn colour was confirmed by sampling the canvas
+(about 7200 pixels of the mark colour in each of the four). They are local to the runner's
+machine and named in the PR's hand-off, not committed.
 
 ## Acceptance
 
@@ -155,6 +208,44 @@ npm --prefix gui ci && npm --prefix gui run build && npm --prefix gui test && np
 - The gui-overhaul milestone record, `docs/milestones/gui-overhaul.md` § Owed to the port.
 
 ## Handover log
+
+### 2026-11-09 — two of three in; the colour waits on the maintainer (PR #PRNUM)
+
+The Peaks panel now says how much of an indexing search ran, whatever the search found, so a
+run stopped at its time limit no longer reads like a finished one. Every candidate cell can be
+adopted from the panel, and a row the gate did not pick says why under its grade, in the
+sentence the adoption records. The peak-mark colour is unchanged. The blue the maintainer
+ruled collides with rietx's blue difference curve and accent, and on the dark theme it is a
+phase's tick colour exactly, so it goes back to him with numbers (§ Decision for the
+maintainer). Next: the maintainer picks A, B or C there; then a short follow-up commit on this
+WP applies it (`theme.py`, `python -m rietx.viz.theme > gui/src/tokens.css`, the palette test,
+a rebuilt dist, and the drawn colour read off the canvas).
+
+- *Done*: items 1, 2 and 4, and the manual. `index_result` drops the arm's `allowed`. The
+  `why` sentence moved from beside the Adopt button to under the row's grade, because beside
+  the button it widened the table past the side panel and chromium cut it after
+  "not best_or_none()'s" (settled by Claude, reversible: under the grade; alternative a
+  sub-row, or beside the button with the table scrolling). The coverage block quotes the
+  library's own words for an incomplete search (settled by Claude, reversible; alternative the
+  workshop's "Not searched: … / Search these", which is the redesign's). The gate's pick keeps
+  its green badge and row tint from WP-1027 (settled by Claude, reversible; alternative drop
+  the tint so no row is coloured). The `/code-review high --fix` pass made four fixes
+  (706c03598): the docs said "beside Adopt" where the code puts it under the grade; the
+  coverage codes are `<Help>` terms; a `where` loop keyed by position, since one diagnostic
+  can repeat a string; the WP's task 4 and acceptance line. Two findings declined: the
+  placement itself (it is the maintainer's call, listed above) and putting the sentence on the
+  extinction table's space-group buttons (new visible prose, a design change; the node still
+  records it).
+- *Measured* (`[dev]` venv plus playwright, darwin/arm64, alone on the serial lock): fast suite 14476 passed, 410 skipped, 32 xfailed in 11:07, on the branch with main merged; this WP adds two python tests (the browser file, 6.6 s together, skipped on CI where no chromium is cached). vitest 24 files, 615
+  passed; svelte-check 393 files, 0 errors; three vitest cases added. The new browser file: 2
+  passed. `tests/test_gui_layout_browser.py` 12 passed serially. `python -m tests.reader_output`
+  exit 0. The colour table in § Context, and screenshots of FAP's 183 picked lines in both
+  colours and themes, kept on the runner's machine.
+- *Gotchas*: `test_a_pending_edit_moves_nothing_in_the_action_bar[stacked]` (WP-2123's) failed
+  once under `-n auto` beside the other browser files and passed alone; it types right after a
+  click. Overriding `--plot-peak` inline on the page repaints nothing until the theme changes,
+  so a colour comparison clicks the theme buttons and then reads the canvas.
+- *Stacking*: on WP-2123's branch (PR #1476, open); this PR merges after it.
 
 - **2026-11-09** — filed by a ghostshift runner from the gui-overhaul record's § Owed to the
   port. No open WP owns these: WP-2124 named them "not here", and the open gui-overhaul runners
