@@ -1336,12 +1336,12 @@
     white-space: nowrap;
   }
 
-  /* the table is measured to fit the panel's default 559 px with six-decimal
-     coordinates (fluorapatite), so the gaps are the tight ones */
+  /* the table is measured to fit the panel at a 1440 px window (546 px) with
+     six-decimal coordinates (fluorapatite), so the gaps are the tight ones */
   .atomtab th,
   .atomtab td {
     height: var(--row-h);
-    padding: 0 3px 0 0;
+    padding: 0 2px 0 0;
     text-align: left;
     font-weight: 400;
   }
@@ -1354,7 +1354,7 @@
     position: sticky;
     left: 0;
     z-index: 1;
-    padding-left: 12px;
+    padding-left: 4px;
     background: var(--panel);
   }
 
@@ -1380,7 +1380,7 @@
 
   .atomtab .ink {
     min-width: 0;
-    padding-inline: 3px;
+    padding-inline: 2px;
   }
 
   .atomtab .slot {
