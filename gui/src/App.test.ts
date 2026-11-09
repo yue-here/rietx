@@ -4574,7 +4574,7 @@ describe("the peaks tab (WP-1027)", () => {
     // gate did not pick says its grade and caveats beside the button
     const adopt = button("Adopt")!;
     expect(adopt.disabled).toBe(false);
-    expect(adopt.closest("td")!.querySelector(".why")!.textContent).toBe(why);
+    expect(adopt.closest("tr")!.querySelector(".why")!.textContent).toBe(why);
     // never a confident singleton: no row wears the gate's badge, and the
     // list says it is ranked
     expect(host.querySelector("tr.best")).toBeNull();

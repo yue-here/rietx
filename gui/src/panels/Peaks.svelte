@@ -801,6 +801,11 @@ and this cell's predicted lines through the data"
                 <td class="cell">{cellText(c.cell)}
                   <span class="chip {confidenceTone(c.confidence)}">{c.confidence}</span>
                   {#if i === best}<span class="chip ok">best_or_none()</span>{/if}
+                  <!-- a row the gate did not pick says why under its grade, in
+                       the sentence its adoption records (WP-2124); here and not
+                       in the Adopt column, which would widen the table past the
+                       side panel and cut the sentence off (WP-2130) -->
+                  {#if verdicts[i]?.why}<span class="muted why">{verdicts[i].why}</span>{/if}
                 </td>
                 <td>{c.centring} {c.system}<br /><span class="muted">{c.volume.toFixed(1)} Å³</span></td>
                 {#if zColumn}
@@ -815,14 +820,11 @@ and this cell's predicted lines through the data"
                 <td class="flags">
                   {#each c.found_by as e (e)}<span class="chip note">{e}</span>{/each}
                 </td>
-                <!-- every row can be adopted (Yue's ruling B, 2026-11-08); a
-                     row the gate did not pick says why beside the button, in
-                     the sentence its history node will record (WP-2124) -->
-                <td class="adopt">
+                <!-- every row can be adopted (Yue's ruling B, 2026-11-08) -->
+                <td>
                   <button class="ghost" disabled={busy}
                     title="adopt this cell as the model (a Le Bail scaffold; one history node)"
                     onclick={() => adopt(i)}>Adopt</button>
-                  {#if verdicts[i]?.why}<span class="muted why">{verdicts[i].why}</span>{/if}
                 </td>
               </tr>
               {#if expanded === i}
@@ -1195,11 +1197,11 @@ convention, not a measurement"
 
   .coverage p { margin: 0; }
 
-  /* the gate's sentence sits beside Adopt and wraps under it, so a long
-     caveat list makes the row taller and never the table wider */
-  td.adopt .why {
+  /* the gate's sentence wraps under the grade, so a long caveat list makes
+     the row taller and never the table wider */
+  td.cell .why {
     display: block;
-    max-width: 28ch;
+    overflow-wrap: anywhere;
   }
 
   .acts {
