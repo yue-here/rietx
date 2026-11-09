@@ -161,15 +161,17 @@ Claude, reversible", with its alternative, and waits for the maintainer's review
 10. Settled by Claude, reversible: the collapse icons are the prototype's panel glyphs, drawn
     inline, with the filled half showing the side the button hides; stacked, they turn to
     top and bottom halves. Alternative: text labels.
-11. Settled by Claude, reversible: the track and raised colours are `#ececea`/`#ffffff` light and
-    `#2c2c2c`/`#474747` dark, as tokens. Alternative: `color-mix` over `--panel`, which the
-    WP-1429 rule asks for (the conflict below).
-
-**A rule conflict for the maintainer.** The root CLAUDE.md (WP-1429) says a page's extra roles
-are `color-mix` over the nine chrome tokens and never a token of their own. The workshop
-handover and this WP's brief ask for new tokens. Settled by adding `--sunken` and `--raised` as
-surface levels, which the nine do not have. Reversal costs one edit to `app.css` and two
-deletions from `theme.py`.
+11. Settled on the written rule (root CLAUDE.md, WP-1429: a page's extra roles are `color-mix`
+    over the nine chrome tokens, never a token of their own). The track and the raised option
+    are mixes of `--fg` into `--panel`, and `light-dark()` picks the dark pair through the
+    `color-scheme` that `tokens.css` sets with each palette. The first round added `--sunken`
+    and `--raised` as tokens instead, on a workshop handover suggestion that was not a ruling;
+    they are gone. The percentages match the prototype's luminances, so the rendered contrast
+    is the prototype's to the third decimal: track against option 1.183 light and 1.502 dark.
+12. Settled by Claude, reversible: while the model panel is hidden, the action bar moves to the
+    foot of the graph column, so Refine stays a visible button with either side collapsed. The
+    move is part of the collapse click, which asks for a layout change. Alternative: one bar
+    across the whole window, under both sides.
 
 ## Non-goals
 

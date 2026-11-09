@@ -206,6 +206,28 @@ def test_a_collapse_button_stays_where_it_was(browser, gui, state):
     page.close()
 
 
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_refine_stays_on_screen_with_either_side_hidden(browser, gui, state):
+    """The action bar ends the model panel, and goes to the foot of the graphs
+    while that panel is hidden, so a fit never needs a hidden button."""
+    url, _ = gui
+    page = _open(browser, url, WIDTHS[state])
+    toggles = page.locator("#app > header > button.toggle")
+    refine = page.locator(".actions button.refine")
+    seen = []
+    for index in (0, 1):
+        toggles.nth(index).click()
+        _frames(page)
+        box = refine.bounding_box() if refine.count() == 1 and refine.is_visible() else None
+        seen.append(box is not None and box["y"] + box["height"] <= 900
+                    and box["x"] + box["width"] <= WIDTHS[state])
+        toggles.nth(index).click()
+        _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert seen == [True, True], seen
+
+
 def test_a_phone_width_window_never_scrolls_sideways(browser, gui):
     """Below the threshold the sides stack, so nothing needs a wider window."""
     url, _ = gui

@@ -1712,6 +1712,7 @@ describe("disclosure and the command palette", () => {
     expect(model.getAttribute("aria-label")).toBe("Hide the model panel");
     expect(host.querySelector('[aria-label="layout"]')).toBeNull();
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(false);
+    expect(host.querySelector(".side .actions button.refine")).not.toBeNull();
 
     graphs.click();
     await flush();
@@ -1736,6 +1737,10 @@ describe("disclosure and the command palette", () => {
     expect(host.querySelector(".side")?.classList.contains("hidden")).toBe(true);
     expect(graphs.disabled).toBe(true);
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(false);
+    // the action bar went with the visible side, so Refine is still a button
+    // on screen; there is one bar, never two
+    expect(host.querySelector(".plotcol .actions button.refine")).not.toBeNull();
+    expect(host.querySelectorAll(".actions").length).toBe(1);
     // the button did not move: it is still the header's last child
     expect(host.querySelector("header")?.lastElementChild).toBe(model);
   });

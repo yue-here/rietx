@@ -1063,6 +1063,18 @@
   });
 </script>
 
+<!-- The action bar (WP-2123).  It ends the model panel, and moves to the foot
+     of the graphs while that panel is hidden, so a fit can always be started
+     from a visible button.  Settled by Claude, reversible: a bar across the
+     whole window under both sides is the alternative.  Moving it is part of
+     the collapse click, which asks for a layout change. -->
+{#snippet actions()}
+  <ActionBar bind:mode={refineMode} touched={pendingTouched} invalid={pendingInvalid}
+    {busy} blocked={noPhases ? NO_PHASES_REASON : null}
+    onapply={applyParams} onrevert={() => paramsPanel?.revert()}
+    onrefine={() => refine()} />
+{/snippet}
+
 <svelte:window onkeydown={keydown} onclick={clickAway} onresize={reanchor}
   onscrollcapture={reanchor} bind:innerWidth={windowWidth} />
 
@@ -1223,6 +1235,7 @@
           onhoverpeak={(i) => (hoveredPeak = i)}
           onaddpeak={addPeak} onmovepeak={movePeak} ontogglepeak={togglePeak}
           onremovepeak={removePeak} onprotocol={setProtocol} />
+        {#if hideModel}{@render actions()}{/if}
       </div>
     {/if}
     <div class="side" class:wide={hideGraphs || !project} class:hidden={!!project && hideModel}
@@ -1319,10 +1332,7 @@
         <div class="panel" class:hidden={tab !== "build"}>
           <Stubs {capabilities} {project} />
         </div>
-        <ActionBar bind:mode={refineMode} touched={pendingTouched} invalid={pendingInvalid}
-          {busy} blocked={noPhases ? NO_PHASES_REASON : null}
-          onapply={applyParams} onrevert={() => paramsPanel?.revert()}
-          onrefine={() => refine()} />
+        {#if !hideModel}{@render actions()}{/if}
         <Console {lines} {dropped} height={consoleHeight} onresize={setConsoleHeight} />
       {/if}
     </div>
