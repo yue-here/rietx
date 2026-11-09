@@ -55,9 +55,11 @@
     }
   }
 
-  // the first listing only: later changes to `start` are not a navigation
+  // the first listing only: later changes to `start` are not a navigation.  A
+  // start the browser may not list (a project outside the two roots, a typed
+  // Where) falls back to home, so the dialog never opens with nothing to pick
   const first = () => start;
-  go(first());
+  go(first()).then(() => { if (first() && path === null) go(); });
 
   async function openHere(target: string) {
     error = await onopen(target);

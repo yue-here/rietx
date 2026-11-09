@@ -273,8 +273,9 @@
   }
 </script>
 
-<svelte:window onkeydowncapture={keydown} onclick={away}
-  onresize={() => closeMenu()} onscrollcapture={() => closeMenu()} />
+<!-- a resize can move the name, a scroll cannot: the header does not scroll,
+     and a panel scrolling itself (the console during a run) must not close it -->
+<svelte:window onkeydowncapture={keydown} onclick={away} onresize={() => closeMenu()} />
 
 <span class="fm">
   <button class="pick fm-name" bind:this={trigger} aria-haspopup="menu"

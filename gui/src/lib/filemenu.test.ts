@@ -89,6 +89,8 @@ describe("the File menu", () => {
   it("splits a project path into its folder and its name", () => {
     expect(projectStem("/a/b/sample.rex")).toBe("sample");
     expect(folderOf("/a/b/sample.rex")).toBe("/a/b");
+    // a project at the root sits in the root, not in itself
+    expect(folderOf("/sample.rex")).toBe("/");
     expect(projectStem("C:\\w\\x.rex")).toBe("x");
   });
 });

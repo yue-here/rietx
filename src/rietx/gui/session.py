@@ -484,7 +484,10 @@ class GuiSession:
         p = self._need_project()
         ref = p.data_ref
         return {
-            "path": str(p.path),
+            # resolved, as the recent list stores it: `rietx gui sample.rex`
+            # opens a relative path, and the File menu derives the folder a
+            # copy or an export starts in from this string (WP-2133)
+            "path": str(Path(p.path).resolve()),
             "doc": p.doc.model_dump(mode="json"),
             "data": {
                 "filename": ref.filename, "reader": ref.reader,
@@ -650,7 +653,9 @@ class GuiSession:
         self._require_idle()
         p = self._need_project()
         source = Path(p.path).resolve()
-        target = self._destination(_need(body, "directory"), source.name)
+        # the folder's own name, unvetted: a project the Python API made may
+        # lack the suffix, and a move must not rename it on the way
+        target = self._browsable_folder(_need(body, "directory")) / source.name
         if target == source:
             return self.project_doc()
         if target.is_relative_to(source):
@@ -712,9 +717,12 @@ class GuiSession:
         path, which every later node is appended to.  The recent list swaps the
         old entry for the new one.
         """
-        _refuse_existing(target)
         p = self._need_project()
         source = Path(p.path).resolve()
+        # a case-only rename on a case-insensitive volume (the macOS default)
+        # finds its own folder at the target; shutil.move renames it in place
+        if not (target.exists() and os.path.samefile(target, source)):
+            _refuse_existing(target)
         try:
             shutil.move(str(source), str(target))
         except OSError as exc:
@@ -3207,6 +3215,11 @@ class GuiSession:
             # one: a Le Bail fit has no weight fractions, and saying so beats
             # writing an empty table
             raise GuiError(str(exc), code="EXPORT_UNAVAILABLE", status=409) from None
+        except OSError as exc:
+            # a folder the person chose may be read-only, or hold a folder of
+            # the file's name: a refusal the dialog shows, never a 500
+            raise GuiError(f"could not write {target}: {exc}",
+                           where=["directory"]) from None
         return {"kind": kind, "path": str(target), "name": target.name,
                 "bytes": target.stat().st_size}
 

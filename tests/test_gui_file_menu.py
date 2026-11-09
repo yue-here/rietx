@@ -144,6 +144,39 @@ def test_move_keeps_the_name_and_refuses_what_it_must(served, tmp_path_factory):
     assert session.project.path == new
 
 
+def test_move_keeps_a_folder_name_without_the_suffix(served):
+    """A project the Python API made may lack ``.rex``; a move must not rename it."""
+    session, client, root = served
+    plain = root / "work" / "plain"
+    _project(plain, root / "data" / "synth.xye")
+    session.project_open({"path": str(plain)})
+    (root / "moved").mkdir()
+    status, payload = client.post("/api/project/move", {"directory": str(root / "moved")})
+    assert status == 200, payload
+    assert payload["path"] == str(root / "moved" / "plain")
+    assert (root / "moved" / "plain" / "project.json").is_file()
+
+
+def test_a_case_only_rename_is_not_refused_as_an_existing_folder(served):
+    session, client, root = served
+    probe = root / "work" / "SAMPLE.rex"
+    if not probe.exists():
+        pytest.skip("a case-sensitive volume: the two names are two folders")
+    status, payload = client.post("/api/project/rename", {"name": "Sample"})
+    assert status == 200, payload
+    assert Path(payload["path"]).name == "Sample.rex"
+    assert [p.name for p in (root / "work").iterdir()] == ["Sample.rex"]
+
+
+def test_project_doc_path_is_absolute_for_a_relative_open(served, monkeypatch):
+    """`rietx gui sample.rex` opens a relative path, and the File menu reads
+    the folder a copy starts in off this string."""
+    session, client, root = served
+    monkeypatch.chdir(root / "work")
+    session.project_open({"path": "sample.rex"})
+    assert client.get("/api/project")[1]["path"] == str(root / "work" / "sample.rex")
+
+
 def test_close_empties_the_session_and_the_next_launch_starts_on_the_start_screen(served):
     session, client, root = served
     path = str(root / "work" / "sample.rex")
@@ -196,6 +229,11 @@ def test_export_into_a_chosen_folder_asks_before_replacing(served, tmp_path_fact
         assert status == 400 and payload["error"]["where"] == ["filename"], (filename, payload)
     status, payload = client.post("/api/export/instrument_profile", {
         "directory": str(tmp_path_factory.mktemp("not-a-root")), "filename": "x.json"})
+    assert status == 400 and payload["error"]["where"] == ["directory"], payload
+    # a write the folder refuses is a refusal the dialog shows, never a 500
+    (root / "data" / "taken.json").mkdir()
+    status, payload = client.post("/api/export/instrument_profile", {
+        "directory": str(root / "data"), "filename": "taken.json", "overwrite": True})
     assert status == 400 and payload["error"]["where"] == ["directory"], payload
     # without a folder it goes to exports/ as before, replacing its namesake
     assert client.post("/api/export/instrument_profile")[0] == 200

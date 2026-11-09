@@ -119,8 +119,8 @@ export function projectStem(path: string): string {
   return path.slice(lastSeparator(path) + 1).replace(/\.rex$/, "");
 }
 
-/** The folder a project sits in. */
+/** The folder a project sits in: `/sample.rex` sits in `/`. */
 export function folderOf(path: string): string {
   const cut = lastSeparator(path);
-  return cut > 0 ? path.slice(0, cut) : path;
+  return cut > 0 ? path.slice(0, cut) : cut === 0 ? path.slice(0, 1) : path;
 }
