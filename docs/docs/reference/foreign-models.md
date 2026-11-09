@@ -317,7 +317,7 @@ Anything with a flag beside it is a `Gsas2Value`, which holds `Gsas2Value.value`
 ### Equations stored with a sequential fit
 
 GSAS-II fits an equation to one column of its sequential results table after the refinement, and stores it in the project.
-The reader takes each one into a `Gsas2SequentialEquation`, ready for `rietx.fit_trajectory` ([An equation fitted to a trajectory](series.md#an-equation-fitted-to-a-trajectory)).
+The reader takes each one into a `Gsas2SequentialEquation`, ready for `rietx.fit_trajectory` ([An equation fitted to a trajectory](parametric.md#an-equation-fitted-to-a-trajectory)).
 The per-histogram results table itself is not carried, and the read says so.
 
 | Field | Holds |
