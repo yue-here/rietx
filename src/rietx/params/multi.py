@@ -350,7 +350,11 @@ def _model_difference(a, b, path: str = "") -> tuple[str, object, object] | None
     ``name`` is skipped too, as a label rather than a model: a CIF names the
     phase after its data block, which per-temperature files spell differently.
     Everything else is compared exactly, recursing through models, lists and
-    dicts in field order.
+    dicts in field order.  A dict is compared by key, never by key order, and
+    a key one side leaves out is no difference where the other side's value is
+    a parameter: a texture term the block leaves out enters the table at 0,
+    held (``ParameterTable._collect_texture``), so ``{}`` and a fitted
+    coefficient set are one model with different values.
     """
     if isinstance(a, Parameter) and isinstance(b, Parameter):
         return None
@@ -372,9 +376,11 @@ def _model_difference(a, b, path: str = "") -> tuple[str, object, object] | None
                 return found
         return None
     if isinstance(a, dict) and isinstance(b, dict):
-        if list(a) != list(b):
-            return path, a, b
-        for k in a:
+        for k in {**a, **b}:
+            if k not in a or k not in b:
+                if isinstance(a.get(k, b.get(k)), Parameter):
+                    continue
+                return f"{path}.{k}", a.get(k), b.get(k)
             found = _model_difference(a[k], b[k], f"{path}.{k}")
             if found:
                 return found

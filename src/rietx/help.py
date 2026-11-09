@@ -3354,7 +3354,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A parametric equation sets a parameter, in some patterns, to a value "
             "outside that parameter's own limits. The equation's coefficients are "
-            "unbounded, so the limits never constrained the solve. Do not quote the "
+            "unbounded. The default LM driver holds a linear equation's target inside "
+            "its limits, but TRF and an expression equation do not. Do not quote the "
             "parameter there as a measurement. Narrow the subset to where the form "
             "holds, lower the order of the polynomial, or use a basis that stays inside "
             "the range."

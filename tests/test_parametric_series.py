@@ -487,6 +487,27 @@ def test_two_texture_axes_under_one_r_column_are_refused():
                         _lab6_instruments(2))
 
 
+def test_a_texture_term_one_start_leaves_out_is_a_value_not_a_model():
+    """A texture term the block leaves out enters the table at 0, held, so a
+    start declaring no coefficients and one carrying fitted ones (in another
+    key order) are one model with different values."""
+    from rietx.crystallography.spherical_harmonics import texture_names
+    from rietx.crystallography.symmetry import resolve_group
+    from rietx.schemas.structure import SphericalHarmonicTexture
+
+    def bare(ph):
+        ph.texture = SphericalHarmonicTexture(order=4)
+
+    def fitted(ph):
+        sg = resolve_group(ph.space_group, ph.symmetry_operations)
+        names = texture_names(sg, 4, ph.cell.lengths_angles())
+        ph.texture = SphericalHarmonicTexture(order=4, coefficients={
+            n: Parameter(value=0.01 * (k + 1)) for k, n in enumerate(reversed(names))})
+
+    MultiParameterTable([_start_with(bare), _start_with(fitted)], _lab6_instruments(2),
+                        sharing=SharingMap(per_histogram=["phases.*.texture.*"]))
+
+
 def test_a_dependent_the_coefficients_put_out_of_range_is_named():
     s, _ = perturbed_inputs()
     equation = _equation(name="w", target="instrument.profile.w")

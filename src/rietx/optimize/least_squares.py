@@ -2758,10 +2758,9 @@ def tied_bound_inequalities(table: ParameterTable, x0: np.ndarray,
             continue
         if not (math.isfinite(e.lo) or math.isfinite(e.hi)):
             continue
-        row = C.getrow(i)
-        if row.nnz == 0 or not np.any(row.data != 0.0):
+        if not np.any(C.data[C.indptr[i]:C.indptr[i + 1]] != 0.0):
             continue
-        t = row.toarray().ravel()
+        t = C.getrow(i).toarray().ravel()
         nz = t != 0.0
         # the entry's lowest and highest value anywhere in the box
         low = float(d[i] + np.sum(np.where(t[nz] > 0, t[nz] * lo[nz], t[nz] * hi[nz])))
@@ -2796,7 +2795,9 @@ def _joint_tied_bound_inequalities(mtable, x0: np.ndarray, lo: np.ndarray,
     A linear parametric equation's target rows, one per subset pattern, are
     gathered into one block per equation, labelled by the equation, so a
     library of hundreds of patterns names one constraint rather than hundreds.
-    Any other tied entry keeps its own block, prefixed ``hist.{h}``.
+    Any other tied entry keeps its own block, prefixed ``hist.{h}``, once: a
+    shared tied entry gives every histogram the same rows on the same joint
+    columns, and only the first histogram's block is kept.
     """
     from . import lm as lm_mod
 
@@ -2804,6 +2805,7 @@ def _joint_tied_bound_inequalities(mtable, x0: np.ndarray, lo: np.ndarray,
     owner = {(h, r.target): r.name for r in mtable.parametric for h in r.patterns}
     by_equation: dict[str, list[lm_mod.LinearInequality]] = {}
     out: list[lm_mod.LinearInequality] = []
+    seen: set[tuple[str, bytes, bytes]] = set()
     for h, (table, local) in enumerate(zip(mtable.tables, mtable.split(x0),
                                            strict=True)):
         cols = np.asarray(mtable.col_map(h), dtype=np.intp)
@@ -2813,6 +2815,10 @@ def _joint_tied_bound_inequalities(mtable, x0: np.ndarray, lo: np.ndarray,
             path = block.label.removesuffix(" bounds")
             name = owner.get((h, path))
             if name is None:
+                key = (path, T.tobytes(), block.c.tobytes())
+                if key in seen:
+                    continue
+                seen.add(key)
                 out.append(lm_mod.LinearInequality(
                     T=T, c=block.c, label=f"hist.{h} {block.label}"))
             else:
