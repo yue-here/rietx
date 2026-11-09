@@ -1,6 +1,6 @@
 # WP-1943 — the PbSO₄ round robin as an acceptance case
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
 Track: Coming from another code
 Depends on: —
 Priority: P3 2026-10-11 — evidence for a validation claim; no user waits on it, and the data are already in the tree
