@@ -171,11 +171,12 @@ def test_a_pending_edit_moves_nothing_in_the_action_bar(browser, gui, state):
     refine". Both have reserved widths, so neither pushes a neighbour."""
     url, _ = gui
     page = _open(browser, url, WIDTHS[state])
-    value = page.locator(".row input.value").first
+    value = page.locator(".params .row button.ink").first
     before = page.evaluate(SNAP, LANDMARKS)
     value.click()
     page.keyboard.press("End")
     page.keyboard.type("1")
+    page.keyboard.press("Enter")
     _frames(page)
     assert "pending" in page.locator(".actions .pending").text_content()
     assert "Apply and refine" in page.locator(".actions button.refine").text_content()
@@ -206,11 +207,12 @@ def test_an_invalid_edit_is_said_in_full_and_moves_nothing(browser, gui, state):
     rides in its tooltip, and nothing in the shell moves to say either."""
     url, _ = gui
     page = _open(browser, url, WIDTHS[state])
-    value = page.locator(".row input.value").first
+    value = page.locator(".params .row button.ink").first
     before = page.evaluate(SNAP, LANDMARKS)
     value.click()
     page.keyboard.press("ControlOrMeta+a")
     page.keyboard.type("abc")
+    page.keyboard.press("Enter")
     _frames(page)
     slot = page.evaluate(SLOT_ROOM)
     moved = _moved(before, page.evaluate(SNAP, LANDMARKS))
@@ -222,6 +224,94 @@ def test_an_invalid_edit_is_said_in_full_and_moves_nothing(browser, gui, state):
     assert "not a number" in slot["title"], slot
     assert slot["ink"] <= slot["room"] and slot["longest"] <= slot["room"], slot
     assert not moved, moved
+
+
+#: The Parameters panel's own pieces (WP-2126). A press on a box, a number or a
+#: padlock changes what a row shows and never where any row is.
+PANEL_LANDMARKS = [
+    ".params > header", ".params .band", ".params .head", ".params .row",
+    ".params .fold", ".params .atomtab tr", ".params .ink", ".params .slot",
+]
+
+#: Each panel landmark's box in the scroller's content coordinates, so that
+#: the scroll a click into view makes is not read as a move.
+PANEL_SNAP = """(selectors) => {
+  const pane = document.querySelector(".params .scroller");
+  const origin = pane.getBoundingClientRect();
+  const out = {};
+  selectors.forEach((sel) => {
+    [...document.querySelectorAll(sel)].forEach((e, i) => {
+      if (!e.getClientRects().length) return;
+      const r = e.getBoundingClientRect();
+      const inside = pane.contains(e);
+      const x = inside ? r.x - origin.x + pane.scrollLeft : r.x;
+      const y = inside ? r.y - origin.y + pane.scrollTop : r.y;
+      out[`${sel} #${i}`] = [x, y, r.width, r.height];
+    });
+  });
+  return out;
+}"""
+
+#: The panel's controls. A band, a group heading and a fold line open and
+#: close what is under them, so they ask for a move; the rest may not make one.
+PANEL_CONTROLS = {
+    "box": ".params input[type=checkbox]",
+    "number": ".params button.ink",
+    "padlock": ".params button.lock",
+}
+PANEL_DISCLOSURES = {
+    "band": ".params .band button.bt",
+    "group": ".params .head button.ht",
+    "fold": ".params button.fold",
+}
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_no_parameters_control_moves_the_layout(browser, gui, state):
+    """The prototype's layout-shift check, ported: every box, number and
+    padlock in the Parameters panel is pressed once, with a real click on a
+    fresh page, and no landmark of the shell or the panel may move. A
+    disclosure moves what is under it, by request, so only the shell and the
+    control itself are held still for it."""
+    url, _ = gui
+    page = _open(browser, url, WIDTHS[state])
+    counts = {name: page.locator(sel).count()
+              for name, sel in {**PANEL_CONTROLS, **PANEL_DISCLOSURES}.items()}
+    page.close()
+    assert counts["box"] >= 5 and counts["number"] >= 5 and counts["group"] >= 3, counts
+
+    failures = []
+    for kind, selector in {**PANEL_CONTROLS, **PANEL_DISCLOSURES}.items():
+        asked = kind in PANEL_DISCLOSURES
+        for i in range(counts[kind]):
+            page = _open(browser, url, WIDTHS[state])
+            control = page.locator(selector).nth(i)
+            if not control.is_visible() or not control.is_enabled():
+                page.close()
+                continue
+            control.scroll_into_view_if_needed()
+            _frames(page)
+            shell = page.evaluate(SNAP, LANDMARKS)
+            panel = page.evaluate(PANEL_SNAP, [f"{selector}"] if asked else PANEL_LANDMARKS)
+            control.click()
+            _frames(page)
+            moved = _moved(shell, page.evaluate(SNAP, LANDMARKS))
+            panel_after = page.evaluate(PANEL_SNAP, [f"{selector}"] if asked else PANEL_LANDMARKS)
+            moved += _moved({k: v for k, v in panel.items() if not asked or k == f"{selector} #{i}"},
+                            panel_after)
+            if moved:
+                failures.append(f"{kind} {i}: " + "; ".join(moved[:4]))
+            # a number's press opens the editor, which floats; close it the
+            # way a person does, and the closing may not move anything either
+            if kind == "number":
+                page.keyboard.press("Escape")
+                _frames(page)
+                again = _moved(panel, page.evaluate(PANEL_SNAP, PANEL_LANDMARKS))
+                if again:
+                    failures.append(f"{kind} {i} closed: " + "; ".join(again[:4]))
+            assert not page.errors, page.errors
+            page.close()
+    assert not failures, "\n".join(failures)
 
 
 @pytest.mark.parametrize("state", list(WIDTHS))
