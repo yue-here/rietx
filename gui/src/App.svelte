@@ -463,12 +463,22 @@
     }
   }
 
-  async function runStage(stage: any) {
+  async function runStage(stage: any, echo?: string) {
     try {
       run = await api.run({ kind: "stage", stage });
+      if (echo) say(echo);
     } catch (error) {
       say(`refused: ${(error as Error).message}`);
     }
+  }
+
+  /** Apply the Parameters panel's pending edits from the action bar. A refusal
+   *  is drawn in that panel, so a refused apply brings it forward: from another
+   *  tab it would otherwise be a press that did nothing visible. */
+  async function applyParams(): Promise<boolean> {
+    const ok = !!(await paramsPanel?.apply());
+    if (!ok) tab = "params";
+    return ok;
   }
 
   /** The action bar's primary: apply the pending edits, then refine (WP-2123).
@@ -477,19 +487,21 @@
    * runs on the working free set — exactly what is ticked, because a stage
    * keeps a hand-freed row where a plan drops it (WP-1208). `plan` is the
    * project's plan, the header's old Run. A refused apply runs nothing: the
-   * refusal is in the Parameters panel, in the verb's own words. */
-  async function refine() {
-    if (busy || noPhases || pendingInvalid) return;
-    if (pendingTouched && !(await paramsPanel?.apply())) return;
-    if (refineMode === "plan") {
-      await start();
-      return;
-    }
+   * refusal is in the Parameters panel, in the verb's own words.
+   *
+   * `refining` covers the apply's round trip, before `busy` can say a run is
+   * in flight, so a second press in that window starts nothing twice. */
+  let refining = false;
+  async function refine(mode: "cycle" | "plan" = refineMode) {
+    if (refining || busy || noPhases || pendingInvalid) return;
+    refining = true;
     try {
-      run = await api.run({ kind: "stage", stage: { name: "cycle", turn_on: [] } });
-      say('ref.run_stage(Stage("cycle", turn_on=[]))');
-    } catch (error) {
-      say(`refused: ${(error as Error).message}`);
+      if (pendingTouched && !(await applyParams())) return;
+      if (mode === "plan") await start();
+      else await runStage({ name: "cycle", turn_on: [] },
+                          'ref.run_stage(Stage("cycle", turn_on=[]))');
+    } finally {
+      refining = false;
     }
   }
 
@@ -778,7 +790,7 @@
     { id: "cycle", label: "Refine one cycle on the ticked parameters",
       echo: 'ref.run_stage(Stage("cycle", turn_on=[]))',
       disabled: busy || !project || noPhases || !!pendingInvalid,
-      run: () => { refineMode = "cycle"; refine(); } },
+      run: () => refine("cycle") },
     { id: "import", label: "Open or import a project", echo: "Project.create(path, …)",
       run: () => { tab = "model"; startImport(); } },
     { id: "disclosure", label: simple ? "Show advanced controls" : "Hide advanced controls",
@@ -1309,8 +1321,8 @@
         </div>
         <ActionBar bind:mode={refineMode} touched={pendingTouched} invalid={pendingInvalid}
           {busy} blocked={noPhases ? NO_PHASES_REASON : null}
-          onapply={() => paramsPanel?.apply()} onrevert={() => paramsPanel?.revert()}
-          onrefine={refine} />
+          onapply={applyParams} onrevert={() => paramsPanel?.revert()}
+          onrefine={() => refine()} />
         <Console {lines} {dropped} height={consoleHeight} onresize={setConsoleHeight} />
       {/if}
     </div>
