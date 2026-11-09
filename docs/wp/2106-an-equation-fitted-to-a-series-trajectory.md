@@ -1,8 +1,7 @@
 # WP-2106 — an equation fitted to a series trajectory
 
-Milestone: parametric · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
+Milestone: parametric · Status: ✅ 2026-11-09 — rx.fit_trajectory and the .gpx's stored equations; follow-ups on #1489
 Depends on: 1964 (the grammar and its derivative rules)
-Priority: P2 2026-11-04 — a feature the open milestone was opened for: this is how a GSAS-II user works, and nothing else in the milestone serves them
 
 ## Goal
 
@@ -99,6 +98,137 @@ its code. Any reader takes the stored format from a file's contents.
 - WP-1964 (the grammar), WP-1325 (the joint fit), WP-1051 (quarantine).
 
 ## Handover log
+
+- **2026-11-09 (a ghostshift runner, closing)** — The checklist is done and the WP closes.
+  After a series, a user can now fit an equation to one parameter's trajectory, weighted by
+  its esds, and get the coefficients with esds and χ², the way a GSAS-II user works. The
+  result says it is a fit to a trajectory and which chain it read, and names every point it
+  left out. On a synthetic ramp it agrees with the joint fit to a twentieth of an esd, and
+  its unscaled esds are the joint fit's; the χ²/ν-scaled ones carry the noise of a handful of
+  degrees of freedom, so both are reported and neither is chosen. A GSAS-II project's stored
+  sequential equations now read in, rewritten in the grammar, and anything outside the
+  rewrite table is refused by name. The consent item for the maintainer is below.
+  - *Consent item: four names join the top level.* `rx.fit_trajectory(series, path,
+    expression, variables, *, coordinates=None, chain=None)` returns
+    `rx.TrajectoryFit`, with `rx.TrajectoryVariable` and `rx.TrajectorySkip` beside it (the
+    three schema classes are top-level because every class in `rietx.schemas` is). The
+    reader adds no top-level name: `Gsas2Model.sequential_equations`, one
+    `Gsas2SequentialEquation` each, and `rietx.io.projects.gsas2.lower_gsas2_expression`.
+  - *Done.* `src/rietx/trajectory_fit.py` (walked, audit owner 2003; no module-level
+    number): the grammar's exact gradient, scipy TRF with the variables' own bounds, the
+    covariance through `optimize.statistics.normal_factors`, a unit residual giving the
+    unscaled inverse. Coordinates are a `CoordinateTable` row per pattern as passed (keyed
+    by `SeriesEntry.index`, so a pattern that failed every rung keeps its row), or the
+    series axis as `x`. Under `direction="both"` the caller names the chain;
+    asking a one-way series for the other chain raises. A step or angle path is refused. Quarantine is `_rejected`, the
+    median's test. The `.gpx` layout (`SeqParFitEqList` of `ExpressionObj`: `expression`,
+    `freeVars` label → [name, value, flag], `assgnVars` label → column, `depVar`, and
+    `SeqPseudoVars` for a pseudo-variable dependent) was read off the contents of the
+    public GSAS-II tutorials' `steel.gpx`, now `tests/local_data.py`'s
+    `gsas2-tutorials/steel`. The equation is parsed with python's `ast`, which runs nothing,
+    and printed in the grammar; every rewrite is a row of `GSAS2_EXPRESSION_REWRITES`, held
+    equal to the table in `reference/foreign-models.md` by test, and checked against python
+    evaluating the same text. GSAS-II's `sin`/`cos`/`tan` are taken as degree functions on
+    `docs/practice.md`'s record; no GSAS-II source was opened. Manual:
+    `guides/equation.md` § Fit the equation to the series trajectory,
+    `reference/series.md` § An equation fitted to a trajectory, `reference/foreign-models.md`
+    § Equations stored with a sequential fit, `switching/gsas2.md`. Skill: the joint-fit row
+    of `references/series.md` and the API index's series section.
+  - *Measured* (`[dev]`, darwin/arm64). `2106-measure/trajectory_vs_joint.py` and its
+    results file: twenty seeds of the guides' seven-pattern LaB₆ ramp, each run as a chain
+    both ways and as one joint fit of the same expression. Largest gap between the
+    trajectory's coefficients and the joint fit's: 0.045 combined esd (a0), 0.031 (k), the
+    same on both chains. Unscaled esd over the joint esd: median 1.000, range 0.995-1.011.
+    Scaled: median 0.90, range 0.35-1.30, with the trajectory's χ²/ν at 0.13-1.70 on five
+    degrees of freedom. Against the truth, (value − truth)/esd has rms 1.00 and 0.68 for the
+    joint fit and the unscaled trajectory esds alike, and 1.31 and 0.85 for the scaled
+    ones. The guide's own seed: the two lines 0.07 and 0.03 of the joint esds apart.
+    FAST_SUITE_LINE
+  - *Review.* `/code-review` was not run, because from this session it would read the main
+    checkout's stale branch; an Opus subagent reviewed the branch diff instead.
+    It found eleven things; fixed in 18c8eb6e4: a pair of variables the trajectory moves
+    only together got small, confident esds (now `None`, through
+    `discarded_directions`), step and angle paths were fitted (now refused), a cancelled
+    chain refused the full coordinate table, a non-finite value was labelled `no_esd`, the
+    lowering's parentheses doubled the nesting (a 30-term sum hit the depth limit; it now
+    builds the grammar's own tree, read from the rewrite table alone, which also makes
+    the manual-table test able to fail), `1e999` lowered to an unbound `inf`, and two
+    messages and two doc lines. Declined: none; the degree reading against GSAS-II's own
+    output is #1489, item 1.
+  - *Generality* (the judge's sections, condensed from its tables into prose, its words kept, then the
+    author's answer):
+
+    > **WALKED += "trajectory_fit.py": 2003.** Holds. Adding a file to the walk only widens
+    > what the table sees. Confirmed at trajectory_fit.py:566: no module-level number, one
+    > string `SERIES_AXIS_NAME`. Note: the solver settings are scipy's inline defaults
+    > (`method="trf"`, `x_scale="jac"`, ftol/xtol/gtol 1e-8), which no walk sees. Against:
+    > none found. What would change it: nothing on the entry itself.
+    >
+    > **(a) Quarantined point left out via `_rejected`.** Holds; the case for is stronger.
+    > The fit drops points the caller passed; kind 1. An error-level code means "do not read
+    > the values, for any purpose" (generality.md, Attention clause 2). None found against:
+    > GSAS-II stops its chain at a failed histogram, so it has nothing to drop
+    > (practice.md:326). One test for both the median and this fit keeps them from drifting
+    > apart. Synthetic data only; recorded in `TrajectoryFit.skipped`. What would change
+    > it: a case where an error-level code about one phase leaves another phase's point
+    > sound.
+    >
+    > **(b) Point with esd None, ≤0 or non-finite left out.** Holds. Arithmetic: 1/esd² is
+    > undefined. When every esd is missing, the fit refuses rather than falling back to unit
+    > weights. But a non-finite *value* with a good esd is also labelled `no_esd`
+    > (trajectory_fit.py:617): wrong label.
+    >
+    > **(c) Two esds, `esd` scaled by χ²/ν, `esd_unscaled` beside it.** Holds; both are
+    > reported, which is the right answer for kind 3. The naming leans one way: the plain
+    > name `esd`, the first number `__str__` prints and `covariance` are all scaled, and with
+    > χ²/ν < 1 it is narrower than the unscaled esd. `chi2_floor=True` is neither used nor
+    > offered. The refined-esd convention also includes the Bérar–Lelann inflation, which is
+    > not applied, and the change does not say so. TOPAS scales by the GoF
+    > (practice.md:929); whether GSAS-II's `DoParEqFit` scales is not recorded
+    > (practice.md:931), so the tier-2 claim rests on one program. What would change it:
+    > GSAS-II's scaling default recorded in practice.md.
+    >
+    > **(d) Forward chain by default under direction="both".** Weak; the case against is
+    > stronger. Kind: none given. The difference between the chains is path dependence,
+    > which the package reports with no threshold. A refiner whose ramp was measured
+    > cooling, or whose sample shows hysteresis, reads the chain in acquisition order or
+    > fits both. What would change it: under "both", requiring `chain=`, or fitting both
+    > chains and returning the coefficient gap.
+    >
+    > **(e) GSAS-II's sin/cos/tan read as degree functions; any other spelling refused.**
+    > Holds, on a reading of GSAS-II's code that nothing in this branch measures against
+    > GSAS-II's own output. practice.md:900 says "checked". The comment cited a heading that
+    > is "Angles". steel.gpx has no trig function, and the property test checks the rewrite
+    > against lambdas built on the same assumption: that verifies the arithmetic, not the
+    > convention. What would change it: a stored trig equation whose fitted values GSAS-II
+    > wrote, reproduced.
+    >
+    > **(f) `at_bound` from scipy's TRF `active_mask`.** Weak; the package's own record
+    > counts against it. TRF's mask is set within XTOL of a bound whatever the gradient
+    > (least_squares.py:300-311, WP-1929), and proximity tests missed 9 of 32 binding cases
+    > (WP-1434). A held variable was written `at_bound=False` without any check: WP-1076's
+    > shape. What would change it: LM's exact active set or the multiplier test, and `None`
+    > for a held variable.
+    >
+    > **(g) Covariance through `normal_factors`.** Holds. Tier 1; the unit residual gives a
+    > factor of exactly 1 (statistics.py:177-183, `chi2_floor` off). A flat direction gets
+    > `esd` = `None`.
+
+    Author: (b) taken, a non-finite value is skipped as `no_value`. (c) both kept and
+    named; the docs now say the scaling is a refined esd's and that Bérar–Lelann is not
+    applied, and the tier claim is narrowed to that. (d) taken: `chain=` is required under
+    `direction="both"`. (e) the comment's heading fixed; the check against GSAS-II's output
+    is issue #1489, item 1. (f) partly taken: `None` on a held variable, and the field is
+    documented as scipy's proximity-based active set; a load test is #1489, item 5.
+  - *Left, on issue #1489:* a GSAS-II-written `.gpx` for the refused arm of the
+    milestone's `.gpx` row (no GSAS-II install was at hand, so the refusals are tested on
+    pickles of the same layout), evaluating a `TrajectoryFit` at a coordinate, a
+    pseudo-variable dependent, and GSAS-II's own table as a trajectory.
+  - *Overlap.* WP-2101 owns `switching/gsas2.md`'s GSAS-II sequential section and the skill's
+    series rows too; its `### Inherited` names what this branch wrote there. No 2101 or 2103
+    branch was on origin at the start.
+  - PR #PR_N. Next: the maintainer's ruling on the four names; then issue #1489's first
+    item closes the milestone's `.gpx` row.
 
 - **2026-11-04** — Filed from the clean-context review of the milestone. No open WP
   owned it: 1325 and 1964 build the joint route, and 2105 fenced the `.gpx` on a claim
