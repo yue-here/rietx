@@ -681,9 +681,18 @@ def test_a_pattern_only_project_picks_peaks_indexes_adopts_and_only_then_fits(
         assert status == 404
         assert "no phase to draw yet" in no3d["error"]["message"]
 
-        # adopt the cell an indexing run found
+        # the extinction screen needs no phase: it fits its own Le Bail
+        # models from the candidate (WP-2124; WP-1207 had refused it here)
         with session._cond:
             session._index_result = _answer(_candidate("high", []))
+        status, frame = client.post("/api/index/extinction", {"candidate": 0})
+        assert status == 200, frame
+        frame = _wait_idle(client, timeout=180.0)
+        assert frame["run"]["status"] == "completed", frame
+        status, screened = client.get("/api/index/extinction")
+        assert status == 200 and screened["result"]["candidates"]
+
+        # adopt the cell an indexing run found
         status, adopted = client.post("/api/index/adopt", {"candidate": 0})
         assert status == 200, adopted
         assert adopted["mode"] == "lebail"

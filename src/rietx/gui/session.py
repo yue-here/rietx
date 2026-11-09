@@ -1585,11 +1585,14 @@ class GuiSession:
             raise GuiError(f"unknown run kind {kind!r}; expected 'fit', "
                            "'stage', 'index', 'extinction' or 'series'",
                            where=["kind"])
-        if kind in ("fit", "stage", "extinction", "series"):
+        if kind in ("fit", "stage", "series"):
             # Up here rather than in the worker: the refusal is knowable before
             # anything starts, and a run *started* is a 200 whose failure only
             # ever reaches the event stream — the caller asked a question that
-            # has an answer now (WP-1207).
+            # has an answer now (WP-1207).  Only the kinds that *refine the
+            # model* need a phase.  An extinction screen builds its own Le Bail
+            # fits from the candidate and the instrument, so a pattern-only
+            # project, where indexing starts, may screen (WP-2124).
             try:
                 _refuse_without_phases(p.refinement.structure, f"a {kind} run")
             except NoPhasesError as exc:
@@ -1654,8 +1657,9 @@ class GuiSession:
             # candidate.  Deliberately *not* gated on the adopt verdict — on
             # real data with no measured shift ``best_or_none()`` is None by
             # design, and a screen is a read-only measurement ("IF this cell,
-            # THEN these classes"); the gate stays on ``index_adopt``, where
-            # the model is at stake.  It rides the run machine because it is
+            # THEN these classes").  Nor is it gated on a phase: the screen
+            # fits its own Le Bail models, so a pattern-only project screens
+            # (WP-2124).  It rides the run machine because it is
             # seconds-long (one profile fit, then one Le Bail per class),
             # takes ``cancel=``, and must hold the same one-worker discipline
             # as every other computation over the project.
