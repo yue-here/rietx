@@ -38,6 +38,8 @@ describe("the single-peak windows (WP-2128)", () => {
   it("opens on a low, a middle and a high window", () => {
     expect(firstPicks(BINS)).toEqual([1, 6, 10]);
     expect(firstPicks(2)).toEqual([0, 1]);
+    // four windows: three distinct ones, never the third named twice
+    expect(firstPicks(4)).toEqual([0, 2, 3]);
   });
 
   it("draws a window from zero to a tenth above the last fit, whatever a preview does", () => {

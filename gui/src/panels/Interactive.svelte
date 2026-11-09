@@ -229,6 +229,11 @@
     const lo = Number(rangeLo), hi = Number(rangeHi);
     if (!Number.isFinite(lo) || !Number.isFinite(hi)) return "not a number";
     if (!(hi > lo)) return "the end must be above the start";
+    // a range past the row's bounds would let a drag reach a value the
+    // preview and Apply both refuse, as a typed one is refused here
+    const s = popSlider;
+    if (s && lo < s.bound[0]) return `below the lower bound ${s.bound[0]}`;
+    if (s && hi > s.bound[1]) return `above the upper bound ${s.bound[1]}`;
     return "";
   });
 

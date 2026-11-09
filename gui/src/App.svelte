@@ -125,7 +125,18 @@
     return { fwhm: fwhm > 0 ? fwhm : FALLBACK_FWHM_DEG,
              thetaMaxDeg: tt?.length ? tt[tt.length - 1] / 2 : 45 };
   });
-  const phaseNames = $derived(Object.keys(baseCurves?.header?.ticks ?? {}));
+  /** One name per phase, in order. The tick rows are keyed by phase name, but
+   *  a magnetic phase adds a `"<name> (magnetic)"` row after its own and the
+   *  declared peaks a `"(extra)"` row (`refine._tick_rows`), and either would
+   *  shift every later phase's name by one place. */
+  const phaseNames = $derived.by(() => {
+    const out: string[] = [];
+    for (const key of Object.keys(baseCurves?.header?.ticks ?? {})) {
+      if (key === "(extra)" || (out.length && key === `${out[out.length - 1]} (magnetic)`)) continue;
+      out.push(key);
+    }
+    return out;
+  });
   let simple = $state(true);
   /** The first-run checklist's own two pieces of state (WP-1017): whether it
    *  has been dismissed for this project, and whether the Report tab has been

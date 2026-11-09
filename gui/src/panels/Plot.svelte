@@ -647,7 +647,10 @@
     untrack(() => {
       if (!chart) return;
       chart.setPreview(p?.curves ?? null);
-      if (p) requestAnimationFrame(() => requestAnimationFrame(() =>
+      // the timeline keeps every entry, so a long session's drags would pile
+      // up there; a revert or an apply ends the set the test reads
+      if (!p) performance.clearMeasures?.("rx-preview-redraw");
+      else requestAnimationFrame(() => requestAnimationFrame(() =>
         performance.measure("rx-preview-redraw", { start: p.sentAt })));
     });
   });

@@ -35,10 +35,21 @@
   } = $props();
 
   const windows = $derived(curves ? peakWindows(curves) : []);
-  let picks = $state<number[]>([]);
-  // a new set of windows (a fit landed) starts again from the first picks
-  $effect(() => {
-    picks = firstPicks(windows.length);
+  // a new set of windows (a fit landed) starts again from the first picks; a
+  // payload framing the same reflections keeps the windows the person stepped
+  // to. Derived rather than reset in an effect, so a render never indexes a
+  // shorter set with the last set's picks
+  const windowsKey = $derived(windows.map((w) => w.center).join(","));
+  let stepped = $state<{ key: string; picks: number[] } | null>(null);
+  const picks = $derived(stepped?.key === windowsKey ? stepped.picks : firstPicks(windows.length));
+
+  /** The last fit's model on the pattern's channels, and its channels' 2θ. */
+  const lastFit = $derived.by(() => {
+    if (!curves) return null;
+    const { two_theta: tt, fitted, y_calc: calc } = curves.arrays;
+    const on: (number | null)[] = new Array(tt.length).fill(null);
+    if (fitted && calc) for (let q = 0; q < fitted.length; q++) on[fitted[q]] = calc[q];
+    return { on, tt: fitted ? Float64Array.from(fitted, (i) => tt[i]) : null };
   });
 
   let canvases: HTMLCanvasElement[] = $state([]);
@@ -47,7 +58,7 @@
   function step(slot: number, by: number) {
     const next = [...picks];
     next[slot] = Math.min(windows.length - 1, Math.max(0, next[slot] + by));
-    picks = next;
+    stepped = { key: windowsKey, picks: next };
   }
 
   $effect(() => {
@@ -63,7 +74,7 @@
 
   function draw(cv: HTMLCanvasElement, w: PeakWindow | undefined) {
     const ctx = cv.getContext?.("2d");
-    if (!ctx || !curves || !w) return;
+    if (!ctx || !curves || !lastFit || !w) return;
     const W = cv.clientWidth, H = cv.clientHeight, dpr = devicePixelRatio || 1;
     if (!W || !H) return;
     cv.width = Math.round(W * dpr);
@@ -74,14 +85,12 @@
     const c = curveColors((n) => style.getPropertyValue(n));
     const muted = style.getPropertyValue("--muted").trim() || "#888";
     const { arrays } = curves, tt = arrays.two_theta, obs = arrays.y_obs;
-    const fitted = arrays.fitted, calc = arrays.y_calc, delta = arrays.delta;
+    const calc = arrays.y_calc, delta = arrays.delta;
     const L = 6, R = 6, T = 6, STRIP = 40, AXIS = 16, B = STRIP + AXIS;
     const ph = H - T - B, pw = W - L - R;
     const px = (x: number) => L + ((x - w.lo) / (w.hi - w.lo)) * pw;
     // the last fit's model on the pattern's channels, for the shared y range
-    const fitOn: (number | null)[] = new Array(tt.length).fill(null);
-    if (fitted && calc) for (let q = 0; q < fitted.length; q++) fitOn[fitted[q]] = calc[q];
-    const [y0, y1] = windowRange(tt, obs, fitOn, w.lo, w.hi);
+    const [y0, y1] = windowRange(tt, obs, lastFit.on, w.lo, w.hi);
     const py = (y: number) => T + ((y1 - y) / (y1 - y0)) * ph;
     ctx.save();
     ctx.beginPath();
@@ -113,7 +122,7 @@
       ctx.stroke();
       ctx.setLineDash([]);
     };
-    const fitTT = fitted ? Float64Array.from(fitted, (i) => tt[i]) : null;
+    const fitTT = lastFit.tt;
     const pv = preview?.curves.arrays;
     // the last fit dashed once a preview is drawn over it: state rides on the
     // mark, never on a second colour (gui/CLAUDE.md, WP-1210)
@@ -129,8 +138,17 @@
     ctx.lineTo(W - R, Math.round(mid) + 0.5);
     ctx.stroke();
     if (rx && ry) {
+      // the strip's scale is the last fit's too, as the pattern graph's
+      // residual pane keeps its y range under a preview (WP-2128 call 10); a
+      // preview residual past it is clipped to the strip
       let m = 5;
-      for (let q = 0; q < rx.length; q++) if (rx[q] >= w.lo && rx[q] <= w.hi) m = Math.max(m, Math.abs(ry[q]));
+      if (fitTT && delta)
+        for (let q = 0; q < fitTT.length; q++)
+          if (fitTT[q] >= w.lo && fitTT[q] <= w.hi && Number.isFinite(delta[q])) m = Math.max(m, Math.abs(delta[q]));
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(L, top, pw, STRIP);
+      ctx.clip();
       ctx.strokeStyle = c.diff;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -142,6 +160,7 @@
         pen = true;
       }
       ctx.stroke();
+      ctx.restore();
     }
     ctx.fillStyle = muted;
     ctx.font = `11px ${style.fontFamily}`;

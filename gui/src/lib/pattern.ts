@@ -149,7 +149,7 @@ export class PatternChart {
   /** A new payload. `keep` holds the reader's view, as a run landing should. */
   setCurves(curves: Curves, keep: boolean): void {
     this.curves = curves;
-    if (this.preview) this.setPreview(this.preview);
+    if (this.preview) this.setPreview(this.preview, keep);
     else this.fig.setCurves(curves, keep);
   }
 
@@ -165,35 +165,39 @@ export class PatternChart {
    * ticks, both the route's. Before any fit there is no last fit to compare
    * with, and the preview is drawn as the model.
    */
-  setPreview(preview: Curves | null): void {
+  setPreview(preview: Curves | null, keep = true): void {
     this.preview = preview;
     const base = this.curves;
     if (!preview) {
       this.previewOn = null;
-      this.fig.setCurves(base, true);
+      this.fig.setCurves(base, keep);
       return;
     }
     const tt = base.arrays.two_theta, pv = preview.arrays;
     const header = { ...base.header, ticks: preview.header.ticks ?? {},
                      tick_hkl: preview.header.tick_hkl ?? {} };
     if (!base.header.fit) {
-      const at = channelIndex(tt, pv.two_theta), keep: number[] = [];
-      at.forEach((i, q) => { if (i >= 0) keep.push(q); });
-      const pick = (a: ArrayLike<number>) => Float64Array.from(keep, (q) => a[q]);
+      const at = channelIndex(tt, pv.two_theta), hit: number[] = [];
+      at.forEach((i, q) => { if (i >= 0) hit.push(q); });
+      const pick = (a: ArrayLike<number>) => Float64Array.from(hit, (q) => a[q]);
       this.previewOn = null;
       this.fig.setCurves({ header: { ...header, fit: true }, arrays: {
-        ...base.arrays, fitted: Int32Array.from(keep, (q) => at[q]),
+        ...base.arrays, fitted: Int32Array.from(hit, (q) => at[q]),
         y_calc: pick(pv.y_calc), y_background: pick(pv.y_background), delta: pick(pv.delta),
-        delta_raw: pick(pv.delta_raw), cumulative_chi2: pick(pv.cumulative_chi2) } }, true);
+        delta_raw: pick(pv.delta_raw), cumulative_chi2: pick(pv.cumulative_chi2) } }, keep);
       return;
     }
     const fitTT = Float64Array.from(base.arrays.fitted, (i) => tt[i]);
     const at = channelIndex(pv.two_theta, fitTT);
     const pick = (a: ArrayLike<number>) => Float64Array.from(at, (j) => (j < 0 ? NaN : a[j]));
+    // a running sum has a value at a channel the preview does not fit: the sum
+    // so far. A NaN there would make every zoom's re-based Σχ² past it NaN
+    let sum = 0;
+    const cum = Float64Array.from(at, (j) => (sum = j < 0 ? sum : pv.cumulative_chi2[j]));
     this.previewOn = { tt: fitTT, last: base.arrays.y_calc, calc: pick(pv.y_calc) };
     this.fig.setCurves({ header, arrays: {
       ...base.arrays, delta: pick(pv.delta), delta_raw: pick(pv.delta_raw),
-      cumulative_chi2: pick(pv.cumulative_chi2) } }, true);
+      cumulative_chi2: cum } }, keep);
   }
 
   /** New layer inputs; a repaint, never a refetch. */

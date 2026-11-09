@@ -98,6 +98,8 @@ export function peakWindows(c: Curves, bins = BINS): PeakWindow[] {
 /** The windows shown first: one low, one in the middle and one high, as the prototype did. */
 export function firstPicks(n: number): number[] {
   if (n <= SHOWN) return Array.from({ length: n }, (_, i) => i);
+  // at four, the prototype's [1, n/2, n − 2] names the third window twice
+  if (n === SHOWN + 1) return [0, Math.floor(n / 2), n - 1];
   return [1, Math.floor(n / 2), n - 2];
 }
 

@@ -174,7 +174,7 @@ export function editText(v: number): string {
 
 /** Read a typed value, or say why it is refused (not a number, out of the row's bounds). */
 export function parseTyped(s: Pick<Slider, "bound">, text: string): { value: number } | { why: string } {
-  const t = text.trim().replace("−", "-");
+  const t = text.trim().replaceAll("−", "-");
   const v = t === "" ? NaN : Number(t);
   if (!Number.isFinite(v)) return { why: "not a number" };
   if (v < s.bound[0]) return { why: `below the lower bound ${s.bound[0]}` };
