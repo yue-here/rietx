@@ -1,45 +1,61 @@
 <script lang="ts">
   /**
-   * The plan editor: which preset, which stages, in which order, and — since
-   * WP-1208 — which parameters each stage will actually free.
+   * The plan as a recipe (WP-2127; the ladder since WP-1208, the editor since
+   * WP-1011): one stage per row, read top to bottom, each saying which
+   * parameters it takes out of the user's hands.
    *
    * A project stores the plan **expanded through its mode**, so this list is
-   * exactly what a run will execute — picking `mccusker_default` in Le Bail mode
-   * shows `profile_only`'s stages, because that is what `fit` would have
-   * substituted at run time (WP-1008).  The preset name beside the menu is
-   * *derived* by comparing the stages against the registry, so editing a stage
-   * turns the label to "custom" by itself rather than by a flag someone has to
-   * remember to clear.
+   * exactly what a run will execute — picking `mccusker_default` in Le Bail
+   * mode shows `profile_only`'s stages, because that is what `fit` would have
+   * substituted at run time (WP-1008).  The preset named in the menu is
+   * *derived* by comparing the stages against the registry, so an edited plan
+   * reads "edited" by itself rather than by a flag someone has to clear.
    *
-   * `Run this stage` sends the same `StageSpec` the list is holding, through the
-   * same run machinery a whole fit uses — which is what makes "run one stage,
-   * look, run the next" the interactive loop the CLI never had.
+   * Five rules.
    *
-   * Four rules for the ladder half.
+   * **The numbers come from the server, resolved, never matched here.**  What
+   * a stage frees is not its globs' matches: it is the matches minus what is
+   * tied, locked, mode-fixed or degenerate with a free cell, and those rules
+   * live in `ParameterTable.set_vary`.  `GET /api/plan/resolve` runs them, and
+   * `lib/fnmatch.ts` stays the parameter table's bulk-edit preview.
    *
-   * **The numbers come from the server, resolved, never matched here.**  The
-   * client owns an fnmatch port (`lib/fnmatch.ts`) for the parameter table's
-   * bulk-edit preview, and it is deliberately not used here: what a stage frees
-   * is not the glob's matches, it is the glob's matches minus what is tied,
-   * locked, mode-fixed or degenerate with a free cell, and those rules live in
-   * `ParameterTable.set_vary`.  `GET /api/plan/resolve` runs them.
+   * **An edited stage has no resolved facts, and the stages before it keep
+   * theirs.**  A plan is cumulative, so stage k's facts depend on stages 0…k
+   * alone (`lib/plan.ts:resolvedPrefix`).  The closing stage's Rwp and the
+   * set-aside list depend on the whole plan, so an edit blanks them and keeps
+   * their rows, since a row that vanished would move what is below it.
    *
-   * **A dirty plan has no resolved facts**, because the ladder describes the
-   * plan the server holds and an edited stage is not that plan.  They are
-   * hidden rather than left standing, and the panel says why.
+   * **The plan's edits are the action bar's** (the maintainer's ruling of
+   * 2026-11-07: the panel ends in Apply and "Apply and refine").  An edited
+   * plan is one pending edit there; Apply stores it through `PUT /api/plan`
+   * (`save`), Revert drops it (`revert`), and Refine on the staged plan
+   * applies it first.  So this panel has no Save button of its own.  A head
+   * move refetches the server's plan and keeps an unsaved one on screen,
+   * because the bar's Apply moves the head before it saves the plan.
    *
-   * **The advanced field list is derived from `lib/rxt.ts`**, whose three stage
-   * arrays are pinned to `StageSpec` from python (`tests/test_textdoc.py`).  So
-   * a field added to the schema arrives in this form, keyed to its own corpus
-   * entry by its own name — the `controls.ts`/`wizard.ts` rule, one vocabulary
-   * over.  A label it has no short name for renders as the field name.
+   * **Every edit can be undone** (interaction rule 10, adopted 2026-11-08).
+   * Plan edits are settings, not history nodes, so the stack is the panel's
+   * own (`lib/plan.ts:Undo`): ⌘Z and ⇧⌘Z inside the tab, outside a text
+   * field, and the palette.  A preset pick is stored at once, because only
+   * the server can expand it through the mode, and undoing it puts the stages
+   * before it back on screen as an edit for Apply to store.
    *
-   * **An emptied box is `null` only where the schema admits one.**  Everywhere
-   * else it is left alone, so the refusal a person meets is a typed value out
-   * of range rather than a box they cleared by accident.
+   * **The advanced field list is derived from `lib/rxt.ts`**, whose stage
+   * arrays are pinned to `StageSpec` from python (`tests/test_textdoc.py`), so
+   * a field added to the schema arrives in this form under its own name.  An
+   * emptied box is `null` only where the schema admits one.
+   *
+   * A glob is a `.chip`, a fact, and the verb that removes it is a ghost
+   * button beside it: a chip never acts (`gui/CLAUDE.md` § House style).
    */
+  import { tick } from "svelte";
+
   import Help from "../Help.svelte";
   import { ApiError, api } from "../api";
+  import {
+    type Stage, Undo, addGlobs, dropIndex, moveStage, newStageName, planDiffers,
+    resolvedPrefix, slideOffset,
+  } from "../lib/plan";
   import { STAGE_INT_WORDS, STAGE_NULLABLE_WORDS, STAGE_WORDS } from "../lib/rxt";
 
   let {
@@ -50,37 +66,26 @@
     simple = true,
     say = (_line: string) => {},
     onrun = (_stage: any) => {},
-    onrunall = () => {},
+    onpending = (_edited: boolean) => {},
   }: {
     mode?: string;
     head?: string | null;
     busy?: boolean;
-    /** Why a run is refused right now, or `null` when it is not. Zero phases
-     *  is a legal project state (WP-1207) and the run verb refuses it, so both
-     *  run buttons here are disabled carrying the reason rather than offering
-     *  a click whose only outcome is a 409 — `gui/CLAUDE.md`'s rule, which the
-     *  header's own Run already follows. The **sentence** is the shell's, not
-     *  this panel's: it names the route out (index a pattern, adopt a cell),
-     *  and a second copy here said "add one in the Model tab", which is a
-     *  different instruction for the same state. */
+    /** Why a run is refused right now, or `null`.  The sentence is the
+     *  shell's (WP-1207): it names the route out, and a second copy here said
+     *  something else for the same state. */
     noPhasesReason?: string | null;
     simple?: boolean;
     say?: (line: string) => void;
     onrun?: (stage: any) => void;
-    onrunall?: () => void;
+    /** whether the plan on screen differs from the one the project holds */
+    onpending?: (edited: boolean) => void;
   } = $props();
 
-  interface Stage {
-    name: string;
-    turn_on: string[];
-    [key: string]: unknown;
-  }
-
-  /** Every `StageSpec` field but the two the list already draws. */
+  /** Every `StageSpec` field but the two each row already draws. */
   const FIELDS = STAGE_WORDS.filter((word) => word !== "free");
 
-  /** Short names for the boxes, at the width a sidebar has. A field with no
-   *  entry here renders under its own name rather than going missing. */
+  /** Short names for the boxes, at the width a sidebar has. */
   const FIELD_LABEL: Record<string, string> = {
     max_iter: "iter",
     lebail_cycles: "lebail",
@@ -90,16 +95,43 @@
     window_slack_deg: "slack",
   };
 
+  /** The plan the project holds, as `GET /api/plan` last answered. */
+  let saved = $state<Stage[]>([]);
+  let savedGuard = $state(0.98);
+  /** The plan on screen. */
   let stages = $state<Stage[]>([]);
   let guard = $state(0.98);
   let preset = $state<string | null>(null);
   let presets = $state<any[]>([]);
   let resolved = $state<any>(null);
   let error = $state("");
-  let dirty = $state(false);
-  let dragging = $state<number | null>(null);
   /** which stage the `.` shortcut and the palette entry would run */
   let selected = $state(0);
+  /** the text typed into each stage's add field, by index */
+  let adding = $state<Record<number, string>>({});
+  let list = $state<HTMLOListElement | null>(null);
+
+  /** The plan fields this panel has no control for (`intermediate_ftol`,
+   *  `lebail_passes`, whatever comes next), carried through a save. */
+  let extra = $state<Record<string, unknown>>({});
+  function otherFields(plan: Record<string, unknown>) {
+    const { stages: _s, correlation_guard: _g, ...rest } = plan;
+    return rest;
+  }
+
+  const edited = $derived(planDiffers(saved, stages) || guard !== savedGuard);
+  $effect(() => onpending(edited));
+
+  /** How many leading stages still carry the server's resolved facts. */
+  const prefix = $derived(
+    resolved?.stages?.length === saved.length ? resolvedPrefix(saved, stages) : 0,
+  );
+  // Both depend on the whole plan, so an edit takes their numbers away and
+  // leaves their rows: an edit that removed a row would move what is below
+  // it, and no edit may move the layout (ruled 2026-11-07).  The closing
+  // stage follows the plan's own field, which no stage edit changes.
+  const closing = $derived(resolved?.closing ?? null);
+  const setAside = $derived((resolved?.set_aside ?? []) as string[]);
 
   /** Presets whose declared modes include the project's, first. */
   const offered = $derived(
@@ -109,20 +141,75 @@
     }),
   );
   const chosen = $derived(presets.find((p) => p.name === preset) ?? null);
-  /** The resolved stages, or `null` while the plan on screen is not the
-   *  server's — see the dirty-plan rule in the header comment. */
-  const ladder = $derived(
-    !dirty && resolved?.stages?.length === stages.length ? resolved.stages : null,
-  );
-  const setAside = $derived((dirty ? [] : resolved?.set_aside ?? []) as string[]);
 
-  /** The plan fields this panel has no control for (`intermediate_ftol`,
-   *  `lebail_passes`, whatever comes next), carried through a save: sending
-   *  only what the panel edits made the server fill each with its default. */
-  let extra = $state<Record<string, unknown>>({});
-  function otherFields(plan: Record<string, unknown>) {
-    const { stages: _s, correlation_guard: _g, ...rest } = plan;
-    return rest;
+  /* ---- undo ------------------------------------------------------------ */
+
+  const history = new Undo<{ stages: Stage[]; guard: number }>();
+  /** bumped on every change of the stack, so `canUndo` is reactive */
+  let undoTick = $state(0);
+  /** the field being typed into, so one burst of typing is one undo step */
+  let typing = "";
+
+  function snapshot() {
+    return { stages: $state.snapshot(stages) as Stage[], guard };
+  }
+
+  /** Record the state an edit is about to leave. */
+  function remember(key = "") {
+    if (key && key === typing) return;
+    typing = key;
+    history.record(snapshot());
+    undoTick += 1;
+  }
+
+  function restore(state: { stages: Stage[]; guard: number } | null) {
+    if (!state) return;
+    stages = state.stages;
+    guard = state.guard;
+    typing = "";
+    undoTick += 1;
+  }
+
+  export function undo() {
+    restore(history.undo(snapshot()));
+  }
+
+  export function redo() {
+    restore(history.redo(snapshot()));
+  }
+
+  export function canUndo(): boolean {
+    void undoTick;
+    return !busy && history.canUndo;
+  }
+
+  export function canRedo(): boolean {
+    void undoTick;
+    return !busy && history.canRedo;
+  }
+
+  function keydown(event: KeyboardEvent) {
+    if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
+    // a text field keeps its own undo, which is the one a person typing expects
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.("input, textarea, select")) return;
+    event.preventDefault();
+    if (event.shiftKey) redo();
+    else undo();
+  }
+
+  /* ---- the server's plan ----------------------------------------------- */
+
+  function adopt(plan: any) {
+    const keep = edited;
+    saved = plan.plan.stages;
+    savedGuard = plan.plan.correlation_guard;
+    extra = otherFields(plan.plan);
+    preset = plan.preset;
+    if (!keep) {
+      stages = structuredClone(plan.plan.stages);
+      guard = plan.plan.correlation_guard;
+    }
   }
 
   async function load() {
@@ -130,13 +217,9 @@
       const [plan, registry, resolve] = await Promise.all([
         api.plan(), api.plans(), api.planResolve(),
       ]);
-      stages = plan.plan.stages;
-      guard = plan.plan.correlation_guard;
-      extra = otherFields(plan.plan);
-      preset = plan.preset;
+      adopt(plan);
       presets = registry.plans;
       resolved = resolve;
-      dirty = false;
       error = "";
     } catch (exc) {
       if (!(exc instanceof ApiError && exc.empty)) error = (exc as Error).message;
@@ -149,72 +232,181 @@
     load();
   });
 
-  async function put(body: Record<string, unknown>) {
+  /** Store a plan; true when the server took it. */
+  async function put(body: Record<string, unknown>): Promise<boolean> {
     try {
       const payload = await api.putPlan(body);
-      stages = payload.plan.stages;
+      saved = payload.plan.stages;
+      savedGuard = payload.plan.correlation_guard;
+      stages = structuredClone(payload.plan.stages);
       guard = payload.plan.correlation_guard;
       extra = otherFields(payload.plan);
       preset = payload.preset;
-      dirty = false;
       error = "";
       resolved = await api.planResolve();
+      return true;
     } catch (exc) {
       error = exc instanceof ApiError && exc.busy
         ? "a run is in flight — the plan is read-only until it ends"
         : (exc as Error).message;
+      return false;
     }
   }
 
   async function pick(name: string) {
+    remember();
     say(`plan = resolve_plan(${JSON.stringify(name)}, ${JSON.stringify(mode)})`);
     await put({ preset: name });
   }
 
-  async function save() {
+  /** The action bar's Apply: store the plan on screen.  True when there was
+   *  nothing to store or the server took it. */
+  export async function save(): Promise<boolean> {
+    if (!edited) return true;
     say(`project.doc.plan = PlanSpec(stages=[${stages.length}], correlation_guard=${guard})`);
-    await put({ plan: { ...extra, stages, correlation_guard: guard } });
+    return put({ plan: { ...extra, stages: $state.snapshot(stages), correlation_guard: guard } });
   }
 
-  function touch() {
-    dirty = true;
+  /** The action bar's Revert: the plan the project holds, back on screen. */
+  export function revert() {
+    if (!edited) return;
+    remember();
+    stages = structuredClone($state.snapshot(saved) as Stage[]);
+    guard = savedGuard;
+    adding = {};
+    error = "";
   }
+
+  /* ---- edits ----------------------------------------------------------- */
 
   function move(from: number, to: number) {
-    if (to < 0 || to >= stages.length || from === to) return;
-    const next = [...stages];
-    next.splice(to, 0, ...next.splice(from, 1));
-    stages = next;
-    touch();
+    if (from === to || to < 0 || to >= stages.length) return;
+    remember();
+    stages = moveStage(stages, from, to);
+    if (selected === from) selected = to;
   }
 
-  function remove(index: number) {
+  function removeStage(index: number) {
+    if (stages.length <= 1) return;
+    remember();
     stages = stages.filter((_, i) => i !== index);
-    touch();
+    adding = {};
+    selected = Math.min(selected, stages.length - 1);
   }
 
-  function globs(index: number, text: string) {
-    stages[index].turn_on = text.split(",").map((s) => s.trim()).filter(Boolean);
-    touch();
+  async function addStage() {
+    remember();
+    const name = newStageName(stages);
+    stages = [...stages, { name, turn_on: [] }];
+    selected = stages.length - 1;
+    await tick();
+    const input = list?.querySelector<HTMLInputElement>(
+      `:scope > li.stage:nth-child(${stages.length}) input.name`);
+    input?.focus({ preventScroll: true });
+    input?.select();
+    input?.scrollIntoView?.({ block: "nearest" });
+  }
+
+  function rename(index: number, value: string) {
+    remember(`name:${index}`);
+    stages[index].name = value;
+  }
+
+  function addGlob(index: number) {
+    const text = adding[index] ?? "";
+    const next = addGlobs(stages[index].turn_on, text);
+    adding[index] = "";
+    if (next.length === stages[index].turn_on.length) return;
+    remember();
+    stages[index].turn_on = next;
+  }
+
+  function removeGlob(index: number, at: number) {
+    remember();
+    stages[index].turn_on = stages[index].turn_on.filter((_, i) => i !== at);
   }
 
   function field(index: number, key: string, raw: string) {
+    let value: unknown;
     if (raw === "") {
       if (!STAGE_NULLABLE_WORDS.includes(key)) return;   // left alone, not nulled
-      stages[index][key] = null;
+      value = null;
     } else {
-      stages[index][key] = STAGE_INT_WORDS.includes(key)
-        ? parseInt(raw, 10) : Number(raw);
+      value = STAGE_INT_WORDS.includes(key) ? parseInt(raw, 10) : Number(raw);
     }
-    touch();
+    remember(`field:${index}:${key}`);
+    stages[index][key] = value;
   }
+
+  function setGuard(raw: string) {
+    if (raw === "") return;
+    remember("guard");
+    guard = Number(raw);
+  }
+
+  /* ---- reorder: the three-line handle ---------------------------------- */
+
+  /** The drag in progress: where it started, where the row would land, and
+   *  the rows' geometry when it began. */
+  let drag = $state<{ from: number; to: number; dy: number; height: number;
+                      centres: number[]; y0: number } | null>(null);
+
+  function grab(event: PointerEvent, index: number) {
+    if (busy || event.button !== 0 || !list) return;
+    const rows = [...list.querySelectorAll<HTMLElement>(":scope > li.stage")];
+    const rects = rows.map((row) => row.getBoundingClientRect());
+    drag = { from: index, to: index, dy: 0, height: rects[index].height,
+             centres: rects.map((r) => r.top + r.height / 2), y0: event.clientY };
+    (event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  }
+
+  function drift(event: PointerEvent) {
+    if (!drag) return;
+    const dy = event.clientY - drag.y0;
+    drag.dy = dy;
+    drag.to = dropIndex(drag.centres, drag.from, drag.centres[drag.from] + dy);
+  }
+
+  async function drop() {
+    if (!drag) return;
+    const { from, to } = drag;
+    drag = null;
+    move(from, to);
+    await tick();
+    handleAt(to)?.focus({ preventScroll: true });
+  }
+
+  function handleAt(index: number) {
+    return list?.querySelector<HTMLElement>(`[data-handle="${index}"]`) ?? null;
+  }
+
+  async function nudge(event: KeyboardEvent, index: number) {
+    const step = ({ ArrowUp: -1, ArrowDown: 1 } as Record<string, number>)[event.key];
+    if (!step || busy) return;
+    event.preventDefault();
+    const to = index + step;
+    if (to < 0 || to >= stages.length) return;
+    move(index, to);
+    await tick();
+    handleAt(to)?.focus({ preventScroll: true });
+  }
+
+  function shift(index: number): string {
+    if (!drag) return "";
+    if (index === drag.from) return `translateY(${drag.dy}px)`;
+    const by = slideOffset(index, drag.from, drag.to, drag.height);
+    return by ? `translateY(${by}px)` : "";
+  }
+
+  /* ---- runs ------------------------------------------------------------ */
 
   export function runStage(index = selected) {
     const stage = stages[index];
     if (stage) {
       selected = index;
       say(`ref.run_stage(Stage(${JSON.stringify(stage.name)}, ${JSON.stringify(stage.turn_on)}))`);
-      onrun(stage);
+      onrun($state.snapshot(stage));
     }
   }
 
@@ -226,14 +418,21 @@
   const pct = (value: number) => `${(value * 100).toFixed(2)}%`;
 </script>
 
-<section>
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<section onkeydown={keydown} aria-label="plan">
   <header>
+    <span class="lab">
+      {#if chosen && !edited}<Help for="plans:{chosen.name}">Preset</Help>{:else}Preset{/if}
+    </span>
     <select
-      value={preset ?? ""}
+      value={edited || preset === null ? "" : preset}
       disabled={busy}
+      title={chosen && !edited ? chosen.description : null}
       onchange={(event) => pick((event.currentTarget as HTMLSelectElement).value)}>
-      {#if preset === null}
-        <option value="" disabled>custom ({stages.length} stages)</option>
+      {#if edited || preset === null}
+        <option value="" disabled>
+          {chosen ? `${chosen.title}, edited` : `custom, ${stages.length} stages`}
+        </option>
       {/if}
       {#each offered as item (item.name)}
         <option value={item.name} title={item.when_to_use}>
@@ -241,87 +440,64 @@
         </option>
       {/each}
     </select>
-    <!-- ghost, not the primary: the header's own Run is this same verb and is
-         on screen whichever tab is up, so two filled buttons would be one
-         action drawn twice.  Saving is the action that belongs to this panel,
-         and it takes the fill while there is something to save. -->
-    <button class="ghost" disabled={busy || dirty || !!noPhasesReason} onclick={onrunall}
-      title={noPhasesReason
-             ?? (dirty ? "save the plan first — this runs the plan the project holds"
-                       : "run every stage in order")}>Run all</button>
-    {#if dirty}
-      <button class="ghost" disabled={busy} onclick={save}>Save plan</button>
-      <button class="ghost" disabled={busy} onclick={load}>Revert</button>
-    {/if}
+    <button class="ghost" disabled={busy} onclick={addStage}>+ Stage</button>
   </header>
-
-  <p class="blurb">
-    A plan is an ordered list of stages. Each stage frees the parameters it
-    names and refines them together with everything an earlier stage freed, so
-    the free set only grows. Run all works down the whole list from a table
-    where nothing is free. Run this stage runs one, from where the model
-    stands now.
-  </p>
-
-  {#if chosen}
-    <!-- the preset's own words are the corpus's `plans` arm, projected from
-         `PLAN_INFO` — the line shown is `description`, and `when_to_use` is
-         one click away rather than one hover (WP-1203/1208) -->
-    <p class="muted blurb">
-      <Help for="plans:{chosen.name}">{chosen.description}</Help>
-    </p>
-  {:else}
-    <p class="muted blurb">
-      Edited — no preset matches these stages. Saving stores them as they stand.
-    </p>
-  {/if}
-
-  {#if dirty}
-    <p class="muted blurb">Unsaved edits. Save the plan to see what its stages free.</p>
-  {:else if resolved}
-    <p class="muted blurb">
-      Ends with {resolved.n_free_final} of {resolved.n_parameters} parameters free.
-    </p>
-  {/if}
 
   {#if error}<p class="bad">{error}</p>{/if}
 
-  <ol class="stages">
+  <ol class="stages" bind:this={list}>
     {#each stages as stage, index (index)}
-      {@const step = ladder?.[index] ?? null}
-      <li
-        class:dragging={dragging === index}
-        class:selected={selected === index}
-        draggable={!busy}
-        ondragstart={() => (dragging = index)}
-        ondragend={() => (dragging = null)}
-        ondragover={(event) => event.preventDefault()}
-        ondrop={() => dragging !== null && move(dragging, index)}>
+      {@const step = index < prefix ? resolved.stages[index] : null}
+      <li class="stage" class:lift={drag?.from === index} class:slide={!!drag && drag.from !== index}
+        class:selected={selected === index} style:transform={shift(index)}>
         <div class="head">
-          <span class="grip muted" title="drag to reorder">⠿</span>
-          <span class="lab"><Help for="stage_fields:name">name</Help></span>
-          <input class="name mono" bind:value={stage.name} oninput={touch} disabled={busy}
-            onfocus={() => (selected = index)} />
-          <button class="ghost" disabled={busy} onclick={() => remove(index)} title="remove"
-            >×</button>
+          <!-- a handle, not a button register: it is dragged, and a box would
+               be a second thing to aim at in a row that is already the target -->
+          <span class="handle" role="button" tabindex={busy ? -1 : 0} data-handle={index}
+            aria-label="Move stage {index + 1}" aria-disabled={busy}
+            title="Drag to reorder, or press ↑ and ↓"
+            onpointerdown={(event) => grab(event, index)} onpointermove={drift}
+            onpointerup={drop} onpointercancel={() => (drag = null)}
+            onkeydown={(event) => nudge(event, index)}>
+            <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 3.5h8M2 6h8M2 8.5h8" /></svg>
+          </span>
+          <span class="step">{index + 1}</span>
+          <input class="name mono" value={stage.name} disabled={busy}
+            aria-label="Name of stage {index + 1}"
+            oninput={(event) => rename(index, (event.currentTarget as HTMLInputElement).value)}
+            onfocus={() => (selected = index)} onblur={() => (typing = "")} />
+          <button class="ghost" disabled={busy || !!noPhasesReason}
+            title={noPhasesReason ?? "run this stage as it stands here, from where the model stands"}
+            onclick={() => runStage(index)}>Run this stage</button>
+          <button class="ghost" disabled={busy || stages.length <= 1}
+            aria-label="Remove stage {index + 1}"
+            title={stages.length <= 1 ? "a plan needs at least one stage" : "remove this stage"}
+            onclick={() => removeStage(index)}>×</button>
         </div>
-        <!-- the grip's width is the gutter these two rows are indented past,
-             so `name` and `frees` sit in one column -->
-        <label class="globs-row indent">
-          <span class="lab"><Help for="stage_fields:turn_on">frees</Help></span>
-          <input
-            class="globs mono"
-            value={stage.turn_on.join(", ")}
-            placeholder="dot-path globs freed here — phases.*.cell.*"
-            disabled={busy}
-            oninput={(event) => globs(index, (event.currentTarget as HTMLInputElement).value)} />
-        </label>
+
+        <div class="frees indent">
+          <span class="lab"><Help for="stage_fields:turn_on">Frees</Help></span>
+          {#each stage.turn_on as glob, at (at)}
+            <span class="glob">
+              <span class="chip mono">{glob}</span>
+              <button class="ghost" disabled={busy}
+                aria-label="Remove {glob} from stage {index + 1}"
+                title="remove from this stage"
+                onclick={() => removeGlob(index, at)}>×</button>
+            </span>
+          {/each}
+          <input class="add mono" disabled={busy} placeholder="add a glob"
+            aria-label="Add a glob to stage {index + 1}"
+            title="Type a dot-path glob and press Enter"
+            value={adding[index] ?? ""}
+            oninput={(event) => (adding[index] = (event.currentTarget as HTMLInputElement).value)}
+            onkeydown={(event) => { if (event.key === "Enter") addGlob(index); }} />
+        </div>
 
         <div class="rung indent">
           {#if step}
             <details>
               <summary>
-                <span class="step">{index + 1}</span> ·
                 <span class="count">+{step.frees.length}</span>
                 → {step.n_free} free
                 {#if step.held.length}· {step.held.length} held{/if}
@@ -344,9 +520,7 @@
                   <p class="lab">matched, and held</p>
                   <ul class="paths mono">
                     {#each step.held as row (row.path)}
-                      <li>
-                        <Help text={row.held_because}>{row.path}</Help>
-                      </li>
+                      <li><Help text={row.held_because}>{row.path}</Help></li>
                     {/each}
                   </ul>
                 {/if}
@@ -356,23 +530,18 @@
               </div>
             </details>
           {:else}
-            <span class="muted"><span class="step">{index + 1}</span> · not resolved</span>
+            <span class="muted" title="Apply the plan to see what this stage frees">not applied</span>
           {/if}
-          <!-- enabled while the plan is dirty, unlike Run all: this sends the
-               stage as it stands on screen, so there is nothing to save first -->
-          <button class="ghost" disabled={busy || !!noPhasesReason}
-            title={noPhasesReason
-                   ?? "run this stage as it stands here, through the same machinery a fit uses"}
-            onclick={() => runStage(index)}>Run this stage</button>
         </div>
 
         {#if !simple}
-          <div class="advanced mono muted">
+          <div class="advanced mono muted indent">
             {#each FIELDS as key (key)}
               <label>
                 <Help for="stage_fields:{key}">{FIELD_LABEL[key] ?? key}</Help>
                 <input type="number" step="any" disabled={busy}
                   value={(stage[key] ?? "") as string | number}
+                  onblur={() => (typing = "")}
                   oninput={(event) =>
                     field(index, key, (event.currentTarget as HTMLInputElement).value)} />
               </label>
@@ -381,41 +550,46 @@
         {/if}
       </li>
     {/each}
-  </ol>
 
-  <!-- the stage every plan ends with (WP-2002): not editable here, and its Rwp
-       is the answer's, which the last declared rung's is not -->
-  {#if ladder && resolved?.closing}
-    <p class="muted blurb">
-      Then <span class="mono">{resolved.closing.name}</span>: every stage's globs once
-      more, with windows that drop {pct(resolved.closing.window_area_tol)} of each peak{#if
-        resolved.closing.rwp !== null} · Rwp {pct(resolved.closing.rwp)}{/if}
-    </p>
-  {/if}
+    <!-- the stage every plan ends with (WP-2002): not editable here, and its
+         Rwp is the answer's, which the last declared rung's is not -->
+    {#if closing}
+      <li class="closing">
+        <div class="head">
+          <span class="handle-space"></span>
+          <span class="step"></span>
+          <span class="mono muted">{closing.name}</span>
+        </div>
+        <div class="frees indent muted"
+          title="every stage's globs once more, with windows that drop {pct(closing.window_area_tol)} of each peak">
+          <span class="lab">Frees</span> everything above
+          {#if !edited && closing.rwp !== null}· Rwp {pct(closing.rwp)}{/if}
+        </div>
+      </li>
+    {/if}
+  </ol>
 
   {#if setAside.length}
     <details class="aside">
-      <summary>
-        {setAside.length} parameter{setAside.length === 1 ? "" : "s"} you freed by
-        hand, named by no stage
+      <summary title="The staged plan starts from a table where nothing is free, so it holds these. Run this stage keeps them free, because a single stage continues from where the model stands.">
+        {#if edited}parameters you freed by hand: not applied{:else}{setAside.length}
+          parameter{setAside.length === 1 ? "" : "s"} you freed by hand, held by the plan{/if}
       </summary>
-      <p class="muted">
-        Run all holds these: it starts every plan from a table where nothing is
-        free. Run this stage keeps them free, because a single stage continues
-        from where the model stands.
-      </p>
-      <ul class="paths mono">
-        {#each setAside as path (path)}<li>{path}</li>{/each}
-      </ul>
+      {#if !edited}
+        <ul class="paths mono">
+          {#each setAside as path (path)}<li>{path}</li>{/each}
+        </ul>
+      {/if}
     </details>
   {/if}
 
   {#if !simple}
-    <p class="muted blurb">
+    <p class="guardline muted">
       <label title="report a parameter pair correlated above this after each stage">
         correlation guard
-        <input class="mono guard" type="number" step="0.01" min="0" max="1" bind:value={guard}
-          oninput={touch} disabled={busy} />
+        <input class="mono guard" type="number" step="0.01" min="0" max="1" value={guard}
+          disabled={busy} onblur={() => (typing = "")}
+          oninput={(event) => setGuard((event.currentTarget as HTMLInputElement).value)} />
       </label>
     </p>
   {/if}
@@ -428,18 +602,24 @@
     min-height: 0;
     overflow: auto;
     flex: 1 1 auto;
-    padding: 6px 8px 10px;
+    padding: 0 8px 10px;
   }
 
+  /* the plan bar stays in view while a long plan scrolls under it */
   header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     display: flex;
     gap: 6px;
     align-items: center;
-    flex-wrap: wrap;
+    padding: 6px 0;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
   }
 
   select {
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-width: 0;
     padding: 3px 4px;
     border: 1px solid var(--line);
@@ -448,30 +628,31 @@
     color: var(--fg);
   }
 
-  .blurb {
-    margin: 4px 0;
-  }
-
   ol.stages {
     list-style: none;
-    margin: 4px 0 0;
+    margin: 0;
     padding: 0;
   }
 
   ol.stages > li {
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    padding: 4px 5px;
-    margin-bottom: 4px;
+    padding: 6px 0;
     background: var(--panel);
   }
 
-  ol.stages > li.dragging {
-    opacity: 0.5;
+  ol.stages > li + li {
+    border-top: 1px solid var(--line);
   }
 
-  ol.stages > li.selected {
-    border-color: var(--accent);
+  /* the lifted stage follows the pointer above its neighbours, which slide
+     aside to show where it will land */
+  ol.stages > li.lift {
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.16);
+  }
+
+  ol.stages > li.slide {
+    transition: transform 0.14s ease;
   }
 
   .head {
@@ -480,24 +661,65 @@
     gap: 4px;
   }
 
-  .grip {
-    cursor: grab;
-    flex: 0 0 14px;
+  .handle,
+  .handle-space {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 18px;
+    height: 22px;
+    color: var(--muted);
   }
 
-  /* past the grip, so every row's label starts in the same column */
-  .indent {
-    padding-left: 18px;
+  .handle {
+    cursor: grab;
+    border-radius: 4px;
+    touch-action: none;
+  }
+
+  .handle:hover {
+    color: var(--fg);
+    background: color-mix(in srgb, var(--fg) 8%, transparent);
+  }
+
+  .handle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  li.lift .handle {
+    cursor: grabbing;
+  }
+
+  .handle svg {
+    width: 12px;
+    height: 12px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
   }
 
   .step {
+    flex: 0 0 2ch;
+    text-align: right;
     font-variant-numeric: tabular-nums;
+    color: var(--muted);
   }
 
-  /* a field's label sits on the control's row (WP-1201's --text-sm register) */
+  li.selected .step {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* past the handle and the number, so a stage's lines start under its name */
+  .indent {
+    padding-left: calc(18px + 2ch + 8px);
+  }
+
   .lab {
     font-size: var(--text-sm);
-    flex: 0 0 34px;
+    color: var(--muted);
   }
 
   input {
@@ -520,32 +742,32 @@
     font-weight: 600;
   }
 
-  .globs-row {
+  /* the recipe's verb line: what this stage frees, one chip per glob */
+  .frees {
     display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 3px;
-  }
-
-  .globs {
-    flex: 1 1 auto;
-    border-color: var(--line);
-  }
-
-  /* the ladder line: what this stage adds, and the one verb that runs it */
-  .rung {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 6px;
     flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
     margin-top: 3px;
     font-size: var(--text-sm);
   }
 
-  .rung details {
-    flex: 1 1 auto;
-    min-width: 0;
+  /* a glob and its × wrap as one, so the verb never lands on another line
+     from the fact it acts on */
+  .glob {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+  }
+
+  .add {
+    flex: 1 1 12ch;
+    border-color: var(--line);
+  }
+
+  .rung {
+    margin-top: 3px;
+    font-size: var(--text-sm);
   }
 
   .rung summary {
@@ -600,15 +822,18 @@
 
   details.aside {
     margin-top: 6px;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: 2px 8px 4px;
+    border-top: 1px solid var(--line);
+    padding: 4px 0;
     font-size: var(--text-sm);
   }
 
   details.aside summary {
     cursor: pointer;
     user-select: none;
+  }
+
+  .guardline {
+    margin: 6px 0 0;
   }
 
   .guard {
@@ -618,6 +843,6 @@
 
   .bad {
     color: var(--bad);
-    margin: 2px 0;
+    margin: 4px 0;
   }
 </style>

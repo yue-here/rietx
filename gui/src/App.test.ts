@@ -1194,17 +1194,40 @@ describe("the plan editor", () => {
     return stub;
   }
 
-  it("lists the stages the run will actually execute, and names the preset", async () => {
+  /** The action bar's button labelled `text` — scoped, because the Model and
+   *  Text panels keep an Apply of their own. */
+  function bar(text: string): HTMLButtonElement | undefined {
+    return [...host.querySelectorAll<HTMLButtonElement>(".actions button")]
+      .find((b) => b.textContent?.trim().startsWith(text));
+  }
+
+  const summaries = () => [...host.querySelectorAll("ol.stages > li.stage .rung")]
+    .map((n) => (n.querySelector("summary") ?? n).textContent!.replace(/\s+/g, " ").trim());
+
+  it("reads as a recipe: one row per stage, its globs as facts, no prose", async () => {
     await openPlan();
-    const names = [...host.querySelectorAll<HTMLInputElement>(".name")].map((i) => i.value);
+    const names = [...host.querySelectorAll<HTMLInputElement>("li.stage input.name")]
+      .map((i) => i.value);
     expect(names).toEqual(["scale+bkg", "cell"]);
-    expect(host.querySelector<HTMLSelectElement>("select")?.value).toBe("mccusker_default");
-    // the preset's own words, from PLAN_INFO through /api/plans.  `description`
-    // is the visible one since WP-1208 and `when_to_use` is in the popover, so
-    // this is the line a person reads without clicking anything
-    expect(host.textContent).toContain("Scale and background, zero shift, cell,");
-    // …and the explainer above it, which is the panel's whole subject
-    expect(host.textContent).toContain("A plan is an ordered list of stages.");
+    const steps = [...host.querySelectorAll("li.stage .step")].map((n) => n.textContent);
+    expect(steps).toEqual(["1", "2"]);
+    // each glob is a chip, a fact, and the verb that removes it sits beside it
+    const first = host.querySelector("li.stage .frees")!;
+    expect([...first.querySelectorAll(".chip")].map((n) => n.textContent))
+      .toEqual(["phases.*.scale", "instrument.background.*"]);
+    expect(first.querySelectorAll(".chip button")).toHaveLength(0);
+    expect([...first.querySelectorAll(".glob > button.ghost")]
+      .map((b) => b.getAttribute("aria-label")))
+      .toEqual(["Remove phases.*.scale from stage 1",
+                "Remove instrument.background.* from stage 1"]);
+    expect(host.querySelector<HTMLSelectElement>("section[aria-label=plan] select")?.value)
+      .toBe("mccusker_default");
+    // the preset's words are a tooltip and a help term now, never a paragraph
+    // (the maintainer's ruling of 2026-11-07: no permanent explanatory text)
+    const panel = host.querySelector("section[aria-label=plan]")!;
+    expect(panel.querySelectorAll(":scope > p")).toHaveLength(0);
+    expect(panel.textContent).not.toContain("A plan is an ordered list of stages.");
+    expect(panel.querySelector("select")?.title).toContain("Scale and background, zero shift");
   });
 
   it("resolves each stage against the live table, and says what it holds", async () => {
@@ -1212,72 +1235,59 @@ describe("the plan editor", () => {
     // match — what a stage frees is its matches minus what is tied, locked,
     // mode-fixed or degenerate with a free cell
     await openPlan();
-    const rungs = [...host.querySelectorAll("ol.stages > li .rung summary")]
-      .map((n) => n.textContent!.replace(/\s+/g, " ").trim());
-    expect(rungs).toEqual([
-      "1 · +2 → 2 free · Rwp 95.35%",
-      "2 · +1 → 3 free · 1 held · Rwp 44.57%",
+    expect(summaries()).toEqual([
+      "+2 → 2 free · Rwp 95.35%",
+      "+1 → 3 free · 1 held · Rwp 44.57%",
     ]);
-    expect(host.textContent).toContain("Ends with 5 of 12 parameters free.");
     // the held row carries the server's own sentence, never one written here
     expect(host.textContent).toContain("phases.0.cell.b");
     const held = [...host.querySelectorAll(".rung .body .help")];
     expect(held.map((n) => n.getAttribute("aria-haspopup"))).toEqual(["dialog"]);
   });
 
-  it("refuses both of its run buttons at zero phases, in the shell's words",
-     async () => {
+  it("refuses its run buttons at zero phases, in the shell's words", async () => {
     // WP-1207: zero phases is a legal state and every run verb refuses it, so
     // a client must disable rather than offer a click whose only outcome is a
-    // 409. The panel's two buttons did not (found by `/code-review`), and the
-    // repair must not spell the reason a second time — the shell's sentence
-    // names the route out, and a local copy said something else.
+    // 409, and the repair must not spell the reason a second time
     await openPlan({ ...PROJECT, n_phases: 0 });
-    const runAll = button("Run all")!;
-    const runStage = [...host.querySelectorAll<HTMLButtonElement>(
-      "ol.stages > li .rung button")].filter(
-        (b) => b.textContent?.trim() === "Run this stage");
-    expect(runAll.disabled).toBe(true);
-    expect(runStage.length).toBeGreaterThan(0);
-    expect(runStage.every((b) => b.disabled)).toBe(true);
-
-    const header = refineButton()!;
-    expect(header.disabled).toBe(true);
-    // one sentence, three buttons
-    expect(runAll.title).toBe(header.title);
-    expect(runStage[0].title).toBe(header.title);
-    expect(header.title).toContain("no phase yet");
-
-    // …and with a phase, all three act again
-    unmount(app);
-    app = null;
-    host.innerHTML = "";
-    await openPlan();
-    expect(button("Run all")!.disabled).toBe(false);
-    expect(refineButton()!.disabled).toBe(false);
+    const runs = [...host.querySelectorAll<HTMLButtonElement>("li.stage .head button")]
+      .filter((b) => b.textContent?.trim() === "Run this stage");
+    expect(runs).toHaveLength(2);
+    expect(runs.every((b) => b.disabled)).toBe(true);
+    const primary = refineButton()!;
+    expect(primary.disabled).toBe(true);
+    expect(runs[0].title).toBe(primary.title);
+    expect(primary.title).toContain("no phase yet");
   });
 
-  it("hides the resolved facts while the plan on screen is not the server's", async () => {
-    await openPlan(PROJECT, {
-      "/api/plan": (call: Call) => ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
-    });
-    expect(host.querySelector(".rung summary")).not.toBeNull();
-    const first = host.querySelector<HTMLInputElement>("ol.stages > li input.globs")!;
-    first.value = "instrument.*";
-    first.dispatchEvent(new Event("input", { bubbles: true }));
+  it("keeps the facts of the stages before an edit, and counts the edit in the bar",
+     async () => {
+    await openPlan();
+    expect(bar("Refine")).toBeTruthy();
+    // remove the second stage's only glob
+    host.querySelectorAll<HTMLButtonElement>("li.stage:nth-child(2) .glob > button")[0].click();
     await flush();
 
-    expect(host.querySelector(".rung summary")).toBeNull();
-    expect(host.textContent).toContain("Save the plan to see what its stages free");
-    // …and Run all is refused meanwhile, because it would run the saved plan
-    expect(button("Run all")!.disabled).toBe(true);
+    // a plan is cumulative, so stage 1's facts still hold and stage 2 has none
+    expect(summaries()).toEqual(["+2 → 2 free · Rwp 95.35%", "not applied"]);
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    expect(bar("Apply and refine")).toBeTruthy();
+    const select = host.querySelector<HTMLSelectElement>("section[aria-label=plan] select")!;
+    expect(select.value).toBe("");
+    expect(select.querySelector("option")?.textContent?.trim())
+      .toBe("Standard (profile only), edited");
+
+    // the bar's Revert puts the plan the project holds back
+    bar("Revert")!.click();
+    await flush();
+    expect(summaries()[1]).toContain("+1 → 3 free");
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
   });
 
   it("runs one stage through the same machinery a whole fit uses", async () => {
     const stub = await openPlan();
-    const runs = [...host.querySelectorAll<HTMLButtonElement>("ol.stages > li .rung button")]
+    const runs = [...host.querySelectorAll<HTMLButtonElement>("li.stage .head button")]
       .filter((b) => b.textContent?.trim() === "Run this stage");
-    expect(runs).toHaveLength(2);
     runs[1].click();
     await flush();
 
@@ -1294,7 +1304,7 @@ describe("the plan editor", () => {
           ? { body: { ...PLAN, preset: "profile_only" } }
           : { body: PLAN },
     });
-    const select = host.querySelector<HTMLSelectElement>("select")!;
+    const select = host.querySelector<HTMLSelectElement>("section[aria-label=plan] select")!;
     select.value = "profile_only";
     select.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
@@ -1316,38 +1326,77 @@ describe("the plan editor", () => {
     expect(host.textContent).toContain("correlation guard");
 
     // …and it offers *every* stage field, because the list is derived from
-    // `lib/rxt.ts`'s stage words rather than typed out here (WP-1208).  Those
-    // are pinned to `StageSpec` from python, so a schema field cannot reach
-    // the `.rxt` document and miss this form.
-    const boxes = host.querySelectorAll("ol.stages > li .advanced label");
+    // `lib/rxt.ts`'s stage words rather than typed out here (WP-1208)
+    const boxes = host.querySelectorAll("ol.stages > li.stage .advanced label");
     expect(boxes.length).toBe((STAGE_WORDS.length - 1) * PLAN.plan.stages.length);
-    const helped = [...host.querySelectorAll("ol.stages > li:first-child .advanced .help")]
-      .map((n) => n.textContent!.trim());
+    const helped = [...host.querySelectorAll(
+      "ol.stages > li.stage:first-child .advanced .help")].map((n) => n.textContent!.trim());
     expect(helped).toHaveLength(STAGE_WORDS.length - 1);
-    // the two fields that were only reachable through the text document
     expect(helped).toContain("ftol");
     expect(helped).toContain("slack");
   });
 
-  it("reorders stages by drag, and offers to save the edited plan", async () => {
+  it("reorders by the handle, and the bar's Apply stores the edited plan", async () => {
     const stub = await openPlan(PROJECT, {
-      "/api/plan": (call: Call) => ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
+      "/api/plan": (call: Call) =>
+        ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
     });
-    // jsdom has no DragEvent; the handlers read only the indices they were
-    // bound with, so a plain Event of the same type drives them identically
-    const items = [...host.querySelectorAll("ol.stages > li")];
-    items[1].dispatchEvent(new Event("dragstart", { bubbles: true }));
-    items[0].dispatchEvent(new Event("drop", { bubbles: true }));
+    // jsdom has no layout, so every row's centre is 0 and a drag upwards of
+    // any length carries the second stage past the first
+    const handle = host.querySelector<HTMLElement>('[data-handle="1"]')!;
+    handle.dispatchEvent(new MouseEvent("pointerdown", { clientY: 100, bubbles: true }));
+    handle.dispatchEvent(new MouseEvent("pointermove", { clientY: 60, bubbles: true }));
+    handle.dispatchEvent(new MouseEvent("pointerup", { clientY: 60, bubbles: true }));
     await flush();
+    const names = () => [...host.querySelectorAll<HTMLInputElement>("li.stage input.name")]
+      .map((i) => i.value);
+    expect(names()).toEqual(["cell", "scale+bkg"]);
 
-    const names = [...host.querySelectorAll<HTMLInputElement>(".name")].map((i) => i.value);
-    expect(names).toEqual(["cell", "scale+bkg"]);
-    button("Save plan")!.click();
+    // the arrow keys move it back
+    host.querySelector<HTMLElement>('[data-handle="0"]')!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     await flush();
+    expect(names()).toEqual(["scale+bkg", "cell"]);
+    // ⌘Z in the tab, outside a text field, takes that move back
+    host.querySelector("section[aria-label=plan]")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true }));
+    await flush();
+    expect(names()).toEqual(["cell", "scale+bkg"]);
 
+    bar("Apply")!.click();
+    await flush();
     const put = stub.calls.find((call) => call.method === "PUT");
     expect(put?.body.plan.stages.map((s: any) => s.name)).toEqual(["cell", "scale+bkg"]);
     expect(put?.body.plan.correlation_guard).toBe(0.98);
+  });
+
+  it("builds a plan: a stage added, globs typed, the last stage kept", async () => {
+    await openPlan();
+    button("+ Stage")!.click();
+    await flush();
+    const rows = () => host.querySelectorAll("li.stage");
+    expect(rows()).toHaveLength(3);
+    expect(host.querySelectorAll<HTMLInputElement>("li.stage input.name")[2].value)
+      .toBe("stage 3");
+    const add = host.querySelectorAll<HTMLInputElement>("li.stage input.add")[2];
+    add.value = "phases.*.atoms.*.biso, instrument.zero_shift";
+    add.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    add.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect([...rows()[2].querySelectorAll(".chip")].map((n) => n.textContent))
+      .toEqual(["phases.*.atoms.*.biso", "instrument.zero_shift"]);
+    expect(add.value).toBe("");
+
+    // a plan needs a stage, so the last one cannot be removed
+    for (const _ of [0, 1]) {
+      host.querySelector<HTMLButtonElement>(
+        'li.stage button[aria-label^="Remove stage"]')!.click();
+      await flush();
+    }
+    expect(rows()).toHaveLength(1);
+    expect(host.querySelector<HTMLButtonElement>(
+      'li.stage button[aria-label^="Remove stage"]')!.disabled).toBe(true);
   });
 });
 

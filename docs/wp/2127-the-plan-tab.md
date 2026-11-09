@@ -112,7 +112,40 @@ reads the data or decides for a fit. The resolved facts stay the server's.
 No ruling covered these, so each took the smallest neutral option. Each is "settled by Claude,
 reversible", with its alternative, and waits for the maintainer's review of the PR.
 
-(Filled as the checklist lands.)
+1. **Plan edits ride the action bar as one pending edit.** Apply stores the plan after the
+   Parameters edits, Revert drops both, and Refine applies first. The tab's own `Save plan`,
+   `Revert` and `Run all` are gone, so a view has one Apply. Alternative: keep a Save button in
+   the tab beside the bar's.
+2. **A preset pick is stored at once and is undone with ⌘Z.** Only the server expands a preset
+   through the mode, so a pick held back until Apply would show stages nobody has seen.
+   Alternative: hold the pick until Apply, which needs a route that returns the expansion
+   without storing it.
+3. **A glob is a mono `.chip` with a ghost × beside it**, added by typing into an "add a glob"
+   field and pressing Enter (space or comma separates several). Alternative: the prototype's
+   grouped picker, a non-goal above.
+4. **The grip is a focusable three-line span, not a button register.** A pointer drag lifts the
+   row and slides the others; ArrowUp and ArrowDown move it one place when focused.
+   Alternative: HTML drag-and-drop, which draws a ghost image and has no keyboard route.
+5. **An edit keeps the resolved facts of the unchanged leading stages.** A stage's ladder line
+   depends only on the stages above it, so they stay true; every stage from the first change
+   down reads "not applied". Alternative: WP-1208's rule, which blanked the whole ladder.
+6. **The closing stage is a last, unnumbered row** that reads "Frees everything above", with
+   its meaning in a tooltip. An edit blanks its Rwp and the set-aside list's paths and keeps
+   both rows, because a row that vanished would move every row below it. Alternative: hide
+   both on an edit.
+7. **The blurbs became tooltips.** A "Preset" label beside the menu carries the plan's help
+   entry; the menu reads "<title>, edited" once the stages differ from the preset. Alternative:
+   one line of description under the menu.
+8. **Undo is ⌘Z and ⇧⌘Z in the tab outside a text field, plus two palette commands.** A text
+   field keeps its own undo, and one burst of typing in one field is one step. Alternative: an
+   Undo button in the plan bar.
+9. **`Run this stage` applies the Parameters edits first**, the way Refine does. This closes
+   the Plan half of the milestone's owed item about a run discarding pending edits.
+10. **`+ Stage` appends "stage N" and focuses its name**; the last stage has no ×.
+11. **Stage names are shown as stored**, in mono, since a name is what the history node and
+    the `.rxt` document carry.
+12. **Rows are separated by a rule, not drawn as cards**, and the selected stage's number takes
+    `--accent`.
 
 ## Non-goals
 
@@ -130,14 +163,14 @@ reversible", with its alternative, and waits for the maintainer's review of the 
 - [x] File the WP.
 - [x] `lib/plan.ts`: moving a stage, the drop index from row midpoints, the resolved prefix, the
   undo stack, adding and removing a glob; with vitest.
-- [ ] The tab redrawn as a recipe: the plan bar (preset menu, + Stage), one row per stage (grip,
+- [x] The tab redrawn as a recipe: the plan bar (preset menu, + Stage), one row per stage (grip,
   number, name, run, ×), the glob chips with × beside them and an add field, the ladder line,
   the closing stage, the set-aside list; no permanent text.
-- [ ] The grip: pointer drag with the lifted row following the pointer, arrow keys when focused.
-- [ ] Plan edits in the action bar: one pending edit, Apply saves, Revert drops, Refine applies
+- [x] The grip: pointer drag with the lifted row following the pointer, arrow keys when focused.
+- [x] Plan edits in the action bar: one pending edit, Apply saves, Revert drops, Refine applies
   first; `Run this stage` applies the Parameters edits first; `Save plan`, `Revert` and
   `Run all` retired from the tab.
-- [ ] Undo and redo of plan edits: ⌘Z and ⇧⌘Z in the tab outside a text field, and the palette.
+- [x] Undo and redo of plan edits: ⌘Z and ⇧⌘Z in the tab outside a text field, and the palette.
 - [ ] The layout browser test extended to the Plan tab: every control clicked, a real drag.
 - [ ] The dist rebuilt; the GUI chapters and the screenshots the tab changes.
 - [ ] Skill: none expected. The agent skill drives the python API, and no route changes.
