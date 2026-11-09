@@ -220,12 +220,12 @@
     <span class="muted mono">.rxt</span>
     <span class="pill mono" data-phase={sync.stale ? "stale" : sync.phase}>{status}</span>
     <span class="spacer"></span>
-    <button onclick={apply} disabled={!applyable} title="apply the whole document as one delta">
+    <button class="ghost" onclick={apply} disabled={!applyable} title="apply the whole document as one delta">
       Apply <kbd>⌘⏎</kbd>
     </button>
     <!-- one button, not a Revert *and* a Re-read: both discard the buffer and
          re-render from state, which is also the only exit a stale pane has -->
-    <button class:ghost={!sync.stale} onclick={() => load(true)}
+    <button class="ghost" onclick={() => load(true)}
       title="discard this buffer and re-read the project">Re-read</button>
   </header>
 

@@ -17,7 +17,7 @@ import { dirname, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { TABS } from "./tabs";
+import { GRAPH_TABS, TABS } from "./tabs";
 
 const CORPUS = resolve(__dirname, "../../../tests/data/gui/panels.json");
 
@@ -29,6 +29,7 @@ describe("the panel corpus", () => {
         "edit the strip. Read by tests/test_gui_manual.py, which fails when a " +
         "GUI chapter of the manual does not name a tab.",
       tabs: TABS.map((tab) => ({ id: tab.id, label: tab.label })),
+      graph_tabs: GRAPH_TABS.map((tab) => ({ id: tab.id, label: tab.label })),
     };
     mkdirSync(dirname(CORPUS), { recursive: true });
     writeFileSync(CORPUS, `${JSON.stringify(payload, null, 2)}\n`, "utf8");

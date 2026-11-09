@@ -983,6 +983,49 @@ Stinton & Evans (2007) use both shapes: a second-order 2θ calibration polynomia
 
 Of the Durham tutorials, ZrP₂O₇ writes a two-coefficient curve in `Xo` on `th2_offset`, and ZrMo₂O₈ writes a tanθ width scaled by `spherical_harmonics_hkl` with fixed coefficients. WO₃'s two lines need neither: one is an overall B and one a sample height. Incidence over a larger set is not measured, since the private archive was not on the machine that ran this, and since 2026-11-04 it decides nothing here.
 
+## The window layout of a GUI
+
+Surveyed 2026-11-06 to 2026-11-08 for the gui-overhaul milestone, and restated 2026-11-08 for
+WP-2123. Desktop applications rather than refinement programs, because the question is how a
+window lets a person hide, resize and stack its panels. Each row is marked checked (read in the
+product's documentation) or recall (from use, not re-read).
+
+| Program | Panel toggles | Resizing | A narrow window | A choice among views |
+|---|---|---|---|---|
+| VS Code | a layout control for each side bar and the panel, at the matching end of the title bar; each never moves (checked, user interface docs) | a sash between parts; drag, double-click resets (recall) | parts stay side by side; the window has a minimum width (recall) | — |
+| Xcode | the navigator toggle at the toolbar's left end, the inspector toggle at its right (recall) | drag the divider (recall) | panes stay side by side (recall) | segmented controls in the toolbar and inspectors (recall) |
+| Claude desktop app | the side panel's toggle sits on its own side (recall) | drag the divider (recall) | drops to one panel below a width (recall) | — |
+| macOS and iOS | — | — | — | a segmented control draws its choices on one track, the chosen one raised (recall, Apple Human Interface Guidelines) |
+| GSAS-II 5.8.4 | none: the data tree on the left and the notebook on the right are fixed (recall) | a splitter between them (recall) | — | — |
+
+The practice these add up to: each side's toggle sits on its own side and does not move, a sash
+resizes and a double-click resets it, and a segmented choice is drawn on a track rather than as
+a row of buttons. Only the Claude app drops to one column below a width; the maintainer chose
+that behaviour on 2026-11-07. The refinement programs offer no model for any of this: TOPAS works
+through a text editor, and FullProf's and GSAS-II's windows are fixed panes (recall).
+
+## A pattern recalculated while a control moves
+
+Surveyed 2026-11-09 for WP-2125, lightly: a minor decision, so one search and recall. The
+question is whether a program redraws the calculated pattern while a person drags a value, and
+how fast a drag must be answered. Each row is marked checked (read in the product's
+documentation) or recall (from use, not re-read).
+
+| Program | Live recalculation while a value moves | Where the model runs |
+|---|---|---|
+| CrystalDiffract 6 (CrystalMaker) | real-time parameter controls for diffraction and sample settings, with instant feedback (checked, a university software catalogue quoting the version 6 description, tigerware.lsu.edu); which parameters have sliders is not established | in the program |
+| Diamond 5 (Crystal Impact) | the powder diagram updates automatically when structure parameters change (checked, crystalimpact.com, the Diamond 5 manual page on powder patterns) | in the program |
+| PowderCell | the cell and the pattern are edited interactively and redrawn (recall) | in the program |
+| TOPAS, GSAS-II, FullProf | none: a value changes by editing the input or a table, and the pattern is recalculated by a refinement or a calculate step (recall) | — |
+
+The latency bar comes from web practice rather than from crystallography. Google's RAIL model
+counts a drag as an animation, budgets 10 ms of work per frame at 60 frames a second, and
+allows 100 ms for a response to feel immediate (web.dev, "Measure performance with the RAIL
+model", checked). The practice these add up to: the simulation programs redraw at every step
+of a control, inside the program that owns the physics, and no refinement program offers it.
+rietx's GUI serves the curve from the package's own forward model through a local route, so
+the page draws numbers and computes none (WP-2125).
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
