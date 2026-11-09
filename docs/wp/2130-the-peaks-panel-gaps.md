@@ -1,6 +1,6 @@
 # WP-2130 — the Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the coverage line and Adopt on every row are in; the peak-mark colour waits on the maintainer; PR #1490
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the coverage line and Adopt on every row are in; the peak-mark colour is deferred to a palette piece that adopts the site theme (ruled 2026-11-09); PR #1490
 Depends on: 2123, 2124 (the shell it draws in, and the adopt arm's `picked` and `why`)
 Priority: P2 2026-11-09 — three of the gui-overhaul record's "owed to the port" defects, all in the existing Peaks panel
 
@@ -117,6 +117,9 @@ Not here, left for the piece that redraws the Peaks panel or a WP of its own:
   (round 11c). This WP changes at most the colour.
 - The candidate table's eight columns, related rows marked ("c doubled of #2"), the four-step
   workflow, the Le Bail check's absent lines as tick indices.
+- The panel's look. This WP fixes gaps in the existing panel only, so its screenshots look like
+  today's GUI. The round-11 Peaks redesign is a later piece (§ Rulings of 2026-11-09).
+- The peak-mark colour, deferred to the palette piece (§ Rulings of 2026-11-09).
 
 ## Tasks
 
@@ -129,9 +132,9 @@ Not here, left for the piece that redraws the Peaks panel or a WP of its own:
   as Adopt (beside the button it widened the table past the side panel); the extinction
   table's space-group buttons are enabled for any screened candidate. `index_result` drops
   `allowed`. Vitest and `test_gui_peaks.py` updated.
-- [ ] 3. The peak-mark colour: measured above; goes to the maintainer. If ruled, change it in
-  `theme.py`, regenerate `tokens.css`, adjust `test_gui_palette.py` as ruled, and read the
-  drawn colour in the browser.
+- [~] 3. The peak-mark colour: measured above and taken to the maintainer. Deferred, by his
+  ruling of 2026-11-09, to a palette piece that adopts the site theme (not yet filed). This
+  PR leaves `--plot-peak` as it is (§ Rulings of 2026-11-09).
 - [x] 4. A Peaks-panel browser case, in `tests/test_gui_peaks_browser.py` beside the layout
   test whose landmarks it reuses: a served indexing answer, real clicks on the Peaks tab, a
   row's disclosure and Adopt, with the coverage line and the history node asserted, and no
@@ -192,6 +195,28 @@ the colour overridden on the page; the drawn colour was confirmed by sampling th
 (about 7200 pixels of the mark colour in each of the four). They are local to the runner's
 machine and named in the PR's hand-off, not committed.
 
+### Rulings of 2026-11-09 (Yue Wu)
+
+**The mark colour is not changed in this PR.** Yue was shown the four options above: the
+ruled Okabe-Ito blue with test exceptions (A), a new dark blue (B), today's purple (C), and a
+wider plum and pink tone gap. He answered: "I am not liking the colours. what happened to the
+colours I chose in the workshop?"
+
+The finding behind that answer. His ruling of 2026-11-06 was "one default theme consistent
+with the site". That theme has warm neutrals, the orange accent `#c65d0a`, an orange
+calculated curve and a grey difference curve. No port piece adopts that palette yet. The
+shipped GUI kept `theme.py`'s blue accent and blue difference curve. The ruled blue `#0072B2`
+was chosen as the complement of orange fits. It collides with the plot only under the old
+palette, which is what the table in § Context measured.
+
+So the mark colour moves to a palette piece that adopts the site theme. That piece is still to
+be filed. It re-measures the mark colour against the new palette under WP-1210's floor.
+
+**The panel's look is not this WP's.** Yue commented that the screenshots look like the old GUI
+rather than the new one. This WP fixes only gaps in the existing panel: the coverage line and
+Adopt on every row. The round-11 Peaks redesign is a later piece. It will be judged against
+the GUI style guide the port is about to distil.
+
 ## Acceptance
 
 ```sh
@@ -246,6 +271,13 @@ a rebuilt dist, and the drawn colour read off the canvas).
   click. Overriding `--plot-peak` inline on the page repaints nothing until the theme changes,
   so a colour comparison clicks the theme buttons and then reads the canvas.
 - *Stacking*: on WP-2123's branch (PR #1476, open); this PR merges after it.
+
+- **2026-11-09** — the maintainer's rulings recorded (§ Rulings of 2026-11-09). The mark
+  colour is deferred to a palette piece that adopts the site theme, still to be filed, and
+  task 3 is marked deferred. The panel's look is the round-11 redesign's, a later piece judged
+  against the GUI style guide the port is about to distil. Nothing implemented. Main merged in
+  first: WP-2125's preview route (#1479), WP-2126's Parameters panel (#1484) and WP-2127's
+  Plan tab (#1483).
 
 - **2026-11-09** — filed by a ghostshift runner from the gui-overhaul record's § Owed to the
   port. No open WP owns these: WP-2124 named them "not here", and the open gui-overhaul runners
