@@ -187,7 +187,7 @@ Each was found in a browser, and jsdom cannot see it.
   (`panels/Series.svelte`'s `hasProject`, WP-1027): an effect reading the project object
   refires on every ui-only PATCH.
 - **Two `$state` assignments either side of an `await` are two flushes** (WP-1212). Read
-  what both need before publishing either (`App.svelte:readPeaks`).
+  what both need before publishing either (`gui/src/App.svelte:readPeaks`).
 - **A style read synchronously in an effect races the shell's `applyTheme`** (WP-1027).
   `lib/pattern.ts`'s `retheme` and `panels/Structure3D.svelte`'s `rebuild` wait one
   microtask before `getComputedStyle`.

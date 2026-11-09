@@ -1017,8 +1017,12 @@ _RULEBOOK_BASES = ("", "gui", "gui/src", "src/rietx", "src/rietx/gui")
 _RUNTIME_DIRS = ("live/", "state_dir/")
 _RULEBOOK_PATH = re.compile(
     r"^((?:[\w.-]+/)+[\w.-]*(?:\{[\w.,-]+\})?[\w.-]*"
-    r"\.(?:ts|svelte|py|mjs|json|css|md|jsonl))(?:::?(\w+))?$"
+    r"\.(?:ts|svelte|py|mjs|cjs|js|json|jsonl|css|md|html|yml|yaml|toml|rs))"
+    r"(?:::?([\w.]+))?$"
 )
+# A directory: written with a trailing slash, or three segments deep with no
+# extension (`src/rietx/gui/static`), which no route or prose token is.
+_RULEBOOK_DIR = re.compile(r"^(?:(?:[\w.-]+/)+|(?:[\w.-]+/){2,}[\w-]+)$")
 
 
 def test_gui_rulebook_paths_resolve():
@@ -1026,14 +1030,22 @@ def test_gui_rulebook_paths_resolve():
 
     The rulebook is rules keyed by the files they govern, so a renamed file
     leaves a rule pointing at nothing and nothing goes red.  A bare file name
-    is ambiguous and is not checked; `lib/plot.ts` is.  A `file:symbol` (or a
-    pytest `file::test`) also asks that the symbol is still in that file.
+    is ambiguous and is not checked; `lib/plot.ts` is, and so is a directory
+    such as `gui/scripts/`.  A `file:symbol` (or a pytest `file::test`) also
+    asks that the symbol is still in that file as a whole word, so a comment
+    saying "cloned" does not keep `lib/model.ts:clone` alive.
     """
     text = (ROOT / GUI_RULEBOOK).read_text(encoding="utf-8")
     problems = []
     for token in sorted(set(re.findall(r"`([^`\n]+)`", text))):
+        if token.startswith(_RUNTIME_DIRS):
+            continue
+        if _RULEBOOK_DIR.match(token):
+            if not any((ROOT / b / token).is_dir() for b in _RULEBOOK_BASES):
+                problems.append(f"`{token}`: no directory under {_RULEBOOK_BASES}")
+            continue
         m = _RULEBOOK_PATH.match(token)
-        if not m or "*" in token or token.startswith(_RUNTIME_DIRS):
+        if not m:
             continue
         path, symbol = m.groups()
         brace = re.search(r"\{([^}]+)\}", path)
@@ -1043,7 +1055,11 @@ def test_gui_rulebook_paths_resolve():
             hits = [ROOT / b / p for b in _RULEBOOK_BASES if (ROOT / b / p).is_file()]
             if not hits:
                 problems.append(f"`{token}`: no file {p} under {_RULEBOOK_BASES}")
-            elif symbol and not any(symbol in h.read_text(encoding="utf-8") for h in hits):
+            elif symbol and not any(
+                all(re.search(rf"\b{re.escape(part)}\b", h.read_text(encoding="utf-8"))
+                    for part in symbol.split("."))
+                for h in hits
+            ):
                 problems.append(f"`{token}`: {symbol} is not in {p}")
     assert not problems, (
         f"{GUI_RULEBOOK} names what the tree no longer has; rewrite the rule "
