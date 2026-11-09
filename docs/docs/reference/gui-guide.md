@@ -343,7 +343,9 @@ powder measures, and a single space group out of a class is a convention you
 choose rather than a measurement the table made.
 
 `Adopt` turns a candidate into a Le Bail scaffold and flips the mode. The
-server's own verdict enables it per row, and the badge does not.
+panel enables it on the candidate `best_or_none()` picks. The route takes any
+candidate, and for one the gate did not pick it writes the grade and the caveats
+into the history node's label.
 
 ## Model
 
