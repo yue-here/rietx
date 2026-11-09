@@ -81,9 +81,26 @@ either's code; nothing is ported.
 
 - [ ] Maintainer decision on scope: point 2 alone, points 1 and 2, or neither; recorded
       here as `Decided YYYY-MM-DD:` and answered on #1090.
-- [ ] Reproduce the two cases on the tree: the Ba₂FeSbSe₅ 1.5 K fit from the fixture, the
+- [x] Reproduce the two cases on the tree: the Ba₂FeSbSe₅ 1.5 K fit from the fixture, the
       lowest line's centroid residual and its cot 2θ fit; LaMnO₃ from #1089's data if it
       is in the tree, else say so.
+      **Reproduced 2026-11-09** on `00cd6db80` (macOS arm64, `[dev]`, numpy path). The
+      fixture's protocol on the 1.5 K pattern alone (nuclear fit, then the
+      `SOLVE_STAGE_PATHS` plan with the fixture's ties): Rwp 0.1171 nuclear, 0.0611 with
+      the moment, |m| = 3.875(121) μ_B. Per-line centroid shift (the residual regressed
+      on each seen line's ∂P/∂2θ, counting-noise esd; negative = observed lower): −47.1(2.2)
+      mdeg at 9.38° (1 0 1)/(1 0 0), −31.3(5.2) at 17.99°, −14.7(3.7) at 18.27°, all three
+      magnetic-only; the first line that is not, (0 1 1) at 21.67°, −6.6(2.0). A cot 2θ shape
+      through the three magnetic lines gives A = −7.7(3) mdeg and predicts −19.3(8) at
+      21.67°, so the nuclear line does not follow them: the shift falls faster than
+      cot 2θ, as #1090 reported (−50, −18, −3). Layer 1 already reads the 8.2-12.0° region
+      as position −0.054(2)° and the nominal-aperture asymmetry column (WP-2054) +0.029(3);
+      no diagnostic named it and the only action was `decrease_background_flexibility`.
+      LaMnO₃ is in the tree (`tests/data/gsas2_bt1_lamno3_50K.gsas`, the WP-1327
+      acceptance protocol, apertures from the instrument file, S/L 0.040, H/L 0.030):
+      (0 1 0) at 11.53° is the only line below the first nuclear one at 22.32°, and sits
+      +19.0(1.8) mdeg (the drawn line too low, as #1089's "centroid 24 mdeg low"), the
+      nuclear line +9.0(2.7). Not re-run: #1089's tied-ratio refinement.
 - [ ] Point 2: the diagnostic, with its audit row and `help.py` entry.
 - [ ] Point 1 (if in scope): the term in `model/profiles/`, its analytic derivatives, a
       `test_cross_backend.py` config, a Layer-1 column, `help.py` entries for its four
