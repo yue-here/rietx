@@ -158,7 +158,7 @@ def test_document_round_trip_including_infinite_bounds(tmp_path, pattern_file):
     project.save()
 
     raw = json.loads((project.path / PROJECT_JSON).read_text(encoding="utf-8"))
-    assert raw["format_version"] == "1.5"   # WP-2002 B1: the plan's phase_support_sigma
+    assert raw["format_version"] == "1.6"   # WP-2030: the indexing controls' formula
     assert raw["patterns"][0]["reader"] == "xy"
 
     reopened = rx.Project.open(project.path)
@@ -419,9 +419,9 @@ def test_an_unbounded_biso_written_after_206_is_a_choice_and_kept(
     assert reopened.history_diagnostics == []
 
 
-#: The keys of a stored ``Parameter`` since schema 0.46, which dropped
-#: ``transform`` (WP-1938); every release before wrote that key too.
-_PARAMETER_KEYS = {"value", "vary", "min", "max", "expr", "unit", "stderr"}
+#: The keys of a stored ``Parameter`` since schema 0.61, which dropped
+#: ``expr`` (WP-1964); 0.46 had dropped ``transform`` (WP-1938).
+_PARAMETER_KEYS = {"value", "vary", "min", "max", "unit", "stderr"}
 
 
 def _stamp_transforms(obj) -> None:

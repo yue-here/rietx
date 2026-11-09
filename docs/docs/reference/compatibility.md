@@ -33,14 +33,14 @@ fixture. The version strings, their bump records and the documented-surface
 partition below are kept current, so tightening is a decision and not a
 rebuild.
 
-## The six version strings
+## The seven version strings
 
 A moved version string means something you could observe changed, and the
 comment beside the constant says what. Those comments are the changelog. Each
 constant carries its own bump history (what moved, in which change, and why) and
 no separate file restates it. Promoting that record to a hosted page
 is part of tightening the promise, when there are users to face it. The strings
-are the six contracts `capabilities()` reports ([API: everyday calls](api.md));
+are the seven contracts `capabilities()` reports ([API: everyday calls](api.md));
 `Capabilities.report_thresholds_version` and
 `Capabilities.indexing_thresholds_version` share a bullet below because they
 answer the same kind of question:
@@ -63,6 +63,9 @@ answer the same kind of question:
   newer `v` with a known kind is read.
 - The report gates and thresholds (`Capabilities.report_thresholds_version`) and
   the indexing gates (`Capabilities.indexing_thresholds_version`).
+- The expression grammar (`Capabilities.expression_grammar_version`), the
+  language a parametric equation is written in. A change to what an expression
+  means, or to what it accepts, moves it ([Expressions](expressions.md)).
 
 Two vocabularies carry no version string because they are open by design: the
 diagnostic and guard codes. A new code may appear in any release, and an

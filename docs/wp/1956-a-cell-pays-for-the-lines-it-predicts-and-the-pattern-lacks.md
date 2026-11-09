@@ -1,9 +1,9 @@
 # WP-1956 — a cell pays for the lines it predicts and the pattern lacks
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — #1263 (the containment refuter's null window) in PR #1302, `split` on top of #1251's `g` decided 2026-11-01; C3 merged (PR #941) and #941's follow-ups (PR #1177, `8260c78b`); open: the `fom_panel_disagrees` revisit, and tutorial 03's absence count (WP-2041)
+Milestone: unscheduled · Status: 🔄 2026-11-07 — every task ticked; task 5 ruled by Yue: `fom_panel_disagrees` kept as it is, the lattice-aware form recorded for a revisit; the one item left is WP-2041's tutorial 03 count (write the post-repair grades into WP-2041's `### Inherited`)
 Track: What fires, and what stays silent
 Depends on: 1449 soft (the index 2–4 refutation it widens); 1511 soft (one Le Bail protocol per cell)
-Priority: P2 2026-10-13 — the absent-line detector fires on the truth and is blind on every wrong cell, and a distorted cell ranks first; no grade is confident today only because the run-level `fom_panel_disagrees` fires, which the reporter measured quiet on arms where a wrong cell reached `medium`
+Priority: P4 2026-11-07 — was P2: the repair shipped and task 5 is ruled kept; what is left is writing tutorial 03's post-repair grades into WP-2041, teaching content that WP-2041 waits on
 
 ## Goal
 
@@ -234,7 +234,11 @@ engine or the ranking. Indexing is provisional by declaration
       windows, the assumed shift bound flooring only the power check (`split`).
       *Built 2026-11-01 (PR #1302). Decided 2026-11-01 (maintainer): `split`
       lands on top of #1251's `g`.*
-- [ ] Revisit `fom_panel_disagrees` only on the same arms, after the repair.
+- [x] Revisit `fom_panel_disagrees` only on the same arms, after the repair.
+      *Measured 2026-11-02 on `a5c99e0fe` under `preset="full"` (PR #1353,
+      handover entry below). Decided 2026-11-07 (Yue): revisited after the
+      repair; kept. The lattice-aware form waits for a lattice comparison with
+      ten times the margin (handover entry of 2026-11-07).*
 - [x] Tests, and `tests/test_acceptance_indexing.py` green.
 - [x] Skill: the indexing reference row for any changed caveat or grade rule.
 
@@ -256,6 +260,117 @@ absences; Si, corundum and magnetite keep their correct cells.
 - WP-1043 (the magnetite measurement and the recorded design), WP-1449.
 
 ## Handover log
+
+- **2026-11-07** (rulings, PR #1455) — task 5 ruled, and every task is now ticked. Decided
+  2026-11-07 (Yue): `fom_panel_disagrees` stays as it is (issue #916). The flag keeps capping the
+  truth's grade on 15 of the 19 #916 arms. In exchange, it holds down the wrong cells that rise above
+  `low` on 7 of the 19 arms without it.
+  The lattice-aware form would lift three truths. Its safe tolerance band is too narrow to trust
+  beyond the arms it was measured on, so it is recorded here for a later revisit.
+
+  *Recorded for the revisit.* The lattice-aware form ("TL") fires only when the members' co-winners
+  share no lattice, comparing lattices by line set. Its measured window for that line-set tolerance
+  is 7e-4 to 2e-3, relative in Q. Below 7e-4, #916 arm b's tI and cF descriptions of one lattice read
+  as two. From 2.2e-3, LaB₆'s tetragonal descents promote wrong cells to `high`. So the margin is
+  under 3×, and both edges come from one synthetic Si family and one lab LaB₆ pattern. Inside the
+  band TL promotes no wrong cell on 27 runs and lifts #916 arm b and brucite to `medium`, and
+  zincite to `high` (entry of 2026-11-02). Revisit TL when a lattice comparison has a margin of 10×
+  or more, for example one built on reduced cells. The build is then the one the 2026-11-02 entry's
+  *Next* describes, with that table re-run as its acceptance.
+
+  *Left before close.* The `### Inherited` entry of 2026-10-24 from WP-2041 asks this WP's closer
+  to re-measure tutorial 03's full range and its 45° cut on `main`, and to write their grades and
+  caveats into WP-2041's `### Inherited`. That has not been done. The other five `### Inherited`
+  entries were not pruned in this rulings pass.
+  *Next:* run tutorial 03's two cuts on current `main`, write the grades into WP-2041's
+  `### Inherited`, prune this file's `### Inherited`, then close this WP.
+
+- **2026-11-05** (post-merge record) — PR #1353 merged at `7ac1f54c1`. Its own
+  entry is below and lacked the sha. Status stays 🔄, and task 5 still waits on
+  the maintainer's ruling on #916.
+
+- **2026-11-02** — task 5 measured: `fom_panel_disagrees` on the #916 arms after
+  PR #1302, with no whole-run ceiling (ghostshift runner, PR #1353; no code
+  changed). The reporter's 10-30 reading holds once the clock is taken out. Removing the flag
+  still lets wrong cells rise above `low` on 7 of the 19 arms, and on LaB₆ as
+  picked three reach `high`. The lattice-aware form ("TL": fire only when the
+  members' co-winners share no lattice) promotes no wrong cell on any of the 27
+  runs. It lifts the same three truths as before: #916 arm b and brucite to
+  `medium`, zincite to `high`. New: its line-set tolerance now has a measured window. Arm b needs at
+  least 7e-4 (relative, in Q) to count its tI and cF descriptions as one lattice, and LaB₆'s descents promote
+  wrong cells to `high` from 2.2e-3, so the safe band is 7e-4 to 2e-3, under a
+  factor of 3. Also new: without the ceiling, both exact-position negative arms
+  fire where `quick` left them quiet, so the flag's cost on correct cells is
+  larger than the 10-30 table showed. The rule is still the maintainer's.
+
+  *Measured* (pearl, `[rietx-py312]` venv, Linux x86-64 under WSL2, Python 3.12,
+  one pinned core per run, 8 runs at a time; tree `a5c99e0fe` = main plus this
+  branch's claim commit; main's later indexing commits are docstring and
+  CLAUDE.md text only). The harness is the reporter's
+  (`planning/magnetic/checks/spikes/fom-panel-disagrees-20261012/`, outside the
+  tree, not committed) with `preset="quick"` → `"full"` and nothing else
+  changed. Each synthetic arm ran twice, at the default 30 s per engine × system
+  and at 300 s. Each acceptance row ran on its fixture as written (`full`, 300 s
+  per unit). No run reported `INDEX_BUDGET_EXHAUSTED`. No acceptance row's unit
+  reached its budget. Synthetic units that did were all orthorhombic, monoclinic
+  or triclinic. Every `not_validated` sits below `CONSENSUS_CHECK_TOP`'s three,
+  so none is a cut validation. TL at 1e-3 unless stated.
+
+  | run | lines | flag | truth: shipped / no flag / TL | wrong cells above `low` without the flag (30 s; 300 s) |
+  |---|---|---|---|---|
+  | #916 arm b | 11 | fires | low / medium / **medium** | — ; — |
+  | Si flat 12–60° | 16 | fires | low / medium / low | hR 5.431 × 4.208, oC → medium; hR → medium |
+  | cP a = 4.0, picked | 48 | fires | #2 low / medium / low | tP a/√2 (ranked #1), tI → medium; + oF |
+  | cP, exact positions | 39 | **fires** | low / medium / low | — ; oC → medium |
+  | Si 12–100°, picked | 30 | fires | low / medium / low | oC → medium, both |
+  | Si 12–100°, exact positions | 25 | **fires** | low / medium / low | — ; oI → medium |
+  | tP c/a 1.01, picked | 62 | quiet, both | medium | — |
+  | Si + four cP 2a₀ lines | 34 | fires | low / medium / low | — ; hR → medium |
+  | brucite | 28 | fires | low / medium / **medium** | — |
+  | corundum SRM 676a | 46 | fires | low / medium / low | — |
+  | corundum, `cos_theta` | 46 | fires | low / medium / low | — |
+  | FAP | 135 | fires | low / high / low | — |
+  | LaB₆ SRM 660c as picked | 30 | fires | low / high / low | tP ×2, cI a√2 → **high**; tP → medium |
+  | LaB₆ calibrated | 24 | quiet | high | (cI a√2 already `high`, #941's Q3) |
+  | fluorite, magnetite | 17, 17 | quiet | medium | — |
+  | NAC 11-BM | 262 | fires | low / medium / low | — |
+  | zincite | 27 | fires | low / high / **high** | — |
+  | zircon | 55 | fires | low / medium / low | — |
+
+  Against the reporter's `quick` table on `e016f187d`: the tP c/a 1.01 arm
+  is quiet at both unit budgets, which #1267's account predicts. Both
+  exact-position arms now fire. Small subcells won M₂₀, F_N, `m_rev` and
+  `m_sym`: oC 2.716 × 2.716 × 3.136 Å on Si, mP 2.36 × 2.83 × 2.89 Å on cP. They
+  are found in the orthorhombic and monoclinic units, which `quick`'s ceiling
+  had cut. The `cos_theta` corundum and FAP rows no longer promote a trigonal P
+  cell without the flag. So the flag lowers 15 of the 19 truths (all but
+  tP c/a 1.01, LaB₆ calibrated, fluorite and magnetite).
+
+  *TL's tolerance*, re-read from the saved results at 3e-4 to 5e-3 (finer
+  near both edges). Arm b's truth is lifted from 7e-4; at 6e-4 the tI 3.8411 ×
+  5.4293 Å and cF 5.4312 Å descriptions read as two lattices and TL fires. LaB₆
+  as picked promotes tP ×2 and cI a√2 to `high` from 2.2e-3 (quiet at 2.0e-3).
+  FAP's truth reaches `high` from 2.2e-3 too, inside the band that fails on LaB₆,
+  so it is no gain. Brucite and zincite are lifted at every tolerance tried.
+  Nothing else moves between 3e-4 and 2e-3. The lower edge is how far two
+  refined descriptions of one lattice sit apart (arm b's tI c = 5.4293 Å
+  against its cF a = 5.4312 Å is 7e-4 in Q). The upper edge is where LaB₆'s
+  tetragonal descents start to read as its cubic lattice. Both edges come from
+  these arms (one synthetic Si family, one lab LaB₆ pattern), so a tolerance
+  chosen inside the band is untested beyond them.
+
+  *Not done.* No code: TL is a rule change and waits on the ruling. The
+  per-unit budget still cuts low-symmetry units of the synthetic arms at 300 s
+  (`trial_error.monoclinic` on five arms, the tP arm's triclinic units too).
+  The flag reads identically at 30 s and 300 s on every arm, so the reading
+  does not hang on it. `python -m tests.reader_output`: exit 0, unchanged.
+
+  *Next.* The maintainer rules on #916. If lattice-aware, build TL in
+  `fom.fom_panel_disagrees`, with co-winners by exact tie and lattices by line
+  set at a tolerance inside 7e-4 to 2e-3, and re-run this table as its acceptance,
+  arm b, brucite and zincite rising and nothing else. If kept, tick task 5 as
+  "revisited after the repair; kept". Then the WP's last open item is WP-2041's
+  tutorial 03 count.
 
 - **2026-11-01** — #1263, built as the reporter's `split` rule (ghostshift runner,
   PR #1302). Decided 2026-11-01 (maintainer): `split` lands on top of #1251's
