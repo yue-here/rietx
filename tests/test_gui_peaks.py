@@ -287,13 +287,15 @@ def _answer(*candidates: CellCandidate) -> IndexingResult:
                               created_utc="2026-07-31T00:00:00Z"))
 
 
-def test_adopt_is_gated_on_best_or_none_server_side(served, client):
-    """The acceptance criterion: no UI path adopts what the gate refuses.
+def test_any_candidate_can_be_adopted_and_an_unpicked_one_records_why(
+        served, client):
+    """Yue's ruling B (2026-11-08, WP-2124): a person may adopt any candidate.
 
     The medium candidate is the *normal* real-data outcome
-    (``shift_allowance_assumed``), so this is the state the panel lives in —
-    the server's ``adopt`` arm must say no, and the route must refuse with the
-    same words, because the button and the route are one answer.
+    (``shift_allowance_assumed``), and on FAP nothing reaches ``high`` at all,
+    so a gate on Adopt left the right cell unreachable.  The gate is still
+    asked: the arm says the row is not its pick and why, and the adoption
+    writes the same sentence, grade and caveats included, into the node.
     """
     session, project, _ = served
     medium = _candidate("medium", ["shift_allowance_assumed"])
@@ -302,25 +304,34 @@ def test_adopt_is_gated_on_best_or_none_server_side(served, client):
 
     status, answer = client.get("/api/index/result")
     assert status == 200
-    assert answer["adopt"] == [{
-        "allowed": False,
-        "why": answer["adopt"][0]["why"],
-    }]
-    assert "medium" in answer["adopt"][0]["why"]
-    assert "best_or_none" in answer["adopt"][0]["why"]
+    why = answer["adopt"][0]["why"]
+    # `allowed` keeps the gate's pick under its old name for the old panel
+    assert answer["adopt"] == [{"allowed": False, "picked": False, "why": why}]
+    assert why == ("not best_or_none()'s pick: grade 'medium' "
+                   "(shift_allowance_assumed)")
 
-    status, refused = client.post("/api/index/adopt", {"candidate": 0})
-    assert status == 409
-    assert refused["error"]["code"] == "ADOPT_GATED"
-    assert "medium" in refused["error"]["message"]
+    status, adopted = client.post("/api/index/adopt", {"candidate": 0})
+    assert status == 200, adopted
+    assert adopted["picked"] is False
+    node = project.history.nodes[adopted["node_id"]]
+    assert node.action.kind == "edit_model"
+    assert node.label.startswith("adopted indexed cell 4.1568")
+    assert node.label.endswith(f"; {why}")
 
-    # two high candidates: still no singleton, still no adoption
+    # two high candidates: no singleton, so neither is the pick, and the
+    # sentence says why a `high` row was still not picked
     with session._cond:
         session._index_result = _answer(_candidate("high", []),
                                         _candidate("high", []))
     _, answer = client.get("/api/index/result")
-    assert [a["allowed"] for a in answer["adopt"]] == [False, False]
-    assert client.post("/api/index/adopt", {"candidate": 0})[0] == 409
+    assert [a["picked"] for a in answer["adopt"]] == [False, False]
+    assert answer["adopt"][1]["why"] == (
+        "not best_or_none()'s pick: grade 'high'; more than one candidate "
+        "reached 'high'")
+    status, adopted = client.post("/api/index/adopt", {"candidate": 1})
+    assert status == 200 and adopted["picked"] is False
+    assert project.history.nodes[adopted["node_id"]].label.endswith(
+        answer["adopt"][1]["why"])
 
 
 def test_adopting_the_one_high_candidate_is_a_model_edit(served, client):
@@ -329,11 +340,12 @@ def test_adopting_the_one_high_candidate_is_a_model_edit(served, client):
         session._index_result = _answer(_candidate("high", []))
 
     _, answer = client.get("/api/index/result")
-    assert answer["adopt"] == [{"allowed": True, "why": ""}]
+    assert answer["adopt"] == [{"allowed": True, "picked": True, "why": ""}]
 
     head_before = project.refinement._head_id
     status, adopted = client.post("/api/index/adopt", {"candidate": 0})
     assert status == 200
+    assert adopted["picked"] is True
     assert adopted["api_call"] == "session.adopt_candidate(0)"
     assert adopted["node_id"] and adopted["node_id"] != head_before
     # a bare cell is a Le Bail scaffold: dummy atom, absence-free group, and
@@ -344,7 +356,9 @@ def test_adopting_the_one_high_candidate_is_a_model_edit(served, client):
     assert len(phase["atoms"]) == 1
     node = project.history.nodes[adopted["node_id"]]
     assert node.action.kind == "edit_model"
-    assert "adopted indexed cell" in (node.label or "")
+    # the gate's own pick carries no "not picked" sentence
+    assert node.label == ("adopted indexed cell 4.1568 4.1568 4.1568 Å "
+                          "(cubic, P m -3 m)")
 
 
 # ----------------------------------------------------------------------

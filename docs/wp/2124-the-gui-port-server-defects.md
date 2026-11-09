@@ -108,7 +108,7 @@ Left for later port WPs (not here):
 ## Tasks
 
 - [x] 1. The extinction screen runs on a project with no phase. Take `extinction` out of the refusal; the message then reads "a fit/stage/series run". Test: a pattern-only project screens a candidate and gets classes back.
-- [ ] 2. Adopt takes any candidate. `index_adopt` drops `ADOPT_GATED`; an unpicked candidate's label records "not the gate's pick", its grade and its caveats. The `adopt` arm per row: `allowed` keeps the gate's pick for the old panel, `picked` says the same under its true name, `note` is the sentence the node will record. Tests: adopt a `low` candidate, read the node label.
+- [x] 2. Adopt takes any candidate. `index_adopt` drops `ADOPT_GATED`; an unpicked candidate's label records "not the gate's pick", its grade and its caveats. The `adopt` arm per row: `allowed` keeps the gate's pick for the old panel, `picked` says the same under its true name, `note` is the sentence the node will record. Tests: adopt a `low` candidate, read the node label.
 - [ ] 3. The pick route takes `two_theta_range` and `flag_contamination` beside `shoulders`; `pick_options` records all three, and the editor's later refits use the detection and marks the stored list was picked with. Tests: a narrowed range, contamination off and kept off through an edit.
 - [ ] 4. Lattice relations between candidates ("c doubled", "a × √3", "same cell"): measure how many of FAP's candidates `supercell_checks` relates under the GUI's default search. Take it only if the fix is clear-cut inside `indexing/`; otherwise file it here as a follow-up line.
 - [ ] Tests: the GUI manual and route partition tests where a route's contract changed.

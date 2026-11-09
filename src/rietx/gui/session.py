@@ -2200,11 +2200,12 @@ class GuiSession:
     # indexing (WP-1027)
     # ------------------------------------------------------------------
     def index_result(self) -> dict:
-        """The last indexing answer, with the adopt gate answered per row.
+        """The last indexing answer, with the gate's pick answered per row.
 
-        ``adopt`` runs parallel to ``result.candidates`` and is the server
-        saying whether :meth:`index_adopt` would act — the button's
-        enabled-ness and the route's willingness must not be two answers
+        ``adopt`` runs parallel to ``result.candidates``: whether
+        ``best_or_none()`` picks the row, and for a row it does not, the
+        sentence :meth:`index_adopt` records when a person adopts it anyway.
+        The pick is the server's, never a client's reading of ``confidence``
         (the ``report.apply`` rule).  ``refuting_caveats`` is served so the
         client colours chips from the constant rather than a hand-written list.
         """
@@ -2222,9 +2223,15 @@ class GuiSession:
         best = result.best_or_none()
         adopt = []
         for cand in result.candidates:
-            allowed = best is not None and cand is best
-            adopt.append({"allowed": allowed,
-                          "why": "" if allowed else _adopt_refusal(cand, best)})
+            picked = best is not None and cand is best
+            # Every row can be adopted (Yue's ruling B, 2026-11-08, WP-2124).
+            # ``picked`` is the gate's own pick and ``why`` the sentence an
+            # adoption of any other row records in its history node.
+            # ``allowed`` carries ``picked`` under its pre-ruling name, because
+            # the old Peaks panel reads it for both its Adopt button and its
+            # ``best_or_none()`` badge; it goes when the port redraws the panel.
+            adopt.append({"allowed": picked, "picked": picked,
+                          "why": "" if picked else _unpicked_note(cand)})
         return {"result": result.model_dump(mode="json"),
                 "adopt": adopt,
                 "refuting_caveats": sorted(INDEX_REFUTING_CAVEATS),
@@ -2433,12 +2440,15 @@ class GuiSession:
                 "running": busy}
 
     def index_adopt(self, body: dict) -> dict:
-        """Adopt one candidate cell as the model — through the gate, or not at
-        all.
+        """Adopt one candidate cell as the model, any candidate the person
+        chooses.
 
-        The gate is re-asked here rather than trusted from the panel: only the
-        candidate ``best_or_none()`` would return can be adopted, so no UI path
-        can hand back a cell the API itself refuses to single out.  Adoption is
+        Yue ruled on 2026-11-08 (WP-2124, option B) that a person may adopt
+        any candidate, on WP-1043's ground: give them all the evidence and let
+        the user, human or machine, be the judge.  That reverses WP-1027's
+        gate here.  ``best_or_none()`` is still asked, so a candidate it does
+        not pick carries the reason into the node's label: its grade, its
+        caveats, and the ambiguity or tie that kept it out.  Adoption is
         a model edit (``Refinement.edit`` → one ``edit_model`` node, no new
         NodeKind): the structure becomes WP-1024's single-phase Le Bail scaffold
         (absence-free lattice group unless a ``space_group`` from the extinction
@@ -2457,11 +2467,7 @@ class GuiSession:
         index = self._peak_number(body, "candidate", int)
         candidate = self._candidate_number(result, index)
         best = result.best_or_none()
-        if best is None or candidate is not best:
-            raise GuiError(
-                f"candidate {index} cannot be adopted: "
-                f"{_adopt_refusal(candidate, best)}",
-                code="ADOPT_GATED", status=409, where=["candidate"])
+        picked = best is not None and candidate is best
         from ..indexing.workflow import structure_from_candidate
 
         space_group = body.get("space_group") or None
@@ -2474,12 +2480,14 @@ class GuiSession:
         a, b, c = candidate.cell[:3]
         label = (f"adopted indexed cell {a:.4f} {b:.4f} {c:.4f} Å "
                  f"({candidate.system}, {space_group or candidate.lattice_group})")
+        if not picked:
+            label += f"; {_unpicked_note(candidate)}"
         node = p.refinement.edit(structure=structure, label=label)
         if p.doc.mode != "lebail":
             p.doc.mode = "lebail"
             p.save()
         sg = f", space_group={space_group!r}" if space_group else ""
-        return {"node_id": node, "mode": p.doc.mode,
+        return {"node_id": node, "mode": p.doc.mode, "picked": picked,
                 "api_call": f"session.adopt_candidate({index}{sg})",
                 **self.structure()}
 
@@ -3167,19 +3175,25 @@ def _summarize_extinction(result, token) -> dict:
                 [f"classes:{result.n_screened}/{result.n_classes}"]}
 
 
-def _adopt_refusal(candidate, best) -> str:
-    """Why ``best_or_none()`` would not return this candidate, in one line."""
+def _unpicked_note(candidate) -> str:
+    """Why ``best_or_none()`` does not pick this candidate, in one line.
+
+    The one sentence both surfaces quote: the ``adopt`` arm's ``why`` and the
+    label of the ``edit_model`` node an adoption of this candidate records
+    (WP-2124).  It names the grade and the caveats, as Yue's ruling of
+    2026-11-08 asks, and for a ``high`` candidate the ambiguity or the tie
+    that kept the gate from picking it.
+    """
+    caveats = ", ".join(candidate.confidence_caveats)
+    note = (f"not best_or_none()'s pick: grade {candidate.confidence!r}"
+            + (f" ({caveats})" if caveats else ""))
     if candidate.confidence != "high":
-        caveats = ", ".join(candidate.confidence_caveats)
-        return (f"confidence is {candidate.confidence!r}"
-                + (f" ({caveats})" if caveats else "")
-                + "; only the one candidate best_or_none() returns can be "
-                  "adopted")
+        return note
     if candidate.ambiguity:
-        return ("a geometrically indistinguishable lattice exists; the "
-                "discriminating reflections are listed on the candidate")
-    return ("more than one candidate reached 'high'; the result cannot "
-            "single one out")
+        return (note + "; a geometrically indistinguishable lattice exists, "
+                "and the discriminating reflections are listed on the "
+                "candidate")
+    return note + "; more than one candidate reached 'high'"
 
 
 def _idle_run() -> dict:
