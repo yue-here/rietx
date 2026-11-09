@@ -43,7 +43,7 @@ measuring, and drop a pair one of these changes dissolved, saying why.
 
 ## Tasks
 
-- [ ] Re-derive the 38 pairs against the tree; drop or merge the dissolved ones with a line
+- [x] Re-derive the 38 pairs against the tree; drop or merge the dissolved ones with a line
       each.
 - [ ] Per pair, the dataset that exercises both, chosen before running.
 - [ ] Measure both orders (or with and without one action, where order is fixed by the
@@ -79,6 +79,47 @@ never a bound the solver sees.
 | C1 | **live, to measure** | `profile_fraction` still pins one width per branch (`trial.set_vary([axis], False)`, fraction_profile.py:216) and refits through `run_stage` (:224), so each refit meets the stage-start hold and the collapse restore (refine.py:5372-5399). The module's own account of the clash (fraction_profile.py:14-23) is still dated to the pre-WP-1523 test. Dataset: `tests/test_qpa_multimodal.py`'s two-basin fixture |
 | C2 | **live, narrowed, to measure** | Since #1075 each probe starts from the fit's own free set (`fresh()`, parameter_interval.py:269-279: the pinned path and every path the fit held), so a probe can no longer free a cell the fit held. Its comment says a refit may still hold *more*, since a lower pinned scale can hide a phase the fit saw: that half of the pair is what to measure. Dataset: a weak phase in a weighed mixture, as listed |
 | C6 | **designed apart, confirm by measuring** | `_significance_columns` (refine.py:2205-2218) still leaves out every column that moves only displacements, occupancies and other phases' scales, so the absent-phase test cannot read a scale-B ridge as absence. The docstring's 153.7σ against 0.02σ on the fluorite is why the exclusion exists, not a measurement of the pair; the WP-2002 reader asked for one. Dataset: `tests/test_scale_b_ridge.py`'s fluorite |
+
+### Re-derivation, C4, C5 and C7-C38 (2026-11-09, read only)
+
+Read by three delegated read-only readers at 4c55b9011 and spot-checked here at eight of their lines (forward.py:1766, instrument.py:1224-1226, :1539, :2340-2344, vector.py:1347-1348, :2867, refine.py:1742, :5062). Line numbers are that commit's.
+
+| # | Status | Reason (file:line) |
+|---|---|---|
+| C4 | **live, to measure** | Ridge hold `_hold_scale_b_ridges` (refine.py:984, called :5193 and late :5421) against the µR/µt multiplier (`_absorption`, forward.py:1310, applied :2133): the ridge probe reads a phase component that already carries A(θ) and holds the Biso/ADP columns µR shifts; nothing separates them |
+| C5 | **designed apart** | The collapse set is drawn from free paths (refine.py:697, called :5347) and the ridge hold is kept out of `phase_held` through `apart` (:5295), so a ridge-held B is never restored by the collapse (:5384-5389) |
+| C7 | **live, to measure** | Moment hold and turn (`_hold_flat_moments`, refine.py:1535, called :5185; turn writes :1518) against the stationary-angle test (least_squares.py:931, run :3294/:3565, read refine.py:2354): on a site held as a combination only dof2 is held (:1451-1452), so the turned dof1 stays free for the test in the same stage |
+| C8 | **designed apart** | The moment hold runs after the phase hold (refine.py:5177 then :5185) and scans free paths only (:1401); the release asks only `moment_held` (:5294-5297) |
+| C9 | **designed apart** | `sequential._floor_unsupported_moments` (sequential.py:1089, called :2036) acts between patterns on a copied carry source after acceptance, keeps the direction (:1151-1153) and skips rows with no verdict (:1127), never inside the fit whose collapse (refine.py:5384-5389) acted |
+| C10 | **live, to measure** | The phase hold leaves a seen-lineless phase's scale free (refine.py:684, filter :697); `FLOOR_HIT` from `bound_findings` (staged.py:2057, emitted refine.py:7472) has no check against the support verdict, so a blank-frame phase can fire both |
+| C11 | **designed apart** | Every seeded phase's prior significance is set to inf (refine.py:1742) before the hold reads it (:1745) |
+| C12 | **live, to measure** | `seed_stephens` (vector.py:3934, called refine.py:5079-5082) skips a nonzero user-set block; such a block can start infeasible, and the cone rows are then dropped (least_squares.py:2433, built :3147). The default seed itself starts inside the cone |
+| C13 | **gone** | Under a Stephens block every width reader takes `CompiledModel.lor_strain_term` (forward.py:1766), which is 0, so a locked nonzero `lor_strain` no longer enters the width sum (WP-1467) |
+| C14 | **live, to measure** | Γ_G² ≥ ε rows (`gaussian_width_inequalities`, least_squares.py:2478, added :3149) against `bound_findings`' exact active set (`_exact_active_bounds`, staged.py:2032, read :2147), which covers box sides only: a U, V or gauss_* held on a row is never reported at a bound. W now has a box floor at ε (instrument.py:1539), so W alone is caught |
+| C15 | **designed apart** | W's box floor equals the clamp's threshold (`TCHZ_BOUNDS`, instrument.py:1539; `_MIN_GAMMA_G2`, caglioti.py:88), and under LM the rows hold total Γ_G² ≥ ε. `FLOOR_SEEDS` (vector.py:1119) now sizes only the FD step, and lm.py:184-185 is no longer a polish. Not covered: TRF and joint fits build no rows, so a negative U or V can still reach the clamp |
+| C16 | **designed apart** | The mode-fixed drop (refine.py:5066-5070) runs before the seeds (:5072-5077), as the comment at :5062 requires |
+| C17 | **designed apart** | `_answer_significance` frees only `phase_held` (refine.py:2355, called :5302), drawn from free paths (:697), and `set_vary` never frees a held entry (vector.py:3822) |
+| C18 | **live, to measure** | `intermediate_ftol` 1e-6 (staged.py:352, `stage_ftols` :429-465, plan.py:73) against the holds and release that read each stage's end point (refine.py:5177, :5184, :5193, :5307). WP-2002 measured one flip (C18 in § Inherited) |
+| C19 | **live, to measure** | `lebail_update` after each stage's solve (refine.py:5557) still runs at the 1e-6 end point of intermediate stages |
+| C20 | **live, measured in part** | `ROUGHNESS_SEED` 0.3 (staged.py:224, applied refine.py:5072-5077) with Biso still free under cumulative staging (staged.py:510). WP-2002 measured it (§ Inherited): invariant on five lab patterns except Pitschke's c |
+| C21 | **live, to measure** | Extinction (extinction.py:174, stage staged.py:535) and Suortti/Pitschke roughness (corrections.py:28, :62, stage staged.py:536) are both degenerate with scale and Biso and free together in the late stages; the plan orders only when each is freed. µR is a declared float, not refined (instrument.py:1264) |
+| C22 | **live, to measure** | `solve_magnetic`'s release (magnetic.py:1469, now 0.05 × seed, `SOLVE_RELEASE_FRACTION` :263) against `_hold_flat_moments` in every stage (refine.py:5184) |
+| C23 | **designed apart** | `tie_to_parent` holds the cell (magnetic.py:1369), `_without_cell` strips the plan's cell glob (magnetic.py:1505, used :2396, :2465), and `set_vary` refuses held entries (vector.py:3822) |
+| C24 | **gone** | Under a Stephens block `lor_strain` is force-fixed (vector.py:1347-1348) and read as 0 (forward.py:1766), and `bounds()` runs over free entries only (vector.py:4219), so the strain cap (vector.py:886) cannot reach it; the cone acts on the microstrain DOFs only (least_squares.py:2391) |
+| C25 | **live, reconciled** | Size cap (vector.py:1005, applied :4231-4234) and `SIZE_LAMBDA_POWER` (multi.py:77, used :147) both act on the shared size column of a joint fit; each table reads its cap in its own scaled units and the bounds are intersected (least_squares.py:3045, docstring :3054-3059). Measure on a joint X-ray and neutron fit |
+| C26 | **live, to measure** | σ widening uses the compile-time background scale (forward.py:4643-4651) while the same scale is a free design row (:4638-4640); the comment at :4644-4647 accepts the per-stage lag |
+| C27 | **live, idempotent by reading** | `_floor_sigma` (pattern.py:39), Poisson fallback (:189-191), compile widening (forward.py:4651), and `RefinementResult.sig` floors again with the same function (results.py:2437-2442), a no-op on an already floored σ. The zero-esd floor stays until WP-1952 (pattern.py:28-31) |
+| C28 | **designed apart** | `_fix_origin` holds through `Entry.held` (vector.py:3150); `_holdable` skips held, tied or locked entries (:3212), the take-back respects caller holds (:3189-3191), stage holds use `set_vary` on free paths (refine.py:711), and the ridge hold acts on B, not on a DOF |
+| C29 | **live, rarely binding** | `MARCH_R_MIN` (structure.py:62) with its repair (:276-289), against `tie_window` (vector.py:1033, called :2796) and the unseen-phase hold (refine.py:1684). WP-2002 B9 cut the box to a 1e-6 pole guard with no ceiling (structure.py:43-60) |
+| C30 | **gone** | Displacement, both capillary offsets and `zero_shift` have had no default box since 2026-10-20 (instrument.py:1224-1226, :1239-1254, :2340-2344), so there is no bound for layer 2's position actions (layer2.py:84, read :1014) to meet |
+| C31 | **designed apart** | The extinction skip gate (forward.py:4557-4560) skips only at exactly 0 and outside `moving_paths`, so a stage freeing extinction turns it off; the holds come after compile (refine.py:5170-5173) and can only leave the gate evaluating an E it could have skipped (cost, never a wrong value) |
+| C32 | **designed apart** | WP-1953 made the FCJ profile continuous at a zero aperture (fcj.py:22-29, :95-102), and the sizing floor (forward.py:4326-4329, `AXIAL_SIZING_FLOOR` :312) applies whenever either aperture is positive or free (:4318-4321), so landing on the zero bound (instrument.py:1255-1256) meets no jump |
+| C33 | **live, to measure** | The reflection list and windows are frozen at compile-time zero and shift (`REFLECTION_MARGIN_DEG` forward.py:331, :4129-4130; `WINDOW_MIN_DEG` :220; `window_slack_deg` :4501-4502) while the now unbounded zero and shift move in the stage (:4333-4340), and Pawley's `off_data` flag (:4574) reads the compile-time list; `rewindow` (:4802) resizes windows only |
+| C34 | **designed apart** | The phase scale is mode-fixed in Pawley (refine.py:341); c_w scales the soft-restraint rows only, and the Pawley rows are their own stripe (least_squares.py:1790-1795, :2326-2333; forward.py:3608-3611, :3624) |
+| C35 | **live, to measure** | Equal-start seed (forward.py:4571), floors (:638, :3349, `LEBAIL_INTENSITY_FLOOR` :586) and the carried `ReflectionState` (refine.py:5131-5133, `_restore_lebail` :9603) all write `hkl_intensity` in one fit |
+| C36 | **live, to measure** | `auto_background(seed=True)` (auto.py:92, :161-165, :187-188) is opt-in (default False, :97); by default the stage-start partition (refine.py:5141-5144) runs against an unfitted background, as the docstring says (auto.py:122-130) |
+| C37 | **live, to measure** | A free measured-background scale (forward.py:4638-4640) and the Chebyshev rows (forward.py:4609) describe the same curve; `select.py` (:100, :114-118) only counts the scale in its BIC, and nothing in the fit separates them |
+| C38 | **designed apart** | `check_wavelength_against_cell` (vector.py:2844, called least_squares.py:3194) returns early for a joint table (vector.py:2867), which hands λ to `check_wavelength_freedom` (multi.py:1377, :461-464) |
 
 ## Acceptance
 
