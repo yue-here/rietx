@@ -381,9 +381,12 @@ PEAK_WIDTH_CENSUS_N = 12
 #: A component's position is bounded to ±this fraction of its seed FWHM.  The
 #: analogue of Layer 1's ``VALIDITY_RADIUS_FWHM = 0.4``, and the reasoning is
 #: the same one rank down: a fit that wants to move a component further than
-#: half a FWHM is reporting a *detection* failure, not a small offset, and
-#: should come back at its bound with a flag rather than converge somewhere
-#: unrelated.
+#: half a FWHM is not reporting a small offset, and should come back at its
+#: bound with a flag rather than converge somewhere unrelated.  The cause is
+#: not always detection: on the 16 IUCr round-robin patterns, 8 of the 24
+#: usable components on this bound were shoulders on the low-angle tail of a
+#: 4-23x stronger line, and freeing the bound moved seven of the eight further
+#: from any lattice line (WP-2055).
 PEAK_POSITION_BOUND_FWHM = 0.5
 #: Bounds on each fitted **component** FWHM (Γ_G, Γ_L separately), as multiples
 #: of the group's seed combined Γ.  The lower one is a *positivity floor*, not a
@@ -718,8 +721,8 @@ PEAK_ASSUMED_ESD_DEG = 0.02
 #: seed, not a measurement.  ``sigma_assumed`` — σ(2θ) was supplied, not fitted.
 #: ``unresolved_shoulder`` — a component kept in a group where it never
 #: separated from its neighbour by half a FWHM.  ``position_at_bound`` — the fit
-#: pushed to :data:`PEAK_POSITION_BOUND_FWHM`, i.e. detection put the seed in
-#: the wrong place.  ``asymmetry_unmodelled`` — see
+#: pushed to :data:`PEAK_POSITION_BOUND_FWHM`: a misplaced seed, or a component
+#: absorbing profile shape the fit does not carry.  ``asymmetry_unmodelled`` — see
 #: :data:`PEAK_ASYMMETRY_MIN_SIGMA`.  ``background_extrapolated`` — the line
 #: stands where the background envelope was extrapolated rather than measured
 #: (WP-1028 §(i)): its prominence is over a level nobody observed, so it is
@@ -2477,8 +2480,9 @@ class ExtinctionCandidate(Base):
     #: forbidden line coinciding with an allowed one never was an independently
     #: determined intensity, so removing it costs no parameter.
     #:
-    #: ``None`` until :attr:`screened` (and after a fit that raised, which
-    #: leaves no pattern to ask), and that is not bookkeeping.  The third
+    #: ``None`` until this class's own fit has run (and after that fit raised,
+    #: which leaves no pattern to ask), and that is not bookkeeping.  A class
+    #: whose scoring fit raised keeps its count while :attr:`screened` is False.  The third
     #: clause is a question about the class's *fit* — a window filled by a
     #: neighbour's tail measures the profile model rather than the absence
     #: (WP-1077) — so before the fit the count is unknown rather than zero, and
@@ -2491,10 +2495,25 @@ class ExtinctionCandidate(Base):
     #: the refuting reflections, so the refutation can be checked in the pattern
     forbidden_hkl: list[tuple[int, int, int]] = Field(default_factory=list)
     forbidden_two_theta: list[float] = Field(default_factory=list)
-    #: whole-pattern Le Bail fit of this class; ``inf`` when the class was never
-    #: fitted (:attr:`screened` False) or its fit raised
+    #: the :attr:`n_testable` forbidden positions themselves, one reflection
+    #: each, so a reader can see where two classes the screen could not
+    #: separate disagree (``EXTINCTION_SYMBOL_AMBIGUOUS`` names them).  Empty
+    #: until :attr:`screened`
+    tested_hkl: list[tuple[int, int, int]] = Field(default_factory=list)
+    tested_two_theta: list[float] = Field(default_factory=list)
+    #: whole-pattern Pawley fit of this class (WP-2076; Le Bail before it);
+    #: ``inf`` when the class was never fitted (:attr:`screened` False) or its
+    #: fit raised
     rwp: float = float("inf")
     gof: float = float("inf")
+    #: the absolute χ² the ranking reads: a Pawley fit of the lattice less only
+    #: this class's :attr:`n_testable` forbidden lines (WP-2076), so the
+    #: comparison with :attr:`ExtinctionScreen.reference_chi2` is nested and
+    #: charges the class for exactly the absences it is counted for.  It is this
+    #: class's own fit when every forbidden line is testable, and the
+    #: reference's when none is.  Stays ``inf`` when that second fit raised,
+    #: and the class is then unscored (:attr:`screened` False, not refuted)
+    #: with its own fit's :attr:`rwp` and :attr:`n_testable` kept
     chi2: float = float("inf")
     #: BIC(this class) − BIC(the absence-free lattice), from
     #: ``report.layer2.delta_bic``: **negative favours this class**.  Differences
@@ -2505,15 +2524,17 @@ class ExtinctionCandidate(Base):
     #: restoring the forbidden reflections is *justified*, i.e. the class's
     #: absences are contradicted by the fit
     absences_rejected: bool = False
-    #: was the Le Bail screen actually run for this class?  False only when
-    #: ``max_classes`` truncated the screen or ``cancel`` stopped it first; the
+    #: was this class scored?  False when ``max_classes`` truncated the screen,
+    #: ``cancel`` stopped it first, or one of its two fits raised.  A raised fit
+    #: is no evidence about the absences, so the class is left unscored rather
+    #: than refuted, and ``EXTINCTION_SYMBOL_AMBIGUOUS`` names the error.  The
     #: absence test reads this class's own fit, so it never runs before one
     screened: bool = False
     #: **One-sided by construction.** A class asserts *absences*, so intensity at
     #: a position it forbids contradicts it — while a class claiming too *few*
     #: absences asserts nothing the data can falsify and is outranked rather than
-    #: refuted.  The one other way in is a Le Bail fit that raised, which
-    #: :attr:`refuted_reason` names as such: with no χ² it cannot be the answer.
+    #: refuted.  A fit that raised is not a way in: it leaves the class
+    #: unscored (:attr:`screened`), and the screen abstains.
     refuted: bool = False
     refuted_reason: str | None = None
     diagnostics: list[Diagnostic] = Field(default_factory=list)
@@ -2543,7 +2564,7 @@ class ExtinctionScreen(Base):
     #: fitted 2θ range the classes were enumerated and judged over.  It is part
     #: of the answer: two classes differing only outside it are one class here.
     two_theta_range: tuple[float, float] = (0.0, 0.0)
-    #: classes enumerated / classes whose Le Bail fit was run
+    #: classes enumerated / classes whose screen fit was run
     n_classes: int = 0
     n_screened: int = 0
     #: the absence-free class's own screen fit — the reference model

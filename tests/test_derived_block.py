@@ -617,3 +617,127 @@ def test_add_derived_refuses_a_frame_input_that_is_not_an_input():
         table.add_derived(_Framed(("phases.0.cell.b",)))
     assert not table.derived
     scratch_table().add_derived(_Framed(("phases.0.cell.a",)))
+
+
+# -- an expression the user wrote (WP-1964) ----------------------------------
+
+def _einstein_table(T: float = 300.0):
+    """LaB6 with ``a`` set by an Einstein expression over three variables."""
+    from tests.test_v02_core import _lab_state
+
+    structure, ins, pattern = _lab_state()
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for name, value in (("zero_a", 4.15), ("grad", 0.02), ("theta", 150.0)):
+        table.add_parameter(f"vars.{name}", value, vary=True)
+    block = table.add_expression(
+        "phases.0.cell.a", "zero_a + grad/(exp(theta/T) - 1)",
+        variables={n: f"vars.{n}" for n in ("zero_a", "grad", "theta")},
+        constants={"T": T})
+    return structure, ins, pattern, table, block
+
+
+def _einstein(zero_a, grad, theta, T):
+    return zero_a + grad / math.expm1(theta / T)
+
+
+def test_an_expression_sets_its_target_and_the_targets_followers():
+    """A cubic ``b`` and ``c`` follow ``a`` through the block, not through C,
+    whose row would read ``a``'s value from before the block wrote it."""
+    _, _, _, table, block = _einstein_table()
+    assert block.outputs == ("phases.0.cell.a", "phases.0.cell.b", "phases.0.cell.c")
+    theta = np.array([4.16, 0.03, 120.0])
+    values = table.decode(theta)
+    want = _einstein(4.16, 0.03, 120.0, 300.0)
+    for edge in "abc":
+        assert values[f"phases.0.cell.{edge}"] == pytest.approx(want, rel=1e-15)
+    for edge in "abc":
+        e = table.entries[table._paths[f"phases.0.cell.{edge}"]]
+        assert e.locked and e.tie is None
+    assert {"phases.0.cell.a", "phases.0.cell.b", "phases.0.cell.c"} <= set(table.moving_paths)
+    table.commit(theta)
+    assert table.entries[table._paths["phases.0.cell.c"]].value == pytest.approx(want)
+
+
+def test_an_expression_rows_jacobian_is_the_exact_gradient():
+    _, _, _, table, _ = _einstein_table()
+    theta = np.array([4.16, 0.03, 120.0])
+    jac = table.local_jacobian(theta).toarray()
+    x = 120.0 / 300.0
+    em = math.expm1(x)
+    want = [1.0, 1.0 / em, -0.03 * math.exp(x) / em ** 2 / 300.0]
+    for edge in "abc":
+        row = jac[table._paths[f"phases.0.cell.{edge}"]]
+        assert row == pytest.approx(want, rel=1e-13)
+
+
+def test_a_linear_expression_equals_the_same_affine_tie():
+    """``c0 + c1*T`` as an expression and as an ``AffineTie``: one table each,
+    one decode and one local Jacobian."""
+    from tests.test_v02_core import _lab_state
+
+    tables = []
+    for spelling in ("expression", "tie"):
+        structure, ins, _ = _lab_state()
+        table = ParameterTable(structure, ins)
+        table.set_vary(["*"], False)
+        table.add_parameter("vars.c0", 4.15, vary=True)
+        table.add_parameter("vars.c1", 2e-5, vary=True)
+        if spelling == "expression":
+            table.add_expression("phases.0.cell.a", "c0 + c1*T",
+                                 variables={"c0": "vars.c0", "c1": "vars.c1"},
+                                 constants={"T": 450.0})
+        else:
+            table.set_tie("phases.0.cell.a",
+                          AffineTie(terms=(("vars.c0", 1.0), ("vars.c1", 450.0))))
+            table.refresh_ties()
+        tables.append(table)
+    theta = np.array([4.157, 3.1e-5])
+    a, b = (t.decode(theta) for t in tables)
+    for edge in "abc":
+        p = f"phases.0.cell.{edge}"
+        assert a[p] == pytest.approx(b[p], rel=1e-15)
+        ia, ib = tables[0]._paths[p], tables[1]._paths[p]
+        assert (tables[0].local_jacobian(theta).toarray()[ia]
+                == pytest.approx(tables[1].local_jacobian(theta).toarray()[ib], rel=1e-15))
+
+
+@pytest.mark.parametrize("kwargs, match", [
+    ({"expression": "zero_b + 1", "variables": {"zero_a": "vars.zero_a"}},
+     "did you mean 'zero_a'"),
+    ({"expression": "zero_a + 1", "variables": {"zero_a": "vars.zero_a"},
+      "constants": {"T": 300.0}}, "'T' is declared but"),
+    ({"expression": "zero_a + exp", "variables": {"zero_a": "vars.zero_a"}},
+     "is a function"),
+    ({"expression": "zero_a * T", "variables": {"zero_a": "vars.zero_a"},
+      "constants": {"zero_a": 1.0, "T": 1.0}}, "both a variable and a constant"),
+    ({"expression": "pi * zero_a",
+      "variables": {"zero_a": "vars.zero_a", "pi": "vars.zero_a"}}, "reserved word"),
+    ({"expression": "zero_a", "variables": {"zero_a": "vars.zero_a"},
+      "target": "phases.0.cell.b"}, "set phases.0.cell.a instead"),
+    ({"expression": "zero_a", "variables": {"zero_a": "vars.zero_a"},
+      "target": "phases.0.cell.alpha"}, "is locked"),
+])
+def test_an_expression_refuses_by_name(kwargs, match):
+    from tests.test_v02_core import _lab_state
+
+    structure, ins, _ = _lab_state()
+    table = ParameterTable(structure, ins)
+    table.add_parameter("vars.zero_a", 4.15, vary=True)
+    target = kwargs.pop("target", "phases.0.cell.a")
+    expression = kwargs.pop("expression")
+    with pytest.raises(ValueError, match=match):
+        table.add_expression(target, expression, **kwargs)
+
+
+def test_a_follower_tied_to_the_target_and_to_another_parameter_is_refused():
+    from tests.test_v02_core import _lab_state
+
+    structure, ins, _ = _lab_state()
+    table = ParameterTable(structure, ins)
+    table.add_parameter("vars.c0", 4.15, vary=True)
+    table.add_parameter("vars.k", 0.1, vary=True)
+    table.set_tie("phases.0.atoms.0.biso",
+                  AffineTie(terms=(("phases.0.cell.a", 1.0), ("vars.k", 1.0))))
+    with pytest.raises(ValueError, match="tied to 'phases.0.cell.a' and to another"):
+        table.add_expression("phases.0.cell.a", "c0", variables={"c0": "vars.c0"})

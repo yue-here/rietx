@@ -419,9 +419,9 @@ def test_an_unbounded_biso_written_after_206_is_a_choice_and_kept(
     assert reopened.history_diagnostics == []
 
 
-#: The keys of a stored ``Parameter`` since schema 0.46, which dropped
-#: ``transform`` (WP-1938); every release before wrote that key too.
-_PARAMETER_KEYS = {"value", "vary", "min", "max", "expr", "unit", "stderr"}
+#: The keys of a stored ``Parameter`` since schema 0.61, which dropped
+#: ``expr`` (WP-1964); 0.46 had dropped ``transform`` (WP-1938).
+_PARAMETER_KEYS = {"value", "vary", "min", "max", "unit", "stderr"}
 
 
 def _stamp_transforms(obj) -> None:

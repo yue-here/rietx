@@ -124,7 +124,7 @@ Every verb that changes the model commits a history node as it runs, so the work
 | `ProjectDoc.excluded_regions` | 2θ regions masked out of the residual |
 | `ProjectDoc.indexing` | the next indexing run's controls |
 | `ProjectDoc.history_file` | the log's filename inside the directory |
-| `ProjectDoc.format_version` | the version of the `.rex` format ([Compatibility](compatibility.md#the-six-version-strings)) |
+| `ProjectDoc.format_version` | the version of the `.rex` format ([Compatibility](compatibility.md#the-seven-version-strings)) |
 | `ProjectDoc.package_version` | the version of rietx that wrote it |
 | `ProjectDoc.created_utc`, `ProjectDoc.updated_utc` | when it was created, and when it was last saved |
 | `ProjectDoc.ui` | keys a front end persists, with no schema |
