@@ -115,6 +115,8 @@ describe("which parameters get a slider", () => {
     expect(s.map((x) => x.path)).toEqual([
       "instrument.profile.u", "instrument.zero_shift", "phases.0.scale", "phases.0.cell.a"]);
     expect(s.at(-1)?.group).toBe("fluorapatite");
+    // one corpus entry covers a, b and c, so a cell slider is named by its edge
+    expect(s.at(-1)?.name).toBe("Lattice parameter a");
   });
 
   it("keeps a range the person set across a rebuild, and rebases the rest", () => {

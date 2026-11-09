@@ -226,7 +226,10 @@ export function buildSliders(rows: readonly ParamRow[], corpus: HelpCorpus | nul
         : defaults(family.kind, row.value, bound, ctx);
       out.push({
         path: row.path, kind: family.kind, group, bound, ref: row.value,
-        name: entry?.title ?? row.path.split(".").slice(-2).join(" "),
+        // the corpus has one entry for a, b and c, so two cell sliders in one
+        // phase would carry one name; a cell length is named by its own edge
+        name: family.kind === "cell" ? `Lattice parameter ${row.path.split(".").at(-1)}`
+          : entry?.title ?? row.path.split(".").slice(-2).join(" "),
         unit: entry?.unit ?? "", custom: !!old?.custom, ...range,
         ...fixFormat(range.lo, range.hi, row.value),
       });

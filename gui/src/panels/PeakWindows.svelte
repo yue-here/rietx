@@ -164,7 +164,7 @@
           <button class="pick step" aria-label="Previous peak" disabled={k <= 0}
             onclick={() => step(slot, -1)}>‹</button>
           <span class="mono tabular">{w.center.toFixed(2)}°</span>
-          <span class="muted sub">{w.hkl ? `(${formatHkl(w.hkl)})` : ""} {w.phase}</span>
+          <span class="muted sub">{w.hkl ? formatHkl(w.hkl) : ""} {w.phase}</span>
           <button class="pick step" aria-label="Next peak" disabled={k >= windows.length - 1}
             onclick={() => step(slot, 1)}>›</button>
         </figcaption>
