@@ -56,8 +56,8 @@ The palette piece moves it, and adds the site's roles the GUI lacks: a second te
 - Numbers are mono so digits line up and a changing value never shifts the text around it. [inferred]
 - Space-group symbols are typeset in a serif face, with italics, subscripts and overbars, and take no comma. [Yue 2026-11-06, 2026-11-07]
 - Identifiers that are words, such as Wyckoff letters, use the text face. [Yue 2026-11-07]
-- Every font is served by the app itself. No built file names a remote host. [inferred, WP-1017]
-- A type size is a role. Each step names what it sets (prose and controls, secondary text, headings), and steps scale with density. `gui/src/lib/style.test.ts` fails a size that is not a step. [Yue, WP-1201, for the principle; inferred for the roles]
+- Every font is served by the app itself. No built file names a remote host, which `tests/test_gui_dist.py` checks. [inferred, WP-1010]
+- A type size is a role. Each step names what it sets (prose and controls, secondary text, headings), and steps scale with density once the Settings dialog piece adds it. `gui/src/lib/style.test.ts` fails a size that is not a step. [Yue, WP-1201, for the principle; inferred for the roles]
 - Headings are sentence case app-wide, with weight setting them apart. No heading, column head or label is uppercase or tracked. Today's `h2, h3` rule in `app.css` is uppercase, and the sentence-case piece moves it. [Yue 2026-11-06, 2026-11-09; inferred for column heads]
 - A selected item never changes weight. A bolder word is wider, so it re-wraps its line and moves what is under it. Today's `.tab.on` sets a heavier weight, and the piece that next touches tabs drops it. [inferred, from principle 4 and the site]
 - Held rows fold into one line in the crystallographer's notation, such as `a = b = c, α = β = γ = 90°`, built from the symmetry. Only rows that cannot be freed fold. [Yue 2026-11-06]
@@ -65,7 +65,7 @@ The palette piece moves it, and adds the site's roles the GUI lacks: a second te
 ## Spacing and density
 
 - Density has three stops: reading, default and compact. The default sits between the other two. Row height, bar heights and type size move together, and Settings offers the choice. [Yue 2026-11-06]
-- Until the density piece adds its tokens, spacing uses `--s1`, `--s2` and `--s3`, and every control's padding is two of them. [inferred, WP-1201]
+- Until the Settings dialog piece adds density tokens, spacing uses `--s1`, `--s2` and `--s3`, and every control's padding is two of them. [inferred, WP-1201]
 - Bars earn their height. No bar is empty and no bar is crowded. The graph title shares a row with the view's controls, and the action bar is one row. [Yue 2026-11-07]
 - Space separates groups. A gap sits above each group and each table. Rows inside a section carry no rules, and a rule sits above a group or a table. [Yue 2026-11-07]
 - A family of parameters for one effect is a group, and a single parameter is a row. Groups follow the refinement order. [Yue 2026-11-07]
@@ -142,7 +142,7 @@ Claude inferred rules 1 to 12 from the rulings on background points and peak pic
 - A slider keeps one number format while you drag it, and clicking its number opens it for typing. Its range and units live in a pop-up opened from the parameter's name, and a slider may have a non-linear scale. [Yue 2026-11-07]
 - A value may be a typed expression. Typing "=" shows a visible formula mode with a list of names, and the value's popover has an "=" button that opens it. [Yue 2026-11-08]
 - A value near one of its limits shows it by text colour and a small mark on the limit's side, wherever the value appears. [Yue 2026-11-08]
-- No layout shift on a click is checked by `tests/test_gui_layout_browser.py`, which clicks every control and compares element boxes before and after. A check clicks as a person does, through real pointer events. [Yue 2026-11-07; inferred for the method]
+- `tests/test_gui_layout_browser.py` checks principle 4. It clicks every control and compares element boxes before and after. A check clicks as a person does, through real pointer events, because a scripted click can reach a control a person cannot. [Yue 2026-11-07; inferred for the method]
 
 ## Numbers and words on screen
 
@@ -180,6 +180,7 @@ These tests hold the rules a machine can check cheaply. A new rule that a machin
 - `tests/test_gui_palette.py`: the token values and the generated `gui/src/tokens.css`, the plot palette's floor, and text contrast.
 - `tests/test_gui_layout_browser.py`: no click moves the layout, collapse buttons stay where they were, and a phone-width window never scrolls sideways.
 - `gui/src/lib/style.test.ts`: no panel sets a register's size, padding or radius, and no size falls outside the steps.
+- `tests/test_gui_dist.py`: no built file names a remote host, so every font is the app's own.
 - `tests/test_gui_style_guide.py`: this guide names only tokens and tests that exist, carries a marker on every rule, and restates no colour or pixel value.
 
 Where the prototype drew a panel fully, the PR that ports it puts its screenshot beside the prototype's at the same window size. That comparison is for review, not a pixel test (`docs/milestones/gui-overhaul.md` § Acceptance).
