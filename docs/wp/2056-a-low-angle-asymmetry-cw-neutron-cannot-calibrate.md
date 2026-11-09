@@ -1,6 +1,6 @@
 # WP-2056 — a low-angle asymmetry the CW neutron lines cannot calibrate
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
 Track: The specimen is not an angle, and the neutron follow-through
 Depends on: 2054 soft (a Layer-1 asymmetry column that does not need FCJ live)
 Priority: P3 2026-10-26 — a workaround covers it: the Ba₂FeSbSe₅ protocol holds asymmetry at 0 and names the centroid shift as a systematic (+0.03 to +0.06 μ_B on a 3.9 μ_B moment); waits on a scope decision
