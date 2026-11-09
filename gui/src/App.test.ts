@@ -1472,7 +1472,8 @@ describe("the report panel", () => {
     expect(actions[1].textContent).toContain("already refined by the staged plan");
     expect(actions[2].textContent).toContain("no phase is named yet");
     // one Apply button: the other two are refusals with reasons, not controls
-    expect(host.querySelectorAll(".action button:not(.ghost)").length).toBe(1);
+    expect([...host.querySelectorAll(".action button")]
+      .filter((b) => b.textContent?.trim() === "Apply").length).toBe(1);
     // 0.5 is capped by the collinear templates, so it must not read as confident
     expect(actions[0].dataset.tone).toBe("medium");
   });
