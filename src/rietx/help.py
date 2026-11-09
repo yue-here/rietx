@@ -5527,6 +5527,20 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         ),
         unit="Å³",
     ),
+    "RefinementResult.fit_range": HelpEntry(
+        title="Fit range",
+        description=(
+            "Which part of its file the fit fitted: the file's range and point "
+            "count, the 2θ limits and excluded regions as asked and as applied, "
+            "the fitted channels and the counts on each side. `outside` holds one "
+            "span per stretch the fit left out, with its share of the file's "
+            "counts, its level and slope at the cut against the fitted median, "
+            "its largest excess over the background envelope, and the "
+            "reflections the model put in it or across its edge. Facts, with no "
+            "threshold: nothing reads them to decide anything. `None` when the "
+            "result did not come from `fit` or `run_stage`."
+        ),
+    ),
     "RefinementResult.microstructure": HelpEntry(
         title="Size and strain",
         description=(

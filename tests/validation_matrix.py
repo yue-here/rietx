@@ -1156,6 +1156,19 @@ CLAIMS: tuple[Claim, ...] = (
                  "closing stage (#1085)",
     ),
     Claim(
+        "test_acceptance_capillary",
+        "test_the_result_records_both_cuts_and_the_lines_above_60_degrees",
+        "srm660a_capillary", ("identity",),
+        "the result's fit_range restates the suite's own limits against the "
+        "file's range, and the stretch above the upper limit is reported with "
+        "its share of the counts and its largest excess (WP-2075)",
+        reference="the file's own first and last channels and the suite's "
+                  "limits (identity); the fitted count against "
+                  "len(result.two_theta)",
+        measured="116001 of 132992 points; above 60 deg: share 0.030, an "
+                 "11.6 sigma excess at 62.82 deg",
+    ),
+    Claim(
         "test_acceptance_capillary", "test_fit_quality_and_the_circular_cell",
         "srm660a_capillary", ("characterisation", "ceiling"),
         "the fit is sound and its cell agrees with SRM 660a — recorded as "
@@ -2801,6 +2814,18 @@ CLAIMS: tuple[Claim, ...] = (
                  "2711 (0.025) and 3.335",
     ),
     # ---- SRM 1976a plate: the spherical-harmonics texture against TOPAS --
+    Claim(
+        "test_acceptance_srm1976a_texture",
+        "test_the_result_records_the_range_cut_below_20_degrees",
+        "srm1976a_plate", ("identity",),
+        "the result's fit_range restates the suite's limits (the upper one "
+        "clipped to the scan's end) and reports the stretch below 20 deg with "
+        "its share of the counts and its level at the cut (WP-2075)",
+        reference="the file's own first and last channels and the suite's "
+                  "limits (identity); statistics.n_points",
+        measured="11793 of 13528 points; below 20 deg: share 0.225, level "
+                 "at the cut 2.80x the fitted median",
+    ),
     Claim(
         "test_acceptance_srm1976a_texture", "test_the_protocol_matches_before_any_number_is_compared",
         "srm1976a_plate", ("cross_code", "ceiling"),
