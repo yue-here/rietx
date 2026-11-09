@@ -23,10 +23,11 @@ from rietx.model.restraints import (
     _resolve_image,
     summarise_restraints,
 )
+from rietx.multi import MultiHistogramRefinement
 from rietx.optimize.least_squares import (
     _make_jacobian,
     _make_residual,
-    run_multi_least_squares,
+    _multi_closures,
 )
 from rietx.optimize.statistics import compute_statistics
 from rietx.params.multi import MultiParameterTable
@@ -786,12 +787,132 @@ def test_restraint_tension_flags_conflict_with_data():
     assert abs(result.restraints.rows[0].deviation_over_sigma) > 3.0
 
 
-def test_multi_histogram_restraints_raise():
+def test_a_joint_residual_holds_a_shared_restraint_once():
+    """Two histograms compile the one structure, so each model carries the
+    bond's row; the stacked residual holds it once, below every histogram's
+    data and background rows, with no histogram weight (WP-1995)."""
     s = _rutile_with_bond(RUTILE_OX, target=1.95, sigma=0.01)
-    model = compile_model(s, LAB, _blank(20.0, 80.0, 0.1), mode="rietveld")
-    mtable = MultiParameterTable(s, [LAB])
-    with pytest.raises(NotImplementedError, match="multi-histogram"):
-        run_multi_least_squares([model], mtable)
+    models = [compile_model(s, LAB, _blank(20.0, 80.0, 0.1), mode="rietveld")
+              for _ in range(2)]
+    mtable = MultiParameterTable(s, [LAB, LAB])
+    mtable.set_vary(["phases.*.atoms.*.dof.*"], True)
+    n_data = sum(len(m.tt) for m in models)
+    for weights in (None, [4.0, 9.0]):
+        residual, jacobian, n_data_total = _multi_closures(models, mtable,
+                                                           weights=weights)
+        x = mtable.x0()
+        r = residual(x)
+        assert n_data_total == n_data and len(r) == n_data + 1
+        single = _make_residual(models[0], mtable.tables[0])(mtable.split(x)[0])
+        assert r[-1] == single[-1], "the restraint row carries a histogram weight"
+        assert jacobian(x).shape == (n_data + 1, len(mtable.free_paths))
+
+
+def _joint_rutile(restraints, n: int = 2):
+    """Rutile with ``restraints`` declared, the coordinate perturbed, and ``n``
+    instruments: the single fit's recovery case, set up for a joint fit."""
+    s = make_rutile(RUTILE_OX + 0.012, vary_coords=True)
+    s.phases[0].restraints = list(restraints)
+    s.phases[0].scale.value = 6e-3
+    instruments = []
+    for _ in range(n):
+        ins = Instrument.debye_scherrer(wavelength=1.5406)
+        ins.profile.w.value = 1.2e-2
+        instruments.append(ins)
+    return s, instruments
+
+
+def _o_x(result) -> float:
+    return next(p.value for p in result.parameters
+                if p.path == "phases.0.atoms.1.x")
+
+
+def test_a_joint_fit_of_one_pattern_twice_is_the_single_fit():
+    """Two copies of one pattern at weight ½ each are the single fit's χ²
+    exactly, so with the bond held once the joint answer is the single one:
+    the same coordinate and the same restraint χ² (WP-1995).  Held once per
+    histogram it would be the single fit at twice the weight, which this
+    test tells apart."""
+    pattern = synthesize_rutile()
+    bond = BondRestraint(atom_i=0, atom_j=1, target=1.95, sigma=0.005)
+    answers = {}
+    for weight in (1.0, 2.0):
+        s, (ins,) = _joint_rutile([bond.model_copy(update={"weight": weight})], n=1)
+        answers[weight] = Refinement(s, ins, history=False).fit(
+            pattern, plan="mccusker_structural", telemetry=False)
+    s, instruments = _joint_rutile([bond])
+    joint = MultiHistogramRefinement(s, instruments).fit(
+        [pattern, pattern], plan="mccusker_structural", weights=[0.5, 0.5],
+        telemetry=False)
+    single, doubled = answers[1.0], answers[2.0]
+    assert joint.status == single.status == "converged"
+    assert _o_x(joint) == pytest.approx(_o_x(single), abs=1e-9)
+    assert abs(_o_x(doubled) - _o_x(single)) > 1e-5, "the arm must be separable"
+    assert joint.restraints.restraint_chi2 == pytest.approx(
+        single.restraints.restraint_chi2, rel=1e-6)
+    # each pattern's copy reports its restraints; the top level mirrors the first
+    assert [h.restraints.n_restraints for h in joint.histograms] == [1, 1]
+    assert joint.restraints == joint.histograms[0].restraints
+    assert joint.for_histogram(1).restraints == joint.histograms[1].restraints
+
+
+def test_the_stacked_and_blocked_joint_layouts_agree_with_restraints():
+    """The blocked Jacobian carries each histogram's restraint rows as a third
+    stripe, and its dense twin is the stacked matrix entry for entry (WP-1995)."""
+    s, instruments = _joint_rutile([
+        BondRestraint(atom_i=0, atom_j=1, target=1.95, sigma=0.01),
+        ValueRestraint(path="instrument.zero_shift", target=0.0, sigma=0.01)])
+    models = [compile_model(s, ins, _blank(20.0, 80.0, 0.1), mode="rietveld")
+              for ins in instruments]
+    mtable = MultiParameterTable(s, instruments)
+    mtable.set_vary(["phases.*.atoms.*.dof.*", "phases.*.cell.*",
+                     "instrument.zero_shift", "phases.*.scale"], True)
+    weights = [2.0, 3.0]
+    residual, dense, n_data = _multi_closures(models, mtable, weights=weights)
+    _, blocked, _ = _multi_closures(models, mtable, weights=weights, layout="blocked")
+    x = mtable.x0()
+    J, bj, r = dense(x), blocked(x), residual(x)
+    assert bj.n_restr == [2, 1], "the bond from pattern 0, a zero row from each"
+    assert bj.shape == J.shape == (n_data + 3, len(mtable.free_paths))
+    np.testing.assert_array_equal(bj.toarray(), J)
+    np.testing.assert_allclose(bj.rmatvec(r), J.T @ r, rtol=1e-12, atol=0.0)
+    A, g = bj.normal_equations(r)
+    np.testing.assert_allclose(A, J.T @ J, rtol=1e-12, atol=1e-300)
+    np.testing.assert_array_equal(bj.data_rows().toarray(), J[:n_data])
+
+
+def test_a_per_pattern_value_restraint_is_each_patterns_own():
+    """A value restraint on a per-histogram path restrains every pattern's own
+    copy, a row each, and a restraint fighting the data is told on the list
+    of the pattern it belongs to; one on the shared structure is told once,
+    at the top (WP-1995)."""
+    pattern = synthesize_rutile()
+    s, instruments = _joint_rutile([
+        BondRestraint(atom_i=0, atom_j=1, target=_true_ti_o_bond() + 0.10,
+                      sigma=0.004),
+        ValueRestraint(path="instrument.zero_shift", target=0.08, sigma=0.002)])
+    result = MultiHistogramRefinement(s, instruments).fit(
+        [pattern, pattern], plan="mccusker_structural", telemetry=False)
+    top = [d for d in result.diagnostics if d.code == "RESTRAINT_TENSION"]
+    assert len(top) == 1 and "bond" in top[0].message
+    for h in result.histograms:
+        own = [d for d in h.diagnostics if d.code == "RESTRAINT_TENSION"]
+        assert len(own) == 1 and "value" in own[0].message
+        assert [r.kind for r in h.restraints.rows] == ["bond", "value"]
+    zero = [p for p in result.parameters if p.path.endswith("instrument.zero_shift")]
+    assert sorted(p.path for p in zero) == ["hist.0.instrument.zero_shift",
+                                            "hist.1.instrument.zero_shift"]
+
+
+def test_a_restraint_on_one_pattern_alone_is_refused_by_name():
+    """A ``hist.N.``-scoped value path would restrain one pattern alone, which
+    a joint fit does not build: refused naming the path (WP-1995)."""
+    s, instruments = _joint_rutile([
+        ValueRestraint(path="hist.1.instrument.zero_shift", target=0.0, sigma=0.01)])
+    models = [compile_model(s, ins, _blank(20.0, 80.0, 0.1), mode="rietveld")
+              for ins in instruments]
+    with pytest.raises(ValueError, match=r"hist\.1\.instrument\.zero_shift.*not built"):
+        _multi_closures(models, MultiParameterTable(s, instruments))
 
 
 def test_lebail_pawley_ignore_restraints():
