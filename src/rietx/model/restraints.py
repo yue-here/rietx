@@ -166,6 +166,23 @@ def _item_rows(it) -> int:
     return it.n_rows if isinstance(it, _Plane) else 1
 
 
+def _item_paths(it) -> tuple[str, ...]:
+    """The entry dot-paths an item's rows read: what its value is a function of.
+
+    A value restraint reads its path; every geometric kind reads its phase's
+    six cell parameters and the fractional coordinates of its atoms, which is
+    the set :func:`restraint_partials` writes partials against.
+    """
+    if isinstance(it, _Value):
+        return (it.path,)
+    atoms = (it.i, it.j) if isinstance(it, _Bond) else (
+        (it.i, it.j, it.k) if isinstance(it, _Angle) else tuple(it.atoms))
+    ip = it.phase
+    return (tuple(f"phases.{ip}.cell.{k}" for k in _CELL_NAMES)
+            + tuple(f"phases.{ip}.atoms.{j}.{c}" for j in dict.fromkeys(atoms)
+                    for c in _XYZ))
+
+
 @dataclass
 class CompiledRestraints:
     """The frozen restraint rows of a compiled model, in schema order.
@@ -178,6 +195,21 @@ class CompiledRestraints:
     @property
     def n_rows(self) -> int:
         return sum(_item_rows(it) for it in self.items)
+
+    def item_rows(self) -> list[tuple[slice, tuple[str, ...]]]:
+        """Each item's rows in the block, with the entry paths they read.
+
+        One pair per item, in item order: the slice of the soft-restraint
+        block its rows fill, and the dot-paths its value depends on.  A joint
+        fit reads it to tell a row it holds once per structure from a row
+        each histogram holds of its own (WP-1995).
+        """
+        out, start = [], 0
+        for it in self.items:
+            stop = start + _item_rows(it)
+            out.append((slice(start, stop), _item_paths(it)))
+            start = stop
+        return out
 
 
 # ----------------------------------------------------------------------
