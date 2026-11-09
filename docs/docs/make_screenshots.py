@@ -141,7 +141,7 @@ SHOTS: tuple[Shot, ...] = (
     ),
     Shot(
         "plan-ladder",
-        "The plan as a ladder — per stage, what it frees and what stays held.",
+        "The plan as a recipe — one row per stage, what it frees and what stays held.",
         selector=".side",
         tab="Plan",
     ),
