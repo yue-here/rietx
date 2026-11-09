@@ -101,9 +101,19 @@ zero as no broadening.
     freeze under the `moving_paths` rule, not a reading; the Stephens block is
     held by a cone and read by `STEPHENS_STRAIN_NOT_POSITIVE`, and has no
     microstructure row (it replaces `lor_strain`).*
-  - *Not generalised: a coefficient **tied** to a floored source is not a
-    free column, so it never carries `FLOOR_HIT` and would still read its
-    tiny value under TRF. No plan ties sample widths.*
+  - *`refine._extra_peak_diagnostics` decides `EXTRA_PEAK_NO_INTENSITY` by
+    its own `BOUND_HIT_RTOL` proximity (1e-10 relative), where TRF stops
+    1e-10 to 1.6e-6 inside a floor (`bound_findings`' docstring), so under
+    TRF the warning can miss a binding area. **Left** (found by the
+    review): a declared peak is not a microstructure reading, the fix
+    changes when a warning fires, and the joint fit calls it per histogram
+    before its bound test runs, so it needs a reorder there. No open WP owns
+    extra peaks; the shift lead files it.*
+  - *Generalised after the review of #1506: a width **tied** to a floored
+    source, or driven by a floored `vars.X`, follows it to zero when its tie
+    has no constant (`microstructure.floored_paths`); and `replay`, which runs
+    no bound test, reads the recorded `FLOOR_HIT` diagnostics, as
+    `cell_runaway` already falls back.*
 - [x] Rebuild WP-1545's notebook 04 and update its prose if the Gaussian rows
   now read as absent.
   *Nothing to rebuild: the notebook runs the default LM driver, whose
@@ -138,18 +148,25 @@ zero as no broadening.
     `at_zero`; `size_agreement` 1.4×10¹¹ → `None`; `strain_agreement`
     5.4×10⁻⁵ → `None`. LM rows and the uncalibrated fit (no floor) are
     unchanged to every printed digit. `tests.reader_output` exit 0
-    (unchanged). Three tests added in `tests/test_microstructure.py`: the
-    floor set from both sides, the joint spelling, and an end-to-end LaB6 fit
-    under both drivers that also requires TRF to stop above zero on a floored
-    row, so it fails if it loses its case.
+    (unchanged). Four tests added in `tests/test_microstructure.py`: the
+    floor set from both sides, the joint spelling, the tie closure, and an
+    end-to-end LaB6 fit and its replay under both drivers.
   - *Settled by Claude* under the maintainer's 2026-10-09 ruling ("read the
     flag"): the floor is `FLOOR_HIT`, not an esd-over-value significance test.
     The alternative would also blank the uncalibrated fit's `gauss_size`
     (6020 Å ± 12 350, off its floor), which notebook 04 teaches from, and
     WP-1944 keeps a general esd-over-value rule out of scope.
+  - *Review* (`/code-review high --fix`, eight findings). Applied: the
+    floor set built beside `on_bound`, `_hist0_floors` through `_unscoped`,
+    the tie closure, the `replay` fallback (a mutation that drops it fails
+    the end-to-end test on TRF's `gauss_strain`, 2.9×10⁻¹⁹), the
+    `_at_zero_floor` wording (a caller's floor under 1e-8 also reads as no
+    broadening), and the end-to-end test now pins only the decision, never
+    where TRF stops. Declined: a shared helper for the `"FLOOR_HIT"` literal
+    (two readers, both beside the findings they filter).
   - *Left.* `report/magnetic._width_support_findings`'s 1e-12 proximity floor
-    (Mike's path, #1075); a coefficient tied to a floored source (no plan ties
-    sample widths). Both are in the task notes above.
+    (Mike's path, #1075) and `EXTRA_PEAK_NO_INTENSITY`'s proximity test (no
+    owner; the shift lead files it). Both are in the task notes above.
   - *Next:* none in this WP.
 
 - **2026-10-07** — filed from WP-1545. No open WP owns the microstructure

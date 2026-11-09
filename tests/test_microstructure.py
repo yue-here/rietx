@@ -23,9 +23,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rietx import Instrument, Parameter, PatternData, Refinement
+from rietx import Instrument, Parameter, PatternData, Refinement, replay
 from rietx.model.forward import compile_model
-from rietx.model.microstructure import microstructure_table
+from rietx.model.microstructure import floored_paths, microstructure_table
 from rietx.model.profiles.caglioti import (
     SCHERRER_K,
     apparent_size_from_size_coefficient,
@@ -421,13 +421,15 @@ def test_a_converged_fit_reports_a_domain_size_with_an_esd(size_and_strain_fit):
 
 
 def test_either_driver_reads_a_width_on_its_floor_as_absent():
-    """WP-1914 end to end: LM lands the floor on 0.0, TRF stops above it.
+    """WP-1914 end to end: the reading follows ``FLOOR_HIT``, not the landing.
 
     The pattern has no Gaussian broadening, so the two Gaussian widths the
-    stage frees go to their floor.  A row reads ``at_zero`` exactly where it
-    is stored as zero or the bound test fired ``FLOOR_HIT`` on it.  The TRF
-    fit must stop above zero on at least one of them, or the test has lost
-    the case it exists for.
+    stage frees head for their floor.  LM lands such a row on 0.0 and
+    ``solver="trf"`` stops just above it (3.4e-24 deg² on notebook 04, and on
+    this pattern on macOS arm64).  Where either stops is the solver's and
+    moves with platform libm, so the test pins only the decision: a row reads
+    ``at_zero`` exactly where it is stored as zero or ``FLOOR_HIT`` names it,
+    and a replay of the node reads it the same way off the recorded finding.
     """
     pattern = _lab6_size_and_strain_pattern()
     widths = ["phases.*.lor_size", "phases.*.lor_strain",
@@ -438,7 +440,6 @@ def test_either_driver_reads_a_width_on_its_floor_as_absent():
         Stage(name="cell", turn_on=["phases.*.cell.*"]),
         Stage(name="width", turn_on=widths, seed=1e-3),
     ])
-    above_zero = 0
     for solver in ("lm", "trf"):
         start = make_lab6()
         start.phases[0].scale.value = 5e-4
@@ -446,22 +447,51 @@ def test_either_driver_reads_a_width_on_its_floor_as_absent():
         ins.profile.w.value = 3e-4
         ins.profile.x.value = 0.0
         ins.background = BackgroundChebyshev.with_terms(3)
-        result = Refinement(start, ins, history=False,
-                            solver=solver).fit(pattern, plan=plan)
+        ref = Refinement(start, ins, solver=solver)
+        result = ref.fit(pattern, plan=plan)
         OUT.mkdir(exist_ok=True)
         result.plot(OUT / f"wp1914_floor_{solver}_fit.png")
-        floors = {p for d in result.diagnostics if d.code == "FLOOR_HIT"
-                  for p in d.where}
-        assert {"phases.0.gauss_size", "phases.0.gauss_strain"} & floors
-        block = result.microstructure[0]
-        for row in block.terms:
-            on_floor = row.path in floors or row.coefficient == 0.0
-            assert (row.unavailable == "at_zero") == on_floor, (solver, row)
-            if solver == "trf" and row.path in floors:
-                above_zero += row.coefficient > 0.0
-        if block.term("gauss_size").unavailable == "at_zero":
-            assert block.size_agreement is None
-    assert above_zero >= 1
+        again = replay(ref.history, ref.history.order[-1], pattern)
+        for res in (result, again):
+            floors = {p for d in res.diagnostics if d.code == "FLOOR_HIT"
+                      for p in d.where}
+            block = res.microstructure[0]
+            for row in block.terms:
+                on_floor = row.path in floors or row.coefficient == 0.0
+                assert (row.unavailable == "at_zero") == on_floor, (solver, row)
+            if block.term("gauss_size").unavailable == "at_zero":
+                assert block.size_agreement is None
+
+
+def test_a_width_tied_to_a_floored_source_is_floored_with_it():
+    """Only a free column carries ``FLOOR_HIT``, so a follower inherits it.
+
+    ``value = Σ c·source + const`` sits at zero when every source does and
+    the constant is zero, and only then (WP-1914; the review of #1506).
+    """
+    from rietx.params.vector import AffineTie
+
+    class _E:
+        def __init__(self, path, tie=None):
+            self.path, self.tie = path, tie
+
+    class _T:
+        entries = [
+            _E("phases.0.gauss_size"),
+            _E("phases.1.gauss_size",
+               AffineTie.identity("phases.0.gauss_size")),
+            _E("phases.2.gauss_size",
+               AffineTie.identity("phases.1.gauss_size")),
+            _E("phases.3.gauss_size", AffineTie(
+                terms=(("phases.0.gauss_size", 1.0),), const=1e-4)),
+            _E("phases.4.gauss_size", AffineTie(
+                terms=(("phases.0.gauss_size", 1.0),
+                       ("phases.0.lor_size", 1.0)))),
+        ]
+
+    assert floored_paths(_T(), {"phases.0.gauss_size"}) == {
+        "phases.0.gauss_size", "phases.1.gauss_size", "phases.2.gauss_size"}
+    assert floored_paths(_T(), ()) == set()
 
 
 def test_the_report_carries_the_block_and_attaches_the_caveat(size_and_strain_fit):

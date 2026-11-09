@@ -36,7 +36,7 @@ bound — which is Scherrer's usual caveat, not a new one.
 from __future__ import annotations
 
 import math
-from collections.abc import Collection
+from collections.abc import Collection, Iterable
 
 from ..schemas.results import MicrostructureTerm, PhaseMicrostructure
 from ..schemas.structure import Structure
@@ -98,6 +98,30 @@ def _reading(kind: str, coefficient: float, variance: bool,
     return value, value * relative, None
 
 
+def floored_paths(table, named: Iterable[str]) -> set[str]:
+    """The paths ``FLOOR_HIT`` named, and every entry that follows them to zero.
+
+    Only a free column carries a bound finding, so a width tied to a floored
+    source, or driven by a floored ``vars.X``, is never named itself.  It sits
+    at zero exactly when its tie has no constant and every source is floored:
+    ``value = Σ c·source + 0``.  Transitive, as a tie chain is, and the
+    closure :func:`~rietx.refine._cell_runaway_withheld` builds for an esd
+    one rank over.  ``table`` is any object with
+    :class:`~rietx.params.vector.ParameterTable`'s ``entries``.
+    """
+    floored = set(named)
+    grew = bool(floored)
+    while grew:
+        grew = False
+        for e in table.entries:
+            if (e.tie is not None and e.path not in floored
+                    and e.tie.const == 0.0 and e.tie.terms
+                    and all(src in floored for src, _ in e.tie.terms)):
+                floored.add(e.path)
+                grew = True
+    return floored
+
+
 def microstructure_table(structure: Structure, values: dict[str, float], *,
                          wavelength: float | None,
                          esds: dict[str, float] | None = None,
@@ -118,11 +142,14 @@ def microstructure_table(structure: Structure, values: dict[str, float], *,
     none: the strains still read, the sizes do not.
 
     ``floors`` holds the paths whose ``FLOOR_HIT`` finding fired in the
-    answer-producing stage, spelled as ``values`` spells them.  Each reads as
-    ``at_zero``.  It is the third projection of that one bound test, beside the
-    diagnostic and ``RefinedParameter.at_bound`` (WP-1076's rule).  Empty is
-    "no test ran" (``replay``), and a coefficient then reads at zero only where
-    it is stored as zero.
+    answer-producing stage, closed over ties by :func:`floored_paths` and
+    spelled as ``values`` spells them.  Each reads as ``at_zero``.  It is the
+    third projection of that one bound test, beside the diagnostic and
+    ``RefinedParameter.at_bound`` (WP-1076's rule).  ``FLOOR_HIT`` is a lower
+    limit of zero, or one under the 1e-8 Γ_G² clamp
+    (``staged._at_zero_floor``), so a caller's floor that small reads as no
+    broadening too.  Empty is "no test was recorded", and a coefficient then
+    reads at zero only where it is stored as zero.
 
     Never raises on a phase whose coefficients are all at zero — the common
     case, since none of them is freed by default — it returns four terms each

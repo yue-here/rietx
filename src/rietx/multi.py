@@ -38,7 +38,7 @@ from .model.forward import (
     recorded_window_tol,
     window_loss,
 )
-from .model.microstructure import microstructure_table
+from .model.microstructure import floored_paths, microstructure_table
 from .optimize.blocked import BlockJacobian
 from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import (
@@ -2692,7 +2692,8 @@ class MultiHistogramRefinement:
             microstructure=microstructure_table(
                 mt.structures[0], per_values[0],
                 wavelength=_longest_line_wavelength(models[0]),
-                esds=esd_hist0, floors=_hist0_floors(at_bounds)),
+                esds=esd_hist0,
+                floors=floored_paths(mt.tables[0], _hist0_floors(at_bounds))),
             # each histogram's background screen, ``hist.<h>.``-scoped, so
             # ``for_histogram`` hands a report its own (WP-1341); ``None``
             # where nothing was screened, the single fit's empty state
@@ -2906,17 +2907,9 @@ def _hist0_floors(at_bounds) -> set[str]:
     microstructure block reads histogram 0's own dict, so a shared floor
     passes through and a ``hist.0.`` one loses its prefix (WP-1914).
     """
-    prefix = "hist.0."
-    out: set[str] = set()
-    for f in at_bounds:
-        if f.code != "FLOOR_HIT":
-            continue
-        for p in f.paths:
-            if p.startswith(prefix):
-                out.add(p[len(prefix):])
-            elif not p.startswith("hist."):
-                out.add(p)
-    return out
+    return {_unscoped(p) for f in at_bounds if f.code == "FLOOR_HIT"
+            for p in f.paths
+            if p.startswith("hist.0.") or not p.startswith("hist.")}
 
 
 #: the entries that move an ADP site: the free columns, and the U^ij rows
