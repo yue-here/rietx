@@ -360,11 +360,10 @@ Where a trajectory skips a pattern, the table still has a row for it and leaves 
 The axis column takes `SeriesResult.x_label`, unless that name is already one of the fixed columns, in which case it is `x`.
 A series with no coordinate has the `x_label` `"index"`, which is such a name.
 
-(series-fit-trajectory)=
 ### An equation fitted to a trajectory
 
 `rietx.fit_trajectory(series, path, expression, variables)` fits an equation to one parameter's trajectory, weighted by its esds, and returns a `TrajectoryFit`.
-It is GSAS-II's fit to the sequential table: the equation is fitted after the series, to the points the series kept ([How to refine a cell edge as a function of temperature](../guides/equation.md)).
+It is GSAS-II's fit to the sequential table: the equation is fitted after the series, to the points the series kept ([How to refine a cell edge as a function of temperature](../guides/equation.md#fit-the-equation-to-the-series-trajectory)).
 
 `expression` is text in the [expression grammar](expressions.md) for the value of `path` at each pattern.
 Its free names are the keys of `variables`, each an `rx.Parameter` whose `value` is the start, `vary` whether it is fitted and `min` and `max` its bounds, and the coordinates.
