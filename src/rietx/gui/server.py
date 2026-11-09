@@ -266,6 +266,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/result"): lambda s, q, b: s.result(),
     # every channel once, as float64 arrays rather than JSON (WP-1461, D4)
     ("GET", "/api/result/curves"): lambda s, q, b: s.result_curves(),
+    # the curves at values nobody has applied, writing nothing (WP-2125)
+    ("POST", "/api/preview"): lambda s, q, b: s.preview(b),
     ("GET", "/api/report"): _report,
     ("POST", "/api/report/apply"): lambda s, q, b: s.report_apply(b),
 

@@ -202,6 +202,13 @@ while a run is in flight, and that refusal outranks body validation. The
 package's frozen-per-stage rule is enforced structurally rather than by
 discipline.
 
+A request that changes several things is applied whole or not at all.
+`PATCH /api/params` with values, vary flags, holds, limits and restraints
+records a history node per verb, and a refusal from any of them leaves the
+model and the history as they were. The refusal names the path in `where` and
+the arm it came from in `details`. `POST /api/project`, `PUT /api/textdoc` and
+`POST /api/history/branch` follow the same rule.
+
 Non-finite floats are spelled as strings (`"Infinity"`, `"-Infinity"`, `"NaN"`)
 in responses and event frames alike, because `JSON.parse` rejects the bare
 tokens Python writes by default.
@@ -234,7 +241,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/project/new` · `POST /api/project/open` | create; open, replacing the session's |
 | `GET /api/project` · `POST /api/project` | the project document; a merge into its settings |
 | `POST /api/project/save` | write the settings file |
-| `GET /api/params` · `PATCH /api/params` | every parameter row; value and vary edits |
+| `GET /api/params` · `PATCH /api/params` | every parameter row; value, vary, hold, limit and restraint edits |
 | `GET /api/plan` · `PUT /api/plan` · `GET /api/plans` | the plan; replace it; the presets |
 | `GET /api/plan/resolve` | the ladder: per stage, what it frees and what stays held |
 | `GET /api/structure` · `PATCH /api/structure` | the model, its sites and its symmetry; a whole validated replacement |
@@ -253,6 +260,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/run` · `POST /api/cancel` · `GET /api/run/state` | start the plan; ask it to stop between iterations; where it is |
 | `GET /api/result` | the fit's numbers, without the curves |
 | `GET /api/result/curves` | every channel of the pattern and, after a fit, its curves on the channels it kept |
+| `POST /api/preview` | the calculated curve, the background, each phase and the ticks at values sent in the body and never applied; writes nothing, and says whether it evaluated the last compile, resized its windows or compiled afresh |
 | `GET /api/report` · `POST /api/report/apply` | the `FitReport`; run the stage one of its suggestions names |
 
 ### Peaks and indexing
