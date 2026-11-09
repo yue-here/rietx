@@ -100,7 +100,8 @@ one stream `watch` tails; and `/api/result` omits the curves, which
 `/api/result/curves` sends once over every channel as float64 arrays (WP-1461,
 D4), decimating past `CURVES_CEILING` through the *same*
 `viz.compare.decimation_index` the comparison UI uses — whose count is a
-budget, not a ceiling. `strategy.staged.resolve_plan` (preset name + mode → plan)
+budget, not a ceiling. **A multi-verb route is all or nothing** (WP-2126): its
+verbs run on `session.rehearse`'s copy first. `strategy.staged.resolve_plan` (preset name + mode → plan)
 is likewise one function, previously inline in `fit` and duplicated in
 `sequential`.
 
@@ -747,8 +748,9 @@ search or screen **returns** what it has and its status is read off the token.
 Both tables' badges follow the server (`adopt`, `best`); the screen is gated on neither the adopt verdict nor a phase
 (a read-only measurement; a pattern-only project is where indexing starts). **Any candidate can be adopted** (Yue's
 ruling B, 2026-11-08, WP-2124): the arm's `picked` is the gate's pick, its `why` the sentence an adoption of any other
-row writes into the `edit_model` node. The old panel still enables Adopt, and a space-group chip of an unrefuted
-class, on `allowed`, which carries `picked` under its old name until the port redraws it.
+row writes into the `edit_model` node. The panel enables Adopt on every row, prints `why` under the grade, and badges only
+`picked` (WP-2130); what the search covered (`systems_searched`, `search_complete`, the run-level diagnostics with
+their `where`) is said above the list whatever it found, WP-1042's "not reached is loud".
 
 Its second pass (2026-07-31) added three browser facts; the one about plotly's
 screen-relative `lightposition` left with plotly (WP-1462), whose renderer lights
@@ -771,16 +773,15 @@ intensity mode's force-fix are the shipped ones; `lib/fnmatch.ts` stays the
 *parameter table's* bulk-edit preview and matches nothing here. **A plan
 replaces the vary flags, it does not continue them**: `fit` starts from
 `_prepare_table(restore=False)`, which holds everything, so a hand-freed row no
-stage names is dropped by `Run all` and kept by `Run this stage` (measured both
-ways) — `set_aside` is that difference named, and it is why the two buttons are
-on screen together. **A stage's Rwp is its history node's**, never a
+stage names is dropped by a staged Refine and kept by `Run this stage` (measured
+both ways) — `set_aside` is that difference named. **A stage's Rwp is its history node's**, never a
 `fit(stage_reports=True)` trajectory: bit-identical, both read off the model the
 stage compiled and the θ it landed on, and the trajectory costs 7.7× the fit to
 rebuild, so the run verb is untouched — the **last** run's node is matched to a
 rung by position **and** by that stage's name and `turn_on`, anything else
-leaving the number absent rather than a neighbour's or an older run's. And a **dirty plan
-has no resolved facts and cannot be run**, because the ladder describes the plan
-the server holds. Beside them, the advanced boxes loop over `lib/rxt.ts`'s stage
+leaving the number absent rather than a neighbour's or an older run's. An **edited plan keeps the facts of the
+stages above its first change only** (WP-2127, `lib/plan.ts:resolvedPrefix`),
+and is **one pending edit in the shell's action bar**, never a Save of its own. Beside them, the advanced boxes loop over `lib/rxt.ts`'s stage
 words — pinned to `StageSpec` from python with the two properties a box needs —
 so a new schema field reaches this form as well as the `.rxt` document.
 
