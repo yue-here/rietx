@@ -7,8 +7,9 @@ Priority: P3 2026-10-07 — a derived number that reads as a finding on every la
 
 ## Goal
 
-A sample-broadening coefficient that the fit drove to its softplus floor reads
-as absent in `result.microstructure`, the way one at exactly zero already does.
+A sample-broadening coefficient that the fit drove to its floor of zero reads
+as absent in `result.microstructure`, the way one at exactly zero already does,
+whichever driver solved it.
 The size and strain agreement ratios are then not computed from it.
 
 ## Context
@@ -40,17 +41,34 @@ ratios (`_agreement`) then compare a real reading against this one.
 (WP-1545) prints the table above in its "Measure the sample" cell. The
 notebook reads the rows with their esds and does not print the ratios.
 
-### Inherited
+**Superseded in part (2026-11-09, re-measured at `eee8486d5`, macOS arm64,
+`[dev]`).** The softplus transform is gone (WP-1938): every coefficient
+refines in its own units with `min=0.0` as a box bound. WP-1929 then keyed
+`at_bound` on the LM driver's exact active set, and the maintainer decided
+(2026-10-09, folded in from `### Inherited`) that this WP's first task
+becomes "read the flag". Re-run on notebook 04's CeO₂ pattern:
 
-- **2026-10-09, from WP-1929 (2nd session): a floor becomes an ordinary
-  bound, and the driver says which rows sit on it.** Decided by the
-  maintainer: WP-1938 refines every parameter in physical units with native
-  bounds, so a coefficient at its floor is at its `min`, with no tiny
-  positive softplus value to interpret. WP-1937 exposes the driver's exact
-  active set on `LSQOutcome`, and WP-1929 keys `at_bound` on it. A row on its
-  bound keeps its value and its marginal esd, flagged. So this WP's first
-  task becomes "read the flag", and it waits on 1937-1938. `bound_untested`,
-  the test the earlier entry named, is deleted by 1938.
+| driver | `gauss_size` coefficient | reading | `size_agreement` | `at_bound` |
+|---|---|---|---|---|
+| `lm` (default) | 0.0 | `at_zero` | `None` | True (`FLOOR_HIT`) |
+| `trf` | 3.4×10⁻²⁴ | 4.3×10¹³ Å ± 4.6×10³³ | 1.4×10¹¹ | True (`FLOOR_HIT`) |
+
+`gauss_strain` behaves the same way (LM 0.0 → `at_zero`; TRF 3.8×10⁻¹¹ →
+5.4×10⁻⁸ ± 2.5, `strain_agreement` 5.4×10⁻⁵). So the default driver already
+lands the coefficient exactly on its floor and the table reads it absent. The
+defect survives under `solver="trf"`, which keeps its iterates strictly
+inside the box. The definition is therefore the bound test's own answer,
+`FLOOR_HIT`, read through `staged.bound_findings`. The significance
+alternative (esd over value) is not the floor question: the uncalibrated fit's
+`gauss_size` reads 6020 Å ± 12350 off its floor, and WP-1944 keeps a general
+"esd exceeds value" rule out of scope.
+
+The tier of the rule this WP adds: **physics**, no new threshold. A
+coefficient on its zero floor is a width the data put at zero, and the test
+that says so is `staged.bound_findings`, which already feeds `FLOOR_HIT` and
+`at_bound` (WP-1929). The reading becomes a third projection of it. Kind of
+ambiguity (DESIGN § Rules, 1): none — every competent refiner reads a width at
+zero as no broadening.
 
 ## Tasks
 
