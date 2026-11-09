@@ -1,6 +1,6 @@
 # WP-2134 — The GUI rulebook keeps rules, and its evidence moves out
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — condensed to 642 lines and PR'd (#1511); the open GUI PRs' rulebook lines fold in when main is merged into it
+Milestone: unscheduled · Status: 🔄 2026-11-09 — condensed to 644 lines and PR'd (#1511); #1490 folded; #1498, #1502, #1487 and #1488 fold in when they merge
 Track: The repo's own process
 Depends on: —
 Priority: P4 2026-11-09 — process: no number moves, but every GUI session pays the file's size
@@ -139,7 +139,9 @@ Elsewhere in the rulebook:
   yet.
   - *Measured* (`wc`, 4 bytes a token): before (origin/main `4c55b9011`) 1059
     lines, 78 154 bytes, about 19 540 tokens. After 642 lines, 43 361 bytes,
-    about 10 840 tokens: −39 % lines, −45 % bytes. Cap 1060 → 643 (landed + 1).
+    about 10 840 tokens: −39 % lines, −45 % bytes. With #1490 folded at the
+    merge of `main`: 644 lines, 43 507 bytes, about 10 880 tokens. Cap
+    1060 → 645 (landed + 1).
   - *Where the material went*: 41 paragraphs, verbatim, to a `## Moved from
     gui/CLAUDE.md` section before the handover log of 37 closed WP files (1 298
     lines, 88 760 bytes): 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015 (2),
@@ -192,12 +194,15 @@ Elsewhere in the rulebook:
   - *Gotchas*: the cap counts lines only, so keep lines at 100 columns or under;
     the rewrite has none longer. `test_gui_rulebook_paths_resolve` checks only
     paths written with a directory, so write `lib/plot.ts`, never `plot.ts`.
-  - *Next*: (1) when #1490, #1498, #1502, #1487 and #1488 have merged, merge
-    `main` here and fold what each added under these rules: #1490 rewrites the
-    Adopt bullet in § Peaks and indexing; #1498 and #1502 rewrite Browse/`Model`
-    in § Model and § Shell and add the start screen and the File menu (#1502
-    also raises the cap to 1067, which conflicts with 643: keep 643 plus what the
-    folded rules add). Then tick the merge task and close the WP. (2) The GUI
+  - *Next*: (1) #1490 merged during the handover and is folded: its Adopt
+    sentence went into § Peaks and indexing's Adopt bullet, and its coverage
+    sentence became a bullet of its own. When #1498, #1502, #1487 and #1488
+    have merged, merge `main` here and fold what each added under these rules.
+    #1498 and #1502 rewrite Browse and `Model` in § Model and § Shell, and add
+    the start screen and the File menu as bullets there. #1502 also raises the
+    cap to 1067, which conflicts with 645: keep 645 plus what the folded rules
+    add. #1487 and #1488 added nothing to the rulebook when this was written.
+    Then tick the merge task and close the WP. (2) The GUI
     style-guide WP takes the 36 rules listed above. No WP for it exists yet.
 - **2026-11-09** — created. No open WP owns a consolidation of the GUI
   rulebook: the gui-overhaul WPs (2123-2133) each add rules to it, and none

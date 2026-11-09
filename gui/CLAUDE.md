@@ -395,9 +395,11 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   gated on neither the adopt verdict nor a phase.
 - **Any candidate can be adopted** (the maintainer's ruling B, 2026-11-08, WP-2124). The
   arm's `picked` is the gate's pick; its `why` is written into the `edit_model` node when
-  another row is adopted. Badges follow the server (`adopt`, `best`). The old panel still
-  enables Adopt, and an unrefuted class's space-group chip, on `allowed`, which carries
-  `picked` under its old name until the port redraws it.
+  another row is adopted. Badges follow the server (`adopt`, `best`). The panel enables
+  Adopt on every row, prints `why` under the grade and badges only `picked` (WP-2130).
+- **What a search covered is said above the list whatever it found** (WP-2130, WP-1042's
+  "not reached is loud"): `systems_searched`, `search_complete`, and the run-level
+  diagnostics with their `where`.
 - **The search form is `ProjectDoc.indexing`, the `SearchSpecSpec` an agent request
   carries, committed whole on the verb** (WP-1045),
   and re-synced from the document on every head move, refusals included.
