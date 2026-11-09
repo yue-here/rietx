@@ -279,7 +279,6 @@ describe("`title=` is no longer how this app explains a name", () => {
     "panels/Console.svelte": 1,      // the event ring's size
     "panels/History.svelte": 4,      // node vocabulary — WP-1217
     "panels/Model.svelte": 3,        // the space-group box, two splitters
-    "panels/Params.svelte": 4,       // the table's own affordances
     // The add-at-2θ box, plus nine on the candidate and extinction tables.
     // **Unowned**, and deliberately not WP-1211's, which this line used to name:
     // 1211 drew a candidate's lines on the plot and added no `title=`, while
