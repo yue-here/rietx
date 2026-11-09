@@ -2818,6 +2818,18 @@ class GuiSession:
         return curve_arrays(p.data.tt(), p.data.y(), p.fitted_mask(), res,
                             weighted=p.data_ref.has_sigma)
 
+    def preview(self, body: dict) -> Packed:
+        """The curves at values nobody has applied, writing nothing (WP-2125).
+
+        Refuses what ``set_values`` refuses, and 409s while a run is in flight
+        like every verb that compiles. :mod:`rietx.gui.preview` has the three
+        evaluation paths and the answer's contract.
+        """
+        from . import preview
+
+        self._require_idle()
+        return preview.evaluate(self._need_project(), body)
+
     def report(self, plan: str | None = None) -> dict:
         """The three-layer :class:`FitReport` for the last fit, plus what applies.
 
