@@ -524,9 +524,15 @@
     padding: 16px 20px 12px;
   }
 
-  /* the app's section heading (app.css) */
+  /* sentence case, the maintainer's heading ruling of 2026-11-06, over the
+     app's uppercase section heading (app.css) */
   h2 {
     margin: 0 0 4px;
+    font-size: var(--text);
+    font-weight: 600;
+    color: var(--fg);
+    text-transform: none;
+    letter-spacing: normal;
   }
 
   /* each row: a 6.5em label column, then the row's body (round 9) */

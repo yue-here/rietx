@@ -204,8 +204,12 @@ npm --prefix gui test && npm --prefix gui run check
   12. An example's "Open a fresh copy" is the old Reset, offered only once built, with no confirm.
   13. The `assumed` tag is a neutral chip; the alternative is the warn tone.
   14. A space group is set in "STIX Two Text", then Times: no font is bundled.
-  15. Headings take the app's section-heading register (small capitals, muted); the prototype
-      had sentence case.
+  15. ~~Headings take the app's section-heading register (small capitals, muted).~~ Withdrawn in
+      the second round: it contradicted the maintainer's ruling of 2026-11-06 ("Sentence-case
+      headings"), and a written ruling outranks a settled call. The two screens' headings are
+      now sentence case, at the prototype's size. Every other panel still wears `app.css`'s
+      uppercase `h2`/`h3`, so the app-wide register conflicts with the ruling; that is a
+      follow-up for Yue (`visual-language.md` open question 12 in the workshop asks the same).
 
   *Gotchas.* The layout test's label check was made to fail once: with the label column at 3em
   it reported `Geometry` ink 59.75 px in a 39 px column. `make_screenshots.py` regenerates every
