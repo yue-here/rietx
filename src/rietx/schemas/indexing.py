@@ -238,7 +238,9 @@ from .structure import Cell
 #: ``lebail.rwp``, ``gof`` and ``unmatched_observed`` move wherever the
 #: declared four terms could not follow the background: on a steep synthetic
 #: silicon 72 unmatched lines go to 0.  ``LeBailValidation.background_terms``
-#: records the order.  No search, rank or grade reads either number.
+#: records the order.  No search, rank or grade reads ``rwp``, ``gof`` or
+#: ``unmatched_observed``; the grade reads ``status``, and without a peak list
+#: the fitted-background ``predicted_but_absent``, both of which can move.
 INDEXING_THRESHOLDS_VERSION = "1.13"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
@@ -1392,8 +1394,10 @@ class LeBailValidation(Base):
     #: the Chebyshev terms the fit's background carried: since WP-2113 the
     #: number ``auto_background(kind="chebyshev")`` selects from the data, and
     #: never fewer than the instrument declared, so a band of background misfit
-    #: is not read as ``unmatched_observed`` lines.  ``None`` for a background
-    #: of another kind, and in a record written before schema 0.61
+    #: is not read as ``unmatched_observed`` lines.  The scan's cap,
+    #: ``background.select.CHEBYSHEV_MAX_ORDER``, is returned whenever BIC still
+    #: falls there.  ``None`` for a background of another kind, and in a
+    #: record written before schema 0.61
     background_terms: int | None = None
 
 
