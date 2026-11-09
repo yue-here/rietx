@@ -1,6 +1,6 @@
 # WP-2129 — the Background tab
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — filed and started by a ghostshift runner
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — PR #1488 open for review; stacks on #1476 and #1479; nine settled calls wait on the maintainer
 Depends on: 2123, 2125 (the shell it draws in, and the preview route whose compile cache it reuses)
 Priority: P2 2026-11-09 — piece 5 of the gui-overhaul milestone, the last of the five
 
@@ -179,6 +179,53 @@ npm --prefix gui test && npm --prefix gui run check
 - Eilers & Marx (1996), *Stat. Sci.* **11**, 89-121: the P-spline penalty whose rows enter J.
 
 ## Handover log
+
+- **2026-11-09** — The GUI now has a Background graph tab. It shows the background curve over
+  the greyed pattern, with a shaded band for where the curve may move when the free parameters
+  refine. The band is rietx's own esd of the curve through the whole covariance, so a free scale
+  or Biso that trades against the background widens it. A Chebyshev term can be held from the
+  tab, through the existing hold verb, and a P-spline's smoothness λ can be edited there. The
+  band is small on a converged fit (FAP: median ±3.9 counts at ±3 esd against a background of
+  52-575), which is why ×5 and ×20 exist. Nine calls nothing settled are listed above for the
+  maintainer, seven of them visual.
+
+  *Done.* `GET /api/background` (`src/rietx/gui/background.py`, cached per working state on
+  `gui.preview`'s key) and a `hold` arm on `PATCH /api/params` with PR #1484's contract. The
+  client is `lib/background.ts` and `panels/Background.svelte`, a second entry in `GRAPH_TABS`,
+  with each graph kept mounted. The manual gains `gui-guide` § The background, tied to
+  `est-derived`, and a `background-tab` screenshot pair; `first-fit` and `plot-readout` were
+  re-taken for the strip's second tab.
+
+  *Measured.* The band against an independent plain-inverse computation: 5.7e-10 relative on
+  FAP, 8.2e-9 on NAC; the test holds 1e-7. First call 172-210 ms, a cached one under 0.01 ms.
+  Fast suite on the final tree, `[dev]` + playwright, darwin/arm64, alone (serial.py): 14513
+  passed, 410 skipped, 32 xfailed, exit 0. That tree carries #1476's and #1479's tests too, so
+  its counts are not main's plus this WP's. This WP added 10 python tests (9 in
+  `test_gui_background.py`, 1 in `test_gui_layout_browser.py`) and 13 vitest cases (626 passed).
+  Added-test times from the local junit: the band test 7.06 s, which is the module fixture's FAP
+  fit shared by four tests; the browser test 1.89 s; the rest under 0.4 s. None marked slow: the
+  fit is the subject and runs once a module. ruff clean; `tests.reader_output` exit 0
+  (unchanged against the merge-base).
+
+  *Review.* `/code-review high --fix` found eight; all eight were taken. Six as it proposed: the
+  band counts a column only when it moves a path the curve reads (a peak component had drawn a
+  zero band as measured), a refetch on mode, fit range and excluded regions, a refused hold puts
+  its box back, λ commits once, a load error and a refusal are two fields, and the last channel
+  draws. Two it left for the maintainer were rules, not visual calls, so they landed too: a held
+  term's `held_because` is a `<Help>` term per `gui/CLAUDE.md`, and the title now reads "at the
+  current values", since the curve's values move without a fit (settled call 8).
+
+  *Generality.* No judge dispatched: `_audit.py` is untouched, and the band decides nothing. Its
+  3 esd and multipliers are drawing choices in the client.
+
+  *Gotchas.* `docs/docs/theory/estimation.md`'s built twin sits within 300 characters of the
+  50 000 cap, so the band's sentence lives in the GUI guide with a link. The band on a synthetic
+  project whose stage freed only the scale is absent, correctly; the browser test frees the
+  terms first.
+
+  Next: the maintainer reviews the nine settled calls on the PR, the colour and the title first.
+  The PR merges after #1476 and #1479. If #1484 merges first, its `hold` arm and this one
+  conflict in `session.py` and resolve to one.
 
 - **2026-11-09** — filed by a ghostshift runner as piece 5 of the gui-overhaul milestone, which
   listed it as not yet filed. The number is 2129, the next free one after the shift's 2126-2128;
