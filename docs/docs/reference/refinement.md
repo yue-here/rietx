@@ -487,7 +487,6 @@ A pattern under a spelling a release retired is reported too.
 A saved project, history tree or `.rxt` file is migrated as it is read, but a plan built in code is not.
 A pattern under the instrument's `background_peaks`, the name up to v1.2, matches nothing and leaves a declared hump at its start value.
 `STAGE_PATH_UNKNOWN` gives its current spelling, `instrument.extra_components.*`.
-A literal of an opt-in correction the model does not declare, such as `phases.0.extinction`, is reported with the declaration that creates it, `phase.extinction = 0.0`.
 
 A literal phase name can also name a parameter the model will not free.
 An atom's coordinates refine along the directions its site symmetry allows, as `phases.0.atoms.2.dof.*`, and its `x`, `y` and `z` are each fixed or follow those directions.

@@ -361,7 +361,7 @@ A row the current mode fixes is the exception to the matching rule: `set_vary` f
 
 A literal path the model lacks raises `ValueError` and names the nearest real path, as `Refinement.hold`, `Refinement.tie`, `Refinement.untie` and `Refinement.set_values` do.
 A path of an opt-in correction the model does not declare names the declaration instead.
-On a phase without extinction, `phases.0.extinction` names `phase.extinction = 0.0`.
+For extinction on a phase that declares none, it names `phase.extinction = 0.0`.
 `set_vary` checks every literal in the call before it changes anything, so a list with one wrong name leaves the model and the history as they were.
 A pattern that matches nothing returns `[]` in silence, since plans reach components that some models lack.
 
