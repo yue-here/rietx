@@ -296,6 +296,27 @@ def formula_unit_volume(formula: str,
     return volume, volume * math.hypot(table_part, expansion_part)
 
 
+def check_formula_input(formula: str | None, temperature: float | None) -> None:
+    """Refuse a formula and temperature that ``index_pattern`` cannot use.
+
+    The one place the words exist, because two surfaces refuse with them
+    (WP-2030): ``rietx index --formula/--temperature``, and
+    :class:`~rietx.schemas.indexing.IndexingControls`, which a project file and
+    the GUI's indexing form fill.  Raises ``ValueError`` for a temperature
+    given without a formula, since it sets only the formula's volumes and would
+    change nothing; for a temperature that is not a positive, finite number of
+    kelvin; and for a formula :func:`formula_unit_volume` cannot read.  ``None``
+    for both is no formula, and a formula with no temperature is read at
+    :data:`TABLE_TEMPERATURE`, the 298 K ``index_pattern`` defaults to.
+    """
+    if temperature is not None and formula is None:
+        raise ValueError("a temperature sets only the formula's volumes; "
+                         "give a formula too")
+    if formula is not None:
+        formula_unit_volume(formula, TABLE_TEMPERATURE if temperature is None
+                            else temperature)
+
+
 __all__ = ["HOFMANN_VOLUMES", "TABLE_TEMPERATURE", "THERMAL_EXPANSION",
            "THERMAL_EXPANSION_ESD", "VOLUME_RATIO_BOUNDS", "VOLUME_SCATTER",
-           "formula_counts", "formula_unit_volume"]
+           "check_formula_input", "formula_counts", "formula_unit_volume"]

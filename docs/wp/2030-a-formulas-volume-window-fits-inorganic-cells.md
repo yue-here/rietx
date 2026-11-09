@@ -1,9 +1,8 @@
 # WP-2030 — A formula's volume window fits inorganic cells, and a hydrate parses
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — part 1 merged from outside as PR #1123 (`a1ce786c`), its follow-ups as PR #1253 (`349ec37b`) and part 2 (the ceiling-only window) as PR #1237 (`4505cbaf`); the GUI formula field and the stale `duplicate_line` marks remain, and #1121 stays open for them
+Milestone: unscheduled · Status: ✅ 2026-11-07 — closed by Yue; all three parts merged from outside (PRs #1123, #1253, #1237, #1344, #1351): a ceiling-only volume window, a two-way hydrate refused, and the formula stored by the GUI; issue #1121 closed
 Track: Data and metadata in, a structure out
 Depends on: — (1510 soft, closed 2026-10-23: the window, the Z check and the review findings this carries)
-Priority: P2 2026-10-23 — a defect that fires wrongly: the skill sends an agent through `SearchSpec.from_formula` before its first search, and the window excludes the true cell of 7 of 8 inorganic solids measured (fluorapatite abstained where the unwindowed search ranked the truth first); indexing is a path few fits run
 
 ## Goal
 
@@ -126,10 +125,6 @@ source. `VOLUME_RATIO_BOUNDS` (WP-2006's walk) and `Z_INTEGER_TOLERANCE` and
 `src/rietx/_audit.py`. A value changed here updates its row, and a name new
 to the table arrives tiered (CI's `tests/audit_delta.py`).
 
-### Inherited
-
-- 2026-10-26 issue triage: #1121 is the outside contributor's (mustachefeeling) claim on this WP; part 1 is in PR #1123. The issue thread holds the measured three-option table (ceiling only, Jenkins 1999 ion volumes, keep with a warning) against 21 known cells and the maintainer's 2026-10-24 reply rejecting Jenkins and the carbon-only floor. Checked against the tree at c0e32ab29: status ⬜, nothing merged.
-
 ## Non-goals
 
 - Replacing Hofmann's table for organic and metal-organic formulas, where the
@@ -160,17 +155,21 @@ to the table arrives tiered (CI's `tests/audit_delta.py`).
 - [x] Hydrate: `CuSO4.5H2O` is refused, naming `·`, or read as a hydrate.
       `Mg0.5SiO3` still reads 0.5 Mg and `CuSO4·5H2O` is unchanged. Test all
       three.
-- [ ] `formula` and `temperature` recorded on `IndexingResult`, with the
+- [x] `formula` and `temperature` recorded on `IndexingResult`, with the
       writer named (root CLAUDE.md: a declared name is a claim). `formula`
-      reaches the CLI and the GUI's indexing call.
+      reaches the CLI and the GUI's indexing call. (The result fields and the
+      CLI landed in part 1. The GUI stores the formula in optional
+      `formula`/`temperature` fields on `IndexingControls`, as the 2026-11-02
+      rulings entry settled, built in part 3.)
 - [x] The instrument-first lead fires only on a lab source. Decide whether
       `PeakList` records its instrument so `index_pattern(peaks)` sees the
       lead. Test both.
 - [x] Supercell (superseded by #941, dropped from this PR; see item 6 of the 2026-10-23 entry): judge the parent's lines with the parent's own shift. Replay
       the captured searches and run the indexing acceptance. Then write or
       decline the supported-promotion rule in `src/rietx/indexing/CLAUDE.md`.
-- [ ] GUI: fix the stale `duplicate_line` marks or decline them, with the
-      reason in the handover.
+- [x] GUI: fix the stale `duplicate_line` marks or decline them, with the
+      reason in the handover. (Fixed, with the two ghost marks, by a change
+      rule that keeps a user's cleared mark; see the 2026-11-02 entry.)
 - [x] Audit rows for every value changed or name added (tiers above).
 - [x] Manual: `docs/docs/theory/indexing.md` and `reference/indexing.md`
       state the window's scope; a staged release note.
@@ -207,6 +206,205 @@ unwindowed one does, and `CuSO4.5H2O` never reads as 4.5 O.
   that need no ruling, then the window rule once it is chosen).
 
 ## Handover log
+
+- **2026-11-07** (rulings, PR #1455) — closed. Decided 2026-11-07 (Yue): close it. A
+  formula's volume window now holds the true cell of an inorganic solid as well as an organic
+  one, because it is a ceiling only. A hydrate written with a full stop that reads two ways is
+  refused instead of read 39 % low. The GUI's indexing form stores the formula and temperature
+  with the project. Issue #1121 was closed by the shift lead on 2026-11-07 with a thanks to the
+  contributor.
+  *Checked before closing:* all twelve tasks are ticked, the withdrawn `INDEX_Z_NOT_INTEGER`
+  task and the superseded supercell task included, each with its reason. The five PRs are
+  merged: #1123 (2026-10-30), #1253 (2026-10-31), #1237 (2026-11-01), #1344 (2026-11-02) and
+  #1351 (2026-11-06). No `### Inherited` section was left. The `Priority:` line is deleted,
+  and the narrative moved to `docs/milestones/v1.12.md`. WP-2033 named this WP as a soft
+  dependency, and it closed on 2026-11-02, so no rating moves.
+  *Next:* none here.
+
+- **2026-11-06** (`/pr-review`) — part 3 merged from outside as PR #1351 (`544dff21`), adding to the contributor's own entry and ticks, which stand as written. `IndexingControls` now stores `formula` and `temperature`, and the GUI's Peaks panel sends them. The stored format changed, and the maintainer approved that on 2026-11-06 ("Yes, run #1351"). The 2026-11-02 entries say 1.10 and 1.11. The releases that apply are 1.11.0 and 1.12: 1.11.0 refuses any project 1.12 has saved. A bookkeeping sync (`f711a92e8`) kept both notes under schema 0.61, this PR's and WP-1542's, and rebuilt the dist. Merged tree, `[dev]`, macOS arm64: `-m slow` 939 passed, 19 skipped, 19 xfailed, 1 failed. The failure is `test_the_two_site_winner_finds_each_site_its_own_moment`, the Mac-only row of #1424 placed under WP-1418, which this PR's files do not reach. CI and the GUI build were green on that head. Closing #1121 and this WP stays the maintainer's. The PR carries no closing keyword.
+
+- **2026-11-02** — Part 3 (#1121): the GUI stores the specimen's formula,
+  built as the rulings entry below settled it. `IndexingControls.formula` and
+  `.temperature` are `None` when unset. One function,
+  `crystallography.atomic_volume.check_formula_input`, refuses what `rietx
+  index` refuses, and the CLI and a model validator both call it. So a
+  project file, an assignment and the GUI's settings verb refuse in the CLI's
+  sentence. The GUI's index run passes both fields, unset reading as the CLI
+  reads it: no formula, at `TABLE_TEMPERATURE` (298 K).
+  `tests/test_search_controls.py` moves the two from `CALL_TIME_INPUTS` to
+  `CONTROL_TO_KWARG`. The form puts both beside the volume limits, with the
+  temperature box disabled until a formula is given. The candidate table gains
+  a `Z` column (`formula_units`) when the run read a formula, its header
+  explained by the formula's help entry, since no help arm covers
+  `CellCandidate`. The dist is rebuilt. The manual's GUI guide § Indexing, the
+  controls table of `reference/indexing.md` and the staged notes say so.
+
+  *Decisions.* The CLI's sentence for a temperature without a formula lost its
+  flag names so that one sentence serves every surface; neither form has
+  shipped. `PROJECT_FORMAT_VERSION` is 1.6. `Project.save` writes every field,
+  so a project this release saves carries both keys as null when unset, and
+  1.10.0 refuses any project 1.11 has saved, not only one carrying a formula.
+  That follows 1.10.0's note ("even where its value is null"); the narrower
+  cost the ruling named would need the keys written only when set. The twin of
+  `reference/indexing.md` sat at its 50 000-character cap, so three sentences
+  of its controls subsection were tightened to pay for the two rows; the page
+  needs a split before it grows again. No audit row: `IndexingControls` is
+  not a default seat or a record schema, and `tests.audit_delta` reports no
+  change.
+
+  *Measured.* Fast suite on pearl at `b43573cb4` (main `e8d210278`; Linux,
+  Python 3.12, `-n 8`): 13 729 passed, 171 skipped, 34 xfailed, 0 failed,
+  479 s. Vitest 24 files, 593 passed; svelte-check 0 errors. Manual `-W`
+  build, Vale (0 errors) and `tests.reader_output` (unchanged) clean. Each new
+  or changed Python test fails on main's `src` (14 failed; the 6 passes are
+  CLI cases whose words did not change), and `controls.test.ts` fails 3 of 10
+  on main's `controls.ts`.
+
+  *Next.* Closing #1121 is the maintainer's. `solve.chemistry.in_volume_window`
+  is flagged separately and untouched here.
+
+- **2026-11-02** (rulings, PR #1349) — Where the GUI stores the
+  specimen's formula is settled: two optional fields, `formula` and
+  `temperature`, on the search-controls block of the project file
+  (`IndexingControls`), shown in the indexing form beside the volume limits.
+  Nothing is built yet. The maintainer delegated the choice in chat on
+  2026-11-02: "whatever is more consistent with our design ethos. don't worry
+  about sunk cost, I don't think that many people are using indexing at the
+  moment and we're doing a big rework anyway."
+
+  *Settled by Claude under that delegation: option A* of the 2026-11-02
+  brief below. Grounds. Root CLAUDE.md § Project: `project.json` holds
+  settings (selected plan, mode, limits), and the formula is a search setting
+  that sits beside the volume limits. The package already treats the formula
+  as a run input (`index_pattern(formula=)`, `rietx index --formula`). The
+  global rule to build the smallest thing, with no scaffolding for later,
+  rules out option B's specimen block, whose other consumers do not exist.
+  Option C loses the formula on every reopen. The maintainer waived the sunk
+  cost and the forward-compatibility cost, which is that a 1.11 project file
+  carrying a formula is refused by 1.10 (`extra="forbid"`).
+
+  *Next* (the build, not done in this batch). (1) `IndexingControls` gains
+  `formula: str | None` and `temperature: float | None`, each `None` when
+  unset, with the CLI's validation (an unreadable formula and a temperature
+  that is not a positive finite number of kelvin are refused, and a
+  temperature without a formula is refused). (2) `gui/session.py`'s index run
+  passes both to `index_pattern`. (3) `tests/test_search_controls.py` moves
+  `formula` and `temperature` from `CALL_TIME_INPUTS` to the controls side of
+  the bijection. (4) The form fields in `gui/src/lib/controls.ts` with their
+  labels and titles, the committed corpus
+  `tests/data/gui/index_controls.json`, a Z (`formula_units`) column in the
+  candidate table, and a rebuilt dist (node >= 20.12). (5) The manual's GUI
+  indexing chapter and a staged note. Then #1121 can close, which is the
+  maintainer's act.
+
+- **2026-11-02** (ghostshift runner, PR #1344) — The GUI's peak editor no longer leaves a
+  line marked unusable after the line it was judged against moves. Two marks
+  are judged against another group's line: a copy (`duplicate_line`) against
+  the better-measured fit of the same peak, and a Kβ or tungsten ghost against
+  its parent. An edit refits one group, and until now only that group's marks
+  were recomputed, so moving or deleting a copy's owner left the copy withheld
+  from the search, and moving a line onto another group's weaker fit left the
+  peak offered twice. Each such mark on an untouched group now changes only
+  where the picker's own judgement changed, so a mark a user cleared stays
+  cleared. The GUI half of the formula task is not done: where the formula is
+  stored is a stored-format choice, set out below for the maintainer.
+
+  *Done.* (1) `gui/peaks.py`: `_spliced` judges the ghost and copy marks on
+  the list before and after the edit, each on copies stripped of the mark
+  (`_machine_marks`), and moves an untouched peak's mark only where the two
+  judgements differ (`_follow_cross_group_marks`). A deleted group takes the
+  same path. Ghosts are followed first, since a ghost owns no line. Task 9's
+  2026-10-03 decline rested on two rules: a user's flag edits must survive
+  (WP-1043), and the editor touches no other group. The change rule keeps the
+  first, since an unchanged judgement never touches a flag. It narrows the
+  second the way `weak_line` already did after the maintainer's review of
+  #947 (item 1: a stale flag elsewhere must not survive an edit). Settled by
+  Claude under that ruling and WP-1043's rule. (2) The sibling class:
+  `ghost_kbeta` and `ghost_tungsten` are judged against a parent anywhere in
+  the list, so they had the same defect and get the same rule.
+  `kalpha2_residual` is judged against the strongest line of its own group, so
+  it cannot go stale this way and is left alone. (3) `gui/CLAUDE.md` gains the
+  rule: a new flag whose basis crosses groups joins
+  `_follow_cross_group_marks`. (4) Staged note under 1.11.0 § Changed.
+  (5) `### Inherited`: the 2026-10-26 triage entry is deleted; its "nothing
+  merged" no longer holds, and the claim it records is in the Status line and
+  the entries below.
+
+  *Tests.* `tests/test_peak_editor_marks.py`, seven cases on a synthetic
+  ten-line pattern. With the new function disabled, four fail (owner moved,
+  owner's group deleted, a line moved onto a weaker fit, a ghost's parent
+  moved). Two guards pass either way, as they should: a copy's mark and a
+  ghost's mark that the user cleared stay cleared when an unrelated group is
+  refitted. The seventh pins that a delete emptying a group hands the ghost
+  screen the declared source (failed with the fix reverted).
+
+  *Review* (`/code-review high --fix`). Accepted: `PeakEditor.remove`, on
+  the path where a delete empties a group, now passes the instrument's
+  source as a refit does, since that path re-judges ghosts and a neutron or
+  monochromated beam must skip the Kβ search (WP-1445); the `gui/CLAUDE.md`
+  rule was cut back under its 1060-line cap; the staged note's "stays
+  cleared" now says through any edit that leaves the judgement alone (a
+  mark the user cleared does return when the judgement itself flips on);
+  the index regenerated; the ghost test checks the follow is per peak.
+  Declined: reusing the after-judgement for the fresh group's own ghost
+  marks (it could reorder flags on a peak with both ghost marks, and three
+  screen runs per click cost little); storing a user's overrides as a
+  human-owned fact in place of the change rule (a design change to the
+  `peaks.json` contents, outside this task); the in-place mutation of the
+  pre-edit list (`flag_weak_lines` already does it, and nothing holds an
+  undo stack).
+
+  *Generality.* No audit row and no judge dispatched. The change adds no
+  threshold, constant or ordering of evidence: it applies the picker's
+  existing ghost and copy rules to the untouched groups, and "ghosts first"
+  is the order those rules already depend on (a ghost owns no line).
+
+  *Measured.* Fast selection on this branch's final code tree (own `[dev]`
+  venv, macOS arm64, Python 3.12; three other runners' suites on the machine,
+  so the 43 min wall clock is a load figure): 13 513 passed, 314 skipped,
+  34 xfailed, 2 failed. Neither failure touches this change. `test_display`'s
+  kernel case fails on this Mac's Jupyter kernel spec, which points at a
+  deleted venv. `test_site_classes`' unplaceable-species case tripped its 15 s
+  runaway guard at 24 s under that load and passed when run alone. The seven
+  added tests cost 2.2 s together (local junit). `tests.reader_output`:
+  unchanged (exit 0). `test_docs_consistency.py` 25 passed; ruff clean.
+
+  *Decision for the maintainer: where the GUI stores the specimen's formula.*
+  Trigger: either stored option changes the project file's format, and the
+  choice rests on how people use the indexing form, which nobody has watched.
+  Why it matters: the formula gives each indexing candidate its number of
+  formula units, Z (`formula_units`), and records which formula the run read.
+  The API and `rietx index --formula` take it today; the GUI's indexing call
+  passes none, so a GUI user never sees Z. The candidate table has no Z column
+  yet, so every option below also adds one. Importance: minor. Aim, as I read
+  it: a GUI user indexing an unknown gets the same evidence an API user gets.
+  Options. (A) Two optional fields on the search-controls block of the project
+  file (`IndexingControls.formula`, `.temperature`), shown in the form beside
+  the volume limits. Remembered per project. A 1.11 project file with a
+  formula then fails to open in 1.10, which `extra="forbid"` refuses; old
+  files open unchanged. Undo: drop the fields with a migration. (B) A
+  specimen block at the top of the project file, which later features could
+  read too (the solve path's chemistry check takes a formula). Same costs,
+  plus a new top-level name on the main surface, for consumers that do not
+  exist yet. (C) Not stored: the form holds the formula and sends it with
+  each indexing run. No format change; the formula is lost on reload and must
+  be retyped after every reopen. (D) Do nothing: the formula stays an API and
+  CLI input. Practice: GSAS-II 5.8.4's indexer takes no formula, and DICVOL06
+  takes an optional density and formula weight (`docs/practice.md`, "A volume
+  window from the formula, in indexing", checked); TOPAS not checked. No
+  program stores a formula as an indexing setting, so every option departs
+  from practice by offering it at all. Recommendation: A, a lean. The crux is
+  whether the formula belongs to the run or to the specimen. The package puts
+  it on `index_pattern` and on `rietx index`, and B builds for consumers that
+  do not exist. C loses to A on retyping, which a person re-indexing after a
+  peak edit would do every session. Evidence that people index several
+  specimens of one chemistry from one project would favour B.
+
+  *Next.* (1) The maintainer's choice above. (2) Then the form field, the Z
+  column, the vitest corpus (`tests/data/gui/index_controls.json`) and a
+  rebuilt dist; on A, `tests/test_search_controls.py` moves `formula` and
+  `temperature` from its call-time inputs to the controls. (3) Closing #1121
+  is the maintainer's once that lands.
 
 - **2026-11-01** (`/pr-review`) — part 2 merged from outside as PR #1237 (`4505cbaf`), adding to the contributor's own 2026-10-30 entry and ticks, which stand as written. The formula's volume window is a ceiling only (Hofmann 2002, factor 1.25), and `VOLUME_RATIO_BOUNDS` is tier 2. `INDEX_Z_NOT_INTEGER` and `Z_INTEGER_TOLERANCE` are deleted. The test fired on true inorganic cells, whose ratio to the estimate runs 0.38 to 0.87, and the number survives as `formula_units`. `solve.chemistry` applies the ceiling too. The 2026-10-30 entry says `in_volume_window` "reads both edges" of the band. That was true when it was written and is not true now. The `Status:` line no longer says "claimed by @mustachefeeling", since part 2 landed. Issue #1121 stays open. The file's tasks leave two things for it: the GUI half of the `formula` task, which waits on the maintainer's choice between an `IndexingControls` field and a project-document field, and the stale `duplicate_line` marks. Closing #1121 is the maintainer's. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
 

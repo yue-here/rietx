@@ -505,7 +505,8 @@ const SERIES_STAGED = {
   sigma_mixed: true,
 };
 
-/** A finished two-pattern series whose cell edge is path-dependent — the case
+/** A finished two-pattern series whose cell edge differs most between the two
+ *  chains, 5.2 esd at T400 where the chains kept different rungs — the case
  *  the panel exists to make un-missable. */
 const SERIES_ANSWER = {
   result: {
@@ -520,11 +521,21 @@ const SERIES_ANSWER = {
         diagnostics: [], n_iterations: 12, reseeded: true, rwp_warm: 0.31,
         node_id: "n0002", tree_id: "t2" },
     ],
+    steps: [
+      { path: "phases.0.cell.a", labels: ["T300", "T400"], indices: [0, 1],
+        step: 0.0021, size_esd: 21, cold_ratio: 0.93 },
+      { path: "instrument.zero_shift", labels: ["T300", "T400"], indices: [0, 1],
+        step: 0.0001, size_esd: 0.8, cold_ratio: null },
+    ],
+    direction_gaps: [
+      { path: "phases.0.cell.a", label: "T400", index: 1, forward: 4.1587,
+        backward: 4.1592, gap: -0.0005, gap_esd: -5.2,
+        forward_rung: "cold", backward_rung: "warm" },
+      { path: "instrument.zero_shift", label: "T400", index: 1, forward: 0.0081,
+        backward: 0.0081, gap: 0, gap_esd: 0.4,
+        forward_rung: "cold", backward_rung: "cold" },
+    ],
     diagnostics: [
-      { level: "warning", code: "SEQUENTIAL_PATH_DEPENDENT",
-        where: ["phases.0.cell.a"],
-        message: "phases.0.cell.a differs between the forward and backward chains",
-        suggestion: "hold it, restrain it, or quote the spread" },
       { level: "warning", code: "SEQUENTIAL_RESEED", where: ["T400"],
         message: "pattern 1 (T400) was refitted from the initial model",
         suggestion: "check whether the specimen changed here" },
@@ -533,18 +544,17 @@ const SERIES_ANSWER = {
   trajectories: [
     { path: "instrument.zero_shift", x: [300, 400], x_label: "T",
       value: [0.008, 0.0081], stderr: [1e-5, 1e-5], labels: ["T300", "T400"],
-      path_dependent: false, discontinuous: false, backward: [0.008, 0.0081],
-      n_sigma: 0.4 },
+      backward: [0.008, 0.0081], n_sigma: 0.4,
+      gap_at: { label: "T400", index: 1, forward_rung: "cold", backward_rung: "cold" } },
     { path: "phases.0.cell.a", x: [300, 400], x_label: "T",
       value: [4.1566, 4.1587], stderr: [1e-4, null], labels: ["T300", "T400"],
-      path_dependent: true, discontinuous: false, backward: [4.1571, 4.1592],
-      n_sigma: 5.2 },
+      backward: [4.1571, 4.1592], n_sigma: 5.2,
+      gap_at: { label: "T400", index: 1, forward_rung: "cold", backward_rung: "warm" } },
   ],
-  path_dependent: ["phases.0.cell.a"],
-  path_dependence_sigma: 3.0,
   has_backward: true,
   n_iterations: 43,
   curves: [true, true],
+  rejected: [false, false],
   running: false,
 };
 
@@ -787,15 +797,35 @@ function button(text: string): HTMLButtonElement | undefined {
   return [...host.querySelectorAll("button")].find((b) => b.textContent?.trim() === text);
 }
 
-function rowsInDom(): HTMLElement[] {
-  return [...host.querySelectorAll<HTMLElement>(".row")];
+/** The action bar's filled primary (WP-2123), which replaced the header's Run. */
+function refineButton(): HTMLButtonElement | null {
+  return host.querySelector<HTMLButtonElement>(".actions button.refine");
 }
 
-/** The editable cell of the row whose leaf is `leaf` — by name, because the
- *  positions shift: a tied row renders a span rather than an input. */
-function cell(leaf: string): HTMLInputElement {
-  const row = rowsInDom().find((r) => r.querySelector(".path")?.textContent?.trim() === leaf);
-  return row!.querySelector<HTMLInputElement>("input.value")!;
+function rowsInDom(): HTMLElement[] {
+  return [...host.querySelectorAll<HTMLElement>(".params .row")];
+}
+
+/** The Parameters panel's row whose label reads `label` (WP-2126). */
+function rowLabelled(label: string): HTMLElement {
+  return rowsInDom().find((r) => r.querySelector(".label")?.textContent?.trim() === label)!;
+}
+
+/** The number a parameter is drawn as: a button that opens the editor. */
+function numberAt(path: string): HTMLElement {
+  return host.querySelector<HTMLElement>(`.params .ink[data-path="${path}"]`)!;
+}
+
+/** Type a value the way a person does in the Parameters panel: press the
+ *  number, type into the editor that floats over it, press Enter. */
+async function editValue(path: string, text: string) {
+  numberAt(path).click();
+  await flush();
+  const editor = document.querySelector<HTMLInputElement>("input.editor")!;
+  editor.value = text;
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+  editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await flush();
 }
 
 async function type(selector: string, value: string) {
@@ -834,8 +864,14 @@ describe("the shell", () => {
     expect(host.textContent).toContain("Choose a data file");
     expect(host.textContent).toContain("a.rex");
     expect(button("Create project")?.disabled).toBe(true);
-    // Run is disabled without a project — the control follows the state, not hope
-    expect(button("Run")?.disabled).toBe(true);
+    // the action bar belongs to a project, so the empty state offers no refine
+    // at all, and both collapse buttons are drawn disabled so opening one
+    // moves nothing (WP-2123)
+    expect(refineButton()).toBeNull();
+    expect(button("Run")).toBeUndefined();
+    const toggles = [...host.querySelectorAll<HTMLButtonElement>("header > button.toggle")];
+    expect(toggles).toHaveLength(2);
+    expect(toggles.every((b) => b.disabled)).toBe(true);
   });
 
   it("renders a project with no fit, and offers Run", async () => {
@@ -854,7 +890,8 @@ describe("the shell", () => {
     // panel while nothing is owed.
     expect(host.textContent).toContain("every panel the v1.0 GUI plan named");
     expect(host.textContent).not.toMatch(/WP-\d{4}/);
-    expect(button("Run")?.disabled).toBe(false);
+    expect(refineButton()?.disabled).toBe(false);
+    expect(refineButton()?.textContent).toContain("Refine");
   });
 
   it("shows the statistics and the stage while a run is in flight", async () => {
@@ -874,7 +911,7 @@ describe("the shell", () => {
     expect(host.textContent).toContain("cell");
     expect(host.textContent).toContain("(3/5)");           // 1-based, from stage_start
     expect(host.textContent).toContain("4.150%");          // Rwp as a percentage
-    expect(button("Run")?.disabled).toBe(true);            // 409 made unclickable
+    expect(refineButton()?.disabled).toBe(true);          // 409 made unclickable
     expect(button("Cancel")?.disabled).toBe(false);
   });
 
@@ -963,45 +1000,60 @@ describe("the shell", () => {
 });
 
 // ----------------------------------------------------------------------
-// the parameter table (WP-1011)
+// the parameter table (WP-1011; the Parameters panel since WP-2126)
 // ----------------------------------------------------------------------
 const ADVANCED = { ...PROJECT, doc: { ...PROJECT.doc, ui: { simple: false } } };
 
 describe("the parameter table", () => {
-  it("groups rows and gives a held row no checkbox at all", async () => {
+  it("groups the rows under the phase and the instrument, and folds what the setting holds", async () => {
     vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // one heading per dot-path prefix, in the server's order
-    const groups = [...host.querySelectorAll(".group")].map((g) => g.textContent?.trim());
-    expect(groups?.[0]).toContain("phases.0.cell");
-    expect(groups.some((g) => g?.includes("instrument.profile"))).toBe(true);
+    // grouping B (WP-2126): one band per phase and one for the instrument,
+    // the phase's space group typeset beside its name
+    const bands = [...host.querySelectorAll(".params .band .title")].map((b) => b.textContent);
+    expect(bands).toEqual(["LaB6", "Instrument"]);
+    expect(host.querySelector(".params .band .sg")?.getAttribute("aria-label")).toBe("P m -3 m");
+    const groups = [...host.querySelectorAll(".params .head .ht")]
+      .map((g) => g.textContent?.replace("›", "").trim());
+    expect(groups).toContain("Cell");
+    expect(groups).toContain("Peak shape");
 
-    expect(rowsInDom().length).toBe(PARAMS.parameters.length);
-    // three of the six rows cannot be freed, and a checkbox that errors on click
-    // is worse than no checkbox — so there are exactly three
-    const boxes = host.querySelectorAll('.row input[type="checkbox"]');
-    expect(boxes.length).toBe(3);
-    // …and each held row says which of the three reasons holds it
+    // the Cell group shows `a` and folds b and α into the crystallographer's line
+    expect(rowsInDom().map((r) => r.querySelector(".label")?.textContent?.trim()))
+      .toEqual(["Scale", "a", "w"]);
+    const fold = host.querySelector<HTMLElement>(".params .fold")!;
+    expect(fold.textContent).toContain("a = b = c, α = β = γ = 90°");
+    fold.click();
+    await flush();
+    expect(rowsInDom().length).toBe(5);
+
+    // a checkbox only beside a parameter it controls: the two folded rows are
+    // held, so they carry the reason's mark and no box
     const held = rowsInDom().filter((row) => row.classList.contains("held"));
-    expect(held.map((row) => row.dataset.held).sort()).toEqual(["locked", "mode", "tied"]);
-    // …and the reason is reachable rather than hovered: WP-1203 moved it off
-    // `title=` onto the glyph itself, which a keyboard can get to
-    const glyph = host.querySelector<HTMLElement>('[data-held="tied"] .vary .help')!;
+    expect(held.map((r) => r.querySelector(".label")?.textContent?.trim())).toEqual(["b", "α"]);
+    expect(held.every((r) => !r.querySelector("input"))).toBe(true);
+    const glyph = held[0].querySelector<HTMLElement>(".mark .help")!;
     expect(glyph.getAttribute("tabindex")).toBe("0");
     glyph.click();
     await flush();
     expect(host.querySelector(".popover")?.textContent).toContain("tied: =");
   });
 
-  it("hides held rows in Simple mode and says how many", async () => {
-    vi.stubGlobal("fetch", server(boot()).fetcher);   // ui.simple defaults true
+  it("puts each atom on one row of its own table", async () => {
+    vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    expect(rowsInDom().length).toBe(3);
-    expect(host.textContent).toContain("3 held hidden");   // a count, not a silent cut
+    const row = host.querySelector<HTMLElement>(".params table.atomtab tbody tr")!;
+    expect(row.dataset.atom).toBe("phases.0.atoms.0");
+    expect(row.querySelector(".aname")?.textContent).toBe("La");
+    // the Biso is mode-fixed: its value is drawn, and its box is the mark
+    // saying why it is held, never a checkbox that would error on click
+    expect(numberAt("phases.0.atoms.0.biso").textContent?.trim()).toBe("0.5");
+    expect(row.querySelector("input[type=checkbox]")).toBeNull();
+    expect(row.querySelector(".mark .help")).toBeTruthy();
   });
 
   it("shows a value to the precision its esd justifies", async () => {
@@ -1009,9 +1061,7 @@ describe("the parameter table", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const value = host.querySelector<HTMLInputElement>(".row input.value");
-    expect(value?.value).toBe("4.1568");                   // 4.1568(2), not 4.15678
-    expect(host.textContent).toContain("(2)");
+    expect(numberAt("phases.0.cell.a").textContent?.replace(/\s+/g, "")).toBe("4.1568(2)");
   });
 
   it("sends the glob for a bulk free — one round trip, one history node", async () => {
@@ -1042,7 +1092,9 @@ describe("the parameter table", () => {
     await flush();
 
     await type("#param-filter", "cell");
-    expect(rowsInDom().length).toBe(3);                    // a, b, alpha
+    // a, b and alpha match: the Cell group alone is left, under its phase
+    expect([...host.querySelectorAll(".params .band")].length).toBe(1);
+    expect([...host.querySelectorAll(".params .head")].length).toBe(1);
     button("Free 0")?.click();                             // disabled: none freeable
     await flush();
     expect(stub.calls.some((call) => call.method === "PATCH")).toBe(false);
@@ -1054,13 +1106,11 @@ describe("the parameter table", () => {
     app = mount(App, { target: host });
     await flush();
 
-    for (const [leaf, text] of [["a", "4.157"], ["scale", "1.05"]] as const) {
-      const input = cell(leaf);
-      input.value = text;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-    await flush();
+    await editValue("phases.0.cell.a", "4.157");
+    await editValue("phases.0.scale", "1.05");
     expect(host.textContent).toContain("2 pending edits");
+    // an edited number is marked where it is drawn
+    expect(numberAt("phases.0.cell.a").classList.contains("edited")).toBe(true);
 
     button("Apply")!.click();
     await flush();
@@ -1071,23 +1121,139 @@ describe("the parameter table", () => {
     });
   });
 
+  it("treats a value typed back as it was drawn as no edit", async () => {
+    vi.stubGlobal("fetch", server(boot(ADVANCED)).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    // WP-1009's rule: the drawn value is compared, so a click in and out of a
+    // cell cannot truncate a parameter
+    await editValue("phases.0.cell.a", "4.1568");
+    expect(host.textContent).not.toContain("pending edit");
+  });
+
+  it("edits every picked value at once, and ranges a shift-press within a column", async () => {
+    const stub = server(boot(ADVANCED));
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    // a modifier press picks rather than opens: scale, then a shift-press on
+    // `a` takes the plain rows between them
+    const down = (path: string, init: MouseEventInit) => {
+      numberAt(path).dispatchEvent(new MouseEvent("mousedown", { bubbles: true, ...init }));
+      numberAt(path).click();
+    };
+    down("phases.0.scale", { metaKey: true });
+    down("phases.0.cell.a", { shiftKey: true });
+    await flush();
+    expect(numberAt("phases.0.scale").classList.contains("picked")).toBe(true);
+    expect(numberAt("phases.0.cell.a").classList.contains("picked")).toBe(true);
+
+    // a press on a picked value edits all of them
+    await editValue("phases.0.cell.a", "2");
+    expect(host.textContent).toContain("2 pending edits");
+  });
+
+  it("holds and releases a value through the padlock in its box's place", async () => {
+    const heldParams = { ...PARAMS, parameters: PARAMS.parameters.map((p) =>
+      p.path === "phases.0.scale"
+        ? { ...p, vary: false, held: true, refinable: false, held_because: "held by hold()" }
+        : p) };
+    const stub = server({ ...boot(ADVANCED), "/api/params": () => ({ body: heldParams }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const lock = rowLabelled("Scale").querySelector<HTMLButtonElement>("button.lock")!;
+    expect(lock.getAttribute("aria-pressed")).toBe("true");
+    lock.click();
+    await flush();
+    expect(host.textContent).toContain("1 pending edit");
+    button("Apply")!.click();
+    await flush();
+    const patch = stub.calls.find((call) => call.method === "PATCH");
+    expect(patch?.body).toEqual({ values: {}, vary: {}, hold: { "phases.0.scale": false } });
+  });
+
+  it("sets limits and a restraint from the popover, in one PATCH", async () => {
+    const stub = server(boot(ADVANCED));
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    numberAt("phases.0.scale").click();
+    await flush();
+    const pop = document.getElementById("value-popover")!;
+    const lower = pop.querySelector<HTMLInputElement>('[aria-label="lower limit"]')!;
+    lower.value = "0.5";
+    lower.dispatchEvent(new Event("change", { bubbles: true }));
+    // the word is the box's label, so pressing the word ticks it
+    const restrain = [...pop.querySelectorAll("label")].find((l) => l.textContent?.includes("Restrain"))!;
+    restrain.click();
+    await flush();
+    expect(pop.querySelector<HTMLInputElement>('[aria-label="restraint target"]')?.value).toBe("1.02");
+    document.querySelector<HTMLInputElement>("input.editor")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flush();
+
+    button("Apply")!.click();
+    await flush();
+    const patch = stub.calls.find((call) => call.method === "PATCH")!;
+    expect(patch.body.limits).toEqual({ "phases.0.scale": [0.5, null] });
+    expect(Object.keys(patch.body.restraints)).toEqual(["phases.0.scale"]);
+    expect(patch.body.restraints["phases.0.scale"].target).toBe(1.02);
+  });
+
+  it("applies the pending edits before it refines, in either refine choice", async () => {
+    // WP-2123: the action bar's primary is "Apply and refine" while edits are
+    // pending, and the choice beside it picks what a refine runs
+    const stub = server({ ...boot(ADVANCED), "/api/run": () => ({ body: IDLE_RUN }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    expect(refineButton()?.textContent).toContain("Refine");
+    expect(host.querySelector('[aria-label="refine"] button.on')?.textContent?.trim())
+      .toBe("Staged plan");
+    await editValue("phases.0.cell.a", "4.157");
+    expect(refineButton()?.textContent).toContain("Apply and refine");
+
+    refineButton()!.click();
+    await flush();
+    const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
+      .map((c) => c.path);
+    expect(order).toEqual(["/api/params", "/api/run"]);
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+
+    // one cycle is one stage on the ticked rows: an empty turn_on
+    button("One cycle")!.click();
+    await flush();
+    refineButton()!.click();
+    await flush();
+    const runs = stub.calls.filter((c) => c.path === "/api/run");
+    expect(runs.at(-1)?.body).toEqual({ kind: "stage", stage: { name: "cycle", turn_on: [] } });
+    expect(host.textContent).toContain('ref.run_stage(Stage("cycle", turn_on=[]))');
+  });
+
   it("refuses an out-of-bounds value before the round trip", async () => {
     const stub = server(boot(ADVANCED));
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    const w = [...host.querySelectorAll<HTMLInputElement>(".row input.value")].at(-1)!;
-    w.value = "2";                                          // instrument.profile.w is [0, 1]
-    w.dispatchEvent(new Event("input", { bubbles: true }));
-    await flush();
-
+    await editValue("instrument.profile.w", "2");          // instrument.profile.w is [0, 1]
+    const w = numberAt("instrument.profile.w");
     expect(w.classList.contains("bad")).toBe(true);
     expect(w.title).toContain("upper bound");
     // Apply is blocked, not silently partial — and Revert is still offered,
     // which is the affordance the bad cell most needs
     expect(button("Apply")?.disabled).toBe(true);
-    expect(host.textContent).toContain("above the upper bound 1");
+    // the action bar says so in words its slot has room for, and the reason
+    // rides in that slot's tooltip as well as the cell's
+    const slot = host.querySelector<HTMLElement>(".actions .pending")!;
+    expect(slot.textContent?.trim()).toBe("invalid edit");
+    expect(slot.title).toBe("w: above the upper bound 1");
     button("Revert")!.click();
     await flush();
     expect(host.textContent).not.toContain("pending edit");
@@ -1109,10 +1275,7 @@ describe("the parameter table", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const input = host.querySelector<HTMLInputElement>(".row input.value")!;
-    input.value = "4.2";
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    await flush();
+    await editValue("phases.0.cell.a", "4.2");
     button("Apply")!.click();
     await flush();
 
@@ -1134,17 +1297,40 @@ describe("the plan editor", () => {
     return stub;
   }
 
-  it("lists the stages the run will actually execute, and names the preset", async () => {
+  /** The action bar's button labelled `text` — scoped, because the Model and
+   *  Text panels keep an Apply of their own. */
+  function bar(text: string): HTMLButtonElement | undefined {
+    return [...host.querySelectorAll<HTMLButtonElement>(".actions button")]
+      .find((b) => b.textContent?.trim().startsWith(text));
+  }
+
+  const summaries = () => [...host.querySelectorAll("ol.stages > li.stage .rung")]
+    .map((n) => (n.querySelector("summary") ?? n).textContent!.replace(/\s+/g, " ").trim());
+
+  it("reads as a recipe: one row per stage, its globs as facts, no prose", async () => {
     await openPlan();
-    const names = [...host.querySelectorAll<HTMLInputElement>(".name")].map((i) => i.value);
+    const names = [...host.querySelectorAll<HTMLInputElement>("li.stage input.name")]
+      .map((i) => i.value);
     expect(names).toEqual(["scale+bkg", "cell"]);
-    expect(host.querySelector<HTMLSelectElement>("select")?.value).toBe("mccusker_default");
-    // the preset's own words, from PLAN_INFO through /api/plans.  `description`
-    // is the visible one since WP-1208 and `when_to_use` is in the popover, so
-    // this is the line a person reads without clicking anything
-    expect(host.textContent).toContain("Scale and background, zero shift, cell,");
-    // …and the explainer above it, which is the panel's whole subject
-    expect(host.textContent).toContain("A plan is an ordered list of stages.");
+    const steps = [...host.querySelectorAll("li.stage .step")].map((n) => n.textContent);
+    expect(steps).toEqual(["1", "2"]);
+    // each glob is a chip, a fact, and the verb that removes it sits beside it
+    const first = host.querySelector("li.stage .frees")!;
+    expect([...first.querySelectorAll(".chip")].map((n) => n.textContent))
+      .toEqual(["phases.*.scale", "instrument.background.*"]);
+    expect(first.querySelectorAll(".chip button")).toHaveLength(0);
+    expect([...first.querySelectorAll(".glob > button.ghost")]
+      .map((b) => b.getAttribute("aria-label")))
+      .toEqual(["Remove phases.*.scale from stage 1",
+                "Remove instrument.background.* from stage 1"]);
+    expect(host.querySelector<HTMLSelectElement>("section[aria-label=plan] select")?.value)
+      .toBe("mccusker_default");
+    // the preset's words are a tooltip and a help term now, never a paragraph
+    // (the maintainer's ruling of 2026-11-07: no permanent explanatory text)
+    const panel = host.querySelector("section[aria-label=plan]")!;
+    expect(panel.querySelectorAll(":scope > p")).toHaveLength(0);
+    expect(panel.textContent).not.toContain("A plan is an ordered list of stages.");
+    expect(panel.querySelector("select")?.title).toContain("Scale and background, zero shift");
   });
 
   it("resolves each stage against the live table, and says what it holds", async () => {
@@ -1152,72 +1338,59 @@ describe("the plan editor", () => {
     // match — what a stage frees is its matches minus what is tied, locked,
     // mode-fixed or degenerate with a free cell
     await openPlan();
-    const rungs = [...host.querySelectorAll("ol.stages > li .rung summary")]
-      .map((n) => n.textContent!.replace(/\s+/g, " ").trim());
-    expect(rungs).toEqual([
-      "1 · +2 → 2 free · Rwp 95.35%",
-      "2 · +1 → 3 free · 1 held · Rwp 44.57%",
+    expect(summaries()).toEqual([
+      "+2 → 2 free · Rwp 95.35%",
+      "+1 → 3 free · 1 held · Rwp 44.57%",
     ]);
-    expect(host.textContent).toContain("Ends with 5 of 12 parameters free.");
     // the held row carries the server's own sentence, never one written here
     expect(host.textContent).toContain("phases.0.cell.b");
     const held = [...host.querySelectorAll(".rung .body .help")];
     expect(held.map((n) => n.getAttribute("aria-haspopup"))).toEqual(["dialog"]);
   });
 
-  it("refuses both of its run buttons at zero phases, in the shell's words",
-     async () => {
+  it("refuses its run buttons at zero phases, in the shell's words", async () => {
     // WP-1207: zero phases is a legal state and every run verb refuses it, so
     // a client must disable rather than offer a click whose only outcome is a
-    // 409. The panel's two buttons did not (found by `/code-review`), and the
-    // repair must not spell the reason a second time — the shell's sentence
-    // names the route out, and a local copy said something else.
+    // 409, and the repair must not spell the reason a second time
     await openPlan({ ...PROJECT, n_phases: 0 });
-    const runAll = button("Run all")!;
-    const runStage = [...host.querySelectorAll<HTMLButtonElement>(
-      "ol.stages > li .rung button")].filter(
-        (b) => b.textContent?.trim() === "Run this stage");
-    expect(runAll.disabled).toBe(true);
-    expect(runStage.length).toBeGreaterThan(0);
-    expect(runStage.every((b) => b.disabled)).toBe(true);
-
-    const header = button("Run")!;
-    expect(header.disabled).toBe(true);
-    // one sentence, three buttons
-    expect(runAll.title).toBe(header.title);
-    expect(runStage[0].title).toBe(header.title);
-    expect(header.title).toContain("no phase yet");
-
-    // …and with a phase, all three act again
-    unmount(app);
-    app = null;
-    host.innerHTML = "";
-    await openPlan();
-    expect(button("Run all")!.disabled).toBe(false);
-    expect(button("Run")!.disabled).toBe(false);
+    const runs = [...host.querySelectorAll<HTMLButtonElement>("li.stage .head button")]
+      .filter((b) => b.textContent?.trim() === "Run this stage");
+    expect(runs).toHaveLength(2);
+    expect(runs.every((b) => b.disabled)).toBe(true);
+    const primary = refineButton()!;
+    expect(primary.disabled).toBe(true);
+    expect(runs[0].title).toBe(primary.title);
+    expect(primary.title).toContain("no phase yet");
   });
 
-  it("hides the resolved facts while the plan on screen is not the server's", async () => {
-    await openPlan(PROJECT, {
-      "/api/plan": (call: Call) => ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
-    });
-    expect(host.querySelector(".rung summary")).not.toBeNull();
-    const first = host.querySelector<HTMLInputElement>("ol.stages > li input.globs")!;
-    first.value = "instrument.*";
-    first.dispatchEvent(new Event("input", { bubbles: true }));
+  it("keeps the facts of the stages before an edit, and counts the edit in the bar",
+     async () => {
+    await openPlan();
+    expect(bar("Refine")).toBeTruthy();
+    // remove the second stage's only glob
+    host.querySelectorAll<HTMLButtonElement>("li.stage:nth-child(2) .glob > button")[0].click();
     await flush();
 
-    expect(host.querySelector(".rung summary")).toBeNull();
-    expect(host.textContent).toContain("Save the plan to see what its stages free");
-    // …and Run all is refused meanwhile, because it would run the saved plan
-    expect(button("Run all")!.disabled).toBe(true);
+    // a plan is cumulative, so stage 1's facts still hold and stage 2 has none
+    expect(summaries()).toEqual(["+2 → 2 free · Rwp 95.35%", "not applied"]);
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    expect(bar("Apply and refine")).toBeTruthy();
+    const select = host.querySelector<HTMLSelectElement>("section[aria-label=plan] select")!;
+    expect(select.value).toBe("");
+    expect(select.querySelector("option")?.textContent?.trim())
+      .toBe("Standard (profile only), edited");
+
+    // the bar's Revert puts the plan the project holds back
+    bar("Revert")!.click();
+    await flush();
+    expect(summaries()[1]).toContain("+1 → 3 free");
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
   });
 
   it("runs one stage through the same machinery a whole fit uses", async () => {
     const stub = await openPlan();
-    const runs = [...host.querySelectorAll<HTMLButtonElement>("ol.stages > li .rung button")]
+    const runs = [...host.querySelectorAll<HTMLButtonElement>("li.stage .head button")]
       .filter((b) => b.textContent?.trim() === "Run this stage");
-    expect(runs).toHaveLength(2);
     runs[1].click();
     await flush();
 
@@ -1234,7 +1407,7 @@ describe("the plan editor", () => {
           ? { body: { ...PLAN, preset: "profile_only" } }
           : { body: PLAN },
     });
-    const select = host.querySelector<HTMLSelectElement>("select")!;
+    const select = host.querySelector<HTMLSelectElement>("section[aria-label=plan] select")!;
     select.value = "profile_only";
     select.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
@@ -1256,38 +1429,77 @@ describe("the plan editor", () => {
     expect(host.textContent).toContain("correlation guard");
 
     // …and it offers *every* stage field, because the list is derived from
-    // `lib/rxt.ts`'s stage words rather than typed out here (WP-1208).  Those
-    // are pinned to `StageSpec` from python, so a schema field cannot reach
-    // the `.rxt` document and miss this form.
-    const boxes = host.querySelectorAll("ol.stages > li .advanced label");
+    // `lib/rxt.ts`'s stage words rather than typed out here (WP-1208)
+    const boxes = host.querySelectorAll("ol.stages > li.stage .advanced label");
     expect(boxes.length).toBe((STAGE_WORDS.length - 1) * PLAN.plan.stages.length);
-    const helped = [...host.querySelectorAll("ol.stages > li:first-child .advanced .help")]
-      .map((n) => n.textContent!.trim());
+    const helped = [...host.querySelectorAll(
+      "ol.stages > li.stage:first-child .advanced .help")].map((n) => n.textContent!.trim());
     expect(helped).toHaveLength(STAGE_WORDS.length - 1);
-    // the two fields that were only reachable through the text document
     expect(helped).toContain("ftol");
     expect(helped).toContain("slack");
   });
 
-  it("reorders stages by drag, and offers to save the edited plan", async () => {
+  it("reorders by the handle, and the bar's Apply stores the edited plan", async () => {
     const stub = await openPlan(PROJECT, {
-      "/api/plan": (call: Call) => ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
+      "/api/plan": (call: Call) =>
+        ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
     });
-    // jsdom has no DragEvent; the handlers read only the indices they were
-    // bound with, so a plain Event of the same type drives them identically
-    const items = [...host.querySelectorAll("ol.stages > li")];
-    items[1].dispatchEvent(new Event("dragstart", { bubbles: true }));
-    items[0].dispatchEvent(new Event("drop", { bubbles: true }));
+    // jsdom has no layout, so every row's centre is 0 and a drag upwards of
+    // any length carries the second stage past the first
+    const handle = host.querySelector<HTMLElement>('[data-handle="1"]')!;
+    handle.dispatchEvent(new MouseEvent("pointerdown", { clientY: 100, bubbles: true }));
+    handle.dispatchEvent(new MouseEvent("pointermove", { clientY: 60, bubbles: true }));
+    handle.dispatchEvent(new MouseEvent("pointerup", { clientY: 60, bubbles: true }));
     await flush();
+    const names = () => [...host.querySelectorAll<HTMLInputElement>("li.stage input.name")]
+      .map((i) => i.value);
+    expect(names()).toEqual(["cell", "scale+bkg"]);
 
-    const names = [...host.querySelectorAll<HTMLInputElement>(".name")].map((i) => i.value);
-    expect(names).toEqual(["cell", "scale+bkg"]);
-    button("Save plan")!.click();
+    // the arrow keys move it back
+    host.querySelector<HTMLElement>('[data-handle="0"]')!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
     await flush();
+    expect(names()).toEqual(["scale+bkg", "cell"]);
+    // ⌘Z in the tab, outside a text field, takes that move back
+    host.querySelector("section[aria-label=plan]")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true }));
+    await flush();
+    expect(names()).toEqual(["cell", "scale+bkg"]);
 
+    bar("Apply")!.click();
+    await flush();
     const put = stub.calls.find((call) => call.method === "PUT");
     expect(put?.body.plan.stages.map((s: any) => s.name)).toEqual(["cell", "scale+bkg"]);
     expect(put?.body.plan.correlation_guard).toBe(0.98);
+  });
+
+  it("builds a plan: a stage added, globs typed, the last stage kept", async () => {
+    await openPlan();
+    button("+ Stage")!.click();
+    await flush();
+    const rows = () => host.querySelectorAll("li.stage");
+    expect(rows()).toHaveLength(3);
+    expect(host.querySelectorAll<HTMLInputElement>("li.stage input.name")[2].value)
+      .toBe("stage 3");
+    const add = host.querySelectorAll<HTMLInputElement>("li.stage input.add")[2];
+    add.value = "phases.*.atoms.*.biso, instrument.zero_shift";
+    add.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    add.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect([...rows()[2].querySelectorAll(".chip")].map((n) => n.textContent))
+      .toEqual(["phases.*.atoms.*.biso", "instrument.zero_shift"]);
+    expect(add.value).toBe("");
+
+    // a plan needs a stage, so the last one cannot be removed
+    for (const _ of [0, 1]) {
+      host.querySelector<HTMLButtonElement>(
+        'li.stage button[aria-label^="Remove stage"]')!.click();
+      await flush();
+    }
+    expect(rows()).toHaveLength(1);
+    expect(host.querySelector<HTMLButtonElement>(
+      'li.stage button[aria-label^="Remove stage"]')!.disabled).toBe(true);
   });
 });
 
@@ -1416,7 +1628,8 @@ describe("the report panel", () => {
     expect(actions[1].textContent).toContain("already refined by the staged plan");
     expect(actions[2].textContent).toContain("no phase is named yet");
     // one Apply button: the other two are refusals with reasons, not controls
-    expect(host.querySelectorAll(".action button:not(.ghost)").length).toBe(1);
+    expect([...host.querySelectorAll(".action button")]
+      .filter((b) => b.textContent?.trim() === "Apply").length).toBe(1);
     // 0.5 is capped by the collinear templates, so it must not read as confident
     expect(actions[0].dataset.tone).toBe("medium");
   });
@@ -1598,7 +1811,6 @@ describe("disclosure and the command palette", () => {
     const post = stub.calls.find((call) => call.method === "POST" && call.path === "/api/project");
     // settings persist on the verb, not on a later save (WP-1005/1008)
     expect(post?.body).toEqual({ ui: { simple: false } });
-    expect(rowsInDom().length).toBe(PARAMS.parameters.length);  // held rows are back
   });
 
   it("opens on Cmd-K and shows the API call behind every command", async () => {
@@ -1644,38 +1856,49 @@ describe("disclosure and the command palette", () => {
     expect(writes[0].body).toEqual({ ui: { console_height: 210 } });
   });
 
-  it("selects the layout from one segmented control, and keeps the plot mounted", async () => {
+  it("collapses either side from its own button, and keeps the plot mounted", async () => {
     vi.stubGlobal("fetch", server(boot()).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // WP-1034: the top-level choice is no longer *which pane* — Model and Text
-    // are tabs — it is how much window the panel column gets.  Two options, the
-    // current one lit, and neither click means two things (WP-1029's rule).
-    const group = host.querySelector<HTMLElement>('[aria-label="layout"]')!;
-    const labels = [...group.querySelectorAll("button")].map((b) => b.textContent?.trim());
-    expect(labels).toEqual(["Split", "Full"]);
-    expect(group.querySelector("button.on")?.textContent?.trim()).toBe("Split");
+    // WP-2123: each side has a collapse button at its own end of the header,
+    // and one side always stays.  This replaced WP-1034's Split | Full control.
+    const [graphs, model] = [...host.querySelectorAll<HTMLButtonElement>("header > button.toggle")];
+    expect(graphs.getAttribute("aria-label")).toBe("Hide the graphs");
+    expect(model.getAttribute("aria-label")).toBe("Hide the model panel");
+    expect(host.querySelector('[aria-label="layout"]')).toBeNull();
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(false);
+    expect(host.querySelector(".side .actions button.refine")).not.toBeNull();
 
-    button("Full")!.click();
+    graphs.click();
     await flush();
     expect(host.querySelector(".side")?.classList.contains("wide")).toBe(true);
     // hidden, not unmounted — a layout click must not purge the drawn window
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(true);
     expect(host.querySelector(".plot")).not.toBeNull();
-    // the tab strip travels with the column, which is what makes this a hatch
-    // for every panel rather than for the two that used to have their own mode
-    // — nine since WP-1016, which needed no mode of its own for exactly this
-    expect(host.querySelectorAll("nav.tabs button").length).toBe(9);
+    // the panel tabs travel with the column, nine since WP-1016
+    expect(host.querySelectorAll(".side nav.tabs button").length).toBe(9);
     // …and no splitter, because there is nothing on the other side of it
     expect(host.querySelector('.side > .grip[data-grow="left"]')).toBeNull();
+    // the last side showing cannot hide too
+    expect(model.disabled).toBe(true);
 
-    button("Split")!.click();
+    graphs.click();
     await flush();
-    expect(group.querySelector("button.on")?.textContent?.trim()).toBe("Split");
-    // a layout is a view choice, not a setting: nothing reached the document
     expect(host.querySelector(".side")?.classList.contains("wide")).toBe(false);
+    expect(model.disabled).toBe(false);
+
+    model.click();
+    await flush();
+    expect(host.querySelector(".side")?.classList.contains("hidden")).toBe(true);
+    expect(graphs.disabled).toBe(true);
+    expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(false);
+    // the action bar went with the visible side, so Refine is still a button
+    // on screen; there is one bar, never two
+    expect(host.querySelector(".plotcol .actions button.refine")).not.toBeNull();
+    expect(host.querySelectorAll(".actions").length).toBe(1);
+    // the button did not move: it is still the header's last child
+    expect(host.querySelector("header")?.lastElementChild).toBe(model);
   });
 
   it("carries nine tabs with no label shortened and every panel reachable", async () => {
@@ -1684,7 +1907,7 @@ describe("disclosure and the command palette", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const tabs = [...host.querySelectorAll<HTMLButtonElement>("nav.tabs button")];
+    const tabs = [...host.querySelectorAll<HTMLButtonElement>(".side nav.tabs button")];
     expect(tabs.map((b) => b.textContent?.trim())).toEqual([
       "Parameters", "Plan", "Peaks", "Model", "Text", "Series", "Report",
       "History", "Build"]);
@@ -2016,6 +2239,32 @@ describe("disclosure and the command palette", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
     await flush();
     expect(stub.calls.some((call) => call.path === "/api/run")).toBe(true);
+  });
+
+  it("applies pending edits on `r` before it runs, as the button it stands for does", async () => {
+    // WP-2123: `r` is the action bar's primary on the staged plan, which reads
+    // "Apply and refine" while edits wait; running without them dropped them
+    const stub = server({ ...boot(ADVANCED), "/api/run": () => ({ body: IDLE_RUN }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    await editValue("phases.0.cell.a", "4.157");
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
+    await flush();
+    const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
+      .map((c) => c.path);
+    expect(order).toEqual(["/api/params", "/api/run"]);
+    expect(stub.calls.find((c) => c.method === "PATCH")?.body)
+      .toEqual({ values: { "phases.0.cell.a": 4.157 }, vary: {} });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+
+    // an invalid edit blocks `r` as it disables the button
+    await editValue("phases.0.cell.a", "abc");
+    const runs = stub.calls.filter((c) => c.path === "/api/run").length;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
+    await flush();
+    expect(stub.calls.filter((c) => c.path === "/api/run").length).toBe(runs);
   });
 });
 
@@ -2420,7 +2669,7 @@ describe("the import wizard", () => {
     expect(opened.body).toEqual({ path: "/tmp/nac.rex" });
     // the session's project is replaced, and the shell lands on the parameters
     expect(host.textContent).toContain("nac.fxye");
-    expect(host.querySelector("nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
+    expect(host.querySelector(".side nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
     expect(host.textContent).toContain("project.open(/tmp/nac.rex)");
   });
 
@@ -2456,7 +2705,7 @@ describe("the import wizard", () => {
     expect(opened.body).toEqual({ name: "fap" });
     // an example is a project like any other from the moment it exists
     expect(host.textContent).toContain("FAP.XRA");
-    expect(host.querySelector("nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
+    expect(host.querySelector(".side nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
   });
 
   it("resets an example through its own verb, not by opening it again", async () => {
@@ -2918,8 +3167,11 @@ describe("the model editor", () => {
       box.dispatchEvent(new Event("change", { bubbles: true }));
       await flush();
     }
-    // back where it started: nothing pending, so there is nothing to apply
-    expect(button("Apply")).toBeFalsy();
+    // back where it started: nothing pending, so there is nothing to apply —
+    // the Model panel draws no Apply, and the action bar's stays disabled
+    expect([...host.querySelectorAll(".panel button")]
+      .find((b) => b.textContent?.trim() === "Apply")).toBeFalsy();
+    expect(button("Apply")?.disabled).toBe(true);
     expect(stub.calls.some((c) => c.method === "PATCH" && c.path === "/api/params"))
       .toBe(false);
   });
@@ -4949,8 +5201,9 @@ describe("the extinction screen table (WP-1027)", () => {
  * A sequential fit is path-dependent by construction, so what these mounts assert
  * is the honesty of the presentation: the list the panel sends is the order it is
  * showing, the σ inconsistency is surfaced before the chain runs rather than
- * after, and `SEQUENTIAL_PATH_DEPENDENT` reaches the top of the panel with the
- * parameter named. jsdom cannot see the plot, so the trajectory drawing is
+ * after, and the largest forward/backward gap (`SeriesResult.direction_gaps`)
+ * reaches the top of the panel as a number with the parameter named, without a
+ * verdict. jsdom cannot see the plot, so the trajectory drawing is
  * asserted in `lib/series.test.ts` and the *requests* are asserted here.
  */
 describe("the series panel", () => {
@@ -5044,7 +5297,7 @@ describe("the series panel", () => {
     expect(stub.calls.some((c) => c.method === "PUT")).toBe(false);
   });
 
-  it("puts the path-dependence where it cannot be missed", async () => {
+  it("puts the forward/backward gap where it cannot be missed", async () => {
     const stub = await openSeries({
       "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
       "/api/series/result": () => ({ body: SERIES_ANSWER }),
@@ -5065,29 +5318,52 @@ describe("the series panel", () => {
         ] } }),
     });
 
-    // the banner, not a strip entry — and it names the parameter
-    const banner = host.querySelector(".banner.bad")!;
-    expect(banner.textContent).toContain("1 parameter");
-    expect(banner.textContent).toContain("path-dependent");
-    expect(banner.textContent).toContain("phases.0.cell.a");
+    // the line over the whole comparison, not a strip entry: the largest gap
+    // as a number, where it is, and that the two chains kept different rungs
+    // there. It calls nothing path-dependent.
+    const banner = host.querySelector(".banner")!;
+    expect(banner.textContent).toContain("differ by 5.2 esd at most");
+    expect(banner.textContent).toContain("phases.0.cell.a at T400");
+    expect(banner.textContent).toContain("escalation ladder");
+    expect(host.textContent).not.toMatch(/path-dependent|artefact/i);
+    expect(host.querySelector(".banner.bad")).toBeNull();
 
-    // the reseed fence rides the row it is about, and the ranking put the
-    // flagged trajectory on the plot first
+    // the reseed fence rides the row it is about. The panel opens on the
+    // series' first-seen parameter, not the largest gap: on a clean series
+    // that order is noise (ruled by the maintainer 2026-11-04)
     expect(host.textContent).toContain("reseeded");
+    expect(host.textContent).toContain("Trajectory — instrument.zero_shift");
+    expect(host.textContent).toContain("phases.0.cell.a (5.2 esd)");
+    expect(host.textContent).toContain("instrument.zero_shift (0.4 esd)");
+    const options = () => [...host.querySelectorAll<HTMLOptionElement>(".side select option")]
+      .map((o) => o.value).filter((v) => v.includes("."));
+    expect(options().slice(0, 2)).toEqual(["instrument.zero_shift", "phases.0.cell.a"]);
+    // ranking by gap is the reader's choice, and it moves no selection
+    const order = (label: string) => [...host.querySelectorAll<HTMLButtonElement>(
+      '[aria-label="the list\'s order"] button')].find((b) => b.textContent === label)!;
+    order("largest gap first").click();
+    await flush();
+    expect(options().slice(0, 2)).toEqual(["phases.0.cell.a", "instrument.zero_shift"]);
+    expect(host.textContent).toContain("Trajectory — instrument.zero_shift");
+    // the largest gap is one click away, on the line that names it
+    banner.querySelector<HTMLButtonElement>("button")!.click();
+    await flush();
     expect(host.textContent).toContain("Trajectory — phases.0.cell.a");
-    expect(host.textContent).toContain("5.2σ");
+    // the caption states the same number for the trajectory on screen
+    expect(host.textContent).toContain("Forward and backward differ by 5.2 esd at T400");
 
-    // …and drew it as the evidence it is: the forward chain in the warning ink
-    // and dashed, the reseeded T400 ringed in the same ink, and the backward
-    // chain beside it, muted and dotted
+    // …and drew it as the evidence it is: the forward chain in the one ink
+    // every parameter wears, the reseeded T400 ringed in the warning ink, and
+    // the backward chain beside it, muted and dotted
     const marks = seriesPane("traj").marks;
     const strokes = (style: string) => marks.filter((m) => m.op === "stroke" && m.style === style);
-    expect(strokes(WARN).some((m) => m.dash && m.points!.length === 2)).toBe(true);
+    expect(strokes(INK.diff).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
+    expect(strokes(WARN).some((m) => m.dash)).toBe(false);
     expect(strokes(WARN).some((m) => m.points!.some((p) => p.length === 3))).toBe(true);
     expect(strokes(INK.edge).some((m) => m.dash)).toBe(true);
     const legend = () => [...host.querySelectorAll<HTMLButtonElement>(".legend button")];
     expect(legend().map((b) => b.textContent?.trim()))
-      .toEqual(["forward (path-dependent)", "esd", "backward", "reseeded"]);
+      .toEqual(["forward", "esd", "backward", "reseeded"]);
     // a legend click hides that mark, and says so on the button
     legend()[2].click();
     await flush();
@@ -5109,6 +5385,76 @@ describe("the series panel", () => {
     expect(curves?.url).toContain("index=1");
     expect([...seriesPane("main").data[0]]).toEqual([9, 9.4]);
     expect(() => seriesPane("traj")).toThrow();
+  });
+
+  it("lists the steps between neighbouring patterns, largest first, and calls none a jump", async () => {
+    await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: SERIES_ANSWER }),
+    });
+    const stepRowsOf = () => {
+      const heading = [...host.querySelectorAll("h2")].find((h) => h.textContent?.trim() === "Steps")!;
+      expect(heading).toBeTruthy();
+      // the Steps table is the first `.scroll` after its heading
+      let node: Element | null = heading;
+      while (node && !node.matches(".scroll")) node = node.nextElementSibling;
+      expect(node).toBeTruthy();
+      return [...node!.querySelectorAll("tbody tr")]
+        .map((r) => [...r.querySelectorAll("td")].map((c) => c.textContent?.trim()));
+    };
+    // the selected parameter's steps: the panel opens on the first-seen
+    // parameter, the zero shift, and then, from the gap line, on the cell
+    // edge, 21 esd, re-measured cold
+    expect(stepRowsOf()).toEqual([["T300 → T400", "+0.0001", "+0.8", "—"]]);
+    host.querySelector<HTMLButtonElement>(".banner button")!.click();
+    await flush();
+    expect(stepRowsOf()).toEqual([["T300 → T400", "+0.0021", "+21.0", "0.93"]]);
+    expect(host.textContent).toContain("1 step");
+    // markup wraps its prose across lines, so compare on single spaces
+    const text = host.textContent!.replace(/\s+/g, " ");
+    expect(text).toContain("later minus earlier");
+    expect(text).not.toMatch(/\bjump|discontinu/i);
+
+    // every parameter, with the record's order and a way into each trajectory
+    button("all parameters")!.click();
+    await flush();
+    expect(stepRowsOf()).toEqual([
+      ["phases.0.cell.a", "T300 → T400", "+0.0021", "+21.0", "0.93"],
+      ["instrument.zero_shift", "T300 → T400", "+0.0001", "+0.8", "—"],
+    ]);
+  });
+
+  it("marks a pattern the library quarantined even when the solver converged", async () => {
+    // T400 converged under an error-level code: `_rejected` quarantines it, so
+    // the server says `rejected` and the panel marks it — a status read would not
+    const [first, second] = SERIES_ANSWER.result.entries;
+    const answer = {
+      ...SERIES_ANSWER,
+      rejected: [false, true],
+      result: { ...SERIES_ANSWER.result, entries: [first, {
+        ...second, status: "converged", reseeded: false, rung: "cold",
+        rungs_tried: ["warm", "warm_staged", "cold"],
+        diagnostics: [{ level: "error", code: "MODEL_FAR_FROM_DATA",
+                        message: "the model is far from the data" }] }] },
+    };
+    await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: answer }),
+    });
+    const rows = [...host.querySelectorAll<HTMLTableRowElement>(".side .panel:not(.hidden) tbody tr")];
+    const row = rows.find((r) => r.textContent?.includes("T400") && r.querySelector(".chip"))!;
+    expect(row.textContent).toContain("converged");
+    expect(row.querySelector(".chip")?.textContent).toBe("unrecovered");
+    // the caption names why, from the entry's own error-level code
+    expect(row.querySelector(".chip")?.getAttribute("title"))
+      .toContain("it carries the error-level code MODEL_FAR_FROM_DATA");
+    expect(row.classList.contains("out")).toBe(true);
+    // …and the trajectory crosses that point, offering the mark in its legend
+    expect([...host.querySelectorAll<HTMLButtonElement>(".legend button")]
+      .map((b) => b.textContent?.trim())).toContain("unrecovered");
+    // the first pattern is not marked
+    const t300 = rows.find((r) => r.textContent?.includes("T300") && r.querySelector("button"))!;
+    expect(t300.querySelector(".chip")).toBeNull();
   });
 
   it("runs the chain through the one run machine", async () => {
@@ -5296,11 +5642,9 @@ describe("the search controls (WP-1045)", () => {
 });
 
 describe("the help popover", () => {
-  /** The `.help` term inside the row whose leaf is `leaf`. */
-  function term(leaf: string): HTMLElement {
-    const row = rowsInDom().find(
-      (r) => r.querySelector(".path")?.textContent?.trim() === leaf);
-    return row!.querySelector<HTMLElement>(".path .help")!;
+  /** The `.help` term naming the row labelled `label`. */
+  function term(label: string): HTMLElement {
+    return rowLabelled(label).querySelector<HTMLElement>(".label .help")!;
   }
 
   const popover = () => host.querySelector<HTMLElement>(".popover");
@@ -5342,7 +5686,7 @@ describe("the help popover", () => {
     await openTable();
     // `phases.*.scale` is a live family the fixture corpus does not carry —
     // exactly the shape of a key the corpus has not caught up with
-    term("scale").click();
+    term("Scale").click();
     await flush();
     expect(popover()!.textContent).toContain("Not described yet");
   });
@@ -5351,7 +5695,7 @@ describe("the help popover", () => {
     await openTable();
     term("a").click();
     await flush();
-    term("scale").click();
+    term("Scale").click();
     await flush();
     expect(host.querySelectorAll(".popover").length).toBe(1);
     expect(popover()!.textContent).toContain("Not described yet");
@@ -5394,7 +5738,7 @@ describe("the help popover", () => {
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
-    const trigger = host.querySelector<HTMLElement>(".path .help")!;
+    const trigger = host.querySelector<HTMLElement>(".params .label .help")!;
     trigger.click();
     await flush();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -5460,9 +5804,10 @@ describe("the help popover", () => {
 
   it("carries a held row's reason, which is the verb's own words", async () => {
     await openTable();
-    const row = rowsInDom().find(
-      (r) => r.querySelector(".path")?.textContent?.trim() === "alpha")!;
-    row.querySelector<HTMLElement>(".vary .help")!.click();
+    // α is held by the setting, so it sits behind the Cell group's fold line
+    host.querySelector<HTMLElement>(".params .fold")!.click();
+    await flush();
+    rowLabelled("α").querySelector<HTMLElement>(".mark .help")!.click();
     await flush();
     // no corpus can hold this: it is about one row, not about one name
     expect(popover()!.textContent).toContain("structurally fixed by symmetry");
@@ -5537,7 +5882,7 @@ describe("the first-run checklist (WP-1017)", () => {
     tabs().find((t) => t.textContent?.trim() === "Report")!.click();
     await flush();
     // every step done, so the strip says so rather than counting
-    expect(host.querySelector(".checklist")!.textContent).toContain("that is the loop");
+    expect(host.querySelector(".checklist")!.textContent).toContain("go back to any state in History");
 
     tabs().find((t) => t.textContent?.trim() === "History")!.click();
     await flush();
@@ -5551,7 +5896,7 @@ describe("the first-run checklist (WP-1017)", () => {
     // fix this read "1 left" — the reset had been put in `readUi()`, which
     // `moved()` calls on every head move, so reading the report and then
     // checking a node out un-ticked the step the person had just finished.
-    expect(host.querySelector(".checklist")!.textContent).toContain("that is the loop");
+    expect(host.querySelector(".checklist")!.textContent).toContain("go back to any state in History");
   });
 
   it("stays hidden on a project that dismissed it before", async () => {

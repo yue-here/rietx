@@ -12,29 +12,58 @@ control behaves as it does, and when you should reach for it.
 
 ## The shape of the window
 
-Two columns. The pattern on the left, a column of nine tabs on the right, and
-the console beneath them. Every panel is mounted at once, so a filter you typed,
-an edit you have not applied and a text buffer you are half way through all
-survive a look at another tab.
+Two sides. The graphs are on the left, under their own tab strip. Today it
+holds one tab, `Pattern`. A title line under it says what the graph shows:
+`Observed pattern` before any fit, `Last fit` after one, and `Refining` while a
+run is in flight. The panel column is on the right, with nine tabs, the action
+bar and the console. Every panel is mounted at once, so a filter you typed, an
+edit you have not applied and a text buffer you are half way through all survive
+a look at another tab.
 
-`Split | Full` in the header chooses how much window the panel column gets. It
-is a view choice and is not persisted; the panel widths you drag are, per
-project. Two panels want the room, and `Full` is for them: the Text document's
+Each side has a collapse button at its own end of the header. One side always
+stays, so the button of the last side showing is disabled. The buttons never
+move: the middle of the header wraps within itself. Collapsing is a view choice
+and is not persisted. The width you drag on the sash between the sides is
+persisted, per project, and a double-click on the sash resets it. Two panels
+want the room, and collapsing the graphs is for them: the Text document's
 editable columns need about 550 px and the atom table about 470.
+
+Below 760 px of window the two sides cannot both meet their floors, 420 px of
+graph and 340 px of panel, so they stack. The graphs go on top and the panels
+below, and the sash then drags up and down.
 
 ## The header
 
 | Control | Does |
 |---|---|
 | the project chip | names the `.rex`, its data file, the point count, the intensity mode, and whether σ came from the file or from counting statistics |
-| `Rwp` / `GoF` | the last run's agreement; `⚠ not a fit yet` appears beside it past an Rwp of {{ MATURITY_MAX_RWP }} |
 | `Open…` | the import wizard, with the recent list in it |
-| `Split \| Full` | how much window the panel column takes |
-| `Simple \| Advanced` | whether rows nothing can free, bounds and transforms are shown |
+| the two collapse buttons | hide the graphs (left end) or the panel column (right end) |
+| `Simple \| Advanced` | whether the Plan, Model, Series and Report panels show their advanced controls |
 | `◐ ☀ ☾` | theme: follow the system, light, dark |
 | the run pill | the stage and its number while busy; the last status otherwise |
-| `Run` / `Cancel` | start the plan; stop it between iterations |
+| `Cancel` | stop the run between iterations |
 | `⌘K` | every command, with the Python call it makes |
+
+`Rwp` and `GoF` are on the title line over the pattern. `⚠ not a fit yet`
+appears beside them past an Rwp of {{ MATURITY_MAX_RWP }}.
+
+## The action bar
+
+One row under the panel column, on every tab.
+
+| Control | Does |
+|---|---|
+| `One cycle \| Staged plan` | what a refine runs: one stage on exactly the ticked parameters, or the project's plan |
+| the pending count | how many Parameters edits wait, plus one for an edited plan, and the first refusal if one is invalid |
+| `Revert` / `Apply` | drop or apply the pending edits: the Parameters edits first, then the plan |
+| `Refine` | run the choice; it reads `Apply and refine` while edits wait, and applies them first |
+
+`⌘⏎` (`Ctrl+Enter` off a Mac) presses `Refine`, except inside the Text
+document, where it applies the document. A refused edit runs nothing. A plan
+replaces the vary flags, so a parameter you ticked by hand stays free under
+`One cycle` and may be held again under `Staged plan`. The Plan tab's ladder
+shows which.
 
 There is no menu bar and no Save button, and neither is an omission. Settings
 persist on the verb. The moment you tick a box or drag a region it is written to
@@ -144,31 +173,71 @@ says so when a browser refuses the clipboard.
 
 ## Parameters
 
-Every entry in the parameter table, one row each, with the control that frees it.
+Every parameter the model has, grouped the way a refinement is read. The panel
+shows each phase in a band headed by its name, its space group and its crystal
+system. The instrument follows in a band of its own.
 
-The filter box is the selection. Type a glob such as `phases.*.cell.*`, and the
-free and fix buttons act on the glob rather than on rows you have ticked. One
-glob is one `set_vary` call and therefore one history node, where a per-row
-multi-select would be one node per row. The count beside the box tells you how
-many rows the glob reaches before you act.
+Inside a phase, single parameters such as `Scale` come first. The groups follow
+in the order a refinement frees them: `Cell`, then `Size and strain`. The atoms
+come last, in a table with one row per atom. Each atom row shows the label, the
+species, the Wyckoff letter, x, y and z, the occupancy, Biso and the site
+multiplicity. The instrument band lists the zero shift and the displacement
+first, then `Background`, `Peak shape`, `Axial divergence` and `Source and
+geometry`.
 
-A row that cannot be freed has no checkbox at all. It carries a mark saying
-which of four reasons holds it: it is locked by symmetry, tied to another
-parameter, fixed by the intensity mode, or needs a held cell. Hover the mark for
-the reason in the package's own words. `Simple` hides those rows along with
-bounds and transforms, and reports how many it hid; `Advanced` brings them back.
+The `Cell` group shows only the edges and angles the space group leaves free.
+The rest fold into one line, such as `a = b, α = β = 90°, γ = 120°` for a
+hexagonal cell. Press that line to see the held rows behind it.
 
-A typed value is compared against the value as displayed, so clicking into a
-cell showing `4.1568(2)` and out again cannot truncate the parameter.
+A checkbox stands beside each parameter it frees, and nowhere else. A group's
+heading has a box that frees or fixes every member at once; it shows a dash when
+only some are free. The atom table's column headings carry the same kind of box
+for every position, every occupancy and every Biso. An atom's position has one
+box per direction its site allows, beside the coordinate that direction moves.
+
+A row that cannot be freed has no checkbox. It carries a mark naming the reason
+it is held: it is locked by symmetry, tied to another parameter, fixed by the
+intensity mode, or needs a held cell. Press the mark for the reason in the
+package's own words.
+
+The padlock is `hold`. A held parameter stays fixed even when a plan stage's
+glob names it, which `vary=False` alone does not do. An atom with a free site
+has a padlock beside its Wyckoff letter, which holds its whole position. A
+plain row shows its padlock in the checkbox's place while it is held.
+
+Numbers keep their columns. Values from 0.01 up to 10 000 are written plainly,
+and others with a power of ten. Atom coordinates, occupancies and Biso are
+always plain. The decimal points in a group line up, and the unit follows the
+value. A number you can edit is tinted; a number you cannot is not.
+
+Press a number to edit it. The editor opens over the number, so nothing else
+moves. Enter keeps the value, and Escape drops it. A value typed back as it was
+shown is no edit, so pressing into `4.1568(2)` and out again cannot truncate
+the parameter. Below the editor, the value's limits can be set, and
+`Restrain` adds a restraint toward a target with a σ. Press the word to tick
+its box.
+
+To edit several values at once, press them with `⌘` held (`Ctrl` off a Mac), or
+press one and then another with Shift held to take every value between them in
+the same column. Press any of the picked values and type: the value goes to all
+of them.
+
+The filter box narrows the panel. Type a word, or a glob such as
+`phases.*.cell.*`. The `Free` and `Fix` buttons beside it act on that glob in
+one `set_vary` call, which is one history node. The count beside the box says
+how many rows the glob reaches.
+
+Edits wait until `Apply`, or until a refine applies them first. The action bar
+counts them.
 
 ```{image} ../screenshots/parameters-light.png
 :class: only-light
-:alt: The parameter table grouped by phase and atom, each refined value carrying its esd in brackets and a checkbox, with a filter box and free and fix buttons above
+:alt: The Parameters panel: a band for fluorapatite with its space group, the Scale row, the Cell group with its folded symmetry line, Size and strain, and the atom table with one row per atom
 ```
 
 ```{image} ../screenshots/parameters-dark.png
 :class: only-dark
-:alt: The parameter table grouped by phase and atom, each refined value carrying its esd in brackets and a checkbox, with a filter box and free and fix buttons above
+:alt: The Parameters panel: a band for fluorapatite with its space group, the Scale row, the Cell group with its folded symmetry line, Size and strain, and the atom table with one row per atom
 ```
 
 ## Plan
@@ -186,25 +255,43 @@ It frees every stage's globs once more, on peak windows that drop 0.10% of
 each peak, and its Rwp is the answer's. The plan's `closing` line in the text
 document sets the fraction, and `none` removes the stage.
 
-The two buttons do different things:
+The plan reads top to bottom, one stage to a row. Each row holds:
 
-- `Run all` runs the plan from the start. A plan replaces the vary flags rather
-  than continuing them, so a row you freed by hand that no stage names is
-  dropped.
-- `Run this stage` runs one stage from where you are, and keeps what you freed
-  by hand.
+- a three-line handle. Drag it to move the stage, or focus it and press the up
+  and down arrow keys.
+- the stage's name, which you can type over.
+- `Run this stage`, which runs that one stage from where you are and keeps what
+  you freed by hand. It applies the pending edits first, as `Refine` does.
+- `×`, which removes the stage. The last stage has none.
+- the globs the stage frees, each with a `×` beside it, and a field where you
+  type another glob and press Enter.
+- the stage's line of the ladder: how many parameters it frees on top of the
+  stages above, the running count of free ones, how many stay held, and the
+  stage's Rwp from the last run. Open it for the paths.
 
-A plan you have edited and not saved has no resolved facts and cannot be run,
-because the ladder describes the plan the server is holding.
+The `Preset` menu replaces the stages with a preset's. `+ Stage` adds an empty
+stage at the end and puts the cursor in its name.
+
+An edit to the plan waits in the action bar as one pending edit. `Apply` stores
+it, `Revert` drops it, and `Refine` stores it before running. To run the whole
+plan, choose `Staged plan` in the action bar and press `Refine`. A plan
+replaces the vary flags rather than continuing them, so a row you freed by hand
+that no stage names is dropped. The panel lists those rows under the closing
+stage.
+
+The ladder describes the plan the server holds. After an edit, the stages
+above the first change keep their lines, and every stage from that change down
+reads `not applied` until you apply. `⌘Z` and `⇧⌘Z` undo and redo plan edits,
+the preset menu included, while the cursor is outside a text field.
 
 ```{image} ../screenshots/plan-ladder-light.png
 :class: only-light
-:alt: The plan panel: an ordered list of stages, each showing the globs it frees and the parameter paths they reach, with a running count of free parameters
+:alt: The plan panel: a preset menu, then one row per stage with a drag handle, its name, the globs it frees and a line counting the parameters it frees and holds
 ```
 
 ```{image} ../screenshots/plan-ladder-dark.png
 :class: only-dark
-:alt: The plan panel: an ordered list of stages, each showing the globs it frees and the parameter paths they reach, with a running count of free parameters
+:alt: The plan panel: a preset menu, then one row per stage with a drag handle, its name, the globs it frees and a line counting the parameters it frees and holds
 ```
 
 ## Peaks
@@ -259,6 +346,14 @@ Three things to understand before reading an answer:
 - State what you already know. A prior cell or space group narrows the search
   honestly, where widening the tolerances does not.
 
+Beside the volume limits, `formula` takes the specimen's chemical formula and
+`temperature (K)` the temperature the pattern was measured at, and the project
+stores both. The temperature box waits for a formula, since a temperature only
+scales the formula's volumes. Emptying the formula box clears the temperature with it. A run with a formula adds a `Z` column to the
+candidate table: the formula units each cell's volume holds by Hofmann's average
+atomic volumes. Z moves no search and no rank. A correct inorganic cell reads
+0.4 to 0.9 of its true Z, so read it as a guide rather than a test.
+
 `Screen extinctions` lives in a candidate's expanded row: one row per extinction
 class, every space group in the class listed, and the reflections that refute it
 named. The teaching point is the package's own. The extinction symbol is what a
@@ -266,7 +361,9 @@ powder measures, and a single space group out of a class is a convention you
 choose rather than a measurement the table made.
 
 `Adopt` turns a candidate into a Le Bail scaffold and flips the mode. The
-server's own verdict enables it per row, and the badge does not.
+panel enables it on the candidate `best_or_none()` picks. The route takes any
+candidate, and for one the gate did not pick it writes the grade and the caveats
+into the history node's label.
 
 ## Model
 
@@ -445,17 +542,30 @@ The panel states those rather than offering them, because one protocol over N
 specimens is what makes their trajectories comparable.
 
 Run it both ways once. `direction="both"` refines the chain forwards and
-backwards and flags the parameters the two passes disagree about. It is the only
-check that separates a measured trajectory from an ordering artefact, and a
-smooth curve is exactly what a poisoned chain produces. The panel banners the
-disagreement and draws the backward chain beside the forward one. Then decide
-whether you need to keep paying for the second pass.
+backwards and records how far the two passes differ. It is the only check that
+separates a measured trajectory from an ordering artefact, and a smooth curve is
+exactly what a poisoned chain produces. The panel opens with one line giving the
+largest gap in esds (the two chains' esds combined) and the parameter and
+pattern it sits at; click the parameter to plot it. Every trajectory is listed
+with its own largest gap, in the series' own order, and the panel opens on the
+first. The "largest gap first" control reorders the list. On a series whose two chains
+agree, the gaps are noise and that order means nothing. The backward chain is
+drawn beside the forward one. No parameter is
+called path-dependent, because no gap size separates a real dependence from
+chance across many parameters and patterns. You decide which size matters for
+your specimen. Where the two chains kept different attempts at that pattern (one
+warm, the other cold), the caption says so, and the gap then measures the
+escalation ladder as well as the order. Then decide whether you need to keep
+paying for the second pass.
 
 The status column carries four chips, best learnt as two pairs. `restaged` and
 `reseeded` are both recoveries, the first still from the neighbour's answer so
 the chain is unbroken, the second only from a cold start. `hard` means nothing
 rescued it but a warm attempt was still the best available, and `unrecovered`
-means it diverged on every attempt: it seeded no successor and joined no median.
+means the chain kept a fit it rejected after its last attempt: the solver
+diverged, or the fit carries an error-level diagnostic. A fit can converge and
+still be rejected, so the chip can sit beside `converged`, and its tooltip names
+the reason. A rejected pattern seeded no successor and joined no median.
 On the trajectory plot a ring marks a reseed and a cross marks an `unrecovered`
 point. They say opposite things: a ring is a good fit from a different starting
 model, a cross is not a measurement.
@@ -467,6 +577,16 @@ pattern's row plots that pattern's own fit instead. The chart has the pattern
 plot's four export buttons, between its legend and the plot. On the trajectory,
 `copy data` gives each pattern in view with its x, its value and its esd, and
 the backward chain's value when there is one.
+
+Under the plot, Steps lists the change in each parameter between neighbouring
+patterns, later minus earlier, with its size in the later pattern's esds. It is
+the series' `steps` field, largest first. It shows the selected parameter, or
+every parameter with the switch beside it, capped at the largest 60 rows. No
+step is called a jump, because what a jump is (a transition, a sample shift, a
+beam dump, a wrong model) depends on the sample's history, which no pattern
+records. When the series ran with `verify_steps`, a column gives the cold ratio
+of the largest steps: the same two patterns refitted cold and independently,
+over the step. Near 1 the step is in the data, and near 0 the chain made it.
 
 A series does not persist. Its patterns are staged uploads and its answer lives
 in the session, so closing the window loses the staged list. Say what you need

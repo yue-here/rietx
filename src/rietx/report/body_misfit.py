@@ -174,7 +174,7 @@ def _fit(ref, structure, data, globs, max_iter, drop=None):
     dropped: list[str] = []
     if drop is not None:
         for path in [p for p, s in trial._ties.items()
-                     if drop(p) or any(drop(q) for q, _ in s.terms)]:
+                     if drop(p) or any(drop(q) for q in s.sources)]:
             del trial._ties[path]
             dropped.append(f"tie {path}")
         for path in sorted(p for p in trial._user_holds if drop(p)):

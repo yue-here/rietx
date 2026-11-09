@@ -15,6 +15,7 @@ from rietx.report import compare_freed
 
 data = rx.read_pattern(examples_dir() / "FAP.XRA")
 structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
+structure.phases[0].extinction = 0.0  # declared, so suggest can weigh it
 instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 instrument.background = rx.BackgroundChebyshev.with_terms(6)
 ref = rx.Refinement(structure, instrument)
@@ -90,7 +91,7 @@ assert at_cell.best_or_none() is None
 assert [len(g.members) for g in at_cell.groups] == [2, 2, 1, 2, 2]
 assert [g.resolved for g in at_cell.groups] == [False, False, True, False, False]
 assert round(at_cell.noise_floor) == 693
-assert [round(g.gain) for g in at_cell.groups] == [322283, 189147, 156429, 129119, 39436]
+assert [round(g.gain) for g in at_cell.groups] == [322280, 189145, 156424, 129105, 39429]
 assert [round(g.delta_bic) for g in at_cell.groups] == [795, 333, 264, 201, 45]
 # After the widths: the Kα2 weight leads, then two occupancies.
 assert [g.members[0].path for g in at_profile.groups[:3]] == [

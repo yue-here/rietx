@@ -130,6 +130,8 @@ def test_a_joint_event_log_partitions_by_histogram(two_patterns, tmp_path):
     assert start["n_points"] == sum(r["n_points"] for r in start["histograms"])
     ends = [d for k, d in log if k == "stage_end"]
     assert log[-1][1]["rwp"] == result.statistics.rwp
+    # the record carries the pooled number each stage_end emitted (WP-1334)
+    assert [s.rwp for s in result.stages] == [e["rwp"] for e in ends]
     assert ends[-1]["rwp"] == pytest.approx(result.statistics.rwp,
                                             rel=FROZEN_COMPILE_CHI2_REL / 2)
     assert "FROZEN_COMPILE_STALE" not in {d.code for d in result.diagnostics}
@@ -681,6 +683,30 @@ def test_a_stage_that_freed_nothing_in_a_histogram_reaches_its_view(two_patterns
                 if d.code == "STAGE_FREED_NOTHING"]
     assert [d for d in result.for_histogram(1).diagnostics
             if d.code == "STAGE_FREED_NOTHING"] == [top]
+
+
+def test_a_stage_that_freed_nothing_lists_the_histogram_through_parameters(two_patterns):
+    """#1270's follow-up: the suggestion's listing is the public read-only one.
+
+    It names ``ref.parameters()``, not the internal ``ref.mtable``, and the
+    expression it prints runs as written on the fit it came from, listing the
+    passed-over histogram's own rows under the names a stage accepts.
+    """
+    from rietx.schemas.instrument import BackgroundChebyshev
+
+    structure, instruments = perturbed_inputs()
+    instruments[0].background = BackgroundChebyshev.with_terms(4)
+    ref = MultiHistogramRefinement(structure, instruments)
+    result = ref.fit(two_patterns, plan=RefinementPlan(stages=[
+        Stage("only", ["instrument.background.c3"], max_iter=3)]))
+    (top,) = _codes(result, "STAGE_FREED_NOTHING")
+    assert "mtable" not in top.suggestion
+    expression = top.suggestion.split(" with ", 1)[1].split(" and add", 1)[0]
+    assert expression.startswith("[r.path for r in ref.parameters()")
+    listed = eval(expression, {"ref": ref})  # noqa: S307 — the package's own text
+    assert listed and all(p.startswith("hist.1.") for p in listed)
+    assert "hist.1.instrument.background.c0" in listed
+    assert "hist.1.instrument.background.c3" not in listed
 
 
 def test_a_fit_level_finding_appears_once_in_every_view(two_patterns):

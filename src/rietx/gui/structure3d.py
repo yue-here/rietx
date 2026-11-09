@@ -210,6 +210,33 @@ _CPK: dict[str, str] = {
     "Fe": "#c05000", "Ti": "#909090", "Na": "#8040e0", "Ca": "#40c060",
 }
 
+#: An element's colour on a dark ground, for a site still in its ``_CPK``
+#: colour there (:func:`dark_ground_colours`).  C's #383838 reads at 1.56:1
+#: against the GUI's dark #151515; #666666 reads at 3.18:1 there and 3.07:1 on
+#: the notebook's #1d1813, sits 0.143 in OKLab from Ti's #909090, above
+#: :data:`MIN_SEPARATION`, and leaves the light picture as it was.  Ruled by
+#: the maintainer, 2026-11-02 (WP-1468).
+DARK_GROUND: dict[str, str] = {"C": "#666666"}
+
+
+def dark_ground_colours(sites: Sequence[dict]) -> dict[int, str]:
+    """Which sites take another colour on a dark ground, by index.
+
+    A site qualifies while it is still in its element's ``_CPK`` colour and
+    :func:`rietx.viz.recolour` has not marked it, so a colour someone chose
+    stays theirs.  A dark-ground colour within :data:`MIN_SEPARATION` of
+    another colour the phase draws is not used, since :func:`phase_palette`
+    separated the colours it was given and not this one.  The payload carries
+    the answer as each site's ``dark_color``, which the GUI reads on its dark
+    theme; ``rietx.viz.render_structure`` asks again of the dict it is handed.
+    """
+    swap = {k: DARK_GROUND[s["element"]] for k, s in enumerate(sites)
+            if s["element"] in DARK_GROUND and not s.get("recoloured")
+            and s["color"] == _CPK.get(s["element"])}
+    others = {s["color"] for s in sites} - {sites[k]["color"] for k in swap}
+    return {k: c for k, c in swap.items()
+            if all(_oklab_distance(_oklab(c), _oklab(o)) >= MIN_SEPARATION for o in others)}
+
 
 def element_symbol(species: str) -> str:
     """The bare element of a scattering species: ``"La3+"`` → ``"La"``.
@@ -743,6 +770,8 @@ def build(structure, phase: int = 0, *, probability: float = DEFAULT_PROBABILITY
     palette = phase_palette([s["element"] for s in sites])
     for site in sites:
         site["color"] = palette[site["element"]]
+    for k, colour in dark_ground_colours(sites).items():
+        sites[k]["dark_color"] = colour
     positions = np.array([a["pos"] for a in atoms], dtype=np.float64).reshape(-1, 3)
     radii = np.array([sites[a["site"]]["radius"] for a in atoms], dtype=np.float64)
     metal = np.array([sites[a["site"]]["metal"] for a in atoms], dtype=bool)

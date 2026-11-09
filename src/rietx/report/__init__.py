@@ -282,6 +282,54 @@ def _reading_models(model, structure, instrument):
     return misfit, shapes
 
 
+#: The axial aperture S/L = H/L at which the report borrows its asymmetry
+#: column when a fit declares both apertures 0 (WP-2054, :func:`_nominal_axial`).
+#: It shapes only that borrowed ∂Ω/∂(S/L) column.  The misfit, the fit's own
+#: four columns and every fitted value are untouched.  0.02 is a typical lab
+#: axial ratio, and on the two real families measured it sits inside the range
+#: where the reading holds: on SRM 660c the action fired at 0.005, 0.01 and
+#: 0.02, and on cpd-1c at 0.01 to 0.03.  At 0.05, above those data's own
+#: apertures (about 0.03 and 0.04 when refined), the low-angle coefficients
+#: fell insignificant and the report went silent.  The number is the same as
+#: :data:`~rietx.model.forward.AXIAL_SIZING_FLOOR` and is kept apart on
+#: purpose, so that retuning the FCJ quadrature floor cannot move the report
+#: (ruled 2026-11-03).
+NOMINAL_AXIAL_APERTURE = 0.02
+
+
+def _nominal_axial(shapes, structure, instrument, values):
+    """Bases drawn at the nominal axial aperture, or ``None`` (WP-2054).
+
+    Given only when the fit's apertures are both zero, where the model draws
+    no asymmetry and Layer 1 has no column of its own to read one with
+    (:func:`.layer1.nominal_axial_columns`).  ``shapes`` is compiled again with
+    S/L = H/L = :data:`NOMINAL_AXIAL_APERTURE` on its own grid and precision,
+    and its bases are taken at the fit's values with those two apertures.
+    Only the ∂Ω/∂(S/L) planes are read; the misfit and every other column stay
+    the fit's own.  A Pawley model and one built by hand are ``None``, for the
+    reason :func:`_reading_models` gives.
+
+    The value decides the reading.  Layer 1 keeps only the part of the column
+    the fit's own four cannot draw, and a tangent taken above the data's own
+    aperture points elsewhere.  The constant's comment gives the measured
+    range, and WP-2054's handover has the sweep.
+    """
+    from ..model.profiles.fcj import fcj_live
+
+    if (shapes.mode == "pawley" or shapes.window_area_tol is None
+            or fcj_live(values["instrument.geometry.axial_sl"],
+                        values["instrument.geometry.axial_hl"])):
+        return None
+    nominal = instrument.model_copy(deep=True)
+    nominal.geometry.axial_sl.value = NOMINAL_AXIAL_APERTURE
+    nominal.geometry.axial_hl.value = NOMINAL_AXIAL_APERTURE
+    twin = _twin(shapes, structure, nominal, shapes.window_area_tol)
+    at = dict(values)
+    at["instrument.geometry.axial_sl"] = NOMINAL_AXIAL_APERTURE
+    at["instrument.geometry.axial_hl"] = NOMINAL_AXIAL_APERTURE
+    return twin.derivative_bases(at)
+
+
 def _twin(model, structure, instrument, window_area_tol):
     """``model`` compiled again at ``window_area_tol`` on its own grid: the
     same channels, σ, moment frames and orbit split (WP-2052), and its Le Bail
@@ -322,7 +370,9 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         ``Refinement.report()`` fills these in for you.
     plan, free_paths:
         Used by the Layer-2 strategy veto: actions the plan already performs,
-        or parameters already free, are marked inactive.
+        or parameters already free, are marked inactive.  ``plan`` is a plan,
+        its ``PlanSpec`` or a preset name, read for ``result.mode`` as the fit
+        read it (``strategy.staged.resolve_plan``, WP-2102).
     structure:
         The :class:`~rietx.schemas.structure.Structure` the model was compiled
         from.  Optional, and it buys two things the compiled model does not
@@ -355,6 +405,12 @@ def build_report(result: RefinementResult, *, model=None, values=None,
             f"Instrument the model was compiled from, because Layer 1 reads its "
             f"misfit and its shapes from two compiles of them.  "
             f"Refinement.report() passes all three")
+    if plan is not None:
+        # the mirror's one outbound crossing, never a read by shape: a name
+        # reached the veto as a string with no stages and vetoed nothing
+        from ..strategy.staged import resolve_plan
+
+        plan = resolve_plan(plan, result.mode)
     report = build_layer0(result, top_n=top_n, match_tol_deg=match_tol_deg,
                           min_peak_sigma=min_peak_sigma)
     # Soft-restraint deviations are model-free (carried from the result), so they
@@ -428,7 +484,9 @@ def build_report(result: RefinementResult, *, model=None, values=None,
                    else None),
         turned=(result.stages[-1].moment_turned if result.stages else None))
     misfit, shapes = _reading_models(model, structure, instrument)
-    attributions = attribute_regions(misfit, values, report.regions, shapes=shapes)
+    nominal_axial = _nominal_axial(shapes, structure, instrument, values)
+    attributions = attribute_regions(misfit, values, report.regions,
+                                     shapes=shapes, axial_bases=nominal_axial)
     report.attribution = attributions
     # March-Dollase texture and Stephens anisotropic strain are computed before
     # the maturity gate: an uncorrected intensity or width *direction* is a
@@ -535,7 +593,8 @@ def build_report(result: RefinementResult, *, model=None, values=None,
     actions = suggest_actions(attributions, report.trends, report.unmatched,
                               rwp=result.statistics.rwp, ticks=ticks,
                               geometry=model.geometry_kind,
-                              wavelength=model.wavelength)
+                              wavelength=model.wavelength,
+                              axial_off=nominal_axial is not None)
     predicted = estimate_delta_chi2(result, attributions)
     for action in actions:
         action.expected_delta_chi2 = predicted

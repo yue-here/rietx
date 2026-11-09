@@ -1,7 +1,7 @@
 """The ILL D1B Co₃O₄ quench series reads, is what was vendored, and is documented.
 
 WP-2003 family D (issue #1150): ten Co₃O₄ samples quenched from 300-1173 K,
-each measured at 1.5 K, some at 100 K and 300 K, with the experiment's garnet
+each measured at 1.5 K, some at 100 K and 300 K, with the experiment's YIG
 standard and empty vanadium can, plus three planted known-bad patterns for a
 series' quarantine and ``on_error``.  Provenance, licence and the reference
 values (Sparks *et al.*, *Phys. Rev. B* **99**, 104104 (2019)) are in
@@ -59,7 +59,7 @@ REAL = {
     "1123q_300K.dat": (1123, 297.707),
     "1173q-1p5K_1.dat": (1173, 1.6663),
     "1173q-300K.dat": (1173, 302.776),
-    "standard_garnet_300K_1.dat": (None, 296.954),
+    "standard_YIG_300K_1.dat": (None, 296.954),
     "vanadium_can_120K.dat": (None, 330.0),
 }
 
@@ -112,8 +112,18 @@ def test_every_real_file_reads_with_the_stated_shape(name):
 
 @pytest.mark.parametrize("name", PLANTED)
 def test_every_planted_file_reads(name):
-    pattern = rx.read_pattern(SERIES / name)
-    assert len(np.asarray(pattern.two_theta)) == 1280
+    diagnostics = []
+    pattern = rx.read_pattern(SERIES / name, diagnostics=diagnostics)
+    dropped = [d for d in diagnostics if d.code == "PATTERN_ROWS_DROPPED"]
+    assert np.all(np.isfinite(pattern.intensity))
+    if "nan_block" in name:
+        # the 60 NaN channels are dropped and named by their 2θ (WP-2079)
+        assert len(pattern.two_theta) == 1220
+        assert [d.where for d in dropped] == [["30.790-36.690"]]
+        assert "60 of 1280 points have a NaN count or σ" in dropped[0].message
+    else:
+        assert len(pattern.two_theta) == 1280
+        assert dropped == []
 
 
 def test_the_bytes_are_the_manifests():

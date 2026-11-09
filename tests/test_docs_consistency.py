@@ -267,6 +267,12 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-10-18  docs/ROADMAP.md               589 -> 614  for the generality milestone (WP-2001): one table
 #                                                          row, a section with three tracks, one Current focus
 #                                                          line; landed 614, no headroom
+#   2026-11-04  docs/ROADMAP.md               614 -> 618  for the parametric milestone (WP-1964): one table
+#                                                          row, one section of one paragraph, one Current focus
+#                                                          line; landed 618, no headroom
+#   2026-11-08  docs/ROADMAP.md               618 -> 623  for the gui-overhaul milestone (WP-2123): one table
+#                                                          row, one section of one paragraph; landed 623, no
+#                                                          headroom
 #   2026-10-06  src/rietx/io/CLAUDE.md        501 -> 561  for the time-of-flight readers and axis (issue
 #                                                          #193): the flight-time axis row, and the two
 #                                                          new reader kinds (a calibration reader and the
@@ -276,6 +282,9 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-10-31  src/rietx/io/CLAUDE.md        563 -> 565  for Yue's review of #1241: § Refusals' fourth
 #                                                          case (a name-only refusal) and the table
 #                                                          row's no-fixture sentence; landed LANDED
+#   2026-11-03  src/rietx/io/CLAUDE.md        565 -> 571  for the finite-row drop (WP-2079, #1187): its
+#                                                          reader-repair row and one rule for every
+#                                                          reader's pre-drop decisions; landed 571
 SIZE_CAPS: dict[str, int | None] = {
     # 739 -> 755 (WP-1102): two standing rules for the component seam — that an
     # additive non-Bragg term is a union *member* and not a new field, and that
@@ -599,7 +608,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # its WP-level paragraphs moved to the v1.6 record.  From here the cap is
     # a budget on prose alone, and the per-row bump above ends.  Landed 570,
     # +1 headroom.
-    "docs/ROADMAP.md": 614,
+    "docs/ROADMAP.md": 623,
     # 1036 -> 1053 (WP-1429): where the GUI's colour values live, now that
     # they are Python and this workspace's `tokens.css` is generated from
     # them. It governs work outside the WP that measured it — an edit to a
@@ -766,7 +775,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # on a banner rather than by escalating, and that a Windows-written header
     # ends in `\r`, which `$` under `re.M` does not match.  Landed at 562; the
     # +1 is headroom.
-    "src/rietx/io/CLAUDE.md": 565,
+    "src/rietx/io/CLAUDE.md": 571,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs

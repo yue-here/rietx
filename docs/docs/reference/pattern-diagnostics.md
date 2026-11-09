@@ -256,7 +256,7 @@ On a line-dense synchrotron capillary pattern with a broad hump, that envelope t
 Its 3° windows miss a rise confined to the first few degrees, and they sit far above the true background where the lines crowd.
 On the synthetic NAC pattern of `tests/test_air_scatter_undeclared.py` (λ = 0.4133 Å, 0.5-50°, 0.005° steps) it reads 0.0042 with a strong rise and 0.044 without one.
 
-[`AIR_SCATTER_UNDECLARED`](diagnostics-refinement.md#air_scatter_undeclared) asks the fit instead.
+[`AIR_SCATTER_UNDECLARED`](diagnostics-corrections.md#air_scatter_undeclared) asks the fit instead.
 It fires on a P-spline with no air term when refitting the background with a 1/(2θ) column, the Bragg model held, would remove at least 0.5 % of χ² and at least 25 times the reduced χ².
 `Diagnostic.value` is the fraction.
 It is the one-column score test on the fit's own residual, so it needs no refit.

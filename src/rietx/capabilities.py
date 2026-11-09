@@ -3,7 +3,7 @@
 One call a client makes once, so it never has to guess: which backends exist and
 which are *installed*, which solvers and plan presets are registered, which
 intensity modes and anodes are known, what ``read_pattern`` actually opens, and
-which of the six versioned contracts it is talking to.
+which of the seven versioned contracts it is talking to.
 
 **Every arm is quoted from the live registry, never restated.** The lesson is
 measured rather than stylistic: the fourth backend name arrived two days after
@@ -68,6 +68,7 @@ from .indexing.engines import (
 from .io.projects import PROJECT_FORMATS
 from .io.readers import PATTERN_FORMATS, READER_OPTIONS
 from .optimize.least_squares import SOLVERS
+from .params.expression import GRAMMAR_VERSION as EXPRESSION_GRAMMAR_VERSION
 from .refine import _VERSION
 from .report.schemas import THRESHOLDS_VERSION
 from .schemas.common import SCHEMA_VERSION, Base, Mode
@@ -229,10 +230,10 @@ class ProjectFormatCapability(Base):
     sniff: str
     #: what the file carries beyond a structure, in words
     carries: list[str]
-    #: ``"read"`` or ``"build"`` — where this format's repairs are reported, so
-    #: a caller knows which call to hand its diagnostics list to.  A real
-    #: per-format difference: a ``.inp``'s species and origin repairs happen
-    #: while parsing, a ``.pcr``'s while converting codewords
+    #: ``"build"`` or ``"both"`` — where this format's repairs are
+    #: reported, so a caller knows which call to hand its diagnostics list to.
+    #: A real per-format difference: a ``.pcr``'s repairs happen while
+    #: converting codewords, a ``.inp``'s both while parsing and while building
     reports_at: str
     #: the top-level verb that writes this format (``"write_topas_inp"``), or
     #: ``None`` where this build has no writer for it (WP-1118).  The **name**
@@ -267,7 +268,7 @@ class Capabilities(Base):
     """The whole answer.  JSON-serialisable; WP-1008 serves it verbatim."""
 
     package_version: str
-    #: the six versioned contracts a client can be talking to, all live values.
+    #: the seven versioned contracts a client can be talking to, all live values.
     #: The count moved from four to five when WP-1009 added the text document,
     #: which is the argument for putting them here rather than in prose: a client
     #: reads the arm, not a paragraph that has to be remembered — and from five
@@ -284,6 +285,9 @@ class Capabilities(Base):
     #: vocabularies, gate thresholds) — ``schemas.indexing``'s peer of
     #: ``report_thresholds_version``, stamped on every ``IndexingResult``
     indexing_thresholds_version: str
+    #: the grammar a parametric equation is written in (WP-1964,
+    #: ``params.expression``): a stored expression is read under it
+    expression_grammar_version: str
 
     backends: list[BackendCapability] = Field(default_factory=list)
     solvers: list[str] = Field(default_factory=list)
@@ -356,6 +360,7 @@ def capabilities() -> Capabilities:
         project_format_version=PROJECT_FORMAT_VERSION,
         textdoc_format_version=TEXTDOC_FORMAT_VERSION,
         indexing_thresholds_version=INDEXING_THRESHOLDS_VERSION,
+        expression_grammar_version=EXPRESSION_GRAMMAR_VERSION,
         backends=[_backend(name) for name in BACKEND_NAMES],
         solvers=list(SOLVERS),
         plans=[PlanCapability(name=name, title=info.title,

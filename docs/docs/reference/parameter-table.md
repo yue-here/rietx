@@ -47,15 +47,15 @@ ref = rx.Refinement(lab6, rx.Instrument.debye_scherrer(wavelength=0.4139),
                     history=False)
 
 rows = ref.parameters()
-assert len(rows) == 42                                  # every scalar, held ones included
-assert sum(row.refinable for row in rows) == 25         # what set_vary could free
+assert len(rows) == 41                                  # every scalar, held ones included
+assert sum(row.refinable for row in rows) == 24         # what set_vary could free
 
 held = {row.path: row.held_because for row in rows if not row.refinable}
 assert held["phases.0.cell.b"] == "tied: = 1·phases.0.cell.a"
 assert held["phases.0.cell.alpha"] == "structurally fixed by symmetry or by the model"
 ```
 
-Two atoms and a default instrument make 42 rows, of which 25 could be freed.
+Two atoms and a default instrument make 41 rows, of which 24 could be freed.
 
 | Field | Type | Holds |
 |---|---|---|
@@ -88,7 +88,7 @@ A row cannot be freed for one of five reasons, and the remedy differs.
 | Reason | Means | Lifted by |
 |---|---|---|
 | `locked` | fixed by the structure: a cell angle the space group fixes, a coordinate on a fully fixed special position, the first emission line's weight, a non-primary line's wavelength, `biso` on a site with an anisotropic tensor, an atom a rigid body places, a position correction the geometry does not have | nothing |
-| `tie` | an affine function of other rows, so the freedom lives in its sources | `Refinement.untie`, if the tie is your own |
+| `tie` | an affine function of other rows, or a formula over named variables, so the freedom lives in its sources | `Refinement.untie`, if the tie is your own |
 | `mode_fixed` | refinable in principle, but the Le Bail or Pawley mode fixes it: every atom parameter, each phase's scale and a texture coefficient | switching back to `rietveld` |
 | `held` | you declared it does not move, whatever a plan frees; a coordinate held to fix a polar group's origin reads `held` too, and `ParameterRow.origin_axis` names the direction | `Refinement.unhold` |
 | `ParameterRow.needs_held_cell` | a wavelength, while this pattern's cell is free, since d = λ/(2 sin θ) fixes only their product | holding the cell; the one reason another parameter decides |
@@ -100,7 +100,7 @@ The structural reasons come next, then the mode, then a hold, then the wavelengt
 A Le Bail phase's held atom therefore names the mode, which is the reason that would still hold if the hold went.
 
 The counts of the five do not add up to the number of held rows.
-On the LaB6 table above, the Le Bail listing marks 12 rows `mode_fixed`, while the refinable count falls only from 26 to 20, because 6 of the 12 were already locked or tied.
+On the LaB6 table above, the Le Bail listing marks 12 rows `mode_fixed`, while the refinable count falls only from 25 to 19, because 6 of the 12 were already locked or tied.
 Read `refinable` for the decision, and the five flags only to explain it.
 
 ```python
@@ -118,7 +118,7 @@ ref = rx.Refinement(lab6, rx.Instrument.debye_scherrer(wavelength=0.4139),
 
 lebail = ref.parameters(mode="lebail")
 assert sum(row.mode_fixed for row in lebail) == 12
-assert sum(row.refinable for row in lebail) == 20
+assert sum(row.refinable for row in lebail) == 19
 ```
 
 `Refinement.parameters` takes `mode` because the mode the object carries is the one its last stage ran in, which before the first run is the `rietveld` default.
@@ -128,15 +128,16 @@ A Le Bail phase must carry a dummy atom to exist at all, and that atom's `biso` 
 
 ## Ties
 
-`TieSpec` is the stored form of value = Σ c·source + k.
+`TieSpec` is the stored form of value = Σ c·source + k, or of a formula.
 
 | Field | Holds |
 |---|---|
-| `TieSpec.terms` | the (path, coefficient) pairs |
-| `TieSpec.const` | the additive constant k |
+| `TieSpec.terms` | the (path, coefficient) pairs; empty for a formula |
+| `TieSpec.const` | the additive constant k; 0 for a formula |
 | `TieSpec.user` | `True` for a tie you declared, `False` for one the symmetry created |
-| `TieSpec.sources` | the paths this value follows, which are the ones to edit instead |
-| `TieSpec.describe` | the right-hand side as text, such as `1·phases.0.cell.a` |
+| `TieSpec.expression` | the formula's text, for a tie declared with `Refinement.tie(path, expression=...)`; `None` for every linear tie |
+| `TieSpec.sources` | the paths this value follows, which are the ones to edit instead; for a formula, the variables it reads |
+| `TieSpec.describe` | the right-hand side as text, such as `1·phases.0.cell.a`, or the formula as written |
 
 A symmetry tie and a tie you declared hold a row the same way, and `held_because` reads the same for both.
 `TieSpec.user` tells them apart.
@@ -358,6 +359,16 @@ A held row is skipped by a wildcard name, as a locked one is.
 A literal path to a row you held raises `ValueError`, saying to `Refinement.unhold` it first.
 A row the current mode fixes is the exception to the matching rule: `set_vary` frees it, and the next stage drops it again and reports it as `mode_fixed`.
 
+A literal path the model lacks raises `ValueError` and names the nearest real path, as `Refinement.hold`, `Refinement.tie`, `Refinement.untie` and `Refinement.set_values` do.
+`set_vary` checks every literal in the call before it changes anything, so a list with one wrong name leaves the model and the history as they were.
+A pattern that matches nothing returns `[]` in silence, since plans reach components that some models lack.
+
+`set_vary` warns with a `UserWarning` when it frees nothing for a row that exists.
+It also warns when a pattern under a spelling a release retired matches nothing, and names the current spelling.
+When freeing, a phase path or a pattern naming one atom site gets the reason a stage gives under `STAGE_PATH_NOT_FREE`.
+On LaB6, `set_vary("phases.0.atoms.0.dof.*")` returns `[]` and warns that every coordinate of La on 1a is fixed by its site symmetry.
+A wildcard pattern such as `phases.*.atoms.*.x` declines rows without a warning, since a sweep declining rows is how plans work.
+
 The `vary` flags on the models you passed in are the starting declaration only.
 Once `set_vary`, a hold, a tie or a stage has declared a free set, the table reads that set, even when it is empty.
 A plan replaces the flags at every stage, so `vary=False` alone does not keep a parameter fixed, and `Refinement.hold` does ([How to keep a parameter fixed whatever the plan frees](../guides/hold.md)).
@@ -368,7 +379,7 @@ It raises `ValueError` on four refusals, each with its own remedy.
 
 | Refusal | Message | Remedy |
 |---|---|---|
-| unknown path | `unknown parameter path(s): [...]` | correct the name |
+| unknown path | `unknown parameter path(s): [...]`, with the nearest real path for each | correct the name |
 | locked | `... is structurally fixed (symmetry, or a representation that owns this channel) and cannot be set` | none; the structure owns the value |
 | tied | `... follows 'phases.0.cell.a' as an affine tie; set that instead` | set the source |
 | out of bounds | `... lies outside its bounds [0.0, inf]` | a value inside them, since the bounded solver cannot start outside |
@@ -434,7 +445,7 @@ Read the diagnostic for the list, and the flag when you are already iterating ro
 ### The table against the result
 
 The two views differ in size.
-A Le Bail fit of the 11-BM NAC pattern over 2-24° gives 73 rows from `Refinement.parameters` and 31 from `RefinementResult.parameters`: 13 free, 18 tied and 42 fixed rows that the result leaves out.
+A Le Bail fit of the 11-BM NAC pattern over 2-24° gives 72 rows from `Refinement.parameters` and 31 from `RefinementResult.parameters`: 13 free, 18 tied and 41 fixed rows that the result leaves out.
 All 13 free rows come back `False`, and all 18 tied rows `None`: `cell.b`, `cell.c` and 16 symmetry-tied coordinates.
 Capping `cell.a` at 10.2500 Å against a free optimum of 10.2512 Å turns that one row `True` and takes Rwp from 0.1435 to 0.2163.
 The other parameters cover for a cell the fit is not allowed to reach.

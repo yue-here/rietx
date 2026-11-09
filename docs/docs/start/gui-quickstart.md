@@ -109,17 +109,21 @@ written.
 :alt: The whole window after a run: the fitted pattern with its difference curve on the left, the parameter table on the right, the console below
 ```
 
-`Split | Full` in the header chooses how much of the window that column gets,
-and the tabs travel with it. The tab is where you are and the layout is how wide
-it is. There are no modes.
+Each side has a collapse button at its own end of the header. The left one
+hides the graphs and the right one hides the panel column. One side always
+stays, and the buttons never move. In a window narrower than 760 px the two
+sides stack, graphs above and panels below.
 
-The header also carries the project's name and pattern, `Rwp` and `GoF` once a
-fit has run, `Simple | Advanced`, a three-way theme control (`◐` follow the
-system, `☀` light, `☾` dark), and `Run`.
+The header also carries the project's name and pattern, `Simple | Advanced` and
+a three-way theme control (`◐` follow the system, `☀` light, `☾` dark). Over the
+pattern, the `Pattern` tab and a title line say what the graph shows. Once a fit
+has run, `Rwp` and `GoF` sit on that line.
 
 ## Run the fit
 
-Press `Run`, or the `r` key.
+Under the panel column is the action bar. Press its `Refine` button, or `⌘⏎`
+(`Ctrl+Enter` off a Mac), or the `r` key. With `Staged plan` chosen beside it,
+a refine runs the project's plan.
 
 The run pill in the header names the stage and counts them off. Underneath the
 tab column, the console prints each stage as it starts and finishes, and beside
@@ -127,7 +131,7 @@ each one the Python call that would have done the same thing. That echo is the
 on-ramp described in [](../reference/gui-power.md). You can always find out what a button you
 pressed actually did.
 
-When it stops, `Rwp` appears in the header. Lower is better. What counts as good
+When it stops, `Rwp` appears on the title line over the pattern. Lower is better. What counts as good
 depends on the data, and [Agreement statistics](../theory/estimation.md#agreement-statistics)
 defines Rwp beside the expected value it is judged against.
 

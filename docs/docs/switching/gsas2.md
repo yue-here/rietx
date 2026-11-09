@@ -74,6 +74,29 @@ Staging is cumulative, so the cell stays free in the profile and atom stages.
 The fit ends with a closing stage, which frees all 34 parameters again with wider peak windows ([The closing stage](../reference/refinement.md#the-closing-stage)).
 [About a fit](../concepts/fit.md#the-plan) describes the stages, and the [plan presets](../reference/plans.md) draw the ones rietx ships.
 
+### A parametric equation is fitted with the patterns
+
+GSAS-II fits an equation to the sequential results table after a sequential refinement.
+The equation is a python-syntax string over the table's columns, and the fit sees the per-pattern values and their esds (`SeqParFitEqList`).
+rietx has two places for the same equation.
+
+- Refined pattern by pattern, a chain gives each parameter's trajectory ([Sequential refinement](../reference/series.md)).
+- Refined jointly, the equation is a formula on the target, and every pattern enters one residual ([Parametric refinement](../reference/parametric.md#formula-equations)).
+
+The second has no GSAS-II counterpart.
+It fits the equation's variables against the patterns themselves, so a pattern that cannot pin the parameter alone still contributes.
+The formula's text follows [Expressions](../reference/expressions.md), which is close to GSAS-II's python syntax:
+
+| GSAS-II | rietx |
+| --- | --- |
+| a free name in the equation, such as `a0` | `variables={"a0": rx.Parameter(value=..., vary=True)}` |
+| a sequential table column, such as the temperature | a `rx.CoordinateTable` column, one value per pattern |
+| `a0 + k*T` as the equation for a cell edge | `rx.ParametricEquation(name="a", target="phases.0.cell.a", basis="expression", expression="a0 + k*T")` |
+| one label in two equations | one variable named in both formulas |
+| `exp`, `log`, `sqrt` | `exp`, `log`, `sqrt` |
+| `sind`, `cosd`, `tand` in degrees | `sin(pi*x/180)`: rietx's trigonometry is in radians |
+| `sin`, `cos`, `tan`, which GSAS-II's expressions also read in degrees | `sin(pi*x/180)` as well: copied unchanged, the formula gives a different value with no error |
+
 ### A project is a directory
 
 A GSAS-II project is one `.gpx` file, a Python pickle.

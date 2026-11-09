@@ -130,16 +130,17 @@ choices = {plan.name: plan.when_to_use for plan in caps.plans}
 `Capabilities.package_version` is the installed rietx version, the same string as `rietx.__version__`.
 It moves with every release.
 
-Six more strings version the data contracts, and each moves on its own:
+Seven more strings version the data contracts, and each moves on its own:
 
 - `Capabilities.schema_version`, the pydantic models;
 - `Capabilities.report_thresholds_version`, the `FitReport` gates and thresholds;
 - `Capabilities.event_schema_version`, the streaming event ladder;
 - `Capabilities.project_format_version`, the `.rex` project directory;
 - `Capabilities.textdoc_format_version`, the `.rxt` text document;
-- `Capabilities.indexing_thresholds_version`, the indexing gates and the grade and caveat vocabularies.
+- `Capabilities.indexing_thresholds_version`, the indexing gates and the grade and caveat vocabularies;
+- `Capabilities.expression_grammar_version`, the grammar a parametric equation is written in ([Expressions](expressions.md)).
 
-[The six version strings](compatibility.md#the-six-version-strings) says what a change to each means.
+[The seven version strings](compatibility.md#the-seven-version-strings) says what a change to each means.
 Store the contract versions beside any answer you store.
 A threshold compared across two `report_thresholds_version` values compares two different tests.
 
@@ -254,7 +255,7 @@ A reader keyword means the same in every format that takes it, so `Capabilities.
 | `ProjectFormatCapability.extensions` | the file extensions |
 | `ProjectFormatCapability.sniff` | how a file is recognised as this format |
 | `ProjectFormatCapability.carries` | what the file holds beyond a structure, in words |
-| `ProjectFormatCapability.reports_at` | where the reader reports its repairs: `"read"`, `"build"` or `"both"` |
+| `ProjectFormatCapability.reports_at` | where the reader reports its repairs: `"build"` or `"both"` |
 | `ProjectFormatCapability.writes` | the function that writes this format, or `None` where this build writes none |
 | `ProjectFormatCapability.refuses` | why the format is declined, or `None` for a format that is read |
 
