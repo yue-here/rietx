@@ -2713,6 +2713,14 @@ def _joint_width_inequalities(models: list[CompiledModel], mtable, x0: np.ndarra
     return out
 
 
+#: how far inside a tied entry's own bound :func:`tied_bound_inequalities`
+#: puts the row's face, relative to the row's scale at the start: ten times
+#: the polished step's feasibility tolerance (``lm._POLISH_FEASIBLE``, 1e-10),
+#: the largest amount by which an accepted step leaves a row.  A held target
+#: then sits 1e-9 of its scale inside the bound rather than on it.
+TIED_BOUND_MARGIN = 1e-9
+
+
 def tied_bound_inequalities(table: ParameterTable, x0: np.ndarray,
                             lo: np.ndarray, hi: np.ndarray
                             ) -> list["lm_mod.LinearInequality"]:
@@ -2738,9 +2746,18 @@ def tied_bound_inequalities(table: ParameterTable, x0: np.ndarray,
     tie's window is exact, and so is a ``constant`` equation's coefficient,
     which carries the target's box, so neither adds a row and a fit that only
     has those runs exactly as before.  A row the start violates is dropped too,
-    the four builders' rule: the step keeps feasibility and cannot restore it,
-    and ``PARAMETRIC_OUT_OF_RANGE`` still reads the answer.  One block per
-    entry, labelled ``"<path> bounds"``.
+    the other builders' rule: the step keeps feasibility and cannot restore it.
+    One block per entry, labelled ``"<path> bounds"``.
+
+    **Each face sits a margin inside the bound** (:data:`TIED_BOUND_MARGIN`
+    of the row's own scale at the start, ``|T|·|θ₀| + |c|``), because the
+    write-back after the solve (``ParameterTable.apply_to_models``) checks the
+    schema's bounds exactly and refuses a value an ulp outside.  The driver
+    accepts a step that crosses a row by its rounding (``lm._ROW_ROUNDING``)
+    and keeps a polished step that holds the rows to ``lm._POLISH_FEASIBLE``
+    of their scale, so a face on the bound itself could hand the write-back
+    a value just past it.  A start inside the margin keeps the face on the
+    bound, since a margin there would read the start as violating the row.
     """
     from . import lm as lm_mod
 
@@ -2772,8 +2789,12 @@ def tied_bound_inequalities(table: ParameterTable, x0: np.ndarray,
             tol = lm_mod._ON_FACE * max(1.0, abs(bound))
             if sign * (reach - bound) >= -tol:       # the box already holds it
                 continue
+            c_row = sign * (float(d[i]) - bound)
+            margin = TIED_BOUND_MARGIN * float(np.abs(t) @ np.abs(x0) + abs(c_row))
+            if sign * float(t @ x0) + c_row >= margin:      # the start's slack
+                c_row -= margin
             T_rows.append(sign * t)
-            c_rows.append(sign * (float(d[i]) - bound))
+            c_rows.append(c_row)
         if not T_rows:
             continue
         block = lm_mod.LinearInequality(T=np.vstack(T_rows),

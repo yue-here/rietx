@@ -452,17 +452,15 @@ def _start_with(edit) -> rx.Structure:
      "phases.0.preferred_orientation"),
     (lambda ph: setattr(ph, "extinction", Parameter(value=10.0, min=0.0)),
      "phases.0.extinction"),
-    (lambda ph: setattr(ph, "particle_radius_um", 5.0), "phases.0.particle_radius_um"),
     (lambda ph: ph.restraints.append(
         rx.schemas.structure.BondRestraint(atom_i=0, atom_j=1, target=3.0, sigma=0.01)),
      "phases.0.restraints"),
-], ids=["texture-declared", "extinction-declared", "particle-radius", "restraint"])
+], ids=["texture-declared", "extinction-declared", "restraint"])
 def test_per_pattern_starts_must_agree_beyond_their_parameters(edit, where):
-    """One model with different values: a field that is not a parameter is
-    the model's, and two starts that disagree there are two models.  The
-    refusal names the field.  A parameter's value, bounds and vary flag may
-    differ, and so may the phase's name, a label a CIF takes from its data
-    block."""
+    """One model with different values: a field that is not a parameter and
+    shapes a shared column is the model's, and two starts that disagree there
+    are two models.  The refusal names the field.  A restraint holds no
+    column of its own, so it is read off the phase, whose cell is shared."""
     ins = _lab6_instruments(2)
     with pytest.raises(ValueError, match=rf"structure 1 differs from structure 0 at "
                                          rf"{where.replace('.', chr(92) + '.')}"):
@@ -477,10 +475,16 @@ def test_two_texture_axes_under_one_r_column_are_refused():
     with pytest.raises(ValueError, match=r"phases\.0\.preferred_orientation\.axis"):
         MultiParameterTable([_start_with(axis((0, 0, 1))), _start_with(axis((1, 1, 1)))],
                             _lab6_instruments(2))
-    # a phase's name is a label, and a parameter's bounds and vary flag are
-    # not the model's: none of them is refused
+    # each pattern its own r: the axes may differ, as GSAS-II keeps texture
+    # per histogram
+    MultiParameterTable([_start_with(axis((0, 0, 1))), _start_with(axis((1, 1, 1)))],
+                        _lab6_instruments(2),
+                        sharing=SharingMap(per_histogram=["phases.*.preferred_orientation.*"]))
+    # a phase's name is a label, its particle radius never enters the fit, and
+    # a parameter's bounds and vary flag are not the model's: none is refused
     def label_and_bounds(ph):
         ph.name = "LaB6_400K"
+        ph.particle_radius_um = 5.0
         ph.atoms[0].occ.max = 1.0
         ph.scale.vary = not ph.scale.vary
     MultiParameterTable([_start_with(lambda ph: None), _start_with(label_and_bounds)],

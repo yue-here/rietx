@@ -16,7 +16,8 @@ solve (``ParameterTable.apply_to_models``).  What is checked here:
   target's floor: LM holds every pattern's target in range, and the
   constraint diagnostic names the equation once; TRF, which takes no rows,
   still meets the write-back refusal;
-* ``PARAMETRIC_OUT_OF_RANGE`` reads a value on its face as inside.
+* each face sits a margin inside its bound, so the strict write-back
+  never meets a held value a rounding past it.
 """
 
 from __future__ import annotations
@@ -28,9 +29,9 @@ import pytest
 
 import rietx as rx
 from rietx.model.forward import compile_model
-from rietx.multi import _parametric_range_diagnostics, refine_multi
+from rietx.multi import refine_multi
 from rietx.optimize.least_squares import tied_bound_inequalities
-from rietx.params.multi import MultiParameterTable, SharingMap
+from rietx.params.multi import SharingMap
 from rietx.params.vector import AffineTie, ParameterTable
 from rietx.refine import _constraint_diagnostics
 from rietx.schemas.common import Parameter
@@ -84,6 +85,10 @@ def test_a_two_source_tie_takes_the_rows_its_outer_box_cannot_hold():
     assert block.T[1, k] == block.T[1, j] == -1.0
     v = table.entries[table._paths["phases.0.atoms.1.biso"]].value
     np.testing.assert_allclose(block.slack(table.x0()), [v, 25.0 - v])
+    # each face a margin inside its bound, never on it: the write-back after
+    # the solve checks the bounds exactly (TIED_BOUND_MARGIN)
+    assert block.c[0] < 0.0 and block.c[1] < 25.0
+    assert -block.c[0] <= 1e-8 and 25.0 - block.c[1] <= 1e-7
     # a bounded co-source whose box already holds both sides adds nothing
     lo, hi = table.bounds()
     lo[j], hi[j] = 0.0, 0.0
@@ -202,30 +207,6 @@ def test_trf_takes_no_rows_and_meets_the_write_back_refusal():
 
 
 # -- the readers ---------------------------------------------------------------
-
-def test_a_target_on_its_face_is_not_out_of_range():
-    s, _ = perturbed_lab6()
-    equation = ParametricEquation(name="w", target="instrument.profile.w",
-                                  basis="polynomial", terms=[[], ["T"]])
-    ins = [rx.Instrument.debye_scherrer(wavelength=0.41390) for _ in range(2)]
-    mt = MultiParameterTable(s, ins, parametric=[equation],
-                             coordinates=CoordinateTable(columns={"T": [300.0, 400.0]},
-                                                         units={"T": "K"}))
-    e = mt.tables[0].entries[mt.tables[0]._paths["instrument.profile.w"]]
-    lo = e.lo
-    for t in mt.tables:
-        t.entries[t._paths["instrument.profile.w"]].value = lo - 1e-14
-    assert _parametric_range_diagnostics(mt) == []
-    for t in mt.tables:
-        t.entries[t._paths["instrument.profile.w"]].value = lo - 1e-6
-    (d,) = _parametric_range_diagnostics(mt)
-    assert d.code == "PARAMETRIC_OUT_OF_RANGE" and d.value == 2.0
-
-
-def perturbed_lab6():
-    from tests.test_multi_histogram import perturbed_inputs
-    return perturbed_inputs()
-
 
 class _Outcome:
     def __init__(self, by: dict[str, int]):

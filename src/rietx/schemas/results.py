@@ -1215,8 +1215,9 @@ class StageResult(Base):
     #: runners that build a ``StageResult``.
     termination: str | None = None
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
-    #: Stephens strain cone, or the Γ_G² floor of WP-1938 D7) during this
-    #: stage: the step for the box alone crossed a row, and the step solved
+    #: Stephens strain cone, the Γ_G² floor of WP-1938 D7, the Γ_L floor of
+    #: WP-2002, or a tied parameter's own bounds of WP-1325) during this
+    #: stage, in a joint fit too: the step for the box alone crossed a row, and the step solved
     #: over the box and the rows replaced it (WP-1938 D8; the name is from
     #: before D8, when such a step was truncated).  Always 0 under
     #: TRF, which has no such vocabulary.  Nonzero in the *final* stage means

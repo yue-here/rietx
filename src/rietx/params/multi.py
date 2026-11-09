@@ -340,54 +340,68 @@ def _target_refusal(table: ParameterTable, e) -> str | None:
     return None
 
 
-def _model_difference(a, b, path: str = "") -> tuple[str, object, object] | None:
-    """The first place two starting structures differ outside a parameter's
-    value, as ``(dotted path, a's, b's)``, or ``None``.
+#: :class:`~rietx.schemas.structure.Phase` fields a per-pattern start may
+#: change although they are not parameters: ``name`` labels the phase (a CIF
+#: takes it from its data block, which per-temperature files spell
+#: differently), and ``particle_radius_um`` never enters the least-squares fit
+#: (its schema docstring; only QPA's Brindley correction and the exporters read it)
+_PHASE_FIELDS_FREE_PER_PATTERN = frozenset({"name", "particle_radius_um"})
+
+
+def _model_differences(a, b, path: str = ""):
+    """Every place two starting structures differ outside a parameter's
+    value, as ``(dotted path, a's, b's)``, in field order.
 
     A :class:`~rietx.schemas.common.Parameter` is skipped whole: its value is
     what a per-pattern start may change, and its bounds and vary flag are
-    either per-histogram or intersected and replaced by a plan.  A phase's
-    ``name`` is skipped too, as a label rather than a model: a CIF names the
-    phase after its data block, which per-temperature files spell differently.
-    Everything else is compared exactly, recursing through models, lists and
-    dicts in field order.  A dict is compared by key, never by key order, and
-    a key one side leaves out is no difference where the other side's value is
-    a parameter: a texture term the block leaves out enters the table at 0,
-    held (``ParameterTable._collect_texture``), so ``{}`` and a fitted
-    coefficient set are one model with different values.
+    either per-histogram or intersected and replaced by a plan.  So are
+    :data:`_PHASE_FIELDS_FREE_PER_PATTERN`.  Everything else is compared
+    exactly, recursing through models, lists and dicts.  A list of another
+    length is one difference at the list.  A dict is compared by key, never by
+    key order, and a key one side leaves out is no difference where the other
+    side's value is a parameter: a texture term the block leaves out enters
+    the table at 0, held (``ParameterTable._collect_texture``), so ``{}`` and a
+    fitted coefficient set are one model with different values.
     """
     if isinstance(a, Parameter) and isinstance(b, Parameter):
-        return None
+        return
     if isinstance(a, BaseModel) and isinstance(b, BaseModel) and type(a) is type(b):
         for name in type(a).model_fields:
-            if isinstance(a, Phase) and name == "name":
+            if isinstance(a, Phase) and name in _PHASE_FIELDS_FREE_PER_PATTERN:
                 continue
-            found = _model_difference(getattr(a, name), getattr(b, name),
-                                      f"{path}.{name}" if path else name)
-            if found:
-                return found
-        return None
+            yield from _model_differences(getattr(a, name), getattr(b, name),
+                                          f"{path}.{name}" if path else name)
+        return
     if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
         if len(a) != len(b):
-            return path, a, b
+            yield path, a, b
+            return
         for k, (x, y) in enumerate(zip(a, b, strict=True)):
-            found = _model_difference(x, y, f"{path}.{k}")
-            if found:
-                return found
-        return None
+            yield from _model_differences(x, y, f"{path}.{k}")
+        return
     if isinstance(a, dict) and isinstance(b, dict):
         for k in {**a, **b}:
             if k not in a or k not in b:
-                if isinstance(a.get(k, b.get(k)), Parameter):
-                    continue
-                return f"{path}.{k}", a.get(k), b.get(k)
-            found = _model_difference(a[k], b[k], f"{path}.{k}")
-            if found:
-                return found
-        return None
+                if not isinstance(a.get(k, b.get(k)), Parameter):
+                    yield f"{path}.{k}", a.get(k), b.get(k)
+                continue
+            yield from _model_differences(a[k], b[k], f"{path}.{k}")
+        return
     if type(a) is not type(b) or a != b:
-        return path, a, b
-    return None
+        yield path, a, b
+
+
+def _enclosed_paths(where: str, paths: set[str]) -> set[str]:
+    """The table paths under the nearest enclosing part of the model, from
+    ``where`` up, that holds any: what a field at ``where`` shapes."""
+    parts = where.split(".")
+    while parts:
+        prefix = ".".join(parts)
+        found = {q for q in paths if q == prefix or q.startswith(prefix + ".")}
+        if found:
+            return found
+        parts.pop()
+    return set()
 
 
 def _short(value: object, limit: int = 60) -> str:
@@ -401,15 +415,11 @@ def _starting_structures(structure: Structure | list[Structure],
 
     A list is the per-pattern form (WP-1325): a library's specimens start from
     their own cells, occupancies and widths.  It must describe **one model**,
-    so everything that is not a parameter's value must agree: the phase
-    count, space groups and atoms, named first, then every other field
-    (:func:`_model_difference`): a preferred-orientation axis, a texture's
-    order, whether an extinction or Stephens block is declared, the magnetic
-    symmetry, the restraints, a rigid body's record.  Two starts with different
-    texture axes sharing one ``r`` column would be two models under one
-    column.  The shared values are checked by
+    so the topology is checked here (phase count, space groups, atoms); every
+    other field, and the shared values, are checked by
     :meth:`MultiParameterTable._check_starts_agree` once the tables exist,
-    the table being the authority on which paths a model has.
+    the table being the authority on which paths a model has and the sharing
+    map on which of them are shared.
     """
     if isinstance(structure, Structure):
         return [structure] * n
@@ -439,15 +449,6 @@ def _starting_structures(structure: Structure | list[Structure],
                     f"phase {ip}'s atoms differ between starting structure 0 "
                     f"{a0} and structure {h} {a1}: per-pattern starting "
                     "structures must carry the same sites, in the same order")
-        found = _model_difference(ref, s)
-        if found:
-            where, v0, v = found
-            raise ValueError(
-                f"starting structure {h} differs from structure 0 at {where} "
-                f"({_short(v)} against {_short(v0)}), which is not a parameter: "
-                "per-pattern starting structures are one model with different "
-                "values, so everything but a parameter's value must agree. Give "
-                f"every structure the same {where}")
     return starts
 
 
@@ -569,7 +570,19 @@ class MultiParameterTable:
 
     # -- per-pattern starting values and parametric equations (WP-1325) -----
     def _check_starts_agree(self, starts: list[Structure]) -> None:
-        """Refuse per-pattern starts that disagree on a shared path.
+        """Refuse per-pattern starts that are not one model, or that disagree
+        on a shared path.
+
+        **A field that is not a parameter** (:func:`_model_differences`) may
+        differ only where nothing it shapes is shared.  What it shapes is read
+        off the nearest enclosing part of the model that holds table paths
+        (:func:`_enclosed_paths`): a preferred-orientation axis shapes
+        ``phases.i.preferred_orientation.r``; a magnetic symmetry or a
+        restraint, holding none of their own, shapes the phase.  Two axes under
+        one shared ``r`` are two models under one column, refused naming the
+        field.  Under ``SharingMap(per_histogram=["phases.*.preferred_orientation.*"])``
+        each pattern has its own ``r`` and the axes may differ, as GSAS-II
+        keeps texture per histogram (``docs/practice.md``).
 
         A shared path is one column, so it has one starting value: the column
         map writes each histogram's into it and keeps the last, which would
@@ -578,6 +591,18 @@ class MultiParameterTable:
         rescaled a shared size term into a histogram's own units, which is
         compared as the caller wrote it.
         """
+        for h, start in enumerate(starts[1:], start=1):
+            paths = {e.path for t in (self.tables[0], self.tables[h]) for e in t.entries}
+            for where, v0, v in _model_differences(starts[0], start):
+                shaped = _enclosed_paths(where, paths)
+                if any(self.sharing.is_shared(q) for q in shaped):
+                    raise ValueError(
+                        f"starting structure {h} differs from structure 0 at {where} "
+                        f"({_short(v)} against {_short(v0)}), which is not a "
+                        f"parameter and shapes the shared {sorted(shaped)[0]}: "
+                        "per-pattern starting structures are one model with "
+                        "different values. Give every structure the same "
+                        f"{where}, or make what it shapes per-histogram")
         scaled = set().union(*(set(s) for s in self.value_scales))
         shared0 = {e.path: e.value for e in self.tables[0].entries
                    if self.sharing.is_shared(e.path)}

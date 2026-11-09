@@ -1616,7 +1616,9 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.results.StageResult.n_constraint_truncations", "action", tier=1, ambiguity=1,
         evidence=("physics: a strain variance and a pole density are non-negative (Stephens 1999; "
                   "WP-1960 D4); the Gamma_G^2 floor's value is tiered on "
-                  "caglioti._MIN_GAMMA_G2's row")),
+                  "caglioti._MIN_GAMMA_G2's row; a tied parameter's own min/max are the "
+                  "caller's or the schema's declaration, which the write-back enforces "
+                  "exactly (WP-1325)")),
     Row("rietx.schemas.results.StageResult.n_degenerate_cell_probes", "action", tier=1, ambiguity=1,
         evidence=("arithmetic: a cell of zero or negative volume has no metric, so the residual is "
                   "undefined there and the step must be rejected (issue #283)")),
@@ -3173,6 +3175,11 @@ ROWS: tuple[Row, ...] = (
         grounds=("B2 option 2: the difference step of the test that keeps the moment sizes' "
                  "esds free of the stopping-point artefact (ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.optimize.least_squares.TIED_BOUND_MARGIN", "constant", tier=1, value=1e-09,
+        evidence=("arithmetic: it must exceed lm._POLISH_FEASIBLE (1e-10), the most an accepted "
+                  "step leaves a row, so the write-back's exact bound check never meets a held "
+                  "tied value past its bound; any factor over 1 serves, and the value it moves is "
+                  "1e-9 of the row's scale, far under any esd (WP-1325)")),
     Row("rietx.optimize.least_squares.XTOL", "constant", tier=3, value=1e-12,
         evidence=("a tolerance defaulted inside opt-in solver='trf' (default 'lm', "
                   "DEFAULT_SOLVER), four orders under SciPy's own 1e-8; WP-1109 tried 1e-8: "

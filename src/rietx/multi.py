@@ -3104,20 +3104,17 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
     unbounded coefficients.  A ``constant`` declaration's one coefficient
     carries the target's box itself (``MultiParameterTable._install_parametric``),
     and under the default LM driver a linear target's bounds are rows held
-    inside the step in every subset pattern
-    (``least_squares._joint_tied_bound_inequalities``).  Three cases still
-    leave a target outside: TRF, which takes no rows; an ``expression``
-    target, which is not affine (WP-1964); and a pattern the start already
-    put outside, whose row the builder drops.  So the answer is read: one
-    warning per declaration, naming every subset pattern whose dependent left
-    its declared range, at the value it took.  ``value`` is how many.
+    inside the step (``least_squares._joint_tied_bound_inequalities``).  So the
+    answer is read: one warning per declaration, naming every subset pattern
+    whose dependent left its declared range, at the value it took.  ``value``
+    is how many.
 
-    A value on its bound to within ``lm._ON_FACE`` of the bound (or of 1) is
-    on the face, the rows' own reading, never outside: the constrained step
-    lands a held target there up to rounding.
+    Measured 2026-11-09: no real fit reaches this.  The write-back after each
+    stage (``ParameterTable.apply_to_models``) refuses a target past its bound
+    with a ``ValueError`` first, under TRF, for an ``expression`` target, or
+    from a start already outside.  WP-1325's handover entry of that date asks
+    the maintainer which of the two should stay.
     """
-    from .optimize.lm import _ON_FACE
-
     out: list[Diagnostic] = []
     # an expression's target is as unbounded as a sum of terms (WP-1964)
     for r in (*mtable.parametric, *mtable.expressions):
@@ -3125,9 +3122,7 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
         for h in r.patterns:
             table = mtable.tables[h]
             e = table.entries[table._paths[r.target]]
-            below = e.value < e.lo - _ON_FACE * max(1.0, abs(e.lo))
-            above = e.value > e.hi + _ON_FACE * max(1.0, abs(e.hi))
-            if below or above or math.isnan(e.value):
+            if not e.lo <= e.value <= e.hi:
                 bad.append((h, e.value, e.lo, e.hi))
         if not bad:
             continue

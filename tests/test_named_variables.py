@@ -618,8 +618,9 @@ def test_a_tie_holds_its_source_where_the_dependents_ceiling_is(four_site_patter
                for d in result.diagnostics)
 
     result, rows = run(window=False)
-    assert rows[BISOS[1]] == pytest.approx(0.33, rel=1e-9)
-    assert rows[BISOS[1]] <= 0.33 * (1.0 + 1e-12)
+    # the row's face sits TIED_BOUND_MARGIN of its scale inside the ceiling
+    assert rows[BISOS[1]] == pytest.approx(0.33, rel=1e-8)
+    assert rows[BISOS[1]] <= 0.33
     assert any(d.code == "CONSTRAINT_ACTIVE"
                and f"{BISOS[1]} bounds" in d.message for d in result.diagnostics)
     with pytest.raises(ValueError, match=r"phases\.0\.atoms\.1\.biso=0\.33.*"
