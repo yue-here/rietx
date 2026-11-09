@@ -1,6 +1,6 @@
 # WP-2126 — the Parameters panel
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — checklist done; PR opening awaits review
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — checklist done; PR #1484 awaits review
 Depends on: WP-2123
 Priority: P2 2026-11-09 — piece 2 of the open gui-overhaul milestone; it builds inside WP-2123's shell
 
@@ -263,7 +263,7 @@ acceptance row 7).
   every `.name`, so this panel's classes are `atomtab` and `aname`. `npm --prefix gui exec` run
   from the repo root leaves a `node_modules/.vite` there.
 
-  Next: the maintainer reviews the sixteen settled calls above, the visual ones first (1, 5, 8,
+  PR #1484, stacked on #1476. Next: the maintainer reviews the sixteen settled calls above, the visual ones first (1, 5, 8,
   11, 12, 13). Then the formula routes and the "=" editor, as their own WP.
 - **2026-11-09** — filed by a ghostshift runner as piece 2 of the gui-overhaul milestone, on top
   of WP-2123's branch (PR #1476, not yet merged). Next: the checklist.
