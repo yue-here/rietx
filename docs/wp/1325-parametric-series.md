@@ -1797,6 +1797,13 @@ vocabulary nobody asked for.
 Next: the maintainer's merge. The WP can close with it; the next-term test and
 the replicate reading stay parked.
 
+Merge of main (#1504, #1506): WP-1914's microstructure block reads `FLOOR_HIT`, so a
+tied width held on its own floor now reads `at_zero` there, as a free width does.
+`floored_paths`' closure cannot reach such a row (`lor_size = lor_strain + d`, `d`
+unbounded), so without the tied finding it read a size off the held value.
+`test_tied_bound_rows.py` pins it (fails with the tied findings dropped from `floors`);
+two docstrings that said only a free column carries `FLOOR_HIT` were corrected.
+
 ### 2026-11-09 (tenth session) — a tied parameter's own bounds hold inside the step, and per-pattern starts must be one model
 
 A parametric equation can no longer walk its target past the target's own limits

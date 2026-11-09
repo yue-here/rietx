@@ -167,6 +167,54 @@ def test_lm_holds_a_two_source_dependent_on_its_floor():
     assert rows["phases.0.atoms.1.biso"].at_bound is True
 
 
+def test_a_tied_width_held_on_its_floor_reads_at_zero_in_the_microstructure_block():
+    """The microstructure block reads ``FLOOR_HIT`` (WP-1914), and a tied
+    width the LM step held on its floor carries one on its own path.  So it
+    reads ``at_zero``, as a free width on its floor does.
+
+    ``floored_paths``' closure cannot reach it: ``lor_size = lor_strain + d``
+    with ``d`` an unbounded variable is no follower of a floored source.
+    Without the finding the held value, a margin above zero, read as a size.
+    """
+    structure = make_lab6()
+    for name in ("a", "b", "c"):
+        getattr(structure.phases[0].cell, name).value = A0
+    structure.phases[0].scale.value = 5e-4
+    ins = rx.Instrument.debye_scherrer(wavelength=WAVELENGTH)
+    ins.profile.w.value = TRUE_W
+    ins.profile.x.value = 0.0
+    ins.background = BackgroundChebyshev(
+        coefficients=[Parameter(value=v) for v in (40.0, -6.0, 1.5)])
+    tt = np.arange(3.0, 24.0, 0.005)
+    blank = rx.PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    model = compile_model(structure, ins, blank, mode="rietveld")
+    y = model.evaluate(ParameterTable(structure, ins).decode(
+        ParameterTable(structure, ins).x0()))
+    y = np.random.default_rng(5).poisson(np.maximum(y, 1.0)).astype(float)
+    pattern = rx.PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
+
+    # the instrument's Lorentzian is wider than the data's, so the data want
+    # a negative sample width
+    ins.profile.x.value = 1e-2
+    ins.background = BackgroundChebyshev.with_terms(3)
+    structure.phases[0].lor_strain.value = 1e-3
+    ref = rx.Refinement(structure, ins)
+    ref.add_variable("d", 5e-3, vary=True)
+    ref.tie("phases.0.lor_size", {"phases.0.lor_strain": 1.0, "vars.d": 1.0})
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage("scale", ["phases.*.scale", "instrument.background.*"]),
+        rx.Stage("width", ["phases.0.lor_strain", "vars.d"])])
+    result = ref.fit(pattern, plan=plan)       # LM, the default driver
+    OUT.mkdir(exist_ok=True)
+    result.plot(OUT / "tied_bound_rows_width.png")
+    assert 0.0 <= ref.structure.phases[0].lor_size.value < 1e-8
+    floors = [d for d in result.diagnostics if d.code == "FLOOR_HIT"
+              and d.where == ["phases.0.lor_size"]]
+    assert len(floors) == 1 and "a tied value" in floors[0].message
+    term = result.microstructure[0].term("lor_size")
+    assert term.unavailable == "at_zero", term
+
+
 # -- a joint fit: a line equation whose free answer dips under the floor -----
 
 #: La's Biso along a five-pattern ramp: flat, then a jump, so the least-squares
