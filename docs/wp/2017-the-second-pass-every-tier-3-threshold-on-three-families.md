@@ -1,6 +1,6 @@
 # WP-2017 — The second pass: every surviving tier-3 threshold measured on three families
 
-Milestone: generality · Status: 🔄 2026-11-05 — the list and group A landed (PR #1428); seven rows closed by ruling; 54 hard-start fits and 18 groups open
+Milestone: generality · Status: 🔄 2026-11-09 — claimed by @mustachefeeling (groups H onward; group A landed in PR #1428)
 Track: The audits
 Depends on: 2002
 Priority: P2 2026-10-23 — 2002 closed with the width twin hold; the evidence every tier-3 approval in the single-fit audit was granted on the promise of, now with 2002's two owed domain tests
