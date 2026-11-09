@@ -979,7 +979,10 @@ class MicrostructureTerm(Base):
     rather than zero):
 
     * ``"at_zero"`` — the coefficient is at its off state, where a size is
-      infinite and a strain is a perfect lattice.  True, and not a number;
+      infinite and a strain is a perfect lattice.  True, and not a number.
+      Stored as zero, or on its floor of zero by the bound test
+      (``FLOOR_HIT``), so ``coefficient`` may be a tiny positive number where
+      ``solver="trf"`` stopped just above it (WP-1914);
     * ``"no_wavelength"`` — a size needs a λ and the source declares none
       (never reaches a strain, which has no λ in it);
     * ``"not_measured"`` — the coefficient carries no esd, so ``value`` stands

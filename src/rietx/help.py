@@ -3460,7 +3460,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "PATTERN_ROWS_DROPPED": HelpEntry(
         title="Some rows were not read as data",
         description=(
-            "The reader dropped rows from the file, for one of two reasons, and the "
+            "The reader dropped rows from the file, for one of three reasons, and the "
             "message says which. Every reader drops a point whose 2θ, count or error "
             "estimate is NaN or infinite, and names the dropped points by their 2θ. "
             "On a time-of-flight pattern, flight time takes the place of 2θ. "
@@ -3471,7 +3471,12 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "per line as the file's layout, and it skips numeric lines with a "
             "different count, naming them by line. A header table or a limits row "
             "usually causes this. If a skipped line was a real measurement, the file "
-            "mixes layouts. Re-export it with the same number of values on every row."
+            "mixes layouts. Re-export it with the same number of values on every row. "
+            "The same reader also names, by line, each line between the first and the "
+            "last data row that does not read as a row of numbers, such as '10.2 n/a'. "
+            "Text above the data is a header and text below it a footer, and both are "
+            "skipped without a report. A line inside the data is a lost point or a "
+            "note, and the reader cannot tell which."
         ),
     ),
     "PATTERN_SCAN_REVERSED": HelpEntry(
