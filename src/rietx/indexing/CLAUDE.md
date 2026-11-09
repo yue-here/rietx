@@ -52,7 +52,9 @@ since one Le Bail pass stalls (WP-2011) — stays **mandatory for the forward di
 cell's), nor `unmatched_observed` as a caveat (its level is the *specimen's* — 10-188
 across 21 correct candidates — comparative only, WP-1041). **The validation fit holds
 the cell**, freeing exactly one peak-position parameter from the candidate's own shift
-template. On real data with no measured shift, `high` is *unreachable* by design
+template, and **its Chebyshev background is sized from the data**, once per call: Layer 0
+reads each maximum of a background band as an observed line (WP-2113: 72 on a pure
+silicon under four terms, 0 sized). On real data with no measured shift, `high` is *unreachable* by design
 (`shift_allowance_assumed`); the fix is evidence, not a bigger constant (WP-1026).
 
 ## The scheduler, the presets and the stream (WP-1042)
