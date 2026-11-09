@@ -1409,3 +1409,22 @@ def test_every_rewrite_the_reader_makes_is_in_the_manuals_table():
     spelled = {cell.strip(" `") for line in rows
                for cell in line.split("|")[1].split(",")}
     assert spelled == set(GSAS2_EXPRESSION_REWRITES)
+
+
+def test_a_project_gsas2_wrote_reads_its_stored_equation_in():
+    """The GSAS-II tutorials' sequential peak fit, as GSAS-II wrote it: its one
+    equation, a straight line in the applied load fitted to a strain, reads in
+    whole.  Local data only (``python -m tests.local_data gsas2-tutorials/steel``)."""
+    from tests import local_data
+
+    where = local_data.dataset("gsas2-tutorials/steel")
+    if where is None:
+        pytest.skip("run `python -m tests.local_data gsas2-tutorials/steel` to read it")
+    model = read_gsas2_gpx(where / "steel.gpx")
+    (eq,) = model.sequential_equations
+    assert (eq.source, eq.text, eq.expression) == (
+        "Sequential peak fit results", "m*y+b", "m * y + b")
+    assert sorted(eq.variables) == ["b", "m"] and all(v.vary for v in eq.variables.values())
+    assert eq.bindings == {"y": "Applied load (MN)"}
+    assert eq.dependent_bindings == {"x": "pos0"} and eq.dependent_expression is not None
+    assert eq.refused is None and eq.rewrites == ()
