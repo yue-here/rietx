@@ -51,6 +51,34 @@ measuring, and drop a pair one of these changes dissolved, saying why.
 - [ ] The table in this file: pair, effect, size in esds, verdict (independent, ordered,
       or a clash). A clash goes to its owner WP's `### Inherited` or to the maintainer.
 
+## The table
+
+Rows are added as pairs are re-derived and measured. "Read" means the file:line was re-read
+against `origin/main` at 4c55b9011 (2026-11-09); nothing below is measured yet.
+
+### Re-derivation, the C3 family (2026-11-09, read only)
+
+The post-solve clamp to ±15 % is gone. `refine.reset_cell_runaway` (refine.py:1805, called at
+:5258 and :5502, read) now puts the **whole** free cell of a phase that left
+`CELL_SAFETY_FRACTION` back at the stage's start values, and the caller holds it and solves once
+more (WP-2002 B8, ruled 2026-10-19). Its docstring states it writes committed values only and
+never a bound the solver sees.
+
+| # | Status | Reason (file:line, read) |
+|---|---|---|
+| C3 | **live, to measure** | Still a triple, with the clamp replaced by the reset: the support window (`least_squares._freeze_cell_windows`, least_squares.py:2944, called :3196; `vector.cell_window`, vector.py:606, applied :4225), the absent-phase hold, and the reset (refine.py:1805). Dataset as listed: the 68-pattern in-situ series and #481's ramp |
+| C3a | **live, unchanged** | The window still binds free entries only (vector.py:4218-4226 loops `self._free_idx`), so a held cell is never windowed; the tie case stays the only one where both act |
+| C3b | **dissolved** | The clamp wrote the window edge and the collapse restore the stage start. The reset now writes the stage start too, and refine.py:5360-5365 makes the two holds disjoint (a path both reach is the collapse's), so both actions write one value and one record holds each path |
+| C3c | **dissolved** | The clamp is gone. The reset acts after the solve on committed values and restores the cell the stage's own residual evaluated, whose volume is positive (refine.py:1821-1826), so the degenerate-cell guard, which acts during the solve, never sees a reset value |
+| C3d | **dissolved** | The clamp moved θ after the solve, under a bound test reading the first solve. Now the reset's paths are held (`set_vary(reset_hold, False)`, refine.py:5406) before the second solve (:5469), whose outcome replaces the first (:5523), and `check_guards` (called :5563) takes `free = table.free_paths` (staged.py:2283) into `bound_findings` (:2355): a reset cell is no longer a free column when the bound test runs |
+
+### Re-derivation, C1 and C2 (2026-11-09, read only)
+
+| # | Status | Reason (file:line, read) |
+|---|---|---|
+| C1 | **live, to measure** | `profile_fraction` still pins one width per branch (`trial.set_vary([axis], False)`, fraction_profile.py:216) and refits through `run_stage` (:224), so each refit meets the stage-start hold and the collapse restore (refine.py:5372-5399). The module's own account of the clash (fraction_profile.py:14-23) is still dated to the pre-WP-1523 test. Dataset: `tests/test_qpa_multimodal.py`'s two-basin fixture |
+| C2 | **live, narrowed, to measure** | Since #1075 each probe starts from the fit's own free set (`fresh()`, parameter_interval.py:269-279: the pinned path and every path the fit held), so a probe can no longer free a cell the fit held. Its comment says a refit may still hold *more*, since a lower pinned scale can hide a phase the fit saw: that half of the pair is what to measure. Dataset: a weak phase in a weighed mixture, as listed |
+
 ## Acceptance
 
 ```sh
@@ -67,4 +95,6 @@ Every pair in `2002-batch/clashes.md` has a measured row or a stated reason it w
 
 ## Handover log
 
+- **2026-11-09** — Ghostshift runner, one short session cut to about 25 minutes by a hard stop. Draft PR #PRNUM. Landed: C1, C2 and the C3 family re-derived against 4c55b9011 by reading, in § The table: C1, C2, C3 and C3a live, C3b, C3c and C3d dissolved by the B8 reset (reasons at file:line). Nothing measured, no fit run, no clash found, so nothing routed to an owner WP or the maintainer and no issue filed. `### Inherited` not pruned (both entries still describe the tree as far as read). Next: re-derive C4-C38 the same way; choose the dataset per pair before running; then measure C1 and C3 first, as the WP says. Tests: the docs checks only (counts in the PR body); no code changed.
 - **2026-10-20** — Filed by WP-2002's session at the maintainer's request ("split"): the clash table moves here so that 2002 closes on its owed tests and B14's lifts. Nothing measured yet.
+
