@@ -114,7 +114,16 @@ either's code; nothing is ported.
 - [ ] Point 1 (if in scope): the term in `model/profiles/`, its analytic derivatives, a
       `test_cross_backend.py` config, a Layer-1 column, `help.py` entries for its four
       parameters, and the Theory tab's equation.
-- [ ] Tests + obs/calc/diff PNGs of the lowest lines at each treatment to `tests/output/`.
+- [x] Tests + obs/calc/diff PNGs of the lowest lines at each treatment to `tests/output/`.
+      `tests/test_low_angle_asymmetry.py` (fast, synthetic CrSBr k = (0 0 ½), the magnetic
+      (0 0 1) at 8.88°, first nuclear line 17.80°): truth S/L = H/L = 0.03 fitted at 0 reads
+      −30.7(7) mdeg; the null arm (no asymmetry anywhere) +0.4(6), still firing because the
+      geometry fires it; silent from 12° up and on the paramagnetic pattern. PNGs
+      `low_angle_asymmetry_{positive,null}.png` (6-20°). Acceptance on the real case beside its
+      fixture (`test_ba2fesbse5_the_report_names_the_low_angle_shift_the_protocol_holds`,
+      slow): the 1.5 K entry names three magnetic-only lines below 21.67° and a shift in
+      (−60, −35) mdeg; silent at 100-200 K. Treatments of point 1 have no PNG: point 1 is out
+      of this PR.
 - [ ] Skill: point 3's recipe as a `references/` row keyed by the diagnostic's code, tagged
       `(Measured: Ba₂FeSbSe₅, LaMnO₃)`.
 
