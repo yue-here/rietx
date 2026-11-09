@@ -219,8 +219,8 @@ pop-up or a stepped peak window, and quotes the drag-to-redraw latency as a rang
   answer, so the judge was not dispatched.
 
   Next: the maintainer reviews the twelve calls in § Calls settled by Claude; a reversal is a
-  `lib/interactive.ts` or `lib/peakwin.ts` constant. The PR stacks on #1476 and #1479 and merges
-  after both. The Parameters panel's pending edits in the preview wait for WP-2126 to land.
+  `lib/interactive.ts` or `lib/peakwin.ts` constant. The PR, #1487, stacks on #1476 and #1479 and
+  merges after both. The Parameters panel's pending edits in the preview wait for WP-2126 to land.
 
 - **2026-11-09** — filed by a ghostshift runner as the client half of piece 4. No open WP
   owns it: WP-2125 built the route and named this as its next piece, and the milestone record
