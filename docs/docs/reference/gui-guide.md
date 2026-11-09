@@ -217,7 +217,7 @@ the parameter. Below the editor, the value's limits can be set, and
 `Restrain` adds a restraint toward a target with a σ. Press the word to tick
 its box.
 
-To edit several values at once, press them with ⌘ (Ctrl elsewhere) held, or
+To edit several values at once, press them with `⌘` held (`Ctrl` off a Mac), or
 press one and then another with Shift held to take every value between them in
 the same column. Press any of the picked values and type: the value goes to all
 of them.
