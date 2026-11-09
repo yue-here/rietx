@@ -1,6 +1,6 @@
 # WP-1325 — parametric series: a parameter as a function of each pattern's coordinates
 
-Milestone: parametric · Status: 🔄 2026-11-09 — claimed by a ghostshift runner; two tasks remain, in-step bounds and start agreement
+Milestone: parametric · Status: 🔄 2026-11-09 — both remaining tasks landed (PR #1497); two questions wait on the maintainer: PARAMETRIC_OUT_OF_RANGE never fires, and how a held tied bound is reported
 Depends on: — (1119 soft: a named coefficient is a named variable)
 Priority: P2 2026-10-14 — was P3: the maintainer took the combinatorial-library case (the first named outside user) and the scalable solver it needs; 1962 waits on that solver
 
@@ -1709,6 +1709,156 @@ Their numbers are as reported and were not re-measured here.
   Schur identity), issue #212.
 
 ## Handover log
+
+### 2026-11-09 (tenth session) — a tied parameter's own bounds hold inside the step, and per-pattern starts must be one model
+
+A parametric equation can no longer walk its target past the target's own limits
+under the default driver. Before, a line through Biso(T) that wanted a negative Biso at
+one end converged and then failed with a `ValueError` when the answer was written back
+to the model, so no result came out at all. Now the target sits on its floor in that
+pattern, the fit converges, and the constraint finding names the equation. The same
+held for a user tie with several sources (occ_C = 1 − occ_A − occ_B), whose limits the
+solver had only approximated. A list of per-pattern starting structures must now agree
+in every field that is not a parameter's value wherever that field shapes a shared
+column, so two texture axes can no longer hide under one shared `r`. One finding is for
+the maintainer: the out-of-range warning this WP built has never fired in a real fit.
+PR #1497.
+
+**Done.**
+
+- `optimize.least_squares.tied_bound_inequalities`: one LM row per finite side of
+  every tied entry (not a free column, not a derived row) whose C row reaches a free
+  column. A row the box already implies is dropped, by interval arithmetic over the
+  solver's box with `tie_window` applied, so a one-source tie and a `constant`
+  equation add none. A row the start violates is dropped, the other builders' rule.
+  Each face sits `TIED_BOUND_MARGIN` (1e-9 of the row's scale at the start) inside the
+  bound, because the write-back checks the bounds exactly and the driver may leave a
+  row by its rounding. Wired into the single fit (`_drive_single`) and, per histogram,
+  into the joint one (`_joint_tied_bound_inequalities`), which gathers an equation's
+  rows from all its patterns into one block labelled
+  `parametric equation '<name>' (<target> bounds)` and keeps a shared tied entry's
+  block once.
+- The joint solve now returns `n_constraint_truncations` and `truncated_by`, so
+  `CONSTRAINT_ACTIVE` reaches a joint fit. It had been silent there for the width rows
+  too, since WP-2002 built them. The refit path sums `truncated_by` as the single fit
+  does.
+- `_constraint_diagnostics` reads a label past a `hist.N ` prefix, and its Γ_G²
+  sentence now matches `instrument.profile (` only. Before, it also fired on the Γ_L
+  rows' `instrument.profile Lorentzian` label, telling the reader the data asked for
+  no Gaussian width when the row that bound was the Lorentzian one.
+- `MultiParameterTable._check_starts_agree` walks the starts field by field
+  (`params.multi._model_differences`), skipping a `Parameter` whole, a phase's `name`
+  and its `particle_radius_um` (which never enters the fit). A difference is refused
+  when the nearest enclosing part of the model holding table paths
+  (`_enclosed_paths`) holds a shared one; the message names the field, both values and
+  the shared path. So two texture axes under a shared `r` are refused, and under a
+  per-histogram texture they are accepted, as GSAS-II keeps texture per histogram.
+  Restraints and the magnetic symmetry hold no paths, so they are read off the phase
+  and refused under default sharing.
+- Manual (`reference/parametric.md`: the in-step hold, and the refusal row), the
+  skill's `CONSTRAINT_ACTIVE` row (no longer "never a joint fit"), its `help.py` entry
+  and `PARAMETRIC_OUT_OF_RANGE`'s, the `n_constraint_truncations` docstring and audit
+  evidence, and the new `TIED_BOUND_MARGIN` audit row follow.
+
+**Measured** (macOS arm64, the worktree's own `[dev]` venv).
+
+- Rows a default table builds: 0, over 32 tables from the repo's 16 structure CIFs,
+  isotropic and anisotropic, every parameter free. So an ordinary fit is handed exactly
+  the rows it had before.
+- The five-pattern Biso ramp in `tests/test_tied_bound_rows.py` (truth 0.05, 0.05,
+  0.05, 0.05, 1.2 Å², a line equation, Biso ≥ 0): on `origin/main` the fit raised
+  `writing phases.0.atoms.0.biso=-0.143732 back to the model breaks its own bounds` on
+  both drivers. On this branch, LM converges in about 5 s with Biso 0.0, 0.159, 0.318,
+  0.476, 0.635, Rwp 0.058, `CONSTRAINT_ACTIVE` on 3 held steps, and
+  `PARAMETRIC_FORM_REJECTED` (9283.7 × χ²_red against a cut of 7.8), rightly, since the
+  truth is not a line. TRF still raises.
+- Each new fit test was failed on purpose once, by making the builder return no rows:
+  both raised the write-back error. The start-agreement refusals failed with the check
+  disabled.
+- Fast selection: 2 failed, 14 351 passed, 417 skipped, 32 xfailed on 9a7c6880b; one failure was the audit-delta reader meeting `_audit.py` edited mid-run, the other the cell-guard test's fake driver lacking `truncated_by` (fixed in 747fa9af5), and both files then passed, 30 of 30. Full suite: 1 failed, 15 297 passed, 428 skipped, 51 xfailed on 747fa9af5 (serialised). The failure, `test_pair_diagnostic_class.py::test_the_two_site_winner_finds_each_site_its_own_moment`, lands on the swapped minimum (moment 0.6995 against 3.5 μ_B) identically on the merge-base 00cd6db80 run from a snapshot, so it is not this branch's.
+- `python -m tests.reader_output`: exit 0, the standard fit's printed text unchanged.
+
+**Code review** (`/code-review high --fix`, eight findings). Fixed by the reviewer:
+texture terms compared by key (a start with no coefficients against one with fitted
+ones is one model); a shared tied entry's joint block kept once; the help and
+builder-count texts. Fixed here after it: a held value one rounding past its bound
+would meet the strict write-back (the margin above); the out-of-range tolerance this
+branch had added was unreachable and is reverted; the rigid-body and restraint
+refusals now follow the sharing map. Nothing declined.
+
+**Generality** (the judge's second reading, unedited in substance; item 3, the label
+matching, held in the first reading and did not change):
+
+- Item 1, the in-step rows: **holds.** Record gap left to the maintainer:
+  `CONSTRAINT_ACTIVE` is `info` with no `where`, where a free parameter on the same
+  bound gets a `warning`, and `at_bound` reads unmeasured for a held tied value. Case
+  against, narrow: TOPAS puts no limits on a constrained quantity, so its parametric
+  law returns its free line.
+- Item 1a, `TIED_BOUND_MARGIN`: **weak.** The margin is measured once against the
+  row's starting scale, while `_POLISH_FEASIBLE` is measured per step, so the
+  guarantee holds only while the scale stays under ten times its start. A stage that
+  starts from the previous stage's held value keeps the face on the bound. The factor
+  10 is free and `_POLISH_FEASIBLE` is tier 3, so tier 1 needs a test over the inputs
+  the code claims. Would change it: a test where the row's scale grows tenfold, and a
+  later stage starting from a held value, both passing the write-back.
+  Author: the evidence now says this. The second case is exercised once, by the later
+  stages of `mccusker_structural` in the joint test, which start from the held value
+  and pass the write-back. A miss raises the same error every such fit raised before
+  this branch, so it is never a new failure. Tier 3 needs the maintainer's approval,
+  so the retiering is left to them.
+- Item 2, the out-of-range reader: **holds** once reverted. A code no live path can
+  fire is a declared name with no writer; the maintainer's ruling settles it.
+- Item 4, the start check: **holds.** Conservative side left: restraints and magnetic
+  symmetry are read against the whole phase; a per-histogram rotation with a shared
+  origin is still refused; no test covers rigid bodies.
+
+**Settled by Claude.**
+
+- One rule for the starts, keyed on the sharing map, rather than the WP's list of
+  three fields. Grounds: the docstring's own "one model with different values", the
+  judge's reading of `SharingMap`'s documented per-histogram texture axis, and
+  GSAS-II's per-histogram texture (`docs/practice.md`). The alternative was a named
+  list of fields that must agree.
+- `name` and `particle_radius_um` may differ: a CIF names the phase after its data
+  block, and the radius never enters the fit (its schema docstring). The alternative
+  was refusing them.
+- The `direction="both"` chain reading is not built, under § Direction and DESIGN.md
+  Rule 5: `SeriesResult.direction_gaps` already says where the walks part, and the
+  caller chooses the starts.
+- The rows cover every tied entry with a finite bound, single fits included, not only
+  parametric targets: the user's multi-source tie is the same defect.
+
+**Not generalised, on purpose.** An `"expression"` target is a derived row, nonlinear
+in its variables, so a frozen linear row cannot hold it; its out-of-range answer still
+raises at write-back.
+
+**For the maintainer** (two questions; nothing here waits on them).
+
+1. `PARAMETRIC_OUT_OF_RANGE` cannot fire in a real fit. Every target is a model
+   parameter, and `apply_to_models` refuses a value past its bounds after each stage,
+   so the fit raises before the result that would carry the warning exists. The WP's
+   "TRF keeps the post-fit warning" was never true: TRF raises, as LM did before
+   today. Should a TRF or expression fit whose target leaves its range keep raising,
+   with the warning removed as dead code, or finish and carry the warning? This
+   changes what a fit returns, so it is yours (2026-11-01 ruling). 2101 holds the
+   manual half.
+2. A tied value held on its own bound is reported only by `CONSTRAINT_ACTIVE`, at
+   `info` and with no `where`; a free parameter on its bound gets `BOUND_HIT` or
+   `FLOOR_HIT` at `warning`. Raise it to the same footing? Also a reader-output change.
+
+**Forward.** 2101 § Inherited: the manual's range-warning section describes a warning
+that never fires.
+
+Mike's #1492 (restraints in a joint fit) edits `least_squares.py`, `multi.py` and this
+WP file. No hunk overlaps: this branch's joint-driver edits are the `inequalities=`
+line and the outcome's two counts, past #1492's `_multi_closures` hunk, and its lines
+here are in the Tasks and the log. #1492 refuses histograms whose compiled restraint
+paths differ; the start check here refuses starts whose restraints differ in any
+field, targets and σ included, so the two agree.
+
+Next: the maintainer's two answers. Both remaining tasks are done, so the WP can close
+once they land or are moved to 2101; the next-term test and the replicate reading stay
+parked.
 
 ### 2026-11-04 (ninth session) — the parametric milestone takes this WP
 
