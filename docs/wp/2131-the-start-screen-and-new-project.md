@@ -149,6 +149,12 @@ npm --prefix gui test && npm --prefix gui run check
 
 ## Handover log
 
+- **2026-11-09, ruling** — Yue Wu ruled on the app-wide heading register, by choosing option A.
+  Sentence-case headings apply to the whole app. One `app.css` rule carries them at this WP's
+  register: 13 px, weight 600, full-colour text. The app's other `h2`/`h3` rules and the Model
+  panel's two table-header rules follow it. A follow-up WP does that work; this one implements
+  nothing more. The question below is ruled.
+
 - **2026-11-09, second round** — a fix round on PR #1498, by a ghostshift runner. Four items.
 
   *Done.* (1) The start screen's and the dialog's headings are sentence case at the
@@ -161,10 +167,11 @@ npm --prefix gui test && npm --prefix gui run check
   (3) A test covers the list form's species-check path: the refusal names `phases.1`, the atom's
   place in the project. (4) The layout flake is recorded and the test left unchanged, below.
 
-  *For Yue.* Every other panel still draws `h2`/`h3` in `app.css`'s uppercase register, so the
-  app-wide heading register conflicts with the 2026-11-06 ruling. This round changed only the
-  two screens it owns. Whether the ruling covers the whole app is a follow-up for Yue; the
-  workshop's `visual-language.md` asks the same as open question 12.
+  *For Yue* (ruled 2026-11-09, option A: see the ruling entry above). Every other panel still
+  draws `h2`/`h3` in `app.css`'s uppercase register, so the app-wide heading register conflicts
+  with the 2026-11-06 ruling. This round changed only the two screens it owns. Whether the
+  ruling covers the whole app was a follow-up for Yue; the workshop's `visual-language.md` asks
+  the same as open question 12.
 
   *The flake, recorded.* `test_a_pending_edit_moves_nothing_in_the_action_bar[stacked]` failed
   once in the first round under `-n 4`, and passed alone. Its message was `'pending' in ''`: the
@@ -184,8 +191,8 @@ npm --prefix gui test && npm --prefix gui run check
   220 passed serially. `npm run build` leaves the committed dist unchanged; ruff clean;
   `tests.reader_output` exit 0, unchanged against the merge-base.
 
-  Next: Yue reviews the settled calls below, the visual ones first, and rules on the app-wide
-  heading register.
+  Next: Yue reviews the settled calls below, the visual ones first. The app-wide heading
+  register is ruled (2026-11-09, option A), and a follow-up WP carries it.
 
 - **2026-11-09** — all seven tasks landed, by a ghostshift runner; PR #1498. With no project open, `rietx
   gui` now shows the round-9 start screen: New project…, Open…, the recent list, the examples, and
@@ -246,8 +253,10 @@ npm --prefix gui test && npm --prefix gui run check
       the second round: it contradicted the maintainer's ruling of 2026-11-06 ("Sentence-case
       headings"), and a written ruling outranks a settled call. The two screens' headings are
       now sentence case, at the prototype's size. Every other panel still wears `app.css`'s
-      uppercase `h2`/`h3`, so the app-wide register conflicts with the ruling; that is a
-      follow-up for Yue (`visual-language.md` open question 12 in the workshop asks the same).
+      uppercase `h2`/`h3`, so the app-wide register conflicts with the ruling. Yue ruled it on
+      2026-11-09 (option A): sentence case app-wide, one `app.css` rule at this WP's register,
+      carried by a follow-up WP (`visual-language.md` open question 12 in the workshop asked the
+      same).
   16. (Second round.) An unnamed typed cell in a create of several phases is named `phase_N`,
       N being its place in the project, as the CIF reader names an unnamed block; a lone typed
       cell stays `phase`. The alternative is a name field on the typed-cell form.
