@@ -558,6 +558,7 @@ def draw(stem: str, *, peaks, data=None, result=None, instrument=None,
             "predicted_but_absent": int(best.lebail.predicted_but_absent),
             "unmatched_observed": int(best.lebail.unmatched_observed),
             "status": best.lebail.status,
+            "background_terms": best.lebail.background_terms,
         }
 
     if pair is not None:
