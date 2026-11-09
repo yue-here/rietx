@@ -122,10 +122,18 @@
   const edited = $derived(planDiffers(saved, stages) || guard !== savedGuard);
   $effect(() => onpending(edited));
 
+  /** The stored stages `resolved` was computed for.  A save moves `saved`
+   *  before its resolve answers, and the old facts must not read as the new
+   *  plan's in between (or for good, if that resolve fails). */
+  let resolvedFor = $state<Stage[]>([]);
+
   /** How many leading stages still carry the server's resolved facts. */
   const prefix = $derived(
-    resolved?.stages?.length === saved.length ? resolvedPrefix(saved, stages) : 0,
+    resolved?.stages?.length === resolvedFor.length ? resolvedPrefix(resolvedFor, stages) : 0,
   );
+  /** Whether the whole-plan facts (closing Rwp, set-aside) describe the plan
+   *  on screen. */
+  const current = $derived(!edited && !planDiffers(resolvedFor, saved));
   // Both depend on the whole plan, so an edit takes their numbers away and
   // leaves their rows: an edit that removed a row would move what is below
   // it, and no edit may move the layout (ruled 2026-11-07).  The closing
@@ -168,14 +176,21 @@
     guard = state.guard;
     typing = "";
     undoTick += 1;
+    clampSelected();
   }
 
+  /** Keep the selected stage on the list after its length changed. */
+  function clampSelected() {
+    selected = Math.min(selected, Math.max(0, stages.length - 1));
+  }
+
+  // the controls are disabled during a run, and ⌘Z must not edit around them
   export function undo() {
-    restore(history.undo(snapshot()));
+    if (!busy) restore(history.undo(snapshot()));
   }
 
   export function redo() {
-    restore(history.redo(snapshot()));
+    if (!busy) restore(history.redo(snapshot()));
   }
 
   export function canUndo(): boolean {
@@ -209,17 +224,27 @@
     if (!keep) {
       stages = structuredClone(plan.plan.stages);
       guard = plan.plan.correlation_guard;
+      clampSelected();
     }
   }
 
+  /** Bumped by every load and every save, so an answer that a later request
+   *  has overtaken is dropped.  The bar's Apply moves the head (a load) and
+   *  then saves the plan: a GET sent before that PUT and answered after it
+   *  would otherwise put the old plan back on screen as the stored one. */
+  let generation = 0;
+
   async function load() {
+    const mine = ++generation;
     try {
       const [plan, registry, resolve] = await Promise.all([
         api.plan(), api.plans(), api.planResolve(),
       ]);
-      adopt(plan);
       presets = registry.plans;
+      if (mine !== generation) return;
+      adopt(plan);
       resolved = resolve;
+      resolvedFor = structuredClone(plan.plan.stages);
       error = "";
     } catch (exc) {
       if (!(exc instanceof ApiError && exc.empty)) error = (exc as Error).message;
@@ -234,29 +259,45 @@
 
   /** Store a plan; true when the server took it. */
   async function put(body: Record<string, unknown>): Promise<boolean> {
+    ++generation;
+    let payload: any;
     try {
-      const payload = await api.putPlan(body);
-      saved = payload.plan.stages;
-      savedGuard = payload.plan.correlation_guard;
-      stages = structuredClone(payload.plan.stages);
-      guard = payload.plan.correlation_guard;
-      extra = otherFields(payload.plan);
-      preset = payload.preset;
-      error = "";
-      resolved = await api.planResolve();
-      return true;
+      payload = await api.putPlan(body);
     } catch (exc) {
       error = exc instanceof ApiError && exc.busy
         ? "a run is in flight — the plan is read-only until it ends"
         : (exc as Error).message;
       return false;
     }
+    saved = payload.plan.stages;
+    savedGuard = payload.plan.correlation_guard;
+    stages = structuredClone(payload.plan.stages);
+    guard = payload.plan.correlation_guard;
+    extra = otherFields(payload.plan);
+    preset = payload.preset;
+    error = "";
+    clampSelected();
+    // the plan is stored whatever the resolve answers, so a failure here is
+    // reported and does not refuse the bar's Apply
+    try {
+      resolved = await api.planResolve();
+      resolvedFor = structuredClone(payload.plan.stages);
+    } catch (exc) {
+      error = (exc as Error).message;
+    }
+    return true;
   }
 
   async function pick(name: string) {
-    remember();
+    // recorded only once the server took the pick, so a refused one leaves
+    // no empty undo step and keeps the redo side
+    const before = snapshot();
     say(`plan = resolve_plan(${JSON.stringify(name)}, ${JSON.stringify(mode)})`);
-    await put({ preset: name });
+    if (await put({ preset: name })) {
+      history.record(before);
+      typing = "";
+      undoTick += 1;
+    }
   }
 
   /** The action bar's Apply: store the plan on screen.  True when there was
@@ -271,10 +312,11 @@
   export function revert() {
     if (!edited) return;
     remember();
-    stages = structuredClone($state.snapshot(saved) as Stage[]);
+    stages = $state.snapshot(saved) as Stage[];
     guard = savedGuard;
     adding = {};
     error = "";
+    clampSelected();
   }
 
   /* ---- edits ----------------------------------------------------------- */
@@ -282,8 +324,14 @@
   function move(from: number, to: number) {
     if (from === to || to < 0 || to >= stages.length) return;
     remember();
+    // the selection and each half-typed glob follow their stage, which every
+    // stage between `from` and `to` changes the index of
+    const order = moveStage(stages.map((_, i) => i), from, to);
     stages = moveStage(stages, from, to);
-    if (selected === from) selected = to;
+    selected = Math.max(0, order.indexOf(selected));
+    adding = Object.fromEntries(
+      order.map((old, k) => [k, adding[old] ?? ""] as const).filter(([, text]) => text),
+    );
   }
 
   function removeStage(index: number) {
@@ -563,7 +611,7 @@
         <div class="frees indent muted"
           title="every stage's globs once more, with windows that drop {pct(closing.window_area_tol)} of each peak">
           <span class="lab">Frees</span> everything above
-          {#if !edited && closing.rwp !== null}· Rwp {pct(closing.rwp)}{/if}
+          {#if current && closing.rwp !== null}· Rwp {pct(closing.rwp)}{/if}
         </div>
       </li>
     {/if}
@@ -572,10 +620,10 @@
   {#if setAside.length}
     <details class="aside">
       <summary title="The staged plan starts from a table where nothing is free, so it holds these. Run this stage keeps them free, because a single stage continues from where the model stands.">
-        {#if edited}parameters you freed by hand: not applied{:else}{setAside.length}
+        {#if !current}parameters you freed by hand: not applied{:else}{setAside.length}
           parameter{setAside.length === 1 ? "" : "s"} you freed by hand, held by the plan{/if}
       </summary>
-      {#if !edited}
+      {#if current}
         <ul class="paths mono">
           {#each setAside as path (path)}<li>{path}</li>{/each}
         </ul>

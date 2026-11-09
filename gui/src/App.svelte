@@ -110,6 +110,10 @@
    *  one pending edit and its Apply stores (WP-2127) */
   let planPending = $state(false);
   const pendingTotal = $derived(pendingTouched + (planPending ? 1 : 0));
+  /** Bumped by every project opened, so the Plan tab starts over: its unsaved
+   *  stages and its undo stack belong to the project they were made in, and
+   *  `{#if project}` stays true across an open. */
+  let opens = $state(0);
   let simple = $state(true);
   /** The first-run checklist's own two pieces of state (WP-1017): whether it
    *  has been dismissed for this project, and whether the Report tab has been
@@ -370,6 +374,7 @@
    */
   async function opened(doc: any) {
     project = doc;
+    opens += 1;
     readUi();
     openError = "";
     // a different project, so the checklist's session-local step starts over
@@ -400,6 +405,7 @@
   async function open(path: string): Promise<string> {
     try {
       project = await api.openProject(path);
+      opens += 1;
       readUi();
       openError = "";
       reportSeen = false;   // a different project — see `opened` (WP-1017)
@@ -788,7 +794,8 @@
       echo: "ref.fit(data, plan=…)", key: "r",
       disabled: busy || !project || noPhases || !!pendingInvalid, run: () => refine("plan") },
     { id: "stage", label: `Run one stage${planPanel?.selectedName() ? ` — ${planPanel.selectedName()}` : ""}`,
-      echo: "ref.run_stage(stage)", key: ".", disabled: busy || !project || noPhases,
+      echo: "ref.run_stage(stage)", key: ".",
+      disabled: busy || !project || noPhases || !!pendingInvalid,
       run: () => { tab = "plan"; planPanel?.runStage(); } },
     { id: "plan-undo", label: "Undo the last plan edit", echo: "# the Plan tab's own undo",
       disabled: !project || !planPanel?.canUndo(),
@@ -1339,9 +1346,11 @@
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
         </div>
         <div class="panel" class:hidden={tab !== "plan"}>
-          <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
-            noPhasesReason={noPhases ? NO_PHASES_REASON : null}
-            {say} onrun={runPlanStage} onpending={(edited) => (planPending = edited)} />
+          {#key opens}
+            <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
+              noPhasesReason={noPhases ? NO_PHASES_REASON : null}
+              {say} onrun={runPlanStage} onpending={(edited) => (planPending = edited)} />
+          {/key}
         </div>
         <div class="panel" class:hidden={!textTab}>
           <Text {head} {busy} active={textTab} dark={theme === "dark"} {say} onmoved={moved} />
