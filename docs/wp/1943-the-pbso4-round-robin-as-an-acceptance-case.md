@@ -109,18 +109,30 @@ many ways, not from replicate measurements (his footnote, p. 606).
       8 (σ_ext, σ_int, ℜ) and 9 from page images of pp. 601 and 604;
       `tests/test_round_robin_pbso4_tables.py` checks it against the paper's
       own relations, each with a planted error.
-- [ ] `tests/test_acceptance_pbso4_round_robin.py`, slow-marked: neutron,
+- [x] `tests/test_acceptance_pbso4_round_robin.py`, slow-marked: neutron,
       X-ray and joint fits from the published single-crystal model. Assert
       every Table 7 value inside the participants' range, |Δ| under a bar
       stated in spreads and justified in the docstring, and λ_N inside a
       stated band. Declare every protocol setting explicitly, dispersion
-      included (`tests/test_validation_matrix.py`).
-- [ ] A row in `tests/test_compare_ui.py`'s standards if the case becomes a
-      `rietx compare` standard; otherwise say why not.
-- [ ] `docs/VALIDATION.md`: the case as the inter-laboratory reference.
-- [ ] Tests + obs/calc/diff PNGs to `tests/output/`.
-- [ ] Skill: none expected. If the agent run in the issue needed a passage
-      the skill lacked, that is WP-1532's.
+      included (`tests/test_validation_matrix.py`). *Done 2026-11-09:* bar
+      3 spreads (≈ 5 % chance a participant-like fit trips it on one of 19);
+      λ_N band 1.91083–1.91290 Å, Hill's own X/N cell ratio over the neutron
+      range; plus an FCJ arm for Hill's p. 605 cell finding.
+- [x] A row in `tests/test_compare_ui.py`'s standards if the case becomes a
+      `rietx compare` standard; otherwise say why not. *Not a standard
+      (2026-11-09):* `rietx compare` localises where a *correction* acts,
+      and this WP lands none; the case's reference is a parameter envelope,
+      which the compare panel does not draw. Whether to add it anyway is
+      left to the maintainer (handover).
+- [x] `docs/VALIDATION.md`: the case as the inter-laboratory reference.
+      *Done 2026-11-09:* dataset `pbso4_rr`, four claims and a suite intro in
+      `tests/validation_matrix.py`, regenerated.
+- [x] Tests + obs/calc/diff PNGs to `tests/output/`. *Done 2026-11-09:*
+      `pbso4_round_robin_{neutron,xray,neutron_axial}.png`.
+- [x] Skill: none expected. If the agent run in the issue needed a passage
+      the skill lacked, that is WP-1532's. *2026-11-09:* none added; the one
+      skill edit is the `PATTERN_ZERO_WEIGHT_EXCLUDED` row naming the new
+      reader.
 
 ## Acceptance
 
