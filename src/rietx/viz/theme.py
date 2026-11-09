@@ -87,8 +87,6 @@ TOKENS: dict[str, dict[str, str]] = {
         "--bg": "#fbfbfa",
         "--panel": "#ffffff",
         "--line": "#dcdcd6",
-        "--sunken": "#ececea",
-        "--raised": "#ffffff",
         "--muted": "#6b6b66",
         "--accent": "#1f5fa8",
         "--ok": "#2e8b57",
@@ -111,8 +109,6 @@ TOKENS: dict[str, dict[str, str]] = {
         "--bg": "#151515",
         "--panel": "#1e1e1e",
         "--line": "#333333",
-        "--sunken": "#2c2c2c",
-        "--raised": "#474747",
         "--muted": "#9a9a94",
         "--accent": "#7fb2ea",
         "--ok": "#6cc08b",
@@ -182,12 +178,6 @@ PHASE_TOKENS: dict[str, str] = {
 #: them — the notes came out of ``app.css`` with WP-1429 and are emitted into
 #: the generated stylesheet, which is a file people read.
 NOTES: dict[str, str] = {
-    "--sunken": """Two surface levels either side of `--panel` (WP-2123).  A segmented
-choice is drawn as a sunken track with one raised option, so that a choice
-never looks like an action, which the filled primary button is (the
-maintainer's ruling of 2026-11-07).  Lighter in the dark theme, as a dark
-interface raises a surface by lightening it.  Surfaces rather than roles, so
-they are tokens and not a `color-mix` at the call site.""",
     "--plot-obs": """The pattern plot's curves (WP-1029) — the Rietveld
 convention: recessive grey observations and background, red calculated, blue
 difference.  The greys are *meant* to sit below the chroma floor a categorical
