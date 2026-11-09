@@ -180,9 +180,9 @@ rule (`window_sizing`, the generation margin) asked at the new values. No thresh
   pass, bit-identical to `evaluate`
 - [x] Tests: each path chosen where it should be, each answer equal to a fresh compile at the
   values, nothing written, the 409, the refusals; the route's latency measured end to end
-- [ ] Manual: the route in the GUI reference chapter, so `tests/test_gui_manual.py`'s partition
+- [x] Manual: the route in the GUI reference chapter, so `tests/test_gui_manual.py`'s partition
   covers it; the practice survey in `docs/practice.md`
-- [ ] Skill: none, because the route serves the GUI and an agent with a shell calls
+- [x] Skill: none, because the route serves the GUI and an agent with a shell calls
   `Refinement` directly (root CLAUDE.md, one integration surface)
 
 ## Acceptance
