@@ -129,11 +129,11 @@ Claude, reversible", with its alternative, and waits for the maintainer's review
 - [x] Tests: the band against an independent normal-equations computation, held and unheld, a
   free scale widening it, absent with no free background term, the hold arm, the 409, nothing
   written by the GET
-- [ ] Client: `lib/background.ts` (pure drawing helpers), `panels/Background.svelte`, the graph tab
+- [x] Client: `lib/background.ts` (pure drawing helpers), `panels/Background.svelte`, the graph tab
   and its title line, per-term holds and the λ field; vitest
 - [ ] Layout browser test over the Background tab, with real clicks
-- [ ] Manual: the route and the tab in the GUI chapters, the band's sentence in the estimation
-  chapter; screenshots where changed
+- [ ] Manual: the route and the tab in the GUI chapters, the band tied to the estimation
+  chapter's derived-esd equation; screenshots where changed
 - [ ] Skill: none expected; the agent skill drives the python API
 
 ## Acceptance

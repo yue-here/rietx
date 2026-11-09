@@ -155,7 +155,8 @@ export const api = {
   save: () => call("POST", "/api/project/save"),
 
   params: () => call("GET", "/api/params"),
-  patchParams: (delta: { values?: Record<string, number>; vary?: Record<string, boolean> }) =>
+  patchParams: (delta: { values?: Record<string, number>; vary?: Record<string, boolean>;
+                         hold?: Record<string, boolean> }) =>
     call("PATCH", "/api/params", delta),
   plan: () => call("GET", "/api/plan"),
   /** Either `{preset: name}` or `{plan: spec}` — a preset is stored *expanded
@@ -237,6 +238,9 @@ export const api = {
   /** The pattern's every channel and the fit's curves on the ones it kept, as
    *  `rxplot.mjs`'s `unpack` reads them; before a fit, the pattern alone. */
   curves: () => arrays("/api/result/curves"),
+  /** The background curve, the observed pattern and the curve's esd at each
+   *  fitted channel, packed as the curves are (WP-2129). Writes nothing. */
+  background: () => arrays("/api/background"),
   /** The three layers **plus** an `apply` arm parallel to `suggested_actions`:
    *  whether the server would act on each one, and what it would run.  Idle-only
    *  (Layers 1-2 read the compiled model a stage would be rewriting), so this

@@ -30,6 +30,8 @@
   import Peaks from "./panels/Peaks.svelte";
   import Plan from "./panels/Plan.svelte";
   import Plot from "./panels/Plot.svelte";
+  import Background from "./panels/Background.svelte";
+  import { backgroundTitle } from "./lib/background";
   import Report from "./panels/Report.svelte";
   import Series from "./panels/Series.svelte";
   import Splitter from "./panels/Splitter.svelte";
@@ -1217,7 +1219,8 @@
              (WP-1029 item c).  The judgement is the *report's* — `maturity`
              quotes `MATURITY_MAX_RWP` — so nothing here decides anything. -->
         <div class="gtitle">
-          <strong class="what">{busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
+          <strong class="what">{graphTab === "background" ? backgroundTitle(!!result, busy)
+            : busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
           <div class="stats tabular mono" class:immature={immature}>
             {#if rwp !== null}
               Rwp <strong>{(rwp * 100).toFixed(3)}%</strong>
@@ -1231,6 +1234,8 @@
             {/if}
           </div>
         </div>
+        <!-- each graph stays mounted while another is up, as the panels do -->
+        <div class="gview" class:hidden={graphTab !== "pattern"}>
         <Plot {result} {plotKey} {zoom} {theme} error={resultError}
           peaks={peaksData} peaksActive={tab === "peaks"} hovered={hoveredPeak}
           candidate={candidateOverlay} {candidatePicked}
@@ -1238,6 +1243,11 @@
           onhoverpeak={(i) => (hoveredPeak = i)}
           onaddpeak={addPeak} onmovepeak={movePeak} ontogglepeak={togglePeak}
           onremovepeak={removePeak} onprotocol={setProtocol} />
+        </div>
+        <div class="gview" class:hidden={graphTab !== "background"}>
+          <Background {head} {busy} {theme} {say} onmoved={moved}
+            active={graphTab === "background" && !hideGraphs} />
+        </div>
         {#if hideModel}{@render actions()}{/if}
       </div>
     {/if}
@@ -1461,6 +1471,17 @@
   /* The graph's title line (WP-2123): what the view shows, then the fit's
      statistic held to the right.  The title gives way first, with an ellipsis,
      so the statistic never wraps under it. */
+  .gview {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gview.hidden {
+    display: none;
+  }
+
   .gtitle {
     display: flex;
     align-items: baseline;

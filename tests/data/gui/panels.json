@@ -42,6 +42,10 @@
     {
       "id": "pattern",
       "label": "Pattern"
+    },
+    {
+      "id": "background",
+      "label": "Background"
     }
   ]
 }

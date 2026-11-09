@@ -47,6 +47,10 @@ export type Tab = (typeof TABS)[number]["id"];
  * data here for the reason `TABS` is: `tabs.test.ts` writes it into the panel
  * corpus, so the manual must name every graph tab too.
  */
-export const GRAPH_TABS = [{ id: "pattern", label: "Pattern" }] as const;
+export const GRAPH_TABS = [
+  { id: "pattern", label: "Pattern" },
+  // WP-2129: the background curve and the band it may move in
+  { id: "background", label: "Background" },
+] as const;
 
 export type GraphTab = (typeof GRAPH_TABS)[number]["id"];
