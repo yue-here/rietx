@@ -105,6 +105,58 @@ class PeakDoc:
     created_utc: str = ""
 
 
+def pick_settings(*, two_theta_range=None, shoulders: bool = True,
+                  flag_contamination: bool = True) -> dict:
+    """:func:`~rietx.indexing.pick.pick_peaks`'s three options, normalised.
+
+    The keyword arguments :class:`PeakEditor` takes, so one dict both builds an
+    editor and keys the session's cache of it (WP-2124).
+    """
+    rng = None if two_theta_range is None else (
+        float(two_theta_range[0]), float(two_theta_range[1]))
+    return {"two_theta_range": rng, "shoulders": bool(shoulders),
+            "flag_contamination": bool(flag_contamination)}
+
+
+def settings_of(doc: PeakDoc | None, *, default_range=None) -> dict:
+    """The options ``doc`` was picked with, for an editor that refits it.
+
+    A refit must see the detection the list came from, so the stored range
+    wins over the project's current limits.  ``default_range`` and the
+    defaults stand in only for a key a list does not record: no list yet, or
+    a list picked before WP-2124 recorded ``flag_contamination``, which was
+    then always on.
+    """
+    opts = {} if doc is None else doc.pick_options
+    return pick_settings(
+        two_theta_range=opts.get("two_theta_range", default_range),
+        shoulders=opts.get("shoulders", True),
+        flag_contamination=opts.get("flag_contamination", True))
+
+
+def pick_call(options: dict, *, default_range=None) -> str:
+    """The pick as the API line the console echoes and ``.rxt`` quotes.
+
+    ``shoulders`` is always written, as it always was.  The range is written
+    when it is not ``default_range`` (the project's limits, which the pick
+    uses unasked), as ``None`` for a whole-pattern pick under limits that
+    have since been set, and ``flag_contamination`` only when it is off.
+    Numbers go at 12 significant digits, the ``.rxt`` document's precision.
+    """
+    opts = pick_settings(**{k: options[k] for k in
+                            ("two_theta_range", "shoulders",
+                             "flag_contamination") if k in options})
+    args = [f"shoulders={opts['shoulders']}"]
+    rng = opts["two_theta_range"]
+    default = pick_settings(two_theta_range=default_range)["two_theta_range"]
+    if rng != default:
+        args.append("two_theta_range=None" if rng is None else
+                    f"two_theta_range=({rng[0]:.12g}, {rng[1]:.12g})")
+    if not opts["flag_contamination"]:
+        args.append("flag_contamination=False")
+    return f"session.pick_peaks({', '.join(args)})"
+
+
 # ----------------------------------------------------------------------
 # the store
 # ----------------------------------------------------------------------
@@ -214,27 +266,36 @@ class _Carry:
 
 
 class PeakEditor:
-    """The verbs, over one (data, instrument, range) triple.
+    """The verbs, over one (data, instrument, pick options) set.
 
     Holds the lazily built :class:`Detection` — the masked pattern, the frozen
     background envelope and the measured width scale — which every refit and
     every drawn curve reads.  The session caches the editor keyed on what the
     detection depends on, so an instrument edit or a changed exclusion rebuilds
     it and a run of peak edits does not.
+
+    The three options are :func:`~rietx.indexing.pick.pick_peaks`'s own, and
+    an editor holds the ones its list was picked with (``PeakDoc.pick_options``):
+    a refit must see the detection the list came from, and must not add the
+    contamination marks a pick declined (WP-2124).
     """
 
     def __init__(self, data: PatternData, instrument: Instrument, *,
-                 two_theta_range: tuple[float, float] | None = None):
+                 two_theta_range: tuple[float, float] | None = None,
+                 shoulders: bool = True, flag_contamination: bool = True):
         self.data = data
         self.instrument = instrument
         self.two_theta_range = two_theta_range
+        self.shoulders = shoulders
+        self.flag_contamination = flag_contamination
         self._det: Detection | None = None
 
     @property
     def det(self) -> Detection:
         if self._det is None:
             self._det = detect_peaks(self.data, self.instrument,
-                                     two_theta_range=self.two_theta_range)
+                                     two_theta_range=self.two_theta_range,
+                                     shoulders=self.shoulders)
         return self._det
 
     @property
@@ -242,11 +303,12 @@ class PeakEditor:
         return self.instrument.source.lines[0].wavelength.value
 
     # -- picking -------------------------------------------------------
-    def pick(self, *, shoulders: bool = True) -> PeakDoc:
+    def pick(self) -> PeakDoc:
         """A fresh list — and a fresh detection, since the fits come from one."""
         peaks, det, fits = pick_peaks_with_state(
             self.data, self.instrument, two_theta_range=self.two_theta_range,
-            shoulders=shoulders)
+            shoulders=self.shoulders,
+            flag_contamination=self.flag_contamination)
         self._det = det
         groups: dict[int, GroupMeta] = {}
         for gi, (group, fit) in enumerate(zip(det.groups, fits)):
@@ -259,8 +321,14 @@ class PeakEditor:
                 gamma_g=float(fit.gamma_g), gamma_l=float(fit.gamma_l),
                 from_reseed=[bool(b) for b in fit.reseeded()])
         return PeakDoc(peaks=peaks, groups=groups, created_utc=_utcnow(),
-                       pick_options={"shoulders": shoulders,
-                                     "two_theta_range": self.two_theta_range})
+                       pick_options=self.pick_options())
+
+    def pick_options(self) -> dict:
+        """The options a list picked by this editor records, as stored."""
+        rng = self.two_theta_range
+        return {"shoulders": self.shoulders,
+                "two_theta_range": None if rng is None else list(rng),
+                "flag_contamination": self.flag_contamination}
 
     # -- editing -------------------------------------------------------
     def add(self, doc: PeakDoc, two_theta: float, *,
@@ -322,7 +390,8 @@ class PeakEditor:
             doc.peaks = _spliced(doc.peaks, g, [], self.det,
                                  self.instrument.source.lines,
                                  source=self.instrument.source,
-                                 windows=doc.groups)
+                                 windows=doc.groups,
+                                 contamination=self.flag_contamination)
             doc.groups.pop(g, None)
             return doc
         return self._refit_with(doc, g, [p.two_theta for p, _ in comps],
@@ -530,7 +599,8 @@ class PeakEditor:
         doc.peaks = _spliced(doc.peaks, g, fresh, self.det,
                              self.instrument.source.lines,
                              source=self.instrument.source,
-                             windows=doc.groups)
+                             windows=doc.groups,
+                             contamination=self.flag_contamination)
         meta.gamma_g, meta.gamma_l = float(fit.gamma_g), float(fit.gamma_l)
         meta.from_reseed = [bool(b) for b in fit.reseeded()]
         return doc
@@ -582,13 +652,16 @@ def _follow_cross_group_marks(untouched: list[ObservedPeak],
 
 def _spliced(peaks: PeakList, g: int, fresh: list[ObservedPeak],
              det: Detection, lines=(), source=None,
-             windows: dict[int, GroupMeta] | None = None) -> PeakList:
+             windows: dict[int, GroupMeta] | None = None,
+             contamination: bool = True) -> PeakList:
     """The list with group ``g`` replaced by ``fresh``, marks and diagnostics
     recomputed for exactly the spliced components.
 
     ``windows`` are the editor's own (``PeakDoc.groups``): ``ObservedPeak.group``
     numbers those, not detection's, so a bound is read from the window the
-    component was fitted in."""
+    component was fitted in.  ``contamination`` is the pick's
+    ``flag_contamination``: a list picked without the Kβ and tungsten marks
+    gains none from an edit (WP-2124)."""
     merged = [p for p in peaks.peaks if p.group != g] + list(fresh)
     merged.sort(key=lambda p: p.two_theta)
     untouched = [p for p in merged if p.group != g]
@@ -597,14 +670,16 @@ def _spliced(peaks: PeakList, g: int, fresh: list[ObservedPeak],
         flag_ghosts(ps, peaks.wavelength, det, only=only, source=source)
 
     # judged on the list as it was, before anything below moves a flag
-    ghosts_before = _machine_marks(peaks.peaks, _GHOST_MARKS, ghosts)
+    ghosts_before = (_machine_marks(peaks.peaks, _GHOST_MARKS, ghosts)
+                     if contamination else set())
     copies_before = _machine_marks(peaks.peaks, {"duplicate_line"},
                                    flag_duplicate_lines)
     only: set[int] = set()
     if fresh:
         new_ids = {id(p) for p in fresh}
         only = {i for i, p in enumerate(merged) if id(p) in new_ids}
-        ghosts(merged, only=only)
+        if contamination:
+            ghosts(merged, only=only)
         # the same one-group restriction, for the same reason: recomputing the
         # Kα2-residual mark on edited components must not resurrect one a user
         # cleared on an untouched line (WP-1043).  A Kα2 residual is judged
@@ -613,8 +688,9 @@ def _spliced(peaks: PeakList, g: int, fresh: list[ObservedPeak],
     # a ghost or a copy is judged against a line anywhere in the list, so an
     # untouched peak's mark follows the edit, a deleted group included
     # (WP-2030).  Ghosts first: a ghost owns no line, so the copies read them.
-    _follow_cross_group_marks(untouched, ghosts_before,
-                              _machine_marks(merged, _GHOST_MARKS, ghosts))
+    if contamination:
+        _follow_cross_group_marks(untouched, ghosts_before,
+                                  _machine_marks(merged, _GHOST_MARKS, ghosts))
     _follow_cross_group_marks(
         untouched, copies_before,
         _machine_marks(merged, {"duplicate_line"}, flag_duplicate_lines))

@@ -531,7 +531,7 @@ The 2026-09-21 triage adds 1444, the pattern drawn before any model exists and
 a title on a figure (issues #394, #405). Issue **#343**, a third colour scheme
 (Solarized) over 1429's token module, is answered on its thread rather than
 filed: welcome as a PR carrying a measured token set that meets the one
-separability floor, and not scheduled here.
+separability floor, and not scheduled here. 2124 is the server half of the GUI port's indexing step (gui-overhaul, opened by 2123): the screen without a phase, any cell adopted, the pick's three options.
 
 The WPs are in [the index](wp/README.md#unscheduled-render-what-the-fit-already-knows).
 
