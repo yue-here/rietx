@@ -348,7 +348,7 @@ It stays under 80 lines on a five-stage fit.
 
 `Refinement.summary()`, called after `Refinement.fit` on the session that ran it, prints more, because a session holds the compiled model.
 It shows the same stage and diagnostic rows, then the report's misfit summary: the worst regions by χ² share, the unmatched-peak count, and the serial correlation as Durbin-Watson with the esd inflation it causes.
-Then come the next parameter to free, and the protocol run: the plan, every held path grouped by why, the excluded ranges, N points against N reflections and the σ source.
+Then come the next parameter to free, and the protocol run: the plan, every held path grouped by why, the excluded ranges, the fit range against the file's (`RefinementResult.fit_range`), N points against N reflections and the σ source.
 The agreement indices come last, with a named visual check:
 
 <!-- api-doc: no-exec — continues the earlier session, needs a completed fit -->

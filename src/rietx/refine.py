@@ -7105,6 +7105,10 @@ class Refinement:
         if self._excluded_regions:
             ranges = ", ".join(f"{lo:.2f}-{hi:.2f}°" for lo, hi in self._excluded_regions)
             lines.append(f"    excluded: {ranges}")
+        # WP-2075: beside ``excluded:``, never in place of it, until the
+        # maintainer rules which (#1219's question 2)
+        if self.result_.fit_range is not None:
+            lines.append(f"    {self.result_.fit_range.line()}")
         support = self.result_.data_support
         stats = self.result_.statistics
         if support is not None:

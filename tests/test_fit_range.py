@@ -87,3 +87,15 @@ def test_the_record_round_trips_through_json(cut):
     assert back.fit_range == result.fit_range
     dumped = result.model_dump(mode="json")["fit_range"]
     assert dumped["limits_requested"] == list(LIMITS)
+
+
+def test_the_summary_prints_the_range_beside_the_excluded_line(uncut, cut):
+    ref, result = uncut
+    line = f"    {result.fit_range.line()}"
+    assert line in ref.summary().splitlines()
+    assert "% of the file's counts outside" not in line
+    _data, ref, result = cut
+    lines = ref.summary().splitlines()
+    excluded = next(i for i, s in enumerate(lines) if s.startswith("    excluded: "))
+    assert lines[excluded + 1] == f"    {result.fit_range.line()}"
+    assert "outside, in 3 spans" in lines[excluded + 1]

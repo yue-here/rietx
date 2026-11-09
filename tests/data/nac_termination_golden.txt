@@ -30,6 +30,7 @@ Refinement.summary: converged (rietveld)
   protocol:
     plan: scale_bkg, zero, cell, profile_w, profile, biso
     held: # symmetry-locked, # user-fixed, # wavelength-blocked
+    fit range: #.#-#.#° of the file's #.#-#.#° (# of # points); #.# % of the file's counts outside, in # spans
     N points=#, N reflections=#, effective obs=#
     σ source: file
   provenance: rietx #, backend=numpy, solver=lm

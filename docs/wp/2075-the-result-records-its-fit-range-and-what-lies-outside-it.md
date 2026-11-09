@@ -81,8 +81,9 @@ chunk 2 is computed there.
       `schemas.results.FitRange`, built by `report.fit_range.fit_range_record` in `_fit_pass`;
       the schema rule is WP-1117's, so it joins 0.61, the version in flight since v1.11 shipped
       0.60; `tests/test_fit_range.py`.)
-- [ ] `summary()`'s protocol block prints one line from it (in place of, or beside,
-      `excluded:`, as ruled).
+- [x] `summary()`'s protocol block prints one line from it (in place of, or beside,
+      `excluded:`, as ruled). (2026-11-09: beside it, the reversible choice, until ruled;
+      `FitRange.line()`; the NAC termination golden gains the line.)
 - [ ] Chunk 2 facts, computed in `fit()`, on `fit_range` or a sibling field: per excluded band
       and range end, the share of counts outside, level and slope ratio against the in-range
       median, the largest peak-like feature beyond, the fitted background's slope at the edge,
