@@ -77,6 +77,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2106](2106-an-equation-fitted-to-a-series-trajectory.md) | An equation fitted to a series trajectory | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2123](2123-the-layout-shell.md) | The layout shell | P2 | — | [gui-overhaul](#gui-overhaul) |
+| [2125](2125-the-pattern-at-values-nobody-has-applied.md) | The pattern at values nobody has applied | P2 | — ([2123](2123-the-layout-shell.md) soft) | [gui-overhaul](#gui-overhaul) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -496,6 +497,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2123](2123-the-layout-shell.md) | The layout shell | ⬜ | P2 | — |
+| [2125](2125-the-pattern-at-values-nobody-has-applied.md) | The pattern at values nobody has applied | ⬜ | P2 | — ([2123](2123-the-layout-shell.md) soft) |
 
 ## <a id="unscheduled"></a>Unscheduled
 
