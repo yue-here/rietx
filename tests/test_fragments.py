@@ -4,12 +4,15 @@ The oracles are geometry built here from ideal symmetry (a D6h benzene and a
 D5h cyclopentadienyl, regular rings with radial hydrogens), a dihedral worked
 by hand, and distances, angles and torsions measured by formulas written here,
 not imported from the module under test.  The bond lengths are round
-illustrative values; every assertion is about geometry, not about them.
+illustrative values; every assertion is about geometry, not about them.  The
+Z-matrix's tangent (WP-1814) is checked against complex step through a
+placement written here.
 """
 
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -356,3 +359,302 @@ def test_z_matrix_lines_are_checked_before_they_are_placed():
         fr.from_zmatrix([("C",), ("C", 0, 0.0)])
     with pytest.raises(ValueError, match="not in the Z-matrix"):
         fr.from_zmatrix([("C",), ("C", 0, 1.5)], bonds=[(0, 2)])
+
+
+# --- the Z-matrix's exact tangent (WP-1814 C2a) -------------------------------
+#
+# The oracle is complex step: for an analytic f, f′(x) = Im f(x + ih)/h with
+# no subtractive cancellation, so at h = 1e-30 it is exact to rounding.  It is taken through a placement written
+# here from the geometry (A = B + r·(−cos θ·û + sin θ·(cos φ·p̂ + sin φ·û×p̂)),
+# the module docstring's convention, which the tests above pin), batched over
+# the perturbed copies, never through the module under test.  The steps are in
+# the stored units, Å and degrees, so a lost π/180 fails it.
+
+_CS_H = 1e-30
+
+
+def _cs_unit(v):
+    return v / np.sqrt(np.sum(v * v, axis=-1, keepdims=True))
+
+
+def _cs_place(b, c, d, r, th_deg, ph_deg):
+    """The placement, complex-safe and batched: b, c, d (K, 3); r, θ, φ (K,)."""
+    u = _cs_unit(b - c)
+    w = d - c
+    p = _cs_unit(w - np.sum(w * u, axis=-1, keepdims=True) * u)
+    n = np.cross(u, p)
+    th, ph = (np.asarray(th_deg) * (math.pi / 180.0))[:, None], \
+        (np.asarray(ph_deg) * (math.pi / 180.0))[:, None]
+    return b + np.asarray(r)[:, None] * (-np.cos(th) * u + np.sin(th) * (
+        np.cos(ph) * p + np.sin(ph) * n))
+
+
+def _cs_points(refs, values):
+    """Every line's position for K value sets at once: values[i] is (K, len).
+
+    At an angle of exactly 0° or 180° over a collinear B, C, D the line is
+    B − r·cos θ·û, the only placement defined there; otherwise the general
+    formula, whose θ-derivative at 0°/180° is the one-sided one inside [0, 180].
+    """
+    k = len(values[1]) if len(values) > 1 else 1
+    pos = []
+    for i, (ref, val) in enumerate(zip(refs, values, strict=True)):
+        if i == 0:
+            pos.append(np.zeros((k, 3), dtype=complex))
+        elif i == 1:
+            pos.append(np.stack([0 * val[:, 0], 0 * val[:, 0], val[:, 0]], axis=1))
+        elif i == 2:
+            b, c = pos[ref[0]], pos[ref[1]]
+            pos.append(_cs_place(b, c, c + np.array([1.0, 0.0, 0.0]),
+                                 val[:, 0], val[:, 1], 0 * val[:, 0]))
+        else:
+            b, c, d = (pos[j] for j in ref)
+            th = float(val[0, 1].real)
+            cb, cd = (b[0] - c[0]).real, (d[0] - c[0]).real
+            sine = np.linalg.norm(np.cross(cb, cd)) / np.linalg.norm(cb) / np.linalg.norm(cd)
+            if th in (0.0, 180.0) and sine < fr.COLLINEAR_TOL:
+                cos_t = np.cos(val[:, 1] * (math.pi / 180.0))[:, None]
+                pos.append(b - val[:, 0][:, None] * cos_t * _cs_unit(b - c))
+            else:
+                pos.append(_cs_place(b, c, d, val[:, 0], val[:, 1], val[:, 2]))
+    return np.stack(pos, axis=1)                      # (K, n, 3)
+
+
+def _cs_tangent(refs, values):
+    """(m, n, 3) by complex step: copy j steps internal j by i·h."""
+    flat = [v for val in values for v in val]
+    m = len(flat)
+    batched, col = [], 0
+    for val in values:
+        a = np.tile(np.asarray(val, dtype=complex), (m, 1))
+        for q in range(len(val)):
+            a[col + q, q] += 1j * _CS_H
+        col += len(val)
+        batched.append(a)
+    return _cs_points(refs, batched).imag / _CS_H
+
+
+def _split(lines):
+    """Z-matrix lines → (species, refs, values) as :func:`zmatrix_points` takes them."""
+    return ([ln[0] for ln in lines], [tuple(int(k) for k in ln[1::2]) for ln in lines],
+            [tuple(float(v) for v in ln[2::2]) for ln in lines])
+
+
+# The 8-atom fragment of #759: references that are not a chain (line 4 from
+# 0, 1, 2; line 5 through 4), a 180° dihedral and a methyl pair.
+_BRANCHED = [("C",), ("C", 0, 1.51), ("O", 1, 1.43, 0, 109.5),
+             ("C", 1, 1.50, 0, 112.7, 2, 122.5), ("O", 0, 1.27, 1, 117.4, 2, 10.0),
+             ("O", 0, 1.27, 1, 117.4, 4, 180.0), ("H", 3, 0.96, 1, 109.5, 0, 180.0),
+             ("H", 3, 0.96, 1, 109.5, 0, -60.0)]
+# A dummy, and two lines at exactly 180° whose reference triple is open.
+_DUMMY_180 = [("C",), ("C", 0, 1.20), (fr.DUMMY, 1, 1.0, 0, 90.0),
+              ("H", 1, 1.06, 0, 180.0, 2, 0.0), ("H", 0, 1.06, 1, 180.0, 2, 37.0),
+              ("O", 1, 1.4, 2, 95.0, 0, -100.0)]
+
+
+def _acridine_lines():
+    """Acridine (COD 2242872, ``tests/data/README.md``) as a Z-matrix.
+
+    The fixture's own construction, not the module's: bonds are read off the
+    deposited distances here (heavy–heavy < 1.6 Å, X–H < 1.2 Å) to grow a
+    breadth-first spanning tree, and each line's internals are measured with
+    this file's ``_angle`` and ``_dihedral``.  Returns the lines and the
+    deposited Cartesian atoms in line order.
+    """
+    from rietx.crystallography.cif import structure_from_cif
+    from rietx.params.derived import cartesian_frame
+
+    path = Path(__file__).parent / "data" / "cod_2242872.cif"
+    phase = structure_from_cif(str(path)).phases[0]
+    m = np.asarray(cartesian_frame(phase.cell.lengths_angles()))
+    sp = [a.species for a in phase.atoms]
+    x = np.array([m @ [a.x.value, a.y.value, a.z.value] for a in phase.atoms])
+    dist = _distances(x)
+    heavy = [i for i, s in enumerate(sp) if not s.startswith("H")]
+
+    def bonded(i, j):
+        h = sp[i].startswith("H") or sp[j].startswith("H")
+        return i != j and dist[i, j] < (1.2 if h else 1.6)
+
+    parent, order = {heavy[0]: -1}, [heavy[0]]
+    for i in order:                                   # grows while it walks
+        for j in range(len(x)):
+            if j not in parent and bonded(i, j):
+                parent[j] = i
+                order.append(j)
+    line_of, lines = {}, []
+    for i in order:
+        k = len(lines)
+        line_of[i] = k
+        if k == 0:
+            lines.append((sp[i],))
+            continue
+        b = parent[i]
+        r = float(np.linalg.norm(x[i] - x[b]))
+        if k == 1:
+            lines.append((sp[i], line_of[b], r))
+            continue
+        placed = [j for j in order[:k] if j != b]
+        c = parent[b] if parent[b] >= 0 else placed[0]
+        ang = _angle(x[i], x[b], x[c])
+        if k == 2:
+            lines.append((sp[i], line_of[b], r, line_of[c], ang))
+            continue
+        d = next(j for j in placed if j != c and np.linalg.norm(np.cross(
+            x[b] - x[c], x[j] - x[c])) / np.linalg.norm(x[b] - x[c])
+            / np.linalg.norm(x[j] - x[c]) > 0.1)
+        lines.append((sp[i], line_of[b], r, line_of[c], ang, line_of[d],
+                      _dihedral(x[i], x[b], x[c], x[d])))
+    return lines, x[order]
+
+
+def _states(lines, rng, n):
+    """The anchor, then ``n`` random states: r ± 0.05 Å, angles and dihedrals
+    ± 5°, an angle kept inside (1°, 179°) unless it sits on 0° or 180°."""
+    _, refs, values = _split(lines)
+    yield values
+    for _ in range(n):
+        out = []
+        for val in values:
+            v = list(val)
+            if v:
+                v[0] += rng.normal(scale=0.05)
+            if len(v) > 1 and v[1] not in (0.0, 180.0):
+                v[1] = float(np.clip(v[1] + rng.normal(scale=5.0), 1.0, 179.0))
+            if len(v) > 2:
+                v[2] += rng.normal(scale=5.0)
+            out.append(tuple(v))
+        yield out
+
+
+def test_zmatrix_placement_partials_match_complex_step():
+    """The six closed-form partials of one placement against complex step,
+    on 100 random draws: < 1e-12 on every block (WP-1814's first bar)."""
+    rng = np.random.default_rng(20261109)
+    worst = dict.fromkeys(("B", "C", "D", "r", "angle", "dihedral"), 0.0)
+    draws = 0
+    while draws < 100:
+        b, c, d = (rng.normal(size=3) * 1.5 for _ in range(3))
+        if np.linalg.norm(np.cross(b - c, d - c)) / np.linalg.norm(b - c) \
+                / np.linalg.norm(d - c) < 1e-3:
+            continue
+        draws += 1
+        r, th, ph = rng.uniform(0.9, 2.2), rng.uniform(5.0, 175.0), rng.uniform(-180, 180)
+        got = dict(zip(worst, fr._place_partials(b, c, d, r, th, ph), strict=True))
+        a = fr._place(b, c, d, r, th, ph)
+        assert np.max(np.abs(a - _cs_place(b[None], c[None], d[None], [r], [th],
+                                           [ph])[0].real)) < 1e-14
+        # 12 copies: B, C, D's three components, then r, θ, φ
+        args = [np.tile(np.asarray(v, dtype=complex), (12, 1)) for v in (b, c, d)]
+        args += [np.full(12, complex(v)) for v in (r, th, ph)]
+        for q in range(9):
+            args[q // 3][q, q % 3] += 1j * _CS_H
+        for q in range(3):
+            args[3 + q][9 + q] += 1j * _CS_H
+        cs = _cs_place(*args).imag / _CS_H                # (12, 3)
+        want = {"B": cs[0:3].T, "C": cs[3:6].T, "D": cs[6:9].T,
+                "r": cs[9], "angle": cs[10], "dihedral": cs[11]}
+        for key in worst:
+            worst[key] = max(worst[key], float(np.max(np.abs(got[key] - want[key]))))
+    assert max(worst.values()) < 1e-12, worst
+
+
+def test_zmatrix_placement_partials_on_a_hand_worked_point():
+    """D = 0, C on +z, B on +x from C, A = (1, 1, 1): the angle A–B–C is 90°
+    and the dihedral +90° (the hand-worked point above).  By hand: r moves A
+    along B → A, (0, 1, 0); opening the angle turns B → A away from B → C =
+    −x, towards +x; the dihedral turns A right-handed about C → B = +x, so
+    x̂ × (0, 1, 0) = +z.  Per degree, both angles carry π/180."""
+    b, c, d = np.array([1.0, 0, 1]), np.array([0.0, 0, 1]), np.zeros(3)
+    *_, d_r, d_th, d_ph = fr._place_partials(b, c, d, 1.0, 90.0, 90.0)
+    deg = math.pi / 180.0
+    np.testing.assert_allclose(d_r, [0, 1, 0], rtol=0, atol=1e-15)
+    np.testing.assert_allclose(d_th, [deg, 0, 0], rtol=0, atol=1e-17)
+    np.testing.assert_allclose(d_ph, [0, 0, deg], rtol=0, atol=1e-17)
+
+
+@pytest.mark.parametrize("name", ["branched", "dummy_180", "acridine"])
+def test_zmatrix_tangent_matches_complex_step(name):
+    """The whole template's tangent against complex step, < 1e-12·max|J|, at
+    the anchor and at 50 random states; the positions are
+    :func:`from_zmatrix`'s, bit for bit, on every line it keeps.
+
+    Branched references, a dummy with two lines at exactly 180° (the angle's
+    column there is the one-sided derivative inside [0, 180]), and acridine,
+    23 atoms and 63 internals."""
+    lines = {"branched": _BRANCHED, "dummy_180": _DUMMY_180}.get(name)
+    if lines is None:
+        lines, deposited = _acridine_lines()
+        assert len(lines) == 23
+        # the fixture is acridine: every distance of the rebuilt template
+        assert np.max(np.abs(_distances(fr.from_zmatrix(lines).xyz)
+                             - _distances(deposited))) < 1e-10
+    species, refs, _ = _split(lines)
+    keep = [i for i, s in enumerate(species) if s != fr.DUMMY]
+    rng = np.random.default_rng(1814)
+    worst = 0.0
+    for values in _states(lines, rng, 50):
+        pos, tan = fr.zmatrix_points(refs, values, tangents=True)
+        assert tan.shape == (sum(len(v) for v in values), len(lines), 3)
+        typed = [(s, *[x for pair in zip(rf, v, strict=True) for x in pair])
+                 for s, rf, v in zip(species, refs, values, strict=True)]
+        assert np.array_equal(pos[keep], fr.from_zmatrix(typed).xyz)
+        want = _cs_tangent(refs, values)
+        worst = max(worst, float(np.max(np.abs(tan - want)) / np.max(np.abs(want))))
+    assert worst < 1e-12, worst
+
+
+def test_zmatrix_tangent_over_a_collinear_triple_at_180():
+    """H–C≡C–H: from line 3 the triple is collinear and only 180° is
+    admissible, so the angle's and the dihedral's columns are zero and the
+    line follows B and C alone; the r columns are complex step's."""
+    lines = [("H",), ("C", 0, 1.06), ("C", 1, 1.2, 0, 180.0),
+             ("H", 2, 1.06, 1, 180.0, 0, 0.0)]
+    _, refs, values = _split(lines)
+    pos, tan = fr.zmatrix_points(refs, values, tangents=True)
+    np.testing.assert_array_equal(pos, fr.from_zmatrix(lines).xyz)
+    np.testing.assert_array_equal(tan[[4, 5], 3], 0.0)   # line 3's angle, dihedral
+    np.testing.assert_allclose(tan, _cs_tangent(refs, values), rtol=0, atol=1e-15)
+    # every r column moves the far H along the axis by exactly one Å per Å
+    np.testing.assert_allclose(tan[[0, 1, 3], 3], [[0, 0, 1]] * 3, rtol=0, atol=1e-15)
+
+
+@pytest.mark.parametrize("name", ["branched", "dummy_180", "acridine"])
+def test_zmatrix_reach_covers_every_line_the_tangent_moves(name):
+    """A column is zero outside its line's reach, at the anchor and 20
+    random states; on the branched fragment the reach is checked by hand."""
+    lines = {"branched": _BRANCHED, "dummy_180": _DUMMY_180}.get(name)
+    if lines is None:
+        lines, _ = _acridine_lines()
+    _, refs, _ = _split(lines)
+    reach = fr.zmatrix_reach(refs)
+    owner = [i for i, ref in enumerate(refs) for _ in ref]
+    for values in _states(lines, np.random.default_rng(7), 20):
+        _, tan = fr.zmatrix_points(refs, values, tangents=True)
+        moved = np.any(tan != 0.0, axis=2)               # (m, n)
+        for j, i in enumerate(owner):
+            assert set(np.flatnonzero(moved[j])) <= reach[i], (j, i)
+    if name == "branched":
+        assert reach == (frozenset(), frozenset(range(1, 8)), frozenset(range(2, 8)),
+                         frozenset({3, 6, 7}), frozenset({4, 5}), frozenset({5}),
+                         frozenset({6}), frozenset({7}))
+
+
+def test_zmatrix_points_refuses_by_line_with_or_without_names():
+    """Without names the refusal says the line and the indices; with them it
+    is :func:`from_zmatrix`'s, word for word."""
+    refs = [(), (0,), (1, 0), (2, 1, 0)]
+    values = [(), (1.2,), (1.2, 180.0), (1.0, 109.5, 0.0)]
+    with pytest.raises(ValueError, match=r"^Z-matrix line 3: reference atoms 2, 1, 0 "
+                       r"are collinear"):
+        fr.zmatrix_points(refs, values)
+    with pytest.raises(ValueError, match=r"line 3 \(H\): reference atoms 2 \(C\), "
+                       r"1 \(C\), 0 \(C\) are collinear"):
+        fr.zmatrix_points(refs, values, names=["C", "C", "C", "H"])
+    with pytest.raises(ValueError, match="line 2 has 2 references and 1 values"):
+        fr.zmatrix_points(refs, [(), (1.2,), (1.2,), (1.0, 109.5, 0.0)])
+    with pytest.raises(ValueError, match="3 reference rows for 2 value rows"):
+        fr.zmatrix_points(refs[:3], values[:2])
+    assert fr.zmatrix_points([], []).shape == (0, 3)
+    pos, tan = fr.zmatrix_points([()], [()], tangents=True)
+    assert pos.shape == (1, 3) and tan.shape == (0, 1, 3)

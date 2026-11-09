@@ -58,6 +58,15 @@ still needs a non-collinear B, C, D.  A dummy point (species :data:`DUMMY`) off 
 line resolves a collinear triple; dummies are placed and then removed from the
 returned fragment.
 
+**The placement and its tangent** (WP-1814).  :func:`from_zmatrix` places
+through :func:`zmatrix_points`, which takes the references and the internal
+coordinates apart and also returns ∂(positions)/∂(internals) exactly: each
+placement's six partials in closed form (:func:`_place_partials`), chained
+forward through the lines in order.  :func:`zmatrix_reach` reads off the
+references which lines each line's internals can move.  Nothing here refines:
+the parameters, their paths and their composition with a body's pose are the
+rigid-body table's.
+
 Internal: nothing here is exported from ``rietx.crystallography`` or
 ``rietx``.  Lengths are in Å and the Z-matrix's angles and dihedrals, which a
 caller types, in degrees.
@@ -240,6 +249,53 @@ def _place(b, c, d, r, angle_deg, dihedral_deg):
                     + math.sin(th) * (math.cos(ph) * p + math.sin(ph) * np.cross(u, p)))
 
 
+def _place_partials(b, c, d, r, angle_deg, dihedral_deg):
+    """The six partials of :func:`_place`, in closed form.
+
+    Returns ∂A/∂B, ∂A/∂C, ∂A/∂D (3 × 3 each), then ∂A/∂r (per Å), ∂A/∂θ and
+    ∂A/∂φ (3-vectors, **per degree**: θ and φ are typed in degrees, so each
+    carries π/180).  With L = |B − C|, û = (B − C)/L, w = D − C,
+    w⊥ = w − (w·û)û, p̂ = w⊥/|w⊥|, n̂ = û × p̂ and
+    g = −cos θ·û + sin θ·(cos φ·p̂ + sin φ·n̂), so that A = B + r·g:
+
+    * dû = (𝟙 − ûûᵀ)(dB − dC)/L;
+    * dw⊥ = (𝟙 − ûûᵀ)·dw − (ûwᵀ + (w·û)𝟙)·dû, with dw = dD − dC;
+    * dp̂ = (𝟙 − p̂p̂ᵀ)·dw⊥/|w⊥| and dn̂ = dû × p̂ + û × dp̂;
+    * dA = dB + r·(−cos θ·dû + sin θ·(cos φ·dp̂ + sin φ·dn̂)) + g·dr
+      + r·(sin θ·û + cos θ·(cos φ·p̂ + sin φ·n̂))·dθ
+      + r·sin θ·(−sin φ·p̂ + cos φ·n̂)·dφ.
+    """
+    eye = np.eye(3)
+    v = b - c
+    length = float(np.linalg.norm(v))
+    u = v / length
+    w = d - c
+    wp = w - (w @ u) * u
+    wlen = float(np.linalg.norm(wp))
+    p = wp / wlen
+    n = np.cross(u, p)
+    th = math.radians(angle_deg)
+    ph = math.radians(dihedral_deg)
+    ct, st, cp, sp = math.cos(th), math.sin(th), math.cos(ph), math.sin(ph)
+    pu = eye - np.outer(u, u)
+    pp = eye - np.outer(p, p)
+    lift = (w @ u) * eye + np.outer(u, w)
+    # dû/dB = Pu/L, dû/dC = −Pu/L, dû/dD = 0; dw/dB = 0, dw/dC = −1, dw/dD = 1
+    du_db = pu / length
+    out = []
+    for du, dw in ((du_db, np.zeros((3, 3))), (-du_db, -eye), (np.zeros((3, 3)), eye)):
+        dp = pp @ (pu @ dw - lift @ du) / wlen
+        dn = np.cross(du.T, p).T + np.cross(u, dp.T).T
+        out.append(r * (-ct * du + st * (cp * dp + sp * dn)))
+    out[0] = out[0] + eye
+    deg = math.radians(1.0)
+    g = -ct * u + st * (cp * p + sp * n)
+    d_r = g
+    d_th = r * (st * u + ct * (cp * p + sp * n)) * deg
+    d_ph = r * st * (-sp * p + cp * n) * deg
+    return out[0], out[1], out[2], d_r, d_th, d_ph
+
+
 def _collinear_sine(b, c, d) -> float:
     """sin of the angle at C between C→B and C→D; 0 when a length is 0."""
     cb, cd = b - c, d - c
@@ -247,6 +303,171 @@ def _collinear_sine(b, c, d) -> float:
     if nb == 0.0 or nd == 0.0:
         return 0.0
     return float(np.linalg.norm(np.cross(cb, cd)) / (nb * nd))
+
+
+def zmatrix_points(refs: Sequence[Sequence[int]], values: Sequence[Sequence[float]],
+                   *, tangents: bool = False, names: Sequence[str] | None = None):
+    """Every Z-matrix line's position, and with ``tangents`` its exact tangent.
+
+    ``refs[i]`` holds line i's earlier reference lines and ``values[i]`` its
+    internal coordinates: ``()`` and ``()`` for line 0, ``(b,)`` and ``(r,)``
+    for line 1, ``(b, c)`` and ``(r, angle)`` for line 2, and ``(b, c, d)``
+    and ``(r, angle, dihedral)`` from line 3 on (:func:`from_zmatrix` for the
+    convention; r in Å, angles in degrees).  Every line is placed, a dummy
+    included: dropping dummies is the caller's.  ``names`` (one per line)
+    only labels the refusals.
+
+    Returns the positions, (n, 3) in Å.  With ``tangents=True`` it returns
+    ``(positions, tangent)``, the tangent ∂(position)/∂ζ of shape (m, n, 3),
+    the column-first layout of the rigid-body block's twist tangents.  ζ lists
+    every line's internals in line order, r then angle then dihedral, so line
+    1 owns column 0, line 2 columns 1–2, and line i ≥ 3 columns 3i − 6 to
+    3i − 4; columns are per Å for r and **per degree** for an angle or a
+    dihedral.  The tangent is propagated forward through the placement
+    recursion with the closed-form partials of each placement
+    (:func:`_place_partials`): a line's tangent is its own internals' column
+    plus the chain through its reference lines' tangents.
+
+    **At an angle of exactly 0° or 180°** (from line 3 on) the position is
+    B − r·cos θ·û, whatever the dihedral, and the dihedral's column is zero.
+    The angle sits at the edge of its domain [0, 180], so its column is the
+    one-sided derivative inside it, which bends A into the half-plane the
+    dihedral names; when B, C and D are collinear no angle other than the
+    edge is admissible (any other is refused), and the angle's column is zero.
+
+    Refusals (``ValueError``): a reference that is not an earlier line or
+    names one line twice, r ≤ 0, an angle outside [0, 180], and a collinear
+    reference triple B, C, D at an angle other than 0° or 180°
+    (:data:`COLLINEAR_TOL`), named with its three lines.
+    """
+    if len(refs) != len(values):
+        raise ValueError(f"{len(refs)} reference rows for {len(values)} value rows; "
+                         f"pass one of each per Z-matrix line")
+    n_lines = len(refs)
+    if names is not None and len(names) != n_lines:
+        raise ValueError(f"{len(names)} names for {n_lines} Z-matrix lines")
+
+    def who(i):
+        return f"Z-matrix line {i}" + ("" if names is None else f" ({names[i]})")
+
+    def atom(k):
+        return f"{k}" + ("" if names is None else f" ({names[k]})")
+
+    m = sum(min(i, 3) for i in range(n_lines))
+    pos = np.zeros((n_lines, 3))
+    tan = np.zeros((m, n_lines, 3)) if tangents else None
+    col = 0
+    for i in range(n_lines):
+        want = min(i, 3)
+        ref = tuple(refs[i])
+        val = tuple(values[i])
+        if len(ref) != want or len(val) != want:
+            raise ValueError(f"{who(i)} has {len(ref)} references and {len(val)} "
+                             f"values; line {i} takes {want} of each")
+        if any(isinstance(k, bool) or int(k) != k for k in ref):
+            raise ValueError(f"{who(i)}: the atom references {list(ref)} must be "
+                             f"integer line indices")
+        ref = tuple(int(k) for k in ref)
+        for k in ref:
+            if not 0 <= k < i:
+                raise ValueError(f"{who(i)} refers to atom {k}, which is not an "
+                                 f"earlier line")
+        if len(set(ref)) != len(ref):
+            raise ValueError(f"{who(i)} names atom {list(ref)} more than once")
+        if i >= 1:
+            r = float(val[0])
+            if not r > 0:
+                raise ValueError(f"{who(i)}: distance {r} Å is not positive")
+        if i >= 2:
+            angle = float(val[1])
+            if not 0.0 <= angle <= 180.0:
+                raise ValueError(f"{who(i)}: angle {angle}° is outside [0, 180]")
+        cols = range(col, col + want)
+        col += want
+        if i == 0:
+            continue
+        if i == 1:
+            pos[1] = (0.0, 0.0, r)
+            if tangents:
+                tan[cols[0], 1, 2] = 1.0
+            continue
+        b, c = pos[ref[0]], pos[ref[1]]
+        if i == 2:
+            # the reference half-plane is x ≥ 0: a virtual D on +x from C,
+            # which moves with C
+            d = c + np.array([1.0, 0.0, 0.0])
+            pos[2] = _place(b, c, d, r, angle, 0.0)
+            if tangents:
+                pb, pc, pd, d_r, d_th, _ = _place_partials(b, c, d, r, angle, 0.0)
+                tan[:, 2] = tan[:, ref[0]] @ pb.T + tan[:, ref[1]] @ (pc + pd).T
+                tan[cols[0], 2] += d_r
+                tan[cols[1], 2] += d_th
+            continue
+        d = pos[ref[2]]
+        dihedral = float(val[2])
+        on_line = angle in (0.0, 180.0)
+        open_triple = _collinear_sine(b, c, d) >= COLLINEAR_TOL
+        if on_line:
+            # A on the line B–C: the dihedral moves nothing, so D is not
+            # needed and its collinearity is no refusal
+            pos[i] = b - r * math.cos(math.radians(angle)) * _unit(b - c)
+        elif not open_triple:
+            names_ = ", ".join(atom(k) for k in ref)
+            raise ValueError(
+                f"{who(i)}: reference atoms {names_} are "
+                f"collinear, so the dihedral about {ref[0]}–{ref[1]} is "
+                f"undefined; insert a dummy atom (species {DUMMY!r}) off "
+                f"the line")
+        else:
+            pos[i] = _place(b, c, d, r, angle, dihedral)
+        if not tangents:
+            continue
+        if open_triple:
+            pb, pc, pd, d_r, d_th, d_ph = _place_partials(b, c, d, r, angle, dihedral)
+            if on_line:
+                d_ph = np.zeros(3)
+        else:
+            # A = B − r·cos θ·û, with no admissible θ but this one
+            v = b - c
+            length = float(np.linalg.norm(v))
+            u = v / length
+            cos_t = math.cos(math.radians(angle))
+            pc = r * cos_t * (np.eye(3) - np.outer(u, u)) / length
+            pb = np.eye(3) - pc
+            pd = np.zeros((3, 3))
+            d_r, d_th, d_ph = -cos_t * u, np.zeros(3), np.zeros(3)
+        tan[:, i] = (tan[:, ref[0]] @ pb.T + tan[:, ref[1]] @ pc.T
+                     + tan[:, ref[2]] @ pd.T)
+        tan[cols[0], i] += d_r
+        tan[cols[1], i] += d_th
+        tan[cols[2], i] += d_ph
+    return (pos, tan) if tangents else pos
+
+
+def zmatrix_reach(refs: Sequence[Sequence[int]]) -> tuple[frozenset[int], ...]:
+    """The lines each line's own internal coordinates move, from the references.
+
+    Entry i holds line i and, transitively, every later line that refers to a
+    line already in it (as b, c or d); line 0 has no internals, so its entry
+    is empty.  Line 2's virtual reference point moves with its c, so the
+    references are the whole dependency graph, and an internal's tangent
+    column (:func:`zmatrix_points`) is zero on every line outside its entry.
+    The entry may hold lines the tangent leaves still (a line whose own
+    geometry absorbs the motion), so it is a covering pattern, not a
+    measurement; dummies are included, and dropping them is the caller's.
+    """
+    refs = [tuple(int(k) for k in ref) for ref in refs]
+    out: list[frozenset[int]] = []
+    for i in range(len(refs)):
+        if i == 0:
+            out.append(frozenset())
+            continue
+        reached = {i}
+        for j in range(i + 1, len(refs)):
+            if any(k in reached for k in refs[j]):
+                reached.add(j)
+        out.append(frozenset(reached))
+    return tuple(out)
 
 
 def from_zmatrix(lines: Sequence[Sequence], bonds=None) -> Fragment:
@@ -268,8 +489,9 @@ def from_zmatrix(lines: Sequence[Sequence], bonds=None) -> Fragment:
     as pairs of line indices and renumbered with the atoms; a bond to a dummy
     is refused.  With ``bonds=None`` the fragment declares none.
     """
-    pos: list[np.ndarray] = []
     species: list[str] = []
+    refs: list[tuple[int, ...]] = []
+    values: list[tuple[float, ...]] = []
     for i, line in enumerate(lines):
         line = tuple(line)
         want = 1 if i == 0 else 3 if i == 1 else 5 if i == 2 else 7
@@ -280,51 +502,10 @@ def from_zmatrix(lines: Sequence[Sequence], bonds=None) -> Fragment:
         if any(isinstance(k, bool) or int(k) != k for k in line[1::2]):
             raise ValueError(f"Z-matrix line {i} ({sp}): the atom references "
                              f"{list(line[1::2])} must be integer line indices")
-        refs = [int(k) for k in line[1::2]]
-        for k in refs:
-            if not 0 <= k < i:
-                raise ValueError(f"Z-matrix line {i} ({sp}) refers to atom {k}, "
-                                 f"which is not an earlier line")
-        if len(set(refs)) != len(refs):
-            raise ValueError(f"Z-matrix line {i} ({sp}) names atom "
-                             f"{refs} more than once")
-        if i >= 1:
-            r = float(line[2])
-            if not r > 0:
-                raise ValueError(f"Z-matrix line {i} ({sp}): distance {r} Å is "
-                                 f"not positive")
-        if i >= 2:
-            angle = float(line[4])
-            if not 0.0 <= angle <= 180.0:
-                raise ValueError(f"Z-matrix line {i} ({sp}): angle {angle}° is "
-                                 f"outside [0, 180]")
-        if i == 0:
-            p = np.zeros(3)
-        elif i == 1:
-            p = np.array([0.0, 0.0, r])
-        elif i == 2:
-            b, c = pos[refs[0]], pos[refs[1]]
-            # the reference half-plane is x ≥ 0: a virtual D on +x from C
-            p = _place(b, c, c + np.array([1.0, 0.0, 0.0]), r, angle, 0.0)
-        else:
-            b, c, d = (pos[k] for k in refs)
-            if angle in (0.0, 180.0):
-                # A on the line B–C: the dihedral moves nothing, so D is not
-                # needed and its collinearity is no refusal
-                p = b - r * math.cos(math.radians(angle)) * _unit(b - c)
-                pos.append(p)
-                species.append(sp)
-                continue
-            if _collinear_sine(b, c, d) < COLLINEAR_TOL:
-                names = ", ".join(f"{k} ({species[k]})" for k in refs)
-                raise ValueError(
-                    f"Z-matrix line {i} ({sp}): reference atoms {names} are "
-                    f"collinear, so the dihedral about {refs[0]}–{refs[1]} is "
-                    f"undefined; insert a dummy atom (species {DUMMY!r}) off "
-                    f"the line")
-            p = _place(b, c, d, r, angle, float(line[6]))
-        pos.append(p)
         species.append(sp)
+        refs.append(tuple(int(k) for k in line[1::2]))
+        values.append(tuple(float(v) for v in line[2::2]))
+    pos = zmatrix_points(refs, values, names=species)
     keep = [i for i, s in enumerate(species) if s != DUMMY]
     index = {old: new for new, old in enumerate(keep)}
     declared = None
