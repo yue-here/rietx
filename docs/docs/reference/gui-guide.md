@@ -309,9 +309,9 @@ which systems it never reached, so a short list there is not evidence that no
 cell exists in them.
 
 `Adopt` turns a candidate into a Le Bail scaffold and flips the mode. Every row
-has it. The candidate `best_or_none()` picks wears that name as a badge. Beside
-any other row's `Adopt` is the sentence its adoption writes into the history
-node's label: that it is not the gate's pick, its grade and its caveats.
+has it. The candidate `best_or_none()` picks wears that name as a badge. Every
+other row prints, under its grade, the sentence its adoption writes into the
+history node's label: that it is not the gate's pick, its grade and its caveats.
 
 ## Model
 

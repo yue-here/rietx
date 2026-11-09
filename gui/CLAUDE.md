@@ -747,7 +747,7 @@ search or screen **returns** what it has and its status is read off the token.
 Both tables' badges follow the server (`adopt`, `best`); the screen is gated on neither the adopt verdict nor a phase
 (a read-only measurement; a pattern-only project is where indexing starts). **Any candidate can be adopted** (Yue's
 ruling B, 2026-11-08, WP-2124): the arm's `picked` is the gate's pick, its `why` the sentence an adoption of any other
-row writes into the `edit_model` node. The panel enables Adopt on every row, prints `why` beside it, and badges only
+row writes into the `edit_model` node. The panel enables Adopt on every row, prints `why` under the grade, and badges only
 `picked` (WP-2130); what the search covered (`systems_searched`, `search_complete`, the run-level diagnostics with
 their `where`) is said above the list whatever it found, WP-1042's "not reached is loud".
 

@@ -131,9 +131,10 @@ Not here, left for the piece that redraws the Peaks panel or a WP of its own:
 - [ ] 3. The peak-mark colour: measured above; goes to the maintainer. If ruled, change it in
   `theme.py`, regenerate `tokens.css`, adjust `test_gui_palette.py` as ruled, and read the
   drawn colour in the browser.
-- [ ] 4. The layout browser test gains a Peaks-panel case: a served indexing answer, real
-  clicks on the Peaks tab, a row's disclosure and Adopt, with the coverage line and the
-  history node asserted, and no shell landmark moved.
+- [x] 4. A Peaks-panel browser case, in `tests/test_gui_peaks_browser.py` beside the layout
+  test whose landmarks it reuses: a served indexing answer, real clicks on the Peaks tab, a
+  row's disclosure and Adopt, with the coverage line and the history node asserted, and no
+  shell landmark moved.
 - [ ] Tests: `npm --prefix gui test`, `npm --prefix gui run check`, the dist rebuilt,
   `tests/test_gui_manual.py` (screenshots where changed), `tests/test_gui_palette.py`.
 - [x] Manual: the GUI guide's indexing section says any row can be adopted.
@@ -142,7 +143,7 @@ Not here, left for the piece that redraws the Peaks panel or a WP of its own:
 
 ```sh
 npm --prefix gui ci && npm --prefix gui run build && npm --prefix gui test && npm --prefix gui run check
-.venv/bin/python -m pytest tests/test_gui_layout_browser.py tests/test_gui_peaks.py tests/test_gui_manual.py tests/test_gui_palette.py tests/test_gui_dist.py -n auto --dist loadgroup
+.venv/bin/python -m pytest tests/test_gui_layout_browser.py tests/test_gui_peaks_browser.py tests/test_gui_peaks.py tests/test_gui_manual.py tests/test_gui_palette.py tests/test_gui_dist.py -n auto --dist loadgroup
 .venv/bin/python -m ruff check src tests examples
 ```
 

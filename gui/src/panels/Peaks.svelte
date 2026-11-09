@@ -14,8 +14,8 @@
    * "here is your cell" happy path would look broken most of the time. And the
    * gate's pick is the **server's** `adopt` arm, never a local reading of
    * `confidence`. Every row can be adopted (Yue's ruling B, 2026-11-08,
-   * WP-2124); a row the gate did not pick shows the arm's `why` beside Adopt,
-   * the sentence its history node records. What the search covered is said
+   * WP-2124); a row the gate did not pick shows the arm's `why` under its
+   * grade, the sentence its history node records. What the search covered is said
    * above the list whatever it found (WP-1042, WP-2130).
    */
   import { untrack } from "svelte";
@@ -751,8 +751,12 @@ can rise when validation and ambiguity run, never fall">
       {/if}
       <ul class="strip">
         {#each indexAnswer.result?.diagnostics ?? [] as d (d.code + d.message)}
-          <li class={d.level}><span class="mono">{d.code}</span> {d.message}
-            {#each d.where ?? [] as w (w)}<span class="where">{w}</span>{/each}</li>
+          <li class={d.level}><span class="mono"><Help for="diagnostics:{d.code}">{d.code}</Help></span>
+            {d.message}
+            <!-- keyed by position: two `where` entries can be one string
+                 (INDEX_MULTIPLE_SOLUTIONS names each high cell by system,
+                 centring and volume to 0.1 Å³) -->
+            {#each d.where ?? [] as w, j (j)}<span class="where">{w}</span>{/each}</li>
         {/each}
       </ul>
     </div>

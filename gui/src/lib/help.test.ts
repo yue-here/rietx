@@ -237,6 +237,9 @@ describe("every key the app writes down names something", () => {
       "panels/Model.svelte: parameters:phases.*.cell.{name}",
       "panels/Model.svelte: reader_options:{opt.name}",
       "panels/Peaks.svelte: diagnostics:{d.code}",
+      // the indexing run's own diagnostics, said above the candidate list
+      // whatever it found (WP-2130), name their codes as the picker's do
+      "panels/Peaks.svelte: diagnostics:{d.code}",
       "panels/Peaks.svelte: peak_flags:{f}",
       // the origin chip (WP-1209): `ObservedPeak.origin`'s Literal, keyed both
       // ways from python, so the chip's words are the corpus's

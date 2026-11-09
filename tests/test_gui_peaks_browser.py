@@ -7,7 +7,8 @@ candidate came back, against WP-1042's rule that what was not reached is said
 loudly. And Adopt followed the gate, so on fluorapatite, where nothing reaches
 ``high``, no cell could be adopted. Yue ruled on 2026-11-08 that any candidate
 may be adopted, and that a row the gate did not pick shows its grade and caveats
-beside Adopt.
+beside Adopt. The panel prints that sentence under the row's grade, because in
+the Adopt column it widened the table past the side panel.
 
 The answer is set on the session directly, as ``tests/test_gui_peaks.py`` does,
 because a real search costs minutes and the panel is what is under test. Every
@@ -141,7 +142,7 @@ def test_every_row_can_be_adopted_and_an_unpicked_one_says_why(browser, gui):
     assert all(a.is_enabled() for a in adopt)
 
     # the gate's pick wears its name as a badge and nothing more; the other row
-    # says, beside its button, the sentence its adoption will record
+    # says, under its grade, the sentence its adoption will record
     assert rows.nth(0).locator(".chip", has_text="best_or_none()").count() == 1
     assert rows.nth(0).locator(".why").count() == 0
     assert rows.nth(1).locator(".chip", has_text="best_or_none()").count() == 0
