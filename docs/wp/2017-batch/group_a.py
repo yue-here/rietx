@@ -129,6 +129,7 @@ HERE = Path(__file__).resolve().parent
 # maintainer's machine.  ``WP2017_RAW`` names a directory outside the tree for the rows and the
 # summaries they rewrite; a rerun's summaries are copied in by hand once read.
 RAW = Path(os.environ.get("WP2017_RAW", HERE))
+RAW.mkdir(parents=True, exist_ok=True)
 JSONL = RAW / "group_a.jsonl"
 SUMMARY = RAW / "group_a_summary.md"
 HARD_JSONL = RAW / "group_a_hard.jsonl"
@@ -744,17 +745,29 @@ def verdict(row: dict, answer: dict, shipped: dict | None) -> dict:
     return out
 
 
+def _same_head(meta: dict) -> None:
+    """Resume only rows from this head: an older head's rows carry no group H count, and an arm
+    read against a shipped row from another tree measures the tree, not the constant."""
+    head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=True).stdout.strip()
+    assert meta["head"] == head, (
+        f"{RAW} holds rows from {meta['head'][:9]}, not {head[:9]}: point WP2017_RAW elsewhere")
+
+
 def hard_sweep() -> None:
     OUT.mkdir(exist_ok=True)
     FITS.mkdir(exist_ok=True)
     assert compiled.available(), compiled.unavailable()
     first = read_rows()
     meta0 = next(r for r in first if r.get("kind") == "meta")
+    _same_head(meta0)
     for family in FAMILIES:
         assert build_start(family) == meta0["starts"][family], f"{family}'s start moved"
     answers = {r["family"]: r for r in first
                if r.get("kind", "fit") == "fit" and r["constant"] == "shipped"}
     done = {_key(r): r for r in read_rows(HARD_JSONL)}
+    if ("meta", "", "", "") in done:
+        _same_head(done[("meta", "", "", "")])
     if ("meta", "", "", "") not in done:
         head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
                               capture_output=True, text=True, check=True).stdout.strip()
@@ -816,6 +829,8 @@ def sweep() -> None:
     FITS.mkdir(exist_ok=True)
     assert compiled.available(), compiled.unavailable()
     done = {_key(r): r for r in read_rows()}
+    if ("meta", "", "", "") in done:
+        _same_head(done[("meta", "", "", "")])
     if ("meta", "", "", "") not in done:
         head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
                               capture_output=True, text=True, check=True).stdout.strip()
@@ -1007,7 +1022,7 @@ def hard_summary() -> None:
         here = [r for r in fits if r["family"] == start and "error" not in r]
         pick = {r["constant"]: r["rwp"] for r in here if r["constant"] in ("shipped", "noise")}
         arms = [r["rwp"] for r in here if r["constant"] in HARD_ARMS
-                and not r["measures"]["unreached"]]
+                and not r.get("measures", {}).get("unreached", False)]
         done = {(r["constant"]): r["rwp"] for r in polished
                 if r["family"] == start and r["constant"] in ("shipped", "noise")}
         rest = [r["rwp"] for r in polished
@@ -1074,6 +1089,7 @@ def window_control() -> None:
     for family in FAMILIES:
         build_start(family)
     build_hard_start("lab6_x1.01")
+    WINDOW_CONTROL_JSONL.unlink(missing_ok=True)
     rf._unsupported_phase_paths = no_start_hold
     try:
         for constant, arm, value in (("shipped", "no_start_hold", None),
@@ -1100,7 +1116,11 @@ def window_summary() -> None:
         if meta is not None:
             lines.append(f"{label}: head {meta['head'][:9]}, rietx {meta['version']}, "
                          f"{meta['platform']}, {meta['threads']} kernel thread per worker.")
-        fits = [r for r in rows if r.get("kind", "fit") == "fit" and "cell_window" in r]
+        every = [r for r in rows if r.get("kind", "fit") == "fit"]
+        fits = [r for r in every if "cell_window" in r]
+        totals["uncounted"] = totals.get("uncounted", []) + [
+            f"{r['family']} {r['constant']} {r['arm']}: {r.get('error', 'no count recorded')}"
+            for r in every if "cell_window" not in r]
         for start in dict.fromkeys(r["family"] for r in fits):
             here = [r for r in fits if r["family"] == start and r["constant"] != "CELL_WINDOW"]
             solves = [s for r in here for s in r["cell_window"]]
@@ -1111,9 +1131,11 @@ def window_summary() -> None:
                       for r in here for s in r["cell_window"] if s["at_edge"]]
             nearest = [s["min_edge_fraction"] for s in applied
                        if s["min_edge_fraction"] is not None]
-            off = next((r for r in fits if r["family"] == start
+            off = next((r for r in every if r["family"] == start
                         and r["constant"] == "CELL_WINDOW"), None)
             m = (off or {}).get("measures")
+            if off is not None and "error" in off:
+                m = None
             table.append(
                 f"| {label} | {start} | {len(here)} | {len(solves)} | {len(windowed)} | "
                 f"{len(applied)} | {len(at_edge)} | "
@@ -1130,7 +1152,9 @@ def window_summary() -> None:
               f"ended on an edge in {totals['at_edge']}.", "",
               "'Window off' is the arm with ``_freeze_cell_windows`` declaring no phase, read "
               "against the same start's shipped arm: 'no, bit-identical' means the same "
-              "evaluations and the same answer to the bit.", ""] + table
+              "evaluations and the same answer to the bit.", "",
+              f"Not counted (fits): {len(totals.get('uncounted', []))}, "
+              + ("; ".join(totals.get("uncounted", [])) or "none") + ".", ""] + table
     controls = read_rows(WINDOW_CONTROL_JSONL)
     if controls:
         lines += ["", "## Positive arm", "",
@@ -1139,6 +1163,9 @@ def window_summary() -> None:
                   "| arm | solves | a phase windowed | a free cell windowed | on an edge | "
                   "nearest edge | Rwp | evaluations |", "|---|---|---|---|---|---|---|---|"]
         for r in controls:
+            if "error" in r:
+                lines.append(f"| {r['arm']} | error: {r['error']} |||||||")
+                continue
             cw = r.get("cell_window", [])
             nearest = [s["min_edge_fraction"] for s in cw if s["min_edge_fraction"] is not None]
             lines.append(

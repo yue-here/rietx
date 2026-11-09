@@ -7,6 +7,8 @@ hard starts: head fabfe9b3f, rietx 1.12.0.dev0+gfabfe9b3f505, linux, 1 kernel th
 
 'Window off' is the arm with ``_freeze_cell_windows`` declaring no phase, read against the same start's shipped arm: 'no, bit-identical' means the same evaluations and the same answer to the bit.
 
+Not counted (fits): 1, cpd1a_x1.03 _M_HI 5.0: FitTimeout: past 1200 s.
+
 | rows | start | fits | solves | a phase windowed | a free cell windowed | on an edge | nearest edge, fraction of window | window off: reached | window off: model esd |
 |---|---|---|---|---|---|---|---|---|---|
 | shipped starts | lab6 | 23 | 184 | 0 | 0 | 0 | n/a | no, bit-identical | 0 |
