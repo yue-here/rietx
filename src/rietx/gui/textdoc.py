@@ -1258,11 +1258,15 @@ def _check_annotations(row: Row, live, fail, kept) -> None:
 def apply(project, delta: Delta, peak_editor=None) -> list[str]:
     """Apply ``delta`` through the public verbs; returns the calls it made.
 
-    ``set_values`` runs first *because* it is the one that can still refuse
-    (locked, tied, out of bounds) and it validates everything before writing
-    anything — so a refusal here leaves the project untouched, which is what
-    "all-or-nothing" has to mean for a caller.  The returned lines are the same
-    API echo the console shows for a form edit.
+    Two verbs can still refuse here, and each commits its own node:
+    ``set_values`` (locked, tied, out of bounds) and, since WP-1435,
+    ``set_vary`` (a held literal).  A ``set_vary`` refusal after the values
+    committed would leave half the delta in, so the two run first on a
+    history-free copy (:func:`~rietx.gui.session.rehearse`, WP-2126).  A
+    refusal there leaves the project untouched, which is what
+    "all-or-nothing" has to mean for a caller.  The settings and the plan were
+    validated by :func:`changes`.  The returned lines are the same API echo
+    the console shows for a form edit.
 
     Peak edits run last and go through the panel's own editor
     (:class:`~rietx.gui.peaks.PeakEditor` — the session passes its cached one
@@ -1270,13 +1274,21 @@ def apply(project, delta: Delta, peak_editor=None) -> list[str]:
     :func:`changes` (indices, vocabulary, editable columns), so what remains is
     solving, which flags a failure on the peak rather than raising.
     """
-    calls: list[str] = []
-    if delta.values:
-        project.refinement.set_values(dict(delta.values))
-        calls.append(f"ref.set_values({dict(delta.values)!r})")
-    for path, flag in delta.vary.items():
-        hits = project.refinement.set_vary(path, flag)
-        calls.append(f"ref.set_vary({path!r}, {flag!r})  # {len(hits)} path(s)")
+    from .session import rehearse
+
+    def verbs(ref) -> list[str]:
+        out: list[str] = []
+        if delta.values:
+            ref.set_values(dict(delta.values))
+            out.append(f"ref.set_values({dict(delta.values)!r})")
+        for path, flag in delta.vary.items():
+            hits = ref.set_vary(path, flag)
+            out.append(f"ref.set_vary({path!r}, {flag!r})  # {len(hits)} path(s)")
+        return out
+
+    if delta.values or delta.vary:
+        rehearse(project.refinement, verbs)
+    calls: list[str] = verbs(project.refinement)
     if delta.plan is not None:
         # a preset is stored expanded through the mode the project will run
         # in and the instrument's geometry, as the GUI's preset route stores

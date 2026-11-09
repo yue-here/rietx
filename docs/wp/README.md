@@ -53,8 +53,10 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 2026-11-08 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | 2026-11-09 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 2026-11-09 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2123](2123-the-layout-shell.md) | The layout shell | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2126](2126-the-parameters-panel.md) | The Parameters panel | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -496,6 +498,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2123](2123-the-layout-shell.md) | The layout shell | 🔄 2026-11-09 | P2 | — |
+| [2125](2125-the-pattern-at-values-nobody-has-applied.md) | The pattern at values nobody has applied | ✅ 2026-11-09 | — | — ([2123](2123-the-layout-shell.md) soft) |
+| [2126](2126-the-parameters-panel.md) | The Parameters panel | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
 
 ## <a id="unscheduled"></a>Unscheduled
 
@@ -650,7 +654,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2115](2115-what-the-bounded-suggestion-gain-still-leaves-open.md) | What the bounded suggestion gain still leaves open | ⬜ | P3 | [1998](1998-a-suggestion-past-its-bound.md) |
 | [2117](2117-a-recipe-ties-the-axial-pair.md) | A recipe ties the axial pair instead of holding H/L | ⬜ | P4 | [2012](2012-the-axial-ratios-are-interchangeable.md) |
 | [2120](2120-a-tail-shoulder-offered-as-a-line.md) | A tail shoulder on its position bound is offered as a line | ⬜ | P3 | — |
-| [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 🔄 2026-11-08 | P2 | — |
+| [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 🔄 2026-11-09 | P2 | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
@@ -674,7 +678,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | ✅ 2026-11-01 | — | — |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | ✅ 2026-11-06 | — | — |
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | ⬜ | P2 | — ([2003](2003-the-chain-actions.md) soft) |
-| [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | ⬜ | P3 | — |
+| [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | 🔄 2026-11-09 | P3 | — |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
 
@@ -819,6 +823,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2077](2077-the-workflow-sees-ghostshift-runners.md) | The WP workflow sees ghostshift's runners | ✅ 2026-11-02 | — | — |
 | [2119](2119-the-design-record-says-how-a-design-is-chosen.md) | The design record says how a design is chosen | ✅ 2026-11-07 | — | — |
 | [2122](2122-the-mark-redrawn.md) | The mark's bar redrawn, and the header lockup set on the type | ✅ 2026-11-08 | — | — |
+| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
