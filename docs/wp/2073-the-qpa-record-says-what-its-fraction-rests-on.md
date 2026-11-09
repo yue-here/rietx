@@ -1,6 +1,6 @@
 # WP-2073 — The QPA record says what its fraction rests on, and QPA at given values has a route
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
 Track: Render what the fit already knows
 Depends on: — (2060 soft: a one-sided limit for a sub-3σ phase is its profile interval)
 Priority: P3 2026-10-31 — a view over what the fit already knows: `PHASE_UNCONSTRAINED` fires on the unseen phase, but the QPA row, the exported table and the series trajectory carry none of it
