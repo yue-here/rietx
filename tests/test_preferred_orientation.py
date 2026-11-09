@@ -265,7 +265,7 @@ def test_jacobian_structural_columns_carry_the_po_factor():
     s = make_aniso_rutile()
     s.phases[0].scale.value = 1e-3
     s.phases[0].preferred_orientation = _po((0, 0, 1), 0.75, vary=True)
-    s.phases[0].extinction.value = 1.5
+    s.phases[0].extinction = 1.5
     ins = Instrument.debye_scherrer(wavelength=1.5406)
     ins.profile.w.value = 1e-2
     grid = np.arange(12.0, 90.0, 0.02)

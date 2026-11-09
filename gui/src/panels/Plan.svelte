@@ -84,6 +84,7 @@
   const FIELD_LABEL: Record<string, string> = {
     max_iter: "iter",
     lebail_cycles: "lebail",
+    lebail_tol: "lebail tol",
     strain_seed: "strain",
     restraint_weight_scale: "restraint",
     window_slack_deg: "slack",
@@ -249,7 +250,7 @@
              ?? (dirty ? "save the plan first — this runs the plan the project holds"
                        : "run every stage in order")}>Run all</button>
     {#if dirty}
-      <button disabled={busy} onclick={save}>Save plan</button>
+      <button class="ghost" disabled={busy} onclick={save}>Save plan</button>
       <button class="ghost" disabled={busy} onclick={load}>Revert</button>
     {/if}
   </header>

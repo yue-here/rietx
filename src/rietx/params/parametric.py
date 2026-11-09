@@ -382,22 +382,33 @@ def parametric_equation(resolved: ResolvedParametric, rows: list[ParametricCoeff
     rows' units already.  ``None`` when a coefficient has no esd, or when a
     equation of several coefficients has no correlation to pair them with.
     """
-    esd = [r.esd for r in rows]
-    covariance = None
-    if all(e is not None for e in esd) and all(c is not None for c in columns):
-        m = len(rows)
-        if m == 1:
-            covariance = [[esd[0] * esd[0]]]
-        elif correlation is not None:
-            # ρ read off one triangle: the solve's correlation can differ from its
-            # transpose in the last bit (measured on Linux, Python 3.14), and a
-            # covariance must be symmetric to the bit
-            covariance = [[esd[i] * esd[j] * (
-                1.0 if i == j else
-                float(correlation[columns[min(i, j)], columns[max(i, j)]]))
-                for j in range(m)] for i in range(m)]
-    return RefinedParametricEquation(equation=resolved.equation, unit=resolved.unit,
-                                     span=dict(resolved.span), covariance=covariance)
+    return RefinedParametricEquation(
+        equation=resolved.equation, unit=resolved.unit, span=dict(resolved.span),
+        covariance=expression_covariance([r.esd for r in rows], columns, correlation))
+
+
+def expression_covariance(esd: list[float | None], columns: list[int | None],
+                          correlation: np.ndarray | None) -> list[list[float]] | None:
+    """esd_i·esd_j·ρ_ij over a list of coefficients, ρ_ii taken as 1.
+
+    :func:`parametric_equation`'s covariance, and an ``expression``
+    equation's over its variables (WP-1964).  ``None`` when one has no esd
+    or no column, or several have no correlation to pair them with.
+    """
+    if not all(e is not None for e in esd) or not all(c is not None for c in columns):
+        return None
+    m = len(esd)
+    if m == 1:
+        return [[esd[0] * esd[0]]]
+    if correlation is None:
+        return None
+    # ρ read off one triangle: the solve's correlation can differ from its
+    # transpose in the last bit (measured on Linux, Python 3.14), and a
+    # covariance must be symmetric to the bit
+    return [[esd[i] * esd[j] * (
+        1.0 if i == j else
+        float(correlation[columns[min(i, j)], columns[max(i, j)]]))
+        for j in range(m)] for i in range(m)]
 
 
 def target_columns(resolved: ResolvedParametric, bj, free_paths: list[str],
@@ -431,8 +442,94 @@ def target_columns(resolved: ResolvedParametric, bj, free_paths: list[str],
     return out
 
 
+def expression_target_columns(expressions, bj, free_paths: list[str],
+                              values: dict[str, float], usable: list[bool],
+                              skip: dict[str, frozenset[int]], scope=None
+                              ) -> list[list[np.ndarray | None] | None]:
+    """Each ``expression`` equation's own target column per pattern (WP-1964).
+
+    :func:`target_columns` with the gradient in place of Φ.  In pattern h the
+    free variables' columns are J_V = T·G, T the targets' columns and
+    G[i, j] = ∂target_i/∂v_j at the answer (``values``) and the pattern's
+    coordinates (:meth:`~rietx.params.expression.Expression.gradient`, exact).
+    A variable may feed several targets (a θ shared by three cell edges), so
+    the targets are recovered together, T = J_V·G⁺.  That needs one direction
+    per target: a pattern where G has lower rank than the targets it carries
+    gives none of them, as does one ``usable`` marks ``False`` (a variable
+    there reaches a row no expression writes, so J_V ≠ T·G).  A target whose
+    G row is zero (every variable it reads held) gets none either.  ``skip``
+    is :func:`target_columns`'.  ``None`` for an equation with no free
+    variable, whose target no column of θ moves.
+
+    ``scope(h, path)`` names a variable's column in pattern h, and ``values``
+    is keyed by that name: a per-pattern variable is a column per pattern,
+    and its value there is that pattern's.  ``None`` names every variable by
+    its own path, one shared column.
+    """
+    index = {p: i for i, p in enumerate(free_paths)}
+    name = (lambda _h, p: p) if scope is None else scope
+    cols = sorted({index[name(h, p)] for r in expressions for h in r.patterns
+                   for p in r.paths if name(h, p) in index})
+    out: list[list[np.ndarray | None] | None] = [
+        [None] * bj.n_blocks
+        if any(name(h, p) in index for h in r.patterns for p in r.paths) else None
+        for r in expressions]
+    where = {c: j for j, c in enumerate(cols)}
+    for h in range(bj.n_blocks):
+        if not usable[h]:
+            continue
+        rows, live = [], []
+        for i, r in enumerate(expressions):
+            if out[i] is None or h not in r.patterns:
+                continue
+            bindings = {n: values[name(h, p)]
+                        for n, p in zip(r.variables, r.paths, strict=True)}
+            bindings.update(r.constants[h])
+            _, grad = r.expression.gradient(bindings, r.variables)
+            g = np.zeros(len(cols))
+            for p, d in zip(r.paths, grad, strict=True):
+                if name(h, p) in index:
+                    g[where[index[name(h, p)]]] += float(d)
+            if np.any(g):
+                rows.append(g)
+                live.append(i)
+        if not live:
+            continue
+        gmat = np.vstack(rows)
+        if len(live) > len(cols):
+            continue
+        # Every target needs a direction of its own.  The cut is the linear
+        # basis's (RANK_RTOL, √PINV_RCOND), on rows scaled to unit length so
+        # two targets in different units (Å/K, °/K) are not read as one.  The
+        # largest entry goes first, so a row of 1e-170s (an Einstein term at
+        # θ/T ≈ 400) does not square to a zero norm.
+        big = np.abs(gmat).max(axis=1)
+        unit = gmat / big[:, None]
+        length = np.linalg.norm(unit, axis=1)
+        unit /= length[:, None]
+        scale = big * length
+        u, s, vt = lapack.svd(unit, full_matrices=False)
+        if s[-1] <= RANK_RTOL * s[0]:
+            continue
+        local = {int(c): k for k, c in enumerate(bj.col_maps[h])}
+        block = bj.blocks[h]
+        jv = np.column_stack([block[:, local[c]] if c in local else np.zeros(block.shape[0])
+                              for c in cols])
+        # G = D·U with D the row scales, full row rank, so G⁺ = U⁺·D⁻¹; U⁺ is
+        # read off the SVD the cut was made on, so the two cannot disagree
+        targets = (jv @ ((vt.T / s) @ u.T)) / scale
+        for a, i in enumerate(live):
+            if h in skip.get(expressions[i].name, ()):
+                continue
+            if np.any(targets[:, a]):
+                out[i][h] = targets[:, a][:, None]
+    return out
+
+
 def form_tests(resolved: list[ResolvedParametric], bj, resid: np.ndarray, n_data: int,
-               free_paths: list[str], skip: dict[str, frozenset[int]], hold
+               free_paths: list[str], skip: dict[str, frozenset[int]], hold,
+               expressions=(), values: dict[str, float] | None = None,
+               usable: list[bool] | None = None, scope=None
                ) -> tuple[list[ParametricFormTest], ParametricFormReading | None]:
     """Each declaration's lack-of-fit test at the answer (WP-1325).
 
@@ -474,20 +571,41 @@ def form_tests(resolved: list[ResolvedParametric], bj, resid: np.ndarray, n_data
     names no equation because the data cannot say which is wrong.  A regression
     tests a term added last beside the overall test of the group the same way.
 
-    Returns the tests in declaration order and the joint reading, ``None``
-    unless two or more equations were tested.
+    ``expressions`` are the ``expression`` equations with a target (WP-1964),
+    tested after the linear ones by the same readings: their target columns
+    are :func:`expression_target_columns`' over ``values`` (each variable's
+    value at the answer) and ``usable``, and the alternative drops the free
+    variables no other expression reads, so a shared θ stays in it and keeps
+    driving the other targets.  ``scope`` is
+    :func:`expression_target_columns`', so a per-pattern variable counts as
+    a column per pattern here too.
+
+    Returns the tests in declaration order, the linear equations first, and
+    the joint reading, ``None`` unless two or more equations were tested.
     """
     rd = resid[:n_data]
     scale = float(rd @ rd) / max(n_data - len(free_paths), 1)    # χ²_red
     index = {p: i for i, p in enumerate(free_paths)}
+    expressions = list(expressions)
+    declared = [*resolved, *expressions]
+    tested = [target_columns(r, bj, free_paths, skip.get(r.name, frozenset()))
+              for r in resolved]
+    if expressions:
+        tested += expression_target_columns(
+            expressions, bj, free_paths, values or {},
+            [True] * bj.n_blocks if usable is None else usable, skip, scope=scope)
+    # an expression's alternative drops only the variables no other one reads
+    name = (lambda _h, p: p) if scope is None else scope
+    columns_of = [list(dict.fromkeys(name(h, p) for h in r.patterns for p in r.paths))
+                  for r in expressions]
+    readers = Counter(q for qs in columns_of for q in qs)
     # the held side is one projection for every alternative tested here
     null = None
     readings: list[ParametricFormReading | None] = []
     swaps: list[tuple[list[np.ndarray | None], list[int]] | None] = []
     gains: dict[int, tuple[float, int]] = {}
     counts = []
-    for i, r in enumerate(resolved):
-        cols = target_columns(r, bj, free_paths, skip.get(r.name, frozenset()))
+    for i, (r, cols) in enumerate(zip(declared, tested, strict=True)):
         counts.append(0 if cols is None else sum(c is not None for c in cols))
         if cols is None:
             readings.append(None)
@@ -495,13 +613,15 @@ def form_tests(resolved: list[ResolvedParametric], bj, resid: np.ndarray, n_data
             continue
         if null is None:
             null = held_projection(bj, resid, hold)
-        drop = [index[p] for p in r.paths]
+        drop = ([index[p] for p in r.paths] if i < len(resolved) else
+                [index[q] for q in columns_of[i - len(resolved)]
+                 if q in index and readers[q] == 1])
         swaps.append((cols, drop))
         gains[i] = added_columns_gain(bj, resid, cols, drop, hold, null=null)
         readings.append(_reading(*gains[i], scale))
     # each equation again with every other tested equation's targets freed: the gain
     # with all of them swapped, less the gain with only the others swapped
-    freed: list[ParametricFormReading | None] = [None] * len(resolved)
+    freed: list[ParametricFormReading | None] = [None] * len(declared)
     joint = None
     live = [i for i, s in enumerate(swaps) if s is not None]
     if len(live) >= 2:
@@ -521,13 +641,13 @@ def form_tests(resolved: list[ResolvedParametric], bj, resid: np.ndarray, n_data
     verdicts = [None if v is None else v.rejected
                 for v in (o if o is not None else t for t, o in zip(readings, freed,
                                                                     strict=True))]
-    rejected = [r.name for r, v in zip(resolved, verdicts, strict=True) if v]
+    rejected = [r.name for r, v in zip(declared, verdicts, strict=True) if v]
     out = [ParametricFormTest(
         equation=r.name, target=r.target, n_patterns=n_patterns, n_subset=len(r.patterns),
         rejected=verdict, tied=tied, others_freed=other,
         # a rejected equation's misfit has moved the answer every reading steps from
         provisional_on=[] if tied is None else [n for n in rejected if n != r.name])
-        for r, n_patterns, tied, other, verdict in zip(resolved, counts, readings, freed,
+        for r, n_patterns, tied, other, verdict in zip(declared, counts, readings, freed,
                                                        verdicts, strict=True)]
     return out, joint
 

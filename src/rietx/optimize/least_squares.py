@@ -32,6 +32,7 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 import numpy as np
+import scipy.linalg
 from scipy.optimize import least_squares
 
 from ..backend import get_backend
@@ -1315,19 +1316,32 @@ def _fd_typicals(table: ParameterTable,
     coef = table.constraint_block()[0].tocsc()
     out = np.ones(len(table.free_paths), dtype=np.float64)
     for c, path in enumerate(table.free_paths):
-        row, unit, k = path, table._units.get(path), 1.0
-        if unit is None and is_variable_path(path) and identities[c][0] != path:
+        row, k = path, 1.0
+        if (table._units.get(path) is None and is_variable_path(path)
+                and identities[c][0] != path):
             row = identities[c][0]
-            unit = table._units.get(row)
             k = abs(float(coef[table._paths[row], c]))
-        size = FLOOR_SEEDS.get(unit)
-        if (size is not None and k > 0.0
-                and (table.entries[table._paths[row]].lo >= 0.0
-                     or unit == "deg^2"
-                     or any(row == w or row.endswith("." + w)
-                            for w in _SIGNED_WIDTHS))):
+        size = _row_typical(table, row)
+        if size is not None and k > 0.0:
             out[c] = size / k
     return out
+
+
+def _row_typical(table: ParameterTable, row: str) -> float | None:
+    """One physical row's width size, or ``None`` where its step is absolute.
+
+    The row test of :func:`_fd_typicals`, whose docstring says which rows are
+    widths and why.  The chained columns (WP-1964) size their step on the
+    rows they move, so they read it here too.
+    """
+    unit = table._units.get(row)
+    size = FLOOR_SEEDS.get(unit)
+    if size is not None and (table.entries[table._paths[row]].lo >= 0.0
+                             or unit == "deg^2"
+                             or any(row == w or row.endswith("." + w)
+                                    for w in _SIGNED_WIDTHS)):
+        return size
+    return None
 
 
 #: Width rows in deg that may go negative, so :func:`_fd_typicals` cannot read
@@ -1368,7 +1382,21 @@ def _peak_chain_column(model: CompiledModel, table: ParameterTable,
     if affected is None:
         affected = ([int(path.split(".")[1])] if path.startswith("phases.")
                     else range(len(model.phases)))
+    return _peak_chain_at(model, bases, values_p, h, path, intensities, affected)
 
+
+def _peak_chain_at(model: CompiledModel, bases: DerivativeBases,
+                   values_p: dict[str, float], h: float, path: str,
+                   intensities: list[np.ndarray] | None,
+                   affected: "list[int] | range") -> np.ndarray:
+    """∂y along one step: the peak scalars at ``values_p`` against the bases.
+
+    The body of :func:`_peak_chain_column`, which perturbs one θ column, and
+    of :func:`_chained_columns`, which perturbs the physical rows a group of
+    columns shares (WP-1964).  ``h`` is the step's length in whatever
+    coordinate the caller moved; ``path`` names the column in the
+    ``profile_derivs=False`` error.
+    """
     parts = []
     for ip in affected:
         # WP-1343: one pass per drawn component.  ``components`` hands back
@@ -1451,7 +1479,8 @@ def _moment_column(model: CompiledModel, table: ParameterTable,
                    bases: DerivativeBases, values: dict[str, float], c: int,
                    ip: int, reach: list[str],
                    grads: dict[tuple[int, int], np.ndarray]) -> np.ndarray:
-    """∂y/∂θ_c for a column moving moment moduli of phase ip only (WP-1327).
+    """∂y/∂θ_c for a column moving moment DOFs of phase ip only (WP-1327):
+    moduli by default, any DOF where ``_moment_reach_ok``'s ``angles`` asks.
 
     The moment enters only p²⟨|F_⊥|²⟩, so only the intensity scalar moves.
     ``grads`` is :meth:`CompiledModel.moment_f2_grads` for the phase at this
@@ -1483,18 +1512,29 @@ def _moment_column(model: CompiledModel, table: ParameterTable,
     return _accumulate(len(model.tt), parts)
 
 
-def _moment_reach_ok(path: str, extra: list[str]) -> bool:
-    """Whether ``_moment_column`` claims this column: moduli of one phase only.
+def _moment_reach_ok(path: str, extra: list[str], *,
+                     angles: bool = False) -> bool:
+    """Whether ``_moment_column`` claims this column: moduli of one phase only,
+    or, with ``angles``, any moment DOF of one phase.
 
     Its reach is moment **moduli** (``dof0``) of one phase, any atom — the
     affine block can tie two sites' moduli or drive them from a variable, and
     the branch sums those.  Anything else (a cell, a coordinate, another
     phase's moment) takes the peak-chain column.
 
-    **An angle is declined by name, and the reason is measured, not a gap in
-    the derivative** (``d_magnetic_f2_d_dofs`` returns the angle rows, held to
-    the same exact oracle).  A moment seeded on a direction the symmetry fixes
-    — (2.5, 0, 2.5) on P 1 2/m 1 puts the azimuth at exactly 0 — sits where
+    ``angles`` widens the claim to every moment DOF of the phase, the angles
+    (``dof1``, ``dof2``) beside the moduli, and to a column mixing the two.
+    ``_moment_column`` needs nothing more for them: a column is Σ_k C[k, c]·
+    ∂(p²⟨|F_⊥|²⟩)/∂d_k over the DOFs it reaches, the DOFs are affine in θ
+    however non-affine the moment is in an angle, and
+    ``d_magnetic_f2_d_dofs`` returns every DOF's row.  It is the caller's to
+    ask for (``_make_jacobian``'s ``moment_angles``); no solve asks today,
+    for the reason below.
+
+    **By default an angle is declined by name, and the reason is measured,
+    not a gap in the derivative** (``d_magnetic_f2_d_dofs`` returns the angle
+    rows, held to the same exact oracle).  A moment seeded on a direction the
+    symmetry fixes — (2.5, 0, 2.5) on P 1 2/m 1 puts the azimuth at exactly 0 — sits where
     the pattern is even in the angle, so its exact column is zero up to
     round-off (2.3e-16 of the modulus column there).  Where that direction is
     a *maximum* along the angle, whether the solver leaves it depends on that
@@ -1506,14 +1546,17 @@ def _moment_reach_ok(path: str, extra: list[str]) -> bool:
     anyone chose; the analytic angle column waits on one that is — an angle
     seeded off its stationary point before the stage that frees it,
     ``moments.tilted_seed``'s shape for the same stationary point, in its own
-    PR.  The decline stands on either platform.  A modulus has no such point a
-    fit can start at: a varied moment of zero is refused by the schema.
+    PR.  The decline stands on either platform, and it is a default, not a
+    gap: re-measured 2026-11-04 (darwin/arm64) with ``angles`` forced on for
+    every solve, those two fits still end at |m| 3.1804 and 3.1766 against
+    the pinned 3.1772(5).  A modulus has no such point a fit can start at: a
+    varied moment of zero is refused by the schema.
     """
     m = _MOMENT_PATH.match(path)
-    if m is None or m.group(3) != "0":
+    if m is None or not (angles or m.group(3) == "0"):
         return False
     prefix = f"phases.{m.group(1)}.atoms."
-    return all((n := _MOMENT_PATH.match(q)) and n.group(3) == "0"
+    return all((n := _MOMENT_PATH.match(q)) and (angles or n.group(3) == "0")
                and q.startswith(prefix) for q in extra)
 
 
@@ -1976,12 +2019,121 @@ def _affected_phases(model: CompiledModel, path: str, extra: list[str]):
     return sorted({int(p.split(".")[1]) for p in touched})
 
 
-def _make_jacobian(model: CompiledModel, table: ParameterTable):
+#: A group's columns are dependent when a singular value of their block of
+#: ∂p/∂θ falls under this fraction of the largest.  Coefficients of one
+#: target are exactly proportional, so theirs sit at rounding (1e-16).
+_CHAIN_RANK_RTOL = 1e-10
+
+
+def _chained_columns(model: CompiledModel, table: ParameterTable,
+                     bases: DerivativeBases, theta: np.ndarray,
+                     values: dict[str, float], cols: list[int],
+                     identities: list[tuple[str, list[str], bool]],
+                     typicals: np.ndarray,
+                     intensities: list[np.ndarray] | None,
+                     sqrt_w: np.ndarray, J: np.ndarray, n_data: int) -> None:
+    """Write the peak-chain columns, a target's column once per group (WP-1964).
+
+    Columns that move the same physical rows are grouped.  A group's block
+    L of ∂p/∂θ (:meth:`ParameterTable.local_jacobian`, exact for an
+    equation's rows) has rank r.  Where r is below the group's size, the
+    columns are J_targets·L, so r directional columns along a basis of L's
+    span serve them all: J_cols = D·X with L = B·X.  Every coefficient of
+    a tie on ``cell.a`` is one direction, so one ``phase_peaks`` call per
+    pattern serves the whole series of coefficients, where each column
+    re-ran it before (1.48-1.52× on the Jacobian loop, WP-1325 § Measured).
+
+    The step then sits on the moved rows, sized by :func:`fd_step` at each
+    row's value and :func:`_row_typical`, the tightest row setting it.  On a
+    coefficient it sat on θ, which a pattern near the reference turns into
+    almost no move of the target.  A group of independent columns, a lone
+    column included, keeps :func:`_peak_chain_column` and so stays
+    bit-identical.  The grouping takes the general form, never a shortcut
+    keyed on a name, since one coefficient may reach several targets.
+    """
+    reach = []
+    for c in cols:
+        path, extra, _ = identities[c]
+        reach.append([q for q in (path, *extra)
+                      if q in table._paths and not is_variable_path(q)])
+    # union-find over shared rows
+    parent = list(range(len(cols)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    owner: dict[str, int] = {}
+    for i, rows in enumerate(reach):
+        for q in rows:
+            if q in owner:
+                parent[find(i)] = find(owner[q])
+            else:
+                owner[q] = i
+    groups: dict[int, list[int]] = {}
+    for i in range(len(cols)):
+        groups.setdefault(find(i), []).append(i)
+
+    L = None
+    for members in groups.values():
+        rows = sorted({q for i in members for q in reach[i]})
+        block = None
+        if len(members) > 1 and rows:
+            if L is None:
+                L = table.local_jacobian(np.asarray(theta, dtype=np.float64)).tocsc()
+            idx = [table._paths[q] for q in rows]
+            block = L[idx][:, [cols[i] for i in members]].toarray()
+            sv = lapack.svd(block, compute_uv=False)
+            rank = int(np.sum(sv > _CHAIN_RANK_RTOL * sv[0])) if sv[0] > 0 else 0
+            if rank == 0 or rank >= len(members):
+                block = None
+        if block is None:
+            for i in members:
+                c = cols[i]
+                path, extra, _ = identities[c]
+                J[:n_data, c] = -sqrt_w * _peak_chain_column(
+                    model, table, bases, theta, values, c, path, intensities,
+                    affected=_affected_phases(model, path, extra),
+                    typical=typicals[c])
+            continue
+        _q, _r, piv = scipy.linalg.qr(block, pivoting=True, mode="economic")
+        basis = block[:, piv[:rank]]
+        coeffs = lapack.lstsq(basis, block, rcond=None)[0]
+        affected = _affected_phases(model, rows[0], rows[1:])
+        sizes = np.array([fd_step(values[q], _row_typical(table, q) or 1.0)
+                          for q in rows])
+        D = np.empty((n_data, rank), dtype=np.float64)
+        for j in range(rank):
+            d = basis[:, j]
+            moved = d != 0.0
+            h = float(np.min(sizes[moved] / np.abs(d[moved])))
+            values_p = dict(values)
+            for q, dq in zip(rows, d, strict=True):
+                if dq != 0.0:
+                    values_p[q] = values[q] + h * dq
+            D[:, j] = _peak_chain_at(model, bases, values_p, h,
+                                     identities[cols[members[piv[j]]]][0],
+                                     intensities, affected)
+        J[:n_data, [cols[i] for i in members]] = -sqrt_w[:, None] * (D @ coeffs)
+
+
+def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
+                   moment_angles: bool = False):
     """Mixed analytic/FD Jacobian of the residual w.r.t. the internal vector.
 
     In Pawley mode the vector is [table θ | intensities]; the table columns are
     built exactly as for Rietveld/Le Bail, then the intensity block gets its own
     exact linear columns (:func:`_pawley_intensity_columns`).
+
+    ``moment_angles`` lets the analytic moment branch claim a moment
+    **angle** column as well as a modulus (``_moment_reach_ok``, WP-1327).
+    Off, an angle takes the peak chain's forward difference, which is what
+    every solve in the package builds: the exact column is zero at a start
+    the symmetry fixes, and a fit started on a maximum there then cannot
+    leave it (the decline's docstring has the measurement).  On, the angle
+    column is exact; nothing above this function asks for it yet.
     """
     sqrt_w = 1.0 / model.sigma
     free = table.free_paths
@@ -2042,6 +2194,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
         values = table.decode(theta_t)
         J = np.zeros((n_rows, len(theta)), dtype=np.float64)
         fd_cols = []
+        chain_cols: list[int] = []
         bases: DerivativeBases | None = None
         # the aperture node-FD bases feed only the axial columns, so ask for
         # them only in a stage that will build those columns — two FCJ node
@@ -2096,7 +2249,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
                     int(dof.group(1)), int(dof.group(2)), rows, grad)
             elif ((mom := _MOMENT_PATH.match(path))
                     and model.moment_grad_supported(int(mom.group(1)))
-                    and _moment_reach_ok(path, extra)):
+                    and _moment_reach_ok(path, extra, angles=moment_angles)):
                 ip = int(mom.group(1))
                 J[:n_data, c] = -sqrt_w * _moment_column(
                     model, table, get_bases(), values, c, ip, [path, *extra],
@@ -2121,12 +2274,14 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
             elif model.scalar_chain_supported(path) and all(
                     model.scalar_chain_supported(p) and p not in bkg_cols
                     and p not in axial_paths for p in extra):
-                J[:n_data, c] = -sqrt_w * _peak_chain_column(
-                    model, table, get_bases(), theta_t, values, c, path, intens,
-                    affected=_affected_phases(model, path, extra),
-                    typical=typicals[c])
+                chain_cols.append(c)
             else:
                 fd_cols.append(c)
+
+        if chain_cols:
+            _chained_columns(model, table, get_bases(), theta_t, values,
+                             chain_cols, identities, typicals, intens,
+                             sqrt_w, J, n_data)
 
         if fd_cols:
             # The declared fallback.  A background-peak parameter lands here by
@@ -2191,7 +2346,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
     return jacobian
 
 
-def _jacobian_for(model, table, backend: str):
+def _jacobian_for(model, table, backend: str, *, moment_angles: bool = False):
     """The Jacobian callable for ``backend`` (lazy import keeps numpy pure).
 
     Every autodiff callable produces the same fp64 host array in the same
@@ -2206,6 +2361,10 @@ def _jacobian_for(model, table, backend: str):
     per column if (and only if) a policy asked for it.  With the default fp64
     policy the wrapper is a plain ``np.asarray``, so the numpy path is
     unchanged.
+
+    ``moment_angles`` is :func:`_make_jacobian`'s, passed to the numpy
+    assembly; a traced backend declines every magnetic model by name, so it
+    has no moment angle to claim.
     """
     if backend == "jax":
         from ..backend.jax_backend import make_jax_jacobian
@@ -2216,7 +2375,7 @@ def _jacobian_for(model, table, backend: str):
 
         inner = make_torch_jacobian(model, table, device=TORCH_DEVICES[backend])
     elif backend == "numpy":
-        inner = _make_jacobian(model, table)
+        inner = _make_jacobian(model, table, moment_angles=moment_angles)
     else:
         raise ValueError(f"unknown backend {backend!r}; "
                          f"available: numpy, jax, {', '.join(TORCH_DEVICES)}")

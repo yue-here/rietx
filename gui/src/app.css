@@ -191,25 +191,49 @@ button:disabled {
 }
 
 /* One choice among N, where the options *are* the control.  The buttons inside
-   take the register's geometry above; only their chrome changes. */
+   take the register's geometry above; only their chrome changes.  A choice is
+   a sunken track with one raised option, so it never looks like an action: the
+   filled `button` above is what an action looks like (the maintainer's ruling
+   of 2026-11-07, WP-2123).  The track's 1 px of padding stands where its 1 px
+   border stood, so the control is as tall as it was and no row moves.
+   Both surfaces are mixes of `--fg` into `--panel`, never tokens of their own
+   (WP-1429's rule).  `light-dark()` picks the dark theme's pair through the
+   `color-scheme` that tokens.css sets with each palette.  A dark interface
+   raises a surface by lightening it, so the option is lighter than the panel
+   in the dark theme and equal to it in the light one, which no single mix
+   can be.  The percentages match the luminance of the prototype's colours,
+   so each contrast is the prototype's to the third decimal: track against
+   option 1.183 light and 1.502 dark, muted text on the track 4.53 and 4.94. */
 .segmented {
   display: flex;
-  border: 1px solid var(--line);
+  gap: 1px;
+  padding: 1px;
   border-radius: var(--r-control);
-  overflow: hidden;
+  background: light-dark(
+    color-mix(in srgb, var(--fg) 8.4%, var(--panel)),
+    color-mix(in srgb, var(--fg) 7%, var(--panel))
+  );
 }
 
 .segmented button {
   border: 0;
-  border-radius: 0;
+  border-radius: calc(var(--r-control) - 1px);
   background: transparent;
   color: var(--muted);
   font-weight: 400;
 }
 
+.segmented button:hover:not(:disabled):not(.on) {
+  color: var(--fg);
+}
+
 .segmented button.on {
-  background: var(--accent);
-  color: var(--panel);
+  background: light-dark(
+    var(--panel),
+    color-mix(in srgb, var(--fg) 20.5%, var(--panel))
+  );
+  color: var(--fg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
 }
 
 /* One choice among N *panels*.  A tab is not a segmented option: it names

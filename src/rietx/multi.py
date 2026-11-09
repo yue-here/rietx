@@ -59,8 +59,10 @@ from .optimize.statistics import (
 )
 from .params.multi import (
     SIZE_LAMBDA_POWER,
+    EquationPreview,
     MultiParameterTable,
     SharingMap,
+    _display_unit,
     _longest_wavelength,
     _unscoped,
     row_shared,
@@ -68,6 +70,7 @@ from .params.multi import (
 from .params.parametric import (
     FORM_TEST_LEVEL,
     coefficient_rows,
+    expression_covariance,
     form_tests,
     parametric_equation,
 )
@@ -116,6 +119,7 @@ from .refine import (
     _onto_flat_meridian,
     _origin_diagnostics,
     _parameter_row,
+    _peak_columns_flat_at_answer,
     _peak_only_instrument_path,
     _phase_agreement,
     _phase_support_diagnostics,
@@ -149,17 +153,19 @@ from .refine import (
 )
 from .report.magnetic import moment_angle_stationary_diagnostics
 from .report.schemas import THRESHOLDS_VERSION
-from .schemas.common import Diagnostic, Provenance
+from .schemas.common import Diagnostic, Parameter, Provenance
 from .schemas.instrument import Instrument
 from .schemas.parametric import (
     CoordinateTable,
+    ParametricCoefficient,
     ParametricEquation,
     ParametricFormReading,
     ParametricFormTest,
+    RefinedParametricEquation,
 )
 from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
-from .schemas.plan import check_phase_support_sigma
+from .schemas.plan import PlanSpec, check_phase_support_sigma
 from .schemas.results import (
     HistogramResult,
     Identifiability,
@@ -170,7 +176,6 @@ from .schemas.results import (
 from .schemas.structure import Structure
 from .strategy.staged import (
     BACKGROUND_ABSORPTION_GUARD,
-    PLAN_PRESETS,
     ROUGHNESS_ABSORPTION_GUARD,
     GuardFinding,
     GuardReport,
@@ -187,6 +192,7 @@ from .strategy.staged import (
     check_resolution_supported,
     check_stephens_positive,
     check_texture_positive,
+    resolve_plan,
 )
 
 #: A diagnostic reported **once per histogram**, on
@@ -308,6 +314,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "worst histogram's loss (WP-2047)"),
     "_max_iter_diagnostics": (
         (FIT,), "a stage's budget is spent by the one joint solve"),
+    "_lebail_cap_diagnostics": (
+        (ABSENT,), "a joint fit is Rietveld-only, so it runs no partition"),
     "_slow_descent_diagnostics": (
         (FIT,), "the slow-descent rule reads the one joint solve's cost"),
     "_frozen_compile_diagnostics": (
@@ -726,6 +734,8 @@ def _constant_link_reach(mtable) -> list[set[str]]:
     blocked = {f"vars.{r.equation.name}_{j}"
                for r in mtable.parametric if r.equation.basis != "constant"
                for j in range(len(r.labels))}
+    # an expression's variable is no constant link either (WP-1964)
+    blocked |= {q for r in mtable.expressions for q in mtable.variable_rows(r)}
     return [set(moved) for column, moved in _joint_column_reach(mtable).items()
             if column not in blocked]
 
@@ -854,7 +864,8 @@ def _unsupported_paths_multi(mtable, absent: list[set[int]],
     already holds every ``lineless`` phase.  ``models`` lets an instrument
     column be held where no histogram it reaches sees a phase (WP-2049).
     ``instrument_absent`` replaces ``absent`` for that question alone: the
-    stage-start hold passes ``lineless``, the collapse leaves it ``None``.
+    stage-start hold passes ``lineless``, the collapse passes
+    ``refine._peak_columns_flat_at_answer``'s reading per histogram.
     """
     if not any(absent):
         return []
@@ -1081,8 +1092,15 @@ def _rehold_multi(models, mtable, held: list[str],
     released = [p for p in held
                 if not _only_unseen(mtable, [p, *held_reach.get(p, ())], absent,
                                     flat_scales, models)]
+    # the single runner's test, per histogram: a shared column is then held
+    # only if it is flat in every histogram that carries it, so one histogram
+    # with peaks left in its residual keeps it free (``_unseen``, all, never any)
+    instrument_absent = [
+        a if _peak_columns_flat_at_answer(m, t, a, n) else set()
+        for a, n, m, t in zip(absent, lineless, models, mtable.tables, strict=True)]
     collapsed = [p for p in _unsupported_paths_multi(mtable, absent, reach,
-                                                     flat_scales, models)
+                                                     flat_scales, models,
+                                                     instrument_absent)
                  if p not in held_set]
     if collapsed:
         for h, table in enumerate(mtable.tables):
@@ -1413,6 +1431,15 @@ class MultiHistogramRefinement:
     declarations as resolved.  The answer's coefficients are
     :attr:`RefinementResult.parametric
     <rietx.schemas.results.RefinementResult.parametric>`.
+
+    ``variables`` (WP-1964) maps a name to an :class:`~rietx.schemas.common.Parameter`,
+    each the shared column ``vars.{name}`` that ``basis="expression"``
+    equations name in their text beside the coordinate columns.  One variable
+    named by several equations is one column.  A stage whose glob reaches an
+    expression's target frees the variables it names, bar one declared
+    ``vary=False``, which stays where it was put unless a glob names
+    ``vars.{name}`` itself.  A variable no expression names is refused, and
+    so is one a coordinate column shadows.
     """
 
     def __init__(self, structure: Structure | list[Structure],
@@ -1420,6 +1447,7 @@ class MultiHistogramRefinement:
                  sharing: SharingMap | None = None,
                  coordinates: CoordinateTable | None = None,
                  parametric: list[ParametricEquation] | None = None,
+                 variables: dict[str, Parameter] | None = None,
                  backend: str = "numpy", solver: str = DEFAULT_SOLVER):
         if backend != "numpy":
             from .backend import resolve_backend
@@ -1458,7 +1486,8 @@ class MultiHistogramRefinement:
                                     f"{i} of {len(instruments)}", instrument=ins)
         self.mtable = MultiParameterTable(structure, instruments, sharing=sharing,
                                           parametric=parametric,
-                                          coordinates=coordinates)
+                                          coordinates=coordinates,
+                                          variables=variables)
         # Resolve each histogram's specimen absorption (capillary µR or
         # flat-plate µt) from composition, exactly as the single-histogram path
         # does.  Without this a user who set ``capillary_radius_mm`` or
@@ -1503,9 +1532,20 @@ class MultiHistogramRefinement:
         (WP-1325): pass these to a refit, or to a fit of a grown campaign,
         and every coefficient keeps its meaning — Φ is rebuilt from the stored
         reference and scale, never recomputed from whichever patterns are in
-        it.  Empty when nothing was declared.
+        it.  An ``expression`` equation (WP-1964) is listed as declared, in
+        its place in the order given.  Empty when nothing was declared.
         """
-        return [r.equation for r in self.mtable.parametric]
+        return list(self.mtable.declared)
+
+    def preview_equations(self) -> list[EquationPreview]:
+        """Every parametric equation evaluated at the start, with no fit (WP-1964).
+
+        Per equation: the target's value at each pattern, the patterns where
+        it is non-finite or outside the target's bounds, and the variables,
+        coordinates and intermediates it resolved to.  The check to run before
+        a long joint fit: a bad start shows here in milliseconds.
+        """
+        return self.mtable.preview_equations()
 
     @property
     def fitted_structures(self) -> list[Structure]:
@@ -1596,7 +1636,7 @@ class MultiHistogramRefinement:
 
     # ------------------------------------------------------------------
     def fit(self, data: list[PatternData], *, mode: str = "rietveld",
-            plan: RefinementPlan | str = "mccusker_default",
+            plan: RefinementPlan | PlanSpec | str = "mccusker_default",
             two_theta_limits=None, weights: list[float] | None = None,
             events=None, cancel=None, telemetry=None, label: str | None = None,
             progress=None) -> RefinementResult:
@@ -1653,13 +1693,9 @@ class MultiHistogramRefinement:
                 "multi-histogram refinement is Rietveld-only; Le Bail / "
                 "Pawley intensities are per-pattern extractions, not shared, so a "
                 "joint fit of them is just independent single-pattern fits")
-        if isinstance(plan, str):
-            try:
-                plan = PLAN_PRESETS[plan]()
-            except KeyError:
-                raise ValueError(
-                    f"unknown plan preset {plan!r}; available: {sorted(PLAN_PRESETS)}"
-                ) from None
+        # the one crossing of the plan mirror (WP-1110, WP-2102): a preset
+        # name, a ``PlanSpec`` or a plan, read as ``Refinement.fit`` reads it
+        plan = resolve_plan(plan, mode)
         if not plan.stages:
             # refused before an event is emitted or a run recorded, as
             # ``Refinement.fit`` refuses it (WP-1110 item 6)
@@ -1737,7 +1773,7 @@ class MultiHistogramRefinement:
             if recorder is not None:
                 recorder.close()
 
-    def report(self, histogram: int, *, plan: RefinementPlan | str | None = None,
+    def report(self, histogram: int, *, plan: RefinementPlan | PlanSpec | str | None = None,
                **kw):
         """The :class:`~rietx.report.FitReport` for one histogram of the last fit.
 
@@ -1747,7 +1783,8 @@ class MultiHistogramRefinement:
         :meth:`RefinementResult.for_histogram`, its compiled model and values
         for Layers 1-2, exactly as :meth:`Refinement.report
         <rietx.refine.Refinement.report>` asks them of a single fit.  ``plan``
-        supplies the Layer-2 strategy veto.
+        supplies the Layer-2 strategy veto: a plan, its ``PlanSpec`` or a
+        preset name, read as :meth:`fit` reads it.
 
         The specimen has one crystallite size (WP-1131), and the report says
         it once.  Its microstructure block is the joint result's, read off the
@@ -1773,8 +1810,9 @@ class MultiHistogramRefinement:
         n = self.n_histograms
         if not 0 <= histogram < n:
             raise IndexError(f"histogram {histogram} of a {n}-histogram fit")
-        if isinstance(plan, str):
-            plan = PLAN_PRESETS[plan]()
+        if plan is not None:
+            # read as the fit that made the result read it (WP-2102)
+            plan = resolve_plan(plan, self.result_.mode)
         answer = self._answer[histogram]
         return build_report(
             self.result_.for_histogram(histogram),
@@ -2530,7 +2568,7 @@ class MultiHistogramRefinement:
         # bound test found on a bound (WP-1325, FIT)
         parametric_form, form_joint = _parametric_form_tests(models, mt, at_bounds,
                                                              weights, unseen)
-        coefficients = self._parametric_rows(esd_hist0)
+        coefficients = self._parametric_rows(esd_hist0, per_esds)
         diagnostics = diagnostics + _parametric_form_diagnostics(mt, parametric_form,
                                                                  form_joint)
         if stage_results:
@@ -2678,24 +2716,63 @@ class MultiHistogramRefinement:
         the matrix those esds were read off (:func:`~rietx.params.parametric.parametric_equation`).
         """
         mt = self.mtable
-        if not mt.parametric:
+        if not (mt.parametric or mt.expressions):
             return None
         index = {p: i for i, p in enumerate(mt.free_paths)}
-        return [parametric_equation(r, [c for c in coefficients if c.equation == r.name],
-                                    [index.get(p) for p in r.paths], corr)
-                for r in mt.parametric]
+        out = [parametric_equation(r, [c for c in coefficients if c.equation == r.name],
+                                   [index.get(p) for p in r.paths], corr)
+               for r in mt.parametric]
+        # An expression and each intermediate it names (WP-1964): the
+        # covariance over its variables in ``r.paths`` order, the order of its
+        # rows in ``coefficients``; an intermediate has no rows of its own, so
+        # its esds are read here.  The span is each coordinate's range over
+        # the subset, which ``evaluate``'s ``outside`` reads.
+        t0 = mt.tables[0]
+        esd = {c.path: c.esd for c in coefficients}
+        for r in (*mt.intermediates, *mt.expressions):
+            if any(not mt.sharing.is_shared(p) for p in r.paths):
+                # a per-pattern variable has a value at each pattern and none
+                # between them, so the equation has no covariance to evaluate
+                # with; ``evaluate`` says where each pattern's value is
+                out.append(RefinedParametricEquation(
+                    equation=r.equation,
+                    unit=None if r.target is None else _display_unit(r.target),
+                    span={}, covariance=None))
+                continue
+            # a held variable is a constant of the answer: its row and column
+            # are zero, so the esd is the free variables' alone
+            free = [j for j, p in enumerate(r.paths) if t0.entries[t0._paths[p]].vary]
+            sub = expression_covariance([esd.get(r.paths[j]) for j in free],
+                                        [index.get(r.paths[j]) for j in free], corr)
+            covariance = None
+            if sub is not None or not free:
+                covariance = [[0.0] * len(r.paths) for _ in r.paths]
+                for a, i in enumerate(free):
+                    for b, j in enumerate(free):
+                        covariance[i][j] = sub[a][b]
+            span = {name: (min(v[name] for v in r.constants.values()),
+                           max(v[name] for v in r.constants.values()))
+                    for name in r.coordinates if r.constants}
+            out.append(RefinedParametricEquation(
+                equation=r.equation,
+                unit=None if r.target is None else _display_unit(r.target),
+                span=span, covariance=covariance))
+        return out
 
-    def _parametric_rows(self, esd0: dict[str, float]):
+    def _parametric_rows(self, esd0: dict[str, float],
+                         per_esds: list[dict[str, float]] | None = None):
         """Every declared coefficient, in user units at the reference.
 
         ``None`` when no parametric equation was declared, the honest empty state.
         A coefficient's value is histogram 0's entry (every table holds the
         same shared one), its esd ``esd0``'s, which omits a row the covariance
         marks unmeasured (``ParameterTable.stderr_physical``): no pattern in
-        the subset carried gradient for it.
+        the subset carried gradient for it.  A per-pattern variable (WP-1964)
+        is one row per pattern of the subset, ``path`` its ``hist.{h}.`` row,
+        read off that pattern's table and ``per_esds[h]``.
         """
         mt = self.mtable
-        if not mt.parametric:
+        if not (mt.parametric or mt.expressions):
             return None
         t0 = mt.tables[0]
         rows = []
@@ -2704,6 +2781,24 @@ class MultiHistogramRefinement:
             rows.extend(coefficient_rows(
                 r, {p: e.value for p, e in entries.items()}, esd0,
                 {p: e.vary for p, e in entries.items()}))
+        # An expression's rows are its variables (WP-1964): ``term`` is the
+        # variable's name, the value its own in its own unit, and no
+        # reference, since an expression has none.  A variable two
+        # equations read is listed under each.
+        for r in mt.expressions:
+            for name, path in zip(r.variables, r.paths, strict=True):
+                if mt.sharing.is_shared(path):
+                    where = [(t0, esd0, path)]
+                else:
+                    where = [(mt.tables[h], per_esds[h] if per_esds else {},
+                              f"hist.{h}.{path}") for h in r.patterns]
+                for table, esds, row in where:
+                    e = table.entries[table._paths[path]]
+                    esd = esds.get(path) if e.vary else None
+                    rows.append(ParametricCoefficient(
+                        equation=r.name, target=r.target, term=name, path=row,
+                        value=float(e.value), esd=None if esd is None else float(esd),
+                        vary=bool(e.vary), unit=table._units.get(path), reference=None))
         return rows
 
     def _parameters(self, thetas, stderr, corr, at_bounds, esd0,
@@ -3010,7 +3105,8 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
     left its declared range, at the value it took.  ``value`` is how many.
     """
     out: list[Diagnostic] = []
-    for r in mtable.parametric:
+    # an expression's target is as unbounded as a sum of terms (WP-1964)
+    for r in (*mtable.parametric, *mtable.expressions):
         bad = []
         for h in r.patterns:
             table = mtable.tables[h]
@@ -3028,7 +3124,10 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
             message=(f"Parametric equation {r.name!r} puts {r.target} outside its own "
                      f"bounds in {len(bad)} of {len(r.patterns)} patterns: "
                      f"{shown}{more}."),
-            suggestion=("Narrow the subset to where the form holds, lower the "
+            suggestion=("Narrow the subset to where the form holds, or bound the "
+                        "variables so the expression stays inside the range."
+                        if r.equation.basis == "expression" else
+                        "Narrow the subset to where the form holds, lower the "
                         "polynomial's order, or declare a design basis that "
                         "stays inside the range.")))
     return out
@@ -3048,16 +3147,39 @@ def _equation_rows(mtable) -> dict[str, list[str]]:
     order.  Empty when nothing was declared (WP-1325).
     """
     out: dict[str, list[str]] = {}
-    if not mtable.parametric:
+    if not (mtable.parametric or mtable.expressions):
         return out
+
+    def mark(h: int, q: str, name: str) -> None:
+        names = out.setdefault(mtable._canonical(h, q), [])
+        if name not in names:
+            names.append(name)
+
     for h, table in enumerate(mtable.tables):
         reach = table.entry_reach()
         for r in mtable.parametric:
             for path in r.paths:
                 for q in reach.get(path, (path,)):
-                    names = out.setdefault(mtable._canonical(h, q), [])
-                    if r.name not in names:
-                        names.append(r.name)
+                    mark(h, q, r.name)
+        # An expression's variable may feed several equations, so its reach
+        # would mark each one's target with every name.  An expression's rows
+        # are its own variables and, in each subset pattern, the rows of the
+        # block that writes its target: the target and what follows it, a
+        # cubic b and c (WP-1964).
+        written = {}
+        if mtable.expressions:
+            path_of = {i: p for p, i in table._paths.items()}
+            for _block, (_ins, outs) in zip(table.derived, table._derived_idx, strict=True):
+                rows = [path_of[int(i)] for i in outs]
+                for q in rows:
+                    written[q] = rows
+        for r in mtable.expressions:
+            for path in r.paths:
+                if path in table._paths:     # a per-pattern variable is not everywhere
+                    mark(h, path, r.name)
+            if h in r.patterns:
+                for q in written.get(r.target, (r.target,)):
+                    mark(h, q, r.name)
     return out
 
 
@@ -3073,13 +3195,13 @@ def _parametric_unseen(models, mtable, sigma: float = PHASE_SUPPORT_SIGMA
     ``models`` goes to :func:`_unseen` as the hold passes it, so an
     instrument target on a pattern that sees no phase is unseen (WP-2049).
     """
-    if not mtable.parametric:
+    if not (mtable.parametric or mtable.expressions):
         return {}
     absent = _joint_unsupported_phases(models, mtable, sigma)
     return {r.name: frozenset(k for k in r.patterns
                               if _unseen(mtable, f"hist.{k}.{r.target}", absent,
                                          models=models))
-            for r in mtable.parametric}
+            for r in (*mtable.parametric, *mtable.expressions)}
 
 
 def _parametric_unseen_diagnostics(mtable, unseen: dict[str, frozenset[int]]
@@ -3097,7 +3219,7 @@ def _parametric_unseen_diagnostics(mtable, unseen: dict[str, frozenset[int]]
     such pattern; ``where`` names each pattern's row, ``value`` counts them.
     """
     out: list[Diagnostic] = []
-    for r in mtable.parametric:
+    for r in (*mtable.parametric, *mtable.expressions):
         blind = sorted(unseen.get(r.name, ()))
         if not blind:
             continue
@@ -3223,16 +3345,41 @@ def _parametric_form_tests(models, mtable, at_bounds, weights,
     ``unseen`` names it (:func:`_parametric_unseen`), the predicate the
     stage's support hold uses, so the alternative is the untied fit's.  The
     columns ``at_bounds`` names stay on their bounds on both sides.
+
+    An ``expression`` equation is tested too (WP-1964), its target's column
+    recovered through its gradient.  That holds only where each variable
+    moves nothing but the rows an expression writes, so a pattern where one
+    reaches further (a caller's tie onto ``vars.X``) is left out of every
+    expression's alternative: read off each table's ``entry_reach``, the
+    claim checked where it is used.
     """
-    if not mtable.parametric:
+    if not (mtable.parametric or mtable.expressions):
         return None, None
     residual, jacobian, n_data = _multi_closures(models, mtable, weights=weights,
                                                  layout="blocked")
     x = mtable.x0()
     index = {p: i for i, p in enumerate(mtable.free_paths)}
     hold = sorted({index[p] for f in at_bounds for p in f.paths if p in index})
+    variables = {p for r in mtable.expressions for p in r.paths}
+    # each variable's value at the answer, by its joint row: a per-pattern one
+    # has a row per pattern (WP-1964)
+    values = {mtable._canonical(h, p): float(
+        mtable.tables[h].entries[mtable.tables[h]._paths[p]].value)
+        for r in mtable.expressions for h in r.patterns for p in r.paths}
+    usable = []
+    for h, table in enumerate(mtable.tables):
+        targets = {r.target for r in mtable.expressions if h in r.patterns}
+        path_of = {i: p for p, i in table._paths.items()}
+        written = set(variables)
+        for _ins, outs in table._derived_idx:
+            rows = {path_of[int(i)] for i in outs}
+            if rows & targets:
+                written |= rows
+        reach = table.entry_reach()
+        usable.append(all(set(reach.get(p, ())) <= written for p in variables))
     return form_tests(mtable.parametric, jacobian(x), residual(x), n_data,
-                      mtable.free_paths, unseen, hold)
+                      mtable.free_paths, unseen, hold, expressions=mtable.expressions,
+                      values=values, usable=usable, scope=mtable._canonical)
 
 
 def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
@@ -3251,7 +3398,11 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
     rejection beside another says its verdict is provisional
     (``ParametricFormTest.provisional_on``), and each tells the reader to
     read the other equations again after the refit."""
-    paths = {r.name: r.paths for r in mtable.parametric}
+    # an expression's rows by their joint names: a per-pattern variable has one
+    # per pattern (WP-1964); a linear coefficient is always shared
+    paths = {r.name: list(r.paths) for r in mtable.parametric}
+    paths.update({r.name: mtable.variable_rows(r) for r in mtable.expressions})
+    written = {r.name for r in mtable.expressions}
     out: list[Diagnostic] = []
     for t in tests or []:
         if not t.rejected:
@@ -3284,9 +3435,11 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
                      f"the target in each would remove {r.statistic:.1f} times "
                      f"χ²_red of χ², past the {100 * FORM_TEST_LEVEL:g} % point "
                      f"{r.cut:.1f} of χ² for {r.dof} directions.{also}"),
-            suggestion=("Add the next term to the basis and refit, or narrow the "
-                        "subset to where the form holds. The chain's trajectory "
-                        f"shows where it bends.{others}")))
+            suggestion=(("Revise the expression and refit, or narrow the subset "
+                         "to where it holds." if t.equation in written else
+                         "Add the next term to the basis and refit, or narrow the "
+                         "subset to where the form holds.")
+                        + f" The chain's trajectory shows where it bends.{others}")))
     if joint is not None and joint.rejected and not out:
         # every equation tested at once had its own freed reading
         tested = [t for t in tests or [] if t.others_freed is not None]
@@ -3311,7 +3464,8 @@ def _parametric_form_diagnostics(mtable, tests: list[ParametricFormTest] | None,
                       "separate that misfit from the others'.")
         out.append(Diagnostic(
             level="warning", code="PARAMETRIC_FORM_REJECTED",
-            where=[p for t in tested for p in paths[t.equation]], value=joint.statistic,
+            where=list(dict.fromkeys(p for t in tested for p in paths[t.equation])),
+            value=joint.statistic,
             message=(f"Parametric equations {names} together do not describe their "
                      "targets: freeing every target in each pattern would remove "
                      f"{joint.statistic:.1f} times χ²_red of χ², past the "
@@ -3452,10 +3606,11 @@ def _joint_origin_findings(stage_results, mtable) -> list[Diagnostic]:
 
 def refine_multi(data: list[PatternData], structure: Structure | list[Structure],
                  instruments: list[Instrument], *,
-                 plan: RefinementPlan | str = "mccusker_default",
+                 plan: RefinementPlan | PlanSpec | str = "mccusker_default",
                  sharing: SharingMap | None = None,
                  coordinates: CoordinateTable | None = None,
                  parametric: list[ParametricEquation] | None = None,
+                 variables: dict[str, Parameter] | None = None,
                  two_theta_limits=None,
                  weights: list[float] | None = None,
                  backend: str = "numpy", solver: str = DEFAULT_SOLVER,
@@ -3465,10 +3620,12 @@ def refine_multi(data: list[PatternData], structure: Structure | list[Structure]
     ``instruments`` pairs.  Functional wrapper over
     :class:`MultiHistogramRefinement`; ``structure`` (one, or one per
     pattern), ``coordinates`` and ``parametric`` are its constructor's
-    (WP-1325), and ``events``, ``cancel``, ``telemetry``, ``label`` and
-    ``progress`` its ``fit``'s."""
+    (WP-1325), as is ``variables``, the named quantities a
+    ``basis="expression"`` equation refines (WP-1964), and ``events``,
+    ``cancel``, ``telemetry``, ``label`` and ``progress`` its ``fit``'s."""
     ref = MultiHistogramRefinement(structure, instruments, sharing=sharing,
                                    coordinates=coordinates, parametric=parametric,
+                                   variables=variables,
                                    backend=backend, solver=solver)
     return ref.fit(data, plan=plan, two_theta_limits=two_theta_limits, weights=weights,
                    events=events, cancel=cancel, telemetry=telemetry, label=label,

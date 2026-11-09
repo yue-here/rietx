@@ -89,6 +89,9 @@ class Backend(Protocol):
     arcsin: Any
     arccos: Any
     arctan2: Any  # two arguments, (y, x): a torsion's angle (WP-1815)
+    arctan: Any
+    expm1: Any  # exp(x) - 1 and log(1 + x) with their digits near 0: an
+    log1p: Any  # equation's Einstein denominator (WP-1964)
     radians: Any
     degrees: Any
     abs: Any
@@ -166,6 +169,9 @@ class NumpyBackend:
     arcsin = staticmethod(np.arcsin)
     arccos = staticmethod(np.arccos)
     arctan2 = staticmethod(np.arctan2)
+    arctan = staticmethod(np.arctan)
+    expm1 = staticmethod(np.expm1)
+    log1p = staticmethod(np.log1p)
     radians = staticmethod(np.radians)
     degrees = staticmethod(np.degrees)
     abs = staticmethod(np.abs)
@@ -222,6 +228,7 @@ class NumpyBackend:
 #: autodiff backends cannot silently drift from the Protocol above)
 _OP_NAMES = (
     "exp", "sqrt", "log", "sin", "cos", "tan", "arcsin", "arccos", "arctan2",
+    "arctan", "expm1", "log1p",
     "radians", "degrees", "abs", "sign", "power", "clip",
     "maximum", "minimum", "where", "isfinite", "i0e", "i1e",
     "einsum", "matmul", "sum", "cumsum", "diff",
@@ -415,7 +422,8 @@ def _torch_matmul(torch):
 #: need only argument coercion
 _TORCH_UNARY = {
     "exp": "exp", "sqrt": "sqrt", "log": "log", "sin": "sin", "cos": "cos",
-    "tan": "tan", "arcsin": "arcsin", "arccos": "arccos",
+    "tan": "tan", "arcsin": "arcsin", "arccos": "arccos", "arctan": "arctan",
+    "expm1": "expm1", "log1p": "log1p",
     "radians": "deg2rad", "degrees": "rad2deg",
     "abs": "abs", "sign": "sign", "isfinite": "isfinite", "real": "real",
     "i0e": "special.i0e", "i1e": "special.i1e",

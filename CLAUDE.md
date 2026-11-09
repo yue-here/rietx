@@ -90,7 +90,7 @@ Structure/Instrument/PatternData (schemas/, pydantic, JSON round-trip)
 
 **Telemetry/cancel.** `fit`/`run_stage`/`refine` take `events=` and `cancel=` (an
 `optimize.cancel.CancelToken` another thread sets). Cancellation is **cooperative, read between
-residual evaluations and LM factorisations** (WP-2063), never an interrupt, so frozen-per-stage discreteness holds; the
+residual evaluations, LM factorisations and Le Bail cycles** (WP-2063, WP-1542), never an interrupt, so frozen-per-stage discreteness holds; the
 in-flight stage is *abandoned* — no node, no commit, models restored to pre-stage values (a
 seeding stage writes before solving). `RefinementCancelled` carries `.completed_stages` and
 `.node_id`, the last completed node the working state stands at. Event `data` is an **open
@@ -174,8 +174,8 @@ structural test would have certified that accident.
 
 **`capabilities()`** (WP-1007, `capabilities.py`) — the one call saying what a build can do:
 backends *with whether each optional dependency imports here*, solvers, plans from `PLAN_INFO`,
-modes, anodes, formats `read_pattern` opens, and the **six** versioned contracts (schema /
-report-thresholds / event-schema / project-format / textdoc-format / indexing-thresholds), in
+modes, anodes, formats `read_pattern` opens, and the **seven** versioned contracts (schema / report-thresholds /
+event-schema / project-format / textdoc-format / indexing-thresholds / expression-grammar), in
 the arm and not prose — a client reads the field list, and a meta-test fails on a `*_version`
 field that is not the constant it claims to quote. **Every arm is quoted from a live registry;
 a meta-test fails on a member missing from its arm.** `features` flags are *derived predicates*
@@ -318,7 +318,7 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   measurement is the caller's**: held paths and their ties leave `RefinementResult.parameters` (its
   rows are `moving_paths`, WP-1999), a trajectory starts at the onset. Which phases: a scale under 3σ of its counting-noise esd
   (`refine._answer_significance`, WP-1523), never the fitted curve an absent phase's cell fits to
-  noise; zero limit `phase_line_counts`. Both feed `PHASE_UNCONSTRAINED`, which says what was done;
+  noise; zero limit `phase_line_counts`. **Missed peaks read as unseen too**, so holding the instrument needs Hill & Flack's d ≥ Q (WP-2086). What a decline leaves free finds the peaks at a rate, so a test pins the decision, never the landing. Both feed `PHASE_UNCONSTRAINED`, which says what was done;
   `SeriesResult.code_counts` what no one pattern can: "42 of 68".
 - **Pydantic knows no crystallography, so a whole-model swap is checked by building its table.**
   Every symmetry refusal is raised in `ParameterTable.__init__`, and the snapshot
