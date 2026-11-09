@@ -149,6 +149,44 @@ npm --prefix gui test && npm --prefix gui run check
 
 ## Handover log
 
+- **2026-11-09, second round** — a fix round on PR #1498, by a ghostshift runner. Four items.
+
+  *Done.* (1) The start screen's and the dialog's headings are sentence case at the
+  prototype's size. Settled call 15 below gave them the app's uppercase section register, and
+  that contradicted the maintainer's ruling of 2026-11-06, "Sentence-case headings". A written
+  ruling outranks a settled call, so call 15 is withdrawn. The empty-state screenshot pair is
+  regenerated. (2) Review finding 8, declined last round, is fixed: two unnamed typed cells in
+  one create were both `phase`. In the list form an unnamed typed cell is now `phase_N`, N being
+  its place in the joined list, the form the CIF reader gives an unnamed block (settled call 16).
+  (3) A test covers the list form's species-check path: the refusal names `phases.1`, the atom's
+  place in the project. (4) The layout flake is recorded and the test left unchanged, below.
+
+  *For Yue.* Every other panel still draws `h2`/`h3` in `app.css`'s uppercase register, so the
+  app-wide heading register conflicts with the 2026-11-06 ruling. This round changed only the
+  two screens it owns. Whether the ruling covers the whole app is a follow-up for Yue; the
+  workshop's `visual-language.md` asks the same as open question 12.
+
+  *The flake, recorded.* `test_a_pending_edit_moves_nothing_in_the_action_bar[stacked]` failed
+  once in the first round under `-n 4`, and passed alone. Its message was `'pending' in ''`: the
+  typed key never reached the value box, so no edit registered. It was not a box that moved.
+  This round it passed serially once and in four reruns of the four GUI files under `-n 4`, at
+  load averages 25-31. The repo has no code remedy for a browser test under shared load:
+  `tests/test_watch_browser.py` carries no retry, rerun or slow mark, and the recorded practice
+  is to rerun a lone red row alone and treat it as real only if it fails there. So the test is
+  unchanged. A second failure with the same message would point at focus being lost between the
+  click and the keystroke, which is worth a probe.
+
+  *Measured* (`[dev]` venv plus playwright, darwin/arm64): fast
+  selection 14484 passed, 410 skipped, 32 xfailed in 10 min 21 s, through `serial.py` with no
+  other suite running. That is the first round's count plus the two added server tests. vitest
+  626 passed; svelte-check 396 files, 0 errors, 0 warnings. The four GUI files
+  (`test_gui_layout_browser.py`, `test_gui_manual.py`, `test_gui_server.py`, `test_gui_dist.py`)
+  220 passed serially. `npm run build` leaves the committed dist unchanged; ruff clean;
+  `tests.reader_output` exit 0, unchanged against the merge-base.
+
+  Next: Yue reviews the settled calls below, the visual ones first, and rules on the app-wide
+  heading register.
+
 - **2026-11-09** — all seven tasks landed, by a ghostshift runner; PR #1498. With no project open, `rietx
   gui` now shows the round-9 start screen: New project…, Open…, the recent list, the examples, and
   links to the manual and the tutorials. A bare launch reopens the last project instead. New
@@ -210,6 +248,9 @@ npm --prefix gui test && npm --prefix gui run check
       now sentence case, at the prototype's size. Every other panel still wears `app.css`'s
       uppercase `h2`/`h3`, so the app-wide register conflicts with the ruling; that is a
       follow-up for Yue (`visual-language.md` open question 12 in the workshop asks the same).
+  16. (Second round.) An unnamed typed cell in a create of several phases is named `phase_N`,
+      N being its place in the project, as the CIF reader names an unnamed block; a lone typed
+      cell stays `phase`. The alternative is a name field on the typed-cell form.
 
   *Gotchas.* The layout test's label check was made to fail once: with the label column at 3em
   it reported `Geometry` ink 59.75 px in a 39 px column. `make_screenshots.py` regenerates every
