@@ -475,11 +475,15 @@ The middle one is the classic doubled-cell false positive, which is why validati
 | `LeBailValidation.n_stages` | the stages the fit ran, of the validation plan's four |
 | `LeBailValidation.diagnostics` | findings from the fit; [`INDEX_VALIDATION_FAILED`](diagnostics-indexing.md#index_validation_failed) when it raised |
 | `LeBailValidation.mode` | the decomposition the fit ran: `"pawley"` since 1.11, `"lebail"` on a record written before it |
+| `LeBailValidation.background_terms` | the Chebyshev terms the fit's background carried, sized from the data since 1.12; `None` for another kind of background |
 
 The fit holds the cell.
 The candidate is the hypothesis under test, and letting it walk would validate a different cell from the one reported.
 It frees the background, then exactly one peak-position parameter chosen from the candidate's own shift template (the zero shift by default, and always on a geometry other than Bragg-Brentano), then `W`, then `U`, `V`, `X` and `Y` together.
 When the declared instrument's widths disagree with the picked lines', `W` starts from the lines' median FWHM.
+A Chebyshev background gets the number of terms the data ask for, chosen once per run by the order scan `auto_background(kind="chebyshev")` runs, and never fewer than the instrument declares.
+A background the fit cannot follow leaves a band in the residual, and each maximum of the band would otherwise count as an observed peak the cell does not own.
+`validate_by_lebail(size_background=False)` fits the background as declared.
 `freeze_profile=True` drops the two width stages and keeps the profile at the peak list's measured width, shared by every candidate, so a wrong cell cannot broaden a neighbour to cover a line it does not explain.
 The fit is single-phase, since a candidate is one lattice.
 The fit is Pawley, and the type keeps its Le Bail name.
