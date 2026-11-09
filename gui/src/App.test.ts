@@ -2089,6 +2089,38 @@ describe("disclosure and the command palette", () => {
     await flush();
     expect(stub.calls.some((call) => call.path === "/api/run")).toBe(true);
   });
+
+  it("applies pending edits on `r` before it runs, as the button it stands for does", async () => {
+    // WP-2123: `r` is the action bar's primary on the staged plan, which reads
+    // "Apply and refine" while edits wait; running without them dropped them
+    const stub = server({ ...boot(ADVANCED), "/api/run": () => ({ body: IDLE_RUN }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const input = cell("a");
+    input.value = "4.157";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
+    await flush();
+    const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
+      .map((c) => c.path);
+    expect(order).toEqual(["/api/params", "/api/run"]);
+    expect(stub.calls.find((c) => c.method === "PATCH")?.body)
+      .toEqual({ values: { "phases.0.cell.a": 4.157 }, vary: {} });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+
+    // an invalid edit blocks `r` as it disables the button
+    const bad = cell("a");
+    bad.value = "abc";
+    bad.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    const runs = stub.calls.filter((c) => c.path === "/api/run").length;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
+    await flush();
+    expect(stub.calls.filter((c) => c.path === "/api/run").length).toBe(runs);
+  });
 });
 
 /**

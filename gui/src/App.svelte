@@ -748,8 +748,11 @@
   }
 
   const commands = $derived<Command[]>([
-    { id: "run", label: "Run the fit", echo: "ref.fit(data, plan=…)", key: "r",
-      disabled: busy || !project || noPhases, run: start },
+    // the action bar's primary on the staged plan, so pending edits are applied
+    // first, as that button applies them (WP-2123)
+    { id: "run", label: pendingTouched ? "Apply the edits and run the fit" : "Run the fit",
+      echo: "ref.fit(data, plan=…)", key: "r",
+      disabled: busy || !project || noPhases || !!pendingInvalid, run: () => refine("plan") },
     { id: "stage", label: `Run one stage${planPanel?.selectedName() ? ` — ${planPanel.selectedName()}` : ""}`,
       echo: "ref.run_stage(stage)", key: ".", disabled: busy || !project || noPhases,
       run: () => { tab = "plan"; planPanel?.runStage(); } },
