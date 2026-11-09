@@ -4741,9 +4741,14 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     )
 
 
-def window_sizing(model: CompiledModel, values: dict[str, float]
-                  ) -> list[tuple[np.ndarray, np.ndarray, np.ndarray]]:
+def window_sizing(model: CompiledModel, values: dict[str, float],
+                  *, component: int = 0
+                  ) -> list[tuple[np.ndarray, np.ndarray, np.ndarray] | None]:
     """Each phase's (windows, FCJ node counts, half-widths) sized at ``values``.
+
+    ``component`` picks the frozen family, as in :meth:`CompiledModel.phase_peaks`:
+    ``0`` the nuclear one every phase has, ``1`` the magnetic one (WP-1343),
+    whose entry is ``None`` for a phase that has no such family.
 
     ``compile_model``'s rule: a half-width of k(η)·Γ plus the slack, plus the
     FCJ extent while the aberration acts.  It reads the peaks the forward
@@ -4767,10 +4772,16 @@ def window_sizing(model: CompiledModel, values: dict[str, float]
     tt = np.asarray(model.tt, dtype=np.float64)
     out = []
     for ip, cp in enumerate(model.phases):
-        win = np.zeros_like(cp.win)
-        fcj_n = np.zeros_like(cp.fcj_n)
-        halves = np.full(cp.win.shape[:2], np.nan)
-        for il, (pos, w1, w2, _) in enumerate(model.phase_peaks(ip, values)):
+        frozen_win, frozen_fcj = ((cp.win, cp.fcj_n) if component == 0
+                                  else (cp.win_mag, cp.fcj_n_mag))
+        if frozen_win is None:
+            out.append(None)
+            continue
+        win = np.zeros_like(frozen_win)
+        fcj_n = np.zeros_like(frozen_fcj)
+        halves = np.full(frozen_win.shape[:2], np.nan)
+        for il, (pos, w1, w2, _) in enumerate(
+                model.phase_peaks(ip, values, component=component)):
             pos = np.asarray(pos, dtype=np.float64)
             gamma, eta = model.peak_gamma_eta(w1, w2)
             half = window_fwhm_mult_interp(eta, tol) * gamma + model.window_slack_deg

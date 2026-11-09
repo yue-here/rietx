@@ -174,6 +174,41 @@ def test_a_zero_shift_past_the_reflection_margin_is_recompiled_and_exact(fap):
     assert err < 1e-9
 
 
+def _magnetic_base(size: float) -> preview._Base:
+    """A base over the MnF₂ magnetic model, with no project behind it."""
+    from tests.test_magnetic_width import _mnf2, _state
+
+    model, table, values = _state(_mnf2(size=size, strain=size))
+    sized = preview.forward.window_sizing
+    return preview._Base(
+        key=(), table=table, stored=[e.value for e in table.entries],
+        values=values, model=model, positions=preview._positions(model, values),
+        fcj_n=[f for _, f, _ in sized(model, values)],
+        fcj_n_mag=[None if s is None else s[1]
+                   for s in sized(model, values, component=1)],
+        lebail=None)
+
+
+def test_a_magnetic_width_off_zero_is_recompiled():
+    """The compile builds no magnetic family at zero widths, so neither the
+    frozen windows nor ``rewindow`` can draw the widened magnetic peaks."""
+    base = _magnetic_base(0.0)
+    assert not base.model.mag_split(0)
+    assert preview._choose(base, base.values) == "frozen"
+    values = {**base.values, "phases.0.magnetic_lor_size": 0.05}
+    assert preview._choose(base, values) == "recompiled"
+
+
+def test_a_magnetic_family_outgrown_is_recompiled():
+    """``rewindow`` keeps the magnetic family's windows, so a width that grows
+    past them needs a compile."""
+    base = _magnetic_base(0.01)
+    assert base.model.mag_split(0)
+    assert preview._choose(base, base.values) == "frozen"
+    values = {**base.values, "phases.0.magnetic_lor_size": 1.0}
+    assert preview._choose(base, values) == "recompiled"
+
+
 # ---------------------------------------------------------------- the answer
 def test_the_phases_and_background_sum_to_the_total(nac):
     answer = preview.evaluate(nac, {"values": {}})
@@ -193,6 +228,18 @@ def test_the_values_header_names_the_tied_dependents(fap):
     answer = preview.evaluate(fap, {"values": {"phases.0.cell.a": a + 1e-4}})
     assert answer.header["values"] == {"phases.0.cell.a": a + 1e-4,
                                        "phases.0.cell.b": a + 1e-4}
+
+
+def test_the_values_header_names_a_formula_tie_s_row(tmp_path_factory):
+    """A row a user formula writes is a derived row rather than an affine
+    tie, and it moves with the variable it reads."""
+    project = build_example("nac", tmp_path_factory.mktemp("preview-formula"))
+    r = project.refinement
+    biso = preview._base(project).values["phases.0.atoms.0.biso"]
+    r.add_variable("half_b", biso / 2)
+    r.tie("phases.0.atoms.0.biso", expression="2*half_b")
+    answer = preview.evaluate(project, {"values": {"vars.half_b": biso / 2 + 0.1}})
+    assert answer.header["values"]["phases.0.atoms.0.biso"] == pytest.approx(biso + 0.2)
 
 
 # ---------------------------------------------------------------- nothing written
