@@ -869,7 +869,7 @@ ROWS: tuple[Row, ...] = (
     Row("LOW_ANGLE_ASYMMETRY_UNCALIBRATED", "code", tier=1, ambiguity=3,
         evidence=("geometry and arithmetic, reported only (WP-2056): fires exactly when a "
                   "magnetic-only line the data sees (MAGNETIC_WIDTH_PURITY's cut, seen at "
-                  "MIN_COEF_SIGNIFICANCE) lies below the lowest seen line that is not; "
+                  "MIN_COEF_SIGNIFICANCE) lies below the lowest seen nuclear-only line; "
                   "quotes each such line's centroid shift by linear least squares on its "
                   "own position derivative and profile with the counting-noise esd, and a one-term "
                   "cot 2theta shape through them; no threshold on any number. Ba2FeSbSe5 "
@@ -5229,7 +5229,8 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: names the stage setting that lifts the cap"),
     Row("LOW_ANGLE_ASYMMETRY_UNCALIBRATED.suggestion", "suggestion", tier=2, ambiguity=3,
         value=1,
-        evidence=("an instrument's asymmetry taken from a standard's calibration is the "
+        evidence=("an instrument's asymmetry taken from a standard's calibration (same "
+                  "container and fill, since S/L carries the specimen's axial length) is the "
                   "instrument-parameter workflow GSAS-II (.instprm) and FullProf (the "
                   "resolution file) run, and rietx's own lab_calibrate -> "
                   "load_instrument_profile; the second sentence names the check, with no "

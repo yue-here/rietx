@@ -1634,7 +1634,7 @@ def test_ba2fesbse5_the_report_names_the_low_angle_shift_the_protocol_holds(
             if d.code == "LOW_ANGLE_ASYMMETRY_UNCALIBRATED"]
     assert d.level == "info"
     assert -0.060 < d.value < -0.035, d.value
-    assert "below 21.67 deg is a magnetic-only line of phase 0 (3 lines)" in d.message
+    assert "lies below 21.67 deg, where 3 magnetic-only lines of phase 0 do" in d.message
     assert "at 9.38 deg (1 0 1)/(1 0 0)" in d.message
     assert "not determinable from this sample's nuclear lines" in d.message
     assert "held at 0" in d.message

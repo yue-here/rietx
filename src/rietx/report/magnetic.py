@@ -1206,9 +1206,10 @@ def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]
     treatment, so this finding decides nothing and reports.
 
     **What fires it is geometry**: at least one seen magnetic-only line (a
-    magnetic fraction at or above 1 − :data:`~.schemas.MAGNETIC_WIDTH_PURITY`,
-    WP-1343's cut) below the lowest seen line of any phase that is not, or
-    seen lines that are all magnetic-only.  **What it says is arithmetic**:
+    magnetic fraction at or above 1 − :data:`~.schemas.MAGNETIC_WIDTH_PURITY`)
+    below the lowest seen nuclear-only line of any phase (a fraction at or
+    below it: WP-1343's control side), or with no nuclear-only line seen at
+    all.  A half-magnetic line neither fires it nor silences it.  **What it says is arithmetic**:
     each such line's centroid shift with its counting-noise esd
     (:func:`_line_shifts`), the shift at the first line that could check it,
     and what a cot 2θ shape through the magnetic-only lines predicts there
@@ -1227,11 +1228,13 @@ def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]
     r = (np.asarray(model.y_obs, dtype=np.float64)
          - np.asarray(y_calc, dtype=np.float64))
     lines = _line_shifts(model, values, r, sigma)
-    magnetic = [ln[3] >= 1.0 - MAGNETIC_WIDTH_PURITY for ln in lines]
-    first = next((i for i, m in enumerate(magnetic) if not m), len(lines))
-    if first == 0:
+    # the anchor is a nuclear-only line (WP-1343's control side of the
+    # cut); a half-magnetic line neither anchors nor is listed
+    first = next((i for i, ln in enumerate(lines)
+                  if ln[3] <= MAGNETIC_WIDTH_PURITY), len(lines))
+    low = [ln for ln in lines[:first] if ln[3] >= 1.0 - MAGNETIC_WIDTH_PURITY]
+    if not low:
         return out
-    low = lines[:first]
     anchor = lines[first] if first < len(lines) else None
     sl = float(values["instrument.geometry.axial_sl"])
     hl = float(values["instrument.geometry.axial_hl"])
@@ -1250,15 +1253,16 @@ def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]
     owner = (f"phase {phases[0]}" if len(phases) == 1
              else "phases " + ", ".join(str(p) for p in phases))
     message = (
-        f"Every line the data sees {where_from} is a magnetic-only line of "
-        f"{owner} ({len(low)} line{'' if one else 's'}), so the axial "
-        f"asymmetry is not determinable from this sample's nuclear lines "
-        f"where it is largest. {'Its centroid sits' if one else 'Their centroids sit'} "
+        f"No nuclear line the data sees lies {where_from}, where "
+        f"{len(low)} magnetic-only line{' of ' if one else 's of '}{owner} "
+        f"{'does' if one else 'do'}, so the axial asymmetry is not "
+        f"determinable from this sample's nuclear lines where it is largest. "
+        f"{'Its centroid sits' if one else 'Their centroids sit'} "
         f"{shown}{more} from the drawn {'position' if one else 'positions'} "
         f"(negative: observed at lower angle).")
     if anchor is not None:
         message += (
-            f" The first line that is not magnetic-only, at {anchor[1]:.2f} "
+            f" The first nuclear line, at {anchor[1]:.2f} "
             f"deg, sits {1e3 * anchor[4]:+.1f}({1e3 * anchor[5]:.1f}) mdeg.")
         shape = _cot_through(low)
         if shape is not None:
@@ -1279,9 +1283,9 @@ def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]
         message=message,
         suggestion=(
             "Take the axial asymmetry from a standard measured on this "
-            "instrument at this wavelength. A value refined on this "
-            "pattern rests on these magnetic lines alone, so compare the "
-            "lowest line's drawn and observed shape before quoting the "
-            "moment."),
+            "instrument at this wavelength, in the same container and fill. "
+            "Whatever the source, a standard, an instrument file or a value "
+            "refined on these magnetic lines, compare the lowest line's "
+            "drawn and observed shape under it before quoting the moment."),
     ))
     return out
