@@ -1,6 +1,6 @@
 # WP-2123 — the layout shell
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-08 — claimed by a ghostshift runner
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — built; PR #1476 waits for the maintainer's review
 Depends on: —
 Priority: P2 2026-11-08 — the first piece of the open gui-overhaul milestone; pieces 2-5 build inside it
 
@@ -202,9 +202,9 @@ deletions from `theme.py`.
   graphs above the model, the sash turned horizontal.
 - [x] The layout-shift browser test: every control clicked on a fresh page in each starting
   state, element boxes compared before and after, real clicks only.
-- [ ] Vitest for the shell's logic, the dist rebuilt, the GUI chapters and the screenshots the
+- [x] Vitest for the shell's logic, the dist rebuilt, the GUI chapters and the screenshots the
   shell changes regenerated.
-- [ ] Skill: none expected. The agent skill drives the python API, and the GUI's routes are
+- [x] Skill: none expected. The agent skill drives the python API, and the GUI's routes are
   unchanged.
 
 ## Acceptance
@@ -229,6 +229,49 @@ today's GUI opens from the new shell, and the page does not scroll sideways at 4
 
 ## Handover log
 
+- **2026-11-09** — the layout shell landed, in PR #1476, whose merge waits for the maintainer's
+  review. The window now has the overhaul's shape: graphs on the left under their own tab strip
+  and a title line saying what the graph shows, the nine panels on the right, and one action
+  bar under them that applies edits and refines (one cycle on the ticked parameters, or the
+  staged plan, on ⌘⏎). Each side collapses from a button at its own end of the header, and a
+  window under 760 px stacks the two. Every segmented choice is now a sunken track with one
+  raised option. A browser test now clicks every shell control and fails on any box that
+  moves; its first runs found four layout shifts, all fixed. Eleven calls no ruling covered are
+  listed under *Calls settled by Claude* above, with one rule conflict, for the maintainer.
+
+  *Done*: `.segmented` and two surface tokens; the top bar's collapse buttons (`Split | Full`
+  retired); `GRAPH_TABS` and the title line, with Rwp and GoF moved onto it; `ActionBar.svelte`,
+  with the header's Run and the Parameters footer retired and Params exposing `apply`,
+  `revert` and `onpending`; the sash's double-click reset; the stacked layout from
+  `shellThreshold()`; `tests/test_gui_layout_browser.py`; the quickstart and the panel guide;
+  `test_gui_manual.py` reads the graph tabs too; every screenshot regenerated and looked at.
+  The checklist and the plot's empty state now say Refine where they said Run.
+
+  *Measured* (macOS arm64, worktree venv `[dev]` plus playwright 1.64.1, node 24.22.1): vitest
+  610 passed (609 before; +1, the action bar's apply-then-refine test, and the Split | Full
+  test rewritten for the collapse buttons); svelte-check 0 errors; the layout browser test 8
+  passed; fast suite (`-m "not slow"`, `-n auto`, queued alone through serial.py) 14468 passed, 410 skipped, 32 xfailed; the 8 new browser cases cost 49.7 s locally, the sweep 35.5 s of it. They stay out of `slow` like their siblings `test_gui_browser.py` and `test_watch_browser.py`: the module skips wherever playwright is not installed, CI included, so the tail they join is local only; ruff clean; `python -m tests.reader_output` exit 0 (unchanged against
+  63d7c120a). The layout test went red on each of the four real shifts before its fix, naming
+  the landmark that moved: stacked, the panel column covered the graph tab; the empty pending
+  slot grew 17 px on the first edit; reading the report moved the tab strip 25 px.
+
+  *Review* (`/code-review high --fix`): five fixes landed (a refused apply from another tab
+  brings Parameters forward; the palette's one-cycle command no longer flips the bar's choice;
+  a double press during the apply starts nothing twice; the one-cycle run reuses `runStage`;
+  the layout test's refine case waits for the run's echo). Five were declined as design
+  questions for the maintainer. With the graphs hidden, Rwp, GoF and the not-a-fit chip are
+  hidden too. With the panel column hidden, no visible button starts a fit (⌘⏎, `r` and the
+  palette still do). Model and Text edits do not ride the action bar (owed to piece 2, in the
+  milestone's owed list). The invalid-edit reason is cut by the bar's reserved 16ch slot and
+  read in full on hover. The `r` key still runs the plan without applying pending edits.
+
+  *Gotchas*: the layout test scopes the header as `#app > header`, since the Model panel has a
+  `<header>` of its own. A column flex item needs `min-height: 0`, or its content height is its
+  floor. `.panel` now clips, which is safe because every panel scrolls inside itself.
+
+  Next: the maintainer reviews the PR, the eleven settled calls and the two hidden-side
+  questions above. Piece 2 of the milestone, not yet filed, inherits the Model tab's two filled
+  buttons.
 - **2026-11-08** — filed by a ghostshift runner as the first piece of the gui-overhaul milestone,
   which this session opened. No open WP owned the GUI shell. The number 2123 was claimed by the
   shift before the milestone claimed 22xx for its later pieces. Next: start the checklist.
