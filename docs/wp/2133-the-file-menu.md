@@ -200,7 +200,7 @@ npm --prefix gui test && npm --prefix gui run check
   13. ⌘N, ⌘W and Show in Finder are left out, and so are the plot and console-script exports,
       which the desktop app and the plot's own buttons hold.
 
-  Next: (1) review and merge #1498, then this PR; (2) a draft of pending edits that survives
+  Next: (1) review and merge #1498, then this one, #1502; (2) a draft of pending edits that survives
   close and crash, which is a stored-format change to the project and so the maintainer's call
   before any code; (3) the maintainer's rulings on the visual calls above.
 
