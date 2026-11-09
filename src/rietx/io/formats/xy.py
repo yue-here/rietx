@@ -1,11 +1,12 @@
 """Two/three-column ASCII — the format everything can be exported to.
 
 No spec: the shape *is* the format.  Rows of ``x y [σ]``, comment lines
-starting ``#``/``!``/``'``/``/``, whitespace, comma or semicolon separated, a
+starting ``#``/``!``/``'``/``/``/``;``, whitespace, comma or semicolon separated, a
 trailing ``#`` or ``!`` comment dropped from a row.  GSAS-II's column importers
 read the same three separators (``docs/practice.md``).  Two shapes are refused
-by name rather than read: quoted fields, and a **decimal comma**, which read as
-written splits every number in two and is a different pattern.  Because there
+by name rather than read: quoted fields, and a **comma inside a number** (a
+decimal comma or a thousands separator), which read as a separator splits the
+number in two and is a different pattern.  Because there
 is nothing to recognise, this reader is the last entry in the dispatch order and
 claims whatever is left — which is **not** the same as everything: a file whose
 first 4 kB holds a NUL is binary and is not claimed, so it reaches
@@ -125,15 +126,21 @@ _OTHER_UNITS: tuple[tuple[re.Pattern[str], str], ...] = (
 #: an assumed 2θ axis is worth a diagnostic.  Never to set the axis.
 _TOF_HINT_RE = re.compile(r"time[-\s]?of[-\s]?flight|\btof\b", re.I)
 
-_COMMENT_MARKERS = ("#", "!", "'", "/")
+#: What opens a comment line.  ``;`` is Bruker's comment marker (``uxd``), and
+#: since ``;`` also separates columns here, a ``;`` line would otherwise read as
+#: a row.
+_COMMENT_MARKERS = ("#", "!", "'", "/", ";")
 
-#: One field of a row written with a **decimal comma**: digits, at most one
-#: comma between digits, an optional exponent, and no point anywhere.  A row
-#: is decimal-comma when it has two or more whitespace- or ``;``-separated
-#: fields, every one of this shape and at least one with its comma.  A
-#: comma-separated row has one such field (``10.0,100``) or a field ending in
-#: its comma (``10.0, 100``), so neither matches.
-_DECIMAL_COMMA_FIELD = re.compile(r"[+-]?\d+(?:,\d+)?(?:[eE][+-]?\d+)?")
+#: A comma **inside a number**: a field that is a number once its commas are
+#: read as part of it (digits on each side of every comma, then an optional
+#: point and exponent), in a row whose fields are separated by whitespace or
+#: ``;``.  The whole field must match, so ``'1,80p'`` in a line of text is not
+#: one.  That comma is a
+#: decimal comma (``10,02``) or a thousands separator (``1,234``), and read as a
+#: column separator it splits the number in two.  A comma-separated row has one
+#: such field (``10.0,100``) or a field ending in its comma (``10.0, 100``), so
+#: neither matches.
+_COMMA_IN_NUMBER = re.compile(r"[+-]?\d+(?:,\d+)+(?:\.\d*)?(?:[eE][+-]?\d+)?")
 
 
 #: The markers that open a comment **after** a row's numbers.  ``#`` and ``!``
@@ -156,12 +163,16 @@ def _cut_comment(parts: list[str]) -> list[str]:
     return parts[:cut]
 
 
-def _is_decimal_comma(s: str) -> bool:
-    """Whether the row ``s`` is written with a decimal comma (:data:`_DECIMAL_COMMA_FIELD`)."""
+def _comma_in_number(s: str) -> str | None:
+    """The first field of the row ``s`` holding a comma inside a number, if any.
+
+    Only a row of two or more whitespace- or ``;``-separated fields can hold
+    one (:data:`_COMMA_IN_NUMBER`).
+    """
     fields = _cut_comment(s.replace(";", " ").split())
-    return (len(fields) >= 2
-            and all(_DECIMAL_COMMA_FIELD.fullmatch(f) for f in fields)
-            and any("," in f for f in fields))
+    if len(fields) < 2:
+        return None
+    return next((f for f in fields if _COMMA_IN_NUMBER.fullmatch(f)), None)
 
 
 def _fields(s: str) -> list[str]:
@@ -181,7 +192,8 @@ def _no_data(p: Path, skipped: list[tuple[int, str]], n_comments: int,
              heading: bool = False) -> str:
     """The refusal for a file with no row of two numbers, naming what it saw."""
     if not skipped:
-        cause = ("every non-blank line starts with a comment marker (# ! ' /)"
+        cause = (f"every non-blank line starts with a comment marker "
+                 f"({' '.join(_COMMENT_MARKERS)})"
                  if n_comments else
                  "the file holds no line of text below its XYDATA heading"
                  if heading else "the file holds no line of text")
@@ -193,8 +205,8 @@ def _no_data(p: Path, skipped: list[tuple[int, str]], n_comments: int,
                  f"without quotes")
     else:
         n, s = skipped[0]
-        cause = (f"no line holds two numbers; the first line that is not a "
-                 f"comment is line {n}: {s!r}")
+        cause = (f"no line reads as a row of numbers; the first line that is "
+                 f"not a comment is line {n}: {s!r}")
     return f"no numeric data found in {p}: {cause}."
 
 #: The ``axis`` reader option's values, :data:`AxisKind`'s, and what each is in
@@ -329,12 +341,16 @@ def read_xy(path: str | Path, *, axis: str | None = None,
     count is out of this check's reach; the axis check in ``read_pattern``
     still sees one landing at or below 0°.
 
-    **A line below the first data row that holds no two numbers is reported
-    by line** (``PATTERN_ROWS_DROPPED``, issue #897).  Above it such a line is
-    a header and is skipped silently, as in 22 repository files; below it, it
-    is a lost point (``10.2 n/a``) or a note, and no repository pattern has
-    one.  A ``nan`` or ``inf`` is a number here and reaches the finite-row
-    drop, which names its 2θ instead.
+    **A line inside the data that does not read as a row of numbers is
+    reported by line** (``PATTERN_ROWS_DROPPED``, issue #897): inside means
+    between the first and the last row at the file's column count.  Above the
+    data such a line is a header and is skipped silently, as in 22 repository
+    files, and below it a footer; inside, it is a lost point (``10.2 n/a``) or
+    a note, and no repository pattern has one.  GSAS-II's xye importer refuses
+    the file there; this reader reads on and names the line, since refusing
+    loses every other point for one line the caller can judge.  A ``nan`` or
+    ``inf`` is a number here and reaches the finite-row drop, which names its
+    2θ instead.
 
     ``axis`` is the caller's declaration of what x is, ``"two_theta"`` or
     ``"tof"``; ``None`` leaves it to the file (the module docstring).  An
@@ -348,8 +364,8 @@ def read_xy(path: str | Path, *, axis: str | None = None,
             f"{p.name}: axis={axis!r} is not an abscissa a pattern holds; "
             f"declare one of {sorted(_AXIS_WORDS)}")
     rows: list[tuple[int, list[str], list[float]]] = []
-    skipped: list[tuple[int, str]] = []         # lines holding no two numbers
-    decimal_comma: list[tuple[int, str]] = []   # rows written with a decimal comma
+    skipped: list[tuple[int, str]] = []        # lines that are not rows of numbers
+    in_number: list[tuple[int, str, str]] = []  # rows with a comma inside a number
     comments: list[str] = []
     # the mark decides the codec, so a UTF-16 export from Windows vendor
     # software reads instead of dying on "no numeric data found"
@@ -378,24 +394,30 @@ def read_xy(path: str | Path, *, axis: str | None = None,
             rows.append((n, parts, vals))
             # the comma test splits and matches the row a second time, a
             # quarter of the read on a 400 000-row file holding no comma
-            if "," in s and _is_decimal_comma(s):
-                decimal_comma.append((n, s))
+            if "," in s and (field := _comma_in_number(s)) is not None:
+                in_number.append((n, s, field))
         else:
             skipped.append((n, s))
     if not rows:
         raise ValueError(_no_data(p, skipped, len(comments), heading > 0))
-    if 2 * len(decimal_comma) >= len(rows):
-        n, s = decimal_comma[0]
+    if in_number:
+        # One such row is enough: the exporter writes its numbers this way, and
+        # a row without one has only a value that did not need it (``10``
+        # beside ``10,02``, ``999`` beside ``1,234``).
+        n, s, field = in_number[0]
         raise ValueError(
-            f"{p.name}: {len(decimal_comma)} of the file's {len(rows)} rows of "
-            f"numbers use a comma as the decimal separator (line {n}: {s!r}). "
-            f"Read as written, each such comma would split a number in two and "
-            f"shift the columns, which is a different pattern, so the file is "
-            f"refused. Re-export it with a decimal point.")
+            f"{p.name}: {len(in_number)} of the file's {len(rows)} rows of "
+            f"numbers write a comma inside a number (line {n}: {s!r}, the field "
+            f"{field!r}). That comma is a decimal separator (10,02) or a "
+            f"thousands separator (1,234). Read as a column separator it would "
+            f"split each such number in two and shift the columns, which is a "
+            f"different pattern, so the file is refused. Re-export it with a "
+            f"decimal point and no thousands separator.")
     counts = Counter(len(parts) for _, parts, _ in rows)
     arity = max(counts, key=lambda k: (counts[k], k == len(rows[-1][1])))
-    first = next(n for n, parts, _ in rows if len(parts) == arity)
-    inside = [(n, s) for n, s in skipped if n > first]
+    kept = [n for n, parts, _ in rows if len(parts) == arity]
+    first, last = kept[0], kept[-1]
+    inside = [(n, s) for n, s in skipped if first < n < last]
     dropped = [(n, parts) for n, parts, _ in rows if len(parts) != arity]
     if dropped and diagnostics is not None:
         shown = "; ".join(f"line {n}: {' '.join(parts)!r}"
@@ -414,18 +436,20 @@ def read_xy(path: str | Path, *, axis: str | None = None,
             value=float(len(dropped)),
         ))
     if inside and diagnostics is not None:
-        # A header above the first data row is normal and is skipped without a
-        # word.  A line below it that holds no two numbers is a lost point
-        # (``10.2 n/a``) or a note written into the data, and the reader cannot
-        # tell which, so it says where each one is.
+        # A header above the first data row, or a footer below the last, is
+        # normal and is skipped without a word.  A line between them that does
+        # not read as a row of numbers is a lost point (``10.2 n/a``) or a note
+        # written into the data, and the reader cannot tell which, so it says
+        # where each one is and reads on: refusing would lose every other point
+        # for one line the caller can judge.
         shown = "; ".join(f"line {n}: {s!r}" for n, s in inside[:3])
         more = f", and {len(inside) - 3} more" if len(inside) > 3 else ""
         diagnostics.append(Diagnostic(
             level="warning", code="PATTERN_ROWS_DROPPED",
             message=(
-                f"{p.name}: {len(inside)} line(s) after the first data row "
-                f"(line {first}) do not hold two numbers and were not read as "
-                f"data ({shown}{more})."),
+                f"{p.name}: {len(inside)} line(s) inside the data (lines "
+                f"{first}-{last}) do not read as a row of numbers and were not "
+                f"read as data ({shown}{more})."),
             where=[f"line {n}" for n, _ in inside],
             suggestion=(
                 "If a skipped line was a measured point, correct it in the file "

@@ -47,7 +47,7 @@ _SUFFIXES = (".pks", ".udi")
 #: The comment markers ``xy.read_xy`` skips, mirrored deliberately rather than
 #: re-chosen: this gate predicts whether *that* reader would open the file, so a
 #: line it ignores may not be counted against it.
-_COMMENT = ("#", "!", "'", "/")
+_COMMENT = ("#", "!", "'", "/", ";")
 
 #: One plain number, in the forms ``float()`` accepts — ``.5`` and ``1.`` are
 #: numbers to the reader this gate stands in for, so they are numbers here.

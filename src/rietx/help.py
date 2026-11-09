@@ -3454,10 +3454,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "different count, naming them by line. A header table or a limits row "
             "usually causes this. If a skipped line was a real measurement, the file "
             "mixes layouts. Re-export it with the same number of values on every row. "
-            "The same reader also names, by line, each line below the first data row "
-            "that does not hold two numbers, such as '10.2 n/a'. Text above the first "
-            "data row is a header and is skipped without a report. A line inside the "
-            "data is a lost point or a note, and the reader cannot tell which."
+            "The same reader also names, by line, each line between the first and the "
+            "last data row that does not read as a row of numbers, such as '10.2 n/a'. "
+            "Text above the data is a header and text below it a footer, and both are "
+            "skipped without a report. A line inside the data is a lost point or a "
+            "note, and the reader cannot tell which."
         ),
     ),
     "PATTERN_SCAN_REVERSED": HelpEntry(

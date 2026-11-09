@@ -485,8 +485,8 @@ text line inside the data and a decimal comma?
 
 | Program | What it does |
 |---|---|
-| rietx | Whitespace, `,` and `;` separate. A field opening with `#` or `!` ends the row, without a report. A line below the first data row that holds no two numbers is dropped and reported by line (`PATTERN_ROWS_DROPPED`); text above it is a header, skipped silently. Quoted fields and a decimal comma are refused by name (checked, `io/formats/xy.py`) |
-| GSAS-II 5.8.4 | `imports/G2pwd_xye.py:166` and `G2pwd_csv.py:28,73` replace `,` and `;` with spaces, so both importers read either separator. After the header, a line with fewer than two fields is printed to the console and skipped; a field that is not a number refuses the whole file, naming the line (`:187`). Columns past the third are ignored, so `10.0 100 # c` reads while `10.0 100 #c` refuses. A quoted field refuses. A decimal comma splits each number in two, as rietx did before (checked by reading, not run) |
+| rietx | Whitespace, `,` and `;` separate, and a `;` line is a comment. A field opening with `#` or `!` ends the row, without a report. A line between the first and last data row that is not a row of numbers is dropped and reported by line (`PATTERN_ROWS_DROPPED`); a header above the data and a footer below it are skipped silently. Quoted fields and a comma inside a number (a decimal comma or a thousands separator) are refused by name (checked, `io/formats/xy.py`) |
+| GSAS-II 5.8.4 | `imports/G2pwd_xye.py:166` and `G2pwd_csv.py:28,73` replace `,` and `;` with spaces, so both importers read either separator. After the header, a line with fewer than two fields is printed to the console and skipped; a field that is not a number refuses the whole file, naming the line (`:187`). Columns past the third are ignored, so `10.0 100 # c` reads while `10.0 100 #c` refuses. A quoted field refuses. A decimal comma or a thousands separator splits the number in two, as rietx did before (checked by reading, not run) |
 | FullProf, TOPAS, RIETAN-FP, BGMN, MAUD | Not checked |
 
 ## A magCIF in a non-standard orientation
