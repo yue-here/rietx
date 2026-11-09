@@ -37,7 +37,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .common import Base
 
@@ -53,11 +53,41 @@ class TieSpec(Base):
     back with ``untie``.  Both hold a row the same way, so ``held_because``
     reads the same for either; the flag is what lets a client tell a row it may
     release from one it may not, without having to try.
+
+    :attr:`expression` is the third form (WP-2118): a user tie declared as a
+    formula, ``Refinement.tie(path, expression="B0 * debye(thD / 300)")``.
+    Its text is the whole tie, so :attr:`terms` stays empty and :attr:`const`
+    at zero, and the names it reads are named variables (``vars.<name>``).
+    ``None`` on every linear tie, symmetry or user, and on every tie stored
+    before schema 0.61.  One writer, ``Refinement.tie``; a formula always runs
+    as a formula, even when it is linear, so a linear tie is never stored as
+    text (the maintainer's ruling of 2026-11-07).
     """
 
     terms: list[tuple[str, float]] = Field(default_factory=list)
     const: float = 0.0
     user: bool = False
+    expression: str | None = None
+
+    @model_validator(mode="after")
+    def _one_form(self) -> "TieSpec":
+        """Refuse a stored tie that is a formula and a linear tie at once.
+
+        ``Refinement.tie(path, expression=...)`` writes the text alone, so a
+        document carrying ``expression`` beside ``terms`` (or beside a nonzero
+        ``const``) was written by something else, and either reading would
+        drop half of what it says.  The maintainer's ruling of 2026-11-07.
+        """
+        if self.expression is not None:
+            if self.terms:
+                raise ValueError(
+                    "a tie carries both 'expression' and 'terms'; a formula tie's "
+                    "text is the whole tie, so store one or the other")
+            if self.const:
+                raise ValueError(
+                    "a tie carries both 'expression' and a nonzero 'const'; a "
+                    "formula tie's text is the whole tie, so store one or the other")
+        return self
 
     @classmethod
     def _from_tie(cls, tie: Any, *, user: bool = False) -> "TieSpec":
@@ -75,11 +105,23 @@ class TieSpec(Base):
 
     @property
     def sources(self) -> list[str]:
-        """The paths this value follows — what to edit instead of this row."""
+        """The paths this value follows — what to edit instead of this row.
+
+        For a formula, the variables it reads, first use first.
+        """
+        if self.expression is not None:
+            from ..params.expression import Expression
+            from ..params.vector import VAR_PREFIX
+            return [f"{VAR_PREFIX}{n}" for n in Expression(self.expression).names]
         return [p for p, _ in self.terms]
 
     def describe(self) -> str:
-        """Human-readable right-hand side, e.g. ``0.1993 + 1·phases.0.atoms.1.dof.0``."""
+        """Human-readable right-hand side, e.g. ``0.1993 + 1·phases.0.atoms.1.dof.0``.
+
+        A formula reads as the text it was declared with.
+        """
+        if self.expression is not None:
+            return self.expression
         parts = [f"{c:g}·{p}" for p, c in self.terms]
         if self.const or not parts:
             parts.insert(0, f"{self.const:g}")

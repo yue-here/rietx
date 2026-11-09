@@ -28,6 +28,8 @@
     parsePriorCell,
     priorCellText,
     searchHelp,
+    setFormula,
+    textOrNull,
     type IndexingControls,
   } from "../lib/controls";
   import { labelFor, type HelpCorpus } from "../lib/help";
@@ -269,6 +271,9 @@
   const verdicts = $derived<Array<{ allowed: boolean; why: string }>>(
     indexAnswer?.adopt ?? []);
   const columns = $derived(fomColumns(candidates));
+  /** the Z column shows when the run read a formula: every candidate then
+   *  carries its formula units, and none does otherwise (WP-2030) */
+  const zColumn = $derived(indexAnswer?.result?.formula != null);
   const best = $derived(verdicts.findIndex((v) => v.allowed));
   const quality = $derived(indexAnswer?.result?.quality ?? null);
   const screen = $derived(extinction?.result ?? null);
@@ -363,11 +368,11 @@
 
 <section>
   <div class="controls">
-    <button onclick={pick} disabled={busy}
+    <button class="ghost" onclick={pick} disabled={busy}
       title="fit every detectable line; replaces the stored list, edits included">
       {rows.length ? "Re-pick peaks" : "Pick peaks"}
     </button>
-    <button onclick={startIndex} disabled={busy || !rows.length}
+    <button class="ghost" onclick={startIndex} disabled={busy || !rows.length}
       title="run every indexing engine on the usable lines; agreement is the confidence">
       Index
     </button>
@@ -508,6 +513,32 @@
               onchange={(ev) => setSearch("max_volume",
                 numOrNull((ev.currentTarget as HTMLInputElement).value))} />
           </label>
+          <!-- the specimen's formula sits beside the volume limits it would
+               set (WP-2030); a temperature without one is refused, so its
+               box waits for a formula -->
+          <label class="num">
+            <Help for={searchHelp(field("formula"))}>{field("formula").label}</Help>
+            <input type="text" spellcheck="false" disabled={busy}
+              placeholder="e.g. CuSO4·5H2O"
+              value={draft.formula ?? ""}
+              onchange={(ev) => {
+                setFormula(draft!,
+                  (ev.currentTarget as HTMLInputElement).value);
+                commit();
+              }} />
+          </label>
+          <label class="num">
+            <Help for={searchHelp(field("temperature"))}
+              >{field("temperature").label}</Help>
+            <input type="text" inputmode="decimal"
+              disabled={busy || draft.formula === null}
+              value={draft.temperature ?? ""}
+              onchange={(ev) => {
+                draft!.temperature =
+                  numOrNull((ev.currentTarget as HTMLInputElement).value);
+                commit();
+              }} />
+          </label>
         </div>
 
         <div class="row">
@@ -554,7 +585,7 @@
           <input class="add" type="text" disabled={busy}
             placeholder="a b c α β γ…" bind:value={priorText}
             onkeydown={(ev) => ev.key === "Enter" && addPriorCell()} />
-          <button disabled={busy || !priorText.trim()}
+          <button class="ghost" disabled={busy || !priorText.trim()}
             onclick={addPriorCell}>add</button>
         </div>
 
@@ -572,7 +603,7 @@
           <input class="add" type="text" disabled={busy}
             placeholder="e.g. R -3 c" bind:value={sgText}
             onkeydown={(ev) => ev.key === "Enter" && addPriorSg()} />
-          <button disabled={busy || !sgText.trim()}
+          <button class="ghost" disabled={busy || !sgText.trim()}
             onclick={addPriorSg}>add</button>
         </div>
       </div>
@@ -726,6 +757,7 @@ can rise when validation and ambiguity run, never fall">
           <thead>
             <tr>
               <th></th><th>cell</th><th>lattice</th>
+              {#if zColumn}<th><Help for="search_fields:formula">Z</Help></th>{/if}
               {#each columns as name (name)}<th>{name}</th>{/each}
               <th>Rwp</th><th title="lines predicted where the pattern has no
                 intensity, of the lines screened; 'in window' is the count the
@@ -755,6 +787,9 @@ and this cell's predicted lines through the data"
                   {#if i === best}<span class="chip ok">best_or_none()</span>{/if}
                 </td>
                 <td>{c.centring} {c.system}<br /><span class="muted">{c.volume.toFixed(1)} Å³</span></td>
+                {#if zColumn}
+                  <td>{c.formula_units == null ? "—" : c.formula_units.toFixed(2)}</td>
+                {/if}
                 {#each columns as name (name)}
                   {@const v = fomOf(c, name)}
                   <td>{v === null ? "—" : v.toFixed(1)}</td>
@@ -765,7 +800,7 @@ and this cell's predicted lines through the data"
                   {#each c.found_by as e (e)}<span class="chip note">{e}</span>{/each}
                 </td>
                 <td>
-                  <button disabled={busy || !(verdicts[i]?.allowed)}
+                  <button class="ghost" disabled={busy || !(verdicts[i]?.allowed)}
                     title={verdicts[i]?.allowed
                       ? "adopt this cell as the model (a Le Bail scaffold; one history node)"
                       : verdicts[i]?.why ?? ""}
@@ -775,7 +810,7 @@ and this cell's predicted lines through the data"
               {#if expanded === i}
                 <tr class="detail">
                   <td></td>
-                  <td colspan={7 + columns.length}>
+                  <td colspan={7 + columns.length + (zColumn ? 1 : 0)}>
                     {#if c.confidence_caveats.length}
                       <p class="flags">
                         {#each c.confidence_caveats as caveat (caveat)}
@@ -799,7 +834,7 @@ and this cell's predicted lines through the data"
                         the measured range</p>
                     {/if}
                     <p>
-                      <button disabled={busy}
+                      <button class="ghost" disabled={busy}
                         title="rank the extinction classes this lattice allows: one shared
 profile fit, then one Le Bail per class — the answer is a ranked list of
 classes, and every class lists all its space groups (WP-1025)"

@@ -505,7 +505,8 @@ const SERIES_STAGED = {
   sigma_mixed: true,
 };
 
-/** A finished two-pattern series whose cell edge is path-dependent — the case
+/** A finished two-pattern series whose cell edge differs most between the two
+ *  chains, 5.2 esd at T400 where the chains kept different rungs — the case
  *  the panel exists to make un-missable. */
 const SERIES_ANSWER = {
   result: {
@@ -520,11 +521,21 @@ const SERIES_ANSWER = {
         diagnostics: [], n_iterations: 12, reseeded: true, rwp_warm: 0.31,
         node_id: "n0002", tree_id: "t2" },
     ],
+    steps: [
+      { path: "phases.0.cell.a", labels: ["T300", "T400"], indices: [0, 1],
+        step: 0.0021, size_esd: 21, cold_ratio: 0.93 },
+      { path: "instrument.zero_shift", labels: ["T300", "T400"], indices: [0, 1],
+        step: 0.0001, size_esd: 0.8, cold_ratio: null },
+    ],
+    direction_gaps: [
+      { path: "phases.0.cell.a", label: "T400", index: 1, forward: 4.1587,
+        backward: 4.1592, gap: -0.0005, gap_esd: -5.2,
+        forward_rung: "cold", backward_rung: "warm" },
+      { path: "instrument.zero_shift", label: "T400", index: 1, forward: 0.0081,
+        backward: 0.0081, gap: 0, gap_esd: 0.4,
+        forward_rung: "cold", backward_rung: "cold" },
+    ],
     diagnostics: [
-      { level: "warning", code: "SEQUENTIAL_PATH_DEPENDENT",
-        where: ["phases.0.cell.a"],
-        message: "phases.0.cell.a differs between the forward and backward chains",
-        suggestion: "hold it, restrain it, or quote the spread" },
       { level: "warning", code: "SEQUENTIAL_RESEED", where: ["T400"],
         message: "pattern 1 (T400) was refitted from the initial model",
         suggestion: "check whether the specimen changed here" },
@@ -533,18 +544,17 @@ const SERIES_ANSWER = {
   trajectories: [
     { path: "instrument.zero_shift", x: [300, 400], x_label: "T",
       value: [0.008, 0.0081], stderr: [1e-5, 1e-5], labels: ["T300", "T400"],
-      path_dependent: false, discontinuous: false, backward: [0.008, 0.0081],
-      n_sigma: 0.4 },
+      backward: [0.008, 0.0081], n_sigma: 0.4,
+      gap_at: { label: "T400", index: 1, forward_rung: "cold", backward_rung: "cold" } },
     { path: "phases.0.cell.a", x: [300, 400], x_label: "T",
       value: [4.1566, 4.1587], stderr: [1e-4, null], labels: ["T300", "T400"],
-      path_dependent: true, discontinuous: false, backward: [4.1571, 4.1592],
-      n_sigma: 5.2 },
+      backward: [4.1571, 4.1592], n_sigma: 5.2,
+      gap_at: { label: "T400", index: 1, forward_rung: "cold", backward_rung: "warm" } },
   ],
-  path_dependent: ["phases.0.cell.a"],
-  path_dependence_sigma: 3.0,
   has_backward: true,
   n_iterations: 43,
   curves: [true, true],
+  rejected: [false, false],
   running: false,
 };
 
@@ -787,6 +797,11 @@ function button(text: string): HTMLButtonElement | undefined {
   return [...host.querySelectorAll("button")].find((b) => b.textContent?.trim() === text);
 }
 
+/** The action bar's filled primary (WP-2123), which replaced the header's Run. */
+function refineButton(): HTMLButtonElement | null {
+  return host.querySelector<HTMLButtonElement>(".actions button.refine");
+}
+
 function rowsInDom(): HTMLElement[] {
   return [...host.querySelectorAll<HTMLElement>(".row")];
 }
@@ -834,8 +849,14 @@ describe("the shell", () => {
     expect(host.textContent).toContain("Choose a data file");
     expect(host.textContent).toContain("a.rex");
     expect(button("Create project")?.disabled).toBe(true);
-    // Run is disabled without a project — the control follows the state, not hope
-    expect(button("Run")?.disabled).toBe(true);
+    // the action bar belongs to a project, so the empty state offers no refine
+    // at all, and both collapse buttons are drawn disabled so opening one
+    // moves nothing (WP-2123)
+    expect(refineButton()).toBeNull();
+    expect(button("Run")).toBeUndefined();
+    const toggles = [...host.querySelectorAll<HTMLButtonElement>("header > button.toggle")];
+    expect(toggles).toHaveLength(2);
+    expect(toggles.every((b) => b.disabled)).toBe(true);
   });
 
   it("renders a project with no fit, and offers Run", async () => {
@@ -854,7 +875,8 @@ describe("the shell", () => {
     // panel while nothing is owed.
     expect(host.textContent).toContain("every panel the v1.0 GUI plan named");
     expect(host.textContent).not.toMatch(/WP-\d{4}/);
-    expect(button("Run")?.disabled).toBe(false);
+    expect(refineButton()?.disabled).toBe(false);
+    expect(refineButton()?.textContent).toContain("Refine");
   });
 
   it("shows the statistics and the stage while a run is in flight", async () => {
@@ -874,7 +896,7 @@ describe("the shell", () => {
     expect(host.textContent).toContain("cell");
     expect(host.textContent).toContain("(3/5)");           // 1-based, from stage_start
     expect(host.textContent).toContain("4.150%");          // Rwp as a percentage
-    expect(button("Run")?.disabled).toBe(true);            // 409 made unclickable
+    expect(refineButton()?.disabled).toBe(true);          // 409 made unclickable
     expect(button("Cancel")?.disabled).toBe(false);
   });
 
@@ -1071,6 +1093,40 @@ describe("the parameter table", () => {
     });
   });
 
+  it("applies the pending edits before it refines, in either refine choice", async () => {
+    // WP-2123: the action bar's primary is "Apply and refine" while edits are
+    // pending, and the choice beside it picks what a refine runs
+    const stub = server({ ...boot(ADVANCED), "/api/run": () => ({ body: IDLE_RUN }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    expect(refineButton()?.textContent).toContain("Refine");
+    expect(host.querySelector('[aria-label="refine"] button.on')?.textContent?.trim())
+      .toBe("Staged plan");
+    const input = cell("a");
+    input.value = "4.157";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    expect(refineButton()?.textContent).toContain("Apply and refine");
+
+    refineButton()!.click();
+    await flush();
+    const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
+      .map((c) => c.path);
+    expect(order).toEqual(["/api/params", "/api/run"]);
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+
+    // one cycle is one stage on the ticked rows: an empty turn_on
+    button("One cycle")!.click();
+    await flush();
+    refineButton()!.click();
+    await flush();
+    const runs = stub.calls.filter((c) => c.path === "/api/run");
+    expect(runs.at(-1)?.body).toEqual({ kind: "stage", stage: { name: "cycle", turn_on: [] } });
+    expect(host.textContent).toContain('ref.run_stage(Stage("cycle", turn_on=[]))');
+  });
+
   it("refuses an out-of-bounds value before the round trip", async () => {
     const stub = server(boot(ADVANCED));
     vi.stubGlobal("fetch", stub.fetcher);
@@ -1087,7 +1143,11 @@ describe("the parameter table", () => {
     // Apply is blocked, not silently partial — and Revert is still offered,
     // which is the affordance the bad cell most needs
     expect(button("Apply")?.disabled).toBe(true);
-    expect(host.textContent).toContain("above the upper bound 1");
+    // the action bar says so in words its slot has room for, and the reason
+    // rides in that slot's tooltip as well as the cell's
+    const slot = host.querySelector<HTMLElement>(".actions .pending")!;
+    expect(slot.textContent?.trim()).toBe("invalid edit");
+    expect(slot.title).toBe("w: above the upper bound 1");
     button("Revert")!.click();
     await flush();
     expect(host.textContent).not.toContain("pending edit");
@@ -1181,7 +1241,7 @@ describe("the plan editor", () => {
     expect(runStage.length).toBeGreaterThan(0);
     expect(runStage.every((b) => b.disabled)).toBe(true);
 
-    const header = button("Run")!;
+    const header = refineButton()!;
     expect(header.disabled).toBe(true);
     // one sentence, three buttons
     expect(runAll.title).toBe(header.title);
@@ -1194,7 +1254,7 @@ describe("the plan editor", () => {
     host.innerHTML = "";
     await openPlan();
     expect(button("Run all")!.disabled).toBe(false);
-    expect(button("Run")!.disabled).toBe(false);
+    expect(refineButton()!.disabled).toBe(false);
   });
 
   it("hides the resolved facts while the plan on screen is not the server's", async () => {
@@ -1416,7 +1476,8 @@ describe("the report panel", () => {
     expect(actions[1].textContent).toContain("already refined by the staged plan");
     expect(actions[2].textContent).toContain("no phase is named yet");
     // one Apply button: the other two are refusals with reasons, not controls
-    expect(host.querySelectorAll(".action button:not(.ghost)").length).toBe(1);
+    expect([...host.querySelectorAll(".action button")]
+      .filter((b) => b.textContent?.trim() === "Apply").length).toBe(1);
     // 0.5 is capped by the collinear templates, so it must not read as confident
     expect(actions[0].dataset.tone).toBe("medium");
   });
@@ -1644,38 +1705,49 @@ describe("disclosure and the command palette", () => {
     expect(writes[0].body).toEqual({ ui: { console_height: 210 } });
   });
 
-  it("selects the layout from one segmented control, and keeps the plot mounted", async () => {
+  it("collapses either side from its own button, and keeps the plot mounted", async () => {
     vi.stubGlobal("fetch", server(boot()).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // WP-1034: the top-level choice is no longer *which pane* — Model and Text
-    // are tabs — it is how much window the panel column gets.  Two options, the
-    // current one lit, and neither click means two things (WP-1029's rule).
-    const group = host.querySelector<HTMLElement>('[aria-label="layout"]')!;
-    const labels = [...group.querySelectorAll("button")].map((b) => b.textContent?.trim());
-    expect(labels).toEqual(["Split", "Full"]);
-    expect(group.querySelector("button.on")?.textContent?.trim()).toBe("Split");
+    // WP-2123: each side has a collapse button at its own end of the header,
+    // and one side always stays.  This replaced WP-1034's Split | Full control.
+    const [graphs, model] = [...host.querySelectorAll<HTMLButtonElement>("header > button.toggle")];
+    expect(graphs.getAttribute("aria-label")).toBe("Hide the graphs");
+    expect(model.getAttribute("aria-label")).toBe("Hide the model panel");
+    expect(host.querySelector('[aria-label="layout"]')).toBeNull();
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(false);
+    expect(host.querySelector(".side .actions button.refine")).not.toBeNull();
 
-    button("Full")!.click();
+    graphs.click();
     await flush();
     expect(host.querySelector(".side")?.classList.contains("wide")).toBe(true);
     // hidden, not unmounted — a layout click must not purge the drawn window
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(true);
     expect(host.querySelector(".plot")).not.toBeNull();
-    // the tab strip travels with the column, which is what makes this a hatch
-    // for every panel rather than for the two that used to have their own mode
-    // — nine since WP-1016, which needed no mode of its own for exactly this
-    expect(host.querySelectorAll("nav.tabs button").length).toBe(9);
+    // the panel tabs travel with the column, nine since WP-1016
+    expect(host.querySelectorAll(".side nav.tabs button").length).toBe(9);
     // …and no splitter, because there is nothing on the other side of it
     expect(host.querySelector('.side > .grip[data-grow="left"]')).toBeNull();
+    // the last side showing cannot hide too
+    expect(model.disabled).toBe(true);
 
-    button("Split")!.click();
+    graphs.click();
     await flush();
-    expect(group.querySelector("button.on")?.textContent?.trim()).toBe("Split");
-    // a layout is a view choice, not a setting: nothing reached the document
     expect(host.querySelector(".side")?.classList.contains("wide")).toBe(false);
+    expect(model.disabled).toBe(false);
+
+    model.click();
+    await flush();
+    expect(host.querySelector(".side")?.classList.contains("hidden")).toBe(true);
+    expect(graphs.disabled).toBe(true);
+    expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(false);
+    // the action bar went with the visible side, so Refine is still a button
+    // on screen; there is one bar, never two
+    expect(host.querySelector(".plotcol .actions button.refine")).not.toBeNull();
+    expect(host.querySelectorAll(".actions").length).toBe(1);
+    // the button did not move: it is still the header's last child
+    expect(host.querySelector("header")?.lastElementChild).toBe(model);
   });
 
   it("carries nine tabs with no label shortened and every panel reachable", async () => {
@@ -1684,7 +1756,7 @@ describe("disclosure and the command palette", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const tabs = [...host.querySelectorAll<HTMLButtonElement>("nav.tabs button")];
+    const tabs = [...host.querySelectorAll<HTMLButtonElement>(".side nav.tabs button")];
     expect(tabs.map((b) => b.textContent?.trim())).toEqual([
       "Parameters", "Plan", "Peaks", "Model", "Text", "Series", "Report",
       "History", "Build"]);
@@ -2016,6 +2088,38 @@ describe("disclosure and the command palette", () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
     await flush();
     expect(stub.calls.some((call) => call.path === "/api/run")).toBe(true);
+  });
+
+  it("applies pending edits on `r` before it runs, as the button it stands for does", async () => {
+    // WP-2123: `r` is the action bar's primary on the staged plan, which reads
+    // "Apply and refine" while edits wait; running without them dropped them
+    const stub = server({ ...boot(ADVANCED), "/api/run": () => ({ body: IDLE_RUN }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const input = cell("a");
+    input.value = "4.157";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
+    await flush();
+    const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
+      .map((c) => c.path);
+    expect(order).toEqual(["/api/params", "/api/run"]);
+    expect(stub.calls.find((c) => c.method === "PATCH")?.body)
+      .toEqual({ values: { "phases.0.cell.a": 4.157 }, vary: {} });
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+
+    // an invalid edit blocks `r` as it disables the button
+    const bad = cell("a");
+    bad.value = "abc";
+    bad.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    const runs = stub.calls.filter((c) => c.path === "/api/run").length;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true }));
+    await flush();
+    expect(stub.calls.filter((c) => c.path === "/api/run").length).toBe(runs);
   });
 });
 
@@ -2420,7 +2524,7 @@ describe("the import wizard", () => {
     expect(opened.body).toEqual({ path: "/tmp/nac.rex" });
     // the session's project is replaced, and the shell lands on the parameters
     expect(host.textContent).toContain("nac.fxye");
-    expect(host.querySelector("nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
+    expect(host.querySelector(".side nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
     expect(host.textContent).toContain("project.open(/tmp/nac.rex)");
   });
 
@@ -2456,7 +2560,7 @@ describe("the import wizard", () => {
     expect(opened.body).toEqual({ name: "fap" });
     // an example is a project like any other from the moment it exists
     expect(host.textContent).toContain("FAP.XRA");
-    expect(host.querySelector("nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
+    expect(host.querySelector(".side nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
   });
 
   it("resets an example through its own verb, not by opening it again", async () => {
@@ -2918,8 +3022,11 @@ describe("the model editor", () => {
       box.dispatchEvent(new Event("change", { bubbles: true }));
       await flush();
     }
-    // back where it started: nothing pending, so there is nothing to apply
-    expect(button("Apply")).toBeFalsy();
+    // back where it started: nothing pending, so there is nothing to apply —
+    // the Model panel draws no Apply, and the action bar's stays disabled
+    expect([...host.querySelectorAll(".panel button")]
+      .find((b) => b.textContent?.trim() === "Apply")).toBeFalsy();
+    expect(button("Apply")?.disabled).toBe(true);
     expect(stub.calls.some((c) => c.method === "PATCH" && c.path === "/api/params"))
       .toBe(false);
   });
@@ -4949,8 +5056,9 @@ describe("the extinction screen table (WP-1027)", () => {
  * A sequential fit is path-dependent by construction, so what these mounts assert
  * is the honesty of the presentation: the list the panel sends is the order it is
  * showing, the σ inconsistency is surfaced before the chain runs rather than
- * after, and `SEQUENTIAL_PATH_DEPENDENT` reaches the top of the panel with the
- * parameter named. jsdom cannot see the plot, so the trajectory drawing is
+ * after, and the largest forward/backward gap (`SeriesResult.direction_gaps`)
+ * reaches the top of the panel as a number with the parameter named, without a
+ * verdict. jsdom cannot see the plot, so the trajectory drawing is
  * asserted in `lib/series.test.ts` and the *requests* are asserted here.
  */
 describe("the series panel", () => {
@@ -5044,7 +5152,7 @@ describe("the series panel", () => {
     expect(stub.calls.some((c) => c.method === "PUT")).toBe(false);
   });
 
-  it("puts the path-dependence where it cannot be missed", async () => {
+  it("puts the forward/backward gap where it cannot be missed", async () => {
     const stub = await openSeries({
       "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
       "/api/series/result": () => ({ body: SERIES_ANSWER }),
@@ -5065,29 +5173,52 @@ describe("the series panel", () => {
         ] } }),
     });
 
-    // the banner, not a strip entry — and it names the parameter
-    const banner = host.querySelector(".banner.bad")!;
-    expect(banner.textContent).toContain("1 parameter");
-    expect(banner.textContent).toContain("path-dependent");
-    expect(banner.textContent).toContain("phases.0.cell.a");
+    // the line over the whole comparison, not a strip entry: the largest gap
+    // as a number, where it is, and that the two chains kept different rungs
+    // there. It calls nothing path-dependent.
+    const banner = host.querySelector(".banner")!;
+    expect(banner.textContent).toContain("differ by 5.2 esd at most");
+    expect(banner.textContent).toContain("phases.0.cell.a at T400");
+    expect(banner.textContent).toContain("escalation ladder");
+    expect(host.textContent).not.toMatch(/path-dependent|artefact/i);
+    expect(host.querySelector(".banner.bad")).toBeNull();
 
-    // the reseed fence rides the row it is about, and the ranking put the
-    // flagged trajectory on the plot first
+    // the reseed fence rides the row it is about. The panel opens on the
+    // series' first-seen parameter, not the largest gap: on a clean series
+    // that order is noise (ruled by the maintainer 2026-11-04)
     expect(host.textContent).toContain("reseeded");
+    expect(host.textContent).toContain("Trajectory — instrument.zero_shift");
+    expect(host.textContent).toContain("phases.0.cell.a (5.2 esd)");
+    expect(host.textContent).toContain("instrument.zero_shift (0.4 esd)");
+    const options = () => [...host.querySelectorAll<HTMLOptionElement>(".side select option")]
+      .map((o) => o.value).filter((v) => v.includes("."));
+    expect(options().slice(0, 2)).toEqual(["instrument.zero_shift", "phases.0.cell.a"]);
+    // ranking by gap is the reader's choice, and it moves no selection
+    const order = (label: string) => [...host.querySelectorAll<HTMLButtonElement>(
+      '[aria-label="the list\'s order"] button')].find((b) => b.textContent === label)!;
+    order("largest gap first").click();
+    await flush();
+    expect(options().slice(0, 2)).toEqual(["phases.0.cell.a", "instrument.zero_shift"]);
+    expect(host.textContent).toContain("Trajectory — instrument.zero_shift");
+    // the largest gap is one click away, on the line that names it
+    banner.querySelector<HTMLButtonElement>("button")!.click();
+    await flush();
     expect(host.textContent).toContain("Trajectory — phases.0.cell.a");
-    expect(host.textContent).toContain("5.2σ");
+    // the caption states the same number for the trajectory on screen
+    expect(host.textContent).toContain("Forward and backward differ by 5.2 esd at T400");
 
-    // …and drew it as the evidence it is: the forward chain in the warning ink
-    // and dashed, the reseeded T400 ringed in the same ink, and the backward
-    // chain beside it, muted and dotted
+    // …and drew it as the evidence it is: the forward chain in the one ink
+    // every parameter wears, the reseeded T400 ringed in the warning ink, and
+    // the backward chain beside it, muted and dotted
     const marks = seriesPane("traj").marks;
     const strokes = (style: string) => marks.filter((m) => m.op === "stroke" && m.style === style);
-    expect(strokes(WARN).some((m) => m.dash && m.points!.length === 2)).toBe(true);
+    expect(strokes(INK.diff).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
+    expect(strokes(WARN).some((m) => m.dash)).toBe(false);
     expect(strokes(WARN).some((m) => m.points!.some((p) => p.length === 3))).toBe(true);
     expect(strokes(INK.edge).some((m) => m.dash)).toBe(true);
     const legend = () => [...host.querySelectorAll<HTMLButtonElement>(".legend button")];
     expect(legend().map((b) => b.textContent?.trim()))
-      .toEqual(["forward (path-dependent)", "esd", "backward", "reseeded"]);
+      .toEqual(["forward", "esd", "backward", "reseeded"]);
     // a legend click hides that mark, and says so on the button
     legend()[2].click();
     await flush();
@@ -5109,6 +5240,76 @@ describe("the series panel", () => {
     expect(curves?.url).toContain("index=1");
     expect([...seriesPane("main").data[0]]).toEqual([9, 9.4]);
     expect(() => seriesPane("traj")).toThrow();
+  });
+
+  it("lists the steps between neighbouring patterns, largest first, and calls none a jump", async () => {
+    await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: SERIES_ANSWER }),
+    });
+    const stepRowsOf = () => {
+      const heading = [...host.querySelectorAll("h2")].find((h) => h.textContent?.trim() === "Steps")!;
+      expect(heading).toBeTruthy();
+      // the Steps table is the first `.scroll` after its heading
+      let node: Element | null = heading;
+      while (node && !node.matches(".scroll")) node = node.nextElementSibling;
+      expect(node).toBeTruthy();
+      return [...node!.querySelectorAll("tbody tr")]
+        .map((r) => [...r.querySelectorAll("td")].map((c) => c.textContent?.trim()));
+    };
+    // the selected parameter's steps: the panel opens on the first-seen
+    // parameter, the zero shift, and then, from the gap line, on the cell
+    // edge, 21 esd, re-measured cold
+    expect(stepRowsOf()).toEqual([["T300 → T400", "+0.0001", "+0.8", "—"]]);
+    host.querySelector<HTMLButtonElement>(".banner button")!.click();
+    await flush();
+    expect(stepRowsOf()).toEqual([["T300 → T400", "+0.0021", "+21.0", "0.93"]]);
+    expect(host.textContent).toContain("1 step");
+    // markup wraps its prose across lines, so compare on single spaces
+    const text = host.textContent!.replace(/\s+/g, " ");
+    expect(text).toContain("later minus earlier");
+    expect(text).not.toMatch(/\bjump|discontinu/i);
+
+    // every parameter, with the record's order and a way into each trajectory
+    button("all parameters")!.click();
+    await flush();
+    expect(stepRowsOf()).toEqual([
+      ["phases.0.cell.a", "T300 → T400", "+0.0021", "+21.0", "0.93"],
+      ["instrument.zero_shift", "T300 → T400", "+0.0001", "+0.8", "—"],
+    ]);
+  });
+
+  it("marks a pattern the library quarantined even when the solver converged", async () => {
+    // T400 converged under an error-level code: `_rejected` quarantines it, so
+    // the server says `rejected` and the panel marks it — a status read would not
+    const [first, second] = SERIES_ANSWER.result.entries;
+    const answer = {
+      ...SERIES_ANSWER,
+      rejected: [false, true],
+      result: { ...SERIES_ANSWER.result, entries: [first, {
+        ...second, status: "converged", reseeded: false, rung: "cold",
+        rungs_tried: ["warm", "warm_staged", "cold"],
+        diagnostics: [{ level: "error", code: "MODEL_FAR_FROM_DATA",
+                        message: "the model is far from the data" }] }] },
+    };
+    await openSeries({
+      "/api/series": () => ({ body: { ...SERIES_STAGED, has_result: true } }),
+      "/api/series/result": () => ({ body: answer }),
+    });
+    const rows = [...host.querySelectorAll<HTMLTableRowElement>(".side .panel:not(.hidden) tbody tr")];
+    const row = rows.find((r) => r.textContent?.includes("T400") && r.querySelector(".chip"))!;
+    expect(row.textContent).toContain("converged");
+    expect(row.querySelector(".chip")?.textContent).toBe("unrecovered");
+    // the caption names why, from the entry's own error-level code
+    expect(row.querySelector(".chip")?.getAttribute("title"))
+      .toContain("it carries the error-level code MODEL_FAR_FROM_DATA");
+    expect(row.classList.contains("out")).toBe(true);
+    // …and the trajectory crosses that point, offering the mark in its legend
+    expect([...host.querySelectorAll<HTMLButtonElement>(".legend button")]
+      .map((b) => b.textContent?.trim())).toContain("unrecovered");
+    // the first pattern is not marked
+    const t300 = rows.find((r) => r.textContent?.includes("T300") && r.querySelector("button"))!;
+    expect(t300.querySelector(".chip")).toBeNull();
   });
 
   it("runs the chain through the one run machine", async () => {
@@ -5537,7 +5738,7 @@ describe("the first-run checklist (WP-1017)", () => {
     tabs().find((t) => t.textContent?.trim() === "Report")!.click();
     await flush();
     // every step done, so the strip says so rather than counting
-    expect(host.querySelector(".checklist")!.textContent).toContain("that is the loop");
+    expect(host.querySelector(".checklist")!.textContent).toContain("go back to any state in History");
 
     tabs().find((t) => t.textContent?.trim() === "History")!.click();
     await flush();
@@ -5551,7 +5752,7 @@ describe("the first-run checklist (WP-1017)", () => {
     // fix this read "1 left" — the reset had been put in `readUi()`, which
     // `moved()` calls on every head move, so reading the report and then
     // checking a node out un-ticked the step the person had just finished.
-    expect(host.querySelector(".checklist")!.textContent).toContain("that is the loop");
+    expect(host.querySelector(".checklist")!.textContent).toContain("go back to any state in History");
   });
 
   it("stays hidden on a project that dismissed it before", async () => {

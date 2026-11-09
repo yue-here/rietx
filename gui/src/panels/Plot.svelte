@@ -636,7 +636,7 @@
     <p class="hint bad">{error}</p>
   {:else if !result && !peaks?.peaks?.length}
     <p class="hint muted">
-      No fitted curves yet. Press <strong>Run</strong> — or, if you just moved the
+      No fitted curves yet. Press <strong>Refine</strong> — or, if you just moved the
       history, run again: a checkout restores parameter values, not a fit.
     </p>
   {:else if !result && peaksActive}

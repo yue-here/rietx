@@ -49,6 +49,7 @@ Each guide's fits are a script in `examples/guides/`, run by the test suite, and
 - [How to fit a temperature series](series.md) chains one refinement per pattern with `refine_sequential` and reads a trajectory.
 - [How to check a series for path dependence](path.md) runs the chain both ways and refits a flagged step from cold.
 - [How to refine a cell edge as a function of temperature](equation.md) refines an equation's coefficients against every pattern at once.
+- [How to refine cell edges as Einstein functions of temperature](formula.md) writes each edge as a formula, with one θ shared by both.
 
 ## Magnetic structures
 
@@ -84,6 +85,7 @@ Open a GSAS, TOPAS or FullProf refinement and write one back <foreign>
 Fit a temperature series <series>
 Check a series for path dependence <path>
 Refine a cell edge as a function of temperature <equation>
+Refine cell edges as Einstein functions of temperature <formula>
 Fit an X-ray and a neutron pattern together <joint>
 Refine a magnetic moment on a known magnetic structure <magnetic>
 Refit the nuclear model with the moment present <moment>

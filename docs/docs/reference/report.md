@@ -10,7 +10,8 @@ This page gives what a `FitReport` carries, field by field: how to build one, th
 
 `Refinement.report` builds the report for the session's last fit.
 It hands the compiled model, the structure and the instrument to `build_report`, and Layers 1 and 2 need that model.
-Pass the plan you ran as `plan=`, either a plan or a preset name.
+Pass the plan you ran as `plan=`: a plan, its `PlanSpec` or a preset name.
+A preset name is read for the result's mode, as the fit read it, so `"mccusker_default"` on a Le Bail result is `profile_only`.
 Layer 2 then marks each suggestion the plan already covers.
 The session also passes its free parameters, so a suggestion to free one that is already free is marked too.
 

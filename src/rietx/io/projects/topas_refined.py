@@ -169,6 +169,14 @@ def _rows_from(free: Any, structure=None
         return None, set(items), False
     rows: dict[str, _Row] = {}
     for r in items:
+        if r.tie is not None and getattr(r.tie, "expression", None) is not None:
+            # a formula tie (WP-2118) has no terms, so read as an affine row it
+            # would be written as the constant 0; refused while the value is
+            # in hand, as every value the file cannot state is
+            raise ValueError(
+                f"{r.path} follows the formula {r.tie.expression!r}, which this "
+                "writer states only as a linear equation; untie it before "
+                "writing, or pass the fit's result as free= to write its value")
         tie = None if r.tie is None else ([(p, float(c)) for p, c in r.tie.terms],
                                           float(r.tie.const))
         lo = -math.inf if r.lo is None else float(r.lo)
@@ -472,6 +480,24 @@ def render_slots(items: Iterable[Any], refined: RefinedSet) -> list[str]:
     source_factor = {p: carried.get(p, 1.0) for p in used}
     refined.source_factor.update(source_factor)
     first: set[str] = set()
+    # A source carried at several slots is one name at each, and the reader
+    # refuses a name stated at two values (`topas_ties`, its own `_close`
+    # test). So the writer refuses it here, where the values are in hand: a
+    # structure whose values break the ties `free=` states (found by WP-1986).
+    from .topas_ties import _close
+    stated: dict[str, float] = {}
+
+    def check_one_value(path: str, value: float) -> None:
+        if path not in stated:
+            stated[path] = value
+        elif not _close(value, stated[path], 1e-6, floor=0.0):
+            raise ValueError(
+                f"{path} is tied as an equality, so the file names it once "
+                f"at every quantity the tie reaches, and the structure states "
+                f"those quantities at {stated[path]!r} and {value!r}. TOPAS "
+                f"and rietx's reader would each have to pick one. Write the "
+                f"structure the ties were fitted on (Refinement.fitted_structure), "
+                f"or make its values satisfy the ties")
 
     def bounds(path: str, a: float, b: float = 0.0) -> str:
         if path in first or refined.rows is None:
@@ -506,6 +532,7 @@ def render_slots(items: Iterable[Any], refined: RefinedSet) -> list[str]:
         if len(aff.terms) == 1 and aff.const == 0.0:
             (path, c), = aff.terms.items()
             if s.carry and c == 1.0 and carried.get(path) == s.factor:
+                check_one_value(path, s.value * s.factor)
                 name = refined.name(path)
                 refined.carriers[name] = (path, s.factor, 0.0)
                 s.text = (f"{name} {number(s.value * s.factor)}"

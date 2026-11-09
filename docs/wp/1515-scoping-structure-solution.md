@@ -82,6 +82,13 @@ the whole surface with real agents.
 
 ### Inherited
 
+- **2026-11-07, from [WP-2109](2109-the-solve-cost-at-a-stated-march-dollase-r.md)'s close: two
+  review points for S9 (#677).** `SolveCost.from_model` builds the orbit layout whenever it gets
+  a `group`, and `from_pawley` always passes one. So every extraction pays for orbits that
+  nothing reads until S9 exists. S9 decides whether to build them at first use. The contributor's
+  PR #1420 comment of 2026-11-05 raised this and a redundant `group=` argument. Neither has a
+  ruling, and both belong to the S9 WP when it is cut.
+
 - **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: #677 step 7 can start from the generator.** `subgroups.maximal(group)` gives each maximal subgroup of the leading group with its (P, p) to the standard setting, in exact arithmetic (PR #1189, `crystallography/representation/subgroups.py`). Nothing is read from a printed table.
 
 - **2026-11-01, from WP-1809 (closed, PR #1287): a radii-backed default for the
@@ -234,7 +241,8 @@ the whole surface with real agents.
   `solve/cost.py`'s docstring confirms that preferred orientation is folded
   into Ω's columns. `model/preferred_orientation.march_term` and
   `march_term_and_dr` exist. WP-1997 lists preferred orientation (S9, #677) as
-  a non-goal, so this belongs with S9.
+  a non-goal, so this belongs with S9. Filed 2026-11-05 as
+  [WP-2109](2109-the-solve-cost-at-a-stated-march-dollase-r.md), in `SolveCost`.
 
 ## What the scoping decides
 

@@ -135,13 +135,13 @@ def test_the_150k_pattern_has_nothing_to_solve(solved_150k):
     Not asserted either: that class 3's trial converges.  Its last stage
     crawls, each 400-evaluation continuation lowering χ² by 0.0002-0.008 of
     about 2177, so how many continuations it takes is the solver's.  At 1e-14
-    nudges of the reference's w on macOS arm64 it took 3, 4, 4, 5 and 10 of
-    ``SOLVE_MAX_CONTINUATIONS``' 10, and 6 with the moment columns taken by
-    forward difference.  At the sixth nudge it ran out at 10 and stopped on
-    ``max_iter``, as the Linux nightly of 2026-11-01 did when it failed here.
+    nudges of the reference's w on macOS arm64 it took 3, 4, 4, 5, 10 and more
+    than ``SOLVE_MAX_CONTINUATIONS``' 10 before the slow-descent rule, and 1,
+    1, 1, 1, 0 and 1 with it (WP-1334); Linux, whose 2026-11-01 nightly ran out
+    at 10 and failed here, is not measured with it.
     Stopped after 2, the pair reads 0.519 ± 0.247 μ_B against 0.518 ± 0.250
     converged, so the bands hold either way, and a stopped trial
-    must carry its caveat (above).  The crawl is WP-1334's.
+    must carry its caveat (above).
     """
     s = solved_150k
     assert s.n_on_forbidden_lattice_points == 0

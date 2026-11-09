@@ -117,7 +117,9 @@ def test_elapsed_time_covers_a_release_and_re_solve_not_just_the_second():
     buf = io.StringIO()
     write = progress_writer(buf)
     write({"t": 0.0, "kind": "stage_start", "data": {"stage": "cell"}})
-    write({"t": 5.0, "kind": "stage_start", "data": {"stage": "cell"}})  # release, re-solve
+    # the release's start carries ``released``, as refine.py's does (WP-2031)
+    write({"t": 5.0, "kind": "stage_start",
+           "data": {"stage": "cell", "released": ["phases.1.cell.a"]}})
     write({"t": 8.0, "kind": "stage_end",
           "data": {"stage": "cell", "status": "converged", "rwp": 0.05}})
     line = buf.getvalue().strip()

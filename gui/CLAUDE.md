@@ -642,14 +642,14 @@ needs a document, which is WP-1003's to decide. **The order is the series**, so
 every edit is a whole-list `PUT` and every file is read *there* (WP-1014's
 two-phase property at N files) — with a member already described not re-read,
 since a staged upload is immutable and re-reading forty patterns per keystroke
-proves nothing. **`SEQUENTIAL_PATH_DEPENDENT` is a banner, and its magnitude is
-computed rather than carried**: a `Diagnostic` has `where` and no number (the
-wall WP-1012 hit), and both chains' trajectories are in hand, so
-`series.trajectories` recomputes the fence's own combined-σ distance and serves
-it — a panel ranks by disagreement with no schema change. **Ranking stops where
-the fence stops**: on a clean ramp nothing is flagged and every distance is under
-5e-4 σ, so sorting the unflagged ones by it ordered fifteen parameters by noise
-and put `phases.0.cell.a` eighth. And **a per-pattern tree is read-only here** —
+proves nothing. **The walks' disagreement is the record's number, read and never
+recomputed** (WP-2003, C5): `SeriesResult.direction_gaps` holds every gap in
+esds, unthresholded, and `series.trajectories` serves each path's largest, so no
+path is called path-dependent. **The list opens in the series' own order, and a
+gap ranking is the reader's choice** (ruled by the maintainer 2026-11-04): with no
+fence, a clean ramp's gaps are noise, and ranked by them the panel opened on
+`instrument.background.c1` with `phases.0.cell.a` sixth (`lib/series.ts`'s
+`rankTrajectories`); the largest gap stays one click away on the gap line. And **a per-pattern tree is read-only here** —
 one tree per pattern, pinned by `data_fingerprint`, so a node cannot be checked
 out into this project; what makes the chain navigable is the root node's
 `series_warm_start_node` note. Two shared authorities came out of it rather than second copies: `curve_arrays`, in
@@ -744,12 +744,11 @@ degenerate component reports σ in tens of degrees (111° measured) and an
 uncapped error bar spans the pattern (under plotly it owned the autorange). `/api/index` and
 `/api/index/extinction` are run *kinds* on the one machine — a cancelled
 search or screen **returns** what it has and its status is read off the token.
-The candidate table's Adopt follows the server's `adopt` arm (one answer with
-the route), the extinction table's badge follows the served `best` the same
-way, and the screen itself is **not** gated on the adopt verdict — it is a
-read-only measurement and `best_or_none() is None` is the normal real-data
-state — while adoption stays gated, and a space-group chip acts only when the
-adopt arm allows and its class is unrefuted.
+Both tables' badges follow the server (`adopt`, `best`); the screen is gated on neither the adopt verdict nor a phase
+(a read-only measurement; a pattern-only project is where indexing starts). **Any candidate can be adopted** (Yue's
+ruling B, 2026-11-08, WP-2124): the arm's `picked` is the gate's pick, its `why` the sentence an adoption of any other
+row writes into the `edit_model` node. The old panel still enables Adopt, and a space-group chip of an unrefuted
+class, on `allowed`, which carries `picked` under its old name until the port redraws it.
 
 Its second pass (2026-07-31) added three browser facts; the one about plotly's
 screen-relative `lightposition` left with plotly (WP-1462), whose renderer lights

@@ -9,7 +9,7 @@ Priority: P3 2026-10-14 — the benefit is measured on synthetic ramps only, its
 
 A joint fit can let a parameter vary smoothly across the pattern coordinates
 under a kernel prior. Where no pattern sees the parameter, its interval then
-widens to what the data allow, instead of inheriting a declared law's
+widens to what the data allow, instead of inheriting a declared equation's
 confidence.
 
 ## Context
@@ -29,7 +29,7 @@ kink. The intervals are confidently wrong there.
 (`params.parametric.form_tests`, WP-1325 § Measured: the form test) checks
 the declared form only where a pattern measures the target. On the same
 ramps it rejected a bent truth in 0 of 20 seeds, and so did a full untied
-refit. A law is unchecked exactly where it is extrapolated. 1325's
+refit. An equation is unchecked exactly where it is extrapolated. 1325's
 § Measured: where one pattern cannot see the parameter ended "a lack-of-fit
 check could give [honest intervals] more cheaply"; the form test's
 measurement withdrew that.
@@ -67,9 +67,9 @@ PET kernel method) and lists its costs and scaling; the literature is in
 ### Inherited
 
 - **2026-10-14, from [1325](1325-parametric-series.md) (seventh session,
-  PR #977): the blind regime is now named per law.**
-  `PARAMETRIC_TARGET_UNSEEN` lists, for each law, the patterns where the
-  target's phase is unseen and the value is the law's alone. Its predicate is
+  PR #977): the blind regime is now named per equation.**
+  `PARAMETRIC_TARGET_UNSEEN` lists, for each equation, the patterns where the
+  target's phase is unseen and the value is the equation's alone. Its predicate is
   `multi._parametric_unseen`, which the form test's skip also reads. A kernel
   prior serves exactly those patterns. `ParametricValue.outside` flags
   extrapolation by each coordinate's range alone, so a 2-D point inside both
@@ -86,7 +86,7 @@ PET kernel method) and lists its costs and scaling; the literature is in
 
 - Replacing the hard tie. It earned a measured precision gain in the same
   regime (WP-1325).
-- Nonlinear laws: [1964](1964-a-nonlinear-law-through-the-derived-block.md).
+- Equations nonlinear in their coefficients: [1964](1964-a-parametric-equation-the-user-writes.md).
 - A pattern summed over several specimens ([1962](1962-xrd-ct-a-pattern-summed-over-the-voxels-its-beam-crosses.md)).
 
 ## Tasks
