@@ -139,7 +139,7 @@ closes. Next: WP-2140's first task, the assessment of label dot-paths.
   restraints move to labels, and WP-2140 runs it if any restraint keeps an index.
 
 *Done.* Status line closed (✅), `Priority:` line deleted, narrative moved to the v1.12 record.
-No code or test changed. Bookkeeping PR: #PRNUM.
+No code or test changed. Bookkeeping PR: #1513.
 
 ### 2026-11-09 — bookkeeping: PR #1463 merged, and the WP stays open
 
