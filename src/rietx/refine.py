@@ -9321,15 +9321,15 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
 
     # A strain broader than solved refinements normally use — a flag to check,
     # not a bound (the bound is params.vector.strain_cap, one tier up).
-    # Both say "held at" for a path the answer did not move (WP-2073).
-    moving_now = set(table.moving_paths)
+    # Both say "held at" for a path the answer did not move (WP-2073):
+    # ``moving``, the set the parameter rows above were read off.
     diagnostics = diagnostics + _strain_flag_diagnostics(model, values, structure,
-                                                         moving_now)
+                                                         moving)
 
     # A crystallite smaller than solved refinements normally report — the size
     # twin of the flag above (bound: params.vector.size_cap, one tier up).
     diagnostics = diagnostics + _size_flag_diagnostics(model, values, structure,
-                                                       moving_now)
+                                                       moving)
 
     # A refined occupancy past a full site (WP-2002): Atom.occ has no ceiling,
     # so this is what meets one.
@@ -11604,13 +11604,17 @@ def _strain_flag_diagnostics(model: CompiledModel, values: dict[str, float],
 
 #: The clause :func:`_strain_flag_diagnostics` and :func:`_size_flag_diagnostics`
 #: add when the flagged path did not move in the answer (WP-2073): the number is
-#: the one the stage was handed — a seed, a user's value, or where a collapsed
-#: phase was restored to — and not a measurement of the specimen.
+#: the one the answer stage started from — a seed, a user's value, an earlier
+#: stage's value, or where a collapsed phase was restored to — and the answer
+#: did not measure it.  The suggestion covers the three ways a path is still:
+#: a stage hold (``StageResult.held``), a user hold
+#: (``StageResult.blocked_by_hold``), or no stage freed it.
 _HELD_FLAG_CLAUSE = (" The answer stage did not refine it, so this is the "
                      "value that stage was handed.")
-_HELD_FLAG_SUGGESTION = ("Read the stage's held paths (StageResult.held; "
-                         "PHASE_UNCONSTRAINED says why a phase was held) before "
-                         "quoting it; this flag changes nothing in the fit.")
+_HELD_FLAG_SUGGESTION = ("If StageResult.held names the path, PHASE_UNCONSTRAINED "
+                         "says why the stage held it; otherwise your hold or the "
+                         "plan kept it, and the value is yours. This flag changes "
+                         "nothing in the fit.")
 
 
 def _sqrt_or_none(variance: float | None) -> float | None:

@@ -904,6 +904,7 @@ def test_a_strain_the_answer_held_is_reported_held_at_not_refined_to():
     assert "handed" in flag.message
     assert "BOUND_HIT" not in flag.suggestion
     assert "StageResult.held" in flag.suggestion
+    assert flag.value == 10.0
 
 
 @pytest.mark.xdist_group("qpa-issue-1213")
@@ -946,15 +947,16 @@ def test_the_flags_wording_follows_the_moving_set_and_none_claims_nothing():
 
 
 @pytest.mark.xdist_group("qpa-issue-1213")
-def test_the_absorbed_case_carries_no_held_wording_and_no_unseen_finding():
+def test_the_absorbed_case_is_seen_and_its_widths_refined_to_a_bound():
     """The case the single fit has no rule for (WP-2073 § Context): the absent
-    phase takes the foot, nothing calls it unseen, and its widths refined
-    (to a bound), so neither flag may say "held"."""
+    phase takes the foot, nothing calls it unseen or holds it, and its strain
+    refined onto the bound the case set.  (Its widths are bounded at the flag
+    thresholds, so neither width flag can fire here.)"""
     _, _, result = _i1213_fit("absorbed")
     assert not _on_minor(result, "PHASE_UNCONSTRAINED")
-    assert _on_minor(result, "BOUND_HIT")
-    for code in ("STRAIN_UNUSUALLY_LARGE", "SIZE_UNUSUALLY_SMALL"):
-        assert all("held" not in d.message for d in _on_minor(result, code))
+    assert not [p for p in result.stages[-1].held if p.startswith("phases.1.")]
+    assert any("phases.1.lor_strain" in d.where
+               for d in _on_minor(result, "BOUND_HIT"))
 
 
 @pytest.mark.xdist_group("qpa-issue-1213")
