@@ -496,6 +496,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2123](2123-the-layout-shell.md) | The layout shell | 🔄 2026-11-09 | P2 | — |
+| [2125](2125-the-pattern-at-values-nobody-has-applied.md) | The pattern at values nobody has applied | ✅ 2026-11-09 | — | — ([2123](2123-the-layout-shell.md) soft) |
 
 ## <a id="unscheduled"></a>Unscheduled
 
