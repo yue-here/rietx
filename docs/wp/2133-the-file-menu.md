@@ -1,6 +1,6 @@
 # WP-2133 — the File menu on the project name
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the server routes landed
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — all four tasks landed; PR #N open, stacked on #1498, awaiting review
 Depends on: 2131
 Priority: P2 2026-11-09 — a piece of the open gui-overhaul milestone, the maintainer's file-and-project I/O ruling of 2026-11-07; 2131's handover names it next
 
@@ -138,6 +138,71 @@ npm --prefix gui test && npm --prefix gui run check
   folder browser and its containment gate), WP-1214 (the export gate).
 
 ## Handover log
+
+- **2026-11-09** — the File menu is built, on real routes, and every task is ticked. Clicking
+  the project's name now opens New, Open, Open recent, Save a copy, Rename, Move to, Export and
+  Close. Copy, rename, move and close are server verbs. Each one refuses an existing destination,
+  a folder outside the browser's two roots, a bad name, a folder moved into itself, and a run in
+  flight. An export can now go to a folder the person picks, and replaces a file there only when
+  asked. Closing a project now survives a relaunch: the next `rietx gui` shows the start screen.
+  The header's `Open…` button is gone. A pending edit still does not survive a close or a crash,
+  because the server keeps no draft. That is the next item.
+
+  *Done.* Server: `project_copy`, `project_rename`, `project_move`, `project_close` and
+  `recent_clear` in `session.py`, five routes, and `export` taking `directory`/`overwrite`.
+  Frontend: `panels/FileMenu.svelte`, `lib/filemenu.ts` (the items as data, with `EXPORT_KINDS`
+  pinned to `EXPORT_DEFAULTS` by `test_gui_file_menu.py`), a `heading`/`start` pair on
+  `Browse.svelte`. The manual's header table, a File menu section, five route rows and three
+  keyboard rows, plus the first-fit screenshot pair. `gui/CLAUDE.md` takes three rules.
+  `/code-review high --fix` found nine. Seven are fixed in `714db343d`: a relative open put
+  Save a copy inside the project, a move renamed a suffix-less folder, a case-only rename was
+  refused on APFS, an unwritable export was a 500, `/x.rex` sat in itself, a browser started
+  outside its roots opened empty, and the console's scrolling closed the menu. Two are declined.
+  The `.pick` padding finding is wrong: `app.css` exempts that register from the rule, and the
+  start screen's menu does the same. The check-then-move race is every 409 verb's pattern,
+  which only a change to the shared run lock can close.
+
+  *Measured* (worktree `[dev]` venv, darwin/arm64). vitest 639 passed in 25 files, 626 before,
+  +13: eight in `filemenu.test.ts`, five in `App.test.ts`. Four `App.test.ts` tests that
+  clicked the header's `Open…` now reach the start screen through the palette. svelte-check
+  0 errors, 0 warnings. `test_gui_file_menu.py` 13 passed. `test_gui_layout_browser.py`
+  18 passed, 16 before, +2. Its new File menu test was made to fail once, with the menu forced
+  static: the header grew 282 px and the test named it. `test_gui_manual.py` 10 passed.
+  Fast suite on the tree merged with `origin/main` (`eee8486d5`): 14498 passed, 410 skipped, 32 xfailed and 1 failed, in 8:39 under serial.py's lock with nothing else running. The one failure was this branch's gui/CLAUDE.md going over its line cap. It is fixed by a shorter rule and a +7 cap with its reason, and test_docs_consistency.py then passed 25. The 23 tests added over main (#1498's six server tests included) cost 10.5 s, 7.4 s of that in the browser file, which skips on CI.
+  `tests.reader_output` exit 0, unchanged. ruff clean.
+
+  *Gotchas.* The branch sits on `wp2131-gui-start-screen` (#1498) and must merge after it.
+  Close replaces WP-2131's settled call 9: "the last project" now means the one open at quit,
+  read off a `closed` mark on the recent list's head.
+
+  *Settled by Claude, reversible, for the maintainer* (call; alternative):
+  1. The header's `Open…` is gone, and File › Open… opens the folder browser directly. The start
+     screen over a project is reached from the palette. Alternative: keep `Open…` for the start
+     screen.
+  2. The name is a `.pick` button with a hover tint and a ▾. Alternative: the round-6 prototype's
+     border on hover.
+  3. The menu copies the start screen's row menus, a grey hover. Alternative: the prototype's
+     accent-filled hover.
+  4. Submenus open on hover or click, with no arrow-key navigation. Alternative: full keyboard
+     menu navigation.
+  5. Export starts from the server's file names (`refinement.cif` and so on). Alternative: names
+     built from the project, such as `fap.cif`.
+  6. Save a copy starts beside the project, as Export does. Alternative: the last folder used.
+  7. An existing export file is refused once, and the button then reads `Replace`. Alternative: a
+     separate confirm.
+  8. Save a copy keeps the window on the original and leaves Recent alone. Alternative: open the
+     copy.
+  9. A copy includes `live/`, the run records. Alternative: leave them out.
+  10. Phase fractions is disabled for one phase and outside Rietveld mode. Alternative: enabled,
+      with the server's refusal.
+  11. A refusal shows for 4 s under the name and in the console. Alternative: a line in the menu.
+  12. The rename box is a 16em overlay that also commits on blur. Alternative: Enter only.
+  13. ⌘N, ⌘W and Show in Finder are left out, and so are the plot and console-script exports,
+      which the desktop app and the plot's own buttons hold.
+
+  Next: (1) review and merge #1498, then this PR; (2) a draft of pending edits that survives
+  close and crash, which is a stored-format change to the project and so the maintainer's call
+  before any code; (3) the maintainer's rulings on the visual calls above.
 
 - **2026-11-09** — filed by a ghostshift runner, as 2133 because 2132 was taken on `main` the same
   day. No open WP owned the File menu: WP-2131's non-goals name it as a later WP, and the
