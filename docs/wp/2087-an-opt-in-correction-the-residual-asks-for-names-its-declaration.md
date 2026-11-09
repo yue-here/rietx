@@ -93,9 +93,9 @@ rescope does not cover it.
       and the misfit that calls for it.
 - [x] Anisotropic ADPs: the help entry names `Atom.aniso` and when a
       declaration is worth trying.
-- [ ] Biso anomalies: the two help entries and their skill rows name the
+- [x] Biso anomalies: the two help entries and their skill rows name the
       declaration each geometry takes, as concisely as the extinction row.
-- [ ] Skill: stay within `tests/skill_caps.py`'s budgets; re-sync the
+- [x] Skill: stay within `tests/skill_caps.py`'s budgets; re-sync the
       committed copies.
 
 ## Acceptance

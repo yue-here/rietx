@@ -1674,10 +1674,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A refined isotropic displacement parameter is below zero. No real vibration "
             "does that, because the Debye-Waller factor would grow with angle instead of "
-            "falling. The parameter is absorbing something else. Likely causes are "
-            "uncorrected absorption or roughness, a wrong species or occupancy, or a "
-            "background that bends at high angle. Correct that cause, or hold the "
-            "parameter at a physical value."
+            "falling. The parameter is absorbing something else, usually a loss of "
+            "low-angle intensity. Three corrections for that are opt-in: surface "
+            "roughness on a Bragg-Brentano plate (`geometry.surface_roughness = "
+            "RoughnessSuortti()`), absorption in a capillary (`geometry.mu_r`) and "
+            "extinction (`phase.extinction = 0.0`). A wrong species or occupancy, or a "
+            "background that bends at high angle, does it too. Correct that cause, or "
+            "hold the parameter at a physical value."
         ),
     ),
     "BISO_UNUSUALLY_LARGE": HelpEntry(
@@ -1685,8 +1688,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A refined isotropic displacement parameter exceeds the amplitude at which a "
             "solid with this cell would melt. That usually points at the model. A wrong "
-            "species or occupancy, a missing absorption correction or a background that "
-            "has taken high-angle intensity can all inflate it. A mobile site, such as a "
+            "species or occupancy, or a background that has taken high-angle intensity, "
+            "can inflate it. So can absorption in a flat plate of finite thickness, "
+            "which depresses high-angle intensity until `geometry.mu_t` declares it. A "
+            "mobile site, such as a "
             "cavity cation, can be genuinely this large. Check the model before you read "
             "the value as motion."
         ),
