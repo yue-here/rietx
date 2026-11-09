@@ -1146,6 +1146,28 @@ ROWS: tuple[Row, ...] = (
     Row("RESOLUTION_UNCONSTRAINED", "code", response="warning",
         responds=("do not quote a width, a crystallite size or a strain from this fit; "
                   "calibrate the instrument on a standard first")),
+    Row("RESTRAINT_ON_FIXED_BODY_GEOMETRY", "code", tier=1, ambiguity=1, response="error",
+        responds=("nothing was fitted: drop the restraint, declare a body torsion that "
+                  "changes it, or take its atoms out of the body and restrain them as free "
+                  "atoms"),
+        evidence=("arithmetic, no threshold: every atom of the restraint is in one copy of one "
+                  "rigid body (one frozen image, an isometry of the template, which is in "
+                  "Angstrom so the cell does not move it either), and no declared torsion of "
+                  "the body turns some of its atoms other than the two axis atoms and not the "
+                  "others; each such torsion is a rotation fixing the axis and moving the rest "
+                  "together, so the bond, angle, torsion or plane distance is the template's "
+                  "for every value of every parameter the body has and the row's partial is "
+                  "zero against each. Verified exactly, not sampled: over all 546 bonds, angles and "
+                  "torsions of a generic seven-atom body with a chained torsion, the rule "
+                  "refuses the 45 that stay put when every torsion twists and the pose and "
+                  "cell move, and no other (tests/test_restraint_body_refusal.py). Read off the declaration, never "
+                  "vary, so a held torsion keeps its restraint. Only the two axis atoms count "
+                  "as on the axis, so an error lands on accepting. Action: refuse at compile, "
+                  "WP-1814's 'restrained or refined, never both by accident' (2026-10-16). "
+                  "Unanimity: one dissenter is named (the WP-1814 design review, 2026-11-09): "
+                  "a refiner keeping one restraint set across a with-body and a without-body "
+                  "comparison, for whom the constant row is the template's penalty; refuse "
+                  "or warn is put to the maintainer in the PR")),
     Row("RESTRAINT_PAIRS_STALE", "code", tier=1, ambiguity=1, response="warning",
         responds=("before quoting a coordinate, or a fraction or moment read through them, "
                   "either rebuild the anti-bump list from the answer's coordinates and refit, "
@@ -3021,6 +3043,11 @@ ROWS: tuple[Row, ...] = (
                   "that has no torsion (WP-1815)")),
     Row("rietx.model.restraints._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: pi/180"),
+    Row("rietx.model.restraints._SAME_IMAGE_TOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: compares an op translation plus a lattice shift, exact "
+                  "small rationals and integers, so any value far above roundoff and far "
+                  "below the smallest nonzero op translation (a fraction of a cell) "
+                  "decides the same inputs")),
     Row("rietx.model.restraints._SAME_CONTACT_A", "constant", tier=1, value=1e-06,
         evidence=("arithmetic: symmetry copies of one contact sit at exactly one distance, so "
                   "matching a contact to a listed row by distance is an identity test; 1e-6 A "
@@ -5362,6 +5389,10 @@ ROWS: tuple[Row, ...] = (
     Row("RECIPE_FIT_RANGE_CHANNELS.suggestion", "suggestion", value=1),
     Row("RESOLUTION_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("RESOLUTION_UNCONSTRAINED.suggestion", "suggestion", value=1),
+    Row("RESTRAINT_ON_FIXED_BODY_GEOMETRY.suggestion", "suggestion", tier=1, ambiguity=1,
+        value=1,
+        evidence=("arithmetic: names the three ways to a row a parameter moves (drop it, a "
+                  "torsion that changes it, free atoms) and picks none")),
     Row("RESTRAINT_PAIRS_STALE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence="arithmetic: names the two remedies (the builder that makes the missing rows, or a lower species-pair minimum for a real contact) and picks neither"),
     Row("RESTRAINT_TENSION.suggestion", "suggestion", value=1),
