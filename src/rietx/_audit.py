@@ -858,6 +858,14 @@ ROWS: tuple[Row, ...] = (
                   "fires exactly when used")),
     Row("LAUE_CLASS_NOT_SEPARABLE", "code"),
     Row("LEBAIL_ALTERNATION_STOPPED", "code"),
+    Row("LEBAIL_CYCLES_AT_CAP", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires exactly when StageResult.lebail_settled is False on the "
+                  "last stage, a partition there having reached Stage.lebail_cycles; "
+                  "gates nothing"),
+        response="warning",
+        responds=("raise lebail_cycles on the stage until StageResult.lebail_settled reads True, "
+                  "and read the intensities and widths as unsettled until then"),
+        scope=("all",)),
     Row("LOW_ANGLE_UNMODELLED", "code"),
     Row("MAGNETIC_ION_ASSUMED", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: fires exactly when the substitution was made (info); the "
@@ -887,11 +895,22 @@ ROWS: tuple[Row, ...] = (
                   "one angle tested alone passes below the one-sided cut 2.706 and so nearly "
                   "always lies inside its 95 % interval (cut 3.84): the test's linearised "
                   "refit can sit up to 1.5 from the full refit the interval walks, more "
-                  "than the 1.13 between the cuts, so 'excludes' stays reachable"),
+                  "than the 1.13 between the cuts, so 'excludes' stays reachable; #1075 "
+                  "(Mike, N = 400): a weak modulus beside the zeroed angles covered 0.82 "
+                  "with its esd and 0.93-0.98 with its profile; a profile withheld on a "
+                  "drop of a full cut, 13-14 of 400 fits, where the esd covered 3 of 20; the "
+                  "collinear reading (the moment along the direction, its esd) covered 0.970 "
+                  "on moments truly along it and 0.47 on a weak one truly tilted 0.08 rad, "
+                  "where the profile covered 0.975 (N = 40-200)"),
         grounds=("The column leaves the covariance by the package's own act, so the finding "
                  "says so, with each angle's distance from the direction and its profile "
-                 "interval (B2 option 2, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                 "interval (B2 option 2, ruled 2026-10-19), and quotes each site's modulus "
+                 "by its profile interval, withheld with a pointer to refit where the "
+                 "profile dropped a full cut below the fit (WP-2060, ruled by Mike on "
+                 "#1075, 2026-11-04 and 2026-11-05). Rare feature: the modulus coverage and "
+                 "the withhold rule rest on one family, the simulated two-site Pnma set, "
+                 "and are untested beyond it."),
+        approved="2026-11-05"),
     Row("MOMENT_PAIR_DEGENERATE", "code"),
     Row("MOMENT_UNSUPPORTED", "code", tier=1, ambiguity=1, response="warning",
         responds=("quote no value ± esd for the named moduli; read each moment as "
@@ -1506,6 +1525,11 @@ ROWS: tuple[Row, ...] = (
                  "a standard, which side carries the width is the caller's, and the record names "
                  "the pair."),
         approved="2026-10-23"),
+    Row("rietx.schemas.results.StageResult.lebail_cycles_run", "action", tier=1, ambiguity=1,
+        evidence="arithmetic: the count each partition returned, recorded and acting on nothing"),
+    Row("rietx.schemas.results.StageResult.lebail_settled", "action", tier=1, ambiguity=1,
+        evidence=("arithmetic: every partition of the stage ended under its cap with a tolerance above 0; "
+                  "None where no tolerance was asked, so it cannot read as an answer")),
     Row("rietx.schemas.results.StageResult.released", "action", tier=3, ambiguity=1,
         evidence=("WP-1301/1523: a held phase reading >= 3 sigma at the answer is released and the "
                   "stage re-solved once; one that fell under it is restored to its stage start and "
@@ -1612,9 +1636,9 @@ ROWS: tuple[Row, ...] = (
                   "1e-6 against every stage at 1e-9 within 0.1 plain esd on FAP, cpd-1a and "
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
-                  "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
-                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "WP-2045); SRM 660c read 8.82 esd on axial_sl, its mirrored S/L and H/L "
+                  "minima (WP-2012), and passes since WP-2012 held H/L on that protocol "
+                  "(tests/test_staged_start_invariance.py, 2026-11-03); "
                   "net of the converged last declared stage and the closing stage, 52/49, "
                   "51/46 and 277/175 evaluations on FAP, 11-BM NAC and cpd-1a (1.06-1.58x), "
                   "116/90 on SRM 660c (1.29x) and 1221/311 on cpd-1a with the absent zircon "
@@ -2381,7 +2405,11 @@ ROWS: tuple[Row, ...] = (
                   "(x0.99), NAC (x0.99, x1.02) and PbSO4 (x1.02), but PbSO4 at x0.99 reads 0.45 "
                   "and passes. Fails on an unmodelled second phase carrying half the net power, "
                   "by arithmetic on weak data (S < N), and where the envelope rides into a "
-                  "continuum of lines."),
+                  "continuum of lines. Those readings are of the Le Bail reference; re-measured "
+                  "on WP-2076's Pawley reference (2026-11-07, default path) right cells read "
+                  "0.11-0.16 (NAC, FAP, PbSO4, SRM 676a), SRM 676a x1.02 and FAP x0.99 read 1.00, "
+                  "PbSO4 x1.02 0.80 and PbSO4 x0.99 0.30; Si, NAC's wrong cells and the held "
+                  "arm were not re-run."),
         grounds="Kept on both grounds, ruled 2026-10-21 (PR #939).",
         approved="2026-10-21"),
     Row("rietx.indexing.extinction._MODULI", "constant", value=(2, 3, 4, 6)),
@@ -2604,6 +2632,10 @@ ROWS: tuple[Row, ...] = (
                  "2026-10-22) keeps it at tier 3 for WP-2017's second pass over a refine-from-zero "
                  "floor of its own."),
         approved="2026-10-22"),
+    Row("rietx.model.forward.LEBAIL_INTENSITY_FLOOR", "constant", tier=1, value=1e-10,
+        evidence=("numerical floor: keeps a partitioned intensity positive so the next cycle's "
+                  "share of the point is defined; ten orders under one count, and the partition's "
+                  "value since before WP-1542 named it")),
     Row("rietx.model.forward.MAGNETIC_SIZING_FLOOR", "constant", tier=3, value=0.1,
         evidence=("invariant behind the closing stage only: a magnetic width freed from "
                   "zero is drawn on windows sized at the floor, which lose 3.2 and 4.1 % of a "
@@ -2691,6 +2723,14 @@ ROWS: tuple[Row, ...] = (
                  "so this margin serves every compile; the eighth round (ruled 2026-10-22) keeps "
                  "it at 0.5 deg, the 0.03-0.04 esd it costs recorded, for WP-2017's second pass."),
         approved="2026-10-22"),
+    Row("rietx.model.forward.SQUAREM_STEP_GROWTH", "constant", tier=2, value=4.0,
+        evidence=("source: mstep = 4, the default of Varadhan and Roland's R package SQUAREM, with "
+                  "step.max0 = 1 and method = 3 (CRAN manual, checked 2026-11-05); unbounded, one "
+                  "FAP partition dropped every landing for hundreds of rounds; of 2, 4 and 8 on six "
+                  "patterns only 4 stays within 1.25x of the best total cycles on all of them (2 "
+                  "loses 1.9x on FAP, 8 loses 2.4x on #740); the factor picks the path, so at 2 and "
+                  "8 #740's 2 % scale lands 1.25 esd away (Rwp 4.697 against 4.680 %), the "
+                  "failing case of StageSpec:lebail_tol (WP-1542, 2026-11-05)")),
     Row("rietx.model.forward.WINDOW_AREA_TOL", "constant", tier=3, value=0.02,
         evidence=("window area tolerance; measured 2026-10-21 on SRM 660c, FAP, cpd-1a and 11-BM NAC against 5e-5 (converged): fails on all four, "
                   "max |dy|/sigma 0.71-2.15 at fixed parameters against a bar of 0.1, a converged "
@@ -3019,14 +3059,16 @@ ROWS: tuple[Row, ...] = (
                  "three families on either side give one answer (B10, ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("rietx.optimize.bccg._SMALL_FACTOR", "constant", tier=3, value=200.0,
-        evidence="Coelho (2005) J. Appl. Cryst. 38, 455, eq (2) (docstring; paper not on disk)",
+        evidence=("Coelho (2005) J. Appl. Cryst. 38, 455, eq (2) prints 200 r_i^2 N_k < s_0 (read "
+                  "2026-11-05); no value beside 200 is tried"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
                  "B10's solver-path switches (ruled 2026-10-20)."),
         approved="2026-10-20"),
     Row("rietx.optimize.bccg._SMALL_RUNS", "constant", tier=3, value=6,
-        evidence="Coelho (2005) J. Appl. Cryst. 38, 455, § 2 (docstring; paper not on disk)",
+        evidence=("Coelho (2005) J. Appl. Cryst. 38, 455, § 2 states 'six consecutive iterations' "
+                  "(read 2026-11-05); no other count is tried"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
@@ -3053,6 +3095,14 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.optimize.identifiability.SOFT_MODES_K", "constant", value=3),
     Row("rietx.optimize.identifiability.SOFT_MODE_MIN_LOADING", "constant", value=0.1),
     Row("rietx.optimize.identifiability.TOP_CORRELATIONS_K", "constant", value=5),
+    Row("rietx.optimize.least_squares._CHAIN_RANK_RTOL", "constant", tier="invariant",
+        value=1e-10,
+        evidence=("answer-invariant: it chooses between a directional peak-chain column per "
+                  "basis direction and a column per coefficient (WP-1964 task 7), and the two "
+                  "land within 7.4e-7 esd of each other on the joint LaB6 ramp at 6 and 14 "
+                  "patterns; exactly proportional coefficients sit at rounding (1e-16) and "
+                  "independent ones at order 1, so any cut between gives the same grouping; "
+                  "tests/test_parametric_series.py::test_a_targets_column_once_serves_every_coefficient")),
     Row("rietx.optimize.least_squares.FD_STEP", "constant", tier=3, value=1e-06,
         evidence=("finite-difference step (WP-2002, 2026-10-21, tests/test_cross_backend.py): every FD "
                   "column of the 23 configurations within 2.5e-4 of a Richardson oracle (5.0e-4 with "
@@ -3151,22 +3201,38 @@ ROWS: tuple[Row, ...] = (
                   "test_the_hostile_pairs_warm_stage_stops_short_of_the_runaway; INTERMEDIATE_FTOL's test measures "
                   "against it (tests/test_staged_start_invariance.py), and this value itself "
                   "was never varied; the signature default of run_least_squares, "
-                  "run_multi_least_squares and lm.minimize until the B14 lift"),
+                  "run_multi_least_squares and lm.minimize until the B14 lift; "
+                  "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
+                  "validate, FAP and NAC verify): 1e-8 and 1e-10 on FAP, NAC, cpd-1a and SRM 660c through "
+                  "lm.minimize and run_least_squares, the last declared and closing stages "
+                  "(run_multi_least_squares not exercised): worst 0.0011 plain esd, cpd-1a phases.0.scale at "
+                  "1e-8, 0.957-1.043x evaluations, no reference moved past 3.2e-4 esd; at 1e-10 FAP and SRM "
+                  "660c stop on exhausted fp64 with identical answers; shipped starts only"),
         grounds=("The last tolerance of the schedule rietx chose (WP-1123): B7's class went to "
                  "tier 3 once its invariance test failed on cpd-1a (ruled 2026-10-19), and the "
                  "schedule was kept on four families with that failure stated (the sixth "
                  "round's Q2, bar 0.1 plain esd, ruled 2026-10-21). That test holds 1e-9 "
                  "fixed, so the maintainer delegated this value's tier to the lead on "
                  "2026-10-23: tier 3, with WP-2017 refitting the four start-test families at "
-                 "1e-8 and 1e-10."),
+                 "1e-8 and 1e-10."
+                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
+                 " failing case sought, so its hard starts are owed before that condition is met."),
         approved="2026-10-23"),
     Row("rietx.optimize.lm._CONVERGED_RUNS", "constant", tier=3, value=3,
-        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, termination rule (docstring: 'Coelho's "
-                  "own criterion'; paper not on disk)"),
+        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428 stops its NIST, Rosenbrock and AntiBump runs at an "
+                  "absolute |dS| under 1e-6 or 1e-7 for three consecutive iterations, and warns that "
+                  "a stop can favour one schedule; Coelho (2005) stops at an Rwp change under 0.001 "
+                  "for three. A test protocol in each, read 2026-11-05, with no other count tried; "
+                  "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
+                  "validate, FAP and NAC verify): 2 and 5 on FAP, NAC, cpd-1a and SRM 660c, both arms acting on"
+                  " all four: worst 0.0024 plain esd, cpd-1a profile.v, 0.891-1.132x evaluations; no reference "
+                  "moved past 1.8e-4 esd; shipped starts only"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
+                 " failing case sought, so its hard starts are owed before that condition is met."),
         approved="2026-10-20"),
     Row("rietx.optimize.lm.SLOW_DESCENT_ESD", "constant", tier=3, value=1.0,
         evidence=("WP-1334 (issue #222): a stage stops once the rest of its budget, at the "
@@ -3178,11 +3244,22 @@ ROWS: tuple[Row, ...] = (
                   "checked), looser than this. Measured on the WP's fixtures (powderline LaB6, "
                   "cpd-1a with zircon at 1e-6 and 1e-9, the 1e-9 acceptance protocols): "
                   "816 -> 539 evaluations on LaB6, worst shift 0.064 plain esd, on background "
-                  "c5 beside the degenerate hump; see the WP's handover for every row"),
+                  "c5 beside the degenerate hump; see the WP's handover for every row; "
+                  "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
+                  "validate, FAP and NAC verify): 0.5, 2.0 and None on the four shipped starts: never read, the"
+                  " longest stage 46 evaluations against the rule's 100. Silent where it should be: NAC +1 % "
+                  "(stages of 374 and 161 evaluations) and cpd-1a +1 % (155) reached the answer, every arm bit-"
+                  "identical. It acts on cpd-1a +3 % and LaB6 +3 %, both of which miss the answer, worst 0.25 "
+                  "and 0.013 esd under each start's noise, and on cpd-1a with zircon under three other arms, "
+                  "within noise; None costs up to 2.2x evaluations; tests/test_slow_descent.py is its injected "
+                  "case"),
         grounds=("A constant that decides where a solve stops, rietx's own; tier 3 until "
                  "three families on either side give one answer, as the solver's other "
-                 "stopping constants (B10)."),
-        approved="2026-11-03"),
+                 "stopping constants (B10)."
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_slow_descent.py."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._SLOW_DESCENT_HORIZON", "constant", tier=3, value=300,
         evidence=("WP-1334: the evaluations the slow-descent rule projects over, the rest of "
                   "a default 400-evaluation stage after its first window; a count so the "
@@ -3202,10 +3279,20 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.optimize.lm._CURVATURE_GATE", "constant", tier=3, value=100.0,
         evidence=("WP-1953: 3762 of 3831 LM solves never raise lambda past 10, and the crawls it "
                   "catches pass 1e8; no measurement chose 100 over 30 or 1000; second pass owed "
-                  "(refits of three families on either side)"),
+                  "(refits of three families on either side); "
+                  "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
+                  "validate, FAP and NAC verify): 30 and 1000 on the four families and nine hard starts: bit-"
+                  "identical on all 13; read on cpd-1a's starts alone, 3 to 14 reads a fit; lambda climbs in "
+                  "decades, so 30 and 100 fire on one trial; a gate-off arm was not run. "
+                  "tests/test_lm_solver.py's two vanishing-column tests stop over twice the chi2 with it off, "
+                  "synthetic; 30, 1000 and off are bit-identical on all 260 of group_a_paper_cases, "
+                  "which never reach it"),
         grounds=("A solver-path switch no refiner has a view on; kept at tier 3 until refits of "
-                 "three families on either side give one answer (B10, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                 "three families on either side give one answer (B10, ruled 2026-10-19)."
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py's two vanishing-column tests."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._CURVATURE_STEP", "constant", tier=1, value=0.0001220703125,
         evidence=("arithmetic: eps^(1/4) balances the difference's truncation (h^2 S''''/12) "
                   "against its rounding (4uS/h^2) (docstring)")),
@@ -3223,36 +3310,85 @@ ROWS: tuple[Row, ...] = (
                  "inner loop."),
         approved="2026-10-19"),
     Row("rietx.optimize.lm._LAMBDA_FAIL_FACTOR", "constant", tier=3, value=10.0,
-        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9) (docstring; WP-0601 restates it; "
-                  "paper not on disk, not checked)"),
+        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9), read 2026-11-05: prints c = 10 as the "
+                  "standard formulation, eq (2), and calls the best c problem dependent. It tests the whole "
+                  "schedule against that standard and never varies c. GSAS-II 5.8.4 multiplies by 10 on a "
+                  "failed step and divides by 10 on a good one (GSASIImath.HessianLSQ, checked). "
+                  "group_a_paper_cases, the paper's hard problems on this solver (docs/wp/2017-batch/; "
+                  "synthetic, 260 fits an arm): 5 and 20 change no answer, 0.91x and 0.79x evaluations on "
+                  "the cusp of eq (12); "
+                  "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
+                  "validate, FAP and NAC verify): 5 and 20: only cpd-1a's shipped start rejects a step, worst "
+                  "6.7e-6 plain esd. From hard starts reaching the answer, on cpd-1a and FAP, two families, "
+                  "worst 0.0084 esd against 0.0055 noise. No arm changed whether any of the nine starts reached"
+                  " the answer. On starts that miss it the value picks the minimum: on NAC +3 % both arms lose "
+                  "NAC, Rwp 0.139 to 0.802 and 0.790; LaB6 +3 % arm 20 moves 118 esd against noise 0.094; "
+                  "cpd-1a +3 % arm 5 reaches a lower chi2 than shipped. It is also lambda/10's factor"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
-        approved="2026-10-20"),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py::test_a_schedule_constant_the_cusp_reaches_gives_one_answer."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._LAMBDA_FAIL_FLOOR", "constant", tier=3, value=0.1,
-        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9) (docstring; WP-0601 restates it; "
-                  "paper not on disk, not checked)"),
+        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9), read 2026-11-05: prints max(lambda, 0.1) "
+                  "and never varies it. GSAS-II 5.8.4's first failure sets 1e-3 instead (HessianLSQ's "
+                  "lamda=-3, checked). group_a_paper_cases, the paper's hard problems on this solver "
+                  "(docs/wp/2017-batch/; synthetic, 260 fits an arm): 0.01 and 1 change no answer, 1.01x "
+                  "and 0.90x evaluations on the cusp of eq (12); "
+                  "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
+                  "validate, FAP and NAC verify): 0.01 and 1: only cpd-1a's shipped start rejects a step, and "
+                  "it moved one evaluation. From hard starts reaching the answer, on cpd-1a and FAP, two "
+                  "families, worst 1.25e-5 esd against 2.9e-6 noise. No arm changed whether any of the nine "
+                  "starts reached the answer. On starts that miss it the value picks the minimum: on NAC +3 % "
+                  "both arms lose NAC, Rwp 0.139 to 0.802 and 0.771; LaB6 +3 % arm 1 moves 19.4 esd"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
-        approved="2026-10-20"),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py::test_a_schedule_constant_the_cusp_reaches_gives_one_answer."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._M_HI", "constant", tier=3, value=10.0,
-        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9) (docstring; WP-0601 restates it; "
-                  "paper not on disk, not checked)"),
+        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9), read 2026-11-05: prints Limit(r_u, 0.4, "
+                  "10) and never varies the 10. group_a_paper_cases, the paper's hard problems on this "
+                  "solver (docs/wp/2017-batch/; synthetic, 260 fits an arm): r_u reaches 5 on 201 of 260 "
+                  "shipped fits, and 5 and 20 change no answer, 1.06x and 1.09x evaluations on the cusp of "
+                  "eq (12); "
+                  "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
+                  "validate, FAP and NAC verify): 5 and 20: no accepted step on the four shipped starts reached"
+                  " r_u 5 (largest 1.51). From cell lengths +1 % and +3 % and zircon declared, the one start "
+                  "reaching the answer that met it is cpd-1a with zircon, under its 0.0055 esd noise: one "
+                  "family. No arm changed whether any of the nine starts reached the answer. On starts that "
+                  "miss it the value picks the minimum: NAC +3 % arm 20 loses NAC, Rwp 0.139 to 0.794, under "
+                  "MODEL_FAR_FROM_DATA_RWP; cpd-1a +3 % arm 5 moves 103 esd against noise 3.99, to a lower chi2"
+                  " than shipped"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
-        approved="2026-10-20"),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py::test_a_schedule_constant_the_cusp_reaches_gives_one_answer."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._M_LO", "constant", tier=3, value=0.4,
-        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9) (docstring; WP-0601 restates it; "
-                  "paper not on disk, not checked)"),
+        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9), read 2026-11-05: prints Limit(r_u, 0.4, "
+                  "10) and never varies the 0.4. group_a_paper_cases, the paper's hard problems on this "
+                  "solver (docs/wp/2017-batch/; synthetic, 260 fits an arm): 0.2 and 0.8 change no answer, "
+                  "0.60x and 0.84x evaluations on the cusp of eq (12); "
+                  "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
+                  "validate, FAP and NAC verify): 0.8 on FAP, cpd-1a and SRM 660c, 0.2 on cpd-1a and SRM 660c "
+                  "(FAP's smallest r_u 0.585; NAC never read it): worst 8.2e-6 plain esd, cpd-1a axial_sl, "
+                  "noise floor 2.4e-6; no reference moved past 2.1e-6 esd; shipped starts only"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 "  WP-2017 group A: one answer from the shipped starts on the families its evidence names; no"
+                 " failing case sought, so its hard starts are owed before that condition is met."),
         approved="2026-10-20"),
     Row("rietx.optimize.lm._NULL_CURVATURE", "constant", tier=1, value=1.4901161193847656e-08,
         evidence=("numerical floor: sqrt(eps); at the cut itself three of 1000 random problems "
@@ -3279,21 +3415,45 @@ ROWS: tuple[Row, ...] = (
                   "9e3 (Higham 2002 §3.1; docstring: S is a sum of ~1e4 squares, resolution "
                   "~1e-16*S)")),
     Row("rietx.optimize.lm._Q_TRIGGER", "constant", tier=3, value=5,
-        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9) (docstring; WP-0601 restates it; "
-                  "paper not on disk, not checked)"),
+        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9), read 2026-11-05: prints Q_u > 5, says "
+                  "this case rarely occurs, and reports it on one example, AntiBump, a penalty it minimises "
+                  "under BFGS. group_a_paper_cases, the paper's hard problems on this solver "
+                  "(docs/wp/2017-batch/; synthetic, 260 fits an arm): under full J^T J AntiBump never fires "
+                  "it in 60 fits. It fires on one of the cusp's 200, n = 0.5 from a = 0.2375, and there it "
+                  "is the failing case: every step overshoots, lambda falls to exactly 0 and cannot rise "
+                  "while Q stays at 10, and the fit zigzags to its 2000-evaluation budget at |a| 7.3e-5, "
+                  "where 7 or the branch off stops in 13 evaluations at 4e-13; "
+                  "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
+                  "validate, FAP and NAC verify): 3 and 7 on the four families and nine hard starts: arm 3 "
+                  "acted once, on FAP (largest Q 4), 3.2e-7 plain esd, 0.98x evaluations; 7 changed nothing. "
+                  "The shipped 5 fired on none of the 13 starts; "
+                  "tests/test_lm_solver.py::test_lambda_schedule_branches pins the formula at a hand-set Q of "
+                  "6, no fit"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
-        approved="2026-10-20"),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py::test_the_overshoot_branch_stalls_on_the_cusp."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._Q_WINDOW", "constant", tier=3, value=10,
-        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9) (docstring; WP-0601 restates it; "
-                  "paper not on disk, not checked)"),
+        evidence=("Coelho (2018) J. Appl. Cryst. 51, 428, eq (9), read 2026-11-05: prints the sum over i = "
+                  "u-10 to u, eleven terms read literally, where rietx sums ten. group_a_paper_cases, the "
+                  "paper's hard problems on this solver (docs/wp/2017-batch/; synthetic, 260 fits an arm): "
+                  "11 and 20 are bit-identical on all 260 and 5 changes the one fit that fires the branch; "
+                  "WP-2017 group A, 2026-11-05 (docs/wp/2017-batch/; development data; cpd-1a and SRM 660c "
+                  "validate, FAP and NAC verify): 5 and 20 on the four families and nine hard starts: bit-"
+                  "identical on all 13, largest Q 4. Arm 5 can never pass the shipped trigger, so it switches "
+                  "the branch off, and that changing nothing shows the branch never fired"),
         grounds=("A constant that decides where a solve stops, taken from the paper that "
                  "defines the algorithm; the paper did not validate it on rietx's problems, so "
                  "tier 3 until refits of three families on either side give one answer, as "
-                 "B10's solver-path switches (ruled 2026-10-20)."),
-        approved="2026-10-20"),
+                 "B10's solver-path switches (ruled 2026-10-20)."
+                 "  WP-2017 group A barely reached it, so an arm that changed nothing measured nothing. The "
+                 "maintainer closed the row at tier 3 on a named synthetic case (ruled 2026-11-05): "
+                 "tests/test_lm_solver.py::test_the_overshoot_branch_stalls_on_the_cusp."),
+        approved="2026-11-05"),
     Row("rietx.optimize.lm._ROW_ROUNDING", "constant", tier=1, value=1e-12,
         evidence=("numerical floor: rounding of the row's own evaluation, 4.5e3 eps, seven decades "
                   "under the guards' 1e-9 (docstring)")),
@@ -3349,6 +3509,37 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: degrees to radians"),
     Row("rietx.params.derived._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: degrees to radians"),
+    Row("rietx.params.expression.MAX_DEPTH", "constant", tier="invariant", value=64,
+        evidence=("answer-invariant: a refusal limit of the expression grammar (WP-1964), never a "
+                  "setting of what an accepted expression means; an expression under it parses to "
+                  "the same tree at any limit, and one over it is refused by name (too_deep), "
+                  "never truncated. It bounds the built tree too, a flat chain counting a level "
+                  "a term, because every walk of the tree recurses (600 terms under MAX_LENGTH "
+                  "raised RecursionError before); "
+                  "tests/test_expression.py::test_limits_on_length_and_depth")),
+    Row("rietx.params.expression.MAX_LENGTH", "constant", tier="invariant", value=4096,
+        evidence=("answer-invariant: as MAX_DEPTH, a refusal limit in characters; an expression "
+                  "under it parses identically at any limit, and a longer one is refused by name "
+                  "(too_long); tests/test_expression.py::test_limits_on_length_and_depth")),
+    Row("rietx.params.expression._DEBYE_TAIL", "constant", tier=1, value=10.0,
+        evidence=("numerical floor: the switch from 32-node Gauss-Legendre to the exponential "
+                  "tail of D1; the quadrature is within 4e-15 of an mpmath quadrature below "
+                  "|x| = 10 (WP-1964 task 3's measurement, the constant's comment) and the tail "
+                  "series is exact to rounding above it (_DEBYE_TAIL_TERMS), so the switch "
+                  "moves no value past rounding")),
+    Row("rietx.params.expression._DEBYE_TAIL_TERMS", "constant", tier=1, value=5,
+        evidence=("arithmetic: at x >= _DEBYE_TAIL the first omitted term of the tail series "
+                  "carries e^-60, about 1e-26 relative to D1, so five terms reach double "
+                  "precision")),
+    Row("rietx.params.expression._NOT_POWER", "constant", tier="invariant", value=3,
+        evidence=("definition: the binding power that places 'not' between 'and' and the "
+                  "comparisons, as the grammar page docs/docs/reference/expressions.md states "
+                  "and tests/test_expression.py's table rows pin; precedence is the grammar's "
+                  "meaning, so any value keeping that order parses identically")),
+    Row("rietx.params.expression._UNARY_POWER", "constant", tier="invariant", value=7,
+        evidence=("definition: the binding power that places unary minus above '*' and '/' and "
+                  "below '^' (-x^2 = -(x^2)), as the grammar page states and the table rows pin; "
+                  "any value keeping that order parses identically")),
     Row("rietx.params.parametric.FORM_TEST_LEVEL", "constant", tier=2, value=0.95,
         evidence=("Venzon & Moolgavkar (1988) Appl. Statist. 37, 87 for the profile-likelihood cut;"
                   " the 95 % level is convention, = PARAMETER_INTERVAL_LEVEL (docstring)")),
@@ -3479,6 +3670,19 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine.LOW_ANGLE_MIN_CHANNELS", "constant", value=10),
     Row("rietx.refine.LOW_ANGLE_UNMODELLED_RATIO", "constant", value=3.0),
     Row("rietx.refine.MAGNETIC_TICK_PURITY", "constant", value=0.05),
+    Row("rietx.refine.PAWLEY_SEED_CYCLES", "constant", tier=3, value=3,
+        evidence=("the fixed 3 of StageSpec:lebail_cycles before WP-1542, kept for the Pawley seed; "
+                  "under the default LM a 300-cycle seed against 3 moved 0.000 esd, 0.000 sigma and "
+                  "under 2e-8 of the largest intensity on #740's pattern, its 2 % scale, corundum "
+                  "and FAP, and a seed settled at 1e-5 moved 0.000 esd at identical evaluations (33, "
+                  "70, 53, 63) on the 2 % scale, corundum, 11-BM NAC and LaB6+cBN; fails under "
+                  "solver='trf' on FAP: 3 cycles stop at Rwp 8.17 % where 300 reach 7.87 % (LM "
+                  "7.86 %), 8.8 esd apart; the same bar holds under TRF on the other three (WP-1542, "
+                  "2026-11-05, macOS arm64); no stated source for the 3"),
+        grounds=("Kept at the count B11 (ruled 2026-10-19) left in place, because under the default "
+                 "solver a longer seed costs index validation, a default path, and moves nothing; "
+                 "the TRF failing case goes to WP-2062, which owns Pawley's bugs."),
+        approved="2026-10-19"),
     Row("rietx.refine.MODEL_FAR_FROM_DATA_RWP", "constant", tier=3, value=0.8,
         evidence=("WP-1028 (c): the zero-scale attractor converges at Rwp 0.99999, honest bad fits "
                   "sit at 0.2-0.5, the failures above it at 72.25 and 2.6e3 (docstring); gates "
@@ -3840,9 +4044,9 @@ ROWS: tuple[Row, ...] = (
                   "1e-6 against every stage at 1e-9 within 0.1 plain esd on FAP, cpd-1a and "
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
-                  "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
-                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "WP-2045); SRM 660c read 8.82 esd on axial_sl, its mirrored S/L and H/L "
+                  "minima (WP-2012), and passes since WP-2012 held H/L on that protocol "
+                  "(tests/test_staged_start_invariance.py, 2026-11-03); "
                   "net of the converged last declared stage and the closing stage, 52/49, "
                   "51/46 and 277/175 evaluations on FAP, 11-BM NAC and cpd-1a (1.06-1.58x), "
                   "116/90 on SRM 660c (1.29x) and 1221/311 on cpd-1a with the absent zircon "
@@ -4219,7 +4423,7 @@ ROWS: tuple[Row, ...] = (
         evidence=("GSAS-II 5.8.4's constant-wavelength peak is the Thompson, Cox & Hastings (1987) "
                   "pseudo-Voigt with the FCJ asymmetry (GSASIIpwd.getFWHM :916, getFCJVoigt3 "
                   ":1316; checked); 'voigt' is the opt-in true Voigt")),
-    Row("rietx.schemas.instrument.ProfileTCHZ:u", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -32400.0, "max": 32400.0, "expr": None, "unit": "deg^2", "stderr": None},
+    Row("rietx.schemas.instrument.ProfileTCHZ:u", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -32400.0, "max": 32400.0, "unit": "deg^2", "stderr": None},
         evidence=("TCHZ_DEFAULTS' seed 0 and TCHZ_BOUNDS' box, dicts the constant walk cannot see; the "
                   "seed is start-invariant for a freed width (tests/test_seed_invariance.py, LaB6, CPD "
                   "and 11-BM NAC within 1.3e-4 esd) and is the held value of an uncalibrated one; the "
@@ -4234,7 +4438,7 @@ ROWS: tuple[Row, ...] = (
                  "floors'; B9, no chosen limit on a quantity that stays physical); the far bound and "
                  "the ceiling are TCHZ_CEILING_DEG's (the sixth round's Q7, ruled 2026-10-21)."),
         approved="2026-10-23"),
-    Row("rietx.schemas.instrument.ProfileTCHZ:v", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -32400.0, "max": 32400.0, "expr": None, "unit": "deg^2", "stderr": None},
+    Row("rietx.schemas.instrument.ProfileTCHZ:v", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -32400.0, "max": 32400.0, "unit": "deg^2", "stderr": None},
         evidence=("TCHZ_DEFAULTS' seed 0 and TCHZ_BOUNDS' box, as ProfileTCHZ:u; the public D1B Co3O4 "
                   "model's V = -0.501, under the old X-ray floor of -0.5, now builds on every preset, "
                   "which retired TCHZ_BOUNDS_COARSE; no per-coefficient floor: a finite bound at -180^2 "
@@ -4247,7 +4451,7 @@ ROWS: tuple[Row, ...] = (
                  "floors'; B9, no chosen limit on a quantity that stays physical); the far bound and "
                  "the ceiling are TCHZ_CEILING_DEG's (the sixth round's Q7, ruled 2026-10-21)."),
         approved="2026-10-23"),
-    Row("rietx.schemas.instrument.ProfileTCHZ:w", "default", tier=3, ambiguity=1, value={"value": 0.001, "vary": False, "min": 1e-08, "max": 32400.0, "expr": None, "unit": "deg^2", "stderr": None},
+    Row("rietx.schemas.instrument.ProfileTCHZ:w", "default", tier=3, ambiguity=1, value={"value": 0.001, "vary": False, "min": 1e-08, "max": 32400.0, "unit": "deg^2", "stderr": None},
         evidence=("TCHZ_DEFAULTS' seed 1e-3 deg^2, start-invariant for a freed width from 1e-6 "
                   "to 1.0 on LaB6 (tests/test_seed_invariance.py), a start too wide losing NAC's "
                   "phase at w = x = 1e-2; the floor is caglioti._MIN_GAMMA_G2 and the ceiling "
@@ -4256,7 +4460,7 @@ ROWS: tuple[Row, ...] = (
                  "TCHZ_CEILING_DEG, the sixth round's Q7, ruled 2026-10-21); the seed is "
                  "start-invariant on the side the default sits on."),
         approved="2026-10-21"),
-    Row("rietx.schemas.instrument.ProfileTCHZ:x", "default", tier=3, ambiguity=1, value={"value": 0.001, "vary": False, "min": 0.0, "max": 180.0, "expr": None, "unit": "deg", "stderr": None},
+    Row("rietx.schemas.instrument.ProfileTCHZ:x", "default", tier=3, ambiguity=1, value={"value": 0.001, "vary": False, "min": 0.0, "max": 180.0, "unit": "deg", "stderr": None},
         evidence=("TCHZ_DEFAULTS' seed 1e-3 deg: start-invariant on LaB6 except starts at x = "
                   "0.02-0.03, which land 0.38 esd away in u on a mirrored S/L-H/L minimum (WP-2012); "
                   "FAP's GSAS protocol holds x at it, and x = 0 instead moves lor_size 0.69 esd at "
@@ -4267,7 +4471,7 @@ ROWS: tuple[Row, ...] = (
         grounds=("Its ceiling is TCHZ_CEILING_DEG's (the sixth round's Q7, ruled 2026-10-21); its "
                  "floor is a width's own, which the ruling of 2026-10-23 kept."),
         approved="2026-10-23"),
-    Row("rietx.schemas.instrument.ProfileTCHZ:y", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -180.0, "max": 180.0, "expr": None, "unit": "deg", "stderr": None},
+    Row("rietx.schemas.instrument.ProfileTCHZ:y", "default", tier=3, ambiguity=1, value={"value": 0.0, "vary": False, "min": -180.0, "max": 180.0, "unit": "deg", "stderr": None},
         evidence=("TCHZ_DEFAULTS' seed 0, start-invariant for a freed width "
                   "(tests/test_seed_invariance.py); the ceiling TCHZ_CEILING_DEG; a negative Y is "
                   "physical as a coefficient: a constant positive Lorentzian width projected onto "
@@ -4293,9 +4497,9 @@ ROWS: tuple[Row, ...] = (
                   "1e-6 against every stage at 1e-9 within 0.1 plain esd on FAP, cpd-1a and "
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
-                  "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
-                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "WP-2045); SRM 660c read 8.82 esd on axial_sl, its mirrored S/L and H/L "
+                  "minima (WP-2012), and passes since WP-2012 held H/L on that protocol "
+                  "(tests/test_staged_start_invariance.py, 2026-11-03); "
                   "net of the converged last declared stage and the closing stage, 52/49, "
                   "51/46 and 277/175 evaluations on FAP, 11-BM NAC and cpd-1a (1.06-1.58x), "
                   "116/90 on SRM 660c (1.29x) and 1221/311 on cpd-1a with the absent zircon "
@@ -4363,9 +4567,9 @@ ROWS: tuple[Row, ...] = (
                   "1e-6 against every stage at 1e-9 within 0.1 plain esd on FAP, cpd-1a and "
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
-                  "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
-                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "WP-2045); SRM 660c read 8.82 esd on axial_sl, its mirrored S/L and H/L "
+                  "minima (WP-2012), and passes since WP-2012 held H/L on that protocol "
+                  "(tests/test_staged_start_invariance.py, 2026-11-03); "
                   "net of the converged last declared stage and the closing stage, 52/49, "
                   "51/46 and 277/175 evaluations on FAP, 11-BM NAC and cpd-1a (1.06-1.58x), "
                   "116/90 on SRM 660c (1.29x) and 1221/311 on cpd-1a with the absent zircon "
@@ -4385,14 +4589,47 @@ ROWS: tuple[Row, ...] = (
                  "S/L and H/L mirror (WP-2012), "
                  "not an accuracy loss from the tolerance."),
         approved="2026-11-01"),
-    Row("rietx.schemas.plan.StageSpec:lebail_cycles", "default", tier=3, ambiguity=1, value=3,
-        evidence=("no stated source; issue #740 (synthetic LaMnO3-like neutron, cell and profile "
-                  "at truth): Rwp 4.56 % at 3 cycles, 1.62 % at 100-400, 1.09 % for the true "
-                  "structure; GSAS-II's DoLeBail runs 10 (GSASIIstrMain.py:761, checked); changed "
-                  "by WP-1542 (converge with a cap)"),
-        grounds=("Kept at 3 until WP-1542 replaces it with a stop once the intensities stop "
-                 "changing, under a cap; #740 is its stated failure (B11, ruled 2026-10-19)."),
+    Row("rietx.schemas.plan.StageSpec:lebail_cycles", "default", tier="invariant", ambiguity=1,
+        value=25000,
+        evidence=("answer-invariant: a cap the stop reaches first; the dearest partition of a "
+                  "profile_only fit at lebail_tol 1e-7 ran 8495 cycles on BT-1 LaMnO3, 1088 on "
+                  "#740's pattern and 161 on FAP, and one from a flat start 12 293 (2.0x, measured "
+                  "once); tests/test_lebail_cycles.py::test_the_tolerance_meets_its_bar asserts 2x "
+                  "on the fit's partitions on six patterns from four kinds of instrument, the "
+                  "largest 329 reflections; past that domain a cut says so "
+                  "(LEBAIL_CYCLES_AT_CAP); "
+                  "GSAS-II's DoLeBail runs a fixed 10 (GSASIIstrMain.py:761, checked)"),
+        grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
+                 "and a budget is treated as not affecting the answer once a test confirms its "
+                 "margin."),
         approved="2026-10-19"),
+    Row("rietx.schemas.plan.StageSpec:lebail_tol", "default", tier=3, ambiguity=1, value=1e-7,
+        evidence=("a numerical setting whose bar fails on one family; a cycle's share of the Bragg "
+                  "counts (the partition is one iterative solve, so this says how far it is taken); "
+                  "max|dy|/sigma against a 1e-10 reference at fixed parameters is, from a flat start, "
+                  "0.027 on #740's pattern, 0.005 at its 2 % scale, 0.015 on BT-1 LaMnO3, 0.011 on "
+                  "FAP and under 0.001 on corundum, 11-BM NAC and LaB6+cBN, where 1e-6 fails at "
+                  "0.237, 0.147 and 0.101; from the fit's own intensities 0.029, 0.001, 0.000 on "
+                  "#740, its 2 % scale, corundum and NAC; fails on FAP, 1.23: a pair 1e-4 A apart "
+                  "(506 and 10 -5 0) that 3000 more cycles swap, Rwp 10.108 to 10.103 %, with "
+                  "the answer 0.001 plain esd off; on #740 at 2 % scale settled intensities from "
+                  "two starts differ by 1.38, so no tolerance closes such a pair, and neither bar "
+                  "reads the split of such a pair, which can move while the curve holds; bar 2, "
+                  "0.1 plain esd, holds on four families of five patterns, #740 and its 2 % "
+                  "scale being one (0.023 on #740's pattern against 1e-9); #740, the "
+                  "ruling's yardstick, ends at Rwp 1.07 % against 1.09 % for its true structure and "
+                  "1.61 % at 3 cycles, a cell 4.6 ppm off truth against 34.9; a stop on estimated "
+                  "distance (s2^2/(s1-s2), Aitken) left FAP at 1.23 too; a Le Bail plan costs "
+                  "1.0-2.1x on six patterns and 150x on LaMnO3 (0.45 s to about a minute); "
+                  "tests/test_lebail_cycles.py, WP-1542, 2026-11-05, macOS arm64"),
+        grounds=("B11 (ruled 2026-10-19): repeat until the intensities stop changing, with a cap, "
+                 "judged against the true structure.  The number, FAP as its failing case and "
+                 "LaMnO3's 150x cost were settled by Claude under the maintainer's delegation "
+                 "of 2026-11-05, and the date is that settlement's.  No "
+                 "surveyed program stops on the intensities at a fixed model, because each "
+                 "extracts inside the solve (docs/practice.md); 1e-8 leaves FAP at 0.55 and "
+                 "more than doubles LaMnO3's cycles."),
+        approved="2026-11-05"),
     Row("rietx.schemas.plan.StageSpec:seed", "default", tier="caller", ambiguity=1, value=0.0,
         evidence=("opt-in: Stage.seed > 0, default 0; the one shipped seed is "
                   "strategy.staged.ROUGHNESS_SEED's 0.3")),
@@ -4410,7 +4647,7 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.schemas.instrument.Source:kind", "default", tier=1, ambiguity=1, value="xray_cw",
         evidence="arithmetic: a union tag, no value judgement"),
-    Row("rietx.schemas.instrument.Source:polarization", "default", tier=3, ambiguity=3, value={"value": 0.5, "vary": False, "min": 0.0, "max": 1.0, "expr": None, "unit": None, "stderr": None},
+    Row("rietx.schemas.instrument.Source:polarization", "default", tier=3, ambiguity=3, value={"value": 0.5, "vary": False, "min": 0.0, "max": 1.0, "unit": None, "stderr": None},
         evidence=("physics: K = 0.5 is the unpolarised beam (docstring; GSAS POLA convention); a "
                   "monochromated lab beam or a synchrotron (K ~ 0.99) built without K is fitted at "
                   "0.5, and a wrong K moved Biso by 12 sigma at near-unchanged Rwp (WP-1311); "
@@ -4967,6 +5204,8 @@ ROWS: tuple[Row, ...] = (
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
     Row("LEBAIL_ALTERNATION_STOPPED.suggestion", "suggestion", value=1),
+    Row("LEBAIL_CYCLES_AT_CAP.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: names the stage setting that lifts the cap"),
     Row("LOW_ANGLE_UNMODELLED.suggestion", "suggestion", value=1),
     Row("MAGNETIC_ION_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=3, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
@@ -4979,11 +5218,17 @@ ROWS: tuple[Row, ...] = (
     Row("MODEL_FAR_FROM_DATA.suggestion", "suggestion", value=1),
     Row("MOMENT_ANGLE_STATIONARY.suggestion", "suggestion", tier=3, ambiguity=1, value=1,
         evidence=("LaMnO3 BT-1 (WP-1929): an angle 5.2 deg off 90 whose interval includes the "
-                  "direction, Delta chi2 0.56 against the interval's 3.84"),
+                  "direction, Delta chi2 0.56 against the interval's 3.84; #1075 (two-site "
+                  "Pnma, N = 400): a weak modulus's esd covered 0.82, its profile 0.93-0.98, "
+                  "and a withheld profile's esd 3 of 20"),
         grounds=("Says what the interval means: one that includes the direction cannot tell "
                  "the moment from one along it, one that excludes it measures the tilt "
-                 "(B2 option 2, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                 "(B2 option 2, ruled 2026-10-19). No longer says to quote the moment along "
+                 "the direction: the modulus is the length at the kept tilt, so it is "
+                 "quoted by its own interval, and a withheld one after a refit (WP-2060, "
+                 "ruled by Mike on #1075, 2026-11-04 condition 3). Rare feature: one "
+                 "family, the simulated two-site Pnma set, untested beyond it."),
+        approved="2026-11-05"),
     Row("MOMENT_UNSUPPORTED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("physics: an esd is no interval where the column vanishes; the profile "
                   "interval is the likelihood statement, kept at m >= 0 where the sign is "

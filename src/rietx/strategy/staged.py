@@ -138,7 +138,13 @@ class Stage:
     #: is unusually sensitive to, or a one-stage validation fit that must
     #: converge as hard as an endpoint.
     ftol: float | None = None
-    lebail_cycles: int = 3  # intensity-partitioning refreshes (lebail mode)
+    #: the most intensity-partitioning cycles run before and after the solve
+    #: (lebail mode), and the seed's (pawley mode)
+    lebail_cycles: int = 25000
+    #: the share of the Bragg counts a cycle may still move and end the
+    #: partition (``CompiledModel.lebail_update``).  0 runs exactly
+    #: ``lebail_cycles``.
+    lebail_tol: float = 1e-7
     #: start every row this stage frees that sits exactly on a lower bound of
     #: 0 or above at this value, before solving
     #: (``ParameterTable.seed_floored``; recorded in ``StageResult.seeded``).
@@ -395,7 +401,7 @@ class RefinementPlan:
         last = self.stages[-1]
         globs = list(dict.fromkeys(g for s in self.stages for g in s.turn_on))
         return Stage(CLOSING_STAGE_NAME, globs, max_iter=last.max_iter, ftol=last.ftol,
-                     lebail_cycles=last.lebail_cycles,
+                     lebail_cycles=last.lebail_cycles, lebail_tol=last.lebail_tol,
                      restraint_weight_scale=last.restraint_weight_scale,
                      window_slack_deg=last.window_slack_deg)
 

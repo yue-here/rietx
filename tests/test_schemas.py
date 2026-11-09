@@ -57,8 +57,12 @@ def test_parameter_bounds_validated():
         Parameter(value=0.5, min=1.0, max=0.0)
 
 
-def test_parameter_expr_reserved():
-    with pytest.raises(ValidationError):
+def test_a_stored_expr_null_reads_and_a_formula_there_is_refused():
+    """``Parameter.expr`` left at schema 0.61 (WP-1964): every file before
+    stored ``null``, which reads as nothing; text there is refused by name."""
+    old = Parameter.model_validate({"value": 1.0, "vary": False, "expr": None})
+    assert old == Parameter(value=1.0) and "expr" not in old.model_dump()
+    with pytest.raises(ValidationError, match="removed at schema 0.61"):
         Parameter(value=1.0, expr="2*a")
 
 
@@ -156,7 +160,7 @@ def test_every_bounds_carrying_atom_field_is_inherited():
     ``default_factory`` declares a min/max/unit beyond Parameter's own bare
     defaults, and check each one inherits. A field added later the same way
     is exercised here automatically, with no edit to this test; if
-    ``Atom._inherit_declared_bounds`` ever regresses to naming fields
+    ``Atom``'s inheritance ever regresses to naming fields
     explicitly and misses one, this fails. Fails on the parent commit for
     both fields it currently finds (occ, biso)."""
     bare = Parameter(value=0.0)
@@ -295,7 +299,7 @@ def test_every_schema_field_that_declares_a_range_passes_it_on():
     found = _declared_fields()
     for cls, name, default in found:
         assert issubclass(cls, _InheritsDeclaredDefaults), (cls.__name__, name)
-        got = cls._inherit_declared_bounds({name: Parameter(value=default.value)})[name]
+        got = cls._inherit_declared(name, Parameter(value=default.value))
         for attr in ("min", "max", "unit"):
             assert getattr(got, attr) == getattr(default, attr), (cls.__name__, name, attr)
     # a guard against a loop that silently matched nothing, not a pin of the set
@@ -329,10 +333,9 @@ def test_a_caller_bound_wins_and_an_omitted_one_inherits():
     assert got.lor_size.min == -1.0
     assert got.gauss_size.min == 0.0
 
-    eta = PeakComponent._inherit_declared_bounds(
-        {"eta": Parameter(value=0.5, max=0.9)})["eta"]
+    eta = PeakComponent._inherit_declared("eta", Parameter(value=0.5, max=0.9))
     assert (eta.min, eta.max) == (0.0, 0.9)
-    eta = PeakComponent._inherit_declared_bounds({"eta": Parameter(value=0.5)})["eta"]
+    eta = PeakComponent._inherit_declared("eta", Parameter(value=0.5))
     assert (eta.min, eta.max) == (0.0, 1.0)
 
 
@@ -402,6 +405,144 @@ def test_inheriting_does_not_touch_the_callers_parameter_on_any_class():
     # unbounded since WP-2002 (2026-10-20); its unit is still its own
     assert (geo.sample_displacement.min, geo.sample_displacement.max,
             geo.sample_displacement.unit) == (float("-inf"), float("inf"), "mm")
+
+
+def _inheriting_classes():
+    """Every class that inherits declared ranges, found by walking the family."""
+    from rietx.schemas.common import _InheritsDeclaredDefaults
+
+    seen, stack = [], list(_InheritsDeclaredDefaults.__subclasses__())
+    while stack:
+        cls = stack.pop()
+        if cls not in seen:
+            seen.append(cls)
+            stack.extend(cls.__subclasses__())
+    return seen
+
+
+def _minimal_instance(cls):
+    """One valid instance of an inheriting class, built with its defaults."""
+    from rietx.schemas import instrument as ins
+    from rietx.schemas import structure as st
+
+    p = Parameter
+    builds = {
+        st.Phase: lambda: make_lab6().phases[0],
+        st.Atom: _atom,
+        st.Moment: lambda: st.Moment(ion="Fe3"),
+        st.PreferredOrientation: lambda: st.PreferredOrientation(axis=(0, 0, 1)),
+        st.SphericalHarmonicTexture: lambda: st.SphericalHarmonicTexture(order=2),
+        st.AnisoU: lambda: st.AnisoU(u11=p(value=0.01), u22=p(value=0.01),
+                                     u33=p(value=0.01)),
+        ins.Instrument: lambda: Instrument.debye_scherrer(wavelength=0.4139),
+        ins.Source: lambda: Instrument.debye_scherrer(wavelength=0.4139).source,
+        ins.EmissionLine: lambda: ins.EmissionLine(wavelength=p(value=1.54)),
+        ins.Harmonic: lambda: ins.Harmonic(order=3),
+        ins.TOFSource: lambda: ins.TOFSource(difc=p(value=5000.0),
+                                             two_theta_bank_deg=90.0),
+        ins.PeakComponent: lambda: ins.PeakComponent(
+            center=p(value=28.4, min=28.0, max=28.8),
+            fwhm=p(value=0.1, min=0.01, max=0.5)),
+        ins.HumpComponent: lambda: ins.HumpComponent(position=p(value=30.0)),
+        ins.BackgroundFixedPlusChebyshev: lambda: ins.BackgroundFixedPlusChebyshev(
+            fixed_two_theta=[10.0, 20.0], fixed_intensity=[1.0, 1.0]),
+    }
+    return builds.get(cls, cls)()
+
+
+def test_an_assigned_parameter_inherits_its_declared_range_on_every_class():
+    """WP-2088: assignment inherits exactly as construction does.
+
+    ``phase.lor_size = Parameter(value=0.01, vary=True)`` read ``min -inf,
+    unit None`` while the same ``Parameter`` passed to the constructor read
+    ``min 0, unit deg``: the fill lived in a model validator, and an
+    assignment never hands that validator the assigned value.  Every declared
+    field of every inheriting class is assigned a ``Parameter`` and a dict
+    leaving out what the field declares, and each must come out carrying it,
+    with the caller's object left as handed in.  An attribute the field does
+    not declare is stated from the instance, since some classes need a finite
+    one of their own (``PeakComponent.center``).  A class added later is found
+    by the walk; one that cannot be built with its defaults needs a line in
+    ``_minimal_instance``."""
+    bare = Parameter(value=0.0)
+    checked = []
+    for cls in _inheriting_classes():
+        names = [n for n in cls.model_fields if cls._declared_default(n) is not None]
+        if not names:
+            continue
+        obj = _minimal_instance(cls)
+        for name in names:
+            declared = cls._declared_default(name)()
+            current = getattr(obj, name) or declared
+            omitted = {a for a in ("min", "max", "unit")
+                       if getattr(declared, a) != getattr(bare, a)}
+            if not omitted:
+                continue
+            stated = {a: getattr(current, a) for a in ("min", "max", "unit")
+                      if a not in omitted}
+            for given in (Parameter(value=current.value, **stated),
+                          {"value": current.value, **stated}):
+                handed = copy.deepcopy(given)
+                setattr(obj, name, given)
+                got = getattr(obj, name)
+                assert isinstance(got, Parameter), (cls.__name__, name, type(got))
+                for attr in omitted:
+                    assert getattr(got, attr) == getattr(declared, attr), (
+                        cls.__name__, name, attr)
+                assert got.value == current.value
+                if isinstance(given, Parameter):
+                    assert given.model_fields_set == handed.model_fields_set
+                    assert (given.min, given.max, given.unit) == (
+                        handed.min, handed.max, handed.unit)
+                else:
+                    assert given == handed
+            checked.append((cls.__name__, name))
+    # a guard against a walk that silently matched nothing, not a pin of the set
+    assert {("Phase", "lor_size"), ("Atom", "occ"), ("Phase", "extinction"),
+            ("ProfileTCHZ", "x"), ("PeakComponent", "center")} <= set(checked)
+
+
+def test_an_assigned_parameter_keeps_the_bound_it_states():
+    """The issue #204 rule on the assignment path: an explicit bound wins in
+    either direction, and only a true omission inherits."""
+    phase = make_lab6().phases[0]
+    phase.lor_size = Parameter(value=0.01, vary=True)
+    assert (phase.lor_size.min, phase.lor_size.unit, phase.lor_size.vary) == (
+        0.0, "deg", True)
+    phase.lor_size = Parameter(value=-0.5, min=-math.inf)
+    assert (phase.lor_size.min, phase.lor_size.unit) == (-math.inf, "deg")
+    a = _atom()
+    a.occ = Parameter(value=0.5, vary=True, max=1.0)
+    assert (a.occ.min, a.occ.max) == (0.0, 1.0)
+
+
+def test_an_assignment_leaves_the_other_fields_objects_in_place():
+    """WP-2088's code review: pydantic re-runs the construction validator on
+    every assignment, over the model's current fields, and what it returns
+    for a field the assignment never touched lands as it is.  It used to
+    return a fresh copy of every default leaving ``max`` unset, so a
+    ``Parameter`` a caller held stopped being the model's.  Fails on the
+    parent commit."""
+    phase = make_lab6().phases[0]
+    held = {name: getattr(phase, name) for name in ("gauss_size", "scale", "lor_strain")}
+    phase.lor_size = Parameter(value=0.01, vary=True)
+    for name, obj in held.items():
+        assert getattr(phase, name) is obj, name
+    held["gauss_size"].vary = True
+    assert phase.gauss_size.vary
+
+
+def test_an_assigned_parameter_outside_the_declared_range_is_refused_by_name():
+    """The construction refusal, reached by assignment: it names the field and
+    the range, and the model keeps the value it had.  The location is the
+    field: before WP-2088 the same text arrived from the model validator with
+    no location, so the message alone would pass on the parent commit."""
+    a = _atom()
+    with pytest.raises(ValidationError, match=r"Atom\.occ: value -0\.5 lies "
+                       r"outside bounds \[0\.0, inf\]") as refused:
+        a.occ = Parameter(value=-0.5, vary=True)
+    assert [e["loc"] for e in refused.value.errors()] == [("occ",)]
+    assert a.occ.value == 1.0
 
 
 def test_one_parameter_handed_to_many_atoms_becomes_one_per_atom():
