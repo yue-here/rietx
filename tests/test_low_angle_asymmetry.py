@@ -65,8 +65,8 @@ def _lowest(ref):
     """The lowest seen line's (position, shift, esd), read the way the finding reads it."""
     model, values = ref._model, ref._answer["values"]
     r = np.asarray(model.y_obs) - np.asarray(model.evaluate(values))
-    pos, _, frac, shift, esd, _ = _line_shifts(model, values, 0, r,
-                                              np.asarray(model.sigma))[0]
+    _, pos, _, frac, shift, esd, _ = _line_shifts(model, values, r,
+                                                 np.asarray(model.sigma))[0]
     return pos, frac, shift, esd
 
 
@@ -104,7 +104,7 @@ def test_an_asymmetry_the_model_lacks_shows_as_a_negative_shift_at_the_magnetic_
     assert d.level == "info"
     assert d.value == pytest.approx(shift)
     assert d.where == ["instrument.geometry.axial_sl", "instrument.geometry.axial_hl"]
-    assert "(0 0 1) " in d.message and "magnetic-only (1 line)" in d.message
+    assert "(0 0 1) " in d.message and "line of phase 0 (1 line)" in d.message
     assert "not determinable from this sample's nuclear lines" in d.message
     assert "held at 0" in d.message and "predicts" in d.message
 

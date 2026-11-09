@@ -1019,25 +1019,20 @@ def _line_profile(model, cp, comps, rows, sl: float, hl: float,
     return i0, y
 
 
-def _line_shifts(model, values, ip: int, r: np.ndarray, sigma: np.ndarray):
-    """Every line of phase ``ip`` the data sees, with its centroid shift.
+def _phase_lines(model, values, ip: int, sigma: np.ndarray) -> list[dict]:
+    """The lines of phase ``ip`` the data sees, each with its drawn profile
+    and position derivative, before any shift is solved.
 
-    Returns rows ``(position, fwhm, magnetic fraction, shift, esd, rows)``
-    sorted by position, shift and esd in degrees.  A *line* is the
-    reflections drawn within :data:`~.schemas.VALIDITY_RADIUS_FWHM` · FWHM of
-    each other, which the data cannot tell apart (a k ≠ 0 supercell puts
-    pairs such as (1 0 1) and (1 0 0) on one position).  It is **seen** when
+    A *line* is the reflections drawn within
+    :data:`~.schemas.VALIDITY_RADIUS_FWHM` · FWHM of each other, which the
+    data cannot tell apart (a k ≠ 0 supercell puts pairs such as (1 0 1) and
+    (1 0 0) on one position).  Its width is the intensity-weighted FWHM of
+    the components that draw it, so a magnetic-only line under a freed
+    magnetic width is read at the width the fit drew.  It is **seen** when
     the t of its own scale against the counting noise, √Σ(P/σ)², reaches
-    :data:`~.schemas.MIN_COEF_SIGNIFICANCE`, the standing bar.
-
-    The shift is the linear least-squares answer for moving the drawn line
-    to the observed one: the residual regressed on ∂P/∂(2θ_k) under weights
-    1/σ², jointly over every seen line whose ±
-    :data:`~.schemas.MAGNETIC_WIDTH_TAIL_FWHM` · FWHM window overlaps
-    another's, so a neighbour's misfit is not read as this line's.  Its esd
-    is the counting-noise one, with no serial-correlation factor: that
-    factor is measured on the residual holding the misfit under test.
-    Negative means the observed line sits at lower angle than the drawn one.
+    :data:`~.schemas.MIN_COEF_SIGNIFICANCE`, the standing bar, and only when
+    its ± :data:`~.schemas.MAGNETIC_WIDTH_TAIL_FWHM` · FWHM window lies inside
+    the fitted range: a line centred off the data is read by its tail alone.
     """
     cp = model.phases[ip]
     sl = values["instrument.geometry.axial_sl"]
@@ -1046,47 +1041,123 @@ def _line_shifts(model, values, ip: int, r: np.ndarray, sigma: np.ndarray):
     if model.mag_split(ip):
         comps.append((1, model.phase_peaks(ip, values, component=1)))
     pos = np.asarray(comps[0][1][0][0], dtype=np.float64)
-    fwhm = np.asarray(model.peak_fwhm(comps[0][1][0][1], comps[0][1][0][2]),
-                      dtype=np.float64)
-    _, _, frac = _magnetic_fraction(model, values, ip)
-    inten = np.zeros(len(pos))
+    n_refl = len(pos)
+    inten = np.zeros(n_refl)
+    width = np.zeros(n_refl)
     for _, peaks in comps:
-        inten = inten + np.asarray(peaks[0][3], dtype=np.float64)
-    live = [k for k in np.argsort(pos)
+        i_c = np.asarray(peaks[0][3], dtype=np.float64)
+        w_c = np.asarray(model.peak_fwhm(peaks[0][1], peaks[0][2]),
+                         dtype=np.float64)
+        inten = inten + i_c
+        width = width + np.where(i_c > 0.0, i_c * w_c, 0.0)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        fwhm = np.where(inten > 0.0, width / inten, np.nan)
+    frac = (_magnetic_fraction(model, values, ip)[2]
+            if cp.magnetic is not None else np.zeros(n_refl))
+    tt = np.asarray(model.tt, dtype=np.float64)
+    lo, hi = float(tt[0]), float(tt[-1])
+    live = [int(k) for k in np.argsort(pos)
             if np.isfinite(pos[k]) and np.isfinite(fwhm[k]) and fwhm[k] > 0.0
             and inten[k] > 0.0 and cp.win[0, k, 1] > cp.win[0, k, 0]]
     groups: list[list[int]] = []
     for k in live:
         if groups and (pos[k] - pos[groups[-1][0]]
                        <= VALIDITY_RADIUS_FWHM * fwhm[groups[-1][0]]):
-            groups[-1].append(int(k))
+            groups[-1].append(k)
         else:
-            groups.append([int(k)])
+            groups.append([k])
     lines = []
     for g in groups:
+        w = float(np.average(fwhm[g], weights=inten[g]))
+        centre = float(np.average(pos[g], weights=inten[g]))
+        reach = MAGNETIC_WIDTH_TAIL_FWHM * w
+        if centre - reach < lo or centre + reach > hi:
+            continue
         drawn = _line_profile(model, cp, comps, g, sl, hl)
         if drawn is None:
             continue
         i0, y = drawn
-        t = float(np.sqrt(np.sum((y / sigma[i0:i0 + len(y)]) ** 2)))
-        if t < MIN_COEF_SIGNIFICANCE:
+        if np.sqrt(np.sum((y / sigma[i0:i0 + len(y)]) ** 2)) < MIN_COEF_SIGNIFICANCE:
             continue
-        w = float(np.average(fwhm[g], weights=inten[g]))
         h = _SHIFT_STEP_FWHM * w
-        up = _line_profile(model, cp, comps, g, sl, hl, shift=h)
-        dn = _line_profile(model, cp, comps, g, sl, hl, shift=-h)
-        if up is None or dn is None or up[0] != i0 or dn[0] != i0:
-            continue
-        lines.append({
-            "pos": float(np.average(pos[g], weights=inten[g])), "fwhm": w,
-            "frac": float(np.average(frac[g], weights=inten[g])),
-            "i0": i0, "dy": (up[1] - dn[1]) / (2.0 * h), "rows": g})
-    # overlapping windows are solved together
+        # the windows are frozen, so both shifted profiles start at i0
+        up = _line_profile(model, cp, comps, g, sl, hl, shift=h)[1]
+        dn = _line_profile(model, cp, comps, g, sl, hl, shift=-h)[1]
+        lines.append({"phase": ip, "pos": centre, "fwhm": w,
+                      "frac": float(np.average(frac[g], weights=inten[g])),
+                      "i0": i0, "y": y, "dy": (up - dn) / (2.0 * h),
+                      "hkl": [tuple(int(x) for x in cp.reflections.hkl[k])
+                              for k in g]})
+    return lines
+
+
+def _solve_shifts(tt: np.ndarray, r: np.ndarray, sigma: np.ndarray,
+                  block: list[dict], lo: float, hi: float) -> list[tuple]:
+    """``(line, shift, esd)`` for one block of overlapping lines.
+
+    The residual on the channels ``lo``-``hi`` is regressed, under weights
+    1/σ², on every line's ∂P/∂(2θ) **and** its own drawn profile P: the
+    second column takes a line's intensity misfit, which an asymmetric drawn
+    line would otherwise leak into its shift.  Only the shift coefficients
+    are reported, each with its counting-noise esd and no serial-correlation
+    factor, since that factor is measured on the residual holding the misfit
+    under test.  A singular block is solved one line at a time.
+    """
+    chan = np.nonzero((tt >= lo) & (tt <= hi))[0]
+    if not len(chan):
+        return []
+    c0, c1 = int(chan[0]), int(chan[-1]) + 1
+
+    def column(ln, key):
+        col = np.zeros(c1 - c0)
+        a, v = ln["i0"], ln[key]
+        s0, s1 = max(a, c0), min(a + len(v), c1)
+        if s1 > s0:
+            col[s0 - c0:s1 - c0] = v[s0 - a:s1 - a]
+        return col / sigma[c0:c1]
+
+    b = r[c0:c1] / sigma[c0:c1]
+
+    def solve(lines):
+        a = np.column_stack([column(ln, key) for ln in lines
+                             for key in ("dy", "y")])
+        cov = np.linalg.inv(a.T @ a)
+        coef = cov @ (a.T @ b)
+        return [(ln, float(coef[2 * i]), float(cov[2 * i, 2 * i]))
+                for i, ln in enumerate(lines)]
+
+    try:
+        rows = solve(block)
+    except np.linalg.LinAlgError:
+        rows = []
+        for ln in block:
+            try:
+                rows += solve([ln])
+            except np.linalg.LinAlgError:
+                continue
+    return [(ln, c, math.sqrt(v)) for ln, c, v in rows
+            if math.isfinite(c) and v > 0.0]
+
+
+def _line_shifts(model, values, r: np.ndarray, sigma: np.ndarray):
+    """Every seen line of every phase, with its centroid shift.
+
+    Rows ``(phase, position, fwhm, magnetic fraction, shift, esd, hkl)``,
+    sorted by position, shift and esd in degrees; negative means the observed
+    line sits at lower angle than the drawn one.  Lines of all phases are
+    pooled, so overlapping lines of two phases are solved together and the
+    lowest line that could check the asymmetry is found in any phase
+    (:func:`_phase_lines`, :func:`_solve_shifts`).
+    """
+    lines = sorted((ln for ip in range(len(model.phases))
+                    for ln in _phase_lines(model, values, ip, sigma)),
+                   key=lambda ln: ln["pos"])
+    tt = np.asarray(model.tt, dtype=np.float64)
     out = []
-    n = len(r)
     j = 0
     while j < len(lines):
         block = [lines[j]]
+        lo = lines[j]["pos"] - MAGNETIC_WIDTH_TAIL_FWHM * lines[j]["fwhm"]
         reach = lines[j]["pos"] + MAGNETIC_WIDTH_TAIL_FWHM * lines[j]["fwhm"]
         j += 1
         while (j < len(lines) and lines[j]["pos"]
@@ -1095,30 +1166,10 @@ def _line_shifts(model, values, ip: int, r: np.ndarray, sigma: np.ndarray):
             reach = max(reach, lines[j]["pos"]
                         + MAGNETIC_WIDTH_TAIL_FWHM * lines[j]["fwhm"])
             j += 1
-        tt = np.asarray(model.tt, dtype=np.float64)
-        lo = block[0]["pos"] - MAGNETIC_WIDTH_TAIL_FWHM * block[0]["fwhm"]
-        chan = np.nonzero((tt >= lo) & (tt <= reach))[0]
-        if not len(chan):
-            continue
-        a = np.zeros((len(chan), len(block)))
-        for c, ln in enumerate(block):
-            col = np.zeros(n)
-            col[ln["i0"]:ln["i0"] + len(ln["dy"])] = ln["dy"]
-            a[:, c] = col[chan] / sigma[chan]
-        b = r[chan] / sigma[chan]
-        normal = a.T @ a
-        try:
-            cov = np.linalg.inv(normal)
-        except np.linalg.LinAlgError:
-            continue
-        coef = cov @ (a.T @ b)
-        for c, ln in enumerate(block):
-            var = float(cov[c, c])
-            if not (np.isfinite(coef[c]) and var > 0.0):
-                continue
-            out.append((ln["pos"], ln["fwhm"], ln["frac"], float(coef[c]),
-                        float(np.sqrt(var)), ln["rows"]))
-    return out
+        for ln, shift, esd in _solve_shifts(tt, r, sigma, block, lo, reach):
+            out.append((ln["phase"], ln["pos"], ln["fwhm"], ln["frac"],
+                        shift, esd, ln["hkl"]))
+    return sorted(out, key=lambda row: row[1])
 
 
 def _cot_through(lines):
@@ -1130,16 +1181,16 @@ def _cot_through(lines):
     (about −50 mdeg at 9.35°, falling to a few mdeg by 21-22°).  It is a
     reporting shape, not a model of the instrument.
     """
-    c = np.array([1.0 / math.tan(math.radians(ln[0])) for ln in lines])
-    s = np.array([ln[3] for ln in lines])
-    w = 1.0 / np.array([ln[4] for ln in lines]) ** 2
+    c = np.array([1.0 / math.tan(math.radians(ln[1])) for ln in lines])
+    s = np.array([ln[4] for ln in lines])
+    w = 1.0 / np.array([ln[5] for ln in lines]) ** 2
     info = float(np.sum(w * c * c))
     if not info > 0.0:
         return None
     return float(np.sum(w * c * s) / info), float(1.0 / math.sqrt(info))
 
 
-def low_angle_asymmetry_findings(model, values) -> list[Diagnostic]:
+def low_angle_asymmetry_findings(model, values, y_calc=None) -> list[Diagnostic]:
     """``LOW_ANGLE_ASYMMETRY_UNCALIBRATED`` — the lowest lines are magnetic.
 
     On a constant-wavelength pattern the axial-divergence asymmetry is
@@ -1156,12 +1207,14 @@ def low_angle_asymmetry_findings(model, values) -> list[Diagnostic]:
 
     **What fires it is geometry**: at least one seen magnetic-only line (a
     magnetic fraction at or above 1 − :data:`~.schemas.MAGNETIC_WIDTH_PURITY`,
-    WP-1343's cut) below the lowest seen line that is not.  **What it says is
-    arithmetic**: each such line's centroid shift with its counting-noise esd
+    WP-1343's cut) below the lowest seen line of any phase that is not, or
+    seen lines that are all magnetic-only.  **What it says is arithmetic**:
+    each such line's centroid shift with its counting-noise esd
     (:func:`_line_shifts`), the shift at the first line that could check it,
     and what a cot 2θ shape through the magnetic-only lines predicts there
     (:func:`_cot_through`), so a reader sees whether that line follows them.
-    No threshold is applied to any of the numbers.
+    No threshold is applied to any of the numbers.  ``y_calc`` is the drawn
+    pattern where the caller already holds it.
     """
     out: list[Diagnostic] = []
     if getattr(model, "phases", None) is None or getattr(model, "tt", None) is None:
@@ -1169,64 +1222,66 @@ def low_angle_asymmetry_findings(model, values) -> list[Diagnostic]:
     if not any(cp.magnetic is not None for cp in model.phases):
         return out
     sigma = np.asarray(model.sigma, dtype=np.float64)
+    if y_calc is None:
+        y_calc = model.evaluate(values)
     r = (np.asarray(model.y_obs, dtype=np.float64)
-         - np.asarray(model.evaluate(values), dtype=np.float64))
+         - np.asarray(y_calc, dtype=np.float64))
+    lines = _line_shifts(model, values, r, sigma)
+    magnetic = [ln[3] >= 1.0 - MAGNETIC_WIDTH_PURITY for ln in lines]
+    first = next((i for i, m in enumerate(magnetic) if not m), len(lines))
+    if first == 0:
+        return out
+    low = lines[:first]
+    anchor = lines[first] if first < len(lines) else None
     sl = float(values["instrument.geometry.axial_sl"])
     hl = float(values["instrument.geometry.axial_hl"])
-    for ip, cp in enumerate(model.phases):
-        if cp.magnetic is None:
-            continue
-        lines = _line_shifts(model, values, ip, r, sigma)
-        magnetic = [ln[2] >= 1.0 - MAGNETIC_WIDTH_PURITY for ln in lines]
-        first = next((i for i, m in enumerate(magnetic) if not m), None)
-        if first is None or first == 0:
-            continue
-        low = lines[:first]
-        anchor = lines[first]
-        hkl = cp.reflections.hkl
+    phases = sorted({ln[0] for ln in low})
 
-        def name(ln, hkl=hkl):
-            return "/".join(
-                f"({' '.join(str(int(x)) for x in hkl[k])})" for k in ln[5][:2])
+    def name(ln):
+        return "/".join(f"({' '.join(str(x) for x in h)})" for h in ln[6][:2])
 
-        shown = ", ".join(
-            f"{1e3 * ln[3]:+.1f}({1e3 * ln[4]:.1f}) mdeg at {ln[0]:.2f} deg "
-            f"{name(ln)}" for ln in low[:4])
-        more = "" if len(low) <= 4 else f" and {len(low) - 4} more"
-        message = (
-            f"Every line of phase {ip} the data sees below {anchor[0]:.2f} "
-            f"deg is magnetic-only ({len(low)} line"
-            f"{'' if len(low) == 1 else 's'}), so the axial asymmetry is "
-            f"not determinable from this sample's nuclear lines where it is "
-            f"largest. {'Its centroid sits' if len(low) == 1 else 'Their centroids sit'} "
-            f"{shown}{more} from the drawn "
-            f"{'position' if len(low) == 1 else 'positions'}; the first "
-            f"line that is not magnetic-only, at {anchor[0]:.2f} deg, sits "
-            f"{1e3 * anchor[3]:+.1f}({1e3 * anchor[4]:.1f}) mdeg "
-            f"(negative: observed at lower angle).")
+    one = len(low) == 1
+    shown = ", ".join(
+        f"{1e3 * ln[4]:+.1f}({1e3 * ln[5]:.1f}) mdeg at {ln[1]:.2f} deg "
+        f"{name(ln)}" for ln in low[:4])
+    more = "" if len(low) <= 4 else f" and {len(low) - 4} more"
+    where_from = (f"below {anchor[1]:.2f} deg" if anchor is not None
+                  else "in the fitted range")
+    owner = (f"phase {phases[0]}" if len(phases) == 1
+             else "phases " + ", ".join(str(p) for p in phases))
+    message = (
+        f"Every line the data sees {where_from} is a magnetic-only line of "
+        f"{owner} ({len(low)} line{'' if one else 's'}), so the axial "
+        f"asymmetry is not determinable from this sample's nuclear lines "
+        f"where it is largest. {'Its centroid sits' if one else 'Their centroids sit'} "
+        f"{shown}{more} from the drawn {'position' if one else 'positions'} "
+        f"(negative: observed at lower angle).")
+    if anchor is not None:
+        message += (
+            f" The first line that is not magnetic-only, at {anchor[1]:.2f} "
+            f"deg, sits {1e3 * anchor[4]:+.1f}({1e3 * anchor[5]:.1f}) mdeg.")
         shape = _cot_through(low)
         if shape is not None:
-            cot = 1.0 / math.tan(math.radians(anchor[0]))
+            cot = 1.0 / math.tan(math.radians(anchor[1]))
             message += (
                 f" A cot 2theta shape through the magnetic-only line"
-                f"{'' if len(low) == 1 else 's'} (shift = A cot 2theta, A = "
+                f"{'' if one else 's'} (shift = A cot 2theta, A = "
                 f"{1e3 * shape[0]:+.1f}({1e3 * shape[1]:.1f}) mdeg) predicts "
                 f"{1e3 * shape[0] * cot:+.1f}({1e3 * shape[1] * cot:.1f}) mdeg "
-                f"at {anchor[0]:.2f} deg.")
-        state = ("held at 0" if sl == 0.0 and hl == 0.0
-                 else f"S/L {sl:.4g}, H/L {hl:.4g}")
-        message += f" The axial apertures are {state}."
-        out.append(Diagnostic(
-            level="info", code="LOW_ANGLE_ASYMMETRY_UNCALIBRATED",
-            where=["instrument.geometry.axial_sl",
-                   "instrument.geometry.axial_hl"],
-            value=float(low[0][3]),
-            message=message,
-            suggestion=(
-                "Take the axial asymmetry from a standard measured on this "
-                "instrument at this wavelength. A value refined on this "
-                "pattern rests on these magnetic lines alone, so compare the "
-                "lowest line's drawn and observed shape before quoting the "
-                "moment."),
-        ))
+                f"there.")
+    state = ("held at 0" if sl == 0.0 and hl == 0.0
+             else f"S/L {sl:.4g}, H/L {hl:.4g}")
+    message += f" The axial apertures are {state}."
+    out.append(Diagnostic(
+        level="info", code="LOW_ANGLE_ASYMMETRY_UNCALIBRATED",
+        where=["instrument.geometry.axial_sl", "instrument.geometry.axial_hl"],
+        value=float(low[0][4]),
+        message=message,
+        suggestion=(
+            "Take the axial asymmetry from a standard measured on this "
+            "instrument at this wavelength. A value refined on this "
+            "pattern rests on these magnetic lines alone, so compare the "
+            "lowest line's drawn and observed shape before quoting the "
+            "moment."),
+    ))
     return out

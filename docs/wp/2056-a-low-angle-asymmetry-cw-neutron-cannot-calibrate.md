@@ -88,10 +88,11 @@ either's code; nothing is ported.
       fixture's protocol on the 1.5 K pattern alone (nuclear fit, then the
       `SOLVE_STAGE_PATHS` plan with the fixture's ties): Rwp 0.1171 nuclear, 0.0611 with
       the moment, |m| = 3.875(121) μ_B. Per-line centroid shift (the residual regressed
-      on each seen line's ∂P/∂2θ, counting-noise esd; negative = observed lower): −47.1(2.2)
-      mdeg at 9.38° (1 0 1)/(1 0 0), −31.3(5.2) at 17.99°, −14.7(3.7) at 18.27°, all three
-      magnetic-only; the first line that is not, (0 1 1) at 21.67°, −6.6(2.0). A cot 2θ shape
-      through the three magnetic lines gives A = −7.7(3) mdeg and predicts −19.3(8) at
+      on each seen line's ∂P/∂2θ and its own profile, counting-noise esd; negative = observed
+      lower): −51.3(2.2)
+      mdeg at 9.38° (1 0 1)/(1 0 0), −20.8(8.0) at 17.99°, −6.2(5.7) at 18.27°, all three
+      magnetic-only; the first line that is not, (0 1 1) at 21.67°, −5.1(2.1). A cot 2θ shape
+      through the three magnetic lines gives A = −8.2(4) mdeg and predicts −20.7(9) at
       21.67°, so the nuclear line does not follow them: the shift falls faster than
       cot 2θ, as #1090 reported (−50, −18, −3). Layer 1 already reads the 8.2-12.0° region
       as position −0.054(2)° and the nominal-aperture asymmetry column (WP-2054) +0.029(3);
@@ -99,8 +100,8 @@ either's code; nothing is ported.
       LaMnO₃ is in the tree (`tests/data/gsas2_bt1_lamno3_50K.gsas`, the WP-1327
       acceptance protocol, apertures from the instrument file, S/L 0.040, H/L 0.030):
       (0 1 0) at 11.53° is the only line below the first nuclear one at 22.32°, and sits
-      +19.0(1.8) mdeg (the drawn line too low, as #1089's "centroid 24 mdeg low"), the
-      nuclear line +9.0(2.7). Not re-run: #1089's tied-ratio refinement.
+      +19.6(1.8) mdeg (the drawn line too low, as #1089's "centroid 24 mdeg low"), the
+      nuclear line +9.2(2.7). Not re-run: #1089's tied-ratio refinement.
 - [x] Point 2: the diagnostic, with its audit row and `help.py` entry.
       `LOW_ANGLE_ASYMMETRY_UNCALIBRATED` (info), `report.magnetic.low_angle_asymmetry_findings`,
       called in the result build beside `magnetic_width_findings`. Fires on geometry alone: a
@@ -117,7 +118,7 @@ either's code; nothing is ported.
 - [x] Tests + obs/calc/diff PNGs of the lowest lines at each treatment to `tests/output/`.
       `tests/test_low_angle_asymmetry.py` (fast, synthetic CrSBr k = (0 0 ½), the magnetic
       (0 0 1) at 8.88°, first nuclear line 17.80°): truth S/L = H/L = 0.03 fitted at 0 reads
-      −30.7(7) mdeg; the null arm (no asymmetry anywhere) +0.4(6), still firing because the
+      −33.7(8) mdeg; the null arm (no asymmetry anywhere) +0.4(6), still firing because the
       geometry fires it; silent from 12° up and on the paramagnetic pattern. PNGs
       `low_angle_asymmetry_{positive,null}.png` (6-20°). Acceptance on the real case beside its
       fixture (`test_ba2fesbse5_the_report_names_the_low_angle_shift_the_protocol_holds`,

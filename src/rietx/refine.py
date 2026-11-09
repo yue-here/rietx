@@ -9252,7 +9252,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # WP-2056: the lowest lines the data sees are magnetic-only, so no
     # nuclear line in this sample checks the low-angle asymmetry; reports
     # their centroid shifts and decides nothing (issue #1090)
-    diagnostics = diagnostics + low_angle_asymmetry_findings(model, values)
+    diagnostics = diagnostics + low_angle_asymmetry_findings(
+        model, values, y_calc=y_calc)
 
     # WP-1929: the moment angles the answer stage's covariance left out at a
     # stationary direction, read off its own record.  The rows carry no

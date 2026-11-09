@@ -871,10 +871,10 @@ ROWS: tuple[Row, ...] = (
                   "magnetic-only line the data sees (MAGNETIC_WIDTH_PURITY's cut, seen at "
                   "MIN_COEF_SIGNIFICANCE) lies below the lowest seen line that is not; "
                   "quotes each such line's centroid shift by linear least squares on its "
-                  "own position derivative with the counting-noise esd, and a one-term "
+                  "own position derivative and profile with the counting-noise esd, and a one-term "
                   "cot 2theta shape through them; no threshold on any number. Ba2FeSbSe5 "
-                  "G4.1 1.5 K: -47.1(2.2) mdeg at 9.38 deg, the nuclear line at 21.67 deg "
-                  "-6.6(2.0); LaMnO3 BT-1 50 K: +19.0(1.8) mdeg at 11.53 deg"),
+                  "G4.1 1.5 K: -51.3(2.2) mdeg at 9.38 deg, the nuclear line at 21.67 deg "
+                  "-5.1(2.1); LaMnO3 BT-1 50 K: +19.6(1.8) mdeg at 11.53 deg"),
         grounds=("Rule 1's third kind: a number with its meaning. The same geometry needs "
                  "opposite treatment on the two measured samples (issue #1090), so the "
                  "finding decides nothing."),

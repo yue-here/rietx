@@ -1624,7 +1624,7 @@ def test_ba2fesbse5_the_report_names_the_low_angle_shift_the_protocol_holds(
     (about -50 mdeg at the 9.35 deg magnetic line, asymmetry held at 0) is
     stated by the report itself, with its size, as not checkable by any
     nuclear line of this sample.  Measured 2026-11-09 on the single 1.5 K fit:
-    -47.1(2.2) mdeg at 9.38 deg, three magnetic-only lines below the first
+    -51.3(2.2) mdeg at 9.38 deg, three magnetic-only lines below the first
     nuclear one at 21.67 deg.  Above T_N the moment is held and the magnetic
     lines carry nothing the data sees, so the lowest seen line is nuclear and
     the finding is silent: the geometry, not the protocol, fires it.
@@ -1634,7 +1634,7 @@ def test_ba2fesbse5_the_report_names_the_low_angle_shift_the_protocol_holds(
             if d.code == "LOW_ANGLE_ASYMMETRY_UNCALIBRATED"]
     assert d.level == "info"
     assert -0.060 < d.value < -0.035, d.value
-    assert "below 21.67 deg is magnetic-only (3 lines)" in d.message
+    assert "below 21.67 deg is a magnetic-only line of phase 0 (3 lines)" in d.message
     assert "at 9.38 deg (1 0 1)/(1 0 0)" in d.message
     assert "not determinable from this sample's nuclear lines" in d.message
     assert "held at 0" in d.message
