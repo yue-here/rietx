@@ -134,8 +134,8 @@ SHOTS: tuple[Shot, ...] = (
     ),
     Shot(
         "parameters",
-        "The parameter table: the filter box that is the selection, and the "
-        "marks on rows nothing can free.",
+        "The Parameters panel: a band per phase with its space group, the "
+        "cell's held edges folded into one line, and one row per atom.",
         selector=".side",
         tab="Parameters",
     ),
