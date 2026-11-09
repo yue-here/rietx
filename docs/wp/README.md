@@ -52,7 +52,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2113](2113-a-background-band-read-as-unmatched-peaks.md) | A background band read as unmatched peaks | 2026-11-08 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 2026-11-08 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## Next, by priority
@@ -639,7 +638,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md) | An opt-in correction the residual asks for names its declaration in the docs | ⬜ | P3 | [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md) |
 | [2088](2088-an-assigned-parameter-inherits-its-declared-range.md) | An assigned Parameter inherits its declared range | ✅ 2026-11-07 | — | — |
 | [2112](2112-an-engines-first-cell-stays-in-the-reported-list.md) | An engine's first cell stays in the reported list | ⬜ | P3 | — |
-| [2113](2113-a-background-band-read-as-unmatched-peaks.md) | A background band read as unmatched peaks | 🔄 2026-11-08 | P3 | — |
+| [2113](2113-a-background-band-read-as-unmatched-peaks.md) | A background band read as unmatched peaks | ✅ 2026-11-09 | — | — |
 | [2114](2114-turn-families-composition-does-not-keep.md) | Turn families composition does not keep: a series carry, cross-body ties, a late hold, a profile | ⬜ | P3 | [1805](1805-the-rigid-body.md) ([1811](1811-bodies-in-a-series.md) soft) |
 | [2115](2115-what-the-bounded-suggestion-gain-still-leaves-open.md) | What the bounded suggestion gain still leaves open | ⬜ | P3 | [1998](1998-a-suggestion-past-its-bound.md) |
 | [2117](2117-a-recipe-ties-the-axial-pair.md) | A recipe ties the axial pair instead of holding H/L | ⬜ | P4 | [2012](2012-the-axial-ratios-are-interchangeable.md) |
