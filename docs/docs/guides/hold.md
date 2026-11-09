@@ -15,7 +15,7 @@ The fit refines it, and nothing reports that your setting was replaced.
 
 Pass `hold` a parameter's name, such as `phases.0.cell.a`, or a list of names.
 A `*` in a name matches any run of characters, dots included, so `phases.0.cell.*` is every lattice parameter of the first phase.
-[Parameter map](../reference/parameters.md) lists every name.
+[Parameter map](../reference/parameters.md) and [Instrument parameter map](../reference/parameters-instrument.md) list every name.
 It returns the paths it held.
 
 ```python
