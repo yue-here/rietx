@@ -691,8 +691,8 @@ def added_columns_gain(bj: BlockJacobian, resid: np.ndarray,
                        ) -> tuple[float, int]:
     """The χ² one linear step gains if block ``h`` also had ``extra[h]``.
 
-    ``extra[h]`` holds columns over block ``h``'s rows, data then penalty as
-    ``blocks[h]``, which no other block reaches; ``None`` adds none.  The
+    ``extra[h]`` holds columns over block ``h``'s rows, data then penalty then
+    restraint as ``blocks[h]``, which no other block reaches; ``None`` adds none.  The
     columns ``drop`` (θ's indices) leave the alternative, so new columns can
     stand in for old ones: each pattern's own target in place of the
     coefficients that tied it.  The columns ``hold`` leave both sides, as a

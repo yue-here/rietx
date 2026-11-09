@@ -294,6 +294,7 @@ A bond under a per-pattern or parametric cell restrains the bond as each pattern
 A `ValueRestraint` path with a `hist.<h>.` prefix is refused, because a restraint on one pattern alone is not built.
 
 `HistogramResult.restraints` reports each pattern's copy of the structure against every restraint, and `RefinementResult.restraints` mirrors pattern 0's.
+Each pattern's report lists the shared restraints too, so its `RestraintReport.restraint_chi2` counts them, and a sum over patterns counts a shared restraint once per pattern.
 `RESTRAINT_TENSION` follows the placement rule below.
 A restraint on the shared structure raises it once at the top level, and a per-pattern one on its pattern's list.
 
