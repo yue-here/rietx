@@ -1,6 +1,6 @@
 # WP-2106 — an equation fitted to a series trajectory
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
 Depends on: 1964 (the grammar and its derivative rules)
 Priority: P2 2026-11-04 — a feature the open milestone was opened for: this is how a GSAS-II user works, and nothing else in the milestone serves them
 
@@ -35,6 +35,16 @@ read.
 The seams are small. The grammar gives the value and its exact derivative, so the fit
 is a few lines of weighted least squares over one equation, and a quarantined pattern
 stays out as it does from a median.
+
+The tier of each rule this WP adds ([generality § The rule](../milestones/generality.md#the-rule)),
+written 2026-11-09 at the start: the fit is arithmetic (tier 1), weighted least squares with
+each coefficient's esd propagated from the trajectory's own. A quarantined pattern is left
+out by the chain's own test (`_rejected`, ruled 2026-11-03), and a point with no esd has
+no weight, so it is left out too (tier 1); both are named in the result. The esds are not
+scaled by χ²/ν by default, since a refiner who trusts each pattern's esd would not scale
+them, so the result carries both readings and no threshold. No new diagnostic. The
+reference is a synthetic ramp with a known truth and the joint fit beside it; there is no
+published number, so the fit ships not yet validated.
 
 GSAS-II's licence is its own (`ATTRIBUTION.md`), and this package takes concepts only from
 its code. Any reader takes the stored format from a file's contents.
