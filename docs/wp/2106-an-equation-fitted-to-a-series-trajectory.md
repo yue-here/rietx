@@ -65,8 +65,11 @@ its code. Any reader takes the stored format from a file's contents.
 - [x] Which trajectory: `direction="both"` gives two, so say which is read, or fit each.
   Skip quarantined patterns and say so. (Forward by default, `chain="backward"` for the
   other; `TrajectoryFit.skipped` names each point left out.)
-- [ ] Measure on a synthetic ramp against the joint fit: do the coefficients agree within
-  their combined esds, and how much wider are the esds?
+- [x] Measure on a synthetic ramp against the joint fit: do the coefficients agree within
+  their combined esds, and how much wider are the esds? (Yes, within 0.05 combined esd on
+  twenty seeds; the unscaled esds equal the joint ones within 1.1 %, and the scaled ones
+  move with five degrees of freedom' χ²/ν, 0.35-1.30× the joint ones.
+  `2106-measure/trajectory_vs_joint.py` and its results file.)
 - [ ] GSAS-II's stored equations: read `SeqParFitEqList` from a `.gpx` into this fit's
   input, or refuse by name. Lower GSAS-II's spelling onto the grammar, with a table of
   each rewrite.
