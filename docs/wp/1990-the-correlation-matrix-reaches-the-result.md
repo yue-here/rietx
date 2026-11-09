@@ -1,6 +1,6 @@
 # WP-1990 — the correlation matrix reaches the result
 
-Milestone: unscheduled · Status: 🔄 2026-11-08 — claimed by @mustachefeeling
+Milestone: unscheduled · Status: 🔄 2026-11-09 — six of seven tasks landed (#1475); the printed block and a joint fit's matrix wait on the maintainer
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-10-16 — a view over what the fit already computes; the one defect in it is a suggestion naming a field that does not exist, which misleads but changes no number
@@ -128,6 +128,72 @@ disagree.
 
 ## Handover log
 
+- **2026-11-09** — six of the seven tasks landed (PR #1475); the printed
+  block waits on the maintainer. A finished fit now carries every pair's
+  correlation, not only the five worst, so a reader can see the whole
+  picture of which refined parameters moved together, and can save it as a
+  labelled table in one call. The hint that appeared when too many
+  correlated pairs were listed used to point at a matrix that did not
+  exist; it now names the real field, and a test fails if it ever names
+  one that is not declared. Nothing about what is flagged, or any number
+  the fit reports, changed.
+
+  *Done.* Storage decided by measurement (task 1's entry: the result only,
+  never a history node). `CorrelationMatrix` (`schemas/results.py`: `paths`,
+  `lower`, `matrix()`, `rho()`, `from_square()`) on
+  `Identifiability.correlation`, filled from
+  `GuardReport.measured_correlation`, which `check_guards` stores from the
+  same resolved matrix it thresholds; packed from the upper half the guard
+  reads, so a quoted pair is the entry bit for bit (the lower half differed
+  in the last digit on LaB6). `SCHEMA_VERSION` stays 0.61 (unreleased) with
+  an "Also in 0.61" entry. Export: `rietx.io.exporters.correlation_table_csv`
+  / `write_correlation_table` (a result or the matrix; refuses a result
+  with none) and `Refinement.write_correlation_table`, documented in the
+  manual's result and exports pages; not re-exported at the top level,
+  which would have grown the skill's `api.md`. Suggestion and help text;
+  skill rows (−58 B).
+
+  *Measured.* See task 1 (node 5.7-8.5 kB, result 481 kB, triangle 2.3 kB at
+  P = 15 to 922 kB at P = 300). Fast selection (`-m "not slow"`, `-n 2`,
+  `.venv` `[dev]`, macOS arm64, on the Mac because pearl did not answer
+  a wake; main had not moved, so branch = merged tree): 14351 passed,
+  415 skipped, 32 xfailed, 16:01 with another shift's suite queued
+  beside it. passed+skipped includes the 11 added tests; no local
+  baseline was run (CI's job). The added tests cost 0.12 s in the
+  junit total (the shared fit sits in a module fixture). Full selection
+  not run: no measured number can move (a field added, nothing
+  computed differently). `tests.reader_output` exit 0.
+
+  *Gotchas.* `import rietx.refine` binds the `refine` function, not the
+  module (`importlib.import_module("rietx.refine")` in the test's spy). A
+  joint fit **does** threshold its own correlation matrix
+  (`multi._top_diagnostics`, since WP-2028), unprojected, so it can emit
+  `HIGH_CORRELATION_OMITTED`; the field is `None` there as this WP rules,
+  and the suggestion says so ("a joint multi-histogram fit carries neither
+  yet").
+
+  *Review.* `/code-review` could not be pointed at this worktree from the
+  runner's session, so an Opus subagent reviewed `origin/main...HEAD`: no
+  correctness finding; one low prose gap (`FLAT_DIRECTION_OMITTED`'s help
+  lacked the joint-fit clause), fixed. It measured the WP-2050 margin on
+  the LaB6 fixture (smallest unit-normal eigenvalue 5.8e-3 against a cut
+  of 1.2e-11), so the exact-equality test has no unresolved pair to meet
+  on another platform. *Generality*: not dispatched — `_audit.py` is
+  untouched and nothing adds a heuristic (no inline literal, fallback or
+  action).
+
+  *Questions for the maintainer.* (1) The printed block in the text
+  FitReport (task 4): on by default, rows with an off-diagonal |ρ| over the
+  guard only, or not at all? Nothing was built. (2) Should a joint fit carry
+  its matrix too? It already forms and thresholds one; carrying it is
+  `CorrelationMatrix.from_square(free, outcome.correlation)` in
+  `multi.py`, and would let the suggestion drop its joint-fit clause. The
+  WP ruled `None`, so it stays `None` until you say otherwise. (3) The GUI
+  Correlations view (non-goal; #992's second half) is yours to file as a WP
+  when this lands; no issue was opened for it, since #992 already asks.
+
+  Next: the maintainer's answers to (1) and (2); with (1) "no" and (2) "no",
+  the WP closes as is.
 - **2026-10-16** — created, from the 2026-10-16 issue triage (issue #992).
   Checked against the tree at `138d55dc`: `Identifiability` has no matrix
   field and the `HIGH_CORRELATION_OMITTED` suggestion claims one; the solver's
