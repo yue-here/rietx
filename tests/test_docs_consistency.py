@@ -999,6 +999,48 @@ def test_every_handover_entry_is_in_a_form_the_session_hook_can_read():
                 )
 
 
+GUI_RULEBOOK = "gui/CLAUDE.md"
+# Where a path the GUI rulebook writes may be rooted: `lib/plot.ts` is under
+# gui/src, `gui/session.py` under src/rietx.  A path under a runtime directory
+# names something a run writes, never a file in the tree.
+_RULEBOOK_BASES = ("", "gui", "gui/src", "src/rietx", "src/rietx/gui")
+_RUNTIME_DIRS = ("live/", "state_dir/")
+_RULEBOOK_PATH = re.compile(
+    r"^((?:[\w.-]+/)+[\w.-]*(?:\{[\w.,-]+\})?[\w.-]*"
+    r"\.(?:ts|svelte|py|mjs|json|css|md|jsonl))(?:::?(\w+))?$"
+)
+
+
+def test_gui_rulebook_paths_resolve():
+    """Every path the GUI rulebook writes with a directory exists (WP-2134).
+
+    The rulebook is rules keyed by the files they govern, so a renamed file
+    leaves a rule pointing at nothing and nothing goes red.  A bare file name
+    is ambiguous and is not checked; `lib/plot.ts` is.  A `file:symbol` (or a
+    pytest `file::test`) also asks that the symbol is still in that file.
+    """
+    text = (ROOT / GUI_RULEBOOK).read_text(encoding="utf-8")
+    problems = []
+    for token in sorted(set(re.findall(r"`([^`\n]+)`", text))):
+        m = _RULEBOOK_PATH.match(token)
+        if not m or "*" in token or token.startswith(_RUNTIME_DIRS):
+            continue
+        path, symbol = m.groups()
+        brace = re.search(r"\{([^}]+)\}", path)
+        paths = ([path[:brace.start()] + alt + path[brace.end():]
+                  for alt in brace.group(1).split(",")] if brace else [path])
+        for p in paths:
+            hits = [ROOT / b / p for b in _RULEBOOK_BASES if (ROOT / b / p).is_file()]
+            if not hits:
+                problems.append(f"`{token}`: no file {p} under {_RULEBOOK_BASES}")
+            elif symbol and not any(symbol in h.read_text(encoding="utf-8") for h in hits):
+                problems.append(f"`{token}`: {symbol} is not in {p}")
+    assert not problems, (
+        f"{GUI_RULEBOOK} names what the tree no longer has; rewrite the rule "
+        "against the code it governs:\n  " + "\n  ".join(problems)
+    )
+
+
 def test_template_declares_both_handover_entry_forms():
     """TEMPLATE.md is where a session learns the format; the hook and this test
     both depend on it saying the same thing."""

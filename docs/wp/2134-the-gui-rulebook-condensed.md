@@ -54,9 +54,9 @@ etc)".
   duplicate; each rule verified against the tree.
 - [x] Evidence moved verbatim to the WP files it came from (a `## Moved from
   gui/CLAUDE.md` section in each), duplicates deleted with where they live.
-- [ ] `gui/CLAUDE.md` rewritten: rules only, grouped by the file a session
+- [x] `gui/CLAUDE.md` rewritten: rules only, grouped by the file a session
   edits, duplicates merged, contradictions with the code fixed.
-- [ ] A cheap test for what the rulebook names, named in the rulebook.
+- [x] A cheap test for what the rulebook names, named in the rulebook.
 - [ ] `SIZE_CAPS` lowered to landed + 1, with a diary row in the test and a
   paragraph in `docs/milestones/process.md` § `gui/CLAUDE.md`.
 - [ ] `main` merged and the open PRs' additions folded in.
@@ -72,7 +72,59 @@ etc)".
 
 ## Visual-style rules for the style guide
 
-Filled in by the rewrite task.
+Each rule below is visual (colour, type, component or layout) and stays in
+`gui/CLAUDE.md` with its wording unchanged in substance until the GUI style guide
+takes it. The style-guide WP moves each one, leaves a pointer if a code rule still
+needs it, and decides any conflict with the guide's own sources with the maintainer.
+Headings are `gui/CLAUDE.md`'s sections; the WP in brackets holds the evidence.
+
+House style and help:
+
+1. One token layer and nine registers; size, padding and radius belong to the register (1201).
+2. The register table: what each of the nine means (1201).
+3. Three type steps; secondary is `.muted`; mono is a family; the five chip tones (1201).
+4. The theme is three-way and resolved once, stamped as `data-theme` (1029).
+5. A `.pick` row carries its own hover background (1204).
+6. A register's width is the call site's (1206).
+7. A placeholder is a word, never a plausible number (1206).
+8. Chrome is not a palette: plot marks take `--plot-*` tokens 0.13 OKLab apart; no free
+   hue is left for a further quantity-carrying mark (1210, 1211).
+9. State rides on the mark's shape, never a second colour; a non-data mark never borrows
+   `--muted` (1210).
+10. A mark carrying no quantity takes chrome ink: the pointer line is solid `--fg` (1213).
+11. Only the Rwp badge may be green (1217).
+12. Two cascade traps: state selectors' specificity, inherited `text-transform` (1201).
+13. A `ch` column holds only at one font and one size (1217).
+14. A `td` that is not `display: table-cell` is not a cell (1209).
+15. GUI prose is written under `/yue-docs-style` (1201).
+16. What a name means is a `rietx.help` entry reached through `<Help>` (1203).
+17. `title=` is what is left over (1203).
+18. A term is a focusable `<span role="button">` named by its children (1203).
+19. A chip's words are the corpus's short label (1209).
+20. No mute fields (1032, 1203).
+
+Elsewhere in the rulebook:
+
+21. Shell: overflow wraps and never truncates, the header included (1034).
+22. Shell: a column that must not lose gets a flex basis, not a share (1034).
+23. Plot: a tick has its own band between pattern and residual (1032).
+24. Plot: hiding a curve is by exception (1032).
+25. Plot: the hover readout is a strip, never a box, and its shape never follows the
+    pointer (1213).
+26. Plot: prose takes `−`, numbers take `-` (1213).
+27. Plot: shading spans every pane's height and is clipped to the measured extent (1033).
+28. Plot: an armed range gesture shows `col-resize` (1044).
+29. Plot: candidate lines are drawn under everything (1211).
+30. Peaks: a scanned column's places are fixed (1209).
+31. Model: a form's column count is a promise; a cell is a `subgrid` (1216).
+32. Structure viewer: the look is crystallography's (projection, edges, bonds, ellipses)
+    (1015).
+33. Structure viewer: distinguishability is a property of the set drawn; OKLab phase
+    palette and CPK anchors (1029).
+34. Structure viewer: the cell frame takes `--accent` (1462).
+35. History: lanes are half a palette in each place (1217).
+36. History: a difference is given twice, the percentage of |a|, at three significant
+    figures (1217).
 
 ## Handover log
 
