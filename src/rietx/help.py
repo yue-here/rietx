@@ -3537,9 +3537,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="Zero-weight points became excluded regions",
         description=(
             "The pdCIF dictionary defines a `_pd_proc_ls_weight` of zero as a data point "
-            "not used for refinement. The reader turned each run of such points into an "
-            "excluded region, so the fit leaves out exactly the points the file's author "
-            "left out, and every other point keeps σ = 1/√w. The code's value is the "
+            "not used for refinement, and a GSAS-II `.gpx` histogram's zero weight "
+            "takes a point out of every sum. The reader turned each run of such points "
+            "into an excluded region, so the fit leaves out exactly the points the "
+            "file's author left out, and every other point keeps σ = 1/√w. The code's value is the "
             "number of points excluded. Their σ is the Poisson value, a placeholder the "
             "fit never reads; remove a region from `excluded_regions` only if you mean "
             "to fit those points."
