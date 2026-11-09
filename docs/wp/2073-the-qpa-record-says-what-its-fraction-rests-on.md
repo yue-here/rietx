@@ -93,7 +93,7 @@ The 1b docs recipe rests on one synthetic family and says so.
       point (mark or skip, as ruled).
 - [x] `STRAIN_UNUSUALLY_LARGE` and `SIZE_UNUSUALLY_SMALL` say "held at" when the hold kept the
       value.
-- [ ] Docs: `docs/docs/reference/qpa.md` § One basin gains the absorbed case (a profile that
+- [x] Docs: `docs/docs/reference/qpa.md` § One basin gains the absorbed case (a profile that
       confirms the esd does not establish the phase exists; the rival-model refit, measured on
       one synthetic family) and a "Fractions at given values" section (the empty-stage route,
       why its esds are `None`, the `run_stage` trap, the values on `ref.structure`).
