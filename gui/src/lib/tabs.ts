@@ -37,3 +37,16 @@ export const TABS = [
 ] as const;
 
 export type Tab = (typeof TABS)[number]["id"];
+
+/** The graph strip (WP-2123): the views on the left of the window.
+ *
+ * The maintainer ruled on 2026-11-07 that the graphs sit on the left in tabs
+ * and the model panel on the right, and that each graph says in a title line
+ * what it shows. One tab today; the Peaks preview, the Background view and the
+ * Structure view join it in later pieces of the gui-overhaul milestone. It is
+ * data here for the reason `TABS` is: `tabs.test.ts` writes it into the panel
+ * corpus, so the manual must name every graph tab too.
+ */
+export const GRAPH_TABS = [{ id: "pattern", label: "Pattern" }] as const;
+
+export type GraphTab = (typeof GRAPH_TABS)[number]["id"];

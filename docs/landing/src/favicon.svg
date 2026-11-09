@@ -2,15 +2,19 @@
   <!-- A Kalpha doublet on a baseline: the sharp line and its shoulder, which
        is the shape this package spends most of its code on.  Drawn as a filled
        profile rather than sticks because at 16 px sticks read as a bar chart.
+       The baseline bar has square ends and is 3.1 units thick, which at the
+       headers' scale is the wordmark's SemiBold stem (WP-2122).
        Authored as SVG rather than .ico so it is text (reviewable in a diff,
        like every other committed asset here) and so it can answer the
        browser's theme; a browser without SVG-favicon support falls back to the
        light fill, which is why the light colour is the declared one.
        The site's one favicon, the landing page's and the manual's (WP-2021), and
        the mark's authority: the manual's header copies its shapes inline, and
-       `tests/test_manual.py` holds them equal.  The two fills are `--accent` in
+       `tests/test_manual.py` holds them equal.  The two fills are the accent token in
        `tokens.css`; an SVG loaded as an icon reads no CSS variable, so they are
-       literal here, and the same test holds the two equal. -->
+       literal here, and the same test holds the two equal.  An XML comment may
+       not hold a double hyphen, so this one never spells the token's name: one
+       did from WP-2021 to WP-2122, and no browser drew the icon. -->
   <style>
     .ink { fill: #c65d0a }
     @media (prefers-color-scheme: dark) { .ink { fill: #ff9d4d } }
@@ -18,6 +22,6 @@
   <g class="ink">
     <path d="M2 26 C7 26 9 23 11.5 3.5 C14 23 16 26 21 26 Z"/>
     <path d="M17 26 C20 26 21.5 24 23 13 C24.5 24 26 26 29 26 Z"/>
-    <rect x="1.5" y="25.5" width="29" height="3" rx="1.5"/>
+    <rect x="1.5" y="25.5" width="29" height="3.1"/>
   </g>
 </svg>

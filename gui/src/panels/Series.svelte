@@ -731,7 +731,7 @@ second pass">
         {/each}
       </select>
     </label>
-    <button onclick={start} disabled={!canRun}
+    <button class="ghost" onclick={start} disabled={!canRun}
       title={patterns.length < 2
         ? "a series needs at least two patterns; one pattern is a fit"
         : "run the chain: each pattern warm-started from its predecessor"}>

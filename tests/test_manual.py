@@ -1282,10 +1282,23 @@ def test_the_site_draws_one_mark():
     are held to it: one mark, never redrawn.  Compared on the drawn shapes rather
     than the bytes, since the favicon carries a `<style>` and the headers take
     their fill from the page.  An SVG loaded as an icon reads no CSS variable, so
-    the favicon spells its two fills, and they are `--accent` in `tokens.css`."""
+    the favicon spells its two fills, and they are `--accent` in `tokens.css`.
+
+    The favicon must first parse as XML, because a browser loading an SVG as an
+    image draws nothing for one that does not, and the regexes below read it
+    either way.  A `--accent` in its comment kept every browser from drawing it
+    from WP-2021 to WP-2122 while this test passed."""
+    from xml.etree import ElementTree
+
     from tests.test_landing import site_tokens
 
     favicon = (LANDING_SRC / "favicon.svg").read_text(encoding="utf-8")
+    try:
+        ElementTree.fromstring(favicon)
+    except ElementTree.ParseError as err:
+        raise AssertionError(
+            f"docs/landing/src/favicon.svg is not XML ({err}), so no browser draws it; "
+            "an XML comment may not hold a double hyphen") from None
     shapes = SVG_SHAPES.findall(favicon)
     assert shapes, "no drawn shape in docs/landing/src/favicon.svg — has the mark moved?"
     # The mark is the 32-unit drawing; the theme button beside it draws on 24.
