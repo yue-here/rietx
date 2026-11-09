@@ -6029,9 +6029,22 @@ class Refinement:
                 phase_support_sigma=plan.phase_support_sigma)
             # WP-2075: the one place the whole pattern is at hand, so the one
             # place the result can say which part of it was fitted.
-            from .report.fit_range import fit_range_record
+            from .report.fit_range import (
+                describe_outside,
+                fit_range_record,
+                model_reflections,
+            )
 
-            self.result_.fit_range = fit_range_record(data, two_theta_limits)
+            fit_range = fit_range_record(data, two_theta_limits)
+            if fit_range.outside:
+                answer = table.decode(outcome.theta)
+                fit_range = describe_outside(
+                    fit_range, data, two_theta_limits,
+                    self.result_.y_background,
+                    model_reflections(model, answer,
+                                      [p.name for p in self.structure.phases]),
+                    model.generation_window(answer))
+            self.result_.fit_range = fit_range
             # beside result_, never at entry: a call that is cancelled or fails
             # leaves the previous result and the pattern it was fitted to
             self._fit_pattern = data

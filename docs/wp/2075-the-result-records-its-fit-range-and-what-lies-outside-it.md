@@ -84,11 +84,17 @@ chunk 2 is computed there.
 - [x] `summary()`'s protocol block prints one line from it (in place of, or beside,
       `excluded:`, as ruled). (2026-11-09: beside it, the reversible choice, until ruled;
       `FitRange.line()`; the NAC termination golden gains the line.)
-- [ ] Chunk 2 facts, computed in `fit()`, on `fit_range` or a sibling field: per excluded band
+- [x] Chunk 2 facts, computed in `fit()`, on `fit_range` or a sibling field: per excluded band
       and range end, the share of counts outside, level and slope ratio against the in-range
       median, the largest peak-like feature beyond, the fitted background's slope at the edge,
       reflections predicted in excluded bands, reflections within 3 FWHM of a range end with
       the fraction of profile outside, and `signal_cutoffs` where the caller ran it.
+      (2026-11-09: on `fit_range.outside`, one `OutsideSpan` per unfitted stretch,
+      `report.fit_range.describe_outside`; "peak-like" is the excess over
+      `background_envelope`, whose window is already ruled, so no third window; the two
+      reporting windows `CUT_WINDOW_DEG` and `STRADDLE_FWHM` enter at tier 3 awaiting approval.
+      Not done: `signal_cutoffs`, since `fit()` has no channel that says the caller ran it — to
+      the follow-up issue.)
 - [ ] The pdCIF writer reads the range from the result when no pattern is handed.
 - [ ] Optional, only if ruled: DW and the Bérar–Lelann factor per contiguous fitted run, as
       `_pooled_durbin_watson` already does; goldens re-pinned under the root rule.
