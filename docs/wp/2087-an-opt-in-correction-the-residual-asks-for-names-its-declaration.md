@@ -91,7 +91,7 @@ rescope does not cover it.
       and the theory page's Primary extinction section (2026-11-09).
 - [x] Stephens: the help entry and the manual section name the declaration
       and the misfit that calls for it.
-- [ ] Anisotropic ADPs: the help entry names `Atom.aniso` and when a
+- [x] Anisotropic ADPs: the help entry names `Atom.aniso` and when a
       declaration is worth trying.
 - [ ] Biso anomalies: the two help entries and their skill rows name the
       declaration each geometry takes, as concisely as the extinction row.

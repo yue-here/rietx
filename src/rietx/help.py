@@ -1209,7 +1209,14 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "it raises `ADP_NOT_POSITIVE_DEFINITE`, because the Debye-Waller factor "
             "then diverges at high Q. Free these parameters with "
             "`phases.*.atoms.*.adp.*`, alongside the `biso` pattern that every "
-            "displacement stage carries."
+            "displacement stage carries. The tensor is opt-in per atom. "
+            "`Structure.from_cif(path, aniso=True)` keeps a file's `U^ij`. "
+            "`atom.aniso = AnisoU.isotropic(uiso, phase.cell)` declares one at the "
+            "isotropic value, with Uiso = B/8π² and `atom.biso.vary = False`. A powder "
+            "pattern seldom determines six components per site. A declaration is worth "
+            "trying on a strongly scattering atom, with data to high angle, where "
+            "single-crystal work reports a markedly anisotropic site. Keep it only if "
+            "the tensor stays positive-definite and each esd is small against its value."
         ),
         unit="Å²", default=None,
         typical="0.005-0.05 Å²",
