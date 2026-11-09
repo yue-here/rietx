@@ -54,10 +54,10 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | 2026-11-09 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
-| [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 2026-11-09 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2123](2123-the-layout-shell.md) | The layout shell | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2126](2126-the-parameters-panel.md) | The Parameters panel | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2127](2127-the-plan-tab.md) | The Plan tab | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -81,6 +81,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2104](2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) | A parametric cell in a Le Bail or Pawley joint fit | P2 | — ([1325](1325-parametric-series.md), [1964](1964-a-parametric-equation-the-user-writes.md) soft) | [parametric](#parametric) |
 | [2106](2106-an-equation-fitted-to-a-series-trajectory.md) | An equation fitted to a series trajectory | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
+| [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -503,6 +504,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2125](2125-the-pattern-at-values-nobody-has-applied.md) | The pattern at values nobody has applied | ✅ 2026-11-09 | — | — ([2123](2123-the-layout-shell.md) soft) |
 | [2126](2126-the-parameters-panel.md) | The Parameters panel | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
 | [2127](2127-the-plan-tab.md) | The Plan tab | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
+| [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md), [2124](2124-the-gui-port-server-defects.md) |
 
 ## <a id="unscheduled"></a>Unscheduled
 
@@ -657,7 +659,9 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2115](2115-what-the-bounded-suggestion-gain-still-leaves-open.md) | What the bounded suggestion gain still leaves open | ⬜ | P3 | [1998](1998-a-suggestion-past-its-bound.md) |
 | [2117](2117-a-recipe-ties-the-axial-pair.md) | A recipe ties the axial pair instead of holding H/L | ⬜ | P4 | [2012](2012-the-axial-ratios-are-interchangeable.md) |
 | [2120](2120-a-tail-shoulder-offered-as-a-line.md) | A tail shoulder on its position bound is offered as a line | ⬜ | P3 | — |
-| [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 🔄 2026-11-09 | P2 | — |
+| [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | ✅ 2026-11-09 | — | — |
+| [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | ⬜ | P2 | — |
+| [2141](2141-a-declared-peak-on-its-floor-reads-the-bound-test.md) | A declared peak on its floor reads the bound test | ⬜ | P3 | — ([1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) soft) |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
