@@ -1,6 +1,6 @@
 # WP-1995 — Soft restraints in a joint fit
 
-Milestone: parametric · Status: ⬜
+Milestone: parametric · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
 Depends on: 1964 (the grammar, for the penalty task alone)
 Priority: P2 2026-11-04 — was P3: the parametric milestone takes it, since an expert's restraints stop at the joint fit, and a penalty is how a bound on a nonlinear target can hold
 
