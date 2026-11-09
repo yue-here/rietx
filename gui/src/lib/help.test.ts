@@ -282,7 +282,6 @@ describe("`title=` is no longer how this app explains a name", () => {
     "panels/Console.svelte": 1,      // the event ring's size
     "panels/History.svelte": 4,      // node vocabulary — WP-1217
     "panels/Model.svelte": 3,        // the space-group box, two splitters
-    "panels/Params.svelte": 4,       // the table's own affordances
     // The add-at-2θ box, plus nine on the candidate and extinction tables.
     // **Unowned**, and deliberately not WP-1211's, which this line used to name:
     // 1211 drew a candidate's lines on the plot and added no `title=`, while
@@ -296,7 +295,8 @@ describe("`title=` is no longer how this app explains a name", () => {
     // docs/reference_pages.py `_VOCABULARIES`, the regenerated help_keys.json),
     // and a WP of its own.
     "panels/Peaks.svelte": 10,
-    "panels/Plan.svelte": 2,         // the reorder grip, correlation_guard
+    "panels/Plan.svelte": 6,         // the reorder handle, the add field, an unapplied
+                                     // stage, the closing stage, set-aside, correlation_guard
     "panels/Plot.svelte": 3,         // fit-range fields — WP-1212
     "panels/Report.svelte": 4,       // report statistics
     "panels/Series.svelte": 11,      // series settings and status chips

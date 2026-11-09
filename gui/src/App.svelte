@@ -106,6 +106,14 @@
   let refineMode = $state<"cycle" | "plan">("plan");
   let pendingTouched = $state(0);
   let pendingInvalid = $state("");
+  /** whether the Plan tab holds an edited plan, which the action bar counts as
+   *  one pending edit and its Apply stores (WP-2127) */
+  let planPending = $state(false);
+  const pendingTotal = $derived(pendingTouched + (planPending ? 1 : 0));
+  /** Bumped by every project opened, so the Plan tab starts over: its unsaved
+   *  stages and its undo stack belong to the project they were made in, and
+   *  `{#if project}` stays true across an open. */
+  let opens = $state(0);
   let simple = $state(true);
   /** The first-run checklist's own two pieces of state (WP-1017): whether it
    *  has been dismissed for this project, and whether the Report tab has been
@@ -366,6 +374,7 @@
    */
   async function opened(doc: any) {
     project = doc;
+    opens += 1;
     readUi();
     openError = "";
     // a different project, so the checklist's session-local step starts over
@@ -396,6 +405,7 @@
   async function open(path: string): Promise<string> {
     try {
       project = await api.openProject(path);
+      opens += 1;
       readUi();
       openError = "";
       reportSeen = false;   // a different project — see `opened` (WP-1017)
@@ -481,6 +491,36 @@
     return ok;
   }
 
+  /** Apply everything the action bar counts: the Parameters edits, then an
+   *  edited plan (WP-2127).  A refusal brings forward the tab that drew it. */
+  async function applyPending(): Promise<boolean> {
+    if (pendingTouched && !(await applyParams())) return false;
+    if (planPending && !(await planPanel?.save())) {
+      tab = "plan";
+      return false;
+    }
+    return true;
+  }
+
+  function revertPending() {
+    paramsPanel?.revert();
+    planPanel?.revert();
+  }
+
+  /** A stage run from the Plan tab applies the Parameters edits first, as the
+   *  bar's Refine does, so the stage starts from the values on screen.  The
+   *  stage itself is sent as it stands, saved or not. */
+  async function runPlanStage(stage: any) {
+    if (refining || busy || noPhases || pendingInvalid) return;
+    refining = true;
+    try {
+      if (pendingTouched && !(await applyParams())) return;
+      await runStage(stage);
+    } finally {
+      refining = false;
+    }
+  }
+
   /** The action bar's primary: apply the pending edits, then refine (WP-2123).
    *
    * `cycle` is one stage with an empty `turn_on`, which `Project.run_stage`
@@ -496,7 +536,7 @@
     if (refining || busy || noPhases || pendingInvalid) return;
     refining = true;
     try {
-      if (pendingTouched && !(await applyParams())) return;
+      if (pendingTotal && !(await applyPending())) return;
       if (mode === "plan") await start();
       else await runStage({ name: "cycle", turn_on: [] },
                           'ref.run_stage(Stage("cycle", turn_on=[]))');
@@ -750,12 +790,19 @@
   const commands = $derived<Command[]>([
     // the action bar's primary on the staged plan, so pending edits are applied
     // first, as that button applies them (WP-2123)
-    { id: "run", label: pendingTouched ? "Apply the edits and run the fit" : "Run the fit",
+    { id: "run", label: pendingTotal ? "Apply the edits and run the fit" : "Run the fit",
       echo: "ref.fit(data, plan=…)", key: "r",
       disabled: busy || !project || noPhases || !!pendingInvalid, run: () => refine("plan") },
     { id: "stage", label: `Run one stage${planPanel?.selectedName() ? ` — ${planPanel.selectedName()}` : ""}`,
-      echo: "ref.run_stage(stage)", key: ".", disabled: busy || !project || noPhases,
+      echo: "ref.run_stage(stage)", key: ".",
+      disabled: busy || !project || noPhases || !!pendingInvalid,
       run: () => { tab = "plan"; planPanel?.runStage(); } },
+    { id: "plan-undo", label: "Undo the last plan edit", echo: "# the Plan tab's own undo",
+      disabled: !project || !planPanel?.canUndo(),
+      run: () => { tab = "plan"; planPanel?.undo(); } },
+    { id: "plan-redo", label: "Redo the plan edit", echo: "# the Plan tab's own undo",
+      disabled: !project || !planPanel?.canRedo(),
+      run: () => { tab = "plan"; planPanel?.redo(); } },
     { id: "cancel", label: "Cancel the run", echo: "token.cancel()", key: "Esc",
       disabled: !busy, run: cancel },
     { id: "free", label: "Free the filtered parameters", echo: 'ref.set_vary(glob, True)',
@@ -1072,9 +1119,9 @@
      whole window under both sides is the alternative.  Moving it is part of
      the collapse click, which asks for a layout change. -->
 {#snippet actions()}
-  <ActionBar bind:mode={refineMode} touched={pendingTouched} invalid={pendingInvalid}
+  <ActionBar bind:mode={refineMode} touched={pendingTotal} invalid={pendingInvalid}
     {busy} blocked={noPhases ? NO_PHASES_REASON : null}
-    onapply={applyParams} onrevert={() => paramsPanel?.revert()}
+    onapply={applyPending} onrevert={revertPending}
     onrefine={() => refine()} />
 {/snippet}
 
@@ -1295,13 +1342,15 @@
         <!-- every tab stays mounted: switching must not throw away a filter, a
              pending edit, an unsaved stage list or a two-node comparison -->
         <div class="panel" class:hidden={tab !== "params"}>
-          <Params bind:this={paramsPanel} {head} {busy} {simple} {say}
+          <Params bind:this={paramsPanel} {head} {busy} {corpus} {say}
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
         </div>
         <div class="panel" class:hidden={tab !== "plan"}>
-          <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
-            noPhasesReason={noPhases ? NO_PHASES_REASON : null}
-            {say} onrun={runStage} onrunall={start} />
+          {#key opens}
+            <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
+              noPhasesReason={noPhases ? NO_PHASES_REASON : null}
+              {say} onrun={runPlanStage} onpending={(edited) => (planPending = edited)} />
+          {/key}
         </div>
         <div class="panel" class:hidden={!textTab}>
           <Text {head} {busy} active={textTab} dark={theme === "dark"} {say} onmoved={moved} />
