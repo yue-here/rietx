@@ -25,9 +25,9 @@ space groups; there the singleton is not unsupported but unmeasurable. Its absen
 can only speak where its own null model is silent — a σ threshold is counting noise, not
 model error, and a forbidden position inside a neighbour's tail measures the *profile*,
 which refuted certified corundum's own `R -3 c` (WP-1077; `_model_is_quiet` and the
-sham-probe measurement are in `extinction.py`'s docstring, and `n_testable` is `None`
-until `screened` because it needs that class's fit). Its reference fit is gated on the
-picker's envelope (`REFERENCE_NET_RWP_MAX`).
+sham-probe measurement are in `extinction.py`'s docstring; `n_testable` is `None` until the
+class's own fit runs). Its reference fit is gated on the picker's envelope
+(`REFERENCE_NET_RWP_MAX`). **A raised fit is no evidence**: its class stays unscored (WP-2076).
 
 ## The pipeline
 

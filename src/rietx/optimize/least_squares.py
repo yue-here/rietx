@@ -32,6 +32,7 @@ from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 import numpy as np
+import scipy.linalg
 from scipy.optimize import least_squares
 
 from ..backend import get_backend
@@ -1315,19 +1316,32 @@ def _fd_typicals(table: ParameterTable,
     coef = table.constraint_block()[0].tocsc()
     out = np.ones(len(table.free_paths), dtype=np.float64)
     for c, path in enumerate(table.free_paths):
-        row, unit, k = path, table._units.get(path), 1.0
-        if unit is None and is_variable_path(path) and identities[c][0] != path:
+        row, k = path, 1.0
+        if (table._units.get(path) is None and is_variable_path(path)
+                and identities[c][0] != path):
             row = identities[c][0]
-            unit = table._units.get(row)
             k = abs(float(coef[table._paths[row], c]))
-        size = FLOOR_SEEDS.get(unit)
-        if (size is not None and k > 0.0
-                and (table.entries[table._paths[row]].lo >= 0.0
-                     or unit == "deg^2"
-                     or any(row == w or row.endswith("." + w)
-                            for w in _SIGNED_WIDTHS))):
+        size = _row_typical(table, row)
+        if size is not None and k > 0.0:
             out[c] = size / k
     return out
+
+
+def _row_typical(table: ParameterTable, row: str) -> float | None:
+    """One physical row's width size, or ``None`` where its step is absolute.
+
+    The row test of :func:`_fd_typicals`, whose docstring says which rows are
+    widths and why.  The chained columns (WP-1964) size their step on the
+    rows they move, so they read it here too.
+    """
+    unit = table._units.get(row)
+    size = FLOOR_SEEDS.get(unit)
+    if size is not None and (table.entries[table._paths[row]].lo >= 0.0
+                             or unit == "deg^2"
+                             or any(row == w or row.endswith("." + w)
+                                    for w in _SIGNED_WIDTHS)):
+        return size
+    return None
 
 
 #: Width rows in deg that may go negative, so :func:`_fd_typicals` cannot read
@@ -1368,7 +1382,21 @@ def _peak_chain_column(model: CompiledModel, table: ParameterTable,
     if affected is None:
         affected = ([int(path.split(".")[1])] if path.startswith("phases.")
                     else range(len(model.phases)))
+    return _peak_chain_at(model, bases, values_p, h, path, intensities, affected)
 
+
+def _peak_chain_at(model: CompiledModel, bases: DerivativeBases,
+                   values_p: dict[str, float], h: float, path: str,
+                   intensities: list[np.ndarray] | None,
+                   affected: "list[int] | range") -> np.ndarray:
+    """∂y along one step: the peak scalars at ``values_p`` against the bases.
+
+    The body of :func:`_peak_chain_column`, which perturbs one θ column, and
+    of :func:`_chained_columns`, which perturbs the physical rows a group of
+    columns shares (WP-1964).  ``h`` is the step's length in whatever
+    coordinate the caller moved; ``path`` names the column in the
+    ``profile_derivs=False`` error.
+    """
     parts = []
     for ip in affected:
         # WP-1343: one pass per drawn component.  ``components`` hands back
@@ -1991,6 +2019,106 @@ def _affected_phases(model: CompiledModel, path: str, extra: list[str]):
     return sorted({int(p.split(".")[1]) for p in touched})
 
 
+#: A group's columns are dependent when a singular value of their block of
+#: ∂p/∂θ falls under this fraction of the largest.  Coefficients of one
+#: target are exactly proportional, so theirs sit at rounding (1e-16).
+_CHAIN_RANK_RTOL = 1e-10
+
+
+def _chained_columns(model: CompiledModel, table: ParameterTable,
+                     bases: DerivativeBases, theta: np.ndarray,
+                     values: dict[str, float], cols: list[int],
+                     identities: list[tuple[str, list[str], bool]],
+                     typicals: np.ndarray,
+                     intensities: list[np.ndarray] | None,
+                     sqrt_w: np.ndarray, J: np.ndarray, n_data: int) -> None:
+    """Write the peak-chain columns, a target's column once per group (WP-1964).
+
+    Columns that move the same physical rows are grouped.  A group's block
+    L of ∂p/∂θ (:meth:`ParameterTable.local_jacobian`, exact for an
+    equation's rows) has rank r.  Where r is below the group's size, the
+    columns are J_targets·L, so r directional columns along a basis of L's
+    span serve them all: J_cols = D·X with L = B·X.  Every coefficient of
+    a tie on ``cell.a`` is one direction, so one ``phase_peaks`` call per
+    pattern serves the whole series of coefficients, where each column
+    re-ran it before (1.48-1.52× on the Jacobian loop, WP-1325 § Measured).
+
+    The step then sits on the moved rows, sized by :func:`fd_step` at each
+    row's value and :func:`_row_typical`, the tightest row setting it.  On a
+    coefficient it sat on θ, which a pattern near the reference turns into
+    almost no move of the target.  A group of independent columns, a lone
+    column included, keeps :func:`_peak_chain_column` and so stays
+    bit-identical.  The grouping takes the general form, never a shortcut
+    keyed on a name, since one coefficient may reach several targets.
+    """
+    reach = []
+    for c in cols:
+        path, extra, _ = identities[c]
+        reach.append([q for q in (path, *extra)
+                      if q in table._paths and not is_variable_path(q)])
+    # union-find over shared rows
+    parent = list(range(len(cols)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    owner: dict[str, int] = {}
+    for i, rows in enumerate(reach):
+        for q in rows:
+            if q in owner:
+                parent[find(i)] = find(owner[q])
+            else:
+                owner[q] = i
+    groups: dict[int, list[int]] = {}
+    for i in range(len(cols)):
+        groups.setdefault(find(i), []).append(i)
+
+    L = None
+    for members in groups.values():
+        rows = sorted({q for i in members for q in reach[i]})
+        block = None
+        if len(members) > 1 and rows:
+            if L is None:
+                L = table.local_jacobian(np.asarray(theta, dtype=np.float64)).tocsc()
+            idx = [table._paths[q] for q in rows]
+            block = L[idx][:, [cols[i] for i in members]].toarray()
+            sv = lapack.svd(block, compute_uv=False)
+            rank = int(np.sum(sv > _CHAIN_RANK_RTOL * sv[0])) if sv[0] > 0 else 0
+            if rank == 0 or rank >= len(members):
+                block = None
+        if block is None:
+            for i in members:
+                c = cols[i]
+                path, extra, _ = identities[c]
+                J[:n_data, c] = -sqrt_w * _peak_chain_column(
+                    model, table, bases, theta, values, c, path, intensities,
+                    affected=_affected_phases(model, path, extra),
+                    typical=typicals[c])
+            continue
+        _q, _r, piv = scipy.linalg.qr(block, pivoting=True, mode="economic")
+        basis = block[:, piv[:rank]]
+        coeffs = lapack.lstsq(basis, block, rcond=None)[0]
+        affected = _affected_phases(model, rows[0], rows[1:])
+        sizes = np.array([fd_step(values[q], _row_typical(table, q) or 1.0)
+                          for q in rows])
+        D = np.empty((n_data, rank), dtype=np.float64)
+        for j in range(rank):
+            d = basis[:, j]
+            moved = d != 0.0
+            h = float(np.min(sizes[moved] / np.abs(d[moved])))
+            values_p = dict(values)
+            for q, dq in zip(rows, d, strict=True):
+                if dq != 0.0:
+                    values_p[q] = values[q] + h * dq
+            D[:, j] = _peak_chain_at(model, bases, values_p, h,
+                                     identities[cols[members[piv[j]]]][0],
+                                     intensities, affected)
+        J[:n_data, [cols[i] for i in members]] = -sqrt_w[:, None] * (D @ coeffs)
+
+
 def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
                    moment_angles: bool = False):
     """Mixed analytic/FD Jacobian of the residual w.r.t. the internal vector.
@@ -2066,6 +2194,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
         values = table.decode(theta_t)
         J = np.zeros((n_rows, len(theta)), dtype=np.float64)
         fd_cols = []
+        chain_cols: list[int] = []
         bases: DerivativeBases | None = None
         # the aperture node-FD bases feed only the axial columns, so ask for
         # them only in a stage that will build those columns — two FCJ node
@@ -2145,12 +2274,14 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable, *,
             elif model.scalar_chain_supported(path) and all(
                     model.scalar_chain_supported(p) and p not in bkg_cols
                     and p not in axial_paths for p in extra):
-                J[:n_data, c] = -sqrt_w * _peak_chain_column(
-                    model, table, get_bases(), theta_t, values, c, path, intens,
-                    affected=_affected_phases(model, path, extra),
-                    typical=typicals[c])
+                chain_cols.append(c)
             else:
                 fd_cols.append(c)
+
+        if chain_cols:
+            _chained_columns(model, table, get_bases(), theta_t, values,
+                             chain_cols, identities, typicals, intens,
+                             sqrt_w, J, n_data)
 
         if fd_cols:
             # The declared fallback.  A background-peak parameter lands here by

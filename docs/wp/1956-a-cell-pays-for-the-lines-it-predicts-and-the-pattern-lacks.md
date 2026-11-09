@@ -1,9 +1,9 @@
 # WP-1956 — a cell pays for the lines it predicts and the pattern lacks
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — task 5 measured on the #916 arms after PR #1302 under `preset="full"` (PR #1353): removing `fom_panel_disagrees` still promotes wrong cells, the lattice-aware form promotes none at a line-set tolerance of 7e-4 to 2e-3; waits on the maintainer's ruling on #916 (lattice-aware, or kept); also open: tutorial 03's absence count (WP-2041)
+Milestone: unscheduled · Status: 🔄 2026-11-07 — every task ticked; task 5 ruled by Yue: `fom_panel_disagrees` kept as it is, the lattice-aware form recorded for a revisit; the one item left is WP-2041's tutorial 03 count (write the post-repair grades into WP-2041's `### Inherited`)
 Track: What fires, and what stays silent
 Depends on: 1449 soft (the index 2–4 refutation it widens); 1511 soft (one Le Bail protocol per cell)
-Priority: P2 2026-10-13 — the absent-line detector fires on the truth and is blind on every wrong cell, and a distorted cell ranks first; no grade is confident today only because the run-level `fom_panel_disagrees` fires, which the reporter measured quiet on arms where a wrong cell reached `medium`
+Priority: P4 2026-11-07 — was P2: the repair shipped and task 5 is ruled kept; what is left is writing tutorial 03's post-repair grades into WP-2041, teaching content that WP-2041 waits on
 
 ## Goal
 
@@ -234,10 +234,11 @@ engine or the ranking. Indexing is provisional by declaration
       windows, the assumed shift bound flooring only the power check (`split`).
       *Built 2026-11-01 (PR #1302). Decided 2026-11-01 (maintainer): `split`
       lands on top of #1251's `g`.*
-- [ ] Revisit `fom_panel_disagrees` only on the same arms, after the repair.
+- [x] Revisit `fom_panel_disagrees` only on the same arms, after the repair.
       *Measured 2026-11-02 on `a5c99e0fe` under `preset="full"` (PR #1353,
-      handover entry below). The rule is the maintainer's, asked on #916:
-      make the flag lattice-aware, or close this task as "kept".*
+      handover entry below). Decided 2026-11-07 (Yue): revisited after the
+      repair; kept. The lattice-aware form waits for a lattice comparison with
+      ten times the margin (handover entry of 2026-11-07).*
 - [x] Tests, and `tests/test_acceptance_indexing.py` green.
 - [x] Skill: the indexing reference row for any changed caveat or grade rule.
 
@@ -259,6 +260,30 @@ absences; Si, corundum and magnetite keep their correct cells.
 - WP-1043 (the magnetite measurement and the recorded design), WP-1449.
 
 ## Handover log
+
+- **2026-11-07** (rulings, PR #1455) — task 5 ruled, and every task is now ticked. Decided
+  2026-11-07 (Yue): `fom_panel_disagrees` stays as it is (issue #916). The flag keeps capping the
+  truth's grade on 15 of the 19 #916 arms. In exchange, it holds down the wrong cells that rise above
+  `low` on 7 of the 19 arms without it.
+  The lattice-aware form would lift three truths. Its safe tolerance band is too narrow to trust
+  beyond the arms it was measured on, so it is recorded here for a later revisit.
+
+  *Recorded for the revisit.* The lattice-aware form ("TL") fires only when the members' co-winners
+  share no lattice, comparing lattices by line set. Its measured window for that line-set tolerance
+  is 7e-4 to 2e-3, relative in Q. Below 7e-4, #916 arm b's tI and cF descriptions of one lattice read
+  as two. From 2.2e-3, LaB₆'s tetragonal descents promote wrong cells to `high`. So the margin is
+  under 3×, and both edges come from one synthetic Si family and one lab LaB₆ pattern. Inside the
+  band TL promotes no wrong cell on 27 runs and lifts #916 arm b and brucite to `medium`, and
+  zincite to `high` (entry of 2026-11-02). Revisit TL when a lattice comparison has a margin of 10×
+  or more, for example one built on reduced cells. The build is then the one the 2026-11-02 entry's
+  *Next* describes, with that table re-run as its acceptance.
+
+  *Left before close.* The `### Inherited` entry of 2026-10-24 from WP-2041 asks this WP's closer
+  to re-measure tutorial 03's full range and its 45° cut on `main`, and to write their grades and
+  caveats into WP-2041's `### Inherited`. That has not been done. The other five `### Inherited`
+  entries were not pruned in this rulings pass.
+  *Next:* run tutorial 03's two cuts on current `main`, write the grades into WP-2041's
+  `### Inherited`, prune this file's `### Inherited`, then close this WP.
 
 - **2026-11-05** (post-merge record) — PR #1353 merged at `7ac1f54c1`. Its own
   entry is below and lacked the sha. Status stays 🔄, and task 5 still waits on

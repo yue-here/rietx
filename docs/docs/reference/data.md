@@ -18,7 +18,6 @@ Bounds are checked when the object is built, too, and not when the fit starts.
 | `Parameter.max` | `float` | `inf` | inclusive upper bound |
 | `Parameter.unit` | `str` or `None` | `None` | a label; nothing converts by it |
 | `Parameter.stderr` | `float` or `None` | `None` | the esd, written by the fit |
-| `Parameter.expr` | `str` or `None` | `None` | reserved for constraint expressions; anything but `None` raises |
 
 `value` must lie within the bounds, and `min` must not exceed `max`.
 An infinite bound survives a JSON round trip as `"Infinity"`, so an unbounded parameter can be saved.

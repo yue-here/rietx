@@ -88,17 +88,21 @@ class RefinedParameter(Base):
     list would have called measured.
 
     **``interval`` is the profile interval of a moment angle the fit left out
-    of its covariance** (WP-2002, B2).  The stationary-angle test
-    (``StageResult.moment_angle_tests``, WP-1929) takes such an angle's column
-    out, so its ``stderr`` stays ``None``.  The data still determine the angle
-    through curvature, so the fit computes its 95 % profile interval
-    (:class:`~rietx.schemas.interval.ParameterInterval`, the answer
-    ``Refinement.profile_interval`` returns) and stores it here.  One writer:
-    ``parameter_interval.attach_stationary_intervals``, which ``fit`` and
-    ``run_stage`` call for every angle the answer-producing stage left out.
-    ``None`` says no interval was computed: any other row, a joint fit (which
-    has no profile verb), a package-internal trial, a fit cancelled while its
-    intervals ran, or a result stored before the field.
+    of its covariance, or of that site's modulus** (WP-2002, B2; WP-2060).
+    The stationary-angle test (``StageResult.moment_angle_tests``, WP-1929)
+    takes such an angle's column out, so its ``stderr`` stays ``None``.  The
+    data still determine the angle through curvature, so the fit computes its
+    95 % profile interval (:class:`~rietx.schemas.interval.ParameterInterval`,
+    the answer ``Refinement.profile_interval`` returns) and stores it here.
+    The modulus of each such site gets one too, because its ``stderr``, kept
+    on the row, assumes the angles sit on the direction (ruled by Mike on
+    #1075, 2026-11-04).  One writer: ``parameter_interval.attach_stationary_intervals``,
+    which ``fit`` and ``run_stage`` call for every angle the answer-producing
+    stage left out.  ``None`` says no interval is quoted: any other row, a
+    joint fit (which has no profile verb), a package-internal trial, a fit
+    cancelled while its intervals ran, a result stored before the field, and
+    a modulus whose profile found the data χ² a whole cut below the fit, which
+    ``MOMENT_ANGLE_STATIONARY`` reports with the lowest point instead.
 
     **``stderr_uncorrected`` is the esd other programs print** (WP-2002, B4).
     ``stderr`` carries the Bérar-Lelann factor f for serially correlated

@@ -28,7 +28,7 @@ from typing import ClassVar, Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from .common import Base, Parameter, _InheritsDeclaredDefaults, declared_fills
+from .common import Base, Parameter, _InheritsDeclaredDefaults
 
 
 def _declared_extinction() -> Parameter:
@@ -1517,26 +1517,16 @@ class Phase(_InheritsDeclaredDefaults):
         ``phase.extinction = 0.0`` is the declaration a user writes, so it
         must not need the unit and the bound spelled out.  A ``Parameter`` or
         a dict that leaves ``min``, ``max`` or ``unit`` unset inherits them
-        from ``_declared_optional``, the rule every declared field follows
-        (issue #204).  The fill is made here as well as in
-        ``_inherit_declared_bounds``, because an assignment
-        (``phase.extinction = Parameter(value=0.0, vary=True)``, the other
-        way to declare it) runs this validator and not that one, and would
-        otherwise leave the coefficient unbounded below.
+        from ``_declared_optional`` in
+        :class:`~rietx.schemas.common._InheritsDeclaredDefaults`, on
+        construction and on assignment alike (issue #204, WP-2088).
         """
         if isinstance(value, bool):
             raise ValueError("extinction takes a number (µm²) or a Parameter; "
                              "declare it with phase.extinction = 0.0")
         if isinstance(value, numbers.Real):
             return _declared_extinction().model_copy(update={"value": float(value)})
-        if isinstance(value, Parameter):
-            present, base = value.model_fields_set, value.model_dump()
-        elif isinstance(value, dict):
-            present, base = value.keys(), value
-        else:
-            return value
-        fills = declared_fills(_declared_extinction(), set(present))
-        return Parameter(**{**base, **fills}) if fills else value
+        return value
 
     @field_validator("symmetry_operations", mode="before")
     @classmethod
@@ -1827,6 +1817,18 @@ class Phase(_InheritsDeclaredDefaults):
 
     @model_validator(mode="after")
     def _valid_restraints(self) -> "Phase":
+        self._check_restraint_indices(every_kind=False)
+        return self
+
+    def _check_restraint_indices(self, *, every_kind: bool) -> None:
+        """Each restraint's atom indices name an atom of this phase.
+
+        Construction checks the bond, angle, planarity and torsion kinds it
+        always checked.  ``every_kind`` adds the tether and anti-bump kinds,
+        which :meth:`_check_atom_references` checks at an edit (WP-2121).  They
+        stay out of construction so that a saved history whose node holds
+        one, which an edit accepted before 1.12, still opens.
+        """
         n = len(self.atoms)
 
         def check(idx: int, label: str) -> None:
@@ -1835,8 +1837,10 @@ class Phase(_InheritsDeclaredDefaults):
                     f"phase {self.name!r} restraint references {label}={idx}, "
                     f"but the phase has {n} atom(s) (indices 0..{n - 1})")
 
+        pairs = ((BondRestraint, TetherRestraint, AntiBumpRestraint) if every_kind
+                 else (BondRestraint,))
         for r in self.restraints:
-            if isinstance(r, BondRestraint):
+            if isinstance(r, pairs):
                 check(r.atom_i, "atom_i")
                 check(r.atom_j, "atom_j")
             elif isinstance(r, AngleRestraint):
@@ -1846,7 +1850,24 @@ class Phase(_InheritsDeclaredDefaults):
             elif isinstance(r, (PlanarityRestraint, TorsionRestraint)):
                 for k, idx in enumerate(r.atoms):
                     check(idx, f"atoms[{k}]")
-        return self
+
+    def _check_atom_references(self) -> None:
+        """Re-run every check that a record naming this phase's atoms still names one.
+
+        Restraints name atoms by index, rigid bodies by label, and a mode record
+        holds one row per atom.  Each is checked when the phase is built or its
+        ``atoms`` assigned, but not after an in-place change to the list
+        (``del phase.atoms[j]``, a swap) or a ``model_copy``, which is how a
+        caller builds the structure it hands to ``Refinement.edit`` (WP-2121).
+        Raises ``ValueError`` naming the first record that no longer fits.
+        """
+        self._check_restraint_indices(every_kind=True)
+        self._bodies_name_their_atoms()
+        self._modes_cover_the_atoms()
+
+
+#: A ``ValueRestraint`` path on an atom: its phase and atom index.
+_VALUE_ATOM_PATH = re.compile(r"^phases\.(\d+)\.atoms\.(\d+)(?=\.|$)")
 
 
 class Structure(Base):
@@ -1877,6 +1898,36 @@ class Structure(Base):
     """
 
     phases: list[Phase]
+
+    def _value_restraints_name_atoms_it_has(self) -> None:
+        """A ``ValueRestraint`` path on an atom names a phase and an atom this structure has.
+
+        The path is a whole-model dot-path, so only the structure can check it;
+        a path on an atom it lacks failed only at the next fit (WP-2121).  Run
+        by :meth:`_check_atom_references`, never at construction, for the
+        reason :meth:`Phase._check_restraint_indices` gives.
+        """
+        for phase in self.phases:
+            for r in phase.restraints:
+                m = (_VALUE_ATOM_PATH.match(r.path) if isinstance(r, ValueRestraint)
+                     else None)
+                if m is None:
+                    continue
+                ip, j = int(m.group(1)), int(m.group(2))
+                if not (ip < len(self.phases) and j < len(self.phases[ip].atoms)):
+                    raise ValueError(
+                        f"phase {phase.name!r} restraint references {r.path}, but "
+                        f"the structure has no such atom")
+
+    def _check_atom_references(self) -> None:
+        """:meth:`Phase._check_atom_references` on every phase, then the value paths.
+
+        For a structure changed in place or built by ``model_copy``, which runs
+        no validator (WP-2121).
+        """
+        for phase in self.phases:
+            phase._check_atom_references()
+        self._value_restraints_name_atoms_it_has()
 
     @classmethod
     def from_cif(cls, path: str | os.PathLike[str], *, phase_name: str | None = None,
