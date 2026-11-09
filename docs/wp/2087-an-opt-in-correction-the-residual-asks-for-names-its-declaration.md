@@ -1,6 +1,6 @@
 # WP-2087 — An opt-in correction the residual asks for names its declaration in the docs
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — all tasks done (PR #1505); waits on the maintainer's call on the unknown-path error and the printed Biso help text
+Milestone: unscheduled · Status: 🔄 2026-11-09 — claimed by @yue-here (ghostshift runner: the unknown-path hint names the declaration)
 Track: What fires, and what stays silent
 Depends on: [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md)
 Priority: P3 2026-11-05 — WP-1944 closed, so nothing blocks it; three opt-in corrections are documented without the declaration a user writes, and nothing is wrong in any number
