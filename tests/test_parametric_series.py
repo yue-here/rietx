@@ -72,6 +72,7 @@ from rietx.params.parametric import (
     term_label,
 )
 from rietx.params.vector import AffineTie
+from rietx.schemas.common import Parameter
 from rietx.schemas.parametric import (
     CoordinateTable,
     ParametricCoefficient,
@@ -437,6 +438,53 @@ def test_per_pattern_starting_structures_differ_only_where_a_path_is_per_histogr
                             _lab6_instruments(2))
     with pytest.raises(ValueError, match="3 starting structures for 2"):
         MultiParameterTable([start(4.15)] * 3, _lab6_instruments(2))
+
+
+def _start_with(edit) -> rx.Structure:
+    s, _ = perturbed_inputs()
+    edit(s.phases[0])
+    return s
+
+
+@pytest.mark.parametrize("edit, where", [
+    (lambda ph: setattr(ph, "preferred_orientation",
+                        rx.schemas.structure.PreferredOrientation(axis=(1, 1, 1))),
+     "phases.0.preferred_orientation"),
+    (lambda ph: setattr(ph, "extinction", Parameter(value=10.0, min=0.0)),
+     "phases.0.extinction"),
+    (lambda ph: setattr(ph, "particle_radius_um", 5.0), "phases.0.particle_radius_um"),
+    (lambda ph: ph.restraints.append(
+        rx.schemas.structure.BondRestraint(atom_i=0, atom_j=1, target=3.0, sigma=0.01)),
+     "phases.0.restraints"),
+], ids=["texture-declared", "extinction-declared", "particle-radius", "restraint"])
+def test_per_pattern_starts_must_agree_beyond_their_parameters(edit, where):
+    """One model with different values: a field that is not a parameter is
+    the model's, and two starts that disagree there are two models.  The
+    refusal names the field.  A parameter's value, bounds and vary flag may
+    differ, and so may the phase's name, a label a CIF takes from its data
+    block."""
+    ins = _lab6_instruments(2)
+    with pytest.raises(ValueError, match=rf"structure 1 differs from structure 0 at "
+                                         rf"{where.replace('.', chr(92) + '.')}"):
+        MultiParameterTable([_start_with(lambda ph: None), _start_with(edit)], ins)
+
+
+def test_two_texture_axes_under_one_r_column_are_refused():
+    def axis(hkl):
+        def edit(ph):
+            ph.preferred_orientation = rx.schemas.structure.PreferredOrientation(axis=hkl)
+        return edit
+    with pytest.raises(ValueError, match=r"phases\.0\.preferred_orientation\.axis"):
+        MultiParameterTable([_start_with(axis((0, 0, 1))), _start_with(axis((1, 1, 1)))],
+                            _lab6_instruments(2))
+    # a phase's name is a label, and a parameter's bounds and vary flag are
+    # not the model's: none of them is refused
+    def label_and_bounds(ph):
+        ph.name = "LaB6_400K"
+        ph.atoms[0].occ.max = 1.0
+        ph.scale.vary = not ph.scale.vary
+    MultiParameterTable([_start_with(lambda ph: None), _start_with(label_and_bounds)],
+                        _lab6_instruments(2))
 
 
 def test_a_dependent_the_coefficients_put_out_of_range_is_named():

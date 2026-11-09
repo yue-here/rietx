@@ -314,6 +314,7 @@ The rest need the patterns:
 | a coordinate degree of freedom whose atom the starting structures place differently | start every pattern with the atom in one place |
 | two declarations with one name, a coefficient path that already exists, or two declarations on one target with overlapping subsets | a name each, and disjoint `patterns` per target |
 | a list of starting structures whose length is not the instrument count, or which differ in phases, space group or atoms | one `Structure`, or one per histogram of one model |
+| starting structures that differ in a field that is not a parameter, such as a texture axis, a declared extinction or Stephens block, the restraints or a rigid body's orientation | the same field in every structure; only parameter values, bounds and vary flags, and the phase's `name`, may differ |
 | starting structures that disagree on a shared path | one value, a per-histogram override, or a declaration on that path |
 | a `SharingMap` that makes a linear equation's coefficient per-histogram | keep its `vars.<name>_<j>` shared; a formula's variable may be per-pattern |
 

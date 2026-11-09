@@ -32,11 +32,12 @@ import math
 from dataclasses import dataclass, field
 
 import numpy as np
+from pydantic import BaseModel
 
 from ..schemas.common import Parameter
 from ..schemas.instrument import Instrument
 from ..schemas.parametric import CoordinateTable, ParametricEquation
-from ..schemas.structure import Structure
+from ..schemas.structure import Phase, Structure
 from .expression import RESERVED, Expression, ExpressionError, names_in
 from .parametric import ResolvedParametric, least_squares_start, resolve_parametric
 from .vector import (
@@ -339,16 +340,70 @@ def _target_refusal(table: ParameterTable, e) -> str | None:
     return None
 
 
+def _model_difference(a, b, path: str = "") -> tuple[str, object, object] | None:
+    """The first place two starting structures differ outside a parameter's
+    value, as ``(dotted path, a's, b's)``, or ``None``.
+
+    A :class:`~rietx.schemas.common.Parameter` is skipped whole: its value is
+    what a per-pattern start may change, and its bounds and vary flag are
+    either per-histogram or intersected and replaced by a plan.  A phase's
+    ``name`` is skipped too, as a label rather than a model: a CIF names the
+    phase after its data block, which per-temperature files spell differently.
+    Everything else is compared exactly, recursing through models, lists and
+    dicts in field order.
+    """
+    if isinstance(a, Parameter) and isinstance(b, Parameter):
+        return None
+    if isinstance(a, BaseModel) and isinstance(b, BaseModel) and type(a) is type(b):
+        for name in type(a).model_fields:
+            if isinstance(a, Phase) and name == "name":
+                continue
+            found = _model_difference(getattr(a, name), getattr(b, name),
+                                      f"{path}.{name}" if path else name)
+            if found:
+                return found
+        return None
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        if len(a) != len(b):
+            return path, a, b
+        for k, (x, y) in enumerate(zip(a, b, strict=True)):
+            found = _model_difference(x, y, f"{path}.{k}")
+            if found:
+                return found
+        return None
+    if isinstance(a, dict) and isinstance(b, dict):
+        if list(a) != list(b):
+            return path, a, b
+        for k in a:
+            found = _model_difference(a[k], b[k], f"{path}.{k}")
+            if found:
+                return found
+        return None
+    if type(a) is not type(b) or a != b:
+        return path, a, b
+    return None
+
+
+def _short(value: object, limit: int = 60) -> str:
+    text = repr(value)
+    return text if len(text) <= limit else text[:limit - 3] + "..."
+
+
 def _starting_structures(structure: Structure | list[Structure],
                          n: int) -> list[Structure]:
     """One starting structure per histogram: the one given, or each its own.
 
     A list is the per-pattern form (WP-1325): a library's specimens start from
     their own cells, occupancies and widths.  It must describe **one model**,
-    so the topology is checked here (phase count, space groups, atoms); the
-    shared values are checked by :meth:`MultiParameterTable._check_starts_agree`
-    once the tables exist, the table being the authority on which paths a
-    model has.
+    so everything that is not a parameter's value must agree: the phase
+    count, space groups and atoms, named first, then every other field
+    (:func:`_model_difference`): a preferred-orientation axis, a texture's
+    order, whether an extinction or Stephens block is declared, the magnetic
+    symmetry, the restraints, a rigid body's record.  Two starts with different
+    texture axes sharing one ``r`` column would be two models under one
+    column.  The shared values are checked by
+    :meth:`MultiParameterTable._check_starts_agree` once the tables exist,
+    the table being the authority on which paths a model has.
     """
     if isinstance(structure, Structure):
         return [structure] * n
@@ -378,6 +433,15 @@ def _starting_structures(structure: Structure | list[Structure],
                     f"phase {ip}'s atoms differ between starting structure 0 "
                     f"{a0} and structure {h} {a1}: per-pattern starting "
                     "structures must carry the same sites, in the same order")
+        found = _model_difference(ref, s)
+        if found:
+            where, v0, v = found
+            raise ValueError(
+                f"starting structure {h} differs from structure 0 at {where} "
+                f"({_short(v)} against {_short(v0)}), which is not a parameter: "
+                "per-pattern starting structures are one model with different "
+                "values, so everything but a parameter's value must agree. Give "
+                f"every structure the same {where}")
     return starts
 
 

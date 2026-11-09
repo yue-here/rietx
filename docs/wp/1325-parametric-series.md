@@ -1296,7 +1296,7 @@ Their numbers are as reported and were not re-measured here.
   A joint fit's held steps now reach `CONSTRAINT_ACTIVE`, and the out-of-range
   test reads a value on its face as inside. TRF still raises.
   `tests/test_tied_bound_rows.py`.
-- [ ] **Per-pattern starting structures agree beyond their parameters.**
+- [x] **Per-pattern starting structures agree beyond their parameters.**
   `_starting_structures` checks the phases, space groups and sites, and
   `_check_starts_agree` the shared values. Fields that are not parameters
   can still differ between starts: a preferred-orientation axis, the magnetic
@@ -1308,6 +1308,19 @@ Their numbers are as reported and were not re-measured here.
     a wrong basin at equal Rwp, or a phase that exists in one walk direction
     only (§ A contributor's series work). Decide whether the start reads
     a `direction="both"` chain and reports where the two walks disagree.
+
+  Landed 2026-11-09 (tenth session): every field that is not a parameter
+  must agree, one rule rather than a list, read by
+  `params.multi._model_difference` after the named topology checks. A
+  `Parameter` is skipped whole (value, bounds, vary flag), and so is a
+  phase's `name`, which a CIF takes from its data block. The refusal names
+  the field and both values. Tests in `test_parametric_series.py`.
+
+  The chain half is not built, settled by Claude under § Direction
+  (machinery before built-in checks) and DESIGN.md Rule 5 (no
+  infrastructure before a use): a `direction="both"` chain already reports
+  where its walks part (`SeriesResult.direction_gaps`), and a caller picks
+  the per-pattern starts from it.
 - [x] **The measurement on real data**, with the same numbers as the
   synthetic half, on the ZrMo₂O₈ ramp: `1325-measure/real_ramp.py`, in
   § Measured on real data. All three sources are Durham TOPAS tutorials.
