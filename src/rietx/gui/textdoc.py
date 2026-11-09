@@ -428,9 +428,10 @@ def _render_peaks(project) -> list[str]:
     widths = [max(2, *(len(r[0]) for r in rows))] + [
         max(len(name), *(len(r[k]) for r in rows))
         for k, name in ((1, "2theta"), (2, "esd"), (3, "fwhm"), (4, "I"))]
-    shoulders = doc.pick_options.get("shoulders", True)
+    limits = (tuple(project.doc.two_theta_limits)
+              if project.doc.two_theta_limits else None)
     provenance = ("σ assumed, not measured" if doc.peaks.source == "positions"
-                  else f"session.pick_peaks(shoulders={shoulders})")
+                  else store.pick_call(doc.pick_options, default_range=limits))
     names = ("2theta", "esd", "fwhm", "I")
     lines = [
         f"peaks {len(rows)}".ljust(34) + f"# {provenance}",
@@ -1206,6 +1207,24 @@ _ANNOTATION_REASONS = {
     "esd": "an esd is a result of a fit, not an input to one",
 }
 
+#: The tie reasons that depend on where the row's tie came from: a user tie
+#: (WP-1070) was made by no symmetry, and a row with none can still take one.
+_TIE_REASONS = {
+    "user": "this tie was declared with ref.tie(); ref.untie() takes it back and "
+            "ref.tie() declares it again",
+    "none": "a tie comes from the crystal system, the site symmetry or ref.tie(), "
+            "and this document cannot add one",
+}
+
+
+def _annotation_reason(key: str, live) -> str:
+    """Why annotation ``key`` cannot be edited on ``live``'s row."""
+    if key == "tie" and live.tie is None:
+        return _TIE_REASONS["none"]
+    if key == "tie" and live.tie.user:
+        return _TIE_REASONS["user"]
+    return _ANNOTATION_REASONS.get(key, "this is read-only")
+
 
 def _check_annotations(row: Row, live, fail, kept) -> None:
     """Annotations are read-only, and only a *differing* one is an error.
@@ -1220,15 +1239,14 @@ def _check_annotations(row: Row, live, fail, kept) -> None:
     current = annotations_of(live)
     for key, typed in row.annotations.items():
         if key not in current:
-            fail(row.line, f"{row.path} is not {key!r} — "
-                           f"{_ANNOTATION_REASONS.get(key, 'this is read-only')}",
+            fail(row.line, f"{row.path} is not {key!r} — {_annotation_reason(key, live)}",
                  row.path, row.text)
         elif current[key] != typed and not (
                 key in ("min", "max") and key in kept()
                 and float(_fmt(kept()[key])) == current[key]):
             shown = current[key] if current[key] is not True else key
             fail(row.line, f"{key} on {row.path} is {shown}, and cannot be "
-                           f"edited here: {_ANNOTATION_REASONS[key]}",
+                           f"edited here: {_annotation_reason(key, live)}",
                  row.path, row.text)
 
 
@@ -1238,11 +1256,15 @@ def _check_annotations(row: Row, live, fail, kept) -> None:
 def apply(project, delta: Delta, peak_editor=None) -> list[str]:
     """Apply ``delta`` through the public verbs; returns the calls it made.
 
-    ``set_values`` runs first *because* it is the one that can still refuse
-    (locked, tied, out of bounds) and it validates everything before writing
-    anything — so a refusal here leaves the project untouched, which is what
-    "all-or-nothing" has to mean for a caller.  The returned lines are the same
-    API echo the console shows for a form edit.
+    Two verbs can still refuse here, and each commits its own node:
+    ``set_values`` (locked, tied, out of bounds) and, since WP-1435,
+    ``set_vary`` (a held literal).  A ``set_vary`` refusal after the values
+    committed would leave half the delta in, so the two run first on a
+    history-free copy (:func:`~rietx.gui.session.rehearse`, WP-2126).  A
+    refusal there leaves the project untouched, which is what
+    "all-or-nothing" has to mean for a caller.  The settings and the plan were
+    validated by :func:`changes`.  The returned lines are the same API echo
+    the console shows for a form edit.
 
     Peak edits run last and go through the panel's own editor
     (:class:`~rietx.gui.peaks.PeakEditor` — the session passes its cached one
@@ -1250,13 +1272,21 @@ def apply(project, delta: Delta, peak_editor=None) -> list[str]:
     :func:`changes` (indices, vocabulary, editable columns), so what remains is
     solving, which flags a failure on the peak rather than raising.
     """
-    calls: list[str] = []
-    if delta.values:
-        project.refinement.set_values(dict(delta.values))
-        calls.append(f"ref.set_values({dict(delta.values)!r})")
-    for path, flag in delta.vary.items():
-        hits = project.refinement.set_vary(path, flag)
-        calls.append(f"ref.set_vary({path!r}, {flag!r})  # {len(hits)} path(s)")
+    from .session import rehearse
+
+    def verbs(ref) -> list[str]:
+        out: list[str] = []
+        if delta.values:
+            ref.set_values(dict(delta.values))
+            out.append(f"ref.set_values({dict(delta.values)!r})")
+        for path, flag in delta.vary.items():
+            hits = ref.set_vary(path, flag)
+            out.append(f"ref.set_vary({path!r}, {flag!r})  # {len(hits)} path(s)")
+        return out
+
+    if delta.values or delta.vary:
+        rehearse(project.refinement, verbs)
+    calls: list[str] = verbs(project.refinement)
     if delta.plan is not None:
         # a preset is stored expanded through the mode the project will run
         # in, as the GUI's preset route stores it, because a project's plan
@@ -1303,7 +1333,7 @@ def _apply_peaks(project, delta: Delta, editor) -> list[str]:
         limits = (tuple(project.doc.two_theta_limits)
                   if project.doc.two_theta_limits else None)
         editor = store.PeakEditor(project.data, project.refinement.instrument,
-                                  two_theta_range=limits)
+                                  **store.settings_of(doc, default_range=limits))
     where = {i: doc.peaks.peaks[i].two_theta
              for i in set(delta.peak_moves) | set(delta.peak_flags)}
 

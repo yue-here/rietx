@@ -53,10 +53,12 @@ from .crystallography.symmetry import reflection_label, reflection_label_row
 from .crystallography.twins import (
     NumberingMoves,
     carry_constraints,
+    carry_restraints,
     carry_state_constraints,
     coordinate_snapshot,
     merge_site_twins,
     numbering_moves,
+    restraints_dropped_message,
     site_of,
 )
 from .help import help_key_for
@@ -3092,6 +3094,20 @@ class Refinement:
         edit that *repairs* such a state is not refused by the damage it is
         undoing.  It costs one table build on a cold path — the same build the
         next stage compile or ``parameters()`` call performs anyway.
+
+        **Holds, ties and restraints follow their atoms.**  An atom's dot-path
+        is its index, so a structure with an atom removed, inserted or
+        reordered numbers the others differently.  Each hold and tie is read
+        into the new numbering (#1264), and so is each restraint the new
+        structure still holds unchanged at its place in the list
+        (:func:`~.crystallography.twins.carry_restraints`, WP-2121).  One
+        appended after those was written for the new structure and is read as
+        written.  One changed in the same edit that renumbers its atoms could
+        mean either atom list, so it refuses the edit: change the atoms alone,
+        then the restraints.  One on an atom the edit removed is
+        dropped, and a warning names it.  A restraint, rigid body or
+        distortion-mode record that names an atom the new structure lacks
+        refuses the edit, since a list changed in place re-ran no check.
         """
         # Refused before anything is touched: a bank's table builds without
         # error, so nothing later stops the edit, and by then the structure,
@@ -3102,8 +3118,26 @@ class Refinement:
         # a proposed structure meets the twin merge before its table is built,
         # since moving a site changes the symmetry its table is checked against
         merged: list[Diagnostic] = []
+        restraints_dropped: list[str] = []
         if structure is not None:
             candidate = merge_site_twins(candidate, diagnostics=merged)
+            # A restraint names atoms by index and lives on the structure, out
+            # of reach of the registers ``_carry_twin_moves`` renumbers below,
+            # and a list changed in place re-ran no phase validator (WP-2121).
+            # The two refusals say different things: the first that a
+            # restraint's numbering is ambiguous, the second that a record
+            # names an atom the structure lacks.
+            try:
+                candidate, restraints_dropped = carry_restraints(self.structure, candidate)
+            except ValueError as exc:
+                raise ValueError(
+                    f"the edit is refused rather than recorded: {exc}") from None
+            try:
+                candidate._check_atom_references()
+            except ValueError as exc:
+                raise ValueError(
+                    f"this model names an atom it does not have, so the edit is "
+                    f"refused rather than recorded: {exc}") from None
         # No magnetic-group judgement here: ``edit`` receives refined state
         # plus one change (the GUI's funnel for every model edit), which is the
         # case :func:`_refined_state` exists for (issue #597).
@@ -3114,6 +3148,9 @@ class Refinement:
             raise ValueError(
                 f"this model has no parameter table, so the edit is refused "
                 f"rather than recorded: {exc}") from None
+        if restraints_dropped:
+            warnings.warn(restraints_dropped_message(restraints_dropped), UserWarning,
+                          stacklevel=2)
         # Reconcile the user constraints with the model being accepted, here
         # rather than at the next table build: this is the recorded verb, so the
         # register it leaves is the one the node carries, and a tie that stopped
@@ -3451,6 +3488,32 @@ class Refinement:
         recorded only once the history tree exists.
         """
         table = self._working_table()
+        by_path = self._refuse_value_edits(table, values)
+        for path, value in values.items():
+            by_path[path].value = float(value)
+        table.refresh_ties()  # dependents follow their sources (b←a, x←dof)
+        self._write_back(table)
+        # a value set next to its own image is the twin case #1007 describes
+        self._merge_twins()
+        # the fitted curve and statistics described the *old* values
+        self._invalidate_fit()
+        if self.history is None:
+            return
+        node = self.history.add(
+            parents=[self._head_id] if self._head_id else [],
+            action=NodeAction(kind="set_value", values=dict(values)),
+            state=self.snapshot())
+        self._head_id = node.id
+
+    def _refuse_value_edits(self, table: ParameterTable,
+                            values: dict[str, float]) -> dict:
+        """``table``'s entries by path, once every edit in ``values`` is legal.
+
+        :meth:`set_values`' refusals, one check so that a caller previewing
+        values without applying them (the GUI's ``POST /api/preview``,
+        WP-2125) refuses exactly what applying them would, in the same
+        sentences.  Raises ``ValueError`` on the first refusal.
+        """
         by_path = {e.path: e for e in table.entries}
         unknown = [p for p in values if p not in by_path]
         if unknown:
@@ -3478,21 +3541,7 @@ class Refinement:
             if not (e.lo <= float(value) <= e.hi):
                 raise ValueError(
                     f"{path}={value} lies outside its bounds [{e.lo}, {e.hi}]")
-        for path, value in values.items():
-            by_path[path].value = float(value)
-        table.refresh_ties()  # dependents follow their sources (b←a, x←dof)
-        self._write_back(table)
-        # a value set next to its own image is the twin case #1007 describes
-        self._merge_twins()
-        # the fitted curve and statistics described the *old* values
-        self._invalidate_fit()
-        if self.history is None:
-            return
-        node = self.history.add(
-            parents=[self._head_id] if self._head_id else [],
-            action=NodeAction(kind="set_value", values=dict(values)),
-            state=self.snapshot())
-        self._head_id = node.id
+        return by_path
 
     # ------------------------------------------------------------------
     # user constraints (WP-1070)
@@ -8967,7 +9016,7 @@ def _extra_peak_tick_support(model: CompiledModel,
 
 
 def _tick_rows(model: CompiledModel, structure: Structure,
-               values: dict[str, float]
+               values: dict[str, float], *, support: bool = True
                ) -> tuple[dict[str, list[float]], dict[str, list[list[int]]],
                           dict[str, list[float]]]:
     """Every tick row of one histogram: positions, Miller indices and
@@ -8978,6 +9027,11 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     task 7), so a joint fit draws the rows a single fit draws: a magnetic
     phase's own ``"<phase> (magnetic)"`` row (issue #278) and the declared
     peaks' ``EXTRA_TICK_KEY`` row as well as one row per phase.
+
+    ``support=False`` skips the support, which evaluates every reflection's
+    window and cost 11 ms of the GUI preview's 20 on the fluorapatite
+    example (WP-2125). Its rows then carry NaN, and the positions and indices
+    are unchanged.
     """
     # Tick positions cover **every** emission line, not just the primary one.
     # The calculated pattern really does have a peak at each Kα2 position, and
@@ -9012,7 +9066,8 @@ def _tick_rows(model: CompiledModel, structure: Structure,
         # (H, m), not H: a satellite is labelled by its order (WP-1326)
         pos, hkl = model.reflection_positions(ip, values)
         n_lines = len(model.line_wavelengths)
-        sup = _reflection_tick_support(model, ip, values, n_lines)
+        sup = (_reflection_tick_support(model, ip, values, n_lines) if support
+               else np.full(len(pos), np.nan))
         keep = np.isfinite(pos)
         if cp.magnetic is not None:
             # issue #278: a magnetic phase's reflections are drawn as their
@@ -9071,7 +9126,9 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     extra_ticks = model.extra_peak_tick_positions(values)
     if extra_ticks:
         ticks[EXTRA_TICK_KEY] = extra_ticks
-        tick_support[EXTRA_TICK_KEY] = _extra_peak_tick_support(model, values)
+        tick_support[EXTRA_TICK_KEY] = (
+            _extra_peak_tick_support(model, values) if support
+            else [math.nan] * len(extra_ticks))
     return ticks, tick_hkl, tick_support
 
 

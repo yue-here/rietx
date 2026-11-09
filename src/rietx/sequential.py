@@ -153,6 +153,7 @@ import fnmatch
 import math
 import numbers
 import re
+import warnings
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -165,9 +166,11 @@ from .backend.api import backend_dtype_note
 from .crystallography.twins import (
     CoordinateSnapshot,
     atom_moves,
+    carry_restraints,
     merge_site_twins,
     numbering_moves,
     renumber_path,
+    restraints_dropped_message,
 )
 from .history.events import EventStream, _attach_progress, as_event_stream
 from .history.store import holds_a_log
@@ -2105,6 +2108,20 @@ class SequentialRefinement:
             prepare(index, data, structure, instrument)
             _refuse_duplicate_names(
                 structure, f"pattern {index} ({label!r}), after prepare")
+            # the hook edits a copy of the declared structure, whose restraints
+            # still number its atoms as declared (WP-2121); the message names
+            # no pattern, so a hook that does this to every pattern warns once
+            # and then the checks a list changed in place skipped, as
+            # ``Refinement.edit`` runs them, so a broken hook is named here
+            try:
+                structure, dropped = carry_restraints(self.structure, structure)
+                structure._check_atom_references()
+            except ValueError as exc:
+                raise ValueError(
+                    f"pattern {index} ({label!r}), after prepare: {exc}") from None
+            if dropped:
+                warnings.warn("after prepare: " + restraints_dropped_message(dropped),
+                              UserWarning, stacklevel=2)
         with _refined_state():
             ref = Refinement(structure, instrument, backend=self._backend,
                              solver=self._solver,
