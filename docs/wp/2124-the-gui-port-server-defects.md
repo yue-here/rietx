@@ -1,9 +1,8 @@
 # WP-2124 — the indexing routes the GUI port needs: an ungated screen, any cell adopted, the pick's options
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — claimed by a ghostshift runner
+Milestone: unscheduled · Status: ✅ 2026-11-09 — the screen without a phase, any cell adopted, the pick's three options; candidate relations filed as a follow-up
 Track: Render what the fit already knows
 Depends on: —
-Priority: P2 2026-11-09 — the server half of the gui-overhaul port's indexing step; on real lab data the old panel's indexing is a dead end without it
 
 ## Goal
 
