@@ -4286,7 +4286,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "competes with the background. Check that the broad lines are size "
             "broadening and not an unmodelled peak shape, strain, an amorphous component "
             "or a second phase. If the size is on its limit, the bound set the width and "
-            "nothing was measured."
+            "nothing was measured. If the fit held the size rather than refining it (a "
+            "phase the data cannot see, or your own hold), the message says held at: the "
+            "number is the one the fit was given."
         ),
     ),
     "SOLVE_B_TIED_PER_PARENT_SITE": HelpEntry(
@@ -4439,7 +4441,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "right. A strain this large reaches across the pattern and competes with the "
             "background and with overlapping phases. Check that the broad lines belong "
             "to this phase and not to an unmodelled peak shape, an amorphous component "
-            "or a second phase. If the strain is on its limit, the bound set the width."
+            "or a second phase. If the strain is on its limit, the bound set the width. "
+            "If the fit held the strain rather than refining it (a phase the data cannot "
+            "see, or your own hold), the message says held at: the number is the one the "
+            "fit was given."
         ),
     ),
     "TEXTURE_NOT_POSITIVE": HelpEntry(
