@@ -1,6 +1,6 @@
 # WP-1995 — Soft restraints in a joint fit
 
-Milestone: parametric · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
+Milestone: parametric · Status: 🔄 2026-11-09 — restraints reach a joint fit (PR #PRNUM); the expression penalty task remains
 Depends on: 1964 (the grammar, for the penalty task alone)
 Priority: P2 2026-11-04 — was P3: the parametric milestone takes it, since an expert's restraints stop at the joint fit, and a penalty is how a bound on a nonlinear target can hold
 
@@ -117,7 +117,8 @@ one per pattern.
       expression). Tests: a
       hinge on a target holds it near its bound on a synthetic ramp, and the block joins
       the cross-backend matrix.
-- [ ] Skill: the series/joint reference's restraint row, or "none" and why.
+- [x] Skill: the series/joint reference's restraint row, or "none" and why.
+      None (2026-11-09): see the handover entry.
 
 ## Acceptance
 
@@ -135,6 +136,60 @@ one per pattern.
 
 ## Handover log
 
+- **2026-11-09** — A joint fit now takes a structure's soft restraints. Before,
+  any restraint made a multi-pattern fit raise; now a restraint on the shared
+  structure counts once, however many patterns see it, so it weighs against
+  the data exactly as in a single fit. A restraint that reads a per-pattern
+  parameter (a pattern's zero shift, a bond under a per-pattern cell) holds in
+  each pattern. Each pattern reports its restraints, and a restraint fighting
+  the data is named once or on its pattern's list. The expression penalty
+  (task 6) is not started.
+  - *Done.* Tasks 1-5 and 7, in PR #PRNUM. `_multi_closures` stacks
+    `[data | background penalty | soft restraint]` off `rows.layout`, refusing a
+    non-empty block it does not place (`_JOINT_BLOCKS`). `_joint_restraint_shared`
+    decides once-or-per-histogram per compiled item: shared when every path it
+    reads is bare under `MultiParameterTable.row_path` and no per-histogram row
+    reaches it through `ParameterTable.entry_reach` (free or fixed, so the answer
+    does not move with the free set). Restraint rows carry no `√w_h`.
+    `BlockJacobian` takes `n_restr`, a third stripe. Task 2's decision: a
+    `ValueRestraint` on a per-histogram path is every histogram's own row; a
+    `hist.N.`-scoped path is refused by name. `HistogramResult.restraints` gets
+    its writer, and `RefinementResult.restraints` mirrors histogram 0's.
+    `RESTRAINT_TENSION` is `(HISTOGRAM, SPECIMEN)`, `RESTRAINT_PAIRS_STALE`
+    `SPECIMEN` (histogram 0's copy). Joint compiles now take the stage's
+    `restraint_weight_scale`, which they had dropped (c_w was 1 in every joint
+    stage). Manual: `reference/joint.md` § Soft restraints.
+  - *Task 7, none.* An agent declares restraints and reads `result.restraints`
+    as in a single fit, and the per-pattern placement is in the refusal message
+    and the manual. Under the skill's placement rule nothing earns a row.
+  - *Measured* (Mac arm64, `.venv` `[dev]`, jax 0.12 added for the matrix; the
+    workstation did not answer, so every run here was on the Mac at `-n 2`).
+    Joint fit of one rutile pattern twice at weight ½ against the single fit:
+    O x equal to 3e-13, restraint χ² to 4e-10 relative; the single fit at
+    restraint weight 2 sits 5e-5 away in x, so a twice-counted row is
+    separable. Selection `test_restraints test_parametric_series
+    test_multi_histogram test_multi_diagnostics test_cross_backend`: 468 passed, 111 skipped, 4 xfailed. Fast selection (`-m "not slow"`, `-n 4`): 14535 passed, 244 skipped, 32 xfailed in 11 min (testslot, `-n 4`); the tests added are 4 net in `test_restraints` (one refusal test replaced) and 8 cases in `test_cross_backend` (the restrained state across 7 method rows, one layout test), 1.2 s in all on that run.
+    Cross-backend `-k multi`: 10 passed, 4 skipped (torch absent).
+    `tests.reader_output` exit 0 (unchanged).
+  - *Review.* No `/code-review` (it cannot be pointed at this worktree from a
+    ghostshift runner); an Opus subagent reviewed the diff and found no bugs.
+    Taken: classify through `entry_reach` instead of free-column reach (a held
+    per-histogram body input was misread as shared, and the answer moved with
+    the free set); the `added_columns_gain` docstring; a manual sentence that a
+    pattern's `restraint_chi2` counts the shared rows too. Declined: exact
+    restraint rows in `_stacked_rows`, which only sizes the layout choice.
+  - *Generality.* No `_audit.py` change, no threshold, code, field or default
+    added; the judge was not dispatched. Rows without `√w_h` are the WP's own
+    design (§ The one design decision).
+  - *Overlap.* `multi._build_result` is edited by open PRs #1477, #1405, #1272
+    and #1108 at other lines; `test_cross_backend.py` by #1372 and #1108 at
+    other lines. `reference/joint.md` is also WP-2103's manual task.
+  - Next: task 6, the expression penalty. Two questions decide its shape
+    before code: how its weight relates to the data's (root CLAUDE.md: a
+    penalty's λ is weighed against the data's, √(λ·m)/σ̄) and whether its rows
+    are one per pattern or once per fit; both are the maintainer's to rule if
+    the grammar does not settle them. It reuses `_JOINT_BLOCKS` and
+    `n_restr`'s stripe, or adds a fourth.
 - **2026-11-04** — Moved into the `parametric` milestone and re-rated P2 on the
   maintainer's opening of it, with the expression penalty added. Next: the first task.
 - **2026-10-16** — Renumbered twice as this branch merged main, which took
