@@ -1,8 +1,7 @@
 # WP-2125 — the pattern at values nobody has applied
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — claimed by a ghostshift runner
+Milestone: gui-overhaul · Status: ✅ 2026-11-09 — the route landed; the sliders and previews are the next piece
 Depends on: 2123 soft (the shell the previews draw in)
-Priority: P2 2026-11-09 — the server half of the milestone's fourth piece; the sliders and both previews wait on it
 
 ## Goal
 
@@ -112,11 +111,26 @@ the 100 ms response rule. The slider thumb moves natively with the pointer. The 
 follows whenever an answer lands, so its bar is the round trip: one 16.7 ms frame to follow the
 thumb with at most a frame of lag, and 100 ms as the limit past which it trails visibly.
 
-The server route meets the frame bar on both examples with the compiled tier: about 9-10 ms on
-fluorapatite (evaluation, the window test, the ties and loopback HTTP) and about 1-2 ms on NAC.
-It spends none of it on the page's main thread, where the JavaScript model's 17 ms would sit.
-With the compiled tier off, fluorapatite takes 89-118 ms and misses the frame bar. The tier is a
-hard dependency with a warned fallback, so only an install whose wheel declined sees that.
+The route as built meets the frame bar on both examples, measured through the real server on
+loopback with the compiled tier, 15 requests after 2 warm-ups, alone under the suite lock:
+
+| Request | fap | nac |
+|---|---|---|
+| the last fit's values (`frozen`) | 11.0-15.7 ms | 2.1-2.4 ms |
+| zero shift +1 FWHM (`frozen`) | 10.3-11.3 ms | 2.2-2.4 ms |
+| Caglioti W ×4 (fap `rewindowed`, nac `frozen`) | 13.9-14.8 ms | 2.1-2.5 ms |
+| zero shift +1° (`recompiled`) | 25.4-26.4 ms | 17.9-20.7 ms |
+| in-process at the last fit's values | 10.0-10.6 ms | 1.5-1.6 ms |
+
+The answer body is 205 kB on fap and 885 kB on nac. None of the time is spent on the page's
+main thread, where the JavaScript model's 17 ms would sit. A recompile misses the frame bar and
+stays inside 100 ms; the default slider ranges never reach one. Two cases trail further. On fap
+a position edit of 2 FWHM can add one FCJ node to some reflection and goes `rewindowed`, about
+13-14 ms. On nac an axial S/L moved off zero is `rewindowed` and exact, but one preview takes
+about 140 ms (in-process, not under the lock), because the FCJ images on 22 003 points cost that
+much in any fit. With the compiled tier off, fluorapatite's evaluation alone takes 89-118 ms.
+The tier is a hard dependency with a warned fallback, so only an install whose wheel declined
+sees that.
 
 ### The settlement: the server route
 
@@ -157,8 +171,22 @@ nothing: the project directory, the history and `project.json` stay byte for byt
 
 ### The tier of each rule this WP adds
 
-The three-way choice in step 4 is physics, not judgement. Each branch is the compile's own
-rule (`window_sizing`, the generation margin) asked at the new values. No threshold is new.
+A numerical setting, the first kind of ambiguity: it sets how close the drawn curve is to what
+applying the values would give, and chooses no model. The window and node branches are the
+compile's own sizing rule asked at the new values. The chain rests on two tier-3 rows,
+`WINDOW_MIN_DEG` and `REFLECTION_MARGIN_DEG`, so it is not tier 1 as first written here
+(generality review, 2026-11-09). Two gaps it leaves are stated, not measured:
+
+- The recompile trigger waits until a listed reflection has moved 0.5°. A fresh compile at the
+  new values lists every reflection within 0.5° of the range, so a reflection that started just
+  past the margin and moved inward by δ is missing from a frozen answer. Its tail inside the
+  range sits at least 0.5° − δ from its centre. The default slider ranges move a peak at most
+  0.15°, where the measured cost was 0.019 σ. Moves from 0.15° to 0.5° are not measured.
+- A node count between the compile's and the sizing rule's own count at the base values stays
+  frozen. That error is not measured either.
+
+A wavelength edit keeps the compile's f′ and f″ on the frozen and rewindowed paths. No slider
+in the design moves a wavelength.
 
 ## Non-goals
 
@@ -204,6 +232,63 @@ measured alone, with the compiled tier on.
   asymmetry whose quadrature nodes a frozen model lacks when S/L starts at zero.
 
 ## Handover log
+
+### 2026-11-09 — the route built, reviewed and handed over
+
+The GUI can now ask rietx for the calculated pattern at values nobody has applied, and get it
+back inside one animation frame on both shipped examples. Nothing is written, so a slider can
+drag the model over the data without moving the project or its history. The server route won
+against shipping the prototype's JavaScript peak model: it is exact to rietx's own window
+tolerance, it costs the page's main thread nothing, and it keeps one copy of the physics. The
+sliders and the two previews that draw from it are the next piece, in `gui/src`.
+
+*Done.* Every task, in PR #1479. `POST /api/preview` in `gui/preview.py`, with `GuiSession.preview` and one
+route line; `Refinement._refuse_value_edits`, the check `set_values` and the preview share;
+`CompiledModel.evaluate_parts`, bit-identical to `evaluate`; `_tick_rows(support=False)`; a
+`component=` argument on `window_sizing` for a magnetic family; the route in the GUI reference
+chapter; the hand-fitting survey in `docs/practice.md`. Tests: `tests/test_gui_preview.py`, 29.
+
+*Measured.* The tables in § Context, all `[dev]`, darwin arm64. The route's round trip through
+the real server: fap 10.3-15.7 ms `frozen`, 13.9-14.8 ms `rewindowed`, 25.4-26.4 ms
+`recompiled`; nac 2.1-2.5 ms `frozen`, 17.9-20.7 ms `recompiled`. The timing ran on the tree
+before the review fixes, which add checks only for a magnetic phase. Fast suite: FAST_COUNTS.
+`python -m tests.reader_output` exit 0, unchanged against the merge-base.
+
+*Review.* `/code-review high --fix` found nine problems and fixed six in one commit: a magnetic
+family that grows or appears from zero now forces a recompile; a recompile carries the cached
+compile's orbit split, moment frames and σ; the header names every row an edit moved; a bound
+refusal on the recompiled path is a 400; one context manager sets and restores the table. It
+left two. The preview sends every fitted channel without the curves route's decimation past
+150 000 channels, which is a wire-contract question for the client half. A tied row pushed past
+its bounds is drawn on the frozen and rewindowed paths, not refused, since refusing would
+restate `apply_to_models`' sentence.
+
+*Generality.* The judge rated the evaluation chain weak as a tier claim and the tick flag holds.
+Its sections, unedited in substance: the window branch could not be faulted, because a frozen
+answer is accepted only where each peak's core still fits its frozen window; the recompile
+trigger is looser than a fresh compile's list, leaving an edge gap at moves between 0.15° and
+0.5° that nothing measures; the node-count comparison against the larger of two counts is a
+hysteresis no test covers; the chain rests on two tier-3 rows, so it is not tier 1; no `_audit`
+row is possible, since the table excludes a fallback chain. Author's answer: § The tier of each
+rule now says all of that, and the module docstring no longer claims no threshold is new. The
+tick flag decides nothing anyone reads.
+
+*Settled by Claude.*
+- The server route over the JavaScript model, under the measurements and root CLAUDE.md's one
+  authority for the residual. Alternative: ship the JS model, 2-3 ms a tick, 0.08 esd rms off.
+- The number 2125, as the shift assigned it, though the milestone record claims 22xx for the
+  pieces after the first. Alternative: 2201.
+- The branch starts at WP-2123's filing commit (`e49f3d9c3`), a fast-forward of `main`, so the
+  milestone this file names exists on the branch. Alternative: `Milestone: unscheduled`, moved
+  later.
+- The route is idle-only (409 while a run is in flight), like `report`. Alternative: serve
+  previews during a run off the models a stage is writing.
+
+*Next.* The client half of piece 4 (the Interactive tab, the Pattern and Peaks previews), after
+WP-2123 merges. It should keep one request in flight and send the latest values when it lands,
+so a fast drag never queues. Then piece 5's background matrices route, which this machinery
+does not build. Measuring the edge gap (moves of 0.15-0.5° near a strong reflection at the range
+edge) would lift the chain's tier.
 
 - **2026-11-09** — filed by a ghostshift runner, with the measurements above. No open WP owns
   the route: the milestone record lists piece 4 as not yet filed, and WP-2123 builds the shell

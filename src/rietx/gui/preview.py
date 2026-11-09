@@ -23,8 +23,10 @@ says which in the header's ``evaluated``:
   and reproduced a fresh compile to 1e-13 σ in every case measured.
 - ``frozen`` otherwise: the cached compile, evaluated as it stands.
 
-No threshold here is new: each branch is a compile rule asked at the new
-values. The WP's measurements show why all three exist. A frozen window costs
+The window and node branches are the compile's own sizing rule asked at the
+new values. The recompile trigger is looser than a fresh compile's list: a
+reflection that started just past ``REFLECTION_MARGIN_DEG`` and moved inward by
+less than it is missing (WP-2125 § The tier of each rule). The WP's measurements show why all three exist. A frozen window costs
 at most a few hundredths of an esd across the position sliders, because its
 0.3° slack covers them; the width sliders cost up to 0.26 σ; and an axial
 term switched on from zero has no quadrature nodes in the frozen model, so a
