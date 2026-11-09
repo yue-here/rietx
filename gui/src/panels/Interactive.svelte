@@ -21,7 +21,7 @@
    * the new value is no longer an edit.
    */
   import { untrack } from "svelte";
-  import { unpack } from "rxplot";
+  import type { Curves } from "rxplot";
 
   import { ApiError, api } from "../api";
   import type { HelpCorpus } from "../lib/help";
@@ -128,11 +128,16 @@
     onpending(edits.size);
   });
 
-  const queue = new PreviewQueue<ArrayBuffer>(
-    (values) => api.preview(values),
-    (buffer, _values, sentAt) => {
+  // the chart module is a chunk off the boot path (gui/CLAUDE.md), so its
+  // reader is fetched with the first answer rather than imported here
+  const queue = new PreviewQueue<Curves>(
+    async (values) => {
+      const [buffer, chart] = await Promise.all([api.preview(values), import("rxplot")]);
+      return chart.unpack(buffer);
+    },
+    (curves, _values, sentAt) => {
       error = "";
-      onpreview({ curves: unpack(buffer), sentAt }, "");
+      onpreview({ curves, sentAt }, "");
     },
     (exc) => {
       error = (exc as Error).message;
