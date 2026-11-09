@@ -1,6 +1,6 @@
 # WP-2087 — An opt-in correction the residual asks for names its declaration in the docs
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: 🔄 2026-11-09 — all tasks done (PR #1505); waits on the maintainer's call on the unknown-path error and the printed Biso help text
 Track: What fires, and what stays silent
 Depends on: [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md)
 Priority: P3 2026-11-05 — WP-1944 closed, so nothing blocks it; three opt-in corrections are documented without the declaration a user writes, and nothing is wrong in any number
@@ -107,6 +107,79 @@ rescope does not cover it.
 ```
 
 ## Handover log
+
+- **2026-11-09** — all five tasks done, by a ghostshift runner (PR #1505).
+  A user who reads the help for Stephens strain, an anisotropic
+  displacement tensor, or a negative or very large Biso now finds the
+  declaration that turns the matching correction on, and the misfit that
+  calls for it. Nothing a fit prints changed on the standard fit. The
+  theory page and the extinction module had one bias backwards: an
+  undeclared extinction lowers Biso, and a strong one drives it negative.
+  The parameter map had reached the manual's page-size cap, so it is now
+  two pages, one for the phases and one for the instrument and background.
+
+  *Done.* Extinction direction corrected in `model/extinction.py`'s
+  docstring and the Primary extinction section, cited to Sabine, Von Dreele
+  & Jørgensen (1988, p. 374), with the rutile table in Context. Stephens:
+  `_STEPHENS_S` and the theory section give
+  `StephensStrain.isotropic(1000, phase.cell)`, say `lab_sample_refine`
+  frees it, point at `FitReport.strain`, and name anisotropic size and a
+  too-high symmetry as look-alikes. Anisotropic ADPs: the `adp.*` entry
+  gives `Structure.from_cif(path, aniso=True)` and
+  `AnisoU.isotropic(uiso, phase.cell)`, says the assignment raises while
+  `biso.vary` is True, and says when to try one and when to keep it.
+  `BISO_NEGATIVE` (help entry and skill row) names roughness on a
+  Bragg-Brentano plate, `mu_r` or `capillary_radius_mm` on a capillary,
+  and extinction. `BISO_UNUSUALLY_LARGE` names `mu_t` or `thickness_mm` on
+  a flat plate. The directions are the theory page's. The diagnostics'
+  `suggestion` text is unchanged. Parameter map: `PARAMETER_PAGES` in
+  `docs/reference_pages.py` assigns each group to `parameters.md` or the
+  new `parameters-instrument.md`, and the build raises on a group shown
+  twice, nowhere, or unknown. Before the split the page stood at about
+  49 600 characters against the 50 000 cap, and the Stephens sentence alone
+  broke it; now 25 400 and 24 000. Links to moved anchors are repointed,
+  and nine pages that said the map lists every name now name both. The
+  inherited entries are pruned: the extinction claim folded into Context
+  with its measurement, the unknown-path error moved to Context as
+  waiting on the maintainer.
+
+  *Measured.* Fast suite (`-m "not slow"`), `[dev]` venv, darwin/arm64,
+  through ghostshift's serial queue, alone: 14343 passed, 417 skipped,
+  32 xfailed (passed+skipped 14760). Added: three cases of
+  `test_a_group_shown_twice_or_nowhere_raises`, 0.00 s together. Full
+  suite not run: no measured number can move. `python -m
+  tests.reader_output`: exit 0, unchanged against the merge-base.
+
+  *Review.* `/code-review high --fix` found five, no code bugs: stale
+  links on four more pages (fixed), the ADP entry's biso clause (rewritten:
+  the assignment does raise while `biso.vary` is True, measured, so the
+  reviewer's "already locked" reading holds only after the declaration),
+  the capillary and plate inputs (fixed), "from the residual" for
+  `FitReport.strain` (fixed), and an untested arm of the split check
+  (test added). Declined: `reference/refinement.md` keeps one link to the
+  parameter map, whose intro links the instrument page, because a second
+  link puts that page 51 characters over the cap. Left alone: the
+  `using/glossary` redirect in `docs/docs_versions.py` now lands instrument
+  fragments on the phase page without their anchor.
+
+  *Generality.* The judge (generality-review) returned: items 1, 2 and 6
+  (the two skill rows, the extinction direction) hold; item 3 (the two
+  help entries) holds with two findings, the unsourced "usually" (removed)
+  and that `Diagnostic.explanation` prints under a notebook's `help:`
+  line, so these two entries are printed text the maintainer should see;
+  items 4 and 5 (the ADP and Stephens guidance) weak: the ADP keep test
+  failed near-zero off-diagonal components, the trigger read as X-ray only
+  and required single-crystal work, and the Stephens sentence named one
+  remedy for a symptom anisotropic size and a too-high symmetry share. All
+  three were rewritten as described under *Done*. Neither sentence cites a
+  source; both are rietx's own wording.
+
+  *Next:* the maintainer's two calls. (1) The unknown-path error (Context,
+  "Waiting on the maintainer"): if approved, `refine._path_hint` names the
+  declaration for an opt-in path, as reader output. (2) Whether the
+  `BISO_NEGATIVE` and `BISO_UNUSUALLY_LARGE` help text, which a notebook
+  prints as the diagnostic's explanation, may land as written. With both
+  answered and this PR merged, the WP can close.
 
 - **2026-11-05** — rescoped to documentation pointers only, by WP-1944's
   follow-up session under the maintainer's ruling of 2026-11-04 (quoted in
