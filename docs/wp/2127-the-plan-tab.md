@@ -1,6 +1,6 @@
 # WP-2127 — the Plan tab
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — claimed by a ghostshift runner
 Depends on: 2123 (the layout shell, PR #1476)
 Priority: P2 2026-11-09 — piece 3 of the open gui-overhaul milestone
 
