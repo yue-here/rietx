@@ -172,7 +172,8 @@ def pattern_items(result, wavelength: float, pattern=None
     # Without the pattern, the measured range is the one the result recorded
     # at fit time (WP-2075), when it recorded one: the loop then holds the
     # fitted points alone, and the file's range and count still say what was
-    # measured.  No step is written, since the grid itself is not at hand.
+    # measured, so ``_pd_meas_number_of_points`` may exceed the loop's rows.
+    # No step is written for a cut fit, the measured grid not being at hand.
     record = getattr(result, "fit_range", None) if pattern is None else None
     if record is not None:
         meas_n, (meas_lo, meas_hi) = record.n_file, record.file_range
@@ -183,7 +184,8 @@ def pattern_items(result, wavelength: float, pattern=None
         ("_pd_meas_2theta_range_min", number("_pd_meas_2theta_range_min", meas_lo)),
         ("_pd_meas_2theta_range_max", number("_pd_meas_2theta_range_max", meas_hi)),
     ]
-    step = _constant_step(tt) if record is None else None
+    # the loop is the whole file only where nothing was cut
+    step = _constant_step(tt) if record is None or not record.outside else None
     if step is not None:
         pairs.append(("_pd_meas_2theta_range_inc", _g(step)))
     pairs += [

@@ -6027,24 +6027,8 @@ class Refinement:
                 cell_runaway=answer_runaway,
                 significance=answer_significance,
                 phase_support_sigma=plan.phase_support_sigma)
-            # WP-2075: the one place the whole pattern is at hand, so the one
-            # place the result can say which part of it was fitted.
-            from .report.fit_range import (
-                describe_outside,
-                fit_range_record,
-                model_reflections,
-            )
-
-            fit_range = fit_range_record(data, two_theta_limits)
-            if fit_range.outside:
-                answer = table.decode(outcome.theta)
-                fit_range = describe_outside(
-                    fit_range, data, two_theta_limits,
-                    self.result_.y_background,
-                    model_reflections(model, answer,
-                                      [p.name for p in self.structure.phases]),
-                    model.generation_window(answer))
-            self.result_.fit_range = fit_range
+            self._attach_fit_range(data, two_theta_limits, model, table,
+                                   outcome.theta)
             # beside result_, never at entry: a call that is cancelled or fails
             # leaves the previous result and the pattern it was fitted to
             self._fit_pattern = data
@@ -6667,6 +6651,7 @@ class Refinement:
                 declared_wavelengths=declared_wavelengths,
                 significance=hold.significance,
                 phase_support_sigma=phase_support_sigma)
+            self._attach_fit_range(data, ttl, model, table, outcome.theta)
             # beside result_, never at entry: a call that is cancelled or fails
             # leaves the previous result and the pattern it was fitted to
             self._fit_pattern = data
@@ -6704,6 +6689,32 @@ class Refinement:
                 self._orbit_split = None
             if recorder is not None:
                 recorder.close()
+
+    def _attach_fit_range(self, data: PatternData,
+                          two_theta_limits: tuple[float, float] | None,
+                          model, table, theta) -> None:
+        """Set ``result_.fit_range`` (WP-2075): which part of ``data`` the
+        result fitted, and what lies outside each cut.
+
+        Called by the two builders that hold the whole pattern, ``fit``'s
+        pass and ``run_stage``; a result has only its fitted channels and
+        ``report()`` no pattern, so nowhere else can say a cut happened.
+        """
+        from .report.fit_range import (
+            describe_outside,
+            fit_range_record,
+            model_reflections,
+        )
+
+        fit_range = fit_range_record(data, two_theta_limits)
+        if fit_range.outside:
+            answer = table.decode(theta)
+            fit_range = describe_outside(
+                fit_range, data, two_theta_limits, self.result_.y_background,
+                model_reflections(model, answer,
+                                  [p.name for p in self.structure.phases]),
+                model.generation_window(answer))
+        self.result_.fit_range = fit_range
 
     def _stamp(self, result: RefinementResult, tree: RefinementTree | None) -> None:
         if tree is not None:

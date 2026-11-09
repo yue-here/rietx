@@ -174,19 +174,22 @@ def _pv_cdf(x: float, pos: float, fwhm: float, eta: float) -> float:
 
 def _slope(x: np.ndarray, y: np.ndarray) -> float | None:
     """The least-squares slope of ``y`` on ``x``, as a fraction of ``y``'s
-    mean per unit ``x``; ``None`` under two distinct abscissae or a mean of
-    zero."""
+    mean per unit ``x``; ``None`` under two distinct abscissae or a mean
+    that is not positive."""
     if x.size < 2 or float(np.ptp(x)) == 0.0:
         return None
     mean = float(np.mean(y))
-    if mean == 0.0:
+    if mean <= 0.0:
         return None
     return float(np.polyfit(x, y, 1)[0] / mean)
 
 
 def _ratio(values: np.ndarray, ref: float) -> float | None:
+    """The median of ``values`` over ``ref``; ``None`` with no values or a
+    reference that is not positive (background-subtracted data), where a
+    ratio would flip sign or blow up."""
     return (float(np.median(values) / ref)
-            if values.size and ref != 0.0 else None)
+            if values.size and ref > 0.0 else None)
 
 
 def describe_outside(record: FitRange, data: PatternData,
@@ -273,4 +276,6 @@ def describe_outside(record: FitRange, data: PatternData,
                 facts["reflections_searched"] = ((float(lo), float(hi)) if lo <= hi
                                                  else None)
         spans.append(span.model_copy(update=facts))
-    return record.model_copy(update={"outside": spans})
+    return record.model_copy(update={
+        "outside": spans, "cut_window_deg": CUT_WINDOW_DEG,
+        "straddle_fwhm": STRADDLE_FWHM if reflections is not None else None})

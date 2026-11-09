@@ -2151,14 +2151,21 @@ class OutsideSpan(Base):
     * ``peak_two_theta`` / ``peak_sigma``: the span's largest excess over the
       rolling low-quantile envelope
       (:func:`~rietx.background.diagnostics.background_envelope`), in σ, and
-      where it is: the largest peak-like feature left out;
+      where it is.  A location, not a detection: the envelope is a low
+      quantile and sits under the background, and the largest of N channels
+      exceeds any one, so a featureless span still reads several σ here;
+      compare spans, or read the value against the same number inside the
+      fitted range, never against a fixed bar;
     * ``reflections``: every reflection the fitted model generated with its
       centre in the span or within
       :data:`~rietx.report.fit_range.STRADDLE_FWHM` FWHM of a cut, with the
-      share of its profile in the span.  ``reflections_searched`` is the part
-      of the span the model's reflection list covers: every interior band, but
-      past a range end only the model's generation margin, so an empty list
-      beyond it says nothing about reflections further out.
+      share of its profile in the span.  The list ignores intensity, and a
+      declared sharp peak (``PeakComponent``) is not in it.
+      ``reflections_searched`` is the part of the span the model's reflection
+      list covers, approximately (the generation window is a Bragg angle at
+      the shortest line): every interior band, but past a range end only the
+      model's generation margin, so an empty list beyond it says nothing about
+      reflections further out.
 
     A fact the span cannot give is ``None``: a window holding fewer than two
     channels, or a fit with no compiled model behind it.
@@ -2193,6 +2200,11 @@ class FitRange(Base):
     count of fitted channels (``n_fitted``, equal to ``len(result.two_theta)``),
     and the summed observed intensity in the file and in the fitted channels.
 
+    ``cut_window_deg`` and ``straddle_fwhm`` are the two reporting widths
+    the spans' facts were read with (``None`` where nothing was cut, or no
+    reflection list was at hand), so a stored result says what "at the cut"
+    meant when it was written.
+
     ``outside`` holds one :class:`OutsideSpan` per stretch the fit left out:
     empty when nothing was cut, which is the one case where ``fitted_range``
     equals ``file_range`` with nothing else to say.  Before WP-2075 a result
@@ -2201,8 +2213,8 @@ class FitRange(Base):
 
     Every angle is in degrees 2θ (``fit`` is a 2θ-only entry).  ``None`` on
     the result for anything not built by :meth:`Refinement.fit
-    <rietx.refine.Refinement.fit>`: a joint multi-histogram fit, a replay, a
-    result written before schema 0.61.
+    <rietx.refine.Refinement.fit>` or ``run_stage``: a joint multi-histogram
+    fit, a replay, a result written before schema 0.61.
     """
 
     file_range: tuple[float, float]
@@ -2216,6 +2228,8 @@ class FitRange(Base):
     counts_file: float
     counts_fitted: float
     outside: list[OutsideSpan] = Field(default_factory=list)
+    cut_window_deg: float | None = None
+    straddle_fwhm: float | None = None
 
     @property
     def count_share_outside(self) -> float:
@@ -2497,9 +2511,10 @@ class RefinementResult(Base):
         return value
 
     #: Which part of its file the fit fitted, and what lies outside each cut
-    #: (WP-2075) — see :class:`FitRange`.  Written by ``Refinement.fit``, the
-    #: one place the whole :class:`~rietx.schemas.pattern.PatternData` is at
-    #: hand; ``None`` for any other result and for one written before 0.61.
+    #: (WP-2075) — see :class:`FitRange`.  Written by ``Refinement.fit`` and
+    #: ``run_stage``, the places the whole
+    #: :class:`~rietx.schemas.pattern.PatternData` is at hand; ``None`` for
+    #: any other result and for one written before 0.61.
     fit_range: FitRange | None = None
 
     # Per-histogram slices of a multi-histogram joint refinement (WP-0308);

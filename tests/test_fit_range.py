@@ -239,3 +239,30 @@ def test_c8_half_of_420_is_outside_at_its_centre_and_more_below_it(c8):
     assert 0.4 < at_centre.fraction_outside < 0.6
     assert below.fraction_outside > at_centre.fraction_outside
     assert below.fraction_outside > 0.75
+
+
+def test_the_record_carries_the_widths_its_facts_were_read_with(uncut, cut):
+    from rietx.report.fit_range import CUT_WINDOW_DEG, STRADDLE_FWHM
+
+    _ref, result = uncut
+    assert result.fit_range.cut_window_deg is result.fit_range.straddle_fwhm is None
+    _data, _ref, result = cut
+    assert result.fit_range.cut_window_deg == CUT_WINDOW_DEG
+    assert result.fit_range.straddle_fwhm == STRADDLE_FWHM
+
+
+def test_run_stage_keeps_the_record(cut):
+    data, _ref, result = cut
+    ref, _ = _fit(data, LIMITS)  # its own fit: run_stage moves the shared one
+    ref.run_stage(data, rx.Stage("scale", ["phases.*.scale"]), two_theta_limits=LIMITS)
+    assert ref.result_.fit_range is not None
+    assert ref.result_.fit_range.n_fitted == result.fit_range.n_fitted
+    assert f"    {ref.result_.fit_range.line()}" in ref.summary().splitlines()
+
+
+def test_an_uncut_pdcif_without_the_pattern_keeps_its_step(uncut):
+    from rietx.io.cif.powder import pattern_items
+
+    _ref, result = uncut
+    pairs = dict(pattern_items(result, 0.4139)[0])
+    assert "_pd_meas_2theta_range_inc" in pairs
