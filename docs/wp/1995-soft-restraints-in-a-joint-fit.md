@@ -1,6 +1,6 @@
 # WP-1995 — Soft restraints in a joint fit
 
-Milestone: parametric · Status: 🔄 2026-11-09 — restraints reach a joint fit (PR #PRNUM); the expression penalty task remains
+Milestone: parametric · Status: 🔄 2026-11-09 — restraints reach a joint fit (PR #1492); the expression penalty task remains
 Depends on: 1964 (the grammar, for the penalty task alone)
 Priority: P2 2026-11-04 — was P3: the parametric milestone takes it, since an expert's restraints stop at the joint fit, and a penalty is how a bound on a nonlinear target can hold
 
@@ -144,7 +144,7 @@ one per pattern.
   each pattern. Each pattern reports its restraints, and a restraint fighting
   the data is named once or on its pattern's list. The expression penalty
   (task 6) is not started.
-  - *Done.* Tasks 1-5 and 7, in PR #PRNUM. `_multi_closures` stacks
+  - *Done.* Tasks 1-5 and 7, in PR #1492. `_multi_closures` stacks
     `[data | background penalty | soft restraint]` off `rows.layout`, refusing a
     non-empty block it does not place (`_JOINT_BLOCKS`). `_joint_restraint_shared`
     decides once-or-per-histogram per compiled item: shared when every path it
