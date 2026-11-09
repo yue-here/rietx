@@ -1,0 +1,170 @@
+# WP-2127 — the Plan tab
+
+Milestone: gui-overhaul · Status: ⬜
+Depends on: 2123 (the layout shell, PR #1476)
+Priority: P2 2026-11-09 — piece 3 of the open gui-overhaul milestone
+
+## Goal
+
+The Plan tab in `rietx gui` reads as a recipe, top to bottom, one stage per row: first the
+plan frees these parameters, then those. Each stage shows the parameters it takes out of the
+user's hands. A three-line handle reorders stages by drag, a plan menu chooses a preset from
+`PLAN_INFO`, and a person can build a plan: add and remove stages, add and remove a stage's
+globs. Plan edits ride the action bar the shell built, so one Apply saves them and one Refine
+runs them. The tab runs on the existing routes: `GET`/`PUT /api/plan`, `GET /api/plan/resolve`
+and `POST /api/run` with kind `stage` or `fit`.
+
+## Context
+
+### Where the tab is today
+
+`gui/src/panels/Plan.svelte` (WP-1011, WP-1208) draws a preset `<select>`, `Run all`, and while
+the plan is edited `Save plan` and `Revert`. Under them sit three paragraphs of explanation, the
+preset's description and the free count at the end. Each stage is a bordered card: a `⠿` grip
+for HTML drag-and-drop, the name, a × that removes the stage, a comma-separated glob field
+labelled `frees`, and a ladder line (`+2 → 2 free · Rwp 95.35%`) that opens to the paths the
+stage frees, those already free and those it matches but holds. Every resolved fact hides the
+moment the plan on screen differs from the server's. `Run this stage` sends the stage as it
+stands on screen. Advanced mode adds a box per `StageSpec` field and the correlation guard.
+
+The shell (WP-2123, PR #1476) put an action bar under every right-hand tab. It applies the
+Parameters panel's pending edits and refines, one cycle on the ticked set or the staged plan.
+The plan's edits do not ride it yet: the tab keeps its own Save, and the milestone's owed list
+records that a run started from the Plan tab does not apply the Parameters edits waiting in the
+bar.
+
+### The designs, and the rulings they rest on
+
+The maintainer designed the overhaul with Claude in twelve rounds of prototypes between
+2026-11-06 and 2026-11-08 and reviewed each on screen. The prototypes are not published, so each
+design this WP builds is restated here with its ruling.
+
+1. **The plan shows which parameters it takes out of the user's hands, and users can build
+   plans.** Ruled 2026-11-07 (fourth review). In rietx a plan replaces the vary flags: `fit`
+   starts every plan from a table where nothing is free and frees only what the stages name
+   (`_prepare_table(restore=False)`, WP-1208). So a stage's freed list is exactly what the plan
+   decides on the user's behalf, and `set_aside` names the hand-freed rows the plan will hold.
+2. **The plan has its own tab and reads as a recipe.** Ruled 2026-11-07 (fifth review): "Humans
+   will read it as a list/recipe. First we free x, then y, then z." One stage is one row, read
+   top to bottom.
+3. **A drag handle of three stacked lines reorders stages, and a plan menu chooses plans.** Ruled
+   2026-11-07 (sixth review). In the prototype the handle also answers the arrow keys when
+   focused, the lifted stage follows the pointer and the others slide aside.
+4. **A stage may fix as well as free.** Ruled 2026-11-07 (sixth review). Not built here: see
+   *Waiting on the maintainer* below.
+5. **No permanent explanatory text.** Ruled 2026-11-07 (sixth review), repeated 2026-11-08
+   ("again, too much AI prose"): an explanation lives in a tooltip or a help box. Today's three
+   paragraphs go.
+6. **A choice must not look like an action.** Ruled 2026-11-07 (fifth review). The workshop's
+   handover named the clash it leaves here: the prototype's stage items are removable chips, and
+   `gui/CLAUDE.md` says a `.chip` never acts and a verb on a chip sits beside it. So a glob is a
+   chip, a fact, and its × is a `button.ghost` beside it.
+7. **The panel ends in Apply and "Apply and refine".** Ruled 2026-11-07 (fourth review), built
+   by WP-2123. In the prototype an edited plan counts as one pending edit in that bar, Apply
+   saves it and Revert drops it.
+8. **No click moves the layout unless it asks to.** Ruled 2026-11-07 (third review), adopted as
+   interaction rule 8 on 2026-11-08. Adding and deleting a stage, opening a stage's path list
+   and the drag ask; editing a name or a glob, choosing a preset and pressing a stage's run
+   button do not.
+9. **Every edit can be undone.** Adopted as interaction rule 10 on 2026-11-08. Plan edits are
+   settings in `project.json` and make no history node, so undo here is the panel's own stack.
+
+A browser check clicks as a person does (`page.click`, `page.mouse`, `page.keyboard`), and the
+drag is a real `page.mouse` drag. The server serves the committed dist, so every browser pass
+follows `npm --prefix gui run build`.
+
+### Rulebook seams
+
+- **Registers** (`gui/CLAUDE.md` § House style): size, padding and radius belong to the register.
+  The grip is not a button register; it is a focusable handle drawn by the panel.
+- **The ladder** (`gui/CLAUDE.md`, WP-1208): the numbers come from `GET /api/plan/resolve`,
+  never from the client's fnmatch port. A dirty plan has no resolved facts. This WP narrows that
+  to the stages that changed: a stage's facts depend only on the stages up to it, so the leading
+  stages that equal the saved plan's keep theirs.
+- **Help keys** (`lib/help.test.ts`): `plans:{chosen.name}` and `stage_fields:{key}` stay.
+- **One authority per plan**: `ProjectDoc.plan`, written by `PUT /api/plan`. The panel holds an
+  unsaved copy and nothing else.
+
+### Waiting on the maintainer: a stage that fixes
+
+The maintainer ruled on 2026-11-07 that a stage may fix as well as free. In rietx that is a
+stored-format change, so it waits for a go-ahead and its own WP. The fields it would add:
+
+- `StageSpec.turn_off: list[str] = []` in `src/rietx/schemas/plan.py`, dot-path globs this
+  stage fixes after it frees `turn_on`, and the same field on the `Stage` dataclass
+  (`strategy/staged.py`), validated through `PlanSpec`/`StageSpec` as today.
+- In `.rxt`, a `fix <globs>` clause on a stage line after `free` (`gui/textdoc.py`; the stage
+  keys derive from `StageSpec`, and `lib/rxt.ts`'s stage words follow by pin).
+- In `GET /api/plan/resolve`, a per-stage `fixes` list beside `frees`, `already` and `held`.
+- The record of what a stage ran: `StageResult` and the `stage` history node's `NodeAction`
+  carry `turn_off` beside `turn_on`, or a replay or cherry-pick frees what the run fixed.
+
+A file carrying `turn_off` would not open in an older rietx (`extra="forbid"`), which is what
+makes it a stored-format change.
+
+### The tier of each rule this WP adds
+
+None is a heuristic in the sense of `docs/milestones/generality.md` § The rule: nothing here
+reads the data or decides for a fit. The resolved facts stay the server's.
+
+### Calls settled by Claude
+
+No ruling covered these, so each took the smallest neutral option. Each is "settled by Claude,
+reversible", with its alternative, and waits for the maintainer's review of the PR.
+
+(Filled as the checklist lands.)
+
+## Non-goals
+
+- A stage that fixes (above).
+- Saving a plan under a name of the user's own. The prototype's menu had "Save as new plan…" and
+  "Delete this plan"; rietx stores one plan per project and has no store for named plans.
+- The prototype's picker, which offers named groups ("Cell (2)", "All Biso") and moves a
+  parameter from any other stage. It needs family names the corpus has as labels and a route
+  for the refinable set. Typing a glob is the route here.
+- A "never freed" row. It needs the refinable set, which `GET /api/plan/resolve` does not serve.
+- Stage badges in the Parameters panel (piece 2, WP-2126).
+
+## Tasks
+
+- [ ] File the WP.
+- [ ] `lib/plan.ts`: moving a stage, the drop index from row midpoints, the resolved prefix, the
+  undo stack, adding and removing a glob; with vitest.
+- [ ] The tab redrawn as a recipe: the plan bar (preset menu, + Stage), one row per stage (grip,
+  number, name, run, ×), the glob chips with × beside them and an add field, the ladder line,
+  the closing stage, the set-aside list; no permanent text.
+- [ ] The grip: pointer drag with the lifted row following the pointer, arrow keys when focused.
+- [ ] Plan edits in the action bar: one pending edit, Apply saves, Revert drops, Refine applies
+  first; `Run this stage` applies the Parameters edits first; `Save plan`, `Revert` and
+  `Run all` retired from the tab.
+- [ ] Undo and redo of plan edits: ⌘Z and ⇧⌘Z in the tab outside a text field, and the palette.
+- [ ] The layout browser test extended to the Plan tab: every control clicked, a real drag.
+- [ ] The dist rebuilt; the GUI chapters and the screenshots the tab changes.
+- [ ] Skill: none expected. The agent skill drives the python API, and no route changes.
+
+## Acceptance
+
+```sh
+npm --prefix gui ci && npm --prefix gui run build
+npm --prefix gui test && npm --prefix gui run check
+.venv/bin/python -m pytest tests/test_gui_layout_browser.py tests/test_gui_browser.py tests/test_gui_manual.py tests/test_gui_palette.py tests/test_gui_dist.py
+.venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
+.venv/bin/python -m ruff check src tests examples
+```
+
+The layout-shift test reports no unasked-for movement on the Plan tab, a real drag reorders a
+stage, and the milestone's row 8 (a five-stage plan read top to bottom) holds in a browser pass.
+
+## References
+
+- The maintainer's rulings of 2026-11-07 and 2026-11-08, restated above with their dates.
+- WP-1208 (the ladder), WP-2123 (the shell).
+- `docs/practice.md` § Staging and what a stage holds: MAUD's refinement wizard is the one
+  surveyed program that offers cumulative stages in a GUI. § The window layout of a GUI.
+
+## Handover log
+
+- **2026-11-09** — filed by a ghostshift runner as piece 3 of the gui-overhaul milestone. No
+  open WP owned the Plan tab: WP-2123 lists it as a non-goal and WP-2126 is the Parameters panel.
+  The milestone claims 22xx for its later pieces, and the shift numbered this one 2127, after
+  2125 and 2126, which other runners filed the same day. Next: start the checklist.
