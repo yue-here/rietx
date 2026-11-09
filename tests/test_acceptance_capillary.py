@@ -250,3 +250,23 @@ def test_the_absorption_shift_is_independent_of_dispersion(plain):
     b_la_disp, b_la_plain = _bisos(ref_a)[0], _bisos(ref_nodisp)[0]
     assert b_la_disp - b_la_plain < -2.0 * predicted, (
         f"dispersion moved B(La) by {b_la_disp - b_la_plain:.4f}, expected ≈ −0.044")
+
+
+def test_the_result_records_both_cuts_and_the_lines_above_60_degrees(plain):
+    """WP-2075 on real data: the suite's limits cut both ends of the file,
+    and the stretch above 60° holds lines the fit never saw (issue #1219)."""
+    data = rx.read_pattern(DATA / "11BM_LaB6_660a.fxye")
+    _ref, result = plain
+    fr = result.fit_range
+    assert fr.file_range == (data.two_theta[0], data.two_theta[-1])
+    assert fr.n_file == len(data.two_theta)
+    assert fr.limits_requested == fr.limits_applied == LIMITS
+    assert fr.n_fitted == len(result.two_theta)
+    below, above = fr.outside
+    assert (below.kind, above.kind) == ("below", "above")
+    assert below.lo == data.two_theta[0] and below.hi < LIMITS[0]
+    assert above.lo > LIMITS[1] and above.hi == data.two_theta[-1]
+    assert below.count_share > 0.0 and above.count_share > 0.0
+    # the strongest peak-like feature past the upper limit is a line
+    assert above.peak_two_theta > LIMITS[1]
+    assert above.peak_sigma > 5.0

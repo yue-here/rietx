@@ -100,9 +100,14 @@ chunk 2 is computed there.
       stretches from `fit_range`; no `_inc`, the grid not being at hand.)
 - [ ] Optional, only if ruled: DW and the Bérar–Lelann factor per contiguous fitted run, as
       `_pooled_durbin_watson` already does; goldens re-pinned under the root rule.
-- [ ] Tests: the issue's C7 cut at 22° and C8 limit at the (420) centre; a fit with no limits
+- [x] Tests: the issue's C7 cut at 22° and C8 limit at the (420) centre; a fit with no limits
       prints equal ranges; SRM 1976a and 11-BM LaB6 660a with their acceptance limits.
-- [ ] Skill: the reference row for `fit_range` if an agent reads it to judge a cut; else none.
+      (2026-11-09: `tests/test_fit_range.py` — C7 at all five cuts, C8 at 0 and −0.5 FWHM;
+      one row each in `test_acceptance_srm1976a_texture.py` and `test_acceptance_capillary.py`
+      on the suites' own fits.)
+- [x] Skill: the reference row for `fit_range` if an agent reads it to judge a cut; else none.
+      (2026-11-09: none. `summary()` prints the range line, and the package's own output is
+      the cheapest place that holds it, WP-1338.)
 
 ## Acceptance
 
