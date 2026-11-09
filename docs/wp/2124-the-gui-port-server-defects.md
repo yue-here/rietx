@@ -107,12 +107,16 @@ Left for later port WPs (not here):
 
 ## Tasks
 
-- [x] 1. The extinction screen runs on a project with no phase. Take `extinction` out of the refusal; the message then reads "a fit/stage/series run". Test: a pattern-only project screens a candidate and gets classes back.
-- [x] 2. Adopt takes any candidate. `index_adopt` drops `ADOPT_GATED`; an unpicked candidate's label records "not the gate's pick", its grade and its caveats. The `adopt` arm per row: `allowed` keeps the gate's pick for the old panel, `picked` says the same under its true name, `note` is the sentence the node will record. Tests: adopt a `low` candidate, read the node label.
+- [x] 1. The extinction screen runs on a project with no phase. Take `extinction` out of the refusal, which leaves it only fit, stage and series, so it can no longer read "a extinction run". Test: a pattern-only project screens a candidate and gets classes back.
+- [x] 2. Adopt takes any candidate. `index_adopt` drops `ADOPT_GATED`; an unpicked candidate's label records "not the gate's pick", its grade and its caveats. The `adopt` arm per row: `allowed` keeps the gate's pick for the old panel, `picked` says the same under its true name, `why` is the sentence the node will record. Tests: adopt a `low` candidate, read the node label.
 - [x] 3. The pick route takes `two_theta_range` and `flag_contamination` beside `shoulders`; `pick_options` records all three, and the editor's later refits use the detection and marks the stored list was picked with. Tests: a narrowed range, contamination off and kept off through an edit.
-- [ ] 4. Lattice relations between candidates ("c doubled", "a × √3", "same cell"): measure how many of FAP's candidates `supercell_checks` relates under the GUI's default search. Take it only if the fix is clear-cut inside `indexing/`; otherwise file it here as a follow-up line.
-- [ ] Tests: the GUI manual and route partition tests where a route's contract changed.
-- [ ] Skill: none expected. The skill drives the python API, whose `best_or_none()` and `pick_peaks` do not change.
+- [x] 4. Lattice relations between candidates ("c doubled", "a × √3", "same cell"): measured, not taken. The premise is stale: under the GUI's default search on `63d7c120a`, 8 of FAP's 12 candidates carry a `supercell_checks` entry, not 2. What stays unnamed is a different relation, and naming it is a new field, so it goes to the follow-up below.
+- [x] Tests: `test_gui_manual.py` and `test_manual_api.py` pass unchanged. No route was added or renamed; the `adopt` arm gained `picked` and the pick route three body keys.
+- [x] Skill: none. The skill drives the python API, whose `best_or_none()` and `pick_peaks` do not change.
+
+### Follow-up, not taken here
+
+- **Name the relation between candidates.** On FAP's default search (122.6 s, cubic, hexagonal and trigonal searched, trigonal stopped early) four of 12 candidates carry no relation: rank 1 (a = 9.374, c = 13.825, c × 2.007 of rank 0), rank 2 (rank 0's metric labelled trigonal), rank 3 (within 0.06 % of rank 0) and rank 11 (a × 1.732, c +0.15 % of rank 0). The eight that do carry one say only `index` and the parent's cell, not which axis multiplied. Two kinds are missing. A same-metric relation ("same cell, trigonal setting", "within 0.2 %") is no supercell, so `SupercellCheck` cannot hold it. A worded transform ("c doubled", "a × √3") needs the sublattice's matrix, which the check does not keep. Either is a new field on `CellCandidate`, which changes what an indexing answer hands a reader (Yue's ruling of 2026-11-01), and the words are a name on the main user surface. Round 11 of the workshop computes them from the a and c ratios, for hexagonal axes only. It belongs to whichever gui-overhaul piece redraws the candidate table.
 
 ## Acceptance
 
