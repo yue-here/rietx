@@ -41,6 +41,9 @@ Measured on 2026-11-03, on a seven-pattern synthetic LaB₆ ramp and by reading 
   now held inside its bounds at every step, so the raise is left to TRF and to an
   `"expression"` equation. 1325's handover entry asks the maintainer whether the
   warning stays, goes, or replaces the raise. Rewrite that section once they rule.
+  Done in 1325's PR #1497 (2026-11-09): the warning replaces the raise, settled by
+  Claude, and that section and `help.py`'s entry now say a TRF or expression fit
+  finishes with it. Nothing is left here.
 
 ## Non-goals
 

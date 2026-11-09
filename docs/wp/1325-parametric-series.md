@@ -1,6 +1,6 @@
 # WP-1325 — parametric series: a parameter as a function of each pattern's coordinates
 
-Milestone: parametric · Status: 🔄 2026-11-09 — both remaining tasks landed (PR #1497); two questions wait on the maintainer: PARAMETRIC_OUT_OF_RANGE never fires, and how a held tied bound is reported
+Milestone: parametric · Status: 🔄 2026-11-09 — both remaining tasks landed and the maintainer's three questions answered (PR #1497, ready for merge); (a) and (b) settled by Claude, (c) ruled by Yue
 Depends on: — (1119 soft: a named coefficient is a named variable)
 Priority: P2 2026-10-14 — was P3: the maintainer took the combinatorial-library case (the first named outside user) and the scalable solver it needs; 1962 waits on that solver
 
@@ -1296,6 +1296,12 @@ Their numbers are as reported and were not re-measured here.
   A joint fit's held steps now reach `CONSTRAINT_ACTIVE`, and the out-of-range
   test reads a value on its face as inside. TRF still raises.
   `tests/test_tied_bound_rows.py`.
+
+  Amended 2026-11-09 (eleventh session): TRF and an `"expression"` target no
+  longer raise. The joint write-back clamps the target into the model at the
+  bound it crossed, and `PARAMETRIC_OUT_OF_RANGE` reports the equation's value,
+  so "TRF keeps the post-fit warning" now holds. A tied value the LM step
+  holds on its limit is a `BOUND_HIT`/`FLOOR_HIT` naming its path.
 - [x] **Per-pattern starting structures agree beyond their parameters.**
   `_starting_structures` checks the phases, space groups and sites, and
   `_check_starts_agree` the shared values. Fields that are not parameters
@@ -1709,6 +1715,87 @@ Their numbers are as reported and were not re-measured here.
   Schur identity), issue #212.
 
 ## Handover log
+
+### 2026-11-09 (eleventh session) — the maintainer's three questions answered
+
+The tenth session left three questions on PR #1497. A ghostshift runner
+answered them on the same branch. Answer (c) is the maintainer's ruling.
+Answers (a) and (b) are settled by Claude: they are evidence, not rulings, and
+the maintainer may reverse either.
+
+**(c) `TIED_BOUND_MARGIN` moves to tier 3. Ruled by Yue 2026-11-09.** The audit
+row now reads `tier=3`, with the generality review's reason as its grounds and
+`approved="2026-11-09"`.
+
+**(a) A TRF or expression fit finishes and carries `PARAMETRIC_OUT_OF_RANGE`.
+Settled by Claude under the root CLAUDE.md's Stephens-cone precedent and the
+declared-name rule (WP-1076).** The precedent: the default LM driver holds a
+constraint inside the step, and where LM cannot hold it (TRF, a joint fit
+without the cone) it becomes a guard diagnostic. The declared-name rule: a code
+no live path produces is a false claim, and this one had never fired.
+
+- `ParameterTable.apply_to_models` takes `clamp=`, paths whose value past its
+  own bounds is written at the bound it crossed instead of refused. A
+  `Parameter` validates its bounds, so the model cannot hold the value at all.
+- `MultiParameterTable.apply_to_models` passes each histogram's parametric and
+  expression targets. The table keeps the equation's value, so the result's
+  rows carry it and the warning quotes it.
+- The warning's message adds "The model there holds the bound the value
+  crossed." Its docstring, `help.py` entry, the manual's § Range and visibility
+  warnings and the skill's row say when it fires.
+- Every other path still refuses, the single fit's multi-source tie under TRF
+  included.
+- Under the default LM driver the in-step row holds a linear target, so the
+  warning cannot fire there by construction.
+
+**(b) A tied value held on its own limit is a `FLOOR_HIT` or `BOUND_HIT`
+warning naming its path. Settled by Claude under the one-bound-test rule** (one
+test, `staged.bound_findings`, feeds both the diagnostics and `at_bound`)
+**and the guard rule that every diagnostic carries its paths in `where`.** It
+mirrors the free-parameter case: same codes, same level, same suggestion.
+
+- `staged.tied_bound_findings` is the tied entry's half of the bound test. It
+  takes `bound_findings`' conjunction, read for a row. The row shaped at least
+  one step (its label in `truncated_by`, read by `staged.pressed_tied_paths`),
+  and the value at the answer sits within `BOUND_HIT_ESD_FRAC` (a hundredth) of
+  its own esd of the limit. No new number: the face's margin is 1e-9 of the
+  row's scale, far inside that window. No esd declines the entry, since a
+  distance alone is the test WP-1434 retired.
+- `GuardFinding.tied_at_bound` builds the finding. Its `detail` reads "(a tied
+  value, held there inside the step, N esd from the limit)".
+- `check_guards` adds the findings for a single fit, building the tied esds
+  only when a tied row pressed. The joint fit adds them per histogram, a
+  shared entry once and unprefixed.
+- `RefinedParameter.at_bound` reads `True` on a held tied row, where it read
+  `None`. A tied row the step did not hold still reads `None`.
+- `CONSTRAINT_ACTIVE` is unchanged: `info`, no `where`. It still says the
+  driver held steps on a named constraint.
+
+**Siblings fixed.** `reference/refinement.md` § Solver counts listed three
+inequalities and said the count is 0 in a joint fit; both were stale since
+WP-2002 and the tenth session. It now lists the five and drops the joint-fit
+clause.
+
+**Not generalised, on purpose.** The single fit's multi-source tie under TRF
+still raises at write-back: it has no warning code, and a new one is new
+vocabulary nobody asked for.
+
+**Measured** (macOS arm64, the worktree's own `[dev]` venv).
+
+- The five-pattern Biso ramp under TRF now finishes: Biso −0.144, 0.063,
+  0.270, 0.477, 0.684 Å², Rwp 0.048 on pattern 0, `PARAMETRIC_OUT_OF_RANGE` on
+  `hist.0.phases.0.atoms.0.biso`, `BISO_NEGATIVE` and `PARAMETRIC_FORM_REJECTED`
+  beside it. On the tenth session's tree it raised.
+- Under LM the same ramp carries `FLOOR_HIT` on `hist.0.phases.0.atoms.0.biso`,
+  and the single-fit two-source tie carries `FLOOR_HIT` on
+  `phases.0.atoms.1.biso`, each with `at_bound is True`.
+- Fast selection on 7b90adad3 (the merged tree, run alone through the serial queue): 14 388 passed, 417 skipped, 32 xfailed, none failed. The tenth session's 14 351 was on the pre-merge tree, so the two do not subtract.
+- `tests/test_audit_table.py`, `tests/test_docs_consistency.py` and
+  `tests/test_help.py`: 74 passed. Ruff clean.
+- `python -m tests.reader_output`: exit 0, unchanged against the merge-base 4c55b9011.
+
+Next: the maintainer's merge. The WP can close with it; the next-term test and
+the replicate reading stay parked.
 
 ### 2026-11-09 (tenth session) — a tied parameter's own bounds hold inside the step, and per-pattern starts must be one model
 
