@@ -84,17 +84,113 @@ the guide's named tokens and tests exist, which is a name check, not a heuristic
 - [x] `gui/STYLE.md`: rule, motive and marker per element, with the tests that check them named.
 - [x] `gui/CLAUDE.md`: the pointer line.
 - [x] A test that every token and test the guide names exists.
-- [ ] The 59 questions, each settled or sent on, recorded below; the batch to the maintainer.
+- [x] The 59 questions, each settled or sent on, recorded below; the batch to the maintainer.
 - [ ] `docs/milestones/gui-overhaul.md`: the unfiled pieces and the screenshot acceptance row;
       ROADMAP's sentence on the peak-mark colour.
 - [ ] Skill: none. The skill is for an agent driving rietx; the guide governs changing the GUI.
+
+## The workshop's 59 questions
+
+The workshop's visual-language draft (2026-11-06) ended with 59 questions it settled none of.
+Its handover said the list "still needs revising against the rulings". Each is placed below:
+**ruling** means a later ruling answers it, **motive** means a stated motive or written rule
+settles it (marked inferred in the guide), **scope** means it is about the website, manual or
+figures and outside this guide, **B** means it went to the maintainer.
+
+| Q | Question, in short | Placed | Answer |
+|---|---|---|---|
+| 1 | Does the GUI adopt the site's colour tokens? | ruling 2026-11-06 | Yes: one default theme consistent with the site. § Colour |
+| 2 | Where do the values live? | ruling 2026-11-09 | `theme.py` tokens and `app.css`; the guide names them |
+| 3 | Do `rietx watch` and `rietx compare` follow? | motive (WP-1429) | They read `theme.py`, so their colours follow; their layout is outside the milestone |
+| 4 | Where does the guide live? | ruling 2026-11-09 | In rietx, in its own file: `gui/STYLE.md` |
+| 5 | Does the accent survive the plots? | ruling 2026-11-06, 2026-11-09 | The curve palette moves with it: orange calculated, grey difference |
+| 6 | Chips, given "a bordered box is a control"? | motive | A fact is words with no border; `.chip` goes as panels are redrawn |
+| 7 | The same for `.pill` | motive; ruling 2026-11-09 (B) | Plain numbers; fit statistics sit in the action bar |
+| 8 | Filled buttons? | ruling 2026-11-06 | One filled primary per view in the accent's text role |
+| 9 | Does "one style element, one meaning" stand? | ruling (WP-1201) | Yes; the registers are redrawn, the style test stays |
+| 10 | How many control kinds? | motive | The guide's components table, one meaning each |
+| 11 | How is a selected item shown? | motive (no click moves layout) | Colour and a bar or underline, never weight |
+| 12 | Uppercase small labels? | ruling 2026-11-09 | Sentence case app-wide; column heads inferred the same |
+| 13 | Do links look like links? | motive (site) | The accent's text role, underlined in running text |
+| 14 | Which radii? | motive (site is the reference) | The site's set, as values in `app.css` |
+| 15 | Do state colours follow the site? | ruling 2026-11-06 | The site's four, info included |
+| 16 | Two-state or three-state theme control? | B2 | Two written rules disagree |
+| 17 | Where does a Tauri app store the theme? | motive (WP-1438) | `settings.json` in the state dir, the theme's one home |
+| 18 | Does the header wrap? | B1 | A ruled bar design and a first-GUI rule disagree |
+| 19 | Motion? | motive (site) | A short fade or turn on disclosures and tooltips; none under reduced motion |
+| 20 | A focus ring on every control? | motive (site) | Yes, the accent ring on keyboard focus |
+| 21 | Shadows? | motive | One shadow, for floating layers only |
+| 22 | Density? | ruling 2026-11-06 | Three stops, default between reading and compact |
+| 23 | When is a box allowed? | motive (site; ruling 2026-11-06 on boxes) | A box means a control or a floating layer |
+| 24 | How is an affordance signalled? | motive | One signal per meaning, in the components table |
+| 25 | How much shows by default? | ruling 2026-11-07 | Graph and model tabs, workflows as a menu, no permanent text |
+| 26 | Fields, selects, checkboxes? | ruling 2026-11-07; motive for dialog fields | Tinted value cells, tint-and-tick boxes, bordered dialog fields |
+| 27 | Editable numbers in a table? | ruling 2026-11-07 | Tinted cells, the whole cell the target |
+| 28 | The table in the GUI? | ruling 2026-11-07 | Density-scaled rows, no inner rules, aligned decimals, one unit column |
+| 29 | Which faces? | ruling 2026-11-06 | Instrument Sans, Plex Mono, self-hosted |
+| 30 | Greek? | ruling 2026-11-06 | From IBM Plex Sans |
+| 31 | When is mono used? | ruling 2026-11-06 | For numbers and code |
+| 32 | How many type steps; does the test stay? | motive (WP-1201) | Steps are named roles scaled by density; the test stays |
+| 33 | Icons or glyphs? | motive (site); ruling 2026-11-08 on the cog | One stroked SVG set |
+| 34 | How is run state shown? | ruling 2026-11-09 (B) | As text in the action bar and status bar |
+| 35 | Modals, popovers, palette? | motive | One floating-layer drawing |
+| 36 | The site's top bar and wordmark? | ruling 2026-11-07, 2026-11-08 | No brand in the working bar; the wordmark is on the start screen |
+| 37 | The empty state's voice? | ruling 2026-11-07, 2026-11-08 | Few plain words; no explanatory prose |
+| 38 | History lanes and the 3D frame? | motive (WP-1217, WP-1462) | Kept; the palette piece re-measures the lanes |
+| 39 | The window floor? | ruling 2026-11-07 | One column below a computed width; a Tauri minimum is that milestone's |
+| 40 | Gridlines? | ruling 2026-11-07 | None, as in rietx's plot conventions |
+| 41 | One set of curve colours? | ruling 2026-11-06, 2026-11-07 | The site's, in rietx's conventions |
+| 42 | Landing animation phase colours | scope | The landing page's |
+| 43 | Figure type face and size | scope; motive for the GUI | Chart text takes the GUI's face and steps |
+| 44 | `make_figures.py` titles and hexes | scope | The manual's |
+| 45 | A figure's light ground | scope | Figures' |
+| 46 | Do captions say what to conclude? | scope | The GUI shows no captions |
+| 47 | The figure skill's web preset | scope | Figures' |
+| 48 | How far "a bordered box is a control" reaches | scope; motive for the GUI | In the GUI it holds everywhere (Q23) |
+| 49 | Is a code block flat? | scope | The site's |
+| 50 | Small-label table heads in the manual | scope | The manual's |
+| 51 | Syntax colours as tokens | scope | The site's; the `.rxt` highlighter reads GUI tokens |
+| 52 | One set of font files for site and manual | scope | The site's |
+| 53 | H1 sizes | scope | The site's |
+| 54 | Which ground is hover? | scope; motive for the GUI | The GUI's hover ground is the one the palette piece adds |
+| 55 | `--accent-soft`'s job | scope | The site's |
+| 56 | Is the hover guard universal? | scope; motive for the GUI | In the GUI, hover styles apply only where the device hovers |
+| 57 | Are the bar's controls one height? | scope | The site's |
+| 58 | A mark for agent-only material in the manual | scope | The manual's |
+| 59 | One source for the card border | scope | The site's |
+
+Count: 22 by ruling, 17 by motive, 18 outside the guide's scope (four of them with a GUI half
+settled by motive), 2 to the maintainer.
+
+## Questions to the maintainer
+
+Sent as one batch on 2026-11-09. The guide marks each `[open Bn]`.
+
+- **B1** (workshop Q18). The graph title shrinks with an ellipsis, the whole title on hover,
+  before the view's controls wrap. The bars approved on 2026-11-07 work this way. The first GUI's
+  rule (WP-1034) says overflow wraps and never truncates, the header included. Proposed: keep the
+  ellipsis for that one title.
+- **B2** (workshop Q16). The site's theme button argues in writing for two states; `theme.py`
+  argues for a third, "follow the system". Proposed: Settings offers follow the system, light,
+  dark and the named themes.
+- **B3**. Where numbers switch to scientific notation. Claude's reading of "scientific by
+  default", unconfirmed: plain from 0.01 to below 10 000, scientific outside, atom-table numbers
+  always plain. Proposed: keep it.
+- **B4**. How a selected plot mark, and a mark no line explains, are shown. Round 11 drew both in
+  colour (the accent, the danger colour). The first GUI's rule (WP-1210) puts state on a mark's
+  shape so the palette stays separable, and the accent will also be the calculated curve's hue.
+
+Settled under a stated motive and listed for the maintainer to reverse if wrong: facts drawn as
+words without chips or pills; Rwp and GoF with no green; selection never by weight; reflection
+ticks at the foot of the plot (rietx's convention) where the first GUI put them between pattern
+and difference; right-click opening a context menu where the first GUI removed a peak.
 
 ## Acceptance
 
 ```sh
 .venv/bin/python -m pytest tests/test_docs_consistency.py tests/test_gui_manual.py tests/test_gui_style_guide.py
 .venv/bin/python -m ruff check src tests examples
-wc -w gui/STYLE.md   # well under the workshop draft's 9 400 words
+wc -w gui/STYLE.md   # well under the workshop draft's 11 192 words
 ```
 
 ## References
