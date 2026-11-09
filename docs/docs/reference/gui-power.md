@@ -219,9 +219,10 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/capabilities` | what this build can do: backends, solvers, plans, formats, contract versions |
 | `GET /api/version` | the package version |
 | `GET /api/help` | the help corpus the popovers and the [parameter map](parameters.md) are written from |
-| `GET /api/spacegroup` | what one symbol constrains; the wizard's typed-cell step needs it before a project exists |
+| `GET /api/spacegroup` | what one symbol constrains; the New project dialog's typed cell needs it before a project exists |
 | `GET /api/settings` · `POST /api/settings` | the person's own settings, the theme among them, stored beside the recent list rather than in the project; not behind the 409 |
-| `GET /api/recent` | the list of recently opened projects |
+| `GET /api/recent` | the list of recently opened projects, newest first, with a project that has moved marked `missing` |
+| `POST /api/recent/remove` | take one path off that list; a path that is not on it is no error |
 | `GET /api/fs` | the filesystem browser's listing, confined to the home directory and the working directory |
 | `GET /api/examples` | the example projects shipped in the wheel |
 | `POST /api/examples/open` · `POST /api/examples/reset` | build one into the state directory and open it; throw a copy away and rebuild it |

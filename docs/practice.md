@@ -1004,6 +1004,35 @@ a row of buttons. Only the Claude app drops to one column below a width; the mai
 that behaviour on 2026-11-07. The refinement programs offer no model for any of this: TOPAS works
 through a text editor, and FullProf's and GSAS-II's windows are fixed panes (recall).
 
+## The start screen and the New project flow
+
+Surveyed 2026-11-08 for the maintainer's round-9 GUI design and restated 2026-11-09 for WP-2131.
+Desktop applications again, because no diffraction program has a start screen: GSAS-II,
+FullProf's WinPLOTR, TOPAS and Profex each open on an empty main window (recall, not re-read).
+Each row is marked checked (read in source or documentation) or recall (from use, not re-read).
+
+| Program | The first screen | At launch | A new project asks first |
+|---|---|---|---|
+| VS Code | Welcome: Start (New, Open), Recent, Walkthroughs (recall) | reopens the last folder (recall) | a folder; no name step (recall) |
+| JetBrains IDEs | New Project, Open, a recent list with a ⋯ menu and Remove from list, Learn (recall) | reopens the last project, a setting (recall) | the name and the location, then the language (recall) |
+| Xcode | Create, Clone, Open, and the recent list beside them (recall) | the welcome window, a setting (recall) | a template, then the name, then the place (recall) |
+| Blender | the splash: New File, Open, Recent, links to the manual and the release notes (recall) | the splash over a default scene (recall) | — |
+| Obsidian | Create, Open folder, the vault list (recall) | reopens the last vault (recall) | the vault's name and location in one dialog (recall) |
+| Profex 5 | — | an empty main window (recall) | one dialog: the pattern, then the device's instrument file (recall) |
+| GSAS-II 5.8.4 | — | an empty data tree (recall) | importing a pattern with no instrument file offers a list of default instrument files, the first `CuKa lab data`; Cancel imports nothing (checked, `defaultIparms.py:31`, `GSASIIdataGUI.py:1840-1860`) |
+
+Interface guidance read the same day, from recall: Apple's Human Interface Guidelines and
+Microsoft's Fluent 2 both advise onboarding that can be skipped and is brief, and Nielsen Norman
+Group's articles advise a wizard only where a later step depends on an earlier answer. The four
+answers here are independent, which is the case for one dialog.
+
+The practice these add up to: New, Open, a recent list and a small learning area, with no tour;
+reopen the last project at launch; ask for the name and the place before anything else. The
+round-9 design follows all three. Its departure is the instrument: no surveyed program assumes one
+silently, and GSAS-II makes the person pick from a list. rietx assumes the first entry of that list
+and tags the line `assumed`. Claude settled that call in the round-9 design of 2026-11-08, and it
+is reversible.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
