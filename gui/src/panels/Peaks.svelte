@@ -368,11 +368,11 @@
 
 <section>
   <div class="controls">
-    <button onclick={pick} disabled={busy}
+    <button class="ghost" onclick={pick} disabled={busy}
       title="fit every detectable line; replaces the stored list, edits included">
       {rows.length ? "Re-pick peaks" : "Pick peaks"}
     </button>
-    <button onclick={startIndex} disabled={busy || !rows.length}
+    <button class="ghost" onclick={startIndex} disabled={busy || !rows.length}
       title="run every indexing engine on the usable lines; agreement is the confidence">
       Index
     </button>
@@ -585,7 +585,7 @@
           <input class="add" type="text" disabled={busy}
             placeholder="a b c α β γ…" bind:value={priorText}
             onkeydown={(ev) => ev.key === "Enter" && addPriorCell()} />
-          <button disabled={busy || !priorText.trim()}
+          <button class="ghost" disabled={busy || !priorText.trim()}
             onclick={addPriorCell}>add</button>
         </div>
 
@@ -603,7 +603,7 @@
           <input class="add" type="text" disabled={busy}
             placeholder="e.g. R -3 c" bind:value={sgText}
             onkeydown={(ev) => ev.key === "Enter" && addPriorSg()} />
-          <button disabled={busy || !sgText.trim()}
+          <button class="ghost" disabled={busy || !sgText.trim()}
             onclick={addPriorSg}>add</button>
         </div>
       </div>
@@ -800,7 +800,7 @@ and this cell's predicted lines through the data"
                   {#each c.found_by as e (e)}<span class="chip note">{e}</span>{/each}
                 </td>
                 <td>
-                  <button disabled={busy || !(verdicts[i]?.allowed)}
+                  <button class="ghost" disabled={busy || !(verdicts[i]?.allowed)}
                     title={verdicts[i]?.allowed
                       ? "adopt this cell as the model (a Le Bail scaffold; one history node)"
                       : verdicts[i]?.why ?? ""}
@@ -834,7 +834,7 @@ and this cell's predicted lines through the data"
                         the measured range</p>
                     {/if}
                     <p>
-                      <button disabled={busy}
+                      <button class="ghost" disabled={busy}
                         title="rank the extinction classes this lattice allows: one shared
 profile fit, then one Le Bail per class — the answer is a ranked list of
 classes, and every class lists all its space groups (WP-1025)"

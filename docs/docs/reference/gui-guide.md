@@ -12,29 +12,58 @@ control behaves as it does, and when you should reach for it.
 
 ## The shape of the window
 
-Two columns. The pattern on the left, a column of nine tabs on the right, and
-the console beneath them. Every panel is mounted at once, so a filter you typed,
-an edit you have not applied and a text buffer you are half way through all
-survive a look at another tab.
+Two sides. The graphs are on the left, under their own tab strip. Today it
+holds one tab, `Pattern`. A title line under it says what the graph shows:
+`Observed pattern` before any fit, `Last fit` after one, and `Refining` while a
+run is in flight. The panel column is on the right, with nine tabs, the action
+bar and the console. Every panel is mounted at once, so a filter you typed, an
+edit you have not applied and a text buffer you are half way through all survive
+a look at another tab.
 
-`Split | Full` in the header chooses how much window the panel column gets. It
-is a view choice and is not persisted; the panel widths you drag are, per
-project. Two panels want the room, and `Full` is for them: the Text document's
+Each side has a collapse button at its own end of the header. One side always
+stays, so the button of the last side showing is disabled. The buttons never
+move: the middle of the header wraps within itself. Collapsing is a view choice
+and is not persisted. The width you drag on the sash between the sides is
+persisted, per project, and a double-click on the sash resets it. Two panels
+want the room, and collapsing the graphs is for them: the Text document's
 editable columns need about 550 px and the atom table about 470.
+
+Below 760 px of window the two sides cannot both meet their floors, 420 px of
+graph and 340 px of panel, so they stack. The graphs go on top and the panels
+below, and the sash then drags up and down.
 
 ## The header
 
 | Control | Does |
 |---|---|
 | the project chip | names the `.rex`, its data file, the point count, the intensity mode, and whether σ came from the file or from counting statistics |
-| `Rwp` / `GoF` | the last run's agreement; `⚠ not a fit yet` appears beside it past an Rwp of {{ MATURITY_MAX_RWP }} |
 | `Open…` | the import wizard, with the recent list in it |
-| `Split \| Full` | how much window the panel column takes |
+| the two collapse buttons | hide the graphs (left end) or the panel column (right end) |
 | `Simple \| Advanced` | whether rows nothing can free, bounds and transforms are shown |
 | `◐ ☀ ☾` | theme: follow the system, light, dark |
 | the run pill | the stage and its number while busy; the last status otherwise |
-| `Run` / `Cancel` | start the plan; stop it between iterations |
+| `Cancel` | stop the run between iterations |
 | `⌘K` | every command, with the Python call it makes |
+
+`Rwp` and `GoF` are on the title line over the pattern. `⚠ not a fit yet`
+appears beside them past an Rwp of {{ MATURITY_MAX_RWP }}.
+
+## The action bar
+
+One row under the panel column, on every tab.
+
+| Control | Does |
+|---|---|
+| `One cycle \| Staged plan` | what a refine runs: one stage on exactly the ticked parameters, or the project's plan |
+| the pending count | how many Parameters edits wait, and the first refusal if one is invalid |
+| `Revert` / `Apply` | drop or apply the pending Parameters edits |
+| `Refine` | run the choice; it reads `Apply and refine` while edits wait, and applies them first |
+
+`⌘⏎` (`Ctrl+Enter` off a Mac) presses `Refine`, except inside the Text
+document, where it applies the document. A refused edit runs nothing. A plan
+replaces the vary flags, so a parameter you ticked by hand stays free under
+`One cycle` and may be held again under `Staged plan`. The Plan tab's ladder
+shows which.
 
 There is no menu bar and no Save button, and neither is an omission. Settings
 persist on the verb. The moment you tick a box or drag a region it is written to
