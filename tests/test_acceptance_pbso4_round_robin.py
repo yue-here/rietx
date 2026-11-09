@@ -1,11 +1,13 @@
 """Acceptance: the IUCr CPD Rietveld round robin on PbSO₄ (Hill 1992), WP-1943.
 
-Hill, R. J. (1992), *J. Appl. Cryst.* **25**, 589–610, is the only published
-inter-laboratory spread of Rietveld *parameters*: one PbSO₄ specimen, one D1A
-neutron pattern and one Cu Kα Bragg–Brentano pattern, refined by 16 X-ray and 17
-neutron participants with 11 programs.  Its Table 7 gives, for the cell, every
-coordinate and every B, the participants' **range** and their **weighted mean**
-with σ_ext, the esd of that mean from the agreement among them (eq. 2, p. 603).
+Hill, R. J. (1992), *J. Appl. Cryst.* **25**, 589–610, publishes the
+inter-laboratory spread of Rietveld *parameters* on one dataset: one PbSO₄
+specimen, one D1A neutron pattern and one Cu Kα Bragg–Brentano pattern, which
+23 participants refined 18 times (X-ray) and 20 times (neutron) with 11
+programs; the weighted means use 16 and 17 of those values (Table 7).  That
+table gives, for the cell, every coordinate and every B, the participants'
+**range** and their **weighted mean** with σ_ext, the esd of that mean from
+the agreement among them (eq. 2, p. 603).
 The two patterns are the two histograms of ``tests/data/gsas2_pbso4.gpx``,
 read through the ``gsas2_gpx`` pattern reader (whose σ = 1/√w is checked against
 GSAS-II's stored Rwp in ``tests/test_projects_gsas2.py``); the published values
@@ -32,20 +34,20 @@ the paper's:
 many ways, not replicate measurements (his footnote, p. 606), so no esd here
 is compared with σ_ext.  Nor is the single-crystal value a gate: Hill uses it
 as "true" (Table 7's second footnote) but notes the single-crystal cell is
-only accurate enough to set a diffractometer (p. 601), and the neutron cell is
+only accurate enough to set a diffractometer (p. 600), and the neutron cell is
 off it by the wavelength error below.
 
 **The protocol, frozen here and declared rather than inherited.**  Start: the
 single-crystal model Hill tabulates (Miyake, Minato, Morikawa & Iwai 1978,
 Table 7's single-crystal column; B as given, the equivalent isotropic value).
 ``mccusker_structural`` with the shipped convergence schedule, a 6-term
-Chebyshev background (Hill finds fewer than 3 or more than 6 terms degrades the
-B's, p. 607), the TCH pseudo-Voigt, isotropic B, the zero refined and no
+Chebyshev background (Hill traces bad X-ray B's to fewer than 3 or more
+than 6 terms, p. 607), the TCH pseudo-Voigt, isotropic B, the zero refined and no
 displacement.
 
 * **Neutron**: λ = 1.909 Å, the wavelength the participants were given
-  (p. 592); the full 10–155.85° range (Hill finds truncation below ~130°
-  damaging, p. 607); σ² = y/N from the file, the N/Y weighting Hill calls
+  (p. 603); the full 10–155.85° range (Hill traces bad B's to an upper
+  limit of 125° or 132°, p. 607); σ² = y/N from the file, the N/Y weighting Hill calls
   correct (p. 595); no axial asymmetry term in the gated arm, the nearer
   rietx counterpart of the round robin's majority practice (Rietveld's
   empirical function shifts a peak's base and leaves its maximum, p. 600),
@@ -53,7 +55,7 @@ displacement.
 * **X-ray**: Cu Kα1/Kα2 at the package's anode preset with the Kα2 ratio held
   at its ideal 0.5 and the graphite diffracted-beam monochromator at
   2θ_m = 26.6°, whose polarization cos²2θ_m = 0.7998 is the ideal value Hill
-  names (p. 596); 18–159.975°, because below 18° a 1° slit over a 20 mm
+  names (p. 595); 18–159.975°, because below 18° a 1° slit over a 20 mm
   specimen does not intercept the whole beam (p. 594).  Anomalous dispersion
   is applied (declared below): Pb's L edges sit near 0.95 Å, well short of
   Cu Kα, so the tabulated f′/f″ answer.
@@ -113,11 +115,11 @@ HILL = json.loads((DATA / "hill1992_pbso4_round_robin.json").read_text(encoding=
 TABLE7 = {row["key"]: row for row in HILL["table7"]}
 N_DETERMINATIONS = HILL["determinations"]          # 16 X-ray, 17 neutron
 
-#: The neutron wavelength the participants were given (Hill 1992, p. 592).
+#: The neutron wavelength the participants were given (Hill 1992, p. 603).
 LAMBDA_NEUTRON = 1.909
 NEUTRON_LIMITS = (10.0, 155.85)                     # the whole pattern
-XRAY_LIMITS = (18.0, 159.975)                       # Hill p. 594: full beam above 18°
-#: Graphite (002) at Cu Kα; cos²2θ_m = 0.7998, Hill's ideal value (p. 596).
+XRAY_LIMITS = (18.0, 159.975)                       # Hill p. 594: full beam from 18°
+#: Graphite (002) at Cu Kα; cos²2θ_m = 0.7998, Hill's ideal value (p. 595).
 MONOCHROMATOR_TWO_THETA = 26.6
 BACKGROUND_TERMS = 6                                # Hill p. 607: 3 to 6 terms
 SPREAD_BAR = 3.0                                    # module docstring, bar 2

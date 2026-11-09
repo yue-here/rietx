@@ -245,8 +245,9 @@ DATASETS: dict[str, Dataset] = {
         "Cu Ka Bragg-Brentano pattern of one specimen, the two histograms of "
         "the vendored GSAS-II tutorial project, read through the gsas2_gpx "
         "pattern reader.  The only published inter-laboratory spread of "
-        "Rietveld parameters: 16 X-ray and 17 neutron refinements with 11 "
-        "programs, each parameter's range, weighted mean and sigma_ext "
+        "Rietveld parameters: 23 participants' 18 X-ray and 20 neutron "
+        "refinements with 11 programs, each parameter's range, weighted mean "
+        "(over 16 and 17 of them) and sigma_ext "
         "(Tables 7-9, hill1992_pbso4_round_robin.json).  Every reference is "
         "other programs' answers to the same data, so it is cross-code",
         "cross_code"),
@@ -2957,7 +2958,7 @@ CLAIMS: tuple[Claim, ...] = (
         "of Hill's Table 7 inside the participants' range and within 3 spreads "
         "of their weighted mean",
         reference="Hill (1992) Table 7 p. 601: the range and the weighted mean "
-                  "of 16 X-ray and 17 neutron participants; a spread is "
+                  "of 16 X-ray and 17 neutron refinements; a spread is "
                   "sigma_ext*sqrt(n) (Table 8), the participants' own standard "
                   "deviation, so 3 spreads passes a participant-like fit on all "
                   "19 values with probability ~95 %",
@@ -3291,7 +3292,7 @@ SUITE_INTROS: dict[str, str] = {
         "the gsas2_gpx pattern reader, are refined from the published "
         "single-crystal model under a protocol frozen in the module docstring, "
         "and every cell edge, coordinate and B is asserted against the "
-        "envelope the 16 X-ray and 17 neutron participants bracket: inside "
+        "envelope the 16 X-ray and 17 neutron refinements bracket: inside "
         "their range and within 3 of their own standard deviations of their "
         "mean.  Two of Hill's qualitative findings ride on top: a physical "
         "axial model raises the neutron cell toward the X-ray cell, and a "
