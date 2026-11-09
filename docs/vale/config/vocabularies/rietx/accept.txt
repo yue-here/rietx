@@ -1,3 +1,4 @@
+Abramowitz
 [aA]bsorber
 [aA]bsorbers
 [aA]ctinide
@@ -15,6 +16,7 @@ Altomare
 [aA]symptote
 [aA]ttenuator
 [aA]utodiff
+Avrami
 [bB]ackend
 [bB]ackends
 [bB]cc
@@ -321,6 +323,8 @@ Sohncke
 [sS]pinel
 [sS]tderr
 [sS]tdout
+Stegun
+Stinton
 Stoe
 [sS]tructureless
 [sS]ubcell

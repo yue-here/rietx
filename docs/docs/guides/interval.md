@@ -9,7 +9,7 @@ A profile interval is read off the data's χ² instead: it pins the parameter at
 ## Find the rows on a bound
 
 This runs `mccusker_structural` on the fluorapatite pattern that ships with rietx.
-Its extinction stage frees the Sabine extinction coefficient, in µm²:
+The phase declares extinction, so the plan's extinction stage frees the Sabine extinction coefficient, in µm²:
 
 ```{literalinclude} ../../../examples/guides/interval.py
 :language: python

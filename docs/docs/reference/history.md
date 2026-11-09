@@ -111,7 +111,8 @@ These are the fields of `Stage`, and [stage settings](settings.md#stage-settings
 | Field | Default | Holds |
 |---|---|---|
 | `NodeAction.max_iter` | `100` | the iteration budget |
-| `NodeAction.lebail_cycles` | `3` | the intensity-partitioning cycles before each solve in `lebail` mode |
+| `NodeAction.lebail_cycles` | `3` | the most intensity-partitioning cycles before and after each solve in `lebail` mode |
+| `NodeAction.lebail_tol` | `0.0` | the share of the Bragg counts that ends the partition; `0.0` runs exactly `lebail_cycles` |
 | `NodeAction.seed` | `0.0` | the starting value for a freed parameter sitting on a lower bound of 0 |
 | `NodeAction.strain_seed` | `0.0` | the microstrain in ppm that starts an all-zero Stephens block |
 | `NodeAction.restraint_weight_scale` | `1.0` | the weight on the geometric restraints |

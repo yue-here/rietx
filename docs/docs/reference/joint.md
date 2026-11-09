@@ -31,7 +31,7 @@ Both return an ordinary `RefinementResult`, with the per-pattern half on `Refine
 | `sharing` | constructor, `refine_multi` | `None`, the default `SharingMap` | which parameters the patterns share ([Shared parameters](#shared-parameters)) |
 | `coordinates`, `parametric` | constructor, `refine_multi` | `None` | a parameter declared as an equation of each pattern's coordinates ([Parametric refinement](parametric.md)) |
 | `backend`, `solver` | constructor, `refine_multi` | `"numpy"`, `"lm"` | as for a single fit ([Entry points](refinement.md#entry-points)) |
-| `plan` | `fit`, `refine_multi` | `"mccusker_default"` | a preset name or a `RefinementPlan` |
+| `plan` | `fit`, `refine_multi` | `"mccusker_default"` | a preset name, a `RefinementPlan` or its `PlanSpec` |
 | `mode` | `fit` | `"rietveld"` | any other mode raises `NotImplementedError` |
 | `two_theta_limits` | `fit`, `refine_multi` | `None` | one `(low, high)` for every pattern, or one per pattern |
 | `weights` | `fit`, `refine_multi` | `None`, 1.0 each | one positive relative weight per pattern's residual block |

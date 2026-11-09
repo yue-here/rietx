@@ -1,0 +1,325 @@
+{
+ "env": {
+  "platform": "Darwin arm64 (macOS-27.2-arm64-arm-64bit)",
+  "python": "3.12.16",
+  "rietx": "1.11.0.dev0",
+  "rietx_file": "/private/tmp/claude-502/-Users-yuewu-Code-rietx/2d6ae8c9-3e42-4d89-bdce-b3f74821ad95/scratchpad/snap/src/rietx/__init__.py",
+  "venv": "worktree .venv, [dev]",
+  "compiled_available": true,
+  "compiled_enabled": true,
+  "numeric_path": "compiled tier (set_enabled(True))"
+ },
+ "family": "planted",
+ "peaks": {
+  "T001": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T002": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T003": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T004": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T005": {
+   "peak": 7,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    7,
+    3
+   ]
+  },
+  "T006": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T007": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T008": {
+   "peak": 4,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    4,
+    1
+   ]
+  },
+  "T009": {
+   "peak": 22,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    22,
+    3
+   ]
+  },
+  "T010": {
+   "peak": 9,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    9,
+    3
+   ]
+  },
+  "T011": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T012": {
+   "peak": 9,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    9,
+    3
+   ]
+  },
+  "T013": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T014": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T015": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T016": {
+   "peak": 10,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    10,
+    3
+   ]
+  },
+  "T017": {
+   "peak": 9,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    9,
+    3
+   ]
+  },
+  "T018": {
+   "peak": 25,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    25,
+    9
+   ]
+  },
+  "T019": {
+   "peak": 19,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    19,
+    10
+   ]
+  },
+  "T020": {
+   "peak": 21,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    21,
+    9
+   ]
+  },
+  "T021": {
+   "peak": 21,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    21,
+    10
+   ]
+  },
+  "T022": {
+   "peak": 20,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    20,
+    10
+   ]
+  },
+  "T023": {
+   "peak": 20,
+   "rungs": [
+    "warm"
+   ],
+   "all_converged": true,
+   "stage_evals": [
+    20,
+    9
+   ]
+  }
+ },
+ "samples1": {
+  "max_ratio": 2.2,
+  "argmax": "T009",
+  "top3": [
+   [
+    "T009",
+    2.2
+   ],
+   [
+    "T018",
+    1.1363636363636365
+   ],
+   [
+    "T002",
+    1.0
+   ]
+  ],
+  "n_armed": 22
+ },
+ "samples2": {
+  "max_ratio": 2.2,
+  "argmax": "T009",
+  "top3": [
+   [
+    "T009",
+    2.2
+   ],
+   [
+    "T018",
+    1.1363636363636365
+   ],
+   [
+    "T003",
+    1.0
+   ]
+  ],
+  "n_armed": 21
+ },
+ "samples3": {
+  "max_ratio": 2.2,
+  "argmax": "T009",
+  "top3": [
+   [
+    "T009",
+    2.2
+   ],
+   [
+    "T018",
+    1.1363636363636365
+   ],
+   [
+    "T004",
+    1.0
+   ]
+  ],
+  "n_armed": 20
+ }
+}
