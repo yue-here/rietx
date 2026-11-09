@@ -75,4 +75,4 @@ joint fit.
   WP-1103, which shipped them, is closed. Read against the tree at `origin/main` on 2026-11-09:
   the proximity test and the joint-fit call order are as described; nothing was run. Numbered
   2141, past the 2130s, because another shift is filing GUI WPs there today. Bookkeeping PR:
-  #PRNUM. Next: wait for #1506 to merge, then reuse its `floors=` wiring.
+  #1513. Next: wait for #1506 to merge, then reuse its `floors=` wiring.
