@@ -26,7 +26,7 @@ redesign is ported in five pieces, in this order:
 |---|---|---|
 | 1 | [2123](../wp/2123-the-layout-shell.md) | the layout shell: graphs on the left in tabs with a title line, the model panel on the right in tabs with a sash, both panels collapsible, a one-row action bar with Apply and refine, the segmented register redrawn, new colour tokens, a one-column layout for a narrow window, and a browser test that no click moves the layout unless it asks to |
 | 2 | [2126](../wp/2126-the-parameters-panel.md) | the Parameters panel: one row per atom, number slots that never move, the padlock as `hold`, the floating editor |
-| 3 | not yet filed | the Plan tab on the existing plan routes, read top to bottom as a recipe |
+| 3 | [2127](../wp/2127-the-plan-tab.md) | the Plan tab on the existing plan routes, read top to bottom as a recipe |
 | 4 | not yet filed | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | not yet filed | the Background tab: a route serving the preview's matrices, a held Chebyshev term, the P-spline |
 
@@ -74,8 +74,9 @@ the piece that touches it or a WP of its own.
 - The Model and Text panels keep their own Apply beside the action bar's, outlined so the bar's
   Refine stays the one filled button, because WP-2123 routes only the Parameters edits through
   the action bar. Their edits still wait on two Apply buttons in one view.
-- A run started from the Plan, Report or Series panel, or by the `.` key, does not apply the
-  Parameters edits waiting in the action bar; the bar's Refine and the `r` key do (WP-2123).
+- A run started from the Report or Series panel, or by the `.` key, does not apply the
+  Parameters edits waiting in the action bar. The bar's Refine, the `r` key (WP-2123) and the
+  Plan panel's `Run this stage` (WP-2127) do.
 
 ## Acceptance
 
