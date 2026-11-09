@@ -55,8 +55,8 @@ One row under the panel column, on every tab.
 | Control | Does |
 |---|---|
 | `One cycle \| Staged plan` | what a refine runs: one stage on exactly the ticked parameters, or the project's plan |
-| the pending count | how many Parameters edits wait, and the first refusal if one is invalid |
-| `Revert` / `Apply` | drop or apply the pending Parameters edits |
+| the pending count | how many Parameters edits wait, plus one for an edited plan, and the first refusal if one is invalid |
+| `Revert` / `Apply` | drop or apply the pending edits: the Parameters edits first, then the plan |
 | `Refine` | run the choice; it reads `Apply and refine` while edits wait, and applies them first |
 
 `⌘⏎` (`Ctrl+Enter` off a Mac) presses `Refine`, except inside the Text
@@ -215,25 +215,43 @@ It frees every stage's globs once more, on peak windows that drop 0.10% of
 each peak, and its Rwp is the answer's. The plan's `closing` line in the text
 document sets the fraction, and `none` removes the stage.
 
-The two buttons do different things:
+The plan reads top to bottom, one stage to a row. Each row holds:
 
-- `Run all` runs the plan from the start. A plan replaces the vary flags rather
-  than continuing them, so a row you freed by hand that no stage names is
-  dropped.
-- `Run this stage` runs one stage from where you are, and keeps what you freed
-  by hand.
+- a three-line handle. Drag it to move the stage, or focus it and press the up
+  and down arrow keys.
+- the stage's name, which you can type over.
+- `Run this stage`, which runs that one stage from where you are and keeps what
+  you freed by hand. It applies the pending edits first, as `Refine` does.
+- `×`, which removes the stage. The last stage has none.
+- the globs the stage frees, each with a `×` beside it, and a field where you
+  type another glob and press Enter.
+- the stage's line of the ladder: how many parameters it frees on top of the
+  stages above, the running count of free ones, how many stay held, and the
+  stage's Rwp from the last run. Open it for the paths.
 
-A plan you have edited and not saved has no resolved facts and cannot be run,
-because the ladder describes the plan the server is holding.
+The `Preset` menu replaces the stages with a preset's. `+ Stage` adds an empty
+stage at the end and puts the cursor in its name.
+
+An edit to the plan waits in the action bar as one pending edit. `Apply` stores
+it, `Revert` drops it, and `Refine` stores it before running. To run the whole
+plan, choose `Staged plan` in the action bar and press `Refine`. A plan
+replaces the vary flags rather than continuing them, so a row you freed by hand
+that no stage names is dropped. The panel lists those rows under the closing
+stage.
+
+The ladder describes the plan the server holds. After an edit, the stages
+above the first change keep their lines, and every stage from that change down
+reads `not applied` until you apply. `⌘Z` and `⇧⌘Z` undo and redo plan edits,
+the preset menu included, while the cursor is outside a text field.
 
 ```{image} ../screenshots/plan-ladder-light.png
 :class: only-light
-:alt: The plan panel: an ordered list of stages, each showing the globs it frees and the parameter paths they reach, with a running count of free parameters
+:alt: The plan panel: a preset menu, then one row per stage with a drag handle, its name, the globs it frees and a line counting the parameters it frees and holds
 ```
 
 ```{image} ../screenshots/plan-ladder-dark.png
 :class: only-dark
-:alt: The plan panel: an ordered list of stages, each showing the globs it frees and the parameter paths they reach, with a running count of free parameters
+:alt: The plan panel: a preset menu, then one row per stage with a drag handle, its name, the globs it frees and a line counting the parameters it frees and holds
 ```
 
 ## Peaks

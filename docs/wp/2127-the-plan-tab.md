@@ -172,7 +172,7 @@ reversible", with its alternative, and waits for the maintainer's review of the 
   `Run all` retired from the tab.
 - [x] Undo and redo of plan edits: ⌘Z and ⇧⌘Z in the tab outside a text field, and the palette.
 - [x] The layout browser test extended to the Plan tab: every control clicked, a real drag.
-- [ ] The dist rebuilt; the GUI chapters and the screenshots the tab changes.
+- [x] The dist rebuilt; the GUI chapters and the screenshots the tab changes.
 - [ ] Skill: none expected. The agent skill drives the python API, and no route changes.
 
 ## Acceptance

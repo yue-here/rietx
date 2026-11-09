@@ -74,8 +74,9 @@ the piece that touches it or a WP of its own.
 - The Model and Text panels keep their own Apply beside the action bar's, outlined so the bar's
   Refine stays the one filled button, because WP-2123 routes only the Parameters edits through
   the action bar. Their edits still wait on two Apply buttons in one view.
-- A run started from the Plan, Report or Series panel, or by the `.` key, does not apply the
-  Parameters edits waiting in the action bar; the bar's Refine and the `r` key do (WP-2123).
+- A run started from the Report or Series panel, or by the `.` key, does not apply the
+  Parameters edits waiting in the action bar. The bar's Refine, the `r` key (WP-2123) and the
+  Plan panel's `Run this stage` (WP-2127) do.
 
 ## Acceptance
 
