@@ -63,8 +63,9 @@ its code. Any reader takes the stored format from a file's contents.
   level. (`rx.fit_trajectory` → `rx.TrajectoryFit`; the names are the handover's consent
   item.)
 - [x] Which trajectory: `direction="both"` gives two, so say which is read, or fit each.
-  Skip quarantined patterns and say so. (Forward by default, `chain="backward"` for the
-  other; `TrajectoryFit.skipped` names each point left out.)
+  Skip quarantined patterns and say so. (Under `direction="both"` the caller names the chain,
+  since their gap is path dependence nothing resolves; `TrajectoryFit.skipped` names each
+  point left out.)
 - [x] Measure on a synthetic ramp against the joint fit: do the coefficients agree within
   their combined esds, and how much wider are the esds? (Yes, within 0.05 combined esd on
   twenty seeds; the unscaled esds equal the joint ones within 1.1 %, and the scaled ones

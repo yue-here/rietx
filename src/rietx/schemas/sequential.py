@@ -1763,8 +1763,11 @@ class TrajectoryVariable(Base):
     widens it.  ``esd_unscaled`` is √((JᵀWJ)⁻¹) alone, the reading of a
     caller who trusts each pattern's esd as it stands.  Neither is chosen for
     the caller: they differ by √(χ²/ν), :attr:`TrajectoryFit.reduced_chi2`.
-    Both are ``None`` on a held variable, on one the trajectory does not
-    move, and ``esd`` is ``None`` too where no degree of freedom is left.
+    Both are ``None`` on a held variable, and on one the trajectory does not
+    move, alone or only together with another; ``esd`` is ``None`` too where
+    no degree of freedom is left.  Bérar and Lelann's factor, which a
+    pattern's own esds carry for its correlated residuals, is not applied:
+    the points are separate fits.
     """
 
     name: str
@@ -1772,9 +1775,11 @@ class TrajectoryVariable(Base):
     vary: bool
     esd: float | None = None
     esd_unscaled: float | None = None
-    #: whether the fitted value rests on the variable's own ``min`` or
-    #: ``max``; its esds are then marginal, as a refined row's are (WP-1929)
-    at_bound: bool
+    #: whether the solver ended with the variable in its active set, on its
+    #: own ``min`` or ``max`` (scipy's ``active_mask``, a proximity test, not
+    #: a test that the bound carried load); its esds are then marginal, as a
+    #: refined row's are (WP-1929).  ``None`` on a held variable.
+    at_bound: bool | None
 
 
 class TrajectorySkip(Base):
@@ -1782,13 +1787,15 @@ class TrajectorySkip(Base):
 
     ``reason`` is ``"quarantined"`` for a pattern the chain rejected
     (diverged, or carrying an ``error``-level code: the test the chain's
-    median uses), and ``"no_esd"`` for a point with no positive, finite esd,
-    which has no weight.
+    median uses), ``"no_value"`` for a point whose value is not finite, and
+    ``"no_esd"`` for a point with no positive, finite esd, which has no
+    weight.  A pattern the path is absent from is no point of the trajectory,
+    so it is not listed.
     """
 
     position: int
     label: str
-    reason: Literal["quarantined", "no_esd"]
+    reason: Literal["quarantined", "no_value", "no_esd"]
 
 
 class TrajectoryFit(Base):
@@ -1811,7 +1818,8 @@ class TrajectoryFit(Base):
     series_direction: Literal["forward", "backward", "both"]
     variables: list[TrajectoryVariable] = Field(default_factory=list)
     #: over the varied variables in :attr:`variables` order, scaled as
-    #: :attr:`TrajectoryVariable.esd` is; ``None`` where that esd is
+    #: :attr:`TrajectoryVariable.esd` is; ``None`` with no degree of freedom,
+    #: or where a direction is undetermined
     covariance: list[list[float]] | None = None
     #: Σ((value − fitted)/esd)² over the points fitted
     chi2: float

@@ -346,7 +346,7 @@ A label that is a reserved word of the grammar, such as `exp` or `min`, is refus
 | `a**b` | `a^b` | python's power. A chain such as `a**b**c` is grouped as python groups it, right to left, with the parentheses the grammar asks for |
 | `sind(u)`, `cosd(u)`, `tand(u)` | `sin(pi*u/180)`, `cos(pi*u/180)`, `tan(pi*u/180)` | the functions of an angle in degrees |
 | `sin(u)`, `cos(u)`, `tan(u)` | `sin(pi*u/180)`, `cos(pi*u/180)`, `tan(pi*u/180)` | GSAS-II's expressions read these in degrees too |
-| `exp(u)`, `log(u)`, `sqrt(u)` | unchanged | the natural logarithm in both |
+| `exp(u)`, `log(u)`, `sqrt(u)` | unchanged | the same functions; `log` is the natural logarithm in both |
 | `pi` | unchanged | |
 
 ### The pickle allow-list

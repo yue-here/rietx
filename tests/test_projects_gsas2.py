@@ -1365,6 +1365,7 @@ def test_a_lowered_equation_has_the_value_python_gives_it(text):
     ("x*z", {"x"}, "it names 'z'"),
     ("x*(", {"x"}, "not python syntax"),
     ("exp*x", {"exp", "x"}, "label 'exp' is a reserved word"),
+    ("1e999*x", {"x"}, "the number inf, which is not finite"),
 ])
 def test_a_spelling_the_table_does_not_carry_is_refused_by_name(text, names, fragment):
     from rietx.io.projects.gsas2 import lower_gsas2_expression
@@ -1428,3 +1429,14 @@ def test_a_project_gsas2_wrote_reads_its_stored_equation_in():
     assert eq.bindings == {"y": "Applied load (MN)"}
     assert eq.dependent_bindings == {"x": "pos0"} and eq.dependent_expression is not None
     assert eq.refused is None and eq.rewrites == ()
+
+
+def test_a_long_sum_lowers_with_no_parentheses_it_did_not_need():
+    """The grammar's own tree is printed, so a 30-term polynomial nests as
+    deep as python's and no deeper (WP-2106 review: a parenthesised operand per
+    level put it past the grammar's depth limit)."""
+    from rietx.io.projects.gsas2 import lower_gsas2_expression
+
+    text = " + ".join(f"a*x**{i}" for i in range(30))
+    lowered, _ = lower_gsas2_expression(text, {"a", "x"})
+    assert "(" not in lowered and lowered.startswith("a * x^0 + a * x^1")

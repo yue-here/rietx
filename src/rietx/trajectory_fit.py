@@ -70,10 +70,15 @@ def fit_trajectory(series: SeriesResult, path: str, expression: str,
     the order passed.  Without it the series axis is the one coordinate, named
     ``x`` (:attr:`SeriesResult.x`, the given coordinate or the pattern index).
 
-    ``chain`` picks the trajectory under ``direction="both"``: the forward
-    chain by default, or ``"backward"``.  A one-way series has the one chain
-    it ran, and asking for the other raises.  ``path`` is any name
-    :meth:`SeriesResult.resolve_trajectory` takes, ``qpa.<phase>`` included.
+    ``chain`` picks the trajectory under ``direction="both"``, and is
+    required there: the two chains' gap is path dependence the package
+    reports and never resolves (:attr:`SeriesResult.direction_gaps`), so
+    which one to read is the caller's.  A one-way series has the one chain it
+    ran, and asking for the other raises.  ``path`` is any name
+    :meth:`SeriesResult.resolve_trajectory` takes, ``qpa.<phase>`` included,
+    bar a step path (:attr:`SeriesResult.relative_paths`), whose values are
+    displacements from where each fit began, and an angle path
+    (:attr:`SeriesResult.angle_paths`), whose values wrap at a turn.
 
     Raises ``ValueError`` naming the cause: an unknown name in the
     expression, a variable that shadows a column or is never used, no free
@@ -85,6 +90,13 @@ def fit_trajectory(series: SeriesResult, path: str, expression: str,
     if not isinstance(series, SeriesResult):
         raise TypeError(f"fit_trajectory takes a SeriesResult, got {type(series).__name__}")
     read, which = _chain(series, chain)
+    for paths, why in ((read.relative_paths, "a step from where each fit began, not "
+                        "a position (SeriesResult.relative_paths); fit the coordinate "
+                        "rows it drives"),
+                       (read.angle_paths, "an angle, whose values wrap at a turn "
+                        "(SeriesResult.angle_paths)")):
+        if path in (paths or ()):
+            raise ValueError(f"{path!r} is {why}")
     expr = Expression(expression)
     columns = _columns(read, coordinates)
     variables = dict(variables)
@@ -102,7 +114,9 @@ def fit_trajectory(series: SeriesResult, path: str, expression: str,
                                       traj.labels, strict=True):
         if _rejected(read.entries[pos]):
             skipped.append(TrajectorySkip(position=pos, label=label, reason="quarantined"))
-        elif esd is None or not math.isfinite(esd) or esd <= 0.0 or not math.isfinite(value):
+        elif not math.isfinite(value):
+            skipped.append(TrajectorySkip(position=pos, label=label, reason="no_value"))
+        elif esd is None or not math.isfinite(esd) or esd <= 0.0:
             skipped.append(TrajectorySkip(position=pos, label=label, reason="no_esd"))
         else:
             points.append((pos, value, esd))
@@ -112,6 +126,14 @@ def fit_trajectory(series: SeriesResult, path: str, expression: str,
         raise ValueError(
             "no variable is free: set vary=True on the ones to fit, as in "
             "rx.Parameter(value=..., vary=True)")
+    pinned = [n for n in varied if not variables[n].min < variables[n].max]
+    if pinned:
+        raise ValueError(f"variable {pinned[0]!r} is free but its min and max are equal; "
+                         "hold it (vary=False) or widen its bounds")
+    if not points:
+        raise ValueError(
+            f"no point of {path!r} can be fitted: all {len(skipped)} were left out "
+            f"({', '.join(sorted({s.reason for s in skipped}))})")
     if len(points) < len(varied):
         raise ValueError(
             f"{len(points)} usable point(s) of {path!r} for {len(varied)} free "
@@ -163,7 +185,11 @@ def fit_trajectory(series: SeriesResult, path: str, expression: str,
     dof = len(points) - len(varied)
     reduced = chi2 / dof if dof > 0 else None
 
-    from .optimize.statistics import covariance_from_factors, normal_factors
+    from .optimize.statistics import (
+        covariance_from_factors,
+        discarded_directions,
+        normal_factors,
+    )
 
     # A residual whose χ²/ν is exactly 1, so the factor `normal_factors`
     # applies is 1 and its K is the unscaled inverse of the equilibrated
@@ -172,10 +198,14 @@ def fit_trajectory(series: SeriesResult, path: str, expression: str,
     unit[0] = math.sqrt(max(dof, 1))
     k, inv_d, _ = normal_factors(jac, unit, len(varied),
                                  what="trajectory fit's covariance residual")
-    raw = [float(d * math.sqrt(max(k[i, i], 0.0))) if d > 0.0 else None
+    # A direction the pseudo-inverse discards comes back at zero variance, so
+    # a variable it touches has no esd rather than a small one (WP-1535's test).
+    n_gone, touched = discarded_directions(jac)
+    flat = set(int(i) for i in touched)
+    raw = [float(d * math.sqrt(max(k[i, i], 0.0))) if d > 0.0 and i not in flat else None
            for i, d in enumerate(inv_d)]
     factor = math.sqrt(reduced) if reduced is not None else None
-    covariance = (None if reduced is None else
+    covariance = (None if reduced is None or n_gone else
                   (covariance_from_factors(k, inv_d) * reduced).tolist())
 
     at_bound = np.asarray(solution.active_mask) != 0
@@ -186,7 +216,7 @@ def fit_trajectory(series: SeriesResult, path: str, expression: str,
             esd=None if raw[i] is None or factor is None else raw[i] * factor,
             esd_unscaled=raw[i], at_bound=bool(at_bound[i]))
     out = [fitted.get(name) or TrajectoryVariable(
-        name=name, value=float(p.value), vary=False, at_bound=False)
+        name=name, value=float(p.value), vary=False, at_bound=None)
         for name, p in variables.items()]
 
     return TrajectoryFit(
@@ -201,7 +231,11 @@ def _chain(series: SeriesResult, chain: str | None) -> tuple[SeriesResult, str]:
     """The chain to read and its name, refusing one the series did not run."""
     direction = series.direction
     if chain is None:
-        return series, "backward" if direction == "backward" else "forward"
+        if direction == "both":
+            raise ValueError(
+                "this series ran both ways: pass chain='forward' or chain='backward' "
+                "(series.direction_gaps says how far apart the two are), or fit each")
+        return series, direction
     if chain not in ("forward", "backward"):
         raise ValueError(f"chain must be 'forward' or 'backward', got {chain!r}")
     if direction == "both":
@@ -221,7 +255,10 @@ def _chain(series: SeriesResult, chain: str | None) -> tuple[SeriesResult, str]:
 def _columns(read: SeriesResult, coordinates: CoordinateTable | None
              ) -> dict[str, list[float | None]]:
     """Each coordinate a name can bind, as one value per pattern of the series."""
-    n = len(read.entries) + len(read.failures)
+    # the series as passed: an entry or a failure per pattern, though a
+    # cancelled chain records neither for the patterns it never reached
+    n = max([len(read.entries) + len(read.failures),
+             *(e.index + 1 for e in read.entries)])
     if coordinates is None:
         axis: list[float | None] = [None] * max(
             [n, *(e.index + 1 for e in read.entries)])
@@ -231,10 +268,10 @@ def _columns(read: SeriesResult, coordinates: CoordinateTable | None
     if not isinstance(coordinates, CoordinateTable):
         raise TypeError(f"coordinates must be an rx.CoordinateTable, got "
                         f"{type(coordinates).__name__}")
-    if coordinates.n_patterns != n:
+    if coordinates.n_patterns < n:
         raise ValueError(
             f"the coordinate table has {coordinates.n_patterns} rows for a series "
-            f"of {n} patterns: one row per pattern, in the order passed")
+            f"of at least {n} patterns: one row per pattern, in the order passed")
     return dict(coordinates.columns)
 
 

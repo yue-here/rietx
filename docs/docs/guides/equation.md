@@ -109,7 +109,7 @@ Each variable carries two esds, and rietx does not choose between them.
 With seven points χ²/ν has five degrees of freedom, so the scaled esd moves with the noise: over twenty noise seeds of this ramp it ran from 0.35 to 1.30 times the declared line's, while the unscaled one stayed within 1.1 % of it, and the two lines never differed by more than 0.05 of their combined esds.
 
 The result says which chain it read, because a chain's values depend on the direction it walked.
-A series run with `direction="both"` is read forward unless you pass `chain="backward"`.
+A series run with `direction="both"` takes `chain="forward"` or `chain="backward"`, since the gap between the two is the path dependence the series measures.
 A pattern the series quarantined is left out, as is a point with no esd, and `fit.skipped` names each one.
 
 A GSAS-II project's stored equations read straight into this call.
