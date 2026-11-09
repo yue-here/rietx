@@ -111,7 +111,7 @@ the PR was open, and now records the merge. The WP stays open. Three of the deci
 previous entry's *Next* are the maintainer's, and none has been made.
 
 *Done.* Status line synced to the tree: `git branch -r --contains 527048aa4` names `origin/main`,
-and `gh pr view 1463` reads `MERGED`. No code, test or other WP changed. Bookkeeping PR: #PRNUM.
+and `gh pr view 1463` reads `MERGED`. No code, test or other WP changed. Bookkeeping PR: #1500.
 
 *Next*, in order. Item 1 of the previous *Next* (review and merge) is done. Items 2-4 wait for the
 maintainer: whether the renumbering records that it fired, whether restraints name atoms by label,
