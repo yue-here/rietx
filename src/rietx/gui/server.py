@@ -214,8 +214,14 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/project"): lambda s, q, b: s.project_doc(),
     ("POST", "/api/project"): lambda s, q, b: s.project_patch(b),
     ("POST", "/api/project/save"): lambda s, q, b: s.project_save(),
+    # the File menu (WP-2133): each acts on the project's folder
+    ("POST", "/api/project/copy"): lambda s, q, b: s.project_copy(b),
+    ("POST", "/api/project/rename"): lambda s, q, b: s.project_rename(b),
+    ("POST", "/api/project/move"): lambda s, q, b: s.project_move(b),
+    ("POST", "/api/project/close"): lambda s, q, b: s.project_close(),
     ("GET", "/api/recent"): lambda s, q, b: {"recent": s.recent()},
     ("POST", "/api/recent/remove"): lambda s, q, b: s.recent_remove(b),
+    ("POST", "/api/recent/clear"): lambda s, q, b: s.recent_clear(),
     # the "Open…" browser's own listing (WP-1205): read-only, confined to the
     # home directory and the process's cwd — see GuiSession.fs
     ("GET", "/api/fs"): lambda s, q, b: s.fs((q.get("path") or [None])[0]),

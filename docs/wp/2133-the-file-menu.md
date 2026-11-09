@@ -1,6 +1,6 @@
 # WP-2133 — the File menu on the project name
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the server routes landed
 Depends on: 2131
 Priority: P2 2026-11-09 — a piece of the open gui-overhaul milestone, the maintainer's file-and-project I/O ruling of 2026-11-07; 2131's handover names it next
 
@@ -110,7 +110,7 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 
 ## Tasks
 
-- [ ] Server: `POST /api/project/copy`, `/rename`, `/move`, `/close`, `POST /api/recent/clear`;
+- [x] Server: `POST /api/project/copy`, `/rename`, `/move`, `/close`, `POST /api/recent/clear`;
   `export` takes a `directory` and `overwrite`; a closed project is not reopened at launch.
   Each refusal tested: an existing destination, a destination outside the roots, a bad name, a
   folder moved into itself, a run in flight.

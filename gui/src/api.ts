@@ -116,6 +116,7 @@ export const api = {
   recent: () => call("GET", "/api/recent"),
   /** Drop one entry from the recent list; the project itself is untouched. */
   removeRecent: (path: string) => call("POST", "/api/recent/remove", { path }),
+  clearRecent: () => call("POST", "/api/recent/clear"),
 
   /** The example projects shipped in the wheel (WP-1204).  `built` says
    *  whether opening one is a plain open or a build first, which is what lets
@@ -155,6 +156,13 @@ export const api = {
   /** A flush a client may call and never must: every settings verb already
    *  saved and the model was on disk the moment its node was appended. */
   save: () => call("POST", "/api/project/save"),
+  /** The File menu's folder verbs (WP-2133): each refused while a run is in
+   *  flight, and none replaces a folder that is already there. */
+  copyProject: (directory: string, name: string) =>
+    call("POST", "/api/project/copy", { directory, name }),
+  renameProject: (name: string) => call("POST", "/api/project/rename", { name }),
+  moveProject: (directory: string) => call("POST", "/api/project/move", { directory }),
+  closeProject: () => call("POST", "/api/project/close"),
 
   params: () => call("GET", "/api/params"),
   patchParams: (delta: { values?: Record<string, number>; vary?: Record<string, boolean> }) =>
@@ -332,6 +340,9 @@ export const api = {
   seriesHistory: (index: number) =>
     call("GET", `/api/series/history?index=${index}`),
 
-  export: (kind: string) => call("POST", `/api/export/${kind}`),
+  /** One export kind; with `directory` it is written there rather than into
+   *  `exports/`, and an existing file is refused unless `overwrite` (WP-2133). */
+  export: (kind: string, body: { directory?: string; filename?: string; overwrite?: boolean } = {}) =>
+    call("POST", `/api/export/${kind}`, body),
   events: (since: number) => call("GET", `/api/events?poll=1&since=${since}`),
 };
