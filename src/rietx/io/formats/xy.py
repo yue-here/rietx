@@ -177,11 +177,14 @@ def _two_numbers(s: str) -> bool:
         return False
 
 
-def _no_data(p: Path, skipped: list[tuple[int, str]], n_comments: int) -> str:
+def _no_data(p: Path, skipped: list[tuple[int, str]], n_comments: int,
+             heading: bool = False) -> str:
     """The refusal for a file with no row of two numbers, naming what it saw."""
     if not skipped:
         cause = ("every non-blank line starts with a comment marker (# ! ' /)"
-                 if n_comments else "the file holds no line of text")
+                 if n_comments else
+                 "the file holds no line of text below its XYDATA heading"
+                 if heading else "the file holds no line of text")
     elif quoted := [(n, s) for n, s in skipped
                     if '"' in s and _two_numbers(s.replace('"', " "))]:
         n, s = quoted[0]
@@ -373,12 +376,14 @@ def read_xy(path: str | Path, *, axis: str | None = None,
             vals = []
         if len(vals) >= 2:
             rows.append((n, parts, vals))
-            if _is_decimal_comma(s):
+            # the comma test splits and matches the row a second time, a
+            # quarter of the read on a 400 000-row file holding no comma
+            if "," in s and _is_decimal_comma(s):
                 decimal_comma.append((n, s))
         else:
             skipped.append((n, s))
     if not rows:
-        raise ValueError(_no_data(p, skipped, len(comments)))
+        raise ValueError(_no_data(p, skipped, len(comments), heading > 0))
     if 2 * len(decimal_comma) >= len(rows):
         n, s = decimal_comma[0]
         raise ValueError(

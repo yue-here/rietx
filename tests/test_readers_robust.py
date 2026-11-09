@@ -670,6 +670,13 @@ def test_a_file_of_comments_says_so(tmp_path):
         rx.read_pattern(path)
 
 
+def test_an_xydata_heading_with_no_rows_names_the_heading(tmp_path):
+    path = tmp_path / "empty.dat"
+    path.write_text("XYDATA\nINTER 1 1 0 0\nTEMP 300\nx\nx\nx\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="no line of text below its XYDATA heading"):
+        rx.read_pattern(path)
+
+
 #: Issue #266's second file, and the same constant σ under a reader whose
 #: format *declares* the column.  The check is on the hook, so both say it.
 _CONSTANT_SIGMA = {

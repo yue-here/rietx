@@ -54,7 +54,10 @@ _COMMENT = ("#", "!", "'", "/")
 _NUMBER = r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?"
 
 #: A row of two or three plain numbers — what a two-column profile is made of.
-_NUMERIC_ROW = re.compile(rf"^\s*{_NUMBER}(?:[\s,]+{_NUMBER}){{1,2}}\s*$")
+#: The separators and the trailing ``#``/``!`` comment are ``xy``'s own
+#: (``xy._fields``), mirrored for the reason :data:`_COMMENT` is.
+_NUMERIC_ROW = re.compile(
+    rf"^\s*{_NUMBER}(?:[\s,;]+{_NUMBER}){{1,2}}(?:[\s,;]*|[\s,;]+[#!].*)$")
 
 #: How many such rows before the head is a profile rather than a coincidence.
 #: Low on purpose: the gate's job is to let a real profile *out*, and a peak
