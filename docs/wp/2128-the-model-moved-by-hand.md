@@ -85,7 +85,48 @@ neither panel. Its edits to shared files are one tab in `lib/tabs.ts`, a few lin
 No ruling covers these. Each took the smallest neutral option, is reversible, and waits for
 the maintainer's review of the PR. Grounds are written where a rule settled it.
 
-(filled as the checklist lands)
+Most important first.
+
+1. **Preview colours.** Settled by Claude, reversible: the preview is drawn solid and the last
+   fit dashed, both in the model's ink (`--plot-calc`). Grounds: `gui/CLAUDE.md` § The peak
+   layer, "state rides on the mark, not on a second colour", and WP-1210 measured that the
+   plot palette has no free hue left. Alternative: the prototype's accent preview over a grey
+   last fit.
+2. **Default slider ranges.** Settled by Claude, reversible: displacement ±0.1 mm; a Gaussian
+   width term ×¼ to ×4 and a Lorentzian one ×½ to ×2 on a logarithmic track, both meaning half
+   to double the peak width; a term at zero linear over one peak width (G² or G). Grounds:
+   the prototype's ±2 FWHM rule for position terms, carried to widths. Alternative: the
+   prototype's even span in width units, or a displacement range from the goniometer radius.
+3. **Graph tab name.** Settled by Claude, reversible: `Single peaks`. The panel corpus is keyed
+   by label, so `Peaks` would collide with the side strip's tab. Alternative: `Peak windows`.
+4. **Apply order.** Settled by Claude, reversible: the action bar applies the Parameters edits
+   first and the sliders second, as two history nodes, so a slider wins on a path both
+   touched. Alternative: one merged `set_values` node.
+5. **Parameters edits are not in the preview.** Settled by Claude, reversible: the sliders
+   start from the head's values. Grounds: that panel is WP-2126's (§ Non-goals).
+   Alternative: send the Parameters panel's pending values with every preview request.
+6. **Windows.** Settled by Claude, reversible: twelve equal 2θ bins, the strongest reflection
+   in each by the last fit's net height, three shown (bins 1, n/2 and n−2), each ±5 FWHM, y
+   from zero to a tenth above the last fit. Alternative: windows chosen by the person only.
+7. **Decimation.** Settled by Claude: the server sends every channel the next fit would fit,
+   and the client draws the preview on the curves payload's own channels, found by equal 2θ.
+   Grounds: `gui/CLAUDE.md`, "which points a payload carries is the server's". Alternative:
+   the route decimates to the same index itself.
+8. **The route sends the residuals.** Settled by Claude: `POST /api/preview` now also answers
+   `delta`, `delta_raw` and `cumulative_chi2`. Grounds: the curves route's rule that
+   `cumulative_chi2` cannot be built in a client. Alternative: the residual pane keeps the last
+   fit's residual under a preview.
+9. **Slider edits survive a head move.** Settled by Claude, reversible: a value equal to the
+   new head's is dropped, and a range nobody set is rebased on the new value. Alternative:
+   every head move clears the sliders.
+10. **The residual pane and the hover readout during a preview.** Settled by Claude,
+    reversible: the residual pane keeps the last fit's y range, and the readout strip still
+    reads the last fit. Alternative: both follow the preview.
+11. **Families.** Settled by Claude, reversible: no slider for atoms, occupancies, Biso, cell
+    angles or the background (§ Non-goals). A cell length's slider is named by its edge
+    (`Lattice parameter a`), because the help corpus has one entry for a, b and c.
+12. **Scale choices.** Settled by Claude, reversible: the pop-up offers `Linear` and
+    `Logarithmic` only. Alternative: a square-root track for width terms.
 
 ## Non-goals
 
@@ -97,24 +138,24 @@ the maintainer's review of the PR. Grounds are written where a rule settled it.
 
 ## Tasks
 
-- [ ] `POST /api/preview` also answers the three residuals the curves route sends, so the
+- [x] `POST /api/preview` also answers the three residuals the curves route sends, so the
   residual pane under a preview reads the server's numbers
-- [ ] `lib/interactive.ts`: the slider set from the parameter rows, the default ranges, the
+- [x] `lib/interactive.ts`: the slider set from the parameter rows, the default ranges, the
   linear and logarithmic tracks, one number format per slider, and the request throttle
   (one request in flight, the newest values sent next, a stale answer dropped)
-- [ ] `panels/Interactive.svelte`: the tab, its sliders, the range-and-scale pop-up from the
+- [x] `panels/Interactive.svelte`: the tab, its sliders, the range-and-scale pop-up from the
   name, a typed value from the number, ↺ to the last fit
-- [ ] The action bar takes the slider values as pending edits: count, Apply, Revert, Apply and
+- [x] The action bar takes the slider values as pending edits: count, Apply, Revert, Apply and
   refine
-- [ ] The Pattern graph draws the preview over the whole pattern at the last fit's scale; the
+- [x] The Pattern graph draws the preview over the whole pattern at the last fit's scale; the
   title line says "Preview, not refined" with both Rwp values
-- [ ] The Single peaks graph tab: three windows at the last fit's scale, stepped by ‹ and ›,
+- [x] The Single peaks graph tab: three windows at the last fit's scale, stepped by ‹ and ›,
   each with the data, the last fit, the preview and its residual
-- [ ] Above `CURVES_CEILING` channels the preview is drawn on the curves payload's own channels
-- [ ] Vitest for the logic; the layout browser test drags a slider and types a value with real
+- [x] Above `CURVES_CEILING` channels the preview is drawn on the curves payload's own channels
+- [x] Vitest for the logic; the layout browser test drags a slider and types a value with real
   input, and measures drag-to-redraw latency; dist rebuilt
-- [ ] Manual: the Interactive tab and the Single peaks tab in the GUI chapters; screenshots
-- [ ] Skill: none expected. The agent skill drives the python API, and an agent with a shell
+- [x] Manual: the Interactive tab and the Single peaks tab in the GUI chapters; screenshots
+- [x] Skill: none expected. The agent skill drives the python API, and an agent with a shell
   calls `Refinement` directly
 
 ## Acceptance
