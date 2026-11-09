@@ -538,6 +538,31 @@ def test_a_list_of_structure_forms_is_one_structure(blank, tmp_path, pattern_fil
         == ["LaB6", "CaF2"]
 
 
+def test_unnamed_typed_cells_in_one_create_get_distinct_names(blank, tmp_path,
+                                                              pattern_file):
+    """The dialog sends no name for a typed cell, and two of them were both
+    "phase" (WP-2131 review finding 8). In a list each unnamed one takes its
+    place in the joined list, phase_N as the CIF reader names an unnamed
+    block; a name given is kept, and a lone cell stays "phase"."""
+    session, client = blank
+    cells = [{"space_group": "P m -3 m", "cell": {"a": 4.160}},
+             {"space_group": "F m -3 m", "cell": {"a": 5.463}, "name": "CaF2"},
+             {"space_group": "F m -3 m", "cell": {"a": 5.431}}]
+    status, payload = client.post("/api/project/new", {
+        "pattern": str(pattern_file), "structure": cells, "mode": "lebail",
+        "path": str(tmp_path / "three.rex"),
+        "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}})
+    assert status == 200, payload
+    assert [p.name for p in session.project.refinement.structure.phases] \
+        == ["phase_1", "CaF2", "phase_3"]
+    status, payload = client.post("/api/project/new", {
+        "pattern": str(pattern_file), "structure": cells[0], "mode": "lebail",
+        "path": str(tmp_path / "one.rex"),
+        "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}})
+    assert status == 200, payload
+    assert [p.name for p in session.project.refinement.structure.phases] == ["phase"]
+
+
 def test_new_refuses_an_instrument_it_would_have_to_guess(blank, tmp_path,
                                                           pattern_file):
     """A default anode would put a wavelength nobody chose into every cell."""

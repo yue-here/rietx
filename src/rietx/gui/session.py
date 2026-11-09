@@ -3556,8 +3556,14 @@ def _as_structure(payload, uploads=None) -> Structure:
         # each member read in its own form, and the species check run once over
         # the joined list, so a refused atom's path carries its phase index in
         # the project rather than in its own file
-        structure = Structure(phases=[ph for item in payload
-                                      for ph in _structure_form(item, uploads).phases])
+        phases: list = []
+        for item in payload:
+            if _is_typed_cell(item) and not str(item.get("name") or "").strip():
+                # two unnamed cells would both be "phase"; a number from the
+                # joined list keeps them apart, in the CIF reader's phase_N form
+                item = {**item, "name": f"phase_{len(phases) + 1}"}
+            phases.extend(_structure_form(item, uploads).phases)
+        structure = Structure(phases=phases)
     else:
         structure = _structure_form(payload, uploads)
     unknown = unknown_species(structure)
