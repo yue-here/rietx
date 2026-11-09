@@ -19,7 +19,8 @@ Each rule ends with a marker in brackets.
 
 - `[Yue 2026-11-07]` means the maintainer stated the rule or its motive on that date.
 - `[inferred]` means Claude inferred the motive from the rulings, the site and common practice. A WP number after it names the first GUI's work the rule comes from. The maintainer approved this way of writing the guide on 2026-11-09 and reads it once.
-- `[open B2]` means the rule waits on item B2 in WP-2142's § Questions to the maintainer.
+- `[open Bn]` means the rule waits on item Bn in its WP's § Questions to the maintainer.
+- `provisional` after a date means the maintainer chose the rule for now, and a later review may revisit it.
 
 ## Principles
 
@@ -40,7 +41,7 @@ Other established themes (Solarized light and dark, Monokai and others) ship as 
 `theme.py` still holds the first GUI's blue and red.
 The palette piece moves it, and adds the site's roles the GUI lacks: a second text ink, a faint ink, a strong rule for control borders, a tinted ground, a hover ground, the accent as text, ink on a fill, and an info state. [Yue 2026-11-06, 2026-11-09]
 
-- Settings offers the theme. Whether it offers "follow the system" beside light, dark and the named themes waits on [open B2].
+- Settings offers the theme as three choices: Match system, Light and Dark. Match system is the default. Light and dark are built first. Named themes such as Solarized come later, and Settings lists them after the three. [Yue 2026-11-09]
 - A colour is chosen by its job, never by its look. [Yue 2026-11-06, adopting the site's rule]
 - The chrome tokens are `--fg`, `--bg`, `--panel`, `--line`, `--muted`, `--accent`, `--ok`, `--warn` and `--bad`. A page's extra role (a hover, a focus ring, a sunken track) is a `color-mix` over them and never a token of its own. [inferred, WP-1429]
 - The accent marks things and sets no running words. It marks the current tab's underline, the focus ring, a ticked box's tick, a selection on a plot, and the calculated curve. Links take the accent's text role. [Yue 2026-11-06 for the curve; inferred, from the site, for the rest]
@@ -111,7 +112,7 @@ The drawings live in `gui/src/app.css`. Each kind below means one thing (princip
 - The panels resize as in VS Code. The atom table is fully visible by default. [Yue 2026-11-07]
 - Below a width computed from the panels' minimums, the window is one column, graphs above the model. The page never scrolls sideways. [Yue 2026-11-07]
 - The graphs carry a title saying what they show, so a preview never reads as a changed fit. [Yue 2026-11-07]
-- The graph title gives way before the view's controls do: it shrinks with an ellipsis and shows the whole text on hover. This departs from the first GUI's rule that overflow wraps and never truncates. [open B1]
+- The graph title gives way before the view's controls do: it shrinks with an ellipsis and shows the whole text on hover. No control wraps while the title can still shrink. This departs from the first GUI's rule that overflow wraps and never truncates. [Yue 2026-11-09]
 - The action bar holds Revert, Apply, the one-cycle or staged-plan choice, and Apply and refine. While the graphs are hidden it also carries Rwp and GoF beside Refine. [Yue 2026-11-07; Yue 2026-11-09, "try B"]
 - The bottom panel holds Console (the Python the window runs) and History (with Compare and Restore). The status bar toggles it, and it starts hidden. [Yue 2026-11-07 for both views; inferred for one shared panel]
 - Workflows (peaks and indexing, series, structure solution, rigid bodies) are entries in the workflow menu, never tabs. A workflow keeps the window and shows its steps across the model panel. [Yue 2026-11-07]
@@ -147,7 +148,7 @@ Claude inferred rules 1 to 12 from the rulings on background points and peak pic
 
 ## Numbers and words on screen
 
-- Numbers default to scientific notation with aligned decimal points, and atom-table numbers stay plain. [Yue 2026-11-07] Where the switch between plain and scientific falls waits on [open B3].
+- Numbers are aligned on the decimal point. A number from 0.01 up to below 10 000 is written plain, and one outside that range in scientific notation. Atom-table numbers are always plain. [Yue 2026-11-07 for scientific by default; Yue 2026-11-09 for the range]
 - Switching a number between plain and scientific moves nothing. Each number slot reserves room for an exponent, and the slots come from the last fit, never from an edit. [Yue 2026-11-07; inferred for the slots]
 - Units follow the value, on the number side, in one column. Sliders are the exception: their units live in the range pop-up. [Yue 2026-11-07]
 - Groups such as cell parameters align on the decimal point. [Yue 2026-11-06]
@@ -169,7 +170,7 @@ Claude inferred rules 1 to 12 from the rulings on background points and peak pic
 - The hover readout is a strip under the plot, never a box that follows the pointer. [inferred, WP-1213]
 - Shading for an excluded region spans every pane and stops at the measured range. [inferred, WP-1033]
 - Peak marks are lenses that echo the reflection ticks, larger and higher above the peak. A used peak's mark is filled and an unused one has no mark on the pattern. Their colour waits for the palette piece. [Yue 2026-11-08; Yue 2026-11-09 on the colour]
-- A selected mark, and a mark no line explains, are shown by [open B4].
+- A selected mark is drawn larger, with a ring in the text ink (`--fg`). Red, the danger colour, marks only a peak no line explains, and it is the layer's only state colour. Orange stays the fit's alone. [Yue 2026-11-09, provisional]
 - A colour scale is perceptually uniform, and a residual map uses a diverging scale centred on zero. [inferred]
 - The 3D structure follows crystallography's drawing: its projection, cell edges, bonds and ellipsoids. The cell frame takes the accent, because a hairline vanishes in a scene. [inferred, WP-1015, WP-1462]
 - A drawn colour is checked on the rendered result, because a chart can paint something other than the option it was handed. [inferred]

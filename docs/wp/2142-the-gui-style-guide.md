@@ -1,6 +1,6 @@
 # WP-2142 — The GUI style guide
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the guide, its test and the milestone's unfiled pieces are in; B1-B4 wait on the maintainer; PR #1514
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the guide, its test and the milestone's unfiled pieces are in; B1-B4 ruled 2026-11-09; PR #1514
 Depends on: —
 Priority: P2 2026-11-09 — every later gui-overhaul piece is judged against it (ruled 2026-11-09)
 
@@ -164,21 +164,26 @@ settled by motive), 2 to the maintainer.
 
 ## Questions to the maintainer
 
-Sent as one batch on 2026-11-09. The guide marks each `[open Bn]`.
+Sent as one batch on 2026-11-09. The maintainer answered all four the same day, and the guide
+marks each `[Yue 2026-11-09]`.
 
 - **B1** (workshop Q18). The graph title shrinks with an ellipsis, the whole title on hover,
   before the view's controls wrap. The bars approved on 2026-11-07 work this way. The first GUI's
   rule (WP-1034) says overflow wraps and never truncates, the header included. Proposed: keep the
-  ellipsis for that one title.
+  ellipsis for that one title. *Ruled 2026-11-09*: yes.
 - **B2** (workshop Q16). The site's theme button argues in writing for two states; `theme.py`
   argues for a third, "follow the system". Proposed: Settings offers follow the system, light,
-  dark and the named themes.
+  dark and the named themes. *Ruled 2026-11-09*: yes, as Match system (the default), Light and
+  Dark. Light and dark are built first; named themes such as Solarized come later, after the three.
 - **B3**. Where numbers switch to scientific notation. Claude's reading of "scientific by
   default", unconfirmed: plain from 0.01 to below 10 000, scientific outside, atom-table numbers
-  always plain. Proposed: keep it.
+  always plain. Proposed: keep it. *Ruled 2026-11-09*: yes.
 - **B4**. How a selected plot mark, and a mark no line explains, are shown. Round 11 drew both in
   colour (the accent, the danger colour). The first GUI's rule (WP-1210) puts state on a mark's
   shape so the palette stays separable, and the accent will also be the calculated curve's hue.
+  *Ruled 2026-11-09, for now*: Claude's option (b). A selected mark is drawn larger, with a ring in the
+  text ink. Red marks only a peak no line explains and is the layer's only state colour; orange
+  stays the fit's. The guide marks the rule provisional, so a later review can revisit it.
 
 Settled under a stated motive and listed for the maintainer to reverse if wrong: facts drawn as
 words without chips or pills; Rwp and GoF with no green; selection never by weight; reflection
@@ -236,6 +241,10 @@ wait on the maintainer (B1-B4 above), and nothing in the GUI's code or colours c
 - *Next*: the maintainer answers B1-B4 (the batch went as one message). Each answer replaces an
   `[open Bn]` marker with `[Yue <date>]`. Then the palette piece, which most of § Colour waits on.
 
+- **2026-11-09** — the maintainer answered B1-B4 the same day. A ghostshift runner replaced the
+  four `[open Bn]` markers in `gui/STYLE.md` with `[Yue 2026-11-09]` and restated each rule to
+  match. B4 is marked provisional ("go with yours for now"). `tests/test_gui_style_guide.py` is
+  unchanged: it accepts `[open Bn]` as a marker for future questions and counts none.
 - **2026-11-09** — created by a ghostshift runner on the maintainer's 2026-11-09 ruling. No open
   WP owns a style guide: WP-2134 lists the visual rules for it and fences them out of its own
   scope, and WP-2123 to 2133 each build one panel.
