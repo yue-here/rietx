@@ -507,6 +507,7 @@ FEATURES: dict[str, Feature] = {
         "A parameter as a function of each pattern's coordinates",
         theory=(
             "parameterisation § A parameter as a function of each pattern's coordinates",
+            "parameterisation § A formula equation",
         ),
     ),
     "distortion_modes": Feature(

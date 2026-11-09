@@ -319,7 +319,8 @@ DATASETS: dict[str, Dataset] = {
         "model's answer under another protocol (docs/DESIGN.md Rule 2), so "
         "every row referenced to it is about the body machinery, not the "
         "structure's accuracy",
-        "characterisation"),
+        "characterisation",
+        state="development"),
 }
 
 
