@@ -529,16 +529,17 @@ behind the 409 like `/api/recent`. **The gate is containment, not a
 blocklist** — `path` is resolved (symlinks included) before it is checked
 against the two roots, the same shape `GuiSession._export_target` already used
 for the exports directory. Browse is **one modal, two jobs**: `mode="open"`
-opens a `.rex` entry, `mode="pick"` hands a plain directory back to the
-wizard's path field, keeping whatever basename was already suggested (a
-browser cannot name a new project, only where it lives). **`Model` is mounted
-exactly once in `App.svelte`**, never one instance per branch of
-`{#if project}`: two instances is two independent `wizardOpen`s, and opening a
-*different* project from the tab-mounted instance's wizard used to leave it
-painted over the freshly-opened one, because `project` stayed truthy the whole
-time and Svelte never tore the stale instance down. And **every opener settles
-`wizardOpen` on success through one function**, `Model.svelte`'s `openPath()`
-— the recent list's own handler never did, which is what let the bug ship.
+opens a `.rex` entry, `mode="pick"` hands a directory to the New project
+dialog's Where field (a browser can say where a project lives, never name it).
+**`Model` is mounted once in `App.svelte`**, never per branch of `{#if project}`,
+and **every opener settles what is drawn over the project in the shell's
+`open`/`opened`**: a second instance, or an opener settling it itself, once left
+a wizard painted over a freshly opened project. **The start screen and the New
+project dialog** (WP-2131, `panels/Start.svelte`, `panels/NewProject.svelte`)
+keep three rules. A moved recent project stays listed as `missing`, with Locate…
+and Remove (`POST /api/recent/remove`). The mode follows the phases, never asked:
+a typed cell gives Le Bail, so WP-1206's refusal stays unreachable. An assumed
+instrument is tagged `assumed` where shown: unmarked, a wrong anode moves cells.
 
 **A project without a CIF** (WP-1206, `GET /api/spacegroup`,
 `session._typed_cell_structure`, `lib/wizard.ts`) is the wizard's second answer

@@ -1,6 +1,6 @@
 # WP-2131 — the start screen and the New project dialog
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — all seven tasks landed; PR open, awaiting review
 Depends on: 2123
 Priority: P2 2026-11-09 — a piece of the open gui-overhaul milestone, the maintainer's round-9 design; the window a person first meets
 
@@ -120,17 +120,17 @@ made it.
 
 ## Tasks
 
-- [ ] `GET /api/recent` keeps a moved project as `missing`, carries each project's phases, and
+- [x] `GET /api/recent` keeps a moved project as `missing`, carries each project's phases, and
   `POST /api/recent/remove` drops one entry; `project_new` takes a list of structure forms.
-- [ ] `rietx gui` with no project reopens the recent list's head, and starts empty when it cannot.
-- [ ] The start screen (`panels/Start.svelte`): the two columns, the row menus, Locate…, Remove,
+- [x] `rietx gui` with no project reopens the recent list's head, and starts empty when it cannot.
+- [x] The start screen (`panels/Start.svelte`): the two columns, the row menus, Locate…, Remove,
   the example's fresh copy, and the header's Open… showing it over an open project.
-- [ ] The New project dialog (`panels/NewProject.svelte`) on `lib/wizard.ts`: the four rows, the
+- [x] The New project dialog (`panels/NewProject.svelte`) on `lib/wizard.ts`: the four rows, the
   instrument's source tag, the 6.5em label column, mode from the phases, no plan asked.
-- [ ] The old wizard and empty state leave `Model.svelte`; vitest moves to the new components.
-- [ ] The layout browser test drives the start screen and the dialog with real clicks; the dist
+- [x] The old wizard and empty state leave `Model.svelte`; vitest moves to the new components.
+- [x] The layout browser test drives the start screen and the dialog with real clicks; the dist
   rebuilt, the GUI chapters and the empty-state screenshot updated.
-- [ ] `docs/practice.md` § The start screen and the New project flow.
+- [x] `docs/practice.md` § The start screen and the New project flow.
 
 ## Acceptance
 
@@ -148,6 +148,67 @@ npm --prefix gui test && npm --prefix gui run check
 - `docs/practice.md` § The start screen and the New project flow.
 
 ## Handover log
+
+- **2026-11-09** — all seven tasks landed, by a ghostshift runner. With no project open, `rietx
+  gui` now shows the round-9 start screen: New project…, Open…, the recent list, the examples, and
+  links to the manual and the tutorials. A bare launch reopens the last project instead. New
+  project is one dialog of four rows (pattern, phases, instrument, project) that asks for no mode
+  and no plan; the instrument is assumed as Bragg-Brentano Cu Kα1/Kα2 where the file's header names
+  none, and the row says `assumed`. The old wizard is gone from the Model panel. What this rules
+  out: a project made from a foreign program's project file, which a browser upload cannot carry
+  with its data file.
+
+  *Done.* Server: the recent list keeps a moved project as `missing` and records each project's
+  phases at open; `POST /api/recent/remove`; `project_new` takes a list of structure forms, joined
+  before the species check; `rietx gui` with no project reopens the list's head, and any `OSError`
+  on open leaves the start screen up. Frontend: `panels/Start.svelte`, `panels/NewProject.svelte`,
+  `SpaceGroup.svelte` (a typeset symbol, `lib/symmetry.ts:symbolTokens`), `lib/wizard.ts`'s state
+  rewritten for the dialog, the wizard and empty state out of `Model.svelte`. Manual: the
+  quickstart's two sections, the header table, the route table, the empty-state screenshot (taken
+  from a server per theme now, or the dark pass had a project open). `docs/practice.md` § The
+  start screen and the New project flow. `gui/CLAUDE.md`: the WP-1205 opener rule restated for the
+  shell, and three rules for the new screens.
+
+  *Review.* `/code-review high --fix` found eight; seven fixed in `2b265cc76` (symbol labels kept
+  their case, a replaced pattern dropped the last file's header anode, Windows separators, a typed
+  cell blocked while its lookup is in flight, species-check paths in a list, any `OSError` on open,
+  the resolved symbol on a typed-cell row). Declined: two typed cells in one create are both named
+  `phase`; naming typed cells is a design call, and every path is keyed by index. No test covers
+  the list form's species-check path.
+
+  *Measured* (`[dev]` venv, darwin/arm64, another session's suite not running per `serial.py`):
+  @@COUNTS@@
+
+  *Settled by Claude, reversible* (for Yue; the call, then the alternative):
+  1. The project's default folder is the server's suggestion, since a browser upload carries no
+     folder; the pattern's own folder waits for the desktop app.
+  2. Add phase "From a TOPAS, FullProf or GSAS project…" is deferred: no upload kind brings the
+     data file the project names.
+  3. Show in Finder is omitted: a browser page cannot reveal a folder.
+  4. The header's Open… shows the start screen over the open project, with Back to the project;
+     the alternative is the File menu, out of scope here.
+  5. A CIF beside a typed cell makes a Le Bail project; the alternative refuses the mixed set.
+  6. The instrument form shows geometry, anode or wavelength, and radius; the other preset fields
+     wait under Advanced. The alternative is the whole preset form at once.
+  7. The anisotropic-ADP checkbox sits on the CIF's phase line, shown only when the file has a
+     U^ij loop; the alternative is under Advanced.
+  8. The wordmark is a 30 px class in `app.css`, the one type size outside the scale.
+  9. "The last project" is the head of the recent list; there is no Close verb yet.
+  10. Drag-and-drop of a file onto the window is deferred.
+  11. A recent row's phases are a label written at last open, not re-read.
+  12. An example's "Open a fresh copy" is the old Reset, offered only once built, with no confirm.
+  13. The `assumed` tag is a neutral chip; the alternative is the warn tone.
+  14. A space group is set in "STIX Two Text", then Times: no font is bundled.
+  15. Headings take the app's section-heading register (small capitals, muted); the prototype
+      had sentence case.
+
+  *Gotchas.* The layout test's label check was made to fail once: with the label column at 3em
+  it reported `Geometry` ink 59.75 px in a 39 px column. `make_screenshots.py` regenerates every
+  picture; only the two empty-state files were committed, the rest being pixel noise.
+
+  Next: Yue reviews the settled calls above, the visual ones first (13-15, 6, 7). Then the File
+  menu (Save a copy, Rename, Move to, Export), which needs a WP of its own and would take over
+  call 4. A Close verb would let call 9 mean "the project open at quit".
 
 - **2026-11-09** — filed by a ghostshift runner. No open WP owned the start screen or the New
   project flow: the milestone's five pieces (2123 and the open 2125-2130) are the shell, the
