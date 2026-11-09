@@ -124,9 +124,9 @@ Claude, reversible", with its alternative, and waits for the maintainer's review
 
 ## Tasks
 
-- [ ] `src/rietx/gui/background.py`: the band, cached per working state; `GuiSession.background`
+- [x] `src/rietx/gui/background.py`: the band, cached per working state; `GuiSession.background`
   and `GET /api/background`; the `hold` arm on `PATCH /api/params`
-- [ ] Tests: the band against an independent normal-equations computation, held and unheld, a
+- [x] Tests: the band against an independent normal-equations computation, held and unheld, a
   free scale widening it, absent with no free background term, the hold arm, the 409, nothing
   written by the GET
 - [ ] Client: `lib/background.ts` (pure drawing helpers), `panels/Background.svelte`, the graph tab

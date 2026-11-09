@@ -267,6 +267,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/result/curves"): lambda s, q, b: s.result_curves(),
     # the curves at values nobody has applied, writing nothing (WP-2125)
     ("POST", "/api/preview"): lambda s, q, b: s.preview(b),
+    # the background curve and its band from the fit's covariance (WP-2129)
+    ("GET", "/api/background"): lambda s, q, b: s.background(),
     ("GET", "/api/report"): _report,
     ("POST", "/api/report/apply"): lambda s, q, b: s.report_apply(b),
 

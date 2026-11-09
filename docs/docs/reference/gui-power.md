@@ -233,7 +233,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/project/new` · `POST /api/project/open` | create; open, replacing the session's |
 | `GET /api/project` · `POST /api/project` | the project document; a merge into its settings |
 | `POST /api/project/save` | write the settings file |
-| `GET /api/params` · `PATCH /api/params` | every parameter row; value and vary edits |
+| `GET /api/params` · `PATCH /api/params` | every parameter row; value, vary and hold edits |
 | `GET /api/plan` · `PUT /api/plan` · `GET /api/plans` | the plan; replace it; the presets |
 | `GET /api/plan/resolve` | the ladder: per stage, what it frees and what stays held |
 | `GET /api/structure` · `PATCH /api/structure` | the model, its sites and its symmetry; a whole validated replacement |
@@ -253,6 +253,7 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/result` | the fit's numbers, without the curves |
 | `GET /api/result/curves` | every channel of the pattern and, after a fit, its curves on the channels it kept |
 | `POST /api/preview` | the calculated curve, the background, each phase and the ticks at values sent in the body and never applied; writes nothing, and says whether it evaluated the last compile, resized its windows or compiled afresh |
+| `GET /api/background` | the background curve at the working state's values, the observed pattern, and the curve's esd at each fitted channel through the whole covariance of the free parameters; writes nothing |
 | `GET /api/report` · `POST /api/report/apply` | the `FitReport`; run the stage one of its suggestions names |
 
 ### Peaks and indexing

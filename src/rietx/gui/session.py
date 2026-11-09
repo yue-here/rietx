@@ -874,13 +874,16 @@ class GuiSession:
         if not isinstance(values, dict) or not isinstance(vary, dict):
             raise GuiError("'values' maps dot-path → number and 'vary' maps "
                            "dot-path glob → bool")
-        changed: dict[str, Any] = {"values": [], "vary": {}}
+        hold = body.get("hold") or {}
+        if not isinstance(hold, dict):
+            raise GuiError("'hold' maps dot-path glob → bool")
+        changed: dict[str, Any] = {"values": [], "vary": {}, "hold": {}}
         # a literal vary key the model lacks is a typo, refused before the
         # values or any earlier key commit a node (WP-1951)
         try:
-            p.refinement._refuse_unknown_literals(list(vary))
+            p.refinement._refuse_unknown_literals(list(vary) + list(hold))
         except ValueError as exc:
-            raise GuiError(str(exc), where=sorted(vary)) from None
+            raise GuiError(str(exc), where=sorted({*vary, *hold})) from None
         if values:
             try:
                 p.refinement.set_values({k: float(v) for k, v in values.items()})
@@ -890,6 +893,12 @@ class GuiSession:
                 # different fix, so the message travels intact
                 raise GuiError(str(exc), where=sorted(values)) from None
             changed["values"] = sorted(values)
+        # ``hold`` is ``Refinement.hold``/``unhold`` (WP-1435), the contract PR
+        # #1484 gives this arm too: releases before the vary flags and holds
+        # after them, so "release and free" and "untick and hold" both land
+        for glob, flag in hold.items():
+            if not flag:
+                changed["hold"][glob] = _holding(p.refinement.unhold, glob)
         for glob, flag in vary.items():
             try:
                 changed["vary"][glob] = p.refinement.set_vary(glob, bool(flag))
@@ -900,6 +909,9 @@ class GuiSession:
                 # treatment as ``set_values`` above: the sentence names the
                 # verb that resolves it, so it travels intact.
                 raise GuiError(str(exc), where=[glob]) from None
+        for glob, flag in hold.items():
+            if flag:
+                changed["hold"][glob] = _holding(p.refinement.hold, glob)
         return {"changed": changed, **self.params()}
 
     # ------------------------------------------------------------------
@@ -2812,6 +2824,15 @@ class GuiSession:
         self._require_idle()
         return preview.evaluate(self._need_project(), body)
 
+    def background(self) -> Packed:
+        """The background curve and the band it may move in, writing nothing
+        (WP-2129). Idle-only, like every verb that compiles;
+        :mod:`rietx.gui.background` has the band's derivation."""
+        from . import background
+
+        self._require_idle()
+        return background.answer(self._need_project())
+
     def report(self, plan: str | None = None) -> dict:
         """The three-layer :class:`FitReport` for the last fit, plus what applies.
 
@@ -3590,3 +3611,10 @@ def _as_plan_argument(plan: Any):
         return plan
     return _validate(PlanSpec, plan, "plan").to_plan()
 
+
+def _holding(verb, glob: str) -> list[str]:
+    """``Refinement.hold``/``unhold`` on one glob, a refusal in its own words."""
+    try:
+        return verb(glob)
+    except ValueError as exc:
+        raise GuiError(str(exc), where=[glob]) from None
