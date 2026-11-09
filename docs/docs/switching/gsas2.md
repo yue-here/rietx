@@ -85,7 +85,7 @@ rietx has two places for the same equation.
 
 The second has no GSAS-II counterpart.
 It fits the equation's variables against the patterns themselves, so a pattern that cannot pin the parameter alone still contributes.
-Where every pattern measures the parameter well, the two agree: on a synthetic seven-pattern ramp the two lines differed by at most 0.05 of their combined esds ([How to refine a cell edge as a function of temperature](../guides/equation.md#fit-the-equation-to-the-series-trajectory)).
+Where every pattern measures the parameter well, the two agree: on a synthetic seven-pattern ramp the two lines differed by at most 0.05 of their combined esds ([the equation guide](../guides/equation.md#fit-the-equation-to-the-series-trajectory)).
 
 A project's stored equations come across.
 `rx.read_gsas2_gpx` reads each one in `SeqParFitEqList` onto `model.sequential_equations`, its text rewritten in rietx's grammar, its free labels as `rx.Parameter`s with their stored values and refine flags, and the table column each other label reads ([Equations stored with a sequential fit](../reference/foreign-models.md#equations-stored-with-a-sequential-fit)):

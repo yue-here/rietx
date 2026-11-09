@@ -100,7 +100,7 @@ phases.0.cell.a = a0 + k*(T - 600), fitted to the forward chain's trajectory (7 
   k = 2.0781664e-05 ± 9.8e-09 (unscaled ± 8.0e-09)
 ```
 
-`a0` is the cell edge at 600 K and `k` the slope, the two numbers the declared line gave above.
+`a0` is the lattice parameter a at 600 K and `k` the slope, the two numbers the declared line gave above.
 They lie 0.07 and 0.03 of the declared line's esds from its values.
 
 Each variable carries two esds, and rietx does not choose between them.
