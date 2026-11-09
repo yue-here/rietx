@@ -321,7 +321,10 @@ def annotations_of(row) -> dict[str, Any]:
     """
     out: dict[str, Any] = {}
     if row.tie is not None:
-        out["tie"] = row.tie.describe()      # the schema's own words
+        # the schema's own words, its whitespace as the parser's ``split``
+        # leaves it: a formula tie (WP-2118) keeps the caller's spacing, and
+        # an unedited document must compare equal
+        out["tie"] = " ".join(row.tie.describe().split())
     if row.lo != float("-inf"):
         out["min"] = float(_fmt(row.lo))
     if row.hi != float("inf"):
@@ -425,9 +428,10 @@ def _render_peaks(project) -> list[str]:
     widths = [max(2, *(len(r[0]) for r in rows))] + [
         max(len(name), *(len(r[k]) for r in rows))
         for k, name in ((1, "2theta"), (2, "esd"), (3, "fwhm"), (4, "I"))]
-    shoulders = doc.pick_options.get("shoulders", True)
+    limits = (tuple(project.doc.two_theta_limits)
+              if project.doc.two_theta_limits else None)
     provenance = ("σ assumed, not measured" if doc.peaks.source == "positions"
-                  else f"session.pick_peaks(shoulders={shoulders})")
+                  else store.pick_call(doc.pick_options, default_range=limits))
     names = ("2theta", "esd", "fwhm", "I")
     lines = [
         f"peaks {len(rows)}".ljust(34) + f"# {provenance}",
@@ -1203,6 +1207,24 @@ _ANNOTATION_REASONS = {
     "esd": "an esd is a result of a fit, not an input to one",
 }
 
+#: The tie reasons that depend on where the row's tie came from: a user tie
+#: (WP-1070) was made by no symmetry, and a row with none can still take one.
+_TIE_REASONS = {
+    "user": "this tie was declared with ref.tie(); ref.untie() takes it back and "
+            "ref.tie() declares it again",
+    "none": "a tie comes from the crystal system, the site symmetry or ref.tie(), "
+            "and this document cannot add one",
+}
+
+
+def _annotation_reason(key: str, live) -> str:
+    """Why annotation ``key`` cannot be edited on ``live``'s row."""
+    if key == "tie" and live.tie is None:
+        return _TIE_REASONS["none"]
+    if key == "tie" and live.tie.user:
+        return _TIE_REASONS["user"]
+    return _ANNOTATION_REASONS.get(key, "this is read-only")
+
 
 def _check_annotations(row: Row, live, fail, kept) -> None:
     """Annotations are read-only, and only a *differing* one is an error.
@@ -1217,15 +1239,14 @@ def _check_annotations(row: Row, live, fail, kept) -> None:
     current = annotations_of(live)
     for key, typed in row.annotations.items():
         if key not in current:
-            fail(row.line, f"{row.path} is not {key!r} — "
-                           f"{_ANNOTATION_REASONS.get(key, 'this is read-only')}",
+            fail(row.line, f"{row.path} is not {key!r} — {_annotation_reason(key, live)}",
                  row.path, row.text)
         elif current[key] != typed and not (
                 key in ("min", "max") and key in kept()
                 and float(_fmt(kept()[key])) == current[key]):
             shown = current[key] if current[key] is not True else key
             fail(row.line, f"{key} on {row.path} is {shown}, and cannot be "
-                           f"edited here: {_ANNOTATION_REASONS[key]}",
+                           f"edited here: {_annotation_reason(key, live)}",
                  row.path, row.text)
 
 
@@ -1300,7 +1321,7 @@ def _apply_peaks(project, delta: Delta, editor) -> list[str]:
         limits = (tuple(project.doc.two_theta_limits)
                   if project.doc.two_theta_limits else None)
         editor = store.PeakEditor(project.data, project.refinement.instrument,
-                                  two_theta_range=limits)
+                                  **store.settings_of(doc, default_range=limits))
     where = {i: doc.peaks.peaks[i].two_theta
              for i in set(delta.peak_moves) | set(delta.peak_flags)}
 

@@ -43,11 +43,15 @@
     busy = false,
     simple = true,
     say = (_line: string) => {},
+    onpending = (_touched: number, _invalid: string) => {},
   }: {
     head?: string | null;
     busy?: boolean;
     simple?: boolean;
     say?: (line: string) => void;
+    /** the pending edits, reported to the shell's action bar (WP-2123): how
+     *  many, and the first invalid one's reason or "" */
+    onpending?: (touched: number, invalid: string) => void;
   } = $props();
 
   const ROW_HEIGHT = 22;
@@ -69,6 +73,15 @@
   const picked = $derived(selection(rows, glob));
   const slice = $derived(windowSlice(view.items.length, scrollTop, viewport, ROW_HEIGHT));
   const pending = $derived(editState(rows, edits, varyEdits.size));
+
+  // The action bar at the panel column's foot shows the count and holds Apply
+  // and Revert (WP-2123); this panel's own footer, which appeared on the first
+  // edit and moved the table, is gone.
+  $effect(() => {
+    const first = pending.invalid[0];
+    onpending(pending.touched,
+              first ? `${first.path.split(".").pop()}: ${first.why}` : "");
+  });
 
   async function load() {
     loading = true;
@@ -104,9 +117,10 @@
     error = "";
   }
 
-  async function patch(body: { values?: Record<string, number>; vary?: Record<string, boolean> }) {
+  async function patch(body: { values?: Record<string, number>; vary?: Record<string, boolean> }): Promise<boolean> {
     try {
       absorb(await api.patchParams(body));
+      return true;
     } catch (exc) {
       // a refusal is the useful answer: a tied path names the source to set
       // instead, a bound violation prints the interval, a 409 says a run owns
@@ -114,6 +128,7 @@
       error = exc instanceof ApiError && exc.busy
         ? "a run is in flight — the table is read-only until it ends"
         : (exc as Error).message;
+      return false;
     }
   }
 
@@ -122,17 +137,21 @@
     await patch({ vary: { [glob]: vary } });
   }
 
-  async function apply() {
+  /** Apply the pending edits; true when there were none or they all landed,
+   *  which is what "Apply and refine" waits on before it runs anything. */
+  export async function apply(): Promise<boolean> {
+    if (!pending.touched) return true;
+    if (pending.invalid.length) return false;
     const { values } = pending;
     const vary = Object.fromEntries(varyEdits);
     if (Object.keys(values).length) say(`ref.set_values(${JSON.stringify(values)})`);
     for (const [path, flag] of varyEdits) {
       say(`ref.set_vary(${JSON.stringify(path)}, ${flag ? "True" : "False"})`);
     }
-    await patch({ values, vary });
+    return await patch({ values, vary });
   }
 
-  function revert() {
+  export function revert() {
     edits = new Map();
     varyEdits = new Map();
     error = "";
@@ -287,24 +306,10 @@
     {/if}
   </div>
 
-  {#if pending.touched}
-    <footer>
-      <span>
-        {pending.touched} pending {pending.touched === 1 ? "edit" : "edits"}
-        {#if pending.invalid.length}
-          <span class="why">· {pending.invalid[0].path.split(".").pop()}: {pending.invalid[0].why}</span>
-        {/if}
-      </span>
-      <span class="spacer"></span>
-      <button class="ghost" onclick={revert}>Revert</button>
-      <!-- an invalid cell blocks Apply rather than being dropped silently: the
-           whole point of carrying bounds on the row is to say so before the
-           round trip, and a partial apply is a worse answer than none -->
-      <button disabled={busy || pending.invalid.length > 0} onclick={apply}>
-        Apply
-      </button>
-    </footer>
-  {/if}
+  <!-- Apply and Revert live in the shell's action bar (WP-2123).  An invalid
+       cell still blocks Apply rather than being dropped silently: the whole
+       point of carrying bounds on the row is to say so before the round trip,
+       and a partial apply is a worse answer than none. -->
 </section>
 
 <style>
@@ -338,18 +343,12 @@
 
   /* rows of controls, so they are control-sized — the counts beside the
      buttons read with them rather than as prose */
-  .bar,
-  footer {
+  .bar {
     display: flex;
     align-items: center;
     gap: 6px;
     padding: 0 8px 4px;
     font-size: var(--text-sm);
-  }
-
-  footer {
-    border-top: 1px solid var(--line);
-    padding-top: 5px;
   }
 
   .spacer {
@@ -472,9 +471,5 @@
     color: var(--bad);
     padding: 0 8px;
     margin: 2px 0;
-  }
-
-  .why {
-    color: var(--bad);
   }
 </style>

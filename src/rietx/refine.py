@@ -53,10 +53,12 @@ from .crystallography.symmetry import reflection_label, reflection_label_row
 from .crystallography.twins import (
     NumberingMoves,
     carry_constraints,
+    carry_restraints,
     carry_state_constraints,
     coordinate_snapshot,
     merge_site_twins,
     numbering_moves,
+    restraints_dropped_message,
     site_of,
 )
 from .help import help_key_for
@@ -525,6 +527,20 @@ class _StageHold:
     window_loss: float | None = None
     #: ``StageResult.rwp`` (WP-1334), the same frozen model at the same answer
     rwp: float | None = None
+
+
+def _add_formula(table: ParameterTable, path: str, expression) -> None:
+    """Set ``path`` on ``table`` by a user's formula tie (WP-2118).
+
+    Every name of the formula is a named variable, bound to its ``vars.``
+    path, so the one binding rule lives here and both the declaration and
+    every rebuild (:meth:`Refinement._apply_ties`) go through it.
+    """
+    from .params.expression import Expression
+
+    expr = expression if isinstance(expression, Expression) else Expression(expression)
+    table.add_expression(path, expr,
+                         variables={n: f"{VAR_PREFIX}{n}" for n in expr.names})
 
 
 def _tie_terms(source: "str | dict[str, float] | Sequence[tuple[str, float]]",
@@ -3076,6 +3092,20 @@ class Refinement:
         edit that *repairs* such a state is not refused by the damage it is
         undoing.  It costs one table build on a cold path — the same build the
         next stage compile or ``parameters()`` call performs anyway.
+
+        **Holds, ties and restraints follow their atoms.**  An atom's dot-path
+        is its index, so a structure with an atom removed, inserted or
+        reordered numbers the others differently.  Each hold and tie is read
+        into the new numbering (#1264), and so is each restraint the new
+        structure still holds unchanged at its place in the list
+        (:func:`~.crystallography.twins.carry_restraints`, WP-2121).  One
+        appended after those was written for the new structure and is read as
+        written.  One changed in the same edit that renumbers its atoms could
+        mean either atom list, so it refuses the edit: change the atoms alone,
+        then the restraints.  One on an atom the edit removed is
+        dropped, and a warning names it.  A restraint, rigid body or
+        distortion-mode record that names an atom the new structure lacks
+        refuses the edit, since a list changed in place re-ran no check.
         """
         # Refused before anything is touched: a bank's table builds without
         # error, so nothing later stops the edit, and by then the structure,
@@ -3086,8 +3116,26 @@ class Refinement:
         # a proposed structure meets the twin merge before its table is built,
         # since moving a site changes the symmetry its table is checked against
         merged: list[Diagnostic] = []
+        restraints_dropped: list[str] = []
         if structure is not None:
             candidate = merge_site_twins(candidate, diagnostics=merged)
+            # A restraint names atoms by index and lives on the structure, out
+            # of reach of the registers ``_carry_twin_moves`` renumbers below,
+            # and a list changed in place re-ran no phase validator (WP-2121).
+            # The two refusals say different things: the first that a
+            # restraint's numbering is ambiguous, the second that a record
+            # names an atom the structure lacks.
+            try:
+                candidate, restraints_dropped = carry_restraints(self.structure, candidate)
+            except ValueError as exc:
+                raise ValueError(
+                    f"the edit is refused rather than recorded: {exc}") from None
+            try:
+                candidate._check_atom_references()
+            except ValueError as exc:
+                raise ValueError(
+                    f"this model names an atom it does not have, so the edit is "
+                    f"refused rather than recorded: {exc}") from None
         # No magnetic-group judgement here: ``edit`` receives refined state
         # plus one change (the GUI's funnel for every model edit), which is the
         # case :func:`_refined_state` exists for (issue #597).
@@ -3098,6 +3146,9 @@ class Refinement:
             raise ValueError(
                 f"this model has no parameter table, so the edit is refused "
                 f"rather than recorded: {exc}") from None
+        if restraints_dropped:
+            warnings.warn(restraints_dropped_message(restraints_dropped), UserWarning,
+                          stacklevel=2)
         # Reconcile the user constraints with the model being accepted, here
         # rather than at the next table build: this is the recorded verb, so the
         # register it leaves is the one the node carries, and a tie that stopped
@@ -3241,11 +3292,42 @@ class Refinement:
         reach = table.entry_reach()
         owned = table.body_rows()
         origin = table.origin_holds
-        return [_parameter_row(
+        rows = [_parameter_row(
             e, tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
                     if e.tie is not None else None),
             esd=esd.get(e.path), mode=mode, blocked=blocked, reach=reach,
             owned=owned, origin=origin) for e in table.entries]
+        return self._formula_rows(table, rows)
+
+    def _formula_rows(self, table: ParameterTable,
+                      rows: list[ParameterRow]) -> list[ParameterRow]:
+        """The rows a user's formula writes, read as ties rather than as locked.
+
+        A formula's block owns its rows the way the space group owns a fixed
+        coordinate, so the table holds them locked with no tie
+        (``ParameterTable.add_expression``).  A row is a reading for the
+        caller, who can lift the formula with :meth:`untie`, so its target
+        reads ``tied: = <the formula>`` and each follower the linear tie the
+        block carries for it (a cubic ``b`` on ``a``) (WP-2118).
+        """
+        from .params.derived import ExpressionBlock
+
+        over: dict[str, TieSpec] = {}
+        for block in table.derived:
+            if not isinstance(block, ExpressionBlock):
+                continue
+            spec = self._ties.get(block.target)
+            if (spec is None or spec.expression is None
+                    or block.target not in self._applied_ties):
+                continue
+            over[block.target] = spec.model_copy(deep=True)
+            for path, coeff, const in block.followers:
+                over[path] = TieSpec(terms=[(block.target, coeff)], const=const,
+                                     user=path in self._applied_ties)
+        if not over:
+            return rows
+        return [r.model_copy(update={"tie": over[r.path], "locked": False})
+                if r.path in over else r for r in rows]
 
     def set_vary(self, path_globs: list[str] | str, vary: bool = True) -> list[str]:
         """Free (or hold) every parameter matching ``path_globs``.
@@ -3412,6 +3494,12 @@ class Refinement:
                 if (h := _path_hint(p, by_path))))
         for path, value in values.items():
             e = by_path[path]
+            user = (self._ties.get(path) if path in self._applied_ties else None)
+            if e.locked and user is not None:
+                # a row a user's formula writes (WP-2118)
+                raise ValueError(
+                    f"{path!r} follows {user.describe()} (a user tie); set "
+                    "the variables it reads instead, or untie it")
             if e.locked:
                 raise ValueError(
                     f"{path!r} is structurally fixed (symmetry, or a "
@@ -3535,6 +3623,8 @@ class Refinement:
         by_path = {e.path: e for e in table.entries}
         dropped: list[str] = []
         for path, spec in self._ties.items():
+            if spec.expression is not None:
+                continue  # after every linear tie, below
             entry = by_path.get(path)
             missing = [p for p, _ in spec.terms if p not in by_path]
             if entry is None:
@@ -3565,6 +3655,31 @@ class Refinement:
         # second time, once per table build (WP-1432), so the anchors are
         # corrected here — on the fresh table, before anything reads it.
         table.rebase_anchored_dofs(self._applied_ties)
+        # Formula ties last (WP-2118): a formula's block takes over every row
+        # whose linear tie reads its target alone, a user's included, so those
+        # ties must be on the table before the block is declared.  Register
+        # order is declaration order, which is the order blocks may read each
+        # other's targets in.
+        for path, spec in self._ties.items():
+            if spec.expression is None:
+                continue
+            entry = by_path.get(path)
+            if entry is None:
+                dropped.append(f"{path} (no such parameter)")
+            elif entry.tie is not None:
+                dropped.append(f"{path} (now tied by symmetry to "
+                               f"{', '.join(p for p, _ in entry.tie.terms)})")
+            elif entry.locked:
+                dropped.append(f"{path} (now structurally fixed)")
+            else:
+                try:
+                    _add_formula(table, path, spec.expression)
+                except ValueError as exc:
+                    # a variable removed under it, or a follower the block
+                    # cannot carry after a model edit: a build must not stop
+                    dropped.append(f"{path} ({exc})")
+                    continue
+                self._applied_ties.add(path)
         if dropped:
             warnings.warn(
                 f"{len(dropped)} user tie(s) no longer apply to this model and "
@@ -3616,6 +3731,20 @@ class Refinement:
         entry = by_path.get(path)
         if entry is None:
             raise _unknown_path_error(path, by_path)
+        user = (self._ties.get(path) if path in self._applied_ties else None)
+        if user is not None and entry.locked:
+            # a formula's block writes this row: its own target, or a row
+            # whose user tie read the target alone (WP-2118).  The table
+            # holds it locked, which is how a block owns a row, and
+            # "structurally fixed" would send the caller to the wrong fix
+            if role == "source":
+                raise ValueError(
+                    f"{path!r} follows {user.describe()} (a user tie), so it "
+                    "carries no freedom of its own; name a variable that "
+                    "formula reads, or write this tie as a formula too")
+            raise ValueError(
+                f"{path!r} already follows {user.describe()} (a user tie); "
+                "untie it first")
         if entry.locked:
             raise ValueError(
                 f"{path!r} is structurally fixed (symmetry, or a representation "
@@ -3737,7 +3866,7 @@ class Refinement:
                 f"{sorted(self._variables) or 'none'}")
         path = f"{VAR_PREFIX}{name}"
         dependents = sorted(p for p, spec in self._ties.items()
-                            if any(src == path for src, _ in spec.terms))
+                            if path in spec.sources)
         if dependents:
             raise ValueError(
                 f"{path!r} still has {len(dependents)} dependent(s) "
@@ -3769,9 +3898,11 @@ class Refinement:
             state=self.snapshot())
         self._head_id = node.id
 
-    def tie(self, path: str, source: "str | dict[str, float] | Sequence[tuple[str, float]]",
-            *, scale: float = 1.0, offset: float = 0.0) -> str:
-        """Constrain ``path`` to ``scale·source + offset``, recording a node.
+    def tie(self, path: str,
+            source: "str | dict[str, float] | Sequence[tuple[str, float]] | None" = None,
+            *, scale: float = 1.0, offset: float = 0.0,
+            expression: str | None = None) -> str:
+        """Constrain ``path`` to ``scale·source + offset``, or to ``expression=``: a formula over ``add_variable`` names, trig in radians.
 
         The general affine form, of which :meth:`tie_equal` is the ``scale=1,
         offset=0`` case.  Complementary occupancies on a shared site are the
@@ -3807,11 +3938,109 @@ class Refinement:
         the one-entry case of the many-source one and neither is a special
         path through the code.
 
+        ``expression`` sets ``path`` by a formula in the grammar of
+        ``docs/docs/reference/expressions.md`` instead (WP-2118)::
+
+            ref.add_variable("B0", 0.5, vary=True, min=0.0)
+            ref.add_variable("thD", 400.0, vary=True, min=50.0)
+            ref.tie("phases.0.atoms.0.biso", expression="B0 * debye(thD / 300)")
+
+        A formula reads **named variables and numbers only**, each name a
+        variable from :meth:`add_variable` (the maintainer's ruling of
+        2026-11-07).  To read a model parameter, tie it to a variable first and
+        name the variable.  It always runs as a formula, linear or not, while
+        ``source`` stays the constant matrix, so no linear tie changes value.
+        Trigonometry is in radians (``pi`` is a constant) and every angle rietx
+        stores is in degrees, so a cell angle enters as ``cos(beta * pi/180)``.
+        :meth:`untie` releases it like any tie, checkout restores it, and the
+        target's row in :meth:`parameters` reads ``tied: = <the formula>``.
+        Refused, besides the target refusals above: a name that is not a
+        declared variable, a formula that reads none (that is
+        :meth:`set_values`), a value off the target's bounds or not finite at
+        the variables' present values, and a target that is a displacement
+        from where the fit began (a site DOF or a rigid-body increment), which
+        no formula can set absolutely.
+
         Returns ``path``.  Like :meth:`set_vary`, the node is recorded only
         once the history tree exists.
         """
+        if expression is not None:
+            if source is not None:
+                raise TypeError("tie() takes a source or an expression, not both")
+            if scale != 1.0 or offset != 0.0:
+                raise ValueError(
+                    "scale and offset apply to a source; write them into the "
+                    "expression instead")
+            return self._declare_expression(path, expression)
+        if source is None:
+            raise TypeError("tie() needs a source path or an expression=")
         return self._declare_ties({path: (_tie_terms(source, float(scale)),
                                           float(offset))})[0]
+
+    def _declare_expression(self, path: str, text: str) -> str:
+        """Validate and apply one formula tie as one move (WP-2118).
+
+        The formula's own refusals come from the table
+        (``ParameterTable.add_expression``), so a declaration and a rebuild
+        refuse the same things; what is checked here first is what only the
+        refinement knows: which names are variables, and the caller's
+        bounds at the values the variables hold now.
+        """
+        from .params.expression import Expression
+
+        if not isinstance(text, str):
+            raise TypeError(f"expression must be text, got {type(text).__name__}")
+        table = self._working_table()
+        self._tie_entry(table, path, role="target")
+        if path in table.anchored_dof_paths or table._body_increment_kind(path):
+            raise ValueError(
+                f"{path!r} is a displacement from where the fit began (a site "
+                "DOF or a rigid-body increment), so a formula cannot set it "
+                "absolutely; set the quantity it moves by a parameter that is "
+                "absolute, or tie it linearly")
+        expr = Expression(text)
+        if not expr.names:
+            raise ValueError(
+                f"the expression {text!r} reads no variable, so it fixes "
+                f"{path!r} at a number; that is set_values, and it says so in "
+                "the history")
+        for name in expr.names:
+            if name not in self._variables:
+                hint = did_you_mean(name, self._variables, n=1)
+                raise ValueError(
+                    f"the expression for {path!r} reads {name!r}, which is not "
+                    "a declared variable.  A formula reads named variables and "
+                    f"numbers only: add_variable({name!r}, value) first, and to "
+                    "read a model parameter tie it to that variable"
+                    + (f"; {hint}" if hint else ""))
+        before = {e.path: e.value for e in table.entries}
+        # a build declares the ties before the holds (``_working_table``), so a
+        # caller's hold on the target cannot refuse here what every rebuild
+        # accepts; a linear tie accepts a held target too
+        held = path in self._user_holds
+        if held:
+            table.set_held([path], False)
+        _add_formula(table, path, expr)
+        if held:
+            table.set_held([path], True)
+        moved = [e for e in table.entries if e.value != before[e.path]
+                 or e.path == path]
+        for e in moved:
+            if not math.isfinite(e.value):
+                raise ValueError(
+                    f"the expression {text!r} gives {e.path}={e.value} at the "
+                    "variables' present values; set them where it is defined")
+        broken = [e for e in moved if not (e.lo <= e.value <= e.hi)]
+        if broken:
+            e = broken[0]
+            more = f" ({len(broken)} parameters in all)" if len(broken) > 1 else ""
+            raise ValueError(
+                f"tying {path} to {text} implies {e.path}={e.value:g}"
+                f"{self._owner_label(e.path)}, outside its bounds "
+                f"[{e.lo:g}, {e.hi:g}]{more}; loosen that bound or set the "
+                "variables nearer")
+        self._register_ties(table, {path: TieSpec(expression=text, user=True)})
+        return path
 
     def tie_equal(self, paths: list[str] | str, *,
                   source: str | None = None) -> list[str]:
@@ -3887,12 +4116,16 @@ class Refinement:
             raise ValueError(f"{glob!r} is not tied")
         if not hits:
             return []
+        derived = table.derived_paths()
         for path in hits:
             del self._ties[path]
-            if path in self._applied_ties:
+            if path in self._applied_ties and path not in derived:
                 # a register entry symmetry has since taken over is dropped from
                 # the register and left alone on the table: releasing it there
-                # would strip the space group's tie for one build
+                # would strip the space group's tie for one build.  A row a
+                # formula's block writes is left too: the commit writes the
+                # value the block last gave it, and the next build, without
+                # the register entry, holds it there (WP-2118)
                 table.set_tie(path, None)
         self._commit_tie_edit(table, ties={}, untied=hits)
         return hits
@@ -4196,6 +4429,12 @@ class Refinement:
                 f"{self._owner_label(e.path)}, outside its bounds "
                 f"[{e.lo:g}, {e.hi:g}]{more}; loosen that bound or change "
                 "the tie")
+        self._register_ties(table, specs)
+        return list(spec)
+
+    def _register_ties(self, table: ParameterTable,
+                       specs: dict[str, TieSpec]) -> None:
+        """Add ``specs`` to the register and commit ``table``, as one move."""
         previous = dict(self._ties)
         self._ties.update(specs)
         try:
@@ -4205,7 +4444,6 @@ class Refinement:
             # failure, and a retry would meet "already follows" (#246)
             self._ties = previous
             raise
-        return list(spec)
 
     def _owner_label(self, path: str) -> str:
         """`` (atom O1 of phase X)`` for an atom's path, else ``""``."""
@@ -11891,6 +12129,8 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
         # the user constraints the node was recorded under: without them the
         # replayed model has a different parameter count from the one whose
         # statistics this call exists to reproduce (WP-1070)
+        if spec.expression is not None:
+            continue  # a formula has no terms; declared after the rebase, below
         tie = AffineTie(terms=tuple((p, float(c)) for p, c in spec.terms),
                         const=float(spec.const))
         # A node recorded before WP-1804 can hold a tie whose source a later
@@ -11904,11 +12144,6 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
             continue
         table.set_tie(path, tie)
         applied_ties[path] = spec
-    if dropped:
-        warnings.warn(
-            f"{len(dropped)} user tie(s) recorded on this node no longer apply "
-            f"to its model and were dropped: {'; '.join(dropped)}.",
-            UserWarning, stacklevel=2)
     # and the anchors, for ``_apply_ties``' reason (WP-1432): this table is
     # built from the node's *own* structure, whose coordinates already carry
     # whatever the recorded tie displaced them by.  Un-rebased, replay
@@ -11916,6 +12151,20 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
     # asked about — 0.2174 against the recorded 0.2084 — and nothing in the
     # answer said so.
     table.rebase_anchored_dofs(applied_ties)
+    # formula ties last, in register order, as ``_apply_ties`` declares them
+    # (WP-2118); read as affine rows they would set each target to 0
+    for path, spec in state.ties.items():
+        if spec.expression is None:
+            continue
+        try:
+            _add_formula(table, path, spec.expression)
+        except ValueError as exc:
+            dropped.append(f"{path} ({exc})")
+    if dropped:
+        warnings.warn(
+            f"{len(dropped)} user tie(s) recorded on this node no longer apply "
+            f"to its model and were dropped: {'; '.join(dropped)}.",
+            UserWarning, stacklevel=2)
     table.refresh_ties()
     for path in state.free_paths:
         table.set_vary([path], True)
