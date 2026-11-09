@@ -110,7 +110,7 @@ one per pattern.
       once); a joint config with restraints in `test_cross_backend.py`'s
       matrix, so the row-Jacobian is checked against FD; the stacked and
       blocked layouts agree.
-- [ ] Remove the refusal line from 1325's, 1962's and 1963's seams (forward
+- [x] Remove the refusal line from 1325's, 1962's and 1963's seams (forward
       references).
 - [ ] A penalty written in 1964's grammar, as a row block in the same seam, with an
       exact derivative from the grammar's rules (§ Context, a penalty written as an

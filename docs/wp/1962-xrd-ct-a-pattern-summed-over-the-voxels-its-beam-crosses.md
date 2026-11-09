@@ -85,8 +85,9 @@ measurement here should expect the same shape.
   without building J.
 - **No regularisation in a joint fit, and esds that would have to say so.**
   Tomography is ill-posed without a penalty (smoothness or total variation).
-  The joint path refuses soft restraints (`least_squares._multi_closures`;
-  lifting it is [1995](1995-soft-restraints-in-a-joint-fit.md)). A
+  A penalty is a row block below the data in the joint residual, the seam
+  [1995](1995-soft-restraints-in-a-joint-fit.md) built for soft restraints
+  (`least_squares._multi_closures`). A
   penalised fit's esds are conditional on the penalty weight, and the report
   must say so rather than quote them bare (the "never a confident wrong
   singleton" rule).
