@@ -1,0 +1,165 @@
+# WP-2126 — the Parameters panel
+
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — filed, checklist started
+Depends on: WP-2123
+Priority: P2 2026-11-09 — piece 2 of the open gui-overhaul milestone; it builds inside WP-2123's shell
+
+## Goal
+
+The Parameters tab reads as a crystallographer reads a refinement: per phase, single parameters
+as rows and each family of parameters for one effect as a group, in the order a refinement frees
+them; the cell as a group with its symmetry folded into one line; one row per atom; numbers that
+hold their columns whatever their format; a padlock that holds; and a floating editor for a value
+with its limits and a restraint. No click on the panel moves the layout unless it asks to.
+
+## Context
+
+### Where the panel is today
+
+`gui/src/panels/Params.svelte` draws the parameter table as a virtualised list of 22 px rows, one
+per entry of `GET /api/params`, headed by its dot-path prefix (`phases.0.cell`,
+`instrument.profile`). Each row has the path's leaf, an always-open text input, the esd, the
+bounds in Advanced mode, and a vary checkbox, or a held mark where the row cannot be freed. A
+filter box above is the selection for a bulk Free/Fix, which sends the glob in one `set_vary`
+call (WP-1011). Edits gather until the action bar's Apply (WP-2123), which sends one `PATCH
+/api/params` with `values` and `vary`.
+
+The server already serves everything the new panel draws: each row's `value`, `esd`, `lo`/`hi`,
+`tie`, `locked`, `held`, `mode_fixed`, `held_because` and `help_key`; the phase's space group,
+crystal system and each atom's site DOFs on `GET /api/structure`; Wyckoff letters and
+multiplicities on `GET /api/structure/symmetry`; units in the help corpus.
+
+Three engine verbs the panel needs have no route. `Refinement.hold`/`unhold` (WP-1435) exist,
+but `PATCH /api/params` takes only `values` and `vary`. No verb sets a parameter's limits or adds
+a value restraint; both are model edits (`Param.min`/`max` and `Phase.restraints`), recorded by
+`Refinement.edit`. This WP adds three arms to `PATCH /api/params` (`hold`, `limits`,
+`restraints`), each a server-side call of an existing verb, so the panel's Apply stays one round
+trip and every refusal stays the engine's own words.
+
+### The designs, and the rulings they rest on
+
+The maintainer designed the panel with Claude in prototype rounds between 2026-11-06 and
+2026-11-08 and reviewed each on screen. The prototypes are not published, so each design is
+restated here with its ruling.
+
+1. **One atom, one row.** Ruled 2026-11-06 (first Parameters review): a crystallographer reads an
+   atom as one row (identity, site, positions, occupancy, Biso, multiplicity), never split across
+   groups or a vertical list. Corrected 2026-11-07: the review's "hkl" meant multiplicity. Label
+   and species are separate columns (second review).
+2. **Grouping B.** Ruled 2026-11-07: a family of parameters for one effect is a group, a single
+   parameter is a row. Rows come first, then groups in refinement order, with a gap above each
+   group. Per phase: Scale, then Extinction, then the Cell group, Size and strain, the atom table.
+   The instrument: zero shift and displacement as rows, then Peak shape, Axial divergence, and
+   Source and geometry. The cell lengths sit in a Cell group with the symmetry line inside.
+3. **The folded symmetry line.** Ruled 2026-11-06: rows that cannot be freed fold into one line in
+   the crystallographer's notation, `a = b = c, α = β = γ = 90°`, built from the symmetry for every
+   crystal system. Only rows that cannot be freed fold; a fixed row keeps its checkbox.
+4. **Group toggles follow the McCusker plan's stages**, beside the individual rows (first review).
+   A group's checkbox ticks every member the user may free, and shows mixed when some are free.
+5. **The background is one group.** First review: its coefficients are meaningless to switch one
+   by one, so the group has one checkbox and no coefficient rows. Its preview is piece 5.
+6. **Numbers.** Third review, 2026-11-07: scientific notation by default with aligned decimals;
+   units on the number side, after the value. Fifth review: switching between scientific and plain
+   moves nothing; atom numbers stay plain; very small and large numbers must read easily. Claude's
+   reading, built in the prototype and not objected to: scientific below 0.01 and from 10 000 up,
+   plain between. Round 6 (accepted 2026-11-07): one value-box width per panel, so units form one
+   column.
+7. **Editable numbers are tinted** (second review), with the whole cell as the click target.
+8. **The padlock is a hold.** Fourth review, 2026-11-07: its cell has a checkbox cell's geometry,
+   so locking moves no number, and there is no "Hold" heading. The prototype's padlock holds one
+   atom's position, which answers the third review's question of how to hold one atom's position
+   but not the others'; in rietx it is `Refinement.hold("phases.i.atoms.j.dof.*")`.
+9. **Occupancy has an all/none box** in its header, like Position and Biso (fourth review).
+10. **A checkbox sits by the parameter it controls, never by a follower** (second review). A
+    coordinate is a follower of its site's DOFs, so a position box sits beside the first
+    coordinate each DOF moves, and a coordinate the symmetry fixes has none.
+11. **Space groups are typeset** (first review), in a serif face with no comma (second review):
+    `P6₃/m`, `Fm3̄m`, `I2₁3`.
+12. **Selection.** Round 6, built and kept: shift-click sets a range of checkboxes from the last
+    one clicked (in the atom table the range stays in one column); ⌘-click (Ctrl elsewhere) adds a
+    value to a selection, shift-click a range; clicking a selected value opens one editor, reading
+    "Mixed" when the values differ, and Enter writes the number into all of them. Fixed in round 8
+    from the maintainer's use: modifier clicks act on mouse-down, so an editor's commit cannot
+    swallow them and the browser's blue text selection never flashes.
+13. **The floating editor.** Fourth review: an edit field is wide enough to show the whole number
+    while typing. Constraints round, 2026-11-08: limits and restraints are set from the value's
+    popover; a value nearing a limit shows it by text colour (round 10b: red text and a 2 px bar
+    on the limit's side, in the atom table too); clicking the word "Restrain" ticks its box and
+    keeps the popover open. Round 10b added an "=" button opening the formula editor; formulas
+    reach rietx only through `add_variable` and `tie`, which no route serves, so the button is
+    not here (Non-goals).
+14. **No click moves the layout unless it asks to** (third review), and **no permanent explanatory
+    text** (sixth review), as WP-2123 restates. The atom table is fully visible by default (fifth
+    review), with the panel resizable.
+
+### Rulebook seams
+
+- **A held row gets no vary checkbox** (`gui/CLAUDE.md` § editors, WP-1214): the five reasons
+  stay distinct, and `held_because` is the mark's help text. A hold is the one reason the user can
+  lift, so its mark is the padlock, pressed, and pressing it unholds.
+- **A typed number is compared to the rendered value** (WP-1009), so opening the editor and
+  leaving it moves nothing.
+- **A vary key is a path or a glob** (WP-1215): a site's DOFs free together through
+  `phases.i.atoms.j.dof.*`.
+- **Registers** (`gui/CLAUDE.md` § House style): three type steps; size, padding and radius belong
+  to the register. New marks are `color-mix` over the chrome tokens (root CLAUDE.md, WP-1429).
+- **Help**: a row's name is a `<Help>` term on its `help_key`; `title=` holds only a value the
+  layout truncated or a verb phrase on a button.
+
+### Tier
+
+No rule here reads the data or decides for a fit: the thresholds are display rules. The `limits`
+and `restraints` arms are model edits the user typed.
+
+### Calls settled by Claude
+
+Each took the smallest neutral option, is reversible, and waits for the maintainer's review.
+
+(filled in as the checklist lands)
+
+## Non-goals
+
+- The formula editor and its "=" button: rietx formulas are `add_variable` plus expression ties,
+  and no route serves either. The next WP after this one adds the routes and the editor.
+- Constraints and bond or angle restraints authored from an atom's popover, the Restraints group,
+  user variables, plan-stage badges on the group toggles (piece 3), and the background group's
+  preview (piece 5).
+- Folding the Model and Text panels' edits into the action bar (WP-2123's owed list).
+
+## Tasks
+
+- [ ] `PATCH /api/params` takes `hold`, `limits` and `restraints` arms, each an engine verb, with
+  server tests.
+- [ ] Pure functions with vitest: the number slots (`lib/numslot.ts`), the space-group typesetting
+  (`lib/spacegroup.ts`), the panel tree and symmetry line (`lib/paramtree.ts`).
+- [ ] `Params.svelte` rebuilt: phase bands, rows and groups under grouping B, the Cell fold line,
+  the atom table, the padlock, tinted values, the group toggles.
+- [ ] The floating editor and popover: limits, Restrain, limit cue, multi-select typing.
+- [ ] Shift-click ranges and modifier selection, acting on mouse-down.
+- [ ] The layout-shift browser test extended over the Parameters panel.
+- [ ] Vitest updated, the dist rebuilt, the GUI chapter and screenshots that show the panel.
+- [ ] Skill: none expected; the agent skill drives the python API.
+
+## Acceptance
+
+```sh
+npm --prefix gui ci && npm --prefix gui run build
+npm --prefix gui test && npm --prefix gui run check
+.venv/bin/python -m pytest tests/test_gui_layout_browser.py tests/test_gui_server.py tests/test_gui_manual.py tests/test_gui_dist.py
+.venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
+.venv/bin/python -m ruff check src tests examples
+```
+
+The layout-shift test clicks every control of the Parameters panel on a fresh page and finds no
+unasked-for movement; one atom is one row; switching a number's format moves nothing (milestone
+acceptance row 7).
+
+## References
+
+- The maintainer's rulings of 2026-11-06 to 2026-11-08, restated above with their dates.
+- `docs/practice.md` § The window layout of a GUI.
+
+## Handover log
+
+- **2026-11-09** — filed by a ghostshift runner as piece 2 of the gui-overhaul milestone, on top
+  of WP-2123's branch (PR #1476, not yet merged). Next: the checklist.

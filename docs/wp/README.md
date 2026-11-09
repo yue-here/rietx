@@ -54,6 +54,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 2026-11-08 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2123](2123-the-layout-shell.md) | The layout shell | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2126](2126-the-parameters-panel.md) | The Parameters panel | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -496,6 +497,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
 | [2123](2123-the-layout-shell.md) | The layout shell | 🔄 2026-11-09 | P2 | — |
+| [2126](2126-the-parameters-panel.md) | The Parameters panel | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
 
 ## <a id="unscheduled"></a>Unscheduled
 

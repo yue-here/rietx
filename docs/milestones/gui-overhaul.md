@@ -25,7 +25,7 @@ redesign is ported in five pieces, in this order:
 | Piece | WP | What it builds |
 |---|---|---|
 | 1 | [2123](../wp/2123-the-layout-shell.md) | the layout shell: graphs on the left in tabs with a title line, the model panel on the right in tabs with a sash, both panels collapsible, a one-row action bar with Apply and refine, the segmented register redrawn, new colour tokens, a one-column layout for a narrow window, and a browser test that no click moves the layout unless it asks to |
-| 2 | not yet filed | the Parameters panel: one row per atom, number slots that never move, the padlock as `hold`, the floating editor |
+| 2 | [2126](../wp/2126-the-parameters-panel.md) | the Parameters panel: one row per atom, number slots that never move, the padlock as `hold`, the floating editor |
 | 3 | not yet filed | the Plan tab on the existing plan routes, read top to bottom as a recipe |
 | 4 | not yet filed | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | not yet filed | the Background tab: a route serving the preview's matrices, a held Chebyshev term, the P-spline |
