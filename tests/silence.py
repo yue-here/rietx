@@ -947,6 +947,52 @@ def _unsupported_silent() -> list:
                 path="phases.0.gauss_size", value=0.0, stderr=1.0, vary=True)]))
 
 
+# ------------------------------------------------------------ the restraint compile
+
+
+def _restraint_compile(*restraints) -> list:
+    """``RESTRAINT_ON_FIXED_BODY_GEOMETRY`` from ``resolve_phase_restraints``
+    on the bodies of ``tests/test_restraint_body_refusal.py``, one restraint
+    at a time: the refusal raises with its record."""
+    from rietx.crystallography.structure_factor import compile_phase_sites
+    from rietx.model.restraints import RestraintRefused, resolve_phase_restraints
+    from tests.test_restraint_body_refusal import _phase
+
+    found: list = []
+    for r in restraints:
+        phase = _phase([r])
+        try:
+            resolve_phase_restraints(phase, 0, compile_phase_sites(phase),
+                                     phase.cell.lengths_angles())
+        except RestraintRefused as err:
+            found.append(err.diagnostic)
+    return found
+
+
+def _fixed_body_fires() -> list:
+    """A bond inside a body with no torsion, and one no declared torsion splits."""
+    from rietx.schemas.structure import BondRestraint
+    from tests.test_restraint_body_refusal import _index
+
+    return _restraint_compile(
+        BondRestraint(atom_i=_index("T0"), atom_j=_index("T1"), target=1.2, sigma=0.01),
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("K1"), target=1.5, sigma=0.01))
+
+
+def _fixed_body_silent() -> list:
+    """A bond a torsion splits, one to a free atom, one across two bodies and
+    one between two copies of the body."""
+    from rietx.schemas.structure import BondRestraint
+    from tests.test_restraint_body_refusal import _index
+
+    return _restraint_compile(
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("K3"), target=3.0, sigma=0.01),
+        BondRestraint(atom_i=_index("Li"), atom_j=_index("K0"), target=3.0, sigma=0.1),
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("T0"), target=3.0, sigma=0.1),
+        BondRestraint(atom_i=_index("K0"), atom_j=_index("K1"), target=8.0, sigma=0.1,
+                      op_index=0, translation=(1, 0, 0)))
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -988,6 +1034,8 @@ SILENCE: dict[str, Pair] = {
         "tests/test_magnetic_structural_preset.py"),
     "PATTERN_WEIGHT_UNUSABLE": Pair(
         _weight_unusable_fires, _weight_unusable_silent, "tests/test_readers.py"),
+    "RESTRAINT_ON_FIXED_BODY_GEOMETRY": Pair(
+        _fixed_body_fires, _fixed_body_silent, "tests/test_restraint_body_refusal.py"),
     "RESOLUTION_UNCONSTRAINED": Pair(
         _resolution_fires, _resolution_silent,
         "strategy.staged.check_resolution_supported (no test pinned it before)"),
