@@ -1219,7 +1219,7 @@
              (WP-1029 item c).  The judgement is the *report's* — `maturity`
              quotes `MATURITY_MAX_RWP` — so nothing here decides anything. -->
         <div class="gtitle">
-          <strong class="what">{graphTab === "background" ? backgroundTitle(!!result, busy)
+          <strong class="what">{graphTab === "background" ? backgroundTitle(busy)
             : busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
           <div class="stats tabular mono" class:immature={immature}>
             {#if rwp !== null}
@@ -1246,6 +1246,8 @@
         </div>
         <div class="gview" class:hidden={graphTab !== "background"}>
           <Background {head} {busy} {theme} {say} onmoved={moved}
+            protocol={JSON.stringify([project?.doc?.mode ?? null, protocol.limits,
+                                      protocol.regions])}
             active={graphTab === "background" && !hideGraphs} />
         </div>
         {#if hideModel}{@render actions()}{/if}

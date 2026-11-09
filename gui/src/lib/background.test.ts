@@ -79,6 +79,11 @@ describe("drawing", () => {
     expect(hi[3]).toBe(7);
   });
 
+  it("puts the point at the right edge in the last column", () => {
+    const { lo } = columnExtremes([0, 1], [2, 9], 0, 1, 4);
+    expect(lo[3]).toBe(9);
+  });
+
   it("draws the band at the level times the multiplier", () => {
     expect(Array.from(halfWidth([1, 2], 5))).toEqual([BAND_LEVEL * 5, BAND_LEVEL * 10]);
   });
@@ -107,9 +112,8 @@ describe("what the band says about itself", () => {
   });
 
   it("titles the graph by what state it shows", () => {
-    expect(backgroundTitle(false, false)).toBe("Background at the starting values");
-    expect(backgroundTitle(true, false)).toBe("Background at the last fit");
-    expect(backgroundTitle(true, true)).toBe("Background, refining");
+    expect(backgroundTitle(false)).toBe("Background at the current values");
+    expect(backgroundTitle(true)).toBe("Background, refining");
   });
 });
 

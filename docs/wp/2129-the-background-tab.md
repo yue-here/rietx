@@ -132,9 +132,11 @@ Each took the smallest neutral option.
 7. Settled by Claude, reversible: the y frame is the prototype's, 0.7× the curve's lowest point to
    1.15× its highest, so the peaks run off the top. A flat zero curve gets ±1. Alternative: frame on
    the curve ± the drawn band, which would keep a ×20 band inside the view.
-8. Settled by Claude, reversible: the title line reads "Background at the last fit", "Background at
-   the starting values" or "Background, refining". The fit's Rwp stays on it. Alternative: the
-   pattern tab's three words unchanged.
+8. Settled by Claude, reversible: the title line reads "Background at the current values", or
+   "Background, refining" during a run. The curve is at the working values, which an edit or a
+   checkout moves without a fit, so "at the last fit" would be untrue after either. The fit's Rwp
+   stays on the line. Alternative: "at the last fit" and "at the starting values", keyed on
+   whether the working values are a fit's answer, which the client cannot tell today.
 9. Settled by Claude, reversible: the view has no zoom, as the non-goals say. Alternative: the
    pattern chart's zoom.
 

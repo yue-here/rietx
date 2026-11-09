@@ -176,8 +176,7 @@ says so when a browser refuses the clipboard.
 The `Background` graph tab draws the background on its own. The observed
 pattern is greyed behind it, and the frame is set by the curve, so the peaks
 run off the top. The curve is drawn at the working values, the ones the next
-run starts from. The title line says whether those come from the last fit or
-are the starting values.
+run starts from, and the title line says so.
 
 The shaded band is where the curve may move when the free parameters refine.
 It is the curve's esd at each channel, taken through the whole covariance of

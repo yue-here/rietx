@@ -68,8 +68,6 @@ from . import preview
 _CACHE: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 _CACHE_LOCK = threading.Lock()
 
-_BACKGROUND_PREFIXES = ("instrument.background.", "instrument.extra_components.")
-
 
 def _free_table(project):
     """The working table with the intensity mode's force-fixed columns dropped."""
@@ -116,8 +114,12 @@ def band_esd(model, table) -> tuple[np.ndarray | None, dict[str, Any]]:
     """
     free = list(table.free_paths)
     reach = table.column_reach()
+    # the paths ``CompiledModel.background`` reads, never a prefix test: a
+    # declared *peak* component is an ``extra_components`` path the curve does
+    # not contain, and counting it would draw a zero band as a measured one
+    reads = set(model.bkg_paths).union(*map(set, model.component_paths))
     touches = [k for k, p in enumerate(free)
-               if any(q.startswith(_BACKGROUND_PREFIXES) for q in reach.get(p, [p]))]
+               if any(q in reads for q in reach.get(p, [p]))]
     facts: dict[str, Any] = {"n_free": len(free),
                              "n_background_free": len(touches),
                              "n_other_free": len(free) - len(touches),

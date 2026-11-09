@@ -107,7 +107,8 @@ export function columnExtremes(x: ArrayLike<number>, y: ArrayLike<number>,
   const lo = new Float64Array(n).fill(NaN), hi = new Float64Array(n).fill(NaN);
   if (!n || !(x1 > x0)) return { lo, hi };
   for (let i = 0; i < x.length; i++) {
-    const c = Math.floor(((x[i] - x0) / (x1 - x0)) * n);
+    // x1 itself is the last column's right edge, not a column past it
+    const c = x[i] === x1 ? n - 1 : Math.floor(((x[i] - x0) / (x1 - x0)) * n);
     if (c < 0 || c >= n || !Number.isFinite(y[i])) continue;
     if (!(y[i] >= lo[c])) lo[c] = y[i];
     if (!(y[i] <= hi[c])) hi[c] = y[i];
@@ -146,10 +147,12 @@ export function bandTitle(header: BackgroundHeader, esd: ArrayLike<number> | nul
     + "A multiplier above ×1 exaggerates the drawing only.";
 }
 
-/** The graph's title (WP-2123 design 2: every graph says what it shows). */
-export function backgroundTitle(fitted: boolean, busy: boolean): string {
-  if (busy) return "Background, refining";
-  return fitted ? "Background at the last fit" : "Background at the starting values";
+/** The graph's title (WP-2123 design 2: every graph says what it shows). The
+ *  curve is at the working values, the ones the next run starts from: whether a
+ *  result is held does not date them, since an edit or a checkout moves them
+ *  without a fit. */
+export function backgroundTitle(busy: boolean): string {
+  return busy ? "Background, refining" : "Background at the current values";
 }
 
 /** λ as typed: a finite number ≥ 0, or the reason it is refused. */

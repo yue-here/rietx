@@ -46,6 +46,7 @@
     busy = false,
     theme = "light",
     active = false,
+    protocol = "",
     say = (_line: string) => {},
     onmoved = () => {},
   }: {
@@ -55,13 +56,21 @@
     /** the tab is showing: a hidden canvas has no size, and a hidden tab
      *  fetches nothing */
     active?: boolean;
+    /** the document's mode, fit range and excluded regions: settings that
+     *  change the answer's channels and free set without moving the head */
+    protocol?: string;
     say?: (line: string) => void;
     onmoved?: () => void;
   } = $props();
 
   type Answer = { header: BackgroundHeader; arrays: Record<string, Float64Array> };
   let answer = $state.raw<Answer | null>(null);
+  // a verb's refusal and the load's failure are two fields (gui/CLAUDE.md,
+  // WP-1014): a reload must not wipe the sentence a press just earned
   let error = $state("");
+  let loadError = $state("");
+  /** the head and protocol the shown answer was fetched for */
+  let loadedKey = "";
   let multiplier = $state<Multiplier>(1);
   let pending = $state(false);
   let lambdaText = $state("");
@@ -75,28 +84,32 @@
   const esd = $derived(answer?.arrays.band_esd ?? null);
   const terms = $derived(header ? coefficientTerms(header.terms) : []);
 
-  async function load() {
+  async function load(key: string) {
     const mine = ++seq;
     try {
       const { unpack } = await import("rxplot");
       const next = unpack(await api.background()) as unknown as Answer;
       if (mine !== seq) return;
       answer = next;
-      error = "";
+      loadedKey = key;
+      loadError = "";
       if (next.header.kind === "pspline") lambdaText = String(next.header.lambda_smooth);
     } catch (exc) {
-      if (mine === seq) error = exc instanceof ApiError ? exc.message : String(exc);
+      if (mine === seq) loadError = exc instanceof ApiError ? exc.message : String(exc);
     }
   }
 
-  // the head is the reload signal; a run in flight answers 409, so wait for idle
+  // the head is the reload signal, and the protocol beside it: a mode, range or
+  // region change moves the channels and the free set but not the head. A run
+  // in flight answers 409, so wait for idle.
   $effect(() => {
     if (!active || busy || !head) return;
-    if (answer?.header.head === head) return;
-    void load();
+    const key = JSON.stringify([head, protocol]);
+    if (key === loadedKey) return;
+    void load(key);
   });
 
-  async function hold(path: string, held: boolean) {
+  async function hold(path: string, held: boolean, box: HTMLInputElement) {
     pending = true;
     try {
       await api.patchParams(holdDelta(path, held));
@@ -105,13 +118,16 @@
       onmoved();
     } catch (exc) {
       error = (exc as Error).message;
+      // refused: nothing moved, so no reload will put the box back
+      box.checked = !held;
     } finally {
       pending = false;
     }
   }
 
   async function commitLambda() {
-    if (!header || header.kind !== "pspline") return;
+    // Enter commits and the blur that follows must not commit it again
+    if (pending || !header || header.kind !== "pspline") return;
     const parsed = parseLambda(lambdaText);
     if (typeof parsed === "string") {
       error = parsed;
@@ -237,10 +253,10 @@
 <section aria-label="background">
   <div class="host" bind:clientWidth={width} bind:clientHeight={height}>
     <canvas bind:this={canvas}></canvas>
-    {#if error}
+    {#if error || loadError}
       <!-- over the plot, never a line of its own: a refusal must not move the
            controls a click just pressed (interaction rule 8) -->
-      <p class="refusal" role="alert">{error}</p>
+      <p class="refusal" role="alert">{error || loadError}</p>
     {:else if !answer}
       <p class="refusal muted">{busy ? "Waiting for the run to finish" : ""}</p>
     {/if}
@@ -250,13 +266,18 @@
       <div class="terms" role="group" aria-label="hold terms">
         <span class="muted"><Help text={HOLD_MEANS} title="Hold">Hold</Help></span>
         {#each terms as term (term.path)}
-          <label class="term mono"
-            title={holdable(term) ? `${term.path} = ${term.value.toPrecision(6)}`
-                                : `${term.path}: ${term.held_because ?? ""}`}>
+          <!-- the title is the value, which the row does not show; why a term
+               cannot be held is the server's sentence, so it is a Help term -->
+          <label class="term mono" title={`${term.path} = ${term.value.toPrecision(6)}`}>
             <input type="checkbox" checked={term.held}
               disabled={!holdable(term) || busy || pending}
-              onchange={(e) => hold(term.path, (e.currentTarget as HTMLInputElement).checked)} />
-            c{termIndex(term.path)}
+              onchange={(e) => {
+                const box = e.currentTarget as HTMLInputElement;
+                void hold(term.path, box.checked, box);
+              }} />
+            {#if holdable(term)}c{termIndex(term.path)}{:else}<Help
+              text={term.held_because ?? ""} title={term.path}
+              >c{termIndex(term.path)}</Help>{/if}
           </label>
         {/each}
       </div>

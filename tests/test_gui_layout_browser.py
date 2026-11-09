@@ -331,7 +331,7 @@ def test_the_background_tab_holds_still_under_a_hold_and_a_band_press(
         page.locator(".plotcol > nav.tabs button", has_text="Background").click()
         page.wait_for_selector(".term input:not([disabled])")
         page.wait_for_function(
-            "document.querySelector('.gtitle .what').textContent === 'Background at the last fit'")
+            "document.querySelector('.gtitle .what').textContent === 'Background at the current values'")
         page.wait_for_selector(".band .segmented button:not([disabled])")
         _frames(page)
         out = Path(__file__).parent / "output"
