@@ -15,7 +15,7 @@
  * The widths come from the **last fit's** values, never from a typed edit, so an
  * edit resizes nothing.
  */
-import { esdSwallowsValue, formatEsd, formatValue } from "./table";
+import { formatEsd, formatValue } from "./table";
 
 /** Below this magnitude a number is written with an exponent. */
 export const SCI_LOW = 0.01;
@@ -55,18 +55,19 @@ export function numParts(value: number, esd: number | null | undefined,
     return { ...split(formatValue(value, esd)), tail: formatEsd(value, esd), exp: null };
   }
   let exp = Math.floor(Math.log10(Math.abs(value)));
-  const usable = esd != null && Number.isFinite(esd) && esd > 0 && !esdSwallowsValue(value, esd);
+  const known = esd != null && Number.isFinite(esd) && esd > 0;
   for (let pass = 0; pass < 2; pass++) {
     const scale = 10 ** exp;
     const mant = value / scale;
-    const e = usable ? esd! / scale : null;
+    // the esd in the exponent's frame, the swallowed `±` form included: it is
+    // drawn before the `×10ⁿ`, so a raw-unit `±1.2` would read as ±1.2×10ⁿ
+    const e = known ? esd! / scale : null;
     const text = formatValue(mant, e);
     if (Math.abs(Number(text)) >= 10 && pass === 0) {
       exp += 1;               // 9.9996e-3 rounds to 10.000: renormalise once
       continue;
     }
-    const tail = usable ? formatEsd(mant, e) : formatEsd(value, esd);
-    return { ...split(text), tail, exp };
+    return { ...split(text), tail: formatEsd(mant, e), exp };
   }
   return { int: String(value), frac: "", tail: "", exp: null };
 }

@@ -60,6 +60,10 @@
   let letters = $state<any[]>([]);
   let query = $state("");
   let error = $state("");
+  /** A verb's refusal, in its own words. Its own field, because the reload a
+   *  moved head triggers clears `error`, and an apply that lands its first
+   *  call and fails its second moves the head (gui/CLAUDE.md, WP-1014). */
+  let refusal = $state("");
   let loading = $state(false);
   /** user-closed sections and groups; everything starts open, and nothing
    *  closes itself (first review: a section never folds itself) */
@@ -122,7 +126,9 @@
     const columns = new Map<string, Array<{ value: number; esd: number | null }>>();
     const add = (column: string, row: ParamRow | null) => {
       if (!row) return;
-      columns.set(column, [...(columns.get(column) ?? []), { value: row.value, esd: row.esd }]);
+      const list = columns.get(column);
+      if (list) list.push({ value: row.value, esd: row.esd });
+      else columns.set(column, [{ value: row.value, esd: row.esd }]);
     };
     for (const section of tree) {
       for (const item of section.items) {
@@ -169,7 +175,18 @@
     return out;
   });
 
-  const valueState = $derived(editState(rows, edits, 0));
+  /** The rows with their pending limits in place: a value typed with its new
+   *  limit is checked against that limit, as the server applies them (the
+   *  limit first, in the same model edit). */
+  const limitedRows = $derived(limitEdits.size ? rows.map((r) => {
+    const pair = limitEdits.get(r.path);
+    return pair ? { ...r, lo: pair[0] ?? -Infinity, hi: pair[1] ?? Infinity } : r;
+  }) : rows);
+  const limitedByPath = $derived(new Map(limitedRows.map((r) => [r.path, r])));
+  const valueState = $derived(editState(limitedRows, edits, 0));
+  const limitInvalid = $derived([...limitEdits].filter(([, [lo, hi]]) =>
+    lo !== null && hi !== null && lo > hi)
+    .map(([path]) => ({ path, why: "lower limit above the upper one" })));
   const positionInvalid = $derived.by(() => {
     const bad: Array<{ path: string; why: string }> = [];
     for (const [atom, fields] of positionEdits) {
@@ -183,7 +200,7 @@
   });
   const touched = $derived(valueState.touched + varyEdits.size + holdEdits.size
     + limitEdits.size + restraintEdits.size + positionEdits.size);
-  const invalid = $derived([...valueState.invalid, ...positionInvalid]);
+  const invalid = $derived([...valueState.invalid, ...positionInvalid, ...limitInvalid]);
 
   $effect(() => {
     const first = invalid[0];
@@ -234,12 +251,12 @@
       const payload = await api.patchParams(body);
       rows = normalize(payload.parameters);
       nFree = payload.n_free;
-      error = "";
+      refusal = "";
       return true;
     } catch (exc) {
       // a refusal is the useful answer, in the verb's own words; a 409 says a
       // run owns the table
-      error = exc instanceof ApiError && exc.busy
+      refusal = exc instanceof ApiError && exc.busy
         ? "a run is in flight — the table is read-only until it ends"
         : (exc as Error).message;
       return false;
@@ -269,10 +286,26 @@
     for (const [path, flag] of holdEdits) {
       say(`ref.${flag ? "hold" : "unhold"}(${JSON.stringify(path)})`);
     }
-    if (limitEdits.size || restraintEdits.size) say("ref.edit(structure=…)  # limits and restraints");
+    if (limitEdits.size || restraintEdits.size) {
+      const onInstrument = [...limitEdits.keys()].some((p) => p.startsWith("instrument."));
+      const onStructure = restraintEdits.size > 0
+        || [...limitEdits.keys()].some((p) => !p.startsWith("instrument."));
+      const args = [onStructure ? "structure=…" : "", onInstrument ? "instrument=…" : ""]
+        .filter(Boolean).join(", ");
+      say(`ref.edit(${args})  # limits and restraints`);
+    }
     const needsPatch = Object.keys(values).length || varyEdits.size || holdEdits.size
       || limitEdits.size || restraintEdits.size;
-    if (needsPatch && !(await patch(body))) return false;
+    if (needsPatch) {
+      if (!(await patch(body))) return false;
+      // landed: a retry after a refused position below must not send these
+      // again (an unhold of a path no longer held is refused)
+      edits = new Map();
+      varyEdits = new Map();
+      holdEdits = new Map();
+      limitEdits = new Map();
+      restraintEdits = new Map();
+    }
     for (const [atom, fields] of positionEdits) {
       const xyz = ["x", "y", "z"].map((axis) =>
         axis in fields ? Number(fields[axis]) : (byPath.get(`${atom}.${axis}`)?.value ?? 0));
@@ -282,9 +315,14 @@
       try {
         await api.position(atom, xyz);
       } catch (exc) {
-        error = (exc as Error).message;
+        // what landed before this changed the structure; the panel re-reads it
+        await load();
+        refusal = (exc as Error).message;
         return false;
       }
+      const next = new Map(positionEdits);
+      next.delete(atom);
+      positionEdits = next;
     }
     clearPending();
     // a limit, a restraint and a position change the structure as well as the
@@ -298,6 +336,7 @@
     clearPending();
     picked = new Set();
     error = "";
+    refusal = "";
   }
 
   export function focusFilter() {
@@ -322,7 +361,7 @@
     if (text !== undefined) {
       const bad = COORD.test(row.path)
         ? (Number.isFinite(Number(text)) && text.trim() !== "" ? "" : "not a number")
-        : validateEdit(row, text);
+        : validateEdit(limitedByPath.get(row.path) ?? row, text);
       if (!bad) return { parts: numParts(Number(text), null, sci), edited: true, bad };
       return { parts: { int: text, frac: "", tail: "", exp: null }, edited: true, bad };
     }
@@ -633,14 +672,20 @@
   }
 
   const editRow = $derived(editor && editor.keys.length === 1 ? byPath.get(editor.keys[0]) ?? null : null);
-  /** limits live on the model; a DOF or a coordinate stores none */
+  /** limits live on the model; a DOF, a coordinate and a user variable (which
+   *  lives on the refinement, not the model) store none */
   const hasLimits = $derived(!!editRow && !/\.dof\.\d+$/.test(editRow.path)
-    && !COORD.test(editRow.path) && !editRow.tie);
+    && !COORD.test(editRow.path) && !editRow.path.startsWith("vars.") && !editRow.tie);
 
   function setLimit(side: 0 | 1, text: string) {
     if (!editRow) return;
     const current = limitsOf(editRow);
     const value = text.trim() === "" ? null : Number(text);
+    if (value !== null && !Number.isFinite(value)) {
+      // NaN would travel as JSON null, which the server reads as "no limit"
+      editor!.error = "A limit is a number, or empty for none.";
+      return;
+    }
     const pair: Limits = side === 0 ? [value, current[1]] : [current[0], value];
     const stored: Limits = [Number.isFinite(editRow.lo) ? editRow.lo : null,
                             Number.isFinite(editRow.hi) ? editRow.hi : null];
@@ -902,7 +947,7 @@
       >Fix {bulk.toFix}</button>
   </header>
 
-  {#if error}<p class="bad">{error}</p>{/if}
+  {#if error || refusal}<p class="bad">{refusal || error}</p>{/if}
 
   <div class="scroller" bind:this={scroller} onscroll={scrolled} style:--inkw="{inkWidth + 1}ch">
     {#if loading && !rows.length}

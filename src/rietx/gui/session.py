@@ -877,7 +877,7 @@ class GuiSession:
         """
         self._require_idle()
         p = self._need_project()
-        values = dict(body.get("values") or {})
+        values = body.get("values") or {}
         vary = body.get("vary") or {}
         hold = body.get("hold") or {}
         limits = body.get("limits") or {}
@@ -888,6 +888,7 @@ class GuiSession:
                            "map dot-path glob → bool, 'limits' maps dot-path → "
                            "[lower, upper] and 'restraints' maps dot-path → "
                            "{target, sigma} or null")
+        values = dict(values)   # a limit's value is taken out of it below
         changed: dict[str, Any] = {"values": [], "vary": {}, "hold": {},
                                    "limits": [], "restraints": []}
         # a literal vary key the model lacks is a typo, refused before the
@@ -3408,6 +3409,12 @@ def _holding(verb, glob: str) -> list[str]:
         raise GuiError(str(exc), where=[glob]) from None
 
 
+#: Table paths whose parameter the model stores somewhere else
+#: (``ParameterTable._collect_instrument``; ``Field.param`` in the GUI's
+#: ``lib/model.ts`` carries the same pair, WP-1214).
+_MODEL_PATH_OF = {"instrument.polarization": "instrument.source.polarization"}
+
+
 def _stored_param(tree: dict, path: str) -> dict:
     """The stored ``{value, min, max, …}`` a parameter path names in a dumped model.
 
@@ -3417,7 +3424,7 @@ def _stored_param(tree: dict, path: str) -> dict:
     live.
     """
     node: Any = tree
-    for part in path.split("."):
+    for part in _MODEL_PATH_OF.get(path, path).split("."):
         if isinstance(node, list) and part.isdigit() and int(part) < len(node):
             node = node[int(part)]
         elif isinstance(node, dict) and part in node:
@@ -3458,14 +3465,22 @@ def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
         if not (isinstance(pair, (list, tuple)) and len(pair) == 2):
             raise GuiError(f"{path}: limits are [lower, upper]", where=[path])
         stored = _stored_param(tree, path)
-        lo, hi = (-math.inf if pair[0] is None else float(pair[0]),
-                  math.inf if pair[1] is None else float(pair[1]))
+        try:
+            lo, hi = (-math.inf if pair[0] is None else float(pair[0]),
+                      math.inf if pair[1] is None else float(pair[1]))
+            value = float(values[path]) if path in values else None
+        except (TypeError, ValueError):
+            raise GuiError(f"{path}: a limit and a value are numbers",
+                           where=[path]) from None
+        if math.isnan(lo) or math.isnan(hi):
+            raise GuiError(f"{path}: a limit is a number, or null for none",
+                           where=[path])
         if lo > hi:
             raise GuiError(f"{path}: the lower limit {lo:g} is above the upper "
                            f"one {hi:g}", where=[path])
         stored["min"], stored["max"] = lo, hi
-        if path in values:
-            stored["value"] = float(values[path])
+        if value is not None:
+            stored["value"] = value
         touched["instrument" if path.startswith("instrument.") else "structure"] = True
     if restraints:
         from ..schemas.structure import ValueRestraint
@@ -3476,6 +3491,9 @@ def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
         kept = [[r for r in phase.restraints
                  if not (isinstance(r, ValueRestraint) and r.path in restraints)]
                 for phase in phases]
+        # the panel edits a target and a σ; a weight set elsewhere survives it
+        weight_of = {r.path: r.weight for phase in phases for r in phase.restraints
+                     if isinstance(r, ValueRestraint)}
         for path, spec in restraints.items():
             if spec is None:
                 continue
@@ -3490,7 +3508,8 @@ def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
             try:
                 kept[home].append(ValueRestraint(path=path,
                                                  target=float(spec["target"]),
-                                                 sigma=float(spec["sigma"])))
+                                                 sigma=float(spec["sigma"]),
+                                                 weight=weight_of.get(path, 1.0)))
             except (ValueError, TypeError) as exc:
                 raise GuiError(f"{path}: {exc}", where=[path]) from None
         touched["structure"] = True

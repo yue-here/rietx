@@ -18,6 +18,12 @@ describe("number slots (WP-2126)", () => {
     expect(numParts(25000, 300)).toEqual({ int: "2", frac: "50", tail: "(3)", exp: 4 });
   });
 
+  it("writes a swallowing esd in the exponent's frame, since the ×10ⁿ follows it", () => {
+    // 0.005 ± 2 is 5 ± 2000 ×10⁻³, never 5 ± 2 ×10⁻³
+    expect(numParts(0.005, 2)).toMatchObject({ int: "5", tail: " ±2000", exp: -3 });
+    expect(numParts(20000, 30000)).toMatchObject({ int: "2", tail: " ±3", exp: 4 });
+  });
+
   it("renormalises a mantissa that rounds up to ten", () => {
     expect(numParts(0.0099996, 0.0001)).toMatchObject({ int: "1", frac: "00", exp: -2 });
   });

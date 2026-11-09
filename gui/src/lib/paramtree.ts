@@ -215,7 +215,9 @@ function families(rows: ParamRow[], prefix: string, info: TreeInfo): Item[] {
   const byKey = new Map<string, ParamRow[]>();
   for (const row of rows) {
     const key = row.help_key ?? row.path.slice(0, row.path.lastIndexOf("."));
-    byKey.set(key, [...(byKey.get(key) ?? []), row]);
+    const bucket = byKey.get(key);
+    if (bucket) bucket.push(row);
+    else byKey.set(key, [row]);
   }
   const singles: Item[] = [];
   const groups: Item[] = [];
@@ -383,7 +385,9 @@ export function buildTree(rows: readonly ParamRow[], info: TreeInfo): Section[] 
     const m = /^phases\.(\d+)\./.exec(row.path);
     if (m) {
       const i = Number(m[1]);
-      phases.set(i, [...(phases.get(i) ?? []), row]);
+      const bucket = phases.get(i);
+      if (bucket) bucket.push(row);
+      else phases.set(i, [row]);
     } else if (row.path.startsWith("instrument.")) instrument.push(row);
     else if (row.path.startsWith("vars.")) variables.push(row);
     else other.push(row);
@@ -406,19 +410,6 @@ export function buildTree(rows: readonly ParamRow[], info: TreeInfo): Section[] 
   }
   return sections.filter((s) => s.items.some((it) =>
     it.kind !== "atoms" || it.atoms.length));
-}
-
-/** Every row a section's toggles and boxes can reach, in document order — the
- *  order a shift-click range runs in outside the atom table. */
-export function rowsInOrder(sections: readonly Section[]): ParamRow[] {
-  const out: ParamRow[] = [];
-  for (const section of sections) {
-    for (const item of section.items) {
-      if (item.kind === "row") out.push(item.row);
-      else if (item.kind === "group") out.push(...item.lines.map((l) => l.row));
-    }
-  }
-  return out;
 }
 
 /** The tri-state of a set of boxes: all on, none, or mixed (`null`). */

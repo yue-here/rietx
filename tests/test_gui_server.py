@@ -4708,4 +4708,18 @@ def test_a_limit_the_model_cannot_store_is_refused_by_name(blank, tmp_path,
                                    {"limits": {"phases.0.atoms.9.biso": [0, 1]}})
     assert status == 400, payload
     assert "stores no limits" in payload["error"]["message"]
+    # a word where a number goes, and a list where a map goes, are 400s too
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"phases.0.cell.a": ["x", 5]}})
+    assert status == 400, payload
+    assert payload["error"]["where"] == ["phases.0.cell.a"]
+    status, payload = client.patch("/api/params", {"values": [1, 2]})
+    assert status == 400, payload
     assert len(project.history) == before
+    # the table's polarization is the model's source.polarization
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"instrument.polarization": [0, 1]}})
+    assert status == 200, payload
+    row = next(r for r in payload["parameters"]
+               if r["path"] == "instrument.polarization")
+    assert (row["lo"], row["hi"]) == (0.0, 1.0)

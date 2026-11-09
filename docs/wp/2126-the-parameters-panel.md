@@ -170,8 +170,13 @@ Each is "settled by Claude, reversible", with the alternative after it.
   popover's "=" button (design 13). The next WP.
 - **Limits on a coordinate DOF**: a `…dof.k` entry stores no `min`/`max` in the model, so the
   popover offers none for a coordinate. The engine would need a home for them first.
-- **`instrument.polarization`'s limits**: its model path is `source.polarization` (WP-1214's
-  `Field.param`), and the limits arm walks the parameter path, so it refuses this one by name.
+- **Limits on a path stored elsewhere in the model**: the limits arm walks the parameter path
+  through the dumped model. It maps `instrument.polarization` to `source.polarization` (WP-1214's
+  `Field.param`), but a texture or background coefficient still refuses by name. The table's
+  path-to-model map lives only inside `ParameterTable`'s write-back; exposing it would serve both.
+- **One PATCH can half-apply**: the limits and restraints node commits before `set_values` or an
+  unhold can refuse, so a refused Apply can leave that node in the history. An all-or-nothing
+  PATCH needs a dry run of those verbs first. Found by this WP's code review, not fixed here.
 - **Plan-stage badges on the group toggles** (piece 3).
 
 ## Tasks
