@@ -1,6 +1,6 @@
 # WP-2131 — the start screen and the New project dialog
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — all seven tasks landed; PR open, awaiting review
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — all seven tasks landed; PR #1498 open, awaiting review
 Depends on: 2123
 Priority: P2 2026-11-09 — a piece of the open gui-overhaul milestone, the maintainer's round-9 design; the window a person first meets
 
@@ -149,7 +149,7 @@ npm --prefix gui test && npm --prefix gui run check
 
 ## Handover log
 
-- **2026-11-09** — all seven tasks landed, by a ghostshift runner. With no project open, `rietx
+- **2026-11-09** — all seven tasks landed, by a ghostshift runner; PR #1498. With no project open, `rietx
   gui` now shows the round-9 start screen: New project…, Open…, the recent list, the examples, and
   links to the manual and the tutorials. A bare launch reopens the last project instead. New
   project is one dialog of four rows (pattern, phases, instrument, project) that asks for no mode
@@ -177,7 +177,12 @@ npm --prefix gui test && npm --prefix gui run check
   the list form's species-check path.
 
   *Measured* (`[dev]` venv, darwin/arm64, another session's suite not running per `serial.py`):
-  @@COUNTS@@
+  fast selection 14482 passed, 410 skipped, 32 xfailed in 10 min 22 s, the seven added
+  tests 5.1 s together (`tests.added_test_times`). vitest 626 passed; svelte-check 0 errors, 0
+  warnings; `test_gui_layout_browser.py` 16 passed serially (one older test,
+  `test_a_pending_edit_moves_nothing_in_the_action_bar[stacked]`, failed once under `-n 4` beside
+  three other files and passed alone); ruff clean; `tests.reader_output` exit 0, unchanged
+  against the merge-base.
 
   *Settled by Claude, reversible* (for Yue; the call, then the alternative):
   1. The project's default folder is the server's suggestion, since a browser upload carries no
