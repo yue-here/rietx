@@ -1,6 +1,6 @@
 # WP-2123 — the layout shell
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — built; PR #1476 waits for the maintainer's review
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — built, second round of fixes in; PR #1476 waits for the maintainer's review
 Depends on: —
 Priority: P2 2026-11-08 — the first piece of the open gui-overhaul milestone; pieces 2-5 build inside it
 
@@ -104,9 +104,8 @@ build`.
 - **Colours** (root CLAUDE.md, WP-1429): values live in `src/rietx/viz/theme.py`, and
   `gui/src/tokens.css` is generated (`python -m rietx.viz.theme > gui/src/tokens.css`) and held
   equal by `tests/test_gui_palette.py`. The same rule says a page's extra roles are `color-mix`
-  over the chrome tokens, never a token of their own. The track and the raised option are two
-  new *surface* levels below and above `--panel`, which the nine chrome tokens do not have,
-  so they are added as tokens; the conflict is recorded for the maintainer below.
+  over the chrome tokens, never a token of their own, so the track and the raised option are
+  mixes in `app.css` and `theme.py` is untouched (settled call 11).
 - **Layout state** (`gui/CLAUDE.md` § One column): a layout is a view choice, session-local and
   unpersisted, while a width is a setting persisted on the verb in `ProjectDoc.ui`. The collapse
   state follows the first and the sash width the second.
@@ -138,10 +137,10 @@ Claude, reversible", with its alternative, and waits for the maintainer's review
    stays the Model tab's third column until the piece that moves it. Alternative: move the 3D
    viewer into a graph tab now.
 4. Settled by Claude, reversible: the action bar shows under every right-hand tab and applies
-   the Parameters tab's pending edits only. The Model and Text panels keep their own Apply, so
-   on the Model tab, while a model edit waits, two filled buttons show at once; that breaks
-   design 6's one filled primary and is owed to piece 2. Alternative: show the bar under the
-   Parameters tab only.
+   the Parameters tab's pending edits only. The Model and Text panels keep their own Apply,
+   outlined since the second round so the bar's Refine is the one filled button in every view
+   (design 6); folding their edits into the bar is owed to piece 2. Alternative: show the bar
+   under the Parameters tab only.
 5. Settled by Claude, reversible: the title reads `Observed pattern` before any fit, `Last fit`
    after one and `Refining` during a run. Alternative: name the model or the stage.
 6. Settled by Claude, reversible: the refine choice is labelled `One cycle`, the ruling's word,
@@ -177,6 +176,11 @@ Claude, reversible", with its alternative, and waits for the maintainer's review
     invalid cell's own. The slot stays 16ch, which a browser test measures against its longest
     message, so no message is cut and none moves the row. Alternative: a popover above the bar
     that shows the reason without a hover.
+14. Settled on the maintainer's ruling of 2026-11-06 (one filled primary per view, every other
+    button outlined), with two calls of Claude's, reversible. The wizard's Create project stays
+    filled while no project is open, when the wizard is the whole view and no action bar shows.
+    The folder browser keeps its filled pick, being a dialog over the window. Alternative:
+    outline both.
 
 ## Non-goals
 
@@ -192,8 +196,8 @@ Claude, reversible", with its alternative, and waits for the maintainer's review
 
 ## Tasks
 
-- [x] `.segmented` redrawn app-wide: a sunken track with one raised option, from two new surface
-  tokens (`--sunken`, `--raised`) in `theme.py`, `tokens.css` regenerated.
+- [x] `.segmented` redrawn app-wide: a sunken track with one raised option, each a `color-mix`
+  of `--fg` into `--panel` (the first round's two tokens were withdrawn in the second).
 - [x] The top bar: the graphs' collapse button first and the model panel's last, in a row whose
   middle wraps while the two buttons keep their places; `Split | Full` retired, since collapsing
   the graphs is the full-width column. One panel always shows. Palette commands for both.
@@ -236,6 +240,46 @@ today's GUI opens from the new shell, and the page does not scroll sideways at 4
 
 ## Handover log
 
+- **2026-11-09, second round** — a fix round on PR #1476, on the open items the first round
+  reported. Five of six are fixed; one is left for the maintainer.
+
+  *Done*, one commit each: (1) the segmented track and raised option are `color-mix` of `--fg`
+  into `--panel`, picked per theme by `light-dark()`, and the `--sunken`/`--raised` tokens are
+  gone, so `theme.py` and `tokens.css` match `main` again (call 11). The painted colours, read
+  in chromium under system, forced-light and forced-dark themes, are 235.8 grey track on white
+  light and 44.0 track under a 71.0 option dark, the prototype's luminances. (2) While the model
+  panel is hidden, the action bar renders at the foot of the graph column, so Refine stays a
+  visible button (call 12). (3) Every panel button is outlined, so the bar's Refine is the one
+  filled button in any view: Model's two Apply buttons, Text's Apply and Re-read, Plan's Save
+  plan, six in Peaks, Report's Apply, History's Checkout and Series' run. The wizard's Create
+  project and the folder browser keep theirs (call 14). `lib/style.test.ts` fails on any other
+  filled button, and failed when one was put back on purpose. (4) The pending slot reads
+  `invalid edit` and the reason rides in its tooltip and the cell's (call 13). (5) The `r` key
+  is the bar's Refine on the staged plan: it applies pending edits first, and an invalid edit
+  blocks it. The text and history screenshots were retaken for (3); the other fourteen
+  re-rendered with only console timestamps changed and were left alone.
+
+  *Left for the maintainer* (6): with the graphs hidden, Rwp, GoF and the not-a-fit chip are
+  hidden too. No ruling places them, and the two candidate homes are both visual calls: back in
+  the header while the graphs are hidden, or in the action bar beside Refine.
+
+  *Deliberately not generalised*: a run started from the Plan, Report or Series panel, or by the
+  `.` key, still runs without the Parameters edits waiting in the bar. Each is its own panel's
+  verb, and routing every run through the bar is a design for the Plan tab's piece. It is in
+  the milestone's owed list.
+
+  *Measured* (macOS arm64, worktree venv `[dev]` plus playwright 1.64.1, node 24.22.1): vitest
+  612 passed (610 before; +2, the one-filled-primary guard and the `r`-key test); svelte-check 0
+  errors; the layout browser test 12 passed (8 before; +4, Refine on screen with either side
+  hidden and the invalid-edit slot, each wide and stacked); `test_gui_manual.py` 10 passed; the
+  five GUI files of the acceptance line together 73 passed; fast suite (`-m "not slow"`, `-n auto`, queued alone through serial.py)
+  14472 passed, 410 skipped, 32 xfailed (14468 before; +4, the new browser cases); ruff clean;
+  `python -m tests.reader_output` exit 0, unchanged against 63d7c120a.
+
+  The milestone's owed list now quotes WP-2124's measured 8 of 12 fluorapatite candidates with a
+  supercell relation, where it said 2 of 12.
+
+  Next: the maintainer reviews the PR, its fourteen calls and item (6).
 - **2026-11-09** — the layout shell landed, in PR #1476, whose merge waits for the maintainer's
   review. The window now has the overhaul's shape: graphs on the left under their own tab strip
   and a title line saying what the graph shows, the nine panels on the right, and one action

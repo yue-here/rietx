@@ -71,9 +71,11 @@ the piece that touches it or a WP of its own.
   maintainer adopted both rules on 2026-11-08.
 - A GUI series lives in session memory only; several series gaps wait on the series fitting
   now changing on `main`.
-- The Model and Text panels keep their own filled Apply beside the action bar's Refine, so the
-  Model tab shows two filled buttons while a model edit waits (found by WP-2123, which routes
-  only the Parameters edits through the action bar).
+- The Model and Text panels keep their own Apply beside the action bar's, outlined so the bar's
+  Refine stays the one filled button, because WP-2123 routes only the Parameters edits through
+  the action bar. Their edits still wait on two Apply buttons in one view.
+- A run started from the Plan, Report or Series panel, or by the `.` key, does not apply the
+  Parameters edits waiting in the action bar; the bar's Refine and the `r` key do (WP-2123).
 
 ## Acceptance
 
