@@ -541,6 +541,19 @@ and Remove (`POST /api/recent/remove`). The mode follows the phases, never asked
 a typed cell gives Le Bail, so WP-1206's refusal stays unreachable. An assumed
 instrument is tagged `assumed` where shown: unmarked, a wrong anode moves cells.
 
+**The File menu** (WP-2133, `panels/FileMenu.svelte`, `lib/filemenu.ts`) acts on
+the folder, on the maintainer's save model A (2026-11-07: autosave, no Save).
+Three rules. **A rename or a move keeps the session's `Project`** and repoints
+the two paths a live one holds, `Project.path` and `RefinementTree.path`, so the
+result and the panels survive; a third path-holding field joins
+`GuiSession._relocate`. **A destination is a folder `_browsable_folder` admits
+and a name `_project_name` admits**, never sanitised (WP-1205's containment
+gate), and an existing one is refused `DESTINATION_EXISTS`, never replaced.
+**Close is a fact on the recent list** (`closed` on its head), the only way
+`reopen_last` can tell a project closed from one left open at quit.
+`EXPORT_KINDS` mirrors `EXPORT_DEFAULTS`, held equal by
+`tests/test_gui_file_menu.py`.
+
 **A project without a CIF** (WP-1206, `GET /api/spacegroup`,
 `session._typed_cell_structure`, `lib/wizard.ts`) is the wizard's second answer
 to step 2: a symbol and a cell, built into the same Le Bail scaffold Adopt lands

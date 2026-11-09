@@ -119,7 +119,7 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   browser, Rename in place, ⌘S "Saved", ⌘O and ⇧⌘S; the header's `Open…` goes.
 - [x] The layout browser test opens the menu, its submenus and both dialogs with real clicks, and
   renames in place, and nothing moves; the dist rebuilt.
-- [ ] The GUI chapters: the header table, a File menu section, the route table, the keyboard.
+- [x] The GUI chapters: the header table, a File menu section, the route table, the keyboard.
 
 ## Acceptance
 
