@@ -3486,6 +3486,32 @@ class Refinement:
         recorded only once the history tree exists.
         """
         table = self._working_table()
+        by_path = self._refuse_value_edits(table, values)
+        for path, value in values.items():
+            by_path[path].value = float(value)
+        table.refresh_ties()  # dependents follow their sources (b←a, x←dof)
+        self._write_back(table)
+        # a value set next to its own image is the twin case #1007 describes
+        self._merge_twins()
+        # the fitted curve and statistics described the *old* values
+        self._invalidate_fit()
+        if self.history is None:
+            return
+        node = self.history.add(
+            parents=[self._head_id] if self._head_id else [],
+            action=NodeAction(kind="set_value", values=dict(values)),
+            state=self.snapshot())
+        self._head_id = node.id
+
+    def _refuse_value_edits(self, table: ParameterTable,
+                            values: dict[str, float]) -> dict:
+        """``table``'s entries by path, once every edit in ``values`` is legal.
+
+        :meth:`set_values`' refusals, one check so that a caller previewing
+        values without applying them (the GUI's ``POST /api/preview``,
+        WP-2125) refuses exactly what applying them would, in the same
+        sentences.  Raises ``ValueError`` on the first refusal.
+        """
         by_path = {e.path: e for e in table.entries}
         unknown = [p for p in values if p not in by_path]
         if unknown:
@@ -3513,21 +3539,7 @@ class Refinement:
             if not (e.lo <= float(value) <= e.hi):
                 raise ValueError(
                     f"{path}={value} lies outside its bounds [{e.lo}, {e.hi}]")
-        for path, value in values.items():
-            by_path[path].value = float(value)
-        table.refresh_ties()  # dependents follow their sources (b←a, x←dof)
-        self._write_back(table)
-        # a value set next to its own image is the twin case #1007 describes
-        self._merge_twins()
-        # the fitted curve and statistics described the *old* values
-        self._invalidate_fit()
-        if self.history is None:
-            return
-        node = self.history.add(
-            parents=[self._head_id] if self._head_id else [],
-            action=NodeAction(kind="set_value", values=dict(values)),
-            state=self.snapshot())
-        self._head_id = node.id
+        return by_path
 
     # ------------------------------------------------------------------
     # user constraints (WP-1070)
@@ -8981,7 +8993,7 @@ def _extra_peak_tick_support(model: CompiledModel,
 
 
 def _tick_rows(model: CompiledModel, structure: Structure,
-               values: dict[str, float]
+               values: dict[str, float], *, support: bool = True
                ) -> tuple[dict[str, list[float]], dict[str, list[list[int]]],
                           dict[str, list[float]]]:
     """Every tick row of one histogram: positions, Miller indices and
@@ -8992,6 +9004,11 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     task 7), so a joint fit draws the rows a single fit draws: a magnetic
     phase's own ``"<phase> (magnetic)"`` row (issue #278) and the declared
     peaks' ``EXTRA_TICK_KEY`` row as well as one row per phase.
+
+    ``support=False`` skips the support, which evaluates every reflection's
+    window and cost 11 ms of the GUI preview's 20 on the fluorapatite
+    example (WP-2125). Its rows then carry NaN, and the positions and indices
+    are unchanged.
     """
     # Tick positions cover **every** emission line, not just the primary one.
     # The calculated pattern really does have a peak at each Kα2 position, and
@@ -9026,7 +9043,8 @@ def _tick_rows(model: CompiledModel, structure: Structure,
         # (H, m), not H: a satellite is labelled by its order (WP-1326)
         pos, hkl = model.reflection_positions(ip, values)
         n_lines = len(model.line_wavelengths)
-        sup = _reflection_tick_support(model, ip, values, n_lines)
+        sup = (_reflection_tick_support(model, ip, values, n_lines) if support
+               else np.full(len(pos), np.nan))
         keep = np.isfinite(pos)
         if cp.magnetic is not None:
             # issue #278: a magnetic phase's reflections are drawn as their
@@ -9085,7 +9103,9 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     extra_ticks = model.extra_peak_tick_positions(values)
     if extra_ticks:
         ticks[EXTRA_TICK_KEY] = extra_ticks
-        tick_support[EXTRA_TICK_KEY] = _extra_peak_tick_support(model, values)
+        tick_support[EXTRA_TICK_KEY] = (
+            _extra_peak_tick_support(model, values) if support
+            else [math.nan] * len(extra_ticks))
     return ticks, tick_hkl, tick_support
 
 
