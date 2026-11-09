@@ -97,7 +97,7 @@ def test_a_held_variable_stays_and_carries_no_esd():
                              "x0": rx.Parameter(value=600.0)})
     held = fit.variables[2]
     assert (held.name, held.value, held.vary) == ("x0", 600.0, False)
-    assert held.esd is None and held.esd_unscaled is None
+    assert held.esd is None and held.esd_unscaled is None and held.at_bound is None
     coef, _, _ = _weighted_line(TEMPS, VALUES, ESDS)
     assert fit.variables[0].value == pytest.approx(coef[0], rel=1e-12)
     assert fit.dof == 5
@@ -147,7 +147,8 @@ def test_the_fit_round_trips_through_json_and_prints_its_chain():
     ("a0 + k*x", {"a0": _free(4.0), "k": 0.0}, {}, "declare it as rx.Parameter"),
     ("a0 + log(k*x)", {"a0": _free(4.0), "k": _free(-1.0)}, {}, "not finite at its start"),
     ("a0 + k*T", {"a0": _free(4.0), "k": _free(0.0)},
-     {"coordinates": rx.CoordinateTable(columns={"T": TEMPS[:3]})}, "3 rows for a series of 7"),
+     {"coordinates": rx.CoordinateTable(columns={"T": TEMPS[:3]})},
+     "3 rows for a series of at least 7"),
     ("a0 + k*T", {"a0": _free(4.0), "k": _free(0.0)},
      {"coordinates": rx.CoordinateTable(columns={"T": [*TEMPS[:6], None]})},
      "pattern 6 ('p6') has no value for coordinate 'T'"),
@@ -198,16 +199,19 @@ def test_a_quarantined_pattern_and_a_point_with_no_esd_are_left_out_and_named():
     assert "4 points, 3 left out (no_esd, quarantined)" in str(fit)
 
 
-def test_a_two_way_series_reads_the_forward_chain_unless_asked():
+def test_a_two_way_series_reads_the_chain_it_is_told():
+    """Which chain to read is the caller's: their gap is path dependence the
+    package reports and never resolves, so no default picks one."""
     back = _series(values=[v + 1e-4 for v in VALUES], direction="backward")
     both = _series(direction="both", backward=back)
     expr, start = "a0 + k*(x - 600)", {"a0": _free(4.16), "k": _free(0.0)}
-    forward = rx.fit_trajectory(both, PATH, expr, start)
+    with pytest.raises(ValueError, match="ran both ways: pass chain='forward' or"):
+        rx.fit_trajectory(both, PATH, expr, start)
+    forward = rx.fit_trajectory(both, PATH, expr, start, chain="forward")
     backward = rx.fit_trajectory(both, PATH, expr, start, chain="backward")
     assert (forward.chain, forward.series_direction) == ("forward", "both")
     assert (backward.chain, backward.series_direction) == ("backward", "both")
     assert backward.variables[0].value - forward.variables[0].value == pytest.approx(1e-4)
-    assert rx.fit_trajectory(both, PATH, expr, start, chain="forward") == forward
     assert "backward chain's trajectory" in str(backward)
 
 
@@ -236,4 +240,55 @@ def test_a_coordinate_row_is_the_patterns_index_not_its_position():
     assert fit.positions == [0, 1, 2, 3, 4, 5]
     coef, _, _ = _weighted_line([TEMPS[i] for i in keep], [VALUES[i] for i in keep],
                                 [ESDS[i] for i in keep])
+    assert [v.value for v in fit.variables] == pytest.approx(list(coef), rel=1e-8)
+
+
+def test_two_variables_the_trajectory_moves_only_together_have_no_esd():
+    """``a + b`` is one number to the data: the pseudo-inverse discards the
+    other direction, and an esd read through it would be small and wrong."""
+    fit = rx.fit_trajectory(_series(), PATH, "a + b + k*(x - 600)",
+                            {"a": _free(2.0), "b": _free(2.16), "k": _free(0.0)})
+    a, b, k = fit.variables
+    assert a.esd is None and b.esd is None and a.esd_unscaled is None
+    assert k.esd is not None and fit.covariance is None
+    coef, _, _ = _weighted_line(TEMPS, VALUES, ESDS)
+    assert a.value + b.value == pytest.approx(coef[0], rel=1e-10)
+
+
+def test_a_step_path_and_an_angle_path_are_refused():
+    series = _series()
+    series.relative_paths = [PATH]
+    with pytest.raises(ValueError, match="a step from where each fit began"):
+        rx.fit_trajectory(series, PATH, "a0 + k*x", {"a0": _free(4.0), "k": _free(0.0)})
+    series.relative_paths, series.angle_paths = [], [PATH]
+    with pytest.raises(ValueError, match="an angle, whose values wrap"):
+        rx.fit_trajectory(series, PATH, "a0 + k*x", {"a0": _free(4.0), "k": _free(0.0)})
+
+
+def test_a_point_with_no_finite_value_is_named_as_such():
+    series = _series()
+    series.entries[1].parameters[0].value = float("nan")
+    fit = rx.fit_trajectory(series, PATH, "a0 + k*(x - 600)",
+                            {"a0": _free(4.16), "k": _free(0.0)})
+    assert [(s.position, s.reason) for s in fit.skipped] == [(1, "no_value")]
+
+
+def test_no_usable_point_and_equal_bounds_are_refused_by_cause():
+    series = _series(status={k: "diverged" for k in range(7)})
+    with pytest.raises(ValueError, match="all 7 were left out \\(quarantined\\)"):
+        rx.fit_trajectory(series, PATH, "a0 + k*x", {"a0": _free(4.0), "k": _free(0.0)})
+    with pytest.raises(ValueError, match="'k' is free but its min and max are equal"):
+        rx.fit_trajectory(_series(), PATH, "a0 + k*x",
+                          {"a0": _free(4.0), "k": _free(0.0, min=0.0, max=0.0)})
+
+
+def test_a_cancelled_chain_takes_the_full_coordinate_table():
+    """A chain cancelled after pattern 4 records neither an entry nor a failure
+    for the rest, so the table of every pattern passed is longer than it."""
+    series = _series()
+    del series.entries[5:]
+    fit = rx.fit_trajectory(series, PATH, "a0 + k*(T - 600)",
+                            {"a0": _free(4.16), "k": _free(0.0)},
+                            coordinates=rx.CoordinateTable(columns={"T": TEMPS}))
+    coef, _, _ = _weighted_line(TEMPS[:5], VALUES[:5], ESDS[:5])
     assert [v.value for v in fit.variables] == pytest.approx(list(coef), rel=1e-8)
