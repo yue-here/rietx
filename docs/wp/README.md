@@ -57,6 +57,8 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 2026-11-09 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2123](2123-the-layout-shell.md) | The layout shell | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2126](2126-the-parameters-panel.md) | The Parameters panel | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2127](2127-the-plan-tab.md) | The Plan tab | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -500,6 +502,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2123](2123-the-layout-shell.md) | The layout shell | 🔄 2026-11-09 | P2 | — |
 | [2125](2125-the-pattern-at-values-nobody-has-applied.md) | The pattern at values nobody has applied | ✅ 2026-11-09 | — | — ([2123](2123-the-layout-shell.md) soft) |
 | [2126](2126-the-parameters-panel.md) | The Parameters panel | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
+| [2127](2127-the-plan-tab.md) | The Plan tab | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
+| [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md), [2124](2124-the-gui-port-server-defects.md) |
 
 ## <a id="unscheduled"></a>Unscheduled
 
