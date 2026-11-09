@@ -89,7 +89,7 @@ rescope does not cover it.
 
 - [x] Extinction's Biso direction: correct `model/extinction.py`'s docstring
       and the theory page's Primary extinction section (2026-11-09).
-- [ ] Stephens: the help entry and the manual section name the declaration
+- [x] Stephens: the help entry and the manual section name the declaration
       and the misfit that calls for it.
 - [ ] Anisotropic ADPs: the help entry names `Atom.aniso` and when a
       declaration is worth trying.

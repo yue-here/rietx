@@ -234,7 +234,12 @@ _STEPHENS_S = HelpEntry(
         "derivative would step 100 times further than the value itself. Like the "
         "anisotropic displacement components, these coefficients are tied. The "
         "refined quantities are the `microstrain.dof.k` entries of the Laue-allowed "
-        "subspace."
+        "subspace. The block is opt-in per phase. `phase.microstrain = "
+        "StephensStrain.isotropic(1000, phase.cell)` declares it at 1000 ppm, and "
+        "`lab_sample_refine` frees it with the other sample widths. Declare it where "
+        "reflections at similar 2θ stay broader along some directions than along "
+        "others once `lor_strain` has refined. `FitReport.strain` measures that and "
+        "names the broadest and narrowest directions."
     ),
     unit="10⁻¹² Å⁻⁴", default="0.0",
     typical="0-500 for a sample with measurable anisotropic strain",
