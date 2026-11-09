@@ -239,7 +239,7 @@ its code. Any reader takes the stored format from a file's contents.
   - *Overlap.* WP-2101 owns `switching/gsas2.md`'s GSAS-II sequential section and the skill's
     series rows too; its `### Inherited` names what this branch wrote there. No 2101 or 2103
     branch was on origin at the start.
-  - PR #PR_N. Next: the maintainer's ruling on the four names; then issue #1489's first
+  - PR #1491. Next: the maintainer's ruling on the four names; then issue #1489's first
     item closes the milestone's `.gpx` row.
 
 - **2026-11-04** — Filed from the clean-context review of the milestone. No open WP
