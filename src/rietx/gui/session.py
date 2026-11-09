@@ -531,6 +531,12 @@ class GuiSession:
         :func:`schemas.project.check_interval`'s words — the same sentence the
         ``.rxt`` document refuses with, because the document's field validators
         are what both routes run into (WP-1033).
+
+        All or nothing (WP-2126): every setting is first written to a copy of
+        the document, whose validators refuse, and only then to the project.
+        Written straight in, a refused ``excluded_regions`` left the ``mode``
+        sent with it in the live document, unsaved, for the next save to
+        persist and the next run to use.
         """
         self._require_idle()
         p = self._need_project()
@@ -540,29 +546,44 @@ class GuiSession:
             raise GuiError(f"unknown setting(s): {sorted(unknown)}; the plan has "
                            "its own route and the model lives in the history",
                            where=sorted(unknown))
+        draft = p.doc.model_copy(deep=True)
         if "mode" in body:
-            p.doc.mode = body["mode"]
+            with self._settings_refusal("mode"):
+                draft.mode = body["mode"]
         if "indexing" in body:
             # whole-object replace, like the plan: the form pushes the block
             # it edited, and a partial merge would let two half-specs disagree
             from ..schemas.indexing import IndexingControls
 
             with self._settings_refusal("indexing"):
-                p.doc.indexing = IndexingControls.model_validate(
+                draft.indexing = IndexingControls.model_validate(
                     body["indexing"] or {})
         if "two_theta_limits" in body:
             limits = body["two_theta_limits"]
             with self._settings_refusal("two_theta_limits"):
-                p.doc.two_theta_limits = None if limits is None else tuple(limits)
+                draft.two_theta_limits = (None if limits is None
+                                          else _pair(limits, "two_theta_limits"))
         if "excluded_regions" in body:
-            regions = [tuple(r) for r in (body["excluded_regions"] or [])]
+            regions = [_pair(r, "excluded_regions")
+                       for r in (body["excluded_regions"] or [])]
             with self._settings_refusal("excluded_regions"):
-                p.set_excluded_regions(regions)
-        for key, value in (body.get("ui") or {}).items():
+                draft.excluded_regions = regions
+        ui = body.get("ui") or {}
+        if not isinstance(ui, dict):
+            raise GuiError("'ui' maps a key to a value, or to null to drop it",
+                           where=["ui"])
+        for key, value in ui.items():
             if value is None:
-                p.doc.ui.pop(key, None)
+                draft.ui.pop(key, None)
             else:
-                p.doc.ui[key] = value
+                draft.ui[key] = value
+        # every setting validated: write the draft's values into the project
+        p.doc.mode = draft.mode
+        p.doc.indexing = draft.indexing
+        p.doc.two_theta_limits = draft.two_theta_limits
+        if "excluded_regions" in body:
+            p.set_excluded_regions(list(draft.excluded_regions))
+        p.doc.ui = draft.ui
         p.save()
         return self.project_doc()
 
@@ -874,9 +895,24 @@ class GuiSession:
         one refused.  ``hold`` maps a glob to ``True`` (``Refinement.hold``) or
         ``False`` (``unhold``); unholds run before the vary flags and holds
         after them, so "release and free" and "untick and hold" both land.
+
+        **One PATCH is all or nothing.**  Each arm commits its own node, and
+        a later arm can refuse after an earlier one committed (a held literal
+        in ``vary``, a value outside the limits it arrived without), so the
+        arms are first run on a history-free copy (:func:`rehearse`).  A
+        refusal there names its arm's path and leaves the model, the head and
+        the history as they were.
         """
         self._require_idle()
         p = self._need_project()
+        arms = self._param_arms(body)
+        rehearse(p.refinement, lambda ref: _apply_param_arms(ref, *arms))
+        changed = _apply_param_arms(p.refinement, *arms)
+        return {"changed": changed, **self.params()}
+
+    @staticmethod
+    def _param_arms(body: dict) -> tuple[dict, dict, dict, dict, dict]:
+        """``PATCH /api/params``'s five arms, each checked to be a map."""
         values = body.get("values") or {}
         vary = body.get("vary") or {}
         hold = body.get("hold") or {}
@@ -888,58 +924,7 @@ class GuiSession:
                            "map dot-path glob → bool, 'limits' maps dot-path → "
                            "[lower, upper] and 'restraints' maps dot-path → "
                            "{target, sigma} or null")
-        values = dict(values)   # a limit's value is taken out of it below
-        changed: dict[str, Any] = {"values": [], "vary": {}, "hold": {},
-                                   "limits": [], "restraints": []}
-        # a literal vary key the model lacks is a typo, refused before the
-        # values or any earlier key commit a node (WP-1951)
-        try:
-            p.refinement._refuse_unknown_literals(list(vary) + list(hold))
-        except ValueError as exc:
-            raise GuiError(str(exc), where=sorted({*vary, *hold})) from None
-        if limits or restraints:
-            # one ``edit_model`` node for both, first: a limit can admit a
-            # value the old one refused, so a value typed with its limit
-            # travels inside the same validated model (pydantic checks a
-            # value against min/max as one object, WP-2126)
-            structure, instrument = _limit_and_restraint_edit(
-                p.refinement, limits, restraints, values)
-            self._edit(structure=structure, instrument=instrument,
-                       label="limits and restraints edited")
-            changed["limits"] = sorted(limits)
-            changed["restraints"] = sorted(restraints)
-            for path in limits:
-                if path in values:
-                    changed["values"].append(path)
-                    del values[path]
-        for glob, flag in hold.items():
-            # unholds before the vary flags and holds after them, so "release
-            # this and free it" and "untick this and hold it" both land
-            if not flag:
-                changed["hold"][glob] = _holding(p.refinement.unhold, glob)
-        if values:
-            try:
-                p.refinement.set_values({k: float(v) for k, v in values.items()})
-            except (ValueError, TypeError) as exc:
-                # a tied path names its sources, a locked one says it is
-                # structural, a bound violation prints the interval — each has a
-                # different fix, so the message travels intact
-                raise GuiError(str(exc), where=sorted(values)) from None
-            changed["values"] = sorted({*changed["values"], *values})
-        for glob, flag in vary.items():
-            try:
-                changed["vary"][glob] = p.refinement.set_vary(glob, bool(flag))
-            except ValueError as exc:
-                # ``set_vary`` could not refuse anything until WP-1435 gave a
-                # caller's hold precedence over a named path, so this branch
-                # ran bare and the first refusal would have been a 500.  Same
-                # treatment as ``set_values`` above: the sentence names the
-                # verb that resolves it, so it travels intact.
-                raise GuiError(str(exc), where=[glob]) from None
-        for glob, flag in hold.items():
-            if flag:
-                changed["hold"][glob] = _holding(p.refinement.hold, glob)
-        return {"changed": changed, **self.params()}
+        return values, vary, hold, limits, restraints
 
     # ------------------------------------------------------------------
     # plan
@@ -1586,14 +1571,8 @@ class GuiSession:
         form needs it to highlight the field.
         """
         self._require_idle()
-        p = self._need_project()
-        try:
-            return p.refinement.edit(structure=structure, instrument=instrument,
-                                     label=label)
-        except ValueError as exc:
-            match = _LEADING_PATH.search(str(exc))
-            raise GuiError(str(exc), code="MODEL_REFUSED",
-                           where=[match.group(1)] if match else []) from None
+        return _edit_on(self._need_project().refinement, structure=structure,
+                        instrument=instrument, label=label)
 
     # ------------------------------------------------------------------
     # run control
@@ -2979,9 +2958,14 @@ class GuiSession:
         p = self._need_project()
         node_id = _need(body, "node_id")
         name = str(body.get("name") or "").strip()
-        out = self.history_checkout({"node_id": node_id})
+        # the tag first: it refuses (an unknown node, the reserved 'head')
+        # before it writes, and a checkout of a node that resolved does not
+        # refuse, so a refused branch has moved nothing (WP-2126).  Checked
+        # out first, a refused name left the head moved.
+        self._require_idle()
         if name:
             self.history_tag({"node_id": node_id, "name": name})
+        out = self.history_checkout({"node_id": node_id})
         return {"branched_from": p.history.resolve(node_id), "name": name, **out}
 
     def history_tag(self, body: dict) -> dict:
@@ -3368,6 +3352,18 @@ def _pick_action(report, kind: str, paths: Any = None):
     return hits[0]
 
 
+def _pair(value, where: str) -> tuple:
+    """A ``[lo, hi]`` from a body as a tuple, for the document's validator.
+
+    Only the shape is checked here; the interval's own rule is
+    :func:`schemas.project.check_interval`'s, reached through the validator.
+    """
+    if not isinstance(value, (list, tuple)):
+        raise GuiError(f"'{where}' takes [lo, hi] pairs, got {value!r}",
+                       where=[where])
+    return tuple(value)
+
+
 def _need(body: dict, key: str):
     value = body.get(key)
     if value in (None, ""):
@@ -3399,6 +3395,125 @@ def _validate(model, payload, where: str):
 #: *searches* rather than anchors — it is what lets :meth:`GuiSession._edit`
 #: address the field without parsing a sentence it does not own.
 _LEADING_PATH = re.compile(r"\b((?:phases|instrument)\.[\w.]*[\w])")
+
+
+def rehearse(refinement, apply: Callable[[Any], Any]) -> None:
+    """Run ``apply`` on a history-free copy of ``refinement``, to see it refuse.
+
+    A route that applies several engine verbs for one request commits a node
+    per verb, so a refusal from a later verb would leave the earlier nodes in
+    the history and their changes in the model: a half-applied request.  No
+    verb can be asked in advance whether it will refuse, and their refusals
+    interact (a limit admits a value; an unhold lets a path be freed).  So the
+    whole sequence runs first on ``Refinement._trial(record=False)``, the copy
+    the package already builds for a fit whose result it discards: same models,
+    ties, variables, holds and free set, no history.  The verbs are
+    deterministic in that state, so a sequence the copy accepts is one the
+    working refinement accepts; a refusal raises here, before anything real
+    was touched.
+
+    The copy's warnings are dropped: the real run warns them once.
+    """
+    import warnings
+
+    trial = refinement._trial(record=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        apply(trial)
+
+
+def _edit_on(refinement, *, structure: Structure | None = None,
+             instrument: Instrument | None = None, label: str = "") -> str | None:
+    """``Refinement.edit`` with its refusal addressed (see ``GuiSession._edit``)."""
+    try:
+        return refinement.edit(structure=structure, instrument=instrument,
+                               label=label)
+    except ValueError as exc:
+        match = _LEADING_PATH.search(str(exc))
+        raise GuiError(str(exc), code="MODEL_REFUSED",
+                       where=[match.group(1)] if match else []) from None
+
+
+@contextmanager
+def _arm(name: str):
+    """Name the ``PATCH /api/params`` arm a refusal came from, in ``details``.
+
+    The message stays the verb's own sentence; the arm rides beside it, so a
+    client can tell a refused limit from a refused value on the same path.
+    """
+    try:
+        yield
+    except GuiError as exc:
+        exc.details = [{"arm": name, "where": list(exc.where)}, *exc.details]
+        raise
+
+
+def _apply_param_arms(ref, values: dict, vary: dict, hold: dict, limits: dict,
+                      restraints: dict) -> dict:
+    """``PATCH /api/params``'s arms applied to ``ref``, in the route's order.
+
+    Returns the ``changed`` map.  Called twice per request: on a rehearsal copy
+    (:func:`rehearse`) and then on the project's refinement.
+    """
+    values = dict(values)   # a limit's value is taken out of it below
+    changed: dict[str, Any] = {"values": [], "vary": {}, "hold": {},
+                               "limits": [], "restraints": []}
+    # a literal vary key the model lacks is a typo, refused before the
+    # values or any earlier key commit a node (WP-1951)
+    for name, arm in (("vary", vary), ("hold", hold)):
+        with _arm(name):
+            try:
+                ref._refuse_unknown_literals(list(arm))
+            except ValueError as exc:
+                raise GuiError(str(exc), where=sorted(arm)) from None
+    if limits or restraints:
+        # one ``edit_model`` node for both, first: a limit can admit a
+        # value the old one refused, so a value typed with its limit
+        # travels inside the same validated model (pydantic checks a
+        # value against min/max as one object, WP-2126)
+        with _arm("limits" if limits else "restraints"):
+            structure, instrument = _limit_and_restraint_edit(
+                ref, limits, restraints, values)
+            _edit_on(ref, structure=structure, instrument=instrument,
+                     label="limits and restraints edited")
+        changed["limits"] = sorted(limits)
+        changed["restraints"] = sorted(restraints)
+        for path in limits:
+            if path in values:
+                changed["values"].append(path)
+                del values[path]
+    with _arm("hold"):
+        for glob, flag in hold.items():
+            # unholds before the vary flags and holds after them, so "release
+            # this and free it" and "untick this and hold it" both land
+            if not flag:
+                changed["hold"][glob] = _holding(ref.unhold, glob)
+    if values:
+        with _arm("values"):
+            try:
+                ref.set_values({k: float(v) for k, v in values.items()})
+            except (ValueError, TypeError) as exc:
+                # a tied path names its sources, a locked one says it is
+                # structural, a bound violation prints the interval — each has
+                # a different fix, so the message travels intact
+                raise GuiError(str(exc), where=sorted(values)) from None
+        changed["values"] = sorted({*changed["values"], *values})
+    with _arm("vary"):
+        for glob, flag in vary.items():
+            try:
+                changed["vary"][glob] = ref.set_vary(glob, bool(flag))
+            except ValueError as exc:
+                # ``set_vary`` could not refuse anything until WP-1435 gave a
+                # caller's hold precedence over a named path, so this branch
+                # ran bare and the first refusal would have been a 500.  Same
+                # treatment as ``set_values`` above: the sentence names the
+                # verb that resolves it, so it travels intact.
+                raise GuiError(str(exc), where=[glob]) from None
+    with _arm("hold"):
+        for glob, flag in hold.items():
+            if flag:
+                changed["hold"][glob] = _holding(ref.hold, glob)
+    return changed
 
 
 def _holding(verb, glob: str) -> list[str]:
