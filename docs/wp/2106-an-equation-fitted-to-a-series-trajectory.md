@@ -81,7 +81,9 @@ its code. Any reader takes the stored format from a file's contents.
   `examples/guides/equation.py`; the reference halves are `reference/series.md` § An
   equation fitted to a trajectory and `reference/foreign-models.md` § Equations stored
   with a sequential fit.)
-- [ ] Skill: the series reference's row.
+- [x] Skill: the series reference's row. (The joint-fit row of `references/series.md`
+  names `rx.fit_trajectory` as the line through a chain, inside the file's budget;
+  `fit_trajectory` joins the API index's series section.)
 
 ## Acceptance
 
