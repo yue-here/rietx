@@ -147,7 +147,7 @@ documentation only.
       separator; quoted fields are refused by name; no CSV format entry.
 - [x] Tests in `tests/test_readers_robust.py`; every existing xy fixture
       reads unchanged with no new diagnostic.
-- [ ] Skill: the diagnostics reference row for any new code. Nothing else
+- [x] Skill: the diagnostics reference row for any new code. Nothing else
       expected.
 
 ## Acceptance
