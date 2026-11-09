@@ -4686,3 +4686,212 @@ def test_plan_resolve_force_fixes_a_column_a_tie_drives(blank, tmp_path,
     # and the row agrees with the panel, being the same test
     rows = {r.path: r for r in ref.parameters(mode="lebail")}
     assert rows["vars.B"].mode_fixed and not rows["vars.B"].refinable
+
+
+def test_the_parameters_panel_holds_limits_and_restrains_through_one_patch(
+        blank, tmp_path, pattern_file):
+    """WP-2126: ``hold``, ``limits`` and ``restraints`` ride ``PATCH /api/params``.
+
+    The panel's Apply is one round trip, so the three arms the padlock and the
+    value popover need are verbs of that route.  A limit typed with a value
+    lands in one ``edit_model`` node, because pydantic checks the value
+    against its limits as one object; a restraint is a ``ValueRestraint`` on
+    the phase its path names, and ``null`` removes it.
+    """
+    session, client = blank
+    project = _open(session, tmp_path / "panel.rex", pattern_file)
+    path = "phases.0.cell.a"
+    before = len(project.history)
+
+    status, payload = client.patch("/api/params", {"hold": {path: True}})
+    assert status == 200, payload
+    assert payload["changed"]["hold"][path] == [path]
+    row = next(r for r in payload["parameters"] if r["path"] == path)
+    assert row["held"] and not row["refinable"]
+
+    # release and free in one call: the unhold runs before the vary flag
+    status, payload = client.patch("/api/params", {"hold": {path: False},
+                                                   "vary": {path: True}})
+    assert status == 200, payload
+    row = next(r for r in payload["parameters"] if r["path"] == path)
+    assert not row["held"] and row["vary"]
+
+    # a value outside the old limits is admitted by the limits sent with it
+    status, payload = client.patch("/api/params", {
+        "limits": {path: [4.0, None]}, "values": {path: 4.25}})
+    assert status == 200, payload
+    row = next(r for r in payload["parameters"] if r["path"] == path)
+    assert (row["lo"], row["hi"]) == (4.0, "Infinity")
+    assert row["value"] == pytest.approx(4.25)
+    assert payload["changed"]["values"] == [path]
+
+    status, payload = client.patch("/api/params", {
+        "restraints": {path: {"target": 4.16, "sigma": 0.01}}})
+    assert status == 200, payload
+    restraints = project.refinement.structure.phases[0].restraints
+    assert [(r.path, r.target, r.sigma) for r in restraints] == [(path, 4.16, 0.01)]
+    status, payload = client.patch("/api/params", {"restraints": {path: None}})
+    assert status == 200, payload
+    assert project.refinement.structure.phases[0].restraints == []
+
+    kinds = [n.action.kind for n in project.history.nodes.values()][before:]
+    assert kinds == ["set_hold", "set_hold", "set_vary", "edit_model",
+                     "edit_model", "edit_model"]
+
+
+def test_a_limit_the_model_cannot_store_is_refused_by_name(blank, tmp_path,
+                                                          pattern_file):
+    """A crossed pair and a path with no stored limits are refusals, not 500s."""
+    session, client = blank
+    project = _open(session, tmp_path / "limits.rex", pattern_file)
+    before = len(project.history)
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"phases.0.cell.a": [5, 4]}})
+    assert status == 400, payload
+    assert "above the upper" in payload["error"]["message"]
+    assert payload["error"]["where"] == ["phases.0.cell.a"]
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"phases.0.atoms.9.biso": [0, 1]}})
+    assert status == 400, payload
+    assert "stores no limits" in payload["error"]["message"]
+    # a word where a number goes, and a list where a map goes, are 400s too
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"phases.0.cell.a": ["x", 5]}})
+    assert status == 400, payload
+    assert payload["error"]["where"] == ["phases.0.cell.a"]
+    status, payload = client.patch("/api/params", {"values": [1, 2]})
+    assert status == 400, payload
+    assert len(project.history) == before
+    # the table's polarization is the model's source.polarization
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"instrument.polarization": [0, 1]}})
+    assert status == 200, payload
+    row = next(r for r in payload["parameters"]
+               if r["path"] == "instrument.polarization")
+    assert (row["lo"], row["hi"]) == (0.0, 1.0)
+
+
+
+def _untouched(project) -> tuple:
+    """What a refused request must leave as it was: the head, the history, the
+    models and the declarations the verbs write (WP-2126)."""
+    ref = project.refinement
+    return (ref._head_id, len(project.history), dict(project.history.refs),
+            ref.structure.model_dump(mode="json"),
+            ref.instrument.model_dump(mode="json"),
+            sorted(ref._user_holds), list(ref._free_paths))
+
+
+def test_a_refused_params_patch_applies_none_of_its_arms(blank, tmp_path,
+                                                         pattern_file):
+    """One ``PATCH /api/params`` is all or nothing (WP-2126).
+
+    Each arm commits its own node, in the route's order: limits and restraints,
+    unholds, values, vary, holds.  A refusal in a later arm used to leave the
+    earlier arms' nodes in the history and their changes in the model.
+    """
+    session, client = blank
+    project = _open(session, tmp_path / "whole.rex", pattern_file)
+    held = "phases.0.atoms.0.biso"
+    assert client.patch("/api/params", {"hold": {held: True}})[0] == 200
+    before = _untouched(project)
+
+    # the value lands first, then freeing the held literal refuses
+    status, payload = client.patch("/api/params", {
+        "values": {"phases.0.cell.a": 4.17}, "vary": {held: True}})
+    assert status == 400, payload
+    assert "unhold it first" in payload["error"]["message"]
+    assert payload["error"]["where"] == [held]
+    assert _untouched(project) == before
+    assert payload["error"]["details"][0] == {"arm": "vary", "where": [held]}
+
+    # the limits-and-restraints node commits first, then a tied value refuses
+    status, payload = client.patch("/api/params", {
+        "limits": {"phases.0.cell.a": [4.0, 4.3]},
+        "restraints": {"phases.0.cell.a": {"target": 4.16, "sigma": 0.01}},
+        "values": {"phases.0.cell.b": 4.2}})
+    assert status == 400, payload
+    assert "follows" in payload["error"]["message"]
+    assert _untouched(project) == before
+    assert payload["error"]["details"][0]["arm"] == "values"
+
+    # an unhold of a path nobody held refuses after the limits node
+    status, payload = client.patch("/api/params", {
+        "limits": {"phases.0.cell.a": [4.0, 4.3]},
+        "hold": {"phases.0.cell.a": False}})
+    assert status == 400, payload
+    assert payload["error"]["details"][0]["arm"] == "hold"
+    assert _untouched(project) == before
+
+    # and the same arms without the refused one land, one node each
+    status, payload = client.patch("/api/params", {
+        "values": {"phases.0.cell.a": 4.17}, "vary": {"phases.0.cell.a": True}})
+    assert status == 200, payload
+    assert len(project.history) == before[1] + 2
+
+
+def test_a_refused_settings_patch_changes_no_setting(blank, tmp_path,
+                                                     pattern_file):
+    """``POST /api/project`` validates every setting before writing any (WP-2126).
+
+    Written straight into the live document, a refused region left the mode
+    sent with it in place, unsaved, for the next save to persist.
+    """
+    session, client = blank
+    project = _open(session, tmp_path / "settings.rex", pattern_file)
+    on_disk = (project.path / "project.json").read_text(encoding="utf-8")
+    before = project.doc.model_dump(mode="json")
+    for body in ({"mode": "pawley", "excluded_regions": [[30.0, 20.0]]},
+                 {"mode": "pawley", "two_theta_limits": [40.0, 10.0]},
+                 {"ui": {"k": 1}, "excluded_regions": [5.0]},
+                 {"mode": "not-a-mode"}):
+        status, payload = client.post("/api/project", body)
+        assert status == 400, (body, payload)
+        assert project.doc.model_dump(mode="json") == before, body
+        assert project.data.excluded_regions == list(project.doc.excluded_regions)
+    assert (project.path / "project.json").read_text(encoding="utf-8") == on_disk
+    status, payload = client.post("/api/project", {
+        "mode": "pawley", "excluded_regions": [[20.0, 30.0]]})
+    assert status == 200, payload
+    assert project.doc.mode == "pawley"
+    assert project.data.excluded_regions == [(20.0, 30.0)]
+
+
+def test_a_refused_branch_name_leaves_the_head_where_it_was(blank, tmp_path,
+                                                           pattern_file):
+    """``POST /api/history/branch`` tags before it checks out (WP-2126).
+
+    The tag is the half that refuses, so a refused name moves no head.
+    """
+    session, client = blank
+    project = _open(session, tmp_path / "branch.rex", pattern_file)
+    root = project.refinement._head_id
+    assert client.patch("/api/params",
+                        {"values": {"phases.0.cell.a": 4.17}})[0] == 200
+    before = _untouched(project)
+    status, payload = client.post("/api/history/branch",
+                                  {"node_id": root, "name": "head"})
+    assert status == 404, payload
+    assert "reserved" in payload["error"]["message"]
+    assert _untouched(project) == before
+
+
+def test_a_refused_text_apply_runs_none_of_its_verbs(blank, tmp_path,
+                                                     pattern_file):
+    """``textdoc.apply`` rehearses its two refusing verbs first (WP-2126).
+
+    ``changes`` already refuses freeing a held row by its ``refinable``, so
+    this hands ``apply`` the delta directly: the all-or-nothing promise is
+    ``apply``'s own, and it no longer rests on the two checks agreeing.
+    """
+    from rietx.gui import textdoc as td
+
+    session, client = blank
+    project = _open(session, tmp_path / "text.rex", pattern_file)
+    held = "phases.0.atoms.0.biso"
+    assert client.patch("/api/params", {"hold": {held: True}})[0] == 200
+    before = _untouched(project)
+    delta = td.Delta(values={"phases.0.cell.a": 4.17}, vary={held: True})
+    with pytest.raises(ValueError, match="unhold it first"):
+        td.apply(project, delta)
+    assert _untouched(project) == before
