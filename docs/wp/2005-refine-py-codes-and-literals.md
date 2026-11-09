@@ -124,7 +124,8 @@ its tier.
 - [ ] The inline literals: each lifted to a named constant (table row with value) or
       recorded tier 1 with the reason. The 29 tier-1 literals are recorded with their
       reasons in `2005-batch/judgements.json`; the 4 thresholds in `refine.py` wait for
-      their tiers, since a new constant enters the table tiered.
+      their tiers, since a new constant enters the table tiered. The fifth threshold
+      refuses a Chebyshev scan in `background/select.py` and gates no code, so it stays.
 - [ ] Tier each code per part, with evidence and families.
 - [ ] The batch to the maintainer; rulings dated into the table.
 - [ ] Approved demotions: `level` to `info`, or, where the threshold was the trigger, the

@@ -12,8 +12,8 @@
   },
   "ABSORPTION_PLATE_THICKNESS": {
    "condition": "Under `flat_plate_transmission`, the declared thickness gives under 0.7 of the counts the optimal thickness would (the inline literal 0.7).",
-   "kind": 3,
-   "kind_reason": "Whether to prepare a different plate depends on the specimen and its preparation, facts outside the pattern.",
+   "kind": 1,
+   "kind_reason": "The fraction of the optimal counts is arithmetic on the declared µt; the threshold decides only when it is said, and the code suggests nothing.",
    "note": "Gated by an inline literal (0.7), one of the two the WP names."
   },
   "ABSORPTION_THICKNESS_MATTERS": {
@@ -34,7 +34,7 @@
    "note": "Issue #1215 (in the WP's Inherited): fires on 20/20 clean synthetic patterns under the P-spline, by the issue's count."
   },
   "BACKGROUND_ABSORPTION": {
-   "condition": "The projection R² of a structural column onto the background span reaches `staged.BACKGROUND_ABSORPTION_GUARD` (0.25).",
+   "condition": "The projection R² of a structural column onto the background span exceeds `staged.BACKGROUND_ABSORPTION_GUARD` (0.25).",
    "kind": 3,
    "kind_reason": "Whether a given overlap biases the quantity the caller wants depends on the purpose, which the pattern does not carry.",
    "note": "Threshold in `strategy/staged.py` (WP-2002's walk), unaudited there."
@@ -147,7 +147,7 @@
   "HARMONIC_ABSENT": {
    "condition": "A declared harmonic's refined fraction is below `HARMONIC_ABSENT_FRAC`.",
    "kind": 1,
-   "kind_reason": "The fraction is measured; the code's word 'indistinguishable' rests on a fixed fraction rather than on the esd.",
+   "kind_reason": "Whether a fraction is distinguishable from zero is a statistical question the data settle; the code answers it with a fixed fraction rather than the esd, which is the threshold's question for part 2.",
    "note": "An absolute fraction, not a significance test."
   },
   "HARMONIC_FRACTION": {
@@ -161,7 +161,7 @@
    "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
   },
   "HIGH_CORRELATION": {
-   "condition": "Two free parameters are correlated at or above the stage's `correlation_guard` (`schemas.plan.CORRELATION_GUARD`, 0.98).",
+   "condition": "Two free parameters are correlated above the stage's `correlation_guard` (`schemas.plan.CORRELATION_GUARD`, 0.98).",
    "kind": 3,
    "kind_reason": "Whether a correlation of this size harms the quantity the caller wants depends on the purpose; WP-2037's response column is the package's answer to that.",
    "note": "The threshold is in `schemas/plan.py` (WP-2002's walk), unaudited there; B13 handed it here."
@@ -210,7 +210,7 @@
    "note": "Error level: a series escalates and quarantines on it (WP-2003, the WP's Inherited)."
   },
   "NEUTRON_RESONANT_ABSORBER": {
-   "condition": "The structure holds an element with a complex scattering length near a resonance; a warning from `RESONANT_ABSORBER_SEVERE_BARN`.",
+   "condition": "Under a neutron source, the structure holds an element with a complex scattering length near a resonance; a warning from `RESONANT_ABSORBER_SEVERE_BARN`.",
    "kind": 1,
    "kind_reason": "The tabulated absorption is a nuclear fact; the threshold sets the level alone."
   },
@@ -252,7 +252,7 @@
    "kind_reason": "The relative esd is measured; the threshold decides only when it is said."
   },
   "PHASE_UNCONSTRAINED": {
-   "condition": "A phase scale is under 3σ of its counting-noise esd, or no line lies in range, so its structural paths were held.",
+   "condition": "A phase with free non-scale paths, held paths or no measured scale has a scale under `PHASE_SUPPORT_SIGMA` of its counting-noise esd, or no line in range (a single-phase model only where something was held); the message says what was held, the instrument included.",
    "kind": 1,
    "kind_reason": "The hold passes the judgement ground (milestone § The rule); only its 3σ is on trial, and that is WP-2002's.",
    "note": "The action is WP-2002's; this WP owns the code."
@@ -299,7 +299,7 @@
    "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
   },
   "ROUGHNESS_ABSORPTION": {
-   "condition": "The roughness column's projection R² onto displacement, scale and background reaches `staged.ROUGHNESS_ABSORPTION_GUARD` (0.9).",
+   "condition": "The roughness column's projection R² onto displacement, scale and background exceeds `staged.ROUGHNESS_ABSORPTION_GUARD` (0.9).",
    "kind": 3,
    "kind_reason": "As for `BACKGROUND_ABSORPTION`: whether the overlap harms the quantity wanted depends on the purpose.",
    "note": "Threshold in `strategy/staged.py`, unaudited there."
@@ -389,7 +389,7 @@
    "kind_reason": "It states a fact the model or the arithmetic fixes, and every competent refiner reads the number the same way."
   },
   "WAVELENGTH_CALIBRATION": {
-   "condition": "The wavelength was free and moved from its declared value; the message gives the shift in ppm.",
+   "condition": "A wavelength was free in the fit; the message gives its shift from the declared value in ppm, with no test on its size.",
    "kind": 1,
    "kind_reason": "It records something the package did or declined to do, which no reading of the data changes."
   }

@@ -109,8 +109,19 @@ class Module:
         return None
 
     def guards(self, node: ast.AST) -> list[str]:
+        """The conditions under which a raise site is reached: every enclosing ``if``,
+        ``while`` or conditional expression, and every earlier ``if …:`` in an enclosing
+        block whose body leaves it (``return``, ``continue``, ``break``, ``raise``),
+        written ``not (…)``.  A ``try`` it sits in is not a condition and is not listed."""
         conds, child, p = [], node, self.parents.get(node)
-        while p is not None and not isinstance(p, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        while p is not None:
+            for field in ("body", "orelse", "finalbody", "handlers"):
+                block = getattr(p, field, None)
+                if isinstance(block, list) and child in block:
+                    for st in reversed(block[:block.index(child)]):
+                        if (isinstance(st, ast.If) and st.body and isinstance(
+                                st.body[-1], (ast.Return, ast.Continue, ast.Break, ast.Raise))):
+                            conds.append("not (" + ast.unparse(st.test) + ")")
             if isinstance(p, (ast.If, ast.While)):
                 if child in p.body:
                     conds.append(ast.unparse(p.test))
@@ -121,6 +132,8 @@ class Module:
                     conds.append(ast.unparse(p.test))
                 elif child is p.orelse:
                     conds.append("not (" + ast.unparse(p.test) + ")")
+            if isinstance(p, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                break
             child, p = p, self.parents.get(p)
         return list(reversed(conds))
 
@@ -133,7 +146,25 @@ class Module:
                     out[n.id] = f"{self.mod}.{n.id}"
                 elif n.id in self.imported:
                     out[n.id] = self.imported[n.id]
+            elif (isinstance(n, ast.Attribute) and n.attr.isupper() and len(n.attr) > 1
+                  and isinstance(n.value, ast.Name) and n.value.id in self.imported):
+                # ``lm.SLOW_DESCENT_ESD``: an attribute of an imported module
+                out[f"{n.value.id}.{n.attr}"] = f"{self.imported[n.value.id]}.{n.attr}"
         return dict(sorted(out.items()))
+
+    def helpers(self, fn) -> list:
+        """Functions of this file ``fn`` calls by name (``helper(...)``, ``self.helper(...)``)."""
+        defs, out = self.functions(), []
+        for n in ast.walk(fn):
+            if not isinstance(n, ast.Call):
+                continue
+            f = n.func
+            name = (f.id if isinstance(f, ast.Name) else
+                    f.attr if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name)
+                    and f.value.id == "self" else None)
+            if name in defs and defs[name] is not fn and defs[name] not in out:
+                out.append(defs[name])
+        return out
 
     def literals(self, fn) -> list[dict]:
         """Every numeric literal in a function but the identities and subscripts."""
@@ -157,6 +188,29 @@ class Module:
             out.append({"line": x.lineno, "value": x.value, "in_comparison": in_compare,
                         "expression": ast.unparse(inner)[:160]})
         return sorted(out, key=lambda d: (d["line"], d["expression"]))
+
+
+def row_for(path: str, rows: dict) -> str | None:
+    """The audit row a name read in a function stands for.  The import path as written
+    first; where the name was re-exported (``refine`` takes ``PHASE_SUPPORT_SIGMA`` from
+    ``model.forward``, whose row is ``schemas.plan``'s), the one constant row with the same
+    leaf whose object is the very object the path resolves to."""
+    if path in rows:
+        return path
+    leaf = path.rsplit(".", 1)[-1]
+    try:
+        obj = _audit.resolve(path)
+    except (ImportError, AttributeError):
+        return None
+    hits = []
+    for name, row in rows.items():
+        if row.kind == "constant" and name.rsplit(".", 1)[-1] == leaf:
+            try:
+                if _audit.resolve(name) is obj:
+                    hits.append(name)
+            except (ImportError, AttributeError):
+                continue
+    return hits[0] if len(hits) == 1 else None
 
 
 def literal_key(fn_name: str, lit: dict) -> str:
@@ -205,6 +259,14 @@ def tests_naming(codes: list[str]) -> dict[str, dict]:
                 names = "|".join(t.id for t in node.targets if isinstance(t, ast.Name))
                 if names:
                     alias[node.value.value] = re.compile(rf"\b(?:{node.value.value}|{names})\b")
+        # and so does a helper of the same file whose text names it, called by a test
+        for node in tree.body:
+            if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and not node.name.startswith("test")):
+                seg = "\n".join(lines[node.lineno - 1:node.end_lineno])
+                for c in hit:
+                    if alias[c].search(seg):
+                        alias[c] = re.compile(rf"(?:{alias[c].pattern})|\b{node.name}\(")
         for fn in ast.walk(tree):
             if not (isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)) and fn.name.startswith("test")):
                 continue
@@ -250,16 +312,8 @@ def build(idx, codes, by_code, judg, *, strict: bool = True):
     # one level down: a function of the same file a raising function calls by name
     # (``helper(...)`` or ``self.helper(...)``), where a statistic's literal can sit
     for key, (mod, fn) in list(seen_fns.items()):
-        defs = mod.functions()
-        for n in ast.walk(fn):
-            if not isinstance(n, ast.Call):
-                continue
-            f = n.func
-            name = (f.id if isinstance(f, ast.Name) else
-                    f.attr if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name)
-                    and f.value.id == "self" else None)
-            if name in defs and defs[name] is not fn:
-                seen_fns.setdefault(f"{mod.rel}:{name}", (mod, defs[name]))
+        for h in mod.helpers(fn):
+            seen_fns.setdefault(f"{mod.rel}:{h.name}", (mod, h))
     lits = {}
     for key, (mod, fn) in sorted(seen_fns.items()):
         for lit in mod.literals(fn):
@@ -294,17 +348,27 @@ def build(idx, codes, by_code, judg, *, strict: bool = True):
         ss = by_code[c]
         help_entry = DIAGNOSTIC_HELP.get(c)
         row, srow = rows.get(c), rows.get(c + ".suggestion")
-        names = {}
+        names, via_helper = {}, {}
         for s in ss:
             if s["_fn"] is not None:
                 names.update(s["_mod"].names_read(s["_fn"]))
-        consts = {n: p for n, p in names.items() if p in rows and rows[p].kind == "constant"}
+                for h in s["_mod"].helpers(s["_fn"]):
+                    for n, p in s["_mod"].names_read(h).items():
+                        if n not in names:
+                            via_helper[n] = h.name
+                            names[n] = p
+        consts = {}
+        for n, p in names.items():
+            hit = row_for(p, rows)
+            if hit is not None and rows[hit].kind == "constant":
+                consts[n] = hit
         rec = {
             "name": c,
             "sites": [{"where": s["where"], "function": s["function"], "level": s["level"],
                        "guards": s["guards"], "suggestion": s["has_suggestion"]} for s in ss],
             "levels": sorted({s["level"] for s in ss if s["level"]}),
-            "constants_read": {n: {"row": p, "tier": str(rows[p].tier), "value": rows[p].value}
+            "constants_read": {n: {"row": p, "tier": str(rows[p].tier), "value": rows[p].value,
+                                   **({"via": via_helper[n]} if n in via_helper else {})}
                                for n, p in sorted(consts.items())},
             "explanation": (first_sentence(help_entry.description) if help_entry else None),
             "audit_row": None if row is None else {"tier": str(row.tier), "response": row.response,
@@ -316,15 +380,16 @@ def build(idx, codes, by_code, judg, *, strict: bool = True):
         }
         j = judg["codes"].get(c)
         if j is not None:
-            rec.update({"condition": j["condition"], "kind": j["kind"], "kind_name": KINDS[j["kind"]],
-                        "kind_reason": j["kind_reason"]})
+            # ``.get`` because ``--skeleton`` builds over a judgement still being written
+            rec.update({"condition": j.get("condition"), "kind": j.get("kind"),
+                        "kind_name": KINDS.get(j.get("kind")), "kind_reason": j.get("kind_reason")})
             if j.get("note"):
                 rec["note"] = j["note"]
         out_codes.append(rec)
     out_lits = []
     for k, lit in lits.items():
         j = judg["literals"].get(k, {})
-        out_lits.append({"key": k, **lit, **({"role": j["role"], "reason": j["reason"]} if j else {})})
+        out_lits.append({"key": k, **lit, **({"role": j.get("role"), "reason": j.get("reason")} if j else {})})
     return out_codes, out_lits
 
 
@@ -336,7 +401,7 @@ def main() -> None:
     if "--skeleton" in sys.argv:
         out_codes, out_lits = build(idx, codes, by_code, judg, strict=False)
         for r in out_codes:
-            print(f"## {r['name']} levels={r['levels']} row={r['audit_row']} tests={r['tests']['test_functions']}")
+            print(f"## {r['name']} kind={r.get('kind')} levels={r['levels']} row={r['audit_row']} tests={r['tests']['test_functions']}")
             for s in r["sites"]:
                 print(f"   {s['where']} {s['function']} guards={s['guards']}")
             print(f"   consts={ {n: (v['value'], v['tier']) for n, v in r['constants_read'].items()} }")
