@@ -1,6 +1,6 @@
 # WP-2075 — The result records its fit range, and what lies outside it
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
 Track: What fires, and what stays silent
 Depends on: — (2005 soft: `LOW_ANGLE_UNMODELLED`'s retext points at this field)
 Priority: P3 2026-10-31 — a fact the result says less about than it could: the caller chose the cut, but after it nothing in the result says a cut happened or what it removed (42 % of the counts on the issue's planted case, 22.5 % on SRM 1976a)
