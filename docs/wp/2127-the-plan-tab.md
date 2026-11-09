@@ -171,7 +171,7 @@ reversible", with its alternative, and waits for the maintainer's review of the 
   first; `Run this stage` applies the Parameters edits first; `Save plan`, `Revert` and
   `Run all` retired from the tab.
 - [x] Undo and redo of plan edits: ⌘Z and ⇧⌘Z in the tab outside a text field, and the palette.
-- [ ] The layout browser test extended to the Plan tab: every control clicked, a real drag.
+- [x] The layout browser test extended to the Plan tab: every control clicked, a real drag.
 - [ ] The dist rebuilt; the GUI chapters and the screenshots the tab changes.
 - [ ] Skill: none expected. The agent skill drives the python API, and no route changes.
 

@@ -305,3 +305,157 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
     finally:
         httpd.shutdown()
     assert not moved, moved
+
+
+# ---------------------------------------------------------------------------
+# WP-2127: the Plan tab
+# ---------------------------------------------------------------------------
+
+#: The plan bar and every stage row, beside the shell's landmarks.
+PLAN_BAR = ["section[aria-label=plan] > header", "section[aria-label=plan] > header > *"]
+PLAN_LANDMARKS = LANDMARKS + PLAN_BAR + ["section[aria-label=plan] li.stage"]
+
+#: The Plan tab's controls, each with a label the failure can name and whether
+#: pressing it asks for the layout to change. Adding or removing a stage or a
+#: glob and opening a stage's path list ask; the rest move nothing. A stage's
+#: run button starts a fit, which the shell's refine test already covers.
+PLAN_CONTROLS = """() => {
+  const plan = document.querySelector("section[aria-label=plan]");
+  const out = [];
+  plan.querySelectorAll("button, [data-handle], summary, input, select").forEach((e, i) => {
+    if (!e.getClientRects().length || e.disabled) return;
+    const text = (e.getAttribute("aria-label") || e.textContent || e.tagName).trim();
+    if (text === "Run this stage") return;
+    const asks = e.tagName === "SUMMARY" || text === "+ Stage" || /^Remove /.test(text);
+    out.push({index: i, text, asks});
+  });
+  return out;
+}"""
+
+#: Mark one control so a locator can find it, after scrolling it clear of the
+#: sticky plan bar: the click itself is playwright's, a real one.
+PLAN_MARK = """(index) => {
+  const plan = document.querySelector("section[aria-label=plan]");
+  const e = plan.querySelectorAll("button, [data-handle], summary, input, select")[index];
+  e.scrollIntoView({block: "center"});
+  e.setAttribute("data-press", "1");
+  return null;
+}"""
+
+
+def _open_plan(browser, url: str, width: int):
+    page = _open(browser, url, width)
+    page.locator(".side > nav.tabs button", has_text="Plan").click()
+    page.wait_for_selector("section[aria-label=plan] li.stage .rung summary")
+    _frames(page)
+    return page
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_no_plan_control_moves_the_layout_unless_it_asks(browser, gui, state):
+    """Every Plan control clicked with a real mouse on a fresh page. None may
+    move the shell or the plan bar; one that does not ask for a change may not
+    move a stage row either."""
+    url, _ = gui
+    page = _open_plan(browser, url, WIDTHS[state])
+    controls = page.evaluate(PLAN_CONTROLS)
+    page.close()
+    assert len(controls) > 10, controls
+
+    failures = []
+    for control in controls:
+        page = _open_plan(browser, url, WIDTHS[state])
+        page.evaluate(PLAN_MARK, control["index"])
+        # Hovering first lets playwright scroll the control clear of the sticky
+        # plan bar, as it does before a click, so the boxes are read after any
+        # scroll the harness makes and before anything the page does. Stacked,
+        # the panel shows little more than one stage, and that scroll measured
+        # 20-24 px.
+        target = page.locator("[data-press]")
+        target.hover()
+        _frames(page)
+        watched = LANDMARKS + PLAN_BAR if control["asks"] else PLAN_LANDMARKS
+        before = page.evaluate(SNAP, watched)
+        target.click()
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, watched))
+        if moved:
+            failures.append(f"{control['text']!r}: " + "; ".join(moved[:4]))
+        page.keyboard.press("Escape")
+        assert not page.errors, page.errors
+        page.close()
+    assert not failures, "\n".join(failures)
+
+
+def _names(page) -> list[str]:
+    return page.locator("section[aria-label=plan] li.stage input.name").evaluate_all(
+        "els => els.map(e => e.value)")
+
+
+def test_a_drag_on_the_handle_reorders_the_stages(browser, gui):
+    """A real pointer drag on the three-line handle lifts a stage and drops it
+    where its centre crossed; the edit is one pending edit in the action bar,
+    and the bar's Revert puts the plan back. A press with no drag moves nothing."""
+    url, _ = gui
+    page = _open_plan(browser, url, WIDTHS["wide"])
+    names = _names(page)
+    assert len(names) >= 3, names
+
+    box = page.locator('[data-handle="2"]').bounding_box()
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    before = page.evaluate(SNAP, PLAN_LANDMARKS)
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.up()
+    _frames(page)
+    assert _names(page) == names
+    assert not _moved(before, page.evaluate(SNAP, PLAN_LANDMARKS))
+
+    top = page.locator('[data-handle="0"]').bounding_box()
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.move(x, top["y"] - 12, steps=8)
+    page.mouse.up()
+    _frames(page)
+    assert _names(page) == [names[2], names[0], names[1], *names[3:]]
+    assert page.locator(".actions .pending").text_content() == "1 pending edit"
+
+    # the arrow keys move the focused handle, and ⌘Z takes the move back
+    page.locator('[data-handle="0"]').focus()
+    page.keyboard.press("ArrowDown")
+    _frames(page)
+    assert _names(page)[:2] == [names[0], names[2]]
+    page.keyboard.press("ControlOrMeta+z")
+    _frames(page)
+    assert _names(page)[:3] == [names[2], names[0], names[1]]
+
+    page.locator(".actions button", has_text="Revert").click()
+    _frames(page)
+    assert _names(page) == names
+    assert page.locator(".actions .pending").text_content() == ""
+    assert not page.errors, page.errors
+    page.close()
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_a_plan_edit_moves_nothing(browser, gui, state):
+    """Typing a stage's name is an edit: the bar counts it and turns Refine into
+    "Apply and refine" in reserved slots, and no row or landmark moves."""
+    url, _ = gui
+    page = _open_plan(browser, url, WIDTHS[state])
+    name = page.locator("section[aria-label=plan] li.stage input.name").first
+    # the click is the sweep's question; this one is about the typing after it
+    name.click()
+    _frames(page)
+    before = page.evaluate(SNAP, PLAN_LANDMARKS)
+    # no End key: on macOS it scrolls the scroller rather than moving the caret
+    page.keyboard.type("x")
+    _frames(page)
+    assert page.locator(".actions .pending").text_content() == "1 pending edit"
+    assert "Apply and refine" in page.locator(".actions button.refine").text_content()
+    moved = _moved(before, page.evaluate(SNAP, PLAN_LANDMARKS))
+    page.locator(".actions button", has_text="Revert").click()
+    _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
