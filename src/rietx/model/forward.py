@@ -2385,6 +2385,27 @@ class CompiledModel:
         return (y_bkg + self.extra_peak_curve(values)
                 + self.bragg_component(values)), y_bkg
 
+    def evaluate_parts(self, values: dict[str, float]
+                       ) -> tuple[np.ndarray, np.ndarray, list[np.ndarray]]:
+        """``(evaluate(values), background(values), [phase_0, phase_1, …])``.
+
+        For an at-rest reader that draws each phase beside the total, such as
+        the GUI's preview route (WP-2125).  One Bragg pass serves both: each
+        phase is computed once and the Bragg sum is :meth:`bragg_component`'s,
+        zeros first and then the phases in order.  The total takes
+        :meth:`evaluate`'s association, background first and the declared
+        peaks before the Bragg sum, so it is bit-identical to it (pinned by
+        ``tests/test_gui_preview.py``).
+        """
+        y_bkg = self.background(values)
+        parts = [self.phase_component(ip, values) for ip in range(len(self.phases))]
+        y = get_backend().zeros_like(self.tt)
+        for comp in parts:
+            y = y + comp
+        if not self.peak_components:
+            return y_bkg + y, y_bkg, parts
+        return y_bkg + self.extra_peak_curve(values) + y, y_bkg, parts
+
     def phase_support(self, values: dict[str, float]) -> np.ndarray:
         """Each phase's integrated contribution ‖y_p/σ‖₂ over the fitted range.
 
@@ -4720,9 +4741,14 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     )
 
 
-def window_sizing(model: CompiledModel, values: dict[str, float]
-                  ) -> list[tuple[np.ndarray, np.ndarray, np.ndarray]]:
+def window_sizing(model: CompiledModel, values: dict[str, float],
+                  *, component: int = 0
+                  ) -> list[tuple[np.ndarray, np.ndarray, np.ndarray] | None]:
     """Each phase's (windows, FCJ node counts, half-widths) sized at ``values``.
+
+    ``component`` picks the frozen family, as in :meth:`CompiledModel.phase_peaks`:
+    ``0`` the nuclear one every phase has, ``1`` the magnetic one (WP-1343),
+    whose entry is ``None`` for a phase that has no such family.
 
     ``compile_model``'s rule: a half-width of k(η)·Γ plus the slack, plus the
     FCJ extent while the aberration acts.  It reads the peaks the forward
@@ -4746,10 +4772,16 @@ def window_sizing(model: CompiledModel, values: dict[str, float]
     tt = np.asarray(model.tt, dtype=np.float64)
     out = []
     for ip, cp in enumerate(model.phases):
-        win = np.zeros_like(cp.win)
-        fcj_n = np.zeros_like(cp.fcj_n)
-        halves = np.full(cp.win.shape[:2], np.nan)
-        for il, (pos, w1, w2, _) in enumerate(model.phase_peaks(ip, values)):
+        frozen_win, frozen_fcj = ((cp.win, cp.fcj_n) if component == 0
+                                  else (cp.win_mag, cp.fcj_n_mag))
+        if frozen_win is None:
+            out.append(None)
+            continue
+        win = np.zeros_like(frozen_win)
+        fcj_n = np.zeros_like(frozen_fcj)
+        halves = np.full(frozen_win.shape[:2], np.nan)
+        for il, (pos, w1, w2, _) in enumerate(
+                model.phase_peaks(ip, values, component=component)):
             pos = np.asarray(pos, dtype=np.float64)
             gamma, eta = model.peak_gamma_eta(w1, w2)
             half = window_fwhm_mult_interp(eta, tol) * gamma + model.window_slack_deg
