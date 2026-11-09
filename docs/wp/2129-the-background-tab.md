@@ -115,6 +115,29 @@ Claude, reversible", with its alternative, and waits for the maintainer's review
    The prototype's one-step prediction of the next cycle's curve is not drawn, since at a converged
    fit it is the same curve. Alternative: draw the linearised next-cycle curve too.
 
+The visual calls below are the maintainer's to review, since visual design questions go to him.
+Each took the smallest neutral option.
+
+3. Settled by Claude, reversible: the curve and the band take `--plot-bkg`, the pattern graph's
+   background colour, and the greyed data takes `--plot-obs` at 45 % opacity. The band is
+   `--plot-bkg` at 28 %. Alternative: a token of the tab's own, such as the figures' warm
+   background brown.
+4. Settled by Claude, reversible: the band is drawn at ±3 esd, with ×1, ×5 and ×20 as a segmented
+   control labelled "Band ±3 esd". These are the prototype's numbers. Alternative: a continuous
+   multiplier.
+5. Settled by Claude, reversible: the holds are a row of checkboxes labelled `c0`, `c1`, …, under
+   the plot beside the band control. Alternative: a hold mark drawn on the plot per term.
+6. Settled by Claude, reversible: λ is a text field committed on Enter or on leaving it.
+   Alternative: a logarithmic slider over 1e-2 to 1e6.
+7. Settled by Claude, reversible: the y frame is the prototype's, 0.7× the curve's lowest point to
+   1.15× its highest, so the peaks run off the top. A flat zero curve gets ±1. Alternative: frame on
+   the curve ± the drawn band, which would keep a ×20 band inside the view.
+8. Settled by Claude, reversible: the title line reads "Background at the last fit", "Background at
+   the starting values" or "Background, refining". The fit's Rwp stays on it. Alternative: the
+   pattern tab's three words unchanged.
+9. Settled by Claude, reversible: the view has no zoom, as the non-goals say. Alternative: the
+   pattern chart's zoom.
+
 ## Non-goals
 
 - The points background (design 5).
@@ -132,9 +155,9 @@ Claude, reversible", with its alternative, and waits for the maintainer's review
 - [x] Client: `lib/background.ts` (pure drawing helpers), `panels/Background.svelte`, the graph tab
   and its title line, per-term holds and the λ field; vitest
 - [x] Layout browser test over the Background tab, with real clicks
-- [ ] Manual: the route and the tab in the GUI chapters, the band tied to the estimation
+- [x] Manual: the route and the tab in the GUI chapters, the band tied to the estimation
   chapter's derived-esd equation; screenshots where changed
-- [ ] Skill: none expected; the agent skill drives the python API
+- [x] Skill: none; the agent skill drives the python API, and the band is a GUI view
 
 ## Acceptance
 

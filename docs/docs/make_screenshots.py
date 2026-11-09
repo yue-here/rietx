@@ -133,6 +133,13 @@ SHOTS: tuple[Shot, ...] = (
         selector=".plotcol",
     ),
     Shot(
+        "background-tab",
+        "The Background graph tab: the data greyed, the background curve, the "
+        "band it may move in, and the per-term holds under it.",
+        selector=".plotcol",
+        tab="Background",
+    ),
+    Shot(
         "parameters",
         "The parameter table: the filter box that is the selection, and the "
         "marks on rows nothing can free.",
