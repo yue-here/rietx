@@ -245,10 +245,12 @@ describe("one filled primary per view", () => {
     // screen's New project…, which is the whole view and has no bar under it
     // (WP-2131), and two dialogs over the window whose own primary is the
     // dialog's, the New project dialog's Create project and the folder
-    // browser's Use this directory.
+    // browser's Use this directory.  The File menu's Save a copy and Export
+    // dialog is a fourth over the window (WP-2133), one primary for both.
     const ALLOWED: Record<string, number> = {
       "panels/ActionBar.svelte": 1,
       "panels/Browse.svelte": 1,
+      "panels/FileMenu.svelte": 1,
       "panels/NewProject.svelte": 1,
       "panels/Start.svelte": 1,
     };

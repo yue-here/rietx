@@ -114,7 +114,7 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   `export` takes a `directory` and `overwrite`; a closed project is not reopened at launch.
   Each refusal tested: an existing destination, a destination outside the roots, a bad name, a
   folder moved into itself, a run in flight.
-- [ ] Frontend: `panels/FileMenu.svelte` on the project name, `lib/filemenu.ts` (items and the
+- [x] Frontend: `panels/FileMenu.svelte` on the project name, `lib/filemenu.ts` (items and the
   export kinds, pinned to `EXPORT_DEFAULTS`), the Save a copy and Export dialogs over the folder
   browser, Rename in place, ⌘S "Saved", ⌘O and ⇧⌘S; the header's `Open…` goes.
 - [ ] The layout browser test opens the menu, its submenus and both dialogs with real clicks, and
