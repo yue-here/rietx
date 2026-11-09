@@ -1241,10 +1241,11 @@ _SEQUENTIAL_ITEMS = ("Sequential results", "Sequential peak fit results")
 #: How each GSAS-II spelling a stored equation may use is written in rietx's
 #: expression grammar, and why.  An equation is python syntax read with
 #: :mod:`ast`, which parses and runs nothing, and printed back in the grammar;
-#: a function or operator not here is refused by name, never guessed.  The
-#: degree functions are recorded in ``docs/practice.md`` § The angle unit of a
-#: trigonometric function: GSAS-II's expressions read ``sin``, ``cos`` and
-#: ``tan`` in degrees, beside ``sind``, ``cosd`` and ``tand``.
+#: a function or operator not here is refused by name, never guessed: the
+#: walk in :func:`lower_gsas2_expression` reads this table and nothing else.
+#: The degree functions are recorded in ``docs/practice.md`` § Angles:
+#: GSAS-II's expressions read ``sin``, ``cos`` and ``tan`` in degrees, beside
+#: ``sind``, ``cosd`` and ``tand``.
 GSAS2_EXPRESSION_REWRITES: dict[str, tuple[str, str]] = {
     "a**b": ("a^b", "python's power; a chain is grouped as python groups it, "
                     "right to left, with the parentheses the grammar asks for"),
@@ -1260,10 +1261,20 @@ GSAS2_EXPRESSION_REWRITES: dict[str, tuple[str, str]] = {
     "pi": ("pi", "unchanged"),
 }
 
-_DEGREE_FUNCTIONS = {"sind": "sin", "cosd": "cos", "tand": "tan",
-                     "sin": "sin", "cos": "cos", "tan": "tan"}
-_SAME_FUNCTIONS = ("exp", "log", "sqrt")
+#: python's arithmetic operators, each the grammar's own; ``**`` is the one
+#: :data:`GSAS2_EXPRESSION_REWRITES` names, the rest are spelt alike
 _PYTHON_OPS = {ast.Add: "+", ast.Sub: "-", ast.Mult: "*", ast.Div: "/", ast.Pow: "^"}
+
+
+def _functions() -> dict[str, tuple[str, bool]]:
+    """Each GSAS-II function the table carries: its grammar name, and whether
+    its argument is converted from degrees."""
+    out: dict[str, tuple[str, bool]] = {}
+    for spelled, (written, _) in GSAS2_EXPRESSION_REWRITES.items():
+        if spelled.endswith("(u)"):
+            name, target = spelled[:-3], written.split("(", 1)[0]
+            out[name] = (target, written == f"{target}(pi*u/180)")
+    return out
 
 
 class _Unlowerable(Exception):
@@ -1293,42 +1304,58 @@ def lower_gsas2_expression(text: str, names: set[str]) -> tuple[str, tuple[str, 
     ``np.exp``, a name the equation does not bind, or a label that is a
     reserved word of the grammar.
     """
-    from ...params.expression import RESERVED, Expression
+    from ...params.expression import (
+        RESERVED,
+        BinOp,
+        Call,
+        Expression,
+        Name,
+        Neg,
+        Num,
+        to_text,
+    )
 
     try:
         tree = ast.parse(text.strip(), mode="eval")
     except SyntaxError as exc:
         raise ValueError(f"it is not python syntax ({exc.msg})") from exc
+    functions = _functions()
     rewrites: list[str] = []
 
-    def walk(node: ast.AST) -> str:
+    # The grammar's own tree is built and printed, so the text carries only
+    # the parentheses its precedence needs and nests no deeper than python's.
+    def walk(node: ast.AST):
         if isinstance(node, ast.Constant) and type(node.value) in (int, float):
-            return repr(node.value)
+            if not math.isfinite(node.value):
+                raise _Unlowerable(f"it holds the number {node.value!r}, which is not finite")
+            return Num(float(node.value))
         if isinstance(node, ast.Name):
             if node.id in names:
-                return node.id
-            if node.id == "pi":
-                return "pi"
+                return Name(node.id)
+            if node.id in GSAS2_EXPRESSION_REWRITES:
+                return Name(node.id)
             raise _Unlowerable(f"it names {node.id!r}, which it neither fits nor "
                                "reads from the table")
         if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
-            sign = "-" if isinstance(node.op, ast.USub) else ""
-            return f"{sign}({walk(node.operand)})"
+            arg = walk(node.operand)
+            return Neg(arg) if isinstance(node.op, ast.USub) else arg
         if isinstance(node, ast.BinOp) and type(node.op) in _PYTHON_OPS:
             if isinstance(node.op, ast.Pow):
                 rewrites.append("** → ^")
-            return f"({walk(node.left)}) {_PYTHON_OPS[type(node.op)]} ({walk(node.right)})"
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
-                and not node.keywords and len(node.args) == 1:
-            func, arg = node.func.id, walk(node.args[0])
-            if func in _DEGREE_FUNCTIONS:
-                rewrites.append(f"{func}(u) → {_DEGREE_FUNCTIONS[func]}(pi*u/180)")
-                return f"{_DEGREE_FUNCTIONS[func]}(pi*({arg})/180)"
-            if func in _SAME_FUNCTIONS:
-                return f"{func}({arg})"
-            raise _Unlowerable(f"it calls {func}(), which the rewrite table does not carry")
+            return BinOp(_PYTHON_OPS[type(node.op)], walk(node.left), walk(node.right))
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             raise _Unlowerable(f"it uses {_python_construct(node.func)}")
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
+                and not node.keywords and len(node.args) == 1:
+            func = node.func.id
+            if func not in functions:
+                raise _Unlowerable(f"it calls {func}(), which the rewrite table does not carry")
+            target, degrees = functions[func]
+            arg = walk(node.args[0])
+            if degrees:
+                rewrites.append(f"{func}(u) → {target}(pi*u/180)")
+                arg = BinOp("/", BinOp("*", Name("pi"), arg), Num(180.0))
+            return Call(target, (arg,))
         if isinstance(node, ast.Call):
             raise _Unlowerable("it calls a function with other than one plain argument")
         raise _Unlowerable(f"it uses {_python_construct(node)}")
@@ -1338,7 +1365,7 @@ def lower_gsas2_expression(text: str, names: set[str]) -> tuple[str, tuple[str, 
         raise ValueError(f"its label {reserved[0]!r} is a reserved word of rietx's "
                          "expression grammar; rename it in GSAS-II")
     try:
-        lowered = Expression(walk(tree.body)).to_text()
+        lowered = Expression(to_text(walk(tree.body))).to_text()
     except _Unlowerable as exc:
         raise ValueError(str(exc)) from None
     return lowered, tuple(dict.fromkeys(rewrites))
