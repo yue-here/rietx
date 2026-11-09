@@ -127,8 +127,8 @@ reversible", with its alternative, and waits for the maintainer's review of the 
 
 ## Tasks
 
-- [ ] File the WP.
-- [ ] `lib/plan.ts`: moving a stage, the drop index from row midpoints, the resolved prefix, the
+- [x] File the WP.
+- [x] `lib/plan.ts`: moving a stage, the drop index from row midpoints, the resolved prefix, the
   undo stack, adding and removing a glob; with vitest.
 - [ ] The tab redrawn as a recipe: the plan bar (preset menu, + Stage), one row per stage (grip,
   number, name, run, ×), the glob chips with × beside them and an add field, the ladder line,
