@@ -46,29 +46,37 @@ WP-1944's handover log. Three gaps remain.
   The diagnostic's own `suggestion` stays as it is, because a change to it
   is a reader-output change this rescope does not make.
 
-### Inherited
+**Which way an undeclared extinction moves Biso** (folded 2026-11-09 from
+WP-1944's inherited entry). `model/extinction.py`'s docstring and the theory
+page's Primary extinction section said an uncorrected extinction gives "a
+spuriously large Biso and a small scale". WP-1944 measured the opposite on
+its LaB6 synthetic: with 2.5 µm² planted and extinction undeclared, La's
+Biso came out 0.364 ± 0.009 against a true 0.5, and the scale 8 % low.
+Sabine, Von Dreele & Jørgensen (1988, p. 374) say the same of their MgO
+data: "the measured temperature factors have lower values than the true
+temperature factors", "in some cases negative". A second fixture, measured
+here on a rutile synthetic (15-120° 2θ, Cu Kα, true B 0.5 on both sites,
+scale, both B, the O coordinate and the background free):
 
-- **2026-11-05, from [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md):
-  which way an undeclared extinction moves Biso.** `model/extinction.py`'s
-  docstring and the theory page's Primary extinction section say an
-  uncorrected extinction gives "a spuriously large Biso and a small scale".
-  On the LaB6 synthetic of `test_extinction.py` with 2.5 µm² planted, true
-  Biso 0.5 on both sites, Biso and coordinates free and extinction
-  undeclared, La's Biso came out 0.364 ± 0.009 (15 esd low), B's
-  0.668 ± 0.071 (2.4 esd high) and the scale 8 % low. Declared, both came
-  back within 1 esd. So the heavy atom's B goes down. WP-1944's skill pointer
-  sits on `BISO_NEGATIVE` for that reason. Check the claim against Sabine
-  (1988) and one more fixture, then correct both texts if it holds.
-- **2026-11-05, from [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md):
-  the unknown-path error points at the wrong parameter.** On a phase that
-  declares no extinction, `set_vary(["phases.0.extinction"], True)` raises
-  "unknown parameter path 'phases.0.extinction'; did you mean
-  'phases.0.lor_strain'?" (measured by WP-1944's code review). It is the one
-  place the package meets a user who already guessed the name. Having
-  `refine._path_hint` name the declaration for an opt-in path would fix it.
-  That changes an error's text, which is reader output, so it goes to the
-  maintainer before it lands, and this WP's rescope does not cover it
-  without that approval.
+| Planted ext (µm²) | Declared | Ti B | O B | Scale (true 8.0e-3) |
+|---|---|---|---|---|
+| 5 | no | 0.293 ± 0.021 | 0.279 ± 0.039 | 7.1e-3 |
+| 5 | yes | 0.509 ± 0.028 | 0.472 ± 0.041 | 8.0e-3 |
+| 20 | no | −0.168 ± 0.032 | −0.075 ± 0.062 | 5.5e-3 |
+| 20 | yes | 0.505 ± 0.032 | 0.503 ± 0.045 | 8.0e-3 |
+
+So both B and the scale go down, and a strong extinction makes B negative.
+Both texts now say so.
+
+**Waiting on the maintainer: the unknown-path error** (from WP-1944's
+inherited entry). On a phase that declares no extinction,
+`set_vary(["phases.0.extinction"], True)` raises "unknown parameter path
+'phases.0.extinction'; did you mean 'phases.0.lor_strain'?" (measured by
+WP-1944's code review). It is the one place the package meets a user who
+already guessed the name. Having `refine._path_hint` name the declaration
+for an opt-in path would fix it. That changes an error's text, which is
+reader output, so it goes to the maintainer before it lands. This WP's
+rescope does not cover it.
 
 ## Non-goals
 
@@ -79,6 +87,8 @@ WP-1944's handover log. Three gaps remain.
 
 ## Tasks
 
+- [x] Extinction's Biso direction: correct `model/extinction.py`'s docstring
+      and the theory page's Primary extinction section (2026-11-09).
 - [ ] Stephens: the help entry and the manual section name the declaration
       and the misfit that calls for it.
 - [ ] Anisotropic ADPs: the help entry names `Atom.aniso` and when a
