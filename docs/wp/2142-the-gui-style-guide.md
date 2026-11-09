@@ -1,6 +1,6 @@
 # WP-2142 — The GUI style guide
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — claimed by @yue-here
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the guide, its test and the milestone's unfiled pieces are in; B1-B4 wait on the maintainer; PR #1514
 Depends on: —
 Priority: P2 2026-11-09 — every later gui-overhaul piece is judged against it (ruled 2026-11-09)
 
@@ -80,14 +80,14 @@ the guide's named tokens and tests exist, which is a name check, not a heuristic
 
 ## Tasks
 
-- [ ] Claimed: this file, the index row, a draft PR.
+- [x] Claimed: this file, the index row, a draft PR.
 - [x] `gui/STYLE.md`: rule, motive and marker per element, with the tests that check them named.
 - [x] `gui/CLAUDE.md`: the pointer line.
 - [x] A test that every token and test the guide names exists.
 - [x] The 59 questions, each settled or sent on, recorded below; the batch to the maintainer.
 - [x] `docs/milestones/gui-overhaul.md`: the unfiled pieces and the screenshot acceptance row;
       ROADMAP's sentence on the peak-mark colour.
-- [ ] Skill: none. The skill is for an agent driving rietx; the guide governs changing the GUI.
+- [x] Skill: none. The skill is for an agent driving rietx; the guide governs changing the GUI.
 
 ## The workshop's 59 questions
 
@@ -201,6 +201,40 @@ wc -w gui/STYLE.md   # well under the workshop draft's 11 192 words
   plot palette's floor is measured in.
 
 ## Handover log
+
+### 2026-11-09 — the guide written, four questions sent
+
+The GUI now has a style guide, `gui/STYLE.md`, that a session changing how anything looks reads
+first. It gives each rule its motive and says whether the maintainer stated it (with the date)
+or Claude inferred it, so a panel the prototypes left unfinished can be completed by the motive
+instead of by copying the prototype. It is 3 908 words against the workshop draft's 11 192 (186
+lines, 22 450 bytes against 658 lines, 66 374 bytes). The workshop's 59 open questions are all
+placed: 22 by a later ruling, 17 by a stated motive, 18 outside the GUI, 2 sent on. Four rules
+wait on the maintainer (B1-B4 above), and nothing in the GUI's code or colours changed.
+
+- *Done*: the guide; the pointer line in `gui/CLAUDE.md` (cap 1060 → 1061);
+  `tests/test_gui_style_guide.py` (four checks: named tokens are declared, named files exist,
+  every rule ends with a marker, no hex or pixel value restated), each made to fail once on a
+  planted mutation; the 59-question table and the batch above; the milestone's eleven unfiled
+  pieces and acceptance rows 11-12; ROADMAP's sentence moving the peak-mark colour from WP-2130 to
+  the palette piece.
+- *Measured*: OKLab distance between the site's accent and danger colours, 0.114 light and 0.080
+  dark, under the plot floor of 0.13 (B4's case), through `rietx.gui.structure3d._oklab`. Fast
+  suite on the final tree, `[dev]` venv, macOS arm64, alone under ghostshift's serial lock:
+  14 379 passed, 418 skipped, 32 xfailed. The four added tests take 0.01 s together.
+- *Review*: `/code-review high --fix` found ten; nine were fixed in one commit (B2's rule had no
+  marker; the contrast rule claimed a test that covers only ink on the accent fill; the token scan
+  read CSS comments; four test-strictness gaps; a stale milestone heading; the cap comment).
+  Declined: adding the new test to `ci.yml`'s docs-job list. It only stats the milestone file
+  rather than reading it, and the workflow file is outside this WP.
+- *Not done, by the non-goals*: `gui/CLAUDE.md`'s 36 visual rules (listed in WP-2134, PR #1511)
+  stay where they are. Once #1511 merges, a follow-up moves each into the guide or points at it.
+  WP-2134's file exists only on that branch, so no `### Inherited` note could be left there.
+- *Gotchas*: the guide may name only tokens that exist, so a rule about a role the palette piece
+  will add describes it in words. When that piece lands it should rename those rules to the new
+  tokens; the test then holds them.
+- *Next*: the maintainer answers B1-B4 (the batch went as one message). Each answer replaces an
+  `[open Bn]` marker with `[Yue <date>]`. Then the palette piece, which most of § Colour waits on.
 
 - **2026-11-09** — created by a ghostshift runner on the maintainer's 2026-11-09 ruling. No open
   WP owns a style guide: WP-2134 lists the visual rules for it and fences them out of its own
