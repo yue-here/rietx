@@ -101,7 +101,16 @@ either's code; nothing is ported.
       (0 1 0) at 11.53° is the only line below the first nuclear one at 22.32°, and sits
       +19.0(1.8) mdeg (the drawn line too low, as #1089's "centroid 24 mdeg low"), the
       nuclear line +9.0(2.7). Not re-run: #1089's tied-ratio refinement.
-- [ ] Point 2: the diagnostic, with its audit row and `help.py` entry.
+- [x] Point 2: the diagnostic, with its audit row and `help.py` entry.
+      `LOW_ANGLE_ASYMMETRY_UNCALIBRATED` (info), `report.magnetic.low_angle_asymmetry_findings`,
+      called in the result build beside `magnetic_width_findings`. Fires on geometry alone: a
+      seen magnetic-only line below the lowest seen line that is not (WP-1343's
+      `MAGNETIC_WIDTH_PURITY` cut; "seen" is the line's own t ≥ `MIN_COEF_SIGNIFICANCE`). Says
+      each such line's centroid shift, the first other line's, and what a one-term cot 2θ
+      shape through the magnetic lines predicts there; no threshold on any number, so no new
+      tunable constant (one numerical step, `_SHIFT_STEP_FWHM`, tier 1). Rows: the code tier 1
+      / ambiguity 3 / info, its suggestion tier 2 (asymmetry from a standard's calibration, the
+      instrument-parameter workflow), the step tier 1.
 - [ ] Point 1 (if in scope): the term in `model/profiles/`, its analytic derivatives, a
       `test_cross_backend.py` config, a Layer-1 column, `help.py` entries for its four
       parameters, and the Theory tab's equation.
