@@ -72,7 +72,7 @@ assert len(plan.stages) == 4
 The second argument of `Stage`, `turn_on`, is a list of parameter names such as `phases.0.cell.a`.
 A `*` in a name matches any run of characters, dots included, so `phases.*.atoms.*.biso` matches every atom's Biso in every phase.
 Names take no square brackets, because the matching reads `[0]` as a set of characters and not as an index.
-[Parameter map](../reference/parameters.md) lists every name.
+[Parameter map](../reference/parameters.md) and [Instrument parameter map](../reference/parameters-instrument.md) list every name.
 
 A stage never frees a parameter the space group fixes or ties, or one you hold with `Refinement.hold`, whatever its names match.
 The other `Stage` arguments have defaults.

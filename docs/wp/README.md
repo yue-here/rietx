@@ -53,6 +53,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md) | An opt-in correction the residual asks for names its declaration in the docs | 2026-11-09 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | 2026-11-09 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2123](2123-the-layout-shell.md) | The layout shell | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2126](2126-the-parameters-panel.md) | The Parameters panel | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
@@ -651,7 +652,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2082](2082-a-stated-prior-is-not-an-engine-in-the-grade.md) | A stated prior is not an engine in the grade | ✅ 2026-11-02 | — | — |
 | [2084](2084-lab6-has-two-minima-in-the-widths.md) | The SRM 660c protocol has two minima in the Gaussian widths, and the shipped start reaches the shallower | ⬜ | P3 | — |
 | [2086](2086-a-zero-scale-holds-the-instrument-only-where-the-residual-is-noise.md) | A zero scale holds the instrument only where the residual is noise | ✅ 2026-11-04 | — | — |
-| [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md) | An opt-in correction the residual asks for names its declaration in the docs | ⬜ | P3 | [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md) |
+| [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md) | An opt-in correction the residual asks for names its declaration in the docs | 🔄 2026-11-09 | P3 | [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md) |
 | [2088](2088-an-assigned-parameter-inherits-its-declared-range.md) | An assigned Parameter inherits its declared range | ✅ 2026-11-07 | — | — |
 | [2112](2112-an-engines-first-cell-stays-in-the-reported-list.md) | An engine's first cell stays in the reported list | ⬜ | P3 | — |
 | [2113](2113-a-background-band-read-as-unmatched-peaks.md) | A background band read as unmatched peaks | ⬜ | P3 | — |
