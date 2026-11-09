@@ -1789,6 +1789,13 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in: Geometry.mu_r/mu_t or capillary_radius_mm/thickness_mm, default None "
                   "(off); choosing flat_plate_transmission applies sec theta; Rouse et al. (1970) "
                   "Acta Cryst. A26, 682 (docstring)")),
+    Row("rietx.schemas.results.RefinementResult.fit_range", "action", tier="caller", ambiguity=1,
+        evidence=("restates the caller's own act (WP-2075, #1219): two_theta_limits handed to "
+                  "fit and PatternData.excluded_regions, both off by default, read through "
+                  "project.fitted_mask, the authority compile_model is pinned to (WP-1033); "
+                  "the record moves no value and gates nothing. The file's range, the limits "
+                  "and regions as asked and as applied, and each unfitted span's share of "
+                  "the file's counts are arithmetic on the pattern")),
     Row("rietx.schemas.results.RefinementResult.qpa", "action", tier=1, ambiguity=1,
         evidence=("arithmetic: a phase's scale is not measured where its column is zero at the "
                   "answer (no reflection in the fitted range), or where the last stage held it "

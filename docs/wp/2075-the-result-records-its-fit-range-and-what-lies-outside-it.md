@@ -75,9 +75,12 @@ chunk 2 is computed there.
 
 ## Tasks
 
-- [ ] `RefinementResult.fit_range`: file range and point count, limits requested and applied,
+- [x] `RefinementResult.fit_range`: file range and point count, limits requested and applied,
       excluded regions declared and applied, counts in the file and in the fitted channels.
-      JSON round-trip; `_audit` row at tier `caller`; `SCHEMA_VERSION` as ruled.
+      JSON round-trip; `_audit` row at tier `caller`; `SCHEMA_VERSION` as ruled. (2026-11-09:
+      `schemas.results.FitRange`, built by `report.fit_range.fit_range_record` in `_fit_pass`;
+      the schema rule is WP-1117's, so it joins 0.61, the version in flight since v1.11 shipped
+      0.60; `tests/test_fit_range.py`.)
 - [ ] `summary()`'s protocol block prints one line from it (in place of, or beside,
       `excluded:`, as ruled).
 - [ ] Chunk 2 facts, computed in `fit()`, on `fit_range` or a sibling field: per excluded band

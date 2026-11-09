@@ -6027,6 +6027,11 @@ class Refinement:
                 cell_runaway=answer_runaway,
                 significance=answer_significance,
                 phase_support_sigma=plan.phase_support_sigma)
+            # WP-2075: the one place the whole pattern is at hand, so the one
+            # place the result can say which part of it was fitted.
+            from .report.fit_range import fit_range_record
+
+            self.result_.fit_range = fit_range_record(data, two_theta_limits)
             # beside result_, never at entry: a call that is cancelled or fails
             # leaves the previous result and the pattern it was fitted to
             self._fit_pattern = data
