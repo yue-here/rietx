@@ -1,6 +1,6 @@
 # WP-2130 — the Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the coverage line and Adopt on every row are in; the peak-mark colour waits on the maintainer
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the coverage line and Adopt on every row are in; the peak-mark colour waits on the maintainer; PR #1490
 Depends on: 2123, 2124 (the shell it draws in, and the adopt arm's `picked` and `why`)
 Priority: P2 2026-11-09 — three of the gui-overhaul record's "owed to the port" defects, all in the existing Peaks panel
 
@@ -209,7 +209,7 @@ npm --prefix gui ci && npm --prefix gui run build && npm --prefix gui test && np
 
 ## Handover log
 
-### 2026-11-09 — two of three in; the colour waits on the maintainer (PR #PRNUM)
+### 2026-11-09 — two of three in; the colour waits on the maintainer (PR #1490)
 
 The Peaks panel now says how much of an indexing search ran, whatever the search found, so a
 run stopped at its time limit no longer reads like a finished one. Every candidate cell can be
