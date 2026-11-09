@@ -1,6 +1,6 @@
 # WP-2127 — the Plan tab
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — claimed by a ghostshift runner
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — built; PR #1483 waits for the maintainer's review and merges after #1476
 Depends on: 2123 (the layout shell, PR #1476)
 Priority: P2 2026-11-09 — piece 3 of the open gui-overhaul milestone
 
@@ -173,7 +173,7 @@ reversible", with its alternative, and waits for the maintainer's review of the 
 - [x] Undo and redo of plan edits: ⌘Z and ⇧⌘Z in the tab outside a text field, and the palette.
 - [x] The layout browser test extended to the Plan tab: every control clicked, a real drag.
 - [x] The dist rebuilt; the GUI chapters and the screenshots the tab changes.
-- [ ] Skill: none expected. The agent skill drives the python API, and no route changes.
+- [x] Skill: none. The agent skill drives the python API, and no route changed.
 
 ## Acceptance
 
@@ -197,6 +197,37 @@ stage, and the milestone's row 8 (a five-stage plan read top to bottom) holds in
 
 ## Handover log
 
+- **2026-11-09** — built by a ghostshift runner; PR #1483. The Plan tab now reads as a
+  recipe: one row per stage, a handle that drags it, its globs as chips each with a × beside
+  it, and the ladder line saying what the stage frees and holds. A person can build a plan in
+  the tab (add and remove stages, rename them, add and remove globs, pick a preset) and undo
+  each step. A plan edit no longer has a Save button of its own: it waits in the shell's action
+  bar as one pending edit beside the Parameters edits, and `Run this stage` applies those edits
+  first. A stage that fixes is not built and waits on the maintainer (§ Context).
+  - *Done*: `lib/plan.ts` with vitest; `Plan.svelte` rewritten; `App.svelte` routes the plan
+    through the action bar and the palette (`plan-undo`, `plan-redo`); the layout browser test
+    clicks every plan control at both widths and drags a stage with a real mouse; the manual's
+    Plan section, the two plan screenshots, `gui/CLAUDE.md`'s ladder rule and the milestone's
+    owed item follow. Twelve visual and interaction calls are listed under § Calls settled by
+    Claude for the maintainer's review.
+  - *Review* (`/code-review high --fix`): eight fixes landed as one commit. A plan load
+    overtaken by an Apply is dropped, the resolved facts are tied to the stages they describe,
+    undo does nothing mid-run, a refused preset pick records no undo step, a reorder carries the
+    selection and a half-typed glob, and the panel starts fresh for each opened project.
+    Declined: dropping an unsaved plan edit when the mode changes. Keeping it is the panel's
+    stated behaviour and loses nothing; a person can Revert.
+  - *Measured*: fast suite on the final tree (origin/main merged, no change), worktree venv `[dev]` plus
+    playwright, macOS arm64: 14479 passed, 410 skipped, 32 xfailed, exit 0, through the shift's
+    serial queue. vitest 625 passed; svelte-check 0 errors; the layout browser file 17 passed;
+    ruff clean; `tests.reader_output` exit 0. One local run's seconds for the added tests: the
+    plan sweep 71.6 s over two widths, the typing test 4.9 s, the drag 1.5 s. The sweep joins the
+    fast tier's tail and stays unmarked, because it is the Plan tab's layout gate and a PR's CI
+    runs the fast tier alone.
+  - *Gotchas*: on macOS the End key scrolls the nearest scroller rather than moving the caret
+    in a text field, and the scroll is smooth, so it lands during the next keystroke. A browser
+    test that types into a field inside a scroller does not press End.
+  - Next: the maintainer reviews the settled calls and rules on the fixing stage. #1476 merges
+    first; this PR then merges after it.
 - **2026-11-09** — filed by a ghostshift runner as piece 3 of the gui-overhaul milestone. No
   open WP owned the Plan tab: WP-2123 lists it as a non-goal and WP-2126 is the Parameters panel.
   The milestone claims 22xx for its later pieces, and the shift numbered this one 2127, after
