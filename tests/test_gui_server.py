@@ -4640,3 +4640,72 @@ def test_plan_resolve_force_fixes_a_column_a_tie_drives(blank, tmp_path,
     # and the row agrees with the panel, being the same test
     rows = {r.path: r for r in ref.parameters(mode="lebail")}
     assert rows["vars.B"].mode_fixed and not rows["vars.B"].refinable
+
+
+def test_the_parameters_panel_holds_limits_and_restrains_through_one_patch(
+        blank, tmp_path, pattern_file):
+    """WP-2126: ``hold``, ``limits`` and ``restraints`` ride ``PATCH /api/params``.
+
+    The panel's Apply is one round trip, so the three arms the padlock and the
+    value popover need are verbs of that route.  A limit typed with a value
+    lands in one ``edit_model`` node, because pydantic checks the value
+    against its limits as one object; a restraint is a ``ValueRestraint`` on
+    the phase its path names, and ``null`` removes it.
+    """
+    session, client = blank
+    project = _open(session, tmp_path / "panel.rex", pattern_file)
+    path = "phases.0.cell.a"
+    before = len(project.history)
+
+    status, payload = client.patch("/api/params", {"hold": {path: True}})
+    assert status == 200, payload
+    assert payload["changed"]["hold"][path] == [path]
+    row = next(r for r in payload["parameters"] if r["path"] == path)
+    assert row["held"] and not row["refinable"]
+
+    # release and free in one call: the unhold runs before the vary flag
+    status, payload = client.patch("/api/params", {"hold": {path: False},
+                                                   "vary": {path: True}})
+    assert status == 200, payload
+    row = next(r for r in payload["parameters"] if r["path"] == path)
+    assert not row["held"] and row["vary"]
+
+    # a value outside the old limits is admitted by the limits sent with it
+    status, payload = client.patch("/api/params", {
+        "limits": {path: [4.0, None]}, "values": {path: 4.25}})
+    assert status == 200, payload
+    row = next(r for r in payload["parameters"] if r["path"] == path)
+    assert (row["lo"], row["hi"]) == (4.0, "Infinity")
+    assert row["value"] == pytest.approx(4.25)
+    assert payload["changed"]["values"] == [path]
+
+    status, payload = client.patch("/api/params", {
+        "restraints": {path: {"target": 4.16, "sigma": 0.01}}})
+    assert status == 200, payload
+    restraints = project.refinement.structure.phases[0].restraints
+    assert [(r.path, r.target, r.sigma) for r in restraints] == [(path, 4.16, 0.01)]
+    status, payload = client.patch("/api/params", {"restraints": {path: None}})
+    assert status == 200, payload
+    assert project.refinement.structure.phases[0].restraints == []
+
+    kinds = [n.action.kind for n in project.history.nodes.values()][before:]
+    assert kinds == ["set_hold", "set_hold", "set_vary", "edit_model",
+                     "edit_model", "edit_model"]
+
+
+def test_a_limit_the_model_cannot_store_is_refused_by_name(blank, tmp_path,
+                                                          pattern_file):
+    """A crossed pair and a path with no stored limits are refusals, not 500s."""
+    session, client = blank
+    project = _open(session, tmp_path / "limits.rex", pattern_file)
+    before = len(project.history)
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"phases.0.cell.a": [5, 4]}})
+    assert status == 400, payload
+    assert "above the upper" in payload["error"]["message"]
+    assert payload["error"]["where"] == ["phases.0.cell.a"]
+    status, payload = client.patch("/api/params",
+                                   {"limits": {"phases.0.atoms.9.biso": [0, 1]}})
+    assert status == 400, payload
+    assert "stores no limits" in payload["error"]["message"]
+    assert len(project.history) == before

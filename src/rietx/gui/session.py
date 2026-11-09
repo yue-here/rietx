@@ -866,21 +866,56 @@ class GuiSession:
         the log — where a following run continues from.  ``vary`` is applied in
         the order the JSON object gave, since overlapping globs are ordinary
         (``phases.*`` then a single path back off).
+
+        Three more arms (WP-2126), so the Parameters panel's Apply stays one
+        round trip.  ``limits`` and ``restraints`` go first, as one
+        ``edit_model`` node (:func:`_limit_and_restraint_edit`): no verb sets a
+        limit or adds a value restraint, and a limit can admit a value the old
+        one refused.  ``hold`` maps a glob to ``True`` (``Refinement.hold``) or
+        ``False`` (``unhold``); unholds run before the vary flags and holds
+        after them, so "release and free" and "untick and hold" both land.
         """
         self._require_idle()
         p = self._need_project()
-        values = body.get("values") or {}
+        values = dict(body.get("values") or {})
         vary = body.get("vary") or {}
-        if not isinstance(values, dict) or not isinstance(vary, dict):
-            raise GuiError("'values' maps dot-path → number and 'vary' maps "
-                           "dot-path glob → bool")
-        changed: dict[str, Any] = {"values": [], "vary": {}}
+        hold = body.get("hold") or {}
+        limits = body.get("limits") or {}
+        restraints = body.get("restraints") or {}
+        if not all(isinstance(arm, dict)
+                   for arm in (values, vary, hold, limits, restraints)):
+            raise GuiError("'values' maps dot-path → number, 'vary' and 'hold' "
+                           "map dot-path glob → bool, 'limits' maps dot-path → "
+                           "[lower, upper] and 'restraints' maps dot-path → "
+                           "{target, sigma} or null")
+        changed: dict[str, Any] = {"values": [], "vary": {}, "hold": {},
+                                   "limits": [], "restraints": []}
         # a literal vary key the model lacks is a typo, refused before the
         # values or any earlier key commit a node (WP-1951)
         try:
-            p.refinement._refuse_unknown_literals(list(vary))
+            p.refinement._refuse_unknown_literals(list(vary) + list(hold))
         except ValueError as exc:
-            raise GuiError(str(exc), where=sorted(vary)) from None
+            raise GuiError(str(exc), where=sorted({*vary, *hold})) from None
+        if limits or restraints:
+            # one ``edit_model`` node for both, first: a limit can admit a
+            # value the old one refused, so a value typed with its limit
+            # travels inside the same validated model (pydantic checks a
+            # value against min/max as one object, WP-2126)
+            structure, instrument = _limit_and_restraint_edit(
+                p.refinement, limits, restraints, values)
+            self._edit(structure=structure, instrument=instrument,
+                       label="limits and restraints edited")
+            changed["limits"] = sorted(limits)
+            changed["restraints"] = sorted(restraints)
+            for path in limits:
+                if path in values:
+                    changed["values"].append(path)
+                    del values[path]
+        for glob, flag in hold.items():
+            # unholds before the vary flags and holds after them, so "release
+            # this and free it" and "untick this and hold it" both land
+            if not flag:
+                changed["hold"][glob] = _holding(p.refinement.unhold, glob)
         if values:
             try:
                 p.refinement.set_values({k: float(v) for k, v in values.items()})
@@ -889,7 +924,7 @@ class GuiSession:
                 # structural, a bound violation prints the interval — each has a
                 # different fix, so the message travels intact
                 raise GuiError(str(exc), where=sorted(values)) from None
-            changed["values"] = sorted(values)
+            changed["values"] = sorted({*changed["values"], *values})
         for glob, flag in vary.items():
             try:
                 changed["vary"][glob] = p.refinement.set_vary(glob, bool(flag))
@@ -900,6 +935,9 @@ class GuiSession:
                 # treatment as ``set_values`` above: the sentence names the
                 # verb that resolves it, so it travels intact.
                 raise GuiError(str(exc), where=[glob]) from None
+        for glob, flag in hold.items():
+            if flag:
+                changed["hold"][glob] = _holding(p.refinement.hold, glob)
         return {"changed": changed, **self.params()}
 
     # ------------------------------------------------------------------
@@ -3289,6 +3327,115 @@ def _validate(model, payload, where: str):
 #: *searches* rather than anchors — it is what lets :meth:`GuiSession._edit`
 #: address the field without parsing a sentence it does not own.
 _LEADING_PATH = re.compile(r"\b((?:phases|instrument)\.[\w.]*[\w])")
+
+
+def _holding(verb, glob: str) -> list[str]:
+    """``Refinement.hold``/``unhold`` on one glob, a refusal in its own words."""
+    try:
+        return verb(glob)
+    except ValueError as exc:
+        raise GuiError(str(exc), where=[glob]) from None
+
+
+def _stored_param(tree: dict, path: str) -> dict:
+    """The stored ``{value, min, max, …}`` a parameter path names in a dumped model.
+
+    ``tree`` is ``{"phases": [...], "instrument": {...}}``.  A path the table
+    has and the model does not store (a coordinate DOF, which is rederived at
+    every table build) is refused by name, because its limits have nowhere to
+    live.
+    """
+    node: Any = tree
+    for part in path.split("."):
+        if isinstance(node, list) and part.isdigit() and int(part) < len(node):
+            node = node[int(part)]
+        elif isinstance(node, dict) and part in node:
+            node = node[part]
+        else:
+            node = None
+            break
+    if not (isinstance(node, dict) and {"value", "min", "max"} <= node.keys()):
+        raise GuiError(f"{path} stores no limits of its own in the model, so "
+                       "they cannot be set here", where=[path])
+    return node
+
+
+def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
+                              values: dict) -> tuple[Structure | None,
+                                                     Instrument | None]:
+    """The model ``limits`` and ``restraints`` describe, validated whole (WP-2126).
+
+    No verb sets a parameter's limits or adds a value restraint: both live on
+    the model (``Param.min``/``max``, ``Phase.restraints``), and
+    ``Refinement.edit`` records a model.  So the stored model is dumped,
+    changed at the paths named, and validated as a whole — a value typed with
+    its limit is written in the same object, since pydantic checks a value
+    against its limits together.  ``None`` for either half means it did not
+    change.
+
+    ``limits`` maps a path to ``[lower, upper]``, ``None`` meaning unbounded on
+    that side.  ``restraints`` maps a path to ``{"target", "sigma"}``, or to
+    ``None`` to remove the path's value restraint.  A value restraint names a
+    whole-model path; it is stored on the phase its path names, or on the
+    first phase for an instrument path.
+    """
+    structure = refinement.structure.model_dump(mode="python")
+    instrument = refinement.instrument.model_dump(mode="python")
+    tree = {"phases": structure["phases"], "instrument": instrument}
+    touched = {"structure": False, "instrument": False}
+    for path, pair in limits.items():
+        if not (isinstance(pair, (list, tuple)) and len(pair) == 2):
+            raise GuiError(f"{path}: limits are [lower, upper]", where=[path])
+        stored = _stored_param(tree, path)
+        lo, hi = (-math.inf if pair[0] is None else float(pair[0]),
+                  math.inf if pair[1] is None else float(pair[1]))
+        if lo > hi:
+            raise GuiError(f"{path}: the lower limit {lo:g} is above the upper "
+                           f"one {hi:g}", where=[path])
+        stored["min"], stored["max"] = lo, hi
+        if path in values:
+            stored["value"] = float(values[path])
+        touched["instrument" if path.startswith("instrument.") else "structure"] = True
+    if restraints:
+        from ..schemas.structure import ValueRestraint
+        phases = refinement.structure.phases
+        if not phases:
+            raise GuiError("a value restraint lives on a phase, and this "
+                           "project has none", where=sorted(restraints))
+        kept = [[r for r in phase.restraints
+                 if not (isinstance(r, ValueRestraint) and r.path in restraints)]
+                for phase in phases]
+        for path, spec in restraints.items():
+            if spec is None:
+                continue
+            if not isinstance(spec, dict) or not {"target", "sigma"} <= spec.keys():
+                raise GuiError(f"{path}: a restraint is {{target, sigma}}",
+                               where=[path])
+            match = re.match(r"phases\.(\d+)\.", path)
+            home = int(match.group(1)) if match else 0
+            if home >= len(phases):
+                raise GuiError(f"{path} names a phase this project lacks",
+                               where=[path])
+            try:
+                kept[home].append(ValueRestraint(path=path,
+                                                 target=float(spec["target"]),
+                                                 sigma=float(spec["sigma"])))
+            except (ValueError, TypeError) as exc:
+                raise GuiError(f"{path}: {exc}", where=[path]) from None
+        touched["structure"] = True
+    try:
+        new_structure = (Structure.model_validate(structure)
+                         if touched["structure"] else None)
+        if restraints and new_structure is not None:
+            for phase, rows in zip(new_structure.phases, kept, strict=True):
+                phase.restraints = rows
+        new_instrument = (Instrument.model_validate(instrument)
+                          if touched["instrument"] else None)
+    except ValueError as exc:
+        match = _LEADING_PATH.search(str(exc))
+        raise GuiError(str(exc), code="MODEL_REFUSED",
+                       where=[match.group(1)] if match else sorted(limits)) from None
+    return new_structure, new_instrument
 
 
 def _is_typed_cell(payload) -> bool:
