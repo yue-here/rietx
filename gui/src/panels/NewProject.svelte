@@ -12,7 +12,8 @@
    *
    * The instrument is **assumed and tagged** rather than asked. A pattern
    * file's header seeds it when it names an anode, and otherwise the dialog
-   * assumes Bragg-Brentano with a Cu Kα1/Kα2 anode, GSAS-II's own fallback.
+   * assumes Bragg-Brentano with a Cu Kα1/Kα2 anode, the first of GSAS-II's
+   * default instrument files (docs/practice.md § The start screen).
    * Either way the row says where the answer came from, because a wrong anode
    * shifts every refined cell and an unmarked default reads as something the
    * file said.
@@ -177,10 +178,14 @@
     const symbol = draft.symbol.trim();
     if (!symbol) { draft.facts = null; draft.error = ""; return; }
     try {
-      draft.facts = await api.spacegroup(symbol);
+      const facts = await api.spacegroup(symbol);
+      // an answer for a symbol since retyped is dropped, never drawn
+      if (draft.symbol.trim() !== symbol) return;
+      draft.facts = facts;
       draft.error = "";
-      say(`get_spacegroup("${symbol}")  # ${draft.facts.constraints}`);
+      say(`get_spacegroup("${symbol}")  # ${facts.constraints}`);
     } catch (err) {
+      if (draft.symbol.trim() !== symbol) return;
       draft.facts = null;
       draft.error = (err as Error).message;
     }
@@ -312,7 +317,8 @@
           {@const first = phase.kind === "cif" ? phase.preview.phases?.[0] : null}
           <div class="phl">
             <span class="pname">{phase.kind === "cif" ? first?.name ?? "phase" : "typed cell"}</span>
-            <SpaceGroup symbol={phase.kind === "cif" ? first?.space_group ?? "" : phase.symbol} />
+            <SpaceGroup symbol={phase.kind === "cif" ? first?.space_group ?? ""
+              : phase.facts?.xhm || phase.symbol} />
             <span class="mono muted">{phaseCell(phase)}</span>
             <span class="muted">{phase.kind === "cif" ? `${first?.n_atoms ?? 0} sites` : "cell only"}</span>
             <span class="muted src">{phase.kind === "cif" ? phase.preview.filename : ""}</span>
@@ -424,7 +430,7 @@
             </label>
             {#snippet field(f: any)}
               <label class="fld">
-                <span class="muted"><Help for={presetHelp(f)}>{f.label}</Help>{f.unit ? ` (${f.unit})` : ""}</span>
+                <span class="muted" class:cap={/^[a-z]{2}/.test(f.label)}><Help for={presetHelp(f)}>{f.label}</Help>{f.unit ? ` (${f.unit})` : ""}</span>
                 {#if f.kind === "anode"}
                   <select class="mono" value={wiz.values[f.name] ?? f.initial ?? ""}
                     onchange={(e) => setValue(f.name, (e.currentTarget as HTMLSelectElement).value)}>
@@ -518,10 +524,9 @@
     padding: 16px 20px 12px;
   }
 
+  /* the app's section heading (app.css) */
   h2 {
     margin: 0 0 4px;
-    font-size: var(--text);
-    font-weight: 600;
   }
 
   /* each row: a 6.5em label column, then the row's body (round 9) */
@@ -685,6 +690,14 @@
     grid-template-columns: 6.5em minmax(0, 1fr);
     align-items: center;
     gap: 12px;
+  }
+
+  /* the preset fields' labels are lower case where the table names them,
+     so the form starts each with a capital beside Geometry, Name and Where.
+     Only a label that starts with a word: a symbol (µR, a, α) keeps its case,
+     since an upper-case µ or α reads as a Latin M or A. */
+  .fld > .cap::first-letter {
+    text-transform: uppercase;
   }
 
   .fld select,

@@ -146,6 +146,23 @@ describe("the instrument is assumed and says so (round 9)", () => {
     expect(instrumentSummary(state)).toBe("Debye-Scherrer · λ 0.4139 Å");
   });
 
+  it("re-seeds a header-seeded form from the replacement file's own header", () => {
+    const mo = { preset: "bragg_brentano", radiation: "MoKa", why: "Mo" };
+    const first = absorbPattern(emptyWizard(), { ...PATTERN, instrument_hint: mo });
+    expect(first.values.radiation).toBe("MoKa");
+    const second = absorbPattern(first, { ...PATTERN, instrument_hint: null });
+    expect(sourceTag(second)).toBe("assumed");
+    expect(second.values.radiation).toBe("CuKa");
+  });
+
+  it("splits a Windows suggestion on its backslashes", () => {
+    const state = absorbPattern(emptyWizard(),
+      { ...PATTERN, suggested_project: "C:\\Users\\me\\rietx\\lab6.rex" });
+    expect(state.name).toBe("lab6");
+    expect(state.where).toBe("C:\\Users\\me\\rietx");
+    expect(blocked(state)).toBe("");
+  });
+
   it("never lets a second file overwrite a person's choice", () => {
     const hint = { preset: "debye_scherrer", wavelength: 0.4139 };
     const state = { ...emptyWizard(), source: "user" as const };
@@ -246,6 +263,8 @@ describe("a typed cell", () => {
     expect(cellBlocked(draft({ a: "4.76", c: "-1" }))).toMatch(/greater than zero/);
     expect(cellBlocked({ ...draft(), error: "unknown symbol" })).toBe("unknown symbol");
     expect(cellBlocked(draft())).toBe("");
+    // a symbol edited since its lookup still has the old symbol's boxes
+    expect(cellBlocked({ ...draft(), symbol: "P m -3 m" })).toBe("Looking up P m -3 m…");
   });
 
   it("is added as numbers and closes its form", () => {

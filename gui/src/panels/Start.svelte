@@ -18,6 +18,7 @@
    * folder.
    */
   import SpaceGroup from "../SpaceGroup.svelte";
+  import { lastSeparator } from "../lib/wizard";
   import Browse from "./Browse.svelte";
 
   let {
@@ -72,7 +73,7 @@
 
   /** The folder a project sits in. */
   function folder(path: string): string {
-    const cut = path.lastIndexOf("/");
+    const cut = lastSeparator(path);
     return cut > 0 ? path.slice(0, cut) : path;
   }
 
@@ -253,17 +254,20 @@
     margin-top: 20px;
   }
 
+  /* an anchor's own underline, which the `.link` register draws on hover only */
+  .links a:not(:hover) {
+    text-decoration: none;
+  }
+
   .right {
     flex: 1 1 auto;
     min-width: 0;
   }
 
+  /* the app's section heading (app.css), placed over the rows' text */
   h2 {
     margin: 0 0 4px;
     padding-left: 10px;
-    font-size: var(--text);
-    font-weight: 500;
-    color: var(--muted);
   }
 
   ul {

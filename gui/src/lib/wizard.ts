@@ -240,15 +240,27 @@ export function absorbPattern(state: WizardState, preview: any,
   let next: WizardState = { ...state, pattern: preview,
     readerOptions: { ...(preview?.reader_options ?? {}) } };
   const suggested = String(preview?.suggested_project ?? "");
-  const cut = suggested.lastIndexOf("/");
+  const cut = lastSeparator(suggested);
   if (!next.nameSet) {
     next.name = (cut >= 0 ? suggested.slice(cut + 1) : suggested).replace(/\.rex$/, "");
   }
   if (!next.whereSet && cut > 0) next.where = suggested.slice(0, cut);
-  if (fresh && preview?.instrument_hint && next.source === "assumed" && !next.instrument) {
-    next = { ...applyInstrumentHint(next, preview.instrument_hint), source: "header" };
+  if (fresh && next.source !== "user" && !next.instrument) {
+    // A header-seeded form belongs to the file that seeded it: a replacement
+    // pattern re-seeds it from its own header, or falls back to the assumed
+    // default, so the tag never names a header this file does not have.
+    const base = seedPreset({ ...next, values: {} }, "bragg_brentano");
+    const hinted = preview?.instrument_hint
+      ? applyInstrumentHint(base, preview.instrument_hint) : base;
+    if (hinted !== base) next = { ...hinted, source: "header" };
+    else if (next.source === "header") next = { ...base, source: "assumed" };
   }
   return next;
+}
+
+/** The last path separator in a server path, `/` or a Windows `\`; -1 if none. */
+export function lastSeparator(path: string): number {
+  return Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
 }
 
 /** The cell parameters the open cell form draws, in the server's own order. */
@@ -263,6 +275,11 @@ export function cellBlocked(draft: CellDraft | null): string {
   const symbol = draft.symbol.trim();
   if (!symbol) return "Type a space-group symbol.";
   if (draft.error) return draft.error;
+  // the boxes drawn are the last resolved symbol's: an edited symbol not yet
+  // looked up would send its free parameters under the new one
+  if (draft.facts && String(draft.facts.space_group ?? "").trim() !== symbol) {
+    return `Looking up ${symbol}…`;
+  }
   const free = freeCellFields(draft);
   if (!free.length) return "Type a space-group symbol.";
   for (const name of free) {
@@ -318,7 +335,7 @@ export function structureArgument(state: WizardState): unknown {
 
 /** Where the project is made: the folder, the name, `.rex`. */
 export function projectPath(state: WizardState): string {
-  const where = state.where.trim().replace(/\/+$/, "");
+  const where = state.where.trim().replace(/[/\\]+$/, "");
   const name = state.name.trim().replace(/\.rex$/, "");
   return `${where}/${name}.rex`;
 }

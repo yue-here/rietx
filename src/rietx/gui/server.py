@@ -739,7 +739,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             project = Project.open(source, backend=args.backend,
                                    solver=args.solver)
-        except (FileNotFoundError, ValueError) as exc:
+        except (OSError, ValueError) as exc:
             # the refusal messages name seven different remedies; printing the
             # one that applies is the whole value of them
             print(f"rietx gui: {exc}")

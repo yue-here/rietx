@@ -471,7 +471,9 @@ class GuiSession:
         path = _need(body, "path")
         try:
             project = Project.open(path, backend=self.backend, solver=self.solver)
-        except (FileNotFoundError, ValueError) as exc:
+        except (OSError, ValueError) as exc:
+            # OSError, not only FileNotFoundError: a folder this user cannot
+            # read is a refusal to report, never a 500 or a failed launch
             raise GuiError(str(exc), code="PROJECT_ERROR") from None
         self._adopt(project)
         return self.project_doc()
@@ -3551,8 +3553,35 @@ def _as_structure(payload, uploads=None) -> Structure:
     if payload is None:
         return Structure(phases=[])
     if isinstance(payload, list):
-        parts = [_as_structure(item, uploads) for item in payload]
-        return Structure(phases=[ph for part in parts for ph in part.phases])
+        # each member read in its own form, and the species check run once over
+        # the joined list, so a refused atom's path carries its phase index in
+        # the project rather than in its own file
+        structure = Structure(phases=[ph for item in payload
+                                      for ph in _structure_form(item, uploads).phases])
+    else:
+        structure = _structure_form(payload, uploads)
+    unknown = unknown_species(structure)
+    if unknown:
+        named = ", ".join(f"{u['label']} ({u['species']})" for u in unknown)
+        raise GuiError(
+            f"{len(unknown)} atom(s) carry a scattering species this build has "
+            f"no form factor for: {named}. A fit would fail at stage compile "
+            "with the same lookup; edit the species (ions fall back to the "
+            "neutral atom, so 'O2-' is fine and 'D' is not).",
+            code="UNKNOWN_SPECIES",
+            where=[f"{u['path']}.species" for u in unknown])
+    return structure
+
+
+def _structure_form(payload, uploads=None) -> Structure:
+    """One non-list ``structure`` form read as a :class:`Structure`, unchecked.
+
+    :func:`_as_structure` is the boundary and runs the species check; this is
+    the per-form dispatch under it.  A list inside a list is not a form, and is
+    refused as a malformed model by the inline branch.
+    """
+    if payload is None:
+        return Structure(phases=[])
     if _is_typed_cell(payload):
         structure = _typed_cell_structure(payload)
     elif isinstance(payload, dict) and ("cif" in payload or "upload" in payload):
@@ -3584,16 +3613,6 @@ def _as_structure(payload, uploads=None) -> Structure:
                            where=["structure.cif"]) from None
     else:
         structure = _validate(Structure, payload, "structure")
-    unknown = unknown_species(structure)
-    if unknown:
-        named = ", ".join(f"{u['label']} ({u['species']})" for u in unknown)
-        raise GuiError(
-            f"{len(unknown)} atom(s) carry a scattering species this build has "
-            f"no form factor for: {named}. A fit would fail at stage compile "
-            "with the same lookup; edit the species (ions fall back to the "
-            "neutral atom, so 'O2-' is fine and 'D' is not).",
-            code="UNKNOWN_SPECIES",
-            where=[f"{u['path']}.species" for u in unknown])
     return structure
 
 
