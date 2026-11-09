@@ -1,6 +1,6 @@
 # WP-2134 — The GUI rulebook keeps rules, and its evidence moves out
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — claimed by ghostshift runner
+Milestone: unscheduled · Status: 🔄 2026-11-09 — condensed to 642 lines and PR'd (#1511); the open GUI PRs' rulebook lines fold in when main is merged into it
 Track: The repo's own process
 Depends on: —
 Priority: P4 2026-11-09 — process: no number moves, but every GUI session pays the file's size
@@ -60,7 +60,7 @@ etc)".
 - [x] `SIZE_CAPS` lowered to landed + 1, with a diary row in the test and a
   paragraph in `docs/milestones/process.md` § `gui/CLAUDE.md`.
 - [ ] `main` merged and the open PRs' additions folded in.
-- [ ] Skill: none. The skill is for an agent driving rietx; this file is for
+- [x] Skill: none. The skill is for an agent driving rietx; this file is for
   changing the GUI.
 
 ## Acceptance
@@ -128,6 +128,77 @@ Elsewhere in the rulebook:
 
 ## Handover log
 
+- **2026-11-09** — The GUI rulebook a session loads under `gui/` is now about
+  half its size and says only what to do. Every story, measurement and example
+  it held is still in the repository, verbatim, in the WP file each rule names,
+  so nothing was lost. Six rules no longer matched the code and now do. A new
+  test turns a renamed file or symbol under a rule into a red test instead of a
+  silent stale rule. The visual rules kept their wording and are listed above
+  for the GUI style guide. Not done: the five open GUI PRs that edit the
+  rulebook had not merged when this was opened, so their lines are not folded in
+  yet.
+  - *Measured* (`wc`, 4 bytes a token): before (origin/main `4c55b9011`) 1059
+    lines, 78 154 bytes, about 19 540 tokens. After 642 lines, 43 361 bytes,
+    about 10 840 tokens: −39 % lines, −45 % bytes. Cap 1060 → 643 (landed + 1).
+  - *Where the material went*: 41 paragraphs, verbatim, to a `## Moved from
+    gui/CLAUDE.md` section before the handover log of 37 closed WP files (1 298
+    lines, 88 760 bytes): 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015 (2),
+    1016 (2), 1017, 1027 (2), 1029, 1032, 1033, 1034, 1035, 1044, 1045, 1201,
+    1203, 1204, 1205, 1206, 1207, 1208, 1209, 1210, 1211, 1212, 1213, 1214, 1215,
+    1216, 1217, 1425, 1429, 1462 (2). These are records of the closed WPs'
+    own rules, never requests for work (`closed_wp_writes.py` lists all 37). Not
+    moved: the old header (superseded by the new one), and the browser-driving
+    paragraph, whose content the new § Tests keeps in substance. Deleted as
+    stated elsewhere: "there is no read-only way to open a project" (root
+    CLAUDE.md § Project), the run state not being an event (root § Telemetry),
+    where the theme lives (root § Conventions), the series keys (root § Series);
+    each is now a pointer. The in-flight WPs' clauses (2003, 2124, 2126, 2127)
+    and 2030's were kept as rules and not copied into their WP files, whose
+    branches are live.
+  - *Contradictions with the tree, fixed in the rulebook*: (1) the node floor
+    "≥ 20.12" is stale; `gui/package-lock.json`'s strictest `engines` is jsdom
+    30's `^22.22.2 || ^24.15.0 || >=26`, and the rule now says to read it there;
+    (2) "the header's `Split | Full` is the only control" was replaced by
+    WP-2123's two collapse buttons (`App.svelte` `hideGraphs`/`hideModel`);
+    (3) "five keys on every event" is four on every event plus
+    `series_rung`/`series_cold` on a restart (`sequential.py`); (4) the theme
+    microtask is `lib/pattern.ts`'s `retheme`, no longer in `Plot.svelte`;
+    (5) the boolean `hasProject` effect key is in `panels/Series.svelte`, not
+    `Model.svelte`; (6) the drag test "in `App.test.ts`" no longer exists, so
+    the pointer went. Method: `git grep` of every backticked name in the old
+    file (all but plotly-era names resolve) and targeted reads of about forty
+    claims. A clear from that method is weaker than a finding: the other rules
+    were checked for their names only.
+  - *Audit*: a Sonnet agent read the old file against the new one, unanchored on
+    this session's, and listed 16 thin or missing rules; 12 were rules and went
+    back in, 4 were rationale. `/code-review high --fix` on the new test found
+    substring symbol matching, unchecked directories and a dead condition; all
+    fixed in `bb8b68614`. Declined: checking bare file names (ambiguous by
+    design), globs, and the other rulebooks (root, `tests/`, `io/`, `indexing/`
+    use bare names the check cannot resolve; extending it is a follow-up, not
+    done here).
+  - *Tests* (`[dev]` venv, darwin/arm64, run alone through ghostshift's
+    `serial.py`, on the branch before `main` was merged): fast selection 14375
+    passed, 417 skipped, 32 xfailed, 1 failed, in 9:54.
+    `test_gui_rulebook_paths_resolve` is the one test added, and it passes. The
+    failure is `test_indexing_reduce.py::test_a_monoclinic_cell_is_re_set_to_the_conventional_setting[P]`.
+    It fails alone too, and this branch changes no `src/` file, so it belongs to
+    the base on this machine, not to this WP. No full suite: the change is
+    docs and one docs test, and it moves no measured number. After the review's
+    fixes, `test_docs_consistency.py` 26 passed and `test_gui_manual.py` 10
+    passed. Baseline counts not re-measured on main (`tests/CLAUDE.md` § Running).
+  - *Generality*: not dispatched; the branch touches no `_audit.py` row and adds
+    no heuristic.
+  - *Gotchas*: the cap counts lines only, so keep lines at 100 columns or under;
+    the rewrite has none longer. `test_gui_rulebook_paths_resolve` checks only
+    paths written with a directory, so write `lib/plot.ts`, never `plot.ts`.
+  - *Next*: (1) when #1490, #1498, #1502, #1487 and #1488 have merged, merge
+    `main` here and fold what each added under these rules: #1490 rewrites the
+    Adopt bullet in § Peaks and indexing; #1498 and #1502 rewrite Browse/`Model`
+    in § Model and § Shell and add the start screen and the File menu (#1502
+    also raises the cap to 1067, which conflicts with 643: keep 643 plus what the
+    folded rules add). Then tick the merge task and close the WP. (2) The GUI
+    style-guide WP takes the 36 rules listed above. No WP for it exists yet.
 - **2026-11-09** — created. No open WP owns a consolidation of the GUI
   rulebook: the gui-overhaul WPs (2123-2133) each add rules to it, and none
   condenses it.
