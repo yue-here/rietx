@@ -61,7 +61,7 @@ from .crystallography.twins import (
     restraints_dropped_message,
     site_of,
 )
-from .help import help_key_for
+from .help import help_key_for, undeclared_opt_in
 from .history.events import _attach_progress, as_event_stream
 from .history.store import fingerprint, refuse_existing_log
 from .history.tree import RefinementTree
@@ -8246,11 +8246,30 @@ def _path_hint(path: str, known) -> str:
     the nearest real path (:mod:`rietx._nearmiss`).  Before this the verbs
     answered ``instrument.zero`` with the bare refusal, and ``set_vary`` with
     nothing at all.
+
+    A third answer comes between them (WP-2087): a path of an opt-in
+    correction its owner does not declare names the declaration
+    (:func:`rietx.help.undeclared_opt_in`).  The nearest real path answered
+    ``phases.0.extinction`` with ``phases.0.lor_strain``.
     """
     current = retired_spelling(path)
     if current is not None:
         return f"it is a spelling retired after v1.2, now spelled {current!r}."
+    if (hit := undeclared_opt_in(path, known)) is not None:
+        row, owner = hit
+        return (f"it exists only once {row.name} is declared on "
+                f"{_owner_words(owner)}, with {row.declaration}.")
     return did_you_mean(path, known, n=1)
+
+
+def _owner_words(owner: str) -> str:
+    """``phases.0`` as "phase 0", ``phases.0.atoms.3`` as "atom 3 of phase 0"."""
+    parts = owner.split(".")
+    if parts[0] == "phases" and len(parts) == 2:
+        return f"phase {parts[1]}"
+    if parts[0] == "phases" and len(parts) == 4 and parts[2] == "atoms":
+        return f"atom {parts[3]} of phase {parts[1]}"
+    return f"the {parts[-1]}"
 
 
 def _unknown_path_error(path: str, known) -> ValueError:
@@ -8576,7 +8595,9 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
     the nearest real path (:mod:`rietx._nearmiss`, the ``__getattr__`` helper)
     rides in the message.  One suggestion rather than three, since on dot
     paths the second and third are usually siblings of the first: for the
-    issue's typo they were ``lines.0.weight`` and ``profile.w``.
+    issue's typo they were ``lines.0.weight`` and ``profile.w``.  A literal
+    of an opt-in correction its owner does not declare names the declaration
+    instead, through :func:`_path_hint` (WP-2087).
 
     The suggestion names ``ref.parameters()`` for seeing every path, which a
     joint fit has too (WP-2028), spelling its rows as ``known`` does.
@@ -8599,7 +8620,7 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
                 suggestion=f"Write {current!r} in the plan.",
             ))
             continue
-        hint = did_you_mean(path, known, n=1)
+        hint = _path_hint(path, known)  # the retired branch is above
         out.append(Diagnostic(
             level="warning", code="STAGE_PATH_UNKNOWN",
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "

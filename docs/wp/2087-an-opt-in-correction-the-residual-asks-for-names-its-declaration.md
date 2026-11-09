@@ -69,21 +69,28 @@ scale, both B, the O coordinate and the background free):
 So both B and the scale go down, and a strong extinction makes B negative.
 Both texts now say so.
 
-**Waiting on the maintainer: the unknown-path error** (from WP-1944's
-inherited entry). On a phase that declares no extinction,
-`set_vary(["phases.0.extinction"], True)` raises "unknown parameter path
+**The unknown-path error names the declaration** (from WP-1944's
+inherited entry; settled by Claude on 2026-11-09 under the close-the-class
+rule and help.py as the one authority for what a name is; the maintainer
+may reverse it). On a phase that declares no extinction,
+`set_vary(["phases.0.extinction"], True)` raised "unknown parameter path
 'phases.0.extinction'; did you mean 'phases.0.lor_strain'?" (measured by
 WP-1944's code review). It is the one place the package meets a user who
-already guessed the name. Having `refine._path_hint` name the declaration
-for an opt-in path would fix it. That changes an error's text, which is
-reader output, so it goes to the maintainer before it lands. This WP's
-rescope does not cover it.
+already guessed the name. `refine._path_hint` now names the declaration
+when the path belongs to an opt-in correction its owner does not declare.
+The mapping from path family to declaration is `rietx.help.OPT_IN`, one
+row per correction. `tests/test_help.py` executes each row's declaration
+and crosses the rows against the families a model declaring nothing
+lacks, both ways. A retired spelling keeps priority. The change is to
+error and warning text, which is reader output, so the maintainer reviews
+the before and after texts in the PR body before merge.
 
 ## Non-goals
 
 - Extinction (WP-1944, done in its follow-up).
 - Any new diagnostic code, report action, `ActionKind` member or audit row.
-- Any change to what a fit prints or returns.
+- Any change to what a fit prints or returns, except the unknown-path
+  answer above (an error's text and `STAGE_PATH_UNKNOWN`'s message).
 - Freeing any of these by default.
 
 ## Tasks
@@ -98,11 +105,14 @@ rescope does not cover it.
       declaration each geometry takes, as concisely as the extinction row.
 - [x] Skill: stay within `tests/skill_caps.py`'s budgets; re-sync the
       committed copies.
+- [x] Unknown-path answer: `refine._path_hint` names an undeclared opt-in
+      correction's declaration, from `help.OPT_IN`, with the crossing
+      meta-test (2026-11-09).
 
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_help.py tests/test_skill.py tests/test_skill_cli.py tests/test_manual.py
+.venv/bin/python -m pytest tests/test_help.py tests/test_params_surface.py tests/test_skill.py tests/test_skill_cli.py tests/test_manual.py
 .venv/bin/python -m ruff check src tests examples
 ```
 

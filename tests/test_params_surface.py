@@ -1223,6 +1223,45 @@ def test_a_verb_refusing_an_unknown_path_names_the_nearest(verb, arg):
         getattr(ref, verb)(arg)
 
 
+@pytest.mark.parametrize("path, hint", [
+    ("phases.0.extinction",
+     "; it exists only once extinction is declared on phase 0, with "
+     "phase.extinction = 0.0."),
+    ("phases.0.atoms.1.u11",
+     "; it exists only once an anisotropic displacement tensor is declared on "
+     "atom 1 of phase 0, with atom.aniso = AnisoU.isotropic(uiso, phase.cell)."),
+    # no phase 3: the declaration could not create it, so no hint
+    ("phases.3.extinction", ""),
+], ids=["phase", "atom", "no-owner"])
+def test_an_undeclared_opt_in_path_names_its_declaration(path, hint):
+    """WP-2087: the nearest real path answered ``phases.0.extinction`` with
+    ``phases.0.lor_strain``, on a phase that declares no extinction."""
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    with pytest.raises(ValueError) as caught:
+        ref.set_vary([path], True)
+    assert str(caught.value) == f"unknown parameter path: {path!r}{hint}"
+
+
+def test_a_declared_opt_in_answers_a_typo_with_the_nearest_path():
+    structure, ins = perturbed_models()
+    structure.phases[0].microstrain = rx.StephensStrain.isotropic(
+        1000, structure.phases[0].cell)
+    ref = rx.Refinement(structure, ins, history=False)
+    with pytest.raises(ValueError, match=r"did you mean 'phases\.0\.microstrain"):
+        ref.set_vary(["phases.0.microstrain.dof.9"], True)
+
+
+def test_a_stage_literal_of_an_undeclared_opt_in_names_its_declaration(pattern):
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    result = ref.fit(pattern, plan=rx.RefinementPlan(stages=[
+        rx.Stage("only", ["phases.0.scale", "phases.0.extinction"], max_iter=2)]))
+    unknown = [d for d in result.diagnostics if d.code == "STAGE_PATH_UNKNOWN"]
+    assert len(unknown) == 1
+    assert unknown[0].message.endswith(
+        "It exists only once extinction is declared on phase 0, with "
+        "phase.extinction = 0.0.")
+
+
 def test_a_tied_path_beside_its_own_source_stays_silent(pattern):
     """Yue's cubic probe: ``cell.a`` and ``cell.b`` named together is a common
     spelling, and the stage frees ``a`` with ``b`` following it."""

@@ -1306,6 +1306,80 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
 }
 
 
+@dataclass(frozen=True)
+class OptIn:
+    """An opt-in correction whose parameters exist only once it is declared.
+
+    ``owner`` is the glob of the object that carries the declaration, and each
+    of ``families`` is a :data:`PARAMETER_HELP` key under it.  ``declaration``
+    is the line a user writes, in the spelling the help entries use;
+    ``tests/test_help.py`` executes it against a model that lacks the
+    correction and checks that every family then has a row.
+    """
+
+    name: str
+    owner: str
+    families: tuple[str, ...]
+    declaration: str
+
+
+#: The opt-in corrections, for answering an unknown path with the declaration
+#: that would create it rather than with the nearest real path (WP-2087).
+#: On a phase without extinction, ``phases.0.extinction`` was answered with
+#: ``phases.0.lor_strain``.  ``tests/test_help.py`` crosses this list with
+#: the families a model declaring nothing lacks, both ways, so a new opt-in
+#: correction adds a row here or a reason there.
+OPT_IN: tuple[OptIn, ...] = (
+    OptIn("extinction", "phases.*", ("phases.*.extinction",),
+          "phase.extinction = 0.0"),
+    OptIn("March-Dollase preferred orientation", "phases.*",
+          ("phases.*.preferred_orientation.r",),
+          "phase.preferred_orientation = PreferredOrientation(axis=(0, 0, 1))"),
+    OptIn("spherical-harmonics texture", "phases.*", ("phases.*.texture.*",),
+          "phase.texture = SphericalHarmonicTexture(order=4)"),
+    OptIn("Stephens anisotropic strain", "phases.*",
+          ("phases.*.microstrain.s*", "phases.*.microstrain.dof.*"),
+          "phase.microstrain = StephensStrain.isotropic(1000, phase.cell)"),
+    OptIn("an anisotropic displacement tensor", "phases.*.atoms.*",
+          (*(f"phases.*.atoms.*.u{ij}" for ij in ("11", "22", "33", "12", "13", "23")),
+           "phases.*.atoms.*.adp.*"),
+          "atom.aniso = AnisoU.isotropic(uiso, phase.cell)"),
+    OptIn("Suortti surface roughness (Bragg-Brentano only)", "instrument.geometry",
+          ("instrument.geometry.surface_roughness.a",
+           "instrument.geometry.surface_roughness.b"),
+          "instrument.geometry.surface_roughness = RoughnessSuortti()"),
+    OptIn("Pitschke surface roughness (Bragg-Brentano only)", "instrument.geometry",
+          ("instrument.geometry.surface_roughness.c",
+           "instrument.geometry.surface_roughness.tau"),
+          "instrument.geometry.surface_roughness = RoughnessPitschke()"),
+)
+
+
+def undeclared_opt_in(path: str, known) -> tuple[OptIn, str] | None:
+    """The opt-in correction an unknown ``path`` belongs to, and its owner's path.
+
+    ``None`` unless the owner exists among the ``known`` paths and declares
+    none of the correction's families.  A declared correction answers a typo
+    in one of its own paths with the nearest real path, as any other path
+    does, and so does an owner the model lacks (``phases.7`` on one phase).
+    """
+    parts = path.split(".")
+    known = list(known)
+    for row in OPT_IN:
+        # fnmatch's `*` crosses dots, so the depth is checked too
+        if not any(fnmatchcase(path, f) and f.count(".") == len(parts) - 1
+                   for f in row.families):
+            continue
+        owner = ".".join(parts[:row.owner.count(".") + 1])
+        if not any(k.startswith(owner + ".") for k in known):
+            return None
+        tails = [owner + f[len(row.owner):] for f in row.families]
+        if any(fnmatchcase(k, t) for k in known for t in tails):
+            return None
+        return row, owner
+    return None
+
+
 # ----------------------------------------------------------------------
 # Named arms
 #
@@ -4406,11 +4480,12 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A stage named a parameter the model lacks",
         description=(
             "A stage asked to refine a parameter by a name that no parameter of the "
-            "model has. The usual cause is a typing slip or a retired spelling. Nothing "
+            "model has. The usual causes are a typing slip, a retired spelling and an "
+            "opt-in correction the model does not declare. Nothing "
             "was freed, yet the fit converged. A wildcard pattern that matches nothing "
-            "stays silent, because some models lack a component. Correct the name, or "
-            "use a wildcard if the stage should reach a component that only some models "
-            "declare."
+            "stays silent, because some models lack a component. Correct the name, "
+            "declare the correction, or use a wildcard if the stage should reach a "
+            "component that only some models declare."
         ),
     ),
     "STAGE_SLOW_DESCENT": HelpEntry(
