@@ -114,8 +114,46 @@ and `restraints` arms are model edits the user typed.
 ### Calls settled by Claude
 
 Each took the smallest neutral option, is reversible, and waits for the maintainer's review.
+Each is "settled by Claude, reversible", with the alternative after it.
 
-(filled in as the checklist lands)
+1. **Every band and group opens expanded**; the folded symmetry line starts folded. Alternative:
+   remember each group's state in the project's `ui` keys.
+2. **The thresholds are 0.01 and 10 000** (design 6 reads them as Claude's, unobjected). A slot
+   reserves the exponent's width only where a column holds a value that needs one. Alternative:
+   per-family formats from `lib/history.ts`'s `PLACES`.
+3. **`Simple | Advanced` no longer touches this panel.** Every row is shown, and a held one sits
+   behind its group's fold or carries its mark. Alternative: Simple hides held rows again.
+4. **No virtualisation.** The panel draws every row, as a grouped tree does. Its cost on a large
+   structure is not measured. Alternative: window the atom table past some atom count.
+5. **A plain row shows its padlock only while held** (or while a hold is pending), in the box's
+   place; an atom with a free site always shows one. A plain row is held from the console
+   (`ref.hold`) or the `.rxt` text. Alternative: a padlock column on every row.
+6. **A family no fixed rule places** (preferred orientation, a later build's) goes between Size and
+   strain and the atom table: a family of one as a row, of more as a group. Alternative: a "More"
+   group.
+7. **Every group with a freeable member gets a box**, Source and geometry included.
+   Alternative: boxes only on the groups a McCusker stage frees.
+8. **Mult is the atom table's last column.** Alternative: beside the Wyckoff letter.
+9. **Restrain seeds its target at the current value to 4 significant figures and σ at the esd,
+   or 5 % of the value without one.** Alternative: an empty target the user types.
+10. **The limits arm applies first** in one `PATCH`, then unholds, values, vary and holds, so a new
+    limit admits the value typed beside it. Alternative: refuse a value outside the stored limits
+    even when the same Apply widens them.
+11. **A long label wraps to a second line** (the GUI's "overflow is wrap, never truncation").
+    Alternative: a wider label column.
+12. **The atom table's gaps are tight** (2 px), measured to fit the 546 px panel a 1440 px window
+    gives, with fluorapatite's six-decimal coordinates: 533 px of table before its positions
+    refine and 526 px after. A table wider than the panel scrolls sideways with the Atom column
+    pinned. Alternative: widen the panel's default while Parameters is the open tab.
+13. **Two members of a group with one title carry their path's index**, counted from 0 as the
+    help corpus counts emission lines: "Emission line weight 0", "… 1". Alternative: the
+    wavelength beside each line's weight.
+14. **A mode-fixed value stays editable**, as the old table had it; only a tied or locked value is
+    bare. Alternative: bare as well.
+15. **A coordinate edit is echoed as a comment**, `# phases.0.atoms.1 moved to [...]`, since no verb
+    of that name exists: the server projects the position onto the site's DOFs (WP-1215).
+16. **`lib/style.test.ts` admits `.ink` as a non-primary button**: the number itself, tinted, not
+    a filled accent. Alternative: a tenth register in `app.css`.
 
 ## Non-goals
 
@@ -125,6 +163,16 @@ Each took the smallest neutral option, is reversible, and waits for the maintain
   user variables, plan-stage badges on the group toggles (piece 3), and the background group's
   preview (piece 5).
 - Folding the Model and Text panels' edits into the action bar (WP-2123's owed list).
+
+## Follow-ups
+
+- **Formula routes and the "=" editor**: routes for `add_variable` and expression ties, then the
+  popover's "=" button (design 13). The next WP.
+- **Limits on a coordinate DOF**: a `…dof.k` entry stores no `min`/`max` in the model, so the
+  popover offers none for a coordinate. The engine would need a home for them first.
+- **`instrument.polarization`'s limits**: its model path is `source.polarization` (WP-1214's
+  `Field.param`), and the limits arm walks the parameter path, so it refuses this one by name.
+- **Plan-stage badges on the group toggles** (piece 3).
 
 ## Tasks
 

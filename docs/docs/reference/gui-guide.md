@@ -39,7 +39,7 @@ below, and the sash then drags up and down.
 | the project chip | names the `.rex`, its data file, the point count, the intensity mode, and whether σ came from the file or from counting statistics |
 | `Open…` | the import wizard, with the recent list in it |
 | the two collapse buttons | hide the graphs (left end) or the panel column (right end) |
-| `Simple \| Advanced` | whether rows nothing can free, bounds and transforms are shown |
+| `Simple \| Advanced` | whether the Plan, Model, Series and Report panels show their advanced controls |
 | `◐ ☀ ☾` | theme: follow the system, light, dark |
 | the run pill | the stage and its number while busy; the last status otherwise |
 | `Cancel` | stop the run between iterations |
@@ -173,31 +173,71 @@ says so when a browser refuses the clipboard.
 
 ## Parameters
 
-Every entry in the parameter table, one row each, with the control that frees it.
+Every parameter the model has, grouped the way a refinement is read. The panel
+shows each phase in a band headed by its name, its space group and its crystal
+system. The instrument follows in a band of its own.
 
-The filter box is the selection. Type a glob such as `phases.*.cell.*`, and the
-free and fix buttons act on the glob rather than on rows you have ticked. One
-glob is one `set_vary` call and therefore one history node, where a per-row
-multi-select would be one node per row. The count beside the box tells you how
-many rows the glob reaches before you act.
+Inside a phase, single parameters such as `Scale` come first. The groups follow
+in the order a refinement frees them: `Cell`, then `Size and strain`. The atoms
+come last, in a table with one row per atom. Each atom row shows the label, the
+species, the Wyckoff letter, x, y and z, the occupancy, Biso and the site
+multiplicity. The instrument band lists the zero shift and the displacement
+first, then `Background`, `Peak shape`, `Axial divergence` and `Source and
+geometry`.
 
-A row that cannot be freed has no checkbox at all. It carries a mark saying
-which of four reasons holds it: it is locked by symmetry, tied to another
-parameter, fixed by the intensity mode, or needs a held cell. Hover the mark for
-the reason in the package's own words. `Simple` hides those rows along with
-bounds and transforms, and reports how many it hid; `Advanced` brings them back.
+The `Cell` group shows only the edges and angles the space group leaves free.
+The rest fold into one line, such as `a = b, α = β = 90°, γ = 120°` for a
+hexagonal cell. Press that line to see the held rows behind it.
 
-A typed value is compared against the value as displayed, so clicking into a
-cell showing `4.1568(2)` and out again cannot truncate the parameter.
+A checkbox stands beside each parameter it frees, and nowhere else. A group's
+heading has a box that frees or fixes every member at once; it shows a dash when
+only some are free. The atom table's column headings carry the same kind of box
+for every position, every occupancy and every Biso. An atom's position has one
+box per direction its site allows, beside the coordinate that direction moves.
+
+A row that cannot be freed has no checkbox. It carries a mark naming the reason
+it is held: it is locked by symmetry, tied to another parameter, fixed by the
+intensity mode, or needs a held cell. Press the mark for the reason in the
+package's own words.
+
+The padlock is `hold`. A held parameter stays fixed even when a plan stage's
+glob names it, which `vary=False` alone does not do. An atom with a free site
+has a padlock beside its Wyckoff letter, which holds its whole position. A
+plain row shows its padlock in the checkbox's place while it is held.
+
+Numbers keep their columns. Values from 0.01 up to 10 000 are written plainly,
+and others with a power of ten. Atom coordinates, occupancies and Biso are
+always plain. The decimal points in a group line up, and the unit follows the
+value. A number you can edit is tinted; a number you cannot is not.
+
+Press a number to edit it. The editor opens over the number, so nothing else
+moves. Enter keeps the value, and Escape drops it. A value typed back as it was
+shown is no edit, so pressing into `4.1568(2)` and out again cannot truncate
+the parameter. Below the editor, the value's limits can be set, and
+`Restrain` adds a restraint toward a target with a σ. Press the word to tick
+its box.
+
+To edit several values at once, press them with ⌘ (Ctrl elsewhere) held, or
+press one and then another with Shift held to take every value between them in
+the same column. Press any of the picked values and type: the value goes to all
+of them.
+
+The filter box narrows the panel. Type a word, or a glob such as
+`phases.*.cell.*`. The `Free` and `Fix` buttons beside it act on that glob in
+one `set_vary` call, which is one history node. The count beside the box says
+how many rows the glob reaches.
+
+Edits wait until `Apply`, or until a refine applies them first. The action bar
+counts them.
 
 ```{image} ../screenshots/parameters-light.png
 :class: only-light
-:alt: The parameter table grouped by phase and atom, each refined value carrying its esd in brackets and a checkbox, with a filter box and free and fix buttons above
+:alt: The Parameters panel: a band for fluorapatite with its space group, the Scale row, the Cell group with its folded symmetry line, Size and strain, and the atom table with one row per atom
 ```
 
 ```{image} ../screenshots/parameters-dark.png
 :class: only-dark
-:alt: The parameter table grouped by phase and atom, each refined value carrying its esd in brackets and a checkbox, with a filter box and free and fix buttons above
+:alt: The Parameters panel: a band for fluorapatite with its space group, the Scale row, the Cell group with its folded symmetry line, Size and strain, and the atom table with one row per atom
 ```
 
 ## Plan
