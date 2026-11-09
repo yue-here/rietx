@@ -1933,15 +1933,24 @@ _MULTI_CACHE: dict[str, tuple] = {}
 #: intensity block after the table's columns (WP-2104)
 MULTI_MODES = ("rietveld", "pawley")
 
+#: The joint states the stacked matrix is checked on.  ``restrained`` adds the
+#: soft-restraint rows a joint fit stacks below the data (WP-1995): a La–B bond
+#: on the shared structure, held once, and a value restraint on each pattern's
+#: zero shift, held once per histogram, with the B coordinate freed so the
+#: bond's row reaches a coordinate column as well as the shared cell.  Under
+#: Pawley the atoms are force-fixed, so the bond's row reaches the cell alone.
+MULTI_STATES = ("plain", "restrained")
 
-def _multi_state(mode: str = "rietveld"):
+
+def _multi_state(mode: str = "rietveld", kind: str = "plain"):
     """Two LaB6 patterns of one crystal at two wavelengths (the WP-0308 state),
     compiled per histogram and wired through a ``MultiParameterTable``:
     ``(models, mtable, theta, labels)``."""
-    key = f"state:{mode}"
+    key = f"state:{mode}:{kind}"
     if key not in _MULTI_CACHE:
         from rietx.optimize.least_squares import _joint_aux_paths
         from rietx.params.multi import MultiParameterTable
+        from rietx.schemas.structure import BondRestraint, ValueRestraint
         from tests.test_multi_histogram import perturbed_inputs, synthesize
 
         data = [synthesize(0.41390, 3.0, 24.0, scale=5e-4, zero=0.006,
@@ -1949,10 +1958,16 @@ def _multi_state(mode: str = "rietveld"):
                 synthesize(0.71070, 6.0, 46.0, scale=9e-4, zero=-0.010,
                            bkg=[70.0, 5.0, -2.0], seed=2)]
         structure, instruments = perturbed_inputs()
+        if kind == "restrained":
+            structure.phases[0].restraints = [
+                BondRestraint(atom_i=0, atom_j=1, target=3.06, sigma=0.01),
+                ValueRestraint(path="instrument.zero_shift", target=0.0, sigma=0.005)]
         mtable = MultiParameterTable(structure, instruments)
         mtable.set_vary(["*"], False)
-        globs = (MULTI_GLOBS if mode == "rietveld"
+        globs = (list(MULTI_GLOBS) if mode == "rietveld"
                  else [g for g in MULTI_GLOBS if not g.endswith(".scale")])
+        if kind == "restrained":
+            globs.append("phases.*.atoms.*.dof.*")
         assert mtable.set_vary(globs, True)
         mtable.apply_to_models()
         models = [compile_model(s, ins, d, mode=mode,
@@ -1973,24 +1988,25 @@ def _multi_state(mode: str = "rietveld"):
     return _MULTI_CACHE[key]
 
 
-def _multi_jacobian(backend: str, mode: str = "rietveld"):
-    key = f"jac:{backend}:{mode}"
+def _multi_jacobian(backend: str, mode: str = "rietveld", kind: str = "plain"):
+    key = f"jac:{backend}:{mode}:{kind}"
     if key not in _MULTI_CACHE:
-        models, mtable, _theta, _labels = _multi_state(mode)
+        models, mtable, _theta, _labels = _multi_state(mode, kind)
         _MULTI_CACHE[key] = _multi_closures(models, mtable, backend=backend)[1]
     return _MULTI_CACHE[key]
 
 
 @pytest.mark.parametrize("mode", MULTI_MODES)
+@pytest.mark.parametrize("kind", MULTI_STATES)
 @pytest.mark.parametrize("method", list(METHODS))
-def test_multi_histogram_stacked_jacobian_matches_analytic(method, mode):
+def test_multi_histogram_stacked_jacobian_matches_analytic(method, mode, kind):
     """The same matrix over the stacked ``run_multi_least_squares`` layout.
 
     Rietveld and Pawley (WP-2104).  Le Bail is not a joint mode:
     ``multi.py`` refuses it, its partition having no seam in the joint solve.
     """
-    models, mtable, theta, labels = _multi_state(mode)
-    J_ref = _multi_jacobian("numpy", mode)(theta)
+    models, mtable, theta, labels = _multi_state(mode, kind)
+    J_ref = _multi_jacobian("numpy", mode, kind)(theta)
     _build, rel_max, cos_min = METHODS[method]
 
     if method == "fd":
@@ -2007,7 +2023,7 @@ def test_multi_histogram_stacked_jacobian_matches_analytic(method, mode):
         backend = method.split("+")[0]
         if backend != "numpy":
             pytest.importorskip(backend)
-        jac = _multi_jacobian(backend, mode)
+        jac = _multi_jacobian(backend, mode, kind)
         if method.endswith("+fp32"):
             with precision_policy(FP32_JACOBIAN):
                 J_test = jac(theta)
@@ -2016,7 +2032,7 @@ def test_multi_histogram_stacked_jacobian_matches_analytic(method, mode):
 
     _assert_columns(J_ref, J_test, labels,
                     rel_max=rel_max, cos_min=cos_min,
-                    what=f"multi/{mode}/{method} ")
+                    what=f"multi/{mode}/{kind}/{method} ")
 
 
 def test_multi_histogram_stacked_layout():
@@ -2036,6 +2052,24 @@ def test_multi_histogram_stacked_layout():
     own = paths.index("hist.1.phases.0.scale")
     assert np.linalg.norm(J[blocks[0], own]) == 0.0
     assert np.linalg.norm(J[blocks[1], own]) > 0.0
+
+
+def test_multi_histogram_restraint_rows_sit_below_every_pattern():
+    """The restrained state's rows past the data and background: the bond on
+    the shared structure once, then each pattern's own zero-shift row, which
+    reaches its own zero column and nothing of the other pattern's (WP-1995)."""
+    models, mtable, _theta, _labels = _multi_state(kind="restrained")
+    J = _multi_jacobian("numpy", kind="restrained")(mtable.x0())
+    below = sum(len(m.tt) + m.bkg_penalty.shape[0] if m.bkg_penalty is not None
+                else len(m.tt) for m in models)
+    assert J.shape[0] == below + 3, "bond once, a zero-shift row per pattern"
+    paths = list(mtable.free_paths)
+    bond, zero0, zero1 = J[below], J[below + 1], J[below + 2]
+    assert bond[paths.index("phases.0.cell.a")] != 0.0
+    assert bond[paths.index("phases.0.atoms.1.dof.0")] != 0.0
+    for row, h in ((zero0, 0), (zero1, 1)):
+        hit = np.flatnonzero(row)
+        assert [paths[c] for c in hit] == [f"hist.{h}.instrument.zero_shift"]
 
 
 # ----------------------------------------------------------------------

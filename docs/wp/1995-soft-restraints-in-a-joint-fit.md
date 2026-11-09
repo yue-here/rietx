@@ -105,7 +105,7 @@ one per pattern.
       result. Flip its `ABSENT` row in `multi.py`. `HistogramResult.restraints`
       has no writer today, always `None` (`schemas/results.py`, and
       `docs/docs/reference/joint.md` says so), so this is its writer.
-- [ ] Tests: a joint fit of two identical patterns with one bond restraint
+- [x] Tests: a joint fit of two identical patterns with one bond restraint
       matches the single fit's restrained bond and restraint χ² (rows counted
       once); a joint config with restraints in `test_cross_backend.py`'s
       matrix, so the row-Jacobian is checked against FD; the stacked and
