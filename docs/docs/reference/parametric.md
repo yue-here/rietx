@@ -322,8 +322,10 @@ The coefficients are unbounded, unless the basis is `"constant"`, whose one coef
 A sum of terms has no box that holds every pattern's target.
 The default LM driver holds each pattern's target inside its own `min` and `max` at every step instead, as one linear constraint per pattern.
 A target the answer leaves on a bound is named in the `CONSTRAINT_ACTIVE` finding, as `parametric equation '<name>' (<target> bounds)`.
+Each pattern whose target sits on its bound also gets a `FLOOR_HIT` or `BOUND_HIT` warning, with `where` naming that pattern's `hist.<h>.` path, as a free parameter on its bound does.
 TRF takes no such constraint, and neither does an `"expression"` equation, which is not linear in its variables.
-There a target can leave its range, and the fit then stops with a `ValueError` naming the target, its value and the equation.
+There a target can leave its range.
+The fit then finishes and carries `PARAMETRIC_OUT_OF_RANGE`, below.
 
 ## Fitting a declaration
 
@@ -408,6 +410,8 @@ print(series.summary(deliverable="series", parametric=result))
 
 [`PARAMETRIC_OUT_OF_RANGE`](diagnostics-series.md#parametric_out_of_range) is a warning on `RefinementResult.diagnostics`, one per declaration, when the fitted coefficients put the target outside its own `min` or `max` on some pattern.
 `where` names each such pattern's `hist.<h>.` path, and `value` counts them.
+It fires under TRF and for an `"expression"` equation, since the default LM driver holds a linear equation's target inside its range.
+The result's rows keep the equation's value, and that pattern's model holds the bound the value crossed.
 Do not quote the target there as a measurement.
 Narrow the subset to where the equation holds, lower the polynomial's order, or declare a design basis that stays inside the range.
 

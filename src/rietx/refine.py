@@ -9156,9 +9156,11 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # tested, so a tied row — in `parameters`, absent from the free vector —
     # reports None, and so does every row when no guard ran at all
     # (`replay`).  A free row on a floor of 0 is tested like any other bound
-    # (WP-1938), and reads True under either code (WP-1929).
-    tested = set(table.free_paths) if guard is not None else set()
+    # (WP-1938), and reads True under either code (WP-1929).  A tied row the
+    # LM step held on its own limit is a finding too (WP-1325,
+    # ``staged.tied_bound_findings``), so it reads True rather than None.
     on_bound = {p for f in guard.at_bounds for p in f.paths} if guard is not None else set()
+    tested = set(table.free_paths) | on_bound if guard is not None else set()
     # A CELL_RUNAWAY finding's own message says the named cell's value is
     # "not a measurement", so its esd is withheld while the row stays (it is
     # still a free column; WP-1301's hold is what drops a row).  Keyed on the

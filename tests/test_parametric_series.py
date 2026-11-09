@@ -525,6 +525,13 @@ def test_a_dependent_the_coefficients_put_out_of_range_is_named():
     assert d.code == "PARAMETRIC_OUT_OF_RANGE" and d.level == "warning"
     assert d.where == ["hist.2.instrument.profile.w"] and d.value == 1.0
     assert "histogram 2" in d.message
+    # the write-back finishes: the model holds the bound the value crossed,
+    # and the table keeps the equation's value the warning quotes
+    bad = mt.tables[2].entries[mt.tables[2]._paths["instrument.profile.w"]].value
+    mt.apply_to_models()
+    w = mt.instruments[2].profile.w
+    assert bad < w.min and w.value == w.min
+    assert mt.tables[2].entries[mt.tables[2]._paths["instrument.profile.w"]].value == bad
 
 
 def test_coefficients_are_reported_per_unit_of_the_coordinates_at_the_reference():

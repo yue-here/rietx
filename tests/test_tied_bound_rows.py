@@ -11,11 +11,14 @@ solve (``ParameterTable.apply_to_models``).  What is checked here:
   the box does not already imply it, none for a one-source tie, none from a
   default table, none the start violates;
 * a single fit with a two-source tie whose data want the dependent below its
-  floor: LM holds it on the floor and says so in ``CONSTRAINT_ACTIVE``;
+  floor: LM holds it on the floor, says so in ``CONSTRAINT_ACTIVE``, and
+  reports the held value as ``FLOOR_HIT`` on its path, as a free column on its
+  floor is (``staged.tied_bound_findings``);
 * a joint fit with a line equation whose free answer dips under the
-  target's floor: LM holds every pattern's target in range, and the
-  constraint diagnostic names the equation once; TRF, which takes no rows,
-  still meets the write-back refusal;
+  target's floor: LM holds every pattern's target in range, the constraint
+  diagnostic names the equation once, and ``FLOOR_HIT`` names the pattern
+  held there; TRF, which takes no rows, finishes and carries
+  ``PARAMETRIC_OUT_OF_RANGE``;
 * each face sits a margin inside its bound, so the strict write-back
   never meets a held value a rounding past it.
 """
@@ -156,6 +159,12 @@ def test_lm_holds_a_two_source_dependent_on_its_floor():
     assert 0.0 <= b < 1e-8, b
     (d,) = [d for d in result.diagnostics if d.code == "CONSTRAINT_ACTIVE"]
     assert "phases.0.atoms.1.biso bounds" in d.message
+    # the held value is reported as a free column on its floor is
+    (f,) = [d for d in result.diagnostics if d.code == "FLOOR_HIT"]
+    assert f.level == "warning" and f.where == ["phases.0.atoms.1.biso"]
+    assert "a tied value, held there inside the step" in f.message
+    rows = {p.path: p for p in result.parameters}
+    assert rows["phases.0.atoms.1.biso"].at_bound is True
 
 
 # -- a joint fit: a line equation whose free answer dips under the floor -----
@@ -198,12 +207,30 @@ def test_lm_holds_a_parametric_target_inside_its_bounds_in_every_pattern():
     # one block for the equation across its five patterns, never one per pattern
     assert "parametric equation 'b' (phases.0.atoms.0.biso bounds)" in d.message
     assert "hist." not in d.message
+    # the pattern held on the floor, by path, as a free column there would be
+    floors = [d for d in result.diagnostics if d.code == "FLOOR_HIT"
+              and any("atoms.0.biso" in w for w in d.where)]
+    assert [d.where for d in floors] == [["hist.0.phases.0.atoms.0.biso"]], floors
+    assert floors[0].level == "warning"
+    rows = {p.path: p for p in result.parameters}
+    assert rows["hist.0.phases.0.atoms.0.biso"].at_bound is True
 
 
 @pytest.mark.xdist_group("tied-bound-rows")
-def test_trf_takes_no_rows_and_meets_the_write_back_refusal():
-    with pytest.raises(ValueError, match=r"phases\.0\.atoms\.0\.biso=-.*\[0, inf\]"):
-        _biso_ramp("trf")
+def test_trf_takes_no_rows_and_finishes_with_the_range_warning():
+    """TRF holds no row, so the line takes the target under its floor at 300 K.
+    The fit finishes and says so (settled by Claude 2026-11-09, the Stephens
+    cone's precedent: a constraint LM cannot hold becomes a warning)."""
+    _, result = _biso_ramp("trf")
+    OUT.mkdir(exist_ok=True)
+    result.for_histogram(0).plot(OUT / "tied_bound_rows_joint_trf_h0.png")
+    rows = {p.path: p.value for p in result.for_histogram(0).parameters}
+    assert rows["phases.0.atoms.0.biso"] < 0.0        # the equation's value, kept
+    (d,) = [d for d in result.diagnostics if d.code == "PARAMETRIC_OUT_OF_RANGE"]
+    assert d.level == "warning" and d.where == ["hist.0.phases.0.atoms.0.biso"]
+    assert d.value == 1.0 and "histogram 0" in d.message
+    assert "FLOOR_HIT" not in {d.code for d in result.diagnostics
+                               if "atoms.0.biso" in " ".join(d.where)}
 
 
 # -- the readers ---------------------------------------------------------------

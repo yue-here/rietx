@@ -1572,8 +1572,18 @@ class MultiParameterTable:
         return combined
 
     def apply_to_models(self) -> None:
+        """Each histogram's table into its own model copies.
+
+        A parametric or expression target the coefficients put past its own
+        bounds is written at the bound it crossed (``clamp``): the fit
+        finishes, and ``PARAMETRIC_OUT_OF_RANGE`` reports the value the
+        equation gave it, which this table keeps (WP-1325).
+        """
         for h, table in enumerate(self.tables):
-            table.apply_to_models(self.structures[h], self.instruments[h])
+            targets = {r.target for r in (*self.parametric, *self.expressions)
+                       if h in r.patterns}
+            table.apply_to_models(self.structures[h], self.instruments[h],
+                                  clamp=targets)
 
     def reframe_moments(self) -> list[str]:
         """:meth:`ParameterTable.reframe_moments` per histogram, at a stage start.

@@ -192,7 +192,9 @@ from .strategy.staged import (
     check_resolution_supported,
     check_stephens_positive,
     check_texture_positive,
+    pressed_tied_paths,
     resolve_plan,
+    tied_bound_findings,
 )
 
 #: A diagnostic reported **once per histogram**, on
@@ -2551,6 +2553,22 @@ class MultiHistogramRefinement:
             mt.bounds(), mt.free_paths, outcome.theta,
             cos=outcome.residual_cosine, esd=outcome.stderr_internal,
             active=_exact_active_bounds(outcome))
+        # a tied value the LM step held on its own limit, per histogram, a
+        # shared entry once and bare (WP-1325, ``staged.tied_bound_findings``)
+        pressed = pressed_tied_paths(outcome.truncated_by)
+        if pressed and per_esds:
+            seen_shared: set[str] = set()
+            for h, table in enumerate(mt.tables):
+                for f in tied_bound_findings(table, pressed, per_esds[h],
+                                             scope=f"hist.{h}."):
+                    base = f.paths[0].removeprefix(f"hist.{h}.")
+                    e = table.entries[table._paths[base]]
+                    if _row_shared(mt, e):
+                        if base in seen_shared:
+                            continue
+                        seen_shared.add(base)
+                        f = dataclasses.replace(f, paths=(base,), message=base)
+                    at_bounds.append(f)
         # Histogram 0's physical esds, built once in the loop above and read by
         # two consumers (WP-1131): the shared rows of ``_parameters``, and the
         # microstructure block, which reads histogram 0 because its value scale
@@ -2826,8 +2844,9 @@ class MultiHistogramRefinement:
         # per-histogram rows `hist.h.…` — which is exactly how
         # `MultiParameterTable.free_paths` spells them, so the projection keys
         # on the row path and needs no second naming convention (WP-1076).
-        tested = set(mt.free_paths)
         on_bound = {p for f in at_bounds for p in f.paths}
+        # a held tied row is tested too (``staged.tied_bound_findings``)
+        tested = set(mt.free_paths) | on_bound
         # which equation set each row, keyed on the same row path (WP-1325)
         equations = _equation_rows(mt)
         # shared parameters reported once, from histogram 0's covariance (its
@@ -3109,11 +3128,14 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
     whose dependent left its declared range, at the value it took.  ``value``
     is how many.
 
-    Measured 2026-11-09: no real fit reaches this.  The write-back after each
-    stage (``ParameterTable.apply_to_models``) refuses a target past its bound
-    with a ``ValueError`` first, under TRF, for an ``expression`` target, or
-    from a start already outside.  WP-1325's handover entry of that date asks
-    the maintainer which of the two should stay.
+    It fires under TRF and for an ``expression`` target, which take no rows.
+    The write-back after each stage clamps the target into the model at the
+    bound it crossed (``MultiParameterTable.apply_to_models``), so the fit
+    finishes, and this table keeps the equation's value, which the warning
+    quotes and the result's rows carry.  Under the default LM driver a linear
+    target cannot reach it.  Settled by Claude 2026-11-09 under the Stephens
+    cone's precedent (a constraint LM holds in the step is a guard where it
+    cannot) and the declared-name rule (WP-1076); the maintainer may reverse it.
     """
     out: list[Diagnostic] = []
     # an expression's target is as unbounded as a sum of terms (WP-1964)
@@ -3134,7 +3156,8 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
             where=[f"hist.{h}.{r.target}" for h, *_ in bad], value=float(len(bad)),
             message=(f"Parametric equation {r.name!r} puts {r.target} outside its own "
                      f"bounds in {len(bad)} of {len(r.patterns)} patterns: "
-                     f"{shown}{more}."),
+                     f"{shown}{more}. The model there holds the bound the value "
+                     f"crossed."),
             suggestion=("Narrow the subset to where the form holds, or bound the "
                         "variables so the expression stays inside the range."
                         if r.equation.basis == "expression" else
