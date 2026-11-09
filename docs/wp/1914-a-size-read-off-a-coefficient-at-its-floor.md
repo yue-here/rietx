@@ -82,12 +82,35 @@ zero as no broadening.
   `_agreement` from reading an absent term.
   *`microstructure_table(floors=)` from `refine._build_result` and
   `multi._hist0_floors`; `at_zero` reused, so no vocabulary member is new.*
-- [ ] Find the siblings: every other consumer that tests a softplus coefficient
+- [x] Find the siblings: every other consumer that tests a softplus coefficient
   with `> 0` (the size flags in `refine._size_flag_diagnostics`,
   `SIZE_UNUSUALLY_SMALL`, the Stephens and extinction readers). Fix the class or
   say which were left and why.
-- [ ] Rebuild WP-1545's notebook 04 and update its prose if the Gaussian rows
+  *Swept every `> 0.0`/`<= 0.0` test on a width, size, strain or extinction
+  value under `src/rietx`. Only one other reader turns a floor into a
+  statement:*
+  - *`report/magnetic._width_support_findings` decides "this term sits on its
+    zero floor" by `val <= _MAGNETIC_WIDTH_FLOOR_DEG` (1e-12), a proximity of
+    its own rather than `FLOOR_HIT`. **Left**: it picks only which cause an
+    info message names on a no-esd branch, and magnetic-path decisions are
+    Mike's (#1075). Under the default LM driver a floored width is exactly
+    0.0, so the two tests agree there.*
+  - *Not siblings: `SIZE_UNUSUALLY_SMALL` fires on a size below 50 Å, so a
+    floored coefficient (an enormous size) cannot trip it;
+    `layer2._size_clause` reads a residual-trend template's coefficient, not a
+    refined parameter; `CompiledPhase.skip_extinction` is a compile-time
+    freeze under the `moving_paths` rule, not a reading; the Stephens block is
+    held by a cone and read by `STEPHENS_STRAIN_NOT_POSITIVE`, and has no
+    microstructure row (it replaces `lor_strain`).*
+  - *Not generalised: a coefficient **tied** to a floored source is not a
+    free column, so it never carries `FLOOR_HIT` and would still read its
+    tiny value under TRF. No plan ties sample widths.*
+- [x] Rebuild WP-1545's notebook 04 and update its prose if the Gaussian rows
   now read as absent.
+  *Nothing to rebuild: the notebook runs the default LM driver, whose
+  Gaussian rows already land on 0.0 and read `at_zero` (its stored output
+  says so, and its prose already reads "Their coefficients are at zero").
+  The manual's absences table (`reference/derived.md`) gains the floor case.*
 
 ## Acceptance
 
