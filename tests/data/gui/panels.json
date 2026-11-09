@@ -37,5 +37,11 @@
       "id": "build",
       "label": "Build"
     }
+  ],
+  "graph_tabs": [
+    {
+      "id": "pattern",
+      "label": "Pattern"
+    }
   ]
 }

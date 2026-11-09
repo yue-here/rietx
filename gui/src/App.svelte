@@ -20,6 +20,7 @@
 
   import { ApiError, api } from "./api";
   import Help from "./Help.svelte";
+  import ActionBar from "./panels/ActionBar.svelte";
   import Checklist from "./panels/Checklist.svelte";
   import Console from "./panels/Console.svelte";
   import History from "./panels/History.svelte";
@@ -43,7 +44,8 @@
   import { isShortcutTarget, type Command } from "./lib/palette";
   import { cellText, type PeaksPayload } from "./lib/peaks";
   import { consoleLine, follow, type EngineEvent, type RunState } from "./lib/stream";
-  import { TABS, type Tab } from "./lib/tabs";
+  import { SHELL_MIN, shellStacks } from "./lib/resize";
+  import { GRAPH_TABS, TABS, type GraphTab, type Tab } from "./lib/tabs";
   import {
     THEME_CHOICES,
     applyTheme,
@@ -81,24 +83,29 @@
     if (tab === "report") reportSeen = true;
   });
 
-  /** Whether the panel column has the whole window (WP-1034).
+  /** Which of the window's two panels are hidden (WP-2123).
    *
-   * The full-window surface WP-1013 and WP-1014 shipped, generalised: instead of
-   * two panes each having their own mode, *the column* expands and its tab strip
-   * comes with it — so the hatch covers every panel and "where am I" is still
-   * read off one strip.  Session-local and unpersisted on purpose: it is a view
-   * choice like the residual selector, not a setting like a width (WP-1033's
-   * line between the two).
-   *
-   * One control for one choice (WP-1029): a segmented pair whose options *are*
-   * the layout, rather than a toggle button that means two different things
-   * depending on where you already are. */
-  let wide = $state(false);
-  const LAYOUTS: { id: boolean; label: string; title: string }[] = [
-    { id: false, label: "Split", title: "the pattern beside the panel column" },
-    { id: true, label: "Full",
-      title: "the panel column across the whole window — the tabs stay with it" },
-  ];
+   * The maintainer's ruling of 2026-11-07: both side panels collapse, each from
+   * a button on its own side that never moves. Hiding the graphs is the
+   * full-window column WP-1034 shipped as `Split | Full`, so the pair replaces
+   * it. One panel always shows, because a window of nothing is no layout.
+   * Session-local and unpersisted, as `Split | Full` was: a layout is a view
+   * choice, not a setting (WP-1033's line between the two). */
+  let hideGraphs = $state(false);
+  let hideModel = $state(false);
+  /** The graph strip's tab (`lib/tabs.ts`), one today. */
+  let graphTab = $state<GraphTab>("pattern");
+  /** The window's width, and whether it has dropped to one column. */
+  let windowWidth = $state(0);
+  const stacked = $derived(shellStacks(windowWidth));
+  /** The model panel's height while stacked, or `null` for half the window.
+   *  Session-local: `side_width` is the stored setting, and a height chosen in
+   *  a narrow window says nothing about the next one. */
+  let sideHeight = $state<number | null>(null);
+  /** The action bar's refine choice and the Parameters panel's pending edits. */
+  let refineMode = $state<"cycle" | "plan">("plan");
+  let pendingTouched = $state(0);
+  let pendingInvalid = $state("");
   let simple = $state(true);
   /** The first-run checklist's own two pieces of state (WP-1017): whether it
    *  has been dismissed for this project, and whether the Report tab has been
@@ -115,6 +122,7 @@
    * The first drag replaces it with a number, which is the user having said. */
   let sideWidth = $state<number | null>(null);
   let sideMeasured = $state(0);
+  let sideMeasuredHeight = $state(0);
   /** The Model pane's first two column widths; its third takes the rest. */
   let modelColumns = $state<number[] | null>(null);
   let mainEl: HTMLElement | undefined = $state();
@@ -463,6 +471,39 @@
     }
   }
 
+  /** The action bar's primary: apply the pending edits, then refine (WP-2123).
+   *
+   * `cycle` is one stage with an empty `turn_on`, which `Project.run_stage`
+   * runs on the working free set — exactly what is ticked, because a stage
+   * keeps a hand-freed row where a plan drops it (WP-1208). `plan` is the
+   * project's plan, the header's old Run. A refused apply runs nothing: the
+   * refusal is in the Parameters panel, in the verb's own words. */
+  async function refine() {
+    if (busy || noPhases || pendingInvalid) return;
+    if (pendingTouched && !(await paramsPanel?.apply())) return;
+    if (refineMode === "plan") {
+      await start();
+      return;
+    }
+    try {
+      run = await api.run({ kind: "stage", stage: { name: "cycle", turn_on: [] } });
+      say('ref.run_stage(Stage("cycle", turn_on=[]))');
+    } catch (error) {
+      say(`refused: ${(error as Error).message}`);
+    }
+  }
+
+  /** Hide or show one side; the other always stays. */
+  function toggleSide(which: "graphs" | "model") {
+    if (which === "graphs") {
+      if (!hideGraphs && hideModel) return;
+      hideGraphs = !hideGraphs;
+    } else {
+      if (!hideModel && hideGraphs) return;
+      hideModel = !hideModel;
+    }
+  }
+
   async function cancel() {
     try {
       run = await api.cancel();
@@ -671,6 +712,12 @@
     if (done) setUi({ side_width: next });
   }
 
+  /** The sash's double-click: back to the CSS clamp, as nobody having said. */
+  function resetSide() {
+    sideWidth = null;
+    setUi({ side_width: null });
+  }
+
   function modelSized(next: number[], done: boolean) {
     modelColumns = next;
     if (done) setUi({ model_columns: next });
@@ -722,9 +769,16 @@
     { id: "model", label: "Edit the structure and instrument",
       echo: "ref.edit(structure=…, instrument=…)", key: "m", disabled: !project,
       run: () => (tab = "model") },
-    { id: "wide", label: wide ? "Show the pattern beside the panel" : "Give the panel the whole window",
-      echo: "# a layout choice, not a setting", disabled: !project,
-      run: () => (wide = !wide) },
+    { id: "graphs", label: hideGraphs ? "Show the graphs" : "Hide the graphs",
+      echo: "# a layout choice, not a setting", disabled: !project || hideModel,
+      run: () => toggleSide("graphs") },
+    { id: "side", label: hideModel ? "Show the model panel" : "Hide the model panel",
+      echo: "# a layout choice, not a setting", disabled: !project || hideGraphs,
+      run: () => toggleSide("model") },
+    { id: "cycle", label: "Refine one cycle on the ticked parameters",
+      echo: 'ref.run_stage(Stage("cycle", turn_on=[]))',
+      disabled: busy || !project || noPhases || !!pendingInvalid,
+      run: () => { refineMode = "cycle"; refine(); } },
     { id: "import", label: "Open or import a project", echo: "Project.create(path, …)",
       run: () => { tab = "model"; startImport(); } },
     { id: "disclosure", label: simple ? "Show advanced controls" : "Hide advanced controls",
@@ -747,6 +801,16 @@
     // while the palette is open it owns the keyboard — Esc closes it there, and
     // `r` would otherwise start a fit from inside a search box
     if (paletteOpen) return;
+    // ⌘⏎ is the action bar's primary (WP-2123), except inside the text pane,
+    // whose CodeMirror keymap binds the same chord to its own Apply
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      const inText = (event.target as HTMLElement | null)?.closest?.(".cm-editor");
+      if (!inText && project) {
+        event.preventDefault();
+        refine();
+      }
+      return;
+    }
     // help first: Esc means "close the thing that just opened", and cancelling
     // a run because a popover was open is not recoverable by pressing it again
     if (event.key === "Escape" && helpRequest) {
@@ -988,91 +1052,96 @@
 </script>
 
 <svelte:window onkeydown={keydown} onclick={clickAway} onresize={reanchor}
-  onscrollcapture={reanchor} />
+  onscrollcapture={reanchor} bind:innerWidth={windowWidth} />
 
+<!-- The top bar (WP-2123).  Each side's collapse button sits at its own end
+     and never moves: the middle wraps within itself, so a narrow window adds
+     a row there and leaves both buttons where they were (the maintainer's
+     ruling of 2026-11-07, after Xcode and VS Code).  Both are drawn without a
+     project too, disabled, so opening one moves nothing. -->
 <header>
-  <div class="title">
-    <strong>rietx</strong>
-    <span class="muted mono">{version?.package_version ?? "…"}</span>
-  </div>
-
-  {#if project}
-    <div class="project mono" title={project.path}>
-      {project.path.split("/").pop()}
-      <span class="muted">· {project.data.filename} · {project.data.n_points} pts</span>
-      <span class="muted">· {project.doc.mode}</span>
-      <span class="muted">· σ {project.data.has_sigma ? "from file" : "Poisson"}</span>
-    </div>
-  {/if}
-
-  <!-- A hopeless fit must not be presented in the register of a good one
-       (WP-1029 item c).  The judgement is the *report's* — `maturity` quotes
-       `MATURITY_MAX_RWP`, the Rwp past which Layer 1 refuses to speak about
-       individual parameters — so nothing here decides anything, and the
-       `status` vocabulary (which still says `converged` at Rwp 96 %) is left
-       alone: that is WP-1028's, and two owners would disagree. -->
-  <div class="stats tabular mono" class:immature={immature}>
-    {#if rwp !== null}
-      Rwp <strong>{(rwp * 100).toFixed(3)}%</strong>
-      {#if gof !== null}<span class="muted">GoF {gof.toFixed(3)}</span>{/if}
-      {#if immature}
-        <!-- WP-1201 moved this off a `<button>` (a chip states a fact and never
-             acts), which put its message out of reach of the keyboard and of
-             assistive tech.  `<Help text=…>` is that debt paid: the sentence is
-             the *report's*, so no corpus can hold it, and it is now reachable
-             by Tab and Enter like every other explanation. -->
-        <span class="chip bad">
-          <Help text={result.maturity.message} title="Not a fit yet"
-            >⚠ not a fit yet</Help>
-        </span>
+  <button class="ghost toggle" aria-pressed={!hideGraphs}
+    disabled={!project || hideModel} onclick={() => toggleSide("graphs")}
+    aria-label={hideGraphs ? "Show the graphs" : "Hide the graphs"}
+    title={hideModel ? "the graphs cannot hide while the model panel is hidden"
+      : hideGraphs ? "show the graphs" : "hide the graphs"}>
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+      {#if stacked}
+        <rect class="fill" x="2" y="3" width="12" height="4.5" /><path d="M1.5 8h13" />
+      {:else}
+        <rect class="fill" x="2" y="3" width="5" height="10" /><path d="M7.5 2.5v11" />
       {/if}
-    {/if}
-  </div>
+    </svg>
+  </button>
 
-  <div class="controls">
+  <div class="bar">
+    <div class="title">
+      <strong>rietx</strong>
+      <span class="muted mono">{version?.package_version ?? "…"}</span>
+    </div>
+
     {#if project}
-      <button class="ghost" onclick={startImport}
-        title="open a recent project, or import a new one — this session's project
-               is replaced, and nothing is unsaved (settings persist on the verb)"
-        >Open…</button>
-      <div class="segmented" role="group" aria-label="layout">
-        {#each LAYOUTS as entry (entry.label)}
-          <button class:on={wide === entry.id} onclick={() => (wide = entry.id)}
-            title={entry.title}>{entry.label}</button>
+      <div class="project mono" title={project.path}>
+        {project.path.split("/").pop()}
+        <span class="muted">· {project.data.filename} · {project.data.n_points} pts</span>
+        <span class="muted">· {project.doc.mode}</span>
+        <span class="muted">· σ {project.data.has_sigma ? "from file" : "Poisson"}</span>
+      </div>
+    {/if}
+
+    <div class="controls">
+      {#if project}
+        <button class="ghost" onclick={startImport}
+          title="open a recent project, or import a new one — this session's project
+                 is replaced, and nothing is unsaved (settings persist on the verb)"
+          >Open…</button>
+        <div class="segmented" role="group" aria-label="disclosure">
+          <button class:on={simple} onclick={() => setSimple(true)}
+            title="hide bounds and stage seeds">Simple</button>
+          <button class:on={!simple} onclick={() => setSimple(false)}
+            title="show every field a stage and a parameter carry">Advanced</button>
+        </div>
+      {/if}
+      <!-- outside the `{#if project}` above, because a theme is not the
+           project's (WP-1044): the empty state is a screen too, and it is the
+           one a first-time user starts on -->
+      <div class="segmented theme" role="group" aria-label="theme">
+        {#each THEME_CHOICES as choice (choice)}
+          <button class:on={themeChoice === choice} onclick={() => setTheme(choice)}
+            aria-label={choice} title={THEME_TITLE[choice]}>{GLYPH[choice]}</button>
         {/each}
       </div>
-      <div class="segmented" role="group" aria-label="disclosure">
-        <button class:on={simple} onclick={() => setSimple(true)}
-          title="hide bounds and stage seeds">Simple</button>
-        <button class:on={!simple} onclick={() => setSimple(false)}
-          title="show every field a stage and a parameter carry">Advanced</button>
-      </div>
-    {/if}
-    <!-- outside the `{#if project}` above, because a theme is not the
-         project's (WP-1044): the empty state is a screen too, and it is the
-         one a first-time user starts on -->
-    <div class="segmented theme" role="group" aria-label="theme">
-      {#each THEME_CHOICES as choice (choice)}
-        <button class:on={themeChoice === choice} onclick={() => setTheme(choice)}
-          aria-label={choice} title={THEME_TITLE[choice]}>{GLYPH[choice]}</button>
-      {/each}
+      <span class="pill" data-state={run?.state ?? "idle"}>
+        {#if busy}
+          {run?.run.stage ?? "starting"}
+          {#if run?.run.stage_index}({run.run.stage_index}/{run.run.n_stages}){/if}
+          {#if run?.run.lebail?.pass}· pass {run.run.lebail.pass}{#if run.run.lebail.of} of {run.run.lebail.of}{/if}{/if}
+        {:else}
+          {run?.run.status ?? "idle"}
+        {/if}
+      </span>
+      <button class="ghost" onclick={cancel} disabled={!busy}>Cancel</button>
+      <button class="ghost" onclick={() => (paletteOpen = true)} title="every command, with the call it makes">
+        <kbd>⌘K</kbd>
+      </button>
     </div>
-    <span class="pill" data-state={run?.state ?? "idle"}>
-      {#if busy}
-        {run?.run.stage ?? "starting"}
-        {#if run?.run.stage_index}({run.run.stage_index}/{run.run.n_stages}){/if}
-        {#if run?.run.lebail?.pass}· pass {run.run.lebail.pass}{#if run.run.lebail.of} of {run.run.lebail.of}{/if}{/if}
-      {:else}
-        {run?.run.status ?? "idle"}
-      {/if}
-    </span>
-    <button onclick={start} disabled={busy || !project || noPhases}
-      title={noPhases ? NO_PHASES_REASON : null}>Run</button>
-    <button class="ghost" onclick={cancel} disabled={!busy}>Cancel</button>
-    <button class="ghost" onclick={() => (paletteOpen = true)} title="every command, with the call it makes">
-      <kbd>⌘K</kbd>
-    </button>
   </div>
+
+  <button class="ghost toggle" aria-pressed={!hideModel}
+    disabled={!project || hideGraphs} onclick={() => toggleSide("model")}
+    aria-label={hideModel ? "Show the model panel" : "Hide the model panel"}
+    title={hideGraphs ? "the model panel cannot hide while the graphs are hidden"
+      : hideModel ? "show the model panel" : "hide the model panel"}>
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+      {#if stacked}
+        <rect class="fill" x="2" y="9.5" width="12" height="3.5" /><path d="M1.5 9h13" />
+      {:else}
+        <rect class="fill" x="9" y="3" width="5" height="10" /><path d="M8.5 2.5v11" />
+      {/if}
+    </svg>
+  </button>
 </header>
 
 {#if !busy && run?.run.lebail?.stopped}
@@ -1101,12 +1170,40 @@
        side column simply takes the whole window (`wide` reuses the
        full-window layout's own CSS) and no other panel exists to share it
        with. -->
-  <div class="panes">
+  <div class="panes" class:stacked>
     <!-- hidden rather than unmounted in the full-window layout, for the same
          reason every panel is: a purge and a refetch on a layout click would
          throw the drawn window away -->
     {#if project}
-      <div class="plotcol" class:hidden={wide}>
+      <!-- The graph column (WP-2123): a strip of graph tabs, then a title line
+           saying what the view shows, so a later preview can never read as a
+           changed fit (the maintainer's ruling of 2026-11-07). The fit's
+           statistic rides on that line, moved from the header. -->
+      <div class="plotcol" class:hidden={hideGraphs}>
+        <nav class="tabs" aria-label="graphs">
+          {#each GRAPH_TABS as entry (entry.id)}
+            <button class="tab" class:on={graphTab === entry.id}
+              onclick={() => (graphTab = entry.id)}>{entry.label}</button>
+          {/each}
+        </nav>
+        <!-- A hopeless fit must not be presented in the register of a good one
+             (WP-1029 item c).  The judgement is the *report's* — `maturity`
+             quotes `MATURITY_MAX_RWP` — so nothing here decides anything. -->
+        <div class="gtitle">
+          <strong class="what">{busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
+          <div class="stats tabular mono" class:immature={immature}>
+            {#if rwp !== null}
+              Rwp <strong>{(rwp * 100).toFixed(3)}%</strong>
+              {#if gof !== null}<span class="muted">GoF {gof.toFixed(3)}</span>{/if}
+              {#if immature}
+                <span class="chip bad">
+                  <Help text={result.maturity.message} title="Not a fit yet"
+                    >⚠ not a fit yet</Help>
+                </span>
+              {/if}
+            {/if}
+          </div>
+        </div>
         <Plot {result} {plotKey} {zoom} {theme} error={resultError}
           peaks={peaksData} peaksActive={tab === "peaks"} hovered={hoveredPeak}
           candidate={candidateOverlay} {candidatePicked}
@@ -1116,12 +1213,21 @@
           onremovepeak={removePeak} onprotocol={setProtocol} />
       </div>
     {/if}
-    <div class="side" class:wide={wide || !project} bind:clientWidth={sideMeasured}
-      style:flex={wide || !project || sideWidth === null ? null : `0 0 ${sideWidth}px`}>
-      {#if project && !wide}
-        <Splitter size={sideWidth ?? sideMeasured} grow="left" min={300} keep={360}
-          extent={() => mainEl?.clientWidth ?? 0} onsize={sideSized}
-          title="drag to resize the panel column" />
+    <div class="side" class:wide={hideGraphs || !project} class:hidden={!!project && hideModel}
+      bind:clientWidth={sideMeasured} bind:clientHeight={sideMeasuredHeight}
+      style:flex={!project || hideGraphs ? null
+        : stacked ? (sideHeight === null ? null : `0 0 ${sideHeight}px`)
+        : sideWidth === null ? null : `0 0 ${sideWidth}px`}>
+      {#if project && !hideGraphs}
+        <!-- one sash, turned by the layout: along the column's left edge side by
+             side, along its top edge stacked (WP-2123) -->
+        <Splitter size={stacked ? sideHeight ?? sideMeasuredHeight : sideWidth ?? sideMeasured}
+          grow={stacked ? "up" : "left"} min={stacked ? 160 : SHELL_MIN.side}
+          keep={stacked ? 160 : SHELL_MIN.graphs}
+          extent={() => (stacked ? mainEl?.clientHeight : mainEl?.clientWidth) ?? 0}
+          onsize={(next, done) => (stacked ? (sideHeight = next) : sideSized(next, done))}
+          onreset={() => (stacked ? (sideHeight = null) : resetSide())}
+          title="drag to resize the panel column; double-click resets it" />
       {/if}
       {#if project}
         <!-- eight wide, and it **wraps** rather than truncating: measured at
@@ -1161,7 +1267,8 @@
         <!-- every tab stays mounted: switching must not throw away a filter, a
              pending edit, an unsaved stage list or a two-node comparison -->
         <div class="panel" class:hidden={tab !== "params"}>
-          <Params bind:this={paramsPanel} {head} {busy} {simple} {say} />
+          <Params bind:this={paramsPanel} {head} {busy} {simple} {say}
+            onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
         </div>
         <div class="panel" class:hidden={tab !== "plan"}>
           <Plan bind:this={planPanel} mode={project.doc.mode} {head} {busy} {simple}
@@ -1200,6 +1307,10 @@
         <div class="panel" class:hidden={tab !== "build"}>
           <Stubs {capabilities} {project} />
         </div>
+        <ActionBar bind:mode={refineMode} touched={pendingTouched} invalid={pendingInvalid}
+          {busy} blocked={noPhases ? NO_PHASES_REASON : null}
+          onapply={() => paramsPanel?.apply()} onrevert={() => paramsPanel?.revert()}
+          onrefine={refine} />
         <Console {lines} {dropped} height={consoleHeight} onresize={setConsoleHeight} />
       {/if}
     </div>
@@ -1256,15 +1367,50 @@
      `Cancel` and `⌘K` were 118 px past the right edge and unreachable, because
      the row's only shrinkable item is the filename and it had already
      collapsed to nothing (WP-1034's browser pass). */
+  /* The two collapse buttons hold the ends and never wrap (WP-2123); the
+     middle `.bar` is what wraps, so a narrow window costs a row there. */
   header {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    flex: 0 0 auto;
+  }
+
+  header > .bar {
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px 14px;
-    padding: 8px 14px;
-    border-bottom: 1px solid var(--line);
-    background: var(--panel);
+  }
+
+  .toggle {
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    color: var(--muted);
+  }
+
+  .toggle svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+  }
+
+  .toggle svg .fill {
+    fill: currentColor;
+    stroke: none;
+    opacity: 0;
+  }
+
+  .toggle[aria-pressed="true"] svg .fill {
+    opacity: 0.55;
   }
 
   .title {
@@ -1287,8 +1433,28 @@
     min-width: 0;
   }
 
+  /* The graph's title line (WP-2123): what the view shows, then the fit's
+     statistic held to the right.  The title gives way first, with an ellipsis,
+     so the statistic never wraps under it. */
+  .gtitle {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 4px 12px;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .gtitle .what {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
+
   .stats {
-    margin-left: auto;
     flex: 0 0 auto;
     display: flex;
     align-items: baseline;
@@ -1301,6 +1467,7 @@
   }
 
   .controls {
+    margin-left: auto;
     display: flex;
     /* The header wraps and this did not, so it was one unbreakable 604 px
        line: measured at a 420 px window, the document scrolled to 618 px
@@ -1384,6 +1551,34 @@
     flex: 1 1 auto;
     max-width: none;
     border-left: 0;
+  }
+
+  .side.hidden {
+    display: none;
+  }
+
+  /* One column below `shellThreshold()` (WP-2123): the graphs above the model,
+     the sash turned to run along the column's top edge.  Half and half until a
+     drag says otherwise. */
+  .panes.stacked {
+    flex-direction: column;
+  }
+
+  .panes.stacked > .plotcol {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .panes.stacked > .side {
+    flex: 0 0 50%;
+    max-width: none;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .panes.stacked > .side.wide {
+    flex: 1 1 auto;
+    border-top: 0;
   }
 
   /* The overflow rule is: never shorten a label, wrap instead (WP-1034) —

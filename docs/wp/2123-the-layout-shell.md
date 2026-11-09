@@ -138,18 +138,18 @@ floors.
 
 - [x] `.segmented` redrawn app-wide: a sunken track with one raised option, from two new surface
   tokens (`--sunken`, `--raised`) in `theme.py`, `tokens.css` regenerated.
-- [ ] The top bar: the graphs' collapse button first and the model panel's last, in a row whose
+- [x] The top bar: the graphs' collapse button first and the model panel's last, in a row whose
   middle wraps while the two buttons keep their places; `Split | Full` retired, since collapsing
   the graphs is the full-width column. One panel always shows. Palette commands for both.
-- [ ] The graph column: a tab strip (Pattern, from a `GRAPH_TABS` array in `lib/tabs.ts` written
+- [x] The graph column: a tab strip (Pattern, from a `GRAPH_TABS` array in `lib/tabs.ts` written
   into the panel corpus) and a title line saying what the view shows, with Rwp, GoF and the
   not-a-fit chip moved there from the header.
-- [ ] The action bar at the foot of the model panel: the refine choice (One cycle = one stage on
+- [x] The action bar at the foot of the model panel: the refine choice (One cycle = one stage on
   the ticked set; Staged plan = the project's plan), the pending count in a reserved slot,
   Revert, Apply, and the filled Refine / Apply and refine (⌘Enter), wired to the Parameters
   panel's pending edits; the header's Run button and the Parameters footer retired. The sash
   resets on double-click.
-- [ ] The one-column layout below the width computed from the two panels' floors and the grip,
+- [x] The one-column layout below the width computed from the two panels' floors and the grip,
   graphs above the model, the sash turned horizontal.
 - [ ] The layout-shift browser test: every control clicked on a fresh page in each starting
   state, element boxes compared before and after, real clicks only.

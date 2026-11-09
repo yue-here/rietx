@@ -797,6 +797,11 @@ function button(text: string): HTMLButtonElement | undefined {
   return [...host.querySelectorAll("button")].find((b) => b.textContent?.trim() === text);
 }
 
+/** The action bar's filled primary (WP-2123), which replaced the header's Run. */
+function refineButton(): HTMLButtonElement | null {
+  return host.querySelector<HTMLButtonElement>(".actions button.refine");
+}
+
 function rowsInDom(): HTMLElement[] {
   return [...host.querySelectorAll<HTMLElement>(".row")];
 }
@@ -844,8 +849,14 @@ describe("the shell", () => {
     expect(host.textContent).toContain("Choose a data file");
     expect(host.textContent).toContain("a.rex");
     expect(button("Create project")?.disabled).toBe(true);
-    // Run is disabled without a project — the control follows the state, not hope
-    expect(button("Run")?.disabled).toBe(true);
+    // the action bar belongs to a project, so the empty state offers no refine
+    // at all, and both collapse buttons are drawn disabled so opening one
+    // moves nothing (WP-2123)
+    expect(refineButton()).toBeNull();
+    expect(button("Run")).toBeUndefined();
+    const toggles = [...host.querySelectorAll<HTMLButtonElement>("header > button.toggle")];
+    expect(toggles).toHaveLength(2);
+    expect(toggles.every((b) => b.disabled)).toBe(true);
   });
 
   it("renders a project with no fit, and offers Run", async () => {
@@ -864,7 +875,8 @@ describe("the shell", () => {
     // panel while nothing is owed.
     expect(host.textContent).toContain("every panel the v1.0 GUI plan named");
     expect(host.textContent).not.toMatch(/WP-\d{4}/);
-    expect(button("Run")?.disabled).toBe(false);
+    expect(refineButton()?.disabled).toBe(false);
+    expect(refineButton()?.textContent).toContain("Refine");
   });
 
   it("shows the statistics and the stage while a run is in flight", async () => {
@@ -884,7 +896,7 @@ describe("the shell", () => {
     expect(host.textContent).toContain("cell");
     expect(host.textContent).toContain("(3/5)");           // 1-based, from stage_start
     expect(host.textContent).toContain("4.150%");          // Rwp as a percentage
-    expect(button("Run")?.disabled).toBe(true);            // 409 made unclickable
+    expect(refineButton()?.disabled).toBe(true);          // 409 made unclickable
     expect(button("Cancel")?.disabled).toBe(false);
   });
 
@@ -1081,6 +1093,40 @@ describe("the parameter table", () => {
     });
   });
 
+  it("applies the pending edits before it refines, in either refine choice", async () => {
+    // WP-2123: the action bar's primary is "Apply and refine" while edits are
+    // pending, and the choice beside it picks what a refine runs
+    const stub = server({ ...boot(ADVANCED), "/api/run": () => ({ body: IDLE_RUN }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    expect(refineButton()?.textContent).toContain("Refine");
+    expect(host.querySelector('[aria-label="refine"] button.on')?.textContent?.trim())
+      .toBe("Staged plan");
+    const input = cell("a");
+    input.value = "4.157";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    expect(refineButton()?.textContent).toContain("Apply and refine");
+
+    refineButton()!.click();
+    await flush();
+    const order = stub.calls.filter((c) => c.method === "PATCH" || c.path === "/api/run")
+      .map((c) => c.path);
+    expect(order).toEqual(["/api/params", "/api/run"]);
+    expect(stub.calls.find((c) => c.path === "/api/run")?.body).toEqual({ kind: "fit" });
+
+    // one cycle is one stage on the ticked rows: an empty turn_on
+    button("One cycle")!.click();
+    await flush();
+    refineButton()!.click();
+    await flush();
+    const runs = stub.calls.filter((c) => c.path === "/api/run");
+    expect(runs.at(-1)?.body).toEqual({ kind: "stage", stage: { name: "cycle", turn_on: [] } });
+    expect(host.textContent).toContain('ref.run_stage(Stage("cycle", turn_on=[]))');
+  });
+
   it("refuses an out-of-bounds value before the round trip", async () => {
     const stub = server(boot(ADVANCED));
     vi.stubGlobal("fetch", stub.fetcher);
@@ -1191,7 +1237,7 @@ describe("the plan editor", () => {
     expect(runStage.length).toBeGreaterThan(0);
     expect(runStage.every((b) => b.disabled)).toBe(true);
 
-    const header = button("Run")!;
+    const header = refineButton()!;
     expect(header.disabled).toBe(true);
     // one sentence, three buttons
     expect(runAll.title).toBe(header.title);
@@ -1204,7 +1250,7 @@ describe("the plan editor", () => {
     host.innerHTML = "";
     await openPlan();
     expect(button("Run all")!.disabled).toBe(false);
-    expect(button("Run")!.disabled).toBe(false);
+    expect(refineButton()!.disabled).toBe(false);
   });
 
   it("hides the resolved facts while the plan on screen is not the server's", async () => {
@@ -1654,38 +1700,44 @@ describe("disclosure and the command palette", () => {
     expect(writes[0].body).toEqual({ ui: { console_height: 210 } });
   });
 
-  it("selects the layout from one segmented control, and keeps the plot mounted", async () => {
+  it("collapses either side from its own button, and keeps the plot mounted", async () => {
     vi.stubGlobal("fetch", server(boot()).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // WP-1034: the top-level choice is no longer *which pane* — Model and Text
-    // are tabs — it is how much window the panel column gets.  Two options, the
-    // current one lit, and neither click means two things (WP-1029's rule).
-    const group = host.querySelector<HTMLElement>('[aria-label="layout"]')!;
-    const labels = [...group.querySelectorAll("button")].map((b) => b.textContent?.trim());
-    expect(labels).toEqual(["Split", "Full"]);
-    expect(group.querySelector("button.on")?.textContent?.trim()).toBe("Split");
+    // WP-2123: each side has a collapse button at its own end of the header,
+    // and one side always stays.  This replaced WP-1034's Split | Full control.
+    const [graphs, model] = [...host.querySelectorAll<HTMLButtonElement>("header > button.toggle")];
+    expect(graphs.getAttribute("aria-label")).toBe("Hide the graphs");
+    expect(model.getAttribute("aria-label")).toBe("Hide the model panel");
+    expect(host.querySelector('[aria-label="layout"]')).toBeNull();
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(false);
 
-    button("Full")!.click();
+    graphs.click();
     await flush();
     expect(host.querySelector(".side")?.classList.contains("wide")).toBe(true);
     // hidden, not unmounted — a layout click must not purge the drawn window
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(true);
     expect(host.querySelector(".plot")).not.toBeNull();
-    // the tab strip travels with the column, which is what makes this a hatch
-    // for every panel rather than for the two that used to have their own mode
-    // — nine since WP-1016, which needed no mode of its own for exactly this
-    expect(host.querySelectorAll("nav.tabs button").length).toBe(9);
+    // the panel tabs travel with the column, nine since WP-1016
+    expect(host.querySelectorAll(".side nav.tabs button").length).toBe(9);
     // …and no splitter, because there is nothing on the other side of it
     expect(host.querySelector('.side > .grip[data-grow="left"]')).toBeNull();
+    // the last side showing cannot hide too
+    expect(model.disabled).toBe(true);
 
-    button("Split")!.click();
+    graphs.click();
     await flush();
-    expect(group.querySelector("button.on")?.textContent?.trim()).toBe("Split");
-    // a layout is a view choice, not a setting: nothing reached the document
     expect(host.querySelector(".side")?.classList.contains("wide")).toBe(false);
+    expect(model.disabled).toBe(false);
+
+    model.click();
+    await flush();
+    expect(host.querySelector(".side")?.classList.contains("hidden")).toBe(true);
+    expect(graphs.disabled).toBe(true);
+    expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(false);
+    // the button did not move: it is still the header's last child
+    expect(host.querySelector("header")?.lastElementChild).toBe(model);
   });
 
   it("carries nine tabs with no label shortened and every panel reachable", async () => {
@@ -1694,7 +1746,7 @@ describe("disclosure and the command palette", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const tabs = [...host.querySelectorAll<HTMLButtonElement>("nav.tabs button")];
+    const tabs = [...host.querySelectorAll<HTMLButtonElement>(".side nav.tabs button")];
     expect(tabs.map((b) => b.textContent?.trim())).toEqual([
       "Parameters", "Plan", "Peaks", "Model", "Text", "Series", "Report",
       "History", "Build"]);
@@ -2430,7 +2482,7 @@ describe("the import wizard", () => {
     expect(opened.body).toEqual({ path: "/tmp/nac.rex" });
     // the session's project is replaced, and the shell lands on the parameters
     expect(host.textContent).toContain("nac.fxye");
-    expect(host.querySelector("nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
+    expect(host.querySelector(".side nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
     expect(host.textContent).toContain("project.open(/tmp/nac.rex)");
   });
 
@@ -2466,7 +2518,7 @@ describe("the import wizard", () => {
     expect(opened.body).toEqual({ name: "fap" });
     // an example is a project like any other from the moment it exists
     expect(host.textContent).toContain("FAP.XRA");
-    expect(host.querySelector("nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
+    expect(host.querySelector(".side nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
   });
 
   it("resets an example through its own verb, not by opening it again", async () => {
@@ -2928,8 +2980,11 @@ describe("the model editor", () => {
       box.dispatchEvent(new Event("change", { bubbles: true }));
       await flush();
     }
-    // back where it started: nothing pending, so there is nothing to apply
-    expect(button("Apply")).toBeFalsy();
+    // back where it started: nothing pending, so there is nothing to apply —
+    // the Model panel draws no Apply, and the action bar's stays disabled
+    expect([...host.querySelectorAll(".panel button")]
+      .find((b) => b.textContent?.trim() === "Apply")).toBeFalsy();
+    expect(button("Apply")?.disabled).toBe(true);
     expect(stub.calls.some((c) => c.method === "PATCH" && c.path === "/api/params"))
       .toBe(false);
   });
