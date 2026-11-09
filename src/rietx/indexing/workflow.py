@@ -48,8 +48,10 @@ detector serves only a call without one.
 
 **The two detectors and ``lebail_rwp`` catch different failures, which is why all
 three are reported.**  Same synthetic pattern under the Pawley validation
-(WP-2011, noise seed 11, no peak list), four cells, re-measured unchanged under
-WP-2113's sized background (the order scan asks no more than the three declared terms):
+(WP-2011, noise seed 11, no peak list), four cells.  Re-measured under WP-2113's
+sized background, every cell is unchanged (the order scan asks no more than the three
+declared terms); the wrong metric's absent count had been quoted as 14/28, and the fit
+reports 14/30 with and without the sizing:
 
 | candidate | Rwp | predicted_but_absent | unmatched_observed |
 |---|---|---|---|
@@ -78,7 +80,6 @@ intensities fits at least as well.
 from __future__ import annotations
 
 import time
-import warnings
 from collections.abc import Sequence
 from dataclasses import replace
 
@@ -433,28 +434,36 @@ def _size_validation_background(instrument: Instrument, data: PatternData,
     impurity lines planted (two on the band) all six stay counted.  The flat
     silicon is unchanged (0 at any order).  The scan reads the data only, so
     :func:`index_pattern` pays it once per call, never once per candidate.
+
+    The scan is ``auto_background``'s own
+    (:func:`~rietx.background.select.select_chebyshev_order` over the cropped
+    range), called directly: the
+    P-spline diagnostics ``auto_background`` also computes are unused here, and
+    its ``BACKGROUND_ORDER_AT_CAP`` warning (a statement about a pick a caller
+    asked for; here the cap is a flexibility ceiling for a nuisance term) would
+    need a process-wide warnings filter to silence, which is not thread-safe
+    under the GUI's worker.  Any failure of the scan falls back to the declared
+    background rather than aborting the run.
     """
-    from ..background import auto_background
+    from ..background.select import select_chebyshev_order
     from ..schemas.common import Parameter
 
     declared = instrument.background
     if not isinstance(declared, BackgroundChebyshev):
         return instrument
     try:
-        with warnings.catch_warnings():
-            # BACKGROUND_ORDER_AT_CAP is a statement about a pick a caller
-            # asked for; here the cap is a flexibility ceiling for a nuisance
-            # term, and the order travels on ``LeBailValidation.background_terms``
-            warnings.simplefilter("ignore", UserWarning)
-            choice = auto_background(data, kind="chebyshev",
-                                     two_theta_limits=two_theta_limits)
-    except (ValueError, np.linalg.LinAlgError):
+        scanned = data if two_theta_limits is None else data.crop(
+            float(two_theta_limits[0]), float(two_theta_limits[1]))
+        n = int(select_chebyshev_order(scanned).selected)
+    except Exception:                               # noqa: BLE001
         return instrument
-    n = len(choice.background.coefficients)
     if n <= len(declared.coefficients):
         return instrument
     out = instrument.model_copy(deep=True)
-    out.background.coefficients += [Parameter(value=0.0, vary=True)
+    # the appended terms carry the declared ones' flag: the plan frees the
+    # background by glob, so the flag is a record, and one background reads alike
+    vary = declared.coefficients[-1].vary if declared.coefficients else True
+    out.background.coefficients += [Parameter(value=0.0, vary=vary)
                                     for _ in range(n - len(declared.coefficients))]
     return out
 
@@ -626,6 +635,7 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
         failed = LeBailValidation(
             rwp=float("inf"), gof=float("inf"), space_group=symbol,
             n_reflections=0, status="failed", mode=VALIDATION_MODE,
+            background_terms=_chebyshev_terms(ins),
             diagnostics=[Diagnostic(
                 level="warning", code="INDEX_VALIDATION_FAILED",
                 message=(f"The whole-pattern validation of {candidate.system} "
@@ -1177,9 +1187,12 @@ def index_pattern(peaks: PeakList | None = None, *,
     if validate and data is not None and instrument is not None:
         progress.add(len(checked))
         # the validation background is sized from the data, which every
-        # candidate shares, so the order scan runs once per call (WP-2113)
-        validation_instrument = _size_validation_background(
-            instrument, data, two_theta_limits)
+        # candidate shares, so the order scan runs once per call (WP-2113),
+        # and not at all when no fit will run
+        validation_instrument = instrument
+        if checked and not (run_cancel is not None and bool(run_cancel)):
+            validation_instrument = _size_validation_background(
+                instrument, data, two_theta_limits)
         # under a declared ceiling the fits run cheapest first, by the
         # reflections each will refine, and each runs on whatever the clock
         # holds (WP-2011): for a common deadline that order maximises the fits
