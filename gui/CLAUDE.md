@@ -156,9 +156,10 @@ test and never silently the rule.
   number (WP-1009).
 - **Grammar** (WP-1009): a `tie` renders last on its line, since `=` runs to end of line;
   column widths are per block, aligned so a rectangular selection hits one field; a stage
-  line's keys are `textdoc.STAGE_KEYS`, derived from `StageSpec` and pinned by `test_textdoc` against `model_fields`, so a new schema field
-  reaches renderer, parser and `lib/rxt.ts`. An added key is no `FORMAT_VERSION` bump.
-  Comments parse and do not survive a re-render; storing one would be a second authority.
+  line's keys are `textdoc.STAGE_KEYS`, derived from `StageSpec` and pinned by
+  `test_textdoc` against `model_fields`, so a new schema field reaches renderer, parser and
+  `lib/rxt.ts`. An added key is no `FORMAT_VERSION` bump. Comments parse and do not survive
+  a re-render; storing one would be a second authority.
 - **The head is the reload signal** (WP-1013); there is no third SSE frame type.
 - **There is no merge and no force-apply** (WP-1013). A stale buffer re-reads and
   re-applies, as the server's 409 `STALE_REVISION` says. Applying a loser's document
@@ -331,7 +332,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   `.u-over`.
 - **A mask is invisible in a picture of its own output** (WP-1033), so masked channels
   travel beside the fitted ones (the curves payload's `kept`). `Project.fitted_mask` is
-  the one authority, pinned to `compile_model` by test.
+  the one authority, pinned to `compile_model` by a test asserting
+  `len(result.two_theta)` against it.
 - **Protocol is not a drawing choice** (WP-1033). The residual selector and scale are
   session-local; a region changes Rwp, persists on the verb and lives in its own strip
   with typed fields and the channel count.
@@ -354,7 +356,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 - **The pointer's 2θ is the cursor's pixel through the chart's x** (WP-1213). A curve is
   read at the nearest drawn channel; a nearby thing is hit-tested against the pointer.
   Hover and the non-destructive verbs use the coarse `PICK_RADIUS_PX`
-  (`panels/Plot.svelte`); the move gesture uses `lib/peaks.ts:grabToleranceDeg`.
+  (`panels/Plot.svelte`), so the ring, the lit table row and the strip name one peak; the
+  move gesture uses `lib/peaks.ts:grabToleranceDeg`.
 - **A masked channel is in no result, so the readout reads two arms** (WP-1213): fitted
   ∪ excluded.
 - **One reflection has one spelling on every browser surface** (WP-1213):
@@ -365,7 +368,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   `instrument.zero_shift`** (WP-1211), on `structure_from_candidate`'s lattice group.
 - **A cap says that it capped** (WP-1211): past `MAX_CANDIDATE_TICKS` lines are thinned by
   rank in 2θ, with `n_total` beside them.
-- **A layer whose control is a row gets no `CurveToggle`** (WP-1211).
+- **A layer whose control is a row gets no `CurveToggle`** (WP-1211); the status line
+  under the plot says what the toggle would have.
 - **A preview is not a selection; they are two props** (WP-1211). A hover draws lines;
   only a selection clears the plot to the data, through the `data only` button's own
   press and one flag saying whose press it was.
@@ -394,7 +398,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   another row is adopted. Badges follow the server (`adopt`, `best`). The old panel still
   enables Adopt, and an unrefuted class's space-group chip, on `allowed`, which carries
   `picked` under its old name until the port redraws it.
-- **The search form is `ProjectDoc.indexing`, committed whole on the verb** (WP-1045),
+- **The search form is `ProjectDoc.indexing`, the `SearchSpecSpec` an agent request
+  carries, committed whole on the verb** (WP-1045),
   and re-synced from the document on every head move, refusals included.
 - **Vocabularies come from `/api/capabilities`**, never literals (WP-1045).
 - **`lib/controls.ts` declares every field** with widget kind, label and help key, replayed
@@ -406,7 +411,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   run. A streamed grade can rise, never fall.
 - **A column is scanned, so its places are fixed** (WP-1209): 2θ at four places
   (`formatPosition`), I as `I/Imax × 100` over the strongest measured line
-  (`formatIntensity`), and an esd from 1° up is not printed.
+  (`formatIntensity`, `—` under `no_intensity`/`fit_failed`), and an esd from 1° up is not
+  printed.
 - **An esd that has swallowed its value is not a precision** (WP-1209):
   `esdSwallowsValue` (≥ 1 and larger than the value) makes `formatValue` print the value
   at its own precision and `formatEsd` write `±` beside it, for every caller.
@@ -417,7 +423,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 `lib/plan.ts`.
 
 - **The filter box is the selection** (WP-1011). A bulk free/fix sends the glob, one
-  `set_vary` and one node; `asGlob` wraps a bare word as `*word*`.
+  `set_vary` and one node; `asGlob` wraps a bare word as `*word*`, so the glob previewed
+  is the glob sent.
 - **The client's matcher is a preview only** (WP-1011): `lib/fnmatch.ts` ports
   `fnmatch.fnmatchcase`, held to Python by `fnmatch_cases.json`.
 - **A held row gets no vary checkbox** (WP-1011). `held_because` is its tooltip, and
@@ -472,19 +479,23 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 - **The `structure` argument's forms are told apart by disjoint keys at one boundary**
   (WP-1206, WP-1207): `phases`, `cif`/`upload`, `space_group`, and `null`. A new form is
   added at `_as_structure`, which reaches `project_new` and `PATCH /api/structure` alike.
-- **A typed cell carries only what the setting leaves free** (WP-1206):
+- **A typed cell builds the Le Bail scaffold Adopt lands**
+  (`schemas.structure.lebail_scaffold`, shared with `structure_from_candidate`), and
+  **carries only what the setting leaves free** (WP-1206):
   `crystallography.symmetry.free_cell_names` decides, the route serves it, the form draws
   those boxes. A determined parameter is refused, never tolerance-checked or ignored.
   `mode` is refused at `rietveld`, never overridden; the form disables that option.
 - **Null is an answer; an absent key is not** (WP-1207). `project_new` requires the key,
   and only explicit `null` makes a phase-free project. Its mode moves nowhere; Adopt sets
-  it. The refusal is on the run verbs, never on the model.
+  it. The refusal is on the run verbs, never on the model: `Structure` takes `phases=[]`, so
+  peak picking, indexing and `PATCH /api/structure` work on one.
 - **An example project is a `compare.py` standard** (WP-1204). `list_examples()` is
   `STANDARDS` filtered by `src/rietx/data/examples/`. The open verb ends in
   `project_open`. Examples build into `state_dir/examples/`. `example_reset` is the one
   destructive verb; `built` rides on the listing.
 - **Browse is one modal, two jobs** (WP-1205): `mode="open"` opens a `.rex`,
-  `mode="pick"` hands a directory to the path field.
+  `mode="pick"` hands a directory to the path field (a browser can say where a project
+  lives, never name it).
 - **Symmetry has two tiers, split by cost** (WP-1035). Phase facts ride on
   `GET /api/structure` as `symmetry` + `causes`; Wyckoff letters are on
   `GET /api/structure/symmetry`.
@@ -494,14 +505,16 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   (WP-1035); per-atom probes run one atom at a time against a real table.
 - **The gate is `Refinement.edit`'s** (WP-1035; root § Invariants). `GuiSession._edit` adds
   only the address: the refusal's leading dot-path.
-- **The notes cover what a table diff cannot see** (WP-1035): a setting or centring
-  change, `_free_paths` casualties, an orbit collision, the orbit multiplicity. A
-  blocked preview has no consequences. A shared orbit is judged as a group by summed
-  occupancy over the coincidence relation's connected components; over 1 blocks. An
-  occupancy the user typed is never rescaled to fit (TOPAS's `occ_merge` is declined).
+- **The notes cover what a table diff cannot see** (WP-1035): a setting or centring change,
+  `_free_paths` casualties, an orbit collision, the orbit multiplicity. A blocked preview
+  has no consequences. A shared orbit is judged as a group by summed occupancy over the
+  coincidence relation's connected components; over 1 blocks, and at or under 1 it is a
+  legal mixed site. An occupancy the user typed is never rescaled to fit (TOPAS's
+  `occ_merge` is declined).
 - **A form's column count is a promise nothing else decides** (WP-1216): three, from
   `PROFILE_ROWS`; a control whose content is a word takes the row (`.fullrow`).
-- **Which group a field is in is data, never its path's prefix** (WP-1216).
+- **Which group a field is in is data, never its path's prefix** (WP-1216). A group with
+  no field is not drawn, which is why the background is not one.
 - **A cell is a `subgrid` of its group's rows** (WP-1216), spanning by content
   (`:has(.varyline)`), never by a class on the grid.
 - A rule aimed at a value reaches the control beside it (WP-1214).
@@ -572,7 +585,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 - **Applicability and reachability are different questions** (WP-1012). `unreachable`
   separates a glob matching nothing from one whose every match is held.
   `GET /api/report` serves `apply` positionally parallel to `suggested_actions`.
-- **`expected_delta_chi2` is one number per report** (WP-1012); print it once.
+- **`expected_delta_chi2` is one number per report** (WP-1012): print it once, saying it
+  bounds only the misfit inside the gated regions.
 - **The two `unmatched` kinds are opposite diagnoses** (WP-1012): an observed peak with no
   reflection is an impurity; a calculated peak with no intensity is a mispositioned model.
 - A `checkout` clears the result server-side; the panel redraws from the curves route
