@@ -131,7 +131,7 @@ Claude, reversible", with its alternative, and waits for the maintainer's review
   written by the GET
 - [x] Client: `lib/background.ts` (pure drawing helpers), `panels/Background.svelte`, the graph tab
   and its title line, per-term holds and the λ field; vitest
-- [ ] Layout browser test over the Background tab, with real clicks
+- [x] Layout browser test over the Background tab, with real clicks
 - [ ] Manual: the route and the tab in the GUI chapters, the band tied to the estimation
   chapter's derived-esd equation; screenshots where changed
 - [ ] Skill: none expected; the agent skill drives the python API
