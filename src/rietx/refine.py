@@ -3439,7 +3439,7 @@ class Refinement:
         known = {e.path for e in table.entries}
         if unknown := [g for g in dict.fromkeys(globs)
                        if is_literal_path(g) and g not in known]:
-            raise _unknown_paths_error(unknown, known)
+            raise _unknown_paths_error(unknown, known, self.instrument)
 
     def _set_vary_findings(self, table: ParameterTable, globs: list[str],
                            vary: bool) -> list[str]:
@@ -3452,7 +3452,7 @@ class Refinement:
         verb = "freed" if vary else "fixed"
         out = []
         for path in table.unknown_paths(globs):
-            hint = _path_hint(path, known)
+            hint = _path_hint(path, known, self.instrument)
             out.append(f"set_vary {verb} nothing for {path!r}, which names no "
                        "parameter of this model."
                        + (f" {hint[:1].upper()}{hint[1:]}" if hint else ""))
@@ -3517,7 +3517,7 @@ class Refinement:
         if unknown:
             raise ValueError(f"unknown parameter path(s): {sorted(unknown)}" + "".join(
                 f"; for {p!r}, {h}" for p in sorted(unknown)
-                if (h := _path_hint(p, by_path))))
+                if (h := _path_hint(p, by_path, self.instrument))))
         for path, value in values.items():
             e = by_path[path]
             user = (self._ties.get(path) if path in self._applied_ties else None)
@@ -3742,7 +3742,7 @@ class Refinement:
         by_path = {e.path: e for e in table.entries}
         entry = by_path.get(path)
         if entry is None:
-            raise _unknown_path_error(path, by_path)
+            raise _unknown_path_error(path, by_path, self.instrument)
         user = (self._ties.get(path) if path in self._applied_ties else None)
         if user is not None and entry.locked:
             # a formula's block writes this row: its own target, or a row
@@ -4120,7 +4120,7 @@ class Refinement:
                 continue
             entry = known.get(glob)
             if entry is None:
-                raise _unknown_path_error(glob, known)
+                raise _unknown_path_error(glob, known, self.instrument)
             if entry.tie is not None:
                 raise ValueError(
                     f"{glob!r} is tied by symmetry, not by this refinement, and "
@@ -4189,7 +4189,7 @@ class Refinement:
         for glob in globs:
             if not is_literal_path(glob) or glob in known:
                 continue
-            raise _unknown_path_error(glob, known)
+            raise _unknown_path_error(glob, known, self.instrument)
         hits = sorted(p for p in known
                       if any(fnmatch.fnmatchcase(p, g) for g in globs))
         # a body owns its atoms' coordinates as symmetry owns a special
@@ -4335,7 +4335,7 @@ class Refinement:
             glob = literals[0]
             known = [e.path for e in table.entries]
             if glob not in known:
-                raise _unknown_path_error(glob, known)
+                raise _unknown_path_error(glob, known, self.instrument)
             raise ValueError(f"{glob!r} is not held by this refinement")
         if not hits and not origin_hits:
             return []
@@ -6019,7 +6019,7 @@ class Refinement:
             diagnostics.extend(_origin_diagnostics(table, stage_results,
                                                    origins=origins))
             diagnostics.extend(_unknown_path_diagnostics(
-                stage_results, [e.path for e in table.entries]))
+                stage_results, [e.path for e in table.entries], self.instrument))
             diagnostics.extend(_window_loss_diagnostics(stage_results))
             if mode == "rietveld":
                 # after the write-back: the search reads the answer's coordinates
@@ -6614,7 +6614,7 @@ class Refinement:
             diagnostics.extend(_origin_diagnostics(
                 table, [stage_result], origins=[(stage.name, hold.origin)]))
             diagnostics.extend(_unknown_path_diagnostics(
-                [stage_result], [e.path for e in table.entries]))
+                [stage_result], [e.path for e in table.entries], self.instrument))
             diagnostics.extend(_window_loss_diagnostics([stage_result]))
 
             # before the node is recorded, which is where `_run_plan` writes it
@@ -8237,7 +8237,7 @@ def _stage_list(names: list[str]) -> str:
             f"stages {', '.join(repr(s) for s in names)}")
 
 
-def _path_hint(path: str, known) -> str:
+def _path_hint(path: str, known, instrument=None) -> str:
     """The spelling a caller most likely meant by an unknown ``path``, or ``""``.
 
     ``STAGE_PATH_UNKNOWN``'s two answers, for the verbs that take a path
@@ -8250,12 +8250,14 @@ def _path_hint(path: str, known) -> str:
     A third answer comes between them (WP-2087): a path of an opt-in
     correction its owner does not declare names the declaration
     (:func:`rietx.help.undeclared_opt_in`).  The nearest real path answered
-    ``phases.0.extinction`` with ``phases.0.lor_strain``.
+    ``phases.0.extinction`` with ``phases.0.lor_strain``.  ``instrument``
+    lets a correction one geometry takes (roughness) answer too; without it
+    that correction gets the nearest path, never a declaration that raises.
     """
     current = retired_spelling(path)
     if current is not None:
         return f"it is a spelling retired after v1.2, now spelled {current!r}."
-    if (hit := undeclared_opt_in(path, known)) is not None:
+    if (hit := undeclared_opt_in(path, known, instrument)) is not None:
         row, owner = hit
         return (f"it exists only once {row.name} is declared on "
                 f"{_owner_words(owner)}, with {row.declaration}.")
@@ -8263,32 +8265,38 @@ def _path_hint(path: str, known) -> str:
 
 
 def _owner_words(owner: str) -> str:
-    """``phases.0`` as "phase 0", ``phases.0.atoms.3`` as "atom 3 of phase 0"."""
+    """``phases.0`` as "phase 0", ``phases.0.atoms.3`` as "atom 3 of phase 0".
+
+    A joint fit's ``hist.1.`` scope reads as "of histogram 1" after it.
+    """
     parts = owner.split(".")
+    tail = ""
+    if parts[0] == "hist" and len(parts) > 2:
+        tail, parts = f" of histogram {parts[1]}", parts[2:]
     if parts[0] == "phases" and len(parts) == 2:
-        return f"phase {parts[1]}"
+        return f"phase {parts[1]}{tail}"
     if parts[0] == "phases" and len(parts) == 4 and parts[2] == "atoms":
-        return f"atom {parts[3]} of phase {parts[1]}"
-    return f"the {parts[-1]}"
+        return f"atom {parts[3]} of phase {parts[1]}{tail}"
+    return f"the {parts[-1]}{tail}"
 
 
-def _unknown_path_error(path: str, known) -> ValueError:
+def _unknown_path_error(path: str, known, instrument=None) -> ValueError:
     """``unknown parameter path: 'p'``, with :func:`_path_hint` when it has one."""
-    hint = _path_hint(path, known)
+    hint = _path_hint(path, known, instrument)
     return ValueError(f"unknown parameter path: {path!r}"
                       + (f"; {hint}" if hint else ""))
 
 
-def _unknown_paths_error(paths: list[str], known) -> ValueError:
+def _unknown_paths_error(paths: list[str], known, instrument=None) -> ValueError:
     """:func:`_unknown_path_error` for one path; for several, every one named.
 
     ``set_vary`` takes a list, and naming each typo saves a rerun per typo.
     """
     if len(paths) == 1:
-        return _unknown_path_error(paths[0], known)
+        return _unknown_path_error(paths[0], known, instrument)
     return ValueError(f"unknown parameter paths: {', '.join(map(repr, paths))}"
                       + "".join(f"; for {p!r}, {h.rstrip('.')}" for p in paths
-                                if (h := _path_hint(p, known))))
+                                if (h := _path_hint(p, known, instrument))))
 
 
 def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
@@ -8560,7 +8568,7 @@ def _window_loss_diagnostics(stage_results: list[StageResult]) -> list[Diagnosti
 
 
 def _unknown_path_diagnostics(stage_results: list[StageResult],
-                              known: list[str]) -> list[Diagnostic]:
+                              known: list[str], instrument=None) -> list[Diagnostic]:
     """``STAGE_PATH_UNKNOWN`` — a stage asked for a parameter by a name no row has.
 
     Issue #265: ``turn_on=["instrument.source.wavelength"]`` freed nothing,
@@ -8597,7 +8605,8 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
     paths the second and third are usually siblings of the first: for the
     issue's typo they were ``lines.0.weight`` and ``profile.w``.  A literal
     of an opt-in correction its owner does not declare names the declaration
-    instead, through :func:`_path_hint` (WP-2087).
+    instead (:func:`rietx.help.undeclared_opt_in`, WP-2087), and its
+    suggestion says to declare it.
 
     The suggestion names ``ref.parameters()`` for seeing every path, which a
     joint fit has too (WP-2028), spelling its rows as ``known`` does.
@@ -8620,7 +8629,20 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
                 suggestion=f"Write {current!r} in the plan.",
             ))
             continue
-        hint = _path_hint(path, known)  # the retired branch is above
+        if (hit := undeclared_opt_in(path, known, instrument)) is not None:
+            row, owner = hit
+            out.append(Diagnostic(
+                level="warning", code="STAGE_PATH_UNKNOWN",
+                message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
+                         "names no parameter of this model, so nothing was freed "
+                         f"for it. It exists only once {row.name} is declared on "
+                         f"{_owner_words(owner)}, with {row.declaration}."),
+                where=[path],
+                suggestion=("Declare the correction, or write a glob if the stage "
+                            "should reach it only on models that declare it."),
+            ))
+            continue
+        hint = did_you_mean(path, known, n=1)
         out.append(Diagnostic(
             level="warning", code="STAGE_PATH_UNKNOWN",
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "

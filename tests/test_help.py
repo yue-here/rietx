@@ -24,6 +24,7 @@ from __future__ import annotations
 import dataclasses
 import importlib.util
 import json
+import math
 import re
 from pathlib import Path
 from typing import get_args
@@ -49,6 +50,7 @@ from rietx.help import (
     UNIT_DISPLAY,
     HelpEntry,
     explain,
+    family_matches,
     help_key_for,
     help_registry,
     plan_help,
@@ -459,11 +461,15 @@ def _undeclared_models() -> tuple[Structure, Instrument]:
 
 
 def _families_with_rows(structure, instrument) -> set[str]:
-    from fnmatch import fnmatchcase
-
     paths = [e.path for e in ParameterTable(structure, instrument).entries]
-    return {g for g in PARAMETER_HELP
-            if any(fnmatchcase(p, g) and p.count(".") == g.count(".") for p in paths)}
+    return {g for g in PARAMETER_HELP if any(family_matches(p, g) for p in paths)}
+
+
+def _declare(row, structure, instrument) -> None:
+    """Run ``row.declaration`` as the error prints it, on phase 0 and atom 0."""
+    phase = structure.phases[0]
+    exec(row.declaration, {**vars(rx), "math": math, "phase": phase,
+                           "atom": phase.atoms[0], "instrument": instrument})
 
 
 @pytest.mark.parametrize("row", OPT_IN, ids=lambda r: r.name)
@@ -471,16 +477,26 @@ def test_an_opt_in_declaration_creates_exactly_its_families(row):
     """The line an unknown path's error prints, executed: on a model that
     lacks the correction, it creates a row in every family the row claims."""
     structure, instrument = _undeclared_models()
+    structure.phases[0].atoms[0].biso.vary = True  # a free biso, as a fit leaves it
     before = _families_with_rows(structure, instrument)
     assert not before & set(row.families), row.name
-    phase = structure.phases[0]
-    phase.atoms[0].biso.vary = False  # the tensor replaces a free biso
-    exec(row.declaration, {**vars(rx), "phase": phase, "atom": phase.atoms[0],
-                           "instrument": instrument, "uiso": 0.01})
+    _declare(row, structure, instrument)
     created = _families_with_rows(structure, instrument) - before
     assert created == set(row.families), row.name
     for family in row.families:
         assert family.startswith(row.owner + "."), family
+
+
+@pytest.mark.parametrize("row", [r for r in OPT_IN if r.geometry or r.source],
+                         ids=lambda r: r.name)
+def test_a_geometry_bound_declaration_is_refused_off_its_geometry(row):
+    """``geometry`` and ``source`` are claims about the schema's refusals, so
+    the declaration raises on any other kind, which is why the hint stays
+    silent there."""
+    structure, instrument = _undeclared_models()
+    instrument.geometry = Geometry(kind="debye_scherrer")
+    with pytest.raises(ValueError, match=row.geometry):
+        _declare(row, structure, instrument)
 
 
 def test_every_family_an_undeclared_model_lacks_is_opt_in_or_says_why():

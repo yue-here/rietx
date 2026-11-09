@@ -1312,15 +1312,19 @@ class OptIn:
 
     ``owner`` is the glob of the object that carries the declaration, and each
     of ``families`` is a :data:`PARAMETER_HELP` key under it.  ``declaration``
-    is the line a user writes, in the spelling the help entries use;
+    is the code a user runs, in the spelling the help entries use;
     ``tests/test_help.py`` executes it against a model that lacks the
-    correction and checks that every family then has a row.
+    correction and checks that every family then has a row.  ``geometry``
+    and ``source`` are the only ``Geometry.kind`` and ``Source.kind`` the
+    schema accepts the declaration on, where it refuses the others.
     """
 
     name: str
     owner: str
     families: tuple[str, ...]
     declaration: str
+    geometry: str | None = None
+    source: str | None = None
 
 
 #: The opt-in corrections, for answering an unknown path with the declaration
@@ -1340,43 +1344,68 @@ OPT_IN: tuple[OptIn, ...] = (
     OptIn("Stephens anisotropic strain", "phases.*",
           ("phases.*.microstrain.s*", "phases.*.microstrain.dof.*"),
           "phase.microstrain = StephensStrain.isotropic(1000, phase.cell)"),
+    # the tensor replaces biso, and the assignment raises while biso is free
     OptIn("an anisotropic displacement tensor", "phases.*.atoms.*",
           (*(f"phases.*.atoms.*.u{ij}" for ij in ("11", "22", "33", "12", "13", "23")),
            "phases.*.atoms.*.adp.*"),
-          "atom.aniso = AnisoU.isotropic(uiso, phase.cell)"),
-    OptIn("Suortti surface roughness (Bragg-Brentano only)", "instrument.geometry",
+          "atom.biso.vary = False; atom.aniso = AnisoU.isotropic("
+          "atom.biso.value / (8 * math.pi**2), phase.cell)"),
+    OptIn("Suortti surface roughness", "instrument.geometry",
           ("instrument.geometry.surface_roughness.a",
            "instrument.geometry.surface_roughness.b"),
-          "instrument.geometry.surface_roughness = RoughnessSuortti()"),
-    OptIn("Pitschke surface roughness (Bragg-Brentano only)", "instrument.geometry",
+          "instrument.geometry.surface_roughness = RoughnessSuortti()",
+          geometry="bragg_brentano", source="xray_cw"),
+    OptIn("Pitschke surface roughness", "instrument.geometry",
           ("instrument.geometry.surface_roughness.c",
            "instrument.geometry.surface_roughness.tau"),
-          "instrument.geometry.surface_roughness = RoughnessPitschke()"),
+          "instrument.geometry.surface_roughness = RoughnessPitschke()",
+          geometry="bragg_brentano", source="xray_cw"),
 )
 
 
-def undeclared_opt_in(path: str, known) -> tuple[OptIn, str] | None:
+def family_matches(path: str, glob: str) -> bool:
+    """Whether ``glob``, a :data:`PARAMETER_HELP` key, names ``path`` at its depth.
+
+    :func:`fnmatch.fnmatchcase` alone lets ``*`` cross dots, so
+    ``phases.*.extinction`` would claim ``phases.0.atoms.1.extinction``.
+    """
+    return path.count(".") == glob.count(".") and fnmatchcase(path, glob)
+
+
+def undeclared_opt_in(path: str, known, instrument=None) -> tuple[OptIn, str] | None:
     """The opt-in correction an unknown ``path`` belongs to, and its owner's path.
 
     ``None`` unless the owner exists among the ``known`` paths and declares
     none of the correction's families.  A declared correction answers a typo
     in one of its own paths with the nearest real path, as any other path
     does, and so does an owner the model lacks (``phases.7`` on one phase).
+    A row the schema accepts on one geometry or source only answers when
+    ``instrument`` is given and is of that kind, since a path cannot say
+    which geometry it is on.  A joint fit's ``hist.N.`` prefix is carried
+    onto the owner, and a shared row is read bare.
     """
     parts = path.split(".")
-    known = list(known)
+    scope = ""
+    if len(parts) > 2 and parts[0] == "hist" and parts[1].isdigit():
+        scope, parts = f"hist.{parts[1]}.", parts[2:]
+    bare = ".".join(parts)
+    known = {k[len(scope):] if scope and k.startswith(scope) else k for k in known}
     for row in OPT_IN:
-        # fnmatch's `*` crosses dots, so the depth is checked too
-        if not any(fnmatchcase(path, f) and f.count(".") == len(parts) - 1
-                   for f in row.families):
+        if not any(family_matches(bare, f) for f in row.families):
             continue
+        if row.geometry is not None and (
+                instrument is None or instrument.geometry.kind != row.geometry):
+            return None
+        if row.source is not None and (
+                instrument is None or instrument.source.kind != row.source):
+            return None
         owner = ".".join(parts[:row.owner.count(".") + 1])
         if not any(k.startswith(owner + ".") for k in known):
             return None
         tails = [owner + f[len(row.owner):] for f in row.families]
-        if any(fnmatchcase(k, t) for k in known for t in tails):
+        if any(family_matches(k, t) for k in known for t in tails):
             return None
-        return row, owner
+        return row, scope + owner
     return None
 
 

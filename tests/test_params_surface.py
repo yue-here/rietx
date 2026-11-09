@@ -1229,10 +1229,14 @@ def test_a_verb_refusing_an_unknown_path_names_the_nearest(verb, arg):
      "phase.extinction = 0.0."),
     ("phases.0.atoms.1.u11",
      "; it exists only once an anisotropic displacement tensor is declared on "
-     "atom 1 of phase 0, with atom.aniso = AnisoU.isotropic(uiso, phase.cell)."),
+     "atom 1 of phase 0, with atom.biso.vary = False; atom.aniso = "
+     "AnisoU.isotropic(atom.biso.value / (8 * math.pi**2), phase.cell)."),
     # no phase 3: the declaration could not create it, so no hint
     ("phases.3.extinction", ""),
-], ids=["phase", "atom", "no-owner"])
+    # a capillary refuses roughness, so the declaration would raise
+    ("instrument.geometry.surface_roughness.a",
+     "; did you mean 'instrument.geometry.sample_transparency'?"),
+], ids=["phase", "atom", "no-owner", "wrong-geometry"])
 def test_an_undeclared_opt_in_path_names_its_declaration(path, hint):
     """WP-2087: the nearest real path answered ``phases.0.extinction`` with
     ``phases.0.lor_strain``, on a phase that declares no extinction."""
@@ -1240,6 +1244,26 @@ def test_an_undeclared_opt_in_path_names_its_declaration(path, hint):
     with pytest.raises(ValueError) as caught:
         ref.set_vary([path], True)
     assert str(caught.value) == f"unknown parameter path: {path!r}{hint}"
+
+
+def test_roughness_on_a_plate_names_its_declaration():
+    structure, ins = perturbed_models()
+    ins.geometry = rx.Geometry(kind="bragg_brentano", goniometer_radius_mm=240.0)
+    ref = rx.Refinement(structure, ins, history=False)
+    with pytest.raises(ValueError, match=r"Suortti surface roughness is declared on "
+                       r"the geometry, with instrument\.geometry\.surface_roughness "
+                       r"= RoughnessSuortti\(\)\.$"):
+        ref.set_vary(["instrument.geometry.surface_roughness.a"], True)
+
+
+def test_a_joint_fits_scoped_path_carries_its_histogram():
+    from rietx.help import undeclared_opt_in
+
+    known = ["hist.1.phases.0.scale", "phases.0.cell.a"]
+    row, owner = undeclared_opt_in("hist.1.phases.0.extinction", known)
+    assert (row.name, owner) == ("extinction", "hist.1.phases.0")
+    assert undeclared_opt_in("hist.1.phases.0.extinction",
+                             [*known, "hist.1.phases.0.extinction"]) is None
 
 
 def test_a_declared_opt_in_answers_a_typo_with_the_nearest_path():
@@ -1260,6 +1284,7 @@ def test_a_stage_literal_of_an_undeclared_opt_in_names_its_declaration(pattern):
     assert unknown[0].message.endswith(
         "It exists only once extinction is declared on phase 0, with "
         "phase.extinction = 0.0.")
+    assert unknown[0].suggestion.startswith("Declare the correction")
 
 
 def test_a_tied_path_beside_its_own_source_stays_silent(pattern):
