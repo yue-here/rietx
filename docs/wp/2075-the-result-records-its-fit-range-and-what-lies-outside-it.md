@@ -95,7 +95,9 @@ chunk 2 is computed there.
       reporting windows `CUT_WINDOW_DEG` and `STRADDLE_FWHM` enter at tier 3 awaiting approval.
       Not done: `signal_cutoffs`, since `fit()` has no channel that says the caller ran it — to
       the follow-up issue.)
-- [ ] The pdCIF writer reads the range from the result when no pattern is handed.
+- [x] The pdCIF writer reads the range from the result when no pattern is handed.
+      (2026-11-09: `io/cif/powder.py`, the measured count and range and the unfitted
+      stretches from `fit_range`; no `_inc`, the grid not being at hand.)
 - [ ] Optional, only if ruled: DW and the Bérar–Lelann factor per contiguous fitted run, as
       `_pooled_durbin_watson` already does; goldens re-pinned under the root rule.
 - [ ] Tests: the issue's C7 cut at 22° and C8 limit at the (420) centre; a fit with no limits

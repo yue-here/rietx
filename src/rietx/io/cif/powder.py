@@ -6,7 +6,9 @@ deposited powder pattern, and ``_pd_proc_ls_weight`` says which points the fit
 used: the weight it gave a fitted point, 1/σ², and 0 on every other.  A point
 outside the fit has no calculated value, so its ``_pd_calc_intensity_total`` and
 ``_pd_proc_intensity_bkg_calc`` are ``.`` (inapplicable).  Where the caller
-hands no pattern, only the fitted points are written.
+hands no pattern, only the fitted points are written, and the measured range,
+its point count and the unfitted stretches come from the result's own
+``fit_range`` when the fit recorded one (WP-2075).
 
 **The grid as measured.**  ``_pd_meas_2theta_scan``, because nothing here
 corrects the angles.  ``_pd_proc_2theta_corrected`` is reserved for a grid a
@@ -167,12 +169,21 @@ def pattern_items(result, wavelength: float, pattern=None
         else:
             rows.append([_g(tt[i]), yi, "0", di, ".", "."])
 
+    # Without the pattern, the measured range is the one the result recorded
+    # at fit time (WP-2075), when it recorded one: the loop then holds the
+    # fitted points alone, and the file's range and count still say what was
+    # measured.  No step is written, since the grid itself is not at hand.
+    record = getattr(result, "fit_range", None) if pattern is None else None
+    if record is not None:
+        meas_n, (meas_lo, meas_hi) = record.n_file, record.file_range
+    else:
+        meas_n, meas_lo, meas_hi = tt.size, tt[0], tt[-1]
     pairs = [
-        ("_pd_meas_number_of_points", str(tt.size)),
-        ("_pd_meas_2theta_range_min", number("_pd_meas_2theta_range_min", tt[0])),
-        ("_pd_meas_2theta_range_max", number("_pd_meas_2theta_range_max", tt[-1])),
+        ("_pd_meas_number_of_points", str(meas_n)),
+        ("_pd_meas_2theta_range_min", number("_pd_meas_2theta_range_min", meas_lo)),
+        ("_pd_meas_2theta_range_max", number("_pd_meas_2theta_range_max", meas_hi)),
     ]
-    step = _constant_step(tt)
+    step = _constant_step(tt) if record is None else None
     if step is not None:
         pairs.append(("_pd_meas_2theta_range_inc", _g(step)))
     pairs += [
@@ -181,13 +192,16 @@ def pattern_items(result, wavelength: float, pattern=None
         ("_pd_proc_2theta_range_max", number("_pd_proc_2theta_range_max", fit_tt[-1])),
     ]
     runs = _runs(tt, mask)
+    lead = "Not fitted, weight 0 in the profile loop: "
+    if record is not None and record.outside:
+        runs = [(s.lo, s.hi, s.n_points) for s in record.outside]
+        lead = "Not fitted, and not in the profile loop: "
     if runs:
         clauses = [f"2theta {_g(lo)} to {_g(hi)} deg ({n} point{'s' if n > 1 else ''})"
                    for lo, hi, n in runs]
         # text() wraps it in lines checkCIF reads (PLAT802)
         pairs.append(("_pd_proc_info_excluded_regions", text(
-            "_pd_proc_info_excluded_regions",
-            "Not fitted, weight 0 in the profile loop: " + "; ".join(clauses))))
+            "_pd_proc_info_excluded_regions", lead + "; ".join(clauses))))
     return pairs, tags, rows
 
 
