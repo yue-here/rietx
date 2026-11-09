@@ -175,11 +175,16 @@ Cryst. 24, 1. Issue #1219; WP-1517 row 6; WP-1033 (the fitted mask).
     f1713917a: 5 failed, 14355 passed, 415 skipped, 32 xfailed in 10:13.
     - One failure is red by design (Gotchas).
     - The other four were this branch's misses, fixed in cbc6af89b and re-run file by file green:
-      the help entry, the API partition (38 names deferred), the stale skill API index, and the
-      validation-matrix rows for the two acceptance tests.
+      the help entry, the API partition, the stale skill API index, and the validation-matrix
+      rows for the two acceptance tests. The API partition is now met by a § Fit range section in
+      `reference/result.md`. Deferring the names failed once main's `DEFERRED_CEILING` fell to 36.
     - No `main` baseline was measured, so the added-test delta is CI's to read.
     - The full selection did not run. Pearl was not answering, and only the two acceptance rows
       above could move, run on their own: 1 passed each.
+  - After merging origin/main at 2026-11-09T01:2xZ, the touched selection was re-run: 1111 passed,
+    1 failed (the red-by-design row). The selection was `test_fit_range`, `test_exporters`,
+    `test_audit_table`, `test_help`, `test_manual_api`, `test_skill`, `test_skill_cli`,
+    `test_validation_matrix` and `test_docs_consistency`. The manual builds under `-W`.
   - CI lint, run locally: ruff, `tests.skill_caps`, `tests.skill_surface` and `tests.audit_delta`
     all exit 0 (3 rows added, 0 new at `unaudited`). Vale shows 0 errors. `tests.reader_output`
     exits 0.
