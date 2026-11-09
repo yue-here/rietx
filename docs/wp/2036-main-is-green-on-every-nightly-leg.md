@@ -133,37 +133,6 @@ and 2045 on 2026-10-25):
   notebook 03's orthorhombic P cell printed a and c swapped on Linux. No prose
   quotes the order, so nothing fails.
 
-### Inherited
-
-- **2026-11-06, from WP-2045 (closed in PR #1440): this WP's dependency on 2045 is met.**
-  The `full` job completed green on `main` twice on 2026-11-04: run 41837816600
-  (`ba3719f06`, 1:35:41) and run 41874118202 (`b1741da64`, 2:47:18). WP-2045 counted the
-  2026-11-05 red row as this WP's, as the bullet below does.
-
-- **2026-11-05, from the issue triage (issue #1424, its wavelength row): the row is a stale
-  pin on every platform, so the nightly is red on main.** The issue reads it as Mac-only, by
-  contrast with the two nightlies of 2026-11-04. Both of those predate the cause. The
-  2026-11-05 nightly (run 42037632923, `d4839e02e`) failed its `full` job on this one row,
-  with `1 failed, 14933 passed, 171 skipped, 53 xfailed` on Linux, `[dev,jax]`. Its value
-  there is 0.010354633004, and an arm64 Mac reads 0.010354633028.
-
-  Bisected over main's merges: passes at `c2da9ae93`, fails from `85ce3f287`, which merged
-  #1391 (WP-1944, extinction opt-in). WP-1944's handover predicted this move: "a pinned width
-  goes from 0.0102922 to 0.0103546". The fast selection does not run the row, so #1391 merged
-  without the repin.
-
-  `tests/test_acceptance_wavelength.py::test_the_neutron_widths_leave_one_esd_at_every_start`
-  needs three pins and its docstring, read on an arm64 Mac at `541f0daf7`, four starts:
-  x's esd 0.0103546 (was 0.0102922), y −0.0216150 (was −0.0210949), y's esd 0.0192658 (was
-  0.0190970). The spread of x's esd across starts is 2.8e-9, so that bar still holds. The
-  test stops at its first assert, so only the first of the three shows in the log.
-
-  PR #1425 first closed this WP on the reading that both rows are Mac-only. That reading did
-  not hold for this row, and #1429 carried the same three pins. **Resolved 2026-11-09:** #1429
-  merged 2026-11-05 22:18Z (`7dec1f490`), and the first nightly on `main` after it, run
-  42225042080 (2026-11-06, `263227986`, which contains that merge), passed all six jobs. The
-  11-07 and 11-08 nightlies passed too. The row is out of the Mac-only reading.
-
 ## Non-goals
 
 - Removing the S/L ↔ H/L mirror or the `x`/`lor_size` degeneracy. Those are WP-2012's.
@@ -329,8 +298,8 @@ gh run list --workflow nightly.yml --branch main --limit 1
   recorded as met except for it.
 
   *Done* (ghostshift runner and this close, PR #1425). The moot `Priority:`
-  line went; the `### Inherited` section stays, holding the 11-05 note on the
-  wavelength row, now resolved; the narrative moved to
+  line and the `### Inherited` section went (its notes, on WP-2045's close and on
+  the wavelength row, are consumed below); the narrative moved to
   `docs/milestones/v1.12.md` § How v1.12 is getting here; the index was
   regenerated. Filed #1424 for the Mac rows. Yue held the close on #1425 until
   #1429 landed and a nightly passed (comment of 2026-11-05 22:21Z). #1429
@@ -349,7 +318,10 @@ gh run list --workflow nightly.yml --branch main --limit 1
   and 14 839 / 252 / 53 (Linux, `[dev,jax]`), the dispatched one 2 h 47 min
   of pytest time, inside the new 300-minute limit. Nightly 11-05 (run
   42037632923, `d4839e02e`) failed its `full` job on the wavelength row alone
-  (1 failed, 14 933 passed), a pin #1391 moved; #1429 repinned it. Mac full
+  (1 failed, 14 933 passed, `[dev,jax]`; value 0.010354633004 on Linux, 0.010354633028 on an arm64
+  Mac). Bisected over `main`'s merges: it passes at `c2da9ae93` and fails from `85ce3f287`
+  (#1391, the extinction opt-in, whose handover predicted the move), and the fast selection does
+  not run the row. #1429 repinned it (x's esd 0.0103546, y −0.0216150, y's esd 0.0192658). Mac full
   suite (darwin/arm64, worktree `[dev]` venv, Python 3.12.13, on `078f10644`,
   run through the suite lock beside other sessions' suites): 5 failed,
   14 841 passed, 250 skipped, 53 xfailed. Re-run alone at load ~1.5 all four
