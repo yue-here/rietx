@@ -124,8 +124,9 @@ either's code; nothing is ported.
       slow): the 1.5 K entry names three magnetic-only lines below 21.67° and a shift in
       (−60, −35) mdeg; silent at 100-200 K. Treatments of point 1 have no PNG: point 1 is out
       of this PR.
-- [ ] Skill: point 3's recipe as a `references/` row keyed by the diagnostic's code, tagged
-      `(Measured: Ba₂FeSbSe₅, LaMnO₃)`.
+- [x] Skill: point 3's recipe as a `references/` row keyed by the diagnostic's code, tagged
+      `(Measured: Ba₂FeSbSe₅, LaMnO₃)`. In `references/magnetic.md` § Moment codes, both
+      committed copies synced; the numbers in it are #1089/#1090's, not re-run.
 
 ## Acceptance
 
