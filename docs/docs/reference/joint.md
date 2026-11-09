@@ -255,7 +255,7 @@ An empty list means an ordinary single-pattern fit.
 | `HistogramResult.tick_hkl` | which reflection each of those is, paired by index |
 | `HistogramResult.radiation` | its source kind and line wavelengths, which its figure names |
 | `HistogramResult.qpa` | its phase quantities |
-| `HistogramResult.restraints` | always `None`: a joint fit refuses soft restraints |
+| `HistogramResult.restraints` | its copy of the structure against every soft restraint ([Soft restraints](#soft-restraints)) |
 | `HistogramResult.phase_agreement` | its R<sub>Bragg</sub> and R<sub>F</sub>, per phase |
 | `HistogramResult.diagnostics` | what that pattern reported |
 
@@ -278,6 +278,24 @@ The view's `diagnostics` are that pattern's own, followed by the top-level findi
 These are a finding whose `where` names one of its `hist.<h>.` rows, a `STAGE_FREED_NOTHING` whose `value` is its index, and the fit-wide `SCALE_B_INSEPARABLE`, `PARAMETRIC_OUT_OF_RANGE`, `PARAMETRIC_FORM_REJECTED` and `STAGE_PATH_UNKNOWN`.
 `RefinementResult.statistics` carries the joint solve's `Statistics.max_shift_over_esd`, one shift per column of the joint parameter vector against its esd, and every view carries the same figure.
 On the two LaB6 patterns a converged fit reads between 5 × 10⁻⁷ and 2.2 × 10⁻³ across both solvers, and a stage starved to one iteration reads 4.0 under LM and 17.9 under TRF.
+
+### Soft restraints
+
+A structure's soft restraints ([Restrain the geometry](../guides/restrain.md)) hold in a joint fit too.
+Each pattern compiles the one structure, so each carries every restraint's row.
+The joint residual holds a restraint on the shared structure once, since counted once per pattern it would weigh N times against the data.
+A restraint row carries no pattern weight, being a prior on the structure and no pattern's measurement.
+It stays in the covariance and out of χ², Rwp and the Bérar-Lelann factor, as in a single fit.
+`Stage.restraint_weight_scale` scales it stage by stage, as in a single fit.
+
+A restraint that reads a per-pattern parameter restrains a different quantity in each pattern, so each pattern holds its own row.
+A `ValueRestraint` on `instrument.zero_shift` restrains every pattern's zero shift.
+A bond under a per-pattern or parametric cell restrains the bond as each pattern's cell gives it.
+A `ValueRestraint` path with a `hist.<h>.` prefix is refused, because a restraint on one pattern alone is not built.
+
+`HistogramResult.restraints` reports each pattern's copy of the structure against every restraint, and `RefinementResult.restraints` mirrors pattern 0's.
+`RESTRAINT_TENSION` follows the placement rule below.
+A restraint on the shared structure raises it once at the top level, and a per-pattern one on its pattern's list.
 
 ### Diagnostic placement
 
@@ -302,7 +320,7 @@ Each copy is the same finding about one pattern, so count it once.
 
 The rule is written as data.
 `rietx.multi.DIAGNOSTIC_SCOPES` places the output of each function that writes diagnostics, and `rietx.multi.GUARD_SCOPES` each field of a `GuardReport`, each row with its reason.
-Four rows are marked absent, for diagnostics a joint fit does not compute: `HOLD_BLOCKED_PLAN` (a joint fit has no hold verb), `RESTRAINT_TENSION` (restraints are refused), and the two magnetic-width checks, `STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT` and `MAGNETIC_WIDTH_MOVED_MOMENT`.
+Three rows are marked absent, for diagnostics a joint fit does not compute: `HOLD_BLOCKED_PLAN` (a joint fit has no hold verb) and the two magnetic-width checks, `STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT` and `MAGNETIC_WIDTH_MOVED_MOMENT`.
 The magnetic-width checks read the single-pattern plan, so a joint fit's width-before-moment ordering is unchecked.
 `DATA_SUPPORT_LOW` is withheld on purpose.
 Its ratio of observations to parameters has no agreed definition across patterns, and one pattern's reflections counted against the shared columns would warn about a fit the other patterns support.
