@@ -57,7 +57,7 @@ etc)".
 - [x] `gui/CLAUDE.md` rewritten: rules only, grouped by the file a session
   edits, duplicates merged, contradictions with the code fixed.
 - [x] A cheap test for what the rulebook names, named in the rulebook.
-- [ ] `SIZE_CAPS` lowered to landed + 1, with a diary row in the test and a
+- [x] `SIZE_CAPS` lowered to landed + 1, with a diary row in the test and a
   paragraph in `docs/milestones/process.md` § `gui/CLAUDE.md`.
 - [ ] `main` merged and the open PRs' additions folded in.
 - [ ] Skill: none. The skill is for an agent driving rietx; this file is for

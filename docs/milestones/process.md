@@ -843,6 +843,20 @@ examples route restates no protocol.  Root kept the half that governs
 command.  The other two root GUI rules needed no lines: the 409 and the
 theme's scope were already stated here in full.
 
+1060 -> 629 for WP-2134 (2026-11-09): the consolidation pass, by the
+method of WP-1031 and WP-1060 above.  The file had grown to 1059 lines and
+78 154 bytes, about 19 500 tokens at 4 bytes a token, paid by every session
+working under `gui/`.  Each paragraph had become a WP's whole story: the rule,
+the measurement that found it, the browser session and the numbers.  The pass
+moved all 41 such paragraphs, verbatim, into a "Moved from gui/CLAUDE.md"
+section of the 37 WP files they named, and rewrote the rulebook as standing
+rules grouped by the file a session edits, each naming its WP.  Nothing was
+deleted that had no second copy.  Six rules had drifted from the tree and were
+restated against it, and `test_gui_rulebook_paths_resolve` now fails on a path
+the rulebook names that has gone.  The visual-style rules keep their wording:
+WP-2134 lists them for the GUI style guide, which takes them next.  Landed
+628, 42 600 bytes, about 10 600 tokens, +1 headroom.
+
 ### `tests/CLAUDE.md`
 
 180 -> 198 for WP-1070 (2026-08-15): the running ladder.  It is a rule
