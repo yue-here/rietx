@@ -2191,7 +2191,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The data cannot tell some combinations of parameters apart, and the list "
             "shows only the strongest of these flat directions. This entry counts the "
             "weaker ones left out. Nothing was dropped from the fit. The identifiability "
-            "record on the result holds the full set."
+            "record on the result holds the full set, except after a joint fit of several "
+            "patterns."
         ),
     ),
     "FLOOR_HIT": HelpEntry(
