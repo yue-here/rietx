@@ -82,7 +82,7 @@ the guide's named tokens and tests exist, which is a name check, not a heuristic
 
 - [ ] Claimed: this file, the index row, a draft PR.
 - [x] `gui/STYLE.md`: rule, motive and marker per element, with the tests that check them named.
-- [ ] `gui/CLAUDE.md`: the pointer line.
+- [x] `gui/CLAUDE.md`: the pointer line.
 - [ ] A test that every token and test the guide names exists.
 - [ ] The 59 questions, each settled or sent on, recorded below; the batch to the maintainer.
 - [ ] `docs/milestones/gui-overhaul.md`: the unfiled pieces and the screenshot acceptance row;

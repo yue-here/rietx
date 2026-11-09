@@ -616,7 +616,9 @@ SIZE_CAPS: dict[str, int | None] = {
     # failure nobody can act on without the rule. Landed at 1045.
     # +4 (WP-1470): the scene rules' Python twin, which a session editing
     # structure3d.ts meets only as a red vitest otherwise.
-    "gui/CLAUDE.md": 1060,   # +3: the node floor the dist build needs (WP-1442)
+    # +1 (WP-2142): the pointer to gui/STYLE.md, the style guide the maintainer
+    # ruled on 2026-11-09, which a session changing how the GUI looks reads.
+    "gui/CLAUDE.md": 1061,   # +3: the node floor the dist build needs (WP-1442)
     # 275 -> 283 (WP-1426): a third way a guard goes quiet, and the only one of
     # the three that is about the instrument rather than the assertion — a
     # browser's layout-shift entry cannot see inside a plotly div, so a
