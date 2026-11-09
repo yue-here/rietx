@@ -276,9 +276,33 @@ export interface Candidate {
   diagnostics: Array<{ level: string; code: string; message: string }>;
 }
 
+/**
+ * One row of the adopt arm, parallel to the candidates (WP-2124).  Every row
+ * can be adopted (Yue's ruling B, 2026-11-08): `picked` is whether
+ * `best_or_none()` picks it, and `why` the sentence an adoption of any other
+ * row writes into its history node, empty on the picked row.
+ */
 export interface AdoptVerdict {
-  allowed: boolean;
+  picked: boolean;
   why: string;
+}
+
+/**
+ * What the search covered, read off the result's own two fields (WP-1042).
+ *
+ * `searched` is what was *tried*, `incomplete` the searched systems whose
+ * domain was not exhausted, in the order the result lists them.  A system
+ * never reached is in neither: `INDEX_BUDGET_EXHAUSTED` names it in its
+ * `where`, which the panel prints beside the code.
+ */
+export function searchCoverage(result: {
+  systems_searched?: readonly string[];
+  search_complete?: Readonly<Record<string, boolean>>;
+} | null | undefined): { searched: string[]; incomplete: string[] } {
+  const searched = [...(result?.systems_searched ?? [])];
+  const complete = result?.search_complete ?? {};
+  const incomplete = Object.keys(complete).filter((s) => complete[s] === false);
+  return { searched, incomplete };
 }
 
 /**

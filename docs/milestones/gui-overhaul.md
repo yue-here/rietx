@@ -53,10 +53,10 @@ the piece that touches it or a WP of its own.
   refusal reads "a extinction run".
 - Adopt is gated to `best_or_none()` (`ADOPT_GATED`). The maintainer ruled on 2026-11-08 that a
   person may adopt any candidate, with its grade and caveats shown beside Adopt and recorded in
-  the history node.
+  the history node. WP-2124 lifted the gate on the route and WP-2130 offers Adopt on every row.
 - The Peaks panel hides `systems_searched`, `search_complete` and the run-level `INDEX_*`
   diagnostics whenever there are candidates, against WP-1042's rule that what was not reached
-  is said loudly.
+  is said loudly. WP-2130 says it above the list in every case.
 - `.rxt` renders no block for user variables, and its tie refusal names only symmetry ties.
 - The Le Bail check's absent lines arrive in its own refined frame, about 0.011° from the
   candidate's ticks on fluorapatite; they should be served as tick indices.
@@ -65,7 +65,7 @@ the piece that touches it or a WP of its own.
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
 - `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
-- `--plot-peak` (purple) loses to the data crosses as a mark colour.
+- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer.
 - The pick route takes only `shoulders`; the 2θ range and `flag_contamination` need to reach it.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08.

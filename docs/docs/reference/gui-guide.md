@@ -360,10 +360,16 @@ named. The teaching point is the package's own. The extinction symbol is what a
 powder measures, and a single space group out of a class is a convention you
 choose rather than a measurement the table made.
 
-`Adopt` turns a candidate into a Le Bail scaffold and flips the mode. The
-panel enables it on the candidate `best_or_none()` picks. The route takes any
-candidate, and for one the gate did not pick it writes the grade and the caveats
-into the history node's label.
+Above the candidate table the panel says what the search covered: the crystal
+systems searched, the ones whose search did not finish, and every run-level
+diagnostic with the systems it names. A run that stopped at its ceiling says
+which systems it never reached, so a short list there is not evidence that no
+cell exists in them.
+
+`Adopt` turns a candidate into a Le Bail scaffold and flips the mode. Every row
+has it. The candidate `best_or_none()` picks wears that name as a badge. Every
+other row prints, under its grade, the sentence its adoption writes into the
+history node's label: that it is not the gate's pick, its grade and its caveats.
 
 ## Model
 
