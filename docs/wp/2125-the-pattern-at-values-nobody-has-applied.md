@@ -1,6 +1,6 @@
 # WP-2125 — the pattern at values nobody has applied
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — claimed by a ghostshift runner
 Depends on: 2123 soft (the shell the previews draw in)
 Priority: P2 2026-11-09 — the server half of the milestone's fourth piece; the sliders and both previews wait on it
 
