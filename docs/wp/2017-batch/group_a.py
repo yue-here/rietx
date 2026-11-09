@@ -404,6 +404,7 @@ def _png(family: str, constant: str, arm: str) -> Path:
 
 def build_start(family: str) -> str:
     """Pickle the family's start under the shipped constants; its sha256."""
+    FITS.mkdir(parents=True, exist_ok=True)
     path = _start_path(family)
     if not path.exists():
         was = compiled.set_enabled(True)
