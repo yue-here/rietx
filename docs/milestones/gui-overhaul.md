@@ -60,8 +60,9 @@ the piece that touches it or a WP of its own.
 - `.rxt` renders no block for user variables, and its tie refusal names only symmetry ties.
 - The Le Bail check's absent lines arrive in its own refined frame, about 0.011° from the
   candidate's ticks on fluorapatite; they should be served as tick indices.
-- `supercell_checks` names a relation for 2 of fluorapatite's 12 candidates; lattice relations
-  between candidates ("c doubled", "a × √3", "same cell") belong in rietx.
+- `supercell_checks` names a relation for 8 of fluorapatite's 12 candidates (measured by WP-2124
+  on 63d7c120a; naming the other four is WP-2124's follow-up); lattice relations between
+  candidates ("c doubled", "a × √3", "same cell") belong in rietx.
 - `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
 - `--plot-peak` (purple) loses to the data crosses as a mark colour.
@@ -70,6 +71,11 @@ the piece that touches it or a WP of its own.
   maintainer adopted both rules on 2026-11-08.
 - A GUI series lives in session memory only; several series gaps wait on the series fitting
   now changing on `main`.
+- The Model and Text panels keep their own Apply beside the action bar's, outlined so the bar's
+  Refine stays the one filled button, because WP-2123 routes only the Parameters edits through
+  the action bar. Their edits still wait on two Apply buttons in one view.
+- A run started from the Plan, Report or Series panel, or by the `.` key, does not apply the
+  Parameters edits waiting in the action bar; the bar's Refine and the `r` key do (WP-2123).
 
 ## Acceptance
 

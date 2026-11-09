@@ -930,7 +930,7 @@
     {/if}
     {#if !showWizard && dirty > 0}
       <span class="muted">{dirty} edit{dirty === 1 ? "" : "s"}</span>
-      <button disabled={busy || invalid.length > 0} onclick={apply}>Apply</button>
+      <button class="ghost" disabled={busy || invalid.length > 0} onclick={apply}>Apply</button>
       <button class="ghost" onclick={revert}>Revert</button>
     {/if}
   </header>
@@ -1357,7 +1357,8 @@
 
       {#if wizError}<p class="bad">{wizError}</p>{/if}
       <div class="create">
-        <button disabled={!!cannotCreate || busy} onclick={create}>Create project</button>
+        <button class:ghost={!!project} disabled={!!cannotCreate || busy}
+          onclick={create}>Create project</button>
         <span class="muted">{cannotCreate
           || "nothing is written until this — every file has already been read, and the directory above is made now if it does not exist"}</span>
       </div>
@@ -1463,7 +1464,7 @@
                 {/if}
               {/if}
               <div class="symrow">
-                <button disabled={symPreview.blocked || !symPreview.changed
+                <button class="ghost" disabled={symPreview.blocked || !symPreview.changed
                   || symBusy || busy} onclick={applySymbol}>Apply</button>
                 <button class="ghost"
                   onclick={() => { symPreview = null; symbolDraft = null; }}
