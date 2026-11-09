@@ -52,6 +52,9 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2076](2076-the-extinction-screen-names-a-wrong-class-at-a-correct-cell.md) | The extinction screen names a wrong class at a correct cell | 2026-11-07 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2078](2078-weak-lines-from-another-phase-push-the-true-cell-off-rank-1.md) | Weak lines from another phase push the true cell off rank 1 | 2026-11-05 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | 2026-11-09 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 2026-11-09 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2123](2123-the-layout-shell.md) | The layout shell | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -489,6 +492,12 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2108](2108-a-pawley-phase-beside-a-rietveld-phase.md) | A Pawley phase beside a Rietveld phase | ⬜ | P3 | [1964](1964-a-parametric-equation-the-user-writes.md) ([2104](2104-a-parametric-cell-in-a-le-bail-or-pawley-joint-fit.md) soft) |
 | [2118](2118-one-formula-language-for-every-constraint.md) | One formula language for every constraint | ✅ 2026-11-07 | — | [1964](1964-a-parametric-equation-the-user-writes.md) ([2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 
+## <a id="gui-overhaul"></a>gui-overhaul — the GUI redesigned around the pattern and the model
+
+| WP | Title | Status | Priority | Depends on |
+|---|---|---|---|---|
+| [2123](2123-the-layout-shell.md) | The layout shell | 🔄 2026-11-09 | P2 | — |
+
 ## <a id="unscheduled"></a>Unscheduled
 
 ### <a id="unscheduled-coming-from-another-code"></a>Coming from another code
@@ -642,6 +651,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2115](2115-what-the-bounded-suggestion-gain-still-leaves-open.md) | What the bounded suggestion gain still leaves open | ⬜ | P3 | [1998](1998-a-suggestion-past-its-bound.md) |
 | [2117](2117-a-recipe-ties-the-axial-pair.md) | A recipe ties the axial pair instead of holding H/L | ⬜ | P4 | [2012](2012-the-axial-ratios-are-interchangeable.md) |
 | [2120](2120-a-tail-shoulder-offered-as-a-line.md) | A tail shoulder on its position bound is offered as a line | ⬜ | P3 | — |
+| [2121](2121-a-restraint-follows-its-atoms-through-an-edit.md) | A restraint follows its atoms through an edit | 🔄 2026-11-09 | P2 | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 
@@ -665,7 +675,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | ✅ 2026-11-01 | — | — |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | ✅ 2026-11-06 | — | — |
 | [2081](2081-how-a-series-holds-what-the-setup-fixes.md) | How a series holds what the setup fixes (a design discussion) | ⬜ | P2 | — ([2003](2003-the-chain-actions.md) soft) |
-| [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | ⬜ | P3 | — |
+| [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | 🔄 2026-11-09 | P3 | — |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
 
@@ -719,6 +729,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2073](2073-the-qpa-record-says-what-its-fraction-rests-on.md) | The QPA record says what its fraction rests on, and QPA at given values has a route | ⬜ | P3 | — ([2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) soft) |
 | [2074](2074-the-report-says-where-the-residual-is-structured.md) | The report says where the residual is structured: a coherent-residual scan, the background's bulge, a replica scan on isolated lines | ⬜ | P3 | — ([2004](2004-the-fitreport-reasons-for-the-caller.md), [1931](1931-the-background-order-scan-runs-to-its-cap.md) soft) |
 | [2111](2111-what-the-structure-figure-still-misleads.md) | What the structure figure still misleads a reader with, and the ORTEP controls asked for | ⬜ | P3 | [1468](1468-what-the-polyhedra-still-miss.md) |
+| [2124](2124-the-gui-port-server-defects.md) | The indexing routes the GUI port needs: an ungated screen, any cell adopted, the pick's options | ✅ 2026-11-09 | — | — |
 
 ### <a id="unscheduled-data-and-metadata-in-a-structure-out"></a>Data and metadata in, a structure out
 
@@ -807,7 +818,9 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2064](2064-an-approval-belongs-to-the-value-it-approved.md) | An approval belongs to the value it approved | ⬜ | P4 | — |
 | [2065](2065-a-hung-fast-job-names-its-test.md) | A hung fast job names its test, and the hang is fixed | ✅ 2026-11-01 | — | — |
 | [2077](2077-the-workflow-sees-ghostshift-runners.md) | The WP workflow sees ghostshift's runners | ✅ 2026-11-02 | — | — |
-| [2119](2119-the-design-record-says-how-a-design-is-chosen.md) | The design record says how a design is chosen | ⬜ | P3 | — |
+| [2119](2119-the-design-record-says-how-a-design-is-chosen.md) | The design record says how a design is chosen | ✅ 2026-11-07 | — | — |
+| [2122](2122-the-mark-redrawn.md) | The mark's bar redrawn, and the header lockup set on the type | ✅ 2026-11-08 | — | — |
+| [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 

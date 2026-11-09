@@ -53,10 +53,12 @@ from .crystallography.symmetry import reflection_label, reflection_label_row
 from .crystallography.twins import (
     NumberingMoves,
     carry_constraints,
+    carry_restraints,
     carry_state_constraints,
     coordinate_snapshot,
     merge_site_twins,
     numbering_moves,
+    restraints_dropped_message,
     site_of,
 )
 from .help import help_key_for
@@ -3099,6 +3101,20 @@ class Refinement:
         edit that *repairs* such a state is not refused by the damage it is
         undoing.  It costs one table build on a cold path — the same build the
         next stage compile or ``parameters()`` call performs anyway.
+
+        **Holds, ties and restraints follow their atoms.**  An atom's dot-path
+        is its index, so a structure with an atom removed, inserted or
+        reordered numbers the others differently.  Each hold and tie is read
+        into the new numbering (#1264), and so is each restraint the new
+        structure still holds unchanged at its place in the list
+        (:func:`~.crystallography.twins.carry_restraints`, WP-2121).  One
+        appended after those was written for the new structure and is read as
+        written.  One changed in the same edit that renumbers its atoms could
+        mean either atom list, so it refuses the edit: change the atoms alone,
+        then the restraints.  One on an atom the edit removed is
+        dropped, and a warning names it.  A restraint, rigid body or
+        distortion-mode record that names an atom the new structure lacks
+        refuses the edit, since a list changed in place re-ran no check.
         """
         # Refused before anything is touched: a bank's table builds without
         # error, so nothing later stops the edit, and by then the structure,
@@ -3109,8 +3125,26 @@ class Refinement:
         # a proposed structure meets the twin merge before its table is built,
         # since moving a site changes the symmetry its table is checked against
         merged: list[Diagnostic] = []
+        restraints_dropped: list[str] = []
         if structure is not None:
             candidate = merge_site_twins(candidate, diagnostics=merged)
+            # A restraint names atoms by index and lives on the structure, out
+            # of reach of the registers ``_carry_twin_moves`` renumbers below,
+            # and a list changed in place re-ran no phase validator (WP-2121).
+            # The two refusals say different things: the first that a
+            # restraint's numbering is ambiguous, the second that a record
+            # names an atom the structure lacks.
+            try:
+                candidate, restraints_dropped = carry_restraints(self.structure, candidate)
+            except ValueError as exc:
+                raise ValueError(
+                    f"the edit is refused rather than recorded: {exc}") from None
+            try:
+                candidate._check_atom_references()
+            except ValueError as exc:
+                raise ValueError(
+                    f"this model names an atom it does not have, so the edit is "
+                    f"refused rather than recorded: {exc}") from None
         # No magnetic-group judgement here: ``edit`` receives refined state
         # plus one change (the GUI's funnel for every model edit), which is the
         # case :func:`_refined_state` exists for (issue #597).
@@ -3121,6 +3155,9 @@ class Refinement:
             raise ValueError(
                 f"this model has no parameter table, so the edit is refused "
                 f"rather than recorded: {exc}") from None
+        if restraints_dropped:
+            warnings.warn(restraints_dropped_message(restraints_dropped), UserWarning,
+                          stacklevel=2)
         # Reconcile the user constraints with the model being accepted, here
         # rather than at the next table build: this is the recorded verb, so the
         # register it leaves is the one the node carries, and a tie that stopped

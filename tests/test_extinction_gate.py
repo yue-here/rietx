@@ -411,6 +411,30 @@ def test_the_gate_fires_on_a_real_family_outside_the_prefits_basin(inputs, facto
     assert wrong.perfect_fit_rwp_net < 0.2 * REFERENCE_NET_RWP_MAX   # misfit
 
 
+@pytest.mark.parametrize("nudge", [1e-14, -1e-12, 1e-10, 1e-8, -1e-6])
+def test_a_prefit_whose_widths_left_no_reflection_reads_unreliable(nudge):
+    """FAP at ×0.99 is outside the prefit's basin, and the prefit runs its Caglioti
+    W to the 32 400 deg² bound there: a Gaussian about 180° 2θ wide.  Whether any
+    reflection then keeps its area inside the window filter flips on rounding,
+    and these relative nudges to the start each left **none** on macOS arm64 (6
+    of 12 tried; Linux CI hit it at the unnudged start).  The screen took the
+    "predicts no reflections" branch and reported ``failed`` with advice about
+    the cell being too small.  The reference gate is read first now, so the
+    screen says what it says at every other cell outside the basin (WP-2076)."""
+    data, instrument, limits, cell, system, centring, _truth = _fap()
+    f = 0.99 * (1.0 + nudge)
+    scaled = tuple(v * f for v in cell[:3]) + tuple(cell[3:])
+    screen = determine_extinction_symbol(data, CellCandidate(
+        cell=scaled, cell_esd=(0.0,) * 6, system=system, centring=centring,
+        volume=1.0), instrument, two_theta_limits=limits)
+    codes = [d.code for d in screen.diagnostics]
+    assert screen.status == "unreliable", codes
+    assert screen.reference_rwp_net > REFERENCE_NET_RWP_MAX
+    assert "EXTINCTION_SCREEN_UNRELIABLE" in codes
+    assert "EXTINCTION_SCREEN_FAILED" not in codes
+    assert screen.best_or_none() is None
+
+
 @pytest.mark.slow
 @pytest.mark.xfail(strict=True, reason=(
     "known miss: PbSO4 X-ray at x0.99 of its index cell; the prefit stops about "

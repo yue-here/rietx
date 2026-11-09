@@ -250,7 +250,7 @@
              ?? (dirty ? "save the plan first — this runs the plan the project holds"
                        : "run every stage in order")}>Run all</button>
     {#if dirty}
-      <button disabled={busy} onclick={save}>Save plan</button>
+      <button class="ghost" disabled={busy} onclick={save}>Save plan</button>
       <button class="ghost" disabled={busy} onclick={load}>Revert</button>
     {/if}
   </header>

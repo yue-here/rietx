@@ -2464,8 +2464,9 @@ class ExtinctionCandidate(Base):
     #: forbidden line coinciding with an allowed one never was an independently
     #: determined intensity, so removing it costs no parameter.
     #:
-    #: ``None`` until :attr:`screened` (and after a fit that raised, which
-    #: leaves no pattern to ask), and that is not bookkeeping.  The third
+    #: ``None`` until this class's own fit has run (and after that fit raised,
+    #: which leaves no pattern to ask), and that is not bookkeeping.  A class
+    #: whose scoring fit raised keeps its count while :attr:`screened` is False.  The third
     #: clause is a question about the class's *fit* — a window filled by a
     #: neighbour's tail measures the profile model rather than the absence
     #: (WP-1077) — so before the fit the count is unknown rather than zero, and
@@ -2495,8 +2496,8 @@ class ExtinctionCandidate(Base):
     #: charges the class for exactly the absences it is counted for.  It is this
     #: class's own fit when every forbidden line is testable, and the
     #: reference's when none is.  Stays ``inf`` when that second fit raised,
-    #: and the class is then refuted with its own fit's :attr:`rwp` and
-    #: :attr:`n_testable` kept
+    #: and the class is then unscored (:attr:`screened` False, not refuted)
+    #: with its own fit's :attr:`rwp` and :attr:`n_testable` kept
     chi2: float = float("inf")
     #: BIC(this class) − BIC(the absence-free lattice), from
     #: ``report.layer2.delta_bic``: **negative favours this class**.  Differences
@@ -2507,15 +2508,17 @@ class ExtinctionCandidate(Base):
     #: restoring the forbidden reflections is *justified*, i.e. the class's
     #: absences are contradicted by the fit
     absences_rejected: bool = False
-    #: was the screen fit actually run for this class?  False only when
-    #: ``max_classes`` truncated the screen or ``cancel`` stopped it first; the
+    #: was this class scored?  False when ``max_classes`` truncated the screen,
+    #: ``cancel`` stopped it first, or one of its two fits raised.  A raised fit
+    #: is no evidence about the absences, so the class is left unscored rather
+    #: than refuted, and ``EXTINCTION_SYMBOL_AMBIGUOUS`` names the error.  The
     #: absence test reads this class's own fit, so it never runs before one
     screened: bool = False
     #: **One-sided by construction.** A class asserts *absences*, so intensity at
     #: a position it forbids contradicts it — while a class claiming too *few*
     #: absences asserts nothing the data can falsify and is outranked rather than
-    #: refuted.  The one other way in is a screen fit that raised, which
-    #: :attr:`refuted_reason` names as such: with no χ² it cannot be the answer.
+    #: refuted.  A fit that raised is not a way in: it leaves the class
+    #: unscored (:attr:`screened`), and the screen abstains.
     refuted: bool = False
     refuted_reason: str | None = None
     diagnostics: list[Diagnostic] = Field(default_factory=list)

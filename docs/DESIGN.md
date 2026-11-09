@@ -25,7 +25,7 @@ of powder diffraction is in scope.
 
 ## Rules
 
-Four, each a consequence of the paragraph above. Milestones and rulebooks cite them by
+Five, each a consequence of the paragraph above. Milestones and rulebooks cite them by
 number. A sentence that nobody would use to make a choice does not belong here.
 
 1. **Decisions.** Ambiguity comes in three kinds, and the package answers each
@@ -152,6 +152,26 @@ number. A sentence that nobody would use to make a choice does not belong here.
 
    *A new skill row.* It names a field, a verb, a code, or a trap or practice with a
    source outside rietx's own runs. Anything else is cut.
+
+5. **Choosing a design.** Three tests, and an order for when they disagree.
+
+   *Convention.* A change takes the shape rietx already uses for the same job. One shape
+   sets fewer traps for a person or an agent learning the package. A departure names in
+   its WP the likely mistake or the wrong number the convention would cause. A convention
+   found wrong is changed everywhere in one change. It is never broken in one place.
+
+   *Direction.* A design builds towards the stated direction of its milestone or of the
+   project. Cases test it as acceptance rows. A design is not fitted to one case, and
+   nothing is built before a case needs it.
+
+   *Practice.* Where a good answer exists, in diffraction or in another field, rietx
+   adopts it and spends its effort on the questions practice leaves open. A practice
+   yields to accuracy and to the constraints a reused design must meet. The survey behind
+   it is in `docs/practice.md`.
+
+   *Conflicts.* The shape of the API follows rietx convention. A name or a meaning follows
+   the term the literature and the IUCr dictionaries use. One program's keyword is not
+   that term, and rietx takes no alias for one. A number follows accuracy.
 
 ## Locked decisions
 
