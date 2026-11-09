@@ -8,7 +8,7 @@ The table walks both models, gives every `Parameter` it finds a name, and record
 {eq}`par-affine` is the mapping, p<sub>phys</sub> = C·p<sub>free</sub> + d.
 The table is rebuilt from the models at every stage boundary, so a row is never stale against the objects it came from.
 
-[Parameter map](parameters.md) lists every name with its unit, default and typical range.
+[Parameter map](parameters.md) and [Instrument parameter map](parameters-instrument.md) list every name with its unit, default and typical range.
 [About parameters](../concepts/parameters.md) groups them by what they belong to.
 
 ## Names

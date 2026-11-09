@@ -89,9 +89,21 @@ def test_notation_renders_outside_code_spans(text, rendered):
     assert reference_pages._notation(text) == rendered
 
 
+@pytest.mark.parametrize("pages", [
+    {"parameters.md": ("Cell and structure",), "elsewhere.md": ("Cell and structure",)},
+    {"parameters.md": ("Cell and structure",)},
+])
+def test_a_group_shown_twice_or_nowhere_raises(monkeypatch, pages):
+    """Each group lands on exactly one parameter-map page (WP-2087)."""
+    monkeypatch.setattr(reference_pages, "PARAMETER_PAGES", pages)
+    with pytest.raises(RuntimeError, match="exactly once"):
+        reference_pages.parameter_map()
+
+
 def test_the_map_shows_every_entry_once_with_its_unit():
-    """One table row and one definition per registry entry."""
-    text = reference_pages.parameter_map()
+    """One table row and one definition per registry entry, across both pages."""
+    text = "\n".join(reference_pages.parameter_map(name)
+                     for name in reference_pages.PARAMETER_PAGES)
     for entry in help_registry()["parameters"]:
         first = f"`{entry['paths'][0]}`"
         assert text.count(f"| {first}") == 1, entry["paths"]
