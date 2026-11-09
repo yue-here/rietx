@@ -70,9 +70,12 @@ its code. Any reader takes the stored format from a file's contents.
   twenty seeds; the unscaled esds equal the joint ones within 1.1 %, and the scaled ones
   move with five degrees of freedom' χ²/ν, 0.35-1.30× the joint ones.
   `2106-measure/trajectory_vs_joint.py` and its results file.)
-- [ ] GSAS-II's stored equations: read `SeqParFitEqList` from a `.gpx` into this fit's
+- [x] GSAS-II's stored equations: read `SeqParFitEqList` from a `.gpx` into this fit's
   input, or refuse by name. Lower GSAS-II's spelling onto the grammar, with a table of
-  each rewrite.
+  each rewrite. (`Gsas2Model.sequential_equations`, one `Gsas2SequentialEquation` each;
+  the rewrites are `GSAS2_EXPRESSION_REWRITES`, held equal to the table in
+  `reference/foreign-models.md`. The layout was read off the contents of the public
+  GSAS-II tutorials' `steel.gpx`.)
 - [ ] Manual: `guides/equation.md` beside the joint route, and `switching/gsas2.md`.
 - [ ] Skill: the series reference's row.
 
