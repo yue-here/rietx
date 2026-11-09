@@ -56,7 +56,7 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 | Edit recovery | Unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 |
 | Fit statistics in the action bar | Rwp and GoF beside Refine while the graphs are hidden ("try B") | 2026-11-09 |
 
-Three decisions wait on the maintainer before the piece that needs them:
+Three decisions went to the maintainer before the piece that needs them. The first is now ruled, and two still wait:
 
 - A plan stage that fixes as well as frees. The maintainer wants it (2026-11-07); in rietx it is
   a `turn_off` list on `StageSpec` and a `fix` clause in `.rxt`, both stored-format changes, so

@@ -40,12 +40,13 @@ Other established themes (Solarized light and dark, Monokai and others) ship as 
 `theme.py` still holds the first GUI's blue and red.
 The palette piece moves it, and adds the site's roles the GUI lacks: a second text ink, a faint ink, a strong rule for control borders, a tinted ground, a hover ground, the accent as text, ink on a fill, and an info state. [Yue 2026-11-06, 2026-11-09]
 
+- Settings offers the theme. Whether it offers "follow the system" beside light, dark and the named themes waits on [open B2].
 - A colour is chosen by its job, never by its look. [Yue 2026-11-06, adopting the site's rule]
 - The chrome tokens are `--fg`, `--bg`, `--panel`, `--line`, `--muted`, `--accent`, `--ok`, `--warn` and `--bad`. A page's extra role (a hover, a focus ring, a sunken track) is a `color-mix` over them and never a token of its own. [inferred, WP-1429]
 - The accent marks things and sets no running words. It marks the current tab's underline, the focus ring, a ticked box's tick, a selection on a plot, and the calculated curve. Links take the accent's text role. [Yue 2026-11-06 for the curve; inferred, from the site, for the rest]
 - The state colours (`--ok`, `--warn`, `--bad`, and info once it exists) mean states and nothing else. A warning is ochre, so it never reads as the brand. [inferred, from the site]
 - No number is judged by colour. Rwp and GoF are plain numbers, and no row turns green because a value moved. [inferred, WP-1217]
-- Every text colour clears 4.5:1 against each ground it sits on, and the accent clears 3:1 as a mark. Each pair is measured. [inferred, from the site]
+- Every text colour clears 4.5:1 against each ground it sits on, and the accent clears 3:1 as a mark. A test measures only ink on the accent fill today, so the palette piece adds a test for the other pairs as it moves them. [inferred, from the site]
 - A plot mark takes a `--plot-*` token of its own, and every plot colour stays at least the floor in `tests/test_gui_palette.py` from every other one. When the accent becomes orange, today's `--plot-calc` and `--warn` fall under that floor, so the plot palette moves with the chrome in the same piece. [inferred, WP-1210]
 - Phases take `--phase-0` onwards in order, with the most legible first. A single phase's ticks are neutral ink. [inferred, WP-1029]
 - `rietx watch` and `rietx compare` read the same `theme.py`, so they change colour with the GUI. Their layout is outside this guide. [inferred, WP-1429]
@@ -177,7 +178,7 @@ Claude inferred rules 1 to 12 from the rulings on background points and peak pic
 
 These tests hold the rules a machine can check cheaply. A new rule that a machine can check gets a test here.
 
-- `tests/test_gui_palette.py`: the token values and the generated `gui/src/tokens.css`, the plot palette's floor, and text contrast.
+- `tests/test_gui_palette.py`: the token values and the generated `gui/src/tokens.css`, the plot palette's floor, and the contrast of ink on the accent fill.
 - `tests/test_gui_layout_browser.py`: no click moves the layout, collapse buttons stay where they were, and a phone-width window never scrolls sideways.
 - `gui/src/lib/style.test.ts`: no panel sets a register's size, padding or radius, and no size falls outside the steps.
 - `tests/test_gui_dist.py`: no built file names a remote host, so every font is the app's own.
