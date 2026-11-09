@@ -1,6 +1,6 @@
 # WP-2018 — The clash table: actions that read or move the same parameter, measured both ways
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
 Track: The audits
 Depends on: —
 Priority: P3 2026-10-20 — split from WP-2002 by the maintainer; 38 candidate pairs found and none measured, and one past clash (WP-1320) changed a design
