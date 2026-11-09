@@ -2385,6 +2385,27 @@ class CompiledModel:
         return (y_bkg + self.extra_peak_curve(values)
                 + self.bragg_component(values)), y_bkg
 
+    def evaluate_parts(self, values: dict[str, float]
+                       ) -> tuple[np.ndarray, np.ndarray, list[np.ndarray]]:
+        """``(evaluate(values), background(values), [phase_0, phase_1, …])``.
+
+        For an at-rest reader that draws each phase beside the total, such as
+        the GUI's preview route (WP-2125).  One Bragg pass serves both: each
+        phase is computed once and the Bragg sum is :meth:`bragg_component`'s,
+        zeros first and then the phases in order.  The total takes
+        :meth:`evaluate`'s association, background first and the declared
+        peaks before the Bragg sum, so it is bit-identical to it (pinned by
+        ``tests/test_gui_preview.py``).
+        """
+        y_bkg = self.background(values)
+        parts = [self.phase_component(ip, values) for ip in range(len(self.phases))]
+        y = get_backend().zeros_like(self.tt)
+        for comp in parts:
+            y = y + comp
+        if not self.peak_components:
+            return y_bkg + y, y_bkg, parts
+        return y_bkg + self.extra_peak_curve(values) + y, y_bkg, parts
+
     def phase_support(self, values: dict[str, float]) -> np.ndarray:
         """Each phase's integrated contribution ‖y_p/σ‖₂ over the fitted range.
 
