@@ -49,7 +49,11 @@
   const count = $derived(
     touched ? `${touched} pending ${touched === 1 ? "edit" : "edits"}` : "",
   );
-  const note = $derived(invalid ? `${count} · ${invalid}` : count);
+  // The slot shows a short message it always has room for, and an invalid
+  // edit's reason, which has no length limit, rides in the slot's tooltip and
+  // in the invalid cell's own. A cut message was the defect this replaced: a
+  // reason clipped at the slot's edge, which no click could widen.
+  const note = $derived(invalid ? "invalid edit" : count);
 </script>
 
 <!-- Two groups that wrap as wholes, the second held to the right. Every width
@@ -63,9 +67,7 @@
     {/each}
   </div>
   <div class="go">
-    <!-- the full text rides in the title because the slot may cut it: a value
-         the layout truncated is what a `title=` is still for (gui/CLAUDE.md) -->
-    <span class="pending" class:bad={!!invalid} title={note || null}>{note}</span>
+    <span class="pending" class:bad={!!invalid} title={invalid || null}>{note}</span>
     <button class="ghost" disabled={!touched} onclick={onrevert}>Revert</button>
     <button class="ghost" disabled={busy || !touched || !!invalid} onclick={onapply}>Apply</button>
     <button class="refine" disabled={busy || !!invalid || !!blocked} title={blocked}
@@ -93,13 +95,13 @@
     margin-left: auto;
   }
 
-  /* as wide as "99 pending edits", and it cuts rather than grows */
+  /* as wide as the longest message, "99 pending edits", which
+     tests/test_gui_layout_browser.py measures in the slot's own font, so no
+     message is cut and none grows the row */
   .pending {
     width: 16ch;
     /* one line tall while empty, so the first edit grows nothing */
     min-height: 1lh;
-    overflow: hidden;
-    text-overflow: ellipsis;
     text-align: right;
     color: var(--muted);
   }

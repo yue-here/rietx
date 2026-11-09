@@ -187,6 +187,43 @@ def test_a_pending_edit_moves_nothing_in_the_action_bar(browser, gui, state):
     assert not moved, moved
 
 
+#: The pending slot's width against its messages' ink, in the slot's own font:
+#: what it shows now, and the longest count it can show, "99 pending edits".
+SLOT_ROOM = """() => {
+  const slot = document.querySelector(".actions .pending");
+  const ctx = document.createElement("canvas").getContext("2d");
+  ctx.font = getComputedStyle(slot).font;
+  const ink = (text) => ctx.measureText(text).width;
+  return {room: slot.clientWidth, shown: slot.textContent.trim(),
+          ink: ink(slot.textContent.trim()), longest: ink("99 pending edits"),
+          title: slot.getAttribute("title") || ""};
+}"""
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_an_invalid_edit_is_said_in_full_and_moves_nothing(browser, gui, state):
+    """The slot says an edit is invalid in words it has room for, the reason
+    rides in its tooltip, and nothing in the shell moves to say either."""
+    url, _ = gui
+    page = _open(browser, url, WIDTHS[state])
+    value = page.locator(".row input.value").first
+    before = page.evaluate(SNAP, LANDMARKS)
+    value.click()
+    page.keyboard.press("ControlOrMeta+a")
+    page.keyboard.type("abc")
+    _frames(page)
+    slot = page.evaluate(SLOT_ROOM)
+    moved = _moved(before, page.evaluate(SNAP, LANDMARKS))
+    page.locator(".actions button", has_text="Revert").click()
+    _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert slot["shown"] == "invalid edit", slot
+    assert "not a number" in slot["title"], slot
+    assert slot["ink"] <= slot["room"] and slot["longest"] <= slot["room"], slot
+    assert not moved, moved
+
+
 @pytest.mark.parametrize("state", list(WIDTHS))
 def test_a_collapse_button_stays_where_it_was(browser, gui, state):
     """Each side's button sits at its own end of the header, and pressing one

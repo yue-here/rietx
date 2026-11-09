@@ -1143,7 +1143,11 @@ describe("the parameter table", () => {
     // Apply is blocked, not silently partial — and Revert is still offered,
     // which is the affordance the bad cell most needs
     expect(button("Apply")?.disabled).toBe(true);
-    expect(host.textContent).toContain("above the upper bound 1");
+    // the action bar says so in words its slot has room for, and the reason
+    // rides in that slot's tooltip as well as the cell's
+    const slot = host.querySelector<HTMLElement>(".actions .pending")!;
+    expect(slot.textContent?.trim()).toBe("invalid edit");
+    expect(slot.title).toBe("w: above the upper bound 1");
     button("Revert")!.click();
     await flush();
     expect(host.textContent).not.toContain("pending edit");

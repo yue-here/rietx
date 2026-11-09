@@ -172,6 +172,11 @@ Claude, reversible", with its alternative, and waits for the maintainer's review
     foot of the graph column, so Refine stays a visible button with either side collapsed. The
     move is part of the collapse click, which asks for a layout change. Alternative: one bar
     across the whole window, under both sides.
+13. Settled by Claude, reversible: while an edit is invalid, the pending slot reads `invalid
+    edit`, and the reason (`w: above the upper bound 1`) rides in that slot's tooltip and in the
+    invalid cell's own. The slot stays 16ch, which a browser test measures against its longest
+    message, so no message is cut and none moves the row. Alternative: a popover above the bar
+    that shows the reason without a hover.
 
 ## Non-goals
 
