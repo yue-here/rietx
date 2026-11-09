@@ -50,8 +50,8 @@ design this WP builds is restated here with its ruling.
 3. **A drag handle of three stacked lines reorders stages, and a plan menu chooses plans.** Ruled
    2026-11-07 (sixth review). In the prototype the handle also answers the arrow keys when
    focused, the lifted stage follows the pointer and the others slide aside.
-4. **A stage may fix as well as free.** Ruled 2026-11-07 (sixth review). Not built here: see
-   *Waiting on the maintainer* below.
+4. **A stage may fix as well as free.** Ruled 2026-11-07 (sixth review), and ruled required on
+   2026-11-09. Not built here: a follow-up WP builds it. See *Ruled: a stage that fixes* below.
 5. **No permanent explanatory text.** Ruled 2026-11-07 (sixth review), repeated 2026-11-08
    ("again, too much AI prose"): an explanation lives in a tooltip or a help box. Today's three
    paragraphs go.
@@ -85,10 +85,29 @@ follows `npm --prefix gui run build`.
 - **One authority per plan**: `ProjectDoc.plan`, written by `PUT /api/plan`. The panel holds an
   unsaved copy and nothing else.
 
-### Waiting on the maintainer: a stage that fixes
+### Ruled: a stage that fixes
 
 The maintainer ruled on 2026-11-07 that a stage may fix as well as free. In rietx that is a
-stored-format change, so it waits for a go-ahead and its own WP. The fields it would add:
+stored-format change, so it waited for a go-ahead and its own WP.
+
+**Ruled 2026-11-09 by Yue Wu**, verbatim: "specifically, I'm thinking of a common case where the
+profile will be fixed with a pawley refinement, then locked; after that, the structural
+parameters are released. Also the case for series refinements (as will be decided soon in the
+series wps). The mechanism can be left to your best judgement but the functionality is
+required."
+
+So the functionality is required, and it is a follow-up WP, not PR #1483. The mechanism is
+Claude's to settle. The brief recommended a `StageSpec.turn_off` list, shown as `fix` in `.rxt`,
+with the closing stage re-solving the plan's end state rather than the union of every `turn_on`.
+The follow-up WP takes two acceptance cases from the ruling:
+
+1. A Pawley fit settles the profile, the profile is then fixed, and a Rietveld plan frees the
+   structure. This crosses a mode change. `StageSpec` carries no mode field today (mode is the
+   fit's), so the WP first checks whether one plan can carry the case or it spans two fits,
+   where `hold` (WP-1435's verb that keeps a parameter fixed across plans) may be the mechanism.
+2. Series refinements, which the series WPs will define.
+
+The brief's fields, for the follow-up WP to confirm or replace:
 
 - `StageSpec.turn_off: list[str] = []` in `src/rietx/schemas/plan.py`, dot-path globs this
   stage fixes after it frees `turn_on`, and the same field on the `Stage` dataclass
@@ -197,6 +216,9 @@ stage, and the milestone's row 8 (a five-stage plan read top to bottom) holds in
 
 ## Handover log
 
+- **2026-11-09** — the maintainer ruled the fixing stage required (§ Ruled: a stage that fixes):
+  a follow-up WP, not this PR, with the mechanism Claude's to settle and two acceptance cases,
+  Pawley-then-Rietveld and series. Recorded only; nothing built.
 - **2026-11-09** — built by a ghostshift runner; PR #1483. The Plan tab now reads as a
   recipe: one row per stage, a handle that drags it, its globs as chips each with a × beside
   it, and the ladder line saying what the stage frees and holds. A person can build a plan in
