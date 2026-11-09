@@ -91,7 +91,7 @@ The 1b docs recipe rests on one synthetic family and says so.
       `None` where unmeasured.
 - [ ] `write_qpa_table` adds a `#` caveat per such phase; `qpa_trajectory` carries the flag per
       point (mark or skip, as ruled).
-- [ ] `STRAIN_UNUSUALLY_LARGE` and `SIZE_UNUSUALLY_SMALL` say "held at" when the hold kept the
+- [x] `STRAIN_UNUSUALLY_LARGE` and `SIZE_UNUSUALLY_SMALL` say "held at" when the hold kept the
       value.
 - [ ] Docs: `docs/docs/reference/qpa.md` § One basin gains the absorbed case (a profile that
       confirms the esd does not establish the phase exists; the rival-model refit, measured on
