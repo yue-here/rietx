@@ -428,9 +428,10 @@ def _render_peaks(project) -> list[str]:
     widths = [max(2, *(len(r[0]) for r in rows))] + [
         max(len(name), *(len(r[k]) for r in rows))
         for k, name in ((1, "2theta"), (2, "esd"), (3, "fwhm"), (4, "I"))]
-    shoulders = doc.pick_options.get("shoulders", True)
+    limits = (tuple(project.doc.two_theta_limits)
+              if project.doc.two_theta_limits else None)
     provenance = ("σ assumed, not measured" if doc.peaks.source == "positions"
-                  else f"session.pick_peaks(shoulders={shoulders})")
+                  else store.pick_call(doc.pick_options, default_range=limits))
     names = ("2theta", "esd", "fwhm", "I")
     lines = [
         f"peaks {len(rows)}".ljust(34) + f"# {provenance}",
@@ -1320,7 +1321,7 @@ def _apply_peaks(project, delta: Delta, editor) -> list[str]:
         limits = (tuple(project.doc.two_theta_limits)
                   if project.doc.two_theta_limits else None)
         editor = store.PeakEditor(project.data, project.refinement.instrument,
-                                  two_theta_range=limits)
+                                  **store.settings_of(doc, default_range=limits))
     where = {i: doc.peaks.peaks[i].two_theta
              for i in set(delta.peak_moves) | set(delta.peak_flags)}
 
