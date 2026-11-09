@@ -101,8 +101,14 @@ many ways, not from replicate measurements (his footnote, p. 606).
       third in dispatch), one histogram read `gsas2.histogram_arrays`; σ = 1/√w
       reproduces each histogram's stored `wR` and the project's 6.1707 % over
       8 739 channels to 1e-12 (`tests/test_projects_gsas2.py`).
-- [ ] Obtain Hill (1992) from the maintainer. Transcribe Table 7 and Table 9
-      into a fixture with the page and table cited per row.
+- [x] Obtain Hill (1992) from the maintainer. Transcribe Table 7 and Table 9
+      into a fixture with the page and table cited per row. *Done
+      2026-11-09:* the paper was already in the contributor's library (its
+      fact note dates from 2026-10-08), so nothing was asked of the
+      maintainer. `tests/data/hill1992_pbso4_round_robin.json` holds Tables 7,
+      8 (σ_ext, σ_int, ℜ) and 9 from page images of pp. 601 and 604;
+      `tests/test_round_robin_pbso4_tables.py` checks it against the paper's
+      own relations, each with a planted error.
 - [ ] `tests/test_acceptance_pbso4_round_robin.py`, slow-marked: neutron,
       X-ray and joint fits from the published single-crystal model. Assert
       every Table 7 value inside the participants' range, |Δ| under a bar
