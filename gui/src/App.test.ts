@@ -4552,27 +4552,69 @@ describe("the peaks tab (WP-1027)", () => {
     expect(stub.calls.filter((c) => c.method === "POST" && c.path === "/api/project")).toEqual([]);
   });
 
-  it("disables Adopt for a medium candidate and quotes the server's why", async () => {
-    vi.stubGlobal("fetch", server({}).fetcher);
+  it("offers Adopt on a medium candidate, with the server's why beside it (WP-2130)", async () => {
+    const stub = server({
+      "/api/index/adopt": (call: Call) => ({ body: { node_id: "n0008", mode: "lebail",
+        picked: false, api_call: `session.adopt_candidate(${call.body.candidate})` } }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    const why = "not best_or_none()'s pick: grade 'medium' (shift_allowance_assumed)";
     app = mount(Peaks, { target: host, props: {
       peaks: PEAKS_PAYLOAD as any,
       indexAnswer: {
         result: { candidates: [MEDIUM_CANDIDATE], diagnostics: [], quality: null },
-        adopt: [{ allowed: false, why: "confidence is 'medium' (shift_allowance_assumed); only the one candidate best_or_none() returns can be adopted" }],
+        adopt: [{ picked: false, why }],
         refuting_caveats: ["predicted_but_absent"], running: false,
       },
       run: IDLE_RUN as any, busy: false,
     } });
     await flush();
 
+    // Yue's ruling B (2026-11-08): any candidate can be adopted, and one the
+    // gate did not pick says its grade and caveats beside the button
     const adopt = button("Adopt")!;
-    // the gate does not leak into the UI: the button follows the server's arm
-    expect(adopt.disabled).toBe(true);
-    expect(adopt.title).toContain("medium");
+    expect(adopt.disabled).toBe(false);
+    expect(adopt.closest("td")!.querySelector(".why")!.textContent).toBe(why);
+    // never a confident singleton: no row wears the gate's badge, and the
+    // list says it is ranked
+    expect(host.querySelector("tr.best")).toBeNull();
     expect(host.textContent).toContain("the list below is ranked, not chosen");
+    adopt.click();
+    await flush();
+    expect(stub.calls.find((c) => c.path === "/api/index/adopt")?.body)
+      .toEqual({ candidate: 0 });
   });
 
-  it("enables Adopt only when the server's arm allows, and sends the candidate", async () => {
+  it("says what the search covered even when it found candidates (WP-1042, WP-2130)", async () => {
+    vi.stubGlobal("fetch", server({}).fetcher);
+    app = mount(Peaks, { target: host, props: {
+      peaks: PEAKS_PAYLOAD as any,
+      indexAnswer: {
+        result: {
+          candidates: [MEDIUM_CANDIDATE], quality: null,
+          systems_searched: ["cubic", "hexagonal", "trigonal"],
+          search_complete: { cubic: true, hexagonal: true, trigonal: false },
+          diagnostics: [{ level: "warning", code: "INDEX_BUDGET_EXHAUSTED",
+            message: "The run hit its declared ceiling of 120 s, so the answer covers what was reached.",
+            where: ["truncated: trigonal", "not reached: orthorhombic, monoclinic, triclinic"] }],
+        },
+        adopt: [{ picked: false, why: "not best_or_none()'s pick: grade 'medium'" }],
+        refuting_caveats: [], running: false,
+      },
+      run: IDLE_RUN as any, busy: false,
+    } });
+    await flush();
+
+    const coverage = host.querySelector(".coverage")!.textContent!;
+    expect(coverage).toContain("Searched: cubic, hexagonal, trigonal");
+    expect(coverage).toContain("Search incomplete in trigonal");
+    expect(coverage).toContain("INDEX_BUDGET_EXHAUSTED");
+    expect(coverage).toContain("not reached: orthorhombic, monoclinic, triclinic");
+    // and the candidates are still listed below it
+    expect(button("Adopt")).toBeTruthy();
+  });
+
+  it("badges the gate's pick and sends the candidate", async () => {
     const stub = server({
       "/api/index/adopt": (call: Call) => ({ body: { node_id: "n0007", mode: "lebail",
         api_call: `session.adopt_candidate(${call.body.candidate})` } }),
@@ -4584,7 +4626,7 @@ describe("the peaks tab (WP-1027)", () => {
         result: { candidates: [{ ...MEDIUM_CANDIDATE, confidence: "high",
                                  confidence_caveats: [] }],
                   diagnostics: [], quality: null },
-        adopt: [{ allowed: true, why: "" }],
+        adopt: [{ picked: true, why: "" }],
         refuting_caveats: [], running: false,
       },
       run: IDLE_RUN as any, busy: false,
@@ -4656,7 +4698,7 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
   const INDEX_ANSWER = {
     "/api/index/result": () => ({ body: {
       result: { candidates: [MEDIUM_CANDIDATE], diagnostics: [], quality: null },
-      adopt: [{ allowed: false, why: "confidence is 'medium'" }],
+      adopt: [{ picked: false, why: "confidence is 'medium'" }],
       refuting_caveats: [], running: false,
     } }),
     "/api/index/ticks": () => ({ body: {
@@ -4953,7 +4995,7 @@ describe("the hover readout (WP-1213)", () => {
       "/api/peaks": () => ({ body: PEAKS_PAYLOAD }),
       "/api/index/result": () => ({ body: {
         result: { candidates: [MEDIUM_CANDIDATE], diagnostics: [], quality: null },
-        adopt: [{ allowed: false, why: "confidence is 'medium'" }],
+        adopt: [{ picked: false, why: "confidence is 'medium'" }],
         refuting_caveats: [], running: false } }),
       "/api/index/ticks": () => ({ body: {
         candidate: 0, space_group: "R -3 m :H", two_theta: [9.398, 12.0],
@@ -4981,13 +5023,13 @@ describe("the hover readout (WP-1213)", () => {
 });
 
 describe("the extinction screen table (WP-1027)", () => {
-  it("ranks classes, lists every space group, and keeps chips inert without the adopt verdict", async () => {
+  it("ranks classes, lists every space group, and offers every unrefuted one", async () => {
     vi.stubGlobal("fetch", server({}).fetcher);
     app = mount(Peaks, { target: host, props: {
       peaks: PEAKS_PAYLOAD as any,
       indexAnswer: {
         result: { candidates: [MEDIUM_CANDIDATE], diagnostics: [], quality: null },
-        adopt: [{ allowed: false, why: "confidence is 'medium'" }],
+        adopt: [{ picked: false, why: "confidence is 'medium'" }],
         refuting_caveats: [], running: false,
       },
       extinction: EXTINCTION(null),
@@ -5011,8 +5053,11 @@ describe("the extinction screen table (WP-1027)", () => {
     // both members of the class render — the singleton is unmeasurable…
     expect(host.textContent).toContain("P 63/m");
     expect(host.textContent).toContain("P 63");
-    // …and with the candidate not adoptable, no space-group chip is a button
-    expect(button("P 63")).toBeFalsy();
+    // …and any candidate can be adopted (Yue's ruling B, 2026-11-08), so an
+    // unrefuted class's members are buttons even off the gate's pick, while a
+    // refuted class's stay facts
+    expect(button("P 63")).toBeTruthy();
+    expect(button("P 63 c m")).toBeFalsy();
     // the not-separable info must be shown (it is information, not a footnote)
     expect(host.textContent).toContain("EXTINCTION_GROUPS_NOT_SEPARABLE");
   });
@@ -5029,7 +5074,7 @@ describe("the extinction screen table (WP-1027)", () => {
         result: { candidates: [{ ...MEDIUM_CANDIDATE, confidence: "high",
                                  confidence_caveats: [] }],
                   diagnostics: [], quality: null },
-        adopt: [{ allowed: true, why: "" }],
+        adopt: [{ picked: true, why: "" }],
         refuting_caveats: [], running: false,
       },
       extinction: EXTINCTION(0),

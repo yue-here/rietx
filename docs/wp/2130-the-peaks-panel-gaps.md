@@ -120,11 +120,11 @@ Not here, left for the piece that redraws the Peaks panel or a WP of its own:
 
 ## Tasks
 
-- [ ] 1. The coverage is said whatever the run found. Above the candidate list (and in the
+- [x] 1. The coverage is said whatever the run found. Above the candidate list (and in the
   no-candidate branch, as before): the systems searched, the ones whose search did not
   complete, and every run-level diagnostic with its `where`, so `INDEX_BUDGET_EXHAUSTED`'s
   "not reached: …" reaches the screen. Vitest: a result with candidates still shows them.
-- [ ] 2. Adopt on every row, reading `picked` and `why`. The `best_or_none()` badge follows
+- [x] 2. Adopt on every row, reading `picked` and `why`. The `best_or_none()` badge follows
   `picked`; a row it does not pick shows the server's `why` beside Adopt; the extinction
   table's space-group buttons are enabled for any screened candidate. `index_result` drops
   `allowed`. Vitest and `test_gui_peaks.py` updated.
@@ -136,7 +136,7 @@ Not here, left for the piece that redraws the Peaks panel or a WP of its own:
   history node asserted, and no shell landmark moved.
 - [ ] Tests: `npm --prefix gui test`, `npm --prefix gui run check`, the dist rebuilt,
   `tests/test_gui_manual.py` (screenshots where changed), `tests/test_gui_palette.py`.
-- [ ] Manual: the GUI guide's indexing section says any row can be adopted.
+- [x] Manual: the GUI guide's indexing section says any row can be adopted.
 
 ## Acceptance
 

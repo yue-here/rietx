@@ -12,8 +12,11 @@
    * **primary** view and the singleton a badge on it — `best_or_none()`
    * returning nothing is the *expected* first outcome on real lab data, so a
    * "here is your cell" happy path would look broken most of the time. And the
-   * Adopt button's enabled-ness is the **server's** `adopt` arm, never a local
-   * reading of `confidence`: the button and the route must be one answer.
+   * gate's pick is the **server's** `adopt` arm, never a local reading of
+   * `confidence`. Every row can be adopted (Yue's ruling B, 2026-11-08,
+   * WP-2124); a row the gate did not pick shows the arm's `why` beside Adopt,
+   * the sentence its history node records. What the search covered is said
+   * above the list whatever it found (WP-1042, WP-2130).
    */
   import { untrack } from "svelte";
 
@@ -47,6 +50,8 @@
     formatIntensity,
     formatPosition,
     intensityScale,
+    searchCoverage,
+    type AdoptVerdict,
     type Candidate,
     type PeaksPayload,
   } from "../lib/peaks";
@@ -268,19 +273,19 @@
   const screening = $derived(busy && run?.run?.kind === "extinction");
   const candidates = $derived<Candidate[]>(indexAnswer?.result?.candidates ?? []);
   const refuting = $derived<string[]>(indexAnswer?.refuting_caveats ?? []);
-  const verdicts = $derived<Array<{ allowed: boolean; why: string }>>(
-    indexAnswer?.adopt ?? []);
+  const verdicts = $derived<AdoptVerdict[]>(indexAnswer?.adopt ?? []);
   const columns = $derived(fomColumns(candidates));
   /** the Z column shows when the run read a formula: every candidate then
    *  carries its formula units, and none does otherwise (WP-2030) */
   const zColumn = $derived(indexAnswer?.result?.formula != null);
-  const best = $derived(verdicts.findIndex((v) => v.allowed));
+  /** the gate's pick, a badge on one row of the list and never the list's
+   *  answer: every row can be adopted (Yue's ruling B, 2026-11-08) */
+  const best = $derived(verdicts.findIndex((v) => v.picked));
   const quality = $derived(indexAnswer?.result?.quality ?? null);
+  /** what the search tried and what it did not finish, said whatever it found
+   *  (WP-1042: a system not reached is said loudly, WP-2130) */
+  const coverage = $derived(searchCoverage(indexAnswer?.result));
   const screen = $derived(extinction?.result ?? null);
-  /** may the screened candidate be adopted?  The server's verdict, reused —
-   *  it decides whether a space-group chip is a button or a fact */
-  const screenAdoptable = $derived(
-    extinction !== null && Boolean(verdicts[extinction.candidate]?.allowed));
 
   /**
    * Selecting a candidate is one act with two effects (WP-1211): the detail row
@@ -735,16 +740,27 @@ can rise when validation and ambiguity run, never fall">
 
   {#if indexAnswer}
     <h2>Indexing</h2>
+    <!-- What the search covered, above any answer: a run stopped at its
+         ceiling reads like a finished one unless this is said (WP-1042).
+         Shown whether or not there are candidates (WP-2130). -->
+    <div class="coverage">
+      <p class="muted">Searched: {coverage.searched.join(", ") || "none"}</p>
+      {#if coverage.incomplete.length}
+        <p class="warn">Search incomplete in {coverage.incomplete.join(", ")}:
+          a negative result there is not evidence.</p>
+      {/if}
+      <ul class="strip">
+        {#each indexAnswer.result?.diagnostics ?? [] as d (d.code + d.message)}
+          <li class={d.level}><span class="mono">{d.code}</span> {d.message}
+            {#each d.where ?? [] as w (w)}<span class="where">{w}</span>{/each}</li>
+        {/each}
+      </ul>
+    </div>
     {#if !candidates.length}
       <p class="hint muted">
         No candidate cells.
         {#if quality?.abstained_reason}{quality.abstained_reason}{/if}
       </p>
-      <ul class="strip">
-        {#each indexAnswer.result?.diagnostics ?? [] as d (d.code + d.message)}
-          <li class={d.level}><span class="mono">{d.code}</span> {d.message}</li>
-        {/each}
-      </ul>
     {:else}
       {#if best < 0}
         <p class="hint muted" title="best_or_none() returned None — the expected
@@ -799,12 +815,14 @@ and this cell's predicted lines through the data"
                 <td class="flags">
                   {#each c.found_by as e (e)}<span class="chip note">{e}</span>{/each}
                 </td>
-                <td>
-                  <button class="ghost" disabled={busy || !(verdicts[i]?.allowed)}
-                    title={verdicts[i]?.allowed
-                      ? "adopt this cell as the model (a Le Bail scaffold; one history node)"
-                      : verdicts[i]?.why ?? ""}
+                <!-- every row can be adopted (Yue's ruling B, 2026-11-08); a
+                     row the gate did not pick says why beside the button, in
+                     the sentence its history node will record (WP-2124) -->
+                <td class="adopt">
+                  <button class="ghost" disabled={busy}
+                    title="adopt this cell as the model (a Le Bail scaffold; one history node)"
                     onclick={() => adopt(i)}>Adopt</button>
+                  {#if verdicts[i]?.why}<span class="muted why">{verdicts[i].why}</span>{/if}
                 </td>
               </tr>
               {#if expanded === i}
@@ -914,7 +932,7 @@ an unasked question, so the gate abstains">not screened</span>
                 </td>
                 <td class="flags">
                   {#each cls.space_groups as sg (sg)}
-                    {#if screenAdoptable && !cls.refuted}
+                    {#if !cls.refuted}
                       <button class="ghost" disabled={busy}
                         title="adopt candidate {extinction.candidate} as a Le Bail scaffold
 in {sg} — the class cannot distinguish its members, so this choice is a
@@ -1171,6 +1189,18 @@ convention, not a measurement"
 
   .strip li.warning { color: var(--warn); }
   .strip li.error { color: var(--bad); }
+
+  /* a diagnostic's `where` is the part that names what was not reached */
+  .strip .where::before { content: " · "; }
+
+  .coverage p { margin: 0; }
+
+  /* the gate's sentence sits beside Adopt and wraps under it, so a long
+     caveat list makes the row taller and never the table wider */
+  td.adopt .why {
+    display: block;
+    max-width: 28ch;
+  }
 
   .acts {
     display: flex;

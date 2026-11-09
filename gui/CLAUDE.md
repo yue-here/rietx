@@ -747,8 +747,9 @@ search or screen **returns** what it has and its status is read off the token.
 Both tables' badges follow the server (`adopt`, `best`); the screen is gated on neither the adopt verdict nor a phase
 (a read-only measurement; a pattern-only project is where indexing starts). **Any candidate can be adopted** (Yue's
 ruling B, 2026-11-08, WP-2124): the arm's `picked` is the gate's pick, its `why` the sentence an adoption of any other
-row writes into the `edit_model` node. The old panel still enables Adopt, and a space-group chip of an unrefuted
-class, on `allowed`, which carries `picked` under its old name until the port redraws it.
+row writes into the `edit_model` node. The panel enables Adopt on every row, prints `why` beside it, and badges only
+`picked` (WP-2130); what the search covered (`systems_searched`, `search_complete`, the run-level diagnostics with
+their `where`) is said above the list whatever it found, WP-1042's "not reached is loud".
 
 Its second pass (2026-07-31) added three browser facts; the one about plotly's
 screen-relative `lightposition` left with plotly (WP-1462), whose renderer lights
