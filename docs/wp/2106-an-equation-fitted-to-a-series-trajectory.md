@@ -78,7 +78,7 @@ its code. Any reader takes the stored format from a file's contents.
   GSAS-II tutorials' `steel.gpx`.)
 - [x] Manual: `guides/equation.md` beside the joint route, and `switching/gsas2.md`.
   (`guides/equation.md` § Fit the equation to the series trajectory, run by
-  `examples/guides/equation.py`; the reference halves are `reference/series.md` § An
+  `examples/guides/equation.py`; the reference halves are `reference/parametric.md` § An
   equation fitted to a trajectory and `reference/foreign-models.md` § Equations stored
   with a sequential fit.)
 - [x] Skill: the series reference's row. (The joint-fit row of `references/series.md`
@@ -131,7 +131,7 @@ its code. Any reader takes the stored format from a file's contents.
     evaluating the same text. GSAS-II's `sin`/`cos`/`tan` are taken as degree functions on
     `docs/practice.md`'s record; no GSAS-II source was opened. Manual:
     `guides/equation.md` § Fit the equation to the series trajectory,
-    `reference/series.md` § An equation fitted to a trajectory, `reference/foreign-models.md`
+    `reference/parametric.md` § An equation fitted to a trajectory, `reference/foreign-models.md`
     § Equations stored with a sequential fit, `switching/gsas2.md`. Skill: the joint-fit row
     of `references/series.md` and the API index's series section.
   - *Measured* (`[dev]`, darwin/arm64). `2106-measure/trajectory_vs_joint.py` and its
@@ -143,7 +143,19 @@ its code. Any reader takes the stored format from a file's contents.
     degrees of freedom. Against the truth, (value − truth)/esd has rms 1.00 and 0.68 for the
     joint fit and the unscaled trajectory esds alike, and 1.31 and 0.85 for the scaled
     ones. The guide's own seed: the two lines 0.07 and 0.03 of the joint esds apart.
-    FAST_SUITE_LINE
+    Fast selection (`-m "not slow"`, `[dev]`, darwin/arm64, on the Mac at `-n 2` through
+    the shared test gates, since pearl did not answer ssh): on 1aa46f2b1, before the
+    review fixes, 14386 passed, 415 skipped, 32 xfailed and 2 failed in 15:35. Both
+    failures were `reference/series.md` over the manual's 50 000-character page cap,
+    after this branch's section on it; the section moved to `reference/parametric.md` in
+    the next commit, and the page is now byte-identical to main. On the final tree the
+    touched files re-ran green: `test_trajectory_fit.py`, `test_projects_gsas2.py`,
+    `test_manual_api.py`, `test_audit_table.py` and `test_skill.py` (378 passed),
+    `test_manual.py` and `test_reference_pages.py` (112 with `test_manual_api.py`),
+    `test_docs_consistency.py` (25), and the equation guide's script. The run added 21
+    tests to the fast tier, together 0.03 s locally (`tests.added_test_times`); the
+    review commit added 8 more. The full suite was not run: nothing here moves a
+    measured number of an existing fit.
   - *Review.* `/code-review` was not run, because from this session it would read the main
     checkout's stale branch; an Opus subagent reviewed the branch diff instead.
     It found eleven things; fixed in 18c8eb6e4: a pair of variables the trajectory moves

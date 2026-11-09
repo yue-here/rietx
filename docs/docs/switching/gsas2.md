@@ -80,7 +80,7 @@ GSAS-II fits an equation to the sequential results table after a sequential refi
 The equation is a python-syntax string over the table's columns, and the fit sees the per-pattern values and their esds (`SeqParFitEqList`).
 rietx has two places for the same equation.
 
-- Fitted to a trajectory, as GSAS-II does: a chain gives each parameter's trajectory ([Sequential refinement](../reference/series.md)), and `rx.fit_trajectory` fits the equation to it, weighted by the esds ([An equation fitted to a trajectory](../reference/series.md#an-equation-fitted-to-a-trajectory)).
+- Fitted to a trajectory, as GSAS-II does: a chain gives each parameter's trajectory ([Sequential refinement](../reference/series.md)), and `rx.fit_trajectory` fits the equation to it, weighted by the esds ([An equation fitted to a trajectory](../reference/parametric.md#an-equation-fitted-to-a-trajectory)).
 - Refined jointly, the equation is a formula on the target, and every pattern enters one residual ([Parametric refinement](../reference/parametric.md#formula-equations)).
 
 The second has no GSAS-II counterpart.
