@@ -203,3 +203,30 @@ def test_a_deleted_group_rejudges_ghosts_under_the_declared_source(
     out = editor.remove(doc, index)
     assert seen and all(s is ins.source for s in seen)
     assert _flagged(out.peaks, "ghost_kbeta") == []
+
+
+def test_a_list_picked_without_contamination_marks_gains_none_from_an_edit():
+    """``flag_contamination=False`` holds through every edit (WP-2124).
+
+    The pick honoured the option and the editor's refits did not: each one
+    re-judged the Kβ and tungsten marks on the components it spliced, and on
+    every untouched line a cross-group ghost could reach.
+    """
+    from rietx.gui import peaks as gp
+    ins = rx.Instrument.debye_scherrer(wavelength=LAM)
+    data = _pattern(kbeta=0.15)
+    # the control: with the marks on, this pattern's Kβ images are marked
+    assert _flagged(gp.PeakEditor(data, ins).pick().peaks, "ghost_kbeta")
+
+    editor = gp.PeakEditor(data, ins, flag_contamination=False)
+    doc = editor.pick()
+    assert doc.pick_options["flag_contamination"] is False
+    assert gp.settings_of(doc) == gp.pick_settings(flag_contamination=False)
+    assert _flagged(doc.peaks, "ghost_kbeta") == []
+    for g in sorted(doc.groups):
+        doc = editor.refit(doc, g)
+    assert _flagged(doc.peaks, "ghost_kbeta") == []
+    groups = [p.group for p in doc.peaks.peaks]
+    index = next(i for i, g in enumerate(groups) if groups.count(g) == 1)
+    doc = editor.remove(doc, index)
+    assert _flagged(doc.peaks, "ghost_kbeta") == []

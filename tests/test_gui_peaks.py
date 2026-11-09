@@ -723,3 +723,74 @@ def test_a_pattern_only_project_picks_peaks_indexes_adopts_and_only_then_fits(
         session.close()
         httpd.shutdown()
         httpd.server_close()
+
+
+# ----------------------------------------------------------------------
+# the pick's three options reach the route (WP-2124)
+# ----------------------------------------------------------------------
+def test_the_pick_route_takes_the_range_and_the_contamination_marks(
+        tmp_path_factory, pattern_file):
+    """``pick_peaks``'s three options, through the wire, and kept by the list.
+
+    The route took ``shoulders`` alone: the range came from the project's fit
+    limits and ``flag_contamination`` was library-only (the GUI port's Pick
+    step offers all three).  The list records what it was picked with, and a
+    session opened later builds its editor from that record, not from the
+    project's limits, so a refit sees the detection the list came from.
+    """
+    structure, instrument = perturbed_models()
+    root = tmp_path_factory.mktemp("pick-opts") / "p.rex"
+    project = rx.Project.create(root, pattern=pattern_file,
+                                structure=structure, instrument=instrument)
+    session = GuiSession(project, state_dir=tmp_path_factory.mktemp("pick-st"))
+    httpd = build_server(session, port=0)
+    threading.Thread(target=httpd.serve_forever,
+                     kwargs={"poll_interval": 0.02}, daemon=True).start()
+    client = Client(httpd.server_address[1])
+    try:
+        # a bad range is refused in the project's own words, and named
+        status, refused = client.post("/api/peaks",
+                                      {"two_theta_range": [60, 20]})
+        assert status == 400, refused
+        assert refused["error"]["where"] == ["two_theta_range"]
+        assert "inverted" in refused["error"]["message"]
+        status, refused = client.post("/api/peaks",
+                                      {"two_theta_range": ["a", 20]})
+        assert status == 400 and "two numbers" in refused["error"]["message"]
+
+        status, doc = client.post("/api/peaks", {
+            "two_theta_range": [20, 60], "shoulders": False,
+            "flag_contamination": False})
+        assert status == 200, doc
+        assert doc["api_call"] == (
+            "session.pick_peaks(shoulders=False, two_theta_range=(20, 60), "
+            "flag_contamination=False)")
+        assert doc["pick_options"] == {"two_theta_range": [20.0, 60.0],
+                                       "shoulders": False,
+                                       "flag_contamination": False}
+        tts = [p["two_theta"] for p in doc["peaks"]]
+        assert tts and 20.0 <= min(tts) and max(tts) <= 60.0
+        assert doc["two_theta_min"] >= 20.0 and doc["two_theta_max"] <= 60.0
+
+        # the `.rxt` quotes the same call
+        assert doc["api_call"] in client.get("/api/textdoc")[1]["text"]
+
+        # a fresh session (the app reopened) refits under the stored options
+        fresh = GuiSession(rx.Project.open(root),
+                           state_dir=tmp_path_factory.mktemp("pick-st2"))
+        try:
+            editor = fresh._peak_editor()
+            assert editor.two_theta_range == (20.0, 60.0)
+            assert editor.shoulders is False
+            assert editor.flag_contamination is False
+        finally:
+            fresh.close()
+
+        # the defaults still read as they always did
+        status, doc = client.post("/api/peaks", {})
+        assert doc["api_call"] == "session.pick_peaks(shoulders=True)"
+        assert doc["pick_options"]["flag_contamination"] is True
+    finally:
+        session.close()
+        httpd.shutdown()
+        httpd.server_close()

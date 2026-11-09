@@ -1994,16 +1994,41 @@ class GuiSession:
 
     def peaks_pick(self, body: dict) -> dict:
         """Run the picker and store the list — replacing any previous one,
-        edits included, which is what "pick" has to mean."""
+        edits included, which is what "pick" has to mean.
+
+        The body takes :func:`~rietx.indexing.pick.pick_peaks`'s three
+        options (WP-2124): ``shoulders``, ``two_theta_range`` (``[lo, hi]``,
+        the project's fit limits when absent) and ``flag_contamination``.  The
+        list records them, and every later edit refits under them.
+        """
+        from ..schemas.project import check_interval
+        from . import peaks as store
+
         self._require_idle()
         p = self._need_project()
-        editor = self._peak_editor()
-        shoulders = bool(body.get("shoulders", True))
-        doc = editor.pick(shoulders=shoulders)
+        limits = (tuple(p.doc.two_theta_limits)
+                  if p.doc.two_theta_limits else None)
+        rng = body.get("two_theta_range")
+        if rng is not None:
+            if (not isinstance(rng, (list, tuple)) or len(rng) != 2
+                    or not all(isinstance(v, (int, float))
+                               and not isinstance(v, bool) for v in rng)):
+                raise GuiError("'two_theta_range' takes two numbers, [lo, hi]",
+                               where=["two_theta_range"])
+            try:
+                check_interval("two_theta_range", float(rng[0]), float(rng[1]))
+            except ValueError as exc:
+                raise GuiError(str(exc), where=["two_theta_range"]) from None
+        options = store.pick_settings(
+            two_theta_range=limits if rng is None else rng,
+            shoulders=body.get("shoulders", True),
+            flag_contamination=body.get("flag_contamination", True))
+        editor = self._peak_editor(options)
+        doc = editor.pick()
         self._save_peaks(p, doc)
         return self._peaks_payload(
             doc, editor=editor,
-            api_call=f"session.pick_peaks(shoulders={shoulders})")
+            api_call=store.pick_call(doc.pick_options, default_range=limits))
 
     def peaks_add(self, body: dict) -> dict:
         tt = self._peak_number(body, "two_theta")
@@ -2146,17 +2171,26 @@ class GuiSession:
                 "n_total": int(len(tt)), "excluded": excluded,
                 "n_excluded": int(len(out_tt))}
 
-    def _peak_editor(self):
+    def _peak_editor(self, options: dict | None = None):
+        """The editor for a pick with ``options``, or for the stored list.
+
+        Without ``options`` the editor takes the ones the stored list was
+        picked with (:func:`peaks.settings_of`), so a refit sees the detection
+        the list came from even after the project's limits move (WP-2124).
+        """
         from . import peaks as store
 
         p = self._need_project()
         instrument = p.refinement.instrument
-        key = (instrument.model_dump_json(), str(p.doc.two_theta_limits),
+        limits = tuple(p.doc.two_theta_limits) if p.doc.two_theta_limits else None
+        if options is None:
+            options = store.settings_of(self._load_peaks(p),
+                                        default_range=limits)
+        key = (instrument.model_dump_json(), repr(sorted(options.items())),
                str(p.doc.excluded_regions))
         if self._peak_ed is not None and self._peak_ed[0] == key:
             return self._peak_ed[1]
-        limits = tuple(p.doc.two_theta_limits) if p.doc.two_theta_limits else None
-        editor = store.PeakEditor(p.data, instrument, two_theta_range=limits)
+        editor = store.PeakEditor(p.data, instrument, **options)
         self._peak_ed = (key, editor)
         return editor
 
