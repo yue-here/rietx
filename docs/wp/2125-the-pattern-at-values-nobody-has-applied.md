@@ -175,7 +175,7 @@ rule (`window_sizing`, the generation margin) asked at the new values. No thresh
 
 - [ ] `src/rietx/gui/preview.py`: the cache, the value check, the three evaluation paths and the
   packed answer; `GuiSession.preview` and the `POST /api/preview` route
-- [ ] `Refinement.set_values`' refusals factored into one check the route calls
+- [x] `Refinement.set_values`' refusals factored into one check the route calls
 - [ ] `CompiledModel.evaluate_parts`: the total, the background and each phase from one Bragg
   pass, bit-identical to `evaluate`
 - [ ] Tests: each path chosen where it should be, each answer equal to a fresh compile at the
