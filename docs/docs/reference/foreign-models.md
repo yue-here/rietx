@@ -199,6 +199,7 @@ It carries two things the older format has no room for: the constraints the refi
 | `Gsas2Model.constraints` | the equivalences, holds and constraint equations, with their variables resolved into names |
 | `Gsas2Model.rwp`, `Gsas2Model.gof`, `Gsas2Model.chi2` | the run's own agreement indices. `gof` is the square root of reduced χ². `chi2` is GSAS-II's `chisq`, which is Σw(I<sub>o</sub> − I<sub>c</sub>)² and not reduced |
 | `Gsas2Model.n_observations`, `Gsas2Model.n_variables`, `Gsas2Model.converged` | how many channels, how many parameters, and whether GSAS-II called the run converged. `n_variables` is `None` where the file's `Rvals` does not state it, which happens |
+| `Gsas2Model.sequential_equations` | the equations stored to fit to a sequential results table, one `Gsas2SequentialEquation` each ([below](#gsas2-sequential-equations)) |
 | `Gsas2Model.unsupported` | one line per thing the read could not carry, kept whether or not you passed a list |
 | `Gsas2Model.histogram`, `Gsas2Model.phase` | pick one by name or by number. Both refuse to choose when the file carries several and you named none |
 
@@ -312,6 +313,42 @@ A constraint is a `Gsas2Constraint`.
 | `Gsas2Constraint.is_equivalence` | whether it is an equivalence, the one shape `Refinement.tie_equal` reproduces in one call |
 
 Anything with a flag beside it is a `Gsas2Value`, which holds `Gsas2Value.value` and `Gsas2Value.refined` and nothing else.
+
+(gsas2-sequential-equations)=
+### Equations stored with a sequential fit
+
+GSAS-II fits an equation to one column of its sequential results table after the refinement, and stores it in the project.
+The reader takes each one into a `Gsas2SequentialEquation`, ready for `rietx.fit_trajectory` ([An equation fitted to a trajectory](series.md#series-fit-trajectory)).
+The per-histogram results table itself is not carried, and the read says so.
+
+| Field | Holds |
+|---|---|
+| `Gsas2SequentialEquation.source` | the tree item it was stored in, `Sequential results` or `Sequential peak fit results` |
+| `Gsas2SequentialEquation.text` | the equation as GSAS-II stored it |
+| `Gsas2SequentialEquation.expression` | the same equation in rietx's [expression grammar](expressions.md), or `None` when it is refused |
+| `Gsas2SequentialEquation.variables` | each label the equation fits, as an `rx.Parameter` with the stored value and refine flag |
+| `Gsas2SequentialEquation.bindings` | each other label, and the table column it reads, by GSAS-II's name for that column |
+| `Gsas2SequentialEquation.dependent` | the column the equation is fitted to, by GSAS-II's name |
+| `Gsas2SequentialEquation.dependent_text`, `Gsas2SequentialEquation.dependent_expression`, `Gsas2SequentialEquation.dependent_bindings` | where that column is a GSAS-II pseudo-variable: its own equation as stored, in the grammar, and the columns it reads |
+| `Gsas2SequentialEquation.rewrites` | each rewrite made between the two spellings, one line each |
+| `Gsas2SequentialEquation.refused` | why the equation is not in the grammar, or `None` |
+
+The expression and the variables go to `fit_trajectory` as they stand.
+Give the trajectory's coordinates under the labels the equation uses, which `Gsas2SequentialEquation.bindings` maps to GSAS-II's columns, and pick the rietx path that the dependent column names.
+Where the dependent is a pseudo-variable, such as a strain `(x-x0)/x0` of a peak position, rietx fits a parameter's own trajectory, so write the equation for that parameter instead.
+
+The equation is python syntax, read with python's own parser, which runs nothing.
+Each spelling the table below names is rewritten, and any other is refused by name: another function, `np.exp` or any other attribute, a conditional, a comparison, `%`, `//`, and `^`, which python reads as exclusive or.
+A refused equation stays on the model with its reason, and [`GSAS2_GPX_ITEM_NOT_READ`](diagnostics-projects.md#gsas2_gpx_item_not_read) names it.
+A label that is a reserved word of the grammar, such as `exp` or `min`, is refused too, since renaming it is yours.
+
+| GSAS-II | rietx | Why |
+|---|---|---|
+| `a**b` | `a^b` | python's power. A chain such as `a**b**c` is grouped as python groups it, right to left, with the parentheses the grammar asks for |
+| `sind(u)`, `cosd(u)`, `tand(u)` | `sin(pi*u/180)`, `cos(pi*u/180)`, `tan(pi*u/180)` | the functions of an angle in degrees |
+| `sin(u)`, `cos(u)`, `tan(u)` | `sin(pi*u/180)`, `cos(pi*u/180)`, `tan(pi*u/180)` | GSAS-II's expressions read these in degrees too |
+| `exp(u)`, `log(u)`, `sqrt(u)` | unchanged | the natural logarithm in both |
+| `pi` | unchanged | |
 
 ### The pickle allow-list
 
