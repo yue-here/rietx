@@ -278,7 +278,7 @@ The deviations are always reported unscaled.
 A row past three σ raises [`RESTRAINT_TENSION`](diagnostics-refinement.md#restraint_tension).
 A plane raises one between its rows, naming the atoms past three σ, worst first.
 The restraint and the data are then pulling against each other, and one of them is wrong.
-A joint fit reports the same object per histogram, on `HistogramResult.restraints`.
+A joint fit reports the same object per histogram, on `HistogramResult.restraints`, and its `RefinementResult.restraints` mirrors histogram 0's ([Soft restraints](joint.md#soft-restraints)).
 
 ## Absorption correction
 

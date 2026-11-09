@@ -101,7 +101,7 @@ one per pattern.
       histogram weight, and drop the refusal. Make `BlockJacobian` agree.
 - [x] Per-histogram `ValueRestraint`: decide, and refuse by name what is not
       built.
-- [ ] `_restraint_tension_diagnostics` and `RestraintReport` reach the joint
+- [x] `_restraint_tension_diagnostics` and `RestraintReport` reach the joint
       result. Flip its `ABSENT` row in `multi.py`. `HistogramResult.restraints`
       has no writer today, always `None` (`schemas/results.py`, and
       `docs/docs/reference/joint.md` says so), so this is its writer.

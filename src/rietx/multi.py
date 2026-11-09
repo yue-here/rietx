@@ -42,6 +42,7 @@ from .model.forward import (
     window_loss,
 )
 from .model.microstructure import floored_paths, microstructure_table
+from .model.restraints import summarise_restraints
 from .optimize.blocked import BlockJacobian
 from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import (
@@ -49,6 +50,7 @@ from .optimize.least_squares import (
     SOLVERS,
     _joint_aux_counts,
     _joint_aux_paths,
+    _joint_restraint_shared,
     _longest_line_wavelength,
     _multi_closures,
     covariance_estimates,
@@ -91,6 +93,7 @@ from .refine import (
     _absorption_diagnostics,
     _absorption_record,
     _air_scatter_undeclared_diagnostics,
+    _anti_bump_start_phases,
     _axis_in_crystal_axes,
     _capillary_offset_diagnostics,
     _carry_lebail,
@@ -141,6 +144,8 @@ from .refine import (
     _resonant_absorber_diagnostics,
     _restore_phase_cells,
     _restrained_scale_phases,
+    _restraint_pairs_stale_diagnostics,
+    _restraint_tension_diagnostics,
     _roughness_regime_diagnostics,
     _scale_b_ridge_diagnostics,
     _significance_columns,
@@ -363,6 +368,15 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (FIT,), "joint-only (WP-1325): one equation sets its target across its "
                 "subset, so the patterns that cannot see it are told once per "
                 "declaration, naming each"),
+    "_restraint_tension_diagnostics": (
+        (HISTOGRAM, SPECIMEN), "a restraint on the shared structure is one row "
+                               "of the joint residual and told once; one reading "
+                               "a per-histogram row is each pattern's own, told "
+                               "in that histogram's list (WP-1995)"),
+    "_restraint_pairs_stale_diagnostics": (
+        (SPECIMEN,), "the anti-bump pair list is the structure's, searched "
+                     "once at the answer on histogram 0's copy, against that "
+                     "copy as the run started (WP-1809, WP-1995)"),
     "_fixed_literal_diagnostics": (
         (FIT,), "a plan read (#803, WP-1341), through _joint_fixed_literals: "
                 "each histogram's table is asked under the joint matching rule, "
@@ -391,13 +405,6 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
     "_pawley_off_data_diagnostics": (
         (HISTOGRAM,), "a reflection is off one histogram's fitted range, and "
                       "the ridge is that histogram's restraint (WP-2104)"),
-    "_restraint_tension_diagnostics": (
-        (ABSENT,), "soft restraints are refused in a joint fit "
-                   "(run_multi_least_squares), so there is no tension to report"),
-    "_restraint_pairs_stale_diagnostics": (
-        (ABSENT,), "soft restraints are refused in a joint fit "
-                   "(run_multi_least_squares), so there is no anti-bump list "
-                   "to have gone stale (WP-1809)"),
     "_stage_order_diagnostics": (
         (ABSENT,), "not called from multi.py: the magnetic-width ordering rule "
                    "(WP-1343) is checked by Refinement.fit and run_stage, and "
@@ -1406,6 +1413,24 @@ def _vars_driven_cell_escapes_multi(mtable, start_values: list[dict[str, float]]
     return list(merged.items())
 
 
+def _restraint_rows_held(report, model, shared: list[bool], *, once: bool):
+    """``report`` cut to the restraints a joint fit holds once (``once``) or
+    per histogram (WP-1995).
+
+    ``shared`` is :func:`~rietx.optimize.least_squares._joint_restraint_shared`'s
+    answer, one flag per compiled item, whose rows the report lists in item
+    order (a planarity item's one per atom).  ``restraint_chi2`` is summed over
+    the rows kept, so the cut is a report of its own.
+    """
+    rows = [row for (sl, _), flag in zip(model.restraints.item_rows(), shared,
+                                         strict=True)
+            if flag == once for row in report.rows[sl]]
+    return report.model_copy(update={
+        "rows": rows, "n_restraints": len(rows),
+        "restraint_chi2": float(sum(r.weight * r.deviation_over_sigma ** 2
+                                    for r in rows))})
+
+
 def _refuse_centroid_origin(structure: Structure) -> None:
     """A joint fit refuses ``Phase.floating_origin = "centroid"`` (WP-1912).
 
@@ -1943,6 +1968,9 @@ class MultiHistogramRefinement:
             self._drain_twin_findings()
             + _symmetry_silence_diagnostics(self.mtable.structures[0], mode)
             + _joint_fixed_literals(plan.stages, self.mtable))
+        # the anti-bump phases as the run starts, which the stale-pair search
+        # at the answer reads against (the single runner's ``stale_since``)
+        stale_since = _anti_bump_start_phases(self.mtable.structures[0], mode)
         self.mtable.set_vary(["*"], False)
         # each histogram's orbit split, decided once from the coordinates the
         # fit starts at and handed to every compile below, the single runner's
@@ -2039,6 +2067,7 @@ class MultiHistogramRefinement:
                 models = [
                     compile_model(s, ins, d, mode=mode, two_theta_limits=lim,
                                   moving_paths=set(tab.moving_paths),
+                                  restraint_weight_scale=stage.restraint_weight_scale,
                                   window_area_tol=recorded_window_tol(window_tol),
                                   orbit_split=split)
                     for s, ins, d, lim, tab, split in zip(
@@ -2340,7 +2369,9 @@ class MultiHistogramRefinement:
         # returns, never the last stage's start-of-stage one (#272, WP-1421)
         models, recompiled = self._final_compiles(models, outcome, data, limits,
                                                   window_tol)
-        opening_diags = [*opening_diags, *recompiled]
+        opening_diags = [*opening_diags, *recompiled,
+                         *_restraint_pairs_stale_diagnostics(
+                             self.mtable.structures[0], stale_since)]
         # an intensity model reads the screen alone (``_joint_answer_significance``
         # returns it unmeasured), so the result does not call it decided, the
         # single fit's rule (``StageResult.significance``)
@@ -2374,6 +2405,7 @@ class MultiHistogramRefinement:
         fresh = [
             compile_model(s, ins, d, mode="rietveld", two_theta_limits=lim,
                           moving_paths=set(tab.moving_paths),
+                          restraint_weight_scale=old.restraint_weight_scale,
                           window_area_tol=recorded_window_tol(window_tol),
                           orbit_split=orbit_split_of(old))
             for s, ins, d, lim, tab, old in zip(
@@ -2440,6 +2472,9 @@ class MultiHistogramRefinement:
         top_bg: list[GuardFinding] = []
         absorption_table: dict[str, float] = {}
         joint_unmeasured = _joint_unmeasured_phases(models, mt, stage_results)
+        # which restraints the joint residual held once (WP-1995)
+        shared = _joint_restraint_shared(models, mt)
+        restraint_reports = []
         for h in range(n):
             table = mt.tables[h]
             model = models[h]
@@ -2597,6 +2632,16 @@ class MultiHistogramRefinement:
                                                 ticks, tick_support))
             diags.extend(_air_scatter_undeclared_diagnostics(model, values,
                                                              y_calc, stats))
+            # this histogram's copy of the structure against every restraint,
+            # as its values give it (WP-1995); a restraint each histogram holds
+            # of its own is told here, a shared one once for the fit below
+            restraints = summarise_restraints(model.restraints, values,
+                                              model.restraint_weight_scale)
+            restraint_reports.append(restraints)
+            if restraints is not None:
+                diags.extend(_restraint_tension_diagnostics(
+                    _restraint_rows_held(restraints, model, shared, once=False),
+                    struct))
 
             histograms.append(HistogramResult(
                 label=model.meta.get("label", "") or f"hist{h}",
@@ -2612,6 +2657,7 @@ class MultiHistogramRefinement:
                 # has one structure R per histogram, not a pooled one
                 phase_agreement=_phase_agreement(model, values, struct),
                 sigma_rule=model.sigma_rule,
+                restraints=restraints,
                 diagnostics=diags))
 
         # pooled combined statistics (reported, never quoted alone) --------------
@@ -2671,6 +2717,12 @@ class MultiHistogramRefinement:
         coefficients = self._parametric_rows(esd_hist0, per_esds)
         diagnostics = diagnostics + _parametric_form_diagnostics(mt, parametric_form,
                                                                  form_joint)
+        # the restraints on the shared structure, one row each in the joint
+        # residual and so told once (WP-1995, SPECIMEN)
+        if restraint_reports[0] is not None:
+            diagnostics = diagnostics + _restraint_tension_diagnostics(
+                _restraint_rows_held(restraint_reports[0], models[0], shared,
+                                     once=True), mt.structures[0])
         if stage_results:
             diagnostics = diagnostics + _constraint_diagnostics(
                 stage_results[-1].name, outcome)
@@ -2785,6 +2837,10 @@ class MultiHistogramRefinement:
             # reflections (WP-2028; WP-1986 found them dropped)
             tick_hkl=histograms[0].tick_hkl,
             qpa=histograms[0].qpa,
+            # histogram 0's, as the arrays above are: every row of a shared
+            # restraint is the joint residual's, and each histogram's own
+            # rows are in its HistogramResult (WP-1995)
+            restraints=histograms[0].restraints,
             # WP-1131: one block per phase, read off **histogram 0** — the
             # reference wavelength, whose value scale is exactly 1.0, so its
             # coefficients *are* the shared column and the size behind them is
