@@ -156,5 +156,5 @@ npm --prefix gui test
   open WP owns atom keys: WP-2121 closed today and folds its remaining items here; WP-1991 (✅)
   matched atoms by label at crossing points; WP-1965 (parametric) owns a glob subset by label, not
   a key; WP-1933, WP-1468 and WP-2003 mention labels for other purposes. Numbered 2140, past the
-  2130s, because another shift is filing GUI WPs there today. Bookkeeping PR: #PRNUM. Next: the
+  2130s, because another shift is filing GUI WPs there today. Bookkeeping PR: #1513. Next: the
   assessment task, which decides between label dot-paths and stored references alone.
