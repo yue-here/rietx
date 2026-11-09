@@ -2298,10 +2298,7 @@ class GuiSession:
             # Every row can be adopted (Yue's ruling B, 2026-11-08, WP-2124).
             # ``picked`` is the gate's own pick and ``why`` the sentence an
             # adoption of any other row records in its history node.
-            # ``allowed`` carries ``picked`` under its pre-ruling name, because
-            # the old Peaks panel reads it for both its Adopt button and its
-            # ``best_or_none()`` badge; it goes when the port redraws the panel.
-            adopt.append({"allowed": picked, "picked": picked,
+            adopt.append({"picked": picked,
                           "why": "" if picked else _unpicked_note(cand)})
         return {"result": result.model_dump(mode="json"),
                 "adopt": adopt,
