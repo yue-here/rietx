@@ -144,7 +144,7 @@ its code. Any reader takes the stored format from a file's contents.
     joint fit and the unscaled trajectory esds alike, and 1.31 and 0.85 for the scaled
     ones. The guide's own seed: the two lines 0.07 and 0.03 of the joint esds apart.
     Fast selection (`-m "not slow"`, `[dev]`, darwin/arm64, on the Mac at `-n 2` through
-    the shared test gates, since pearl did not answer ssh): on 1aa46f2b1, before the
+    the shared test gates, since the build workstation did not answer): on 1aa46f2b1, before the
     review fixes, 14386 passed, 415 skipped, 32 xfailed and 2 failed in 15:35. Both
     failures were `reference/series.md` over the manual's 50 000-character page cap,
     after this branch's section on it; the section moved to `reference/parametric.md` in
