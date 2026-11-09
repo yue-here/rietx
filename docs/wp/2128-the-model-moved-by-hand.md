@@ -1,8 +1,7 @@
 # WP-2128 — the model moved by hand: the Interactive tab and the previews
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — filed; the checklist starts
+Milestone: gui-overhaul · Status: ✅ 2026-11-09 — the Interactive tab and both previews landed; the Background tab is piece 5
 Depends on: 2123 (the shell the previews draw in); 2125 (the preview route)
-Priority: P2 2026-11-09 — piece 4's client half of the open gui-overhaul milestone
 
 ## Goal
 
@@ -178,6 +177,50 @@ pop-up or a stepped peak window, and quotes the drag-to-redraw latency as a rang
   response budgets WP-2125 measured the route against.
 
 ## Handover log
+
+- **2026-11-09** — the Interactive tab and both previews landed, and the WP closes. A person can
+  now drag a scale, a cell length, a zero shift or a width term and watch the pattern move
+  before anything is committed: the title line says `Preview, not refined` beside both Rwp
+  values, and the action bar's Apply writes the values as an ordinary edit. A second graph tab,
+  Single peaks, shows three reflections at the last fit's scale, so a change in one peak's shape
+  is visible rather than averaged over the pattern. Twelve presentation calls had no ruling and
+  were settled as the smallest neutral option; they are listed under § Calls settled by Claude
+  for the maintainer's review. The Background tab stays piece 5.
+
+  *Done.* The route answers `delta`, `delta_raw` and `cumulative_chi2` (the curves route's three
+  residuals, item 1). `lib/interactive.ts` holds the slider set, the default ranges, the tracks,
+  the fixed number format and `PreviewQueue` (one request in flight, the newest values next, an
+  answer to reverted values dropped). `panels/Interactive.svelte` is the tab; the range-and-scale
+  pop-up opens from the name and a typed value from the number. `lib/pattern.ts:setPreview`
+  draws the preview over the last fit on the curves payload's own channels (`channelIndex`, by
+  equal 2θ), keeping every y range. `lib/peakwin.ts` and `panels/PeakWindows.svelte` are the
+  Single peaks graph. `App.svelte` sums both panels' pending counts and applies Parameters
+  first, sliders second. Manual: `reference/gui-guide.md` § Single peaks and § Interactive, the
+  quickstart's tab table, two new screenshot pairs (`interactive`, `single-peaks`) and every
+  other pair regenerated, since the strip gained a tab.
+
+  *Measured* (arm64 macOS, worktree venv `[dev]`, no other suite running). Drag to redraw in
+  chromium, real pointer, synthetic layout pattern: 32-38 ms wide, 32-36 ms stacked, 25 redraws
+  a run, from the value change to the second frame after paint (`rx-preview-redraw` User
+  Timing). vitest 637 passed (was 612: +25). svelte-check 0 errors. Layout browser test 14
+  passed (was 12: +2, the new test at both widths). Fast suite 14506 passed, 410 skipped, 32 xfailed through ghostshift's serial queue (run before the review's fixes, which touched TypeScript only; the dist, layout and manual files were re-run after them: 39 passed, drag to redraw 32-44 ms). ruff clean. sphinx `-W`
+  clean. `tests.reader_output` exit 0, unchanged against the merge-base.
+
+  *Gotchas.* In a mac text field `End` is a scroll key: a browser test pressing it scrolled the
+  panel 47 px with the caret unmoved, which read as a layout move. Use `ArrowRight`. The chart
+  module must stay off the boot path, so the panel imports `rxplot` dynamically for `unpack`; a
+  static import was flagged by vite's `INEFFECTIVE_DYNAMIC_IMPORT` warning before any test.
+  The panel corpus is keyed by label, which is why the graph tab is `Single peaks`.
+
+  *Code review.* `/code-review high --fix` found nine and fixed eight, in one commit: a shorter window list indexed with the last fit's picks (a render crash), `firstPicks(4)` repeating a window, the residual strip rescaling to the preview, magnetic and extra tick rows shifting the slider groups, a range past the row's bounds accepted, NaN in a picked cumulative χ², `setPreview` dropping `keep`, and redraw timings accumulating. Declined: out-of-order parameter loads, which `Params.svelte` shares and WP-2126 owns; and computing the windows once in `App`, cheap as it is.
+
+  *Generality.* No row added to `rietx._audit`, and nothing in `src/rietx` decides for a caller.
+  The slider ranges and window choices are GUI view defaults in TypeScript that change no
+  answer, so the judge was not dispatched.
+
+  Next: the maintainer reviews the twelve calls in § Calls settled by Claude; a reversal is a
+  `lib/interactive.ts` or `lib/peakwin.ts` constant. The PR stacks on #1476 and #1479 and merges
+  after both. The Parameters panel's pending edits in the preview wait for WP-2126 to land.
 
 - **2026-11-09** — filed by a ghostshift runner as the client half of piece 4. No open WP
   owns it: WP-2125 built the route and named this as its next piece, and the milestone record
