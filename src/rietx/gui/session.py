@@ -1585,11 +1585,14 @@ class GuiSession:
             raise GuiError(f"unknown run kind {kind!r}; expected 'fit', "
                            "'stage', 'index', 'extinction' or 'series'",
                            where=["kind"])
-        if kind in ("fit", "stage", "extinction", "series"):
+        if kind in ("fit", "stage", "series"):
             # Up here rather than in the worker: the refusal is knowable before
             # anything starts, and a run *started* is a 200 whose failure only
             # ever reaches the event stream — the caller asked a question that
-            # has an answer now (WP-1207).
+            # has an answer now (WP-1207).  Only the kinds that *refine the
+            # model* need a phase.  An extinction screen builds its own Le Bail
+            # fits from the candidate and the instrument, so a pattern-only
+            # project, where indexing starts, may screen (WP-2124).
             try:
                 _refuse_without_phases(p.refinement.structure, f"a {kind} run")
             except NoPhasesError as exc:
@@ -1654,8 +1657,9 @@ class GuiSession:
             # candidate.  Deliberately *not* gated on the adopt verdict — on
             # real data with no measured shift ``best_or_none()`` is None by
             # design, and a screen is a read-only measurement ("IF this cell,
-            # THEN these classes"); the gate stays on ``index_adopt``, where
-            # the model is at stake.  It rides the run machine because it is
+            # THEN these classes").  Nor is it gated on a phase: the screen
+            # fits its own Le Bail models, so a pattern-only project screens
+            # (WP-2124).  It rides the run machine because it is
             # seconds-long (one profile fit, then one Le Bail per class),
             # takes ``cancel=``, and must hold the same one-worker discipline
             # as every other computation over the project.
@@ -1986,20 +1990,59 @@ class GuiSession:
         doc = self._load_peaks(p)
         if doc is None:
             return self._peaks_payload(None)
-        return self._peaks_payload(doc, editor=self._peak_editor())
+        return self._peaks_payload(doc, editor=self._peak_editor(doc=doc))
 
     def peaks_pick(self, body: dict) -> dict:
         """Run the picker and store the list — replacing any previous one,
-        edits included, which is what "pick" has to mean."""
+        edits included, which is what "pick" has to mean.
+
+        The body takes :func:`~rietx.indexing.pick.pick_peaks`'s three
+        options (WP-2124): ``shoulders``, ``two_theta_range`` (``[lo, hi]``,
+        the project's fit limits when absent) and ``flag_contamination``.  The
+        list records them, and every later edit refits under them.
+        """
+        from ..schemas.project import check_interval
+        from . import peaks as store
+
         self._require_idle()
         p = self._need_project()
-        editor = self._peak_editor()
-        shoulders = bool(body.get("shoulders", True))
-        doc = editor.pick(shoulders=shoulders)
+        limits = (tuple(p.doc.two_theta_limits)
+                  if p.doc.two_theta_limits else None)
+        rng = body.get("two_theta_range")
+        if rng is not None:
+            if (not isinstance(rng, (list, tuple)) or len(rng) != 2
+                    or not all(isinstance(v, (int, float))
+                               and not isinstance(v, bool) for v in rng)):
+                raise GuiError("'two_theta_range' takes two numbers, [lo, hi]",
+                               where=["two_theta_range"])
+            try:
+                check_interval("two_theta_range", float(rng[0]), float(rng[1]))
+            except ValueError as exc:
+                raise GuiError(str(exc), where=["two_theta_range"]) from None
+        flags = {}
+        for key in ("shoulders", "flag_contamination"):
+            value = body.get(key, True)
+            if not isinstance(value, bool):
+                # bool("false") is True and bool(None) is False: a coerced
+                # value would pick under an option nobody asked for
+                raise GuiError(f"'{key}' takes true or false, got {value!r}",
+                               where=[key])
+            flags[key] = value
+        options = store.pick_settings(
+            two_theta_range=limits if rng is None else rng, **flags)
+        editor = self._peak_editor(options)
+        try:
+            doc = editor.pick()
+        except ValueError as exc:
+            # a range inside the limits' grammar can still hold too few
+            # channels to pick in (one outside the pattern, say); that is the
+            # caller's range, not a server fault
+            raise GuiError(str(exc), where=[] if rng is None
+                           else ["two_theta_range"]) from None
         self._save_peaks(p, doc)
         return self._peaks_payload(
             doc, editor=editor,
-            api_call=f"session.pick_peaks(shoulders={shoulders})")
+            api_call=store.pick_call(doc.pick_options, default_range=limits))
 
     def peaks_add(self, body: dict) -> dict:
         tt = self._peak_number(body, "two_theta")
@@ -2059,8 +2102,8 @@ class GuiSession:
         """
         self._require_idle()
         p = self._need_project()
-        editor = self._peak_editor()
         doc = self._need_peaks(p)
+        editor = self._peak_editor(doc=doc)
         try:
             doc = edit(editor, doc)
         except IndexError as exc:
@@ -2142,17 +2185,31 @@ class GuiSession:
                 "n_total": int(len(tt)), "excluded": excluded,
                 "n_excluded": int(len(out_tt))}
 
-    def _peak_editor(self):
+    _UNREAD = object()
+
+    def _peak_editor(self, options: dict | None = None, *, doc=_UNREAD):
+        """The editor for a pick with ``options``, or for the stored list.
+
+        Without ``options`` the editor takes the ones the stored list was
+        picked with (:func:`peaks.settings_of`), so a refit sees the detection
+        the list came from even after the project's limits move (WP-2124).
+        A caller that has already loaded the list passes it as ``doc``, so the
+        file is not read twice.
+        """
         from . import peaks as store
 
         p = self._need_project()
         instrument = p.refinement.instrument
-        key = (instrument.model_dump_json(), str(p.doc.two_theta_limits),
+        limits = tuple(p.doc.two_theta_limits) if p.doc.two_theta_limits else None
+        if options is None:
+            if doc is GuiSession._UNREAD:
+                doc = self._load_peaks(p)
+            options = store.settings_of(doc, default_range=limits)
+        key = (instrument.model_dump_json(), repr(sorted(options.items())),
                str(p.doc.excluded_regions))
         if self._peak_ed is not None and self._peak_ed[0] == key:
             return self._peak_ed[1]
-        limits = tuple(p.doc.two_theta_limits) if p.doc.two_theta_limits else None
-        editor = store.PeakEditor(p.data, instrument, two_theta_range=limits)
+        editor = store.PeakEditor(p.data, instrument, **options)
         self._peak_ed = (key, editor)
         return editor
 
@@ -2196,11 +2253,12 @@ class GuiSession:
     # indexing (WP-1027)
     # ------------------------------------------------------------------
     def index_result(self) -> dict:
-        """The last indexing answer, with the adopt gate answered per row.
+        """The last indexing answer, with the gate's pick answered per row.
 
-        ``adopt`` runs parallel to ``result.candidates`` and is the server
-        saying whether :meth:`index_adopt` would act — the button's
-        enabled-ness and the route's willingness must not be two answers
+        ``adopt`` runs parallel to ``result.candidates``: whether
+        ``best_or_none()`` picks the row, and for a row it does not, the
+        sentence :meth:`index_adopt` records when a person adopts it anyway.
+        The pick is the server's, never a client's reading of ``confidence``
         (the ``report.apply`` rule).  ``refuting_caveats`` is served so the
         client colours chips from the constant rather than a hand-written list.
         """
@@ -2218,9 +2276,15 @@ class GuiSession:
         best = result.best_or_none()
         adopt = []
         for cand in result.candidates:
-            allowed = best is not None and cand is best
-            adopt.append({"allowed": allowed,
-                          "why": "" if allowed else _adopt_refusal(cand, best)})
+            picked = best is not None and cand is best
+            # Every row can be adopted (Yue's ruling B, 2026-11-08, WP-2124).
+            # ``picked`` is the gate's own pick and ``why`` the sentence an
+            # adoption of any other row records in its history node.
+            # ``allowed`` carries ``picked`` under its pre-ruling name, because
+            # the old Peaks panel reads it for both its Adopt button and its
+            # ``best_or_none()`` badge; it goes when the port redraws the panel.
+            adopt.append({"allowed": picked, "picked": picked,
+                          "why": "" if picked else _unpicked_note(cand)})
         return {"result": result.model_dump(mode="json"),
                 "adopt": adopt,
                 "refuting_caveats": sorted(INDEX_REFUTING_CAVEATS),
@@ -2429,12 +2493,15 @@ class GuiSession:
                 "running": busy}
 
     def index_adopt(self, body: dict) -> dict:
-        """Adopt one candidate cell as the model — through the gate, or not at
-        all.
+        """Adopt one candidate cell as the model, any candidate the person
+        chooses.
 
-        The gate is re-asked here rather than trusted from the panel: only the
-        candidate ``best_or_none()`` would return can be adopted, so no UI path
-        can hand back a cell the API itself refuses to single out.  Adoption is
+        Yue ruled on 2026-11-08 (WP-2124, option B) that a person may adopt
+        any candidate, on WP-1043's ground: give them all the evidence and let
+        the user, human or machine, be the judge.  That reverses WP-1027's
+        gate here.  ``best_or_none()`` is still asked, so a candidate it does
+        not pick carries the reason into the node's label: its grade, its
+        caveats, and the ambiguity or tie that kept it out.  Adoption is
         a model edit (``Refinement.edit`` → one ``edit_model`` node, no new
         NodeKind): the structure becomes WP-1024's single-phase Le Bail scaffold
         (absence-free lattice group unless a ``space_group`` from the extinction
@@ -2453,11 +2520,7 @@ class GuiSession:
         index = self._peak_number(body, "candidate", int)
         candidate = self._candidate_number(result, index)
         best = result.best_or_none()
-        if best is None or candidate is not best:
-            raise GuiError(
-                f"candidate {index} cannot be adopted: "
-                f"{_adopt_refusal(candidate, best)}",
-                code="ADOPT_GATED", status=409, where=["candidate"])
+        picked = best is not None and candidate is best
         from ..indexing.workflow import structure_from_candidate
 
         space_group = body.get("space_group") or None
@@ -2470,12 +2533,14 @@ class GuiSession:
         a, b, c = candidate.cell[:3]
         label = (f"adopted indexed cell {a:.4f} {b:.4f} {c:.4f} Å "
                  f"({candidate.system}, {space_group or candidate.lattice_group})")
+        if not picked:
+            label += f"; {_unpicked_note(candidate)}"
         node = p.refinement.edit(structure=structure, label=label)
         if p.doc.mode != "lebail":
             p.doc.mode = "lebail"
             p.save()
         sg = f", space_group={space_group!r}" if space_group else ""
-        return {"node_id": node, "mode": p.doc.mode,
+        return {"node_id": node, "mode": p.doc.mode, "picked": picked,
                 "api_call": f"session.adopt_candidate({index}{sg})",
                 **self.structure()}
 
@@ -3163,19 +3228,25 @@ def _summarize_extinction(result, token) -> dict:
                 [f"classes:{result.n_screened}/{result.n_classes}"]}
 
 
-def _adopt_refusal(candidate, best) -> str:
-    """Why ``best_or_none()`` would not return this candidate, in one line."""
+def _unpicked_note(candidate) -> str:
+    """Why ``best_or_none()`` does not pick this candidate, in one line.
+
+    The one sentence both surfaces quote: the ``adopt`` arm's ``why`` and the
+    label of the ``edit_model`` node an adoption of this candidate records
+    (WP-2124).  It names the grade and the caveats, as Yue's ruling of
+    2026-11-08 asks, and for a ``high`` candidate the ambiguity or the tie
+    that kept the gate from picking it.
+    """
+    caveats = ", ".join(candidate.confidence_caveats)
+    note = (f"not best_or_none()'s pick: grade {candidate.confidence!r}"
+            + (f" ({caveats})" if caveats else ""))
     if candidate.confidence != "high":
-        caveats = ", ".join(candidate.confidence_caveats)
-        return (f"confidence is {candidate.confidence!r}"
-                + (f" ({caveats})" if caveats else "")
-                + "; only the one candidate best_or_none() returns can be "
-                  "adopted")
+        return note
     if candidate.ambiguity:
-        return ("a geometrically indistinguishable lattice exists; the "
-                "discriminating reflections are listed on the candidate")
-    return ("more than one candidate reached 'high'; the result cannot "
-            "single one out")
+        return (note + "; a geometrically indistinguishable lattice exists, "
+                "and the discriminating reflections are listed on the "
+                "candidate")
+    return note + "; more than one candidate reached 'high'"
 
 
 def _idle_run() -> dict:
