@@ -3580,18 +3580,107 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       moment_angle_tests=moment_angle_tests)
 
 
+#: The row blocks the stacked joint residual places (``rows.BLOCK_ORDER`` names).
+#: A model carrying rows in any other block is refused by name rather than
+#: stacked into the wrong place: the centroid
+#: origin is refused by ``multi._refuse_centroid_origin`` (WP-1912, its lift WP-2029's).
+_JOINT_BLOCKS = ("data", "background_penalty", "pawley_restraint", "soft_restraint")
+
+
+def _joint_blocks(model: CompiledModel) -> dict[str, slice]:
+    """One model's row blocks the joint residual places, read off ``rows.layout``."""
+    out = {}
+    for b in row_layout.layout(model):
+        if b.name in _JOINT_BLOCKS:
+            out[b.name] = b.rows
+        elif b.n:
+            raise NotImplementedError(
+                f"a joint refinement does not stack the {b.name!r} row block "
+                f"({b.n} rows); it places only {', '.join(_JOINT_BLOCKS)}")
+    return out
+
+
+def _joint_restraint_shared(models: list[CompiledModel],
+                            mtable: "MultiParameterTable") -> list[bool]:
+    """Per compiled restraint item, whether a joint fit holds it once.
+
+    Each histogram compiles the one structure, so each model carries every
+    restraint's rows.  Stacked as they are, a restraint on the shared
+    structure would count once per histogram and weigh N times against the
+    data (WP-1995; the problem ``multi._refuse_centroid_origin`` names).  So a
+    restraint is held **once per quantity it restrains**:
+
+    * one whose every path is one column of the joint fit (the default for a
+      structure: ``MultiParameterTable.row_path`` names it bare), and that no
+      histogram's own column reaches, is one function of θ in every model:
+      ``True``, held once;
+    * one reading a per-histogram row (a ``ValueRestraint`` on
+      ``instrument.zero_shift``, a bond under a per-histogram or parametric
+      cell) restrains a different quantity in each pattern: ``False``, each
+      histogram holding its own row.
+
+    Empty when no model carries restraints.  Refused: models that disagree
+    about their restraints, and a path that is no row of a histogram's table
+    (a ``hist.N.``-scoped value path, which would restrain one pattern alone,
+    is not built).
+    """
+    compiled = [m.restraints for m in models]
+    if all(c is None for c in compiled):
+        return []
+    items = [None if c is None else c.item_rows() for c in compiled]
+    if any(it is None or [p for _, p in it] != [p for _, p in items[0]]
+           for it in items):
+        raise ValueError(
+            "the histograms of a joint refinement compile different soft "
+            "restraints; a joint fit restrains one structure, so every "
+            "histogram's copy must declare the same restraints")
+    shared = [True] * len(items[0])
+    for h, table in enumerate(mtable.tables):
+        reach = table.column_reach()
+        own = {e for p in mtable.per_hist_paths[h] for e in reach.get(p, ())}
+        for k, (_, paths) in enumerate(items[h]):
+            for path in paths:
+                i = table._paths.get(path)
+                if i is None:
+                    raise ValueError(
+                        f"a soft restraint reads {path!r}, which is no parameter "
+                        f"of histogram {h}'s model; a joint fit restrains each "
+                        "histogram's own copy of an unscoped path, and a "
+                        "restraint on one histogram alone (a hist.N. path) is "
+                        "not built")
+                if (mtable.row_path(h, table.entries[i]).startswith("hist.")
+                        or path in own):
+                    shared[k] = False
+    return shared
+
+
+def _joint_restraint_rows(models: list[CompiledModel],
+                          mtable: "MultiParameterTable") -> list[np.ndarray]:
+    """Per histogram, which of its soft-restraint rows the joint residual holds.
+
+    Indices into each model's soft-restraint block: a shared restraint's rows
+    from histogram 0 alone, every other restraint's from each histogram
+    (:func:`_joint_restraint_shared`).
+    """
+    shared = _joint_restraint_shared(models, mtable)
+    if not shared:
+        return [np.zeros(0, dtype=np.int64) for _ in models]
+    return [np.asarray([i for (rows, _), once in zip(m.restraints.item_rows(), shared,
+                                                     strict=True)
+                        if h == 0 or not once
+                        for i in range(rows.start, rows.stop)], dtype=np.int64)
+            for h, m in enumerate(models)]
+
+
 def _stacked_rows(models: list[CompiledModel]) -> tuple[int, int]:
-    """``(n_data_total, n_rows)`` of the stacked joint residual: every
-    histogram's data rows, then every histogram's rows below its data."""
-    n_data = sum(len(m.tt) for m in models)
-    return n_data, n_data + sum(_rows_below_data(m) for m in models)
-
-
-def _rows_below_data(model: CompiledModel) -> int:
-    """One histogram's rows after its data: the background penalty, then a
-    Pawley model's restraint rows (``model/rows.py``'s order).  A joint fit
-    refuses soft restraints and a floating origin, so nothing else sits there."""
-    return row_layout.n_rows(model) - len(model.tt)
+    """``(n_data_total, n_rows)`` of the stacked joint residual, for sizing:
+    every histogram's data, background-penalty and Pawley-restraint rows,
+    and every model's soft-restraint rows, of which the residual holds a shared restraint's
+    once (:func:`_joint_restraint_rows`), so ``n_rows`` is a bound."""
+    sizes = [row_layout.block_sizes(m) for m in models]
+    n_data = sum(s["data"] for s in sizes)
+    return n_data, n_data + sum(s["background_penalty"] + s["soft_restraint"]
+                                for s in sizes)
 
 
 def _joint_aux_counts(models: list[CompiledModel]) -> list[int]:
@@ -3641,8 +3730,17 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     reachable without running a solve — WP-0404's cross-backend matrix compares
     this Jacobian across backends exactly as the solver would build it.
 
+    The rows are ``[every histogram's data | every histogram's background
+    penalty | the soft-restraint rows]``, each model's blocks read off
+    ``rows.layout`` (WP-1995).  Data and penalty rows carry ``√w_h``; a
+    restraint row carries none, being a prior on the structure and no
+    pattern's measurement, and a restraint on the shared structure is held
+    once rather than once per histogram (:func:`_joint_restraint_rows`).
+    Everything past ``n_data_total`` is the penalty side, so the restraint
+    rows are in JᵀJ and out of χ², Rwp and Bérar-Lelann, as in a single fit.
+
     ``layout="blocked"`` returns the same Jacobian as a
-    :class:`~.blocked.BlockJacobian`, each histogram's weighted rows against
+    :class:`~.blocked.BlockJacobian`, each histogram's rows against
     its own columns, whose :meth:`~.blocked.BlockJacobian.toarray` is the
     dense matrix entry for entry (WP-1325).
 
@@ -3655,13 +3753,6 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
         raise ValueError(f"unknown Jacobian layout {layout!r}; "
                          f"available: {', '.join(blocked.LAYOUTS)}")
     n_hist = len(models)
-    if any(m.restraints is not None for m in models):
-        # The stacked layout sizes the below-data slot from the background
-        # penalty rows only, and a shared structure's restraints would land
-        # once per histogram.  Deferred since WP-0406; owned by WP-1995.
-        raise NotImplementedError(
-            "soft restraints are not yet supported in a multi-histogram joint "
-            "refinement; run each restrained phase in a single-histogram fit")
     weights = [1.0] * n_hist if weights is None else list(weights)
     if len(weights) != n_hist:
         raise ValueError("weights must have one entry per histogram")
@@ -3670,12 +3761,22 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
     residuals = [_make_residual(m, t) for m, t in zip(models, mtable.tables, strict=True)]
     jacobians = [_jacobian_for(m, t, backend)
                  for m, t in zip(models, mtable.tables, strict=True)]
-    n_data = [len(m.tt) for m in models]
-    n_pen = [_rows_below_data(m) for m in models]
+    blocks = [_joint_blocks(m) for m in models]
+    data = [b["data"] for b in blocks]
+    # the rows below the data that carry √w_h: the background penalty, then a
+    # Pawley model's restraint rows (adjacent in ``rows.BLOCK_ORDER``, WP-2104)
+    pen = [slice(b["background_penalty"].start, b["pawley_restraint"].stop)
+           for b in blocks]
+    restr = [b["soft_restraint"].start + k
+             for b, k in zip(blocks, _joint_restraint_rows(models, mtable), strict=True)]
+    n_data = [s.stop - s.start for s in data]
+    n_pen = [s.stop - s.start for s in pen]
+    n_restr = [len(r) for r in restr]
     data_off = np.concatenate([[0], np.cumsum(n_data)])
     n_data_total = int(data_off[-1])
     pen_off = n_data_total + np.concatenate([[0], np.cumsum(n_pen)])
-    n_rows = int(pen_off[-1])
+    restr_off = int(pen_off[-1]) + np.concatenate([[0], np.cumsum(n_restr)])
+    n_rows = int(restr_off[-1])
     # a Pawley histogram's intensity block rides after the table's columns,
     # one block per histogram (WP-2104); outside Pawley every slice is empty
     n_table = len(mtable.free_paths)
@@ -3695,12 +3796,16 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
         thetas = split(theta)
         data_parts: list[np.ndarray] = []
         pen_parts: list[np.ndarray] = []
+        restr_parts: list[np.ndarray] = []
         for h in range(n_hist):
             r = residuals[h](thetas[h])
-            data_parts.append(sqrt_w[h] * r[:n_data[h]])
+            data_parts.append(sqrt_w[h] * r[data[h]])
             if n_pen[h]:
-                pen_parts.append(sqrt_w[h] * r[n_data[h]:])
-        return np.concatenate(data_parts + pen_parts) if n_rows else np.zeros(0)
+                pen_parts.append(sqrt_w[h] * r[pen[h]])
+            if n_restr[h]:
+                restr_parts.append(r[restr[h]])
+        return (np.concatenate(data_parts + pen_parts + restr_parts) if n_rows
+                else np.zeros(0))
 
     def jacobian(theta: np.ndarray) -> np.ndarray:
         thetas = split(theta)
@@ -3709,19 +3814,29 @@ def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
             Jh = jacobians[h](thetas[h])
             cm = col_maps[h]
             do = int(data_off[h])
-            J[do:do + n_data[h], cm] = sqrt_w[h] * Jh[:n_data[h]]
+            J[do:do + n_data[h], cm] = sqrt_w[h] * Jh[data[h]]
             if n_pen[h]:
                 po = int(pen_off[h])
-                J[po:po + n_pen[h], cm] = sqrt_w[h] * Jh[n_data[h]:]
+                J[po:po + n_pen[h], cm] = sqrt_w[h] * Jh[pen[h]]
+            if n_restr[h]:
+                ro = int(restr_off[h])
+                J[ro:ro + n_restr[h], cm] = Jh[restr[h]]
         return J
 
     def block_jacobian(theta: np.ndarray) -> BlockJacobian:
         # the dense closure's entries, never scattered: each histogram's rows
         # stay against its own columns (WP-1325)
         thetas = split(theta)
-        return BlockJacobian(
-            [sqrt_w[h] * jacobians[h](thetas[h]) for h in range(n_hist)],
-            col_maps, n_data, n_pen, n_cols)
+        parts = []
+        for h in range(n_hist):
+            Jh = jacobians[h](thetas[h])
+            if not n_restr[h] and pen[h].stop == Jh.shape[0]:
+                parts.append(sqrt_w[h] * Jh)
+                continue
+            parts.append(np.concatenate([sqrt_w[h] * Jh[:pen[h].stop],
+                                         Jh[restr[h]]]))
+        return BlockJacobian(parts, col_maps,
+                             n_data, n_pen, n_cols, n_restr=n_restr)
 
     return (residual, jacobian if layout == "dense" else block_jacobian,
             n_data_total)
@@ -3748,7 +3863,8 @@ def run_multi_least_squares(models: list[CompiledModel],
     quantity better than any single pattern could.
 
     Row layout is [all histograms' data rows] then [all histograms' background-
-    penalty rows], so :func:`covariance_estimates` (which treats the first
+    penalty rows] then [the soft-restraint rows, a shared structure's once]
+    (:func:`_multi_closures`), so :func:`covariance_estimates` (which treats the first
     ``n_data`` rows as data for χ² and the Bérar-Lelann factor) is reused
     verbatim.  The BL run-of-signs statistic is therefore evaluated on the
     *concatenated* data residual: WP-0407 examined this and kept it as-is —

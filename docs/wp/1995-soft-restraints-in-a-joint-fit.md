@@ -96,10 +96,10 @@ one per pattern.
 
 ## Tasks
 
-- [ ] `_multi_closures`: read each model's below-data blocks from
+- [x] `_multi_closures`: read each model's below-data blocks from
       `rows.layout`, place the soft-restraint rows once per structure without
       histogram weight, and drop the refusal. Make `BlockJacobian` agree.
-- [ ] Per-histogram `ValueRestraint`: decide, and refuse by name what is not
+- [x] Per-histogram `ValueRestraint`: decide, and refuse by name what is not
       built.
 - [ ] `_restraint_tension_diagnostics` and `RestraintReport` reach the joint
       result. Flip its `ABSENT` row in `multi.py`. `HistogramResult.restraints`
