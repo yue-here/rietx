@@ -150,7 +150,15 @@ zero as no broadening.
     unchanged to every printed digit. `tests.reader_output` exit 0
     (unchanged). Four tests added in `tests/test_microstructure.py`: the
     floor set from both sides, the joint spelling, the tie closure, and an
-    end-to-end LaB6 fit and its replay under both drivers.
+    end-to-end LaB6 fit and its replay under both drivers. All four pass,
+    1.01 s together locally (the end-to-end row; one run, so a rank and not a
+    time). Gates on the final tree (macOS arm64, worktree `[dev]`): fast
+    selection 14344 passed, 417 skipped, 32 xfailed in 7:28, alone on the
+    machine through ghostshift's serial lock; acceptance command 86 passed;
+    `test_docs_consistency.py` 25 passed; ruff clean. Full selection not run:
+    the acceptance suites run the default LM driver, whose floored widths are
+    stored as 0.0 and read the same before and after. No audit-table row and
+    no new heuristic, so no generality judge.
   - *Settled by Claude* under the maintainer's 2026-10-09 ruling ("read the
     flag"): the floor is `FLOOR_HIT`, not an esd-over-value significance test.
     The alternative would also blank the uncalibrated fit's `gauss_size`
