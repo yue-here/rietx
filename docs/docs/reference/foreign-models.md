@@ -199,7 +199,7 @@ It carries two things the older format has no room for: the constraints the refi
 | `Gsas2Model.constraints` | the equivalences, holds and constraint equations, with their variables resolved into names |
 | `Gsas2Model.rwp`, `Gsas2Model.gof`, `Gsas2Model.chi2` | the run's own agreement indices. `gof` is the square root of reduced χ². `chi2` is GSAS-II's `chisq`, which is Σw(I<sub>o</sub> − I<sub>c</sub>)² and not reduced |
 | `Gsas2Model.n_observations`, `Gsas2Model.n_variables`, `Gsas2Model.converged` | how many channels, how many parameters, and whether GSAS-II called the run converged. `n_variables` is `None` where the file's `Rvals` does not state it, which happens |
-| `Gsas2Model.sequential_equations` | the equations stored to fit to a sequential results table, one `Gsas2SequentialEquation` each ([below](#gsas2-sequential-equations)) |
+| `Gsas2Model.sequential_equations` | the equations stored to fit to a sequential results table, one `Gsas2SequentialEquation` each ([below](#equations-stored-with-a-sequential-fit)) |
 | `Gsas2Model.unsupported` | one line per thing the read could not carry, kept whether or not you passed a list |
 | `Gsas2Model.histogram`, `Gsas2Model.phase` | pick one by name or by number. Both refuse to choose when the file carries several and you named none |
 
@@ -314,11 +314,10 @@ A constraint is a `Gsas2Constraint`.
 
 Anything with a flag beside it is a `Gsas2Value`, which holds `Gsas2Value.value` and `Gsas2Value.refined` and nothing else.
 
-(gsas2-sequential-equations)=
 ### Equations stored with a sequential fit
 
 GSAS-II fits an equation to one column of its sequential results table after the refinement, and stores it in the project.
-The reader takes each one into a `Gsas2SequentialEquation`, ready for `rietx.fit_trajectory` ([An equation fitted to a trajectory](series.md#series-fit-trajectory)).
+The reader takes each one into a `Gsas2SequentialEquation`, ready for `rietx.fit_trajectory` ([An equation fitted to a trajectory](series.md#an-equation-fitted-to-a-trajectory)).
 The per-histogram results table itself is not carried, and the read says so.
 
 | Field | Holds |

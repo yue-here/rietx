@@ -76,7 +76,11 @@ its code. Any reader takes the stored format from a file's contents.
   the rewrites are `GSAS2_EXPRESSION_REWRITES`, held equal to the table in
   `reference/foreign-models.md`. The layout was read off the contents of the public
   GSAS-II tutorials' `steel.gpx`.)
-- [ ] Manual: `guides/equation.md` beside the joint route, and `switching/gsas2.md`.
+- [x] Manual: `guides/equation.md` beside the joint route, and `switching/gsas2.md`.
+  (`guides/equation.md` § Fit the equation to the series trajectory, run by
+  `examples/guides/equation.py`; the reference halves are `reference/series.md` § An
+  equation fitted to a trajectory and `reference/foreign-models.md` § Equations stored
+  with a sequential fit.)
 - [ ] Skill: the series reference's row.
 
 ## Acceptance

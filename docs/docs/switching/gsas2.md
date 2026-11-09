@@ -80,11 +80,26 @@ GSAS-II fits an equation to the sequential results table after a sequential refi
 The equation is a python-syntax string over the table's columns, and the fit sees the per-pattern values and their esds (`SeqParFitEqList`).
 rietx has two places for the same equation.
 
-- Refined pattern by pattern, a chain gives each parameter's trajectory ([Sequential refinement](../reference/series.md)).
+- Fitted to a trajectory, as GSAS-II does: a chain gives each parameter's trajectory ([Sequential refinement](../reference/series.md)), and `rx.fit_trajectory` fits the equation to it, weighted by the esds ([An equation fitted to a trajectory](../reference/series.md#an-equation-fitted-to-a-trajectory)).
 - Refined jointly, the equation is a formula on the target, and every pattern enters one residual ([Parametric refinement](../reference/parametric.md#formula-equations)).
 
 The second has no GSAS-II counterpart.
 It fits the equation's variables against the patterns themselves, so a pattern that cannot pin the parameter alone still contributes.
+Where every pattern measures the parameter well, the two agree: on a synthetic seven-pattern ramp the two lines differed by at most 0.05 of their combined esds ([How to refine a cell edge as a function of temperature](../guides/equation.md#fit-the-equation-to-the-series-trajectory)).
+
+A project's stored equations come across.
+`rx.read_gsas2_gpx` reads each one in `SeqParFitEqList` onto `model.sequential_equations`, its text rewritten in rietx's grammar, its free labels as `rx.Parameter`s with their stored values and refine flags, and the table column each other label reads ([Equations stored with a sequential fit](../reference/foreign-models.md#equations-stored-with-a-sequential-fit)):
+
+<!-- api-doc: no-exec — reads a project of your own, and needs the series fitted from its patterns -->
+```python
+model = rx.read_gsas2_gpx("ramp.gpx")
+eq = model.sequential_equations[0]
+coordinates = rx.CoordinateTable(columns={"T": temperatures})  # the label eq.bindings maps to the column
+fit = rx.fit_trajectory(series, "phases.0.cell.a", eq.expression, eq.variables,
+                        coordinates=coordinates)
+```
+
+An equation the grammar cannot carry, such as one calling `np.exp` or one of GSAS-II's external functions, stays on the model with `refused` naming why.
 The formula's text follows [Expressions](../reference/expressions.md), which is close to GSAS-II's python syntax:
 
 | GSAS-II | rietx |

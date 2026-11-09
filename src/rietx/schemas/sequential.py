@@ -1848,8 +1848,8 @@ class TrajectoryFit(Base):
             if not v.vary:
                 lines.append(f"  {v.name} = {v.value:.10g} (held)")
                 continue
-            esd = "n/a" if v.esd is None else f"{v.esd:.2g}"
-            raw = "n/a" if v.esd_unscaled is None else f"{v.esd_unscaled:.2g}"
+            esd = "n/a" if v.esd is None else f"{v.esd:.1e}"
+            raw = "n/a" if v.esd_unscaled is None else f"{v.esd_unscaled:.1e}"
             lines.append(f"  {v.name} = {v.value:.10g} ± {esd} (unscaled ± {raw})"
                          + (" at its bound" if v.at_bound else ""))
         return "\n".join(lines)
