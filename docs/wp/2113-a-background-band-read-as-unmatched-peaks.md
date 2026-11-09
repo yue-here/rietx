@@ -42,6 +42,13 @@ P-spline). Or let the unmatched count require a peak's shape, so a run of channe
 once or not at all. The first changes a fit every `index_pattern` call pays for, and the second touches
 Layer 0, which every report reads.
 
+**Decided 2026-11-09 (Michael): route A.** The validation fit's background is sized with the existing
+`auto_background(kind="chebyshev")` over the fitted range, once per `index_pattern` call. Grounds, from
+task 1's table: on the steep silicon it takes the count from 72 to 0 and Rwp/GoF from 0.098/3.42 to
+0.029/1.01, keeps all six planted impurity lines (two of them on the band), leaves the flat silicon
+unchanged, and is machinery the package already has and has audited (B12), where route B adds a tier-3
+constant to the Layer 0 every `FitReport` reads and leaves the validation at Rwp 0.098.
+
 **Tier.** A shape test on the residual is new judgement: name the families (this silicon, the indexing
 acceptance lists, and a two-phase list where the unmatched lines are real), with the known impurity as
 the reference. It answers by kind 3: report the number with its meaning.
