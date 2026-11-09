@@ -523,20 +523,19 @@ its box because the row is the target, so a list that gives the row no
 background reads as prose that happens to be clickable — found in the browser,
 and invisible to jsdom, which has neither hover nor cursor.
 
-**The filesystem browser** (WP-1205, `GET /api/fs`, `Browse.svelte`) is the
-empty state's third way to reach a project, beside the recent list and the
-examples: read-only, confined to `Path.home()` and the process's cwd, and not
-behind the 409 like `/api/recent`. **The gate is containment, not a
-blocklist** — `path` is resolved (symlinks included) before it is checked
-against the two roots, the same shape `GuiSession._export_target` already used
-for the exports directory. Browse is **one modal, two jobs**: `mode="open"`
-opens a `.rex` entry, `mode="pick"` hands a directory to the New project
-dialog's Where field (a browser can say where a project lives, never name it).
-**`Model` is mounted once in `App.svelte`**, never per branch of `{#if project}`,
-and **every opener settles what is drawn over the project in the shell's
-`open`/`opened`**: a second instance, or an opener settling it itself, once left
-a wizard painted over a freshly opened project. **The start screen and the New
-project dialog** (WP-2131, `panels/Start.svelte`, `panels/NewProject.svelte`)
+**The filesystem browser** (WP-1205, `GET /api/fs`, `Browse.svelte`) is the empty
+state's third way to reach a project, beside the recent list and the examples:
+read-only, confined to `Path.home()` and the process's cwd, and not behind the
+409 like `/api/recent`. **The gate is containment, not a blocklist** — `path` is
+resolved (symlinks included) before it is checked against the two roots, the same
+shape `GuiSession._export_target` already used for the exports directory. Browse
+is **one modal, two jobs**: `mode="open"` opens a `.rex` entry, `mode="pick"`
+hands a directory to New project's Where field (a browser can say where a project
+lives, never name it). **`Model` is mounted once in `App.svelte`**, never per
+branch of `{#if project}`, and **every opener settles what is drawn over the
+project in the shell's `open`/`opened`**: a second instance or a self-settling
+opener once left a wizard over a freshly opened project. **The start screen and
+the New project dialog** (WP-2131, `panels/Start.svelte`, `NewProject.svelte`)
 keep three rules. A moved recent project stays listed as `missing`, with Locate…
 and Remove (`POST /api/recent/remove`). The mode follows the phases, never asked:
 a typed cell gives Le Bail, so WP-1206's refusal stays unreachable. An assumed

@@ -154,6 +154,9 @@ npm --prefix gui test && npm --prefix gui run check
   register: 13 px, weight 600, full-colour text. The app's other `h2`/`h3` rules and the Model
   panel's two table-header rules follow it. A follow-up WP does that work; this one implements
   nothing more. The question below is ruled.
+  The merge of main that round put `gui/CLAUDE.md` one line over its 1060-line cap, since
+  each side had added one. The filesystem-browser paragraph is rewrapped and four phrases
+  shortened. No fact was dropped.
 
 - **2026-11-09, second round** — a fix round on PR #1498, by a ghostshift runner. Four items.
 
