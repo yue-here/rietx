@@ -1,6 +1,6 @@
 # WP-1914 — a size read off a coefficient at its floor
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-09 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-07 — a derived number that reads as a finding on every lab_sample_refine fit of a purely Lorentzian specimen; the reading's own esd flags it, the agreement ratio beside it does not
