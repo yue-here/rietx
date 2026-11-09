@@ -1,6 +1,6 @@
 # WP-2133 — the File menu on the project name
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — all four tasks landed; PR #N open, stacked on #1498, awaiting review
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — all four tasks landed; PR #1502 open, stacked on #1498, awaiting review
 Depends on: 2131
 Priority: P2 2026-11-09 — a piece of the open gui-overhaul milestone, the maintainer's file-and-project I/O ruling of 2026-11-07; 2131's handover names it next
 
