@@ -1062,8 +1062,9 @@ def histogram_arrays(payload: Any) -> Gsas2Arrays | None:
     **The one histogram read**: :func:`read_gsas2_gpx` takes its point count
     from here and the ``.gpx`` pattern reader (:mod:`rietx.io.formats.gpx`)
     its x, y and w, so the two cannot come to disagree about which array is
-    which.  ``None`` means the payload does not hold three equal-length
-    one-dimensional arrays, which a caller reports in its own words.
+    which.  ``None`` means the payload does not hold three non-empty numeric
+    arrays of one size (each read flat), which a caller reports in its own
+    words.
     """
     arrays = payload[1] if isinstance(payload, (list, tuple)) and len(payload) > 1 else None
     if not isinstance(arrays, (list, tuple, np.ndarray)) or len(arrays) < 3:

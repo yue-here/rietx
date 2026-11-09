@@ -54,8 +54,8 @@ displacement.
   and the physical model as the separate arm 4 below.
 * **X-ray**: Cu Kα1/Kα2 at the package's anode preset with the Kα2 ratio held
   at its ideal 0.5 and the graphite diffracted-beam monochromator at
-  2θ_m = 26.6°, whose polarization cos²2θ_m = 0.7998 is the ideal value Hill
-  names (p. 595); 18–159.975°, because below 18° a 1° slit over a 20 mm
+  2θ_m = 26.6°, whose polarization cos²2θ_m = 0.7995 sits within 0.0003 of
+  the ideal 0.7998 Hill names (p. 595); 18–159.975°, because below 18° a 1° slit over a 20 mm
   specimen does not intercept the whole beam (p. 594).  Anomalous dispersion
   is applied (declared below): Pb's L edges sit near 0.95 Å, well short of
   Cu Kα, so the tabulated f′/f″ answer.
@@ -119,7 +119,7 @@ N_DETERMINATIONS = HILL["determinations"]          # 16 X-ray, 17 neutron
 LAMBDA_NEUTRON = 1.909
 NEUTRON_LIMITS = (10.0, 155.85)                     # the whole pattern
 XRAY_LIMITS = (18.0, 159.975)                       # Hill p. 594: full beam from 18°
-#: Graphite (002) at Cu Kα; cos²2θ_m = 0.7998, Hill's ideal value (p. 595).
+#: Graphite (002) at Cu Kα; cos²2θ_m = 0.7995, against Hill's ideal 0.7998 (p. 595).
 MONOCHROMATOR_TWO_THETA = 26.6
 BACKGROUND_TERMS = 6                                # Hill p. 607: 3 to 6 terms
 SPREAD_BAR = 3.0                                    # module docstring, bar 2

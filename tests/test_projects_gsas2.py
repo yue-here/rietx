@@ -1407,3 +1407,41 @@ def test_a_project_can_point_at_a_gpx_histogram(tmp_path):
     assert len(proj.data.two_theta) == 6000
     reopened = rx.Project.open(tmp_path / "pbso4.rex")
     assert reopened.data.two_theta == proj.data.two_theta
+
+
+def test_a_negative_zero_weight_is_a_zero_weight(tmp_path):
+    """1/√(−0.0) is −∞, which the zero-weight path would not see (review of
+    WP-1943): −0.0 is read as the zero weight it is."""
+    from tests.writers_xrd import write_gpx
+
+    x = 10.0 + 0.02 * np.arange(12)
+    y = 500.0 + np.arange(12) % 7
+    w = 1.0 / y
+    w[4] = -0.0
+    found = []
+    pat = rx.read_pattern(write_gpx(tmp_path / "a.gpx", [dict(x=x, y=y, w=w)]),
+                          diagnostics=found)
+    assert len(pat.two_theta) == 12 and len(pat.excluded_regions) == 1
+    assert [d.code for d in found] == ["PATTERN_ZERO_WEIGHT_EXCLUDED"]
+
+
+def test_a_histogram_with_nothing_left_to_fit_is_refused(tmp_path):
+    from tests.writers_xrd import write_gpx
+
+    x = 10.0 + 0.02 * np.arange(12)
+    y = 500.0 + np.arange(12) % 7
+    w = np.zeros(12)
+    w[3] = 1.0 / y[3]
+    y = y.copy()
+    y[3] = np.nan                    # the one weighted point has no count
+    with pytest.raises(ValueError, match="no point of non-zero weight") as exc:
+        rx.read_pattern(write_gpx(tmp_path / "a.gpx", [dict(x=x, y=y, w=w)]))
+    assert "a.gpx" in str(exc.value)
+
+
+def test_a_tof_histogram_lists_no_two_theta_span():
+    from rietx.io.readers import list_scans
+
+    scans = list_scans(SETTING)
+    assert all(s.two_theta_range == (0.0, 0.0) for s in scans)
+    assert all("time-of-flight" in s.label for s in scans)

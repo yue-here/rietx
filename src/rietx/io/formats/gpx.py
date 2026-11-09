@@ -49,8 +49,9 @@ abscissa, but this entry has measured no file's TOF unit against its own
 output, and adopting it from prose is the one thing the format rule forbids.
 
 **Dispatch position.**  The file is a sequence of pickles, so it goes with the
-binary-claiming entries — a protocol-0 pickle is ASCII and the catch-all would
-otherwise read its opcodes as columns.  The sniff is the project reader's own,
+binary-claiming entries, because the stream is binary (a protocol-1 or -2
+pickle, the two ``looks_gpx`` accepts; a protocol-0 one, which is ASCII, is not
+claimed).  The sniff is the project reader's own,
 :func:`~rietx.io.projects.gsas2.looks_gpx` (a pickle opcode *and* a GSAS-II tree
 label), which no other entry's evidence overlaps.  Reading goes through the same
 allow-listed unpickler (:data:`~rietx.io.projects.gsas2.ALLOWED_GLOBALS`), so a
@@ -117,6 +118,7 @@ def _sigma(p: Path, label: str, w: np.ndarray,
     rather than this function setting the whole column aside (WP-2079's rule:
     a reader's decisions skip non-finite values and drop none of their rows).
     """
+    w = w + 0.0                    # −0.0 is a zero weight, not a √ of a negative
     finite = np.isfinite(w)
     if not np.any(w[finite] < 0) and np.any(w[finite] > 0):
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -167,6 +169,10 @@ def read_gpx_pattern(path: str | Path, *, scan: int | None = None,
     tt, y, sig = ascending(arrays.x, arrays.y, sigma, path=p, fmt=GPX,
                            keep_infinite_sigma=True, diagnostics=diagnostics)
     excluded: list[tuple[float, float]] = []
+    if sig is not None and np.isinf(sig).all():
+        raise ValueError(f"{p.name}: histogram {label!r} has no point of non-zero "
+                         f"weight left once its non-finite rows are dropped, so "
+                         f"no point of it would be fitted")
     if sig is not None and np.isinf(sig).any():
         unused = np.isinf(sig)
         sig = np.where(unused, np.sqrt(np.maximum(y, 1.0)), sig)
@@ -211,8 +217,9 @@ def list_gpx_scans(path: str | Path) -> list[ScanInfo]:
         kind = _kind(children)
         named = gsas2.HISTOGRAM_TYPES.get(kind, kind or "untyped")
         n = 0 if arrays is None else int(arrays.x.size)
+        # a non-CW histogram's abscissa is not 2θ, and it cannot be read here
         span = ((float(np.nanmin(arrays.x)), float(np.nanmax(arrays.x)))
-                if arrays is not None else (0.0, 0.0))
+                if arrays is not None and kind in gsas2.CW_TYPES else (0.0, 0.0))
         out.append(ScanInfo(index=i, label=f"{label} ({named})", n_points=n,
                             two_theta_range=span))
     return out

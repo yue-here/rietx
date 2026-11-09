@@ -75,10 +75,10 @@ from .xy import XY, read_xy
 #: pair is disjoint by construction — ``RAW…`` against ``V3RD``/``V5RD`` — which
 #: matters more here than usual, since ``.raw`` is written by six unrelated
 #: vendors and ``.rd`` by two, so neither reader may trust a suffix.
-#: ``GPX`` is third (WP-1943): a ``.gpx`` is a pickle stream, and a protocol-0
-#: pickle is ASCII that every text sniff below would decode, so it takes the
-#: binary-first position; its two-clause test (a pickle opcode at byte 0 *and*
-#: a GSAS-II tree label in the head) overlaps neither magic above it.
+#: ``GPX`` is third (WP-1943): a ``.gpx`` is a binary pickle stream, so it
+#: takes the binary-first position; its two-clause test (a pickle opcode at
+#: byte 0 *and* a GSAS-II tree label in the head) overlaps neither magic above
+#: it.
 #: ``RASX`` and ``BRML`` follow, sharing a zip's magic and
 #: separated by their manifests rather than by it; then ``RAS``, ``UXD``,
 #: ``XRDML`` and ``UDF``, each recognised by a first line, a root element or a
