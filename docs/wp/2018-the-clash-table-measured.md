@@ -1,6 +1,6 @@
 # WP-2018 — The clash table: actions that read or move the same parameter, measured both ways
 
-Milestone: generality · Status: 🔄 2026-11-09 — claimed by @mustachefeeling
+Milestone: generality · Status: 🔄 2026-11-09 — 8 of the list re-derived (3 dissolved); none measured
 Track: The audits
 Depends on: —
 Priority: P3 2026-10-20 — split from WP-2002 by the maintainer; 38 candidate pairs found and none measured, and one past clash (WP-1320) changed a design
@@ -72,12 +72,13 @@ never a bound the solver sees.
 | C3c | **dissolved** | The clamp is gone. The reset acts after the solve on committed values and restores the cell the stage's own residual evaluated, whose volume is positive (refine.py:1821-1826), so the degenerate-cell guard, which acts during the solve, never sees a reset value |
 | C3d | **dissolved** | The clamp moved θ after the solve, under a bound test reading the first solve. Now the reset's paths are held (`set_vary(reset_hold, False)`, refine.py:5406) before the second solve (:5469), whose outcome replaces the first (:5523), and `check_guards` (called :5563) takes `free = table.free_paths` (staged.py:2283) into `bound_findings` (:2355): a reset cell is no longer a free column when the bound test runs |
 
-### Re-derivation, C1 and C2 (2026-11-09, read only)
+### Re-derivation, C1, C2 and C6 (2026-11-09, read only)
 
 | # | Status | Reason (file:line, read) |
 |---|---|---|
 | C1 | **live, to measure** | `profile_fraction` still pins one width per branch (`trial.set_vary([axis], False)`, fraction_profile.py:216) and refits through `run_stage` (:224), so each refit meets the stage-start hold and the collapse restore (refine.py:5372-5399). The module's own account of the clash (fraction_profile.py:14-23) is still dated to the pre-WP-1523 test. Dataset: `tests/test_qpa_multimodal.py`'s two-basin fixture |
 | C2 | **live, narrowed, to measure** | Since #1075 each probe starts from the fit's own free set (`fresh()`, parameter_interval.py:269-279: the pinned path and every path the fit held), so a probe can no longer free a cell the fit held. Its comment says a refit may still hold *more*, since a lower pinned scale can hide a phase the fit saw: that half of the pair is what to measure. Dataset: a weak phase in a weighed mixture, as listed |
+| C6 | **designed apart, confirm by measuring** | `_significance_columns` (refine.py:2205-2218) still leaves out every column that moves only displacements, occupancies and other phases' scales, so the absent-phase test cannot read a scale-B ridge as absence. The docstring's 153.7σ against 0.02σ on the fluorite is why the exclusion exists, not a measurement of the pair; the WP-2002 reader asked for one. Dataset: `tests/test_scale_b_ridge.py`'s fluorite |
 
 ## Acceptance
 
@@ -95,6 +96,6 @@ Every pair in `2002-batch/clashes.md` has a measured row or a stated reason it w
 
 ## Handover log
 
-- **2026-11-09** — Ghostshift runner, one short session cut to about 25 minutes by a hard stop. PR #1512. Landed: C1, C2 and the C3 family re-derived against 4c55b9011 by reading, in § The table: C1, C2, C3 and C3a live, C3b, C3c and C3d dissolved by the B8 reset (reasons at file:line). Nothing measured, no fit run, no clash found, so nothing routed to an owner WP or the maintainer and no issue filed. `### Inherited` not pruned (both entries still describe the tree as far as read). Next: re-derive C4-C38 the same way; choose the dataset per pair before running; then measure C1 and C3 first, as the WP says. Tests: the docs checks only (counts in the PR body); no code changed.
+- **2026-11-09** — The clash table has begun: eight entries of the candidate list (four of its 38 numbered pairs and the four sub-pairs of C3) were checked against today's code, and three of them no longer exist, because the cell reset that replaced the old ±15 % clamp writes the same value as the collapse restore and acts outside the solve. Four remain real and unmeasured, among them the two the WP names first (C1 and C3), and one (C6) was designed apart but never measured. No fit was run, so nothing here says whether any pair actually changes an answer; that is still the WP's whole point. *Done* (PR #1512, docs only): § The table holds C1, C2, C3, C3a, C3b, C3c, C3d and C6 re-derived at 4c55b9011 by reading, each with file:line. Live: C1, C2 (narrowed by #1075), C3, C3a. Dissolved: C3b, C3c, C3d. C6 designed apart, measurement still owed. No clash found, so nothing went to an owner WP, the maintainer or an issue. `### Inherited` kept: both entries still describe the tree as far as read. *Gotchas*: the session was a ghostshift runner cut to about 30 minutes by a hard stop, so no dataset was chosen and nothing was measured; the line numbers above are 4c55b9011's. On this Mac a pytest run with `-n` is refused unless it goes through `testslot.sh`. *Tests* (macOS arm64, `.venv` `[dev]`): `tests/test_docs_consistency.py` 25 passed; `python -m tests.reader_output` exit 0, unchanged. Next: (1) re-derive C4, C5 and C7-C38 the same way, since a dissolved pair saves a measurement; (2) choose the dataset per live pair before running; (3) measure C1 and C3 first, both orders or with and without the action, Rwp, the shared parameter and its esd, PNGs to `tests/output/`.
 - **2026-10-20** — Filed by WP-2002's session at the maintainer's request ("split"): the clash table moves here so that 2002 closes on its owed tests and B14's lifts. Nothing measured yet.
 
