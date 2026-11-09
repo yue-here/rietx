@@ -49,10 +49,10 @@ etc)".
 
 ## Tasks
 
-- [ ] Claimed.
-- [ ] Inventory the file: each paragraph sorted into standing rule, evidence or
+- [x] Claimed.
+- [x] Inventory the file: each paragraph sorted into standing rule, evidence or
   duplicate; each rule verified against the tree.
-- [ ] Evidence moved verbatim to the WP files it came from (a `## Moved from
+- [x] Evidence moved verbatim to the WP files it came from (a `## Moved from
   gui/CLAUDE.md` section in each), duplicates deleted with where they live.
 - [ ] `gui/CLAUDE.md` rewritten: rules only, grouped by the file a session
   edits, duplicates merged, contradictions with the code fixed.
