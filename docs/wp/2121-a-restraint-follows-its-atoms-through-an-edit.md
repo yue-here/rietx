@@ -1,6 +1,6 @@
 # WP-2121 — A restraint follows its atoms through an edit
 
-Milestone: unscheduled · Status: 🔄 2026-11-08 — every task landed; the PR is open for review, and three decisions wait for the maintainer
+Milestone: unscheduled · Status: 🔄 2026-11-09 — every task landed and PR #1463 merged on 2026-11-08 (`527048aa4`); three decisions under *Next* wait for the maintainer
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-11-08 — a silent wrong answer on a path few fits run: an edit that reorders atoms leaves a bond restraint on two other atoms, and the next fit pulls them to the old target with nothing said
@@ -102,6 +102,21 @@ never by a bare `IndexError` at the next fit.
 - #1264 and WP-1991: the same defect for holds and ties, and the tie-drop warning this one matches.
 
 ## Handover log
+
+### 2026-11-09 — bookkeeping: PR #1463 merged, and the WP stays open
+
+The fix is on main. PR #1463 merged on 2026-11-08 at 14:00 UTC as `527048aa4`, so a restraint
+follows its atoms through an edit in every build from that commit on. The status line still said
+the PR was open, and now records the merge. The WP stays open. Three of the decisions under the
+previous entry's *Next* are the maintainer's, and none has been made.
+
+*Done.* Status line synced to the tree: `git branch -r --contains 527048aa4` names `origin/main`,
+and `gh pr view 1463` reads `MERGED`. No code, test or other WP changed. Bookkeeping PR: #PRNUM.
+
+*Next*, in order. Item 1 of the previous *Next* (review and merge) is done. Items 2-4 wait for the
+maintainer: whether the renumbering records that it fired, whether restraints name atoms by label,
+and whether construction checks tether, anti-bump and value-path atoms. Item 5's follow-ups each
+become a WP after the fold check. The WP closes once the three decisions are answered.
 
 ### 2026-11-08 (2nd session) — the review's two refusal messages
 
