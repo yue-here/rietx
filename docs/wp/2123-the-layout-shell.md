@@ -122,6 +122,55 @@ No rule this WP adds is a heuristic in the sense of `docs/milestones/generality.
 nothing here reads the data or decides for a fit. The stacking width is arithmetic over declared
 floors.
 
+### Calls settled by Claude
+
+No ruling covered these, so each took the smallest neutral option. Each is marked "settled by
+Claude, reversible", with its alternative, and waits for the maintainer's review of the PR.
+
+1. Settled by Claude, reversible: the header's `Run` is retired and the action bar's `Refine`
+   is the one way to start a fit from the window, defaulting to `Staged plan`, so a first
+   press does what `Run` did. The pill and `Cancel` stay in the header. Alternative: keep `Run`
+   in the header beside the action bar.
+2. Settled by Claude, reversible: Rwp, GoF and the not-a-fit chip move from the header to the
+   Pattern title line, which design 2 gives the view's own facts. Alternative: keep them in the
+   header.
+3. Settled by Claude, reversible: the graph strip holds `Pattern` alone. The Structure view
+   stays the Model tab's third column until the piece that moves it. Alternative: move the 3D
+   viewer into a graph tab now.
+4. Settled by Claude, reversible: the action bar shows under every right-hand tab and applies
+   the Parameters tab's pending edits only. The Model and Text panels keep their own Apply, so
+   on the Model tab, while a model edit waits, two filled buttons show at once; that breaks
+   design 6's one filled primary and is owed to piece 2. Alternative: show the bar under the
+   Parameters tab only.
+5. Settled by Claude, reversible: the title reads `Observed pattern` before any fit, `Last fit`
+   after one and `Refining` during a run. Alternative: name the model or the stage.
+6. Settled by Claude, reversible: the refine choice is labelled `One cycle`, the ruling's word,
+   though a rietx stage runs least squares to convergence on the ticked set rather than one
+   iteration. `Staged plan` carries no stage count yet. Alternative: `One stage`, and a count.
+7. Settled by Claude, reversible: `⌘⏎` (`Ctrl+Enter`) presses the primary everywhere except in
+   the Text document, whose editor binds the same chord to its own Apply. No `⌘1`/`⌘2` panel
+   shortcuts, since browsers reserve them; the palette carries both collapse commands and a
+   one-cycle command. Alternative: other chords.
+8. Settled by Claude, reversible: the collapse state and the stacked sash height are
+   session-local and unpersisted, as `Split | Full` was. The side-by-side sash width stays
+   persisted per project, and a double-click resets it. Alternative: persist the collapse state.
+9. Settled by Claude, reversible: the floors are 420 px of graph and 340 px of panel, so the
+   window stacks below 760 px. The panel floor is the sidebar's old clamp raised from 300 to
+   340, the Splitter's minimum; the graph floor keeps a readable 2θ axis. Alternative: other
+   floors, which move the threshold with them.
+10. Settled by Claude, reversible: the collapse icons are the prototype's panel glyphs, drawn
+    inline, with the filled half showing the side the button hides; stacked, they turn to
+    top and bottom halves. Alternative: text labels.
+11. Settled by Claude, reversible: the track and raised colours are `#ececea`/`#ffffff` light and
+    `#2c2c2c`/`#474747` dark, as tokens. Alternative: `color-mix` over `--panel`, which the
+    WP-1429 rule asks for (the conflict below).
+
+**A rule conflict for the maintainer.** The root CLAUDE.md (WP-1429) says a page's extra roles
+are `color-mix` over the nine chrome tokens and never a token of their own. The workshop
+handover and this WP's brief ask for new tokens. Settled by adding `--sunken` and `--raised` as
+surface levels, which the nine do not have. Reversal costs one edit to `app.css` and two
+deletions from `theme.py`.
+
 ## Non-goals
 
 - The Parameters panel, the Plan tab, the previews and the Background tab are pieces 2-5. Their
@@ -151,7 +200,7 @@ floors.
   resets on double-click.
 - [x] The one-column layout below the width computed from the two panels' floors and the grip,
   graphs above the model, the sash turned horizontal.
-- [ ] The layout-shift browser test: every control clicked on a fresh page in each starting
+- [x] The layout-shift browser test: every control clicked on a fresh page in each starting
   state, element boxes compared before and after, real clicks only.
 - [ ] Vitest for the shell's logic, the dist rebuilt, the GUI chapters and the screenshots the
   shell changes regenerated.

@@ -1569,8 +1569,12 @@
     min-height: 0;
   }
 
+  /* `min-height: 0` because a column flex item's automatic minimum is its
+     content height, which let the panel column take the whole window and the
+     graphs none (measured at 700 px: 1094 px against a 860 px pane). */
   .panes.stacked > .side {
     flex: 0 0 50%;
+    min-height: 0;
     max-width: none;
     border-left: 0;
     border-top: 1px solid var(--line);
@@ -1592,11 +1596,15 @@
     flex: 0 0 auto;
   }
 
+  /* Every panel scrolls inside itself, so a panel taller than its share is
+     clipped here rather than painted over the action bar and the console
+     below it (found stacked at 700 px, WP-2123). */
   .panel {
     display: flex;
     flex-direction: column;
     min-height: 0;
     flex: 1 1 auto;
+    overflow: hidden;
   }
 
   .panel.hidden {

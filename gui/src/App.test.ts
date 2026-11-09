@@ -5696,7 +5696,7 @@ describe("the first-run checklist (WP-1017)", () => {
     tabs().find((t) => t.textContent?.trim() === "Report")!.click();
     await flush();
     // every step done, so the strip says so rather than counting
-    expect(host.querySelector(".checklist")!.textContent).toContain("that is the loop");
+    expect(host.querySelector(".checklist")!.textContent).toContain("go back to any state in History");
 
     tabs().find((t) => t.textContent?.trim() === "History")!.click();
     await flush();
@@ -5710,7 +5710,7 @@ describe("the first-run checklist (WP-1017)", () => {
     // fix this read "1 left" — the reset had been put in `readUi()`, which
     // `moved()` calls on every head move, so reading the report and then
     // checking a node out un-ticked the step the person had just finished.
-    expect(host.querySelector(".checklist")!.textContent).toContain("that is the loop");
+    expect(host.querySelector(".checklist")!.textContent).toContain("go back to any state in History");
   });
 
   it("stays hidden on a project that dismissed it before", async () => {

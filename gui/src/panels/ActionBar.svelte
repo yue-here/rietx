@@ -96,6 +96,8 @@
   /* as wide as "99 pending edits", and it cuts rather than grows */
   .pending {
     width: 16ch;
+    /* one line tall while empty, so the first edit grows nothing */
+    min-height: 1lh;
     overflow: hidden;
     text-overflow: ellipsis;
     text-align: right;

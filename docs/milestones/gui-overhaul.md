@@ -70,6 +70,9 @@ the piece that touches it or a WP of its own.
   maintainer adopted both rules on 2026-11-08.
 - A GUI series lives in session memory only; several series gaps wait on the series fitting
   now changing on `main`.
+- The Model and Text panels keep their own filled Apply beside the action bar's Refine, so the
+  Model tab shows two filled buttons while a model edit waits (found by WP-2123, which routes
+  only the Parameters edits through the action bar).
 
 ## Acceptance
 
