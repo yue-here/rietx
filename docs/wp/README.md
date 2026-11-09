@@ -57,6 +57,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2123](2123-the-layout-shell.md) | The layout shell | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2126](2126-the-parameters-panel.md) | The Parameters panel | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2127](2127-the-plan-tab.md) | The Plan tab | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | 2026-11-09 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 
 ## Next, by priority
 
@@ -826,6 +827,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2119](2119-the-design-record-says-how-a-design-is-chosen.md) | The design record says how a design is chosen | ✅ 2026-11-07 | — | — |
 | [2122](2122-the-mark-redrawn.md) | The mark's bar redrawn, and the header lockup set on the type | ✅ 2026-11-08 | — | — |
 | [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
+| [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | 🔄 2026-11-09 | P4 | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
