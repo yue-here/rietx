@@ -1,6 +1,6 @@
 # WP-1325 — parametric series: a parameter as a function of each pattern's coordinates
 
-Milestone: parametric · Status: 🔄 2026-11-04 — the parametric milestone took this WP; two tasks remain, in-step bounds and start agreement
+Milestone: parametric · Status: 🔄 2026-11-09 — claimed by a ghostshift runner; two tasks remain, in-step bounds and start agreement
 Depends on: — (1119 soft: a named coefficient is a named variable)
 Priority: P2 2026-10-14 — was P3: the maintainer took the combinatorial-library case (the first named outside user) and the scalable solver it needs; 1962 waits on that solver
 
