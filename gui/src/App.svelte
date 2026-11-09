@@ -1295,7 +1295,7 @@
         <!-- every tab stays mounted: switching must not throw away a filter, a
              pending edit, an unsaved stage list or a two-node comparison -->
         <div class="panel" class:hidden={tab !== "params"}>
-          <Params bind:this={paramsPanel} {head} {busy} {simple} {say}
+          <Params bind:this={paramsPanel} {head} {busy} {corpus} {say}
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
         </div>
         <div class="panel" class:hidden={tab !== "plan"}>

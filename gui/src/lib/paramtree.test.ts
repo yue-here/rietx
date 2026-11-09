@@ -90,6 +90,17 @@ describe("the Parameters panel tree (WP-2126)", () => {
     expect(atom.dofs.map((d) => d.path)).toEqual(["phases.0.atoms.0.dof.0"]);
   });
 
+  it("tells two members of one family apart by the index their path names", () => {
+    const rows = [r("instrument.source.lines.0.weight", { help_key: "w" }),
+                  r("instrument.source.lines.1.weight", { help_key: "w" }),
+                  r("instrument.polarization", { help_key: "p" })];
+    const titles: Record<string, string> = { w: "Emission line weight", p: "Polarisation factor" };
+    const source = buildTree(rows, { ...INFO, titleOf: (k) => (k ? titles[k] : null) })[0]
+      .items.find((it): it is Group => it.kind === "group")!;
+    expect(source.lines.map((l) => l.label))
+      .toEqual(["Emission line weight 0", "Emission line weight 1", "Polarisation factor"]);
+  });
+
   it("keeps every row reachable: a row the filter keeps is somewhere in the tree", () => {
     const tree = buildTree(ROWS, { ...INFO, keep: (p) => p.includes("profile") });
     expect(tree.length).toBe(1);

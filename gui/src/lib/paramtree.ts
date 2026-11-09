@@ -192,6 +192,19 @@ function line(row: ParamRow, label: string, column: string): Line {
   return { kind: "row", key: row.path, row, label, column };
 }
 
+/** A group's lines under their corpus titles. Two members of one family share a
+ *  title (each emission line's weight is "Emission line weight"), so a title
+ *  that repeats carries the index its path names, counted from 0 as the help
+ *  corpus counts them ("line 0 is locked at 1"). */
+function titledLines(members: ParamRow[], info: TreeInfo, column: string): Line[] {
+  const titles = members.map((r) => info.titleOf(r.help_key) ?? leaf(r.path));
+  return members.map((r, k) => {
+    const repeated = titles.filter((t) => t === titles[k]).length > 1;
+    const index = /\.(\d+)(\.|$)/.exec(r.path);
+    return line(r, repeated && index ? `${titles[k]} ${index[1]}` : titles[k], column);
+  });
+}
+
 function group(key: string, title: string, lines: Line[], rows: ParamRow[]): Group {
   return { kind: "group", key, title, lines, members: rows.filter((r) => r.refinable || r.vary) };
 }
@@ -308,8 +321,7 @@ function phaseSection(i: number, rows: ParamRow[], info: TreeInfo): Section {
       else g.lines.push(...hidden);
       groups.push(g);
     } else {
-      groups.push(group(key, spec.title,
-        members.map((r) => line(r, info.titleOf(r.help_key) ?? leaf(r.path), key)), members));
+      groups.push(group(key, spec.title, titledLines(members, info, key), members));
     }
   }
   const atomRows = kept.filter((r) => ATOM_FIELDS.test(r.path));
@@ -350,8 +362,7 @@ function instrumentSection(rows: ParamRow[], info: TreeInfo): Section {
       g.summary = `${members.length} ${members.length === 1 ? "term" : "terms"}`;
       groups.push(g);
     } else {
-      groups.push(group(key, spec.title, members.map((r) =>
-        line(r, info.titleOf(r.help_key) ?? leaf(r.path), key)), members));
+      groups.push(group(key, spec.title, titledLines(members, info, key), members));
     }
   }
   const extra = families(kept.filter((r) => !placed.has(r.path)), prefix, info);
