@@ -246,7 +246,10 @@ acceptance row 7).
 
   *Measured* (arm64 macOS, this worktree's `[dev]` venv plus playwright). The rehearsal costs
   2 ms on the FAP example and 7 ms on NAC, against 9-10 ms and 43-44 ms for the whole PATCH.
-  Gate counts are in the PR body.
+  Fast selection through ghostshift's `serial.py`: 14482 passed, 410 skipped, 32 xfailed,
+  which is the last round's 14478 plus this round's 4 tests. The GUI server, textdoc,
+  manual, peaks and help files: 244 passed. Ruff clean; `python -m tests.reader_output`
+  exit 0. No client code changed, so vitest and the dist were not rerun.
 
   PR #1484, stacked on #1476. Next: the maintainer reviews the sixteen calls in § Calls settled by Claude.
 
