@@ -139,7 +139,9 @@ def pick_call(options: dict, *, default_range=None) -> str:
 
     ``shoulders`` is always written, as it always was.  The range is written
     when it is not ``default_range`` (the project's limits, which the pick
-    uses unasked), and ``flag_contamination`` only when it is off.
+    uses unasked), as ``None`` for a whole-pattern pick under limits that
+    have since been set, and ``flag_contamination`` only when it is off.
+    Numbers go at 12 significant digits, the ``.rxt`` document's precision.
     """
     opts = pick_settings(**{k: options[k] for k in
                             ("two_theta_range", "shoulders",
@@ -147,8 +149,9 @@ def pick_call(options: dict, *, default_range=None) -> str:
     args = [f"shoulders={opts['shoulders']}"]
     rng = opts["two_theta_range"]
     default = pick_settings(two_theta_range=default_range)["two_theta_range"]
-    if rng is not None and rng != default:
-        args.append(f"two_theta_range=({rng[0]:g}, {rng[1]:g})")
+    if rng != default:
+        args.append("two_theta_range=None" if rng is None else
+                    f"two_theta_range=({rng[0]:.12g}, {rng[1]:.12g})")
     if not opts["flag_contamination"]:
         args.append("flag_contamination=False")
     return f"session.pick_peaks({', '.join(args)})"

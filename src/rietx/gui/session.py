@@ -1990,7 +1990,7 @@ class GuiSession:
         doc = self._load_peaks(p)
         if doc is None:
             return self._peaks_payload(None)
-        return self._peaks_payload(doc, editor=self._peak_editor())
+        return self._peaks_payload(doc, editor=self._peak_editor(doc=doc))
 
     def peaks_pick(self, body: dict) -> dict:
         """Run the picker and store the list — replacing any previous one,
@@ -2019,12 +2019,26 @@ class GuiSession:
                 check_interval("two_theta_range", float(rng[0]), float(rng[1]))
             except ValueError as exc:
                 raise GuiError(str(exc), where=["two_theta_range"]) from None
+        flags = {}
+        for key in ("shoulders", "flag_contamination"):
+            value = body.get(key, True)
+            if not isinstance(value, bool):
+                # bool("false") is True and bool(None) is False: a coerced
+                # value would pick under an option nobody asked for
+                raise GuiError(f"'{key}' takes true or false, got {value!r}",
+                               where=[key])
+            flags[key] = value
         options = store.pick_settings(
-            two_theta_range=limits if rng is None else rng,
-            shoulders=body.get("shoulders", True),
-            flag_contamination=body.get("flag_contamination", True))
+            two_theta_range=limits if rng is None else rng, **flags)
         editor = self._peak_editor(options)
-        doc = editor.pick()
+        try:
+            doc = editor.pick()
+        except ValueError as exc:
+            # a range inside the limits' grammar can still hold too few
+            # channels to pick in (one outside the pattern, say); that is the
+            # caller's range, not a server fault
+            raise GuiError(str(exc), where=[] if rng is None
+                           else ["two_theta_range"]) from None
         self._save_peaks(p, doc)
         return self._peaks_payload(
             doc, editor=editor,
@@ -2088,8 +2102,8 @@ class GuiSession:
         """
         self._require_idle()
         p = self._need_project()
-        editor = self._peak_editor()
         doc = self._need_peaks(p)
+        editor = self._peak_editor(doc=doc)
         try:
             doc = edit(editor, doc)
         except IndexError as exc:
@@ -2171,12 +2185,16 @@ class GuiSession:
                 "n_total": int(len(tt)), "excluded": excluded,
                 "n_excluded": int(len(out_tt))}
 
-    def _peak_editor(self, options: dict | None = None):
+    _UNREAD = object()
+
+    def _peak_editor(self, options: dict | None = None, *, doc=_UNREAD):
         """The editor for a pick with ``options``, or for the stored list.
 
         Without ``options`` the editor takes the ones the stored list was
         picked with (:func:`peaks.settings_of`), so a refit sees the detection
         the list came from even after the project's limits move (WP-2124).
+        A caller that has already loaded the list passes it as ``doc``, so the
+        file is not read twice.
         """
         from . import peaks as store
 
@@ -2184,8 +2202,9 @@ class GuiSession:
         instrument = p.refinement.instrument
         limits = tuple(p.doc.two_theta_limits) if p.doc.two_theta_limits else None
         if options is None:
-            options = store.settings_of(self._load_peaks(p),
-                                        default_range=limits)
+            if doc is GuiSession._UNREAD:
+                doc = self._load_peaks(p)
+            options = store.settings_of(doc, default_range=limits)
         key = (instrument.model_dump_json(), repr(sorted(options.items())),
                str(p.doc.excluded_regions))
         if self._peak_ed is not None and self._peak_ed[0] == key:

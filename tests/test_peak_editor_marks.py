@@ -222,6 +222,13 @@ def test_a_list_picked_without_contamination_marks_gains_none_from_an_edit():
     doc = editor.pick()
     assert doc.pick_options["flag_contamination"] is False
     assert gp.settings_of(doc) == gp.pick_settings(flag_contamination=False)
+    # a whole-pattern list under limits set since says so, and a range keeps
+    # its digits
+    assert gp.pick_call(doc.pick_options, default_range=(10, 50)) == (
+        "session.pick_peaks(shoulders=True, two_theta_range=None, "
+        "flag_contamination=False)")
+    assert "(12.3456789, 50)" in gp.pick_call(
+        {"two_theta_range": [12.3456789, 50]})
     assert _flagged(doc.peaks, "ghost_kbeta") == []
     for g in sorted(doc.groups):
         doc = editor.refit(doc, g)

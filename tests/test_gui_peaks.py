@@ -757,6 +757,16 @@ def test_the_pick_route_takes_the_range_and_the_contamination_marks(
         status, refused = client.post("/api/peaks",
                                       {"two_theta_range": ["a", 20]})
         assert status == 400 and "two numbers" in refused["error"]["message"]
+        # a range holding too few channels to pick in is the caller's, not a 500
+        status, refused = client.post("/api/peaks",
+                                      {"two_theta_range": [500, 600]})
+        assert status == 400, refused
+        assert refused["error"]["where"] == ["two_theta_range"]
+        # a flag is a boolean, never coerced: bool("false") would be True
+        for key in ("shoulders", "flag_contamination"):
+            status, refused = client.post("/api/peaks", {key: "false"})
+            assert status == 400, refused
+            assert refused["error"]["where"] == [key]
 
         status, doc = client.post("/api/peaks", {
             "two_theta_range": [20, 60], "shoulders": False,
