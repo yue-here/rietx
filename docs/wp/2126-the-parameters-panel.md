@@ -1,6 +1,6 @@
 # WP-2126 — the Parameters panel
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — filed, checklist started
+Milestone: gui-overhaul · Status: 🔄 2026-11-09 — checklist done; PR opening awaits review
 Depends on: WP-2123
 Priority: P2 2026-11-09 — piece 2 of the open gui-overhaul milestone; it builds inside WP-2123's shell
 
@@ -181,17 +181,17 @@ Each is "settled by Claude, reversible", with the alternative after it.
 
 ## Tasks
 
-- [ ] `PATCH /api/params` takes `hold`, `limits` and `restraints` arms, each an engine verb, with
+- [x] `PATCH /api/params` takes `hold`, `limits` and `restraints` arms, each an engine verb, with
   server tests.
-- [ ] Pure functions with vitest: the number slots (`lib/numslot.ts`), the space-group typesetting
+- [x] Pure functions with vitest: the number slots (`lib/numslot.ts`), the space-group typesetting
   (`lib/spacegroup.ts`), the panel tree and symmetry line (`lib/paramtree.ts`).
-- [ ] `Params.svelte` rebuilt: phase bands, rows and groups under grouping B, the Cell fold line,
+- [x] `Params.svelte` rebuilt: phase bands, rows and groups under grouping B, the Cell fold line,
   the atom table, the padlock, tinted values, the group toggles.
-- [ ] The floating editor and popover: limits, Restrain, limit cue, multi-select typing.
-- [ ] Shift-click ranges and modifier selection, acting on mouse-down.
-- [ ] The layout-shift browser test extended over the Parameters panel.
-- [ ] Vitest updated, the dist rebuilt, the GUI chapter and screenshots that show the panel.
-- [ ] Skill: none expected; the agent skill drives the python API.
+- [x] The floating editor and popover: limits, Restrain, limit cue, multi-select typing.
+- [x] Shift-click ranges and modifier selection, acting on mouse-down.
+- [x] The layout-shift browser test extended over the Parameters panel.
+- [x] Vitest updated, the dist rebuilt, the GUI chapter and screenshots that show the panel.
+- [x] Skill: none expected; the agent skill drives the python API.
 
 ## Acceptance
 
@@ -214,5 +214,56 @@ acceptance row 7).
 
 ## Handover log
 
+- **2026-11-09** — the Parameters panel is rebuilt on the designs above, against the real routes.
+  A person now reads each phase as a band with its space group typeset, single parameters first,
+  then the Cell group with the setting's held edges folded into one line, Size and strain, and one
+  row per atom. They can hold a parameter with the padlock, set its limits and a restraint from a
+  popover under the value, and edit many values at once. Nothing they press moves the layout,
+  which a browser test now checks control by control. The formula editor is not here: no route
+  serves `add_variable` or an expression tie, so it is the next WP.
+
+  *Done.* `PATCH /api/params` gained three arms, `hold`, `limits` and `restraints`, each an
+  existing engine verb (`Refinement.hold`/`unhold`, and `Refinement.edit` for the model's
+  `min`/`max` and a `ValueRestraint`), with two server tests. Three pure modules carry the logic
+  under vitest: `lib/numslot.ts` (the number slots), `lib/spacegroup.ts` (typesetting) and
+  `lib/paramtree.ts` (the tree and the fold line). `Params.svelte` is rewritten on them, and
+  `App.test.ts`'s parameter-table block with it. The layout-shift sweep
+  (`test_no_parameters_control_moves_the_layout`) presses every box, number and padlock at both
+  widths. The GUI guide's Parameters section and its screenshots are rewritten; `first-run` and
+  `first-fit` show the panel too, so they moved with it.
+
+  *Measured* (arm64 macOS, this worktree's `[dev]` venv plus playwright, on the tree with
+  origin/main `5ae35232c` merged; no other suite running). Fast selection, through ghostshift's
+  `serial.py`: 14478 passed, 410 skipped, 32 xfailed. This WP adds 4 pytest cases there: two
+  server tests and the sweep's two widths. vitest 635 passed; svelte-check 0 errors, 0 warnings;
+  `tests/test_gui_layout_browser.py` 14 passed alone; `test_gui_dist.py` 15 and
+  `test_gui_manual.py` with `test_gui_server.py` 185 passed; ruff clean;
+  `python -m tests.reader_output` exit 0. `tests.added_test_times` on that run puts the sweep at
+  107 s for its two widths under `-n auto` (29 s each when run alone). It joins the fast tier's
+  local tail and is not marked `slow`, because the module skips wherever playwright is missing,
+  CI included, so it costs CI nothing. The sweep was made to fail once on purpose: a rule
+  padding a ticked row's label moved the rows below 6-24 px, and every unticked box failed. The
+  atom table measures 533 px before fluorapatite's positions refine and 526 px after, in the
+  546 px panel of a 1440 px window.
+
+  *Review.* `/code-review high --fix` found ten. Eight are fixed in one commit: limits typed in
+  the popover now feed the value check, a crossed or non-numeric limit blocks Apply, the maps a
+  landed PATCH sent are cleared before a position call can fail, a verb's refusal has its own
+  field, a swallowing esd is scaled to the exponent, the server returns 400 for a malformed body,
+  `instrument.polarization`'s limits reach `source.polarization`, and a restraint keeps its
+  stored weight. Two are follow-ups above: a PATCH can half-apply, and texture and background
+  coefficients still refuse limits.
+
+  *Generality.* Not dispatched: the branch leaves `_audit.py` alone, and its thresholds (0.01,
+  10 000) are display rules that read no data and decide nothing for a fit.
+
+  *Gotchas.* A `bind:value` hanging off an object that the same keystroke sets to `null` throws
+  after the event (Svelte 5 writes the binding late), so the editor's text is its own `$state`.
+  The atom table and the Model panel both used `table.atoms`, and the plan editor's test reads
+  every `.name`, so this panel's classes are `atomtab` and `aname`. `npm --prefix gui exec` run
+  from the repo root leaves a `node_modules/.vite` there.
+
+  Next: the maintainer reviews the sixteen settled calls above, the visual ones first (1, 5, 8,
+  11, 12, 13). Then the formula routes and the "=" editor, as their own WP.
 - **2026-11-09** — filed by a ghostshift runner as piece 2 of the gui-overhaul milestone, on top
   of WP-2123's branch (PR #1476, not yet merged). Next: the checklist.
