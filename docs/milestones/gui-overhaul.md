@@ -60,8 +60,9 @@ the piece that touches it or a WP of its own.
 - `.rxt` renders no block for user variables, and its tie refusal names only symmetry ties.
 - The Le Bail check's absent lines arrive in its own refined frame, about 0.011° from the
   candidate's ticks on fluorapatite; they should be served as tick indices.
-- `supercell_checks` names a relation for 2 of fluorapatite's 12 candidates; lattice relations
-  between candidates ("c doubled", "a × √3", "same cell") belong in rietx.
+- `supercell_checks` names a relation for 8 of fluorapatite's 12 candidates (measured by WP-2124
+  on 63d7c120a; naming the other four is WP-2124's follow-up); lattice relations between
+  candidates ("c doubled", "a × √3", "same cell") belong in rietx.
 - `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
 - `--plot-peak` (purple) loses to the data crosses as a mark colour.
