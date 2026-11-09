@@ -72,12 +72,16 @@ zero as no broadening.
 
 ## Tasks
 
-- [ ] Decide what "at its floor" means for a softplus coefficient: an internal
+- [x] Decide what "at its floor" means for a softplus coefficient: an internal
   coordinate past where `log(1+eᵘ)` is indistinguishable from zero, or a reading
   whose esd exceeds its value (a significance test, as WP-1523 did for a phase
   scale). Name the threshold's source in its docstring.
-- [ ] Apply it in `_reading`, reusing `at_zero` or a new absence name, and keep
+  *Settled (2026-11-09) on the maintainer's 2026-10-09 ruling ("read the
+  flag"): the bound test's `FLOOR_HIT`, no threshold of this module's own.*
+- [x] Apply it in `_reading`, reusing `at_zero` or a new absence name, and keep
   `_agreement` from reading an absent term.
+  *`microstructure_table(floors=)` from `refine._build_result` and
+  `multi._hist0_floors`; `at_zero` reused, so no vocabulary member is new.*
 - [ ] Find the siblings: every other consumer that tests a softplus coefficient
   with `> 0` (the size flags in `refine._size_flag_diagnostics`,
   `SIZE_UNUSUALLY_SMALL`, the Stephens and extinction readers). Fix the class or

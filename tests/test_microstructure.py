@@ -287,14 +287,62 @@ def test_the_two_independent_columns_are_compared_rather_than_combined():
     assert blocks[0].size_agreement is None
 
 
+def test_a_coefficient_on_its_floor_reads_at_zero_whatever_it_stores():
+    """WP-1914: ``FLOOR_HIT`` is the off state, not a tiny positive width.
+
+    ``solver="trf"`` stops a hair above a floor of zero; on notebook 04's
+    CeO₂ the Gaussian size variance came back 3.4e-24 deg² and read as a
+    4.3e13 Å domain.  Without the floor set that is still what the table
+    says, which is the defect this pins from both sides.
+    """
+    lor = size_coefficient_for_size(300.0, LAM_LONG)
+    values = _phase_values(lor_size=lor, gauss_size=3.4e-24,
+                           gauss_strain=3.8e-11)
+    esds = {"phases.0.lor_size": 0.01 * lor,
+            "phases.0.gauss_size": 4.6e-15, "phases.0.gauss_strain": 1e-6}
+    unread = microstructure_table(_one_phase(), values, wavelength=LAM_LONG,
+                                  esds=esds)
+    assert unread[0].term("gauss_size").value > 1e12
+    assert unread[0].size_agreement > 1e9
+
+    floors = {"phases.0.gauss_size", "phases.0.gauss_strain"}
+    blocks = microstructure_table(_one_phase(), values, wavelength=LAM_LONG,
+                                  esds=esds, floors=floors)
+    for name in ("gauss_size", "gauss_strain"):
+        row = blocks[0].term(name)
+        assert row.unavailable == "at_zero"
+        assert row.value is None and row.esd is None
+        # the stored number is still the stored number
+        assert row.coefficient > 0.0
+    assert blocks[0].term("lor_size").value == pytest.approx(300.0, rel=1e-12)
+    assert blocks[0].size_agreement is None
+    assert blocks[0].strain_agreement is None
+
+
+def test_a_joint_fit_hands_histogram_0_its_own_floor_spelling():
+    """Shared rows are bare and per-histogram rows ``hist.h.…`` (WP-1914)."""
+    from rietx.multi import _hist0_floors
+    from rietx.strategy.staged import GuardFinding
+
+    found = [
+        GuardFinding.at_bound("phases.0.gauss_size", limit=("lower", 0.0)),
+        GuardFinding.at_bound("hist.0.phases.0.gauss_strain",
+                              limit=("lower", 0.0)),
+        GuardFinding.at_bound("hist.1.phases.0.lor_size",
+                              limit=("lower", 0.0)),
+        GuardFinding.at_bound("phases.0.lor_strain", limit=("upper", 0.5)),
+    ]
+    assert _hist0_floors(found) == {"phases.0.gauss_size",
+                                    "phases.0.gauss_strain"}
+
+
 # --- end to end: the block on a real fit, and the caveat on the report ------
 
 OUT = Path(__file__).parent / "output"
 
 
-@pytest.fixture(scope="module")
-def size_and_strain_fit():
-    """One LaB6 pattern with a 400 Å domain and Δd/d = 1e-3, refined."""
+def _lab6_size_and_strain_pattern() -> PatternData:
+    """LaB6 with a 400 Å Lorentzian domain, Δd/d = 1e-3, no Gaussian term."""
     lam = LAM_LONG
     truth = make_lab6()
     truth.phases[0].scale.value = 5e-4
@@ -312,8 +360,14 @@ def size_and_strain_fit():
     table = ParameterTable(truth, ins)
     y = model.evaluate(table.decode(table.x0()))
     y = np.random.default_rng(3).poisson(np.maximum(y, 1.0)).astype(float)
-    pattern = PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
+    return PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
 
+
+@pytest.fixture(scope="module")
+def size_and_strain_fit():
+    """One LaB6 pattern with a 400 Å domain and Δd/d = 1e-3, refined."""
+    lam = LAM_LONG
+    pattern = _lab6_size_and_strain_pattern()
     start = make_lab6()
     start.phases[0].scale.value = 5e-4
     ins2 = Instrument.debye_scherrer(wavelength=lam)
@@ -364,6 +418,50 @@ def test_a_converged_fit_reports_a_domain_size_with_an_esd(size_and_strain_fit):
     # the two the plan never freed say so, in the same block
     for name in ("gauss_size", "gauss_strain"):
         assert block.term(name).unavailable == "at_zero"
+
+
+def test_either_driver_reads_a_width_on_its_floor_as_absent():
+    """WP-1914 end to end: LM lands the floor on 0.0, TRF stops above it.
+
+    The pattern has no Gaussian broadening, so the two Gaussian widths the
+    stage frees go to their floor.  A row reads ``at_zero`` exactly where it
+    is stored as zero or the bound test fired ``FLOOR_HIT`` on it.  The TRF
+    fit must stop above zero on at least one of them, or the test has lost
+    the case it exists for.
+    """
+    pattern = _lab6_size_and_strain_pattern()
+    widths = ["phases.*.lor_size", "phases.*.lor_strain",
+              "phases.*.gauss_size", "phases.*.gauss_strain"]
+    plan = RefinementPlan(stages=[
+        Stage(name="scale+bkg",
+              turn_on=["phases.*.scale", "instrument.background.*"]),
+        Stage(name="cell", turn_on=["phases.*.cell.*"]),
+        Stage(name="width", turn_on=widths, seed=1e-3),
+    ])
+    above_zero = 0
+    for solver in ("lm", "trf"):
+        start = make_lab6()
+        start.phases[0].scale.value = 5e-4
+        ins = Instrument.debye_scherrer(wavelength=LAM_LONG)
+        ins.profile.w.value = 3e-4
+        ins.profile.x.value = 0.0
+        ins.background = BackgroundChebyshev.with_terms(3)
+        result = Refinement(start, ins, history=False,
+                            solver=solver).fit(pattern, plan=plan)
+        OUT.mkdir(exist_ok=True)
+        result.plot(OUT / f"wp1914_floor_{solver}_fit.png")
+        floors = {p for d in result.diagnostics if d.code == "FLOOR_HIT"
+                  for p in d.where}
+        assert {"phases.0.gauss_size", "phases.0.gauss_strain"} & floors
+        block = result.microstructure[0]
+        for row in block.terms:
+            on_floor = row.path in floors or row.coefficient == 0.0
+            assert (row.unavailable == "at_zero") == on_floor, (solver, row)
+            if solver == "trf" and row.path in floors:
+                above_zero += row.coefficient > 0.0
+        if block.term("gauss_size").unavailable == "at_zero":
+            assert block.size_agreement is None
+    assert above_zero >= 1
 
 
 def test_the_report_carries_the_block_and_attaches_the_caveat(size_and_strain_fit):

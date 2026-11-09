@@ -9228,10 +9228,15 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # the three cannot attribute one coefficient to different wavelengths.
     # ``stderr_phys`` rather than a second ``stderr_physical`` call: with a
     # correlation matrix that build is a dense n x n, which a Pawley table
-    # makes large, and the two calls would return the same dict.
+    # makes large, and the two calls would return the same dict.  ``floors``
+    # is the FLOOR_HIT half of the bound findings ``at_bound`` projects
+    # above, so a width solve="trf" stopped a hair above zero reads absent
+    # exactly where LM's lands on it (WP-1914).
     microstructure = microstructure_table(
         structure, values, wavelength=_longest_line_wavelength(model),
-        esds=stderr_phys)
+        esds=stderr_phys,
+        floors={p for f in guard.at_bounds if f.code == "FLOOR_HIT"
+                for p in f.paths} if guard is not None else ())
 
     # WP-1343: whether the magnetic peaks are broader than the profile drew
     # them, read off the converged residual's *shape* rather than from any
