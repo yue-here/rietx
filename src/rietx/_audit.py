@@ -3176,10 +3176,14 @@ ROWS: tuple[Row, ...] = (
                  "esds free of the stopping-point artefact (ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("rietx.optimize.least_squares.TIED_BOUND_MARGIN", "constant", tier=1, value=1e-09,
-        evidence=("arithmetic: it must exceed lm._POLISH_FEASIBLE (1e-10), the most an accepted "
-                  "step leaves a row, so the write-back's exact bound check never meets a held "
-                  "tied value past its bound; any factor over 1 serves, and the value it moves is "
-                  "1e-9 of the row's scale, far under any esd (WP-1325)")),
+        evidence=("arithmetic against lm._POLISH_FEASIBLE (1e-10), the most an accepted step "
+                  "leaves a row, so the write-back's exact bound check never meets a held tied "
+                  "value past its bound; the two scales differ (this one is the row at the "
+                  "start, the polish's is per step), the factor 10 is free, and the value it "
+                  "moves is 1e-9 of the row's scale, far under any esd; measured on the "
+                  "single-fit and five-pattern held fits of test_tied_bound_rows, the second "
+                  "through the later stages of mccusker_structural that start from the held "
+                  "value; a miss raises the write-back error every fit raised before WP-1325")),
     Row("rietx.optimize.least_squares.XTOL", "constant", tier=3, value=1e-12,
         evidence=("a tolerance defaulted inside opt-in solver='trf' (default 'lm', "
                   "DEFAULT_SOLVER), four orders under SciPy's own 1e-8; WP-1109 tried 1e-8: "

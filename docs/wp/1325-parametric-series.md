@@ -1309,12 +1309,15 @@ Their numbers are as reported and were not re-measured here.
     only (§ A contributor's series work). Decide whether the start reads
     a `direction="both"` chain and reports where the two walks disagree.
 
-  Landed 2026-11-09 (tenth session): every field that is not a parameter
-  must agree, one rule rather than a list, read by
-  `params.multi._model_difference` after the named topology checks. A
-  `Parameter` is skipped whole (value, bounds, vary flag), and so is a
-  phase's `name`, which a CIF takes from its data block. The refusal names
-  the field and both values. Tests in `test_parametric_series.py`.
+  Landed 2026-11-09 (tenth session): one rule rather than a list, keyed on
+  the sharing map. `params.multi._model_differences` walks the starts field
+  by field after the named topology checks, skipping a `Parameter` whole
+  (value, bounds, vary flag), a phase's `name` (a CIF takes it from its data
+  block) and its `particle_radius_um` (never in the fit). A difference is
+  refused when the nearest enclosing part of the model holding table paths
+  holds a shared one, so two texture axes under a shared `r` are refused and
+  under a per-histogram texture accepted. The refusal names the field, both
+  values and the shared path. Tests in `test_parametric_series.py`.
 
   The chain half is not built, settled by Claude under § Direction
   (machinery before built-in checks) and DESIGN.md Rule 5 (no
