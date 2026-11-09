@@ -92,6 +92,7 @@ def test_notation_renders_outside_code_spans(text, rendered):
 @pytest.mark.parametrize("pages", [
     {"parameters.md": ("Cell and structure",), "elsewhere.md": ("Cell and structure",)},
     {"parameters.md": ("Cell and structure",)},
+    {**reference_pages.PARAMETER_PAGES, "elsewhere.md": ("No such group",)},
 ])
 def test_a_group_shown_twice_or_nowhere_raises(monkeypatch, pages):
     """Each group lands on exactly one parameter-map page (WP-2087)."""

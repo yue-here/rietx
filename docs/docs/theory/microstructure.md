@@ -199,8 +199,11 @@ Declare it where the widths depend on direction as well as on 2θ.
 Once `lor_strain` has refined, reflections at similar angles stay broader along
 some directions than along others, and the difference curve shows a
 width-shaped misfit on those reflections alone.
-`FitReport.strain` measures that from the residual and names the broadest and
+`FitReport.strain` measures that from the observed peak widths and names the broadest and
 narrowest directions with their width ratio.
+Anisotropic crystallite size and a peak split by too high a symmetry also
+broaden some directions more than others, and `FitReport.strain` fits the
+tan θ form alone, so rule them out before quoting the coefficients.
 
 ```{warning}
 Three independent labelling conventions sit behind these $S_{HKL}$, and getting

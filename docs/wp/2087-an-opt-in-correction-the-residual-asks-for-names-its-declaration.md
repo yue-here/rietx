@@ -52,9 +52,10 @@ page's Primary extinction section said an uncorrected extinction gives "a
 spuriously large Biso and a small scale". WP-1944 measured the opposite on
 its LaB6 synthetic: with 2.5 µm² planted and extinction undeclared, La's
 Biso came out 0.364 ± 0.009 against a true 0.5, and the scale 8 % low.
-Sabine, Von Dreele & Jørgensen (1988, p. 374) say the same of their MgO
-data: "the measured temperature factors have lower values than the true
-temperature factors", "in some cases negative". A second fixture, measured
+Sabine, Von Dreele & Jørgensen (1988, p. 374) say the same in their
+introduction, of time-of-flight and constant-wavelength work alike: "the
+measured temperature factors have lower values than the true temperature
+factors", "in some cases negative". A second fixture, measured
 here on a rutile synthetic (15-120° 2θ, Cu Kα, true B 0.5 on both sites,
 scale, both B, the O coordinate and the background free):
 

@@ -239,7 +239,9 @@ _STEPHENS_S = HelpEntry(
         "`lab_sample_refine` frees it with the other sample widths. Declare it where "
         "reflections at similar 2θ stay broader along some directions than along "
         "others once `lor_strain` has refined. `FitReport.strain` measures that and "
-        "names the broadest and narrowest directions."
+        "names the broadest and narrowest directions. Anisotropic crystallite size "
+        "and a peak split by too high a symmetry also widen some directions more, "
+        "so rule them out before quoting the coefficients."
     ),
     unit="10⁻¹² Å⁻⁴", default="0.0",
     typical="0-500 for a sample with measurable anisotropic strain",
@@ -1212,11 +1214,12 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "displacement stage carries. The tensor is opt-in per atom. "
             "`Structure.from_cif(path, aniso=True)` keeps a file's `U^ij`. "
             "`atom.aniso = AnisoU.isotropic(uiso, phase.cell)` declares one at the "
-            "isotropic value, with Uiso = B/8π² and `atom.biso.vary = False`. A powder "
+            "isotropic value, with Uiso = B/8π². The tensor replaces `biso`, so the "
+            "assignment raises while `atom.biso.vary` is True. A powder "
             "pattern seldom determines six components per site. A declaration is worth "
-            "trying on a strongly scattering atom, with data to high angle, where "
-            "single-crystal work reports a markedly anisotropic site. Keep it only if "
-            "the tensor stays positive-definite and each esd is small against its value."
+            "trying on a site that scatters strongly for the radiation used, with data "
+            "to high Q. Keep it only if the tensor stays positive-definite and each "
+            "diagonal component's esd is small against its value."
         ),
         unit="Å²", default=None,
         typical="0.005-0.05 Å²",
@@ -1674,10 +1677,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A refined isotropic displacement parameter is below zero. No real vibration "
             "does that, because the Debye-Waller factor would grow with angle instead of "
-            "falling. The parameter is absorbing something else, usually a loss of "
-            "low-angle intensity. Three corrections for that are opt-in: surface "
+            "falling. The parameter is absorbing something else. A loss of low-angle "
+            "intensity does this, and three corrections for it are opt-in: surface "
             "roughness on a Bragg-Brentano plate (`geometry.surface_roughness = "
-            "RoughnessSuortti()`), absorption in a capillary (`geometry.mu_r`) and "
+            "RoughnessSuortti()`), absorption in a capillary (`geometry.mu_r` or "
+            "`geometry.capillary_radius_mm`) and "
             "extinction (`phase.extinction = 0.0`). A wrong species or occupancy, or a "
             "background that bends at high angle, does it too. Correct that cause, or "
             "hold the parameter at a physical value."
@@ -1690,7 +1694,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "solid with this cell would melt. That usually points at the model. A wrong "
             "species or occupancy, or a background that has taken high-angle intensity, "
             "can inflate it. So can absorption in a flat plate of finite thickness, "
-            "which depresses high-angle intensity until `geometry.mu_t` declares it. A "
+            "which depresses high-angle intensity until `geometry.mu_t` or "
+            "`geometry.thickness_mm` declares it. A "
             "mobile site, such as a "
             "cavity cation, can be genuinely this large. Check the model before you read "
             "the value as motion."

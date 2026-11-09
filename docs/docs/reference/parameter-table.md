@@ -70,7 +70,7 @@ Two atoms and a default instrument make 41 rows, of which 24 could be freed.
 | `ParameterRow.mode_fixed` | `bool` | fixed by the Le Bail or Pawley mode |
 | `ParameterRow.needs_held_cell` | `bool` | a wavelength that cannot be freed while this pattern's cell is free |
 | `ParameterRow.origin_axis` | `(int, int, int)` or `None` | the direction along which this row holds a polar group's floating origin |
-| `ParameterRow.help_key` | `str` or `None` | the [parameter map](parameters.md) entry that describes this row's family |
+| `ParameterRow.help_key` | `str` or `None` | the [parameter map](parameters.md) or [instrument parameter map](parameters-instrument.md) entry that describes this row's family |
 
 The first eight fields mirror the solver's own row type field for field, and a test holds the two equal.
 The rest are deliberate additions.
