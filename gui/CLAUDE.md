@@ -100,7 +100,8 @@ one stream `watch` tails; and `/api/result` omits the curves, which
 `/api/result/curves` sends once over every channel as float64 arrays (WP-1461,
 D4), decimating past `CURVES_CEILING` through the *same*
 `viz.compare.decimation_index` the comparison UI uses — whose count is a
-budget, not a ceiling. `strategy.staged.resolve_plan` (preset name + mode → plan)
+budget, not a ceiling. **A multi-verb route is all or nothing** (WP-2126): its
+verbs run on `session.rehearse`'s copy first. `strategy.staged.resolve_plan` (preset name + mode → plan)
 is likewise one function, previously inline in `fit` and duplicated in
 `sequential`.
 
