@@ -251,7 +251,7 @@ chapter; the hand-fitting survey in `docs/practice.md`. Tests: `tests/test_gui_p
 *Measured.* The tables in § Context, all `[dev]`, darwin arm64. The route's round trip through
 the real server: fap 10.3-15.7 ms `frozen`, 13.9-14.8 ms `rewindowed`, 25.4-26.4 ms
 `recompiled`; nac 2.1-2.5 ms `frozen`, 17.9-20.7 ms `recompiled`. The timing ran on the tree
-before the review fixes, which add checks only for a magnetic phase. Fast suite: FAST_COUNTS.
+before the review fixes, which add checks only for a magnetic phase. Fast suite on the merged tree (main at 5ae35232c), `[dev]` darwin arm64, alone under the suite lock: 14369 passed, 416 skipped, 32 xfailed in 10:15. The 29 added cases are all passes and cost 14.7 s in that run, 8.6 s of it the first test, which builds both examples' fits for the module.
 `python -m tests.reader_output` exit 0, unchanged against the merge-base.
 
 *Review.* `/code-review high --fix` found nine problems and fixed six in one commit: a magnetic
