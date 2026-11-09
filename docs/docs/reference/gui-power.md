@@ -259,12 +259,12 @@ indices int32, so a browser reads each array without copying it.
 
 | Route | Is |
 |---|---|
-| `GET /api/peaks` · `POST /api/peaks` | the picked list; pick it |
+| `GET /api/peaks` · `POST /api/peaks` | the picked list; pick it, with `pick_peaks`'s `shoulders`, `two_theta_range` and `flag_contamination` |
 | `POST /api/peaks/add` · `POST /api/peaks/remove` · `POST /api/peaks/move` | one line, added, removed, moved |
 | `POST /api/peaks/flag` · `POST /api/peaks/refit` | mark a line; refit its group |
 | `POST /api/index` · `GET /api/index/result` | search for a cell; the ranked candidates |
 | `GET /api/index/ticks` | one candidate's predicted lines, for the overlay |
-| `POST /api/index/adopt` | adopt a candidate as a Le Bail scaffold |
+| `POST /api/index/adopt` | adopt any candidate as a Le Bail scaffold |
 | `POST /api/index/extinction` · `GET /api/index/extinction` | screen the extinction classes; the answer |
 
 ### Series and history
