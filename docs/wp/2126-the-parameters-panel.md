@@ -174,9 +174,10 @@ Each is "settled by Claude, reversible", with the alternative after it.
   through the dumped model. It maps `instrument.polarization` to `source.polarization` (WP-1214's
   `Field.param`), but a texture or background coefficient still refuses by name. The table's
   path-to-model map lives only inside `ParameterTable`'s write-back; exposing it would serve both.
-- **One PATCH can half-apply**: the limits and restraints node commits before `set_values` or an
-  unhold can refuse, so a refused Apply can leave that node in the history. An all-or-nothing
-  PATCH needs a dry run of those verbs first. Found by this WP's code review, not fixed here.
+- **Positions after the PATCH**: the panel's Apply sends `PATCH /api/params`, then one
+  `POST /api/structure/position` per moved atom. A refused position leaves the PATCH applied,
+  across two requests. A `positions` arm on the PATCH would make the whole Apply one rehearsed
+  request. The Model panel's value-then-model sequence is the same shape.
 - **Plan-stage badges on the group toggles** (piece 3).
 
 ## Tasks
@@ -213,6 +214,41 @@ acceptance row 7).
 - `docs/practice.md` § The window layout of a GUI.
 
 ## Handover log
+
+- **2026-11-09, fix round** — one `PATCH /api/params` now applies whole or not at all. Before,
+  each arm committed its own node in the route's order (limits and restraints, unholds, values,
+  vary, holds), so a refusal in a later arm left the earlier nodes in the history and their
+  changes in the model. A held path freed beside a value edit did that: the value landed and the
+  freeing was refused.
+
+  *Done.* No engine verb can be asked in advance whether it will refuse, and the arms' refusals
+  interact (a limit admits a value; an unhold lets a path be freed). So the route runs its arms
+  first on a history-free copy, `session.rehearse`, built on `Refinement._trial(record=False)`:
+  the copy the package already makes for a fit it discards, carrying the models, ties,
+  variables, holds and free set. A refusal there leaves the model, the head and the history as
+  they were. It answers with the verb's own sentence, the path in `where` and the arm in
+  `details` (`{"arm": "vary", "where": [path]}`). The panel already keeps its pending edits on a
+  refusal, so no client code changed. Three siblings share the mechanism and are fixed:
+  `textdoc.apply` runs `set_values` then `set_vary`, which can refuse since WP-1435, and now
+  rehearses both; `POST /api/project` wrote each setting into the live document in turn, so a
+  refused region left the mode sent with it in memory for the next save, and now validates a
+  draft document first (a bad `mode` is a 400 too, where it was a 500); `POST
+  /api/history/branch` checked out before tagging, so a refused name moved the head, and now
+  tags first. One test per route asserts the head, the node count, the refs, both models, the
+  holds and the free set are unchanged after a refused request. Each of the four failed on the
+  old code, run from a snapshot of the previous head.
+
+  *Not generalised, deliberately.* Peak edits are functional (a document in, a document out,
+  one save), so they cannot half-apply. `index_adopt`'s second step, setting the mode, cannot
+  refuse. `example_reset` removes and rebuilds a directory, which is a filesystem sequence and
+  not engine verbs. The panel's positions travel as separate requests after the PATCH, which no
+  server-side rehearsal can reach (follow-ups above).
+
+  *Measured* (arm64 macOS, this worktree's `[dev]` venv plus playwright). The rehearsal costs
+  2 ms on the FAP example and 7 ms on NAC, against 9-10 ms and 43-44 ms for the whole PATCH.
+  Gate counts are in the PR body.
+
+  PR #1484, stacked on #1476. Next: the maintainer reviews the sixteen calls in § Calls settled by Claude.
 
 - **2026-11-09** — the Parameters panel is rebuilt on the designs above, against the real routes.
   A person now reads each phase as a band with its space group typeset, single parameters first,
