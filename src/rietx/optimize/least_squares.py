@@ -3612,7 +3612,7 @@ def _joint_restraint_shared(models: list[CompiledModel],
 
     * one whose every path is one column of the joint fit (the default for a
       structure: ``MultiParameterTable.row_path`` names it bare), and that no
-      histogram's own column reaches, is one function of θ in every model:
+      histogram's own row reaches, free or fixed, is one function of θ in every model:
       ``True``, held once;
     * one reading a per-histogram row (a ``ValueRestraint`` on
       ``instrument.zero_shift``, a bond under a per-histogram or parametric
@@ -3634,10 +3634,17 @@ def _joint_restraint_shared(models: list[CompiledModel],
             "the histograms of a joint refinement compile different soft "
             "restraints; a joint fit restrains one structure, so every "
             "histogram's copy must declare the same restraints")
+    from ..params.multi import row_shared
+
     shared = [True] * len(items[0])
     for h, table in enumerate(mtable.tables):
-        reach = table.column_reach()
-        own = {e for p in mtable.per_hist_paths[h] for e in reach.get(p, ())}
+        # every entry a per-histogram row moves, free or fixed: read off the
+        # declarations (``entry_reach``) rather than C, so a derived row (a
+        # body atom) whose per-histogram inputs a stage holds still counts,
+        # and the answer does not depend on which columns are free
+        reach = table.entry_reach()
+        own = {d for e in table.entries if not row_shared(mtable.sharing, e)
+               for d in reach.get(e.path, ())}
         for k, (_, paths) in enumerate(items[h]):
             for path in paths:
                 i = table._paths.get(path)
