@@ -1059,10 +1059,11 @@ right, each freed gain is 0.92-1.10 of its refit.
   (`docs/solver-survey.md` §2.A1). It holds **only while no bound is
   active**: a bounded local block (phase scales) leaves the identity once a
   bound binds.
-- **Soft restraints are refused in a joint fit**
-  (`least_squares._multi_closures`, deferred since WP-0406; lifting it is
-  [1995](1995-soft-restraints-in-a-joint-fit.md)). So partial pooling
-  or a smoothness penalty over the axis needs that refusal lifted first.
+- **Soft restraints reach a joint fit** since
+  [1995](1995-soft-restraints-in-a-joint-fit.md): `least_squares._multi_closures`
+  stacks each model's blocks off `rows.layout`, a restraint on the shared
+  structure once and with no histogram weight. Partial pooling or a smoothness
+  penalty over the axis is a row block in that below-data seam.
 - **Reusable bases:** `background/models.py` has `bspline_design_matrix`,
   `chebyshev_design_matrix` and `second_difference_matrix`, all 1-D. n-D
   polynomial terms are a few lines over numpy.
@@ -1154,8 +1155,9 @@ Their numbers are as reported and were not re-measured here.
 - One pattern as a sum over several specimens (A ≠ identity): direct XRD-CT,
   depth profiles. That is [1962](1962-xrd-ct-a-pattern-summed-over-the-voxels-its-beam-crosses.md).
 - Soft forms: partial pooling toward the surface, or a P-spline smoothness
-  penalty over a coordinate. Both need the joint path's restraint refusal
-  lifted, and both make the esds conditional on a penalty weight. Both are
+  penalty over a coordinate. Both are row blocks in the joint path's
+  below-data seam ([1995](1995-soft-restraints-in-a-joint-fit.md)), and both
+  make the esds conditional on a penalty weight. Both are
   members of one kernel family (§ A kernel over the coordinates), so the
   follow-up builds the kernel:
   [1963](1963-a-kernel-over-the-pattern-coordinates.md), filed 2026-10-14
