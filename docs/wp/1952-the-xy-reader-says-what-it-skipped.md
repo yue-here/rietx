@@ -130,19 +130,22 @@ documentation only.
 
 ## Tasks
 
-- [ ] Report non-numeric lines after the first data row, by line number:
+- [x] Report non-numeric lines after the first data row, by line number:
       `PATTERN_ROWS_DROPPED` widened, or a sibling code (record which).
       Decide whether a `nan` or `inf` value is such a row.
-- [ ] Refuse a decimal-comma file by name. Detect it where a comma sits
+- [x] Refuse a decimal-comma file by name. Detect it where a comma sits
       between digits with no space, and every row has the same comma count.
       Test on the 1° and 0.02° steps.
-- [ ] The "no numeric data found" refusal names what it saw: an inline
+- [x] The "no numeric data found" refusal names what it saw: an inline
       comment after the numbers, a `;` separator, quoted fields.
-- [ ] Decide, and record as `Decided YYYY-MM-DD:`, whether an inline
+- [x] Decide, and record as `Decided YYYY-MM-DD:`, whether an inline
       trailing comment is stripped (a report) or refused, and whether `;`
       and quoted CSV are refused by name or read by a separate format
       entry.
-- [ ] Tests in `tests/test_readers_robust.py`; every existing xy fixture
+      Decided 2026-11-09 (settled by Claude, see the handover entry): a
+      trailing `#` or `!` comment is stripped silently; `;` is read as a
+      separator; quoted fields are refused by name; no CSV format entry.
+- [x] Tests in `tests/test_readers_robust.py`; every existing xy fixture
       reads unchanged with no new diagnostic.
 - [ ] Skill: the diagnostics reference row for any new code. Nothing else
       expected.

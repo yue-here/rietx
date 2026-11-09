@@ -554,6 +554,122 @@ def test_a_tied_column_count_goes_to_the_last_row(tmp_path):
     assert rx.read_pattern(path).two_theta == [10.0, 10.1]
 
 
+# --- WP-1952: what the xy reader skips inside the data, and what it refuses
+
+def _read_xy(tmp_path, name, text):
+    path = tmp_path / name
+    path.write_text(text, encoding="utf-8")
+    found = []
+    return rx.read_pattern(path, diagnostics=found), found
+
+
+def test_a_text_line_inside_the_data_is_reported_by_line(tmp_path):
+    """``10.2 n/a`` between data rows was a lost point with no word (#897)."""
+    pat, found = _read_xy(tmp_path, "na.xy", "# 2theta counts\n10.0 100\n"
+                          "10.1 110\n10.2 n/a\n10.3 130\nEnd of data\n")
+    assert pat.two_theta == [10.0, 10.1, 10.3]
+    assert [d.code for d in found] == ["PATTERN_ROWS_DROPPED"]
+    assert found[0].where == ["line 4", "line 6"]
+    assert found[0].value == 2.0
+    assert "'10.2 n/a'" in found[0].message and "(line 2)" in found[0].message
+
+
+def test_a_header_above_the_first_data_row_is_skipped_without_a_word(tmp_path):
+    """22 repository files open with text; reporting it would fire on all."""
+    pat, found = _read_xy(tmp_path, "head.xy", "Sample: quartz\n2theta intensity\n"
+                          "10.0 100\n10.1 110\n10.2 120\n")
+    assert pat.two_theta == [10.0, 10.1, 10.2]
+    assert found == []
+
+
+def test_a_nan_row_is_reported_by_its_angle_and_not_as_text(tmp_path):
+    """``nan`` parses as a number, so the finite-row drop (WP-2079) names it."""
+    _, found = _read_xy(tmp_path, "nan.xy", "10.0 100\n10.1 nan\n10.2 120\n")
+    assert [d.code for d in found] == ["PATTERN_ROWS_DROPPED"]
+    assert "10.1°" in found[0].message
+    assert "line" not in found[0].where[0]
+
+
+@pytest.mark.parametrize("step", [1.0, 0.02])
+def test_a_decimal_comma_file_is_refused_naming_the_separator(step, tmp_path):
+    """At 1° the file read as 2θ = 10, 11… with y = 0 and σ the counts; at 0.02°
+    the duplicate-2θ refusal fired and named the wrong cause."""
+    rows = "".join(f"{10 + step * i:.2f}".replace(".", ",") + f"\t{100 + 10 * i}\n"
+                   for i in range(30))
+    path = tmp_path / "comma.xy"
+    path.write_text("2Theta\tCounts\n" + rows, encoding="utf-8")
+    with pytest.raises(ValueError, match=r"comma\.xy: 30 of the file's 30 rows "
+                                         r".*comma as the decimal separator"):
+        rx.read_pattern(path)
+
+
+def test_a_decimal_comma_under_semicolons_is_refused_too(tmp_path):
+    path = tmp_path / "euro.csv"
+    path.write_text("".join(f"{10 + 0.02 * i:.2f};{100 + i}.5\n".replace(".", ",")
+                            for i in range(10)), encoding="utf-8")
+    with pytest.raises(ValueError, match="decimal separator"):
+        rx.read_pattern(path)
+
+
+@pytest.mark.parametrize("text", [
+    "10.0,100\n10.1,110\n10.2,120\n",            # comma-separated, decimal point
+    "10.0, 100\n10.1, 110\n10.2, 120\n",         # with a space after the comma
+    "10, 100\n11, 110\n12, 120\n",               # integers
+])
+def test_a_comma_separated_file_is_not_taken_for_a_decimal_comma(text, tmp_path):
+    pat, found = _read_xy(tmp_path, "csv.xy", text)
+    assert len(pat.two_theta) == 3 and pat.intensity[0] == 100.0
+    assert found == []
+
+
+def test_a_trailing_comment_is_dropped_and_its_row_kept(tmp_path):
+    """JulesOpp's file (#897): one ``# spike`` row was dropped in silence."""
+    rows = "".join(f"{10 + 0.01 * i:.2f} {150 + i}" + ("  # spike" if i == 6 else "")
+                   + "\n" for i in range(10))
+    pat, found = _read_xy(tmp_path, "spike.xy", rows)
+    assert len(pat.two_theta) == 10 and pat.intensity[6] == 156.0
+    assert found == []
+
+
+def test_a_trailing_comment_on_every_row_reads(tmp_path):
+    pat, found = _read_xy(tmp_path, "every.xy", "10.0 100 ! a\n10.1 110 ! b\n"
+                          "10.2 120 # c\n")
+    assert pat.intensity == [100.0, 110.0, 120.0]
+    assert found == []
+
+
+def test_semicolon_separated_columns_read_as_commas_do(tmp_path):
+    pat, found = _read_xy(tmp_path, "semi.xy",
+                          "10.0;100;10\n10.1;110;10.5\n10.2;120;11\n")
+    assert pat.sigma == [10.0, 10.5, 11.0]
+    assert found == []
+
+
+def test_quoted_fields_are_refused_by_name(tmp_path):
+    path = tmp_path / "quoted.csv"
+    path.write_text('"2theta","counts"\n"10.0","100"\n"10.1","110"\n',
+                    encoding="utf-8")
+    with pytest.raises(ValueError, match=r"quoted\.csv: its fields are quoted "
+                                         r"\(line 2"):
+        rx.read_pattern(path)
+
+
+def test_prose_with_quotes_is_not_called_quoted_fields(tmp_path):
+    path = tmp_path / "notes.txt"
+    path.write_text('A file "about" nothing\nno numbers here\n', encoding="utf-8")
+    with pytest.raises(ValueError, match=r"no line holds two numbers; the first "
+                                         r"line that is not a comment is line 1"):
+        rx.read_pattern(path)
+
+
+def test_a_file_of_comments_says_so(tmp_path):
+    path = tmp_path / "comments.xy"
+    path.write_text("# one\n! two\n' three\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="every non-blank line starts with a "
+                                         "comment marker"):
+        rx.read_pattern(path)
+
+
 #: Issue #266's second file, and the same constant σ under a reader whose
 #: format *declares* the column.  The check is on the hook, so both say it.
 _CONSTANT_SIGMA = {
