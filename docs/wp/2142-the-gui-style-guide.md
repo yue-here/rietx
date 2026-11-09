@@ -85,7 +85,7 @@ the guide's named tokens and tests exist, which is a name check, not a heuristic
 - [x] `gui/CLAUDE.md`: the pointer line.
 - [x] A test that every token and test the guide names exists.
 - [x] The 59 questions, each settled or sent on, recorded below; the batch to the maintainer.
-- [ ] `docs/milestones/gui-overhaul.md`: the unfiled pieces and the screenshot acceptance row;
+- [x] `docs/milestones/gui-overhaul.md`: the unfiled pieces and the screenshot acceptance row;
       ROADMAP's sentence on the peak-mark colour.
 - [ ] Skill: none. The skill is for an agent driving rietx; the guide governs changing the GUI.
 
