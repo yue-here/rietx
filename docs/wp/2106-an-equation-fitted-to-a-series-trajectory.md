@@ -40,9 +40,10 @@ The tier of each rule this WP adds ([generality § The rule](../milestones/gener
 written 2026-11-09 at the start: the fit is arithmetic (tier 1), weighted least squares with
 each coefficient's esd propagated from the trajectory's own. A quarantined pattern is left
 out by the chain's own test (`_rejected`, ruled 2026-11-03), and a point with no esd has
-no weight, so it is left out too (tier 1); both are named in the result. The esds are not
-scaled by χ²/ν by default, since a refiner who trusts each pattern's esd would not scale
-them, so the result carries both readings and no threshold. No new diagnostic. The
+no weight, so it is left out too (tier 1); both are named in the result. The esd follows
+the package's convention for every refined esd, scaled by χ²/ν (named practice), and the
+unscaled one rides beside it, since a refiner who trusts each pattern's esd would not
+scale (no unanimity), so neither is chosen and no threshold reads them. No new diagnostic. The
 reference is a synthetic ramp with a known truth and the joint fit beside it; there is no
 published number, so the fit ships not yet validated.
 
@@ -57,11 +58,13 @@ its code. Any reader takes the stored format from a file's contents.
 
 ## Tasks
 
-- [ ] The fit: a trajectory, an expression and a `variables` dict in, coefficients with
+- [x] The fit: a trajectory, an expression and a `variables` dict in, coefficients with
   esds and χ² out. Name it as a consent item for the maintainer, since it joins the top
-  level.
-- [ ] Which trajectory: `direction="both"` gives two, so say which is read, or fit each.
-  Skip quarantined patterns and say so.
+  level. (`rx.fit_trajectory` → `rx.TrajectoryFit`; the names are the handover's consent
+  item.)
+- [x] Which trajectory: `direction="both"` gives two, so say which is read, or fit each.
+  Skip quarantined patterns and say so. (Forward by default, `chain="backward"` for the
+  other; `TrajectoryFit.skipped` names each point left out.)
 - [ ] Measure on a synthetic ramp against the joint fit: do the coefficients agree within
   their combined esds, and how much wider are the esds?
 - [ ] GSAS-II's stored equations: read `SeqParFitEqList` from a `.gpx` into this fit's

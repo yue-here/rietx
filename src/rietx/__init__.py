@@ -134,6 +134,7 @@ from .strategy.staged import (
     RefinementPlan,
     Stage,
 )
+from .trajectory_fit import fit_trajectory
 
 __all__ = [
     "__version__",
@@ -224,6 +225,7 @@ __all__ = [
     "index_pattern",
     "load_instrument_profile",
     "fit_peaks",
+    "fit_trajectory",
     "pick_peaks",
     "identify_project_format",
     "read_gsas2_instprm",
