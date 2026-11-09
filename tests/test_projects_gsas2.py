@@ -1248,3 +1248,164 @@ def test_a_cubic_order_2_entry_loses_nothing_and_says_so(tmp_path):
     assert structure.phases[0].texture is None
     (note,) = [d for d in notes if d.code == "GSAS2_GPX_TEXTURE_NOT_CARRIED"]
     assert note.level == "info"
+
+
+# ------------------------------------- equations stored with a sequential fit (WP-2106)
+#
+# The layout is read off a public file's contents: the GSAS-II tutorials' "TOF
+# Sequential Single Peak Fit" project (steel.gpx) stores one equation, an
+# ExpressionObj in `SeqParFitEqList` with `expression`, `freeVars` (label →
+# [name, value, refine flag]), `assgnVars` (label → table column) and `depVar`,
+# whose dependent is a pseudo-variable in `SeqPseudoVars`.  The numbers below
+# are synthetic.
+
+class _StoredExpression:
+    """Pickled under GSAS-II's own name, as the file carries it."""
+
+
+def _expression_obj(monkeypatch, **attrs):
+    import sys
+    import types
+
+    module = types.ModuleType("GSASIIobj")
+    _StoredExpression.__module__ = "GSASIIobj"
+    _StoredExpression.__qualname__ = _StoredExpression.__name__ = "ExpressionObj"
+    module.ExpressionObj = _StoredExpression
+    monkeypatch.setitem(sys.modules, "GSASIIobj", module)
+    obj = _StoredExpression()
+    obj.__dict__.update({"expression": "", "freeVars": {}, "assgnVars": {}, "depVar": None,
+                         "compiledExpr": None, "lastError": ("", ""),
+                         "distance_atoms": None, "distance_dict": None, **attrs})
+    return obj
+
+
+def _sequential_project(monkeypatch, *equations, pseudo=None,
+                        item="Sequential peak fit results"):
+    tree = _minimal_project()
+    tree.append([[item, {"histNames": ["PWDR a.gda Bank 1"],
+                         "SeqParFitEqList": list(equations),
+                         "SeqPseudoVars": pseudo or {}, "variableLabels": {}}]])
+    return tree
+
+
+def test_a_stored_equation_is_read_into_the_trajectory_fits_input(tmp_path, monkeypatch):
+    strain = _expression_obj(monkeypatch, expression="(x-30000)/30000",
+                             assgnVars={"x": "pos0"})
+    line = _expression_obj(monkeypatch, expression="m*y+b", depVar="(x-30000)/30000",
+                           freeVars={"b": ["b", 2e-5, True], "m": ["m", 4e-6, False]},
+                           assgnVars={"y": "Applied load (MN)"})
+    tree = _sequential_project(monkeypatch, line, pseudo={"(x-30000)/30000": strain})
+    notes: list = []
+    model = read_gsas2_gpx(_write_gpx(tmp_path / "seq.gpx", tree), diagnostics=notes)
+    (eq,) = model.sequential_equations
+    assert (eq.source, eq.text, eq.expression) == (
+        "Sequential peak fit results", "m*y+b", "m * y + b")
+    assert {k: (v.value, v.vary) for k, v in eq.variables.items()} == {
+        "b": (2e-5, True), "m": (4e-6, False)}
+    assert eq.bindings == {"y": "Applied load (MN)"}
+    assert (eq.dependent, eq.dependent_expression) == ("(x-30000)/30000", "(x - 30000) / 30000")
+    assert eq.dependent_bindings == {"x": "pos0"} and eq.refused is None
+    assert eq.rewrites == ()
+    (note,) = [d for d in notes if "Sequential peak fit results" in d.message]
+    assert "model.sequential_equations" in note.message
+
+
+def test_the_read_equation_fits_a_trajectory(tmp_path, monkeypatch):
+    """The reader's output is :func:`rietx.fit_trajectory`'s input as it stands:
+    the expression, the variables, and a coordinate under the label it reads."""
+    from rietx.schemas.results import RefinedParameter
+    from rietx.schemas.sequential import SeriesEntry, SeriesResult
+
+    line = _expression_obj(monkeypatch, expression="m*y**2+b", depVar="pos0",
+                           freeVars={"b": ["b", 0.0, True], "m": ["m", 1.0, True]},
+                           assgnVars={"y": "load"})
+    model = read_gsas2_gpx(_write_gpx(tmp_path / "fit.gpx",
+                                      _sequential_project(monkeypatch, line)))
+    (eq,) = model.sequential_equations
+    loads = [0.0, 1.0, 2.0, 3.0]
+    series = SeriesResult(entries=[
+        SeriesEntry(index=k, label=f"p{k}", parameters=[
+            RefinedParameter(path="instrument.zero_shift", value=0.5 + 0.25 * y * y,
+                             stderr=0.01)])
+        for k, y in enumerate(loads)])
+    assert eq.bindings == {"y": "load"}  # the table column the label reads
+    fit = rx.fit_trajectory(series, "instrument.zero_shift", eq.expression, eq.variables,
+                            coordinates=rx.CoordinateTable(columns={"y": loads}))
+    assert {v.name: v.value for v in fit.variables} == pytest.approx({"b": 0.5, "m": 0.25})
+    assert eq.rewrites == ("** → ^",)
+
+
+@pytest.mark.parametrize("text", [
+    "-x**2", "a*x**2**y", "2**-x", "-(a+b)**2*x", "a/b/x - b - x",
+    "sind(2*x) + cosd(a)*tand(b) - sin(y) + cos(x)*tan(a)",
+    "exp(-b/x)*sqrt(a) + log(y)", "+a - -b", "pi*x/2"])
+def test_a_lowered_equation_has_the_value_python_gives_it(text):
+    """Each rewrite in the table, checked against python reading the same text,
+    with GSAS-II's degree functions (``docs/practice.md``) as python lambdas."""
+    from rietx.io.projects.gsas2 import lower_gsas2_expression
+    from rietx.params.expression import Expression
+
+    degrees = {name: (lambda f: lambda u: f(math.radians(u)))(getattr(math, base))
+               for name, base in (("sind", "sin"), ("cosd", "cos"), ("tand", "tan"),
+                                  ("sin", "sin"), ("cos", "cos"), ("tan", "tan"))}
+    env = {**degrees, "exp": math.exp, "log": math.log, "sqrt": math.sqrt, "pi": math.pi}
+    lowered, _ = lower_gsas2_expression(text, {"a", "b", "x", "y"})
+    rng = np.random.default_rng(7)
+    for _ in range(5):
+        bound = dict(zip("abxy", rng.uniform(0.5, 2.0, 4), strict=True))
+        want = eval(text, {"__builtins__": {}}, {**env, **bound})  # noqa: S307 - our own literal
+        assert float(Expression(lowered).evaluate(bound)) == pytest.approx(want, rel=1e-12)
+
+
+@pytest.mark.parametrize("text, names, fragment", [
+    ("x^2", {"x"}, "exclusive or"),
+    ("np.exp(x)", {"x"}, "an attribute"),
+    ("a if x > 0 else x", {"a", "x"}, "a conditional"),
+    ("abs(x)", {"x"}, "calls abs()"),
+    ("x*z", {"x"}, "it names 'z'"),
+    ("x*(", {"x"}, "not python syntax"),
+    ("exp*x", {"exp", "x"}, "label 'exp' is a reserved word"),
+])
+def test_a_spelling_the_table_does_not_carry_is_refused_by_name(text, names, fragment):
+    from rietx.io.projects.gsas2 import lower_gsas2_expression
+
+    with pytest.raises(ValueError, match=fragment.replace("(", r"\(").replace(")", r"\)")):
+        lower_gsas2_expression(text, names)
+
+
+def test_a_refused_equation_is_kept_with_its_reason_and_reported(tmp_path, monkeypatch):
+    bad = _expression_obj(monkeypatch, expression="np.exp(k*y)", depVar="pos0",
+                          freeVars={"k": ["k", 1.0, True]}, assgnVars={"y": "load"})
+    distance = _expression_obj(monkeypatch, expression="d", depVar="pos0",
+                               distance_atoms=[1, 2])
+    tree = _sequential_project(monkeypatch, bad, distance, item="Sequential results")
+    notes: list = []
+    model = read_gsas2_gpx(_write_gpx(tmp_path / "bad.gpx", tree), diagnostics=notes)
+    first, second = model.sequential_equations
+    assert first.expression is None and "an attribute (such as np.exp)" in first.refused
+    assert first.variables["k"].value == 1.0 and first.bindings == {"y": "load"}
+    assert second.expression is None and "distance or angle" in second.refused
+    refused = [d for d in notes if d.code == "GSAS2_GPX_ITEM_NOT_READ"
+               and "is not read into rietx's grammar" in d.message]
+    assert len(refused) == 2
+
+
+def test_a_project_with_no_stored_equation_reads_none(tmp_path, monkeypatch):
+    model = read_gsas2_gpx(_write_gpx(
+        tmp_path / "none.gpx", _sequential_project(monkeypatch, item="Sequential results")))
+    assert model.sequential_equations == ()
+    assert read_gsas2_gpx(PBSO4).sequential_equations == ()
+
+
+def test_every_rewrite_the_reader_makes_is_in_the_manuals_table():
+    """The table in ``reference/foreign-models.md`` is the reader's, both ways."""
+    from rietx.io.projects.gsas2 import GSAS2_EXPRESSION_REWRITES
+
+    page = (Path(__file__).parents[1] / "docs" / "docs" / "reference"
+            / "foreign-models.md").read_text(encoding="utf-8")
+    section = page.split("### Equations stored with a sequential fit", 1)[1].split("\n### ", 1)[0]
+    table = section.split("| GSAS-II | rietx | Why |", 1)[1].split("\n\n", 1)[0]
+    rows = [line for line in table.splitlines() if line.startswith("| `")]
+    spelled = {cell.strip(" `") for line in rows
+               for cell in line.split("|")[1].split(",")}
+    assert spelled == set(GSAS2_EXPRESSION_REWRITES)
