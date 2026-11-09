@@ -2193,6 +2193,10 @@ class MultiHistogramRefinement:
                         n_iterations=outcome.n_iterations + second.n_iterations,
                         n_constraint_truncations=(outcome.n_constraint_truncations
                                                   + second.n_constraint_truncations),
+                        truncated_by={k: (outcome.truncated_by.get(k, 0)
+                                          + second.truncated_by.get(k, 0))
+                                      for k in {**outcome.truncated_by,
+                                                **second.truncated_by}},
                         # summed for the same reason the truncations are: the stage
                         # ran twice and the count is a fact about its whole search
                         n_degenerate_cell_probes=(outcome.n_degenerate_cell_probes
@@ -3097,13 +3101,23 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
     its own bounds (WP-1325).
 
     The WP-1119 hazard one rank up: a pattern's target is Σ_j Φ_kj·c_j over
-    unbounded coefficients, so the solve never sees the target's own
-    ``min``/``max``.  A ``constant`` declaration's one coefficient carries the
-    target's box itself (``MultiParameterTable._install_parametric``), but a
-    sum of several terms has no box that holds it.  So the answer is read:
-    one warning per declaration, naming every subset pattern whose dependent
-    left its declared range, at the value it took.  ``value`` is how many.
+    unbounded coefficients.  A ``constant`` declaration's one coefficient
+    carries the target's box itself (``MultiParameterTable._install_parametric``),
+    and under the default LM driver a linear target's bounds are rows held
+    inside the step in every subset pattern
+    (``least_squares._joint_tied_bound_inequalities``).  Three cases still
+    leave a target outside: TRF, which takes no rows; an ``expression``
+    target, which is not affine (WP-1964); and a pattern the start already
+    put outside, whose row the builder drops.  So the answer is read: one
+    warning per declaration, naming every subset pattern whose dependent left
+    its declared range, at the value it took.  ``value`` is how many.
+
+    A value on its bound to within ``lm._ON_FACE`` of the bound (or of 1) is
+    on the face, the rows' own reading, never outside: the constrained step
+    lands a held target there up to rounding.
     """
+    from .optimize.lm import _ON_FACE
+
     out: list[Diagnostic] = []
     # an expression's target is as unbounded as a sum of terms (WP-1964)
     for r in (*mtable.parametric, *mtable.expressions):
@@ -3111,7 +3125,9 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
         for h in r.patterns:
             table = mtable.tables[h]
             e = table.entries[table._paths[r.target]]
-            if not e.lo <= e.value <= e.hi:
+            below = e.value < e.lo - _ON_FACE * max(1.0, abs(e.lo))
+            above = e.value > e.hi + _ON_FACE * max(1.0, abs(e.hi))
+            if below or above or math.isnan(e.value):
                 bad.append((h, e.value, e.lo, e.hi))
         if not bad:
             continue

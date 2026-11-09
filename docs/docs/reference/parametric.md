@@ -318,8 +318,11 @@ The rest need the patterns:
 | a `SharingMap` that makes a linear equation's coefficient per-histogram | keep its `vars.<name>_<j>` shared; a formula's variable may be per-pattern |
 
 The coefficients are unbounded, unless the basis is `"constant"`, whose one coefficient carries the target's own bounds.
-A sum of terms has no box that holds every pattern's target, so a target can leave its own range on some pattern.
-That is read after the fit ([Range and visibility warnings](#range-and-visibility-warnings)).
+A sum of terms has no box that holds every pattern's target.
+The default LM driver holds each pattern's target inside its own `min` and `max` at every step instead, as one linear constraint per pattern.
+A target the answer leaves on a bound is named in the `CONSTRAINT_ACTIVE` finding, as `parametric equation '<name>' (<target> bounds)`.
+TRF takes no such constraint, and neither does an `"expression"` equation, which is not linear in its variables.
+There a target can leave its range, and the fit then stops with a `ValueError` naming the target, its value and the equation.
 
 ## Fitting a declaration
 

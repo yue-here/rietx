@@ -1268,7 +1268,7 @@ Their numbers are as reported and were not re-measured here.
     declaration (schema 0.56), printed after its coefficients;
   - `PARAMETRIC_FORM_REJECTED`, a warning on the coefficients;
   - the series deliverable's functional-form row names a rejected law.
-- [ ] **Hold each target's own bounds inside the step.** Coefficients are
+- [x] **Hold each target's own bounds inside the step.** Coefficients are
   unbounded, so a polynomial can step a target through its floor or pole
   mid-solve (March-Dollase r at `MARCH_R_MIN`, the Caglioti W floor, an
   occupancy outside [0, 1]). `PARAMETRIC_OUT_OF_RANGE` reports this only
@@ -1280,6 +1280,22 @@ Their numbers are as reported and were not re-measured here.
   - TRF keeps the post-fit warning.
 
   Declined from the 2026-10-14 code review as a design change.
+
+  Superseded in part, 2026-11-09 (tenth session): the joint driver has
+  passed the width rows since WP-2002, so "`inequalities=[]` today" was
+  stale. And `PARAMETRIC_OUT_OF_RANGE` never reported anything in a real
+  fit: a target past its bound made `apply_to_models` raise `ValueError`
+  after the solve, on either driver, before the result was built.
+
+  Landed as `least_squares.tied_bound_inequalities`, one block per tied
+  entry with a finite bound the box does not already imply, built for the
+  single fit and, per histogram, for the joint one
+  (`_joint_tied_bound_inequalities`, one block per equation). The class is
+  wider than the targets: a user's tie with several sources had only
+  `tie_window`'s outer box, and its infeasible corner raised the same way.
+  A joint fit's held steps now reach `CONSTRAINT_ACTIVE`, and the out-of-range
+  test reads a value on its face as inside. TRF still raises.
+  `tests/test_tied_bound_rows.py`.
 - [ ] **Per-pattern starting structures agree beyond their parameters.**
   `_starting_structures` checks the phases, space groups and sites, and
   `_check_starts_agree` the shared values. Fields that are not parameters

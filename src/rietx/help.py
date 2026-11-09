@@ -1968,8 +1968,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A constraint held the optimum on its edge",
         description=(
             "In the final stage the optimiser held some steps against a built-in "
-            "inequality constraint. Examples are the positivity of the strain broadening "
-            "and the positive Gaussian instrument width. The optimum therefore sits on "
+            "inequality constraint. Examples are the positivity of the strain broadening, "
+            "the positive Gaussian instrument width, and the bounds of a tied parameter or "
+            "of a parametric equation's target. The optimum therefore sits on "
             "or near the edge of the allowed region. The values are admissible but not "
             "measured. Start from a different seed and quote the values only if they "
             "survive."

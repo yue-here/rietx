@@ -7921,16 +7921,19 @@ def _constraint_diagnostics(stage_name: str, outcome) -> list[Diagnostic]:
         return []
     # which block bound each step, by its label (WP-1938 D7): the Stephens
     # cone's end in ``.microstrain``, the Γ_G² floor's start with
-    # ``instrument.profile``
+    # ``instrument.profile (`` (the Γ_L floor's with ``instrument.profile
+    # Lorentzian``).  A joint fit prefixes a histogram's block with
+    # ``hist.{h} `` (WP-1325), read past here.
     by = getattr(outcome, "truncated_by", None) or {}
     which = "; ".join(f"{label}: {k}" for label, k in sorted(by.items()))
+    bare = [re.sub(r"^hist\.\d+ ", "", label) for label in by]
     suggestion = ("Vary the starting seed and quote the values only if they "
                   "survive.")
-    if any(label.endswith(".microstrain") for label in by):
+    if any(label.endswith(".microstrain") for label in bare):
         suggestion += (" The STEPHENS_STRAIN_NOT_POSITIVE protocol row "
                        "applies to the strain cone, although that guard stays "
                        "silent while the default LM driver holds the cone.")
-    if any(label.startswith("instrument.profile") for label in by):
+    if any(label.startswith("instrument.profile (") for label in bare):
         suggestion += (" At some reflection the data asked for no Gaussian "
                        "width (the Γ_G² floor, 1e-8 deg²), so U, V, W and the "
                        "phase's Gaussian size and strain describe that floor.")
