@@ -563,6 +563,28 @@ def test_unnamed_typed_cells_in_one_create_get_distinct_names(blank, tmp_path,
     assert [p.name for p in session.project.refinement.structure.phases] == ["phase"]
 
 
+def test_a_species_refused_in_a_list_names_its_place_in_the_project(
+        blank, tmp_path, pattern_file):
+    """The list form joins its members before the species check, so a refused
+    atom's path carries its phase index in the joined list, never in its own
+    form: the second member's atom is phases.1, not phases.0."""
+    from rietx.schemas.structure import lebail_scaffold
+
+    _session, client = blank
+    bad = lebail_scaffold("F m -3 m", [5.463, 5.463, 5.463, 90, 90, 90],
+                          name="bad").model_dump(mode="json")
+    bad["phases"][0]["atoms"][0]["species"] = "Xx"
+    status, payload = client.post("/api/project/new", {
+        "pattern": str(pattern_file), "mode": "lebail",
+        "structure": [{"space_group": "P m -3 m", "cell": {"a": 4.160}}, bad],
+        "path": str(tmp_path / "species.rex"),
+        "instrument": {"preset": "debye_scherrer", "wavelength": 0.4139}})
+    assert status == 400, payload
+    assert payload["error"]["code"] == "UNKNOWN_SPECIES"
+    assert payload["error"]["where"] == ["phases.1.atoms.0.species"]
+    assert not (tmp_path / "species.rex").exists()   # refused before anything is made
+
+
 def test_new_refuses_an_instrument_it_would_have_to_guess(blank, tmp_path,
                                                           pattern_file):
     """A default anode would put a wavelength nobody chose into every cell."""
