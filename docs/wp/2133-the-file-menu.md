@@ -152,6 +152,20 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-2131 (the start screen, whose settled calls 4 and 9 this WP takes over), WP-1205 (the
   folder browser and its containment gate), WP-1214 (the export gate).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-10 WP-2134 folded this WP's additions to `gui/CLAUDE.md` into the
+condensed rulebook as standing rules, each still naming this WP. The text below is
+the paragraph that file carried for this WP until then, verbatim. Where it and the
+rulebook disagree, the rulebook is current.
+
+**The File menu** (WP-2133, `panels/FileMenu.svelte`, `lib/filemenu.ts`) acts on
+the folder. **A rename or a move keeps the session's `Project`** and repoints the
+two paths a live one holds (`Project.path`, `RefinementTree.path`); a third such
+field joins `GuiSession._relocate`. **A destination passes `_browsable_folder` and
+`_project_name`**, never sanitised, and an existing one is refused, never replaced.
+**Close is a `closed` mark on the recent list's head**, which `reopen_last` reads.
+
 ## Handover log
 
 - **2026-11-09** — the File menu is built, on real routes, and every task is ticked. Clicking

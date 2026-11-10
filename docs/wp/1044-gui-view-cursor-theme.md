@@ -108,6 +108,37 @@ row for the same region; the armed cursor is `col-resize` and returns to
   part in the autorange (bands drawn past the data *became* the range).
 - WP-1029 — the three-way theme and `ProjectDoc.ui`; this WP moves one key out.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**The view, the armed cursor and the theme's scope** (WP-1044, `Plot.svelte`,
+`session.settings`) is the pass that answered four defects reported from use,
+and three rules came out of it. **A redraw is not a reason to move the axes.**
+Under plotly it was one: `react` re-autoranged over everything drawn, the peak
+markers and the mask shapes included, so a zoom lasted until the next peak edit
+(measured in Chrome: a drag to 9.97-14.66° came back 4.57-24.85 with a peak
+list). The chart zooms in the browser over a payload that is every channel
+(WP-1461), so the rule is kept by what the panel does not do: a knob or a layer
+change repaints and fetches nothing, a payload over the same channels keeps the
+view (`lib/pattern.ts:sameGrid`), and the knob effect reads the payload
+**untracked**, or every fetch costs a second paint (counted under plotly: 2 per
+zoom drag, 6 at boot). **An armed range gesture must say so under the
+pointer**: a select drag and a zoom drag are pointer-identical, so `col-resize`
+goes on the chart's plot area (`.u-over`), where an inherited cursor loses to
+it without a specificity fight. And **a `ui` key belongs to whatever it is about**
+— a width or Simple/Advanced is the project's (four phases, so the table wants to
+be wide), a theme is the *person's*, so it lives in `GET`/`POST /api/settings`
+over `state_dir/settings.json` beside the recent list, with `ProjectDoc.ui`'s
+exact grammar (top-level merge, `null` drops, persisted on the verb) at app
+scope. In `ProjectDoc.ui` it was re-read per project, so dark lasted until the
+next `Open…`; out of there it also stops being refused mid-run, which is the
+finding WP-1029 recorded and could not fix from inside `POST /api/project` (the
+project's *other* `ui` keys still ride that route).
+
 ## Handover log
 
 - **2026-08-06** — **all four items landed; WP closed.**

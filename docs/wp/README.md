@@ -62,6 +62,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2131](2131-the-start-screen-and-new-project.md) | The start screen and the New project dialog | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2133](2133-the-file-menu.md) | The File menu on the project name | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | 2026-11-10 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2142](2142-the-gui-style-guide.md) | The GUI style guide | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
@@ -841,6 +842,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2119](2119-the-design-record-says-how-a-design-is-chosen.md) | The design record says how a design is chosen | ✅ 2026-11-07 | — | — |
 | [2122](2122-the-mark-redrawn.md) | The mark's bar redrawn, and the header lockup set on the type | ✅ 2026-11-08 | — | — |
 | [2132](2132-the-estimation-page-splits-before-it-grows.md) | The Estimation page splits before it grows | ⬜ | P3 | — |
+| [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | 🔄 2026-11-10 | P4 | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
