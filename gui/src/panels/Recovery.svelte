@@ -65,7 +65,7 @@
   <div class="rc-dialog" bind:this={dialog} role="dialog" aria-modal="true" aria-labelledby="rc-title">
     <h2 id="rc-title">Unapplied edits</h2>
     <p>{offerText(draft, savedUtc)}</p>
-    {#if moved}<p class="muted">The project has changed since.</p>{/if}
+    {#if moved}<p class="muted">The project has been refined or edited since. Restored values will replace the current ones.</p>{/if}
     <footer>
       <button type="button" class="ghost" onclick={ondiscard}>Discard</button>
       <!-- svelte-ignore a11y_autofocus -->

@@ -6360,7 +6360,8 @@ describe("unapplied edits kept across a close (WP-2209)", () => {
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
-    expect(dialog()?.textContent).toContain("The project has changed since.");
+    expect(dialog()?.textContent).toContain(
+      "The project has been refined or edited since. Restored values will replace the current ones.");
     [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Discard")!.click();
     await flush();
     expect(dialog()).toBeNull();

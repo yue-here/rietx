@@ -115,9 +115,12 @@ browser tab or stopping the server keeps them.
 
 Opening the project again shows `Unapplied edits`, with how many and when they
 were made. `Restore` puts them back as pending edits, and `Discard` deletes
-them. If the project has moved on since, for example after a fit run from
-Python, the dialog says so. Restored edits still wait in the action bar until
-you apply them.
+them. `Escape` closes the dialog and keeps the copy without restoring it. The
+dialog comes back the next time the project opens. Edits you make before then
+are not kept. If the project has been refined or edited since, for example by a
+fit run from Python, the dialog adds "The project has been refined or edited
+since. Restored values will replace the current ones." Restored edits still
+wait in the action bar until you apply them.
 
 The copy is deleted once the edits are applied, reverted or discarded. It
 follows the project through `Rename…` and `Move to…`. `Save a copy…`, and a
