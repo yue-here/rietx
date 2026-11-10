@@ -1,9 +1,8 @@
 # WP-2134 — The GUI rulebook keeps rules, and its evidence moves out
 
-Milestone: unscheduled · Status: 🔄 2026-11-10 — condensed to 662 lines and PR'd (#1511); #1490, #1498, #1502 and #1514 folded
+Milestone: unscheduled · Status: ✅ 2026-11-10 — `gui/CLAUDE.md` condensed to 662 lines, merged in #1511; moving its 36 visual rules is a gui-overhaul owed item
 Track: The repo's own process
 Depends on: —
-Priority: P4 2026-11-09 — process: no number moves, but every GUI session pays the file's size
 
 ## Goal
 
@@ -154,6 +153,25 @@ WP-2142's style guide merged before this WP (#1514). The 36 rules above stay in
   here as code rules.
 
 ## Handover log
+
+- **2026-11-10, close** — closed. PR #1511 merged on 2026-11-10, so the rulebook a session
+  loads under `gui/` is 662 lines on `main`, against 1068 before. Its first "Next" item, the
+  fold of the five PRs' rules, landed in that PR. The second, moving the 36 visual rules into
+  `gui/STYLE.md`, has no WP of its own.
+
+  *Leftovers, and where each went.* The 36 visual rules: an item in
+  `docs/milestones/gui-overhaul.md` § Owed to the port, which points at this file's coverage
+  list above, because the move needs the maintainer for the departures and the uncovered rules.
+  Extending `test_gui_rulebook_paths_resolve` to the other rulebooks (root, `tests/`, `io/`,
+  `indexing/`) was declined at review as a follow-up. No open WP owns rulebook checks and the
+  milestone is the GUI's, so it is not carried; it stays recorded in the entry below. The
+  failure this WP saw on `main`,
+  `test_indexing_reduce.py::test_a_monoclinic_cell_is_re_set_to_the_conventional_setting[P]`,
+  did not reproduce on 2026-11-10: both cases passed at `ddabab7d3` (arm64 macOS, worktree
+  `[dev]` venv). The narrative went to `docs/milestones/v1.12.md`.
+
+  Closed by the batch close-out of the port's merged WPs, PR #1516. Docs only; no test moved.
+  Next: none here.
 
 - **2026-11-10** — `main` merged, and every rule the five GUI PRs added in the
   meantime is folded in. The rulebook is 662 lines. #1487 and #1488 added nothing

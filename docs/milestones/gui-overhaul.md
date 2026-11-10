@@ -45,7 +45,7 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 
 | Piece | What it builds | Ruled |
 |---|---|---|
-| The palette | The site's palette as the default theme: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Theme machinery in Settings for established themes (Solarized light and dark, Monokai and others) | 2026-11-06, 2026-11-09 |
+| The palette | The site's palette as the default theme: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Theme machinery in Settings for established themes (Solarized light and dark, Monokai and others). `gui/STYLE.md`'s rules that describe a new role in words take its tokens once they exist (WP-2142) | 2026-11-06, 2026-11-09 |
 | Sentence-case headings | One `app.css` rule at the start screen's register, app-wide | 2026-11-09 |
 | Peaks and indexing | The redesign in four steps (pick peaks, fit peaks, index, judge), the eight-column candidate table, lens peak marks, per-line curves in the fit windows | 2026-11-08, 2026-11-09 |
 | Structure tab | The 3D structure as one of the graph tabs | 2026-11-07 |
@@ -89,7 +89,7 @@ the piece that touches it or a WP of its own.
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
 - `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
-- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits.
+- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits. It is the row "The palette" above.
 - The pick route takes only `shoulders`; the 2θ range and `flag_contamination` need to reach it.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08.
@@ -101,6 +101,31 @@ the piece that touches it or a WP of its own.
 - A run started from the Report or Series panel, or by the `.` key, does not apply the
   Parameters edits waiting in the action bar. The bar's Refine, the `r` key (WP-2123) and the
   Plan panel's `Run this stage` (WP-2127) do.
+- The Parameters panel has no formula editor: no route serves `add_variable` or an expression
+  tie, so the popover's "=" button (design 13) waits for both routes (WP-2126's follow-up).
+- The popover offers no limits for a coordinate DOF, whose entry stores no `min`/`max`, and
+  refuses them by name for a texture or background coefficient. Both need the path-to-model map
+  that lives only inside `ParameterTable`'s write-back (WP-2126's follow-up).
+- The panel's Apply sends `PATCH /api/params` and then one `POST /api/structure/position` per
+  moved atom, so a refused position leaves the PATCH applied. A `positions` arm on the PATCH
+  makes it one rehearsed request; the Model panel's value-then-model sequence has the same shape
+  (WP-2126's follow-up).
+- No group toggle in the Parameters panel shows which plan stage frees it. WP-2126 left the
+  badges to the Plan tab and WP-2127 left them to the panel.
+- `gui/src/lib/spacegroup.ts:typesetSpaceGroup` (WP-2126) and
+  `gui/src/lib/symmetry.ts:symbolTokens` (WP-2131) typeset a space-group symbol by the same
+  rules into two token types. One should go.
+- The Plan tab adds a glob by typing it. The prototype's grouped picker ("Cell (2)", "All Biso")
+  and its "never freed" row both need the refinable set, which `GET /api/plan/resolve` does not
+  serve. Its "Save as new plan…" needs a store for named plans, and rietx keeps one plan per
+  project (WP-2127's non-goals).
+- New project cannot add a phase from a TOPAS, FullProf or GSAS-II project file, which the
+  round-9 design offers. A browser upload carries one file, and such a project names a data
+  file beside it (WP-2131's settled call 2).
+- `gui/CLAUDE.md` still holds 36 visual rules that belong in `gui/STYLE.md`. WP-2134's § What
+  `gui/STYLE.md` covers of these sorts them: drop the covered ones from the rulebook, merge the
+  partly covered ones into the guide, and bring the departures and the uncovered ones to the
+  maintainer, since visual questions go to him (WP-2134's and WP-2142's next step).
 
 ## Acceptance
 

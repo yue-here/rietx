@@ -1,8 +1,7 @@
 # WP-2133 — the File menu on the project name
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — all four tasks landed; PR #1502 open, stacked on #1498, awaiting review
+Milestone: gui-overhaul · Status: ✅ 2026-11-10 — the File menu merged in #1502; the draft of unapplied edits is the milestone's edit-recovery row
 Depends on: 2131
-Priority: P2 2026-11-09 — a piece of the open gui-overhaul milestone, the maintainer's file-and-project I/O ruling of 2026-11-07; 2131's handover names it next
 
 ## Goal
 
@@ -167,6 +166,23 @@ field joins `GuiSession._relocate`. **A destination passes `_browsable_folder` a
 **Close is a `closed` mark on the recent list's head**, which `reopen_last` reads.
 
 ## Handover log
+
+- **2026-11-10** — closed. PR #1502 merged on 2026-11-10, after #1498. Clicking the project's
+  name on `main` opens the File menu, and copy, rename, move and close are server verbs that
+  refuse rather than overwrite. A pending edit still does not survive a close or a crash. That
+  is the one piece of work this WP named next.
+
+  *Leftovers, and where each went.* The draft of unapplied edits, ruled on 2026-11-09 to live in
+  rietx's state directory with no project-format change, is the row "Edit recovery" in
+  `docs/milestones/gui-overhaul.md` § Designed, not yet filed. Exporting the console as a Python
+  script needs a writer that does not exist; the console itself is the row "Bottom panel".
+  `.rxt` kept beside the project is the third of the milestone's open decisions. ⌘N, ⌘W, Show
+  in Finder and the `.rex` package wait for the desktop app and are not carried here. The
+  thirteen settled calls were reviewed with the PR at its merge. The narrative went to
+  `docs/milestones/v1.12.md`.
+
+  Closed by the batch close-out of the port's merged WPs, PR #1516. Docs only; no test moved.
+  Next: none here.
 
 - **2026-11-09** — the File menu is built, on real routes, and every task is ticked. Clicking
   the project's name now opens New, Open, Open recent, Save a copy, Rename, Move to, Export and

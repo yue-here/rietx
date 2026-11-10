@@ -1,8 +1,7 @@
 # WP-2142 — The GUI style guide
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — the guide, its test and the milestone's unfiled pieces are in; B1-B4 ruled 2026-11-09; PR #1514
+Milestone: gui-overhaul · Status: ✅ 2026-11-10 — `gui/STYLE.md` merged in #1514, approved with B1-B4 ruled; moving the 36 visual rules into it is an owed item
 Depends on: —
-Priority: P2 2026-11-09 — every later gui-overhaul piece is judged against it (ruled 2026-11-09)
 
 ## Goal
 
@@ -206,6 +205,23 @@ wc -w gui/STYLE.md   # well under the workshop draft's 11 192 words
   plot palette's floor is measured in.
 
 ## Handover log
+
+### 2026-11-10 — closed; the 36 rules wait as an owed item
+
+PR #1514 merged on 2026-11-10, after the maintainer read `gui/STYLE.md` and approved it ("looks
+good") with B1-B4 ruled. Every later piece of the port is judged against it. Two pieces of work
+it named stay open, and both now sit in the milestone record where the next piece will see them.
+
+- *Leftovers, and where each went.* Moving `gui/CLAUDE.md`'s 36 visual rules into the guide
+  (this WP's non-goal, WP-2134's "Next") went to `docs/milestones/gui-overhaul.md` § Owed to the
+  port, citing WP-2134's coverage list. Renaming the rules that describe a role the palette
+  piece adds, once its tokens exist (the gotcha below), went into that piece's row in § Designed,
+  not yet filed. The rules settled under a stated motive were read with the guide at its
+  approval. Declined at review and not carried: adding the new test to `ci.yml`'s docs-job list,
+  since the workflow file was outside this WP. The narrative went to `docs/milestones/v1.12.md`.
+- Closed by the batch close-out of the port's merged WPs, PR #1516. Docs only; no test moved.
+- Next: none here. The palette piece is first in the milestone's order and most of § Colour
+  waits on it.
 
 ### 2026-11-09 — the guide written, four questions sent
 
