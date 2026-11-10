@@ -112,7 +112,7 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   entries, the current one derived from the model tab or the chosen placeholder.
 - [x] The placeholder pane in the model panel: one tab with the workflow's name, the step strip,
   each step's heading and dashed box; the action bar hidden.
-- [ ] Tests: vitest for the derivation and the menu; the layout browser test opens the menu,
+- [x] Tests: vitest for the derivation and the menu; the layout browser test opens the menu,
   chooses every entry and comes back; the dist rebuilt.
 - [x] The GUI chapter: the header table and a Workflow menu section.
 - [ ] Screenshot beside the prototype's at the same window size, for the PR.

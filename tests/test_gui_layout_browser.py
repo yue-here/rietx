@@ -892,3 +892,60 @@ def test_the_file_menu_moves_nothing(browser, filemenu, state):
     assert fields[0] == "sample copy", fields
     assert status == 200 and doc["path"].endswith("sample2.rex"), doc
     assert not moved, moved
+
+
+#: The model panel's strip and the action bar, which a workflow choice changes.
+WORKFLOW_STATE = """() => ({
+  button: document.querySelector("header .wf-name").textContent.replace("▾", "").trim(),
+  tabs: [...document.querySelectorAll(".side > nav.tabs button")].map((b) => b.textContent.trim()),
+  on: document.querySelector(".side > nav.tabs button.on")?.textContent.trim() ?? null,
+  actions: !!document.querySelector(".side .actions"),
+  box: document.querySelector(".side .wf .box")?.textContent.replace(/\\s+/g, " ").trim() ?? null,
+})"""
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_the_workflow_menu_moves_nothing_and_every_entry_comes_back(browser, gui, state):
+    """The workflow menu beside the graphs toggle (WP-2204). Opening it is an
+    overlay and moves nothing. Peaks and indexing and Series open their tabs;
+    a placeholder says it is not built, has one tab and no action bar; and
+    Refinement brings back the strip and every landmark where it was."""
+    url, _ = gui
+    page = _open(browser, url, WIDTHS[state])
+    before = page.evaluate(SNAP, LANDMARKS)
+    trigger = page.locator("header .wf-name")
+
+    trigger.click()
+    _frames(page)
+    opened = _moved(before, page.evaluate(SNAP, LANDMARKS))
+    entries = page.get_by_role("menuitemradio").all_text_contents()
+    page.keyboard.press("Escape")
+    _frames(page)
+    closed = page.get_by_role("menu").count() == 0
+
+    seen = {}
+    for name in ["Peaks and indexing", "Series", "Structure solution", "Rigid bodies", "Refinement"]:
+        trigger.click()
+        page.get_by_role("menuitemradio", name=name).click()
+        _frames(page)
+        seen[name] = page.evaluate(WORKFLOW_STATE)
+    back = _moved(before, page.evaluate(SNAP, LANDMARKS))
+    assert not page.errors, page.errors
+    page.close()
+
+    assert not opened, opened
+    assert closed
+    assert [e.replace("✓", "").strip() for e in entries] == [
+        "Refinement", "Peaks and indexing", "Series",
+        "Structure solution · placeholder", "Rigid bodies · placeholder"], entries
+    assert seen["Peaks and indexing"]["on"] == "Peaks"
+    assert seen["Peaks and indexing"]["button"] == "Peaks and indexing"
+    assert seen["Series"]["on"] == "Series"
+    for name in ["Structure solution", "Rigid bodies"]:
+        assert seen[name]["tabs"] == [name], seen[name]
+        assert not seen[name]["actions"], seen[name]
+        assert seen[name]["box"].startswith("Not built yet."), seen[name]
+        assert seen[name]["button"] == f"{name} · placeholder", seen[name]
+    assert seen["Refinement"]["on"] == "Parameters" and len(seen["Refinement"]["tabs"]) == 10
+    assert seen["Refinement"]["actions"]
+    assert not back, back
