@@ -191,6 +191,11 @@ npm --prefix gui test && npm --prefix gui run check
   `test_gui_background.py`'s malformed-body refusal now matches main's combined sentence
   ("'vary' and 'hold' map dot-path glob → bool"). The dist and every screenshot were rebuilt
   on the merged tree.
+  A second merge brought in WP-2128's `Single peaks` graph tab. The strip now reads `Pattern`,
+  `Single peaks`, `Background`: the tab main shipped second keeps its place, and the manual's
+  "second graph tab" sentence stays true. On the Background tab the title stays "Background at
+  the current values" while the Interactive tab holds a preview, because this curve is drawn
+  at the working values and not at the preview's. Both settled by Claude, reversible.
 
 - **2026-11-09** — The GUI now has a Background graph tab. It shows the background curve over
   the greyed pattern, with a shaded band for where the curve may move when the free parameters

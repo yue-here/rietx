@@ -148,6 +148,13 @@ SHOTS: tuple[Shot, ...] = (
         tab="Parameters",
     ),
     Shot(
+        "interactive",
+        "The Interactive tab at rest: a slider per value a person adjusts by "
+        "hand, grouped under the instrument and each phase.",
+        selector=".side",
+        tab="Interactive",
+    ),
+    Shot(
         "plan-ladder",
         "The plan as a recipe — one row per stage, what it frees and what stays held.",
         selector=".side",
@@ -173,6 +180,15 @@ SHOTS: tuple[Shot, ...] = (
         "The project as an `.rxt` document, where `@` frees a parameter.",
         selector=".side",
         tab="Text",
+    ),
+    # Last of the fitted pass: it switches the graph strip, and every shot of
+    # the graph column above wants the Pattern tab.
+    Shot(
+        "single-peaks",
+        "The Single peaks graph: three windows on single reflections at the "
+        "last fit's scale.",
+        selector=".plotcol",
+        tab="Single peaks",
     ),
 )
 
