@@ -6343,11 +6343,7 @@ describe("unapplied edits kept across a close (WP-2209)", () => {
     await flush();
     expect(dialog()?.querySelector("h2")?.textContent).toBe("Unapplied edits");
     expect(dialog()?.textContent).toMatch(/1 edit from .*, not applied when the project closed\./);
-    expect(dialog()?.textContent).not.toContain("changed since");
-    // Escape answers neither, and nothing behind the dialog hears it
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    await flush();
-    expect(dialog()).toBeTruthy();
+    expect(dialog()?.textContent).not.toContain("since");
 
     [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Restore")!.click();
     await flush();
@@ -6371,6 +6367,41 @@ describe("unapplied edits kept across a close (WP-2209)", () => {
     expect(recoveryPuts(stub).map((c) => c.body))
       .toEqual([{ project: "/tmp/lab6.rex", head: null, draft: null }]);
     expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+  });
+
+  it("closes on Escape keeping the copy, and offers it again at the next open", async () => {
+    // the maintainer's ruling of 2026-11-10: Escape restores nothing,
+    // discards nothing, and the offer returns when the project next opens
+    const stub = server({
+      ...boot(), ...kept({ draft: KEPT, saved_utc: null, head: "n0000", head_now: "n0000" }),
+      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/lab6.rex", name: "lab6.rex",
+                                                  phases: [], missing: false }] } }),
+      "/api/project/open": () => ({ body: PROJECT }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()).toBeTruthy();
+    const cancels = stub.calls.filter((c) => c.path === "/api/cancel").length;
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flush();
+    expect(dialog()).toBeNull();
+    // nothing restored, and the shell's Escape never heard it
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+    expect(stub.calls.filter((c) => c.path === "/api/cancel")).toHaveLength(cancels);
+    // an edit made meanwhile never overwrites the copy set aside
+    await editValue("phases.0.cell.a", "4.3");
+    await wait();
+    expect(recoveryPuts(stub)).toEqual([]);
+
+    await toStart();
+    [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === "lab6")!
+      .querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    await wait();
+    expect(dialog()?.querySelector("h2")?.textContent).toBe("Unapplied edits");
+    expect(recoveryPuts(stub)).toEqual([]);
   });
 
   it("keeps an edit as it is made, and deletes the copy once it is reverted", async () => {

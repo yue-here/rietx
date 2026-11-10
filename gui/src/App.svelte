@@ -463,6 +463,17 @@
     if (project?.path === o.path) recoveryWriter.arm(o.path, null);
   }
 
+  /** Escape on the offer (the maintainer's ruling of 2026-11-10): neither
+   *  restored nor discarded.  The copy stays on the server and is offered at
+   *  the project's next open, so the writer stays disarmed until then: an
+   *  edit made meanwhile would otherwise overwrite the copy it set aside. */
+  function setAsideKept() {
+    const o = offer;
+    if (!o) return;
+    offer = null;
+    say("# unapplied edits kept; offered again when the project next opens");
+  }
+
   /** The page is going: send the write the timer was holding, with
    *  `keepalive`, which a timer cannot outlive. */
   function pageHidden() {
@@ -1315,7 +1326,7 @@
 
 {#if offer}
   <Recovery draft={offer.draft} savedUtc={offer.savedUtc} moved={offer.moved}
-    onrestore={restoreKept} ondiscard={discardKept} />
+    onrestore={restoreKept} ondiscard={discardKept} onlater={setAsideKept} />
 {/if}
 
 <!-- The top bar (WP-2123).  Each side's collapse button sits at its own end

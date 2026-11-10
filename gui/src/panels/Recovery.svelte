@@ -7,8 +7,10 @@
    * 11's asking-to-choose (`gui/STYLE.md`), so the dialog names what was kept
    * and offers both outcomes, and confirms nothing.  It is modal, because an
    * edit made before the answer would have to overwrite the kept copy or be
-   * lost.  Escape answers neither and is held here, with every other key, so
-   * no shortcut acts behind the question (the shell's Escape cancels a fit).
+   * lost.  Escape answers neither: it closes the dialog and keeps the copy,
+   * which is offered again when the project next opens (the maintainer's
+   * ruling of 2026-11-10).  Every key is held here, so no shortcut acts
+   * behind the question (the shell's Escape cancels a fit).
    */
   import { offerText, type Draft } from "../lib/recovery";
 
@@ -18,6 +20,7 @@
     moved = false,
     onrestore = () => {},
     ondiscard = () => {},
+    onlater = () => {},
   }: {
     draft: Draft;
     /** when the copy was last written, ISO 8601 */
@@ -26,18 +29,25 @@
     moved?: boolean;
     onrestore?: () => void;
     ondiscard?: () => void;
+    /** Escape: neither restored nor discarded, offered at the next open */
+    onlater?: () => void;
   } = $props();
 
   let dialog = $state<HTMLElement | null>(null);
 
   /** No shortcut acts behind the question: every key stops here, in the
    *  capture phase, while its default (Enter or Space on a button) still
-   *  happens.  Escape does nothing at all.  Tab moves between the two
-   *  buttons and never out of the dialog: stopping a key's listeners does not
-   *  stop its default, so focus that left could type an edit behind the
-   *  question, which nothing would keep. */
+   *  happens.  Escape closes the dialog and keeps the copy.  Tab moves
+   *  between the two buttons and never out of the dialog: stopping a key's
+   *  listeners does not stop its default, so focus that left could type an
+   *  edit behind the question, which nothing would keep. */
   function keydown(event: KeyboardEvent) {
-    if (event.key === "Escape") event.preventDefault();
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      onlater();
+      return;
+    }
     if (event.key === "Tab" && dialog) {
       event.preventDefault();
       const buttons = [...dialog.querySelectorAll<HTMLButtonElement>("button")];

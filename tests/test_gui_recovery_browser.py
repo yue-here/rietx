@@ -8,8 +8,10 @@ backups. Reopening offers the edits, and the person restores or discards them.
 Each test types a value into the Parameters panel the way a person does, then
 loses the page: a tab closed, or a new server process over the same state
 directory standing in for a crash. The next page must offer the edit, and
-Restore must put it back as pending while Discard deletes the copy. Every
-click is a mouse click and every key a keyboard press (gui-checks-use-real-clicks).
+Restore must put it back as pending while Discard deletes the copy. Escape
+closes the offer and keeps the copy, which the next open offers again (the
+maintainer's ruling of 2026-11-10). Every click is a mouse click and every key
+a keyboard press (gui-checks-use-real-clicks).
 
 Driven through playwright, which is not a dependency, so the module skips where
 the package or a cached chromium is missing. That includes CI.
@@ -127,9 +129,6 @@ def test_an_edit_survives_a_restarted_server_and_restores(served, browser):
     dialog.wait_for()
     assert dialog.locator("h2").inner_text() == "Unapplied edits"
     assert "1 edit from" in dialog.inner_text()
-    # Escape answers neither
-    page.keyboard.press("Escape")
-    assert dialog.count() == 1
     dialog.get_by_role("button", name="Restore", exact=True).click()
     dialog.wait_for(state="detached")
     assert page.locator(".actions .pending").inner_text() == "1 pending edit"
@@ -160,5 +159,37 @@ def test_a_closed_tab_keeps_an_edit_and_discard_deletes_it(served, browser):
     dialog.wait_for(state="detached")
     assert _until(lambda: _kept(state, project) is None)
     assert page.locator(".actions .pending").inner_text() == ""
+    assert page.errors == []
+    page.close()
+
+
+def test_escape_keeps_the_copy_and_the_next_open_offers_it(served, browser):
+    serve, state, project = served
+    url = serve()
+    page = _page(browser, url)
+    _type_value(page, "5.7")
+    assert _until(lambda: _kept(state, project) is not None)
+    page.close()
+
+    page = _page(browser, url)
+    dialog = page.locator(".rc-dialog")
+    dialog.wait_for()
+    page.keyboard.press("Escape")
+    dialog.wait_for(state="detached")
+    # neither restored nor discarded
+    assert page.locator(".actions .pending").inner_text() == ""
+    time.sleep(1.0)  # past the writer's half second
+    assert _kept(state, project)["params"]["edits"] == {PATH: "5.7"}
+
+    # close the project from the File menu, and open it again from the list
+    page.locator("header .fm-name").click()
+    page.locator(".fm-menu button.item").filter(
+        has=page.locator(".label").get_by_text("Close project", exact=True)).click()
+    row = page.locator(".start li").filter(
+        has=page.locator(".name").get_by_text("sample", exact=True))
+    row.locator("button.row").click()
+    dialog.wait_for()
+    assert dialog.locator("h2").inner_text() == "Unapplied edits"
+    assert _kept(state, project)["params"]["edits"] == {PATH: "5.7"}
     assert page.errors == []
     page.close()
