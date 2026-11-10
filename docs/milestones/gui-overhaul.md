@@ -54,7 +54,7 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 | Status bar | The bar along the window's foot, with the console toggle | 2026-11-07 |
 | Fixing plan stages | A plan stage that fixes as well as frees (WP-2127 records the ruling) | 2026-11-09 |
 | Edit recovery | Unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 |
-| Fit statistics in the action bar | Rwp and GoF beside Refine while the graphs are hidden ("try B") | 2026-11-09 |
+| Fit statistics in the action bar | Rwp, GoF and the not-a-fit chip beside Refine while the graphs are hidden ("try B"). WP-2123 left them hidden with the graphs (its item 6) | 2026-11-09 |
 
 Three decisions went to the maintainer before the piece that needs them. The first is now ruled, and two still wait:
 
