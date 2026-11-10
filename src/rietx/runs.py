@@ -1528,7 +1528,7 @@ class RunRecorder(EventStream):
                 self._status["stage"] = data["stage"]
             if data.get("rwp") is not None:
                 self._status["rwp"] = float(data["rwp"])
-        elif kind in ("fit_end", "index_end"):
+        elif kind in ("fit_end", "index_end", "solve_end"):
             for key in ("rwp", "gof"):
                 if data.get(key) is not None:
                     self._status[key] = float(data[key])

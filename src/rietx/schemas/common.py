@@ -703,6 +703,10 @@ from .._nearmiss import did_you_mean
 #: Additive and defaulted to ``None``, a linear tie, the 0.25 → 0.26 rule; so
 #: every stored tie opens as the linear tie it was.  An older build refuses a
 #: document carrying the key.
+#: Also in 0.61 (#562 S2b, WP-1997): ``Capabilities.solve_engines``, the
+#: structure-solution engines the build registers.  Additive and defaulted to
+#: an empty list, the same rule.  The solver stays unexported, so
+#: ``SolutionResult``'s own schema move waits until it is exported.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
