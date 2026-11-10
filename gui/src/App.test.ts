@@ -2400,7 +2400,8 @@ describe("the text pane", () => {
     button("Apply ⌘⏎")!.click();
     await flush();
 
-    const applied = stub.calls.filter((c) => c.method === "PUT" && !c.body.validate_only);
+    const applied = stub.calls.filter(
+      (c) => c.method === "PUT" && c.path === "/api/textdoc" && !c.body.validate_only);
     expect(applied).toHaveLength(1);
     expect(applied[0].body.base_revision).toBe("r1");
     // the same verbs a form calls, so the console reads the same either way
@@ -5612,7 +5613,7 @@ describe("the series panel", () => {
     expect(icons("↑")[0].disabled).toBe(true);
     icons("↑")[0].click();
     await flush();
-    expect(stub.calls.some((c) => c.method === "PUT")).toBe(false);
+    expect(stub.calls.some((c) => c.method === "PUT" && c.path === "/api/series")).toBe(false);
   });
 
   it("puts the forward/backward gap where it cannot be missed", async () => {
@@ -5803,7 +5804,7 @@ describe("the series panel", () => {
     carry.value = "phases.* instrument.zero_shift";
     carry.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
-    const put = stub.calls.filter((c) => c.method === "PUT").at(-1);
+    const put = stub.calls.filter((c) => c.method === "PUT" && c.path === "/api/series").at(-1);
     expect(put?.body.carry).toEqual(["phases.*", "instrument.zero_shift"]);
   });
 });
