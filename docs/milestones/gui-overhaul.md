@@ -44,7 +44,7 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 
 | Piece | What it builds | Ruled |
 |---|---|---|
-| The palette | The site's palette as the default theme: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Theme machinery in Settings for established themes (Solarized light and dark, Monokai and others) | 2026-11-06, 2026-11-09 |
+| The palette | The site's palette as the default theme: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Theme machinery in Settings for established themes (Solarized light and dark, Monokai and others). `gui/STYLE.md`'s rules that describe a new role in words take its tokens once they exist (WP-2142) | 2026-11-06, 2026-11-09 |
 | Sentence-case headings | One `app.css` rule at the start screen's register, app-wide | 2026-11-09 |
 | Peaks and indexing | The redesign in four steps (pick peaks, fit peaks, index, judge), the eight-column candidate table, lens peak marks, per-line curves in the fit windows | 2026-11-08, 2026-11-09 |
 | Structure tab | The 3D structure as one of the graph tabs | 2026-11-07 |
@@ -122,6 +122,10 @@ the piece that touches it or a WP of its own.
 - New project cannot add a phase from a TOPAS, FullProf or GSAS-II project file, which the
   round-9 design offers. A browser upload carries one file, and such a project names a data
   file beside it (WP-2131's settled call 2).
+- `gui/CLAUDE.md` still holds 36 visual rules that belong in `gui/STYLE.md`. WP-2134's § What
+  `gui/STYLE.md` covers of these sorts them: drop the covered ones from the rulebook, merge the
+  partly covered ones into the guide, and bring the departures and the uncovered ones to the
+  maintainer, since visual questions go to him (WP-2134's and WP-2142's next step).
 
 ## Acceptance
 

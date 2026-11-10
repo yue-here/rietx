@@ -57,7 +57,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | 2026-11-09 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2133](2133-the-file-menu.md) | The File menu on the project name | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2134](2134-the-gui-rulebook-condensed.md) | The GUI rulebook keeps rules, and its evidence moves out | 2026-11-10 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
-| [2142](2142-the-gui-style-guide.md) | The GUI style guide | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -509,7 +508,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row | ✅ 2026-11-09 | — | [2123](2123-the-layout-shell.md), [2124](2124-the-gui-port-server-defects.md) |
 | [2131](2131-the-start-screen-and-new-project.md) | The start screen and the New project dialog | ✅ 2026-11-10 | — | [2123](2123-the-layout-shell.md) |
 | [2133](2133-the-file-menu.md) | The File menu on the project name | 🔄 2026-11-09 | P2 | [2131](2131-the-start-screen-and-new-project.md) |
-| [2142](2142-the-gui-style-guide.md) | The GUI style guide | 🔄 2026-11-09 | P2 | — |
+| [2142](2142-the-gui-style-guide.md) | The GUI style guide | ✅ 2026-11-10 | — | — |
 
 ## <a id="unscheduled"></a>Unscheduled
 
