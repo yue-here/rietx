@@ -134,6 +134,13 @@ SHOTS: tuple[Shot, ...] = (
         selector=".plotcol",
     ),
     Shot(
+        "background-tab",
+        "The Background graph tab: the data greyed, the background curve, the "
+        "band it may move in, and the per-term holds under it.",
+        selector=".plotcol",
+        tab="Background",
+    ),
+    Shot(
         "parameters",
         "The Parameters panel: a band per phase with its space group, the "
         "cell's held edges folded into one line, and one row per atom.",
