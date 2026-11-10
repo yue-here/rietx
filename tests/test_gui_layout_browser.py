@@ -34,7 +34,8 @@ LANDMARKS = [
     "#app > header", "#app > header > button.toggle", "#app > header > .bar",
     "#app > header .controls > *",
     ".plotcol", ".plotcol > nav.tabs", ".gtitle", ".side", ".side > nav.tabs",
-    ".actions", ".actions .segmented", ".actions .go > *", ".console",
+    ".actions", ".actions .segmented", ".actions .go > *", ".actions .fit",
+    ".actions .fit .stat", ".actions .fit .fact", ".console",
 ]
 
 #: Every landmark's box, keyed by its selector and its place among the matches.
@@ -61,7 +62,7 @@ CONTROLS = """() => [...document.querySelectorAll(
 WIDTHS = {"wide": 1300, "stacked": 700}
 
 
-def _serve(tmp_path_factory, name: str):
+def _serve(tmp_path_factory, name: str, fitted: bool = True):
     from tests.test_project import _write_xye
     from tests.test_refine_synthetic import synthesize
 
@@ -70,10 +71,11 @@ def _serve(tmp_path_factory, name: str):
     session = GuiSession(project, state_dir=tmp_path_factory.mktemp(f"{name}-state"))
     httpd = _start(session)
     client = Client(httpd.server_address[1])
-    status, run = client.post("/api/run", {"kind": "stage", "stage": {
-        "name": "scale", "turn_on": ["phases.*.scale"], "max_iter": 5}})
-    assert status == 200, run
-    _wait_idle(client)
+    if fitted:
+        status, run = client.post("/api/run", {"kind": "stage", "stage": {
+            "name": "scale", "turn_on": ["phases.*.scale"], "max_iter": 5}})
+        assert status == 200, run
+        _wait_idle(client)
     return httpd, client
 
 
@@ -96,6 +98,24 @@ def browser():
             pytest.skip(f"no chromium to drive: {exc}")
         yield handle
         handle.close()
+
+
+def _hide_graphs(page) -> None:
+    """The graphs' collapse button, pressed as a person presses it."""
+    page.locator("#app > header > button.toggle").first.click()
+    page.wait_for_selector(".side .actions .fit")
+    _frames(page)
+
+
+def _open_state(browser, url: str, state: str):
+    """A fresh page in one of the sweep's starting states: a width from
+    ``WIDTHS``, or ``graphs-hidden``, the wide window with the graphs collapsed,
+    where the action bar carries the fit's statistics (WP-2210)."""
+    if state == "graphs-hidden":
+        page = _open(browser, url, WIDTHS["wide"])
+        _hide_graphs(page)
+        return page
+    return _open(browser, url, WIDTHS[state])
 
 
 def _open(browser, url: str, width: int):
@@ -141,17 +161,17 @@ def _press(page, label: str) -> None:
     raise AssertionError(f"no enabled control named {label!r}")
 
 
-@pytest.mark.parametrize("state", list(WIDTHS))
+@pytest.mark.parametrize("state", [*WIDTHS, "graphs-hidden"])
 def test_no_shell_control_moves_the_layout(browser, gui, state):
     url, _ = gui
-    page = _open(browser, url, WIDTHS[state])
+    page = _open_state(browser, url, state)
     labels = page.evaluate(CONTROLS)
     page.close()
     assert len(labels) > 15, labels
 
     failures = []
     for label in labels:
-        page = _open(browser, url, WIDTHS[state])
+        page = _open_state(browser, url, state)
         before = page.evaluate(SNAP, LANDMARKS)
         _press(page, label)
         _frames(page)
@@ -395,6 +415,85 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
     finally:
         httpd.shutdown()
     assert not moved, moved
+
+
+#: Each statistic slot in the action bar against the ink of the widest value it
+#: can hold, in the slot's own font (WP-2210): "9999.999%" for Rwp and
+#: "9999.999" for GoF, the widest plain numbers `gui/STYLE.md` allows. An
+#: unfitted model passes 1000 % (1067 % measured here), hence Rwp's four digits.
+FIT_ROOM = """() => {
+  const ctx = document.createElement("canvas").getContext("2d");
+  return [...document.querySelectorAll(".actions .fit .num")].map((slot, i) => {
+    ctx.font = getComputedStyle(slot).font;
+    return {room: slot.clientWidth, longest: ctx.measureText(i ? "9999.999" : "9999.999%").width};
+  });
+}"""
+
+
+def test_the_fit_statistics_ride_beside_refine_while_the_graphs_are_hidden(browser, gui):
+    """WP-2210, the maintainer's "try B" of 2026-11-09. With the graphs hidden
+    the statistics sit right of Refine on the bar's row, every number slot holds
+    its widest value, and showing the graphs takes them back to the title line."""
+    url, _ = gui
+    page = _open(browser, url, WIDTHS["wide"])
+    assert page.locator(".actions .fit").count() == 0
+    _hide_graphs(page)
+    refine = page.locator(".actions button.refine").bounding_box()
+    fit = page.locator(".actions .fit").bounding_box()
+    rooms = page.evaluate(FIT_ROOM)
+    text = " ".join(page.locator(".actions .fit").inner_text().split())
+    page.locator("#app > header > button.toggle").first.click()
+    _frames(page)
+    gone = page.locator(".actions .fit").count()
+    assert not page.errors, page.errors
+    page.close()
+    assert text.startswith("Rwp ") and "GoF " in text, text
+    # one row at this width, the statistics to Refine's right
+    assert abs((fit["y"] + fit["height"] / 2) - (refine["y"] + refine["height"] / 2)) < 2
+    assert 0 <= fit["x"] - (refine["x"] + refine["width"]) < 24, (fit, refine)
+    assert len(rooms) == 2 and all(r["room"] >= r["longest"] for r in rooms), rooms
+    assert gone == 0
+
+
+#: The landmarks below the header. The header's run pill reads `idle` before a
+#: project's first run and its status after, and the controls right of it are
+#: held right, so that first run moves them left (35 px measured, WP-2210). The
+#: pill is the header's, which no piece has redrawn yet, so this test keeps to
+#: what WP-2210 changed and the WP's handover carries the finding.
+BAR_LANDMARKS = [sel for sel in LANDMARKS if not sel.startswith("#app > header")]
+
+
+def test_a_refine_with_the_graphs_hidden_moves_nothing(browser, tmp_path_factory):
+    """A project never fitted, the graphs hidden: the bar shows dashes, and a
+    refine fills them, and perhaps the judgement, without moving anything. A
+    fit finishing does not ask for a layout change (gui/STYLE.md principle 4)."""
+    httpd, client = _serve(tmp_path_factory, "layout-fit-stats", fitted=False)
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        page = _open(browser, url, WIDTHS["wide"])
+        _hide_graphs(page)
+        dashes = " ".join(page.locator(".actions .fit").inner_text().split())
+        page.locator(".actions button", has_text="One cycle").click()
+        _frames(page)
+        before = page.evaluate(SNAP, BAR_LANDMARKS)
+        page.locator(".actions button.refine").click()
+        page.wait_for_function(
+            "document.querySelector('.console')?.textContent"
+            ".includes('ref.run_stage(Stage(\"cycle\"')")
+        _wait_idle(client)
+        page.wait_for_selector('.pill[data-state="idle"]')
+        page.wait_for_function(
+            "!document.querySelector('.actions .fit').textContent.includes('—')")
+        _frames(page)
+        filled = " ".join(page.locator(".actions .fit").inner_text().split())
+        moved = _moved(before, page.evaluate(SNAP, BAR_LANDMARKS))
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert dashes == "Rwp — GoF —", dashes
+    assert filled.startswith("Rwp ") and "—" not in filled, filled
+    assert not moved, filled + "\n" + "\n".join(moved)
 
 
 #: The Background tab's own controls, beside the shell's landmarks (WP-2129).

@@ -975,21 +975,25 @@ describe("the shell", () => {
     app = mount(App, { target: host });
     await flush();
 
-    expect(host.querySelector(".stats")?.classList.contains("immature")).toBe(true);
-    // A chip, not a button (WP-1201): a chip is a fact and never acts, so the
-    // judgement travels as a `bad` tone and the maturity message, and the panel
-    // that explains it is reached from the tab strip like every other panel.
+    // A fact, not a button (WP-1201): a fact never acts, so the judgement
+    // travels as the `bad` tone and the maturity message, and the panel that
+    // explains it is reached from the tab strip like every other panel.
     // WP-1029 had made this badge a route to the Report tab; the register
     // vocabulary trades that shortcut for "a thing that acts looks like one".
-    const flag = [...host.querySelectorAll<HTMLElement>(".stats .chip")]
-      .find((c) => c.textContent?.trim() === "⚠ not a fit yet")!;
+    // Since WP-2210 it is words with no border and no glyph (gui/STYLE.md
+    // § Components, "Fact"), and the number beside it keeps its plain colour
+    // (§ Colour: no number is judged by colour).
+    const flag = [...host.querySelectorAll<HTMLElement>(".stats .fact")]
+      .find((c) => c.textContent?.trim() === "not a fit yet")!;
     expect(flag).toBeTruthy();
     expect(flag.tagName).toBe("SPAN");
     expect(flag.classList.contains("bad")).toBe(true);
-    // …and the message is reachable (WP-1203).  It was this chip's `title=`,
+    expect(host.querySelector(".stats .chip")).toBeNull();
+    expect(host.querySelector(".stats strong")?.classList.contains("bad")).toBe(false);
+    // …and the message is reachable (WP-1203).  It was the chip's `title=`,
     // which is exactly what a chip cannot carry: WP-1201 moved the badge off a
     // `<button>` and took the sentence out of reach of the keyboard with it.
-    // The term inside the chip is focusable and answers Enter.
+    // The term inside the words is focusable and answers Enter.
     const term = flag.querySelector<HTMLElement>(".help")!;
     expect(term.getAttribute("tabindex")).toBe("0");
     expect(flag.title).toBe("");
@@ -999,6 +1003,63 @@ describe("the shell", () => {
       .toContain("same specimen");
     // the calm pill is still there and still says `converged` — untouched
     expect(host.querySelector(".pill")?.textContent?.trim()).toBe("idle");
+  });
+
+  it("carries the fit's statistics beside Refine only while the graphs are hidden", async () => {
+    // WP-2210, the maintainer's "try B" of 2026-11-09: one home per layout.
+    // The title line holds them while the graphs show; the action bar while
+    // they are hidden, so a person who hid them to read the atom table still
+    // sees what Refine did.
+    const hopeless = {
+      ...RESULT,
+      statistics: { rwp: 0.963, gof: 18.4 },
+      maturity: { immature: true, max_rwp: 0.35, message: "Rwp 96.3% is past the point" },
+    };
+    vi.stubGlobal("fetch", server({
+      ...boot(),
+      "/api/result": () => ({ body: { result: hopeless } }),
+      "/api/result/curves": fitCurves(),
+    }).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const text = (sel: string) =>
+      host.querySelector(sel)?.textContent?.replace(/\s+/g, " ").trim() ?? null;
+    expect(text(".gtitle .stats")).toBe("Rwp 96.300% GoF 18.400 not a fit yet");
+    expect(host.querySelector(".actions .fit")).toBeNull();
+
+    const graphs = host.querySelector<HTMLButtonElement>("header > button.toggle")!;
+    graphs.click();
+    await flush();
+    expect(text(".actions .fit")).toBe("Rwp 96.300% GoF 18.400 not a fit yet");
+    // beside Refine: the group right after the one Refine ends
+    const go = host.querySelector(".actions .go")!;
+    expect(go.nextElementSibling).toBe(host.querySelector(".actions .fit"));
+    expect(go.lastElementChild?.classList.contains("refine")).toBe(true);
+    // the judgement's message is reachable from the bar too
+    expect(host.querySelector(".actions .fit .fact.bad .help")?.getAttribute("tabindex")).toBe("0");
+
+    graphs.click();
+    await flush();
+    expect(host.querySelector(".actions .fit")).toBeNull();
+  });
+
+  it("keeps the bar's statistic slots filled before a fit and while it is mature", async () => {
+    // A fit finishing does not ask for a layout change, so every slot in the
+    // bar holds its room from the moment the graphs hide (gui/STYLE.md
+    // principle 4): a dash for a number not yet measured, and the judgement's
+    // words kept invisibly while the fit is mature.
+    vi.stubGlobal("fetch", server(boot()).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    host.querySelector<HTMLButtonElement>("header > button.toggle")!.click();
+    await flush();
+    const fit = host.querySelector<HTMLElement>(".actions .fit")!;
+    expect(fit.textContent?.replace(/\s+/g, " ").trim()).toBe("Rwp — GoF — not a fit yet");
+    const kept = fit.querySelector<HTMLElement>(".fact")!;
+    expect(kept.classList.contains("reserved")).toBe(true);
+    expect(kept.getAttribute("aria-hidden")).toBe("true");
+    expect(kept.querySelector(".help")).toBeNull();
   });
 
   it("surfaces an open refusal verbatim rather than 'could not open'", async () => {

@@ -88,7 +88,7 @@ nothing reads the data or decides for a fit. The judgement shown is the report's
   title line uses it while the graphs show.
 - [x] The action bar carries it beside Refine while the graphs are hidden, in a slot
   reserved at its widest content, so a fit finishing moves nothing.
-- [ ] Vitest: the bar shows the statistics only while the graphs are hidden, and the
+- [x] Vitest: the bar shows the statistics only while the graphs are hidden, and the
   judgement is words, not a chip. Browser: the slot holds its longest content, a refine with
   the graphs hidden moves nothing, and the shell sweep runs with the graphs hidden too.
 - [ ] The GUI chapters say where the statistics are in each layout; the dist rebuilt;
