@@ -4550,7 +4550,10 @@ ROWS: tuple[Row, ...] = (
                   "(t = -268); recorded in RefinementResult.stages as the stage named "
                   "'closing'; solve_magnetic runs it on its winner too, when the package "
                   "chose the plan and the verdict is solved, after ranking every trial "
-                  "without it (2026-10-22)"),
+                  "without it (2026-10-22); since WP-2208 it is free but for the paths the "
+                  "declared stages leave fixed (a turn_off whose glob matched last, "
+                  "staged.fixed_at_end), which it keeps fixed and records in its "
+                  "StageResult.fixed"),
         grounds=("The maintainer's ruling (the sixth round's Q2, option 3, 2026-10-21): every "
                  "plan ends with a closing stage at tight windows, which removes the 2 % "
                  "window's error from the answer and most of a staged plan's start dependence; "

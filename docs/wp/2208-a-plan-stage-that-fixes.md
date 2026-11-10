@@ -182,16 +182,61 @@ stage included.
      popover with a Free/Fix toggle, which this panel has no equivalent of. An always-drawn row
      was built first and dropped: it added a line to every stage and pushed the closing row out
      of the plan-ladder screenshot.
+  5. The report's veto (`apply_strategy_veto`) no longer marks a suggestion on a path the plan
+     leaves fixed as "already refined by the staged plan", so a suggestion to refine a profile
+     the caller fixed stays active. A `hold` still vetoes it. Alternative: a deliberate fix
+     silences suggestions on its paths, as a hold does, with its own reason.
 
-  *Measured* (darwin/arm64, worktree venv `[dev]` + playwright): see the PR body for the gate
-  counts. `tests.reader_output` exit 0, unchanged; `StageResult.fixed` is the one new reader
-  field, an empty list unless a stage fixes.
+  *Review.* `/code-review high --fix` found ten; eight fixed in one commit: `StageResult.fixed`
+  names only free paths a fix took (it had listed rows already fixed or held); the plan checks
+  (`_stage_order_diagnostics`, `_held_moment_diagnostics`) and the report veto read `turn_off`;
+  the magnetic nuclear reference keeps the caller's `turn_off`; `STAGE_PATH_UNKNOWN` says
+  "nothing was fixed" for a mistyped fix; the GUI's closing count takes only free literals; the
+  `.rxt` `fix` clause parses anywhere among the stage keys; the skill copies re-synced. Not
+  fixed: the series collapse (decision 2), and the `.rxt` error for a malformed clause still
+  lists only the numeric keys.
+
+  *Measured* (darwin/arm64, worktree venv `[dev]` plus playwright, one run each, on 64416ece2):
+  fast suite 14634 passed, 410 skipped, 32 xfailed, 0 failed, 11:55 through `serial.py` (with
+  playwright installed the browser files run inside it too); all eight `tests/*_browser.py`
+  files 153 passed, 0 skipped; vitest 720 passed (32 files, +3); svelte-check 0 errors, 0
+  warnings; ruff clean. 15 tests added, 4.81 s in all on this machine, the slowest
+  `test_a_pawley_profile_stays_fixed_through_a_rietveld_plan` at 1.79 s, so none joins the
+  slow tail. `tests.reader_output` exit 0, unchanged; `StageResult.fixed` is the one new reader
+  field, an empty list unless a stage fixes. The full suite did not run: the change moves no
+  measured number of a plan without `turn_off`, which every golden and acceptance protocol is.
 
   *Gotchas.* `StageSpec` gaining a field changes the typo hint ("did you mean 'turn_on'" now lists
   `turn_off` too). `reference/refinement.md` sits at the 50 000-character page cap, so the prose
   went to `guides/plan.md`.
 
-  Next: the maintainer rules on decisions 1-4 and merges #1520; the series WPs revisit decision 2.
+  *Generality* (the `generality-review` agent, 2026-11-10, sections as returned):
+
+  - `StageSpec:turn_off` default — **holds.** The empty list reproduces every earlier fit; no
+    preset sets `turn_off`; tier 1 like `StageSpec:turn_on`. Would change: a preset or GUI default
+    shipping a non-empty `turn_off`.
+  - `StageResult.fixed` in `OTHER_RECORD_FIELDS` — **weak.** On a declared stage it reports the
+    caller's own fix, as `freed` does; on the closing stage it records the package's replay
+    (`fixed_at_end`), an action with no row. Would change: an action row for it, or the
+    `PlanSpec:closing_window_tol` row's evidence extended to say the closing stage keeps the
+    end-state fixes (that row also still said "all free"). *Author:* done the second way: the
+    `closing_window_tol` row's evidence now says the closing stage keeps the paths the declared
+    stages leave fixed and records them in `StageResult.fixed`.
+  - 3a, a series refits a fixing plan stage by stage — **holds.** The collapse as written frees
+    what the caller fixed. Unweighed: a per-member collapse built with `closing_stage(member
+    paths)`, FullProf `CYC`'s shape; the iteration cost on a fixing plan is unmeasured (1.8-1.9×
+    per warm pattern on round-robin sample 1, a plan with no fix). *Author:* left as decision 2
+    for the maintainer; the series WPs own the cheaper route.
+  - 3b, the closing stage keeps the end-state fixes — **holds.** BGMN's and RIETAN-FP's
+    all-free closing runs have no in-step fix verb, so the dissent is weak; every solve passes
+    the table's paths, and the no-paths union reaches only names and counts.
+  - 3c, `apply_strategy_veto` reads the last matching glob — **holds.** A fixed path is not
+    refined, so "already refined by the staged plan" was false for it. Weak side: a `hold` still
+    vetoes (predates this WP), so the two ways to fix a parameter get opposite verdicts; a
+    literal fix of `instrument.profile.w` lifts the veto on an action over `instrument.profile.*`.
+    *Author:* recorded for the maintainer as decision 5; not changed here.
+
+  Next: the maintainer rules on decisions 1-5 and merges #1520; the series WPs revisit decision 2.
 
 - **2026-11-10** — filed by a ghostshift runner as piece 3's follow-up in the gui-overhaul
   milestone, numbered 2208 in the milestone's 22xx block by the shift lead. No open WP owns the
