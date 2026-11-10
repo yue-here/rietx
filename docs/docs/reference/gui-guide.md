@@ -37,6 +37,7 @@ below, and the sash then drags up and down.
 
 | Control | Does |
 |---|---|
+| the workflow's name | opens the workflow menu, below; disabled when no project is open |
 | the project's name | opens the File menu, below; `No project` when none is open |
 | the project line | the data file, the point count, the intensity mode, and whether σ came from the file or from counting statistics |
 | the two collapse buttons | hide the graphs (left end) or the panel column (right end) |
@@ -48,6 +49,24 @@ below, and the sash then drags up and down.
 
 `Rwp` and `GoF` are on the title line over the pattern. `⚠ not a fit yet`
 appears beside them past an Rwp of {{ MATURITY_MAX_RWP }}.
+
+### The workflow menu
+
+The first word after the left collapse button names the workflow the window is
+in. Click it to choose another. A workflow keeps the window as it is and changes
+what the panel column shows.
+
+| Item | Does |
+|---|---|
+| `Refinement` | the panel tabs, back on the last one you used among them |
+| `Peaks and indexing` | the Peaks tab |
+| `Series` | the Series tab |
+| `Structure solution · placeholder` | not built yet: the panel shows the workflow's four steps and what each will hold |
+| `Rigid bodies · placeholder` | not built yet: the panel shows the workflow's three steps and what each will hold |
+
+While a placeholder is up, the panel has one tab, named after it, and no action
+bar. Choose `Refinement` to return. Clicking a panel tab, or a palette command
+that opens one, picks the workflow that tab belongs to.
 
 ### The File menu
 

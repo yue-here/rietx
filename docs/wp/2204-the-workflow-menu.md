@@ -114,7 +114,7 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
   each step's heading and dashed box; the action bar hidden.
 - [ ] Tests: vitest for the derivation and the menu; the layout browser test opens the menu,
   chooses every entry and comes back; the dist rebuilt.
-- [ ] The GUI chapter: the header table and a Workflow menu section.
+- [x] The GUI chapter: the header table and a Workflow menu section.
 - [ ] Screenshot beside the prototype's at the same window size, for the PR.
 
 ## Acceptance
