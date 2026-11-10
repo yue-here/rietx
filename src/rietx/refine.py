@@ -467,6 +467,9 @@ class _StageHold:
     #: for ``blocked_by_hold``'s reason: decided before the solve, unchanged
     #: by it, and delivered to the two ``StageResult`` call sites this way
     unknown_paths: list[str] = dataclasses.field(default_factory=list)
+    #: ``StageResult.fixed`` (WP-2208), riding here for the same reason: the
+    #: paths the stage's ``turn_off`` fixed, decided before the solve
+    fixed: list[str] = dataclasses.field(default_factory=list)
     #: ``StageResult.seeded`` (WP-1930), riding here for the same reason:
     #: decided before the solve, and unrecoverable after it, when the seeded
     #: row has moved.  ``Stage.seed``'s rows and ``Stage.strain_seed``'s.
@@ -4884,6 +4887,7 @@ class Refinement:
         # carries the frozen 100 and 3 for a node written before the fields
         stage = Stage(node.action.name or "cherry-pick",
                       list(node.action.turn_on),
+                      turn_off=list(node.action.turn_off),
                       max_iter=node.action.max_iter,
                       lebail_cycles=node.action.lebail_cycles,
                       lebail_tol=node.action.lebail_tol,
@@ -5031,10 +5035,13 @@ class Refinement:
         # that are held *on this model* and cannot disagree with what
         # ``set_vary`` just did.  A stage that frees nothing held records an
         # empty list, which is every stage of every fit that declares no hold.
+        # A path the same stage fixes is left out (WP-2208): the stage did not
+        # want it free, so the hold refused nothing it asked for.
         blocked_by_hold = sorted(
             e.path for e in table.entries
             if e.held and e.tie is None and not e.locked
-            and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on))
+            and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
+            and not any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_off))
         # What the stage asked for by name and the model does not have
         # (WP-1414).  A literal, or a pattern under a retired spelling: any
         # other pattern matching nothing is how the shipped plans reach
@@ -5043,7 +5050,9 @@ class Refinement:
         # and a retired name is a rename the plan missed.  Recorded, never
         # raised — one plan runs a whole series, and a path one pattern's
         # model lacks must not end the chain.
-        unknown_paths = table.unknown_paths(stage.turn_on)
+        # A fix's literal is read the same way (WP-2208): a mistyped path in
+        # either list is the same mistake.
+        unknown_paths = table.unknown_paths([*stage.turn_on, *stage.turn_off])
         # what the previous stage's answer held, which the support hold reads
         # as tried and flat (WP-2049, ``_unsupported_phase_paths``)
         tried = list(self._held)
@@ -5053,6 +5062,13 @@ class Refinement:
             # need not name its cell again for it to keep refining
             table.set_vary(self._held, True)
             self._held = []
+        # The stage's fixes, after its frees and after the lift above, so a
+        # lifted support hold cannot free again what the stage fixes (WP-2208).
+        # ``freed`` then describes the set this stage leaves free.
+        fixed = table.set_vary(stage.turn_off, False) if stage.turn_off else []
+        if fixed:
+            gone = set(fixed)
+            freed = [p for p in freed if p not in gone]
         if mode in ("lebail", "pawley"):
             # never refine what ``mode_fixed_path`` force-fixes against the
             # intensity model (structure, the phase scale, texture, a magnetic
@@ -5601,7 +5617,7 @@ class Refinement:
             scale_b_held=dict(scale_b_held),
             width_twins_held=width_twins_held,
             blocked_by_hold=blocked_by_hold, unknown_paths=unknown_paths,
-            seeded=seeded,
+            fixed=list(fixed), seeded=seeded,
             cell_runaway=list(cell_runaway),
             cell_reset=list(cell_reset), collapsed=list(collapsed),
             cell_runaway_unresolved=[(d, list(e)) for d, e in cell_runaway_unresolved],
@@ -6167,7 +6183,9 @@ class Refinement:
         model = outcome = guard = None
         # the declared stages and the closing one, with the schedule of each
         # (WP-2002, the sixth round's Q1 and Q2): the plan is the one authority
-        stages = plan.run_stages()
+        # the table's paths, which the closing stage of a plan that fixes
+        # replays its fixes over (WP-2208, ``staged.fixed_at_end``)
+        stages = plan.run_stages(paths=[e.path for e in table.entries])
         ftols = plan.stage_ftols()
         window_tols = plan.stage_window_tols()
         # a dataclass validates nothing, so the plan's threshold is checked
@@ -6274,7 +6292,7 @@ class Refinement:
                 moment_flat_axes=hold.moment_flat_axes,
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
-                unknown_paths=hold.unknown_paths,
+                unknown_paths=hold.unknown_paths, fixed=hold.fixed,
                 window_loss=hold.window_loss, rwp=hold.rwp,
                 lebail_cycles_run=hold.lebail_run,
                 lebail_settled=hold.lebail_settled,
@@ -6299,6 +6317,7 @@ class Refinement:
                 self._record_free_paths(table)
                 self._record(tree, NodeAction(
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
+                    turn_off=list(stage.turn_off),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
                     lebail_tol=stage.lebail_tol,
                     seed=stage.seed, strain_seed=stage.strain_seed,
@@ -6598,7 +6617,7 @@ class Refinement:
                 moment_flat_axes=hold.moment_flat_axes,
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
-                unknown_paths=hold.unknown_paths, unreached_histograms={},
+                unknown_paths=hold.unknown_paths, fixed=hold.fixed, unreached_histograms={},
                 window_loss=hold.window_loss, rwp=hold.rwp,
                 lebail_cycles_run=hold.lebail_run,
                 lebail_settled=hold.lebail_settled,
@@ -6630,6 +6649,7 @@ class Refinement:
             if tree is not None:
                 self._record(tree, NodeAction(
                     kind="stage", name=stage.name, turn_on=list(stage.turn_on),
+                    turn_off=list(stage.turn_off),
                     max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
                     lebail_tol=stage.lebail_tol,
                     seed=stage.seed, strain_seed=stage.strain_seed,

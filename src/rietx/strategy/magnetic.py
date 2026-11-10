@@ -1415,7 +1415,10 @@ def _close(trial: MagneticTrial, data, limits, mask) -> MagneticTrial:
     """
     plan = replace(trial._plan, closing_window_tol=CLOSING_WINDOW_TOL)
     ref = trial._refinement
-    result = ref.run_stage(data, plan.closing_stage(), two_theta_limits=limits,
+    # the model's paths, which a plan that fixes needs (WP-2208)
+    paths = ([r.path for r in ref.parameters()]
+             if any(s.turn_off for s in plan.stages) else None)
+    result = ref.run_stage(data, plan.closing_stage(paths), two_theta_limits=limits,
                            correlation_guard=plan.correlation_guard,
                            phase_support_sigma=plan.phase_support_sigma,
                            telemetry=False)

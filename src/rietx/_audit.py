@@ -511,6 +511,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.RefinementResult.y_obs",
     "rietx.schemas.results.StageResult.cost_final",
     "rietx.schemas.results.StageResult.cost_initial",
+    "rietx.schemas.results.StageResult.fixed",
     "rietx.schemas.results.StageResult.freed",
     "rietx.schemas.results.StageResult.held_reach",
     "rietx.schemas.results.StageResult.n_iterations",
@@ -4569,6 +4570,8 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.schemas.plan.StageSpec:turn_on", "default", tier=1, ambiguity=1, value=(),
         evidence="arithmetic: the empty container"),
+    Row("rietx.schemas.plan.StageSpec:turn_off", "default", tier=1, ambiguity=1, value=(),
+        evidence="arithmetic: the empty container; a stage fixes nothing unless it says so (WP-2208)"),
     Row("rietx.schemas.plan.StageSpec:max_iter", "default", tier="invariant", ambiguity=1, value=100,
         evidence=("answer-invariant: caps evaluations at max_iter x NFEV_PER_ITERATION, "
                   "never iterations; the worst stage under the shipped schedule ran 48 "

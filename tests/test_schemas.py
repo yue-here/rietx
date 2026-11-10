@@ -792,7 +792,8 @@ def test_a_wrong_stage_or_plan_field_gets_the_closest_match():
     with pytest.raises(AttributeError, match=r"its fields are .*'turn_on'.*"
                                                r"what a stage freed is StageResult\.freed"):
         stage.free
-    with pytest.raises(AttributeError, match=r"did you mean 'turn_on'"):
+    # ``turn_off`` (WP-2208) is as close, so both are offered, nearest first
+    with pytest.raises(AttributeError, match=r"did you mean 'turn_on"):
         stage.turnon  # a close typo, not the historical miss above
 
     plan = rx.RefinementPlan.mccusker_default()

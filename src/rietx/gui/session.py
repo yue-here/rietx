@@ -1226,7 +1226,7 @@ class GuiSession:
         stages, 4200 channels; WP-1208's handover has the matrix).  A node is
         matched to a ladder rung by **position and identity**: the last run of
         ``stage`` nodes on the head's lineage, aligned from its start, each
-        required to carry this stage's name *and* its ``turn_on``.  Anything
+        required to carry this stage's name *and* its ``turn_on`` and ``turn_off``.  Anything
         else — a plan edited since the run, a single stage run from a state no
         plan describes, a checkout — leaves ``rwp`` null rather than printing
         the wrong stage's number.  Between the head and that run,
@@ -1266,8 +1266,18 @@ class GuiSession:
                        if mode_fixed_column(reach.get(path, [path]), mode)]
             if dropped:
                 table.set_vary(dropped, False)
+            # the stage's fixes, after its frees, as ``_run_stage`` applies
+            # them (WP-2208); ``fixes`` names the free paths they took
+            pre_fix = set(table.free_paths)
+            fixed_here = (set(table.set_vary(list(stage.turn_off), False))
+                          if stage.turn_off else set())
             after = set(table.free_paths)
+            fixes = [path for path in rows
+                     if path in fixed_here and path in pre_fix]
 
+            # a path the stage frees and fixes is the stage's own fix, under
+            # ``fixes``, so the three buckets below still partition ``matched``
+            matched = [path for path in matched if path not in fixed_here]
             held, already, frees = [], [], []
             for path in matched:
                 if path not in after:
@@ -1281,7 +1291,9 @@ class GuiSession:
                     frees.append(path)
             stages.append({
                 "name": stage.name, "turn_on": globs,
+                "turn_off": list(stage.turn_off),
                 "frees": frees, "already": already, "held": held,
+                "fixes": fixes,
                 "n_matched": len(matched), "n_free": len(after),
             })
 
@@ -1327,7 +1339,11 @@ class GuiSession:
         the first run, and the honest one whenever the plan on screen is not
         the plan that ran.
         """
-        stages = plan.run_stages()
+        # the closing stage of a plan that fixes records its fixes as the
+        # model's paths (WP-2208), so the plan is read over them too
+        paths = ([row.path for row in p.parameters()]
+                 if any(s.turn_off for s in plan.stages) else None)
+        stages = plan.run_stages(paths=paths)
         blank: list[float | None] = [None] * len(stages)
         tree = p.refinement.history
         head = p.refinement._head_id
@@ -1362,7 +1378,8 @@ class GuiSession:
                 break
             node = run[k]
             if (node.action.name != stage.name
-                    or list(node.action.turn_on) != list(stage.turn_on)):
+                    or list(node.action.turn_on) != list(stage.turn_on)
+                    or list(node.action.turn_off) != list(stage.turn_off)):
                 break
             stats = node.metrics.statistics
             out[k] = None if stats is None else float(stats.rwp)

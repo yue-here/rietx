@@ -107,12 +107,13 @@ which is machinery choosing a route to the same answer, not a judgement about th
 ## Tasks
 
 - [x] File the WP; the practice survey in `docs/practice.md`.
-- [ ] Schema and runners: `StageSpec.turn_off` and `Stage.turn_off`; `fixed_at_end` and the
+- [x] Schema and runners: `StageSpec.turn_off` and `Stage.turn_off`; `fixed_at_end` and the
   closing stage; both runners, `run_stage`, `replay`; `StageResult.fixed`; the stage node's
   `turn_off`; `blocked_by_hold` and `unknown_paths`; the series collapse; tests, including the
   maintainer's case and a fix a later stage undoes.
-- [ ] `.rxt` `fix` clause; `/api/plan/resolve` `fixes`; the GUI's run-stage matching.
-- [ ] `help.py`, `capabilities()`, the audit table, the manual.
+- [x] `.rxt` `fix` clause; `/api/plan/resolve` `fixes`; the GUI's run-stage matching.
+- [x] `help.py`, the audit table, the manual; `capabilities()` needs nothing (it lists plans and
+  versions, not stage fields).
 - [ ] The Plan tab: fix chips and their add field, `lib/plan.ts`, `lib/rxt.ts`, vitest, the dist,
   the layout browser test.
 

@@ -4809,11 +4809,26 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
             "Wildcard patterns for the parameter paths that the stage frees when it "
             "starts. For example, `phases.*.cell.*` frees every lattice parameter of "
             "every phase. Staging is cumulative, so a parameter freed here keeps "
-            "refining in every later stage. Paths contain no square brackets, because "
+            "refining in every later stage unless a later stage's `turn_off` fixes it. Paths contain no square brackets, because "
             "the matching reads brackets as a character class."
         ),
         default="[]",
         typical="one or two patterns per stage",
+        anchor="theory/parameterisation.html#from-tree-to-vector",
+    ),
+    "turn_off": HelpEntry(
+        title="Parameters fixed this stage",
+        description=(
+            "Wildcard patterns for the parameter paths that the stage fixes after it "
+            "frees its `turn_on` patterns. For example, `instrument.profile.*` keeps "
+            "the profile a Pawley fit settled while the structure refines. A fixed "
+            "parameter stays fixed in later stages until a later stage frees it again, "
+            "and the closing stage keeps it fixed too. The `.rxt` document writes the "
+            "patterns as a `fix` clause. To keep a parameter fixed in every plan, "
+            "use `Refinement.hold` instead."
+        ),
+        default="[]",
+        typical="empty; one pattern where a stage takes back what an earlier one freed",
         anchor="theory/parameterisation.html#from-tree-to-vector",
     ),
     "max_iter": HelpEntry(
@@ -5971,6 +5986,13 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "Paths this stage's `turn_on` matched and did not free, because the caller "
             "declared a hold on them with `Refinement.hold`. A hold outranks a plan's "
             "pattern and lasts until `Refinement.unhold`. It feeds `HOLD_BLOCKED_PLAN`."
+        ),
+    ),
+    "StageResult.fixed": HelpEntry(
+        title="Parameters fixed",
+        description=(
+            "The parameter paths this stage's `turn_off` patterns fixed after its "
+            "frees. Empty when the stage declares no `turn_off`."
         ),
     ),
     "StageResult.unknown_paths": HelpEntry(
