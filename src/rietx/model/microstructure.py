@@ -101,10 +101,11 @@ def _reading(kind: str, coefficient: float, variance: bool,
 def floored_paths(table, named: Iterable[str]) -> set[str]:
     """The paths ``FLOOR_HIT`` named, and every entry that follows them to zero.
 
-    Only a free column carries a bound finding, so a width tied to a floored
-    source, or driven by a floored ``vars.X``, is never named itself.  It sits
-    at zero exactly when its tie has no constant and every source is floored:
-    ``value = Σ c·source + 0``.  Transitive, as a tie chain is, and the
+    A free column carries a bound finding, and so does a tied width the LM
+    step held on its own floor (WP-1325, ``staged.tied_bound_findings``).  A
+    width tied to a floored source, or driven by a floored ``vars.X``, is
+    never named itself.  It sits at zero exactly when its tie has no constant
+    and every source is floored: ``value = Σ c·source + 0``.  Transitive, as a tie chain is, and the
     closure :func:`~rietx.refine._cell_runaway_withheld` builds for an esd
     one rank over.  ``table`` is any object with
     :class:`~rietx.params.vector.ParameterTable`'s ``entries``.

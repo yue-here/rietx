@@ -2095,11 +2095,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A constraint held the optimum on its edge",
         description=(
             "In the final stage the optimiser held some steps against a built-in "
-            "inequality constraint. Examples are the positivity of the strain broadening "
-            "and the positive Gaussian instrument width. The optimum therefore sits on "
+            "inequality constraint. Examples are the positivity of the strain broadening, "
+            "the positive Gaussian instrument width, and the bounds of a tied parameter or "
+            "of a parametric equation's target. The optimum therefore sits on "
             "or near the edge of the allowed region. The values are admissible but not "
-            "measured. Start from a different seed and quote the values only if they "
-            "survive."
+            "measured. A tied parameter held on its own limit also gets a BOUND_HIT or "
+            "FLOOR_HIT warning that names it. Start from a different seed and quote the "
+            "values only if they survive."
         ),
     ),
     "COVARIANCE_DIRECTION_DISCARDED": HelpEntry(
@@ -3480,7 +3482,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A parametric equation sets a parameter, in some patterns, to a value "
             "outside that parameter's own limits. The equation's coefficients are "
-            "unbounded, so the limits never constrained the solve. Do not quote the "
+            "unbounded. The default LM driver holds a linear equation's target inside "
+            "its limits, but TRF and an expression equation do not. The fit finishes. "
+            "The result keeps the equation's value, and that pattern's model holds the "
+            "limit the value crossed. Do not quote the "
             "parameter there as a measurement. Narrow the subset to where the form "
             "holds, lower the order of the polynomial, or use a basis that stays inside "
             "the range."
