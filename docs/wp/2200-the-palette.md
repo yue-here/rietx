@@ -1,6 +1,6 @@
 # WP-2200 — The palette
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — claimed by a ghostshift runner
 Depends on: 2142 (the style guide)
 Priority: P2 2026-11-10 — a gui-overhaul piece the maintainer ruled for on 2026-11-06 and 2026-11-09; the peak-mark colour waits on it
 
