@@ -84,10 +84,13 @@ The offer is a choice between two outcomes, so it is interaction rule 11's askin
   draft as an open dict (the frontend owns its keys, as it owns `ui`). A write goes to a
   temporary name and is renamed into place, so a crash mid-write leaves the last good copy.
   Two routes: `GET /api/recovery` answers the open project's copy or `null`, and
-  `PUT /api/recovery` writes `{project, draft}` or deletes on `draft: null`. A `project`
-  that is not the open one is refused, so a write sent before an open landed cannot land on
-  the next project. Neither route is behind the run's 409: like `/api/settings`, nothing here
-  can disagree with a run, and edits made during a run must still be kept.
+  `PUT /api/recovery` writes `{project, head, draft}` or deletes on `draft: null`. The write
+  names its project rather than meaning the open one, and `project` must be a project
+  folder. New project and Close are answered before the shell hears of them, so the shell's
+  last write for the project it leaves lands after the switch; keyed to "whatever is open",
+  it would put one project's edits under the next one's name. Neither route is behind the
+  run's 409: like `/api/settings`, nothing here can disagree with a run, and edits made
+  during a run must still be kept.
 - **One authority per fact** (root CLAUDE.md § Project). The copy holds *proposed* edits only.
   It never holds the project's values, so it cannot disagree with `history.jsonl`. It is
   deleted when the edits are applied, reverted or discarded.
@@ -123,12 +126,12 @@ No rule here reads a pattern. The retention ceiling and floor are storage consta
 
 - [x] Server: `gui/recovery.py`, the two routes, `_relocate` moves the copy, `example_reset`
   discards it, tests in `tests/test_gui_recovery.py`
-- [ ] Client: `lib/recovery.ts`, `draft()`/`restoreDraft()` on the three panels, the shell's
+- [x] Client: `lib/recovery.ts`, `draft()`/`restoreDraft()` on the three panels, the shell's
   writer and offer, the carry-over across an open fixed, vitest
-- [ ] Manual: the routes in a GUI chapter, the offer described; `tests/test_gui_manual.py`
+- [x] Manual: the routes in a GUI chapter, the offer described; `tests/test_gui_manual.py`
 - [ ] Browser: a test that closes with pending edits, reopens, restores and discards, by real
   clicks; every `tests/*_browser.py` run locally
-- [ ] Dist rebuilt; `npm --prefix gui test` and `npm --prefix gui run check`
+- [x] Dist rebuilt; `npm --prefix gui test` and `npm --prefix gui run check`
 - [ ] Skill: none. The GUI is not a surface an agent driving rietx uses
 
 ## Acceptance

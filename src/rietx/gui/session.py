@@ -64,7 +64,7 @@ from ..history.events import EventStream
 from ..io.readers import read_pattern
 from ..optimize.cancel import CancelToken, RefinementCancelled
 from ..optimize.least_squares import DEFAULT_SOLVER
-from ..project import Project
+from ..project import PROJECT_JSON, Project
 from ..refine import (
     _VERSION,
     NoPhasesError,
@@ -841,21 +841,24 @@ class GuiSession:
                 "head": record.get("head"), "head_now": p.refinement._head_id}
 
     def recovery_put(self, body: dict) -> dict:
-        """Keep the client's pending edits for the open project, or drop them.
+        """Keep a project's pending edits, or drop them with ``draft: null``.
 
-        ``project`` must be the open project's path, so a write sent before
-        an open or a close landed is refused (``STALE_PROJECT``) rather than
-        kept under the next project's name.  ``draft: null`` deletes the copy:
-        the client sends it when the edits are applied, reverted or discarded.
-        Not behind the run's 409, for ``settings_patch``'s reason: nothing
-        here can disagree with a run, and an edit made during one must still
-        be kept.
+        The write names its project rather than meaning the open one.  The
+        client writes once more after a switch has landed, for the project it
+        is leaving: New project and Close are answered before the shell hears
+        of them, and a write keyed to "whatever is open" would then put one
+        project's edits under the next one's name.  So ``project`` must be a
+        project folder, and ``head`` is the node the client drew the edits
+        against.  ``draft: null`` deletes the copy: the client sends it when
+        the edits are applied, reverted or discarded.  Not behind the run's
+        409, for ``settings_patch``'s reason: nothing here can disagree with a
+        run, and an edit made during one must still be kept.
         """
-        unknown = set(body) - {"project", "draft"}
+        unknown = set(body) - {"project", "head", "draft"}
         if unknown:
             raise GuiError(f"unknown key(s): {sorted(unknown)}; a recovery write "
-                           "is {project, draft}", where=sorted(unknown))
-        project = _need(body, "project")
+                           "is {project, head, draft}", where=sorted(unknown))
+        project = Path(str(_need(body, "project"))).expanduser()
         if "draft" not in body:
             raise GuiError("missing 'draft' (an object, or null to delete the copy)",
                            where=["draft"])
@@ -863,24 +866,23 @@ class GuiSession:
         if draft is not None and not isinstance(draft, dict):
             raise GuiError("'draft' is an object, or null to delete the copy",
                            where=["draft"])
-        with self._cond:
-            p = self._need_project()
-            if recovery_mod.project_key(str(project)) != recovery_mod.project_key(p.path):
-                raise GuiError(f"{project} is not the open project; its pending "
-                               "edits are not kept under another project's name",
-                               code="STALE_PROJECT", status=409, where=["project"])
-            if draft is None:
-                recovery_mod.discard(self.state_dir, p.path)
-                return {"draft": None}
-            try:
-                record = recovery_mod.write(self.state_dir, p.path, draft,
-                                            p.refinement._head_id)
-            except ValueError as exc:
-                raise GuiError(str(exc), where=["draft"]) from None
-            except OSError as exc:
-                raise GuiError(f"could not keep the pending edits in "
-                               f"{recovery_mod.root(self.state_dir)}: {exc}",
-                               code="RECOVERY_ERROR") from None
+        head = body.get("head")
+        if head is not None and not isinstance(head, str):
+            raise GuiError("'head' is a node id, or null", where=["head"])
+        if not (project / PROJECT_JSON).is_file():
+            raise GuiError(f"{project} is not a project folder; pending edits are "
+                           "kept only for a project", where=["project"])
+        if draft is None:
+            recovery_mod.discard(self.state_dir, project)
+            return {"draft": None}
+        try:
+            record = recovery_mod.write(self.state_dir, project, draft, head)
+        except ValueError as exc:
+            raise GuiError(str(exc), where=["draft"]) from None
+        except OSError as exc:
+            raise GuiError(f"could not keep the pending edits in "
+                           f"{recovery_mod.root(self.state_dir)}: {exc}",
+                           code="RECOVERY_ERROR") from None
         return {"saved_utc": record["saved_utc"], "head": record["head"]}
 
     # ------------------------------------------------------------------

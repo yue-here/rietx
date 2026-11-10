@@ -1431,7 +1431,7 @@ describe("the plan editor", () => {
     select.dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
 
-    const put = stub.calls.find((call) => call.method === "PUT");
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/plan");
     expect(put?.path).toBe("/api/plan");
     expect(put?.body).toEqual({ preset: "profile_only" });
   });
@@ -1487,7 +1487,7 @@ describe("the plan editor", () => {
 
     bar("Apply")!.click();
     await flush();
-    const put = stub.calls.find((call) => call.method === "PUT");
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/plan");
     expect(put?.body.plan.stages.map((s: any) => s.name)).toEqual(["cell", "scale+bkg"]);
     expect(put?.body.plan.correlation_guard).toBe(0.98);
   });
@@ -2376,10 +2376,10 @@ describe("the text pane", () => {
     });
     await typeInto(TEXTDOC_MOVED);
     expect(host.textContent).toContain("edited");
-    expect(stub.calls.some((call) => call.method === "PUT")).toBe(false);  // still debouncing
+    expect(stub.calls.some((call) => call.method === "PUT" && call.path === "/api/textdoc")).toBe(false);  // still debouncing
 
     await settle();
-    const put = stub.calls.find((call) => call.method === "PUT")!;
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/textdoc")!;
     expect(put.body).toEqual({ text: TEXTDOC_MOVED, base_revision: "r1", validate_only: true });
     expect(host.textContent).toContain("ready to apply");
   });
@@ -2522,7 +2522,7 @@ describe("the text pane", () => {
     // no validate is even attempted: the server would answer RUN_IN_FLIGHT, and
     // the state refusal outranking a parse complaint is only useful if the pane
     // does not ask a question it knows the answer to
-    expect(stub.calls.some((call) => call.method === "PUT")).toBe(false);
+    expect(stub.calls.some((call) => call.method === "PUT" && call.path === "/api/textdoc")).toBe(false);
     expect((button("Apply ⌘⏎") as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -6316,5 +6316,130 @@ describe("the Interactive tab (WP-2128)", () => {
     await flush();
     // the two-channel fixture has no ticks, so the graph says why it is empty
     expect(host.textContent).toContain("No fitted peaks to frame yet.");
+  });
+});
+
+describe("unapplied edits kept across a close (WP-2209)", () => {
+  const KEPT_PARAMS = { edits: { "phases.0.cell.a": "4.2" }, vary: {}, hold: {}, limits: {},
+                        restraints: {}, positions: {} };
+  const KEPT = { count: 1, params: KEPT_PARAMS, interactive: null, plan: null };
+  const wait = async (ms = 600) => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    await flush();
+  };
+  const recoveryPuts = (stub: { calls: Call[] }) =>
+    stub.calls.filter((c) => c.path === "/api/recovery" && c.method === "PUT");
+  const dialog = () => document.querySelector<HTMLElement>(".rc-dialog");
+  function kept(answer: unknown) {
+    return { "/api/recovery": (call: Call) => ({ body: call.method === "GET" ? answer : {} }) };
+  }
+
+  it("offers the kept edits on open, and Restore puts them back as pending", async () => {
+    const stub = server({ ...boot(), ...kept({
+      draft: KEPT, saved_utc: "2026-11-10T09:05:00+00:00", head: "n0000", head_now: "n0000" }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()?.querySelector("h2")?.textContent).toBe("Unapplied edits");
+    expect(dialog()?.textContent).toMatch(/1 edit from .*, not applied when the project closed\./);
+    expect(dialog()?.textContent).not.toContain("changed since");
+    // Escape answers neither, and nothing behind the dialog hears it
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flush();
+    expect(dialog()).toBeTruthy();
+
+    [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Restore")!.click();
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    // the server holds exactly these, so nothing is written until they change
+    await wait();
+    expect(recoveryPuts(stub)).toEqual([]);
+  });
+
+  it("says when the project has moved since, and Discard deletes the copy", async () => {
+    const stub = server({ ...boot(), ...kept({
+      draft: KEPT, saved_utc: null, head: "n0099", head_now: "n0000" }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()?.textContent).toContain("The project has changed since.");
+    [...dialog()!.querySelectorAll("button")].find((b) => b.textContent === "Discard")!.click();
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(recoveryPuts(stub).map((c) => c.body))
+      .toEqual([{ project: "/tmp/lab6.rex", head: null, draft: null }]);
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+  });
+
+  it("keeps an edit as it is made, and deletes the copy once it is reverted", async () => {
+    const stub = server({ ...boot(), ...kept({ draft: null }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(dialog()).toBeNull();
+    await editValue("phases.0.cell.a", "4.2");
+    expect(recoveryPuts(stub)).toEqual([]);   // half a second after the last change
+    await wait();
+    const [first] = recoveryPuts(stub);
+    expect(first.body.project).toBe("/tmp/lab6.rex");
+    expect(first.body.head).toBe("n0000");
+    expect(first.body.draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
+
+    button("Revert")!.click();
+    await wait();
+    expect(recoveryPuts(stub).map((c) => c.body.draft)).toEqual([first.body.draft, null]);
+  });
+
+  it("leaves the pending edits behind as the project's copy when it closes", async () => {
+    const stub = server({ ...boot(), ...kept({ draft: null }),
+                          "/api/recent": () => ({ body: { recent: [] } }),
+                          "/api/project/close": () => ({ body: { closed: "/tmp/lab6.rex" } }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await editValue("phases.0.cell.a", "4.2");
+    host.querySelector<HTMLButtonElement>("header .fm-name")!.click();
+    await flush();
+    [...host.querySelectorAll<HTMLButtonElement>(".fm-menu button.item")]
+      .find((b) => b.querySelector(".label")?.textContent === "Close project")!.click();
+    await flush();
+    // written at once, not half a second later
+    expect(recoveryPuts(stub)).toHaveLength(1);
+    await wait();
+    expect(host.querySelector(".start")).toBeTruthy();
+    // and never followed by a delete as the panels empty
+    const puts = recoveryPuts(stub).map((c) => c.body);
+    expect(puts).toHaveLength(1);
+    expect(puts[0].project).toBe("/tmp/lab6.rex");
+    expect(puts[0].draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
+  });
+
+  it("opens another project with no pending edit carried over", async () => {
+    const other = { ...PROJECT, path: "/tmp/nac.rex",
+                    data: { ...PROJECT.data, filename: "nac.fxye" } };
+    const stub = server({
+      ...boot(), ...kept({ draft: null }),
+      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/nac.rex", name: "nac.rex",
+                                                  phases: [], missing: false }] } }),
+      "/api/project/open": () => ({ body: other }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await editValue("phases.0.cell.a", "4.2");
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("1 pending edit");
+    await toStart();
+    [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === "nac")!
+      .querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    await wait();
+    expect(host.textContent).toContain("nac.fxye");
+    // one project's pending value is never the next project's Apply
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+    const puts = recoveryPuts(stub).map((c) => c.body);
+    expect(puts.map((b) => b.project)).toEqual(["/tmp/lab6.rex"]);
+    expect(puts[0].draft.params.edits).toEqual({ "phases.0.cell.a": "4.2" });
   });
 });

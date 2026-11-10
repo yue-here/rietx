@@ -16,7 +16,7 @@
    * `ProjectDoc.ui`, whose keys the frontend owns (WP-1005): it is a property of
    * the project a user comes back to, not of this browser tab.
    */
-  import { onMount, setContext } from "svelte";
+  import { onMount, setContext, untrack } from "svelte";
 
   import { ApiError, api } from "./api";
   import Help from "./Help.svelte";
@@ -40,6 +40,8 @@
   import Splitter from "./panels/Splitter.svelte";
   import Start from "./panels/Start.svelte";
   import FileMenu from "./panels/FileMenu.svelte";
+  import Recovery from "./panels/Recovery.svelte";
+  import { RecoveryWriter, combine, readDraft, type Draft } from "./lib/recovery";
   import Stubs from "./panels/Stubs.svelte";
   import Text from "./panels/Text.svelte";
   import {
@@ -151,6 +153,25 @@
    *  one pending edit and its Apply stores (WP-2127) */
   let planPending = $state(false);
   const pendingTotal = $derived(touched + (planPending ? 1 : 0));
+
+  /** The recovery copy of the pending edits (WP-2209, the maintainer's
+   *  ruling of 2026-11-09).  The writer is armed for the open project once
+   *  its kept copy has been offered and answered, and the effect below hands
+   *  it every change: the panels' `draft()` read their pending maps, so a
+   *  retyped value is a change even where the count stays the same.  A
+   *  switch of project disarms it first, so the panels' emptied maps never
+   *  overwrite the copy of the project just left. */
+  const recoveryWriter = new RecoveryWriter(
+    (path, at, draft) => api.putRecovery(path, at, draft));
+  let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
+                           moved: boolean } | null>(null);
+  $effect(() => {
+    const path = project?.path ?? null;
+    const draft = combine(pendingTotal, paramsPanel?.draft() ?? null,
+                          interactivePanel?.draft() ?? null, planPanel?.draft() ?? null);
+    const at = head;
+    untrack(() => recoveryWriter.schedule(path, at, draft));
+  });
   /** Bumped by every project opened, so the Plan tab starts over: its unsaved
    *  stages and its undo stack belong to the project they were made in, and
    *  `{#if project}` stays true across an open. */
@@ -379,6 +400,70 @@
     }
   }
 
+  /** Leave the open project's pending edits behind as its recovery copy, and
+   *  clear them from the panels, which stay mounted across an open: without
+   *  this, one project's pending values were the next project's Apply. */
+  async function leaveEdits() {
+    await recoveryWriter.flush();
+    recoveryWriter.disarm();
+    offer = null;
+    paramsPanel?.revert();
+    interactivePanel?.revert();
+  }
+
+  /** Offer the open project's kept edits, or start keeping new ones. */
+  async function offerRecovery() {
+    const path = project?.path;
+    if (!path) return;
+    recoveryWriter.disarm();
+    let kept: any = null;
+    try {
+      kept = await api.recovery();
+    } catch {
+      // an unreadable copy is no copy: the open goes on, and the next edit
+      // writes a good one
+    }
+    if (project?.path !== path) return;   // another project opened meanwhile
+    const draft = readDraft(kept?.draft);
+    if (draft) {
+      offer = { path, draft, savedUtc: kept.saved_utc ?? null,
+                moved: !!kept.head && kept.head !== kept.head_now };
+      return;
+    }
+    recoveryWriter.arm(path, null);
+  }
+
+  function restoreKept() {
+    const o = offer;
+    if (!o) return;
+    offer = null;
+    if (o.draft.params) paramsPanel?.restoreDraft(o.draft.params);
+    if (o.draft.interactive) interactivePanel?.restoreDraft(o.draft.interactive);
+    if (o.draft.plan) planPanel?.restoreDraft(o.draft.plan);
+    // the server holds exactly this, so it is not written again until it changes
+    recoveryWriter.arm(o.path, o.draft);
+    say(`# ${o.draft.count === 1 ? "1 unapplied edit" : `${o.draft.count} unapplied edits`} restored`);
+  }
+
+  async function discardKept() {
+    const o = offer;
+    if (!o) return;
+    offer = null;
+    try {
+      await api.putRecovery(o.path, null, null);
+    } catch (error) {
+      say(`refused: ${(error as Error).message}`);
+    }
+    if (project?.path === o.path) recoveryWriter.arm(o.path, null);
+  }
+
+  /** The page is going: send the write the timer was holding, with
+   *  `keepalive`, which a timer cannot outlive. */
+  function pageHidden() {
+    const unsent = recoveryWriter.unsent();
+    if (unsent) api.putRecoveryOnHide(unsent.project, unsent.head, unsent.draft);
+  }
+
   async function loadProject() {
     try {
       project = await api.project();
@@ -415,6 +500,7 @@
    * the new project's root node supplies.
    */
   async function opened(doc: any) {
+    await leaveEdits();
     project = doc;
     opens += 1;
     readUi();
@@ -434,6 +520,7 @@
     run = await api.runState();
     await loadResult();
     await loadPeaks();
+    await offerRecovery();
   }
 
   /** Open another project **in place of** this one (WP-1034).
@@ -447,8 +534,11 @@
    * remedy, so it travels verbatim.
    */
   async function open(path: string): Promise<string> {
+    await recoveryWriter.flush();
     try {
-      project = await api.openProject(path);
+      const doc = await api.openProject(path);
+      await leaveEdits();
+      project = doc;
       opens += 1;
       readUi();
       openError = "";
@@ -461,6 +551,7 @@
       await loadResult();
       await loadPeaks();
       say(`project.open(${path})`);
+      await offerRecovery();
       return "";
     } catch (error) {
       openError = (error as Error).message;
@@ -471,12 +562,15 @@
   /** A rename or a move from the File menu (WP-2133): the same project, at a
    *  new path, its result and panels kept, since the server kept them too. */
   function relocated(doc: any) {
+    // the server re-keyed the kept copy; the writer follows it there
+    recoveryWriter.follow(doc.path);
     project = doc;
     say(`# project: ${doc.path}`);
   }
 
   /** Close from the File menu (WP-2133): the start screen is the window. */
   async function closed() {
+    await leaveEdits();
     project = null;
     result = null;
     startOpen = false;
@@ -1139,6 +1233,7 @@
         // loadIndexAnswer clears the screen it assumes stale.
         await loadIndexAnswer();
         await loadExtinction();
+        await offerRecovery();
       }
     })();
 
@@ -1207,7 +1302,12 @@
 {/snippet}
 
 <svelte:window onkeydown={keydown} onclick={clickAway} onresize={reanchor}
-  onscrollcapture={reanchor} bind:innerWidth={windowWidth} />
+  onscrollcapture={reanchor} onpagehide={pageHidden} bind:innerWidth={windowWidth} />
+
+{#if offer}
+  <Recovery draft={offer.draft} savedUtc={offer.savedUtc} moved={offer.moved}
+    onrestore={restoreKept} ondiscard={discardKept} />
+{/if}
 
 <!-- The top bar (WP-2123).  Each side's collapse button sits at its own end
      and never moves: the middle wraps within itself, so a narrow window adds

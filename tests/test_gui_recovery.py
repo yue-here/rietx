@@ -33,9 +33,10 @@ def test_a_draft_is_kept_read_back_and_deleted(served):  # noqa: F811
     assert status == 200 and payload == {"draft": None}
 
     path = _project_path(client)
-    status, payload = client.request("PUT", "/api/recovery", {"project": path, "draft": DRAFT})
-    assert status == 200, payload
     head = session.project.refinement._head_id
+    status, payload = client.request("PUT", "/api/recovery",
+                                     {"project": path, "head": head, "draft": DRAFT})
+    assert status == 200, payload
     assert payload["head"] == head
 
     status, payload = client.get("/api/recovery")
@@ -72,23 +73,28 @@ def test_a_draft_survives_a_close_and_a_new_session(served):  # noqa: F811
         fresh.close()
 
 
-def test_a_write_for_another_project_is_refused(served):  # noqa: F811
+def test_a_write_names_its_project_and_needs_a_project_folder(served):  # noqa: F811
     session, client, root = served
+    (root / "elsewhere.rex").mkdir()
     status, payload = client.put("/api/recovery",
                                  {"project": str(root / "elsewhere.rex"), "draft": DRAFT})
-    assert status == 409 and payload["error"]["code"] == "STALE_PROJECT", payload
+    assert status == 400 and payload["error"]["where"] == ["project"], payload
     assert client.get("/api/recovery")[1] == {"draft": None}
 
     path = _project_path(client)
     for body, where in (({"project": path}, "draft"),
                         ({"project": path, "draft": [1]}, "draft"),
+                        ({"project": path, "head": 3, "draft": {}}, "head"),
                         ({"project": path, "draft": {}, "extra": 1}, "extra")):
         status, payload = client.request("PUT", "/api/recovery", body)
         assert status == 400 and payload["error"]["where"] == [where], payload
 
+    # the shell's last write for a project it has just left still lands: a
+    # close is answered before the shell hears of it
     client.post("/api/project/close", {})
     status, payload = client.request("PUT", "/api/recovery", {"project": path, "draft": DRAFT})
-    assert status == 409 and payload["error"]["code"] == "NO_PROJECT", payload
+    assert status == 200, payload
+    assert recovery.read(root / "state", path)["draft"] == DRAFT
 
 
 def test_an_oversized_draft_is_refused(served):  # noqa: F811
