@@ -60,7 +60,10 @@ With the site's chrome and the prototype's plot roles in place:
   shares the pattern pane with the calculated curve, so it cannot be the same orange
   (WP-1210's floor; principle 9, the rule wins over the mockup). The peak layer keeps one hue
   in two tones (`viz/theme.py`'s note): the fit takes a second blue, `#6f83e6` light and
-  `#2e5e9a` dark, each the nearest to a step of the marks' tone that clears the same set.
+  `#516494` dark, each the nearest to a step of the marks' tone that clears the same set.
+  The dark one was first `#2e5e9a`, which cleared every floor at 2.67:1 on the panel;
+  `#516494` is the nearest that also clears WCAG's 3:1 for graphics (3.02:1). Every curve
+  is now held to 3:1 on both grounds.
 - The background brown sits 0.065 from the orange calculated curve on the light theme and
   0.092 on the dark, and 0.110 from the dark difference grey. The dash carries its identity,
   as the point marks do for the greys WP-1210 exempted. These three pairs are named in the
@@ -124,4 +127,49 @@ tests/test_gui_dist.py` green; `npm --prefix gui test && npm --prefix gui run ch
 the screenshots in the PR; the maintainer's look before merge (milestone row 10).
 
 ## Handover log
+- **2026-11-10** — built, PR #PRNUM. The GUI now opens in the site's palette, light and
+  dark: warm neutrals, an orange calculated curve, observed points in the ink, a grey
+  difference. `rietx watch` and `rietx compare` read the same stylesheet and changed with it.
+  The filled primary button now carries legible ink (5.84:1), where white on the orange
+  would have been 4.22:1. Six colour choices that no rule settled went to the choice nearest
+  the prototype. They wait on the maintainer's look before merge (milestone row 10).
+
+  *Done.* Tasks 1-7. The emitter writes one block per scheme in `theme.SCHEMES`. A named
+  theme is an entry there plus its `TOKENS` arm. The review pictures are in
+  `2200-screenshots/`, and the manual's GUI screenshots were retaken.
+
+  *Measured* (worktree `[dev]` venv, macOS arm64). vitest 717 passed, svelte-check 0 errors.
+  `test_gui_palette`, `test_gui_style_guide` and `test_docs_consistency`: 64 passed. The
+  GUI-adjacent files (`test_gui_dist`, `test_watch_app`, `test_compare_ui`,
+  `test_gui_manual`, `test_gui_server`): 352 passed. Every `tests/*_browser.py`: 152 passed,
+  0 failed (40 + 18 + 94 over three runs). `python -m tests.reader_output` exit 0, unchanged.
+  FASTCOUNT
+
+  *Open visual questions for the maintainer.* Each is one value in `viz/theme.py` to change.
+  The pictures are `2200-screenshots/gui-*.png` beside `prototype-*.png`.
+  1. The background is the figures' brown, `#b5793a` light and `#c99a6a` dark, as the
+     prototype drew it. It sits under WP-1210's 0.13 floor from the orange calculated curve
+     (0.065 light, 0.092 dark) and from the dark difference grey (0.110). The dash tells it
+     apart. Alternatives that clear the floor: olive `#a19258` light; `#b2a92a` or
+     `#cd7700` dark.
+  2. The picked peaks' fitted curve is a second blue, `#6f83e6` light and `#516494` dark.
+     The prototype draws it orange, but in the GUI it shares the pane with the orange
+     calculated curve, and STYLE.md principle 9 puts the rule over the mockup. The
+     alternative is today's magenta.
+  3. The dark peak mark is `#008ad5`. The ruled `#56b4e9` is exactly `--phase-2`, distance
+     0.000. `#008ad5` is the light mark's hue, lifted for the dark ground.
+  4. The zero line takes the site's zero grey (`#cfcfcf` / `#4a4a4a`). The prototype draws
+     it in its rule colour.
+  5. On the light theme the difference curve is `--muted` exactly, as in the prototype. The
+     series trajectory wore the difference colour, so it now wears the observed ink, apart
+     from the backward chain's `--muted`.
+  6. Every non-primary button is outlined in `--line-strong` with ink text, from the
+     2026-11-06 ruling. The look is unconfirmed.
+
+  *Gotchas.* A Bash hook here refuses `cd` and a sed operand computed at runtime. The
+  prototype's peak marks appear only in its "Peaks and indexing" workflow, which no URL
+  parameter reaches: click through the workflow menu, then "Pick peaks".
+
+  Next: the maintainer looks at the six questions and the screenshots. Then the named-theme
+  piece builds Solarized and Monokai on `SCHEMES`, and Settings lists them.
 - **2026-11-10** — created. No open WP owns the palette: the milestone lists it under "Designed, not yet filed", and WP-2130 deferred the peak-mark colour to it by the ruling of 2026-11-09. Numbered in the milestone's 22xx block by the shift lead.

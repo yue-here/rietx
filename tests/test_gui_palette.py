@@ -52,10 +52,9 @@ PLOT_TS = ROOT / "gui" / "src" / "lib" / "plot.ts"
 
 #: The colours a *curve* is drawn in — the set a reader has to tell apart.
 #:
-#: `--plot-zero` and `--plot-mask` are deliberately absent: both are chrome with
-#: an alpha channel (a zero line, a wash over what is not fitted), and neither
-#: carries a quantity.  The greys are here and are deliberately *close* — see
-#: the recessive pair below.
+#: `--plot-zero` and `--plot-mask` are deliberately absent: both are chrome (a
+#: zero line, a wash over what is not fitted), and neither carries a quantity.
+#: The pairs that sit under the floor are named below in :data:`NAMED_PAIRS`.
 CURVES = ("--plot-obs", "--plot-calc", "--plot-bkg", "--plot-diff",
           "--plot-peak", "--plot-peakfit", "--plot-candidate")
 
@@ -376,9 +375,9 @@ def test_every_phase_reads_against_every_page_it_is_drawn_on(theme):
 def test_no_phase_colour_comes_closer_to_a_curve_than_the_recorded_number():
     """The one distance below the floor, pinned so it can only improve.
 
-    Named rather than exempted quietly, the way `GRANDFATHERED` names its two
-    pairs: the nearest neighbour is sky blue against the dark difference curve,
-    and a retune that brought a phase closer to a curve than this would be
+    Named rather than exempted quietly, the way `NAMED_PAIRS` names its
+    pairs: the nearest neighbour is bluish green against the light candidate
+    overlay, and a retune that brought a phase closer to a curve than this would be
     undoing what the set was chosen for.
     """
     worst, where = _phase_distances()[0]
@@ -571,3 +570,45 @@ def test_every_text_colour_clears_aa_on_every_ground(theme):
     for ground in ("--bg", "--panel"):
         ratio = _contrast(palette["--accent"], palette[ground])
         assert ratio >= 3.0, f"{theme}: --accent on {ground} is {ratio:.2f}:1"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_every_drawn_plot_colour_clears_3_to_1_on_its_grounds(theme):
+    """WCAG 2.1 § 1.4.11 asks 3:1 of a graphic a reader must see (WP-2200).
+
+    The OKLab floor against the page (0.30) does not imply it: the dark peak fit
+    first chosen, `#2e5e9a`, cleared every floor at 2.67:1 on `--panel`.  The
+    weakest pair is now that curve, `#516494`, at 3.02:1.  The zero line and the
+    mask are chrome drawn to recede (:data:`CURVES`' note), so they are exempt.
+    """
+    palette = TOKENS[theme]
+    for role in CURVES:
+        for ground in ("--bg", "--panel"):
+            ratio = _contrast(palette[role], palette[ground])
+            assert ratio >= 3.0, f"{theme}: {role} on {ground} is {ratio:.2f}:1"
+
+
+#: Every stylesheet that reads these tokens: the GUI's, its panels', and the two
+#: Python pages that link the same `/tokens.css` (WP-1429).
+STYLESHEETS = (APP_CSS, *sorted((ROOT / "gui" / "src").rglob("*.svelte")),
+               ROOT / "src" / "rietx" / "watch" / "static" / "watch.css",
+               ROOT / "src" / "rietx" / "compare_app" / "static" / "compare.css")
+
+#: A declaration setting words in the accent, or filling a control with it.
+#: `accent-color`, `border-color`, `outline` and a `color-mix` wash are marks.
+ACCENT_AS_TEXT_OR_FILL = re.compile(r"(?<![-\w])(color|background)\s*:\s*var\(--accent\)")
+
+
+def test_no_page_sets_words_in_the_accent_or_fills_a_control_with_it():
+    """The two rules above, held on every page the tokens reach (WP-2200).
+
+    The measurements are made on the tokens, so a page that sets text in
+    `--accent` or fills a button with it escapes them: the light accent is
+    4.05:1 on the page and `--panel` on it 4.22:1, both under AA.  `rietx watch`
+    and `rietx compare` did both when the palette moved, and no test read them.
+    """
+    found = [f"{path.relative_to(ROOT)}: {match.group(0)}"
+             for path in STYLESHEETS
+             for match in ACCENT_AS_TEXT_OR_FILL.finditer(
+                 path.read_text(encoding="utf-8"))]
+    assert not found, f"the accent sets words or fills a control: {found}"

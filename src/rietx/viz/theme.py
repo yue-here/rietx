@@ -150,7 +150,7 @@ TOKENS: dict[str, dict[str, str]] = {
         "--plot-diff": "#8f8f8f",
         "--plot-zero": "#4a4a4a",
         "--plot-peak": "#008ad5",
-        "--plot-peakfit": "#2e5e9a",
+        "--plot-peakfit": "#516494",
         "--plot-candidate": "#4ccf8a",
         "--plot-mask": "#f1ece514",
         "--lane-l": "0.72",
@@ -165,9 +165,11 @@ TOKENS: dict[str, dict[str, str]] = {
 #: **Okabe-Ito** (Okabe & Ito 2002; Wong, *Nature Methods* **8**, 441, 2011),
 #: which is the categorical standard a scientific figure reaches for, and four
 #: of its eight, because the Rietveld plot has already spent the rest.  Measured
-#: in OKLab against every curve role and page of both themes on both surfaces:
-#: blue lands 0.053 from the difference curve, orange 0.061 from the figures'
-#: calculated curve, vermillion 0.065 from the app's.  What is left is bluish
+#: in OKLab against every curve role and page of both themes on both surfaces
+#: (WP-1438): blue landed 0.053 from the difference curve, orange 0.061 from the
+#: figures' calculated curve, vermillion 0.065 from the app's.  Since WP-2200 the
+#: calculated curve is orange in the app too, and blue is the picked-peak
+#: marks'.  What is left is bluish
 #: green, reddish purple, sky blue and yellow.  Black is not a member: it is the
 #: *single-phase* row's neutral, which is
 #: :data:`~rietx.viz.plots.PALETTES`'s ``tick`` and follows the theme.
