@@ -234,6 +234,10 @@ ROUTES: dict[tuple[str, str], Any] = {
     # *person's* rather than a project's (WP-1044)
     ("GET", "/api/settings"): lambda s, q, b: s.settings(),
     ("POST", "/api/settings"): lambda s, q, b: s.settings_patch(b),
+    # the open project's recovery copy of unapplied edits (WP-2209), in the
+    # state directory beside the settings and, like them, not behind the 409
+    ("GET", "/api/recovery"): lambda s, q, b: s.recovery(),
+    ("PUT", "/api/recovery"): lambda s, q, b: s.recovery_put(b),
 
     ("GET", "/api/params"): lambda s, q, b: s.params(),
     ("PATCH", "/api/params"): lambda s, q, b: s.params_patch(b),

@@ -121,7 +121,7 @@ No rule here reads a pattern. The retention ceiling and floor are storage consta
 
 ## Tasks
 
-- [ ] Server: `gui/recovery.py`, the two routes, `_relocate` moves the copy, `example_reset`
+- [x] Server: `gui/recovery.py`, the two routes, `_relocate` moves the copy, `example_reset`
   discards it, tests in `tests/test_gui_recovery.py`
 - [ ] Client: `lib/recovery.ts`, `draft()`/`restoreDraft()` on the three panels, the shell's
   writer and offer, the carry-over across an open fixed, vitest

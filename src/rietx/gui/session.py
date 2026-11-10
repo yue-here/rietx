@@ -80,6 +80,7 @@ from ..viz import packed as _packed
 from ..viz import theme
 from ..viz.compare import decimation_index
 from ..viz.packed import Packed
+from . import recovery as recovery_mod
 from . import series as series_mod
 from . import symmetry
 from .imports import (
@@ -753,6 +754,12 @@ class GuiSession:
             p.path = target
             p.history.path = target / p.doc.history_file
             self._peak_ed = None
+            # the third place that holds the old path: the recovery copy's key
+            # (WP-2209); a move made in the app takes the pending edits along
+            try:
+                recovery_mod.move(self.state_dir, source, target)
+            except OSError:
+                pass  # the edits are still on screen; the next write re-keys them
         self._write_recent([_recent_entry(e) for e in self._recent_raw()
                             if str(e.get("path", "")) != str(source)])
         self._remember(p)
@@ -815,6 +822,66 @@ class GuiSession:
             # an unwritable recent list
             pass
         return {"ui": ui}
+
+    # ------------------------------------------------------------------
+    # recovery of unapplied edits (WP-2209)
+    # ------------------------------------------------------------------
+    def recovery(self) -> dict:
+        """The open project's recovery copy of unapplied edits, or ``draft: None``.
+
+        ``head`` is the node the edits were made against and ``head_now`` the
+        project's, so the client can say the project moved since.  Not behind
+        the run's 409: reading a copy changes nothing.
+        """
+        p = self._need_project()
+        record = recovery_mod.read(self.state_dir, p.path)
+        if record is None:
+            return {"draft": None}
+        return {"draft": record["draft"], "saved_utc": record.get("saved_utc"),
+                "head": record.get("head"), "head_now": p.refinement._head_id}
+
+    def recovery_put(self, body: dict) -> dict:
+        """Keep the client's pending edits for the open project, or drop them.
+
+        ``project`` must be the open project's path, so a write sent before
+        an open or a close landed is refused (``STALE_PROJECT``) rather than
+        kept under the next project's name.  ``draft: null`` deletes the copy:
+        the client sends it when the edits are applied, reverted or discarded.
+        Not behind the run's 409, for ``settings_patch``'s reason: nothing
+        here can disagree with a run, and an edit made during one must still
+        be kept.
+        """
+        unknown = set(body) - {"project", "draft"}
+        if unknown:
+            raise GuiError(f"unknown key(s): {sorted(unknown)}; a recovery write "
+                           "is {project, draft}", where=sorted(unknown))
+        project = _need(body, "project")
+        if "draft" not in body:
+            raise GuiError("missing 'draft' (an object, or null to delete the copy)",
+                           where=["draft"])
+        draft = body["draft"]
+        if draft is not None and not isinstance(draft, dict):
+            raise GuiError("'draft' is an object, or null to delete the copy",
+                           where=["draft"])
+        with self._cond:
+            p = self._need_project()
+            if recovery_mod.project_key(str(project)) != recovery_mod.project_key(p.path):
+                raise GuiError(f"{project} is not the open project; its pending "
+                               "edits are not kept under another project's name",
+                               code="STALE_PROJECT", status=409, where=["project"])
+            if draft is None:
+                recovery_mod.discard(self.state_dir, p.path)
+                return {"draft": None}
+            try:
+                record = recovery_mod.write(self.state_dir, p.path, draft,
+                                            p.refinement._head_id)
+            except ValueError as exc:
+                raise GuiError(str(exc), where=["draft"]) from None
+            except OSError as exc:
+                raise GuiError(f"could not keep the pending edits in "
+                               f"{recovery_mod.root(self.state_dir)}: {exc}",
+                               code="RECOVERY_ERROR") from None
+        return {"saved_utc": record["saved_utc"], "head": record["head"]}
 
     # ------------------------------------------------------------------
     # examples (WP-1204)
@@ -896,6 +963,8 @@ class GuiSession:
                     self._run = _idle_run()
                     self._cond.notify_all()
             shutil.rmtree(root)
+        # starting the example over is the request, its pending edits included
+        recovery_mod.discard(self.state_dir, root)
         self._build_example(name, root)
         return self.project_open({"path": str(root)})
 
