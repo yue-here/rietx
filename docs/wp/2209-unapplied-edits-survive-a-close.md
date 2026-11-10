@@ -132,7 +132,7 @@ No rule here reads a pattern. The retention ceiling and floor are storage consta
 - [x] Browser: a test that closes with pending edits, reopens, restores and discards, by real
   clicks; every `tests/*_browser.py` run locally
 - [x] Dist rebuilt; `npm --prefix gui test` and `npm --prefix gui run check`
-- [ ] Skill: none. The GUI is not a surface an agent driving rietx uses
+- [x] Skill: none. The GUI is not a surface an agent driving rietx uses
 
 ## Acceptance
 
