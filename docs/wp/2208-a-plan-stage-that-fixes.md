@@ -1,6 +1,6 @@
 # WP-2208 — a plan stage that fixes as well as frees
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — claimed by a ghostshift runner
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built; PR #1520 waits on the maintainer (a stored-format change)
 Depends on: 2127 (the Plan tab)
 Priority: P2 2026-11-10 — a feature the open gui-overhaul milestone was opened for, ruled required 2026-11-09
 
@@ -114,7 +114,7 @@ which is machinery choosing a route to the same answer, not a judgement about th
 - [x] `.rxt` `fix` clause; `/api/plan/resolve` `fixes`; the GUI's run-stage matching.
 - [x] `help.py`, the audit table, the manual; `capabilities()` needs nothing (it lists plans and
   versions, not stage fields).
-- [ ] The Plan tab: fix chips and their add field, `lib/plan.ts`, `lib/rxt.ts`, vitest, the dist,
+- [x] The Plan tab: fix chips and their add field, `lib/plan.ts`, `lib/rxt.ts`, vitest, the dist,
   the layout browser test.
 
 ## Acceptance
@@ -140,6 +140,58 @@ stage included.
 - `docs/practice.md` § A stage that fixes a parameter.
 
 ## Handover log
+
+- **2026-11-10** — built end to end by a ghostshift runner; PR #1520. A stage of a plan can now
+  fix parameters as well as free them, in python (`Stage(..., turn_off=[...])`), in the `.rxt`
+  document (`stage NAME free ... fix ...`) and on the Plan tab (a `Fixes` row under each stage's
+  `Frees`). The maintainer's case runs: a Pawley fit settles the profile, and a Rietveld plan
+  whose stage fixes `instrument.profile.*` refines everything else with the profile left at the
+  Pawley values, the closing stage included. A file that uses the field does not open in an older
+  rietx, so the merge waits on the maintainer; every older file opens unchanged.
+
+  *Done.* `StageSpec.turn_off`/`Stage.turn_off`; `staged.fixed_at_end` and
+  `closing_stage(paths)`/`run_stages(paths)`; both runners (`refine._run_stage`,
+  `multi.MultiHistogramRefinement.fit`, with `MultiParameterTable.row_names()` so a fix matches
+  a joint row by either name), `run_stage`, `replay` and `cherry_pick` through the stage node's
+  `turn_off`; `StageResult.fixed`; `blocked_by_hold` leaves out what the stage fixes and
+  `unknown_paths` reads both lists; `sequential` refits a plan that fixes stage by stage
+  (`warm_staged`); the magnetic strategy passes the table's paths. `.rxt` `fix` clause
+  (`textdoc.STAGE_FIX_WORD`, `lib/rxt.ts` follows). `GET /api/plan/resolve` carries per-stage
+  `turn_off`/`fixes` and `closing.fixes`. Plan tab: a `Fixes` row drawn once the stage fixes something or
+  `+ Fix` opens it, its own add field, undo, the rung's `−N` and a "fixed here" list, the closing row's "keeps N fixed";
+  `lib/plan.ts:sameStage` reads an empty `turn_off` as an absent one. `help.py` entries, the
+  audit rows (`StageSpec:turn_off` default, `StageResult.fixed` in `OTHER_RECORD_FIELDS`), the
+  manual (`guides/plan.md` § Fix parameters in a stage, `guides/hold.md`, `gui-guide.md` § Plan,
+  `gui-power.md`, `refinement.md`), the plan-ladder screenshot pair, `docs/practice.md` § A
+  stage that fixes a parameter.
+
+  *Decisions for the maintainer* (each settled by the runner on the practice named; the PR body
+  repeats them):
+  1. A later stage's `turn_on` frees a path an earlier stage fixed (GSAS-II's `set`/`clear`
+     carry, `docs/practice.md`). Alternative: a fix sticky for the rest of the plan, which `hold`
+     already gives across plans.
+  2. A series whose plan fixes is refit stage by stage, never collapsed into one stage, so its
+     warm fits cost more iterations. Alternative: collapse with literal paths from a template
+     table, which a member whose table differs would get wrong.
+  3. The closing stage's `turn_off` holds literal paths (the replayed end state), so its history
+     node records paths rather than the declared globs. Alternative: record the globs and replay
+     at checkout.
+  4. Visual, open: a stage draws its `Fixes` row only when it fixes something, as the
+     workshop prototype (`renderPlan`) draws its `Fix` row; a `+ Fix` ghost button at the end of
+     the frees opens it with the cursor in its field. The prototype adds through one `+ Add`
+     popover with a Free/Fix toggle, which this panel has no equivalent of. An always-drawn row
+     was built first and dropped: it added a line to every stage and pushed the closing row out
+     of the plan-ladder screenshot.
+
+  *Measured* (darwin/arm64, worktree venv `[dev]` + playwright): see the PR body for the gate
+  counts. `tests.reader_output` exit 0, unchanged; `StageResult.fixed` is the one new reader
+  field, an empty list unless a stage fixes.
+
+  *Gotchas.* `StageSpec` gaining a field changes the typo hint ("did you mean 'turn_on'" now lists
+  `turn_off` too). `reference/refinement.md` sits at the 50 000-character page cap, so the prose
+  went to `guides/plan.md`.
+
+  Next: the maintainer rules on decisions 1-4 and merges #1520; the series WPs revisit decision 2.
 
 - **2026-11-10** — filed by a ghostshift runner as piece 3's follow-up in the gui-overhaul
   milestone, numbered 2208 in the milestone's 22xx block by the shift lead. No open WP owns the

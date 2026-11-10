@@ -1528,12 +1528,21 @@ describe("the plan editor", () => {
         ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
     });
     const second = () => host.querySelector("ol.stages > li.stage:nth-child(2)")!;
-    // the row is drawn while empty, so a first fix moves nothing below it
+    // a stage that fixes nothing has no Fixes row, as in the workshop
+    // prototype; `+ Fix` opens one and puts the cursor in its field
+    expect(second().querySelector(".fixing")).toBeNull();
+    const open = [...second().querySelectorAll<HTMLButtonElement>(".frees button.ghost")]
+      .find((b) => b.textContent?.trim() === "+ Fix")!;
+    open.click();
+    await flush();
     const row = second().querySelector(".fixing")!;
     expect(row.textContent).toContain("Fixes");
     expect(row.querySelectorAll(".chip")).toHaveLength(0);
+    // opening a row is no edit
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
 
     const fix = second().querySelector<HTMLInputElement>("input.add.fix")!;
+    expect(document.activeElement).toBe(fix);
     fix.value = "instrument.profile.*";
     fix.dispatchEvent(new Event("input", { bubbles: true }));
     await flush();
@@ -1545,6 +1554,10 @@ describe("the plan editor", () => {
     expect([...second().querySelectorAll(".frees:not(.fixing) .chip")]
       .map((n) => n.textContent)).toEqual(["phases.*.cell.*"]);
     expect(summaries()[1]).toBe("not applied");
+
+    // the open row has no `+ Fix` beside the frees any more
+    expect([...second().querySelectorAll(".frees button")].map((b) => b.textContent?.trim()))
+      .not.toContain("+ Fix");
 
     // ⌘Z takes the fix back, and the plan is the stored one again
     host.querySelector("section[aria-label=plan]")!
@@ -1579,6 +1592,10 @@ describe("the plan editor", () => {
       "/api/plan/resolve": () => ({ body: resolve }),
     });
     expect(summaries()[1]).toContain("+1 −1 → 3 free");
+    // a stored fix draws its row with no `+ Fix` press
+    expect([...host.querySelectorAll("ol.stages > li.stage:nth-child(2) .fixing .chip")]
+      .map((n) => n.textContent)).toEqual(["instrument.zero_shift"]);
+    expect(host.querySelector("ol.stages > li.stage:nth-child(1) .fixing")).toBeNull();
     const body = host.querySelector("ol.stages > li.stage:nth-child(2) .rung .body")!;
     expect(body.textContent).toContain("fixed here");
     expect(body.textContent).toContain("instrument.zero_shift");

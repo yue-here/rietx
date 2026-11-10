@@ -47,8 +47,9 @@
    *
    * A glob is a `.chip`, a fact, and the verb that removes it is a ghost
    * button beside it: a chip never acts (`gui/CLAUDE.md` § House style).
-   * A stage's fixes (WP-2208) are a second row of the same shape, drawn even
-   * when empty, so a first fix moves nothing below it.
+   * A stage's fixes (WP-2208) are a second row of the same shape, drawn when
+   * the stage fixes something or `+ Fix` opened it, as the workshop prototype
+   * draws its Fix row, so a plan that fixes nothing reads as it did.
    */
   import { tick } from "svelte";
 
@@ -111,7 +112,8 @@
   let selected = $state(0);
   /** the text typed into each stage's add field, by index */
   let adding = $state<Record<number, string>>({});
-  /** the text typed into each stage's fix field, by index (WP-2208) */
+  /** the text typed into each stage's fix field, by index (WP-2208); a key
+   *  present, even as "", is a fix row `+ Fix` opened */
   let fixing = $state<Record<number, string>>({});
   let list = $state<HTMLOListElement | null>(null);
 
@@ -335,9 +337,9 @@
     stages = moveStage(stages, from, to);
     selected = Math.max(0, order.indexOf(selected));
     const follow = (typed: Record<number, string>) => Object.fromEntries(
-      order.map((old, k) => [k, typed[old] ?? ""] as const).filter(([, text]) => text),
+      order.map((old, k) => [k, typed[old]] as const).filter(([, text]) => text !== undefined),
     );
-    adding = follow(adding);
+    adding = Object.fromEntries(Object.entries(follow(adding)).filter(([, text]) => text));
     fixing = follow(fixing);
   }
 
@@ -391,6 +393,14 @@
     if (next.length === before.length) return;
     remember();
     stages[index].turn_off = next;
+  }
+
+  /** `+ Fix`: open the stage's fix row and put the cursor in its field. */
+  async function openFix(index: number) {
+    fixing[index] = fixing[index] ?? "";
+    await tick();
+    list?.querySelector<HTMLInputElement>(
+      `:scope > li.stage:nth-child(${index + 1}) input.add.fix`)?.focus({ preventScroll: true });
   }
 
   function removeFix(index: number, at: number) {
@@ -565,10 +575,16 @@
             value={adding[index] ?? ""}
             oninput={(event) => (adding[index] = (event.currentTarget as HTMLInputElement).value)}
             onkeydown={(event) => { if (event.key === "Enter") addGlob(index); }} />
+          {#if !stage.turn_off?.length && fixing[index] === undefined}
+            <button class="ghost" disabled={busy}
+              title="fix parameters in this stage, after it frees its own"
+              onclick={() => openFix(index)}>+ Fix</button>
+          {/if}
         </div>
 
-        <!-- what the stage fixes after it frees (WP-2208); the row is always
-             drawn, so a first fix moves nothing below it -->
+        <!-- what the stage fixes after it frees (WP-2208), drawn once it fixes
+             something or `+ Fix` opened it -->
+        {#if stage.turn_off?.length || fixing[index] !== undefined}
         <div class="frees fixing indent">
           <span class="lab"><Help for="stage_fields:turn_off">Fixes</Help></span>
           {#each stage.turn_off ?? [] as glob, at (at)}
@@ -587,6 +603,7 @@
             oninput={(event) => (fixing[index] = (event.currentTarget as HTMLInputElement).value)}
             onkeydown={(event) => { if (event.key === "Enter") addFix(index); }} />
         </div>
+        {/if}
 
         <div class="rung indent">
           {#if step}

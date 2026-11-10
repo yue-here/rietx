@@ -426,7 +426,8 @@ The plan reads top to bottom, one stage to a row. Each row holds:
 - `×`, which removes the stage. The last stage has none.
 - the globs the stage frees, each with a `×` beside it, and a field where you
   type another glob and press Enter.
-- the globs the stage fixes, in a `Fixes` row of the same shape. The stage
+- the globs the stage fixes, in a `Fixes` row of the same shape. `+ Fix` at
+  the end of the frees opens the row when the stage fixes nothing yet. The stage
   fixes them after it frees its own globs, so a stage that frees `phases.*`
   and fixes `phases.*.atoms.*.biso` frees all of the phase but its
   displacements. A parameter stays fixed until a later stage frees it again.
