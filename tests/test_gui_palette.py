@@ -70,37 +70,28 @@ NEIGHBOURS = (*CURVES, "--muted", "--fg")
 #: `--bad`, which is the specific mistake WP-1210 was written to undo.
 LAYERS = ("--plot-peak", "--plot-peakfit", "--plot-candidate")
 
-#: The recessive set, exempt from the floor **against each other only**.
+#: The pairs the shipped palette misses the floor on, named rather than exempted
+#: quietly, each held to the distance it was measured at so it can only improve.
 #:
-#: `viz/theme.py` says why: observations and background are meant to sit below the
-#: chroma a categorical palette would demand, and their identity is carried by
-#: the mark — points against a dotted line.  Measured, obs/bkg is 0.086 on the
-#: light theme, so a blanket all-pairs assertion would be asserting the opposite
-#: of the design.
+#: All three are the background (WP-2200).  The site's palette draws it dashed in
+#: the figures' brown, beside an orange calculated curve and a grey difference,
+#: as the design rounds of 2026-11-06 to 11-08 drew it and as `viz/plots.PALETTES`
+#: has drawn every figure since.  The dash carries its identity, as the point
+#: marks carry the observations'.  A fourth pair fails.
 #:
-#: `--muted` belongs here for a second reason worth stating, because a reviewer
-#: has already flagged it once: it draws the **masked measured points**, which
-#: are the same data as `--plot-obs` and are meant to read that way (WP-1033) —
-#: 0.032 apart on the dark theme.  What may *not* borrow it is a mark that is
-#: not the data: WP-1210 briefly drew unusable peak markers in it, sitting on
-#: top of the very points it matched, and they now take the peak layer's own
-#: colour with the hollow ring carrying the state.
-RECESSIVE = frozenset({"--plot-obs", "--plot-bkg", "--muted"})
-
-#: The two pairs the shipped palette misses the floor on, named rather than
-#: exempted quietly.
-#:
-#: Both are a recessive grey against the difference curve, and both were chosen
-#: in WP-1029 against their own surface: light `--plot-bkg`/`--plot-diff` is
-#: **0.129** and dark `--plot-obs`/`--plot-diff` is **0.124**, against a 0.13
-#: floor.  Retuning a shipped curve colour is not WP-1210's — the layer that had
-#: no colours at all is — but they may not get *worse* either, which is what
-#: :data:`GRANDFATHERED_FLOOR` holds them to.  A third such pair fails.
-GRANDFATHERED = {
-    "light": {("--plot-bkg", "--plot-diff")},
-    "dark": {("--plot-diff", "--plot-obs")},
+#: The pairs WP-1210 named here (light `--plot-bkg`/`--plot-diff` at 0.129, dark
+#: `--plot-obs`/`--plot-diff` at 0.124) cleared the floor under the new palette and
+#: left the table, and so did the recessive set that exempted the old grey
+#: observations from the background: the observations are drawn in the ink now.
+#: `--muted` still draws the masked measured points, which are the same data as
+#: `--plot-obs` (WP-1033); what may *not* borrow it is a mark that is not the
+#: data, which `test_each_layer_colour_clears_the_floor_against_every_neighbour`
+#: holds.
+NAMED_PAIRS: dict[str, dict[tuple[str, str], float]] = {
+    "light": {("--plot-bkg", "--plot-calc"): 0.064},
+    "dark": {("--plot-bkg", "--plot-calc"): 0.092,
+             ("--plot-bkg", "--plot-diff"): 0.109},
 }
-GRANDFATHERED_FLOOR = 0.12
 
 
 def _block(name: str, css: str) -> dict[str, str]:
@@ -221,34 +212,34 @@ def test_each_layer_colour_clears_the_floor_against_every_neighbour(themes, them
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
 def test_every_chromatic_curve_pair_clears_it_too(themes, theme):
-    """The floor holds across the whole curve set, the recessive greys apart.
+    """The floor holds across the whole curve set, the named pairs apart.
 
     Which is the assertion that would have failed the day the peak layer was
     written: `--accent` against `--plot-diff` was 0.000.
     """
     palette = themes[theme]
-    known = GRANDFATHERED[theme]
+    known = NAMED_PAIRS[theme]
     for one in CURVES:
         for two in CURVES:
-            if one >= two or {one, two} <= RECESSIVE:
+            if one >= two:
                 continue
             gap = _oklab_distance(_oklab(palette[one]), _oklab(palette[two]))
-            floor = GRANDFATHERED_FLOOR if (one, two) in known else MIN_SEPARATION
+            floor = known.get((one, two), MIN_SEPARATION)
             assert gap >= floor, (
                 f"{theme}: {one} and {two} are {gap:.3f} apart")
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
-def test_the_grandfathered_pairs_are_still_the_only_ones(themes, theme):
+def test_the_named_pairs_are_still_the_only_ones(themes, theme):
     """An exemption that outlives its reason is a lie about the palette."""
     palette = themes[theme]
     under = {
         (one, two)
         for one in CURVES for two in CURVES
-        if one < two and not {one, two} <= RECESSIVE
+        if one < two
         and _oklab_distance(_oklab(palette[one]), _oklab(palette[two])) < MIN_SEPARATION
     }
-    assert under == GRANDFATHERED[theme], (
+    assert under == set(NAMED_PAIRS[theme]), (
         f"{theme}: the pairs under the floor have changed — {sorted(under)}")
 
 
@@ -516,37 +507,67 @@ def test_the_watcher_and_the_gui_offer_the_same_three_themes():
     assert set(THEME_GLYPHS) == set(THEME_TITLES) == set(THEME_CHOICES)
 
 
-@pytest.mark.parametrize("theme", ["light", "dark"])
-def test_nothing_writes_white_on_the_accent(theme):
-    """Measured: on the dark theme the accent is a light blue, and white on it
-    is **2.22:1** — under WCAG AA at any size.  `--panel` is white on the
-    light theme and near-black on the dark one, so one token is the legible
-    ink on both fills: 6.44 and 7.51.
-
-    The literal was in `app.css` in three places and was on its way into the
-    watcher's own control when that page's no-colour-literals guard caught it
-    (`test_no_colour_literal_is_left_in_the_page`).  This is that guard for
-    the stylesheet which has none, stated as the measurement rather than as a
-    ban on a string.
-    """
+def _contrast(a: str, b: str) -> float:
+    """The WCAG 2.2 contrast ratio of two opaque `#rrggbb` colours."""
     def luminance(value: str) -> float:
         parts = [int(value[i:i + 2], 16) / 255 for i in (1, 3, 5)]
         lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
                for c in parts]
         return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
 
-    def contrast(a: str, b: str) -> float:
-        la, lb = luminance(a), luminance(b)
-        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+    la, lb = luminance(a), luminance(b)
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 
-    accent = TOKENS[theme]["--accent"]
-    panel = TOKENS[theme]["--panel"]
-    assert contrast(accent, panel) >= 4.5, (
-        f"{theme}: --panel on --accent is {contrast(accent, panel):.2f}:1")
-    # and the two stylesheets do not reach for white instead
-    css = (Path(__file__).resolve().parents[1] / "gui" / "src" / "app.css"
-           ).read_text(encoding="utf-8")
-    for block in ("button {", "button.on {", ".segmented button.on {"):
+
+APP_CSS = ROOT / "gui" / "src" / "app.css"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_the_filled_controls_ink_legibly_on_their_fill(theme):
+    """The primary and an engaged toggle are filled in the accent's text role.
+
+    White on the orange accent is **4.22:1**, under WCAG AA, which is why the
+    maintainer's ruling of 2026-11-06 fills the one primary in `--accent-ink`
+    (5.84:1 with white).  The ink is `--panel`, never a literal white: on the
+    dark theme the fill is a light orange, and `--panel` is the near-black there
+    (WP-1438 found the literal on its way into the watcher's control).
+    """
+    fill, ink = TOKENS[theme]["--accent-ink"], TOKENS[theme]["--panel"]
+    assert _contrast(fill, ink) >= 4.5, (
+        f"{theme}: --panel on --accent-ink is {_contrast(fill, ink):.2f}:1")
+    css = APP_CSS.read_text(encoding="utf-8")
+    for block in ("button {", "button.on {"):
         start = css.index("\n" + block)
         rule = css[start:css.index("}", start)]
-        assert "#fff" not in rule, f"{block} still inks white on the accent"
+        assert "background: var(--accent-ink)" in rule, f"{block} is not filled in --accent-ink"
+        assert "color: var(--panel)" in rule, f"{block} does not ink in --panel"
+        assert "#fff" not in rule, f"{block} inks white on its fill"
+
+
+#: Every token a panel sets text in, each with the grounds it is set on: the page
+#: and the panel for all of them, and the hover ground for the ink a ghost
+#: button's label is set in.
+TEXT_ON = {ink: ("--bg", "--panel")
+           for ink in ("--muted", "--accent-ink", "--ok", "--warn", "--bad")}
+TEXT_ON["--fg"] = ("--bg", "--panel", "--hover")
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_every_text_colour_clears_aa_on_every_ground(theme):
+    """The site's rule, carried over with its palette (WP-2200): every text
+    colour clears 4.5:1 on each ground it is set on, and the accent, which
+    marks and sets no running words, clears 3:1 as a mark.
+
+    `gui/STYLE.md` § Colour states it; before this WP only ink on the accent
+    fill was measured.  The weakest pair is `--ok` on the light page, 4.95:1.
+    A state colour on the hover ground would not clear it (`--ok` is 4.20:1
+    there), so a hovered control keeps its label in the ink.
+    """
+    palette = TOKENS[theme]
+    for ink, grounds in TEXT_ON.items():
+        for ground in grounds:
+            ratio = _contrast(palette[ink], palette[ground])
+            assert ratio >= 4.5, f"{theme}: {ink} on {ground} is {ratio:.2f}:1"
+    for ground in ("--bg", "--panel"):
+        ratio = _contrast(palette["--accent"], palette[ground])
+        assert ratio >= 3.0, f"{theme}: --accent on {ground} is {ratio:.2f}:1"

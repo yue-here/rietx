@@ -100,18 +100,18 @@ action on data.
 
 ## Tasks
 
-- [ ] 1. `theme.py`: the site's chrome, the new roles the GUI reads (`--accent-ink`,
+- [x] 1. `theme.py`: the site's chrome, the new roles the GUI reads (`--accent-ink`,
   `--line-strong`, `--hover`), the re-measured plot palette, the notes rewritten; the
   emitter loops over the themes `TOKENS` holds, with the colour scheme each declares.
   Regenerate `tokens.css`.
-- [ ] 2. `app.css` and the panels: the primary fill and an engaged toggle in
+- [x] 2. `app.css` and the panels: the primary fill and an engaged toggle in
   `--accent-ink` under `--panel` ink; the outlined button in `--line-strong` with `--fg`
   text and the `--hover` ground; every text set in `--accent` moved to `--accent-ink`.
-- [ ] 3. `plot.ts` fallbacks and the vitest fixtures pinning them; the `Structure3D.svelte`
+- [x] 3. `plot.ts` fallbacks and the vitest fixtures pinning them; the `Structure3D.svelte`
   fallbacks.
-- [ ] 4. `test_gui_palette.py`: the named pairs with their measured values; every text
+- [x] 4. `test_gui_palette.py`: the named pairs with their measured values; every text
   colour against each ground; ink on the primary fill.
-- [ ] 5. `gui/STYLE.md` § Colour states what now holds.
+- [x] 5. `gui/STYLE.md` § Colour states what now holds.
 - [ ] 6. Dist rebuilt; vitest, svelte-check, every `tests/*_browser.py`, the fast suite,
   `python -m tests.reader_output`.
 - [ ] 7. Screenshots of the built GUI beside the prototype's at the same window size, light

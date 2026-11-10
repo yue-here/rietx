@@ -756,7 +756,7 @@
   }
 
   li.selected .step {
-    color: var(--accent);
+    color: var(--accent-ink);
     font-weight: 600;
   }
 
