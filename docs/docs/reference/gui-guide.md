@@ -36,8 +36,8 @@ below, and the sash then drags up and down.
 
 | Control | Does |
 |---|---|
-| the project chip | names the `.rex`, its data file, the point count, the intensity mode, and whether σ came from the file or from counting statistics |
-| `Open…` | the import wizard, with the recent list in it |
+| the project chip | names the `.rex`, its data file, the point count, the intensity mode, and whether σ came from the file or from counting statistics; `No project` when none is open |
+| `Open…` | the start screen, over the open project, with `Back to the project` to return |
 | the two collapse buttons | hide the graphs (left end) or the panel column (right end) |
 | `Simple \| Advanced` | whether the Plan, Model, Series and Report panels show their advanced controls |
 | `◐ ☀ ☾` | theme: follow the system, light, dark |
