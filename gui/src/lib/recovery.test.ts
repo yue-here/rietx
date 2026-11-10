@@ -107,6 +107,17 @@ describe("the writer", () => {
     expect(w.armedFor).toBeNull();
   });
 
+  it("hands a closing page its unsent write once", async () => {
+    const { w, calls } = writer();
+    w.arm("/a.rex");
+    w.schedule("/a.rex", "n1", DRAFT);
+    expect(w.takeUnsent()).toEqual({ project: "/a.rex", head: "n1", draft: DRAFT });
+    expect(w.takeUnsent()).toBeNull();
+    // the page came back from the back-forward cache: nothing is sent again
+    await w.flush();
+    expect(calls).toEqual([]);
+  });
+
   it("follows a renamed project", async () => {
     const { w, calls, clock } = writer();
     w.arm("/a.rex");

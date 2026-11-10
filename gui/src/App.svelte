@@ -453,6 +453,12 @@
       await api.putRecovery(o.path, null, null);
     } catch (error) {
       say(`refused: ${(error as Error).message}`);
+      // the server still holds the copy: arm as if it does, and ask again
+      if (project?.path === o.path) {
+        recoveryWriter.arm(o.path, o.draft);
+        recoveryWriter.schedule(o.path, head, null);
+      }
+      return;
     }
     if (project?.path === o.path) recoveryWriter.arm(o.path, null);
   }
@@ -460,7 +466,7 @@
   /** The page is going: send the write the timer was holding, with
    *  `keepalive`, which a timer cannot outlive. */
   function pageHidden() {
-    const unsent = recoveryWriter.unsent();
+    const unsent = recoveryWriter.takeUnsent();
     if (unsent) api.putRecoveryOnHide(unsent.project, unsent.head, unsent.draft);
   }
 
@@ -612,6 +618,9 @@
    * exists.  Returns the refusal for the button that was clicked, as `open`
    * does, and refreshes the list because `built` has just changed. */
   async function openExample(name: string, reset = false): Promise<string> {
+    // a write still on the timer lands first: after a reset it would
+    // otherwise re-create the copy the server has just discarded (WP-2209)
+    await recoveryWriter.flush();
     try {
       const doc = reset ? await api.resetExample(name) : await api.openExample(name);
       await opened(doc);

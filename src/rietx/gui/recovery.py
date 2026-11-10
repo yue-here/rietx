@@ -38,6 +38,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import time
 import warnings
 from datetime import UTC, datetime
@@ -135,11 +136,27 @@ def write(state_dir: str | Path, project_path: str | Path, draft: dict,
     }
     target = path_for(state_dir, project_path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
-    temporary.write_text(json.dumps(record), encoding="utf-8")
-    os.replace(temporary, target)
+    _replace(target, record)
     _prune_once(target.parent)
     return record
+
+
+def _replace(target: Path, record: dict) -> None:
+    """Write ``record`` to a temporary name beside ``target``, then rename it over.
+
+    The temporary name carries the thread as well as the process: the GUI
+    server is a ``ThreadingHTTPServer``, and two writes for one project at once
+    (a closing page's ``keepalive`` write beside one in flight, or a second tab)
+    must not write into one temporary file.
+    """
+    temporary = target.with_name(
+        f".{target.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        temporary.write_text(json.dumps(record), encoding="utf-8")
+        os.replace(temporary, target)
+    except OSError:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def discard(state_dir: str | Path, project_path: str | Path) -> bool:
@@ -159,9 +176,7 @@ def move(state_dir: str | Path, source: str | Path, target: str | Path) -> bool:
         return False
     record["project"] = project_key(target)
     destination = path_for(state_dir, target)
-    temporary = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
-    temporary.write_text(json.dumps(record), encoding="utf-8")
-    os.replace(temporary, destination)
+    _replace(destination, record)
     old = path_for(state_dir, source)
     if old != destination:
         _guarded_unlink(old, old.parent)

@@ -28,11 +28,23 @@
     ondiscard?: () => void;
   } = $props();
 
+  let dialog = $state<HTMLElement | null>(null);
+
   /** No shortcut acts behind the question: every key stops here, in the
-   *  capture phase, while its default (Tab, Enter or Space on a button) still
-   *  happens.  Escape does nothing at all. */
+   *  capture phase, while its default (Enter or Space on a button) still
+   *  happens.  Escape does nothing at all.  Tab moves between the two
+   *  buttons and never out of the dialog: stopping a key's listeners does not
+   *  stop its default, so focus that left could type an edit behind the
+   *  question, which nothing would keep. */
   function keydown(event: KeyboardEvent) {
     if (event.key === "Escape") event.preventDefault();
+    if (event.key === "Tab" && dialog) {
+      event.preventDefault();
+      const buttons = [...dialog.querySelectorAll<HTMLButtonElement>("button")];
+      const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const step = event.shiftKey ? -1 : 1;
+      buttons[(at + step + buttons.length) % buttons.length]?.focus();
+    }
     event.stopPropagation();
   }
 </script>
@@ -40,7 +52,7 @@
 <svelte:window onkeydowncapture={keydown} />
 
 <div class="backdrop">
-  <div class="rc-dialog" role="dialog" aria-modal="true" aria-labelledby="rc-title">
+  <div class="rc-dialog" bind:this={dialog} role="dialog" aria-modal="true" aria-labelledby="rc-title">
     <h2 id="rc-title">Unapplied edits</h2>
     <p>{offerText(draft, savedUtc)}</p>
     {#if moved}<p class="muted">The project has changed since.</p>{/if}

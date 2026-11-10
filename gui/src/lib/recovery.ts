@@ -160,6 +160,17 @@ export class RecoveryWriter {
     return { project: this.project, ...this.next };
   }
 
+  /** {@link unsent}, handed over: the timer is cleared and the draft counted
+   *  as sent, so a page that comes back from the back-forward cache does not
+   *  send it a second time behind the `keepalive` one. */
+  takeUnsent(): { project: string; head: string | null; draft: Draft | null } | null {
+    const out = this.unsent();
+    if (!out) return null;
+    this.drop();
+    this.sent = JSON.stringify(out.draft);
+    return out;
+  }
+
   private drop() {
     if (this.handle !== null) this.timers.clear(this.handle);
     this.handle = null;
