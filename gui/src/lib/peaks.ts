@@ -283,7 +283,8 @@ export interface Candidate {
     unmatched_observed?: number;
   } | null;
   diagnostics: Array<{ level: string; code: string; message: string }>;
-  supercell_checks?: Array<{ parent_cell: number[]; index: number; verdict: string }> | null;
+  supercell_checks?: Array<{ parent_cell: number[]; index: number; relation?: string;
+    verdict: string }> | null;
 }
 
 /**
@@ -506,7 +507,10 @@ export function candidateRelation(cands: readonly Candidate[], i: number): strin
   }
   for (const check of c.supercell_checks ?? []) {
     const k = cands.findIndex((o) => sameCell(o.cell, check.parent_cell));
-    if (k >= 0 && k !== i) return `#${k + 1} with ${check.index}× the volume`;
+    if (k < 0 || k === i) continue;
+    // a containment pair is no sublattice, so its index is 0 (SupercellCheck)
+    return check.index >= 2 ? `#${k + 1} with ${check.index}× the volume`
+      : `indexes every line #${k + 1} does`;
   }
   return "";
 }

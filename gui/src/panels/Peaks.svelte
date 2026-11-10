@@ -318,6 +318,23 @@
   const imax = $derived(intensityScale(rows));
   const indexing = $derived(busy && run?.run?.kind === "index");
   const screening = $derived(busy && run?.run?.kind === "extinction");
+  /** The run frame carries the elapsed time only when the run's state changes,
+   *  so the clock counts on from the last frame by the browser's own time. */
+  let frameElapsed = $state(0);
+  let frameAt = $state(0);
+  let now = $state(0);
+  // a derived number, so a poll repeating the same value restarts nothing
+  const stamped = $derived(run?.run?.elapsed ?? 0);
+  $effect(() => {
+    frameElapsed = stamped;
+    frameAt = now = performance.now();
+  });
+  $effect(() => {
+    if (!indexing) return;
+    const id = setInterval(() => (now = performance.now()), 1000);
+    return () => clearInterval(id);
+  });
+  const elapsed = $derived(frameElapsed + (indexing ? (now - frameAt) / 1000 : 0));
   const candidates = $derived<Candidate[]>(indexAnswer?.result?.candidates ?? []);
   const refuting = $derived<string[]>(indexAnswer?.refuting_caveats ?? []);
   const verdicts = $derived<AdoptVerdict[]>(indexAnswer?.adopt ?? []);
@@ -340,6 +357,9 @@
   /** the time limit is a preset's ceiling, said as a time */
   const limitWord = (s: number | null | undefined) =>
     s == null ? "None" : s % 60 === 0 ? `${s / 60} minutes` : `${s} s`;
+  /** the limits in rising order with the unbounded one last, as the prototype has them */
+  const limitOrder = $derived([...presetsVocab].sort((x, y) =>
+    (x.total_budget_seconds ?? Infinity) - (y.total_budget_seconds ?? Infinity) || 0));
   const preset = $derived(draft?.search.preset ?? defaultPreset);
   const budget = $derived(draft?.search.total_budget_seconds
     ?? presetsVocab.find((p) => p.name === preset)?.total_budget_seconds ?? null);
@@ -354,8 +374,19 @@
   const judged = $derived(expanded);
   /** a run with a formula adds Z, the formula units each cell holds (WP-2030) */
   const zColumn = $derived(indexAnswer?.result?.formula != null);
-  /** the two figures of merit the literature names by a symbol */
-  const FOM_LABEL: Record<string, string> = { m20: "M₂₀", f_n: "F_N" };
+  /** each figure of merit as the literature writes it: a symbol with its
+   *  subscript, or a share said in words and printed as a percentage (the
+   *  prototype's round 11 labels); an unknown name prints as it comes */
+  const FOM_LABEL: Record<string, { word: string; sub?: string; pct?: boolean }> = {
+    m20: { word: "M", sub: "20" }, f_n: { word: "F", sub: "N" },
+    m_rev: { word: "M", sub: "rev" }, m_sym: { word: "M", sub: "sym" },
+    indexed_fraction: { word: "Lines indexed", pct: true },
+    indexed_intensity_fraction: { word: "Intensity indexed", pct: true },
+    predicted_seen_fraction: { word: "Predicted lines seen", pct: true },
+  };
+  const fomValue = (f: { name: string; value: number | null }) =>
+    f.value == null ? "–" : FOM_LABEL[f.name]?.pct ? `${Math.round(100 * f.value)} %`
+      : f.value.toFixed(2);
   const caveatWords = (c: Candidate) =>
     c.confidence_caveats.map((k) => k.replaceAll("_", " "));
   /** the gate's pick, a badge on one row of the list and never the list's
@@ -365,6 +396,7 @@
   /** what the search tried and what it did not finish, said whatever it found
    *  (WP-1042: a system not reached is said loudly, WP-2130) */
   const coverage = $derived(searchCoverage(indexAnswer?.result));
+  const searchDiagnostics = $derived<any[]>(indexAnswer?.result?.diagnostics ?? []);
   const screen = $derived(extinction?.result ?? null);
 
   /**
@@ -694,7 +726,7 @@
           <span class="lab"><Help for={searchHelp(field("preset"))}>Time limit</Help></span>
           <span class="field">
             <div class="segmented" role="group" aria-label="Time limit">
-              {#each presetsVocab as p (p.name)}
+              {#each limitOrder as p (p.name)}
                 {@const on = draft.search.total_budget_seconds == null && preset === p.name}
                 <button class:on={on} aria-pressed={on} disabled={busy}
                   onclick={() => setLimit(p.name)}>{limitWord(p.total_budget_seconds)}</button>
@@ -740,14 +772,17 @@
             <p class="warn">Search incomplete in {coverage.incomplete.join(", ")}:
               a negative result there is not evidence.</p>
           {/if}
-          <ul class="strip">
-            {#each indexAnswer.result?.diagnostics ?? [] as d (d.code + d.message)}
-              <li class={d.level}><span class="mono"><Help for="diagnostics:{d.code}">{d.code}</Help></span>
-                {d.message}
-                <!-- keyed by position: two `where` entries can be one string -->
-                {#each d.where ?? [] as w, j (j)}<span class="where">{w}</span>{/each}</li>
-            {/each}
-          </ul>
+          <!-- a warning or an error stays in view; the informational notes
+               fold, as the picker's do, so the list stays on the first
+               screen (on FAP, five notes filled the pane: WP-2202) -->
+          {@render searchNotes(searchDiagnostics.filter((d) => d.level !== "info"))}
+          {#if searchDiagnostics.some((d) => d.level === "info")}
+            <details class="fold">
+              <summary>Notes from the search
+                ({searchDiagnostics.filter((d) => d.level === "info").length})</summary>
+              {@render searchNotes(searchDiagnostics.filter((d) => d.level === "info"))}
+            </details>
+          {/if}
         </div>
         {#if !candidates.length}
           <p class="muted">No candidate cells.
@@ -816,8 +851,8 @@
       <div class="foot">
         {#if indexing}
           <button class="ghost" onclick={stop}>Stop</button>
-          <span class="muted mono why">{clock(run?.run?.elapsed ?? 0)} elapsed{#if budget != null}
-            · about {clock(Math.max(0, budget - (run?.run?.elapsed ?? 0)))} left{/if}</span>
+          <span class="muted mono why">{clock(elapsed)} elapsed{#if budget != null}{" "}·
+            about {clock(Math.max(0, budget - elapsed))} left{/if}</span>
         {:else}
           {#if candidates.length}
             <button class="ghost" disabled={judged === null} onclick={() => goStep(3)}
@@ -875,9 +910,9 @@
       <dl class="kv">
         {#each c.fom as f (f.name)}
           <!-- each figure's blind spot is one click away (round 11) -->
-          <dt>{#if f.blind_spot}<Help text={f.blind_spot}>{FOM_LABEL[f.name] ?? f.name}</Help>
-            {:else}{FOM_LABEL[f.name] ?? f.name}{/if}</dt>
-          <dd class="mono">{f.value == null ? "–" : f.value.toFixed(2)}</dd>
+          <dt>{#if f.blind_spot}<Help text={f.blind_spot}>{@render fomName(f.name)}</Help>
+            {:else}{@render fomName(f.name)}{/if}</dt>
+          <dd class="mono">{fomValue(f)}</dd>
         {/each}
         <dt>Found by</dt><dd>{c.found_by.join(", ")}</dd>
       </dl>
@@ -964,9 +999,27 @@
     {/if}
   {/if}
 
+  {#snippet fomName(name: string)}
+    {#if FOM_LABEL[name]}{FOM_LABEL[name].word}{#if FOM_LABEL[name].sub}<sub
+      >{FOM_LABEL[name].sub}</sub>{/if}{:else}{name}{/if}
+  {/snippet}
+
+  {#snippet searchNotes(list: any[])}
+    {#if list.length}
+      <ul class="strip">
+        {#each list as d (d.code + d.message)}
+          <li class={d.level}><span class="mono"><Help for="diagnostics:{d.code}">{d.code}</Help></span>
+            {d.message}
+            <!-- keyed by position: two `where` entries can be one string -->
+            {#each d.where ?? [] as w, j (j)}<span class="where">{w}</span>{/each}</li>
+        {/each}
+      </ul>
+    {/if}
+  {/snippet}
+
   {#snippet moreSettings()}
     <details class="fold search">
-      <summary>More settings{#if digest}<span class="muted"> · {digest}</span>{/if}</summary>
+      <summary>More settings{#if digest}{" "}<span class="muted">· {digest}</span>{/if}</summary>
       <div class="grid" class:frozen={busy}>
         <div class="block">
           <span class="lab"><Help for={searchHelp(field("engines"))}
@@ -1216,7 +1269,8 @@
   }
   .field.wrap { flex-wrap: wrap; gap: var(--s1) var(--s3); }
   .field input[type="text"] {
-    width: 8ch;
+    /* "from data" whole, with the box's padding (a placeholder is a word) */
+    width: 11ch;
     font-family: var(--mono-family, monospace);
   }
   .add {
@@ -1296,9 +1350,11 @@
   th.r, td.r { text-align: right; }
   td.ck, th.ck { width: 1.5em; padding-right: var(--s2); }
   td.note { white-space: normal; }
+  /* the note's words are a list, so they read as one: "fit failed, asymmetric" */
+  .word + .word::before { content: ", "; }
   /* a greyed row stays clickable: it is dimmed by colour, never by
-     pointer-events (round 11's fault) */
-  tr.out td { color: var(--muted); }
+     pointer-events (round 11's fault); the 2θ button inherits it */
+  tr.out td, tr.out .pick { color: var(--muted); }
   tr.lit td { background: color-mix(in srgb, var(--accent) 12%, transparent); }
   tr.sel td { background: color-mix(in srgb, var(--accent) 18%, transparent); }
   .candidates tr.lit td {
@@ -1308,6 +1364,12 @@
   td.on { color: var(--fg); }
   .pos { font: inherit; }
   td.cell { white-space: normal; min-width: 12em; }
+  /* the cell is read as one line of numbers; only the words under it wrap */
+  td.cell > .pick { white-space: nowrap; }
+  .candidates th { white-space: nowrap; }
+  /* a class's group list is the column that gives way, so a refutation keeps
+     its width under the symbol */
+  .classes td:last-child { white-space: normal; }
   td.cell .rel, td.cell .why {
     display: block;
     overflow-wrap: anywhere;

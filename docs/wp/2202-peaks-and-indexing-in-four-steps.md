@@ -42,9 +42,11 @@ the workflow's home, so no route or tab becomes unreachable.
    picker's notes sit under a disclosure, and so do the picking settings with Pick peaks again,
    which says how many edits it replaces before it runs (round 11c call 29, 11d). A row click
    frames its line on the plot (interaction rule 5).
-2. **Fit peaks.** The overlap groups, filtered "To look at" (χ²ᵣ above 10, or a flag other than
-   asymmetry: call 13, measured on FAP, where χ²ᵣ > 3 flags 84 of 117 groups and asymmetry is
-   on 36 lines) or "All groups", with the 2θ span, the line count, χ²ᵣ and the notes. The graph
+2. **Fit peaks.** The overlap groups, filtered "To look at" (χ²ᵣ above 10, or a flag saying
+   the window fit is in doubt: a position at its bound, an unresolved shoulder or split, a
+   capped width, a non-separable pair or a Kα2 residual. Call 13, measured on FAP, where
+   χ²ᵣ > 3 flags 84 of 117 groups and asymmetry is on 36 lines. A duplicate, weak or ghost
+   line is a fact about the line, so it is not in the set) or "All groups", with the 2θ span, the line count, χ²ᵣ and the notes. The graph
    shows the group windows: data, the fit, the background envelope, the line marks and the
    residual in esd. Each line's own curve is drawn under the sum, as a tinted fill with a line,
    including its Kα2 partner, with numbered toggles per window (round 11b and 11c, calls 23
@@ -101,8 +103,8 @@ waits for the palette piece (ruled 2026-11-09), so `--plot-peak` stays as it is 
 
 ### The tier of each rule this WP adds
 
-One threshold is new to the package: "To look at" (χ²ᵣ above 10, or a flag other than
-`asymmetry_unmodelled`) is a view filter over the picker's own numbers. It changes which rows a
+One threshold is new to the package: "To look at" (χ²ᵣ above 10, or one of the six flags in
+`gui/src/lib/peaks.ts:LOOK_FLAGS`) is a view filter over the picker's own numbers. It changes which rows a
 person sees first, never which lines reach the search, so it is a display choice in the GUI and
 not a heuristic of the package (`rietx._audit` audits the package's diagnostics, defaults and
 suggestions, and this is none of them).
@@ -119,6 +121,32 @@ suggestions, and this is none of them).
 - "Search these" running a narrowed search, and keeping the indexing result across a restart (a
   stored-format change).
 
+## Follow-ups
+
+None of these has an owner yet. Each is a later piece of the milestone, or a row of its own
+when the milestone's table of unfiled pieces is next filed.
+
+- The plot's interaction grammar across Pattern, Background and Peaks: a selection, a
+  selection bar, Delete, Option-click, Esc to undo a drag, right-click context menus, and undo
+  for peak edits (adopted rules, 2026-11-08). The workflow menu has its own row in the
+  milestone.
+- "Search these" under the coverage line, running the search over the systems it did not
+  reach.
+- An overrule memory: which flags a person overruled on which line, kept across a re-pick (a
+  `peaks.json` format change).
+- The Judge step's absent lines as tick indices on the plot, and the peaks no line explains as
+  red marks (the prototype's round 11d). Today the candidate's lines span the data pane, as
+  WP-1211 drew them.
+- Relations rietx does not compute yet, such as "c doubled" or "a × √3". The table names only
+  a repeated cell and a `supercell_checks` entry.
+- A help arm for the grade's caveats. The Judge step prints `confidence_caveats` with the
+  underscores replaced, where the prototype has words ("engines disagree").
+- 96 px of headroom above the tallest peak for the lens marks, so a mark never clamps at the
+  plot's top edge.
+- Refit in each fit window's caption, beside the line toggles. Today it is the ↻ on the
+  group's row.
+- Keeping the indexing result across a restart of the GUI (a stored-format change).
+
 ## Tasks
 
 - [x] 1. File this WP and give it the milestone's "Peaks and indexing" row.
@@ -126,13 +154,13 @@ suggestions, and this is none of them).
   to the group's model.
 - [x] 3. `lib/peaks.ts` helpers for the steps, filters, groups to look at, the candidate columns
   and relations; vitest.
-- [ ] 4. The Peaks tab in four steps (`Peaks.svelte`), the pick options sent to the route.
-- [ ] 5. The fit windows with per-line curves (`PeakFits.svelte`) in the Single peaks graph
+- [x] 4. The Peaks tab in four steps (`Peaks.svelte`), the pick options sent to the route.
+- [x] 5. The fit windows with per-line curves (`PeakFits.svelte`) in the Single peaks graph
   while the Peaks tab is up.
-- [ ] 6. Lens peak marks on the pattern; no mark for an unused line.
-- [ ] 7. Manual § Peaks, browser tests updated, dist rebuilt, screenshots beside the
+- [x] 6. Lens peak marks on the pattern; no mark for an unused line.
+- [x] 7. Manual § Peaks, browser tests updated, dist rebuilt, screenshots beside the
   prototype's.
-- [ ] Skill: none. The skill drives the Python API, and this piece changes only the GUI.
+- [x] Skill: none. The skill drives the Python API, and this piece changes only the GUI.
 
 ## Acceptance
 

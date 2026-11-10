@@ -557,9 +557,11 @@ it as a guide rather than a test.
 
 Above the candidate table the panel says what the search covered: the crystal
 systems searched, the ones whose search did not finish, and every run-level
-diagnostic with the systems it names. A run that stopped at its ceiling says
-which systems it never reached, so a short list there is not evidence that no
-cell exists in them.
+diagnostic with the systems it names. A warning or an error stays in view.
+The informational notes, such as the peak-position precision, fold under
+"Notes from the search". A run that stopped at its ceiling says which systems
+it never reached, so a short list there is not evidence that no cell exists in
+them.
 
 The table ranks every candidate in eight columns: the cell's free lengths and
 angles, the lattice, the volume, de Wolff's M₂₀, the lines it leaves unindexed,

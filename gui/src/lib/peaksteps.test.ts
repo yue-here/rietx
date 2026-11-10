@@ -86,6 +86,10 @@ describe("the candidate columns", () => {
     expect(candidateRelation(list, 0)).toBe("#2 with 2× the volume");
     expect(candidateRelation(list, 1)).toBe("");
     expect(candidateRelation(list, 2)).toBe("same cell as #2");
+    // a containment pair has no index: its number is 0, never a volume ratio
+    const dense = cand({ cell: [16.24, 16.24, 7.92, 90, 90, 120], supercell_checks: [
+      { parent_cell: base.cell, index: 0, relation: "containment", verdict: "undecided" }] });
+    expect(candidateRelation([base, dense], 1)).toBe("indexes every line #1 does");
   });
   it("write the clock as m:ss", () => {
     expect(clock(109.4)).toBe("1:49");

@@ -6038,6 +6038,29 @@ describe("the search controls (WP-1045)", () => {
       .toBe(stub.calls.slice(0, before).filter(
         (c) => c.method === "POST" && c.path === "/api/project").length);
   });
+
+  it("counts the search clock on between run frames (WP-2202)", async () => {
+    // the server stamps `elapsed` only on a frame, and a search can go a
+    // minute without one, so a clock read off the frame alone stood at 0:00
+    const running = { ...IDLE_RUN, state: "running",
+                      run: { ...IDLE_RUN.run, kind: "index", elapsed: 5 } };
+    const stub = server({ ...controlsBoot(),
+      "/api/run/state": () => ({ body: running }),
+      "/api/events": () => ({ body: { events: [], next: 0, oldest: 1, ...running } }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    button("Peaks")!.click();
+    await flush();
+    await step("Index");
+    const clockText = () => [...host.querySelectorAll(".why")]
+      .map((e) => e.textContent!).find((t) => t.includes("elapsed")) ?? "";
+    expect(clockText()).toContain("0:05 elapsed");
+    expect(clockText()).toContain("about 1:55 left");
+    await new Promise((resolve) => setTimeout(resolve, 1100));
+    await flush();
+    expect(clockText()).toContain("0:06 elapsed");
+  });
 });
 
 describe("the help popover", () => {
