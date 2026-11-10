@@ -4807,24 +4807,34 @@ describe("the peaks tab (WP-1027)", () => {
     expect(sent("/api/peaks/add")).toHaveLength(1);
   });
 
-  it("caps a line's σ whisker at 3×FWHM", async () => {
-    // WP-1027: a degenerate component reports σ in tens of degrees (111°
-    // measured), and an uncapped whisker would span the whole pattern
-    const payload = { ...PEAKS_PAYLOAD,
-      peaks: [PEAK(0, 10.0, { two_theta_esd: 111 }), PEAK(1, 12.0, { two_theta_esd: 0.02 })] };
-    const stub = server({ ...boot(), ...RAW, "/api/peaks": () => ({ body: payload }) });
+  it("marks each used line with a lens clear of the data, stacking a near twin (WP-2202)",
+     async () => {
+    // Round 11c/11d (2026-11-08): a lens 18 px tall, its lower tip 7 px above
+    // the highest count near the line; a line left out has no mark; lines
+    // closer than 7 px stack upward, so a duplicate never hides under its twin
+    // the strongest count is far from the marked lines, so the lens has room
+    const tt = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    const y = [1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 9];
+    const payload = { ...PEAKS_PAYLOAD, pattern: { two_theta: tt, y_obs: y, n_total: 12 },
+      peaks: [PEAK(0, 12.0), PEAK(1, 12.01), PEAK(2, 14.0, { usable: false })] };
+    const stub = server({ ...boot(), "/api/result/curves": rawCurves(tt, y),
+                          "/api/peaks": () => ({ body: payload }) });
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
     button("Peaks")!.click();
     await flush();
 
-    // a whisker is one stroke of six points, its bar and its two caps; at 200 px
-    // a degree the capped one reaches 3 × 0.08° each side, the other its own σ
-    const half = pane("main").marks
-      .filter((m) => m.op === "stroke" && m.style === INK.peak && m.points?.length === 6)
-      .map((m) => Math.round((m.points![1][0] - m.points![0][0]) / 2));
-    expect(half).toEqual([48, 4]);
+    // a lens is a fill of three points: its top tip, its bottom tip, its top again
+    const main = pane("main");
+    const lenses = main.marks
+      .filter((m) => m.op === "fill" && m.style === INK.peak && m.points?.length === 3);
+    expect(lenses.length).toBe(2);
+    const [a, b] = lenses.map((m) => m.points!);
+    expect(Math.round(a[1][1] - a[0][1])).toBe(18);
+    // the crest within three channels of 12° is its own 2 counts
+    expect(a[1][1]).toBeCloseTo(main.valToPos(2, "y", true) - 7, 6);
+    expect(Math.round(a[1][1] - b[1][1])).toBe(19);
   });
 
   it("links the table and the plot by hover, through a DOM ring rather than a repaint",
@@ -4952,15 +4962,12 @@ describe("the peaks tab (WP-1027)", () => {
     // the state is what had it on `--bad` (which is `--plot-calc` exactly),
     // and the recessive grey tried next measured 0.032 from `--plot-obs` on
     // the dark theme — the ink of the points these markers sit on.
-    // A marker is an arc (a circle) or four points (a diamond); a whisker is
-    // the six points of its bar and its two caps.
+    // A mark is a lens of three points, filled, on each line the search uses;
+    // a line left out has none (WP-2202, round 11d), and a line a person
+    // placed is said in the table rather than by a second shape (round 11b).
     const markers = main.marks.filter((m) => m.style === INK.peak
-      && (m.op === "fill" || m.op === "stroke") && (m.points!.length === 1 || m.points!.length === 4));
-    expect(markers.map((m) => [m.op, m.points!.length === 1 ? "circle" : "diamond"])).toEqual([
-      ["fill", "circle"],      // fitted, usable
-      ["stroke", "circle"],    // fitted, unusable: hollow
-      ["fill", "diamond"],     // placed by a person
-    ]);
+      && (m.op === "fill" || m.op === "stroke") && m.points!.length === 3);
+    expect(markers.map((m) => m.op)).toEqual(["fill", "fill"]);
     expect(INK.peak).not.toBe(INK.calc);
     expect(INK.peak).not.toBe(INK.diff);
     // …and the hover ring wears it too
