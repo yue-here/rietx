@@ -115,6 +115,10 @@ the piece that touches it or a WP of its own.
 - `gui/src/lib/spacegroup.ts:typesetSpaceGroup` (WP-2126) and
   `gui/src/lib/symmetry.ts:symbolTokens` (WP-2131) typeset a space-group symbol by the same
   rules into two token types. One should go.
+- The Plan tab adds a glob by typing it. The prototype's grouped picker ("Cell (2)", "All Biso")
+  and its "never freed" row both need the refinable set, which `GET /api/plan/resolve` does not
+  serve. Its "Save as new plan…" needs a store for named plans, and rietx keeps one plan per
+  project (WP-2127's non-goals).
 
 ## Acceptance
 
