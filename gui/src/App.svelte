@@ -24,10 +24,12 @@
   import Checklist from "./panels/Checklist.svelte";
   import Console from "./panels/Console.svelte";
   import History from "./panels/History.svelte";
+  import Interactive from "./panels/Interactive.svelte";
   import Model from "./panels/Model.svelte";
   import NewProject from "./panels/NewProject.svelte";
   import Palette from "./panels/Palette.svelte";
   import Params from "./panels/Params.svelte";
+  import PeakWindows from "./panels/PeakWindows.svelte";
   import Peaks from "./panels/Peaks.svelte";
   import Plan from "./panels/Plan.svelte";
   import Plot from "./panels/Plot.svelte";
@@ -48,6 +50,8 @@
   import { consoleLine, follow, type EngineEvent, type RunState } from "./lib/stream";
   import { SHELL_MIN, shellStacks } from "./lib/resize";
   import { GRAPH_TABS, TABS, type GraphTab, type Tab } from "./lib/tabs";
+  import { FALLBACK_FWHM_DEG, type PreviewAnswer, type RangeContext } from "./lib/interactive";
+  import { peakWindows, widestFwhm } from "./lib/peakwin";
   import {
     THEME_CHOICES,
     applyTheme,
@@ -113,10 +117,37 @@
   let refineMode = $state<"cycle" | "plan">("plan");
   let pendingTouched = $state(0);
   let pendingInvalid = $state("");
+  /** The Interactive tab's pending slider values and the preview they drew
+   *  (WP-2128). The action bar counts both panels' edits as one set. */
+  let sliderTouched = $state(0);
+  let previewAnswer = $state.raw<PreviewAnswer | null>(null);
+  let previewError = $state("");
+  const touched = $derived(pendingTouched + sliderTouched);
+  /** The curves the pattern graph last fetched, which the Single peaks graph
+   *  frames and the sliders' ranges are measured from. */
+  let baseCurves = $state.raw<any>(null);
+  const rangeContext = $derived.by((): RangeContext => {
+    const tt = baseCurves?.arrays?.two_theta;
+    const fwhm = baseCurves ? widestFwhm(peakWindows(baseCurves)) : 0;
+    return { fwhm: fwhm > 0 ? fwhm : FALLBACK_FWHM_DEG,
+             thetaMaxDeg: tt?.length ? tt[tt.length - 1] / 2 : 45 };
+  });
+  /** One name per phase, in order. The tick rows are keyed by phase name, but
+   *  a magnetic phase adds a `"<name> (magnetic)"` row after its own and the
+   *  declared peaks a `"(extra)"` row (`refine._tick_rows`), and either would
+   *  shift every later phase's name by one place. */
+  const phaseNames = $derived.by(() => {
+    const out: string[] = [];
+    for (const key of Object.keys(baseCurves?.header?.ticks ?? {})) {
+      if (key === "(extra)" || (out.length && key === `${out[out.length - 1]} (magnetic)`)) continue;
+      out.push(key);
+    }
+    return out;
+  });
   /** whether the Plan tab holds an edited plan, which the action bar counts as
    *  one pending edit and its Apply stores (WP-2127) */
   let planPending = $state(false);
-  const pendingTotal = $derived(pendingTouched + (planPending ? 1 : 0));
+  const pendingTotal = $derived(touched + (planPending ? 1 : 0));
   /** Bumped by every project opened, so the Plan tab starts over: its unsaved
    *  stages and its undo stack belong to the project they were made in, and
    *  `{#if project}` stays true across an open. */
@@ -159,6 +190,7 @@
   $effect(() => applyTheme(theme, document.documentElement));
   let paletteOpen = $state(false);
   let paramsPanel = $state<any>(null);
+  let interactivePanel = $state<any>(null);
   let planPanel = $state<any>(null);
   let modelPanel = $state<any>(null);
   let seriesPanel = $state<any>(null);
@@ -507,13 +539,19 @@
   async function applyParams(): Promise<boolean> {
     const ok = !!(await paramsPanel?.apply());
     if (!ok) tab = "params";
-    return ok;
+    if (!ok) return false;
+    // the slider values second, so a slider wins a path both panels touched;
+    // each panel's apply is its own node, as its own Apply always was
+    const slid = !!(await interactivePanel?.apply());
+    if (!slid) tab = "interactive";
+    return slid;
   }
 
-  /** Apply everything the action bar counts: the Parameters edits, then an
-   *  edited plan (WP-2127).  A refusal brings forward the tab that drew it. */
+  /** Apply everything the action bar counts: the Parameters edits and the
+   *  Interactive values (WP-2128), then an edited plan (WP-2127).  A refusal
+   *  brings forward the tab that drew it. */
   async function applyPending(): Promise<boolean> {
-    if (pendingTouched && !(await applyParams())) return false;
+    if (touched && !(await applyParams())) return false;
     if (planPending && !(await planPanel?.save())) {
       tab = "plan";
       return false;
@@ -523,17 +561,18 @@
 
   function revertPending() {
     paramsPanel?.revert();
+    interactivePanel?.revert();
     planPanel?.revert();
   }
 
-  /** A stage run from the Plan tab applies the Parameters edits first, as the
-   *  bar's Refine does, so the stage starts from the values on screen.  The
-   *  stage itself is sent as it stands, saved or not. */
+  /** A stage run from the Plan tab applies the Parameters and Interactive
+   *  edits first, as the bar's Refine does, so the stage starts from the values
+   *  on screen.  The stage itself is sent as it stands, saved or not. */
   async function runPlanStage(stage: any) {
     if (refining || busy || noPhases || pendingInvalid) return;
     refining = true;
     try {
-      if (pendingTouched && !(await applyParams())) return;
+      if (touched && !(await applyParams())) return;
       await runStage(stage);
     } finally {
       refining = false;
@@ -1284,9 +1323,15 @@
              (WP-1029 item c).  The judgement is the *report's* — `maturity`
              quotes `MATURITY_MAX_RWP` — so nothing here decides anything. -->
         <div class="gtitle">
-          <strong class="what">{busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
+          <strong class="what">{previewAnswer ? "Preview, not refined"
+            : busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
           <div class="stats tabular mono" class:immature={immature}>
-            {#if rwp !== null}
+            {#if previewAnswer}
+              Rwp <strong>{(previewAnswer.curves.header.rwp * 100).toFixed(3)}%</strong>
+              {#if rwp !== null}<span class="muted">last fit {(rwp * 100).toFixed(3)}%</span>{/if}
+            {:else if previewError}
+              <span class="muted">preview refused: {previewError}</span>
+            {:else if rwp !== null}
               Rwp <strong>{(rwp * 100).toFixed(3)}%</strong>
               {#if gof !== null}<span class="muted">GoF {gof.toFixed(3)}</span>{/if}
               {#if immature}
@@ -1298,13 +1343,20 @@
             {/if}
           </div>
         </div>
+        <div class="gview" class:hidden={graphTab !== "pattern"}>
         <Plot {result} {plotKey} {zoom} {theme} error={resultError}
           peaks={peaksData} peaksActive={tab === "peaks"} hovered={hoveredPeak}
           candidate={candidateOverlay} {candidatePicked}
           {protocol} {extent} {channels} {wavelengths} {protocolError} {busy}
           onhoverpeak={(i) => (hoveredPeak = i)}
           onaddpeak={addPeak} onmovepeak={movePeak} ontogglepeak={togglePeak}
-          onremovepeak={removePeak} onprotocol={setProtocol} />
+          onremovepeak={removePeak} onprotocol={setProtocol}
+          preview={previewAnswer} oncurves={(c) => (baseCurves = c)} />
+        </div>
+        <div class="gview" class:hidden={graphTab !== "single"}>
+          <PeakWindows curves={baseCurves} preview={previewAnswer} {theme}
+            active={graphTab === "single" && !hideGraphs} />
+        </div>
         {#if hideModel}{@render actions()}{/if}
       </div>
     {/if}
@@ -1362,6 +1414,12 @@
         <div class="panel" class:hidden={tab !== "params"}>
           <Params bind:this={paramsPanel} {head} {busy} {corpus} {say}
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
+        </div>
+        <div class="panel" class:hidden={tab !== "interactive"}>
+          <Interactive bind:this={interactivePanel} {head} {busy} {corpus} {say}
+            context={rangeContext} {phaseNames}
+            onpending={(n) => (sliderTouched = n)}
+            onpreview={(answer, why) => { previewAnswer = answer; previewError = why; }} />
         </div>
         <div class="panel" class:hidden={tab !== "plan"}>
           {#key opens}
@@ -1614,6 +1672,19 @@
   }
 
   .plotcol.hidden {
+    display: none;
+  }
+
+  /* one graph tab's view (WP-2128): the column's remaining height, so the
+     pattern graph's host sizes exactly as it did before there were two */
+  .gview {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gview.hidden {
     display: none;
   }
 
