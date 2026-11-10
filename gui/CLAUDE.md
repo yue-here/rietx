@@ -451,7 +451,7 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   Refine drops a hand-freed row no stage names; `Run this stage` keeps it. `set_aside`
   names that difference.
 - **A stage's Rwp is its history node's** (WP-1208), matched to a rung by position and by
-  the stage's name and `turn_on`, else absent.
+  the stage's name, `turn_on` and `turn_off` (WP-2208), else absent.
 - **An edited plan keeps the facts of the stages above its first change only**
   (WP-2127, `lib/plan.ts:resolvedPrefix`), and is one pending edit in the shell's action
   bar, never a Save of its own.

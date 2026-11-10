@@ -535,6 +535,13 @@ def test_a_stage_line_carries_its_fixes(project):
     assert delta.plan["plan"]["stages"][0]["turn_on"] == []
     empty = _edit(text, "stage", "stage none  free   fix", which=0)
     assert _changes(empty, project)[1]
+    # the clause may follow a `<key> <number>` pair too
+    late = _edit(text, "stage", "stage late  free phases.*.scale   max_iter 40   "
+                                "fix instrument.zero_shift", which=0)
+    delta, errors = _changes(late, project)
+    assert errors == []
+    stage = delta.plan["plan"]["stages"][0]
+    assert stage["turn_off"] == ["instrument.zero_shift"] and stage["max_iter"] == 40
     # rendered back after the frees, and absent from a stage that fixes nothing
     from rietx.schemas.plan import PlanSpec, StageSpec
 

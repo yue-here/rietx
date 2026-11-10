@@ -1989,8 +1989,14 @@ class MultiHistogramRefinement:
                     carried_hold = []
                 # the stage's fixes, after its frees and the lift above, the
                 # single runner's order (``_run_stage``, WP-2208)
-                fixed = (self.mtable.set_vary(stage.turn_off, False)
-                         if stage.turn_off else [])
+                # ``fixed`` names only what the fix took out of the free set
+                fixed: list[str] = []
+                if stage.turn_off:
+                    was_free = {self.mtable._canonical(h, e.path)
+                                for h, tab in enumerate(self.mtable.tables)
+                                for e in tab.entries if e.vary and e.tie is None}
+                    fixed = [p for p in self.mtable.set_vary(stage.turn_off, False)
+                             if p in was_free]
                 if fixed:
                     gone = set(fixed)
                     freed = [p for p in freed if p not in gone]

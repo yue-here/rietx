@@ -5064,8 +5064,14 @@ class Refinement:
             self._held = []
         # The stage's fixes, after its frees and after the lift above, so a
         # lifted support hold cannot free again what the stage fixes (WP-2208).
-        # ``freed`` then describes the set this stage leaves free.
-        fixed = table.set_vary(stage.turn_off, False) if stage.turn_off else []
+        # ``freed`` then describes the set this stage leaves free, and
+        # ``fixed`` names only what the fix took out of the free set: a row
+        # already fixed, or held, matches ``set_vary`` but was not fixed here.
+        fixed: list[str] = []
+        if stage.turn_off:
+            was_free = set(table.free_paths)
+            fixed = [p for p in table.set_vary(stage.turn_off, False)
+                     if p in was_free]
         if fixed:
             gone = set(fixed)
             freed = [p for p in freed if p not in gone]
@@ -6035,7 +6041,8 @@ class Refinement:
             diagnostics.extend(_origin_diagnostics(table, stage_results,
                                                    origins=origins))
             diagnostics.extend(_unknown_path_diagnostics(
-                stage_results, [e.path for e in table.entries], self.instrument))
+                stage_results, [e.path for e in table.entries], self.instrument,
+                fixes=_fix_only_globs(plan.stages)))
             diagnostics.extend(_window_loss_diagnostics(stage_results))
             if mode == "rietveld":
                 # after the write-back: the search reads the answer's coordinates
@@ -6633,7 +6640,8 @@ class Refinement:
             diagnostics.extend(_origin_diagnostics(
                 table, [stage_result], origins=[(stage.name, hold.origin)]))
             diagnostics.extend(_unknown_path_diagnostics(
-                [stage_result], [e.path for e in table.entries], self.instrument))
+                [stage_result], [e.path for e in table.entries], self.instrument,
+                fixes=_fix_only_globs([stage])))
             diagnostics.extend(_window_loss_diagnostics([stage_result]))
 
             # before the node is recorded, which is where `_run_plan` writes it
@@ -7654,6 +7662,19 @@ _MAGNETIC_WIDTH_PATH = re.compile(
     r"^phases\.(\d+)\.magnetic_lor_(?:size|strain)$")
 
 
+def _left_free(freed: list[str], stage: Stage) -> list[str]:
+    """``freed`` without the paths ``stage``'s own ``turn_off`` fixes after it.
+
+    ``_run_stage``'s order (WP-2208), for the plan checks that read
+    ``would_free`` before a stage runs: a path the stage frees and fixes
+    again is not one it refines.
+    """
+    if not stage.turn_off:
+        return freed
+    return [p for p in freed
+            if not any(fnmatch.fnmatchcase(p, g) for g in stage.turn_off)]
+
+
 def _stage_order_diagnostics(plan, table,
                              mode: Mode) -> list[Diagnostic]:
     """``STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT`` — the ordering rule, checked
@@ -7711,7 +7732,7 @@ def _stage_order_diagnostics(plan, table,
         # ``_run_stage`` drops with, so this cannot report a stage the mode
         # empties.  A hold the data decides later (``_hold_unsupported_phases``,
         # the flat-moment hold) is not seen here.
-        freed = table.would_free(stage.turn_on)
+        freed = _left_free(table.would_free(stage.turn_on), stage)
         if mode in ("lebail", "pawley"):
             reach = table.column_reach()
             freed = [p for p in freed
@@ -7781,8 +7802,10 @@ def _held_moment_diagnostics(plan, table, structure: Structure,
                 bases.append(base)
     if not sites:
         return []
-    freed = table.would_free(
-        [g for stage in plan.run_stages() for g in stage.turn_on])
+    # what some stage leaves free, its own fixes taken out (WP-2208): a moment
+    # a stage frees and fixes again never moves
+    freed = [p for stage in plan.run_stages()
+             for p in _left_free(table.would_free(stage.turn_on), stage)]
     moving = {p.split(".")[1] for p in freed if _MOMENT_DOF.match(p)}
     start = table.decode(table.x0())
     out: list[Diagnostic] = []
@@ -8592,8 +8615,15 @@ def _window_loss_diagnostics(stage_results: list[StageResult]) -> list[Diagnosti
     return out
 
 
+def _fix_only_globs(stages) -> set[str]:
+    """The ``turn_off`` globs no stage's ``turn_on`` also names (WP-2208)."""
+    frees = {g for s in stages for g in s.turn_on}
+    return {g for s in stages for g in s.turn_off} - frees
+
+
 def _unknown_path_diagnostics(stage_results: list[StageResult],
-                              known: list[str], instrument=None) -> list[Diagnostic]:
+                              known: list[str], instrument=None,
+                              fixes=frozenset()) -> list[Diagnostic]:
     """``STAGE_PATH_UNKNOWN`` — a stage asked for a parameter by a name no row has.
 
     Issue #265: ``turn_on=["instrument.source.wavelength"]`` freed nothing,
@@ -8635,6 +8665,10 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
 
     The suggestion names ``ref.parameters()`` for seeing every path, which a
     joint fit has too (WP-2028), spelling its rows as ``known`` does.
+
+    ``fixes`` holds the plan's ``turn_off`` globs (WP-2208): a path asked for
+    there alone was meant to be fixed, so the message says nothing was fixed,
+    since whatever the plan freed under that name still refines.
     """
     by_path: dict[str, list[str]] = {}
     for sr in stage_results:
@@ -8643,12 +8677,13 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
     out = []
     for path, stages in by_path.items():
         which = _stage_list(stages)
+        done = "fixed" if path in fixes else "freed"
         current = retired_spelling(path)
         if current is not None:
             out.append(Diagnostic(
                 level="warning", code="STAGE_PATH_UNKNOWN",
                 message=(f"{which[:1].upper()}{which[1:]} asked for {path}, a "
-                         "spelling retired after v1.2, so nothing was freed "
+                         f"spelling retired after v1.2, so nothing was {done} "
                          f"for it. The current spelling is {current!r}."),
                 where=[path],
                 suggestion=f"Write {current!r} in the plan.",
@@ -8659,7 +8694,7 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
             out.append(Diagnostic(
                 level="warning", code="STAGE_PATH_UNKNOWN",
                 message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
-                         "names no parameter of this model, so nothing was freed "
+                         f"names no parameter of this model, so nothing was {done} "
                          f"for it. It is a parameter of {row.name}, which "
                          f"{_owner_words(owner)} does not declare."),
                 where=[path],
@@ -8672,7 +8707,7 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
         out.append(Diagnostic(
             level="warning", code="STAGE_PATH_UNKNOWN",
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
-                     "names no parameter of this model, so nothing was freed "
+                     f"names no parameter of this model, so nothing was {done} "
                      "for it."
                      + (f" {hint[:1].upper()}{hint[1:]}" if hint else "")),
             where=[path],

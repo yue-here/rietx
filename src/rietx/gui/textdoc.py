@@ -869,26 +869,27 @@ def _parse_stage(n: int, rest: list[str], raw: str, fail) -> StageSpec | None:
     globs = [g for g in " ".join(rest[:cut]).replace(",", " ").split() if g]
     tail = rest[cut:]
     fixes: list[str] = []
-    if tail[:1] == [STAGE_FIX_WORD]:
-        # ``fix <globs>``: the stage's turn_off, after its frees (WP-2208)
-        tail = tail[1:]
-        cut = next((i for i, token in enumerate(tail) if token in keys), len(tail))
-        fixes = [g for g in " ".join(tail[:cut]).replace(",", " ").split() if g]
-        tail = tail[cut:]
-        if not fixes:
-            fail(n, f"stage {name!r}: 'fix' takes '<glob>[, <glob>…]'", raw, name)
-            return None
-    if not globs and not fixes:
-        fail(n, f"stage {name!r} frees nothing", raw, name)
-        return None
     fields: dict[str, Any] = {}
     while tail:
         key = tail.pop(0)
+        if key == STAGE_FIX_WORD and not fixes:
+            # ``fix <globs>``: the stage's turn_off, after its frees (WP-2208),
+            # read up to the next key wherever the clause sits on the line
+            cut = next((i for i, token in enumerate(tail) if token in keys), len(tail))
+            fixes = [g for g in " ".join(tail[:cut]).replace(",", " ").split() if g]
+            tail = tail[cut:]
+            if not fixes:
+                fail(n, f"stage {name!r}: 'fix' takes '<glob>[, <glob>…]'", raw, name)
+                return None
+            continue
         if key not in keys or not tail or _number(tail[0]) is None:
             fail(n, f"stage {name!r}: expected '<{'|'.join(keys)}> <number>' "
                     f"but found {key!r}", raw, name)
             return None
         fields[key] = float(tail.pop(0))
+    if not globs and not fixes:
+        fail(n, f"stage {name!r} frees nothing", raw, name)
+        return None
     for key in STAGE_INT_KEYS:
         if key in fields:
             fields[key] = int(fields[key])

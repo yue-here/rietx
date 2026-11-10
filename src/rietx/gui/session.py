@@ -1297,16 +1297,21 @@ class GuiSession:
                 "n_matched": len(matched), "n_free": len(after),
             })
 
-        rwps = self._stage_rwp(p, plan)
+        rwps = self._stage_rwp(p, plan, paths=list(rows))
         for entry, rwp in zip(stages, rwps, strict=False):
             entry["rwp"] = rwp
         # the stage the plan appends (WP-2002, the sixth round's Q1 and Q2):
         # every glob again at tight windows, read-only here, and its Rwp is
         # the answer's, which the last declared rung's is not
         closing = plan.closing_stage(list(rows))
+        # the rows the closing stage's fix takes back from its frees: a tied,
+        # locked or held row its literals name was never free to keep fixed
         closing_entry = None if closing is None else {
             "name": closing.name, "window_area_tol": plan.closing_window_tol,
-            "fixes": list(closing.turn_off), "rwp": rwps[-1]}
+            "fixes": [path for path in closing.turn_off
+                      if rows[path].refinable
+                      and any(fnmatchcase(path, g) for g in closing.turn_on)],
+            "rwp": rwps[-1]}
         reached = {path for entry in stages for path in entry["frees"]}
         set_aside = [row.path for row in rows.values()
                      if row.vary and row.refinable and row.path not in reached]
@@ -1329,7 +1334,8 @@ class GuiSession:
                                   "set_variable"})
 
     @classmethod
-    def _stage_rwp(cls, p: Project, plan) -> list[float | None]:
+    def _stage_rwp(cls, p: Project, plan,
+                   paths: list[str] | None = None) -> list[float | None]:
         """One Rwp per stage the plan runs, off the history nodes the run recorded.
 
         Parallel to ``plan.run_stages()``: the declared stages, then the
@@ -1340,9 +1346,12 @@ class GuiSession:
         the plan that ran.
         """
         # the closing stage of a plan that fixes records its fixes as the
-        # model's paths (WP-2208), so the plan is read over them too
-        paths = ([row.path for row in p.parameters()]
-                 if any(s.turn_off for s in plan.stages) else None)
+        # model's paths (WP-2208), so the plan is read over them too; a
+        # caller already holding them passes them in
+        if not any(s.turn_off for s in plan.stages):
+            paths = None
+        elif paths is None:
+            paths = [row.path for row in p.parameters()]
         stages = plan.run_stages(paths=paths)
         blank: list[float | None] = [None] * len(stages)
         tree = p.refinement.history

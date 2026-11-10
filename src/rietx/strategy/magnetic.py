@@ -2319,9 +2319,13 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     nuclear_stages: list[Stage] = []
     for stage in plan.stages:
         turn_on = [p for p in stage.turn_on if _MOMENT_GLOB not in p]
-        if nuclear_stages and turn_on == nuclear_stages[-1].turn_on:
+        # a caller's fixes hold for the reference too (WP-2208), or the ΔBIC
+        # compares trials against a fit with a different free set
+        turn_off = [p for p in stage.turn_off if _MOMENT_GLOB not in p]
+        if (nuclear_stages and turn_on == nuclear_stages[-1].turn_on
+                and turn_off == nuclear_stages[-1].turn_off):
             continue
-        nuclear_stages.append(Stage(stage.name, turn_on))
+        nuclear_stages.append(Stage(stage.name, turn_on, turn_off=turn_off))
     # the trials' absent-phase hold and correlation guard, so the reference a
     # ΔBIC compares them with is fitted under the same rule (WP-2002, B1)
     nuclear_plan = RefinementPlan(stages=nuclear_stages,

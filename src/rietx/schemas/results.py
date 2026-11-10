@@ -1371,7 +1371,8 @@ class StageResult(Base):
     #: it free (WP-2208).
     blocked_by_hold: list[str] = Field(default_factory=list)
     #: paths this stage's ``turn_off`` fixed after its frees (WP-2208), in
-    #: table order; a joint fit names them as :attr:`freed` does.  Disjoint
+    #: table order: the free paths it took, never a row that was already
+    #: fixed or held; a joint fit names them as :attr:`freed` does.  Disjoint
     #: from :attr:`freed`.  Empty for a stage that declares no ``turn_off``,
     #: which is every stage before the field, and the empty list is then the
     #: truth: no stage could fix anything.  Writers: the three runners that

@@ -5992,7 +5992,8 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         title="Parameters fixed",
         description=(
             "The parameter paths this stage's `turn_off` patterns fixed after its "
-            "frees. Empty when the stage declares no `turn_off`."
+            "frees: the free paths they took, never a row that was already fixed. "
+            "Empty when the stage declares no `turn_off`."
         ),
     ),
     "StageResult.unknown_paths": HelpEntry(
