@@ -1,6 +1,6 @@
 # WP-2209 — unapplied edits survive a close or a crash
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — claimed by @yue-here (ghostshift runner)
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built; PR #1523 waits on the maintainer's look at the offer (milestone row 10)
 Depends on: 2133
 Priority: P2 2026-11-10 — a piece the gui-overhaul milestone was opened for, ruled 2026-11-09
 
@@ -156,6 +156,102 @@ The milestone's row 10: the maintainer looks at the offer on screen before the m
 - WP-2133 § The maintainer's rulings of 2026-11-09, item 1.
 
 ## Handover log
+
+### 2026-11-10 — the recovery copy built and offered; PR #1523, waiting on the maintainer's look
+
+An edit in the action bar's count now survives a closed project, a closed tab and a killed
+server. The GUI writes the pending edits to a small file in rietx's state directory half a
+second after each change, and at once before an open, a new project or a close. Reopening
+the project shows a dialog, "Unapplied edits", with Restore and Discard. The copy holds only
+proposed edits and is deleted once they are applied, reverted or discarded, so it never
+competes with the history for a parameter's value. Building it found a defect: opening
+another project kept the Parameters and Interactive panels' pending values, so the next
+Apply sent one project's typed values to another. Opening now clears them, after keeping
+them as the old project's copy. The merge waits on the maintainer's look (milestone row 10)
+and on the five open questions below.
+
+*Done.* `src/rietx/gui/recovery.py` (the store: atomic write, sha256 key of the resolved
+path, record tag, age-and-size prune behind three guards); `GuiSession.recovery` and
+`recovery_put`; `GET`/`PUT /api/recovery`; `_relocate` re-keys the copy and `example_reset`
+discards it. Client: `gui/src/lib/recovery.ts` (the draft's shape and `RecoveryWriter`, which
+debounces, drops writes while disarmed and sends the unsent one with `keepalive` on
+`pagehide`), `draft()`/`restoreDraft()` on Params, Interactive and Plan,
+`gui/src/panels/Recovery.svelte` (the dialog), the shell's wiring in `App.svelte`. Manual:
+`reference/gui-guide.md` § Edits not yet applied, and the two routes in `gui-power.md`.
+
+*A design change made while building.* The first cut refused a write whose `project` was not
+the open one. That lost edits: New project and Close are answered before the shell hears of
+them, so the shell's last write for the project it leaves arrives after the switch. The write
+now names its project and needs only a project folder there (`project.json`).
+
+*Measured* (darwin/arm64, `[dev]` venv plus `playwright` 1.65 installed locally for the
+browser rows, node v24.22.1). `tests/test_gui_recovery.py` 10 passed.
+`tests/test_gui_recovery_browser.py` 2 passed, by real clicks and keys: a value typed, the
+server restarted over the same state directory, Restore, then Revert deleting the copy; a
+value typed and the tab closed inside the half-second, Discard. With the `pagehide` handler
+blanked the closed-tab test fails, and with the panel clear or the flush removed from
+`leaveEdits` two vitest cases fail, so each guard can go red. vitest 732 passed (717 before
+this branch, +10 in `lib/recovery.test.ts`, +5 in `App.test.ts`; eight existing
+`App.test.ts` lookups of "the PUT" now name their route, and `lib/style.test.ts` admits the
+dialog's one primary). svelte-check 0 errors. `python -m tests.reader_output` exit 0.
+Every `tests/*_browser.py`, one file at a time: gui 4, layout 28, peaks 2, recovery 2, compare 6, html 12, rxplot 41, structure3d 6, watch 53, all passed (154). Fast suite (`-m "not slow"`, through ghostshift's `serial.py`, after the review fixes): 14631 passed, 410 skipped, 32 xfailed, 10:44 on a machine shared with other runners. This branch adds 12 tests, all passing locally (the two browser ones skip in CI, which has no playwright). No local baseline on main was run, so the +12 is the added count and not a measured delta. `tests.added_test_times`: 12.14 s over the 12, the slowest 5.52 s (the browser restart test); per file 7.32 s `test_gui_recovery_browser.py`, 4.82 s `test_gui_recovery.py`. Neither joins the slow tail.
+
+*Gotcha: a module-scoped GUI fixture now carries pending edits between tests.*
+`tests/test_gui_layout_browser.py` serves one session to many tests. A test leaving an edit
+pending left a copy, and every later page opened under the offer's modal: at least 10 of
+its first 19 cases failed. Its pages now answer `/api/recovery` themselves
+(`_keep_no_edits`), because clearing the copy before each page races the closing page's own
+last write. A new browser module sharing one session and leaving edits pending needs the
+same.
+
+*Review* (`/code-review high --fix`): nine findings, five fixed in one commit. A temporary
+name per thread, so two writes for one project cannot share one file. The writer flushes
+before an example reset, which a late write would otherwise undo. Tab stays inside the
+dialog. The page-hide send counts as sent, so it is not sent twice. A failed Discard is
+retried. Four declined: a write in flight during a rename can land under the old key
+(closing it needs a File-menu flush before the rename, outside this diff); the PUT checks
+only that `project` is a project folder, not that it is open or recent (the path is only
+hashed into a file name, never written to); an edit typed while the offer's GET is pending
+is kept only from the next change; a malformed copy is not offered and is left to
+retention.
+
+*Generality*: no judge dispatched. The branch leaves `_audit.py` alone, and its constants
+(the retention ceiling and floor, the 1 MiB draft cap, the half-second debounce) live in
+`gui/recovery.py` and the frontend, which the walk leaves out (`_audit.WALKED` takes only
+`gui/imports.py` and `gui/symmetry.py`). None reads a pattern.
+
+*Settled by Claude, for review.*
+1. Scope is the action bar's three kinds of pending edit (Parameters, Interactive, Plan). The
+   Model forms and the Text buffer apply through their own buttons, so they do not share the
+   mechanism; the brief said to include them only if they did.
+2. The write names its project rather than meaning the open one (above). Alternative: a
+   pre-switch hook in every panel that opens or closes a project, which is more code at more
+   call sites.
+3. A rename or move made in the app re-keys the copy; Save a copy leaves it behind (ruled);
+   resetting an example discards it, since the reset asks to start the example over.
+4. Retention: 16 MiB ceiling, a week's floor by file time, oldest first, warn and keep, on
+   `runs.py`'s rule. A copy is a few kilobytes, so the ceiling bounds a defect and deletes
+   nothing in normal use. A copy left by a folder moved outside the app or by `--scratch` stays
+   until then.
+5. The offer restores even when the project's head has moved since, and says "The project
+   has changed since." VS Code also restores over a file changed on disk and leaves the
+   conflict to the save.
+6. Writes are not behind the run's 409, like `/api/settings`.
+7. Half a second of debounce, plus `keepalive` on `pagehide`. VS Code backs up on every
+   content change; half a second keeps a typing burst to one write.
+
+*Open questions for the maintainer* (visual, so not settled; the plainest choice was taken).
+1. The offer is a modal dialog on open, drawn as the File menu's dialogs are. The modal also
+   stops an edit being made before the answer, which would overwrite the kept copy.
+   Alternatives: a line in the action bar, or VS Code's way, restoring without asking.
+2. Escape does nothing while the dialog is up. Restore and Discard are the only ways out,
+   because Escape as Discard loses work and Escape as Restore surprises.
+3. The words: title "Unapplied edits"; "N edits from 10 Nov 2026, 09:05, not applied when the
+   project closed."; "The project has changed since." when the head moved.
+4. Restore is the filled primary and takes focus, so Enter restores.
+5. Whether the Model forms and the Text buffer should join the copy (a follow-up).
+
+Next: the maintainer looks at the dialog on screen and answers the five questions; then merge.
 
 - **2026-11-10** — created by the shift lead's assignment (number 2209 in the gui-overhaul
   block), from the milestone's "Edit recovery" row. No open WP owns the work: WP-2133 closed
