@@ -72,6 +72,7 @@ from rietx.params.parametric import (
     term_label,
 )
 from rietx.params.vector import AffineTie
+from rietx.schemas.common import Parameter
 from rietx.schemas.parametric import (
     CoordinateTable,
     ParametricCoefficient,
@@ -439,6 +440,78 @@ def test_per_pattern_starting_structures_differ_only_where_a_path_is_per_histogr
         MultiParameterTable([start(4.15)] * 3, _lab6_instruments(2))
 
 
+def _start_with(edit) -> rx.Structure:
+    s, _ = perturbed_inputs()
+    edit(s.phases[0])
+    return s
+
+
+@pytest.mark.parametrize("edit, where", [
+    (lambda ph: setattr(ph, "preferred_orientation",
+                        rx.schemas.structure.PreferredOrientation(axis=(1, 1, 1))),
+     "phases.0.preferred_orientation"),
+    (lambda ph: setattr(ph, "extinction", Parameter(value=10.0, min=0.0)),
+     "phases.0.extinction"),
+    (lambda ph: ph.restraints.append(
+        rx.schemas.structure.BondRestraint(atom_i=0, atom_j=1, target=3.0, sigma=0.01)),
+     "phases.0.restraints"),
+], ids=["texture-declared", "extinction-declared", "restraint"])
+def test_per_pattern_starts_must_agree_beyond_their_parameters(edit, where):
+    """One model with different values: a field that is not a parameter and
+    shapes a shared column is the model's, and two starts that disagree there
+    are two models.  The refusal names the field.  A restraint holds no
+    column of its own, so it is read off the phase, whose cell is shared."""
+    ins = _lab6_instruments(2)
+    with pytest.raises(ValueError, match=rf"structure 1 differs from structure 0 at "
+                                         rf"{where.replace('.', chr(92) + '.')}"):
+        MultiParameterTable([_start_with(lambda ph: None), _start_with(edit)], ins)
+
+
+def test_two_texture_axes_under_one_r_column_are_refused():
+    def axis(hkl):
+        def edit(ph):
+            ph.preferred_orientation = rx.schemas.structure.PreferredOrientation(axis=hkl)
+        return edit
+    with pytest.raises(ValueError, match=r"phases\.0\.preferred_orientation\.axis"):
+        MultiParameterTable([_start_with(axis((0, 0, 1))), _start_with(axis((1, 1, 1)))],
+                            _lab6_instruments(2))
+    # each pattern its own r: the axes may differ, as GSAS-II keeps texture
+    # per histogram
+    MultiParameterTable([_start_with(axis((0, 0, 1))), _start_with(axis((1, 1, 1)))],
+                        _lab6_instruments(2),
+                        sharing=SharingMap(per_histogram=["phases.*.preferred_orientation.*"]))
+    # a phase's name is a label, its particle radius never enters the fit, and
+    # a parameter's bounds and vary flag are not the model's: none is refused
+    def label_and_bounds(ph):
+        ph.name = "LaB6_400K"
+        ph.particle_radius_um = 5.0
+        ph.atoms[0].occ.max = 1.0
+        ph.scale.vary = not ph.scale.vary
+    MultiParameterTable([_start_with(lambda ph: None), _start_with(label_and_bounds)],
+                        _lab6_instruments(2))
+
+
+def test_a_texture_term_one_start_leaves_out_is_a_value_not_a_model():
+    """A texture term the block leaves out enters the table at 0, held, so a
+    start declaring no coefficients and one carrying fitted ones (in another
+    key order) are one model with different values."""
+    from rietx.crystallography.spherical_harmonics import texture_names
+    from rietx.crystallography.symmetry import resolve_group
+    from rietx.schemas.structure import SphericalHarmonicTexture
+
+    def bare(ph):
+        ph.texture = SphericalHarmonicTexture(order=4)
+
+    def fitted(ph):
+        sg = resolve_group(ph.space_group, ph.symmetry_operations)
+        names = texture_names(sg, 4, ph.cell.lengths_angles())
+        ph.texture = SphericalHarmonicTexture(order=4, coefficients={
+            n: Parameter(value=0.01 * (k + 1)) for k, n in enumerate(reversed(names))})
+
+    MultiParameterTable([_start_with(bare), _start_with(fitted)], _lab6_instruments(2),
+                        sharing=SharingMap(per_histogram=["phases.*.texture.*"]))
+
+
 def test_a_dependent_the_coefficients_put_out_of_range_is_named():
     s, _ = perturbed_inputs()
     equation = _equation(name="w", target="instrument.profile.w")
@@ -452,6 +525,13 @@ def test_a_dependent_the_coefficients_put_out_of_range_is_named():
     assert d.code == "PARAMETRIC_OUT_OF_RANGE" and d.level == "warning"
     assert d.where == ["hist.2.instrument.profile.w"] and d.value == 1.0
     assert "histogram 2" in d.message
+    # the write-back finishes: the model holds the bound the value crossed,
+    # and the table keeps the equation's value the warning quotes
+    bad = mt.tables[2].entries[mt.tables[2]._paths["instrument.profile.w"]].value
+    mt.apply_to_models()
+    w = mt.instruments[2].profile.w
+    assert bad < w.min and w.value == w.min
+    assert mt.tables[2].entries[mt.tables[2]._paths["instrument.profile.w"]].value == bad
 
 
 def test_coefficients_are_reported_per_unit_of_the_coordinates_at_the_reference():
