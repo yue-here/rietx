@@ -1,6 +1,6 @@
 # WP-2208 — a plan stage that fixes as well as frees
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built; PR #1520 waits on the maintainer (a stored-format change)
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built and ruled; PR #1520 approved for merge (a stored-format change)
 Depends on: 2127 (the Plan tab)
 Priority: P2 2026-11-10 — a feature the open gui-overhaul milestone was opened for, ruled required 2026-11-09
 
@@ -141,6 +141,11 @@ stage included.
 
 ## Handover log
 
+- **2026-11-10** — stewarded by a ghostshift runner. Yue ruled the same day on PR #1520's five
+  decisions: all five stand as built (each marked in the entry below), and approved merging the
+  stored-format change. Main merged in (WP-2211 and WP-2212 filed there, no conflict in code).
+  Next: the lead merges #1520 once CI is green; the series WPs revisit the collapse (decision 2).
+
 - **2026-11-10** — built end to end by a ghostshift runner; PR #1520. A stage of a plan can now
   fix parameters as well as free them, in python (`Stage(..., turn_off=[...])`), in the `.rxt`
   document (`stage NAME free ... fix ...`) and on the Plan tab (a `Fixes` row under each stage's
@@ -166,26 +171,28 @@ stage included.
   stage that fixes a parameter.
 
   *Decisions for the maintainer* (each settled by the runner on the practice named; the PR body
-  repeats them):
+  repeats them). **Ruled by Yue 2026-11-10: all five stand as built.**
   1. A later stage's `turn_on` frees a path an earlier stage fixed (GSAS-II's `set`/`clear`
      carry, `docs/practice.md`). Alternative: a fix sticky for the rest of the plan, which `hold`
-     already gives across plans.
+     already gives across plans. *Ruled by Yue 2026-11-10: stands.*
   2. A series whose plan fixes is refit stage by stage, never collapsed into one stage, so its
      warm fits cost more iterations. Alternative: collapse with literal paths from a template
-     table, which a member whose table differs would get wrong.
+     table, which a member whose table differs would get wrong. *Ruled by Yue 2026-11-10: stands; the
+     faster collapse is left to the series WPs.*
   3. The closing stage's `turn_off` holds literal paths (the replayed end state), so its history
      node records paths rather than the declared globs. Alternative: record the globs and replay
-     at checkout.
+     at checkout. *Ruled by Yue 2026-11-10: stands.*
   4. Visual, open: a stage draws its `Fixes` row only when it fixes something, as the
      workshop prototype (`renderPlan`) draws its `Fix` row; a `+ Fix` ghost button at the end of
      the frees opens it with the cursor in its field. The prototype adds through one `+ Add`
      popover with a Free/Fix toggle, which this panel has no equivalent of. An always-drawn row
      was built first and dropped: it added a line to every stage and pushed the closing row out
-     of the plan-ladder screenshot.
+     of the plan-ladder screenshot. *Ruled by Yue 2026-11-10: stands (the row on demand, `+ Fix`).*
   5. The report's veto (`apply_strategy_veto`) no longer marks a suggestion on a path the plan
      leaves fixed as "already refined by the staged plan", so a suggestion to refine a profile
      the caller fixed stays active. A `hold` still vetoes it. Alternative: a deliberate fix
-     silences suggestions on its paths, as a hold does, with its own reason.
+     silences suggestions on its paths, as a hold does, with its own reason. *Ruled by Yue
+     2026-11-10: stands; only a hold silences a suggestion.*
 
   *Review.* `/code-review high --fix` found ten; eight fixed in one commit: `StageResult.fixed`
   names only free paths a fix took (it had listed rows already fixed or held); the plan checks
