@@ -13,6 +13,9 @@ here with a directory (`lib/plot.ts`, `gui/session.py`) that no longer exists, a
 `file:symbol` whose symbol has left the file. Write paths that way, so a rename breaks the
 test and never silently the rule.
 
+How the GUI looks and behaves, with each rule's motive, is `gui/STYLE.md` (WP-2142):
+read it before changing either.
+
 ## Defaults
 
 - **Every choice the GUI offers ships a default that suits most phases; a setting is for
@@ -297,8 +300,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   (WP-2123, replacing WP-1034's `Split | Full`). The layout is session-local and
   unpersisted: a view choice, not a setting.
 - **`Model` is mounted exactly once in `App.svelte`**, never per branch of
-  `{#if project}` (WP-1205), and every opener settles `wizardOpen` through
-  `panels/Model.svelte`'s `openPath()`.
+  `{#if project}` (WP-1205), and **every opener settles what is drawn over the project
+  in the shell's `open`/`opened`** (WP-2131).
 - **A stored size is not a settled size** (WP-1029): `fitColumns` re-clamps at render.
 - **A splitter reports a size and never writes one** (WP-1029): `onsize(size, done)`,
   persisted to `ProjectDoc.ui` on the verb, with an `inline` flow inside `overflow: auto`.
@@ -458,7 +461,9 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 ## Model: projects, import, structure and forms
 
 `panels/Model.svelte`, `lib/model.ts`, `lib/wizard.ts`, `panels/Browse.svelte`,
-`src/rietx/gui/imports.py`, `src/rietx/gui/symmetry.py`, `src/rietx/examples.py`.
+`panels/Start.svelte`, `panels/NewProject.svelte`, `panels/FileMenu.svelte`,
+`lib/filemenu.ts`, `src/rietx/gui/imports.py`, `src/rietx/gui/symmetry.py`,
+`src/rietx/examples.py`.
 
 - **If the parameter table has the path, the parameter table owns it** (WP-1014). A
   value goes through `PATCH /api/params`; a species, label, atom added or removed,
@@ -496,8 +501,21 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   `project_open`. Examples build into `state_dir/examples/`. `example_reset` is the one
   destructive verb; `built` rides on the listing.
 - **Browse is one modal, two jobs** (WP-1205): `mode="open"` opens a `.rex`,
-  `mode="pick"` hands a directory to the path field (a browser can say where a project
-  lives, never name it).
+  `mode="pick"` hands a directory to New project's Where field (a browser can say where
+  a project lives, never name it).
+- **The start screen keeps a moved recent project listed as `missing`**, with Locate…
+  and Remove (`POST /api/recent/remove`) (WP-2131).
+- **New project's mode follows the phases, never asked** (WP-2131): a typed cell gives
+  Le Bail, so WP-1206's `rietveld` refusal stays unreachable.
+- **An assumed instrument is tagged `assumed` wherever it is shown** (WP-2131): unmarked,
+  a wrong anode moves every cell.
+- **A File-menu rename or move keeps the session's `Project`** and repoints the two paths
+  a live one holds, `Project.path` and `RefinementTree.path` (WP-2133). A third such
+  field joins `src/rietx/gui/session.py:GuiSession._relocate`.
+- **A File-menu destination passes `GuiSession._browsable_folder` and `_project_name`**,
+  never sanitised, and an existing folder is refused, never replaced (WP-2133).
+- **Close is a `closed` mark on the recent list's head**, which
+  `src/rietx/gui/session.py:GuiSession.reopen_last` reads (WP-2133).
 - **Symmetry has two tiers, split by cost** (WP-1035). Phase facts ride on
   `GET /api/structure` as `symmetry` + `causes`; Wyckoff letters are on
   `GET /api/structure/symmetry`.

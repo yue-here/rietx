@@ -61,7 +61,7 @@ from .crystallography.twins import (
     restraints_dropped_message,
     site_of,
 )
-from .help import help_key_for
+from .help import help_key_for, undeclared_opt_in
 from .history.events import _attach_progress, as_event_stream
 from .history.store import fingerprint, refuse_existing_log
 from .history.tree import RefinementTree
@@ -83,7 +83,7 @@ from .model.forward import (
     window_loss,
 )
 from .model.geometry import cell_volumes, geometry_table
-from .model.microstructure import microstructure_table
+from .model.microstructure import floored_paths, microstructure_table
 from .model.origin import CompiledOrigin, OriginPhaseRows, compile_origin
 from .model.profiles.caglioti import (
     SCHERRER_K,
@@ -3439,7 +3439,7 @@ class Refinement:
         known = {e.path for e in table.entries}
         if unknown := [g for g in dict.fromkeys(globs)
                        if is_literal_path(g) and g not in known]:
-            raise _unknown_paths_error(unknown, known)
+            raise _unknown_paths_error(unknown, known, self.instrument)
 
     def _set_vary_findings(self, table: ParameterTable, globs: list[str],
                            vary: bool) -> list[str]:
@@ -3452,7 +3452,7 @@ class Refinement:
         verb = "freed" if vary else "fixed"
         out = []
         for path in table.unknown_paths(globs):
-            hint = _path_hint(path, known)
+            hint = _path_hint(path, known, self.instrument)
             out.append(f"set_vary {verb} nothing for {path!r}, which names no "
                        "parameter of this model."
                        + (f" {hint[:1].upper()}{hint[1:]}" if hint else ""))
@@ -3517,7 +3517,7 @@ class Refinement:
         if unknown:
             raise ValueError(f"unknown parameter path(s): {sorted(unknown)}" + "".join(
                 f"; for {p!r}, {h}" for p in sorted(unknown)
-                if (h := _path_hint(p, by_path))))
+                if (h := _path_hint(p, by_path, self.instrument))))
         for path, value in values.items():
             e = by_path[path]
             user = (self._ties.get(path) if path in self._applied_ties else None)
@@ -3742,7 +3742,7 @@ class Refinement:
         by_path = {e.path: e for e in table.entries}
         entry = by_path.get(path)
         if entry is None:
-            raise _unknown_path_error(path, by_path)
+            raise _unknown_path_error(path, by_path, self.instrument)
         user = (self._ties.get(path) if path in self._applied_ties else None)
         if user is not None and entry.locked:
             # a formula's block writes this row: its own target, or a row
@@ -4120,7 +4120,7 @@ class Refinement:
                 continue
             entry = known.get(glob)
             if entry is None:
-                raise _unknown_path_error(glob, known)
+                raise _unknown_path_error(glob, known, self.instrument)
             if entry.tie is not None:
                 raise ValueError(
                     f"{glob!r} is tied by symmetry, not by this refinement, and "
@@ -4189,7 +4189,7 @@ class Refinement:
         for glob in globs:
             if not is_literal_path(glob) or glob in known:
                 continue
-            raise _unknown_path_error(glob, known)
+            raise _unknown_path_error(glob, known, self.instrument)
         hits = sorted(p for p in known
                       if any(fnmatch.fnmatchcase(p, g) for g in globs))
         # a body owns its atoms' coordinates as symmetry owns a special
@@ -4335,7 +4335,7 @@ class Refinement:
             glob = literals[0]
             known = [e.path for e in table.entries]
             if glob not in known:
-                raise _unknown_path_error(glob, known)
+                raise _unknown_path_error(glob, known, self.instrument)
             raise ValueError(f"{glob!r} is not held by this refinement")
         if not hits and not origin_hits:
             return []
@@ -6019,7 +6019,7 @@ class Refinement:
             diagnostics.extend(_origin_diagnostics(table, stage_results,
                                                    origins=origins))
             diagnostics.extend(_unknown_path_diagnostics(
-                stage_results, [e.path for e in table.entries]))
+                stage_results, [e.path for e in table.entries], self.instrument))
             diagnostics.extend(_window_loss_diagnostics(stage_results))
             if mode == "rietveld":
                 # after the write-back: the search reads the answer's coordinates
@@ -6614,7 +6614,7 @@ class Refinement:
             diagnostics.extend(_origin_diagnostics(
                 table, [stage_result], origins=[(stage.name, hold.origin)]))
             diagnostics.extend(_unknown_path_diagnostics(
-                [stage_result], [e.path for e in table.entries]))
+                [stage_result], [e.path for e in table.entries], self.instrument))
             diagnostics.extend(_window_loss_diagnostics([stage_result]))
 
             # before the node is recorded, which is where `_run_plan` writes it
@@ -7933,16 +7933,19 @@ def _constraint_diagnostics(stage_name: str, outcome) -> list[Diagnostic]:
         return []
     # which block bound each step, by its label (WP-1938 D7): the Stephens
     # cone's end in ``.microstrain``, the Γ_G² floor's start with
-    # ``instrument.profile``
+    # ``instrument.profile (`` (the Γ_L floor's with ``instrument.profile
+    # Lorentzian``).  A joint fit prefixes a histogram's block with
+    # ``hist.{h} `` (WP-1325), read past here.
     by = getattr(outcome, "truncated_by", None) or {}
     which = "; ".join(f"{label}: {k}" for label, k in sorted(by.items()))
+    bare = [re.sub(r"^hist\.\d+ ", "", label) for label in by]
     suggestion = ("Vary the starting seed and quote the values only if they "
                   "survive.")
-    if any(label.endswith(".microstrain") for label in by):
+    if any(label.endswith(".microstrain") for label in bare):
         suggestion += (" The STEPHENS_STRAIN_NOT_POSITIVE protocol row "
                        "applies to the strain cone, although that guard stays "
                        "silent while the default LM driver holds the cone.")
-    if any(label.startswith("instrument.profile") for label in by):
+    if any(label.startswith("instrument.profile (") for label in bare):
         suggestion += (" At some reflection the data asked for no Gaussian "
                        "width (the Γ_G² floor, 1e-8 deg²), so U, V, W and the "
                        "phase's Gaussian size and strain describe that floor.")
@@ -8237,7 +8240,7 @@ def _stage_list(names: list[str]) -> str:
             f"stages {', '.join(repr(s) for s in names)}")
 
 
-def _path_hint(path: str, known) -> str:
+def _path_hint(path: str, known, instrument=None) -> str:
     """The spelling a caller most likely meant by an unknown ``path``, or ``""``.
 
     ``STAGE_PATH_UNKNOWN``'s two answers, for the verbs that take a path
@@ -8246,30 +8249,59 @@ def _path_hint(path: str, known) -> str:
     the nearest real path (:mod:`rietx._nearmiss`).  Before this the verbs
     answered ``instrument.zero`` with the bare refusal, and ``set_vary`` with
     nothing at all.
+
+    A third answer comes between them (WP-2087): a path of an opt-in
+    correction its owner does not declare names the declaration
+    (:func:`rietx.help.undeclared_opt_in`).  The nearest real path answered
+    ``phases.0.extinction`` with ``phases.0.lor_strain``.  ``instrument``
+    lets a correction one geometry takes (roughness) answer too; without it
+    that correction gets the nearest path, never a declaration that raises.
     """
     current = retired_spelling(path)
     if current is not None:
         return f"it is a spelling retired after v1.2, now spelled {current!r}."
+    if (hit := undeclared_opt_in(path, known, instrument)) is not None:
+        row, owner = hit
+        # "a parameter of", never "exists once declared": an indexed family
+        # (a texture term, a Stephens or ADP DOF) need not hold this index
+        return (f"it is a parameter of {row.name}, which {_owner_words(owner)} "
+                f"does not declare. Declare it with {row.declaration}.")
     return did_you_mean(path, known, n=1)
 
 
-def _unknown_path_error(path: str, known) -> ValueError:
+def _owner_words(owner: str) -> str:
+    """``phases.0`` as "phase 0", ``phases.0.atoms.3`` as "atom 3 of phase 0".
+
+    A joint fit's ``hist.1.`` scope reads as "of histogram 1" after it.
+    """
+    parts = owner.split(".")
+    tail = ""
+    if parts[0] == "hist" and len(parts) > 2:
+        tail, parts = f" of histogram {parts[1]}", parts[2:]
+    if parts[0] == "phases" and len(parts) == 2:
+        return f"phase {parts[1]}{tail}"
+    if parts[0] == "phases" and len(parts) == 4 and parts[2] == "atoms":
+        return f"atom {parts[3]} of phase {parts[1]}{tail}"
+    return f"the {parts[-1]}{tail}"
+
+
+def _unknown_path_error(path: str, known, instrument=None) -> ValueError:
     """``unknown parameter path: 'p'``, with :func:`_path_hint` when it has one."""
-    hint = _path_hint(path, known)
+    hint = _path_hint(path, known, instrument)
     return ValueError(f"unknown parameter path: {path!r}"
                       + (f"; {hint}" if hint else ""))
 
 
-def _unknown_paths_error(paths: list[str], known) -> ValueError:
+def _unknown_paths_error(paths: list[str], known, instrument=None) -> ValueError:
     """:func:`_unknown_path_error` for one path; for several, every one named.
 
     ``set_vary`` takes a list, and naming each typo saves a rerun per typo.
     """
     if len(paths) == 1:
-        return _unknown_path_error(paths[0], known)
+        return _unknown_path_error(paths[0], known, instrument)
     return ValueError(f"unknown parameter paths: {', '.join(map(repr, paths))}"
                       + "".join(f"; for {p!r}, {h.rstrip('.')}" for p in paths
-                                if (h := _path_hint(p, known))))
+                                if (h := _path_hint(p, known, instrument))))
 
 
 def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
@@ -8541,7 +8573,7 @@ def _window_loss_diagnostics(stage_results: list[StageResult]) -> list[Diagnosti
 
 
 def _unknown_path_diagnostics(stage_results: list[StageResult],
-                              known: list[str]) -> list[Diagnostic]:
+                              known: list[str], instrument=None) -> list[Diagnostic]:
     """``STAGE_PATH_UNKNOWN`` — a stage asked for a parameter by a name no row has.
 
     Issue #265: ``turn_on=["instrument.source.wavelength"]`` freed nothing,
@@ -8576,7 +8608,10 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
     the nearest real path (:mod:`rietx._nearmiss`, the ``__getattr__`` helper)
     rides in the message.  One suggestion rather than three, since on dot
     paths the second and third are usually siblings of the first: for the
-    issue's typo they were ``lines.0.weight`` and ``profile.w``.
+    issue's typo they were ``lines.0.weight`` and ``profile.w``.  A literal
+    of an opt-in correction its owner does not declare names the declaration
+    instead (:func:`rietx.help.undeclared_opt_in`, WP-2087), and its
+    suggestion says to declare it.
 
     The suggestion names ``ref.parameters()`` for seeing every path, which a
     joint fit has too (WP-2028), spelling its rows as ``known`` does.
@@ -8597,6 +8632,20 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
                          f"for it. The current spelling is {current!r}."),
                 where=[path],
                 suggestion=f"Write {current!r} in the plan.",
+            ))
+            continue
+        if (hit := undeclared_opt_in(path, known, instrument)) is not None:
+            row, owner = hit
+            out.append(Diagnostic(
+                level="warning", code="STAGE_PATH_UNKNOWN",
+                message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
+                         "names no parameter of this model, so nothing was freed "
+                         f"for it. It is a parameter of {row.name}, which "
+                         f"{_owner_words(owner)} does not declare."),
+                where=[path],
+                suggestion=(f"Declare it with {row.declaration}, or write a glob "
+                            "if the stage should reach it only on models that "
+                            "declare it."),
             ))
             continue
         hint = did_you_mean(path, known, n=1)
@@ -9153,9 +9202,21 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # tested, so a tied row — in `parameters`, absent from the free vector —
     # reports None, and so does every row when no guard ran at all
     # (`replay`).  A free row on a floor of 0 is tested like any other bound
-    # (WP-1938), and reads True under either code (WP-1929).
-    tested = set(table.free_paths) if guard is not None else set()
+    # (WP-1938), and reads True under either code (WP-1929).  A tied row the
+    # LM step held on its own limit is a finding too (WP-1325,
+    # ``staged.tied_bound_findings``), so it reads True rather than None.
     on_bound = {p for f in guard.at_bounds for p in f.paths} if guard is not None else set()
+    tested = set(table.free_paths) | on_bound if guard is not None else set()
+    # the FLOOR_HIT half of the same findings, read by the microstructure
+    # block below (WP-1914).  With no guard (``replay``) the recorded
+    # FLOOR_HIT diagnostics are the test, as ``cell_runaway`` falls back to
+    # them below, so the table cannot contradict a warning the result carries.
+    # A tied width the LM step held on its own floor is named here directly
+    # (WP-1325), and ``floored_paths`` adds the ones tied to a floored source
+    floors = floored_paths(table, (
+        {p for f in guard.at_bounds if f.code == "FLOOR_HIT" for p in f.paths}
+        if guard is not None else
+        {p for d in diagnostics if d.code == "FLOOR_HIT" for p in d.where}))
     # A CELL_RUNAWAY finding's own message says the named cell's value is
     # "not a measurement", so its esd is withheld while the row stays (it is
     # still a free column; WP-1301's hold is what drops a row).  Keyed on the
@@ -9248,10 +9309,13 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # the three cannot attribute one coefficient to different wavelengths.
     # ``stderr_phys`` rather than a second ``stderr_physical`` call: with a
     # correlation matrix that build is a dense n x n, which a Pawley table
-    # makes large, and the two calls would return the same dict.
+    # makes large, and the two calls would return the same dict.  ``floors``
+    # is the FLOOR_HIT half of the bound findings ``at_bound`` projects
+    # above, so a width solve="trf" stopped a hair above zero reads absent
+    # exactly where LM's lands on it (WP-1914).
     microstructure = microstructure_table(
         structure, values, wavelength=_longest_line_wavelength(model),
-        esds=stderr_phys)
+        esds=stderr_phys, floors=floors)
 
     # WP-1343: whether the magnetic peaks are broader than the profile drew
     # them, read off the converged residual's *shape* rather than from any

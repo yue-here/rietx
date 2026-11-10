@@ -397,6 +397,149 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
     assert not moved, moved
 
 
+#: The Background tab's own controls, beside the shell's landmarks (WP-2129).
+BACKGROUND_LANDMARKS = LANDMARKS + [
+    "section[aria-label=background] .host", "section[aria-label=background] .knobs",
+    "section[aria-label=background] .knobs > *", ".term",
+]
+
+
+def test_the_background_tab_holds_still_under_a_hold_and_a_band_press(
+        browser, tmp_path_factory):
+    """WP-2129. Holding a term moves the head and refetches the band; pressing
+    ×5 redraws it. Neither asks for a layout change, so no landmark moves, the
+    tab's own controls included. A project of its own: the hold is written."""
+    from pathlib import Path
+
+    httpd, client = _serve(tmp_path_factory, "layout-background")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        # the fixture's stage freed the scale alone; free the terms, or no band
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        page = _open(browser, url, WIDTHS["wide"])
+        page.locator(".plotcol > nav.tabs").get_by_role("button", name="Background", exact=True).click()
+        page.wait_for_selector(".term input:not([disabled])")
+        page.wait_for_function(
+            "document.querySelector('.gtitle .what').textContent === 'Background at the current values'")
+        page.wait_for_selector(".band .segmented button:not([disabled])")
+        _frames(page)
+        out = Path(__file__).parent / "output"
+        out.mkdir(exist_ok=True)
+        page.screenshot(path=str(out / "gui_background_tab.png"))
+        before = page.evaluate(SNAP, BACKGROUND_LANDMARKS)
+
+        head = client.get("/api/project")[1]["head"]
+        page.locator(".term", has_text="c1").locator("input").click()
+        page.wait_for_function(
+            "document.querySelector('.console')?.textContent"
+            ".includes('ref.hold(\"instrument.background.c1\")')")
+        page.wait_for_selector(".term input:checked:not([disabled])")
+        _frames(page)
+        assert client.get("/api/project")[1]["head"] != head
+        held = page.evaluate(SNAP, BACKGROUND_LANDMARKS)
+
+        page.locator(".band .segmented button", has_text="×5").click()
+        _frames(page)
+        page.screenshot(path=str(out / "gui_background_tab_x5.png"))
+        pressed = page.evaluate(SNAP, BACKGROUND_LANDMARKS)
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not _moved(before, held), _moved(before, held)
+    assert not _moved(before, pressed), _moved(before, pressed)
+
+
+#: The Interactive tab's own rows (WP-2128): a drag or a typed value changes a
+#: number and a thumb, and never where a row sits.
+SLIDER_ROWS = [".side .panel:not(.hidden) .slider", ".side .panel:not(.hidden) .slider .line > *"]
+
+#: Every `rx-preview-redraw` entry's duration, in ms: from the moment a slider's
+#: values were set to the second frame after the preview was drawn.
+REDRAWS = """() => performance.getEntriesByName("rx-preview-redraw").map((e) => e.duration)"""
+
+
+def _drag(page, track, frac_from: float, frac_to: float, steps: int = 24) -> None:
+    """A real pointer drag along a range input, from one track fraction to another."""
+    box = track.bounding_box()
+    # the thumb's centre runs from 8 px to 8 px short of the box's ends
+    x = lambda f: box["x"] + 8 + (box["width"] - 16) * f  # noqa: E731
+    y = box["y"] + box["height"] / 2
+    page.mouse.move(x(frac_from), y)
+    page.mouse.down()
+    for k in range(1, steps + 1):
+        page.mouse.move(x(frac_from + (frac_to - frac_from) * k / steps), y)
+        _frames(page, 1)
+    page.mouse.up()
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_a_slider_drag_previews_and_moves_nothing(browser, gui, state):
+    """WP-2128: a drag, a typed value, the range pop-up and a peak window's step
+    each change what is drawn and never where anything sits. The drag is a real
+    pointer drag, so its redraws are what a person would wait for, and their
+    latencies are printed as a range."""
+    url, _ = gui
+    page = _open(browser, url, WIDTHS[state])
+    _press(page, "Interactive")
+    page.wait_for_selector(".side .panel:not(.hidden) .slider")
+    _frames(page)
+    marks = LANDMARKS + SLIDER_ROWS
+    before = page.evaluate(SNAP, marks)
+    failures = []
+
+    track = page.locator('.side .panel:not(.hidden) input[type="range"]').first
+    value = int(track.input_value()) / 1000
+    _drag(page, track, value, min(1.0, value + 0.3))
+    page.wait_for_function(
+        "document.querySelector('.gtitle .what').textContent === 'Preview, not refined'")
+    _frames(page)
+    failures += [f"drag: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+    assert "pending" in page.locator(".actions .pending").text_content()
+
+    # a typed value: the number is a button, and typing opens over it. The
+    # first row's, because a click on a row out of view scrolls the panel, and
+    # a scroll moves every row without moving the layout
+    page.locator(".side .panel:not(.hidden) button.num").first.click()
+    page.wait_for_selector(".side .panel:not(.hidden) input.typed")
+    page.wait_for_function("document.activeElement?.classList.contains('typed')")
+    # ArrowRight to the end of the selected text. End is a scroll key in a mac
+    # text field, and it scrolled the panel 47 px with the caret unmoved
+    page.keyboard.press("ArrowRight")
+    page.keyboard.type("1")
+    page.keyboard.press("Enter")
+    _frames(page)
+    failures += [f"typed: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+
+    # the range pop-up from the parameter's name, closed the way a person does
+    page.locator(".side .panel:not(.hidden) button.pname").first.click()
+    page.wait_for_selector(".rangepop")
+    _frames(page)
+    failures += [f"pop-up: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+    page.keyboard.press("Escape")
+
+    # the Single peaks graph, stepped once while the preview is drawn
+    _press(page, "Single peaks")
+    page.wait_for_selector(".peakwins canvas")
+    page.locator('.peakwins button[aria-label="Next peak"]').first.click()
+    _frames(page)
+    failures += [f"single peaks: {m}" for m in _moved(before, page.evaluate(SNAP, LANDMARKS))]
+
+    redraws = page.evaluate(REDRAWS)
+    page.locator(".actions button", has_text="Revert").click()
+    page.wait_for_function("document.querySelector('.gtitle .what').textContent === 'Last fit'")
+    assert not page.errors, page.errors
+    page.close()
+    assert redraws, "no preview was drawn"
+    # a runaway guard on one redraw, never a timer: the route answers in tens
+    # of ms on this synthetic pattern
+    assert max(redraws) < 5000, redraws
+    print(f"\n[{state}] {len(redraws)} preview redraws, drag to redraw "
+          f"{min(redraws):.0f}-{max(redraws):.0f} ms")
+    assert not failures, "\n".join(failures)
+
+
 # ---------------------------------------------------------------------------
 # WP-2127: the Plan tab
 # ---------------------------------------------------------------------------
@@ -435,7 +578,7 @@ PLAN_MARK = """(index) => {
 
 def _open_plan(browser, url: str, width: int):
     page = _open(browser, url, width)
-    page.locator(".side > nav.tabs button", has_text="Plan").click()
+    page.locator(".side > nav.tabs").get_by_role("button", name="Plan", exact=True).click()
     page.wait_for_selector("section[aria-label=plan] li.stage .rung summary")
     _frames(page)
     return page
@@ -548,4 +691,204 @@ def test_a_plan_edit_moves_nothing(browser, gui, state):
     _frames(page)
     assert not page.errors, page.errors
     page.close()
+    assert not moved, moved
+
+
+# -- WP-2131: the start screen and the New project dialog ---------------------
+
+#: The start screen's own landmarks: its two columns, their headings and rows.
+START_LANDMARKS = [".start .left > *", ".start .right h2", ".start li", ".start .row"]
+
+#: The dialog's rows and their label column.
+DIALOG_LANDMARKS = ['[role="dialog"]', ".nrow", ".nlabel"]
+
+#: Each instrument-form label's ink, its column's width, and the gap from the
+#: ink to its control.
+LABEL_ROOM = """() => [...document.querySelectorAll(".iform .fld")]
+  .filter((f) => f.getClientRects().length)
+  .map((f) => {
+    const label = f.firstElementChild, control = f.lastElementChild;
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    const ink = range.getBoundingClientRect();
+    return {label: label.textContent.trim(), room: label.getBoundingClientRect().width,
+            ink: ink.width, gap: control.getBoundingClientRect().left - ink.right};
+  })"""
+
+
+@pytest.fixture(scope="module")
+def start(tmp_path_factory):
+    """A session with no project whose recent list holds one, and a pattern file."""
+    from tests.test_project import _write_xye
+    from tests.test_refine_synthetic import synthesize
+
+    data = _write_xye(tmp_path_factory.mktemp("start-data") / "synth.xye", synthesize())
+    project = _project(tmp_path_factory.mktemp("start") / "sample.rex", data)
+    state = tmp_path_factory.mktemp("start-state")
+    # one session opens it, which is what writes the recent list
+    first = _start(GuiSession(state_dir=state))
+    try:
+        status, _ = Client(first.server_address[1]).post(
+            "/api/project/open", {"path": str(project.path)})
+        assert status == 200
+    finally:
+        first.shutdown()
+    httpd = _start(GuiSession(state_dir=state))
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/", data
+    finally:
+        httpd.shutdown()
+
+
+def _open_start(browser, url: str, width: int):
+    page = browser.new_page(viewport={"width": width, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda exc: page.errors.append(str(exc)))
+    page.goto(url)
+    page.wait_for_selector(".start .row")
+    page.evaluate("document.fonts.ready")
+    _frames(page)
+    return page
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_the_start_screen_holds_still_under_its_menus(browser, start, state):
+    """A row's ⋯ appears on hover and opens a menu over the list, so neither
+    the hover nor the menu moves a row (WP-2131)."""
+    url, _ = start
+    page = _open_start(browser, url, WIDTHS[state])
+    assert page.locator(".start h2").all_text_contents() == ["Recent", "Examples"]
+    before = page.evaluate(SNAP, START_LANDMARKS)
+    row = page.locator(".start li").first
+    row.hover()
+    _frames(page)
+    row.locator("button.more").click()
+    _frames(page)
+    items = row.locator('[role="menuitem"]').all_text_contents()
+    moved = _moved(before, page.evaluate(SNAP, START_LANDMARKS))
+    page.keyboard.press("Escape")
+    _frames(page)
+    closed = row.locator('[role="menu"]').count() == 0
+    assert not page.errors, page.errors
+    page.close()
+    assert items == ["Open", "Remove from list"], items
+    assert closed
+    assert not moved, moved
+
+
+def test_the_new_project_dialog_holds_still_and_its_labels_fit(browser, start):
+    """The dialog's rows stay put as its menu opens, and each instrument-form
+    label has room beside its control (round 9's Wavelength fix: a 6.5em
+    label column)."""
+    url, data = start
+    page = _open_start(browser, url, WIDTHS["wide"])
+    page.get_by_role("button", name="New project…").click()
+    page.wait_for_selector('[role="dialog"]')
+    _frames(page)
+    page.locator('.slot input[type="file"]').set_input_files(str(data))
+    page.wait_for_selector(".spark path")
+    _frames(page)
+    before = page.evaluate(SNAP, DIALOG_LANDMARKS)
+    page.get_by_role("button", name="Add phase").click()
+    _frames(page)
+    items = page.locator('[role="menuitem"]').count()
+    moved = _moved(before, page.evaluate(SNAP, DIALOG_LANDMARKS))
+    page.keyboard.press("Escape")
+    _frames(page)
+    still_open = page.locator('[role="dialog"]').count() == 1   # Escape closed the menu only
+
+    page.get_by_role("button", name="Change…").click()
+    _frames(page)
+    page.locator(".iform select").first.select_option("debye_scherrer")
+    _frames(page)
+    rows = page.evaluate(LABEL_ROOM)
+    assert not page.errors, page.errors
+    page.close()
+    assert items == 2 and still_open
+    assert not moved, moved
+    assert {"Geometry", "wavelength (Å)", "radius (mm)"} <= {r["label"] for r in rows}, rows
+    for r in rows:
+        assert r["ink"] <= r["room"] + 0.5 and r["gap"] > 0, r
+
+
+def test_the_start_screen_and_dialog_never_scroll_sideways(browser, start):
+    """At phone width the start screen stacks its columns and the dialog takes
+    the window less its gutter, so neither needs a wider window."""
+    url, _ = start
+    page = _open_start(browser, url, 420)
+    overflow = "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+    on_start = page.evaluate(overflow)
+    page.get_by_role("button", name="New project…").click()
+    page.wait_for_selector('[role="dialog"]')
+    _frames(page)
+    on_dialog = page.evaluate(overflow)
+    width = page.locator('[role="dialog"]').bounding_box()["width"]
+    assert not page.errors, page.errors
+    page.close()
+    assert on_start <= 0 and on_dialog <= 0, (on_start, on_dialog)
+    assert width <= 420 - 32 + 1, width
+
+
+@pytest.fixture
+def filemenu(tmp_path_factory):
+    """A project of its own, since this test renames its folder."""
+    httpd, client = _serve(tmp_path_factory, "filemenu")
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/", client
+    finally:
+        httpd.shutdown()
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_the_file_menu_moves_nothing(browser, filemenu, state):
+    """The File menu on the project name (WP-2133): the menu, both submenus,
+    the Save a copy dialog and the rename box are overlays, so walking through
+    them with the mouse moves no landmark, and a rename lands in place."""
+    url, client = filemenu
+    page = _open(browser, url, WIDTHS[state])
+    before = page.evaluate(SNAP, LANDMARKS)
+    moved: dict[str, list[str]] = {}
+
+    def look(step: str) -> None:
+        _frames(page)
+        hit = _moved(before, page.evaluate(SNAP, LANDMARKS))
+        if hit:
+            moved[step] = hit[:4]
+
+    name = page.locator("header .fm-name")
+    name.click()
+    look("open the menu")
+    menu = page.locator(".fm-menu").first
+    labels = menu.locator("button.item .label").all_text_contents()
+    menu.get_by_role("menuitem", name="Open recent").hover()
+    look("hover Open recent")
+    menu.get_by_role("menuitem", name="Export").hover()
+    look("hover Export")
+    kinds = page.locator(".fm-sub button.item .label").all_text_contents()
+    menu.get_by_role("menuitem", name="Save a copy…").click()
+    page.wait_for_selector('[aria-labelledby="fm-title"]')
+    look("Save a copy dialog")
+    fields = page.locator('[aria-labelledby="fm-title"] input').evaluate_all(
+        "els => els.map((e) => e.value)")
+    page.locator('[aria-labelledby="fm-title"]').get_by_role("button", name="Cancel").click()
+    look("cancel the dialog")
+
+    name.click()
+    page.locator(".fm-menu").get_by_role("menuitem", name="Rename…").click()
+    box = page.locator("header input.fm-rename")
+    box.wait_for()
+    look("rename box")
+    box.fill("sample2")
+    box.press("Enter")
+    page.wait_for_selector("header .fm-name:text('sample2')")
+    look("renamed")
+    status, doc = client.get("/api/project")
+    assert not page.errors, page.errors
+    page.close()
+
+    assert labels == ["New project…", "Open…", "Open recent", "Save a copy…", "Rename…",
+                      "Move to…", "Export", "Close project"], labels
+    assert len(kinds) == 6, kinds
+    assert fields[0] == "sample copy", fields
+    assert status == 200 and doc["path"].endswith("sample2.rex"), doc
     assert not moved, moved

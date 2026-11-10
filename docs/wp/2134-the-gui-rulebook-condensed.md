@@ -1,6 +1,6 @@
 # WP-2134 — The GUI rulebook keeps rules, and its evidence moves out
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — condensed to 644 lines and PR'd (#1511); #1490 folded; #1498, #1502, #1487 and #1488 fold in when they merge
+Milestone: unscheduled · Status: 🔄 2026-11-10 — condensed to 662 lines and PR'd (#1511); #1490, #1498, #1502 and #1514 folded
 Track: The repo's own process
 Depends on: —
 Priority: P4 2026-11-09 — process: no number moves, but every GUI session pays the file's size
@@ -59,7 +59,7 @@ etc)".
 - [x] A cheap test for what the rulebook names, named in the rulebook.
 - [x] `SIZE_CAPS` lowered to landed + 1, with a diary row in the test and a
   paragraph in `docs/milestones/process.md` § `gui/CLAUDE.md`.
-- [ ] `main` merged and the open PRs' additions folded in.
+- [x] `main` merged and the open PRs' additions folded in.
 - [x] Skill: none. The skill is for an agent driving rietx; this file is for
   changing the GUI.
 
@@ -126,8 +126,51 @@ Elsewhere in the rulebook:
 36. History: a difference is given twice, the percentage of |a|, at three significant
     figures (1217).
 
+### What `gui/STYLE.md` covers of these (checked 2026-11-10)
+
+WP-2142's style guide merged before this WP (#1514). The 36 rules above stay in
+`gui/CLAUDE.md` in this PR. Each was read against `gui/STYLE.md` at `384a3a4b2`:
+
+- **Covered** (STYLE.md states the rule; the rulebook copy can go, leaving a pointer
+  where a code rule needs it): 1 (principle 3 and `lib/style.test.ts`), 7, 8 (minus
+  "no free hue is left"), 15, 16, 19, 24, 25, 26, 27, 32, 34.
+- **Covered, and STYLE.md departs from the rulebook** (the move takes STYLE.md's
+  version; each departure is marked by the maintainer there): 9 (the peak layer keeps
+  one state colour, red, `provisional`), 11 (STYLE.md: no number is judged by colour,
+  the Rwp badge included), 21 (the graph title now ellipsises before a control wraps;
+  tab labels still never shorten), 23 (ticks sit in their own band at the foot, never
+  on the difference axis).
+- **Partly covered** (the move merges the rulebook's mechanism into STYLE.md's rule):
+  2 (the Components table replaces the nine-register table as the target set), 3
+  (type steps as roles; `.chip` and `.pill` go, so the chip tones go with them), 4
+  (three theme choices; the `data-theme` stamp is a code rule and stays here), 10
+  (the `--fg` ring; the pointer line is not named), 17 and 18 (a tooltip is a verb
+  phrase; the help term's markup is not named), 30 (number slots fixed under a
+  sweep), 31 (one value-box width per panel; the subgrid mechanism is not named), 33
+  (phase order; the OKLab spacing and CPK anchors are not named).
+- **Not covered** (STYLE.md says nothing; the style-guide move decides with the
+  maintainer whether each is style or code): 5, 6, 12, 13, 14, 20, 22, 28, 29, 35, 36.
+  Of these, 12, 13, 14 and 22 are CSS traps a code session meets, and likely stay
+  here as code rules.
+
 ## Handover log
 
+- **2026-11-10** — `main` merged, and every rule the five GUI PRs added in the
+  meantime is folded in. The rulebook is 662 lines. #1487 and #1488 added nothing
+  to it. #1498 and #1502 added six standing rules: the start screen's three and
+  the File menu's three. Each is now a bullet of § Model, and their two paragraphs
+  moved verbatim to WP-2131's and WP-2133's `## Moved from gui/CLAUDE.md`. #1514's
+  pointer to `gui/STYLE.md` sits in the header. The § Shell bullet on mounting
+  `Model` once took WP-2131's wording: it had named `panels/Model.svelte`'s
+  `openPath()`, which the tree no longer has (the path test checks only
+  `file:symbol`, so it could not see the possessive form). The 36 visual rules
+  were checked against `gui/STYLE.md` and not moved; the coverage is above.
+  - *Measured* (`wc`, 4 bytes a token): 662 lines, 44 703 bytes, about 11 180
+    tokens, against main's 1068 lines. Cap 1068 → 663 (landed + 1).
+  - *Next*: (1) The GUI style guide takes the 36 rules above, by the coverage
+    list: drop the covered ones here, merge the partly covered ones, and ask the
+    maintainer about the departures and the uncovered ones (visual questions go
+    to the maintainer). No WP owns that move yet. (2) Then close this WP.
 - **2026-11-09** — The GUI rulebook a session loads under `gui/` is now about
   half its size and says only what to do. Every story, measurement and example
   it held is still in the repository, verbatim, in the WP file each rule names,

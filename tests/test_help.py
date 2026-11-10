@@ -24,6 +24,7 @@ from __future__ import annotations
 import dataclasses
 import importlib.util
 import json
+import math
 import re
 from pathlib import Path
 from typing import get_args
@@ -37,6 +38,7 @@ from rietx.gui.imports import INSTRUMENT_PRESETS
 from rietx.help import (
     DIAGNOSTIC_HELP,
     INSTRUMENT_FIELD_HELP,
+    OPT_IN,
     PARAMETER_HELP,
     PEAK_FLAG_HELP,
     PEAK_ORIGIN_HELP,
@@ -48,6 +50,7 @@ from rietx.help import (
     UNIT_DISPLAY,
     HelpEntry,
     explain,
+    family_matches,
     help_key_for,
     help_registry,
     plan_help,
@@ -413,6 +416,110 @@ def test_every_family_glob_describes_a_real_path():
     assert not dead, (
         f"family globs matching no live parameter path: {dead} — the "
         "parameter was renamed or removed, and its entry outlived it")
+
+
+# ------------------------------------------------------- opt-in declarations
+#: The families a model declaring no opt-in block lacks that are not in
+#: ``rietx.help.OPT_IN``, each with why an unknown path in it gets the nearest
+#: real path rather than a declaration (WP-2087).
+NOT_OPT_IN: dict[str, str] = {
+    **dict.fromkeys(
+        [g for g in PARAMETER_HELP if g.startswith("instrument.source.")
+         and g.split(".")[2] in {"difc", "difa", "tzero", "difb", "profile_tof",
+                                 "incident_spectrum"}],
+        "a time-of-flight bank's own parameter: the source kind, not a declaration"),
+    "instrument.background.scale":
+        "the measured-background model's: one of three background kinds",
+    "instrument.background.air":
+        "the measured-background model's: one of three background kinds",
+    **dict.fromkeys(
+        [g for g in PARAMETER_HELP if g.startswith("instrument.extra_components.")],
+        "a member of a list of additive components, each of its own kind, "
+        "addressed by index"),
+    **dict.fromkeys(
+        [g for g in PARAMETER_HELP if "magnetic" in g or ".moment." in g],
+        "a magnetic structure's: read from an mCIF, never one assignment"),
+    **dict.fromkeys(
+        [g for g in PARAMETER_HELP if ".rigid_bodies." in g],
+        "a rigid body's: structure content, addressed by index"),
+    "phases.*.distortion_modes.modes.*.amplitude":
+        "a distortion-mode description's: built from a parent and a child "
+        "structure, never one assignment",
+    "vars.*": "a named variable: Refinement.add_variable declares it, outside the model",
+}
+
+
+def _undeclared_models() -> tuple[Structure, Instrument]:
+    """:func:`_default_models` with every opt-in block it carries removed,
+    on a Bragg-Brentano plate, the one geometry that takes roughness."""
+    structure, instrument = _default_models()
+    instrument.geometry = Geometry(kind="bragg_brentano", goniometer_radius_mm=240.0)
+    phase = structure.phases[0]
+    phase.extinction = phase.preferred_orientation = phase.microstrain = None
+    phase.atoms[0].aniso = None
+    return structure, instrument
+
+
+def _families_with_rows(structure, instrument) -> set[str]:
+    paths = [e.path for e in ParameterTable(structure, instrument).entries]
+    return {g for g in PARAMETER_HELP if any(family_matches(p, g) for p in paths)}
+
+
+def _declare(row, structure, instrument) -> None:
+    """Run ``row.declaration`` as the error prints it, on phase 0 and atom 0."""
+    phase = structure.phases[0]
+    exec(row.declaration, {**vars(rx), "math": math, "phase": phase,
+                           "atom": phase.atoms[0], "instrument": instrument,
+                           # the axis placeholder, filled as GSAS-II pre-fills it
+                           "h": 0, "k": 0, "l": 1})
+
+
+@pytest.mark.parametrize("row", OPT_IN, ids=lambda r: r.name)
+def test_an_opt_in_declaration_creates_exactly_its_families(row):
+    """The line an unknown path's error prints, executed: on a model that
+    lacks the correction, it creates a row in every family the row claims."""
+    structure, instrument = _undeclared_models()
+    structure.phases[0].atoms[0].biso.vary = True  # a free biso, as a fit leaves it
+    before = _families_with_rows(structure, instrument)
+    assert not before & set(row.families), row.name
+    _declare(row, structure, instrument)
+    created = _families_with_rows(structure, instrument) - before
+    assert created == set(row.families), row.name
+    for family in row.families:
+        assert family.startswith(row.owner + "."), family
+
+
+@pytest.mark.parametrize("row", [r for r in OPT_IN if r.geometry or r.source],
+                         ids=lambda r: r.name)
+def test_a_geometry_bound_declaration_is_refused_off_its_geometry(row):
+    """``geometry`` and ``source`` are claims about the schema's refusals, so
+    the declaration raises on any other kind, which is why the hint stays
+    silent there."""
+    assert (row.geometry, row.source) == ("bragg_brentano", "xray_cw")
+    structure, instrument = _undeclared_models()
+    instrument.geometry = Geometry(kind="debye_scherrer")
+    with pytest.raises(ValueError, match="bragg_brentano"):
+        _declare(row, structure, instrument)
+    # the source half: the same plate under a neutron beam
+    from rietx.schemas.instrument import NeutronSource
+    structure, instrument = _undeclared_models()
+    _declare(row, structure, instrument)
+    with pytest.raises(ValueError, match="X-ray correction"):
+        Instrument(source=NeutronSource(wavelength=1.5),
+                   geometry=instrument.geometry)
+
+
+def test_every_family_an_undeclared_model_lacks_is_opt_in_or_says_why():
+    """The other direction: an opt-in correction added without a row in
+    ``OPT_IN`` fails here, and so does a reason left for a family that is
+    gone or that a model now always carries."""
+    missing = set(PARAMETER_HELP) - _families_with_rows(*_undeclared_models())
+    opt_in = {f for row in OPT_IN for f in row.families}
+    assert not opt_in & set(NOT_OPT_IN)
+    assert missing - opt_in == set(NOT_OPT_IN), (
+        "a family that only a declaration creates is in neither OPT_IN nor "
+        "NOT_OPT_IN, or a reason names a family a bare model carries")
+    assert opt_in <= missing
 
 
 # --------------------------------------------------------------- the named arms
