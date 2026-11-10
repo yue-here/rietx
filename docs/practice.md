@@ -477,6 +477,18 @@ Dropping and zero weight give the same χ². The two differ in what the pattern 
 GSAS-II keeps the point to plot, and rietx's pdCIF reader likewise keeps a zero-weight point as an
 excluded region.
 
+## Separators, trailing comments and text lines in a column file
+
+Surveyed 2026-11-09 for WP-1952 (issue #897). The question: in a plain two- or three-column
+file, which characters separate the columns, what happens to a comment after a row's numbers, a
+text line inside the data and a decimal comma?
+
+| Program | What it does |
+|---|---|
+| rietx | Whitespace, `,` and `;` separate, and a `;` line is a comment. A field opening with `#` or `!` ends the row, without a report. A line between the first and last data row that is not a row of numbers is dropped and reported by line (`PATTERN_ROWS_DROPPED`); a header above the data and a footer below it are skipped silently. Quoted fields and a comma inside a number (a decimal comma or a thousands separator) are refused by name (checked, `io/formats/xy.py`) |
+| GSAS-II 5.8.4 | `imports/G2pwd_xye.py:166` and `G2pwd_csv.py:28,73` replace `,` and `;` with spaces, so both importers read either separator. After the header, a line with fewer than two fields is printed to the console and skipped; a field that is not a number refuses the whole file, naming the line (`:187`). Columns past the third are ignored, so `10.0 100 # c` reads while `10.0 100 #c` refuses. A quoted field refuses. A decimal comma or a thousands separator splits the number in two, as rietx did before (checked by reading, not run) |
+| FullProf, TOPAS, RIETAN-FP, BGMN, MAUD | Not checked |
+
 ## A magCIF in a non-standard orientation
 
 Surveyed 2026-11-01 for WP-1918's decision on the 91 untabulated orientations, by a research
