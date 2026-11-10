@@ -145,7 +145,7 @@ defines Rwp beside the expected value it is judged against.
 :::{admonition} A hopeless fit says so
 :class: note
 Past an Rwp of {{ MATURITY_MAX_RWP }} the title line shows `not a fit yet` beside
-the number, and the run's own status pill may still read `converged`. Both are true: the
+the number, or the action bar does while the graphs are hidden, and the run's own status pill may still read `converged`. Both are true: the
 optimiser stopped moving, and the model is not yet describing the data. Believe
 the warning, and go to the Report.
 :::

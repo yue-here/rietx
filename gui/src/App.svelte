@@ -300,6 +300,8 @@
   /** The report's own maturity gate, quoted rather than re-derived — see the
    *  header below and `GuiSession.result`. */
   const immature = $derived(Boolean(result?.maturity?.immature));
+  /** the report's sentence about that gate, for both homes of `FitStats` */
+  const maturityMessage = $derived(result?.maturity?.message ?? "");
   // the head is the working state (WP-1005), so it is the one signal that says
   // "the table moved" whether a run, a checkout or an edit moved it
   const head = $derived(run?.head ?? project?.head ?? null);
@@ -1212,7 +1214,7 @@
      fit alone: a preview's Rwp stays with the title line, which is what tells
      a preview from a fit. -->
 {#snippet barStats()}
-  <FitStats {rwp} {gof} {immature} message={result?.maturity?.message ?? ""} reserve />
+  <FitStats {rwp} {gof} {immature} message={maturityMessage} reserve />
 {/snippet}
 
 <svelte:window onkeydown={keydown} onclick={clickAway} onresize={reanchor}
@@ -1364,7 +1366,7 @@
             {:else if previewError}
               <span class="muted">preview refused: {previewError}</span>
             {:else if rwp !== null}
-              <FitStats {rwp} {gof} {immature} message={result?.maturity?.message ?? ""} />
+              <FitStats {rwp} {gof} {immature} message={maturityMessage} />
             {/if}
           </div>
         </div>

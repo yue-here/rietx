@@ -423,9 +423,10 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
 #: unfitted model passes 1000 % (1067 % measured here), hence Rwp's four digits.
 FIT_ROOM = """() => {
   const ctx = document.createElement("canvas").getContext("2d");
-  return [...document.querySelectorAll(".actions .fit .num")].map((slot, i) => {
+  return [...document.querySelectorAll(".actions .fit .num")].map((slot) => {
     ctx.font = getComputedStyle(slot).font;
-    return {room: slot.clientWidth, longest: ctx.measureText(i ? "9999.999" : "9999.999%").width};
+    const widest = slot.classList.contains("pct") ? "9999.999%" : "9999.999";
+    return {room: slot.clientWidth, longest: ctx.measureText(widest).width};
   });
 }"""
 
@@ -465,7 +466,7 @@ BAR_LANDMARKS = [sel for sel in LANDMARKS if not sel.startswith("#app > header")
 
 def test_a_refine_with_the_graphs_hidden_moves_nothing(browser, tmp_path_factory):
     """A project never fitted, the graphs hidden: the bar shows dashes, and a
-    refine fills them, and perhaps the judgement, without moving anything. A
+    refine fills them and the judgement's words without moving anything. A
     fit finishing does not ask for a layout change (gui/STYLE.md principle 4)."""
     httpd, client = _serve(tmp_path_factory, "layout-fit-stats", fitted=False)
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
@@ -493,6 +494,10 @@ def test_a_refine_with_the_graphs_hidden_moves_nothing(browser, tmp_path_factory
         httpd.shutdown()
     assert dashes == "Rwp — GoF —", dashes
     assert filled.startswith("Rwp ") and "—" not in filled, filled
+    # One cycle with nothing ticked evaluates the model as built, which this
+    # synthetic project puts past 1000 %, so the judgement's words swap in for
+    # the room kept for them: the swap the reservation exists for.
+    assert filled.endswith("not a fit yet"), filled
     assert not moved, filled + "\n" + "\n".join(moved)
 
 

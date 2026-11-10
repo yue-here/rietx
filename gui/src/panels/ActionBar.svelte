@@ -65,9 +65,10 @@
   const note = $derived(invalid ? "invalid edit" : count);
 </script>
 
-<!-- Two groups that wrap as wholes, the second held to the right. Every width
-     in it is reserved, so where the row breaks depends on the panel's width
-     alone and never on a click. -->
+<!-- Groups that wrap as wholes: the refine choice, then Refine's group held to
+     the right, and the fit's statistics after it while the graphs are hidden.
+     Every width in it is reserved, so where the row breaks depends on the
+     panel's width and the graphs' collapse alone, never on any other click. -->
 <div class="actions" role="toolbar" aria-label="actions">
   <div class="segmented" role="group" aria-label="refine">
     {#each CHOICES as choice (choice.id)}
