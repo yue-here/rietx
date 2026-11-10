@@ -1,6 +1,7 @@
 # Parameter map
 
-This page lists every parameter rietx can refine, grouped by what it does to the pattern.
+This page lists the parameters of the phases and the named variables, grouped by what each does to the pattern.
+[Instrument parameter map](parameters-instrument.md) lists the instrument's, the time-of-flight source's and the background's.
 
 Every parameter has a name made of parts joined by dots.
 `phases.0.cell.a` is lattice parameter a of the first phase, counting from 0, and `instrument.zero_shift` is the instrument's zero shift.
