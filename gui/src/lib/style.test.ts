@@ -157,7 +157,7 @@ describe("the control registers are declared once, in app.css", () => {
       }
     }
     // Three steps: --text (prose), --text-sm (a control and its row),
-    // --text-xs (a chip and a section heading).  A fourth is a decision, and
+    // --text-xs (a chip and a small label).  A fourth is a decision, and
     // it is taken in app.css or not at all.
     expect(found).toEqual([]);
   });
@@ -270,5 +270,38 @@ describe("one filled primary per view", () => {
     // the scanner read real tags: one of them holds an arrow function's `>`
     expect(tags.some((tag) => tag.includes("=>"))).toBe(true);
     expect(filled).toEqual(ALLOWED);
+  });
+});
+
+describe("headings, column heads and labels read in sentence case", () => {
+  it("no stylesheet uppercases or tracks one", () => {
+    // The maintainer's rulings of 2026-11-06 and 2026-11-09 (WP-2201): a
+    // heading is set apart by weight, never by capitals and tracking.  The
+    // case is the markup's, so a proper noun or a symbol (Rwp, Le Bail, hkl)
+    // keeps it.  Two exceptions, each by its selector: `::first-letter`
+    // capitalises a label the vocabulary writes in lower case (New project's
+    // preset fields), and `.sg` spaces a typeset space-group symbol, which is
+    // not a label.
+    const sheets: Array<[string, string]> = [
+      ["app.css", read("app.css").replace(/\/\*[\s\S]*?\*\//g, "")],
+      ...styledFiles().map((rel): [string, string] => [rel, styleBlock(read(rel))]),
+    ];
+    const found: string[] = [];
+    for (const [rel, block] of sheets) {
+      for (const rule of rules(block)) {
+        const where = `${rel}: ${rule.selectors.join(", ")}`;
+        for (const declaration of rule.declarations) {
+          const transform = /^text-transform\s*:\s*(uppercase|capitalize)/.exec(declaration);
+          if (transform && !rule.selectors.every((s) => s.includes("::first-letter")))
+            found.push(`${where} { ${declaration} }`);
+          const spacing = /^letter-spacing\s*:\s*([0-9.]+)/.exec(declaration);
+          if (spacing && Number(spacing[1]) > 0 && !rule.selectors.every((s) => /\.sg\b/.test(s)))
+            found.push(`${where} { ${declaration} }`);
+        }
+      }
+    }
+    // the scan read real rules: app.css's heading rule is among them
+    expect(sheets[0][1]).toMatch(/\bh2,\s*h3\s*\{/);
+    expect(found).toEqual([]);
   });
 });

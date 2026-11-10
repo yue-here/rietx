@@ -4624,7 +4624,7 @@ describe("the peaks tab (WP-1027)", () => {
     // the seven columns, use on its own; the picker's notes folded to a count
     const heads = [...host.querySelectorAll<HTMLElement>(".panel:not(.hidden) thead th")]
       .map((th) => th.textContent!.trim());
-    expect(heads).toEqual(["#", "2θ (°)", "d (Å)", "I (rel)", "flags", "use", ""]);
+    expect(heads).toEqual(["#", "2θ (°)", "d (Å)", "I (rel)", "Flags", "Use", ""]);
     expect(host.querySelectorAll('td.use input[type="checkbox"]').length).toBe(3);
     expect(host.querySelector("details.notes summary")!.textContent!.replace(/\s+/g, " ").trim())
       .toBe("1 note from the picker");

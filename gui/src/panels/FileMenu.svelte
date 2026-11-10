@@ -502,14 +502,8 @@
     padding: 16px 20px 12px;
   }
 
-  /* sentence case, the maintainer's heading ruling of 2026-11-06 */
   h2 {
     margin: 0;
-    font-size: var(--text);
-    font-weight: 600;
-    color: var(--fg);
-    text-transform: none;
-    letter-spacing: normal;
   }
 
   .fld {

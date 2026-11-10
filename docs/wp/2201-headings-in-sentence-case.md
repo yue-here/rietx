@@ -60,13 +60,13 @@ check, not a heuristic.
 
 ## Tasks
 
-- [ ] `app.css`'s `h2, h3` rule at the ruled register; the local overrides that only undid
+- [x] `app.css`'s `h2, h3` rule at the ruled register; the local overrides that only undid
       the uppercase drop those lines
-- [ ] The Model atom table's heads and `.sublabel` in sentence case, at the column-head
+- [x] The Model atom table's heads and `.sublabel` in sentence case, at the column-head
       register; lower-case column heads in Peaks and Series written in sentence case
-- [ ] A vitest in `gui/src/lib/style.test.ts` failing on an uppercase or tracked heading,
+- [x] A vitest in `gui/src/lib/style.test.ts` failing on an uppercase or tracked heading,
       column head or label in any stylesheet
-- [ ] `gui/STYLE.md` § Type's heading rule names the rule and the test, with its motive
+- [x] `gui/STYLE.md` § Type's heading rule names the rule and the test, with its motive
 - [ ] Dist rebuilt; vitest, svelte-check and every `tests/*_browser.py` run locally
 - [ ] Before/after screenshots in the PR
 - [ ] Skill: none. The agent skill drives rietx from Python and quotes no GUI heading.

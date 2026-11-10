@@ -20,10 +20,11 @@
      were different objects.  Each step means a *role*, not a degree of
      smallness:
 
-       --text     prose — a sentence a person reads
+       --text     prose — a sentence a person reads, and a section heading
+                  (sentence case at weight 600, WP-2201)
        --text-sm  a control and everything on its row: a field, a field's
                   label, a count beside a button, a table cell
-       --text-xs  a chip and a section heading: a label on something else
+       --text-xs  a chip, and a small label on something else
 
      A field is control-sized with no exception: a field that needs to feel
      prominent gets width and padding, never a step of its own.
@@ -109,10 +110,9 @@ button {
   font-size: var(--text-sm);
   line-height: 1.4;
   font-weight: 600;
-  /* a button's label is its own, not the heading's it happens to sit in — the
-     model pane's `Replace from CIF…` read as REPLACE FROM CIF… inside an `h2`
-     (found in the browser).  `Console`'s caret opts back in, because there the
-     button *is* the heading. */
+  /* a button's label is its own, not the case or tracking of whatever it sits
+     in — the model pane's `Replace from CIF…` once read as REPLACE FROM CIF…
+     inside an uppercase `h2` (found in the browser, before WP-2201). */
   text-transform: none;
   letter-spacing: normal;
   padding: var(--s1) var(--s3);
@@ -436,15 +436,8 @@ button:disabled {
   line-height: 1.45;
 }
 
-/* `h2` is the section-heading register, which is uppercase and muted — right
-   on a block of a panel and wrong on the *name* this popover is about, which
-   is the one thing on it that must read as a title. */
+/* the name this popover is about, flush with the popover's top edge */
 .popover h2 {
-  font-size: var(--text);
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--fg);
-  font-weight: 600;
   margin: 0 0 var(--s2);
 }
 
@@ -481,14 +474,15 @@ textarea {
 }
 
 /* A section heading, which every panel had its own copy of (six identical
-   rules before WP-1201).  Uppercase and tracked, so it reads as a label on the
-   block below rather than as a line of the prose. */
+   rules before WP-1201).  Sentence case, set apart by weight and full-colour
+   ink rather than by capitals and tracking: the maintainer's rulings of
+   2026-11-06 and 2026-11-09 (option A), at the New project dialog's register
+   (WP-2131, WP-2201).  A heading read in capitals loses its proper nouns and
+   symbols (Rwp, Le Bail, hkl), which carry their meaning in their case. */
 h2,
 h3 {
-  font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  font-size: var(--text);
+  color: var(--fg);
   font-weight: 600;
   margin: var(--s3) 0 var(--s1);
 }

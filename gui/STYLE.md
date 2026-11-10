@@ -60,7 +60,7 @@ The palette piece moves it, and adds the site's roles the GUI lacks: a second te
 - Identifiers that are words, such as Wyckoff letters, use the text face. [Yue 2026-11-07]
 - Every font is served by the app itself. No built file names a remote host, which `tests/test_gui_dist.py` checks. [inferred, WP-1010]
 - A type size is a role. Each step names what it sets (prose and controls, secondary text, headings), and steps scale with density once the Settings dialog piece adds it. `gui/src/lib/style.test.ts` fails a size that is not a step. [Yue, WP-1201, for the principle; inferred for the roles]
-- Headings are sentence case app-wide, with weight setting them apart. No heading, column head or label is uppercase or tracked. Today's `h2, h3` rule in `app.css` is uppercase, and the sentence-case piece moves it. [Yue 2026-11-06, 2026-11-09; inferred for column heads]
+- Headings are sentence case app-wide, with weight setting them apart. No heading, column head or label is uppercase or tracked, so a proper noun or a symbol (Rwp, Le Bail, hkl) keeps the case that carries its meaning. One rule in `gui/src/app.css` sets every `h2` and `h3`, and `gui/src/lib/style.test.ts` fails on a stylesheet that uppercases or tracks one (WP-2201). [Yue 2026-11-06, 2026-11-09; inferred for column heads and the motive]
 - A selected item never changes weight. A bolder word is wider, so it re-wraps its line and moves what is under it. Today's `.tab.on` sets a heavier weight, and the piece that next touches tabs drops it. [inferred, from principle 4 and the site]
 - Held rows fold into one line in the crystallographer's notation, such as `a = b = c, α = β = γ = 90°`, built from the symmetry. Only rows that cannot be freed fold. [Yue 2026-11-06]
 

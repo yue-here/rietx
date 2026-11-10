@@ -967,12 +967,12 @@
         <div class="tablewrap">
         <table class="atoms">
           <thead>
-            <tr><th>label</th><th>species</th><th>site</th>
+            <tr><th>Label</th><th>Species</th><th>Site</th>
               <th>x</th><th>y</th><th>z</th>
-              <th><Help for="parameters:phases.*.atoms.*.occ">occ</Help></th>
+              <th><Help for="parameters:phases.*.atoms.*.occ">Occ</Help></th>
               <th><Help for="parameters:phases.*.atoms.*.biso">Biso</Help></th>
-              <th><Help for="parameters:phases.*.atoms.*.adp.*">aniso</Help></th>
-              <th><Help for="parameters:phases.*.atoms.*.dof.*">vary</Help></th>
+              <th><Help for="parameters:phases.*.atoms.*.adp.*">Aniso</Help></th>
+              <th><Help for="parameters:phases.*.atoms.*.dof.*">Vary</Help></th>
               <th></th></tr>
           </thead>
           <tbody>
@@ -1297,9 +1297,6 @@
      register: it names a block of the form, not the form */
   h3 {
     font-size: var(--text-sm);
-    text-transform: none;
-    letter-spacing: 0;
-    color: inherit;
     margin: 10px 0 3px;
   }
 
@@ -1623,8 +1620,6 @@
     font-weight: 600;
     color: var(--muted);
     font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     border-bottom: 1px solid var(--line);
     padding: 2px 3px;
   }
@@ -1676,15 +1671,8 @@
     display: block;
     font-size: var(--text-xs);
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--muted);
     margin: 1px 0;
-  }
-
-  .sublabel sup {
-    text-transform: none;
-    letter-spacing: 0;
   }
 
   /* `min(…, 100%)` rather than a bare track floor, and it is not cosmetic

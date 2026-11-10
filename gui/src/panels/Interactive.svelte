@@ -385,9 +385,6 @@
   }
   h3 {
     margin: var(--s3) 0 var(--s1);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    color: var(--muted);
   }
   h3:first-of-type {
     margin-top: 0;

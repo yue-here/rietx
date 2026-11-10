@@ -264,15 +264,13 @@
     min-width: 0;
   }
 
-  /* sentence case, the maintainer's heading ruling of 2026-11-06, over the
-     app's uppercase section heading (app.css); placed over the rows' text */
+  /* a list's label rather than a section's title, as the round-9 design drew
+     it: lighter and muted, placed over the rows' text */
   h2 {
     margin: 0 0 4px;
     padding-left: 10px;
-    font-size: var(--text);
     font-weight: 500;
-    text-transform: none;
-    letter-spacing: normal;
+    color: var(--muted);
   }
 
   ul {

@@ -684,7 +684,7 @@ can rise when validation and ambiguity run, never fall">
         <thead>
           <tr>
             <th>#</th><th>2θ (°)</th><th>d (Å)</th><th class="rel">I (rel)</th>
-            <th>flags</th><th>use</th><th></th>
+            <th>Flags</th><th>Use</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -776,13 +776,13 @@ can rise when validation and ambiguity run, never fall">
         <table class="tabular candidates">
           <thead>
             <tr>
-              <th></th><th>cell</th><th>lattice</th>
+              <th></th><th>Cell</th><th>Lattice</th>
               {#if zColumn}<th><Help for="search_fields:formula">Z</Help></th>{/if}
               {#each columns as name (name)}<th>{name}</th>{/each}
               <th>Rwp</th><th title="lines predicted where the pattern has no
                 intensity, of the lines screened; 'in window' is the count the
-                predicted_but_absent caveat caps on — the oversized-cell detector">absent</th>
-              <th>engines</th><th></th>
+                predicted_but_absent caveat caps on — the oversized-cell detector">Absent</th>
+              <th>Engines</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -902,15 +902,15 @@ classes, and every class lists all its space groups (WP-1025)"
         <table class="tabular">
           <thead>
             <tr>
-              <th>class</th>
+              <th>Class</th>
               <th title="BIC(class) − BIC(absence-free reference); negative favours the class">ΔBIC</th>
               <th title="absences the data could test / absences the class asserts —
 an absence outside the range, under a neighbour, or in a window this class's own
 fit already fills with a tail is not an observation.  Needs the fit, so an
-unscreened class shows —">testable</th>
-              <th title="testable forbidden positions carrying intensity; each one refutes the class">refuting</th>
+unscreened class shows —">Testable</th>
+              <th title="testable forbidden positions carrying intensity; each one refutes the class">Refuting</th>
               <th title="every space group in the class — a powder cannot
-distinguish them, so a singleton here would be unmeasurable">space groups</th>
+distinguish them, so a singleton here would be unmeasurable">Space groups</th>
             </tr>
           </thead>
           <tbody>

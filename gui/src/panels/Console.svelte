@@ -123,12 +123,9 @@
     flex: 0 0 auto;
   }
 
-  /* a ghost button that carries the heading's own tracking, since it *is* the
-     heading — the register supplies everything else */
+  /* a ghost button that *is* the heading — the register supplies the rest */
   .caret {
     color: var(--muted);
-    letter-spacing: inherit;
-    text-transform: inherit;
   }
 
   pre {
@@ -148,7 +145,5 @@
 
   .warn {
     color: var(--warn);
-    text-transform: none;
-    letter-spacing: 0;
   }
 </style>

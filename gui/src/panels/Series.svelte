@@ -504,11 +504,11 @@ once the files are read">
       <table class="tabular">
         <thead>
           <tr>
-            <th>#</th><th>label</th>
+            <th>#</th><th>Label</th>
             <th title="the series coordinate — blank means the index is the axis"
               >{settings?.x_label ?? "x"}</th>
             {#if !compact}
-              <th>file</th><th>pts</th><th>2θ</th><th>σ</th>
+              <th>File</th><th>Pts</th><th>2θ</th><th>σ</th>
             {/if}
             <th></th>
           </tr>
@@ -697,9 +697,9 @@ plot's x-axis title, and the column above">
           <table class="tabular">
             <thead>
               <tr>
-                {#if stepScope === "all"}<th>parameter</th>{/if}
-                <th>between</th><th>step</th><th>esd</th>
-                {#if hasCold}<th>cold ratio</th>{/if}
+                {#if stepScope === "all"}<th>Parameter</th>{/if}
+                <th>Between</th><th>Step</th><th>esd</th>
+                {#if hasCold}<th>Cold ratio</th>{/if}
               </tr>
             </thead>
             <tbody>
@@ -726,14 +726,14 @@ plot's x-axis title, and the column above">
       <table class="tabular">
         <thead>
           <tr>
-            <th>#</th><th>label</th><th>{answer.result.x_label}</th>
-            <th>status</th><th>Rwp</th>
+            <th>#</th><th>Label</th><th>{answer.result.x_label}</th>
+            <th>Status</th><th>Rwp</th>
             <!-- the same floor as the staged table one section up, and GoF is
                  what goes: Rwp is the headline and this column was the 6 px that
                  put the drill-down button off the right edge (measured) -->
             {#if !compact}<th>GoF</th>{/if}
             <th title="least-squares iterations over every attempt on this pattern,
-every rung of the escalation ladder included — what the warm start actually buys">iter</th>
+every rung of the escalation ladder included — what the warm start actually buys">Iter</th>
             <th></th>
           </tr>
         </thead>
