@@ -1,7 +1,7 @@
 (guide-next)=
 # How to choose the next parameter to free
 
-Call `Refinement.suggest` after a stage, free its top group if the group is resolved, its `delta_bic` is positive and the parameter is not on a bound, then measure the move with `rietx.report.compare_freed` against a re-solved copy of the fit.
+Call `Refinement.suggest` after a stage, free its top group if the group is resolved and its `delta_bic` is positive, then measure the move with `rietx.report.compare_freed` against a re-solved copy of the fit.
 
 `suggest` changes nothing.
 It scores copies of the model and records no history node.
@@ -35,7 +35,7 @@ Read each group in this order:
 2. `resolved`.
    A group of two holds parameters whose effects on the pattern the data cannot tell apart.
    Here each instrument width pairs with the sample width of the same shape, Lorentzian with Lorentzian and Gaussian with Gaussian.
-   `best_or_none()` returns `None` when the top group is such a tie.
+   `best_or_none()` returns `None` when the top group is such a tie, or when its `delta_bic` (the next item) is not positive.
 3. `delta_bic`, the change in the Bayesian information criterion.
    It weighs the gain against one more parameter at this pattern's effective number of observations, and a positive value favours freeing.
    The [theory chapter](../theory/estimation.md#which-parameter-to-free-next) derives it.
@@ -79,18 +79,17 @@ The structure declared extinction at the start, so it is among them: an undeclar
 
 <!-- output of examples/guides/next.py -->
 ```text
-free phases.0.extinction next: predicted Δχ² 96.1, ΔBIC -1.3; ΔBIC refuses it — the predicted gain does not pay for 1 parameter(s) at N_eff=1001 (5751 rows over the squared esd inflation) (24 candidate(s) evaluated, 4 non-separable from the free set, 0 without leverage; noise floor 26.98)
+phases.0.atoms.6.biso leads: predicted Δχ² 32.7, ΔBIC -5.0; ΔBIC refuses it — the predicted gain does not pay for 1 parameter(s) at N_eff=1001 (5751 rows over the squared esd inflation) (24 candidate(s) evaluated, 4 non-separable from the free set, 0 without leverage, 1 held back by a bound; noise floor 26.98)
 ```
 
-Extinction clears the noise floor, and ΔBIC refuses it.
-`best_or_none()` still returns it, because it checks the floor and the tie and does not check ΔBIC.
-Read `delta_bic` before you free what `best_or_none()` names.
+The one Biso left clears the noise floor, and ΔBIC refuses it, so the summary says it leads rather than that it is next.
+`best_or_none()` returns `None` for the same reason: it names a parameter only when the top group clears the floor, is resolved and has a positive `delta_bic`.
+It reads `delta_bic` on the top group only, and a lower group that ΔBIC admits is yours to weigh from `groups`.
 
-A positive `delta_bic` is not enough either.
-Asked again on the re-solved fit of the next section, the same query gives extinction a ΔBIC of +0.4.
-Extinction sits on its lower bound of 0, and the data push it below 0, so freeing it moves nothing.
-`suggest` predicts each gain as if the parameter could move both ways.
-Before you free a candidate, check that it is not on a bound, or measure it as the next section does.
+The candidate held back by a bound is extinction.
+It sits on its lower bound of 0 and the data push it below 0, so no value it can take moves χ².
+`suggest` scores each candidate by the gain it can reach inside its bounds, so extinction scores 0 and is listed in `bound_limited`.
+Its `gain_unbounded` of 96.1 is the gain it would have if it could go negative.
 
 The four non-separable candidates are the sample widths, which the free instrument widths already cover.
 
