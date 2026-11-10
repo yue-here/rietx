@@ -15,7 +15,7 @@ names hard dependencies, and *soft* marks a preferred order.
 |---|---|---|---|---|
 | [1132](1132-neutron-specimen-absorption.md) | A neutron µR, from the table this package already ships | 2026-10-01 | P2 | [Unscheduled](#unscheduled-the-specimen-is-not-an-angle-and-the-neutron-follow-through) |
 | [1317](1317-series-scrubber.md) | Scrub the series along its own trace | 2026-10-21 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
-| [1325](1325-parametric-series.md) | Parametric series: a parameter as a function of each pattern's coordinates | 2026-11-04 | P2 | [parametric](#parametric) |
+| [1325](1325-parametric-series.md) | Parametric series: a parameter as a function of each pattern's coordinates | 2026-11-09 | P2 | [parametric](#parametric) |
 | [1327](1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | 2026-11-04 | P2 | [magnetic](#magnetic) |
 | [1335](1335-the-report-costs-more-than-the-fit.md) | The report costs more than the fit | 2026-11-02 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 2026-10-25 | P2 | [magnetic](#magnetic) |
@@ -484,7 +484,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 
 | WP | Title | Status | Priority | Depends on |
 |---|---|---|---|---|
-| [1325](1325-parametric-series.md) | Parametric series: a parameter as a function of each pattern's coordinates | 🔄 2026-11-04 | P2 | — ([1119](1119-named-variables.md) soft) |
+| [1325](1325-parametric-series.md) | Parametric series: a parameter as a function of each pattern's coordinates | 🔄 2026-11-09 | P2 | — ([1119](1119-named-variables.md) soft) |
 | [1964](1964-a-parametric-equation-the-user-writes.md) | A parametric equation the user writes | ✅ 2026-11-06 | — | [1804](1804-the-derived-block.md) ([1325](1325-parametric-series.md), [2103](2103-a-joint-fit-has-the-verbs-a-single-fit-has.md) soft) |
 | [1965](1965-a-parametric-equation-declared-by-condition-and-glob.md) | A parametric equation declared by condition and glob | ⬜ | P3 | [1325](1325-parametric-series.md) ([1964](1964-a-parametric-equation-the-user-writes.md) soft) |
 | [1995](1995-soft-restraints-in-a-joint-fit.md) | Soft restraints in a joint fit | ⬜ | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) |
