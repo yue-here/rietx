@@ -1,6 +1,6 @@
 # WP-2209 — unapplied edits survive a close or a crash
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built; PR #1523 waits on the maintainer's look at the offer (milestone row 10)
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built, and the maintainer's five rulings of 2026-11-10 applied; PR #1523 waits on the merge
 Depends on: 2133
 Priority: P2 2026-11-10 — a piece the gui-overhaul milestone was opened for, ruled 2026-11-09
 
@@ -108,6 +108,21 @@ The offer is a choice between two outcomes, so it is interaction rule 11's askin
   for the project's copy. A copy found is offered in a small modal dialog. Writing is held
   until the dialog is answered, so an unanswered offer is never overwritten.
 
+### Ruled by Yue 2026-11-10
+
+The maintainer's answers to the five open questions of the first handover entry.
+
+1. **The offer stays a modal dialog on open**, as built. Ruled by Yue 2026-11-10.
+2. **Escape closes the dialog and keeps the recovery copy.** Nothing is restored and nothing
+   is discarded, and the offer returns on the next open of the project. Ruled by Yue
+   2026-11-10. It replaces the first cut, where Escape did nothing.
+3. **The title and the first line stay.** The line shown when the project's head has moved
+   becomes "The project has been refined or edited since. Restored values will replace the
+   current ones." Ruled by Yue 2026-11-10.
+4. **Restore stays the default and takes focus**, as built. Ruled by Yue 2026-11-10.
+5. **The Text panel's buffer and the Model panel's forms join the recovery copy**, the Text
+   buffer first, in one follow-up WP: WP-2213. Ruled by Yue 2026-11-10.
+
 ### Tier
 
 No rule here reads a pattern. The retention ceiling and floor are storage constants in
@@ -116,7 +131,7 @@ No rule here reads a pattern. The retention ceiling and floor are storage consta
 ## Non-goals
 
 - The Model panel's forms and the Text panel's buffer: they apply through their own buttons.
-  A follow-up joins them to the same draft if the maintainer wants it.
+  WP-2213 joins them to the same draft (ruled 2026-11-10).
 - Finding a project's copy after the folder was moved outside the app. The copy stays under
   the old path, and retention removes it in time.
 - A list of every kept copy (Blender's File › Recover). Each copy is offered by its project.
@@ -133,6 +148,8 @@ No rule here reads a pattern. The retention ceiling and floor are storage consta
   clicks; every `tests/*_browser.py` run locally
 - [x] Dist rebuilt; `npm --prefix gui test` and `npm --prefix gui run check`
 - [x] Skill: none. The GUI is not a surface an agent driving rietx uses
+- [x] The rulings of 2026-11-10: Escape sets the offer aside (vitest and a real-key browser
+  test), the head-moved line reworded in the dialog and the manual, WP-2213 filed
 
 ## Acceptance
 
