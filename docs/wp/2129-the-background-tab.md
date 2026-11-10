@@ -196,6 +196,9 @@ npm --prefix gui test && npm --prefix gui run check
   "second graph tab" sentence stays true. On the Background tab the title stays "Background at
   the current values" while the Interactive tab holds a preview, because this curve is drawn
   at the working values and not at the preview's. Both settled by Claude, reversible.
+  Since #1487, `test_gui_peaks_browser.py` clicked the `Single peaks` graph tab: it took the
+  first tab whose label contained "Peaks". It now selects the tab by its exact name, as do the
+  two other substring tab selectors in `test_gui_layout_browser.py` (Background, Plan).
 
 - **2026-11-09** — The GUI now has a Background graph tab. It shows the background curve over
   the greyed pattern, with a shaded band for where the curve may move when the free parameters

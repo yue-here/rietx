@@ -418,7 +418,7 @@ def test_the_background_tab_holds_still_under_a_hold_and_a_band_press(
         status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
         assert status == 200, body
         page = _open(browser, url, WIDTHS["wide"])
-        page.locator(".plotcol > nav.tabs button", has_text="Background").click()
+        page.locator(".plotcol > nav.tabs").get_by_role("button", name="Background", exact=True).click()
         page.wait_for_selector(".term input:not([disabled])")
         page.wait_for_function(
             "document.querySelector('.gtitle .what').textContent === 'Background at the current values'")
@@ -578,7 +578,7 @@ PLAN_MARK = """(index) => {
 
 def _open_plan(browser, url: str, width: int):
     page = _open(browser, url, width)
-    page.locator(".side > nav.tabs button", has_text="Plan").click()
+    page.locator(".side > nav.tabs").get_by_role("button", name="Plan", exact=True).click()
     page.wait_for_selector("section[aria-label=plan] li.stage .rung summary")
     _frames(page)
     return page
