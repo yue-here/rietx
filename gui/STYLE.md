@@ -59,7 +59,7 @@ The palette piece moves it, and adds the site's roles the GUI lacks: a second te
 - Space-group symbols are typeset in a serif face, with italics, subscripts and overbars, and take no comma. [Yue 2026-11-06, 2026-11-07]
 - Identifiers that are words, such as Wyckoff letters, use the text face. [Yue 2026-11-07]
 - Every font is served by the app itself. No built file names a remote host, which `tests/test_gui_dist.py` checks. [inferred, WP-1010]
-- A type size is a role. Each step names what it sets (prose and controls, secondary text, headings), and steps scale with density once the Settings dialog piece adds it. `gui/src/lib/style.test.ts` fails a size that is not a step. [Yue, WP-1201, for the principle; inferred for the roles]
+- A type size is a role. Each step names what it sets (prose and headings, controls, chips and small labels), and steps scale with density once the Settings dialog piece adds it. `gui/src/lib/style.test.ts` fails a size that is not a step. [Yue, WP-1201, for the principle; inferred for the roles]
 - Headings are sentence case app-wide, with weight setting them apart. No heading, column head or label is uppercase or tracked, so a proper noun or a symbol (Rwp, Le Bail, hkl) keeps the case that carries its meaning. One rule in `gui/src/app.css` sets every `h2` and `h3`, and `gui/src/lib/style.test.ts` fails on a stylesheet that uppercases or tracks one (WP-2201). [Yue 2026-11-06, 2026-11-09; inferred for column heads and the motive]
 - A selected item never changes weight. A bolder word is wider, so it re-wraps its line and moves what is under it. Today's `.tab.on` sets a heavier weight, and the piece that next touches tabs drops it. [inferred, from principle 4 and the site]
 - Held rows fold into one line in the crystallographer's notation, such as `a = b = c, α = β = γ = 90°`, built from the symmetry. Only rows that cannot be freed fold. [Yue 2026-11-06]
@@ -181,7 +181,7 @@ These tests hold the rules a machine can check cheaply. A new rule that a machin
 
 - `tests/test_gui_palette.py`: the token values and the generated `gui/src/tokens.css`, the plot palette's floor, and the contrast of ink on the accent fill.
 - `tests/test_gui_layout_browser.py`: no click moves the layout, collapse buttons stay where they were, and a phone-width window never scrolls sideways.
-- `gui/src/lib/style.test.ts`: no panel sets a register's size, padding or radius, and no size falls outside the steps.
+- `gui/src/lib/style.test.ts`: no panel sets a register's size, padding or radius, no size falls outside the steps, and no stylesheet uppercases or tracks a heading or label.
 - `tests/test_gui_dist.py`: no built file names a remote host, so every font is the app's own.
 - `tests/test_gui_style_guide.py`: this guide names only tokens and tests that exist, carries a marker on every rule, and restates no colour or pixel value.
 

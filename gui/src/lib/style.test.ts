@@ -295,7 +295,10 @@ describe("headings, column heads and labels read in sentence case", () => {
           if (transform && !rule.selectors.every((s) => s.includes("::first-letter")))
             found.push(`${where} { ${declaration} }`);
           const spacing = /^letter-spacing\s*:\s*([0-9.]+)/.exec(declaration);
-          if (spacing && Number(spacing[1]) > 0 && !rule.selectors.every((s) => /\.sg\b/.test(s)))
+          if (spacing && Number(spacing[1]) > 0 && !rule.selectors.every((s) => /\.sg(?![\w-])/.test(s)))
+            found.push(`${where} { ${declaration} }`);
+          // small capitals are the same capitals spelled around the property
+          if (/^font-variant(-caps)?\s*:.*small-caps/.test(declaration))
             found.push(`${where} { ${declaration} }`);
         }
       }

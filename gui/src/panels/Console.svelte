@@ -143,7 +143,9 @@
     display: none;
   }
 
+  /* a fact beside the heading, at a chip's size rather than the heading's */
   .warn {
     color: var(--warn);
+    font-size: var(--text-xs);
   }
 </style>

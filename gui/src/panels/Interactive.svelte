@@ -383,9 +383,6 @@
     --int: 5ch;
     --exp: 5ch;
   }
-  h3 {
-    margin: var(--s3) 0 var(--s1);
-  }
   h3:first-of-type {
     margin-top: 0;
   }

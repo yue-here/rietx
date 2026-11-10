@@ -164,7 +164,6 @@
 
   header h2 {
     margin: 0;
-    font-size: var(--text);
   }
 
   .nav {

@@ -67,8 +67,8 @@ check, not a heuristic.
 - [x] A vitest in `gui/src/lib/style.test.ts` failing on an uppercase or tracked heading,
       column head or label in any stylesheet
 - [x] `gui/STYLE.md` § Type's heading rule names the rule and the test, with its motive
-- [ ] Dist rebuilt; vitest, svelte-check and every `tests/*_browser.py` run locally
-- [ ] Before/after screenshots in the PR
+- [x] Dist rebuilt; vitest, svelte-check and every `tests/*_browser.py` run locally
+- [x] Before/after screenshots in the PR
 - [ ] Skill: none. The agent skill drives rietx from Python and quotes no GUI heading.
 
 ## Acceptance

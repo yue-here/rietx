@@ -238,7 +238,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   | `.help` | an explanation one click away; the cursor is the whole mark |
 
 - **Three type steps** (WP-1201): `--text` prose and a sentence-case heading (WP-2201);
-  `--text-sm` a control and its row; `--text-xs` a chip. Secondary is `.muted`, never a size.
+  `--text-sm` a control and its row; `--text-xs` a chip and a small label on something else
+  (the atom table's column heads). Secondary is `.muted`, never a size.
   Mono is a family, not a size. `lib/style.test.ts` refuses `.small` and `.tiny`. A
   chip's tone is one of `note` (default), `ok`, `warn`, `bad`, `accent`; `lib/peaks.ts`'s
   tone functions return members of it.
