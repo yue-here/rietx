@@ -3,7 +3,7 @@
 This page gives the fields of `Instrument` and of everything inside it: the radiation source, the geometry, the instrumental peak width, the background and declared extra peaks.
 
 [Patterns and structures](data.md) gives the other two objects a refinement needs.
-The [parameter map](parameters.md#instrument) gives the name, unit and typical range of each refinable instrument parameter.
+The [instrument parameter map](parameters-instrument.md#instrument) gives the name, unit and typical range of each refinable instrument parameter.
 [Instrument preset fields](settings.md#instrument-preset-fields) describes each constructor argument.
 
 Every object on this page refuses a field it does not know, and checks its bounds when it is built.
