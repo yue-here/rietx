@@ -851,19 +851,29 @@ afterEach(() => {
 });
 
 describe("the shell", () => {
-  it("renders the no-project state as the import wizard, with its recent list", async () => {
+  it("renders the no-project state as the start screen, with its recent list", async () => {
     vi.stubGlobal("fetch", server({
       ...boot(null),
-      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/a.rex", name: "a.rex" }] } }),
+      "/api/recent": () => ({ body: { recent: [
+        { path: "/tmp/a.rex", name: "a.rex", opened_utc: "2026-11-08T10:00:00+00:00",
+          phases: [["LaB6", "P m -3 m"]], missing: false }] } }),
     }).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // the empty state *is* the wizard (WP-1014) rather than a note about it
-    expect(host.textContent).toContain("New project");
-    expect(host.textContent).toContain("Choose a data file");
-    expect(host.textContent).toContain("a.rex");
-    expect(button("Create project")?.disabled).toBe(true);
+    // the start screen is the window (WP-2131): New, Open, Recent, the links
+    expect(host.querySelector(".start")).toBeTruthy();
+    expect(host.querySelector("header .project")?.textContent).toBe("No project");
+    expect(button("New project…")?.className).not.toContain("ghost");
+    expect(button("Open…")?.className).toContain("ghost");
+    expect(host.querySelector(".start .row .name")?.textContent).toBe("a");
+    expect(host.querySelector(".start .row .sg")).toBeTruthy();
+    expect(host.querySelector(".start .row")?.textContent).toContain("/tmp");
+    const links = [...host.querySelectorAll<HTMLAnchorElement>(".start a.link")];
+    expect(links.map((a) => a.textContent)).toEqual(["Manual", "Tutorials"]);
+    expect(links[1].href).toBe("https://rietx.org/docs/dev/start/tutorials.html");
+    // no tour, no news, and no dialog until asked
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
     // the action bar belongs to a project, so the empty state offers no refine
     // at all, and both collapse buttons are drawn disabled so opening one
     // moves nothing (WP-2123)
@@ -992,8 +1002,7 @@ describe("the shell", () => {
     app = mount(App, { target: host });
     await flush();
 
-    const open = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes("a.rex"));
-    open!.click();
+    host.querySelector<HTMLButtonElement>(".start button.row")!.click();
     await flush();
     expect(host.textContent).toContain("sha256");
   });
@@ -2565,118 +2574,285 @@ const CIF_PREVIEW = {
   unknown_species: [],
 };
 
-describe("the import wizard", () => {
+describe("the start screen and the New project dialog", () => {
+  const RECENT = [
+    { path: "/tmp/nac.rex", name: "nac.rex", opened_utc: "2026-11-08T10:00:00+00:00",
+      phases: [["NAC", "I 21 3"]], missing: false },
+    { path: "/gone/old.rex", name: "old.rex", opened_utc: "2026-10-01T10:00:00+00:00",
+      phases: [], missing: true },
+  ];
+
+  /** `GET /api/spacegroup` for `R -3 c`, as the server sends it. */
+  const CORUNDUM = {
+    space_group: "R -3 c", xhm: "R -3 c:H", crystal_system: "trigonal",
+    setting: "R -3 c:H is trigonal on hexagonal axes", free_cell: ["a", "c"],
+    constraints: "b = a",
+  };
+
+  function dialog(): HTMLElement | null {
+    return host.querySelector<HTMLElement>('[role="dialog"][aria-labelledby="np-title"]');
+  }
+
+  function inDialog(text: string): HTMLButtonElement | undefined {
+    return [...(dialog()?.querySelectorAll("button") ?? [])]
+      .find((b) => b.textContent?.trim() === text);
+  }
+
+  function rowFor(name: string): HTMLLIElement {
+    return [...host.querySelectorAll<HTMLLIElement>(".start li")]
+      .find((li) => li.querySelector(".name")?.textContent === name)!;
+  }
+
+  async function newProject(routes: Record<string, any> = {}) {
+    const stub = server({ ...boot(null), "/api/recent": () => ({ body: { recent: [] } }),
+                          ...routes });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    button("New project…")!.click();
+    await flush();
+    return stub;
+  }
+
+  async function stagePattern() {
+    chooseFile(dialog()!.querySelector<HTMLInputElement>('.slot input[type="file"]')!,
+               "nac.fxye");
+    await flush();
+  }
+
   it("stages each file, then commits tokens — nothing exists until Create", async () => {
-    const stub = server({
-      ...boot(null),
-      "/api/recent": () => ({ body: { recent: [] } }),
+    const stub = await newProject({
       "/api/upload/pattern": () => ({ body: PATTERN_PREVIEW }),
       "/api/upload/cif": () => ({ body: CIF_PREVIEW }),
       "/api/project/new": () => ({ body: PROJECT }),
     });
-    vi.stubGlobal("fetch", stub.fetcher);
-    app = mount(App, { target: host });
-    await flush();
+    expect(dialog()).toBeTruthy();
+    expect(inDialog("Create project")?.disabled).toBe(true);
+    expect(dialog()!.textContent).toContain("Choose a pattern file.");
 
-    const files = [...host.querySelectorAll<HTMLInputElement>('input[type="file"]')];
-    chooseFile(files[0], "nac.fxye");
-    await flush();
+    await stagePattern();
     // the reader that claimed it, in its own words — not the extension
-    expect(host.textContent).toContain("GSAS raw powder data");
-    expect(host.textContent).toContain("σ from the file");
-    // …and how it was recognised is behind the popover, not always-on prose
-    // (WP-1205): the trigger is the format's short name, "gsas".
-    const sniff = [...host.querySelectorAll<HTMLElement>(".help")]
+    expect(dialog()!.textContent).toContain("GSAS raw powder data");
+    expect(dialog()!.textContent).toContain("esd from the file");
+    const sniff = [...dialog()!.querySelectorAll<HTMLElement>(".help")]
       .find((el) => el.textContent?.trim() === "gsas")!;
-    expect(sniff).toBeTruthy();
     sniff.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
     await flush();
-    expect(host.ownerDocument.querySelector(".popover")?.textContent)
-      .toContain("BANK record");
-    // …and the filename went in the query, while the bytes went in the body
+    expect(host.ownerDocument.querySelector(".popover")?.textContent).toContain("BANK record");
     const staged = stub.calls.find((c) => c.path === "/api/upload/pattern")!;
     expect(staged.url).toContain("filename=nac.fxye");
-    expect(staged.body).toBeNull();
     expect(staged.blob).toBeInstanceOf(Blob);
+    // the name and the place follow the file until someone types
+    const [name, where] = [...dialog()!.querySelectorAll<HTMLInputElement>(".pjn input")];
+    expect(name.value).toBe("nac");
+    expect(where.value).toBe("/work");
 
-    chooseFile(files[1], "lab6.cif");
+    inDialog("Add phase")!.click();
     await flush();
-    expect(host.textContent).toContain("P m -3 m");
-    // the aniso checkbox is offered *disabled* when the file has no loop
-    const aniso = host.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-    expect(aniso.disabled).toBe(true);
-    expect(host.textContent).toContain("no aniso loop in this file");
-
-    // the project path was suggested by the pattern step, and the anode by the preset
-    expect(button("Create project")?.disabled).toBe(false);
-    button("Create project")!.click();
+    expect([...dialog()!.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent))
+      .toEqual(["From a CIF…", "Space group and cell…"]);
+    inDialog("From a CIF…")!.click();
     await flush();
+    expect(dialog()!.querySelector('[role="menu"]')).toBeNull();
+    chooseFile(dialog()!.querySelector<HTMLInputElement>("input.hiddenfile")!, "lab6.cif");
+    await flush();
+    expect(dialog()!.querySelector(".phl")?.textContent).toContain("LaB6");
+    expect(dialog()!.querySelector(".phl .sg")).toBeTruthy();
+    expect(dialog()!.querySelector(".phl")?.textContent).toContain("2 sites");
+    // no loop in this file, so nothing to opt into
+    expect(dialog()!.querySelector('input[type="checkbox"]')).toBeNull();
+    // the instrument is assumed, and says so
+    expect(dialog()!.querySelector('[aria-label="Instrument"] .chip')?.textContent)
+      .toBe("assumed");
 
+    inDialog("Create project")!.click();
+    await flush();
     const created = stub.calls.find((c) => c.path === "/api/project/new")!;
-    expect(created.body.pattern).toEqual({ upload: "p1" });
-    expect(created.body.structure).toEqual({ upload: "c1", aniso: false });
-    expect(created.body.instrument).toEqual({ preset: "bragg_brentano", radiation: "CuKa" });
-    expect(created.body.path).toBe("/work/nac.rex");
-    // and the shell adopted it without a second GET /api/project
+    expect(created.body).toEqual({
+      path: "/work/nac.rex", pattern: { upload: "p1" },
+      structure: { upload: "c1", aniso: false },
+      instrument: { preset: "bragg_brentano", radiation: "CuKa" }, mode: "rietveld",
+    });
+    // the shell adopted it without a second GET /api/project, and both went away
+    expect(dialog()).toBeNull();
+    expect(host.querySelector(".start")).toBeNull();
     expect(host.textContent).toContain("synth.xye");
   });
 
   it("shows the reader's refusal and stages nothing", async () => {
-    const stub = server({
-      ...boot(null),
-      "/api/recent": () => ({ body: { recent: [] } }),
-      "/api/upload/cif": () => ({ status: 400, body: { error: { code: "UPLOAD_INVALID",
-        message: "could not read a structure from notes.cif: ValueError: "
-                 + "notes.cif:1:0(0): expected block header (data_)" } } }),
+    await newProject({
+      "/api/upload/pattern": () => ({ status: 400, body: { error: { code: "UPLOAD_INVALID",
+        message: "could not read a pattern from notes.txt: no numeric columns" } } }),
     });
-    vi.stubGlobal("fetch", stub.fetcher);
-    app = mount(App, { target: host });
-    await flush();
-
-    const files = [...host.querySelectorAll<HTMLInputElement>('input[type="file"]')];
-    chooseFile(files[1], "notes.cif");
-    await flush();
-
-    expect(host.textContent).toContain("expected block header");
-    expect(button("Create project")?.disabled).toBe(true);
+    await stagePattern();
+    expect(dialog()!.textContent).toContain("no numeric columns");
+    expect(inDialog("Create project")?.disabled).toBe(true);
   });
 
-  it("carries the recent list inside itself, reachable with a project open", async () => {
-    // WP-1034: the only recent list used to be the *empty state's*, so with a
-    // project open there was no route back to another one short of restarting
-    // the program.  The wizard is one component either way (WP-1014), so the
-    // list lives in it and the header's `Open…` is the route.
+  it("makes a typed cell a Le Bail project, without asking for the mode", async () => {
+    const stub = await newProject({
+      "/api/upload/pattern": () => ({ body: PATTERN_PREVIEW }),
+      "/api/spacegroup": () => ({ body: CORUNDUM }),
+      "/api/project/new": () => ({ body: PROJECT }),
+    });
+    await stagePattern();
+    inDialog("Add phase")!.click();
+    await flush();
+    inDialog("Space group and cell…")!.click();
+    await flush();
+    expect(dialog()!.textContent).toContain("Add the typed cell, or cancel it.");
+    const symbol = dialog()!.querySelector<HTMLInputElement>(".tc input")!;
+    symbol.value = "R -3 c";
+    symbol.dispatchEvent(new Event("input", { bubbles: true }));
+    symbol.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    // the boxes are the ones the setting leaves free
+    const boxes = [...dialog()!.querySelectorAll<HTMLInputElement>(".cellgrid input")];
+    expect(boxes).toHaveLength(2);
+    expect(inDialog("Add")?.disabled).toBe(true);
+    for (const [box, value] of [[boxes[0], "4.759"], [boxes[1], "12.99"]] as const) {
+      box.value = value;
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    await flush();
+    inDialog("Add")!.click();
+    await flush();
+    expect(dialog()!.querySelector(".phl")?.textContent).toContain("cell only");
+
+    inDialog("Create project")!.click();
+    await flush();
+    const created = stub.calls.find((c) => c.path === "/api/project/new")!;
+    expect(created.body.structure).toEqual({ space_group: "R -3 c", cell: { a: 4.759, c: 12.99 } });
+    expect(created.body.mode).toBe("lebail");
+    expect("plan" in created.body).toBe(false);
+  });
+
+  it("opens the instrument form on Change…, and a change drops the assumed tag", async () => {
+    await newProject({ "/api/upload/pattern": () => ({ body: PATTERN_PREVIEW }) });
+    await stagePattern();
+    expect(dialog()!.querySelector(".iform")).toBeNull();
+    inDialog("Change…")!.click();
+    await flush();
+    const geometry = dialog()!.querySelector<HTMLSelectElement>(".iform select")!;
+    geometry.value = "debye_scherrer";
+    geometry.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    expect(dialog()!.querySelector('[aria-label="Instrument"] .chip')).toBeNull();
+    expect(dialog()!.querySelector(".npf .reason")?.textContent)
+      .toBe("Debye-Scherrer needs a wavelength.");
+    // the wavelength and the radius come first; the rest wait under Advanced
+    const shown = [...dialog()!.querySelector(".iform")!.querySelectorAll(":scope > .fld .help")]
+      .map((el) => el.textContent);
+    expect(shown).toEqual(["wavelength", "radius"]);
+    expect(inDialog("Done")).toBeTruthy();
+  });
+
+  it("closes on Cancel and on Escape, creating nothing", async () => {
+    const stub = await newProject();
+    inDialog("Cancel")!.click();
+    await flush();
+    expect(dialog()).toBeNull();
+    button("New project…")!.click();
+    await flush();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await flush();
+    expect(dialog()).toBeNull();
+    expect(stub.calls.some((c) => c.path === "/api/project/new")).toBe(false);
+  });
+
+  it("is reachable over an open project, with a way back", async () => {
+    // WP-1034: with a project open there must be a route to another one short
+    // of restarting the program.  The header's Open… shows the start screen,
+    // and the project's panes stay mounted behind it.
     const other = { ...PROJECT, path: "/tmp/nac.rex",
                     data: { ...PROJECT.data, filename: "nac.fxye" } };
     const stub = server({
       ...boot(),
-      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/nac.rex", name: "nac.rex" }] } }),
+      "/api/recent": () => ({ body: { recent: RECENT } }),
       "/api/project/open": () => ({ body: other }),
     });
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
-    expect(host.textContent).not.toContain("Open a recent project");   // not until asked
+    expect(host.querySelector(".start")).toBeNull();   // not until asked
 
     button("Open…")!.click();
     await flush();
-    expect(host.textContent).toContain("Open a recent project");
-    expect(host.textContent).toContain("nothing is unsaved");
-
-    button("nac.rex")!.click();
+    expect(host.querySelector(".start")).toBeTruthy();
+    expect(host.querySelector(".panes")?.classList.contains("hidden")).toBe(true);
+    button("Back to the project")!.click();
     await flush();
-    const opened = stub.calls.find((c) => c.path === "/api/project/open")!;
-    expect(opened.body).toEqual({ path: "/tmp/nac.rex" });
-    // the session's project is replaced, and the shell lands on the parameters
+    expect(host.querySelector(".start")).toBeNull();
+    expect(host.querySelector(".panes")?.classList.contains("hidden")).toBe(false);
+
+    button("Open…")!.click();
+    await flush();
+    rowFor("nac").querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    expect(stub.calls.find((c) => c.path === "/api/project/open")!.body)
+      .toEqual({ path: "/tmp/nac.rex" });
+    expect(host.querySelector(".start")).toBeNull();
     expect(host.textContent).toContain("nac.fxye");
     expect(host.querySelector(".side nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
     expect(host.textContent).toContain("project.open(/tmp/nac.rex)");
   });
 
+  it("keeps a moved project listed, with Locate… and Remove from list", async () => {
+    const after = [RECENT[0]];
+    const stub = server({
+      ...boot(null),
+      "/api/recent": () => ({ body: { recent: RECENT } }),
+      "/api/recent/remove": () => ({ body: { recent: after } }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const row = rowFor("old");
+    expect(row.classList.contains("missing")).toBe(true);
+    expect(row.querySelector(".when")?.textContent).toBe("Not found");
+    // its main click cannot open it, so it offers the two verbs that remain
+    row.querySelector<HTMLButtonElement>("button.row")!.click();
+    await flush();
+    expect([...row.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent))
+      .toEqual(["Locate…", "Remove from list"]);
+    expect(stub.calls.some((c) => c.path === "/api/project/open")).toBe(false);
+    // Escape closes the menu and does nothing else
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await flush();
+    expect(row.querySelector('[role="menu"]')).toBeNull();
+
+    row.querySelector<HTMLButtonElement>("button.more")!.click();
+    await flush();
+    [...row.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find((b) => b.textContent === "Remove from list")!.click();
+    await flush();
+    expect(stub.calls.find((c) => c.path === "/api/recent/remove")!.body)
+      .toEqual({ path: "/gone/old.rex" });
+    expect(rowFor("old")).toBeUndefined();
+    expect(rowFor("nac")).toBeTruthy();
+  });
+
+  it("offers Open and Remove from list on a row's ⋯ and on a right-click", async () => {
+    vi.stubGlobal("fetch", server({
+      ...boot(null), "/api/recent": () => ({ body: { recent: RECENT } }),
+    }).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    const row = rowFor("nac");
+    row.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    await flush();
+    expect([...row.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent))
+      .toEqual(["Open", "Remove from list"]);
+    // a click elsewhere closes it
+    host.querySelector<HTMLElement>(".start h2")!.click();
+    await flush();
+    expect(row.querySelector('[role="menu"]')).toBeNull();
+  });
+
   it("lists the shipped examples and opens one, building it on the way", async () => {
-    // WP-1204: the other half of the empty state.  A new user has no recent
-    // list, so without this the first screen offers only "choose a data file"
-    // to someone who has no data file.
+    // WP-1204: a new user has no recent list, so the first screen shows the
+    // examples alone rather than offering only "choose a file" to someone with none
     const built = { ...PROJECT, path: "/home/me/.rietx/examples/fap.rex",
                     data: { ...PROJECT.data, filename: "FAP.XRA" } };
     const stub = server({
@@ -2689,26 +2865,16 @@ describe("the import wizard", () => {
     app = mount(App, { target: host });
     await flush();
 
-    expect(host.textContent).toContain("Open an example");
-    expect(host.textContent).toContain("APS 11-BM");
-    // the description is what says which one to pick, so it is on the row
+    expect([...host.querySelectorAll(".start h2")].map((h) => h.textContent)).toEqual(["Examples"]);
     expect(host.textContent).toContain("one of them you did not ask for");
-    // Reset appears only where there is a copy to throw away
-    expect(button("Reset")).toBeTruthy();
-    expect(host.querySelectorAll("section.examples button.ghost")).toHaveLength(1);
-
-    [...host.querySelectorAll<HTMLButtonElement>("section.examples button.pick")]
-      .find((b) => b.textContent?.includes("fluorapatite"))!.click();
+    rowFor(EXAMPLES[0].title).querySelector<HTMLButtonElement>("button.row")!.click();
     await flush();
-
-    const opened = stub.calls.find((c) => c.path === "/api/examples/open")!;
-    expect(opened.body).toEqual({ name: "fap" });
-    // an example is a project like any other from the moment it exists
+    expect(stub.calls.find((c) => c.path === "/api/examples/open")!.body).toEqual({ name: "fap" });
     expect(host.textContent).toContain("FAP.XRA");
     expect(host.querySelector(".side nav.tabs button.on")?.textContent?.trim()).toBe("Parameters");
   });
 
-  it("resets an example through its own verb, not by opening it again", async () => {
+  it("opens a fresh copy of an example through its own verb, only once one is built", async () => {
     const fresh = { ...PROJECT, path: "/home/me/.rietx/examples/nac.rex" };
     const stub = server({
       ...boot(null),
@@ -2720,50 +2886,54 @@ describe("the import wizard", () => {
     app = mount(App, { target: host });
     await flush();
 
-    button("Reset")!.click();
+    const unbuilt = rowFor(EXAMPLES[0].title);
+    unbuilt.querySelector<HTMLButtonElement>("button.more")!.click();
     await flush();
-    expect(stub.calls.find((c) => c.path === "/api/examples/reset")!.body)
-      .toEqual({ name: "nac" });
+    const freshItem = (li: HTMLElement) => [...li.querySelectorAll<HTMLButtonElement>(
+      '[role="menuitem"]')].find((b) => b.textContent === "Open a fresh copy")!;
+    expect(freshItem(unbuilt).disabled).toBe(true);
+
+    const builtRow = rowFor(EXAMPLES[1].title);
+    builtRow.querySelector<HTMLButtonElement>("button.more")!.click();
+    await flush();
+    freshItem(builtRow).click();
+    await flush();
+    expect(stub.calls.find((c) => c.path === "/api/examples/reset")!.body).toEqual({ name: "nac" });
     expect(stub.calls.some((c) => c.path === "/api/examples/open")).toBe(false);
   });
 
-  it("shows a refused example beside the list that asked for it", async () => {
+  it("shows a refused example on the start screen", async () => {
     const message = "could not build the nac example: [Errno 28] No space left";
-    const stub = server({
+    vi.stubGlobal("fetch", server({
       ...boot(null),
       "/api/recent": () => ({ body: { recent: [] } }),
       "/api/examples": () => ({ body: { examples: EXAMPLES } }),
       "/api/examples/open": () => ({ status: 500, body: {
         error: { code: "EXAMPLE_BUILD_FAILED", message } } }),
-    });
-    vi.stubGlobal("fetch", stub.fetcher);
+    }).fetcher);
     app = mount(App, { target: host });
     await flush();
-
-    host.querySelector<HTMLButtonElement>("section.examples button.pick")!.click();
+    host.querySelector<HTMLButtonElement>(".start button.row")!.click();
     await flush();
-    expect(host.textContent).toContain(message);
+    expect(host.querySelector(".start .bad")?.textContent).toContain(message);
   });
 
-  it("shows a refused open beside the list that asked for it", async () => {
+  it("shows a refused open on the start screen, and the open project stays open", async () => {
     const message = "file has changed since the project was created (sha256 1a2b3c4d)";
-    const stub = server({
+    vi.stubGlobal("fetch", server({
       ...boot(),
-      "/api/recent": () => ({ body: { recent: [{ path: "/tmp/nac.rex", name: "nac.rex" }] } }),
+      "/api/recent": () => ({ body: { recent: RECENT } }),
       "/api/project/open": () => ({ status: 400,
         body: { error: { code: "PROJECT_ERROR", message } } }),
-    });
-    vi.stubGlobal("fetch", stub.fetcher);
+    }).fetcher);
     app = mount(App, { target: host });
     await flush();
     button("Open…")!.click();
     await flush();
-    button("nac.rex")!.click();
+    rowFor("nac").querySelector<HTMLButtonElement>("button.row")!.click();
     await flush();
-
-    // verbatim, in the wizard, and the project that was open is still open —
-    // every Project.open refusal names a different remedy (WP-1008)
-    expect(host.querySelector(".wizard .bad")?.textContent).toContain("sha256 1a2b3c4d");
+    // verbatim: every Project.open refusal names a different remedy (WP-1008)
+    expect(host.querySelector(".start .bad")?.textContent).toContain("sha256 1a2b3c4d");
     expect(host.textContent).toContain("synth.xye");
   });
 
@@ -2795,13 +2965,9 @@ describe("the import wizard", () => {
     button("Open…")!.click();
     await flush();
     expect(stub.calls.some((c) => c.path === "/api/fs")).toBe(true);
-    // a plain directory and a project are different rows: only the project
-    // gets a `.pick` "open" affordance
     expect(host.querySelector(".backdrop ul")?.textContent).toContain("rietx-projects");
     const openRow = [...host.querySelectorAll<HTMLButtonElement>(".backdrop button.pick")]
       .find((b) => b.textContent?.includes("nac.rex"))!;
-    expect(openRow).toBeTruthy();
-
     openRow.click();
     await flush();
     expect(stub.calls.find((c) => c.path === "/api/project/open")!.body)
@@ -2828,79 +2994,59 @@ describe("the import wizard", () => {
     await flush();
     const calls = stub.calls.filter((c) => c.path === "/api/fs");
     expect(calls[calls.length - 1].url).toContain("rietx-projects");
-    expect(host.querySelector(".backdrop")).toBeTruthy();   // still open — a navigation, not a project
+    expect(host.querySelector(".backdrop")).toBeTruthy();   // a navigation, not a project
     expect(host.querySelector(".backdrop .none")?.textContent).toBe("nothing here");
   });
 
-  it("settles the wizard after opening a different project from over one already open", async () => {
-    // The bug this closes (WP-1205): `Model` used to be mounted twice — the
-    // empty-state wizard and the Model tab were separate component
-    // instances, each its own `wizardOpen`.  Opening a *different* project
-    // from the tab instance's own wizard left it painted over the freshly
-    // opened one, because `project` stayed truthy the whole time and nothing
-    // ever tore the instance down to reset it.
+  it("settles the start screen after opening a different project over one already open", async () => {
+    // WP-1205's bug one screen along: an opener that forgot to settle what was
+    // drawn over the project left it painted over the freshly opened one.
     const other = { ...PROJECT, path: "/home/me/nac.rex",
                     data: { ...PROJECT.data, filename: "nac.fxye" } };
-    const stub = server({
-      ...boot(),   // a project is already open
+    vi.stubGlobal("fetch", server({
+      ...boot(),
       "/api/recent": () => ({ body: { recent: [] } }),
       "/api/fs": () => ({ body: FS_HOME }),
       "/api/project/open": () => ({ body: other }),
-    });
-    vi.stubGlobal("fetch", stub.fetcher);
+    }).fetcher);
     app = mount(App, { target: host });
     await flush();
-    expect(host.textContent).toContain("Structure & instrument");   // not the wizard
-
     button("Model")!.click();
     await flush();
-    button("Open…")!.click();      // the App-level header button (startImport)
+    button("Open…")!.click();      // the header's
     await flush();
-    expect(host.textContent).toContain("New project");
-
-    button("Browse for a project…")!.click();
+    host.querySelector<HTMLButtonElement>(".start .left button.ghost")!.click();   // Start's Open…
     await flush();
-    const openRow = [...host.querySelectorAll<HTMLButtonElement>(".backdrop button.pick")]
-      .find((b) => b.textContent?.includes("nac.rex"))!;
-    openRow.click();
+    [...host.querySelectorAll<HTMLButtonElement>(".backdrop button.pick")]
+      .find((b) => b.textContent?.includes("nac.rex"))!.click();
     await flush();
-
-    // the wizard is gone — the panel shows the freshly-opened project's model,
-    // never the wizard painted over it (checked on the heading and the wizard
-    // markup itself, not a text search: "New project…" is also the button
-    // that reopens it, and stays in the DOM whenever the wizard is closed)
-    expect(host.querySelector(".model header h1")?.textContent).toBe("Structure & instrument");
-    expect(host.querySelector(".model .wizard")).toBeNull();
+    expect(host.querySelector(".start")).toBeNull();
+    expect(host.querySelector(".panes")?.classList.contains("hidden")).toBe(false);
+    expect(host.textContent).toContain("nac.fxye");
   });
 
-  it("browses to a different directory for a new project, keeping the suggested name", async () => {
-    // A browser cannot suggest a new folder's name, only where it should
-    // live — so picking a directory swaps the *parent* of the path the
-    // staged pattern already suggested, rather than replacing it outright.
-    const stub = server({
-      ...boot(null),
-      "/api/recent": () => ({ body: { recent: [] } }),
+  it("browses to a different folder for a new project, keeping the name", async () => {
+    await newProject({
       "/api/upload/pattern": () => ({ body: PATTERN_PREVIEW }),
       "/api/fs": () => ({ body: FS_HOME }),
     });
-    vi.stubGlobal("fetch", stub.fetcher);
-    app = mount(App, { target: host });
-    await flush();
+    await stagePattern();
+    const fields = () => [...dialog()!.querySelectorAll<HTMLInputElement>(".pjn input")];
+    expect(fields()[1].value).toBe("/work");   // PATTERN_PREVIEW's suggestion
 
-    const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
-    chooseFile(fileInput, "nac.fxye");
+    inDialog("Browse…")!.click();
     await flush();
-    const pathInput = () => host.querySelector<HTMLInputElement>(".steps input.wide")!;
-    expect(pathInput().value).toBe("/work/nac.rex");   // PATTERN_PREVIEW's suggestion
-
-    button("Browse…")!.click();
+    expect(host.querySelector(".backdrop .panel")).toBeTruthy();
+    // Escape closes the browser and leaves the dialog open
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     await flush();
-    expect(host.querySelector(".backdrop")).toBeTruthy();
-
+    expect(dialog()).toBeTruthy();
+    inDialog("Browse…")!.click();
+    await flush();
     button("Use this directory")!.click();
     await flush();
-    expect(host.querySelector(".backdrop")).toBeNull();
-    expect(pathInput().value).toBe("/home/me/nac.rex");   // the parent moved, the name did not
+    expect(fields()[1].value).toBe("/home/me");
+    expect(fields()[0].value).toBe("nac");
   });
 });
 

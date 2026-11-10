@@ -549,3 +549,138 @@ def test_a_plan_edit_moves_nothing(browser, gui, state):
     assert not page.errors, page.errors
     page.close()
     assert not moved, moved
+
+
+# -- WP-2131: the start screen and the New project dialog ---------------------
+
+#: The start screen's own landmarks: its two columns, their headings and rows.
+START_LANDMARKS = [".start .left > *", ".start .right h2", ".start li", ".start .row"]
+
+#: The dialog's rows and their label column.
+DIALOG_LANDMARKS = ['[role="dialog"]', ".nrow", ".nlabel"]
+
+#: Each instrument-form label's ink, its column's width, and the gap from the
+#: ink to its control.
+LABEL_ROOM = """() => [...document.querySelectorAll(".iform .fld")]
+  .filter((f) => f.getClientRects().length)
+  .map((f) => {
+    const label = f.firstElementChild, control = f.lastElementChild;
+    const range = document.createRange();
+    range.selectNodeContents(label);
+    const ink = range.getBoundingClientRect();
+    return {label: label.textContent.trim(), room: label.getBoundingClientRect().width,
+            ink: ink.width, gap: control.getBoundingClientRect().left - ink.right};
+  })"""
+
+
+@pytest.fixture(scope="module")
+def start(tmp_path_factory):
+    """A session with no project whose recent list holds one, and a pattern file."""
+    from tests.test_project import _write_xye
+    from tests.test_refine_synthetic import synthesize
+
+    data = _write_xye(tmp_path_factory.mktemp("start-data") / "synth.xye", synthesize())
+    project = _project(tmp_path_factory.mktemp("start") / "sample.rex", data)
+    state = tmp_path_factory.mktemp("start-state")
+    # one session opens it, which is what writes the recent list
+    first = _start(GuiSession(state_dir=state))
+    try:
+        status, _ = Client(first.server_address[1]).post(
+            "/api/project/open", {"path": str(project.path)})
+        assert status == 200
+    finally:
+        first.shutdown()
+    httpd = _start(GuiSession(state_dir=state))
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/", data
+    finally:
+        httpd.shutdown()
+
+
+def _open_start(browser, url: str, width: int):
+    page = browser.new_page(viewport={"width": width, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda exc: page.errors.append(str(exc)))
+    page.goto(url)
+    page.wait_for_selector(".start .row")
+    page.evaluate("document.fonts.ready")
+    _frames(page)
+    return page
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_the_start_screen_holds_still_under_its_menus(browser, start, state):
+    """A row's ⋯ appears on hover and opens a menu over the list, so neither
+    the hover nor the menu moves a row (WP-2131)."""
+    url, _ = start
+    page = _open_start(browser, url, WIDTHS[state])
+    assert page.locator(".start h2").all_text_contents() == ["Recent", "Examples"]
+    before = page.evaluate(SNAP, START_LANDMARKS)
+    row = page.locator(".start li").first
+    row.hover()
+    _frames(page)
+    row.locator("button.more").click()
+    _frames(page)
+    items = row.locator('[role="menuitem"]').all_text_contents()
+    moved = _moved(before, page.evaluate(SNAP, START_LANDMARKS))
+    page.keyboard.press("Escape")
+    _frames(page)
+    closed = row.locator('[role="menu"]').count() == 0
+    assert not page.errors, page.errors
+    page.close()
+    assert items == ["Open", "Remove from list"], items
+    assert closed
+    assert not moved, moved
+
+
+def test_the_new_project_dialog_holds_still_and_its_labels_fit(browser, start):
+    """The dialog's rows stay put as its menu opens, and each instrument-form
+    label has room beside its control (round 9's Wavelength fix: a 6.5em
+    label column)."""
+    url, data = start
+    page = _open_start(browser, url, WIDTHS["wide"])
+    page.get_by_role("button", name="New project…").click()
+    page.wait_for_selector('[role="dialog"]')
+    _frames(page)
+    page.locator('.slot input[type="file"]').set_input_files(str(data))
+    page.wait_for_selector(".spark path")
+    _frames(page)
+    before = page.evaluate(SNAP, DIALOG_LANDMARKS)
+    page.get_by_role("button", name="Add phase").click()
+    _frames(page)
+    items = page.locator('[role="menuitem"]').count()
+    moved = _moved(before, page.evaluate(SNAP, DIALOG_LANDMARKS))
+    page.keyboard.press("Escape")
+    _frames(page)
+    still_open = page.locator('[role="dialog"]').count() == 1   # Escape closed the menu only
+
+    page.get_by_role("button", name="Change…").click()
+    _frames(page)
+    page.locator(".iform select").first.select_option("debye_scherrer")
+    _frames(page)
+    rows = page.evaluate(LABEL_ROOM)
+    assert not page.errors, page.errors
+    page.close()
+    assert items == 2 and still_open
+    assert not moved, moved
+    assert {"Geometry", "wavelength (Å)", "radius (mm)"} <= {r["label"] for r in rows}, rows
+    for r in rows:
+        assert r["ink"] <= r["room"] + 0.5 and r["gap"] > 0, r
+
+
+def test_the_start_screen_and_dialog_never_scroll_sideways(browser, start):
+    """At phone width the start screen stacks its columns and the dialog takes
+    the window less its gutter, so neither needs a wider window."""
+    url, _ = start
+    page = _open_start(browser, url, 420)
+    overflow = "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+    on_start = page.evaluate(overflow)
+    page.get_by_role("button", name="New project…").click()
+    page.wait_for_selector('[role="dialog"]')
+    _frames(page)
+    on_dialog = page.evaluate(overflow)
+    width = page.locator('[role="dialog"]').bounding_box()["width"]
+    assert not page.errors, page.errors
+    page.close()
+    assert on_start <= 0 and on_dialog <= 0, (on_start, on_dialog)
+    assert width <= 420 - 32 + 1, width
