@@ -679,7 +679,7 @@ The WP closes when the maintainer has answered § Questions and R1 is filed.
 ## Handover log
 
 - **2026-11-11** — filed by a ghostshift runner on the maintainer's rebuild ruling of the same
-  night, in PR #PRNUM. Every feature of today's GUI now has a written home in the new design, and
+  night, in PR #1529. Every feature of today's GUI now has a written home in the new design, and
   the rebuild has an order of seven pieces and a swap. Five placements the prototype never drew
   wait on the maintainer; the rest are settled on the prototype, `gui/STYLE.md` or named
   practice, with the fourteen calls a reviewer might reverse listed in § Settled by Claude. No
