@@ -116,6 +116,8 @@ export const api = {
   spacegroup: (symbol: string) =>
     call("GET", `/api/spacegroup?space_group=${encodeURIComponent(symbol)}`),
   recent: () => call("GET", "/api/recent"),
+  /** Drop one entry from the recent list; the project itself is untouched. */
+  removeRecent: (path: string) => call("POST", "/api/recent/remove", { path }),
 
   /** The example projects shipped in the wheel (WP-1204).  `built` says
    *  whether opening one is a plain open or a build first, which is what lets
@@ -157,7 +159,16 @@ export const api = {
   save: () => call("POST", "/api/project/save"),
 
   params: () => call("GET", "/api/params"),
-  patchParams: (delta: { values?: Record<string, number>; vary?: Record<string, boolean> }) =>
+  /** Values, vary flags and (WP-2126) holds, limits and value restraints, in
+   *  one call; the server applies limits and restraints first, as one model
+   *  edit, then values, unholds, vary flags and holds. */
+  patchParams: (delta: {
+    values?: Record<string, number>;
+    vary?: Record<string, boolean>;
+    hold?: Record<string, boolean>;
+    limits?: Record<string, [number | null, number | null]>;
+    restraints?: Record<string, { target: number; sigma: number } | null>;
+  } | Record<string, unknown>) =>
     call("PATCH", "/api/params", delta),
   plan: () => call("GET", "/api/plan"),
   /** Either `{preset: name}` or `{plan: spec}` — a preset is stored *expanded

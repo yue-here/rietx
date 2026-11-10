@@ -1,6 +1,6 @@
 # WP-2087 — An opt-in correction the residual asks for names its declaration in the docs
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-09 — all tasks done (PR #1505); waits on the maintainer's call on the unknown-path error and the printed Biso help text
 Track: What fires, and what stays silent
 Depends on: [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md)
 Priority: P3 2026-11-05 — WP-1944 closed, so nothing blocks it; three opt-in corrections are documented without the declaration a user writes, and nothing is wrong in any number
@@ -46,29 +46,38 @@ WP-1944's handover log. Three gaps remain.
   The diagnostic's own `suggestion` stays as it is, because a change to it
   is a reader-output change this rescope does not make.
 
-### Inherited
+**Which way an undeclared extinction moves Biso** (folded 2026-11-09 from
+WP-1944's inherited entry). `model/extinction.py`'s docstring and the theory
+page's Primary extinction section said an uncorrected extinction gives "a
+spuriously large Biso and a small scale". WP-1944 measured the opposite on
+its LaB6 synthetic: with 2.5 µm² planted and extinction undeclared, La's
+Biso came out 0.364 ± 0.009 against a true 0.5, and the scale 8 % low.
+Sabine, Von Dreele & Jørgensen (1988, p. 374) say the same in their
+introduction, of time-of-flight and constant-wavelength work alike: "the
+measured temperature factors have lower values than the true temperature
+factors", "in some cases negative". A second fixture, measured
+here on a rutile synthetic (15-120° 2θ, Cu Kα, true B 0.5 on both sites,
+scale, both B, the O coordinate and the background free):
 
-- **2026-11-05, from [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md):
-  which way an undeclared extinction moves Biso.** `model/extinction.py`'s
-  docstring and the theory page's Primary extinction section say an
-  uncorrected extinction gives "a spuriously large Biso and a small scale".
-  On the LaB6 synthetic of `test_extinction.py` with 2.5 µm² planted, true
-  Biso 0.5 on both sites, Biso and coordinates free and extinction
-  undeclared, La's Biso came out 0.364 ± 0.009 (15 esd low), B's
-  0.668 ± 0.071 (2.4 esd high) and the scale 8 % low. Declared, both came
-  back within 1 esd. So the heavy atom's B goes down. WP-1944's skill pointer
-  sits on `BISO_NEGATIVE` for that reason. Check the claim against Sabine
-  (1988) and one more fixture, then correct both texts if it holds.
-- **2026-11-05, from [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md):
-  the unknown-path error points at the wrong parameter.** On a phase that
-  declares no extinction, `set_vary(["phases.0.extinction"], True)` raises
-  "unknown parameter path 'phases.0.extinction'; did you mean
-  'phases.0.lor_strain'?" (measured by WP-1944's code review). It is the one
-  place the package meets a user who already guessed the name. Having
-  `refine._path_hint` name the declaration for an opt-in path would fix it.
-  That changes an error's text, which is reader output, so it goes to the
-  maintainer before it lands, and this WP's rescope does not cover it
-  without that approval.
+| Planted ext (µm²) | Declared | Ti B | O B | Scale (true 8.0e-3) |
+|---|---|---|---|---|
+| 5 | no | 0.293 ± 0.021 | 0.279 ± 0.039 | 7.1e-3 |
+| 5 | yes | 0.509 ± 0.028 | 0.472 ± 0.041 | 8.0e-3 |
+| 20 | no | −0.168 ± 0.032 | −0.075 ± 0.062 | 5.5e-3 |
+| 20 | yes | 0.505 ± 0.032 | 0.503 ± 0.045 | 8.0e-3 |
+
+So both B and the scale go down, and a strong extinction makes B negative.
+Both texts now say so.
+
+**Waiting on the maintainer: the unknown-path error** (from WP-1944's
+inherited entry). On a phase that declares no extinction,
+`set_vary(["phases.0.extinction"], True)` raises "unknown parameter path
+'phases.0.extinction'; did you mean 'phases.0.lor_strain'?" (measured by
+WP-1944's code review). It is the one place the package meets a user who
+already guessed the name. Having `refine._path_hint` name the declaration
+for an opt-in path would fix it. That changes an error's text, which is
+reader output, so it goes to the maintainer before it lands. This WP's
+rescope does not cover it.
 
 ## Non-goals
 
@@ -79,13 +88,15 @@ WP-1944's handover log. Three gaps remain.
 
 ## Tasks
 
-- [ ] Stephens: the help entry and the manual section name the declaration
+- [x] Extinction's Biso direction: correct `model/extinction.py`'s docstring
+      and the theory page's Primary extinction section (2026-11-09).
+- [x] Stephens: the help entry and the manual section name the declaration
       and the misfit that calls for it.
-- [ ] Anisotropic ADPs: the help entry names `Atom.aniso` and when a
+- [x] Anisotropic ADPs: the help entry names `Atom.aniso` and when a
       declaration is worth trying.
-- [ ] Biso anomalies: the two help entries and their skill rows name the
+- [x] Biso anomalies: the two help entries and their skill rows name the
       declaration each geometry takes, as concisely as the extinction row.
-- [ ] Skill: stay within `tests/skill_caps.py`'s budgets; re-sync the
+- [x] Skill: stay within `tests/skill_caps.py`'s budgets; re-sync the
       committed copies.
 
 ## Acceptance
@@ -96,6 +107,79 @@ WP-1944's handover log. Three gaps remain.
 ```
 
 ## Handover log
+
+- **2026-11-09** — all five tasks done, by a ghostshift runner (PR #1505).
+  A user who reads the help for Stephens strain, an anisotropic
+  displacement tensor, or a negative or very large Biso now finds the
+  declaration that turns the matching correction on, and the misfit that
+  calls for it. Nothing a fit prints changed on the standard fit. The
+  theory page and the extinction module had one bias backwards: an
+  undeclared extinction lowers Biso, and a strong one drives it negative.
+  The parameter map had reached the manual's page-size cap, so it is now
+  two pages, one for the phases and one for the instrument and background.
+
+  *Done.* Extinction direction corrected in `model/extinction.py`'s
+  docstring and the Primary extinction section, cited to Sabine, Von Dreele
+  & Jørgensen (1988, p. 374), with the rutile table in Context. Stephens:
+  `_STEPHENS_S` and the theory section give
+  `StephensStrain.isotropic(1000, phase.cell)`, say `lab_sample_refine`
+  frees it, point at `FitReport.strain`, and name anisotropic size and a
+  too-high symmetry as look-alikes. Anisotropic ADPs: the `adp.*` entry
+  gives `Structure.from_cif(path, aniso=True)` and
+  `AnisoU.isotropic(uiso, phase.cell)`, says the assignment raises while
+  `biso.vary` is True, and says when to try one and when to keep it.
+  `BISO_NEGATIVE` (help entry and skill row) names roughness on a
+  Bragg-Brentano plate, `mu_r` or `capillary_radius_mm` on a capillary,
+  and extinction. `BISO_UNUSUALLY_LARGE` names `mu_t` or `thickness_mm` on
+  a flat plate. The directions are the theory page's. The diagnostics'
+  `suggestion` text is unchanged. Parameter map: `PARAMETER_PAGES` in
+  `docs/reference_pages.py` assigns each group to `parameters.md` or the
+  new `parameters-instrument.md`, and the build raises on a group shown
+  twice, nowhere, or unknown. Before the split the page stood at about
+  49 600 characters against the 50 000 cap, and the Stephens sentence alone
+  broke it; now 25 400 and 24 000. Links to moved anchors are repointed,
+  and nine pages that said the map lists every name now name both. The
+  inherited entries are pruned: the extinction claim folded into Context
+  with its measurement, the unknown-path error moved to Context as
+  waiting on the maintainer.
+
+  *Measured.* Fast suite (`-m "not slow"`), `[dev]` venv, darwin/arm64,
+  through ghostshift's serial queue, alone: 14343 passed, 417 skipped,
+  32 xfailed (passed+skipped 14760). Added: three cases of
+  `test_a_group_shown_twice_or_nowhere_raises`, 0.00 s together. Full
+  suite not run: no measured number can move. `python -m
+  tests.reader_output`: exit 0, unchanged against the merge-base.
+
+  *Review.* `/code-review high --fix` found five, no code bugs: stale
+  links on four more pages (fixed), the ADP entry's biso clause (rewritten:
+  the assignment does raise while `biso.vary` is True, measured, so the
+  reviewer's "already locked" reading holds only after the declaration),
+  the capillary and plate inputs (fixed), "from the residual" for
+  `FitReport.strain` (fixed), and an untested arm of the split check
+  (test added). Declined: `reference/refinement.md` keeps one link to the
+  parameter map, whose intro links the instrument page, because a second
+  link puts that page 51 characters over the cap. Left alone: the
+  `using/glossary` redirect in `docs/docs_versions.py` now lands instrument
+  fragments on the phase page without their anchor.
+
+  *Generality.* The judge (generality-review) returned: items 1, 2 and 6
+  (the two skill rows, the extinction direction) hold; item 3 (the two
+  help entries) holds with two findings, the unsourced "usually" (removed)
+  and that `Diagnostic.explanation` prints under a notebook's `help:`
+  line, so these two entries are printed text the maintainer should see;
+  items 4 and 5 (the ADP and Stephens guidance) weak: the ADP keep test
+  failed near-zero off-diagonal components, the trigger read as X-ray only
+  and required single-crystal work, and the Stephens sentence named one
+  remedy for a symptom anisotropic size and a too-high symmetry share. All
+  three were rewritten as described under *Done*. Neither sentence cites a
+  source; both are rietx's own wording.
+
+  *Next:* the maintainer's two calls. (1) The unknown-path error (Context,
+  "Waiting on the maintainer"): if approved, `refine._path_hint` names the
+  declaration for an opt-in path, as reader output. (2) Whether the
+  `BISO_NEGATIVE` and `BISO_UNUSUALLY_LARGE` help text, which a notebook
+  prints as the diagnostic's explanation, may land as written. With both
+  answered and this PR merged, the WP can close.
 
 - **2026-11-05** — rescoped to documentation pointers only, by WP-1944's
   follow-up session under the maintainer's ruling of 2026-11-04 (quoted in

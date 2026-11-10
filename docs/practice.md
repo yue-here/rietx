@@ -477,6 +477,18 @@ Dropping and zero weight give the same χ². The two differ in what the pattern 
 GSAS-II keeps the point to plot, and rietx's pdCIF reader likewise keeps a zero-weight point as an
 excluded region.
 
+## Separators, trailing comments and text lines in a column file
+
+Surveyed 2026-11-09 for WP-1952 (issue #897). The question: in a plain two- or three-column
+file, which characters separate the columns, what happens to a comment after a row's numbers, a
+text line inside the data and a decimal comma?
+
+| Program | What it does |
+|---|---|
+| rietx | Whitespace, `,` and `;` separate, and a `;` line is a comment. A field opening with `#` or `!` ends the row, without a report. A line between the first and last data row that is not a row of numbers is dropped and reported by line (`PATTERN_ROWS_DROPPED`); a header above the data and a footer below it are skipped silently. Quoted fields and a comma inside a number (a decimal comma or a thousands separator) are refused by name (checked, `io/formats/xy.py`) |
+| GSAS-II 5.8.4 | `imports/G2pwd_xye.py:166` and `G2pwd_csv.py:28,73` replace `,` and `;` with spaces, so both importers read either separator. After the header, a line with fewer than two fields is printed to the console and skipped; a field that is not a number refuses the whole file, naming the line (`:187`). Columns past the third are ignored, so `10.0 100 # c` reads while `10.0 100 #c` refuses. A quoted field refuses. A decimal comma or a thousands separator splits the number in two, as rietx did before (checked by reading, not run) |
+| FullProf, TOPAS, RIETAN-FP, BGMN, MAUD | Not checked |
+
 ## A magCIF in a non-standard orientation
 
 Surveyed 2026-11-01 for WP-1918's decision on the 91 untabulated orientations, by a research
@@ -1003,6 +1015,35 @@ resizes and a double-click resets it, and a segmented choice is drawn on a track
 a row of buttons. Only the Claude app drops to one column below a width; the maintainer chose
 that behaviour on 2026-11-07. The refinement programs offer no model for any of this: TOPAS works
 through a text editor, and FullProf's and GSAS-II's windows are fixed panes (recall).
+
+## The start screen and the New project flow
+
+Surveyed 2026-11-08 for the maintainer's round-9 GUI design and restated 2026-11-09 for WP-2131.
+Desktop applications again, because no diffraction program has a start screen: GSAS-II,
+FullProf's WinPLOTR, TOPAS and Profex each open on an empty main window (recall, not re-read).
+Each row is marked checked (read in source or documentation) or recall (from use, not re-read).
+
+| Program | The first screen | At launch | A new project asks first |
+|---|---|---|---|
+| VS Code | Welcome: Start (New, Open), Recent, Walkthroughs (recall) | reopens the last folder (recall) | a folder; no name step (recall) |
+| JetBrains IDEs | New Project, Open, a recent list with a ⋯ menu and Remove from list, Learn (recall) | reopens the last project, a setting (recall) | the name and the location, then the language (recall) |
+| Xcode | Create, Clone, Open, and the recent list beside them (recall) | the welcome window, a setting (recall) | a template, then the name, then the place (recall) |
+| Blender | the splash: New File, Open, Recent, links to the manual and the release notes (recall) | the splash over a default scene (recall) | — |
+| Obsidian | Create, Open folder, the vault list (recall) | reopens the last vault (recall) | the vault's name and location in one dialog (recall) |
+| Profex 5 | — | an empty main window (recall) | one dialog: the pattern, then the device's instrument file (recall) |
+| GSAS-II 5.8.4 | — | an empty data tree (recall) | importing a pattern with no instrument file offers a list of default instrument files, the first `CuKa lab data`; Cancel imports nothing (checked, `defaultIparms.py:31`, `GSASIIdataGUI.py:1840-1860`) |
+
+Interface guidance read the same day, from recall: Apple's Human Interface Guidelines and
+Microsoft's Fluent 2 both advise onboarding that can be skipped and is brief, and Nielsen Norman
+Group's articles advise a wizard only where a later step depends on an earlier answer. The four
+answers here are independent, which is the case for one dialog.
+
+The practice these add up to: New, Open, a recent list and a small learning area, with no tour;
+reopen the last project at launch; ask for the name and the place before anything else. The
+round-9 design follows all three. Its departure is the instrument: no surveyed program assumes one
+silently, and GSAS-II makes the person pick from a list. rietx assumes the first entry of that list
+and tags the line `assumed`. Claude settled that call in the round-9 design of 2026-11-08, and it
+is reversible.
 
 ## A pattern recalculated while a control moves
 
