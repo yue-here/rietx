@@ -1,6 +1,6 @@
 # WP-2087 — An opt-in correction the residual asks for names its declaration in the docs
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — all tasks done (PR #1515); waits on the maintainer's review of the unknown-path texts and the Biso help-text call
+Milestone: unscheduled · Status: 🔄 2026-11-10 — all tasks done (PR #1515); waits on the maintainer's review of the unknown-path texts and the Biso help-text call
 Track: What fires, and what stays silent
 Depends on: [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md)
 Priority: P3 2026-11-05 — WP-1944 closed, so nothing blocks it; three opt-in corrections are documented without the declaration a user writes, and nothing is wrong in any number
@@ -119,7 +119,7 @@ the before and after texts in the PR body before merge.
 
 ## Handover log
 
-- **2026-11-09 (second session)** — the unknown-path answer, by a ghostshift
+- **2026-11-10** — the unknown-path answer, by a ghostshift
   runner (PR #1515). A user who guesses the name of an opt-in correction's
   parameter, on a model that has not declared the correction, is now told
   the line that declares it. Before, the package offered the nearest real
