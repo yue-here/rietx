@@ -250,6 +250,9 @@ export const api = {
   /** The pattern's every channel and the fit's curves on the ones it kept, as
    *  `rxplot.mjs`'s `unpack` reads them; before a fit, the pattern alone. */
   curves: () => arrays("/api/result/curves"),
+  /** The background curve, the observed pattern and the curve's esd at each
+   *  fitted channel, packed as the curves are (WP-2129). Writes nothing. */
+  background: () => arrays("/api/background"),
   /** The curves at values nobody has applied, writing nothing (WP-2125): the
    *  fitted channels, the model, its background, each phase, the three
    *  residuals and the ticks, with the Rwp there. */

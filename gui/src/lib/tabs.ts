@@ -55,6 +55,8 @@ export const GRAPH_TABS = [
   // the single-peak comparison (WP-2128); "Peaks" is the side strip's
   // picker, and the manual's corpus is keyed by label
   { id: "single", label: "Single peaks" },
+  // WP-2129: the background curve and the band it may move in
+  { id: "background", label: "Background" },
 ] as const;
 
 export type GraphTab = (typeof GRAPH_TABS)[number]["id"];
