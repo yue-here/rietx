@@ -1,6 +1,6 @@
 # WP-2200 — The palette
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built, PR #1517; six colour questions wait on the maintainer's look
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built, PR #1517; the six colour questions ruled 2026-11-10
 Depends on: 2142 (the style guide)
 Priority: P2 2026-11-10 — a gui-overhaul piece the maintainer ruled for on 2026-11-06 and 2026-11-09; the peak-mark colour waits on it
 
@@ -36,6 +36,21 @@ seam in the emitter and are not built.
   shape, red marks only an unexplained peak, and orange is the fit's alone.
 
 `gui/STYLE.md` § Colour states these as rules; this WP is the piece its paragraph names.
+
+### Rulings of 2026-11-10, on the six visual questions
+
+Ruled by Yue 2026-11-10, on the handover's six open questions and the PR's screenshots.
+Every value stays as built.
+
+1. The background stays the figures' brown, `#b5793a` light and `#c99a6a` dark. The dash
+   separates it from the calculated curve.
+2. The peak-fit curve stays the second blue, `#6f83e6` light and `#516494` dark.
+3. The dark peak mark stays `#008ad5`. The ruled `#56b4e9` equals the third phase colour.
+4. The zero line stays the site's zero grey.
+5. On the light theme the difference grey may share `--muted` with the excluded region's
+   edge.
+6. The outlined-button rule stands. The clutter it shows goes to a new graph-window piece,
+   filed on 2026-11-10.
 
 ### The site's palette, and the prototype's plot roles
 
