@@ -101,6 +101,20 @@ the piece that touches it or a WP of its own.
 - A run started from the Report or Series panel, or by the `.` key, does not apply the
   Parameters edits waiting in the action bar. The bar's Refine, the `r` key (WP-2123) and the
   Plan panel's `Run this stage` (WP-2127) do.
+- The Parameters panel has no formula editor: no route serves `add_variable` or an expression
+  tie, so the popover's "=" button (design 13) waits for both routes (WP-2126's follow-up).
+- The popover offers no limits for a coordinate DOF, whose entry stores no `min`/`max`, and
+  refuses them by name for a texture or background coefficient. Both need the path-to-model map
+  that lives only inside `ParameterTable`'s write-back (WP-2126's follow-up).
+- The panel's Apply sends `PATCH /api/params` and then one `POST /api/structure/position` per
+  moved atom, so a refused position leaves the PATCH applied. A `positions` arm on the PATCH
+  makes it one rehearsed request; the Model panel's value-then-model sequence has the same shape
+  (WP-2126's follow-up).
+- No group toggle in the Parameters panel shows which plan stage frees it. WP-2126 left the
+  badges to the Plan tab and WP-2127 left them to the panel.
+- `gui/src/lib/spacegroup.ts:typesetSpaceGroup` (WP-2126) and
+  `gui/src/lib/symmetry.ts:symbolTokens` (WP-2131) typeset a space-group symbol by the same
+  rules into two token types. One should go.
 
 ## Acceptance
 
