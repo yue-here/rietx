@@ -248,7 +248,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/project/copy` | copy the `.rex` folder, history included, to a `directory` under a `name`; the session stays on the original |
 | `POST /api/project/rename` · `POST /api/project/move` | rename the folder in place; move it into another `directory` |
 | `POST /api/project/close` | close the project; the next launch shows the start screen |
-| `GET /api/recovery` · `PUT /api/recovery` | the open project's unapplied edits, kept in the state directory apart from the project; `PUT` takes `{project, head, draft}` for a project folder, the one just closed included, and `draft: null` deletes the copy; not behind the 409 |
+| `GET /api/recovery` · `PUT /api/recovery` | the open project's pending edits, kept in the state directory apart from the project; `PUT` takes `{project, head, draft}` for any project folder, including the one that closed a moment ago, and `draft: null` deletes the copy; not behind the 409 |
 | `GET /api/params` · `PATCH /api/params` | every parameter row; value, vary, hold, limit and restraint edits |
 | `GET /api/plan` · `PUT /api/plan` · `GET /api/plans` | the plan; replace it; the presets |
 | `GET /api/plan/resolve` | the ladder: per stage, what it frees and what stays held |
