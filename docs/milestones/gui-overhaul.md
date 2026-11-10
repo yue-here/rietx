@@ -76,7 +76,8 @@ the piece that touches it or a WP of its own.
 
 - The extinction screen is refused on a project with no phase: `GuiSession.run` groups the kind
   `extinction` with the refinement kinds, though WP-1027 ruled the screen ungated, and the
-  refusal reads "a extinction run".
+  refusal reads "a extinction run". WP-2124 took `extinction` out of the refusal, so a
+  pattern-only project screens a candidate.
 - Adopt is gated to `best_or_none()` (`ADOPT_GATED`). The maintainer ruled on 2026-11-08 that a
   person may adopt any candidate, with its grade and caveats shown beside Adopt and recorded in
   the history node. WP-2124 lifted the gate on the route and WP-2130 offers Adopt on every row.
@@ -84,15 +85,19 @@ the piece that touches it or a WP of its own.
   diagnostics whenever there are candidates, against WP-1042's rule that what was not reached
   is said loudly. WP-2130 says it above the list in every case.
 - `.rxt` renders no block for user variables, and its tie refusal names only symmetry ties.
+  WP-2121 made the refusal name a user tie's own verbs, `ref.untie()` and `ref.tie()`. The
+  block for user variables is still owed.
 - The Le Bail check's absent lines arrive in its own refined frame, about 0.011° from the
   candidate's ticks on fluorapatite; they should be served as tick indices.
 - `supercell_checks` names a relation for 8 of fluorapatite's 12 candidates (measured by WP-2124
   on 63d7c120a; naming the other four is WP-2124's follow-up); lattice relations between
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
-- `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
+- `PeakEditor.curves` serves only each group's sum; per-line curves need a route. In PR #1526
+  (WP-2202), which serves them as `lines` on each group.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
-- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits. It is the row "The palette" above.
+- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits. It is the row "The palette" above. In PR #1517 (WP-2200).
 - The pick route takes only `shoulders`; the 2θ range and `flag_contamination` need to reach it.
+  WP-2124 added both to the route, and `pick_options` records all three.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08.
 - A GUI series lives in session memory only; several series gaps wait on the series fitting
