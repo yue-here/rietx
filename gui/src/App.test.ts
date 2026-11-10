@@ -6087,6 +6087,29 @@ describe("the search controls (WP-1045)", () => {
     await flush();
     expect(clockText()).toContain("0:06 elapsed");
   });
+
+  it("starts the search clock at the search, not at the idle frame before it", async () => {
+    // idle and a search's first frame both stamp 0, so a clock keyed on the
+    // stamp alone counted from the page's load (0:57 into a 15 s search)
+    let current: any = IDLE_RUN;
+    const stub = server({ ...controlsBoot(),
+      "/api/run/state": () => ({ body: current }),
+      "/api/events": () => ({ body: { events: [], next: 0, oldest: 1, ...current } }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    button("Peaks")!.click();
+    await flush();
+    await step("Index");
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    current = { ...IDLE_RUN, state: "running", run: { ...IDLE_RUN.run, kind: "index", elapsed: 0 } };
+    // a poll to see the search, then a tick of the browser's clock to count
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    await flush();
+    const clockText = [...host.querySelectorAll(".why")]
+      .map((e) => e.textContent!).find((t) => t.includes("elapsed")) ?? "";
+    expect(clockText).toMatch(/0:0[0-2] elapsed/);
+  }, 10_000);  // two real waits of the browser's clock, 5.5 s together
 });
 
 describe("the help popover", () => {

@@ -330,6 +330,9 @@
   // a derived number, so a poll repeating the same value restarts nothing
   const stamped = $derived(run?.run?.elapsed ?? 0);
   $effect(() => {
+    // a search starting reads 0 like the idle frame before it, so its start
+    // restarts the count as well as a new stamp does
+    void indexing;
     frameElapsed = stamped;
     frameAt = now = performance.now();
   });
@@ -973,10 +976,11 @@
                       >{cls.symbol}</button>{/if}
                     {#if extinction.best === k}<span class="mark">rietx's pick</span>{/if}
                     {#if cls.refuted && cls.n_present}
-                      <span class="why">refuted by {(cls.forbidden_hkl ?? []).slice(0, 3)
-                        .map((hkl: number[], j: number) =>
-                          `${formatHkl(hkl)} ${cls.forbidden_two_theta?.[j]?.toFixed(2) ?? "?"}°`)
-                        .join(", ")}</span>
+                      <!-- each reflection and its 2θ is one unit, never broken
+                           inside its indices -->
+                      <span class="why">refuted by {#each (cls.forbidden_hkl ?? []).slice(0, 3)
+                        as hkl, j (j)}{j ? ", " : ""}<span class="nb">{`${formatHkl(hkl)} ${
+                          cls.forbidden_two_theta?.[j]?.toFixed(2) ?? "?"}°`}</span>{/each}</span>
                     {/if}
                   </td>
                   <td class="r">{cls.screened ? cls.delta_bic.toFixed(1) : "–"}</td>
@@ -1425,6 +1429,7 @@
   .cellline { margin: var(--s1) 0 0; }
   p.rel { margin: 0; min-height: 1.4em; }
   p.partner { margin: 0; }
+  .nb { white-space: nowrap; }
   .caveats {
     display: flex;
     flex-wrap: wrap;
