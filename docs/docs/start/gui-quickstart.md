@@ -37,8 +37,8 @@ temporary directory.
 
 ## Start with an example
 
-`rietx gui` with no project named reopens the project you had open last. With
-none, it shows the start screen. On the left are `New project…`, `Open…`, and
+`rietx gui` with no project named reopens the project you had open last, unless
+you closed it from the File menu. Otherwise it shows the start screen. On the left are `New project…`, `Open…`, and
 links to this manual and its tutorials. On the right are the projects you opened
 recently and the example projects shipped inside the package. A first run has no
 recent list, so it shows the examples alone. Start from an example if you have

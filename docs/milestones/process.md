@@ -843,6 +843,16 @@ examples route restates no protocol.  Root kept the half that governs
 command.  The other two root GUI rules needed no lines: the 409 and the
 theme's scope were already stated here in full.
 
+1061 -> 1068 for WP-2133 (2026-11-09, approved by the maintainer the same
+day): the File menu acts on the project folder, and three of its facts are
+seams a later verb must keep.  A rename or a move keeps the session's
+`Project` and repoints the two paths a live one holds, so a third such field
+has to join `GuiSession._relocate`.  A destination passes the folder
+browser's containment gate and the name check, and an existing folder is
+refused rather than replaced.  Close is a mark on the recent list's head,
+which `reopen_last` reads.  The refusal list, the review's nine findings and
+the browser measurements are in the WP.  Landed 1068, no headroom.
+
 ### `tests/CLAUDE.md`
 
 180 -> 198 for WP-1070 (2026-08-15): the running ladder.  It is a rule

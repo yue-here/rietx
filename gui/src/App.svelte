@@ -39,6 +39,7 @@
   import Series from "./panels/Series.svelte";
   import Splitter from "./panels/Splitter.svelte";
   import Start from "./panels/Start.svelte";
+  import FileMenu from "./panels/FileMenu.svelte";
   import Stubs from "./panels/Stubs.svelte";
   import Text from "./panels/Text.svelte";
   import {
@@ -465,6 +466,27 @@
       openError = (error as Error).message;
       return openError;
     }
+  }
+
+  /** A rename or a move from the File menu (WP-2133): the same project, at a
+   *  new path, its result and panels kept, since the server kept them too. */
+  function relocated(doc: any) {
+    project = doc;
+    say(`# project: ${doc.path}`);
+  }
+
+  /** Close from the File menu (WP-2133): the start screen is the window. */
+  async function closed() {
+    project = null;
+    result = null;
+    startOpen = false;
+    newOpen = false;
+    indexAnswer = null;
+    forgetCandidates();
+    extinction = null;
+    run = await api.runState();
+    await loadRecent();
+    await loadExamples();
   }
 
   /** The recent list, which the start screen reads (WP-2131). */
@@ -1214,23 +1236,21 @@
       <span class="muted mono">{version?.package_version ?? "…"}</span>
     </div>
 
-    {#if project}
-      <div class="project mono" title={project.path}>
-        {project.path.split("/").pop()}
+    <!-- the project's name opens the File menu (WP-2133), with or without a
+         project, so opening one moves nothing in the bar -->
+    <div class="project mono" title={project?.path ?? ""}>
+      <FileMenu {project} {busy} hasResult={!!result} {say}
+        onnew={() => (newOpen = true)} onopen={open} onproject={relocated}
+        onclosed={closed} />
+      {#if project}
         <span class="muted">· {project.data.filename} · {project.data.n_points} pts</span>
         <span class="muted">· {project.doc.mode}</span>
         <span class="muted">· σ {project.data.has_sigma ? "from file" : "Poisson"}</span>
-      </div>
-    {:else}
-      <div class="project muted">No project</div>
-    {/if}
+      {/if}
+    </div>
 
     <div class="controls">
       {#if project}
-        <button class="ghost" onclick={startImport}
-          title="the start screen: open another project or make a new one; nothing
-                 is unsaved, because settings persist on the verb"
-          >Open…</button>
         <div class="segmented" role="group" aria-label="disclosure">
           <button class:on={simple} onclick={() => setSimple(true)}
             title="hide bounds and stage seeds">Simple</button>

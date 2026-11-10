@@ -37,8 +37,8 @@ below, and the sash then drags up and down.
 
 | Control | Does |
 |---|---|
-| the project chip | names the `.rex`, its data file, the point count, the intensity mode, and whether σ came from the file or from counting statistics; `No project` when none is open |
-| `Open…` | the start screen, over the open project, with `Back to the project` to return |
+| the project's name | opens the File menu, below; `No project` when none is open |
+| the project line | the data file, the point count, the intensity mode, and whether σ came from the file or from counting statistics |
 | the two collapse buttons | hide the graphs (left end) or the panel column (right end) |
 | `Simple \| Advanced` | whether the Plan, Model, Series and Report panels show their advanced controls |
 | `◐ ☀ ☾` | theme: follow the system, light, dark |
@@ -48,6 +48,37 @@ below, and the sash then drags up and down.
 
 `Rwp` and `GoF` are on the title line over the pattern. `⚠ not a fit yet`
 appears beside them past an Rwp of {{ MATURITY_MAX_RWP }}.
+
+### The File menu
+
+Click the project's name to open the File menu. Work saves itself as you go, so
+the menu has no Save. `⌘S` answers `Saved` and does nothing else.
+
+| Item | Does |
+|---|---|
+| `New project…` | the New project dialog |
+| `Open…` | the folder browser, to open another `.rex`; `⌘O` |
+| `Open recent` | the other projects on the recent list, and `Clear the list` |
+| `Save a copy…` | copies the whole `.rex` folder with its history, under a name and into a folder you choose; the window stays on the original; `⇧⌘S` |
+| `Rename…` | turns the name into a text box; `Enter` renames the folder, and `Esc` keeps the old name |
+| `Move to…` | moves the folder into another folder you choose |
+| `Export` | writes one of the six exports into a folder you choose, starting beside the project |
+| `Close project` | returns to the start screen |
+
+The folders come from the folder browser, which lists only your home directory
+and the working directory. A page in a browser cannot open the system's own save
+dialog. None of these items replaces a folder that already exists. An export
+refuses a file of the same name once, and the dialog's button then reads
+`Replace`. Every item that changes the folder is refused while a run is in
+flight.
+
+An export that needs a fit stays disabled until there is one. The instrument
+profile is the exception, because it is read from the project. Phase fractions
+also needs a Rietveld fit with two phases or more.
+
+After `Close project`, the next `rietx gui` with no project named shows the start
+screen. The `Open or create a project` palette command shows the start screen
+over an open project, with `Back to the project` to return.
 
 ## The action bar
 
@@ -66,7 +97,7 @@ replaces the vary flags, so a parameter you ticked by hand stays free under
 `One cycle` and may be held again under `Staged plan`. The Plan tab's ladder
 shows which.
 
-There is no menu bar and no Save button, and neither is an omission. Settings
+There is no Save command, and that is not an omission. Settings
 persist on the verb. The moment you tick a box or drag a region it is written to
 the project, so there is nothing to save and nothing to lose on close.
 `Save the project` exists as a palette command for the one case that is not
