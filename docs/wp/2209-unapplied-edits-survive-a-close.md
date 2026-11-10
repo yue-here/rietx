@@ -129,7 +129,7 @@ No rule here reads a pattern. The retention ceiling and floor are storage consta
 - [x] Client: `lib/recovery.ts`, `draft()`/`restoreDraft()` on the three panels, the shell's
   writer and offer, the carry-over across an open fixed, vitest
 - [x] Manual: the routes in a GUI chapter, the offer described; `tests/test_gui_manual.py`
-- [ ] Browser: a test that closes with pending edits, reopens, restores and discards, by real
+- [x] Browser: a test that closes with pending edits, reopens, restores and discards, by real
   clicks; every `tests/*_browser.py` run locally
 - [x] Dist rebuilt; `npm --prefix gui test` and `npm --prefix gui run check`
 - [ ] Skill: none. The GUI is not a surface an agent driving rietx uses
