@@ -451,6 +451,54 @@ def test_the_background_tab_holds_still_under_a_hold_and_a_band_press(
     assert not _moved(before, pressed), _moved(before, pressed)
 
 
+#: The Structure tab's own regions (WP-2203): the viewer's header, its picture
+#: and the row of view buttons under it, beside the shell's landmarks.
+STRUCTURE_LANDMARKS = LANDMARKS + [
+    ".gview.structure", ".viewer > header", ".viewer .plot", ".viewer .knobs",
+]
+
+#: The viewer's choices and actions a person presses, each by its exact name.
+#: The "drawing" disclosure asks to change the layout, and PNG saves a file,
+#: so neither is here.
+STRUCTURE_CONTROLS = ["ellipsoids", "balls", "a", "b", "c", "reset"]
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_the_structure_tab_holds_still_under_its_choices(browser, gui, state):
+    """WP-2203. The 3D structure is a graph tab now. Choosing a draw mode or a
+    view redraws the picture and moves no region, the viewer's own included,
+    and the tab itself is reached by a real click in the graph strip."""
+    from pathlib import Path
+
+    url, _ = gui
+    page = _open(browser, url, WIDTHS[state])
+    _press(page, "Structure")
+    page.wait_for_selector(".viewer canvas")
+    page.wait_for_selector(".viewer .knobs")
+    page.wait_for_function(
+        "document.querySelector('.gtitle .what').textContent === 'Structure at the current values'")
+    _frames(page)
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    page.screenshot(path=str(out / f"gui_structure_tab_{state}.png"))
+    viewer = page.locator("section.viewer")
+    failures = []
+    for name in STRUCTURE_CONTROLS:
+        # stacked, the graphs have half the window and the view scrolls inside
+        # its tab: bring each button into view before the boxes are read,
+        # because a scroll moves every row without moving the layout
+        button = viewer.get_by_role("button", name=name, exact=True)
+        button.scroll_into_view_if_needed()
+        _frames(page)
+        before = page.evaluate(SNAP, STRUCTURE_LANDMARKS)
+        button.click()
+        _frames(page)
+        failures += [f"{name!r}: {m}" for m in _moved(before, page.evaluate(SNAP, STRUCTURE_LANDMARKS))]
+    assert not page.errors, page.errors
+    page.close()
+    assert not failures, "\n".join(failures)
+
+
 #: The Interactive tab's own rows (WP-2128): a drag or a typed value changes a
 #: number and a thumb, and never where a row sits.
 SLIDER_ROWS = [".side .panel:not(.hidden) .slider", ".side .panel:not(.hidden) .slider .line > *"]

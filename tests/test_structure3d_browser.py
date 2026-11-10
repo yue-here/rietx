@@ -75,7 +75,8 @@ def page(browser, gui):
     page.on("pageerror", lambda exc: errors.append(str(exc)))
     page.on("request", lambda r: asked.append(r.url))
     page.goto(gui)
-    page.get_by_role("button", name="Model", exact=True).click()
+    # a graph tab since WP-2203, beside the pattern
+    page.locator(".plotcol > nav.tabs").get_by_role("button", name="Structure", exact=True).click()
     page.wait_for_selector(".viewer canvas")
     _settle(page)
     page.asked = asked
@@ -92,8 +93,8 @@ def _settle(page, frames: int = 4) -> None:
 
 def _centre(page) -> tuple[float, float]:
     """The canvas's centre in the viewport, scrolled into view first: in a
-    narrow window the model pane stacks and the viewer sits below the fold,
-    where a screenshot still finds it and the mouse does not."""
+    narrow window the shell stacks, and a view below the fold is found by a
+    screenshot and not by the mouse."""
     canvas = page.locator(".viewer canvas")
     canvas.scroll_into_view_if_needed()
     box = canvas.bounding_box()

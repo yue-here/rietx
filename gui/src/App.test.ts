@@ -2195,7 +2195,10 @@ describe("disclosure and the command palette", () => {
       ?? host.querySelector(".cellrow .fixed")).toBeTruthy();
   });
 
-  it("drags a model column and persists both widths together", async () => {
+  it("drags the structure column and persists its width alone", async () => {
+    // a second width was the instrument column's while the 3D view sat to its
+    // right; since WP-2203 the instrument column takes what is left, so a
+    // project stored before still opens and its second entry is read past
     const stub = server(boot({ ...PROJECT,
       doc: { ...PROJECT.doc, ui: { model_columns: [400, 380] } } }));
     vi.stubGlobal("fetch", stub.fetcher);
@@ -2204,23 +2207,25 @@ describe("disclosure and the command palette", () => {
     button("Model")!.click();
     await flush();
 
-    const columns = [...host.querySelectorAll<HTMLElement>(".column")];
+    const columns = [...host.querySelectorAll<HTMLElement>(".editors > .column")];
+    expect(columns.length).toBe(2);
     expect(columns[0].style.flex).toBe("0 0 400px");
-    expect(columns[1].style.flex).toBe("0 0 380px");
+    expect(columns[1].style.flex).toBe("");
 
-    // the grips are flex items *between* the columns, not absolute children of
-    // them: a column scrolls, and an absolute edge inside `overflow: auto`
+    // the grip is a flex item *between* the columns, not an absolute child of
+    // one: a column scrolls, and an absolute edge inside `overflow: auto`
     // scrolls away from the edge it is supposed to be
-    const grip = host.querySelector<HTMLElement>('.editors > .grip[data-flow="inline"]')!;
-    grip.dispatchEvent(new MouseEvent("pointerdown", { clientX: 400, bubbles: true }));
+    const grips = host.querySelectorAll<HTMLElement>('.editors > .grip[data-flow="inline"]');
+    expect(grips.length).toBe(1);
+    grips[0].dispatchEvent(new MouseEvent("pointerdown", { clientX: 400, bubbles: true }));
     window.dispatchEvent(new MouseEvent("pointermove", { clientX: 460, bubbles: true }));
     window.dispatchEvent(new MouseEvent("pointerup", { bubbles: true }));
     await flush();
 
     expect(columns[0].style.flex).toBe("0 0 460px");
-    expect(columns[1].style.flex).toBe("0 0 380px");        // untouched, not reset
+    expect(columns[1].style.flex).toBe("");
     const writes = stub.calls.filter((c) => c.method === "POST" && c.path === "/api/project");
-    expect(writes.at(-1)!.body).toEqual({ ui: { model_columns: [460, 380] } });
+    expect(writes.at(-1)!.body).toEqual({ ui: { model_columns: [460] } });
   });
 
   it("collapses to its header and remembers the height to come back to", async () => {
@@ -3725,9 +3730,20 @@ describe("the structure viewer", () => {
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
+    // the model pane beside it, whose edits several cases make, and the
+    // viewer itself, a graph tab since WP-2203
     button("Model")!.click();
     await flush();
+    graphTab("Structure").click();
+    await flush();
     return stub;
+  }
+
+  /** A graph tab by its exact label: "Structure" is also a heading in the
+   *  model pane, so the strip is the scope. */
+  function graphTab(label: string): HTMLButtonElement {
+    return [...host.querySelectorAll<HTMLButtonElement>(".plotcol > nav.tabs button")]
+      .find((b) => b.textContent?.trim() === label)!;
   }
 
   /** The drawing knobs are behind a disclosure since WP-1029 — every one of
@@ -4077,22 +4093,35 @@ describe("the structure viewer", () => {
     expect(frames.length).toBeGreaterThan(painted);
   });
 
-  it("can be closed, gives its WebGL context back, and asks for nothing while closed", async () => {
-    // browsers keep about sixteen live contexts a page and drop the oldest
-    // without a word, so a viewer toggled a few times must not hold on to its
+  it("asks for nothing behind another graph tab, keeps its context, and catches up on return", async () => {
+    // WP-2203: the viewer is a graph tab, mounted while another is up as every
+    // graph is, so a look at the pattern must neither fetch nor give the WebGL
+    // context back (a canvas keeps the first context it gave) — and an edit
+    // made meanwhile is drawn the moment the tab is shown again
     const stub = await openViewer();
-    const given = lifecycle.disposed;
-    button("3D")!.click();
+    const { created, disposed } = { ...lifecycle };
+    graphTab("Pattern").click();
     await flush();
-    expect(lifecycle.disposed).toBe(given + 1);
     const before = stub.calls.filter((c) => c.path === "/api/structure3d").length;
-    expect(host.querySelector('.viewer input[type="range"]')).toBeNull();
     field("phases.0.cell.a").value = "4.3";
     field("phases.0.cell.a").dispatchEvent(new Event("input", { bubbles: true }));
     await flush();
     button("Apply")!.click();
     await flush();
     expect(stub.calls.filter((c) => c.path === "/api/structure3d").length).toBe(before);
+    expect(lifecycle.disposed).toBe(disposed);
+
+    graphTab("Structure").click();
+    await flush();
+    expect(stub.calls.filter((c) => c.path === "/api/structure3d").length).toBe(before + 1);
+    // …and only once: shown again with nothing moved, it asks for nothing
+    graphTab("Pattern").click();
+    await flush();
+    graphTab("Structure").click();
+    await flush();
+    expect(stub.calls.filter((c) => c.path === "/api/structure3d").length).toBe(before + 1);
+    expect(lifecycle.created).toBe(created);
+    expect(lifecycle.disposed).toBe(disposed);
   });
 
   it("keeps one renderer through every redraw", async () => {

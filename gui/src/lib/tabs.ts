@@ -45,8 +45,8 @@ export type Tab = (typeof TABS)[number]["id"];
  *
  * The maintainer ruled on 2026-11-07 that the graphs sit on the left in tabs
  * and the model panel on the right, and that each graph says in a title line
- * what it shows. Two tabs since WP-2128; the Peaks preview, the Background view and the
- * Structure view join it in later pieces of the gui-overhaul milestone. It is
+ * what it shows. Single peaks joined in WP-2128, Background in WP-2129 and
+ * Structure in WP-2203; the Peaks preview joins in a later piece. It is
  * data here for the reason `TABS` is: `tabs.test.ts` writes it into the panel
  * corpus, so the manual must name every graph tab too.
  */
@@ -57,6 +57,8 @@ export const GRAPH_TABS = [
   { id: "single", label: "Single peaks" },
   // WP-2129: the background curve and the band it may move in
   { id: "background", label: "Background" },
+  // WP-2203: the 3D structure, moved here from the Model panel's third column
+  { id: "structure", label: "Structure" },
 ] as const;
 
 export type GraphTab = (typeof GRAPH_TABS)[number]["id"];

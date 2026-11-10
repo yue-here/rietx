@@ -59,6 +59,7 @@ import {
   type Mat3,
   type Polyhedron,
   type Site,
+  structureTitle,
 } from "./structure3d";
 
 function site(extra: Partial<Site> = {}): Site {
@@ -467,6 +468,15 @@ describe("the legend", () => {
     const entries = legend(geo);
     expect(entries.map((e) => e.species)).toEqual(["F1-", "Ca2+"]);
     expect(entries[0].sites.map((s) => s.label)).toEqual(["F1", "F2"]);
+  });
+});
+
+describe("the graph title", () => {
+  it("says the scene is the working model, and when a run is moving it", () => {
+    // WP-2203: the title line names what the Structure tab draws, so it never
+    // reads as the last fit after an edit applied without one
+    expect(structureTitle(false)).toBe("Structure at the current values");
+    expect(structureTitle(true)).toBe("Structure, refining");
   });
 });
 

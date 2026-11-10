@@ -59,7 +59,7 @@ export function clampSize(value: number, min: number, keep: number, available: n
  * makes.
  */
 /**
- * What each of the model pane's three columns needs, in px.
+ * What each of the model pane's two columns needs, in px.
  *
  * `structure` is **measured**, not chosen (WP-1034 task 1, re-measured WP-1215
  * when the atom row went from seven columns to eleven): the atom table's
@@ -90,18 +90,19 @@ export function clampSize(value: number, min: number, keep: number, available: n
  * padding) and `resize.test.ts` crosses this number against them, because a
  * width restated is a width that goes stale (WP-1215).
  *
- * `view` is `Model.svelte`'s own `VIEW_KEEP`; `form` is where its `COL_MIN` now
- * comes *from*, so the threshold below is arithmetic rather than a number
- * somebody liked, and the CSS basis reads it through `--col-min`.
+ * `form` is where `Model.svelte`'s `COL_MIN` comes *from*, so the threshold
+ * below is arithmetic rather than a number somebody liked, and the CSS basis
+ * reads it through `--col-min`. The 3D view's `view` floor left with the view,
+ * which is a graph tab since WP-2203.
  */
-export const MODEL_MIN = { structure: 666, form: 320, view: 260 } as const;
+export const MODEL_MIN = { structure: 666, form: 320 } as const;
 
 /**
  * The width an inline splitter grip takes out of the row, in px.
  *
  * `Splitter.svelte`'s `flex: 0 0 5px`. It is here because the stacking threshold
- * is the *sum of what the row must hold*, and two grips sit inside that row
- * between the three columns — left out, the arithmetic said 1126 and the
+ * is the *sum of what the row must hold*, and a grip sits inside that row
+ * between the columns — left out, the arithmetic said 1126 and the
  * structure column measured 636 of the 642 its table needs, side-scrolling by
  * six pixels at exactly the width the threshold exists to protect (WP-1215; the
  * gap was there at 932 too and no one had measured it).
@@ -111,10 +112,10 @@ export const GRIP = 5;
 /**
  * Does the model pane have to become one stacked column?
  *
- * Three columns side by side need the structure column's floor plus a form
- * column plus what the 3D view keeps **plus the two grips between them** — 1256
- * px since WP-1216 (1136 while `form` was 200, 932 before WP-1215 counted the
- * grips). Below that something is being squeezed under
+ * Two columns side by side need the structure column's floor plus a form
+ * column **plus the grip between them** — 991 px since WP-2203 moved the 3D
+ * view to a graph tab (1256 with it since WP-1216, 1136 while `form` was 200,
+ * 932 before WP-1215 counted the grips). Below that something is being squeezed under
  * its minimum, and the thing that loses is the atom table, which side-scrolls
  * *the whole column* and takes the cell row and the headings with it (measured
  * at 860 px: `10.25710.25790` where a, b, c should be).
@@ -127,9 +128,9 @@ export function modelStacks(available: number): boolean {
   return available > 0 && available < modelThreshold();
 }
 
-/** The width three columns need, grips included — the sum, in one place. */
+/** The width the two columns need, the grip included — the sum, in one place. */
 export function modelThreshold(): number {
-  return MODEL_MIN.structure + MODEL_MIN.form + MODEL_MIN.view + 2 * GRIP;
+  return MODEL_MIN.structure + MODEL_MIN.form + GRIP;
 }
 
 /**

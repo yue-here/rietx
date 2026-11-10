@@ -81,9 +81,7 @@
     type ParamRow,
   } from "../lib/table";
   import { MODEL_MIN, fitColumns, modelStacks } from "../lib/resize";
-  import type { Theme } from "../lib/theme";
   import Splitter from "./Splitter.svelte";
-  import Structure3D from "./Structure3D.svelte";
 
   let {
     project = null,
@@ -93,10 +91,10 @@
     simple = true,
     active = true,
     columns = null,
-    theme = "light",
     say = (_line: string) => {},
     oncolumns = (_widths: number[], _done: boolean) => {},
     onmoved = () => {},
+    onreloaded = () => {},
   }: {
     project?: any;
     capabilities?: any;
@@ -104,53 +102,58 @@
     busy?: boolean;
     simple?: boolean;
     active?: boolean;
-    /** the first two columns' widths in px, or `null` while the flex defaults
-     *  hold — the shell owns the `ui` key, this pane only reports drags */
+    /** the structure column's width in px, first of the array, or `null`
+     *  while the flex defaults hold — the shell owns the `ui` key, this pane
+     *  only reports drags.  A second entry, stored while the 3D view was a
+     *  third column (before WP-2203), is read past: the instrument column
+     *  takes what is left. */
     columns?: number[] | null;
-    /** passed through to the 3D viewer, whose draw effect depends on it */
-    theme?: Theme;
     say?: (line: string) => void;
     oncolumns?: (widths: number[], done: boolean) => void;
     onmoved?: () => void;
+    /** every successful `load()`: the Structure graph tab redraws on it, one
+     *  SSE frame before the head reaches the shell (WP-2203) */
+    onreloaded?: () => void;
   } = $props();
 
-  /** The narrowest a form column may be, and what the 3D column must keep.
+  /** The narrowest a form column may be.
    *
    *  `MODEL_MIN.form` rather than a literal: the stacking threshold is that
    *  number's arithmetic, so a second copy here would be the drag's floor and
    *  the threshold's floor disagreeing about the same column.  The CSS basis
    *  reads it too, through `--col-min` on `.editors`. */
   const COL_MIN = MODEL_MIN.form;
-  const VIEW_KEEP = 260;
 
   /** The cell edges as crystallography writes them.  The *path* keeps the
    *  spelled-out name — it is a parameter path, and a glyph in one would be a
    *  second vocabulary for the same field. */
   const CELL_GLYPH: Record<string, string> = { alpha: "α", beta: "β", gamma: "γ" };
 
-  // -- the three columns ---------------------------------------------
+  // -- the two columns -----------------------------------------------
   /** what the drag has set, ahead of the round trip that persists it */
   let colLocal = $state<number[] | null>(null);
-  let colMeasured = $state([0, 0]);
+  let colMeasured = $state([0]);
   let editorsEl: HTMLElement | undefined = $state();
   let editorsWidth = $state(0);
-  /** One column, stacked, when three cannot each hold their floor (WP-1034).
+  /** One column, stacked, when two cannot each hold their floor (WP-1034).
    *
    * The pane is a tab now, so it is routinely rendered into 340-560 px — and
-   * three columns there are not a squeeze but a *loss*: the atom table needs
+   * two columns there are not a squeeze but a *loss*: the atom table needs
    * `MODEL_MIN.structure` and side-scrolls the whole column, cell row and
    * headings included, below it.  Stacked, everything keeps its width and the
    * pane scrolls
    * vertically, which is what a narrow column can actually do.  The threshold
-   * is arithmetic over the three floors (`lib/resize.ts`), not a taste. */
+   * is arithmetic over the two floors (`lib/resize.ts`), not a taste. */
   const stacked = $derived(modelStacks(editorsWidth));
   /** Clamped at *render*, not only at drag: widths chosen in one window have to
    *  survive being reopened in a smaller one, and no drag is present to clamp
-   *  them.  A browser found the alternative — a 3D column 24 px wide.  Stacked,
-   *  a stored width means nothing: the columns are rows. */
+   *  them.  A browser found the alternative — a 3D column 24 px wide, while
+   *  the view was a column (before WP-2203).  Stacked, a stored width means
+   *  nothing: the columns are rows.  Only the structure column's width is
+   *  stored; the instrument column keeps its floor and takes the rest. */
   const cols = $derived(stacked
     ? null
-    : fitColumns(colLocal ?? columns, editorsWidth, COL_MIN, VIEW_KEEP));
+    : fitColumns((colLocal ?? columns)?.slice(0, 1), editorsWidth, COL_MIN, COL_MIN));
 
   /** The rendered width of column `i`, in px — its stored value if it has one,
    *  else whatever the flex default is currently producing. */
@@ -158,11 +161,9 @@
     return cols?.[i] ?? colMeasured[i] ?? 0;
   }
 
-  function dragColumn(i: number, next: number, done: boolean) {
-    const widths = [colWidth(0), colWidth(1)];
-    widths[i] = next;
-    colLocal = widths;
-    oncolumns(widths, done);
+  function dragColumn(next: number, done: boolean) {
+    colLocal = [next];
+    oncolumns([next], done);
   }
 
   // -- the editors ---------------------------------------------------
@@ -172,8 +173,7 @@
    * instrument and the background are editable, and there is no structure to
    * draw, name or give a cell to. Every phase-indexed control below reads
    * `structure.phases[phase]`, so this gates the section rather than each of
-   * them, and the 3D column is hidden with it — an empty viewer beside an
-   * empty form is two ways of saying the same nothing.
+   * them.
    */
   const noPhases = $derived(!!structure && !structure.phases?.length);
   let sites = $state<Site[]>([]);
@@ -253,13 +253,8 @@
    *  makes the file a description of something else. */
   let profileSaved = $state("");
   let draft = $state({ label: "", species: "", x: "0", y: "0", z: "0" });
-  /** The 3D view is a **third column of this pane**, not a sixth tab and not a
-   *  window of its own: it answers questions about the rows beside it (is that
-   *  ADP a balloon? did that coordinate DOF move the atom off its axis?), and a
-   *  view you have to switch to in order to check an edit is a view nobody
-   *  checks. Toggleable because a narrow window has room for two columns. */
-  let viewer = $state(true);
-  /** Bumped by every successful `load()`; the 3D view redraws on it. */
+  /** Bumped by every successful `load()`; the site letters refetch on it, and
+   *  the shell's Structure graph tab hears it through `onreloaded`. */
   let stamp = $state(0);
 
   const insFields = $derived(instrument ? instrumentFields(instrument) : []);
@@ -330,8 +325,8 @@
    *
    *  `projectKey`, not `project`: a `ui`-only PATCH (a theme, a pane width)
    *  replaces the project *object* without moving the head, and reading the
-   *  object here made every such write reload three routes and refetch the 3D
-   *  geometry (WP-1029 q).  The *path* rather than a boolean, because the head
+   *  object here made every such write reload three routes and, while the 3D
+   *  view sat in this pane, refetch its geometry (WP-1029 q).  The *path* rather than a boolean, because the head
    *  cannot tell two projects apart — node ids are sequential (`n0000`), so
    *  two fresh projects share a head — and a switch must reload even when the
    *  heads collide.  (Today `App.opened()` also forces `mode = "panes"`, so a
@@ -373,10 +368,11 @@
       symPreview = null;
       symbolDraft = null;
       profileSaved = "";
-      // the signal the 3D view follows: this runs on every head move *and*
-      // immediately after every local write, which is one frame earlier than
-      // the head reaches the shell
+      // the signal the Structure tab follows: this runs on every head move
+      // *and* immediately after every local write, which is one frame earlier
+      // than the head reaches the shell
       stamp += 1;
+      onreloaded();
     } catch (exc) {
       if (!(exc instanceof ApiError && exc.empty)) loadError = (exc as Error).message;
     }
@@ -698,11 +694,6 @@
   <header>
     <h1>Structure & instrument</h1>
     <span class="spacer"></span>
-    {#if !noPhases}
-      <button class="ghost" class:on={viewer} onclick={() => (viewer = !viewer)}
-        title="the cell, the symmetry images, the bonds and the displacement
-               ellipsoids — drawn from the model on screen">3D</button>
-    {/if}
     {#if dirty > 0}
       <span class="muted">{dirty} edit{dirty === 1 ? "" : "s"}</span>
       <button class="ghost" disabled={busy || invalid.length > 0} onclick={apply}>Apply</button>
@@ -1135,14 +1126,13 @@
       <!-- no grip between rows: stacked, a column's width is the pane's -->
       {#if !stacked}
         <Splitter size={colWidth(0)} grow="right" min={COL_MIN}
-          keep={colWidth(1) + VIEW_KEEP} flow="inline"
+          keep={COL_MIN} flow="inline"
           extent={() => editorsEl?.clientWidth ?? 0}
-          onsize={(next, done) => dragColumn(0, next, done)}
+          onsize={(next, done) => dragColumn(next, done)}
           title="drag to resize the structure column" />
       {/if}
 
-      <div class="column" bind:clientWidth={colMeasured[1]}
-        style:flex={cols ? `0 0 ${cols[1]}px` : null}>
+      <div class="column">
         <h2>Instrument
           <label class="file inline-file">
             <input type="file" onchange={(e) => replaceFrom("instrument", e)} />
@@ -1200,23 +1190,6 @@
           </label>
         {/if}
       </div>
-
-      {#if viewer && !noPhases}
-        {#if !stacked}
-          <Splitter size={colWidth(1)} grow="right" min={COL_MIN} keep={VIEW_KEEP}
-            flow="inline"
-            extent={() => (editorsEl?.clientWidth ?? 0) - colWidth(0)}
-            onsize={(next, done) => dragColumn(1, next, done)}
-            title="drag to resize the instrument column" />
-        {/if}
-        <!-- stacked, this is a section under the forms rather than a third of a
-             400 px pane, and the header's `3D` button is its collapse control —
-             one control for one choice (WP-1029), not a second one down here -->
-        <div class="column view">
-          {#if stacked}<h2>3D</h2>{/if}
-          <Structure3D {stamp} {theme} {say} />
-        </div>
-      {/if}
     </div>
 
     <footer>
@@ -1360,7 +1333,7 @@
     min-height: 0;
   }
 
-  /* one column, stacked, below the width three floors need (`lib/resize.ts`).
+  /* one column, stacked, below the width two floors need (`lib/resize.ts`).
      The pane scrolls once rather than each column scrolling separately, which
      is the difference between reading a form and hunting for it. */
   .editors.stacked {
@@ -1378,20 +1351,13 @@
     border-top: 1px solid var(--line);
   }
 
-  /* the scene needs a height of its own once it is a row: a 3D view in a
-     `flex: 0 0 auto` row would otherwise be its content's height, which is zero */
-  .editors.stacked > .column.view {
-    height: 340px;
-    padding-top: 8px;
-  }
-
   /* Each column starts at **its own floor** and shares what is left over.
      Equal `flex: 1 1 0` shares looked fair and was not: at a 1000 px pane it
      gave the structure column 306 px against the 472 its atom table needs,
      while the two columns that needed less had more than enough (measured in a
      browser, WP-1034).  A basis is not a maximum — a drag still overrides both
-     with `flex: 0 0 Npx` — and the 3D column keeps the 1.25 growth WP-1015 gave
-     it, so free space still favours the only two-dimensional content here. */
+     with `flex: 0 0 Npx`.  The 3D column that took a 1.25 share of free space
+     here is a graph tab since WP-2203. */
   .column {
     /* the basis is `MODEL_MIN.form`, handed down as `--col-min` (the fallback is
        for a render before the style directive lands): the form column's floor
@@ -1418,19 +1384,6 @@
      itself, so a column next to one must not draw a second */
   .column + .column {
     border-left: 1px solid var(--line);
-  }
-
-  /* the viewer scrolls nothing: its plot fills the column and its controls sit
-     under it, so an overflow here would scroll a 3D scene out of view */
-  .column.view {
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    padding-bottom: 6px;
-    /* a quarter more of the *free* space than the two form columns, because
-       this is the only one whose content is two-dimensional: a form reads fine
-       in a narrow column and a cell drawn in one is a cell drawn small */
-    flex: 1.25 1 260px;
   }
 
   /* choosing one of N phases is the `.segmented` register (app.css) — as N

@@ -992,6 +992,15 @@ export function pickFace(scene: Scene, view: View, width: number, height: number
   return best;
 }
 
+/** The Structure graph tab's title (WP-2203; WP-2123 design 2: every graph
+ *  says what it shows). The scene is the working model, the one the next run
+ *  starts from, and an applied edit moves it without a fit, so no result dates
+ *  it. Worded as the Background tab's title (`lib/background.ts`), which draws
+ *  from the same state. */
+export function structureTitle(busy: boolean): string {
+  return busy ? "Structure, refining" : "Structure at the current values";
+}
+
 /** The sentence under the plot: what is drawn, at what thresholds. */
 export function caption(geometry: Geometry, mode: Mode, exaggeration = 1,
                         shown: readonly number[] = []): string {

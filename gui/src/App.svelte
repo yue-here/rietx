@@ -38,6 +38,8 @@
   import Report from "./panels/Report.svelte";
   import Series from "./panels/Series.svelte";
   import Splitter from "./panels/Splitter.svelte";
+  import Structure3D from "./panels/Structure3D.svelte";
+  import { structureTitle } from "./lib/structure3d";
   import Start from "./panels/Start.svelte";
   import FileMenu from "./panels/FileMenu.svelte";
   import Stubs from "./panels/Stubs.svelte";
@@ -107,8 +109,11 @@
    * choice, not a setting (WP-1033's line between the two). */
   let hideGraphs = $state(false);
   let hideModel = $state(false);
-  /** The graph strip's tab (`lib/tabs.ts`), one today. */
+  /** The graph strip's tab (`lib/tabs.ts`). */
   let graphTab = $state<GraphTab>("pattern");
+  /** Bumped by every model-pane reload, which the Structure tab follows: one
+   *  SSE frame earlier than the head (WP-2203, `panels/Structure3D.svelte`). */
+  let modelStamp = $state(0);
   /** The window's width, and whether it has dropped to one column. */
   let windowWidth = $state(0);
   const stacked = $derived(shellStacks(windowWidth));
@@ -1346,6 +1351,7 @@
              quotes `MATURITY_MAX_RWP` — so nothing here decides anything. -->
         <div class="gtitle">
           <strong class="what">{graphTab === "background" ? backgroundTitle(busy)
+            : graphTab === "structure" ? structureTitle(busy)
             : previewAnswer ? "Preview, not refined"
             : busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
           <div class="stats tabular mono" class:immature={immature}>
@@ -1386,6 +1392,12 @@
             protocol={JSON.stringify([project?.doc?.mode ?? null, protocol.limits,
                                       protocol.regions])}
             active={graphTab === "background" && !hideGraphs} />
+        </div>
+        <!-- the 3D structure, moved here from the Model panel's third column
+             as it was (WP-2203; the maintainer's ruling of 2026-11-07) -->
+        <div class="gview structure" class:hidden={graphTab !== "structure"}>
+          <Structure3D stamp={modelStamp} {head} projectPath={project?.path ?? null}
+            {theme} {say} active={graphTab === "structure" && !hideGraphs} />
         </div>
         {#if hideModel}{@render actions()}{/if}
       </div>
@@ -1435,8 +1447,8 @@
            active and never hidden. -->
       <div class="panel" class:hidden={!!project && !modelTab}>
         <Model bind:this={modelPanel} {project} {capabilities} {head} {busy} {simple}
-          {theme} {say} active={modelTab} columns={modelColumns}
-          oncolumns={modelSized} onmoved={moved} />
+          {say} active={modelTab} columns={modelColumns}
+          oncolumns={modelSized} onmoved={moved} onreloaded={() => (modelStamp += 1)} />
       </div>
       {#if project}
         <!-- every tab stays mounted: switching must not throw away a filter, a
@@ -1727,6 +1739,16 @@
 
   .gview.hidden {
     display: none;
+  }
+
+  /* the viewer brings its own header, plot and controls, laid out for the
+     model panel's column padding (WP-2203 moved it as it was).  Its picture
+     keeps a 300 px floor, so in a short column — the stacked window gives the
+     graphs half its height — the view scrolls, as the stacked model pane it
+     came from did, rather than running under the panel column below */
+  .gview.structure {
+    padding: 0 12px 6px;
+    overflow: auto;
   }
 
   /* The panel column is a *surface*, and says so (WP-1032).

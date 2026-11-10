@@ -64,12 +64,12 @@ No flag, threshold or automatic action is added. The one rule this WP adds is wh
 
 ## Tasks
 
-- [ ] The Structure graph tab: `GRAPH_TABS` gains it, `App.svelte` mounts the viewer in its own
+- [x] The Structure graph tab: `GRAPH_TABS` gains it, `App.svelte` mounts the viewer in its own
       view, refetching on the head and on the Model pane's reloads while it is shown, and the title
       line says what it draws.
-- [ ] The Model pane loses its 3D column, toggle and splitter; `MODEL_MIN`, `modelThreshold()`
+- [x] The Model pane loses its 3D column, toggle and splitter; `MODEL_MIN`, `modelThreshold()`
       and the stored column widths follow two columns.
-- [ ] Tests: the vitest viewer block opens the tab, a hidden tab asks for nothing, and the layout
+- [x] Tests: the vitest viewer block opens the tab, a hidden tab asks for nothing, and the layout
       test presses the viewer's controls; `tests/test_structure3d_browser.py` opens the tab.
 - [ ] The manual: the graph tabs name Structure, § The 3D view moves under the graph tabs, a
       `structure-tab` screenshot, and every shot showing the graph strip regenerated.

@@ -93,13 +93,14 @@ describe("fitting stored columns into the window they are reopened in", () => {
 });
 
 describe("when the model pane becomes one stacked column", () => {
-  it("is decided by the three floors, not by a round number", () => {
+  it("is decided by the two floors, not by a round number", () => {
     // WP-1034 task 1, re-measured WP-1215 when the atom row went from seven
     // columns to eleven: the table's min-content is 642 px on the fluorapatite
     // example, in the widest state it reaches (one atom anisotropic), and the
     // column adds 24 px of padding — so `structure` is a measurement and this
-    // number moves when the row does.
-    expect(modelThreshold()).toBe(1256);
+    // number moves when the row does. 1256 while the 3D view was a third
+    // column; WP-2203 made it a graph tab.
+    expect(modelThreshold()).toBe(991);
     expect(modelStacks(modelThreshold() - 1)).toBe(true);
     expect(modelStacks(modelThreshold())).toBe(false);
   });
@@ -127,20 +128,18 @@ describe("when the model pane becomes one stacked column", () => {
     expect(css).toContain("calc(3 * var(--w-num) + 2 * var(--grid-gap))");
   });
 
-  it("counts the grips, because they are inside the row it is measuring", () => {
+  it("counts the grip, because it is inside the row it is measuring", () => {
     // found in a browser (WP-1215): the three floors alone came to 1126 and the
     // structure column measured 636 of the 642 its table needs, side-scrolling
     // at exactly the width the threshold exists to protect. The gap was there
     // at 932 too; nobody had put a ruler on it.
-    expect(modelThreshold() - 2 * GRIP)
-      .toBe(MODEL_MIN.structure + MODEL_MIN.form + MODEL_MIN.view);
-    expect(modelStacks(MODEL_MIN.structure + MODEL_MIN.form + MODEL_MIN.view))
-      .toBe(true);
+    expect(modelThreshold() - GRIP).toBe(MODEL_MIN.structure + MODEL_MIN.form);
+    expect(modelStacks(MODEL_MIN.structure + MODEL_MIN.form)).toBe(true);
   });
 
   it("stacks at every sidebar width the shell can produce", () => {
     // the clamp floor, a 1000/1200 px window's 38 %, and the clamp ceiling —
-    // measured 340 / 380 / 456 / 560, all narrower than three columns need
+    // measured 340 / 380 / 456 / 560, all narrower than two columns need
     for (const width of [340, 380, 456, 560, 720]) {
       expect(modelStacks(width)).toBe(true);
     }

@@ -54,6 +54,10 @@
     {
       "id": "background",
       "label": "Background"
+    },
+    {
+      "id": "structure",
+      "label": "Structure"
     }
   ]
 }

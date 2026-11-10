@@ -66,11 +66,22 @@
 
   let {
     stamp = 0,
+    head = null,
+    projectPath = null,
+    active = true,
     theme = "light",
     say = (_line: string) => {},
   }: {
     /** bumped by the model pane every time it re-reads — see the effect below */
     stamp?: number;
+    /** the working state's node: a run, a checkout or another panel's edit
+     *  moves it, and the model pane re-reads only while it is shown */
+    head?: string | null;
+    /** the open project's path, because two fresh projects share a head */
+    projectPath?: string | null;
+    /** whether the Structure graph tab is up: hidden, the viewer asks for
+     *  nothing and catches up when it is shown again (WP-2203) */
+    active?: boolean;
     /** the resolved theme, and a dependency of the scene effect: the cell
      *  frame samples `--accent` and the canvas the panel's background, so a
      *  theme change that does not redraw leaves the old theme on the canvas
@@ -164,23 +175,28 @@
     : shownPolyhedra(geo, polyhedraIn[mode], polyFormulas, hidden, showBoundary));
   const polyEntries = $derived(painted ? polyhedraLegend(painted) : []);
 
-  /** Refetch whenever the model pane re-reads, and whenever a knob the *server*
-   *  owns moves.
+  /** Refetch whenever the working state moves, and whenever a knob the
+   *  *server* owns moves, while the tab is shown.
    *
-   *  `stamp` rather than `head` directly, and the difference is not cosmetic: a
-   *  head move reaches the shell one SSE frame later, while the pane around this
-   *  one re-reads the moment its own Apply returns — so following the head would
-   *  leave the picture a frame behind the atom table it sits beside.  The pane's
-   *  reload is itself driven by the head (WP-1005: the head *is* the working
-   *  state), so this is one signal, not two. */
+   *  `stamp` as well as `head`, and the difference is not cosmetic: a head
+   *  move reaches the shell one SSE frame later, while the model pane re-reads
+   *  the moment its own Apply returns — so following the head alone would
+   *  leave the picture a frame behind the atom table.  The model pane re-reads
+   *  only while it is shown, though, and since WP-2203 this viewer is a graph
+   *  tab beside every panel, so the head is the signal for an edit made
+   *  anywhere else (WP-1005: the head *is* the working state).  The project's
+   *  path rides beside them because two fresh projects share a head.
+   *
+   *  Hidden, nothing is fetched, as the Background tab does; shown again, the
+   *  key says whether anything moved meanwhile, so a look at another tab costs
+   *  no request. */
+  let fetchedFor = "";
   $effect(() => {
-    void stamp;
-    void phase;
-    void tolerance;
-    void disorder;
-    void centres;
-    void ligands;
-    load();
+    const key = JSON.stringify([projectPath, head, stamp, phase, tolerance, disorder,
+                                centres, ligands]);
+    if (!active || key === fetchedFor) return;
+    fetchedFor = key;
+    untrack(() => load());
   });
 
   /** One renderer for the canvas's life, given back when the panel closes:
