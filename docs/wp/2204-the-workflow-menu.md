@@ -108,9 +108,9 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 ## Tasks
 
 - [x] File this WP, its ROADMAP prose and its milestone row.
-- [ ] `panels/WorkflowMenu.svelte` and `lib/workflows.ts`: the button, the menu, the five
+- [x] `panels/WorkflowMenu.svelte` and `lib/workflows.ts`: the button, the menu, the five
   entries, the current one derived from the model tab or the chosen placeholder.
-- [ ] The placeholder pane in the model panel: one tab with the workflow's name, the step strip,
+- [x] The placeholder pane in the model panel: one tab with the workflow's name, the step strip,
   each step's heading and dashed box; the action bar hidden.
 - [ ] Tests: vitest for the derivation and the menu; the layout browser test opens the menu,
   chooses every entry and comes back; the dist rebuilt.

@@ -42,6 +42,9 @@
   import FileMenu from "./panels/FileMenu.svelte";
   import Stubs from "./panels/Stubs.svelte";
   import Text from "./panels/Text.svelte";
+  import Workflow from "./panels/Workflow.svelte";
+  import WorkflowMenu from "./panels/WorkflowMenu.svelte";
+  import { isPlaceholder, shownFor, workflow, workflowOf, type Shown } from "./lib/workflows";
   import {
     HELP_CONTEXT,
     type HelpOpener,
@@ -86,7 +89,16 @@
 
   /** The nine panels, and the one that is showing.  The strip itself is
    *  `lib/tabs.ts` — data, because the manual is held to it (WP-1017). */
-  let tab = $state<Tab>("params");
+  let tab = $state<Shown>("params");
+  /** The workflow the window is in is read off `tab`, where a placeholder
+   *  workflow is a value of its own (WP-2204), so every opener that sets a
+   *  tab leaves a placeholder without being told. Refinement returns to the
+   *  last tab that was its own. */
+  const placeholder = $derived(isPlaceholder(tab) ? tab : null);
+  let lastRefineTab = $state<Tab>("params");
+  $effect(() => {
+    if (!isPlaceholder(tab) && workflowOf(tab) === "refine") lastRefineTab = tab;
+  });
   const modelTab = $derived(tab === "model");
   const textTab = $derived(tab === "text");
   const seriesTab = $derived(tab === "series");
@@ -1231,6 +1243,10 @@
   </button>
 
   <div class="bar">
+    <!-- the workflow menu (WP-2204), beside the graphs toggle as the
+         maintainer's frame of 2026-11-07 places it -->
+    <WorkflowMenu current={workflowOf(tab)} disabled={!project}
+      onchoose={(id) => (tab = shownFor(id, lastRefineTab))} />
     <div class="title">
       <strong>rietx</strong>
       <span class="muted mono">{version?.package_version ?? "…"}</span>
@@ -1420,10 +1436,16 @@
             ongo={(next) => (tab = next as Tab)} ondismiss={dismissFirstRun} />
         {/if}
         <nav class="tabs">
-          {#each TABS as entry (entry.id)}
-            <button class="tab" class:on={tab === entry.id} onclick={() => (tab = entry.id)}
-              >{entry.label}</button>
-          {/each}
+          {#if placeholder}
+            <!-- a workflow that is not built has one tab, its own name, as the
+                 design round drew it; the menu is the way back (WP-2204) -->
+            <button class="tab on" aria-current="page">{workflow(placeholder).name}</button>
+          {:else}
+            {#each TABS as entry (entry.id)}
+              <button class="tab" class:on={tab === entry.id} onclick={() => (tab = entry.id)}
+                >{entry.label}</button>
+            {/each}
+          {/if}
         </nav>
       {/if}
       <!-- the model pane and the text pane are tabs (WP-1034) and stay
@@ -1490,7 +1512,11 @@
         <div class="panel" class:hidden={tab !== "build"}>
           <Stubs {capabilities} {project} />
         </div>
-        {#if !hideModel}{@render actions()}{/if}
+        {#if placeholder}
+          <div class="panel"><Workflow id={placeholder} /></div>
+        {/if}
+        <!-- a placeholder has nothing to apply, so it has no action bar -->
+        {#if !hideModel && !placeholder}{@render actions()}{/if}
         <Console {lines} {dropped} height={consoleHeight} onresize={setConsoleHeight} />
       {/if}
     </div>
