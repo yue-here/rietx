@@ -54,6 +54,13 @@ describe("which resolved facts stay true while the plan is edited", () => {
     expect(sameStage(A, { ...A, turn_on: ["phases.*.scale", "x"] })).toBe(false);
   });
 
+  it("reads an empty fix list as the absent one, and a fix as a change", () => {
+    // a stored plan carries `turn_off: []`; a stage typed here has none
+    expect(sameStage(A, { ...A, turn_off: [] })).toBe(true);
+    expect(sameStage({ ...A, turn_off: [] }, A)).toBe(true);
+    expect(sameStage(A, { ...A, turn_off: ["instrument.profile.*"] })).toBe(false);
+  });
+
   it("keeps the stages before the first difference", () => {
     expect(resolvedPrefix([A, B, C], [A, B, C])).toBe(3);
     expect(resolvedPrefix([A, B, C], [A, { ...B, name: "cell2" }, C])).toBe(1);

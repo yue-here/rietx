@@ -2197,7 +2197,10 @@ def test_plan_resolve_names_what_a_stage_fixes(blank, tmp_path, pattern_file):
     status, payload = client.put("/api/plan", {"plan": plan})
     assert status == 200, payload
     assert payload["plan"]["stages"][1]["turn_off"] == ["instrument.zero_shift"]
-    one, two = _ladder(client)["stages"]
+    ladder = _ladder(client)
+    one, two = ladder["stages"]
+    # the closing stage keeps the fix, as a literal path
+    assert ladder["closing"]["fixes"] == ["instrument.zero_shift"]
     assert one["fixes"] == [] and "instrument.zero_shift" in one["frees"]
     assert two["fixes"] == ["instrument.zero_shift"]
     assert two["turn_off"] == ["instrument.zero_shift"]

@@ -47,6 +47,8 @@
    *
    * A glob is a `.chip`, a fact, and the verb that removes it is a ghost
    * button beside it: a chip never acts (`gui/CLAUDE.md` § House style).
+   * A stage's fixes (WP-2208) are a second row of the same shape, drawn even
+   * when empty, so a first fix moves nothing below it.
    */
   import { tick } from "svelte";
 
@@ -109,6 +111,8 @@
   let selected = $state(0);
   /** the text typed into each stage's add field, by index */
   let adding = $state<Record<number, string>>({});
+  /** the text typed into each stage's fix field, by index (WP-2208) */
+  let fixing = $state<Record<number, string>>({});
   let list = $state<HTMLOListElement | null>(null);
 
   /** The plan fields this panel has no control for (`intermediate_ftol`,
@@ -315,6 +319,7 @@
     stages = $state.snapshot(saved) as Stage[];
     guard = savedGuard;
     adding = {};
+    fixing = {};
     error = "";
     clampSelected();
   }
@@ -329,9 +334,11 @@
     const order = moveStage(stages.map((_, i) => i), from, to);
     stages = moveStage(stages, from, to);
     selected = Math.max(0, order.indexOf(selected));
-    adding = Object.fromEntries(
-      order.map((old, k) => [k, adding[old] ?? ""] as const).filter(([, text]) => text),
+    const follow = (typed: Record<number, string>) => Object.fromEntries(
+      order.map((old, k) => [k, typed[old] ?? ""] as const).filter(([, text]) => text),
     );
+    adding = follow(adding);
+    fixing = follow(fixing);
   }
 
   function removeStage(index: number) {
@@ -339,13 +346,14 @@
     remember();
     stages = stages.filter((_, i) => i !== index);
     adding = {};
+    fixing = {};
     selected = Math.min(selected, stages.length - 1);
   }
 
   async function addStage() {
     remember();
     const name = newStageName(stages);
-    stages = [...stages, { name, turn_on: [] }];
+    stages = [...stages, { name, turn_on: [], turn_off: [] }];
     selected = stages.length - 1;
     await tick();
     const input = list?.querySelector<HTMLInputElement>(
@@ -372,6 +380,22 @@
   function removeGlob(index: number, at: number) {
     remember();
     stages[index].turn_on = stages[index].turn_on.filter((_, i) => i !== at);
+  }
+
+  /* a stage's fixes (WP-2208): applied after its frees, as `_run_stage` does */
+  function addFix(index: number) {
+    const text = fixing[index] ?? "";
+    const before = stages[index].turn_off ?? [];
+    const next = addGlobs(before, text);
+    fixing[index] = "";
+    if (next.length === before.length) return;
+    remember();
+    stages[index].turn_off = next;
+  }
+
+  function removeFix(index: number, at: number) {
+    remember();
+    stages[index].turn_off = (stages[index].turn_off ?? []).filter((_, i) => i !== at);
   }
 
   function field(index: number, key: string, raw: string) {
@@ -453,7 +477,8 @@
     const stage = stages[index];
     if (stage) {
       selected = index;
-      say(`ref.run_stage(Stage(${JSON.stringify(stage.name)}, ${JSON.stringify(stage.turn_on)}))`);
+      const off = stage.turn_off?.length ? `, turn_off=${JSON.stringify(stage.turn_off)}` : "";
+      say(`ref.run_stage(Stage(${JSON.stringify(stage.name)}, ${JSON.stringify(stage.turn_on)}${off}))`);
       onrun($state.snapshot(stage));
     }
   }
@@ -542,11 +567,33 @@
             onkeydown={(event) => { if (event.key === "Enter") addGlob(index); }} />
         </div>
 
+        <!-- what the stage fixes after it frees (WP-2208); the row is always
+             drawn, so a first fix moves nothing below it -->
+        <div class="frees fixing indent">
+          <span class="lab"><Help for="stage_fields:turn_off">Fixes</Help></span>
+          {#each stage.turn_off ?? [] as glob, at (at)}
+            <span class="glob">
+              <span class="chip mono">{glob}</span>
+              <button class="ghost" disabled={busy}
+                aria-label="Stop fixing {glob} in stage {index + 1}"
+                title="remove from this stage"
+                onclick={() => removeFix(index, at)}>×</button>
+            </span>
+          {/each}
+          <input class="add fix mono" disabled={busy} placeholder="add a glob to fix"
+            aria-label="Add a glob stage {index + 1} fixes"
+            title="Type a dot-path glob and press Enter: the stage fixes it after its frees"
+            value={fixing[index] ?? ""}
+            oninput={(event) => (fixing[index] = (event.currentTarget as HTMLInputElement).value)}
+            onkeydown={(event) => { if (event.key === "Enter") addFix(index); }} />
+        </div>
+
         <div class="rung indent">
           {#if step}
             <details>
               <summary>
                 <span class="count">+{step.frees.length}</span>
+                {#if step.fixes?.length}<span class="count">−{step.fixes.length}</span>{/if}
                 → {step.n_free} free
                 {#if step.held.length}· {step.held.length} held{/if}
                 {#if step.rwp !== null}· Rwp {pct(step.rwp)}{/if}
@@ -556,6 +603,12 @@
                   <p class="lab">frees here</p>
                   <ul class="paths mono">
                     {#each step.frees as path (path)}<li>{path}</li>{/each}
+                  </ul>
+                {/if}
+                {#if step.fixes?.length}
+                  <p class="lab">fixed here</p>
+                  <ul class="paths mono">
+                    {#each step.fixes as path (path)}<li>{path}</li>{/each}
                   </ul>
                 {/if}
                 {#if step.already.length}
@@ -611,6 +664,7 @@
         <div class="frees indent muted"
           title="every stage's globs once more, with windows that drop {pct(closing.window_area_tol)} of each peak">
           <span class="lab">Frees</span> everything above
+          {#if closing.fixes?.length}· keeps {closing.fixes.length} fixed{/if}
           {#if current && closing.rwp !== null}· Rwp {pct(closing.rwp)}{/if}
         </div>
       </li>

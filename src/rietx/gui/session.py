@@ -1303,10 +1303,10 @@ class GuiSession:
         # the stage the plan appends (WP-2002, the sixth round's Q1 and Q2):
         # every glob again at tight windows, read-only here, and its Rwp is
         # the answer's, which the last declared rung's is not
-        closing = plan.closing_stage()
+        closing = plan.closing_stage(list(rows))
         closing_entry = None if closing is None else {
             "name": closing.name, "window_area_tol": plan.closing_window_tol,
-            "rwp": rwps[-1]}
+            "fixes": list(closing.turn_off), "rwp": rwps[-1]}
         reached = {path for entry in stages for path in entry["frees"]}
         set_aside = [row.path for row in rows.values()
                      if row.vary and row.refinable and row.path not in reached]

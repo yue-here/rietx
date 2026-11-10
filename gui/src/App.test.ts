@@ -1500,7 +1500,7 @@ describe("the plan editor", () => {
     expect(rows()).toHaveLength(3);
     expect(host.querySelectorAll<HTMLInputElement>("li.stage input.name")[2].value)
       .toBe("stage 3");
-    const add = host.querySelectorAll<HTMLInputElement>("li.stage input.add")[2];
+    const add = host.querySelectorAll<HTMLInputElement>("li.stage input.add:not(.fix)")[2];
     add.value = "phases.*.atoms.*.biso, instrument.zero_shift";
     add.dispatchEvent(new Event("input", { bubbles: true }));
     await flush();
@@ -1519,6 +1519,71 @@ describe("the plan editor", () => {
     expect(rows()).toHaveLength(1);
     expect(host.querySelector<HTMLButtonElement>(
       'li.stage button[aria-label^="Remove stage"]')!.disabled).toBe(true);
+  });
+
+  it("fixes in a stage: a row of its own, stored as turn_off, undone by ⌘Z", async () => {
+    // WP-2208: a stage fixes its turn_off after it frees its turn_on
+    const stub = await openPlan(PROJECT, {
+      "/api/plan": (call: Call) =>
+        ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
+    });
+    const second = () => host.querySelector("ol.stages > li.stage:nth-child(2)")!;
+    // the row is drawn while empty, so a first fix moves nothing below it
+    const row = second().querySelector(".fixing")!;
+    expect(row.textContent).toContain("Fixes");
+    expect(row.querySelectorAll(".chip")).toHaveLength(0);
+
+    const fix = second().querySelector<HTMLInputElement>("input.add.fix")!;
+    fix.value = "instrument.profile.*";
+    fix.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    fix.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect([...second().querySelectorAll(".fixing .chip")].map((n) => n.textContent))
+      .toEqual(["instrument.profile.*"]);
+    // the frees row is untouched, and the stage has lost its resolved facts
+    expect([...second().querySelectorAll(".frees:not(.fixing) .chip")]
+      .map((n) => n.textContent)).toEqual(["phases.*.cell.*"]);
+    expect(summaries()[1]).toBe("not applied");
+
+    // ⌘Z takes the fix back, and the plan is the stored one again
+    host.querySelector("section[aria-label=plan]")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true }));
+    await flush();
+    expect(second().querySelectorAll(".fixing .chip")).toHaveLength(0);
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+
+    // typed again and applied: the PUT carries the fix
+    fix.value = "instrument.profile.*";
+    fix.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    fix.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    bar("Apply")!.click();
+    await flush();
+    const put = stub.calls.find((call) => call.method === "PUT");
+    expect(put?.body.plan.stages[1].turn_off).toEqual(["instrument.profile.*"]);
+    expect(put?.body.plan.stages[1].turn_on).toEqual(["phases.*.cell.*"]);
+  });
+
+  it("counts what a stage fixed in its rung and in the closing stage", async () => {
+    const resolve = structuredClone(PLAN_RESOLVE) as any;
+    resolve.stages[1].turn_off = ["instrument.zero_shift"];
+    resolve.stages[1].fixes = ["instrument.zero_shift"];
+    resolve.closing = { name: "closing", window_area_tol: 0.001,
+                        fixes: ["instrument.zero_shift"], rwp: 0.44 };
+    const plan = structuredClone(PLAN) as any;
+    plan.plan.stages[1].turn_off = ["instrument.zero_shift"];
+    await openPlan(PROJECT, {
+      "/api/plan": () => ({ body: plan }),
+      "/api/plan/resolve": () => ({ body: resolve }),
+    });
+    expect(summaries()[1]).toContain("+1 −1 → 3 free");
+    const body = host.querySelector("ol.stages > li.stage:nth-child(2) .rung .body")!;
+    expect(body.textContent).toContain("fixed here");
+    expect(body.textContent).toContain("instrument.zero_shift");
+    expect(host.querySelector("li.closing")!.textContent!.replace(/\s+/g, " "))
+      .toContain("keeps 1 fixed");
   });
 });
 
