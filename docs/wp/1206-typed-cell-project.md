@@ -82,6 +82,41 @@ npm --prefix gui test && npm --prefix gui run check
   determines. Prior art for the shape only; both are concepts-only fences
   (TOPAS closed, GSAS-II inspected through its published behaviour).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**A project without a CIF** (WP-1206, `GET /api/spacegroup`,
+`session._typed_cell_structure`, `lib/wizard.ts`) is the wizard's second answer
+to step 2: a symbol and a cell, built into the same Le Bail scaffold Adopt lands
+(`schemas.structure.lebail_scaffold`, shared with `structure_from_candidate`).
+Four rules. The `structure` argument has **four forms told apart by disjoint
+keys** — `phases`, `cif`/`upload`, `space_group` — and the typed one's `cell` is
+an **object keyed by parameter carrying only what the setting leaves free**:
+`crystallography.symmetry.free_cell_names` decides, the route serves it, and the
+form draws the boxes it names, so a `b` under `P 4/m m m` is unrepresentable
+rather than refused — WP-1014's coordinate-DOF rule one parameter family over,
+and TOPAS's `Tetragonal(a, c)` shape (concept only). A determined parameter is
+**refused, never tolerance-checked and never ignored**: a tolerance on a *length*
+is a constant nothing else here needs, and ignoring is what a six-number route
+does — under `P 4/m m m` a typed `b` was tied away by `ParameterTable` and the
+number read back was never the one entered. `mode` is **refused at `rietveld`,
+not overridden**, the form disabling the option so the refusal is unreachable —
+Adopt sets the mode because there the caller chose a *candidate*; here they chose
+a mode — and it is refused at **both** routes `_as_structure` serves, since a new
+form added at that one boundary reaches every verb crossing it (`project_new` and
+`PATCH /api/structure`, where a scaffold would otherwise leave a rietveld project
+refining a dummy carbon). And two browser facts about drawing a form, both
+invisible to jsdom: a
+**register's width is the call site's** (`.segmented` is `display: flex`, so in a
+block parent it stretches to the whole column — every other use in the app sits
+in a flex row already), and a **placeholder that is a plausible number reads as a
+value somebody filled in**, which is why the instrument form's say `default`, a
+word; where there is no default to name, the honest placeholder is none.
+
 ## Handover log
 
 - **2026-08-26 (2nd session)** — **Review round on PR #151, four findings, all

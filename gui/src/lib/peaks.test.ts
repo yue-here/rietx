@@ -28,6 +28,7 @@ import {
   intensityScale,
   joinCurves,
   nearestPeak,
+  searchCoverage,
   type Candidate,
   type GroupCurve,
 } from "./peaks";
@@ -266,5 +267,23 @@ describe("writing a reflection (WP-1213)", () => {
     expect(formatHkl([1, 0, -4])).toBe("(1 0 −4)");
     expect(formatHkl([12, 0, 10])).toBe("(12 0 10)");
     expect(formatHkl([0, 0, 0])).toBe("(0 0 0)");
+  });
+});
+
+describe("what the search covered (WP-1042, WP-2130)", () => {
+  it("reads the searched systems and the incomplete ones off the result", () => {
+    // FAP's default search as the workshop measured it: trigonal stopped at
+    // the ceiling, the three lower systems never reached
+    const result = {
+      systems_searched: ["cubic", "hexagonal", "trigonal"],
+      search_complete: { cubic: true, hexagonal: true, trigonal: false },
+    };
+    expect(searchCoverage(result)).toEqual({
+      searched: ["cubic", "hexagonal", "trigonal"], incomplete: ["trigonal"] });
+  });
+
+  it("says nothing was searched rather than failing on an empty result", () => {
+    expect(searchCoverage(null)).toEqual({ searched: [], incomplete: [] });
+    expect(searchCoverage({})).toEqual({ searched: [], incomplete: [] });
   });
 });

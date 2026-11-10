@@ -89,10 +89,22 @@ def test_notation_renders_outside_code_spans(text, rendered):
     assert reference_pages._notation(text) == rendered
 
 
+@pytest.mark.parametrize("pages", [
+    {"parameters.md": ("Cell and structure",), "elsewhere.md": ("Cell and structure",)},
+    {"parameters.md": ("Cell and structure",)},
+    {**reference_pages.PARAMETER_PAGES, "elsewhere.md": ("No such group",)},
+])
+def test_a_group_shown_twice_or_nowhere_raises(monkeypatch, pages):
+    """Each group lands on exactly one parameter-map page (WP-2087)."""
+    monkeypatch.setattr(reference_pages, "PARAMETER_PAGES", pages)
+    with pytest.raises(RuntimeError, match="exactly once"):
+        reference_pages.parameter_map()
+
+
 def test_the_map_shows_every_entry_once_with_its_unit():
-    """One table row and one definition per registry entry, across the map's pages."""
-    text = "\n".join(reference_pages.parameter_map(stem)
-                     for stem in ("parameters", *reference_pages.PARAMETER_PAGES))
+    """One table row and one definition per registry entry, across both pages."""
+    text = "\n".join(reference_pages.parameter_map(name)
+                     for name in reference_pages.PARAMETER_PAGES)
     for entry in help_registry()["parameters"]:
         first = f"`{entry['paths'][0]}`"
         assert text.count(f"| {first}") == 1, entry["paths"]
@@ -100,17 +112,6 @@ def test_the_map_shows_every_entry_once_with_its_unit():
         if entry["unit"]:
             row = next(line for line in text.splitlines() if line.startswith(f"| {first}"))
             assert f"| {reference_pages._notation(entry['unit'])} |" in row, row
-
-
-def test_the_time_of_flight_group_is_on_its_own_page_and_no_group_on_two():
-    """The map was 88 characters over the 50 000 cap with #1108's strain row, so
-    the time-of-flight group has its own page; every group is on exactly one."""
-    main = reference_pages.parameter_map()
-    tof = reference_pages.parameter_map("parameters-tof")
-    assert "\n## Time of flight\n" in tof and "\n## Time of flight\n" not in main
-    assert "\n## Cell and structure\n" in main and "\n## Cell and structure\n" not in tof
-    for heading, _lead, _leaves in reference_pages.PARAMETER_GROUPS:
-        assert (f"\n## {heading}\n" in main) != (f"\n## {heading}\n" in tof), heading
 
 
 # ----------------------------------------------------------------------

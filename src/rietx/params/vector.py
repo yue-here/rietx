@@ -4841,7 +4841,8 @@ class ParameterTable:
         return c_rows @ cov_free @ c_rows.T
 
     def apply_to_models(self, structure: Structure, instrument: Instrument,
-                        stderr: dict[str, float] | None = None) -> None:
+                        stderr: dict[str, float] | None = None, *,
+                        clamp: Iterable[str] = ()) -> None:
         """Write current table values back into (copies of) the pydantic models.
 
         With ``stderr`` (a path → esd map, e.g. from
@@ -4849,7 +4850,18 @@ class ParameterTable:
         ``stderr`` set — to ``None`` where the map has no entry, so a stale
         esd from an earlier stage can never survive.  That is what lets the
         CIF exporter write standard uncertainties.
+
+        ``clamp`` names paths whose value past its own bounds is written at the
+        bound it crossed instead of refused.  A ``Parameter`` validates its
+        bounds, so the model cannot hold such a value at all.  The one caller is
+        a joint fit's parametric targets
+        (:meth:`~rietx.params.multi.MultiParameterTable.apply_to_models`):
+        there the value is the equation's, it stays in this table and on the
+        result's rows, and ``PARAMETRIC_OUT_OF_RANGE`` names it (WP-1325,
+        settled by Claude 2026-11-09 under the Stephens-cone precedent).
+        Every other path is refused as before.
         """
+        clamped = frozenset(clamp)
         self._refresh_moment_components()
         self._refresh_derived()
         values = {e.path: e.value for e in self.entries}
@@ -4998,6 +5010,8 @@ class ParameterTable:
         # for anything the check does not model.
         for p, path in pending:
             v = values[path]
+            if path in clamped:
+                v = values[path] = min(max(v, p.min), p.max)
             if not (p.min <= v <= p.max):
                 _refuse(path, v)
         for p, path in pending:

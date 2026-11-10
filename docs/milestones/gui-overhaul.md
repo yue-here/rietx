@@ -25,19 +25,45 @@ redesign is ported in five pieces, in this order:
 | Piece | WP | What it builds |
 |---|---|---|
 | 1 | [2123](../wp/2123-the-layout-shell.md) | the layout shell: graphs on the left in tabs with a title line, the model panel on the right in tabs with a sash, both panels collapsible, a one-row action bar with Apply and refine, the segmented register redrawn, new colour tokens, a one-column layout for a narrow window, and a browser test that no click moves the layout unless it asks to |
-| 2 | not yet filed | the Parameters panel: one row per atom, number slots that never move, the padlock as `hold`, the floating editor |
-| 3 | not yet filed | the Plan tab on the existing plan routes, read top to bottom as a recipe |
-| 4 | not yet filed | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
-| 5 | not yet filed | the Background tab: a route serving the preview's matrices, a held Chebyshev term, the P-spline |
+| 2 | [2126](../wp/2126-the-parameters-panel.md) | the Parameters panel: one row per atom, number slots that never move, the padlock as `hold`, the floating editor |
+| 3 | [2127](../wp/2127-the-plan-tab.md) | the Plan tab on the existing plan routes, read top to bottom as a recipe |
+| 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
+| 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
+| — | [2211](../wp/2211-the-history-table.md) | the History table in the bottom panel: one row per node, the node count on the tab, Compare as an overlay on the pattern, Restore as pending edits (after WP-2206) |
+| — | [2212](../wp/2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt on the calls the window ran, and the console exported as a `.py` script (after WP-2206) |
 
 Every merge leaves a working GUI. No existing panel or route becomes unreachable at any piece;
 a panel moves into the new shell as it is, and is redesigned by its own piece.
 
-Three decisions wait on the maintainer before the piece that needs them:
+Every piece is judged against `gui/STYLE.md`, the style guide WP-2142 writes. The maintainer
+ruled on 2026-11-09 for "a consistent style that hews very close to the workshop version",
+achieved through a concise guide that states each rule's motive, so a piece completes what the
+prototype left unfinished by the guide rather than by copying the prototype.
+
+### Designed, not yet filed
+
+The design rounds drew these and no WP builds them yet. Each is filed when its turn comes.
+
+| Piece | What it builds | Ruled |
+|---|---|---|
+| The palette | The site's palette as the default theme: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Theme machinery in Settings for established themes (Solarized light and dark, Monokai and others). `gui/STYLE.md`'s rules that describe a new role in words take its tokens once they exist (WP-2142) | 2026-11-06, 2026-11-09 |
+| Sentence-case headings | One `app.css` rule at the start screen's register, app-wide | 2026-11-09 |
+| Peaks and indexing | The redesign in four steps (pick peaks, fit peaks, index, judge), the eight-column candidate table, lens peak marks, per-line curves in the fit windows | 2026-11-08, 2026-11-09 |
+| Structure tab | The 3D structure as one of the graph tabs | 2026-11-07 |
+| Workflow menu | The top bar's workflow menu, with placeholders for peaks and indexing, series, structure solution and rigid bodies | 2026-11-07 |
+| Settings dialog | Theme, density and number format | 2026-11-07 |
+| Bottom panel | Console (the Python the window runs) and History (Compare, Restore), toggled from the status bar | 2026-11-07 |
+| Status bar | The bar along the window's foot, with the console toggle | 2026-11-07 |
+| Fixing plan stages | A plan stage that fixes as well as frees (WP-2127 records the ruling) | 2026-11-09 |
+| Edit recovery | Unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 |
+| Fit statistics in the action bar | Rwp, GoF and the not-a-fit chip beside Refine while the graphs are hidden ("try B"). WP-2123 left them hidden with the graphs (its item 6) | 2026-11-09 |
+
+Three decisions went to the maintainer before the piece that needs them. The first is now ruled, and two still wait:
 
 - A plan stage that fixes as well as frees. The maintainer wants it (2026-11-07); in rietx it is
   a `turn_off` list on `StageSpec` and a `fix` clause in `.rxt`, both stored-format changes, so
-  piece 3 asks for the go-ahead in its WP.
+  piece 3 asks for the go-ahead in its WP. Ruled required on 2026-11-09, the mechanism left to
+  Claude; the build is the "Fixing plan stages" row above.
 - A background drawn through points the user places. rietx has no such background type; a new
   one is a stored-format change.
 - A text file kept beside the project, which the maintainer deferred to the port on 2026-11-07.
@@ -50,23 +76,28 @@ the piece that touches it or a WP of its own.
 
 - The extinction screen is refused on a project with no phase: `GuiSession.run` groups the kind
   `extinction` with the refinement kinds, though WP-1027 ruled the screen ungated, and the
-  refusal reads "a extinction run".
+  refusal reads "a extinction run". WP-2124 took `extinction` out of the refusal, so a
+  pattern-only project screens a candidate.
 - Adopt is gated to `best_or_none()` (`ADOPT_GATED`). The maintainer ruled on 2026-11-08 that a
   person may adopt any candidate, with its grade and caveats shown beside Adopt and recorded in
-  the history node.
+  the history node. WP-2124 lifted the gate on the route and WP-2130 offers Adopt on every row.
 - The Peaks panel hides `systems_searched`, `search_complete` and the run-level `INDEX_*`
   diagnostics whenever there are candidates, against WP-1042's rule that what was not reached
-  is said loudly.
+  is said loudly. WP-2130 says it above the list in every case.
 - `.rxt` renders no block for user variables, and its tie refusal names only symmetry ties.
+  WP-2121 made the refusal name a user tie's own verbs, `ref.untie()` and `ref.tie()`. The
+  block for user variables is still owed.
 - The Le Bail check's absent lines arrive in its own refined frame, about 0.011° from the
   candidate's ticks on fluorapatite; they should be served as tick indices.
 - `supercell_checks` names a relation for 8 of fluorapatite's 12 candidates (measured by WP-2124
   on 63d7c120a; naming the other four is WP-2124's follow-up); lattice relations between
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
-- `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
+- `PeakEditor.curves` serves only each group's sum; per-line curves need a route. In PR #1526
+  (WP-2202), which serves them as `lines` on each group.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
-- `--plot-peak` (purple) loses to the data crosses as a mark colour.
+- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits. It is the row "The palette" above. In PR #1517 (WP-2200).
 - The pick route takes only `shoulders`; the 2θ range and `flag_contamination` need to reach it.
+  WP-2124 added both to the route, and `pick_options` records all three.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08.
 - A GUI series lives in session memory only; several series gaps wait on the series fitting
@@ -74,8 +105,34 @@ the piece that touches it or a WP of its own.
 - The Model and Text panels keep their own Apply beside the action bar's, outlined so the bar's
   Refine stays the one filled button, because WP-2123 routes only the Parameters edits through
   the action bar. Their edits still wait on two Apply buttons in one view.
-- A run started from the Plan, Report or Series panel, or by the `.` key, does not apply the
-  Parameters edits waiting in the action bar; the bar's Refine and the `r` key do (WP-2123).
+- A run started from the Report or Series panel, or by the `.` key, does not apply the
+  Parameters edits waiting in the action bar. The bar's Refine, the `r` key (WP-2123) and the
+  Plan panel's `Run this stage` (WP-2127) do.
+- The Parameters panel has no formula editor: no route serves `add_variable` or an expression
+  tie, so the popover's "=" button (design 13) waits for both routes (WP-2126's follow-up).
+- The popover offers no limits for a coordinate DOF, whose entry stores no `min`/`max`, and
+  refuses them by name for a texture or background coefficient. Both need the path-to-model map
+  that lives only inside `ParameterTable`'s write-back (WP-2126's follow-up).
+- The panel's Apply sends `PATCH /api/params` and then one `POST /api/structure/position` per
+  moved atom, so a refused position leaves the PATCH applied. A `positions` arm on the PATCH
+  makes it one rehearsed request; the Model panel's value-then-model sequence has the same shape
+  (WP-2126's follow-up).
+- No group toggle in the Parameters panel shows which plan stage frees it. WP-2126 left the
+  badges to the Plan tab and WP-2127 left them to the panel.
+- `gui/src/lib/spacegroup.ts:typesetSpaceGroup` (WP-2126) and
+  `gui/src/lib/symmetry.ts:symbolTokens` (WP-2131) typeset a space-group symbol by the same
+  rules into two token types. One should go.
+- The Plan tab adds a glob by typing it. The prototype's grouped picker ("Cell (2)", "All Biso")
+  and its "never freed" row both need the refinable set, which `GET /api/plan/resolve` does not
+  serve. Its "Save as new plan…" needs a store for named plans, and rietx keeps one plan per
+  project (WP-2127's non-goals).
+- New project cannot add a phase from a TOPAS, FullProf or GSAS-II project file, which the
+  round-9 design offers. A browser upload carries one file, and such a project names a data
+  file beside it (WP-2131's settled call 2).
+- `gui/CLAUDE.md` still holds 36 visual rules that belong in `gui/STYLE.md`. WP-2134's § What
+  `gui/STYLE.md` covers of these sorts them: drop the covered ones from the rulebook, merge the
+  partly covered ones into the guide, and bring the departures and the uncovered ones to the
+  maintainer, since visual questions go to him (WP-2134's and WP-2142's next step).
 
 ## Acceptance
 
@@ -94,3 +151,5 @@ when all are met on one tree.
 | 8 | The plan reads top to bottom as a recipe, on the existing plan routes | 3 | a browser pass over a five-stage plan |
 | 9 | A preview is drawn at the last fit's scale and never moves the comparison | 4 | the preview route's timing and a browser pass |
 | 10 | The maintainer has looked at each piece on screen before its merge | every piece | the PR's review |
+| 11 | Where the prototype drew a panel fully, the piece's PR puts its screenshot beside the prototype's at the same window size (ruled 2026-11-09) | every piece after WP-2142 | a review aid in the PR, not a pixel test |
+| 12 | Every rule in `gui/STYLE.md` names its motive and who stated it, and names only tokens and tests that exist | 2142, then every piece | `tests/test_gui_style_guide.py` |
