@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import scipy.linalg
+from scipy import sparse
 from scipy.optimize import least_squares
 
 from ..backend import get_backend
@@ -220,12 +221,13 @@ class LSQOutcome:
     #: which driver produced this — "trf" (scipy, the reference) or "lm"
     solver: str = DEFAULT_SOLVER
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
-    #: Stephens strain cone, the Γ_G² floor), each solved over the box and the
+    #: Stephens strain cone, a width floor, a tied entry's own bounds), each
+    #: solved over the box and the
     #: rows together (WP-1938 D8).  0 under TRF, which has no such vocabulary —
     #: see ``optimize/lm.py``.
     n_constraint_truncations: int = 0
     #: the same count by the label of each block the box-only step crossed
-    #: (:attr:`.lm.LMOutcome.truncated_by`); empty under TRF and in a joint fit
+    #: (:attr:`.lm.LMOutcome.truncated_by`); empty under TRF
     truncated_by: dict[str, int] = field(default_factory=dict)
     #: McCusker et al. (1999) §7's convergence quantity, measured over the
     #: final accepted step with both sides in external parameter units — see
@@ -2711,6 +2713,145 @@ def _joint_width_inequalities(models: list[CompiledModel], mtable, x0: np.ndarra
     return out
 
 
+#: how far inside a tied entry's own bound :func:`tied_bound_inequalities`
+#: puts the row's face, relative to the row's scale at the start: ten times
+#: the polished step's feasibility tolerance (``lm._POLISH_FEASIBLE``, 1e-10),
+#: the largest amount by which an accepted step leaves a row.  A held target
+#: then sits 1e-9 of its scale inside the bound rather than on it.
+TIED_BOUND_MARGIN = 1e-9
+
+
+def tied_bound_inequalities(table: ParameterTable, x0: np.ndarray,
+                            lo: np.ndarray, hi: np.ndarray
+                            ) -> list["lm_mod.LinearInequality"]:
+    """Each tied entry's own bounds, as rows held inside the step (WP-1325).
+
+    A tied entry is not a column, so the box never holds it: its value is its
+    row of **C** times θ plus d, a combination of columns.  The root rule for a
+    bound on a combination is an LM row, and this builds one per finite side:
+
+        C_i·θ + d_i − lo_i ≥ 0        hi_i − C_i·θ − d_i ≥ 0
+
+    for every entry that is neither a free column nor a derived row (an
+    expression is not affine, and is written after the matmul), whose C row
+    reaches a free column.  Two cases need it.  A parametric equation's target
+    in each pattern is Σ_j Φ_kj·c_j over unbounded coefficients, so a
+    polynomial could step it through its floor mid-solve.  A user's tie with
+    several sources gets only :func:`~rietx.params.vector.tie_window`'s outer
+    box, which admits an infeasible corner: occ_C = 1 − occ_A − occ_B passes
+    the box at occ_A = occ_B = 0.7.
+
+    **A row the box already implies is dropped**, read by interval arithmetic
+    over ``lo``/``hi`` (the solver's box, tie windows included).  A one-source
+    tie's window is exact, and so is a ``constant`` equation's coefficient,
+    which carries the target's box, so neither adds a row and a fit that only
+    has those runs exactly as before.  A row the start violates is dropped too,
+    the other builders' rule: the step keeps feasibility and cannot restore it.
+    One block per entry, labelled ``"<path> bounds"``.
+
+    **Each face sits a margin inside the bound** (:data:`TIED_BOUND_MARGIN`
+    of the row's own scale at the start, ``|T|·|θ₀| + |c|``), because the
+    write-back after the solve (``ParameterTable.apply_to_models``) checks the
+    schema's bounds exactly and refuses a value an ulp outside.  The driver
+    accepts a step that crosses a row by its rounding (``lm._ROW_ROUNDING``)
+    and keeps a polished step that holds the rows to ``lm._POLISH_FEASIBLE``
+    of their scale, so a face on the bound itself could hand the write-back
+    a value just past it.  A start inside the margin keeps the face on the
+    bound, since a margin there would read the start as violating the row.
+    """
+    from . import lm as lm_mod
+
+    if not table.free_paths:
+        return []
+    C, d = table.constraint_block()
+    C = sparse.csr_matrix(C)
+    free = set(table._free_idx)
+    derived = table.derived_paths()
+    lo = np.asarray(lo, dtype=np.float64)
+    hi = np.asarray(hi, dtype=np.float64)
+    out: list[lm_mod.LinearInequality] = []
+    for i, e in enumerate(table.entries):
+        if i in free or e.path in derived:
+            continue
+        if not (math.isfinite(e.lo) or math.isfinite(e.hi)):
+            continue
+        if not np.any(C.data[C.indptr[i]:C.indptr[i + 1]] != 0.0):
+            continue
+        t = C.getrow(i).toarray().ravel()
+        nz = t != 0.0
+        # the entry's lowest and highest value anywhere in the box
+        low = float(d[i] + np.sum(np.where(t[nz] > 0, t[nz] * lo[nz], t[nz] * hi[nz])))
+        high = float(d[i] + np.sum(np.where(t[nz] > 0, t[nz] * hi[nz], t[nz] * lo[nz])))
+        T_rows, c_rows = [], []
+        for bound, sign, reach in ((e.lo, 1.0, low), (e.hi, -1.0, high)):
+            if not math.isfinite(bound):
+                continue
+            tol = lm_mod._ON_FACE * max(1.0, abs(bound))
+            if sign * (reach - bound) >= -tol:       # the box already holds it
+                continue
+            c_row = sign * (float(d[i]) - bound)
+            margin = TIED_BOUND_MARGIN * float(np.abs(t) @ np.abs(x0) + abs(c_row))
+            if sign * float(t @ x0) + c_row >= margin:      # the start's slack
+                c_row -= margin
+            T_rows.append(sign * t)
+            c_rows.append(c_row)
+        if not T_rows:
+            continue
+        block = lm_mod.LinearInequality(T=np.vstack(T_rows),
+                                        c=np.asarray(c_rows, dtype=np.float64))
+        keep = ~block.violated(x0)
+        if keep.any():
+            out.append(lm_mod.LinearInequality(
+                T=np.ascontiguousarray(block.T[keep]), c=block.c[keep],
+                label=f"{e.path} bounds"))
+    return out
+
+
+def _joint_tied_bound_inequalities(mtable, x0: np.ndarray, lo: np.ndarray,
+                                   hi: np.ndarray) -> list["lm_mod.LinearInequality"]:
+    """:func:`tied_bound_inequalities` asked of each histogram, laid on the
+    joint columns (``mtable.col_map``), as :func:`_joint_width_inequalities`
+    lays the width rows.
+
+    A linear parametric equation's target rows, one per subset pattern, are
+    gathered into one block per equation, labelled by the equation, so a
+    library of hundreds of patterns names one constraint rather than hundreds.
+    Any other tied entry keeps its own block, prefixed ``hist.{h}``, once: a
+    shared tied entry gives every histogram the same rows on the same joint
+    columns, and only the first histogram's block is kept.
+    """
+    from . import lm as lm_mod
+
+    n = len(x0)
+    owner = {(h, r.target): r.name for r in mtable.parametric for h in r.patterns}
+    by_equation: dict[str, list[lm_mod.LinearInequality]] = {}
+    out: list[lm_mod.LinearInequality] = []
+    seen: set[tuple[str, bytes, bytes]] = set()
+    for h, (table, local) in enumerate(zip(mtable.tables, mtable.split(x0),
+                                           strict=True)):
+        cols = np.asarray(mtable.col_map(h), dtype=np.intp)
+        for block in tied_bound_inequalities(table, local, lo[cols], hi[cols]):
+            T = np.zeros((block.T.shape[0], n), dtype=np.float64)
+            T[:, cols] = block.T
+            path = block.label.removesuffix(" bounds")
+            name = owner.get((h, path))
+            if name is None:
+                key = (path, T.tobytes(), block.c.tobytes())
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(lm_mod.LinearInequality(
+                    T=T, c=block.c, label=f"hist.{h} {block.label}"))
+            else:
+                by_equation.setdefault(f"parametric equation {name!r} ({path} bounds)",
+                                       []).append(lm_mod.LinearInequality(T=T, c=block.c))
+    for label, blocks in by_equation.items():
+        out.append(lm_mod.LinearInequality(
+            T=np.vstack([b.T for b in blocks]),
+            c=np.concatenate([b.c for b in blocks]), label=label))
+    return out
+
+
 def _pad_inequalities(blocks: list["lm_mod.LinearInequality"], n_aux: int
                       ) -> list["lm_mod.LinearInequality"]:
     """Each block's T widened by ``n_aux`` zero columns for the Pawley tail.
@@ -3140,14 +3281,17 @@ def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobia
     shape; a function of its own so that one ``try`` covers both drivers
     (WP-2048)."""
     if solver == "lm":
-        # the strain cone and the Γ_G² and Γ_L floors (WP-1938 D7, WP-2002)
-        # are built against the *starting* point, because feasibility is
-        # maintained rather than restored (see the builders)
+        # the strain cone, the Γ_G² and Γ_L floors (WP-1938 D7, WP-2002) and
+        # each tied entry's own bounds (WP-1325) are built against the
+        # *starting* point, because feasibility is maintained rather than
+        # restored (see the builders)
         ineqs = _pad_inequalities(
             strain_cone_inequalities(model, table, x0[:n_table])
             + texture_positivity_inequalities(model, table, x0[:n_table])
             + gaussian_width_inequalities(model, table, x0[:n_table])
-            + lorentzian_width_inequalities(model, table, x0[:n_table]), n_aux)
+            + lorentzian_width_inequalities(model, table, x0[:n_table])
+            + tied_bound_inequalities(table, x0[:n_table], lo[:n_table],
+                                      hi[:n_table]), n_aux)
         from . import lm as lm_mod
 
         # a Pawley block past the BVLS cut takes its normal matrix sparse,
@@ -3456,7 +3600,11 @@ def run_multi_least_squares(models: list[CompiledModel],
     silently on scipy.  The Stephens cone is not built here: its rows are
     per-model and the stacked column map would have to scatter each phase's T
     into the joint vector.  Deferred rather than half-done — a joint refinement
-    with `solver="lm"` gets the bounded driver, not the cone.
+    with `solver="lm"` gets the bounded driver, not the cone.  The width rows
+    (:func:`_joint_width_inequalities`) and each tied entry's own bounds, a
+    parametric target's in every subset pattern among them
+    (:func:`_joint_tied_bound_inequalities`, WP-1325), are built, and the
+    steps they shaped are counted as the single fit counts them.
 
     ``events``, ``stage`` and ``cancel`` are :func:`run_least_squares`' own
     (WP-1341).  An ``eval`` is one evaluation of the *stacked* residual, so
@@ -3543,7 +3691,9 @@ def run_multi_least_squares(models: list[CompiledModel],
         if solver == "lm":
             res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                               ftol=ftol,
-                              inequalities=_joint_width_inequalities(models, mtable, x0),
+                              inequalities=(
+                                  _joint_width_inequalities(models, mtable, x0)
+                                  + _joint_tied_bound_inequalities(mtable, x0, lo, hi)),
                               events=events, stage=stage, track=tracker, table=mtable,
                               cancel=cancel)
         else:
@@ -3589,7 +3739,13 @@ def run_multi_least_squares(models: list[CompiledModel],
                       covariance_error=covariance_error,
                       esd_inflation=esd_inflation,
                       moment_angle_tests=moment_angle_tests,
-                      jacobian_layout=layout)
+                      jacobian_layout=layout,
+                      # the single fit's count (WP-1938 D8): without it a
+                      # joint fit's held steps never reached CONSTRAINT_ACTIVE
+                      n_constraint_truncations=(res.n_truncated if solver == "lm"
+                                                else 0),
+                      truncated_by=(dict(res.truncated_by) if solver == "lm"
+                                    else {}))
 
 
 def covariance_estimates(jac: np.ndarray, fun: np.ndarray, n_free: int,

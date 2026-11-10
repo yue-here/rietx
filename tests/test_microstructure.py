@@ -464,7 +464,9 @@ def test_either_driver_reads_a_width_on_its_floor_as_absent():
 
 
 def test_a_width_tied_to_a_floored_source_is_floored_with_it():
-    """Only a free column carries ``FLOOR_HIT``, so a follower inherits it.
+    """A follower of a floored source carries no ``FLOOR_HIT`` of its own, so
+    it inherits its source's (a tied width held on its own floor is named
+    directly, ``test_tied_bound_rows``).
 
     ``value = Σ c·source + const`` sits at zero when every source does and
     the constant is zero, and only then (WP-1914; the review of #1506).
