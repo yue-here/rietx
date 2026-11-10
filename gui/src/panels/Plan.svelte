@@ -575,7 +575,7 @@
             <span class="glob">
               <span class="chip mono">{glob}</span>
               <button class="ghost" disabled={busy}
-                aria-label="Stop fixing {glob} in stage {index + 1}"
+                aria-label="Remove {glob} from what stage {index + 1} fixes"
                 title="remove from this stage"
                 onclick={() => removeFix(index, at)}>×</button>
             </span>

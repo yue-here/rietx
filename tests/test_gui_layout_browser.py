@@ -694,6 +694,34 @@ def test_a_plan_edit_moves_nothing(browser, gui, state):
     assert not moved, moved
 
 
+def test_a_fix_typed_into_a_stage_lands_in_its_own_row(browser, gui):
+    """WP-2208: a glob typed into a stage's fix field and entered becomes a chip
+    in that stage's Fixes row, the frees row beside it keeps its chips, the
+    edit is one pending edit, and nothing above the stage moves."""
+    url, _ = gui
+    page = _open_plan(browser, url, WIDTHS["wide"])
+    stage = page.locator("section[aria-label=plan] li.stage").nth(1)
+    frees = stage.locator(".frees:not(.fixing) .chip").all_text_contents()
+    fix = stage.locator("input.add.fix")
+    fix.click()
+    _frames(page)
+    above = ["section[aria-label=plan] li.stage:first-child", *LANDMARKS, *PLAN_BAR]
+    before = page.evaluate(SNAP, above)
+    page.keyboard.type("instrument.zero_shift")
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert stage.locator(".fixing .chip").all_text_contents() == ["instrument.zero_shift"]
+    assert stage.locator(".frees:not(.fixing) .chip").all_text_contents() == frees
+    assert page.locator(".actions .pending").text_content() == "1 pending edit"
+    moved = _moved(before, page.evaluate(SNAP, above))
+    page.locator(".actions button", has_text="Revert").click()
+    _frames(page)
+    assert stage.locator(".fixing .chip").count() == 0
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
 # -- WP-2131: the start screen and the New project dialog ---------------------
 
 #: The start screen's own landmarks: its two columns, their headings and rows.
