@@ -1,6 +1,6 @@
 # WP-2201 — Headings in sentence case
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — claimed by a ghostshift runner
 Depends on: 2131, 2142
 Priority: P2 2026-11-10 — a piece the open gui-overhaul milestone was opened for, ruled 2026-11-09
 
