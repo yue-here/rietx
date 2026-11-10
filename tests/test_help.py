@@ -481,6 +481,9 @@ NOT_OPT_IN: dict[str, str] = {
     "phases.*.distortion_modes.modes.*.amplitude":
         "a distortion-mode description's: built from a parent and a child "
         "structure, never one assignment",
+    "phases.*.parent_cell.strain.*":
+        "a parent-cell child's: magnetic_supercell builds it from a parent and a "
+        "transform, never one assignment",
     "vars.*": "a named variable: Refinement.add_variable declares it, outside the model",
 }
 
