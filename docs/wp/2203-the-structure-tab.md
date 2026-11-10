@@ -1,6 +1,6 @@
 # WP-2203 — the Structure tab
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — claimed by a ghostshift runner
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — in review, PR #1519; the merge waits on the maintainer's look (row 10) and four visual questions
 Depends on: 2123 (the graph column and its tab strip)
 Priority: P3 2026-11-10 — a view moved, nothing it draws changes; the milestone's designed pieces are P3 until one blocks another
 
@@ -96,6 +96,66 @@ maintainer looks) and 11 (screenshots beside the prototype's in the PR).
 
 ## Handover log
 
+- **2026-11-10** — the 3D structure is a graph tab. The viewer that sat in the Model panel's
+  third column now opens from a fourth tab, Structure, beside Pattern, Single peaks and
+  Background. It draws and controls exactly what it did. It fetches only while its tab is shown,
+  and a look at another tab keeps its WebGL context, so returning costs no request when nothing
+  moved. The Model panel keeps two columns, and its stacking width drops from 1256 px to 991 px.
+  Four visual choices wait on the maintainer's look (below). The merge waits on that look anyway
+  (milestone row 10). PR #1519.
+  - *Done.* `GRAPH_TABS` gains `structure`; `App.svelte` mounts `Structure3D` in its own `.gview`
+    with a title line ("Structure at the current values", "Structure, refining" during a run;
+    `lib/structure3d.ts:structureTitle`). The viewer keys its fetch on the project path, the head,
+    `Model`'s reload after its own write, and its own choices, and asks nothing while `active` is
+    false. `Model.svelte` lost the toggle, the view column and its splitter; `model_columns`
+    stores one width, and an older two-width entry still opens (the second is read past).
+    `MODEL_MIN.view` is gone and `modelThreshold()` is 666 + 320 + 5 = 991 px. Manual: the
+    graph-tab list, a new § The structure in `gui-guide.md`, the quickstart's Model row, a new
+    `structure-tab` screenshot pair, and the five pairs that show the graph strip retaken.
+    `gui/CLAUDE.md`'s "never a tab" rule replaced.
+  - *Review* (`/code-review high --fix`, 280e8048f): six findings, all taken. A phase-free
+    project showed the server's 404 as a red error and kept the last project's picture (the old
+    column was unmounted there); it is now the viewer's grey empty state, with a vitest that
+    fails without the fix. A project switch now resets the phase and the chemistry choices.
+    `Model`'s head-driven reload no longer signals the tab, which follows the head itself (one
+    edit made three requests, now two). The instrument column's floor now counts the grip. One
+    stale comment.
+  - *Measured* (venv `[dev]` + playwright 1.65.0, darwin arm64, node 24.22.1): vitest 719
+    passed (32 files; +1 over main's 718 at the branch's first run, the review's empty-state
+    test); svelte-check 416 files, 0 errors; every `tests/*_browser.py` (eight files) 154 passed, none failed or skipped, after the review fixes and the probe fix (42 in the four GUI files, 112 in compare, html, rxplot and watch); the committed dist rebuilds byte-identical after `npm ci`; fast selection (`-m "not slow"`, through the machine's suite lock) 14621 passed, 410 skipped, 32 xfailed in 15 min 33 s, the branch adding two cases (the new layout test, wide and stacked, 4.86 s together in this run) and no skip; sphinx `-W` exit 0;
+    `tests.reader_output` exit 0 ("unchanged against the merge-base"); ruff clean. The new
+    layout test, `test_the_structure_tab_holds_still_under_its_choices[wide|stacked]`, clicks
+    each view button (ellipsoids, balls, a, b, c, reset) and compares the landmark boxes.
+  - *Gotchas.* The viewer's canvas sits inside a `.plot`, now mounted (hidden) on every page, so
+    a probe counting `.plot canvas` for the pattern plot must exclude `.viewer`
+    (`test_gui_browser.py`'s `PANES` did not, and failed with four panes). In a stacked window
+    the viewer's 300 px canvas floor overflows its half-height tab, so `.gview.structure`
+    scrolls; the layout test scrolls each button into view before it snaps.
+  - *Generality.* Not dispatched: `_audit.py` is untouched and the branch adds no refinement
+    heuristic (a view moved).
+  - *Open visual questions* (taken nearest the prototype or the rules; screenshots beside the
+    prototype's at 1440×900 and 700×900 are local to the runner's machine,
+    `~/.cache/ghostshift/rietx/wp-2203/compare/side-by-side-{1440x900,700x900}.png`):
+    1. Title wording. Taken: the Background tab's form, "Structure at the current values". The
+       prototype's "Last fit" is untrue after an applied edit, since a result survives a
+       `set_value`. Alternative: "Last fit" / "Preview, not refined".
+    2. The viewer's controls moved as they were: the "View" header with balls | ellipsoids above
+       the canvas, the legend, view-down and PNG buttons below. The prototype puts "Look down
+       a b c", Atoms | Polyhedra and the species legend on the title row, and has no "View"
+       heading under the title line. Ruled out of scope here (§ Context 3); the redundant
+       heading is the smallest piece of it.
+    3. Stacked (700 px wide): the view scrolls inside its half-height tab and the legend and
+       buttons sit below the fold. Alternative: a smaller canvas floor under a stacked window.
+    4. The Model panel's instrument column takes all the width the view freed. Alternative: cap
+       it and leave the space empty.
+  - *Settled.* `model_columns` keeps one width, older entries read past (a `ui` key, never a
+    schema field; `gui/CLAUDE.md` § the document's `ui` keys). The tab is present with no phase
+    and says so, since a tab that appears with the first phase would move the strip (row 1).
+    ROADMAP's prose left alone: three sibling runners edit the milestone files today. Only the
+    screenshots that show the graph strip were retaken; the rest showed no change and were
+    reverted.
+  - *Next.* The maintainer looks (row 10) and answers the four questions; then close this WP
+    ✅. A redesign of the viewer's controls (question 2) is its own piece; no WP owns it yet.
 - **2026-11-10** — created by a ghostshift runner, number assigned by the shift lead in the
   gui-overhaul 22xx block. No open WP owns the move: the milestone record lists it under
   § Designed, not yet filed.
