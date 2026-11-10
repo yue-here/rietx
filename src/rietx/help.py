@@ -1306,6 +1306,111 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
 }
 
 
+@dataclass(frozen=True)
+class OptIn:
+    """An opt-in correction whose parameters exist only once it is declared.
+
+    ``owner`` is the glob of the object that carries the declaration, and each
+    of ``families`` is a :data:`PARAMETER_HELP` key under it.  ``declaration``
+    is the code a user runs, in the spelling the help entries use;
+    ``tests/test_help.py`` executes it against a model that lacks the
+    correction and checks that every family then has a row.  ``geometry``
+    and ``source`` are the only ``Geometry.kind`` and ``Source.kind`` the
+    schema accepts the declaration on, where it refuses the others.
+    """
+
+    name: str
+    owner: str
+    families: tuple[str, ...]
+    declaration: str
+    geometry: str | None = None
+    source: str | None = None
+
+
+#: The opt-in corrections, for answering an unknown path with the declaration
+#: that would create it rather than with the nearest real path (WP-2087).
+#: On a phase without extinction, ``phases.0.extinction`` was answered with
+#: ``phases.0.lor_strain``.  ``tests/test_help.py`` crosses this list with
+#: the families a model declaring nothing lacks, both ways, so a new opt-in
+#: correction adds a row here or a reason there.
+OPT_IN: tuple[OptIn, ...] = (
+    OptIn("extinction", "phases.*", ("phases.*.extinction",),
+          "phase.extinction = 0.0"),
+    OptIn("March-Dollase preferred orientation", "phases.*",
+          ("phases.*.preferred_orientation.r",),
+          # the axis is the crystallites' habit, so it prints as a placeholder
+          "phase.preferred_orientation = PreferredOrientation(axis=(h, k, l))"),
+    # order 4 is what report.layer2 already prints for a texture action
+    OptIn("spherical-harmonics texture", "phases.*", ("phases.*.texture.*",),
+          "phase.texture = SphericalHarmonicTexture(order=4)"),
+    OptIn("Stephens anisotropic strain", "phases.*",
+          ("phases.*.microstrain.s*", "phases.*.microstrain.dof.*"),
+          "phase.microstrain = StephensStrain.isotropic(1000, phase.cell)"),
+    # the tensor replaces biso, and the assignment raises while biso is free
+    OptIn("an anisotropic displacement tensor", "phases.*.atoms.*",
+          (*(f"phases.*.atoms.*.u{ij}" for ij in ("11", "22", "33", "12", "13", "23")),
+           "phases.*.atoms.*.adp.*"),
+          "atom.biso.vary = False; atom.aniso = AnisoU.isotropic("
+          "atom.biso.value / (8 * math.pi**2), phase.cell)"),
+    OptIn("Suortti surface roughness", "instrument.geometry",
+          ("instrument.geometry.surface_roughness.a",
+           "instrument.geometry.surface_roughness.b"),
+          "instrument.geometry.surface_roughness = RoughnessSuortti()",
+          geometry="bragg_brentano", source="xray_cw"),
+    OptIn("Pitschke surface roughness", "instrument.geometry",
+          ("instrument.geometry.surface_roughness.c",
+           "instrument.geometry.surface_roughness.tau"),
+          "instrument.geometry.surface_roughness = RoughnessPitschke()",
+          geometry="bragg_brentano", source="xray_cw"),
+)
+
+
+def family_matches(path: str, glob: str) -> bool:
+    """Whether ``glob``, a :data:`PARAMETER_HELP` key, names ``path`` at its depth.
+
+    :func:`fnmatch.fnmatchcase` alone lets ``*`` cross dots, so
+    ``phases.*.extinction`` would claim ``phases.0.atoms.1.extinction``.
+    """
+    return path.count(".") == glob.count(".") and fnmatchcase(path, glob)
+
+
+def undeclared_opt_in(path: str, known, instrument=None) -> tuple[OptIn, str] | None:
+    """The opt-in correction an unknown ``path`` belongs to, and its owner's path.
+
+    ``None`` unless the owner exists among the ``known`` paths and declares
+    none of the correction's families.  A declared correction answers a typo
+    in one of its own paths with the nearest real path, as any other path
+    does, and so does an owner the model lacks (``phases.7`` on one phase).
+    A row the schema accepts on one geometry or source only answers when
+    ``instrument`` is given and is of that kind, since a path cannot say
+    which geometry it is on.  A joint fit's ``hist.N.`` prefix is carried
+    onto the owner, and a shared row is read bare.
+    """
+    parts = path.split(".")
+    scope = ""
+    if len(parts) > 2 and parts[0] == "hist" and parts[1].isdigit():
+        scope, parts = f"hist.{parts[1]}.", parts[2:]
+    bare = ".".join(parts)
+    known = {k[len(scope):] if scope and k.startswith(scope) else k for k in known}
+    for row in OPT_IN:
+        if not any(family_matches(bare, f) for f in row.families):
+            continue
+        if row.geometry is not None and (
+                instrument is None or instrument.geometry.kind != row.geometry):
+            return None
+        if row.source is not None and (
+                instrument is None or instrument.source.kind != row.source):
+            return None
+        owner = ".".join(parts[:row.owner.count(".") + 1])
+        if not any(k.startswith(owner + ".") for k in known):
+            return None
+        tails = [owner + f[len(row.owner):] for f in row.families]
+        if any(family_matches(k, t) for k in known for t in tails):
+            return None
+        return row, scope + owner
+    return None
+
+
 # ----------------------------------------------------------------------
 # Named arms
 #
@@ -4448,11 +4553,12 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A stage named a parameter the model lacks",
         description=(
             "A stage asked to refine a parameter by a name that no parameter of the "
-            "model has. The usual cause is a typing slip or a retired spelling. Nothing "
+            "model has. The usual causes are a typing slip, a retired spelling and an "
+            "opt-in correction the model does not declare. Nothing "
             "was freed, yet the fit converged. A wildcard pattern that matches nothing "
-            "stays silent, because some models lack a component. Correct the name, or "
-            "use a wildcard if the stage should reach a component that only some models "
-            "declare."
+            "stays silent, because some models lack a component. Correct the name, "
+            "declare the correction, or use a wildcard if the stage should reach a "
+            "component that only some models declare."
         ),
     ),
     "STAGE_SLOW_DESCENT": HelpEntry(

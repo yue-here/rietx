@@ -72,11 +72,12 @@ refinement starts to need a plan rather than a button.
 ## What is on the screen
 
 The window is two columns. On the left is the pattern; on the right is a column
-of nine tabs, all mounted at once:
+of ten tabs, all mounted at once:
 
 | Tab | Is |
 |---|---|
 | `Parameters` | every parameter, with the one control that frees it |
+| `Interactive` | sliders that move a parameter and show the pattern before you apply it |
 | `Plan` | the stages the fit will run, and what each one frees |
 | `Peaks` | picked lines, and indexing a pattern that has no structure yet |
 | `Model` | the structure and the instrument, and a 3D view of the cell |
@@ -229,7 +230,7 @@ has it in full.
 
 ## Where to go next
 
-- [](../reference/gui-guide.md): the nine panels, and when to branch the history.
+- [](../reference/gui-guide.md): the ten panels, and when to branch the history.
 - [](../reference/gui-power.md): the `.rxt` text document, the keyboard, and the routes.
 - [](tutorials.md): the same fluorapatite pattern fitted in Python, one step a notebook cell.
 - [](../guides/index.md): one task a page, each done from a Python script.
