@@ -30,6 +30,7 @@ redesign is ported in five pieces, in this order:
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
 | The palette | [2200](../wp/2200-the-palette.md) | the site's palette as the default theme, light and dark: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Named themes (Solarized, Monokai) in Settings come later; the emitter leaves their seam. `gui/STYLE.md`'s rules that describe a new role in words take its tokens (WP-2142) |
+| The graph window | [2213](../wp/2213-the-graph-window.md) | the graph pane's chrome as the prototype draws it: curves switched from a legend in a right-hand gutter, the view's controls on the title line with the rarer ones in a menu, the fitted range and excluded regions as plot objects with a selection bar. Ruled 2026-11-10, after the maintainer asked for the cluttered buttons to be concealed |
 
 Every merge leaves a working GUI. No existing panel or route becomes unreachable at any piece;
 a panel moves into the new shell as it is, and is redesigned by its own piece.
