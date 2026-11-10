@@ -472,11 +472,11 @@ moved or left out lines, it first says how many it replaces.
 The table lists 2θ, d, the intensity relative to the strongest measured line,
 and a note: who placed the line, then the fitter's flags in words, each one a
 click from its explanation. `All`, `Used` and `Not used` filter the rows. A row
-you tick or untick stays in the filtered list until you choose a filter again,
+you tick or clear stays in the filtered list until you choose a filter again,
 so a tick never moves the table under the pointer. Click a 2θ to zoom the plot
 to that line.
 
-Each line the search uses has a lens above the pattern, standing just clear of
+Each line the search uses has a lens above the pattern, a little higher than
 the highest count near it. A line left out has no mark; its row is its route.
 Lines closer than a lens's width stack upward, so a duplicate never hides under
 its twin.
