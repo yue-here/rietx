@@ -29,6 +29,7 @@ redesign is ported in five pieces, in this order:
 | 3 | [2127](../wp/2127-the-plan-tab.md) | the Plan tab on the existing plan routes, read top to bottom as a recipe |
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
+| Peaks and indexing | [2202](../wp/2202-peaks-and-indexing-in-four-steps.md) | the Peaks tab in four steps (pick peaks, fit peaks, index, judge), the eight-column candidate table, lens peak marks, per-line curves in the fit windows (ruled 2026-11-08, 2026-11-09) |
 | — | [2211](../wp/2211-the-history-table.md) | the History table in the bottom panel: one row per node, the node count on the tab, Compare as an overlay on the pattern, Restore as pending edits (after WP-2206) |
 | — | [2212](../wp/2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt on the calls the window ran, and the console exported as a `.py` script (after WP-2206) |
 
@@ -48,7 +49,6 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 |---|---|---|
 | The palette | The site's palette as the default theme: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Theme machinery in Settings for established themes (Solarized light and dark, Monokai and others). `gui/STYLE.md`'s rules that describe a new role in words take its tokens once they exist (WP-2142) | 2026-11-06, 2026-11-09 |
 | Sentence-case headings | One `app.css` rule at the start screen's register, app-wide | 2026-11-09 |
-| Peaks and indexing | The redesign in four steps (pick peaks, fit peaks, index, judge), the eight-column candidate table, lens peak marks, per-line curves in the fit windows | 2026-11-08, 2026-11-09 |
 | Structure tab | The 3D structure as one of the graph tabs | 2026-11-07 |
 | Workflow menu | The top bar's workflow menu, with placeholders for peaks and indexing, series, structure solution and rigid bodies | 2026-11-07 |
 | Settings dialog | Theme, density and number format | 2026-11-07 |

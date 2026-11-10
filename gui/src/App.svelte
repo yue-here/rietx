@@ -29,6 +29,7 @@
   import NewProject from "./panels/NewProject.svelte";
   import Palette from "./panels/Palette.svelte";
   import Params from "./panels/Params.svelte";
+  import PeakFits from "./panels/PeakFits.svelte";
   import PeakWindows from "./panels/PeakWindows.svelte";
   import Peaks from "./panels/Peaks.svelte";
   import Plan from "./panels/Plan.svelte";
@@ -220,6 +221,12 @@
    *  here rather than one per panel, because "which line is this" is a question
    *  about the session, and two copies would be two answers. */
   let hoveredPeak = $state<number | null>(null);
+  /** the overlap groups the Fit peaks step draws, and the one its list chose
+   *  (WP-2202); the Peaks panel owns the list, the graph pane the windows */
+  let fitGroups = $state<number[]>([]);
+  let fitFocused = $state<number | null>(null);
+  /** the Single peaks graph shows the group fits while the Peaks tab is up */
+  const groupFits = $derived(tab === "peaks");
   /** Which candidate's predicted lines the plot draws (WP-1211).
    *
    *  Two indices, not one, because a preview and a selection are different
@@ -1346,6 +1353,7 @@
              quotes `MATURITY_MAX_RWP` — so nothing here decides anything. -->
         <div class="gtitle">
           <strong class="what">{graphTab === "background" ? backgroundTitle(busy)
+            : graphTab === "single" && groupFits ? "Peak fits"
             : previewAnswer ? "Preview, not refined"
             : busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
           <div class="stats tabular mono" class:immature={immature}>
@@ -1377,9 +1385,15 @@
           onremovepeak={removePeak} onprotocol={setProtocol}
           preview={previewAnswer} oncurves={(c) => (baseCurves = c)} />
         </div>
-        <div class="gview" class:hidden={graphTab !== "single"}>
+        <div class="gview" class:hidden={graphTab !== "single" || groupFits}>
           <PeakWindows curves={baseCurves} preview={previewAnswer} {theme}
-            active={graphTab === "single" && !hideGraphs} />
+            active={graphTab === "single" && !groupFits && !hideGraphs} />
+        </div>
+        <!-- the Fit peaks step's group windows: the picker's fits, drawn where
+             the single-peak comparison is while the Peaks tab is up (WP-2202) -->
+        <div class="gview" class:hidden={graphTab !== "single" || !groupFits}>
+          <PeakFits peaks={peaksData} groups={fitGroups} focused={fitFocused} {theme}
+            active={graphTab === "single" && groupFits && !hideGraphs} />
         </div>
         <div class="gview" class:hidden={graphTab !== "background"}>
           <Background {head} {busy} {theme} {say} onmoved={moved}
@@ -1471,7 +1485,9 @@
             oncandidatehover={(i) => { previewCandidate = i; showCandidate(i); }}
             onpeaks={(p) => (peaksData = p)}
             onindexed={(a) => { indexAnswer = a; forgetCandidates(); }}
-            onzoom={(lo, hi) => (zoom = [lo, hi])} onmoved={moved} />
+            onzoom={(lo, hi) => (zoom = [lo, hi])} onmoved={moved}
+            ongraph={(id) => (graphTab = id)}
+            onfitgroups={(g, f) => { fitGroups = g; fitFocused = f; }} />
         </div>
         <div class="panel" class:hidden={!seriesTab}>
           <Series bind:this={seriesPanel} {project} {run} {busy} {simple} {theme}

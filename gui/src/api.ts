@@ -304,7 +304,10 @@ export const api = {
   /** The stored peak list plus the decimated raw pattern — the one payload the
    *  plot can draw before any fit exists (WP-1027). */
   peaks: () => call("GET", "/api/peaks"),
-  pickPeaks: (body: { shoulders?: boolean } = {}) => call("POST", "/api/peaks", body),
+  /** `pick_peaks`'s three options (WP-2124); an absent one is the default. */
+  pickPeaks: (body: { shoulders?: boolean; flag_contamination?: boolean;
+                      two_theta_range?: [number, number] } = {}) =>
+    call("POST", "/api/peaks", body),
   addPeak: (twoTheta: number) => call("POST", "/api/peaks/add", { two_theta: twoTheta }),
   movePeak: (index: number, twoTheta: number) =>
     call("POST", "/api/peaks/move", { index, two_theta: twoTheta }),

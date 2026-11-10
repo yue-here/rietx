@@ -55,6 +55,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2080](2080-a-warm-fit-in-a-wrong-basin.md) | A warm fit that stopped in a wrong basin is kept, and nothing escalates it | 2026-11-02 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md) | An opt-in correction the residual asks for names its declaration in the docs | 2026-11-10 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2116](2116-an-extra-components-columns-cost-no-bragg-evaluation.md) | An extra component's columns cost no Bragg evaluation | 2026-11-09 | P3 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [2202](2202-peaks-and-indexing-in-four-steps.md) | Peaks and indexing in four steps: pick, fit, index, judge | 2026-11-10 | — | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -507,6 +508,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2131](2131-the-start-screen-and-new-project.md) | The start screen and the New project dialog | ✅ 2026-11-10 | — | [2123](2123-the-layout-shell.md) |
 | [2133](2133-the-file-menu.md) | The File menu on the project name | ✅ 2026-11-10 | — | [2131](2131-the-start-screen-and-new-project.md) |
 | [2142](2142-the-gui-style-guide.md) | The GUI style guide | ✅ 2026-11-10 | — | — |
+| [2202](2202-peaks-and-indexing-in-four-steps.md) | Peaks and indexing in four steps: pick, fit, index, judge | 🔄 2026-11-10 | — | [2123](2123-the-layout-shell.md), [2124](2124-the-gui-port-server-defects.md), [2130](2130-the-peaks-panel-gaps.md) |
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | ⬜ | P3 | #1521 |
 | [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | ⬜ | P3 | #1521 |
 

@@ -53,6 +53,7 @@ function recorder(marks: () => Mark[]) {
     moveTo(x: number, y: number) { path.push([x, y]); },
     lineTo(x: number, y: number) { path.push([x, y]); },
     arc(x: number, y: number, r: number) { path.push([x, y, r]); },
+    quadraticCurveTo(_cx: number, _cy: number, x: number, y: number) { path.push([x, y]); },
     rect(x: number, y: number) { path.push([x, y]); },
     stroke() { marks().push({ op: "stroke", style: ctx.strokeStyle, dash: dash.length > 0, points: path }); },
     fill() { marks().push({ op: "fill", style: ctx.fillStyle, points: path }); },

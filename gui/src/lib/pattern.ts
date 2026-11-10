@@ -18,6 +18,7 @@ import { channelIndex } from "./interactive";
 import { joinCurves, type GroupCurve, type PeakRow } from "./peaks";
 import {
   curveColors,
+  lens,
   maskShapes,
   nearestIndex,
   type CandidateOverlay,
@@ -347,40 +348,63 @@ export class PatternChart {
   }
 
   /**
-   * The picked lines, at the measured intensity nearest each: a circle where
-   * the picker fitted it and a diamond where a person placed it, hollow where
-   * it is not used. The whisker is capped at 3×FWHM (WP-1027).
+   * The lines the search uses, each a lens (the shape of a reflection tick)
+   * standing just clear of the highest count near it (WP-2202, the
+   * maintainer's rounds 11c and 11d, 2026-11-08). A line left out of the
+   * search has no mark: its row in the table is its route. Lines closer than
+   * a lens's width stack upward, so a duplicate never hides under its twin.
+   * A halo of the page's background lets a lens read over the crosses.
    */
   private peakMarkers(u: any): void {
     const { peaks, peaksActive, hidden } = this.overlay;
     if (!peaksActive || !peaks?.length || hidden.includes("peaks")) return;
-    const { ctx } = u, dpr = devicePixelRatio, r = 4.5 * dpr, cap = 3 * dpr;
+    const { ctx } = u, dpr = devicePixelRatio;
+    const H = LENS_HEIGHT * dpr, W = LENS_WIDTH * dpr, gap = LENS_GAP * dpr;
+    const row = (LENS_HEIGHT + 1) * dpr, near = 7 * dpr, top = u.bbox.top + H / 2 + 2 * dpr;
     const { min, max } = u.scales.x;
+    const halo = getComputedStyle(document.body).getPropertyValue("--bg").trim();
+    const marks: Array<{ x: number; y: number; level: number }> = [];
+    for (const p of [...peaks].sort((a, b) => a.two_theta - b.two_theta)) {
+      if (!p.usable || p.two_theta < min || p.two_theta > max) continue;
+      const h = this.crest(p.two_theta);
+      if (h == null) continue;
+      const x = u.valToPos(p.two_theta, "x", true);
+      let level = 0;
+      while (marks.some((m) => m.level === level && Math.abs(m.x - x) < near)) level++;
+      // at the plot's top the stack turns downward, so a twin under the
+      // strongest line still clears its partner rather than landing on it
+      const y = Math.max(top + level * row, u.valToPos(h, "y", true) - gap - H / 2 - level * row);
+      marks.push({ x, y, level });
+    }
     ctx.save();
-    ctx.strokeStyle = ctx.fillStyle = this.colors.peak;
-    ctx.lineWidth = 1.2 * dpr;
     // uPlot leaves the last series' dash on the context (the background's)
     ctx.setLineDash([]);
-    for (const p of peaks) {
-      if (p.two_theta < min || p.two_theta > max) continue;
-      const h = this.height(p.two_theta);
-      if (h == null) continue;
-      const X = u.valToPos(p.two_theta, "x", true), Y = u.valToPos(h, "y", true);
-      const w = Math.min(p.two_theta_esd, 3 * p.fwhm);
-      if (w > 0) {
-        const a = u.valToPos(p.two_theta - w, "x", true), b = u.valToPos(p.two_theta + w, "x", true);
-        ctx.beginPath();
-        ctx.moveTo(a, Y); ctx.lineTo(b, Y);
-        ctx.moveTo(a, Y - cap); ctx.lineTo(a, Y + cap);
-        ctx.moveTo(b, Y - cap); ctx.lineTo(b, Y + cap);
-        ctx.stroke();
+    if (halo) {
+      ctx.fillStyle = halo;
+      for (const m of marks) {
+        lens(ctx, m.x, m.y, H + 5 * dpr, W + 4 * dpr);
+        ctx.fill();
       }
-      ctx.beginPath();
-      if (p.origin === "fitted") ctx.arc(X, Y, r, 0, 2 * Math.PI);
-      else { ctx.moveTo(X, Y - r); ctx.lineTo(X + r, Y); ctx.lineTo(X, Y + r); ctx.lineTo(X - r, Y); ctx.closePath(); }
-      if (p.usable) ctx.fill(); else ctx.stroke();
+    }
+    ctx.fillStyle = this.colors.peak;
+    for (const m of marks) {
+      lens(ctx, m.x, m.y, H, W);
+      ctx.fill();
     }
     ctx.restore();
+  }
+
+  /** The highest measured count within three channels of 2θ, or null on a log
+   *  axis at or under zero: what a lens stands clear of. */
+  private crest(tt: number): number | null {
+    const w = this.overlay.held, k = w ? nearestIndex(w.two_theta, tt) : -1;
+    let v = k < 0 ? 0 : w!.y_obs[k];
+    if (k >= 0) {
+      for (let q = Math.max(0, k - 3); q < Math.min(w!.y_obs.length, k + 4); q++) {
+        if (w!.y_obs[q] > v) v = w!.y_obs[q];
+      }
+    }
+    return this.fig.panes.main.scales.y.distr === 3 && !(v > 0) ? null : v;
   }
 
   /** The measured intensity at the channel nearest 2θ, or null on a log axis at or under zero. */
@@ -408,6 +432,12 @@ export class PatternChart {
     el.style.borderColor = this.colors.peak;
   }
 }
+
+/** A peak mark's lens, in CSS pixels: 18 tall and 4.5 wide, its lower tip
+ *  7 above the data (round 11c). */
+export const LENS_HEIGHT = 18;
+export const LENS_WIDTH = 4.5;
+export const LENS_GAP = 7;
 
 function readColors(): ReturnType<typeof curveColors> {
   const style = getComputedStyle(document.body);

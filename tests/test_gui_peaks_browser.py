@@ -99,8 +99,16 @@ def browser():
         handle.close()
 
 
-def _peaks_tab(browser, url: str, width: int = 1300):
-    """A fresh page on the Peaks tab, reached by clicking it."""
+def _step(page, name: str) -> None:
+    """Choose one of the Peaks tab's four steps by a click on its tab (WP-2202)."""
+    number = ["Pick peaks", "Fit peaks", "Index", "Judge"].index(name) + 1
+    page.locator("nav.steps").get_by_role(
+        "button", name=f"{number} {name}", exact=True).click()
+    _frames(page)
+
+
+def _peaks_tab(browser, url: str, width: int = 1300, step: str = "Index"):
+    """A fresh page on the Peaks tab and one of its steps, reached by clicking them."""
     page = browser.new_page(viewport={"width": width, "height": 900})
     page.errors = []
     page.on("pageerror", lambda exc: page.errors.append(str(exc)))
@@ -108,7 +116,10 @@ def _peaks_tab(browser, url: str, width: int = 1300):
     page.wait_for_selector(".actions button.refine")
     page.evaluate("document.fonts.ready")
     page.locator(".side > nav.tabs").get_by_role("button", name="Peaks", exact=True).click()
-    page.wait_for_selector(".coverage")
+    page.wait_for_selector("nav.steps")
+    _step(page, step)
+    if step == "Index":
+        page.wait_for_selector(".coverage")
     _frames(page)
     return page
 
@@ -141,11 +152,11 @@ def test_every_row_can_be_adopted_and_an_unpicked_one_says_why(browser, gui):
     adopt = [rows.nth(i).get_by_role("button", name="Adopt", exact=True) for i in (0, 1)]
     assert all(a.is_enabled() for a in adopt)
 
-    # the gate's pick wears its name as a badge and nothing more; the other row
-    # says, under its grade, the sentence its adoption will record
-    assert rows.nth(0).locator(".chip", has_text="best_or_none()").count() == 1
+    # the gate's pick wears a badge and nothing more; the other row says, under
+    # its cell, the sentence its adoption will record
+    assert rows.nth(0).locator(".mark", has_text="rietx's pick").count() == 1
     assert rows.nth(0).locator(".why").count() == 0
-    assert rows.nth(1).locator(".chip", has_text="best_or_none()").count() == 0
+    assert rows.nth(1).locator(".mark").count() == 0
     assert rows.nth(1).locator(".why").inner_text() == WHY_LOW
     # and the sentence is on screen whole: its box ends inside the side panel,
     # where a sentence in the Adopt column pushed the table past it (WP-2130)
@@ -153,11 +164,11 @@ def test_every_row_can_be_adopted_and_an_unpicked_one_says_why(browser, gui):
     side = page.locator(".side").bounding_box()
     assert why["x"] + why["width"] <= side["x"] + side["width"], (why, side)
 
-    # opening a row is content inside the panel and moves no shell landmark
+    # selecting a row is content inside the panel and moves no shell landmark
     before = page.evaluate(SNAP, LANDMARKS)
-    rows.nth(1).locator("button.ghost").first.click()
+    rows.nth(1).locator("button.pick").first.click()
     _frames(page)
-    assert page.locator("tr.detail").count() == 1
+    assert page.locator("table.candidates tr.sel").count() == 1
     assert not _moved(before, page.evaluate(SNAP, LANDMARKS))
 
     # adopt the row the gate did not pick, with a real click
@@ -174,5 +185,46 @@ def test_every_row_can_be_adopted_and_an_unpicked_one_says_why(browser, gui):
     assert node.action.kind == "edit_model"
     assert node.label.endswith(f"; {WHY_LOW}")
     assert not _moved(before, page.evaluate(SNAP, LANDMARKS))
+    assert not page.errors, page.errors
+    page.close()
+
+
+def test_pick_then_fit_draws_the_group_windows(browser, gui):
+    """WP-2202: Pick peaks fills the table, and Fit peaks draws the group fits.
+
+    The pick is real (the synthetic pattern's lines, a few seconds), so the
+    windows draw the server's own per-line curves. Choosing Fit peaks is a jump
+    the person asked for, so it may put the graph on the group fits; ticking a
+    line is not, so it moves nothing.
+    """
+    url, _session = gui
+    page = _peaks_tab(browser, url, step="Pick peaks")
+    page.get_by_role("button", name="Pick peaks", exact=True).click()
+    page.wait_for_selector("table.lines tbody tr", timeout=120_000)
+    _frames(page)
+    assert page.locator("table.lines tbody tr").count() > 3
+
+    # a tick moves no landmark and keeps its row in the filtered list
+    before = page.evaluate(SNAP, LANDMARKS)
+    n = page.locator("table.lines tbody tr").count()
+    page.locator("table.lines tbody tr").first.locator('input[type="checkbox"]').click()
+    page.wait_for_function(
+        "document.querySelector('.console')?.textContent.includes('use_for_indexing')")
+    _frames(page)
+    assert page.locator("table.lines tbody tr").count() == n
+    assert not _moved(before, page.evaluate(SNAP, LANDMARKS))
+
+    _step(page, "Fit peaks")
+    assert page.locator(".gtitle .what").inner_text().strip() == "Peak fits"
+    page.get_by_role("button", name="All groups", exact=False).click()
+    _frames(page)
+    page.locator("table.groups tbody tr").first.locator("button.pick").click()
+    _frames(page)
+    assert page.locator(".fits figure").count() >= 1
+    # every window's canvas has paint on it
+    inked = page.evaluate("""() => [...document.querySelectorAll('.fits canvas')].map((c) => {
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; })""")
+    assert inked and all(n > 0 for n in inked), inked
     assert not page.errors, page.errors
     page.close()
