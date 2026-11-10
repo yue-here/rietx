@@ -1,6 +1,6 @@
 # WP-2202 — Peaks and indexing in four steps: pick, fit, index, judge
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — filed and started by a ghostshift runner
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — PR #1526 open; the merge waits on the maintainer's look and six visual questions
 Depends on: 2123, 2124, 2130 (the shell, the indexing server half, the coverage line and Adopt on every row)
 
 ## Goal
@@ -94,7 +94,7 @@ waits for the palette piece (ruled 2026-11-09), so `--plot-peak` stays as it is 
 
 - `src/rietx/gui/peaks.py` `PeakEditor.curves`: the `lines` arm; `tests/test_gui_peaks.py`.
 - `gui/src/lib/peaks.ts`: the pure helpers (steps, filters, the to-look-at rule, the eight
-  columns, the relation line), tested in `lib/peaks.test.ts`.
+  columns, the relation line), tested in `lib/peaksteps.test.ts`.
 - `gui/src/panels/Peaks.svelte`: the four steps.
 - `gui/src/panels/PeakFits.svelte` (new): the group windows with per-line curves, drawn in the
   Single peaks graph while the Peaks tab is up.
@@ -173,4 +173,33 @@ when the milestone's table of unfiled pieces is next filed.
 
 ## Handover log
 
+- **2026-11-10** — the Peaks tab now reads as four steps: pick peaks, fit peaks, index, judge. A person picks lines and ticks which ones the search uses. They look at the group fits worth a look, with each line's own curve drawn under the sum. They run the search from a short form, and judge one candidate at a time: its grade, Le Bail check, figures of merit, the cells it cannot be told from, and the extinction screen. The pattern marks each used line with a lens and leaves an unused one unmarked. Nothing in the package's fitting or indexing moved. The one server change serves each group's per-line curves and its observed counts, and a pytest holds the lines' sum to the group's model. The merge waits on the maintainer's look (milestone acceptance row 10), and six visual choices below are open for it. PR #1526.
+
+  *Done.* Tasks 1-7: `93611f4f1` per-line curves, `458232159` helpers, `51c546ff1` the four steps and the eight-column table, `cdc109837` lens marks, `9085d2e1b` manual and browser tests. Then three rounds of fixes. `c59bf1caa` came from the screenshot pass beside the prototype at 1440×900, which found eight defects. Note words ran together ("fit failedasymmetric"). The search clock stood still, because the server stamps `elapsed` only on a run frame. A containment relation printed "0× the volume", since its `SupercellCheck.index` is 0. The figures of merit printed their python names. Five informational search notes pushed the candidates off the first screen. The volume box cut "from data", the time limits ran None first, and two spaces were lost before "·". `a5c151c03` came from `/code-review high --fix`. `cdd81a890` came from a third screenshot pass: the clock counted from the page's load (0:57 fifteen seconds into a search), and a refuting reflection broke inside its indices.
+
+  *Review pass* (`/code-review high --fix`, ten findings). Fixed: the pick options reloaded on every edit and wiped a typed 2θ range; near-duplicate lens marks at the plot's top landed on one pixel; the group windows drew the decimated pattern, about one channel in five on a 22 000-channel scan (the route now sends `y_obs` per group); an empty "To look at" list left a blank pane; a non-numeric 2θ range went out as null; a singleton group evaluated its model twice; the lens path was written twice; the χ²ᵣ highlight used a literal 10. The review left one finding as a design call, and this session fixed it: Judge had lost the ambiguity partners and the candidate's own diagnostics, which the old expanded row showed (now restored, with a vitest). Declined: the per-line toggle set and the filter's kept rows are keyed by row index, so removing a line shifts them to a neighbour. A fix needs a stable line identity, which `peaks.json` does not carry, and clearing the sets on every edit would break the rule that an edit keeps rows in place.
+
+  *Settled by Claude* (each a call a reviewer could make the other way):
+  - Adopt stays immediate rather than a pending edit in the action bar, because the action bar's pending route carries Parameters edits only. Alternative: a pending Adopt, which needs a new route.
+  - "To look at" is χ²ᵣ above 10 or one of six flags saying the window fit is in doubt (`LOOK_FLAGS`), the prototype's CHECK set. Alternative: every flag but asymmetry, as this WP's Context first said; on FAP that keeps duplicates and weak lines, which say nothing about the fit.
+  - The gate's pick wears the words "rietx's pick" (the prototype's), replacing the chip `best_or_none()`. Alternative: the API name, which a person using the GUI never meets.
+  - Each figure of merit's blind spot is one click away under its name, and the names are the prototype's (M₂₀, F_N, M_rev, M_sym, lines indexed, intensity indexed, predicted lines seen; shares in %). Alternative: the python names.
+  - Refit stays the ↻ on each group's row. Alternative: each window's caption, as the prototype has it (a follow-up).
+  - The Index form shows before a peak list exists, so the settings can be set first. Alternative: gate the step on a pick.
+  - The Z column stays when the run read a formula (WP-2030). The prototype has no Z.
+  - No generality judge was dispatched. The one new threshold ("To look at") is a view filter in `gui/src/lib/peaks.ts`, which changes what a person sees first and never what the search uses (§ The tier of each rule this WP adds), and `src/rietx/_audit.py` is untouched.
+
+  *Open visual questions for the maintainer.* Screenshots are in the runner's scratch, `~/.cache/ghostshift/rietx/wp-2202/shots/`: `rietx-step0.png` to `rietx-step3-bottom.png` beside `proto-step0.png` to `proto-step3.png`, all at 1440×900. The prototype ones stay private.
+  1. The step strip is a `.tab` strip with numbered words; the prototype draws numbered pills joined by chevrons. STYLE.md's `.tab` register is "choose one of N panels", which is what a step is here.
+  2. The steps' actions (Pick peaks, Index, Judge ›, Adopt as a Le Bail start) are ghost buttons, because STYLE.md allows one filled primary per view and Refine holds it. The prototype fills them.
+  3. The group fits draw in the Single peaks graph tab, titled "Peak fits" while the Peaks tab is up. The prototype gives them a Peaks graph tab of their own.
+  4. A line a person added reads "manual", the corpus's label for that origin; the prototype says "added by you".
+  5. A warning or an error about the search stays above the list, and the informational notes fold under "Notes from the search". On FAP the five notes filled the pane. WP-2130 had every note in view; the prototype has one line of coverage and a Search these button.
+  6. WP-2130's `why` sentence sits under each unpicked candidate's cell. At 1440×900 it makes a row six lines tall, and Rwp, Grade and Adopt scroll off the side of the table (`rietx-step2.png`). The prototype has no `why` in the table.
+
+  *Measured* ([dev] venv in this worktree, darwin/arm64, other ghostshift runners working on the machine): vitest 729 passed (726 before the screenshot pass; +3: the search clock twice, the Judge partners); svelte-check 0 errors, 0 warnings; every `tests/*_browser.py` 153 passed (8 files, serial, 6-9 min); the fast selection 14619 passed, 410 skipped, 32 xfailed and 1 failed in 10:33 behind another suite's queue: the manual's GUI page ran 727 characters over its 50 000 cap, so this session cut the Peaks chapter's history and rationale sentences, and test_manual.py, test_gui_manual.py and test_docs_consistency.py then passed (99). One Python test was added (test_pick_then_fit_draws_the_group_windows, 1.72 s locally); the other additions are vitest; `python -m tests.reader_output` exit 0, "unchanged against the merge-base". Indexing engines and ranking are untouched, so `test_acceptance_indexing` did not run.
+
+  *Gotchas.* Svelte trims whitespace at the start of an element and keeps a newline inside one, so write `{" "}` or one template string. The run frame's `elapsed` is a stamp, never a clock, and idle stamps the same 0 a new run does. `help.test` counts every `title=` per file, so a panel that drops its last one loses its entry.
+
+  Next: the maintainer's look at the screenshots and the six questions above; a reversal is a small change in `Peaks.svelte` or `PeakFits.svelte`. Then § Follow-ups, the interaction grammar first, since it spans Pattern and Background as well.
 - **2026-11-10** — created by a ghostshift runner, which holds it in this session. No open WP owned the Peaks redesign: WP-2130 fenced it out as a later piece, and the milestone listed it as designed, not filed.

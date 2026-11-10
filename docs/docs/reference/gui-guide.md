@@ -491,14 +491,9 @@ gestures across the top whenever it is:
 | shift-click | exclude a line from indexing | the row's checkbox |
 | right-click | remove it | the row's `×` |
 
-Every pointer verb has a typed twin. A pointer is not available to everyone, and
-a position typed to four decimals is not a position aimed at with a mouse.
-
 A drag only moves a line when you are zoomed in far enough for the line to be
 visible. The grab radius is the smaller of 10 px and 1.5 fitted peak widths, so
-at a whole-pattern view a drag is always a zoom. Zoom first, then
-correct. Before that radius existed, a drag starting near a marker could move a
-line by degrees.
+at a whole-pattern view a drag is always a zoom. Zoom first, then correct.
 
 A pasted position list carries the badge `σ assumed`, and its σ is a stated
 assumption rather than a property of your data.
@@ -510,15 +505,13 @@ lists the groups `To look at`, or `All groups`, with each group's 2θ span, its
 number of lines, its reduced χ² and the fitter's flags. A group is worth a look
 when its reduced χ² is above 10, or when the fitter flagged the fit itself: a
 position at its bound, an unresolved shoulder or split, a capped width, a group
-it could not separate, or a Kα2 residual. Asymmetry alone does not count: on
-fluorapatite it is on 36 lines, so it picks out nothing. `↻` refits a group
-under the picker's own judgement.
+it could not separate, or a Kα2 residual. `↻` refits a group under the
+picker's own judgement.
 
 The graph shows six group windows, from the group you chose onward. Each draws
 the data, the group's fit, its background envelope, a mark per line and the
 residual in esd with the ±3 band. Every line's own curve is drawn under the sum
 as a tinted fill, and the numbered buttons over a window show or hide each one.
-The curves are the server's, and they add up to the group's fit.
 
 ### Indexing
 
@@ -526,8 +519,7 @@ The curves are the server's, and they add up to the group's fit.
 largest cell volume, and a time limit. Each time limit is a search preset,
 named by its ceiling. `More settings` holds the rest of `ProjectDoc.indexing`:
 the engines, centrings, bounds and budgets, the formula and temperature, and two
-editors for what you already know. Its vocabularies come from the build's own
-capabilities, so a fourth engine would appear here with no new control written.
+editors for what you already know.
 
 While a search runs, the step lists each crystal system as waiting, searching
 or searched, the cells found so far, the time spent and the time left, and
@@ -540,9 +532,7 @@ Three things to understand before reading an answer:
   click gives an answer in bounded time. A `low` grade from a run that hit its
   ceiling means unconfirmed rather than bad, and the full search is one rerun
   away.
-- A list with no high-confidence entry is a result. The whole module is built so
-  that "the data cannot distinguish these" is an answer it can give, and there is
-  no setting that forces an answer.
+- A list with no high-confidence entry is a result. No setting forces an answer.
 - State what you already know. A prior cell or space group narrows the search
   honestly, where widening the tolerances does not.
 
@@ -557,9 +547,8 @@ it as a guide rather than a test.
 
 Above the candidate table the panel says what the search covered: the crystal
 systems searched, the ones whose search did not finish, and every run-level
-diagnostic with the systems it names. A warning or an error stays in view.
-The informational notes, such as the peak-position precision, fold under
-"Notes from the search". A run that stopped at its ceiling says which systems
+diagnostic with the systems it names. Warnings stay in view, and the
+informational notes fold under "Notes from the search". A run that stopped at its ceiling says which systems
 it never reached, so a short list there is not evidence that no cell exists in
 them.
 
@@ -581,14 +570,13 @@ history node's label: that it is not the gate's pick, its grade and its caveats.
 list: its cell with esds, its grade and caveats (a caveat that refutes the cell
 in red), the Le Bail check, every figure of merit with its blind spot a click
 away, and the engines that found it. A cell the data cannot tell from another
-names the other cell and the 2θ values where their lines part. When those lie
-beyond the measured range, the step says how far in 2θ to collect. The candidate's own
-diagnostics follow.
+names the other and the 2θ where their lines part, with how far to collect when
+that is beyond the data. The candidate's own diagnostics follow.
 
 `Screen extinctions` ranks the extinction classes the lattice allows by ΔBIC,
 with how many of each class's absences the data could test. A refuted class
 stays in the table, muted, with the reflections that refute it named. The
-teaching point is the package's own. The extinction symbol is what a powder
+extinction symbol is what a powder
 measures, and a single space group out of a class is a convention you choose
 rather than a measurement the table made. Choosing a class offers its space
 groups, its representative first chosen, and `Adopt as a Le Bail start` adopts
