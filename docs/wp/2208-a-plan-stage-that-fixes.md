@@ -1,6 +1,6 @@
 # WP-2208 — a plan stage that fixes as well as frees
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — claimed by a ghostshift runner
 Depends on: 2127 (the Plan tab)
 Priority: P2 2026-11-10 — a feature the open gui-overhaul milestone was opened for, ruled required 2026-11-09
 
