@@ -162,6 +162,9 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-09-16  gui/CLAUDE.md                1028 -> 1036 for WP-1425's one rule: the watch page's
 #                                                          port of lib/resize.ts, pinned by a text-compared
 #                                                          case table, and the dist digest that hashes tests
+#   2026-11-09  gui/CLAUDE.md                1060 -> 1067 for WP-2133: the File menu's three rules, each a seam
+#                                                          a later verb must keep. Approved by the maintainer
+#                                                          2026-11-09; landed 1067, no headroom
 #   2026-09-03  docs/ROADMAP.md               621 -> 645  for the 2026-09-03 issue triage (1332-1341): ten rows
 #                                                          across three existing sections and one new one, landed 641
 #   2026-09-08  docs/ROADMAP.md               645 -> 648  for WP-1343 (issue #277, the magnetic
@@ -614,11 +617,13 @@ SIZE_CAPS: dict[str, int | None] = {
     # them. It governs work outside the WP that measured it — an edit to a
     # token here is a rebuild, and an edit in the wrong file is a test
     # failure nobody can act on without the rule. Landed at 1045.
+    # +3 (WP-1442): the node floor the dist build needs.
     # +4 (WP-1470): the scene rules' Python twin, which a session editing
     # structure3d.ts meets only as a red vitest otherwise.
-    # +7 (WP-2133): the File menu's three rules, each a seam a later verb
-    # must keep (the paths a move repoints, the destination gate, the close mark).
-    "gui/CLAUDE.md": 1067,   # +3: the node floor the dist build needs (WP-1442)
+    # 1060 -> 1067 (WP-2133, approved by the maintainer 2026-11-09): the File
+    # menu's three rules, each a seam a later verb must keep (the paths a move
+    # repoints, the destination gate, the close mark).  Landed 1067, no headroom.
+    "gui/CLAUDE.md": 1067,   # WP-2133's File menu rules; process.md § The caps diary
     # 275 -> 283 (WP-1426): a third way a guard goes quiet, and the only one of
     # the three that is about the instrument rather than the assertion — a
     # browser's layout-shift entry cannot see inside a plotly div, so a
