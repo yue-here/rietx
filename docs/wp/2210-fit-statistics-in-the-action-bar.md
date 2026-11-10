@@ -91,7 +91,7 @@ nothing reads the data or decides for a fit. The judgement shown is the report's
 - [x] Vitest: the bar shows the statistics only while the graphs are hidden, and the
   judgement is words, not a chip. Browser: the slot holds its longest content, a refine with
   the graphs hidden moves nothing, and the shell sweep runs with the graphs hidden too.
-- [ ] The GUI chapters say where the statistics are in each layout; the dist rebuilt;
+- [x] The GUI chapters say where the statistics are in each layout; the dist rebuilt;
   screenshots beside the prototype's at the same window size for the PR.
 - [ ] Skill: none. The agent skill drives the python API, and no route changes.
 

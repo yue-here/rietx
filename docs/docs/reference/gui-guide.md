@@ -46,8 +46,10 @@ below, and the sash then drags up and down.
 | `Cancel` | stop the run between iterations |
 | `⌘K` | every command, with the Python call it makes |
 
-`Rwp` and `GoF` are on the title line over the pattern. `⚠ not a fit yet`
-appears beside them past an Rwp of {{ MATURITY_MAX_RWP }}.
+`Rwp` and `GoF` are on the title line over the pattern. While the graphs are
+hidden they move to the action bar, right of `Refine`. `not a fit yet` appears
+beside them past an Rwp of {{ MATURITY_MAX_RWP }}, and a click on it gives the
+report's reason.
 
 ### The File menu
 
@@ -90,6 +92,7 @@ One row under the panel column, on every tab.
 | the pending count | how many Parameters and Interactive edits wait, plus one for an edited plan, and the first refusal if one is invalid |
 | `Revert` / `Apply` | drop or apply the pending edits: the Parameters edits first, then the Interactive values, then the plan |
 | `Refine` | run the choice; it reads `Apply and refine` while edits wait, and applies them first |
+| `Rwp` and `GoF` | the fit's statistics, here only while the graphs are hidden; a dash before the first fit |
 
 `⌘⏎` (`Ctrl+Enter` off a Mac) presses `Refine`, except inside the Text
 document, where it applies the document. A refused edit runs nothing. A plan

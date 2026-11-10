@@ -13,10 +13,10 @@
    * border (`gui/STYLE.md` § Components), and no number is coloured by it
    * (§ Colour). Its message is one click away through `<Help>` (WP-1203).
    *
-   * Every number has a slot as wide as its widest value, so a changing value
-   * never moves the words after it. With `reserve`, the judgement's words keep
-   * their room while the fit is mature too, invisibly, so a fit finishing moves
-   * nothing in the bar (principle 4).
+   * With `reserve` (the bar), every number has a slot as wide as its widest
+   * value, a dash fills it before a fit, and the judgement's words keep their
+   * room while the fit is mature, invisibly, so a fit finishing moves nothing
+   * in the bar (principle 4).
    */
   import Help from "../Help.svelte";
 
@@ -40,10 +40,10 @@
 </script>
 
 <span class="fitstats">
-  <span class="stat">Rwp <strong class="num pct mono tabular">{rwp === null ? "—"
+  <span class="stat">Rwp <strong class="num pct mono tabular" class:slot={reserve}>{rwp === null ? "—"
     : `${(rwp * 100).toFixed(3)}%`}</strong></span>
   {#if gof !== null || reserve}
-    <span class="stat muted">GoF <span class="num mono tabular">{gof === null ? "—"
+    <span class="stat muted">GoF <span class="num mono tabular" class:slot={reserve}>{gof === null ? "—"
       : gof.toFixed(3)}</span></span>
   {/if}
   {#if immature}
@@ -61,16 +61,17 @@
     white-space: nowrap;
   }
 
-  /* Each slot holds the widest plain number `gui/STYLE.md` writes: "9999.999"
-     for GoF, and "9999.999%" for Rwp, which passes 1000 % on a model that has
-     not met its data (measured 1067 % before a synthetic project's first
-     scale). */
-  .num {
+  /* With `reserve`, each slot holds the widest plain number `gui/STYLE.md`
+     writes: "9999.999" for GoF, and "9999.999%" for Rwp, which passes 1000 % on
+     a model that has not met its data (measured 1067 % before a synthetic
+     project's first scale). The title line reserves nothing: its statistics
+     are held right, so a slot there would add a gap and hold nothing still. */
+  .slot {
     display: inline-block;
     min-width: 8ch;
   }
 
-  .num.pct {
+  .slot.pct {
     min-width: 9ch;
   }
 

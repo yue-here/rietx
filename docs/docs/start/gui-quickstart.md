@@ -138,13 +138,13 @@ each one the Python call that would have done the same thing. That echo is the
 on-ramp described in [](../reference/gui-power.md). You can always find out what a button you
 pressed actually did.
 
-When it stops, `Rwp` appears on the title line over the pattern. Lower is better. What counts as good
+When it stops, `Rwp` appears on the title line over the pattern, or right of `Refine` while the graphs are hidden. Lower is better. What counts as good
 depends on the data, and [Agreement statistics](../theory/estimation.md#agreement-statistics)
 defines Rwp beside the expected value it is judged against.
 
 :::{admonition} A hopeless fit says so
 :class: note
-Past an Rwp of {{ MATURITY_MAX_RWP }} the header shows `⚠ not a fit yet` beside
+Past an Rwp of {{ MATURITY_MAX_RWP }} the title line shows `not a fit yet` beside
 the number, and the run's own status pill may still read `converged`. Both are true: the
 optimiser stopped moving, and the model is not yet describing the data. Believe
 the warning, and go to the Report.
