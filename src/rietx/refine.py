@@ -83,7 +83,7 @@ from .model.forward import (
     window_loss,
 )
 from .model.geometry import cell_volumes, geometry_table
-from .model.microstructure import microstructure_table
+from .model.microstructure import floored_paths, microstructure_table
 from .model.origin import CompiledOrigin, OriginPhaseRows, compile_origin
 from .model.profiles.caglioti import (
     SCHERRER_K,
@@ -3486,6 +3486,32 @@ class Refinement:
         recorded only once the history tree exists.
         """
         table = self._working_table()
+        by_path = self._refuse_value_edits(table, values)
+        for path, value in values.items():
+            by_path[path].value = float(value)
+        table.refresh_ties()  # dependents follow their sources (b←a, x←dof)
+        self._write_back(table)
+        # a value set next to its own image is the twin case #1007 describes
+        self._merge_twins()
+        # the fitted curve and statistics described the *old* values
+        self._invalidate_fit()
+        if self.history is None:
+            return
+        node = self.history.add(
+            parents=[self._head_id] if self._head_id else [],
+            action=NodeAction(kind="set_value", values=dict(values)),
+            state=self.snapshot())
+        self._head_id = node.id
+
+    def _refuse_value_edits(self, table: ParameterTable,
+                            values: dict[str, float]) -> dict:
+        """``table``'s entries by path, once every edit in ``values`` is legal.
+
+        :meth:`set_values`' refusals, one check so that a caller previewing
+        values without applying them (the GUI's ``POST /api/preview``,
+        WP-2125) refuses exactly what applying them would, in the same
+        sentences.  Raises ``ValueError`` on the first refusal.
+        """
         by_path = {e.path: e for e in table.entries}
         unknown = [p for p in values if p not in by_path]
         if unknown:
@@ -3513,21 +3539,7 @@ class Refinement:
             if not (e.lo <= float(value) <= e.hi):
                 raise ValueError(
                     f"{path}={value} lies outside its bounds [{e.lo}, {e.hi}]")
-        for path, value in values.items():
-            by_path[path].value = float(value)
-        table.refresh_ties()  # dependents follow their sources (b←a, x←dof)
-        self._write_back(table)
-        # a value set next to its own image is the twin case #1007 describes
-        self._merge_twins()
-        # the fitted curve and statistics described the *old* values
-        self._invalidate_fit()
-        if self.history is None:
-            return
-        node = self.history.add(
-            parents=[self._head_id] if self._head_id else [],
-            action=NodeAction(kind="set_value", values=dict(values)),
-            state=self.snapshot())
-        self._head_id = node.id
+        return by_path
 
     # ------------------------------------------------------------------
     # user constraints (WP-1070)
@@ -7921,16 +7933,19 @@ def _constraint_diagnostics(stage_name: str, outcome) -> list[Diagnostic]:
         return []
     # which block bound each step, by its label (WP-1938 D7): the Stephens
     # cone's end in ``.microstrain``, the Γ_G² floor's start with
-    # ``instrument.profile``
+    # ``instrument.profile (`` (the Γ_L floor's with ``instrument.profile
+    # Lorentzian``).  A joint fit prefixes a histogram's block with
+    # ``hist.{h} `` (WP-1325), read past here.
     by = getattr(outcome, "truncated_by", None) or {}
     which = "; ".join(f"{label}: {k}" for label, k in sorted(by.items()))
+    bare = [re.sub(r"^hist\.\d+ ", "", label) for label in by]
     suggestion = ("Vary the starting seed and quote the values only if they "
                   "survive.")
-    if any(label.endswith(".microstrain") for label in by):
+    if any(label.endswith(".microstrain") for label in bare):
         suggestion += (" The STEPHENS_STRAIN_NOT_POSITIVE protocol row "
                        "applies to the strain cone, although that guard stays "
                        "silent while the default LM driver holds the cone.")
-    if any(label.startswith("instrument.profile") for label in by):
+    if any(label.startswith("instrument.profile (") for label in bare):
         suggestion += (" At some reflection the data asked for no Gaussian "
                        "width (the Γ_G² floor, 1e-8 deg²), so U, V, W and the "
                        "phase's Gaussian size and strain describe that floor.")
@@ -8978,7 +8993,7 @@ def _extra_peak_tick_support(model: CompiledModel,
 
 
 def _tick_rows(model: CompiledModel, structure: Structure,
-               values: dict[str, float]
+               values: dict[str, float], *, support: bool = True
                ) -> tuple[dict[str, list[float]], dict[str, list[list[int]]],
                           dict[str, list[float]]]:
     """Every tick row of one histogram: positions, Miller indices and
@@ -8989,6 +9004,11 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     task 7), so a joint fit draws the rows a single fit draws: a magnetic
     phase's own ``"<phase> (magnetic)"`` row (issue #278) and the declared
     peaks' ``EXTRA_TICK_KEY`` row as well as one row per phase.
+
+    ``support=False`` skips the support, which evaluates every reflection's
+    window and cost 11 ms of the GUI preview's 20 on the fluorapatite
+    example (WP-2125). Its rows then carry NaN, and the positions and indices
+    are unchanged.
     """
     # Tick positions cover **every** emission line, not just the primary one.
     # The calculated pattern really does have a peak at each Kα2 position, and
@@ -9023,7 +9043,8 @@ def _tick_rows(model: CompiledModel, structure: Structure,
         # (H, m), not H: a satellite is labelled by its order (WP-1326)
         pos, hkl = model.reflection_positions(ip, values)
         n_lines = len(model.line_wavelengths)
-        sup = _reflection_tick_support(model, ip, values, n_lines)
+        sup = (_reflection_tick_support(model, ip, values, n_lines) if support
+               else np.full(len(pos), np.nan))
         keep = np.isfinite(pos)
         if cp.magnetic is not None:
             # issue #278: a magnetic phase's reflections are drawn as their
@@ -9082,7 +9103,9 @@ def _tick_rows(model: CompiledModel, structure: Structure,
     extra_ticks = model.extra_peak_tick_positions(values)
     if extra_ticks:
         ticks[EXTRA_TICK_KEY] = extra_ticks
-        tick_support[EXTRA_TICK_KEY] = _extra_peak_tick_support(model, values)
+        tick_support[EXTRA_TICK_KEY] = (
+            _extra_peak_tick_support(model, values) if support
+            else [math.nan] * len(extra_ticks))
     return ticks, tick_hkl, tick_support
 
 
@@ -9133,9 +9156,21 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # tested, so a tied row — in `parameters`, absent from the free vector —
     # reports None, and so does every row when no guard ran at all
     # (`replay`).  A free row on a floor of 0 is tested like any other bound
-    # (WP-1938), and reads True under either code (WP-1929).
-    tested = set(table.free_paths) if guard is not None else set()
+    # (WP-1938), and reads True under either code (WP-1929).  A tied row the
+    # LM step held on its own limit is a finding too (WP-1325,
+    # ``staged.tied_bound_findings``), so it reads True rather than None.
     on_bound = {p for f in guard.at_bounds for p in f.paths} if guard is not None else set()
+    tested = set(table.free_paths) | on_bound if guard is not None else set()
+    # the FLOOR_HIT half of the same findings, read by the microstructure
+    # block below (WP-1914).  With no guard (``replay``) the recorded
+    # FLOOR_HIT diagnostics are the test, as ``cell_runaway`` falls back to
+    # them below, so the table cannot contradict a warning the result carries.
+    # A tied width the LM step held on its own floor is named here directly
+    # (WP-1325), and ``floored_paths`` adds the ones tied to a floored source
+    floors = floored_paths(table, (
+        {p for f in guard.at_bounds if f.code == "FLOOR_HIT" for p in f.paths}
+        if guard is not None else
+        {p for d in diagnostics if d.code == "FLOOR_HIT" for p in d.where}))
     # A CELL_RUNAWAY finding's own message says the named cell's value is
     # "not a measurement", so its esd is withheld while the row stays (it is
     # still a free column; WP-1301's hold is what drops a row).  Keyed on the
@@ -9228,10 +9263,13 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # the three cannot attribute one coefficient to different wavelengths.
     # ``stderr_phys`` rather than a second ``stderr_physical`` call: with a
     # correlation matrix that build is a dense n x n, which a Pawley table
-    # makes large, and the two calls would return the same dict.
+    # makes large, and the two calls would return the same dict.  ``floors``
+    # is the FLOOR_HIT half of the bound findings ``at_bound`` projects
+    # above, so a width solve="trf" stopped a hair above zero reads absent
+    # exactly where LM's lands on it (WP-1914).
     microstructure = microstructure_table(
         structure, values, wavelength=_longest_line_wavelength(model),
-        esds=stderr_phys)
+        esds=stderr_phys, floors=floors)
 
     # WP-1343: whether the magnetic peaks are broader than the profile drew
     # them, read off the converged residual's *shape* rather than from any

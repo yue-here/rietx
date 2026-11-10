@@ -18,6 +18,7 @@ import pytest
 
 import rietx as rx
 from rietx.model.forward import compile_model
+from rietx.optimize import least_squares
 from rietx.optimize.least_squares import _jacobian_for, _make_residual
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
@@ -573,11 +574,14 @@ def test_a_tie_holds_its_source_where_the_dependents_ceiling_is(four_site_patter
     ``bounds()`` the window is applied in, so a source held somewhere it never
     declared comes back as ``BOUND_HIT`` like any other bound a stage imposed.
 
-    Without the window the master reaches 0.6697, the dependent 0.3348, and the
-    first thing to notice is pydantic inside ``apply_to_models`` — measured
-    below, by disabling the window on a copy of the same fit.
+    Without the window the dependent's own row holds it, inside the LM step
+    (WP-1325, ``least_squares.tied_bound_inequalities``, which builds it only
+    where the box does not already hold it), and the fit lands in the same
+    place.  Without either, the master reaches 0.6697, the dependent 0.3348,
+    and the first thing to notice is pydantic inside ``apply_to_models`` —
+    measured below, by disabling both on a copy of the same fit.
     """
-    def run(*, window: bool) -> tuple[object, dict[str, float]]:
+    def run(*, window: bool, rows: bool = True) -> tuple[object, dict[str, float]]:
         structure, instrument = four_site_models(true=False)
         structure.phases[0].atoms[0].biso.value = 0.3    # starts well inside 0.66
         structure.phases[0].atoms[1].biso.value = 0.15   # value first: max validates it
@@ -591,6 +595,9 @@ def test_a_tie_holds_its_source_where_the_dependents_ceiling_is(four_site_patter
             # down under ``-n auto``, in whichever worker ran this one first.
             monkeypatch.setattr(ParameterTable, "_derive_tie_windows",
                                 lambda self, tied, d: {})
+        if not rows:
+            monkeypatch.setattr(least_squares, "tied_bound_inequalities",
+                                lambda table, x0, lo, hi: [])
         result = ref.fit(four_site_pattern, plan=rx.RefinementPlan(stages=[
             rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"],
                      max_iter=30),
@@ -610,9 +617,15 @@ def test_a_tie_holds_its_source_where_the_dependents_ceiling_is(four_site_patter
     assert any(d.code == "BOUND_HIT" and BISOS[0] in d.where
                for d in result.diagnostics)
 
+    result, rows = run(window=False)
+    # the row's face sits TIED_BOUND_MARGIN of its scale inside the ceiling
+    assert rows[BISOS[1]] == pytest.approx(0.33, rel=1e-8)
+    assert rows[BISOS[1]] <= 0.33
+    assert any(d.code == "CONSTRAINT_ACTIVE"
+               and f"{BISOS[1]} bounds" in d.message for d in result.diagnostics)
     with pytest.raises(ValueError, match=r"phases\.0\.atoms\.1\.biso=0\.33.*"
                                          r"0\.5\u00b7phases\.0\.atoms\.0\.biso"):
-        run(window=False)
+        run(window=False, rows=False)
 
 
 # ------------------------------------------ a tie onto a coordinate DOF (1432)

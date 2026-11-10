@@ -25,8 +25,8 @@ redesign is ported in five pieces, in this order:
 | Piece | WP | What it builds |
 |---|---|---|
 | 1 | [2123](../wp/2123-the-layout-shell.md) | the layout shell: graphs on the left in tabs with a title line, the model panel on the right in tabs with a sash, both panels collapsible, a one-row action bar with Apply and refine, the segmented register redrawn, new colour tokens, a one-column layout for a narrow window, and a browser test that no click moves the layout unless it asks to |
-| 2 | not yet filed | the Parameters panel: one row per atom, number slots that never move, the padlock as `hold`, the floating editor |
-| 3 | not yet filed | the Plan tab on the existing plan routes, read top to bottom as a recipe |
+| 2 | [2126](../wp/2126-the-parameters-panel.md) | the Parameters panel: one row per atom, number slots that never move, the padlock as `hold`, the floating editor |
+| 3 | [2127](../wp/2127-the-plan-tab.md) | the Plan tab on the existing plan routes, read top to bottom as a recipe |
 | 4 | not yet filed | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | not yet filed | the Background tab: a route serving the preview's matrices, a held Chebyshev term, the P-spline |
 
@@ -53,10 +53,10 @@ the piece that touches it or a WP of its own.
   refusal reads "a extinction run".
 - Adopt is gated to `best_or_none()` (`ADOPT_GATED`). The maintainer ruled on 2026-11-08 that a
   person may adopt any candidate, with its grade and caveats shown beside Adopt and recorded in
-  the history node.
+  the history node. WP-2124 lifted the gate on the route and WP-2130 offers Adopt on every row.
 - The Peaks panel hides `systems_searched`, `search_complete` and the run-level `INDEX_*`
   diagnostics whenever there are candidates, against WP-1042's rule that what was not reached
-  is said loudly.
+  is said loudly. WP-2130 says it above the list in every case.
 - `.rxt` renders no block for user variables, and its tie refusal names only symmetry ties.
 - The Le Bail check's absent lines arrive in its own refined frame, about 0.011° from the
   candidate's ticks on fluorapatite; they should be served as tick indices.
@@ -65,7 +65,7 @@ the piece that touches it or a WP of its own.
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
 - `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
-- `--plot-peak` (purple) loses to the data crosses as a mark colour.
+- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer.
 - The pick route takes only `shoulders`; the 2θ range and `flag_contamination` need to reach it.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08.
@@ -74,8 +74,9 @@ the piece that touches it or a WP of its own.
 - The Model and Text panels keep their own Apply beside the action bar's, outlined so the bar's
   Refine stays the one filled button, because WP-2123 routes only the Parameters edits through
   the action bar. Their edits still wait on two Apply buttons in one view.
-- A run started from the Plan, Report or Series panel, or by the `.` key, does not apply the
-  Parameters edits waiting in the action bar; the bar's Refine and the `r` key do (WP-2123).
+- A run started from the Report or Series panel, or by the `.` key, does not apply the
+  Parameters edits waiting in the action bar. The bar's Refine, the `r` key (WP-2123) and the
+  Plan panel's `Run this stage` (WP-2127) do.
 
 ## Acceptance
 

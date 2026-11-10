@@ -254,7 +254,10 @@ describe("one filled primary per view", () => {
       "panels/NewProject.svelte": 1,
       "panels/Start.svelte": 1,
     };
-    const OTHER = /\bclass="[^"]*\b(ghost|tab|pick|link|help)\b/;
+    // `.ink` is the Parameters panel's number (WP-2126): the value itself,
+    // tinted because it can be edited, whose press opens the editor over it.
+    // It carries no fill of the accent, so it is no second primary.
+    const OTHER = /\bclass="[^"]*\b(ghost|tab|pick|link|help|ink)\b/;
     const filled: Record<string, number> = {};
     const tags: string[] = [];
     for (const rel of styledFiles()) {
