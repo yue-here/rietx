@@ -124,7 +124,7 @@ suggestions, and this is none of them).
 - [x] 1. File this WP and give it the milestone's "Peaks and indexing" row.
 - [x] 2. Per-line curves: `PeakEditor.curves` serves `lines` per group; a pytest holds their sum
   to the group's model.
-- [ ] 3. `lib/peaks.ts` helpers for the steps, filters, groups to look at, the candidate columns
+- [x] 3. `lib/peaks.ts` helpers for the steps, filters, groups to look at, the candidate columns
   and relations; vitest.
 - [ ] 4. The Peaks tab in four steps (`Peaks.svelte`), the pick options sent to the route.
 - [ ] 5. The fit windows with per-line curves (`PeakFits.svelte`) in the Single peaks graph

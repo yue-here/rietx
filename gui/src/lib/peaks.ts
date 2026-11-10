@@ -32,6 +32,9 @@ export interface GroupCurve {
   delta: number[];
   chi2_red: number;
   n_components: number;
+  /** each line's own curve over the window, model only, lowest 2θ first, with
+   *  the row it draws (WP-2202); they sum to `y_fit − y_env` */
+  lines?: Array<{ index: number; y: number[] }>;
 }
 
 export interface PeaksPayload {
@@ -274,6 +277,7 @@ export interface Candidate {
     predicted_but_absent_uncancellable_in_window?: number | null;
   } | null;
   diagnostics: Array<{ level: string; code: string; message: string }>;
+  supercell_checks?: Array<{ parent_cell: number[]; index: number; verdict: string }> | null;
 }
 
 /**
@@ -381,4 +385,150 @@ export function collectTo(candidate: Candidate): number | null {
  */
 export function formatHkl(hkl: readonly number[]): string {
   return `(${hkl.map((v) => (v < 0 ? `−${Math.abs(v)}` : String(v))).join(" ")})`;
+}
+
+// ----------------------------------------------------------------------
+// the four steps (WP-2202)
+// ----------------------------------------------------------------------
+/** The workflow's steps, as the maintainer named them (2026-11-07). */
+export const PEAK_STEPS = ["Pick peaks", "Fit peaks", "Index", "Judge"] as const;
+
+export type PeakFilter = "all" | "used" | "unused";
+
+/**
+ * The rows a filter shows, in 2θ order. `keep` holds the rows ticked or
+ * unticked since the filter was chosen: they stay until it is chosen again,
+ * because a row that left the list on a tick would move the layout on a click
+ * that did not ask to (round 11b call 22; `gui/STYLE.md` principle 4).
+ */
+export function filterPeaks(rows: readonly PeakRow[], filter: PeakFilter,
+                            keep: ReadonlySet<number> = new Set()): PeakRow[] {
+  return rows
+    .filter((p) => filter === "all" || keep.has(p.index)
+      || (filter === "used") === p.usable)
+    .sort((a, b) => a.two_theta - b.two_theta);
+}
+
+/** The words a row's note column says: who placed it, then its flags. */
+export function peakNote(p: PeakRow, label: (flag: string) => string): string {
+  const words: string[] = [];
+  if (p.origin === "manual") words.push("added by you");
+  else if (p.origin === "edited") words.push("moved by you");
+  for (const f of p.flags) words.push(label(f));
+  return words.join(", ");
+}
+
+/** A group whose window fit is worth a look has a reduced χ² above this. */
+export const LOOK_CHI2_RED = 10;
+
+/**
+ * The flags that say a group's window fit itself is in doubt (round 11 call
+ * 13). Asymmetry is not one: measured on fluorapatite it is on 36 lines, so it
+ * picks out nothing, and χ²ᵣ > 3 marks 84 of 117 groups for the same reason.
+ * A duplicate, a weak line or a ghost is a fact about the line, not the fit.
+ */
+export const LOOK_FLAGS: readonly string[] = [
+  "position_at_bound", "unresolved_shoulder", "unresolved_split", "width_capped",
+  "not_separable", "kalpha2_residual",
+];
+
+export interface GroupRow {
+  group: number;
+  lo: number;
+  hi: number;
+  n: number;
+  chi2_red: number;
+  flags: string[];
+  look: boolean;
+}
+
+/** One row per fitted group, in 2θ order, with whether it is worth a look. */
+export function groupRows(groups: readonly GroupCurve[],
+                          rows: readonly PeakRow[]): GroupRow[] {
+  return groups.map((g) => {
+    const members = rows.filter((p) => p.group === g.group);
+    const flags = [...new Set(members.flatMap((p) => p.flags))];
+    return {
+      group: g.group,
+      lo: g.two_theta[0],
+      hi: g.two_theta[g.two_theta.length - 1],
+      n: g.n_components,
+      chi2_red: g.chi2_red,
+      flags,
+      look: g.chi2_red > LOOK_CHI2_RED || flags.some((f) => LOOK_FLAGS.includes(f)),
+    };
+  }).sort((a, b) => a.lo - b.lo);
+}
+
+/** A number with its esd in the last place, `9.3750(3)`, or bare without one. */
+function withEsd(v: number, esd: number | undefined, places = 4): string {
+  if (!esd || !(esd > 0)) return v.toFixed(places);
+  return `${v.toFixed(places)}(${Math.max(1, Math.round(esd * 10 ** places))})`;
+}
+
+/**
+ * A candidate's cell as a crystallographer writes it: only the lengths and
+ * angles its system leaves free, `a = 9.3750, c = 6.8900 Å`.
+ */
+export function cellLine(c: Pick<Candidate, "cell" | "cell_esd" | "system">,
+                         esd = false): string {
+  const [a, b, cc, al, be, ga] = c.cell;
+  const e = esd ? c.cell_esd ?? [] : [];
+  const f = (i: number, v: number) => withEsd(v, e[i]);
+  switch (c.system) {
+    case "cubic": return `a = ${f(0, a)} Å`;
+    case "hexagonal": case "trigonal": case "tetragonal":
+      return `a = ${f(0, a)}, c = ${f(2, cc)} Å`;
+    case "orthorhombic": return `a = ${f(0, a)}, b = ${f(1, b)}, c = ${f(2, cc)} Å`;
+    case "monoclinic":
+      return `a = ${f(0, a)}, b = ${f(1, b)}, c = ${f(2, cc)} Å, β = ${withEsd(be, e[4], 3)}°`;
+    default:
+      return `a = ${f(0, a)}, b = ${f(1, b)}, c = ${f(2, cc)} Å, `
+        + `α = ${withEsd(al, e[3], 3)}°, β = ${withEsd(be, e[4], 3)}°, γ = ${withEsd(ga, e[5], 3)}°`;
+  }
+}
+
+const sameCell = (x: readonly number[], y: readonly number[]) =>
+  x.length === y.length
+  && x.every((v, i) => Math.abs(v - y[i]) <= 1e-9 * Math.max(1, Math.abs(v)));
+
+/**
+ * How candidate `i` relates to a candidate above it, in words, or "".
+ *
+ * Marked, never merged (round 11 call 8): every candidate stays a row. Only
+ * the relations rietx states are named. "Same cell" is the same numbers
+ * printed under another lattice label; a supercell is a `supercell_checks`
+ * entry whose parent is another reported row. Relations rietx does not compute
+ * ("c doubled", "a × √3") are a follow-up of WP-2202.
+ */
+export function candidateRelation(cands: readonly Candidate[], i: number): string {
+  const c = cands[i];
+  const text = cellText(c.cell);
+  for (let k = 0; k < i; k++) {
+    if (cellText(cands[k].cell) === text) return `same cell as #${k + 1}`;
+  }
+  for (const check of c.supercell_checks ?? []) {
+    const k = cands.findIndex((o) => sameCell(o.cell, check.parent_cell));
+    if (k >= 0 && k !== i) return `#${k + 1} with ${check.index}× the volume`;
+  }
+  return "";
+}
+
+/** Lines the search used that this cell leaves unindexed. */
+export function unindexedOf(c: Candidate): number {
+  return Math.max(0, c.n_lines - c.n_indexed);
+}
+
+/** The absent column's count and what it is a share of, or null unchecked. */
+export function absentOf(c: Candidate): { absent: number; of: number } | null {
+  if (!c.lebail) return null;
+  const of = c.lebail.absent_source === "line_screen" && c.lebail.n_lines_screened != null
+    ? c.lebail.n_lines_screened : c.lebail.n_reflections;
+  return { absent: c.lebail.predicted_but_absent, of };
+}
+
+/** Seconds as `m:ss`, the search clock's format. */
+export function clock(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
