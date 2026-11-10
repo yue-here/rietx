@@ -397,6 +397,60 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
     assert not moved, moved
 
 
+#: The Background tab's own controls, beside the shell's landmarks (WP-2129).
+BACKGROUND_LANDMARKS = LANDMARKS + [
+    "section[aria-label=background] .host", "section[aria-label=background] .knobs",
+    "section[aria-label=background] .knobs > *", ".term",
+]
+
+
+def test_the_background_tab_holds_still_under_a_hold_and_a_band_press(
+        browser, tmp_path_factory):
+    """WP-2129. Holding a term moves the head and refetches the band; pressing
+    ×5 redraws it. Neither asks for a layout change, so no landmark moves, the
+    tab's own controls included. A project of its own: the hold is written."""
+    from pathlib import Path
+
+    httpd, client = _serve(tmp_path_factory, "layout-background")
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        # the fixture's stage freed the scale alone; free the terms, or no band
+        status, body = client.patch("/api/params", {"vary": {"instrument.background.*": True}})
+        assert status == 200, body
+        page = _open(browser, url, WIDTHS["wide"])
+        page.locator(".plotcol > nav.tabs").get_by_role("button", name="Background", exact=True).click()
+        page.wait_for_selector(".term input:not([disabled])")
+        page.wait_for_function(
+            "document.querySelector('.gtitle .what').textContent === 'Background at the current values'")
+        page.wait_for_selector(".band .segmented button:not([disabled])")
+        _frames(page)
+        out = Path(__file__).parent / "output"
+        out.mkdir(exist_ok=True)
+        page.screenshot(path=str(out / "gui_background_tab.png"))
+        before = page.evaluate(SNAP, BACKGROUND_LANDMARKS)
+
+        head = client.get("/api/project")[1]["head"]
+        page.locator(".term", has_text="c1").locator("input").click()
+        page.wait_for_function(
+            "document.querySelector('.console')?.textContent"
+            ".includes('ref.hold(\"instrument.background.c1\")')")
+        page.wait_for_selector(".term input:checked:not([disabled])")
+        _frames(page)
+        assert client.get("/api/project")[1]["head"] != head
+        held = page.evaluate(SNAP, BACKGROUND_LANDMARKS)
+
+        page.locator(".band .segmented button", has_text="×5").click()
+        _frames(page)
+        page.screenshot(path=str(out / "gui_background_tab_x5.png"))
+        pressed = page.evaluate(SNAP, BACKGROUND_LANDMARKS)
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert not _moved(before, held), _moved(before, held)
+    assert not _moved(before, pressed), _moved(before, pressed)
+
+
 #: The Interactive tab's own rows (WP-2128): a drag or a typed value changes a
 #: number and a thumb, and never where a row sits.
 SLIDER_ROWS = [".side .panel:not(.hidden) .slider", ".side .panel:not(.hidden) .slider .line > *"]
@@ -524,7 +578,7 @@ PLAN_MARK = """(index) => {
 
 def _open_plan(browser, url: str, width: int):
     page = _open(browser, url, width)
-    page.locator(".side > nav.tabs button", has_text="Plan").click()
+    page.locator(".side > nav.tabs").get_by_role("button", name="Plan", exact=True).click()
     page.wait_for_selector("section[aria-label=plan] li.stage .rung summary")
     _frames(page)
     return page
