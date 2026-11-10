@@ -128,6 +128,10 @@ the piece that touches it or a WP of its own.
   `gui/STYLE.md` covers of these sorts them: drop the covered ones from the rulebook, merge the
   partly covered ones into the guide, and bring the departures and the uncovered ones to the
   maintainer, since visual questions go to him (WP-2134's and WP-2142's next step).
+- The workflow menu (WP-2204) copies the File menu's drawing rather than sharing it, because
+  two open pieces were rewriting `app.css`. Both menus want one register, arrow keys that move
+  through the items, focus on the first item when a menu opens, and the shell's single-key
+  shortcuts held while a menu is open.
 
 ## Acceptance
 
