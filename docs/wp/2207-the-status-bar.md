@@ -1,6 +1,6 @@
 # WP-2207 — the status bar
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — claimed by a ghostshift runner
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built; PR #1521 open with WP-2206, waiting on review
 Depends on: 2123
 Priority: P2 2026-11-10 — a feature the open milestone was opened for; the bottom panel (2206) is toggled from it
 
@@ -77,12 +77,12 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 ## Tasks
 
 - [x] Claim: this file, the index, the milestone's piece table.
-- [ ] `panels/StatusBar.svelte` and `lib/statusbar.ts`: the console toggle at the left, the run
+- [x] `panels/StatusBar.svelte` and `lib/statusbar.ts`: the console toggle at the left, the run
   state beside it, `Cancel` at the right end; the header's pill and `Cancel` go. Vitest for the
   run-state words and the toggle.
-- [ ] The layout browser test covers a project's first run, the status bar's landmarks and its
+- [x] The layout browser test covers a project's first run, the status bar's landmarks and its
   toggle; the dist rebuilt.
-- [ ] The GUI chapters: the header table, a status bar section, the quickstart's run section;
+- [x] The GUI chapters: the header table, a status bar section, the quickstart's run section;
   the screenshot driver waits on the status bar; the screenshots retaken.
 
 ## Acceptance
@@ -102,6 +102,30 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-2123 (the layout shell and its layout-shift test), WP-2206 (the bottom panel).
 
 ## Handover log
+
+- **2026-11-10** — The window has a status bar along its foot, and a project's first run no
+  longer shifts the header. The run's state and `Cancel` left the header for the bar: the
+  words sit in a slot that takes the room left, so `idle` turning into a stage name moves
+  nothing, and a browser test now runs a first run at both window widths to hold it. The bar's
+  left end is the `Console` toggle that shows WP-2206's bottom panel. PR #1521 carries both WPs.
+  *Done*: `panels/StatusBar.svelte`, `lib/statusbar.ts` (the words, the toggle's title, the
+  platform's modifier) with vitest; the header's pill and Cancel removed from `App.svelte`;
+  `test_a_first_run_moves_nothing` and `test_the_console_toggle_stays_where_it_was` in
+  `tests/test_gui_layout_browser.py`; the guide's status bar table, the quickstart's run
+  section and the keyboard table; the screenshot driver waits on `.statusbar .run`.
+  *Rule kept out of gui/CLAUDE.md for its cap*: words that change length live in a slot that
+  takes the room left (`flex: 1 1 0`, ellipsised, `title` carrying the whole words).
+  *Open visual questions for the maintainer* (each taken nearest the prototype; screenshots
+  at 1440x900 beside the prototype's are listed by path in PR #1521):
+  1. `Cancel` sits at the status bar's right end, beside the run state. The prototype's status
+     bar has no Cancel; the alternative is to keep it in the header, where it was. Moving it
+     is what removes the header's shift.
+  2. The run state is plain words (STYLE's Fact: words without a box), so the header's `.pill`
+     box is gone. The alternative is a pill in the status bar.
+  3. The toggle's tooltip reads "Show the console and history" with the shortcut on a second
+     line. The prototype's reads "console".
+  *Measured*: see WP-2206's entry; both WPs ran one set of gates.
+  Next: the maintainer's review of PR #1521 and the three questions above.
 
 - **2026-11-10** — created and claimed by a ghostshift runner, with WP-2206 on one branch. No
   open WP owned the status bar: the milestone record listed it under "Designed, not yet filed".
