@@ -165,6 +165,7 @@ Claude inferred rules 1 to 12 from the rulings on background points and peak pic
 - Every curve and the data can be hidden and shown. Their labels sit in a right-hand gutter and act as the switches. A hidden curve is not remembered, so a curve a later build adds arrives drawn. [Yue 2026-11-07; inferred, WP-1032]
 - A preview is drawn in the accent, and the last fit turns grey only while a preview exists. [inferred]
 - No gridlines, no title inside the plot, no shadow. [Yue 2026-11-07, adopting rietx's plot conventions]
+- Every curve and mark stays inside the plot area at any zoom. Nothing is drawn into the axis margins. [inferred, WP-2200]
 - A legend puts its symbols in one column on the left, with the labels aligned after them. A colour key goes in empty space inside the plot, never in a margin of its own. [Yue 2026-11-08]
 - The hover readout is a strip under the plot, never a box that follows the pointer. [inferred, WP-1213]
 - Shading for an excluded region spans every pane and stops at the measured range. [inferred, WP-1033]

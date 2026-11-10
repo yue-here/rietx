@@ -4934,6 +4934,46 @@ describe("the peaks tab (WP-1027)", () => {
     expect(host.querySelector<HTMLElement>(".rx-ring")!.style.borderColor).toBe(probe.style.color);
   });
 
+  it("clips every layer it draws to the plot area, at a zoom that cuts one", async () => {
+    // the report (WP-2200): zoomed into a peak, the peak fit's dashes ran left
+    // of the y axis into its gutter. uPlot clips its own series and leaves a
+    // hook's strokes alone, so every layer is held to the pane's plot area.
+    const withGroups = {
+      ...PEAKS_PAYLOAD,
+      groups: [{ two_theta: [8.5, 9.5, 10.5], y_fit: [1, 5, 1], delta: [0, 0, 0] }],
+    };
+    const stub = server({
+      ...boot(), ...FITTED,
+      "/api/result/curves": fitCurves({
+        two_theta: [3, 6, 9, 9.4, 10, 12, 14, 18, 23.995], y_obs: [1, 2, 1, 2, 5, 3, 4, 1, 1],
+        header: { ticks: { NAC: [9.1, 12], CaF2: [9.3] } } }),
+      "/api/peaks": () => ({ body: withGroups }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await dragOver(9, 14);
+
+    const box = (u: StubPlot) => [u.bbox.left, u.bbox.top, u.bbox.width, u.bbox.height];
+    /** Every pane's strokes and fills beyond uPlot's own series, each under its pane's clip. */
+    const unclipped = () => (["main", "ticks", "resid"] as const).flatMap((key) =>
+      pane(key).marks.filter((m) => m.op !== "series" && JSON.stringify(m.clip) !== JSON.stringify(box(pane(key))))
+        .map((m) => `${key} ${m.op} ${m.style}`));
+    // the model's view: the tick rows and the residual's zero line
+    expect(tickInks().length).toBeGreaterThan(0);
+    expect(pane("resid").marks.some((m) => m.op === "stroke")).toBe(true);
+    expect(unclipped()).toEqual([]);
+
+    button("Peaks")!.click();
+    await flush();
+    const main = pane("main");
+    const fit = main.marks.find((m) => m.op === "stroke" && m.style === INK.peakfit)!;
+    // the zoom cut the group: its first point is left of the plot area
+    expect(fit.points!.some(([x]) => x < main.bbox.left)).toBe(true);
+    expect(main.marks.some((m) => m.style === INK.peak)).toBe(true);
+    expect(unclipped()).toEqual([]);
+  });
+
   it("clears the plot to the data and puts back what was there before", async () => {
     // "an easy way to hide everything except the data" — and the way back is
     // the state the plot was in, not everything on: a user who had already
