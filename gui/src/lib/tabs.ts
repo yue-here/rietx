@@ -35,7 +35,6 @@ export const TABS = [
   { id: "text", label: "Text" },
   { id: "series", label: "Series" },
   { id: "report", label: "Report" },
-  { id: "history", label: "History" },
   { id: "build", label: "Build" },
 ] as const;
 
@@ -60,3 +59,19 @@ export const GRAPH_TABS = [
 ] as const;
 
 export type GraphTab = (typeof GRAPH_TABS)[number]["id"];
+
+/** The bottom panel's strip (WP-2206): the Console and the History, in one
+ *  panel across the window's foot, toggled from the status bar.
+ *
+ * The maintainer asked on 2026-11-07 for a collapsible console showing what
+ * the Python is doing, and for a History tab. One shared panel holds both, as
+ * VS Code's holds Output and Terminal, so History left the model column's
+ * strip. Data here for the reason the other two strips are: the manual must
+ * name both tabs.
+ */
+export const BOTTOM_TABS = [
+  { id: "console", label: "Console" },
+  { id: "history", label: "History" },
+] as const;
+
+export type BottomTab = (typeof BOTTOM_TABS)[number]["id"];

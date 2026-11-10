@@ -279,6 +279,7 @@ describe("`title=` is no longer how this app explains a name", () => {
    */
   const OWED: Record<string, number> = {
     "App.svelte": 1,                 // the splitter's drag gesture
+    "panels/Bottom.svelte": 1,       // its splitter's drag gesture — WP-2206
     "panels/Console.svelte": 1,      // the event ring's size
     "panels/History.svelte": 4,      // node vocabulary — WP-1217
     "panels/Model.svelte": 3,        // the space-group box, two splitters

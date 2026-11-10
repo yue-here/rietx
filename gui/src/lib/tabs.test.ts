@@ -17,7 +17,7 @@ import { dirname, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { GRAPH_TABS, TABS } from "./tabs";
+import { BOTTOM_TABS, GRAPH_TABS, TABS } from "./tabs";
 
 const CORPUS = resolve(__dirname, "../../../tests/data/gui/panels.json");
 
@@ -30,6 +30,7 @@ describe("the panel corpus", () => {
         "GUI chapter of the manual does not name a tab.",
       tabs: TABS.map((tab) => ({ id: tab.id, label: tab.label })),
       graph_tabs: GRAPH_TABS.map((tab) => ({ id: tab.id, label: tab.label })),
+      bottom_tabs: BOTTOM_TABS.map((tab) => ({ id: tab.id, label: tab.label })),
     };
     mkdirSync(dirname(CORPUS), { recursive: true });
     writeFileSync(CORPUS, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
@@ -44,11 +45,13 @@ describe("the panel corpus", () => {
   it("has an id and a label on every tab, and no duplicates", () => {
     // The corpus is keyed by label in the manual, so two tabs sharing one would
     // make a chapter that names it cover both by accident.
-    const labels = TABS.map((t) => t.label);
-    const ids = TABS.map((t) => t.id);
+    // across every strip, since the manual's corpus is keyed by label
+    const all = [...TABS, ...GRAPH_TABS, ...BOTTOM_TABS];
+    const labels = all.map((t) => t.label);
+    const ids = all.map((t) => t.id);
     expect(new Set(labels).size).toBe(labels.length);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const tab of TABS) {
+    for (const tab of all) {
       expect(tab.label.length).toBeGreaterThan(0);
       expect(tab.id.length).toBeGreaterThan(0);
     }

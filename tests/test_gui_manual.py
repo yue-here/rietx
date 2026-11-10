@@ -301,9 +301,11 @@ def test_every_panel_is_named_in_a_chapter():
         f"{PANELS_CORPUS} missing — run `npm --prefix gui test` to write it"
     )
     panels = json.loads(PANELS_CORPUS.read_text(encoding="utf-8"))
-    # both strips: the panel tabs on the right and, since WP-2123, the graph
-    # tabs over the plot, which a reader meets as tabs just the same
-    labels = [entry["label"] for entry in panels["tabs"] + panels["graph_tabs"]]
+    # every strip: the panel tabs on the right, the graph tabs over the plot
+    # (WP-2123) and the bottom panel's (WP-2206), which a reader meets as tabs
+    # just the same
+    labels = [entry["label"] for entry in
+              panels["tabs"] + panels["graph_tabs"] + panels["bottom_tabs"]]
     assert labels, "the panel corpus carries no tabs"
     prose = "\n".join(page.read_text(encoding="utf-8") for page in GUI_PAGES)
     missing = [label for label in labels if not re.search(rf"\b{re.escape(label)}\b", prose)]

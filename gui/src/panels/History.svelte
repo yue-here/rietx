@@ -206,6 +206,10 @@
 
   {#if error}<p class="bad">{error}</p>{/if}
 
+  <!-- Two columns since WP-2206: the panel is the bottom panel's tab, short
+       and as wide as the window, so the graph takes the left and the selected
+       node and the comparison the right. Below two columns' width they stack. -->
+  <div class="body">
   <div class="scroller">
     {#if !nodes.length}
       <p class="muted pad">No history yet — the tree exists from the project's
@@ -267,6 +271,7 @@
     {/if}
   </div>
 
+  <div class="detail">
   {#if node}
     <footer>
       <p class="call mono" title="this node's equivalent public-API call">{node.api_call}</p>
@@ -352,6 +357,8 @@
       </div>
     </div>
   {/if}
+  </div>
+  </div>
 </section>
 
 <style>
@@ -375,11 +382,27 @@
     flex: 1 1 auto;
   }
 
-  .scroller {
+  .body {
     flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-wrap: wrap;
     overflow: auto;
     border-top: 1px solid var(--line);
-    min-height: 90px;
+  }
+
+  /* each column at least a usable list's width; past two of them side by
+     side, the detail wraps below the graph and the body scrolls */
+  .scroller,
+  .detail {
+    flex: 1 1 340px;
+    min-width: 0;
+    max-height: 100%;
+    overflow: auto;
+  }
+
+  .detail {
+    border-left: 1px solid var(--line);
   }
 
   .pad {
@@ -503,9 +526,7 @@
   }
 
   footer {
-    border-top: 1px solid var(--line);
     padding: 5px 8px 7px;
-    flex: 0 0 auto;
   }
 
   footer p {
@@ -549,11 +570,8 @@
 
   .diff {
     border-top: 1px solid var(--line);
-    flex: 0 0 auto;
-    max-height: 45%;
     display: flex;
     flex-direction: column;
-    min-height: 0;
   }
 
   .diff .rows {
