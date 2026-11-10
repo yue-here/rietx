@@ -493,6 +493,9 @@
     result = null;
     startOpen = false;
     newOpen = false;
+    // the workflow button is drawn on the start screen and reads `tab`, so a
+    // placeholder left up would name itself there (WP-2204)
+    tab = "params";
     indexAnswer = null;
     forgetCandidates();
     extinction = null;
@@ -957,10 +960,11 @@
     // `r` would otherwise start a fit from inside a search box
     if (paletteOpen) return;
     // ⌘⏎ is the action bar's primary (WP-2123), except inside the text pane,
-    // whose CodeMirror keymap binds the same chord to its own Apply
+    // whose CodeMirror keymap binds the same chord to its own Apply, and while
+    // a placeholder workflow has hidden the bar (WP-2204, as the prototype did)
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       const inText = (event.target as HTMLElement | null)?.closest?.(".cm-editor");
-      if (!inText && project) {
+      if (!inText && project && (hideModel || !placeholder)) {
         event.preventDefault();
         refine();
       }

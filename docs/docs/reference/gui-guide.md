@@ -52,7 +52,7 @@ appears beside them past an Rwp of {{ MATURITY_MAX_RWP }}.
 
 ### The workflow menu
 
-The first word after the left collapse button names the workflow the window is
+The button after the left collapse button names the workflow the window is
 in. Click it to choose another. A workflow keeps the window as it is and changes
 what the panel column shows.
 
