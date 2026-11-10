@@ -232,10 +232,10 @@ describe("every key the app writes down names something", () => {
         .map((m) => `${rel}: ${m[1]}`));
     expect(interpolated.sort()).toEqual([
       "panels/Model.svelte: parameters:phases.*.cell.{edge}",
-      // the wizard's typed cell (WP-1206) draws only the parameters the setting
-      // leaves free, so its loop runs over names rather than all six edges
-      "panels/Model.svelte: parameters:phases.*.cell.{name}",
-      "panels/Model.svelte: reader_options:{opt.name}",
+      // the New project dialog's typed cell (WP-1206, WP-2131) draws only the
+      // parameters the setting leaves free, so its loop runs over names
+      "panels/NewProject.svelte: parameters:phases.*.cell.{name}",
+      "panels/NewProject.svelte: reader_options:{opt.name}",
       "panels/Peaks.svelte: diagnostics:{d.code}",
       // the indexing run's own diagnostics, said above the candidate list
       // whatever it found (WP-2130), name their codes as the picker's do

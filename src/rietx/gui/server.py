@@ -215,6 +215,7 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("POST", "/api/project"): lambda s, q, b: s.project_patch(b),
     ("POST", "/api/project/save"): lambda s, q, b: s.project_save(),
     ("GET", "/api/recent"): lambda s, q, b: {"recent": s.recent()},
+    ("POST", "/api/recent/remove"): lambda s, q, b: s.recent_remove(b),
     # the "Open…" browser's own listing (WP-1205): read-only, confined to the
     # home directory and the process's cwd — see GuiSession.fs
     ("GET", "/api/fs"): lambda s, q, b: s.fs((q.get("path") or [None])[0]),
@@ -740,13 +741,17 @@ def main(argv: list[str] | None = None) -> int:
         try:
             project = Project.open(source, backend=args.backend,
                                    solver=args.solver)
-        except (FileNotFoundError, ValueError) as exc:
+        except (OSError, ValueError) as exc:
             # the refusal messages name seven different remedies; printing the
             # one that applies is the whole value of them
             print(f"rietx gui: {exc}")
             return 2
     session = GuiSession(project, backend=args.backend, solver=args.solver,
                          state_dir=args.state_dir)
+    if project is None:
+        # no project named: return to the last one, as VS Code and JetBrains
+        # do, and start on the start screen when there is none (WP-2131)
+        session.reopen_last()
     serve(session, port=args.port, open_browser=args.open_browser,
           machine=args.machine, scratch_of=scratch_of)
     return 0
