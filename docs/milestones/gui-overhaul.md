@@ -119,6 +119,9 @@ the piece that touches it or a WP of its own.
   and its "never freed" row both need the refinable set, which `GET /api/plan/resolve` does not
   serve. Its "Save as new plan…" needs a store for named plans, and rietx keeps one plan per
   project (WP-2127's non-goals).
+- New project cannot add a phase from a TOPAS, FullProf or GSAS-II project file, which the
+  round-9 design offers. A browser upload carries one file, and such a project names a data
+  file beside it (WP-2131's settled call 2).
 
 ## Acceptance
 
