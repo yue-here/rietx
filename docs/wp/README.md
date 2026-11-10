@@ -509,6 +509,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2133](2133-the-file-menu.md) | The File menu on the project name | ✅ 2026-11-10 | — | [2131](2131-the-start-screen-and-new-project.md) |
 | [2142](2142-the-gui-style-guide.md) | The GUI style guide | ✅ 2026-11-10 | — | — |
 | [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | 🔄 2026-11-10 | P2 | [2127](2127-the-plan-tab.md) |
+| [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | ⬜ | P3 | #1521 |
+| [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | ⬜ | P3 | #1521 |
 
 ## <a id="unscheduled"></a>Unscheduled
 
