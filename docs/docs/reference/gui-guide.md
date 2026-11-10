@@ -13,8 +13,8 @@ control behaves as it does, and when you should reach for it.
 ## The shape of the window
 
 Two sides. The graphs are on the left, under their own tab strip. It holds
-two tabs, `Pattern` and `Single peaks`. A title line under it says what the
-graph shows: `Observed pattern` before any fit, `Last fit` after one, and
+three tabs, `Pattern`, `Single peaks` and `Background`. A title line under it says what the
+graph shows. On the pattern it reads `Observed pattern` before any fit, `Last fit` after one, and
 `Refining` while a run is in flight. While the Interactive tab has values
 waiting, it says `Preview, not refined`. The panel column is on the right, with
 ten tabs, the action bar and the console. Every panel is mounted at once, so a filter you typed, an
@@ -198,6 +198,48 @@ Before any fit there is nothing to frame, and the tab says so.
 :class: only-dark
 :alt: Three windows on single reflections, each with observed crosses, the fitted curve and a residual strip, and arrows beside each caption to step to the next reflection
 ```
+
+## The background
+
+The `Background` graph tab draws the background on its own. The observed
+pattern is greyed behind it, and the frame is set by the curve, so the peaks
+run off the top. The curve is drawn at the working values, the ones the next
+run starts from, and the title line says so.
+
+The shaded band is where the curve may move when the free parameters refine.
+It is the curve's esd at each channel, taken through the whole covariance of
+every free parameter: equation {eq}`est-derived` of
+[Esds of derived quantities](../theory/estimation.md#esds-of-derived-quantities),
+with the background curve as the derived quantity. `rietx.gui.background`
+computes it. A free scale or Biso that trades against the background
+therefore widens it. The band is drawn at ±3 esd, and `×5` and `×20` draw it
+wider still. A multiplier exaggerates the picture and is not a probability. The
+band is linearised at the current values, so before a fit converges it
+describes the curvature there and nothing more. With no background term free
+there is no band, and the `Band ±3 esd` label opens a note saying why. The route
+behind it is `GET /api/background`.
+
+```{image} ../screenshots/background-tab-light.png
+:class: only-light
+:alt: The Background tab after one fit, the greyed pattern behind a falling background curve with a narrow band, and six hold boxes c0 to c5 under it beside the band's multiplier
+```
+
+```{image} ../screenshots/background-tab-dark.png
+:class: only-dark
+:alt: The Background tab after one fit, the greyed pattern behind a falling background curve with a narrow band, and six hold boxes c0 to c5 under it beside the band's multiplier
+```
+
+The controls under the plot follow the background family.
+
+| family | control | what it does |
+|---|---|---|
+| Chebyshev | a `Hold` box per term, `c0` upwards | holds the term at its value from the previous cycle; no plan stage frees it until it is released |
+| P-spline | `Smoothness λ` | the penalty's weight, applied on Enter or when the box loses focus; larger is stiffer |
+
+A hold is `Refinement.hold`, and a release `Refinement.unhold`. Each records a
+history node, and the console echoes the call. The Parameters panel offers no
+switch per coefficient, since one coefficient alone means little. The family and
+the number of Chebyshev terms are set in Model.
 
 ## Parameters
 

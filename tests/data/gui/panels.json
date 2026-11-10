@@ -50,6 +50,10 @@
     {
       "id": "single",
       "label": "Single peaks"
+    },
+    {
+      "id": "background",
+      "label": "Background"
     }
   ]
 }
