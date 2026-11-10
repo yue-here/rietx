@@ -237,7 +237,7 @@ class GuiSession:
         #: cannot be two answers.
         self._series_run: dict | None = None
         if project is not None:
-            self._remember(project.path)
+            self._remember(project)
 
     # ------------------------------------------------------------------
     # introspection
@@ -471,7 +471,9 @@ class GuiSession:
         path = _need(body, "path")
         try:
             project = Project.open(path, backend=self.backend, solver=self.solver)
-        except (FileNotFoundError, ValueError) as exc:
+        except (OSError, ValueError) as exc:
+            # OSError, not only FileNotFoundError: a folder this user cannot
+            # read is a refusal to report, never a 500 or a failed launch
             raise GuiError(str(exc), code="PROJECT_ERROR") from None
         self._adopt(project)
         return self.project_doc()
@@ -775,18 +777,64 @@ class GuiSession:
                            code="EXAMPLE_BUILD_FAILED") from None
 
     def recent(self) -> list[dict]:
-        """Recently opened projects, newest first (missing ones filtered out)."""
+        """Recently opened projects, newest first.
+
+        A project whose folder has moved stays listed with ``missing`` set
+        (WP-2131): the start screen shows it as "Not found" beside Locate… and
+        Remove from list, as JetBrains does, rather than letting it vanish
+        between two launches with nothing said.  ``phases`` is what
+        :meth:`_remember` wrote at the last open, ``[]`` for an entry written
+        before it did.
+        """
+        out = []
+        for entry in self._recent_raw():
+            row = _recent_entry(entry)
+            path = Path(row["path"])
+            out.append({**row, "name": path.name,
+                        "missing": not (path / "project.json").is_file()})
+        return out
+
+    def _recent_raw(self) -> list[dict]:
         try:
             raw = json.loads((self.state_dir / "recent.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return []
-        out = []
-        for entry in raw if isinstance(raw, list) else []:
-            path = Path(str(entry.get("path", "")))
-            if (path / "project.json").is_file():
-                out.append({"path": str(path), "name": path.name,
-                            "opened_utc": entry.get("opened_utc", "")})
-        return out
+        return [e for e in raw if isinstance(e, dict) and e.get("path")] \
+            if isinstance(raw, list) else []
+
+    def recent_remove(self, body: dict) -> dict:
+        """Drop one entry from the recent list; the project itself is untouched.
+
+        Matched on the stored path exactly, so a path the list does not hold
+        changes nothing and is not an error: removing is idempotent.  Not
+        behind the 409, like the list itself, since nothing here touches a
+        project a run is writing.
+        """
+        path = str(_need(body, "path"))
+        kept = [_recent_entry(e) for e in self._recent_raw()
+                if str(e.get("path", "")) != path]
+        self._write_recent(kept)
+        return {"recent": self.recent()}
+
+    def reopen_last(self) -> str | None:
+        """Open the recent list's head at launch, or leave the session empty.
+
+        The start screen's rule (WP-2131, the maintainer's round-9 design):
+        a launch with no project named returns to the last project, and the
+        start screen shows when there is none.  Until a Close verb exists the
+        last project opened is the last one open, so the head is the answer.
+        A head that has moved, or that refuses to open, leaves the session
+        empty rather than failing the launch: the start screen then lists it.
+        Returns the path opened, or ``None``.
+        """
+        head = next(iter(self.recent()), None)
+        if head is None or head["missing"]:
+            return None
+        try:
+            self.project_open({"path": head["path"]})
+        except GuiError:
+            return None
+        return head["path"]
 
     def fs(self, path: str | None) -> dict:
         """Directories and projects under one root, for the "Open…" browser.
@@ -3073,15 +3121,29 @@ class GuiSession:
             self._series = series_mod.SeriesSetup()
             self._series_run = None
             self._cond.notify_all()
-        self._remember(project.path)
+        self._remember(project)
 
-    def _remember(self, path: Path) -> None:
-        entry = {"path": str(Path(path).resolve()), "opened_utc": _utcnow()}
-        kept = [e for e in self.recent() if e["path"] != entry["path"]]
+    def _remember(self, project: Project) -> None:
+        """Put ``project`` at the head of the recent list, with its phases.
+
+        The phases are written here, while the project is open, because the
+        start screen names each one with its space group (WP-2131) and reading
+        every listed project's history to find them would cost a log parse per
+        row.  They are a label as of the last open, never a second authority:
+        the history is the model.
+        """
+        entry = {"path": str(Path(project.path).resolve()), "opened_utc": _utcnow(),
+                 "phases": [[ph.name, ph.space_group]
+                            for ph in project.refinement.structure.phases]}
+        kept = [_recent_entry(e) for e in self._recent_raw()
+                if str(e.get("path", "")) != entry["path"]]
+        self._write_recent([entry, *kept])
+
+    def _write_recent(self, entries: list[dict]) -> None:
         try:
             self.state_dir.mkdir(parents=True, exist_ok=True)
             (self.state_dir / "recent.json").write_text(
-                json.dumps([entry, *kept][:_MAX_RECENT], indent=2), encoding="utf-8")
+                json.dumps(entries[:_MAX_RECENT], indent=2), encoding="utf-8")
         except OSError:
             pass  # a read-only home is not a reason to fail opening a project
 
@@ -3657,12 +3719,26 @@ def _limit_and_restraint_edit(refinement, limits: dict, restraints: dict,
 
 
 def _is_typed_cell(payload) -> bool:
-    """Is this ``structure`` argument the typed-cell form? (WP-1206)
+    """Is this ``structure`` argument the typed-cell form, or a list holding one?
 
     The four forms are told apart by their keys, and these are disjoint: a whole
-    :class:`Structure` has ``phases``, the file forms have ``cif``/``upload``.
+    :class:`Structure` has ``phases``, the file forms have ``cif``/``upload``
+    (WP-1206).  A list (WP-2131) holds a typed cell when any member is one,
+    which is what makes ``rietveld`` refused for it too.
     """
+    if isinstance(payload, list):
+        return any(_is_typed_cell(item) for item in payload)
     return isinstance(payload, dict) and "space_group" in payload
+
+
+def _recent_entry(entry: dict) -> dict:
+    """One stored recent-list row, reduced to the keys it is written with."""
+    phases = entry.get("phases")
+    return {"path": str(entry.get("path", "")),
+            "opened_utc": str(entry.get("opened_utc", "")),
+            "phases": [[str(n), str(sg)] for n, sg in phases]
+            if isinstance(phases, list) and all(
+                isinstance(x, list) and len(x) == 2 for x in phases) else []}
 
 
 def _typed_cell_structure(payload: dict) -> Structure:
@@ -3744,8 +3820,12 @@ def _typed_cell_structure(payload: dict) -> Structure:
 
 
 def _as_structure(payload, uploads=None) -> Structure:
-    """A :class:`Structure` from ``None``, an inline dict, a typed cell, a CIF
-    or an upload.
+    """A :class:`Structure` from ``None``, an inline dict, a typed cell, a CIF,
+    an upload, or a list of those.
+
+    The list is the sixth form (WP-2131): the New project dialog lists several
+    phases, each a CIF or a typed cell, and their phases are concatenated in
+    the order given.  An empty list is the pattern-only project, as ``None``.
 
     Every route into the model passes through here, which is where the species
     check belongs: a structure carrying a scattering species no form-factor table
@@ -3763,6 +3843,42 @@ def _as_structure(payload, uploads=None) -> Structure:
     themselves — ``project_new`` does — because the absence of a key and a
     ``null`` value are the same thing to ``dict.get`` and only one of them is a
     deliberate answer.
+    """
+    if payload is None:
+        return Structure(phases=[])
+    if isinstance(payload, list):
+        # each member read in its own form, and the species check run once over
+        # the joined list, so a refused atom's path carries its phase index in
+        # the project rather than in its own file
+        phases: list = []
+        for item in payload:
+            if _is_typed_cell(item) and not str(item.get("name") or "").strip():
+                # two unnamed cells would both be "phase"; a number from the
+                # joined list keeps them apart, in the CIF reader's phase_N form
+                item = {**item, "name": f"phase_{len(phases) + 1}"}
+            phases.extend(_structure_form(item, uploads).phases)
+        structure = Structure(phases=phases)
+    else:
+        structure = _structure_form(payload, uploads)
+    unknown = unknown_species(structure)
+    if unknown:
+        named = ", ".join(f"{u['label']} ({u['species']})" for u in unknown)
+        raise GuiError(
+            f"{len(unknown)} atom(s) carry a scattering species this build has "
+            f"no form factor for: {named}. A fit would fail at stage compile "
+            "with the same lookup; edit the species (ions fall back to the "
+            "neutral atom, so 'O2-' is fine and 'D' is not).",
+            code="UNKNOWN_SPECIES",
+            where=[f"{u['path']}.species" for u in unknown])
+    return structure
+
+
+def _structure_form(payload, uploads=None) -> Structure:
+    """One non-list ``structure`` form read as a :class:`Structure`, unchecked.
+
+    :func:`_as_structure` is the boundary and runs the species check; this is
+    the per-form dispatch under it.  A list inside a list is not a form, and is
+    refused as a malformed model by the inline branch.
     """
     if payload is None:
         return Structure(phases=[])
@@ -3797,16 +3913,6 @@ def _as_structure(payload, uploads=None) -> Structure:
                            where=["structure.cif"]) from None
     else:
         structure = _validate(Structure, payload, "structure")
-    unknown = unknown_species(structure)
-    if unknown:
-        named = ", ".join(f"{u['label']} ({u['species']})" for u in unknown)
-        raise GuiError(
-            f"{len(unknown)} atom(s) carry a scattering species this build has "
-            f"no form factor for: {named}. A fit would fail at stage compile "
-            "with the same lookup; edit the species (ions fall back to the "
-            "neutral atom, so 'O2-' is fine and 'D' is not).",
-            code="UNKNOWN_SPECIES",
-            where=[f"{u['path']}.species" for u in unknown])
     return structure
 
 

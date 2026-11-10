@@ -114,6 +114,8 @@ export const api = {
   spacegroup: (symbol: string) =>
     call("GET", `/api/spacegroup?space_group=${encodeURIComponent(symbol)}`),
   recent: () => call("GET", "/api/recent"),
+  /** Drop one entry from the recent list; the project itself is untouched. */
+  removeRecent: (path: string) => call("POST", "/api/recent/remove", { path }),
 
   /** The example projects shipped in the wheel (WP-1204).  `built` says
    *  whether opening one is a plain open or a build first, which is what lets

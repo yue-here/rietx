@@ -234,7 +234,14 @@ _STEPHENS_S = HelpEntry(
         "derivative would step 100 times further than the value itself. Like the "
         "anisotropic displacement components, these coefficients are tied. The "
         "refined quantities are the `microstrain.dof.k` entries of the Laue-allowed "
-        "subspace."
+        "subspace. The block is opt-in per phase. `phase.microstrain = "
+        "StephensStrain.isotropic(1000, phase.cell)` declares it at 1000 ppm, and "
+        "`lab_sample_refine` frees it with the other sample widths. Declare it where "
+        "reflections at similar 2θ stay broader along some directions than along "
+        "others once `lor_strain` has refined. `FitReport.strain` measures that and "
+        "names the broadest and narrowest directions. Anisotropic crystallite size "
+        "and a peak split by too high a symmetry also widen some directions more, "
+        "so rule them out before quoting the coefficients."
     ),
     unit="10⁻¹² Å⁻⁴", default="0.0",
     typical="0-500 for a sample with measurable anisotropic strain",
@@ -1204,7 +1211,15 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "it raises `ADP_NOT_POSITIVE_DEFINITE`, because the Debye-Waller factor "
             "then diverges at high Q. Free these parameters with "
             "`phases.*.atoms.*.adp.*`, alongside the `biso` pattern that every "
-            "displacement stage carries."
+            "displacement stage carries. The tensor is opt-in per atom. "
+            "`Structure.from_cif(path, aniso=True)` keeps a file's `U^ij`. "
+            "`atom.aniso = AnisoU.isotropic(uiso, phase.cell)` declares one at the "
+            "isotropic value, with Uiso = B/8π². The tensor replaces `biso`, so the "
+            "assignment raises while `atom.biso.vary` is True. A powder "
+            "pattern seldom determines six components per site. A declaration is worth "
+            "trying on a site that scatters strongly for the radiation used, with data "
+            "to high Q. Keep it only if the tensor stays positive-definite and each "
+            "diagonal component's esd is small against its value."
         ),
         unit="Å²", default=None,
         typical="0.005-0.05 Å²",
@@ -1662,10 +1677,14 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A refined isotropic displacement parameter is below zero. No real vibration "
             "does that, because the Debye-Waller factor would grow with angle instead of "
-            "falling. The parameter is absorbing something else. Likely causes are "
-            "uncorrected absorption or roughness, a wrong species or occupancy, or a "
-            "background that bends at high angle. Correct that cause, or hold the "
-            "parameter at a physical value."
+            "falling. The parameter is absorbing something else. A loss of low-angle "
+            "intensity does this, and three corrections for it are opt-in: surface "
+            "roughness on a Bragg-Brentano plate (`geometry.surface_roughness = "
+            "RoughnessSuortti()`), absorption in a capillary (`geometry.mu_r` or "
+            "`geometry.capillary_radius_mm`) and "
+            "extinction (`phase.extinction = 0.0`). A wrong species or occupancy, or a "
+            "background that bends at high angle, does it too. Correct that cause, or "
+            "hold the parameter at a physical value."
         ),
     ),
     "BISO_UNUSUALLY_LARGE": HelpEntry(
@@ -1673,8 +1692,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A refined isotropic displacement parameter exceeds the amplitude at which a "
             "solid with this cell would melt. That usually points at the model. A wrong "
-            "species or occupancy, a missing absorption correction or a background that "
-            "has taken high-angle intensity can all inflate it. A mobile site, such as a "
+            "species or occupancy, or a background that has taken high-angle intensity, "
+            "can inflate it. So can absorption in a flat plate of finite thickness, "
+            "which depresses high-angle intensity until `geometry.mu_t` or "
+            "`geometry.thickness_mm` declares it. A "
+            "mobile site, such as a "
             "cavity cation, can be genuinely this large. Check the model before you read "
             "the value as motion."
         ),
@@ -1968,11 +1990,13 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="A constraint held the optimum on its edge",
         description=(
             "In the final stage the optimiser held some steps against a built-in "
-            "inequality constraint. Examples are the positivity of the strain broadening "
-            "and the positive Gaussian instrument width. The optimum therefore sits on "
+            "inequality constraint. Examples are the positivity of the strain broadening, "
+            "the positive Gaussian instrument width, and the bounds of a tied parameter or "
+            "of a parametric equation's target. The optimum therefore sits on "
             "or near the edge of the allowed region. The values are admissible but not "
-            "measured. Start from a different seed and quote the values only if they "
-            "survive."
+            "measured. A tied parameter held on its own limit also gets a BOUND_HIT or "
+            "FLOOR_HIT warning that names it. Start from a different seed and quote the "
+            "values only if they survive."
         ),
     ),
     "COVARIANCE_DIRECTION_DISCARDED": HelpEntry(
@@ -3365,7 +3389,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "A parametric equation sets a parameter, in some patterns, to a value "
             "outside that parameter's own limits. The equation's coefficients are "
-            "unbounded, so the limits never constrained the solve. Do not quote the "
+            "unbounded. The default LM driver holds a linear equation's target inside "
+            "its limits, but TRF and an expression equation do not. The fit finishes. "
+            "The result keeps the equation's value, and that pattern's model holds the "
+            "limit the value crossed. Do not quote the "
             "parameter there as a measurement. Narrow the subset to where the form "
             "holds, lower the order of the polynomial, or use a basis that stays inside "
             "the range."
@@ -3454,7 +3481,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "PATTERN_ROWS_DROPPED": HelpEntry(
         title="Some rows were not read as data",
         description=(
-            "The reader dropped rows from the file, for one of two reasons, and the "
+            "The reader dropped rows from the file, for one of three reasons, and the "
             "message says which. Every reader drops a point whose 2θ, count or error "
             "estimate is NaN or infinite, and names the dropped points by their 2θ. "
             "On a time-of-flight pattern, flight time takes the place of 2θ. "
@@ -3465,7 +3492,12 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "per line as the file's layout, and it skips numeric lines with a "
             "different count, naming them by line. A header table or a limits row "
             "usually causes this. If a skipped line was a real measurement, the file "
-            "mixes layouts. Re-export it with the same number of values on every row."
+            "mixes layouts. Re-export it with the same number of values on every row. "
+            "The same reader also names, by line, each line between the first and the "
+            "last data row that does not read as a row of numbers, such as '10.2 n/a'. "
+            "Text above the data is a header and text below it a footer, and both are "
+            "skipped without a report. A line inside the data is a lost point or a "
+            "note, and the reader cannot tell which."
         ),
     ),
     "PATTERN_SCAN_REVERSED": HelpEntry(

@@ -1121,10 +1121,11 @@ class GuardFinding:
     #: rendered form, identical to the pre-v1.0 list entry
     message: str
     #: a clause a *diagnostic* appends to its own sentence, already rendered.
-    #: Two writers, each read only where its own code builds the
+    #: Three writers, each read only where its own code builds the
     #: ``Diagnostic`` (WP-1076 wants both ends of a field named):
-    #: :meth:`at_bound`, read by ``BOUND_HIT`` and ``FLOOR_HIT`` (WP-1434 gives
-    #: that finding evidence to carry), and :meth:`nonpositive_strain`, read by
+    #: :meth:`at_bound` and :meth:`tied_at_bound`, read by ``BOUND_HIT`` and
+    #: ``FLOOR_HIT`` (WP-1434 gives that finding evidence to carry, WP-1325 a
+    #: tied value's), and :meth:`nonpositive_strain`, read by
     #: ``STEPHENS_STRAIN_NOT_POSITIVE`` (the intensity share, WP-1467).  It
     #: is deliberately not part of :meth:`__str__`, which is the pre-v1.0 text
     #: byte for byte and is what the other diagnostics are built from.
@@ -1168,6 +1169,19 @@ class GuardFinding:
                else f", {gap_over_esd:.1e} esd from the limit")
         return cls(code, (path,), float(cos), path,
                    detail=f" (ρ={cos:+.3f}{gap})", limit=limit)
+
+    @classmethod
+    def tied_at_bound(cls, path: str, gap_over_esd: float, *,
+                      limit: tuple[str, float]) -> "GuardFinding":
+        """A tied value held on its own limit by the row the LM step keeps
+        (:func:`tied_bound_findings`, WP-1325).  The code follows the limit as
+        :meth:`at_bound`'s does, and ``detail`` says the value is tied, since
+        "refined to its bound" alone reads as a free column."""
+        code = "FLOOR_HIT" if _at_zero_floor(limit) else "BOUND_HIT"
+        return cls(code, (path,), None, path,
+                   detail=(f" (a tied value, held there inside the step, "
+                           f"{gap_over_esd:.1e} esd from the limit)"),
+                   limit=limit)
 
     @classmethod
     def background_absorption(cls, path: str, r2: float) -> "GuardFinding":
@@ -2259,6 +2273,75 @@ def bound_findings(bounds, free: list[str], theta, *,
     return out
 
 
+def pressed_tied_paths(truncated_by) -> set[str]:
+    """The tied entries whose bound rows shaped a step, read off the labels
+    :func:`~rietx.optimize.least_squares.tied_bound_inequalities` writes
+    (``"<path> bounds"``, a joint fit's ``"hist.<h> <path> bounds"`` and
+    ``"parametric equation '<name>' (<target> bounds)"``).  A label of any
+    other block (the Stephens cone, the width floors) names no tied entry."""
+    out: set[str] = set()
+    for label, n in (truncated_by or {}).items():
+        if not n:
+            continue
+        m = (re.search(r"\((\S+) bounds\)$", label)
+             or re.fullmatch(r"(?:hist\.\d+ )?(\S+) bounds", label))
+        if m:
+            out.add(m.group(1))
+    return out
+
+
+def tied_bound_findings(table, pressed: set[str], esd: dict[str, float], *,
+                        scope: str = "") -> list[GuardFinding]:
+    """Tied values held on their own limit at the answer (WP-1325).
+
+    :func:`bound_findings` tests free columns only.  A tied entry with a finite
+    bound gets an LM row instead
+    (:func:`~rietx.optimize.least_squares.tied_bound_inequalities`), and the
+    step holds the value on it.  This is that entry's half of the one bound
+    test, so ``BOUND_HIT``/``FLOOR_HIT`` and ``RefinedParameter.at_bound``
+    report a held tied value as they report a free column on its bound
+    (settled by Claude 2026-11-09 under that rule and the guard rule that
+    every diagnostic carries its paths in ``where``).
+
+    It is :func:`bound_findings`' conjunction, read for a row.  *Pushed into
+    the limit*: the row shaped at least one step of the stage (``pressed``,
+    from :func:`pressed_tied_paths`), the driver's own record that the limit
+    carried load.  *And still on it at the answer*: the value sits within
+    :data:`BOUND_HIT_ESD_FRAC` of its own esd of the nearer limit.  The face
+    is :data:`~rietx.optimize.least_squares.TIED_BOUND_MARGIN` of the row's
+    scale inside the bound, far under that window.  A row that pressed and let
+    go leaves the value an ordinary distance away, and no finding.  No esd
+    (no covariance, or a row on a column that measured nothing) declines the
+    entry: a distance alone is the test WP-1434 retired.
+
+    ``esd`` is :meth:`~rietx.params.vector.ParameterTable.stderr_physical`'s
+    map for this table.  ``scope`` prefixes each finding's path, as a joint
+    fit spells a per-histogram row (``"hist.1."``); a joint caller passes
+    ``""`` for a shared entry.
+    """
+    import math
+
+    out: list[GuardFinding] = []
+    if not pressed:
+        return out
+    free = set(table.free_paths)
+    for e in table.entries:
+        if e.path not in pressed or e.path in free:
+            continue
+        below, above = e.value - e.lo, e.hi - e.value
+        side, limit, gap = (("lower", e.lo, below) if below <= above
+                            else ("upper", e.hi, above))
+        if not math.isfinite(limit):
+            continue
+        sd = esd.get(e.path)
+        if sd is None or not math.isfinite(sd) or sd <= 0.0:
+            continue
+        if abs(gap) <= BOUND_HIT_ESD_FRAC * sd:
+            out.append(GuardFinding.tied_at_bound(
+                scope + e.path, abs(gap) / sd, limit=(side, float(limit))))
+    return out
+
+
 def check_discarded_directions(jac, free: list[str],
                                flat: list[GuardFinding]) -> list[GuardFinding]:
     """``COVARIANCE_DIRECTION_DISCARDED``: the parameters a direction the solve
@@ -2416,4 +2499,12 @@ def check_guards(table, outcome, threshold: float,
         cos=getattr(outcome, "residual_cosine", None),
         esd=getattr(outcome, "stderr_internal", None),
         active=_exact_active_bounds(outcome))
+    # a tied value the LM step held on its own limit (WP-1325): the esds are
+    # built only when a tied bound row pressed, which a default table never has
+    pressed = pressed_tied_paths(getattr(outcome, "truncated_by", None))
+    sd_internal = getattr(outcome, "stderr_internal", None)
+    if pressed and sd_internal is not None:
+        report.at_bounds += tied_bound_findings(
+            table, pressed,
+            table.stderr_physical(outcome.theta, sd_internal, outcome.correlation))
     return report

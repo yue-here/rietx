@@ -362,6 +362,39 @@ button:disabled {
   text-decoration: underline;
 }
 
+/* The start screen's name (WP-2131, the round-9 design of 2026-11-08): the one
+   type size outside the scale, so it is declared here rather than in a panel. */
+.wordmark {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+
+/* A space-group symbol (SpaceGroup.svelte): a serif face, as the International
+   Tables print one (the maintainer's ruling of 2026-11-08).  A rotoinversion's
+   bar is drawn over its digit. */
+.sg {
+  font-family: "STIX Two Text", "Times New Roman", Times, serif;
+  font-weight: 400;
+  letter-spacing: 0.015em;
+}
+
+.sg .bar {
+  position: relative;
+  display: inline-block;
+  margin: 0 0.04em;
+}
+
+.sg .bar::before {
+  content: "";
+  position: absolute;
+  left: 0.08em;
+  right: 0.08em;
+  top: 0.08em;
+  border-top: 0.07em solid currentColor;
+}
+
 /* The help register (WP-1201; the popover itself is WP-1203).  The cursor is
    the whole mark — no glyph, no underline — so an explanation costs nothing on
    a screen someone is reading past.

@@ -38,7 +38,7 @@ from .model.forward import (
     recorded_window_tol,
     window_loss,
 )
-from .model.microstructure import microstructure_table
+from .model.microstructure import floored_paths, microstructure_table
 from .optimize.blocked import BlockJacobian
 from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import (
@@ -193,7 +193,9 @@ from .strategy.staged import (
     check_resolution_supported,
     check_stephens_positive,
     check_texture_positive,
+    pressed_tied_paths,
     resolve_plan,
+    tied_bound_findings,
 )
 
 #: A diagnostic reported **once per histogram**, on
@@ -2197,6 +2199,10 @@ class MultiHistogramRefinement:
                         n_iterations=outcome.n_iterations + second.n_iterations,
                         n_constraint_truncations=(outcome.n_constraint_truncations
                                                   + second.n_constraint_truncations),
+                        truncated_by={k: (outcome.truncated_by.get(k, 0)
+                                          + second.truncated_by.get(k, 0))
+                                      for k in {**outcome.truncated_by,
+                                                **second.truncated_by}},
                         # summed for the same reason the truncations are: the stage
                         # ran twice and the count is a fact about its whole search
                         n_degenerate_cell_probes=(outcome.n_degenerate_cell_probes
@@ -2554,6 +2560,22 @@ class MultiHistogramRefinement:
             mt.bounds(), mt.free_paths, outcome.theta,
             cos=outcome.residual_cosine, esd=outcome.stderr_internal,
             active=_exact_active_bounds(outcome))
+        # a tied value the LM step held on its own limit, per histogram, a
+        # shared entry once and bare (WP-1325, ``staged.tied_bound_findings``)
+        pressed = pressed_tied_paths(outcome.truncated_by)
+        if pressed and per_esds:
+            seen_shared: set[str] = set()
+            for h, table in enumerate(mt.tables):
+                for f in tied_bound_findings(table, pressed, per_esds[h],
+                                             scope=f"hist.{h}."):
+                    base = f.paths[0].removeprefix(f"hist.{h}.")
+                    e = table.entries[table._paths[base]]
+                    if _row_shared(mt, e):
+                        if base in seen_shared:
+                            continue
+                        seen_shared.add(base)
+                        f = dataclasses.replace(f, paths=(base,), message=base)
+                    at_bounds.append(f)
         # Histogram 0's physical esds, built once in the loop above and read by
         # two consumers (WP-1131): the shared rows of ``_parameters``, and the
         # microstructure block, which reads histogram 0 because its value scale
@@ -2699,7 +2721,8 @@ class MultiHistogramRefinement:
             microstructure=microstructure_table(
                 mt.structures[0], per_values[0],
                 wavelength=_longest_line_wavelength(models[0]),
-                esds=esd_hist0),
+                esds=esd_hist0,
+                floors=floored_paths(mt.tables[0], _hist0_floors(at_bounds))),
             # each histogram's background screen, ``hist.<h>.``-scoped, so
             # ``for_histogram`` hands a report its own (WP-1341); ``None``
             # where nothing was screened, the single fit's empty state
@@ -2829,8 +2852,9 @@ class MultiHistogramRefinement:
         # per-histogram rows `hist.h.…` — which is exactly how
         # `MultiParameterTable.free_paths` spells them, so the projection keys
         # on the row path and needs no second naming convention (WP-1076).
-        tested = set(mt.free_paths)
         on_bound = {p for f in at_bounds for p in f.paths}
+        # a held tied row is tested too (``staged.tied_bound_findings``)
+        tested = set(mt.free_paths) | on_bound
         # which equation set each row, keyed on the same row path (WP-1325)
         equations = _equation_rows(mt)
         # shared parameters reported once, from histogram 0's covariance (its
@@ -2903,6 +2927,19 @@ def _row_shared(mtable, entry) -> bool:
     """Whether a table entry is one column of the joint fit
     (:func:`~rietx.params.multi.row_shared`, read with ``mtable``'s map)."""
     return row_shared(mtable.sharing, entry)
+
+
+def _hist0_floors(at_bounds) -> set[str]:
+    """Histogram 0's paths whose ``FLOOR_HIT`` fired, as its values spell them.
+
+    The joint findings name a shared row bare and a per-histogram row
+    ``hist.h.…`` (``_parameters`` keys on the same spelling), and the
+    microstructure block reads histogram 0's own dict, so a shared floor
+    passes through and a ``hist.0.`` one loses its prefix (WP-1914).
+    """
+    return {_unscoped(p) for f in at_bounds if f.code == "FLOOR_HIT"
+            for p in f.paths
+            if p.startswith("hist.0.") or not p.startswith("hist.")}
 
 
 #: the entries that move an ADP site: the free columns, and the U^ij rows
@@ -3104,12 +3141,22 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
     its own bounds (WP-1325).
 
     The WP-1119 hazard one rank up: a pattern's target is Σ_j Φ_kj·c_j over
-    unbounded coefficients, so the solve never sees the target's own
-    ``min``/``max``.  A ``constant`` declaration's one coefficient carries the
-    target's box itself (``MultiParameterTable._install_parametric``), but a
-    sum of several terms has no box that holds it.  So the answer is read:
-    one warning per declaration, naming every subset pattern whose dependent
-    left its declared range, at the value it took.  ``value`` is how many.
+    unbounded coefficients.  A ``constant`` declaration's one coefficient
+    carries the target's box itself (``MultiParameterTable._install_parametric``),
+    and under the default LM driver a linear target's bounds are rows held
+    inside the step (``least_squares._joint_tied_bound_inequalities``).  So the
+    answer is read: one warning per declaration, naming every subset pattern
+    whose dependent left its declared range, at the value it took.  ``value``
+    is how many.
+
+    It fires under TRF and for an ``expression`` target, which take no rows.
+    The write-back after each stage clamps the target into the model at the
+    bound it crossed (``MultiParameterTable.apply_to_models``), so the fit
+    finishes, and this table keeps the equation's value, which the warning
+    quotes and the result's rows carry.  Under the default LM driver a linear
+    target cannot reach it.  Settled by Claude 2026-11-09 under the Stephens
+    cone's precedent (a constraint LM holds in the step is a guard where it
+    cannot) and the declared-name rule (WP-1076); the maintainer may reverse it.
     """
     out: list[Diagnostic] = []
     # an expression's target is as unbounded as a sum of terms (WP-1964)
@@ -3130,7 +3177,8 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
             where=[f"hist.{h}.{r.target}" for h, *_ in bad], value=float(len(bad)),
             message=(f"Parametric equation {r.name!r} puts {r.target} outside its own "
                      f"bounds in {len(bad)} of {len(r.patterns)} patterns: "
-                     f"{shown}{more}."),
+                     f"{shown}{more}. The model there holds the bound the value "
+                     f"crossed."),
             suggestion=("Narrow the subset to where the form holds, or bound the "
                         "variables so the expression stays inside the range."
                         if r.equation.basis == "expression" else

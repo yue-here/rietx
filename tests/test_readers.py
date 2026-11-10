@@ -648,6 +648,15 @@ def test_the_pks_escape_survives_a_comment_header_and_a_short_scan(tmp_path):
     assert len(rx.read_pattern(commented).two_theta) == 40
     assert rx.io.readers.identify_format(short).name == "xy"
 
+    # xy reads `;` separators and a trailing `#`/`!` comment (WP-1952), so the
+    # gate standing in for it lets those profiles out too
+    for name, row in (("semi.pks", "{:.2f};{}\n"), ("noted.udi", "{:.2f} {}  # ok\n")):
+        p = tmp_path / name
+        p.write_text("".join(row.format(10.0 + 0.02 * i, 500 + i % 7)
+                             for i in range(40)), encoding="utf-8")
+        assert rx.io.readers.identify_format(p).name == "xy"
+        assert len(rx.read_pattern(p).two_theta) == 40
+
     # and a peak list is still one: its rows carry an hkl and its header is not
     # a comment marker either reader knows
     peaks = tmp_path / "real.pks"

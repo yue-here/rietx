@@ -25,6 +25,7 @@
   import Console from "./panels/Console.svelte";
   import History from "./panels/History.svelte";
   import Model from "./panels/Model.svelte";
+  import NewProject from "./panels/NewProject.svelte";
   import Palette from "./panels/Palette.svelte";
   import Params from "./panels/Params.svelte";
   import Peaks from "./panels/Peaks.svelte";
@@ -33,6 +34,7 @@
   import Report from "./panels/Report.svelte";
   import Series from "./panels/Series.svelte";
   import Splitter from "./panels/Splitter.svelte";
+  import Start from "./panels/Start.svelte";
   import Stubs from "./panels/Stubs.svelte";
   import Text from "./panels/Text.svelte";
   import {
@@ -62,6 +64,11 @@
   let recent = $state<any[]>([]);
   let examples = $state<any[]>([]);
   let openError = $state<string>("");
+  /** the start screen over an open project, from the header's Open… (WP-2131);
+   *  with no project it is always shown, so this is only the over-a-project case */
+  let startOpen = $state(false);
+  /** the New project dialog (WP-2131) */
+  let newOpen = $state(false);
 
   let run = $state<RunState | null>(null);
   let result = $state<any>(null);
@@ -377,6 +384,8 @@
     opens += 1;
     readUi();
     openError = "";
+    startOpen = false;
+    newOpen = false;
     // a different project, so the checklist's session-local step starts over
     // (WP-1017) — this belongs with `tab = "params"` rather than in `readUi`,
     // which `moved()` also calls on every head move: reset there, reading the
@@ -408,6 +417,7 @@
       opens += 1;
       readUi();
       openError = "";
+      startOpen = false;
       reportSeen = false;   // a different project — see `opened` (WP-1017)
       tab = "params";
       indexAnswer = null;
@@ -423,7 +433,7 @@
     }
   }
 
-  /** The recent list, kept where both the empty state and the wizard read it. */
+  /** The recent list, which the start screen reads (WP-2131). */
   async function loadRecent() {
     try {
       recent = (await api.recent()).recent ?? [];
@@ -461,6 +471,15 @@
     } catch (error) {
       openError = (error as Error).message;
       return openError;
+    }
+  }
+
+  /** Take a project off the recent list; the list comes back whole. */
+  async function removeRecent(path: string) {
+    try {
+      recent = (await api.removeRecent(path)).recent ?? [];
+    } catch (error) {
+      openError = (error as Error).message;
     }
   }
 
@@ -775,16 +794,15 @@
     if (done) setUi({ model_columns: next });
   }
 
-  /** Show the import wizard, from anywhere — the header button, the palette.
+  /** Show the start screen, from anywhere: the header button, the palette.
    *
-   * The wizard *is* `Model.svelte` (WP-1014), so reaching it is selecting that
-   * tab and telling the pane to show it; the recent list rides inside it, which
-   * is what makes "open another" reachable without restarting the program. */
+   * Over an open project it is a screen of its own with a way back, so the
+   * project's panels stay mounted behind it and lose nothing (WP-2131). The
+   * lists are refetched, because another window may have moved them. */
   function startImport() {
-    tab = "model";
+    startOpen = true;
     loadRecent();
     loadExamples();
-    modelPanel?.startImport();
   }
 
   const commands = $derived<Command[]>([
@@ -841,8 +859,8 @@
       echo: 'ref.run_stage(Stage("cycle", turn_on=[]))',
       disabled: busy || !project || noPhases || !!pendingInvalid,
       run: () => refine("cycle") },
-    { id: "import", label: "Open or import a project", echo: "Project.create(path, …)",
-      run: () => { tab = "model"; startImport(); } },
+    { id: "import", label: "Open or create a project", echo: "Project.create(path, …)",
+      run: startImport },
     { id: "disclosure", label: simple ? "Show advanced controls" : "Hide advanced controls",
       echo: 'project.doc.ui["simple"]', disabled: !project, run: () => setSimple(!simple) },
     // no `disabled`: the theme is the person's, so it is reachable in the empty
@@ -1162,13 +1180,15 @@
         <span class="muted">· {project.doc.mode}</span>
         <span class="muted">· σ {project.data.has_sigma ? "from file" : "Poisson"}</span>
       </div>
+    {:else}
+      <div class="project muted">No project</div>
     {/if}
 
     <div class="controls">
       {#if project}
         <button class="ghost" onclick={startImport}
-          title="open a recent project, or import a new one — this session's project
-                 is replaced, and nothing is unsaved (settings persist on the verb)"
+          title="the start screen: open another project or make a new one; nothing
+                 is unsaved, because settings persist on the verb"
           >Open…</button>
         <div class="segmented" role="group" aria-label="disclosure">
           <button class:on={simple} onclick={() => setSimple(true)}
@@ -1232,19 +1252,19 @@
 {/if}
 
 <main bind:this={mainEl}>
-  <!-- `Model` is mounted exactly once (WP-1205), whether or not a project is
-       open — it used to sit in two separate branches of an `{#if project}`
-       (the empty-state wizard and a tab panel), each its own component
-       instance with its own `wizardOpen`. That let a project opened from
-       *inside* the tab panel's wizard (`Open…` over an already-open project)
-       leave the wizard painted over the freshly-opened project: `project`
-       stayed truthy the whole time, so the tab-panel instance was never torn
-       down and re-created, and nothing else ever cleared its `wizardOpen`.
-       One instance removes the seam that bug lived in. Without a project the
-       side column simply takes the whole window (`wide` reuses the
-       full-window layout's own CSS) and no other panel exists to share it
-       with. -->
-  <div class="panes" class:stacked>
+  <!-- With no project the start screen is the window (WP-2131), and the
+       header's Open… lays it over an open project, whose panes stay mounted
+       behind it so a look at the recent list throws nothing away. `Model` is
+       still mounted exactly once (WP-1205): switching from one project to
+       another keeps `project` truthy, so no panel is torn down. -->
+  {#if !project || startOpen}
+    <Start version={version?.package_version ?? ""} {recent} {examples} {busy}
+      docsUrl={corpus?.docs_url ?? null} error={openError} hasProject={!!project}
+      onnew={() => (newOpen = true)} onopen={open} onexample={openExample}
+      onremove={removeRecent} onback={() => (startOpen = false)} />
+  {/if}
+  {#if project}
+  <div class="panes" class:stacked class:hidden={startOpen}>
     <!-- hidden rather than unmounted in the full-window layout, for the same
          reason every panel is: a purge and a refetch on a layout click would
          throw the drawn window away -->
@@ -1324,7 +1344,6 @@
           {/each}
         </nav>
       {/if}
-      {#if !project && openError}<p class="bad">{openError}</p>{/if}
       <!-- the model pane and the text pane are tabs (WP-1034) and stay
            mounted like every other one: a typed species, a half-filled wizard
            and a typed `.rxt` buffer all have to survive a look at the plot.
@@ -1334,9 +1353,8 @@
            active and never hidden. -->
       <div class="panel" class:hidden={!!project && !modelTab}>
         <Model bind:this={modelPanel} {project} {capabilities} {head} {busy} {simple}
-          {theme} {recent} {examples} {say} onexample={openExample}
-          active={!project || modelTab} columns={modelColumns}
-          oncolumns={modelSized} onopen={open} onopened={opened} onmoved={moved} />
+          {theme} {say} active={modelTab} columns={modelColumns}
+          oncolumns={modelSized} onmoved={moved} />
       </div>
       {#if project}
         <!-- every tab stays mounted: switching must not throw away a filter, a
@@ -1389,7 +1407,13 @@
       {/if}
     </div>
   </div>
+  {/if}
 </main>
+
+{#if newOpen}
+  <NewProject {capabilities} {busy} {say} onclose={() => (newOpen = false)}
+    onopened={opened} />
+{/if}
 
 {#if paletteOpen}
   <Palette {commands} onclose={() => (paletteOpen = false)} />
@@ -1685,11 +1709,7 @@
     display: none;
   }
 
-  /* the `openError` shown above Model when there is no project yet — the
-     side column used to be `.empty`'s own full-height flex box before the two
-     `Model` mounts became one (WP-1205); `.side` already carries the same
-     shape (`display: flex; flex-direction: column`). */
-  .side > .bad {
-    margin: 0.6rem 1.2rem 0;
+  .panes.hidden {
+    display: none;
   }
 </style>
