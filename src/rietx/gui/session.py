@@ -46,6 +46,7 @@ import json
 import math
 import os
 import re
+import shutil
 import threading
 import time
 from collections import deque
@@ -483,7 +484,10 @@ class GuiSession:
         p = self._need_project()
         ref = p.data_ref
         return {
-            "path": str(p.path),
+            # resolved, as the recent list stores it: `rietx gui sample.rex`
+            # opens a relative path, and the File menu derives the folder a
+            # copy or an export starts in from this string (WP-2133)
+            "path": str(Path(p.path).resolve()),
             "doc": p.doc.model_dump(mode="json"),
             "data": {
                 "filename": ref.filename, "reader": ref.reader,
@@ -621,6 +625,137 @@ class GuiSession:
         p = self._need_project()
         p.save()
         return {"saved": str(p.path), "updated_utc": p.doc.updated_utc}
+
+    # -- the File menu (WP-2133) -------------------------------------------
+    #
+    # The maintainer's save model A (2026-11-07): work saves itself, so the
+    # menu has no Save, and what it does to a project is done to the *folder*.
+    # Four rules, shared by the verbs below.  Each is idle-only, the 409
+    # outranking every other refusal, because a stage appends to the history
+    # log while it runs and a copy or a move taken then could split a line.  A
+    # name is one path component, refused rather than cleaned.  A destination
+    # folder passes the folder browser's containment gate (WP-1205).  And no
+    # folder is ever replaced: an existing destination is a 409.
+
+    def project_copy(self, body: dict) -> dict:
+        """Copy the whole project folder, history included, and stay on this one.
+
+        "Save a copy" in the document apps' sense: the window keeps the
+        project it had, and the copy is a project of its own from the moment
+        it exists, opened later through Open or Open recent like any other.
+        """
+        self._require_idle()
+        p = self._need_project()
+        target = self._destination(_need(body, "directory"), _need(body, "name"))
+        if target.is_relative_to(Path(p.path).resolve()):
+            raise GuiError("a project cannot be copied into itself",
+                           where=["directory"])
+        _refuse_existing(target)
+        try:
+            shutil.copytree(p.path, target, symlinks=True)
+        except OSError as exc:
+            raise GuiError(f"could not copy the project to {target}: {exc}",
+                           code="PROJECT_ERROR") from None
+        return {"path": str(target), "name": target.name}
+
+    def project_rename(self, body: dict) -> dict:
+        """Rename the project's folder where it stands."""
+        self._require_idle()
+        p = self._need_project()
+        source = Path(p.path).resolve()
+        target = source.parent / _project_name(_need(body, "name"))
+        if target == source:
+            return self.project_doc()
+        self._relocate(target)
+        return self.project_doc()
+
+    def project_move(self, body: dict) -> dict:
+        """Move the project's folder into another folder, keeping its name."""
+        self._require_idle()
+        p = self._need_project()
+        source = Path(p.path).resolve()
+        # the folder's own name, unvetted: a project the Python API made may
+        # lack the suffix, and a move must not rename it on the way
+        target = self._browsable_folder(_need(body, "directory")) / source.name
+        if target == source:
+            return self.project_doc()
+        if target.is_relative_to(source):
+            raise GuiError("a project cannot be moved into itself",
+                           where=["directory"])
+        self._relocate(target)
+        return self.project_doc()
+
+    def project_close(self) -> dict:
+        """Close the project: the session holds none, and the start screen shows.
+
+        Nothing is saved here because nothing is unsaved (save model A).  The
+        recent list's entry is marked ``closed``, so the next launch shows the
+        start screen rather than reopening a project its user closed.
+        """
+        self._require_idle()
+        p = self._need_project()
+        path = str(Path(p.path).resolve())
+        with self._cond:
+            self.project = None
+            self._run = _idle_run()
+            self._index_result = None
+            self._extinction = None
+            self._peak_ed = None
+            self._series = series_mod.SeriesSetup()
+            self._series_run = None
+            self._cond.notify_all()
+        self._write_recent([
+            {**_recent_entry(e), "closed": True} if str(e.get("path", "")) == path
+            else _recent_entry(e) for e in self._recent_raw()])
+        return {"closed": path}
+
+    def _destination(self, directory: Any, name: Any) -> Path:
+        """``directory/name`` for a copy or a move, refused where it may not go."""
+        return self._browsable_folder(directory) / _project_name(str(name))
+
+    def _browsable_folder(self, directory: Any) -> Path:
+        """A destination folder the person chose in the folder browser.
+
+        The browser's own gate (WP-1205, :meth:`fs`): resolved first, then
+        contained in one of the two roots, so a client cannot name a folder the
+        browser would not have listed.
+        """
+        folder = Path(str(directory)).expanduser().resolve()
+        roots = self._fs_roots()
+        if not any(folder.is_relative_to(r) for r in roots):
+            raise GuiError(
+                f"{folder} is outside the browsable roots "
+                f"({', '.join(str(r) for r in roots)})", where=["directory"])
+        if not folder.is_dir():
+            raise GuiError(f"{folder} is not a folder", where=["directory"])
+        return folder
+
+    def _relocate(self, target: Path) -> None:
+        """Move the open project's folder to ``target`` and follow it.
+
+        The session keeps its project object, result and run frame: only two
+        things hold the old place, ``Project.path`` and the history log's own
+        path, which every later node is appended to.  The recent list swaps the
+        old entry for the new one.
+        """
+        p = self._need_project()
+        source = Path(p.path).resolve()
+        # a case-only rename on a case-insensitive volume (the macOS default)
+        # finds its own folder at the target; shutil.move renames it in place
+        if not (target.exists() and os.path.samefile(target, source)):
+            _refuse_existing(target)
+        try:
+            shutil.move(str(source), str(target))
+        except OSError as exc:
+            raise GuiError(f"could not move the project to {target}: {exc}",
+                           code="PROJECT_ERROR") from None
+        with self._cond:
+            p.path = target
+            p.history.path = target / p.doc.history_file
+            self._peak_ed = None
+        self._write_recent([_recent_entry(e) for e in self._recent_raw()
+                            if str(e.get("path", "")) != str(source)])
+        self._remember(p)
 
     def settings(self) -> dict:
         """The **app's** own `ui` keys — the ones that belong to the person.
@@ -816,19 +951,29 @@ class GuiSession:
         self._write_recent(kept)
         return {"recent": self.recent()}
 
+    def recent_clear(self) -> dict:
+        """Empty the recent list (the File menu's Clear the list, WP-2133).
+
+        Only the list: no project is touched.  Not behind the 409, for
+        :meth:`recent_remove`'s reason.
+        """
+        self._write_recent([])
+        return {"recent": []}
+
     def reopen_last(self) -> str | None:
         """Open the recent list's head at launch, or leave the session empty.
 
         The start screen's rule (WP-2131, the maintainer's round-9 design):
         a launch with no project named returns to the last project, and the
-        start screen shows when there is none.  Until a Close verb exists the
-        last project opened is the last one open, so the head is the answer.
+        start screen shows when there is none.  The head is the last project
+        opened, and :meth:`project_close` marks it ``closed`` (WP-2133), so a
+        project closed before quitting is not the one open at the next launch.
         A head that has moved, or that refuses to open, leaves the session
         empty rather than failing the launch: the start screen then lists it.
         Returns the path opened, or ``None``.
         """
         head = next(iter(self.recent()), None)
-        if head is None or head["missing"]:
+        if head is None or head["missing"] or head.get("closed"):
             return None
         try:
             self.project_open({"path": head["path"]})
@@ -3058,7 +3203,7 @@ class GuiSession:
     # exports
     # ------------------------------------------------------------------
     def export(self, kind: str, body: dict) -> dict:
-        """Write an export into ``<project>/exports/``.
+        """Write an export into ``<project>/exports/``, or into a chosen folder.
 
         Idle-only, and not because it writes: ``write_cif`` and the reflection
         table read the *compiled model*, which a running stage owns.
@@ -3066,6 +3211,14 @@ class GuiSession:
         Two gates, not one.  Everything here describes a fit and needs a result;
         ``_EXPORT_MODEL_ONLY`` names the kinds that describe the model instead
         and are answered from the project alone.
+
+        ``directory`` is the File menu's Export dialog (WP-2133), which starts
+        in the folder holding the project, after File › Export in the document
+        apps.  It passes the folder browser's containment gate, and a file
+        already there is refused (``DESTINATION_EXISTS``) unless the request
+        says ``overwrite``: the dialog shows the refusal and asks first, because
+        a replaced file has no undo.  Without ``directory`` the export goes to
+        ``exports/`` and replaces its namesake, as it always has.
         """
         self._require_idle()
         p = self._need_project()
@@ -3074,7 +3227,13 @@ class GuiSession:
                            f"available: {sorted(EXPORT_DEFAULTS)}",
                            code="NOT_FOUND", status=404)
         res = None if kind in _EXPORT_MODEL_ONLY else self._need_result()
-        target = self._export_target(body.get("filename") or EXPORT_DEFAULTS[kind])
+        filename = body.get("filename") or EXPORT_DEFAULTS[kind]
+        if body.get("directory"):
+            target = self._export_elsewhere(body["directory"], filename)
+            if not body.get("overwrite"):
+                _refuse_existing(target, "filename")
+        else:
+            target = self._export_target(filename)
         ref = p.refinement
         try:
             if kind == "instrument_profile":
@@ -3099,8 +3258,21 @@ class GuiSession:
             # one: a Le Bail fit has no weight fractions, and saying so beats
             # writing an empty table
             raise GuiError(str(exc), code="EXPORT_UNAVAILABLE", status=409) from None
+        except OSError as exc:
+            # a folder the person chose may be read-only, or hold a folder of
+            # the file's name: a refusal the dialog shows, never a 500
+            raise GuiError(f"could not write {target}: {exc}",
+                           where=["directory"]) from None
         return {"kind": kind, "path": str(target), "name": target.name,
                 "bytes": target.stat().st_size}
+
+    def _export_elsewhere(self, directory: Any, filename: str) -> Path:
+        """``directory/filename`` for the Export dialog, refused where it may not go."""
+        folder = self._browsable_folder(directory)
+        name = str(filename).strip()
+        if not name or name.startswith(".") or any(c in name for c in "/\\\0"):
+            raise GuiError(f"{filename!r} is not a file name", where=["filename"])
+        return folder / name
 
     def _export_target(self, filename: str) -> Path:
         p = self._need_project()
@@ -3436,6 +3608,29 @@ def _pick_action(report, kind: str, paths: Any = None):
     return hits[0]
 
 
+def _project_name(name: str) -> str:
+    """A project folder's name from what a person typed, or a refusal.
+
+    One path component, refused rather than cleaned (WP-1205's rule: the gate
+    is a test, never a sanitiser).  The project suffix is added when it is not
+    typed, so "sample" and "sample.rex" name the same folder.
+    """
+    text = str(name or "").strip()
+    if text.endswith(_about.PROJECT_SUFFIX):
+        text = text[: -len(_about.PROJECT_SUFFIX)].strip()
+    if not text or text.startswith(".") or any(c in text for c in "/\\\0"):
+        raise GuiError(f"{name!r} is not a project name: give one folder name, "
+                       "with no separator and no leading dot", where=["name"])
+    return f"{text}{_about.PROJECT_SUFFIX}"
+
+
+def _refuse_existing(target: Path, where: str = "name") -> None:
+    """No File menu verb replaces a folder or a file that is already there."""
+    if target.exists():
+        raise GuiError(f"{target} already exists; choose another name or folder",
+                       code="DESTINATION_EXISTS", status=409, where=[where])
+
+
 def _pair(value, where: str) -> tuple:
     """A ``[lo, hi]`` from a body as a tuple, for the document's validator.
 
@@ -3743,11 +3938,15 @@ def _is_typed_cell(payload) -> bool:
 def _recent_entry(entry: dict) -> dict:
     """One stored recent-list row, reduced to the keys it is written with."""
     phases = entry.get("phases")
-    return {"path": str(entry.get("path", "")),
-            "opened_utc": str(entry.get("opened_utc", "")),
-            "phases": [[str(n), str(sg)] for n, sg in phases]
-            if isinstance(phases, list) and all(
-                isinstance(x, list) and len(x) == 2 for x in phases) else []}
+    row = {"path": str(entry.get("path", "")),
+           "opened_utc": str(entry.get("opened_utc", "")),
+           "phases": [[str(n), str(sg)] for n, sg in phases]
+           if isinstance(phases, list) and all(
+               isinstance(x, list) and len(x) == 2 for x in phases) else []}
+    if entry.get("closed") is True:
+        # written by Close (WP-2133); absent on every entry an open wrote
+        row["closed"] = True
+    return row
 
 
 def _typed_cell_structure(payload: dict) -> Structure:
