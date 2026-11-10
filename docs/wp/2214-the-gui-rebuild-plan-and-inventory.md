@@ -679,8 +679,25 @@ The WP closes when the maintainer has answered § Questions and R1 is filed.
 ## Handover log
 
 - **2026-11-11** — filed by a ghostshift runner on the maintainer's rebuild ruling of the same
-  night. No open WP owns the rebuild's plan: the milestone's tables have no row for it, and the
-  graph-window branch covers one pane. The inventory walks `origin/main` at 68fd06973 (254 rows),
-  read by a subagent over every panel and checked against the prototype's element map by a second;
-  both maps are in the runner's scratch. Five rows wait on the maintainer. Next: the maintainer
-  answers § Questions; then file R1, the frame, and build it.
+  night, in PR #PRNUM. Every feature of today's GUI now has a written home in the new design, and
+  the rebuild has an order of seven pieces and a swap. Five placements the prototype never drew
+  wait on the maintainer; the rest are settled on the prototype, `gui/STYLE.md` or named
+  practice, with the fourteen calls a reviewer might reverse listed in § Settled by Claude. No
+  open WP owned the rebuild's plan: the milestone's tables had no row for it, and the
+  graph-window branch covered one pane.
+  - *Done*: the WP with its inventory (254 rows over `origin/main` at 68fd06973), the plan and the
+    dispositions; the milestone rewritten to the rebuild; WP-2211 and WP-2212 re-pointed at R1;
+    `docs/practice.md` § Where a GUI keeps its secondary controls; one ROADMAP sentence.
+  - *How the inventory was made*: one subagent walked every panel, the keys and the palette
+    (330 fine rows, merged here into 254); a second mapped the prototype's elements and its ways
+    of hiding controls. Both maps are in the runner's scratch, `~/.cache/ghostshift/rietx/gui-rebuild/`,
+    and the prototype map quotes private files, so it stays there.
+  - *Measured*: `tests/test_docs_consistency.py` and `tests/test_gui_manual.py`, 36 passed, in the
+    worktree's `[dev]` venv on darwin arm64. The CI Vale steps exit 0 (266 warnings, all in files
+    this branch does not touch).
+  - *Gotchas*: PRs #1517, #1520 and #1523 each edit the milestone's tables, so whichever merges
+    second meets a conflict there. This branch's version already states their merged outcome, so
+    the resolution takes this side and keeps their WP numbers as plain text until their files
+    reach `main`, when they can become links.
+  - *Next*: the maintainer answers § Questions. Then file R1, the frame, with the carry-overs its
+    row names, and build it.
