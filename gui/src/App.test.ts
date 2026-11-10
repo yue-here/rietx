@@ -997,8 +997,9 @@ describe("the shell", () => {
     await flush();
     expect(host.ownerDocument.querySelector(".popover")?.textContent)
       .toContain("same specimen");
-    // the calm pill is still there and still says `converged` — untouched
-    expect(host.querySelector(".pill")?.textContent?.trim()).toBe("idle");
+    // the run state is still there, in the status bar since WP-2207, and still
+    // says the run's own status — untouched by the report's judgement
+    expect(host.querySelector(".statusbar .run")?.textContent?.trim()).toBe("idle");
   });
 
   it("surfaces an open refusal verbatim rather than 'could not open'", async () => {
@@ -1848,31 +1849,100 @@ describe("disclosure and the command palette", () => {
     expect(cancel?.disabled).toBe(true);
   });
 
-  it("gives the console a fixed height it can be dragged out of", async () => {
+  it("gives the bottom panel a height it can be dragged out of (WP-2206)", async () => {
     const stub = server(boot());
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    // sized, not flexible: sharing the sidebar with `flex: 1 1 auto` gave the
-    // log half the column, which is the wrong split for a panel read in glances
-    const panel = host.querySelector<HTMLElement>("section.console")!;
-    expect(panel.style.flex).toBe("0 0 150px");
+    // hidden at first, and shown from the status bar's toggle
+    const panel = host.querySelector<HTMLElement>("section.bottom")!;
+    expect(panel.classList.contains("hidden")).toBe(true);
+    host.querySelector<HTMLButtonElement>(".statusbar button.toggle")!.click();
+    await flush();
+    expect(panel.classList.contains("hidden")).toBe(false);
+    expect(panel.style.flex).toBe("0 0 200px");
 
-    // `.grip` is also the plan editor's drag handle, and `.caret` is a group
-    // header's — scope to the console or the query finds a hidden panel's
-    const grip = host.querySelector<HTMLElement>("section.console .grip")!;
+    // `.grip` is also the plan editor's drag handle — scope to the panel
+    const grip = host.querySelector<HTMLElement>("section.bottom > .grip")!;
     grip.dispatchEvent(new MouseEvent("pointerdown", { clientY: 400, bubbles: true }));
     window.dispatchEvent(new MouseEvent("pointermove", { clientY: 340, bubbles: true }));
     await flush();
-    expect(panel.style.flex).toBe("0 0 210px");            // dragging up grows it
+    expect(panel.style.flex).toBe("0 0 260px");            // dragging up grows it
 
     window.dispatchEvent(new MouseEvent("pointerup", { bubbles: true }));
     await flush();
-    // one write per drag, not one per pixel — and it lands in the project's ui
+    // one write per drag, not one per pixel — and it lands in the project's ui,
+    // under the key the Console's own pane used before
     const writes = stub.calls.filter((c) => c.method === "POST" && c.path === "/api/project");
     expect(writes).toHaveLength(1);
-    expect(writes[0].body).toEqual({ ui: { console_height: 210 } });
+    expect(writes[0].body).toEqual({ ui: { console_height: 260 } });
+  });
+
+  it("shows the console and the history from the status bar, ⌘J and `h`", async () => {
+    vi.stubGlobal("fetch", server({ ...boot(), ...FITTED }).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const toggle = host.querySelector<HTMLButtonElement>(".statusbar button.toggle")!;
+    const panel = host.querySelector<HTMLElement>("section.bottom")!;
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+    expect(toggle.textContent?.trim()).toBe("Console");
+    expect(toggle.title).toMatch(/^Show the console and history\n(⌘|Ctrl\+)J$/);
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "j", metaKey: true, bubbles: true }));
+    await flush();
+    expect(panel.classList.contains("hidden")).toBe(false);
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+    const tabs = [...panel.querySelectorAll<HTMLButtonElement>("nav.tabs button")];
+    expect(tabs.map((b) => b.textContent?.trim())).toEqual(["Console", "History"]);
+    expect(panel.querySelector(".pane:not(.hidden) section.console")).not.toBeNull();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "j", ctrlKey: true, bubbles: true }));
+    await flush();
+    expect(panel.classList.contains("hidden")).toBe(true);
+
+    // `h` opens it on History, which moved here from the model column
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "h", bubbles: true }));
+    await flush();
+    expect(panel.classList.contains("hidden")).toBe(false);
+    expect(panel.querySelector(".pane:not(.hidden)")?.textContent).toContain("2 lanes");
+    expect(host.querySelector(".side nav.tabs")?.textContent).not.toContain("History");
+  });
+
+  it("draws the status bar without a project, its toggle disabled", async () => {
+    vi.stubGlobal("fetch", server(boot(null)).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const toggle = host.querySelector<HTMLButtonElement>(".statusbar button.toggle")!;
+    expect(toggle.disabled).toBe(true);
+    expect(toggle.title).toBe("No project is open");
+    expect(host.querySelector(".statusbar .run")?.textContent?.trim()).toBe("");
+    expect(host.querySelector("section.bottom")).toBeNull();
+    // the run's state and Cancel left the header for the bar (WP-2207)
+    expect(host.querySelector("header .pill")).toBeNull();
+    expect([...host.querySelectorAll("header button")]
+      .some((b) => b.textContent?.trim() === "Cancel")).toBe(false);
+    expect(button("Cancel")?.closest(".statusbar")).not.toBeNull();
+  });
+
+  it("names the stage in the status bar while a run is in flight", async () => {
+    const running = { ...IDLE_RUN, state: "running",
+                      run: { ...IDLE_RUN.run, kind: "fit", stage: "cell",
+                             stage_index: 2, n_stages: 5 } };
+    vi.stubGlobal("fetch", server({
+      ...boot(),
+      "/api/run/state": () => ({ body: running }),
+      "/api/events": () => ({ body: { events: [], next: 0, oldest: 1, ...running } }),
+    }).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+
+    const words = host.querySelector<HTMLElement>(".statusbar .run")!;
+    expect(words.textContent?.trim()).toBe("cell (2/5)");
+    expect(words.dataset.state).toBe("running");
+    expect(button("Cancel")!.disabled).toBe(false);
   });
 
   it("collapses either side from its own button, and keeps the plot mounted", async () => {
@@ -1895,8 +1965,9 @@ describe("disclosure and the command palette", () => {
     // hidden, not unmounted — a layout click must not purge the drawn window
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(true);
     expect(host.querySelector(".plot")).not.toBeNull();
-    // the panel tabs travel with the column, ten since WP-2128
-    expect(host.querySelectorAll(".side nav.tabs button").length).toBe(10);
+    // the panel tabs travel with the column: ten since WP-2128, nine since
+    // History moved to the bottom panel (WP-2206)
+    expect(host.querySelectorAll(".side nav.tabs button").length).toBe(9);
     // …and no splitter, because there is nothing on the other side of it
     expect(host.querySelector('.side > .grip[data-grow="left"]')).toBeNull();
     // the last side showing cannot hide too
@@ -1920,7 +1991,7 @@ describe("disclosure and the command palette", () => {
     expect(host.querySelector("header")?.lastElementChild).toBe(model);
   });
 
-  it("carries ten tabs with no label shortened and every panel reachable", async () => {
+  it("carries nine tabs with no label shortened and every panel reachable", async () => {
     const stub = server({ ...boot(), ...FITTED });
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
@@ -1929,7 +2000,7 @@ describe("disclosure and the command palette", () => {
     const tabs = [...host.querySelectorAll<HTMLButtonElement>(".side nav.tabs button")];
     expect(tabs.map((b) => b.textContent?.trim())).toEqual([
       "Parameters", "Interactive", "Plan", "Peaks", "Model", "Text", "Series",
-      "Report", "History", "Build"]);
+      "Report", "Build"]);
     // the overflow rule is `flex-wrap` plus `min-width: max-content`: a strip
     // that hides a tab or elides its name is worse than the mode buttons it
     // replaced, so the *count* and the *labels* are the assertion jsdom can make
@@ -1937,7 +2008,7 @@ describe("disclosure and the command palette", () => {
 
     for (const [label, marker] of [["Plan", "scale+bkg"], ["Peaks", "peak"],
                                    ["Series", "No patterns staged"],
-                                   ["Report", "21.600%"], ["History", "2 lanes"],
+                                   ["Report", "21.600%"],
                                    // the owed list is empty since this panel
                                    // landed — the last one the plan named
                                    ["Build", "every panel the v1.0"]] as const) {
@@ -1947,7 +2018,7 @@ describe("disclosure and the command palette", () => {
     }
     // every panel is still in the document after the tour — switching must not
     // throw away a filter, a pending edit or a two-node comparison
-    expect(host.querySelectorAll(".side .panel").length).toBe(10);
+    expect(host.querySelectorAll(".side .panel").length).toBe(9);
   });
 
   it("stamps an explicit theme on the root and persists the choice", async () => {
@@ -2223,25 +2294,37 @@ describe("disclosure and the command palette", () => {
     expect(writes.at(-1)!.body).toEqual({ ui: { model_columns: [460, 380] } });
   });
 
-  it("collapses to its header and remembers the height to come back to", async () => {
+  it("restores the stored height, and a shut pane opens at the floor", async () => {
     const tall = { ...PROJECT, doc: { ...PROJECT.doc, ui: { console_height: 260 } } };
-    const stub = server(boot(tall));
-    vi.stubGlobal("fetch", stub.fetcher);
+    vi.stubGlobal("fetch", server(boot(tall)).fetcher);
     app = mount(App, { target: host });
     await flush();
 
-    const panel = host.querySelector<HTMLElement>("section.console")!;
-    expect(panel.style.flex).toBe("0 0 260px");            // restored from the project
-
-    const caret = host.querySelector<HTMLButtonElement>("section.console .caret")!;
-    caret.click();
+    const toggle = host.querySelector<HTMLButtonElement>(".statusbar button.toggle")!;
+    const panel = host.querySelector<HTMLElement>("section.bottom")!;
+    toggle.click();
     await flush();
-    expect(panel.style.flex).toBe("0 0 26px");             // header only
-    expect(panel.classList.contains("shut")).toBe(true);
-
-    caret.click();
+    expect(panel.style.flex).toBe("0 0 260px");            // restored from the project
+    toggle.click();
+    await flush();
+    expect(panel.classList.contains("hidden")).toBe(true);
+    toggle.click();
     await flush();
     expect(panel.style.flex).toBe("0 0 260px");            // …and back to where it was
+    app && unmount(app);
+    app = null;
+    host.innerHTML = "";
+
+    // the Console's own pane could be shut to its 26 px header; that height,
+    // stored by an older build, opens the panel at its floor rather than as a
+    // sliver
+    const shut = { ...PROJECT, doc: { ...PROJECT.doc, ui: { console_height: 26 } } };
+    vi.stubGlobal("fetch", server(boot(shut)).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    host.querySelector<HTMLButtonElement>(".statusbar button.toggle")!.click();
+    await flush();
+    expect(host.querySelector<HTMLElement>("section.bottom")!.style.flex).toBe("0 0 90px");
   });
 
   it("runs the fit on `r`, but not while a filter box has focus", async () => {

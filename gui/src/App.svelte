@@ -22,8 +22,7 @@
   import Help from "./Help.svelte";
   import ActionBar from "./panels/ActionBar.svelte";
   import Checklist from "./panels/Checklist.svelte";
-  import Console from "./panels/Console.svelte";
-  import History from "./panels/History.svelte";
+  import Bottom from "./panels/Bottom.svelte";
   import Interactive from "./panels/Interactive.svelte";
   import Model from "./panels/Model.svelte";
   import NewProject from "./panels/NewProject.svelte";
@@ -39,6 +38,7 @@
   import Series from "./panels/Series.svelte";
   import Splitter from "./panels/Splitter.svelte";
   import Start from "./panels/Start.svelte";
+  import StatusBar from "./panels/StatusBar.svelte";
   import FileMenu from "./panels/FileMenu.svelte";
   import Stubs from "./panels/Stubs.svelte";
   import Text from "./panels/Text.svelte";
@@ -52,7 +52,7 @@
   import { cellText, type PeaksPayload } from "./lib/peaks";
   import { consoleLine, follow, type EngineEvent, type RunState } from "./lib/stream";
   import { SHELL_MIN, shellStacks } from "./lib/resize";
-  import { GRAPH_TABS, TABS, type GraphTab, type Tab } from "./lib/tabs";
+  import { GRAPH_TABS, TABS, type BottomTab, type GraphTab, type Tab } from "./lib/tabs";
   import { FALLBACK_FWHM_DEG, type PreviewAnswer, type RangeContext } from "./lib/interactive";
   import { peakWindows, widestFwhm } from "./lib/peakwin";
   import {
@@ -107,6 +107,11 @@
    * choice, not a setting (WP-1033's line between the two). */
   let hideGraphs = $state(false);
   let hideModel = $state(false);
+  /** The bottom panel (WP-2206): whether it shows, and which of its two tabs.
+   *  Hidden at first and session-local, for the reason the sides are: a
+   *  layout is a view choice. Its *height* is a setting, persisted below. */
+  let bottomOpen = $state(false);
+  let bottomTab = $state<BottomTab>("console");
   /** The graph strip's tab (`lib/tabs.ts`), one today. */
   let graphTab = $state<GraphTab>("pattern");
   /** The window's width, and whether it has dropped to one column. */
@@ -162,7 +167,7 @@
    *  project, and therefore session-local rather than persisted. */
   let firstRun = $state(true);
   let reportSeen = $state(false);
-  let consoleHeight = $state(150);
+  let consoleHeight = $state(200);
   /** The panel column's width in px, or `null` for "nobody has said".
    *
    * `null` is not laziness: while it holds, the CSS `clamp(340px, 38%, 560px)`
@@ -328,7 +333,9 @@
     // Absent means "not dismissed yet", so a project made before this existed
     // gets the strip once. Only `false` hides it (WP-1017).
     firstRun = project?.doc?.ui?.first_run !== false;
-    consoleHeight = project?.doc?.ui?.console_height ?? 150;
+    // the bottom panel's height since WP-2206, under the key the Console's own
+    // pane stored it in; a pane shut to its header (26 px) opens at the floor
+    consoleHeight = Math.max(90, project?.doc?.ui?.console_height ?? 200);
     sideWidth = project?.doc?.ui?.side_width ?? null;
     modelColumns = project?.doc?.ui?.model_columns ?? null;
   }
@@ -638,6 +645,17 @@
     }
   }
 
+  /** Show or hide the bottom panel, from the status bar or ⌘J (WP-2206). */
+  function toggleBottom() {
+    if (project) bottomOpen = !bottomOpen;
+  }
+
+  /** Open the bottom panel on one of its tabs: `h` and the palette's history. */
+  function showBottom(which: BottomTab) {
+    bottomTab = which;
+    bottomOpen = true;
+  }
+
   async function cancel() {
     try {
       run = await api.cancel();
@@ -905,7 +923,10 @@
     { id: "report", label: "Show the fit report", echo: "ref.report()", key: "?",
       disabled: !project, run: () => (tab = "report") },
     { id: "history", label: "Show the history", echo: "ref.history.summary()", key: "h",
-      disabled: !project, run: () => (tab = "history") },
+      disabled: !project, run: () => showBottom("history") },
+    { id: "console", label: bottomOpen ? "Hide the console and history" : "Show the console",
+      echo: "# a layout choice, not a setting", key: "⌘J", disabled: !project,
+      run: toggleBottom },
     { id: "text", label: "Edit the project as text",
       echo: "print(rietx.gui.textdoc.render(project))", key: "t", disabled: !project,
       run: () => (tab = "text") },
@@ -939,6 +960,12 @@
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
       event.preventDefault();
       paletteOpen = !paletteOpen;
+      return;
+    }
+    // the bottom panel (WP-2206), as VS Code binds its own panel's toggle
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "j") {
+      event.preventDefault();
+      toggleBottom();
       return;
     }
     // while the palette is open it owns the keyboard — Esc closes it there, and
@@ -1267,16 +1294,8 @@
             aria-label={choice} title={THEME_TITLE[choice]}>{GLYPH[choice]}</button>
         {/each}
       </div>
-      <span class="pill" data-state={run?.state ?? "idle"}>
-        {#if busy}
-          {run?.run.stage ?? "starting"}
-          {#if run?.run.stage_index}({run.run.stage_index}/{run.run.n_stages}){/if}
-          {#if run?.run.lebail?.pass}· pass {run.run.lebail.pass}{#if run.run.lebail.of} of {run.run.lebail.of}{/if}{/if}
-        {:else}
-          {run?.run.status ?? "idle"}
-        {/if}
-      </span>
-      <button class="ghost" onclick={cancel} disabled={!busy}>Cancel</button>
+      <!-- the run state and Cancel are the status bar's since WP-2207: a slot
+           whose words change moved every control left of it here -->
       <button class="ghost" onclick={() => (paletteOpen = true)} title="every command, with the call it makes">
         <kbd>⌘K</kbd>
       </button>
@@ -1484,19 +1503,28 @@
             onzoom={(lo, hi) => (zoom = [lo, hi])}
             onapplied={absorbApply} onmoved={moved} />
         </div>
-        <div class="panel" class:hidden={tab !== "history"}>
-          <History {head} {busy} {say} onmoved={moved} />
-        </div>
         <div class="panel" class:hidden={tab !== "build"}>
           <Stubs {capabilities} {project} />
         </div>
         {#if !hideModel}{@render actions()}{/if}
-        <Console {lines} {dropped} height={consoleHeight} onresize={setConsoleHeight} />
       {/if}
     </div>
   </div>
   {/if}
 </main>
+
+<!-- The bottom panel and the status bar (WP-2206, WP-2207), across the whole
+     window under both sides, as the prototype drew them.  The panel is mounted
+     with a project and hidden by class, so its log and its comparison survive
+     a toggle; the bar is drawn without one too, so opening a project moves
+     nothing in it. -->
+{#if project}
+  <Bottom open={bottomOpen} bind:tab={bottomTab} height={consoleHeight}
+    extent={() => (mainEl?.clientHeight ?? 0) + consoleHeight}
+    onresize={setConsoleHeight} {lines} {dropped} {head} {busy} {say} onmoved={moved} />
+{/if}
+<StatusBar project={!!project} open={bottomOpen} {run} {busy}
+  ontoggle={toggleBottom} oncancel={cancel} />
 
 {#if newOpen}
   <NewProject {capabilities} {busy} {say} onclose={() => (newOpen = false)}
@@ -1685,16 +1713,6 @@
   .lebail-stop[data-level="warning"] {
     background: color-mix(in srgb, var(--warn) 14%, var(--panel));
   }
-  .pill[data-state="running"] {
-    color: var(--ok);
-    border-color: var(--ok);
-  }
-
-  .pill[data-state="cancelling"] {
-    color: var(--warn);
-    border-color: var(--warn);
-  }
-
   main {
     flex: 1 1 auto;
     overflow: hidden;

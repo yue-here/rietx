@@ -34,7 +34,10 @@ LANDMARKS = [
     "#app > header", "#app > header > button.toggle", "#app > header > .bar",
     "#app > header .controls > *",
     ".plotcol", ".plotcol > nav.tabs", ".gtitle", ".side", ".side > nav.tabs",
-    ".actions", ".actions .segmented", ".actions .go > *", ".console",
+    ".actions", ".actions .segmented", ".actions .go > *",
+    # the status bar (WP-2207) and the bottom panel it shows (WP-2206)
+    ".statusbar", ".statusbar > *", "section.bottom", "section.bottom > nav.tabs",
+    "section.bottom > nav.tabs button",
 ]
 
 #: Every landmark's box, keyed by its selector and its place among the matches.
@@ -61,7 +64,7 @@ CONTROLS = """() => [...document.querySelectorAll(
 WIDTHS = {"wide": 1300, "stacked": 700}
 
 
-def _serve(tmp_path_factory, name: str):
+def _serve(tmp_path_factory, name: str, fitted: bool = True):
     from tests.test_project import _write_xye
     from tests.test_refine_synthetic import synthesize
 
@@ -70,10 +73,11 @@ def _serve(tmp_path_factory, name: str):
     session = GuiSession(project, state_dir=tmp_path_factory.mktemp(f"{name}-state"))
     httpd = _start(session)
     client = Client(httpd.server_address[1])
-    status, run = client.post("/api/run", {"kind": "stage", "stage": {
-        "name": "scale", "turn_on": ["phases.*.scale"], "max_iter": 5}})
-    assert status == 200, run
-    _wait_idle(client)
+    if fitted:
+        status, run = client.post("/api/run", {"kind": "stage", "stage": {
+            "name": "scale", "turn_on": ["phases.*.scale"], "max_iter": 5}})
+        assert status == 200, run
+        _wait_idle(client)
     return httpd, client
 
 
@@ -356,15 +360,22 @@ def test_refine_stays_on_screen_with_either_side_hidden(browser, gui, state):
 
 
 def test_a_phone_width_window_never_scrolls_sideways(browser, gui):
-    """Below the threshold the sides stack, so nothing needs a wider window."""
+    """Below the threshold the sides stack, so nothing needs a wider window,
+    the bottom panel and the status bar included (WP-2206, WP-2207)."""
     url, _ = gui
     page = _open(browser, url, 420)
     assert page.locator(".panes.stacked").count() == 1
     overflow = page.evaluate(
         "document.documentElement.scrollWidth - document.documentElement.clientWidth")
+    page.locator(".statusbar button.toggle").click()
+    page.locator("section.bottom > nav.tabs").get_by_role("button", name="History", exact=True).click()
+    _frames(page)
+    opened = page.evaluate(
+        "document.documentElement.scrollWidth - document.documentElement.clientWidth")
     assert not page.errors, page.errors
     page.close()
     assert overflow <= 0, f"{overflow} px of horizontal scroll at 420 px"
+    assert opened <= 0, f"{opened} px of horizontal scroll at 420 px, the bottom panel open"
 
 
 def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory):
@@ -386,7 +397,7 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
             "document.querySelector('.console')?.textContent"
             ".includes('ref.run_stage(Stage(\"cycle\"')")
         _wait_idle(client)
-        page.wait_for_selector('.pill[data-state="idle"]')
+        page.wait_for_selector('.statusbar .run[data-state="idle"]')
         page.wait_for_function("document.querySelector('.gtitle .what').textContent === 'Last fit'")
         _frames(page)
         moved = _moved(before, page.evaluate(SNAP, LANDMARKS))
@@ -395,6 +406,113 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
     finally:
         httpd.shutdown()
     assert not moved, moved
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_a_first_run_moves_nothing(browser, tmp_path_factory, state):
+    """WP-2207. A project's first run turns the run state from `idle` into the
+    run's status. In the header that was a content-sized pill left of `Cancel`,
+    so the words moved `Simple | Advanced`, the theme and `Cancel` 35 px left.
+    The words are the status bar's now, in a slot that takes the room left, so
+    the first run moves nothing, the bottom panel open or not."""
+    httpd, client = _serve(tmp_path_factory, f"layout-first-{state}", fitted=False)
+    url = f"http://127.0.0.1:{httpd.server_address[1]}/"
+    try:
+        page = _open(browser, url, WIDTHS[state])
+        assert page.locator(".statusbar .run").text_content().strip() == "idle"
+        page.locator(".actions button", has_text="One cycle").click()
+        page.locator(".statusbar button.toggle").click()
+        _frames(page)
+        before = page.evaluate(SNAP, LANDMARKS)
+        page.locator(".actions button.refine").click()
+        page.wait_for_function(
+            "document.querySelector('.console')?.textContent"
+            ".includes('ref.run_stage(Stage(\"cycle\"')")
+        _wait_idle(client)
+        page.wait_for_function(
+            "document.querySelector('.statusbar .run')?.textContent.trim() !== 'idle'"
+            " && document.querySelector('.statusbar .run')?.dataset.state === 'idle'")
+        page.wait_for_function("document.querySelector('.gtitle .what').textContent === 'Last fit'")
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, LANDMARKS))
+        words = page.locator(".statusbar .run").text_content().strip()
+        assert not page.errors, page.errors
+        page.close()
+    finally:
+        httpd.shutdown()
+    assert words != "idle", words
+    assert not moved, moved
+
+
+#: The bottom panel's own controls (WP-2206): its tabs, the Console's buttons,
+#: and History's rows and compare buttons. None asks for a layout change, so
+#: no landmark of the shell moves, the panel and the status bar included. The
+#: History verbs that write (Checkout, Branch) are left out: the fixture is
+#: shared, and what they move is the head, which every panel already follows.
+BOTTOM_CONTROLS = """() => [...document.querySelectorAll(
+    "section.bottom > nav.tabs button, section.bottom .pane:not(.hidden) button")]
+  .filter((b) => b.getClientRects().length && !b.disabled
+          && !/^(Checkout|Branch|Tag|Label)$/.test((b.textContent || "").trim()))
+  .map((b, i) => i)"""
+
+
+@pytest.mark.parametrize("tab", ["Console", "History"])
+def test_no_bottom_panel_control_moves_the_layout(browser, gui, tab):
+    url, _ = gui
+    page = _open(browser, url, WIDTHS["wide"])
+    page.locator(".statusbar button.toggle").click()
+    page.locator("section.bottom > nav.tabs").get_by_role("button", name=tab, exact=True).click()
+    _frames(page)
+    n = len(page.evaluate(BOTTOM_CONTROLS))
+    page.close()
+    assert n >= 2, n
+
+    failures = []
+    for i in range(n):
+        page = _open(browser, url, WIDTHS["wide"])
+        page.locator(".statusbar button.toggle").click()
+        page.locator("section.bottom > nav.tabs").get_by_role(
+            "button", name=tab, exact=True).click()
+        _frames(page)
+        # the same filter, and the i-th of what it keeps
+        handle = page.evaluate_handle(BOTTOM_CONTROLS.replace(
+            ".map((b, i) => i)", f"[{i}]"))
+        control = handle.as_element()
+        control.scroll_into_view_if_needed()
+        _frames(page)
+        label = (control.text_content() or "").strip()[:40]
+        before = page.evaluate(SNAP, LANDMARKS)
+        control.click()
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, LANDMARKS))
+        if moved:
+            failures.append(f"{tab} {i} {label!r}: " + "; ".join(moved[:4]))
+        assert not page.errors, page.errors
+        page.close()
+    assert not failures, "\n".join(failures)
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_the_console_toggle_stays_where_it_was(browser, gui, state):
+    """The status bar never changes shape (WP-2207): showing the bottom panel
+    above it moves the panes, by request, and neither the bar nor its toggle."""
+    url, _ = gui
+    page = _open(browser, url, WIDTHS[state])
+    bar = [".statusbar", ".statusbar > *", "#app > header", "#app > header > button.toggle"]
+    before = page.evaluate(SNAP, bar)
+    for _ in range(2):
+        page.locator(".statusbar button.toggle").click()
+        _frames(page)
+        assert not _moved(before, page.evaluate(SNAP, bar))
+    page.keyboard.press("ControlOrMeta+j")
+    _frames(page)
+    assert page.locator("section.bottom").is_visible()
+    assert not _moved(before, page.evaluate(SNAP, bar))
+    box = page.locator(".statusbar").bounding_box()
+    assert not page.errors, page.errors
+    page.close()
+    # the bar ends the window: nothing scrolls it out of sight
+    assert box["y"] + box["height"] <= 900 + 0.5, box
 
 
 #: The Background tab's own controls, beside the shell's landmarks (WP-2129).
