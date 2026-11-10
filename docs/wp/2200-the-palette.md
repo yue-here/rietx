@@ -142,6 +142,37 @@ tests/test_gui_dist.py` green; `npm --prefix gui test && npm --prefix gui run ch
 the screenshots in the PR; the maintainer's look before merge (milestone row 10).
 
 ## Handover log
+- **2026-11-11** — rulings applied, PR #1517. Main was merged in at c5fe8cf38; the one
+  conflict was the milestone's piece table, and both rows stand. Yue's rulings of 2026-11-10
+  on the six colour questions are in § Rulings of 2026-11-10. Every value stays as built.
+
+  *Fixed.* Zoomed into a peak on the Peaks tab, the dashed peak fit ran left of the y axis
+  into its gutter. uPlot clips its own series to the plot area and leaves a hook's strokes
+  alone. So every hook a pattern pane runs now draws through `rxplot.clipped`, one seam in
+  `pattern()`. That covers the peak fit, the peak marks and their whiskers, the preview
+  lines, candidate lines, region shading, tick rows and the zero line, on every page that
+  draws a pattern (GUI, `rietx watch`, `rietx compare`). The observed points, calculated
+  curve, background and difference are uPlot series and were already clipped. The peak
+  windows, the Background tab and the series trajectory already clipped their own
+  drawings. The uPlot stub now records the clip in force on each stroke. The new vitest
+  zooms so the zoom cuts a peak group, then asserts every non-series mark on all three panes
+  carries its pane's clip; with the seam removed it fails. A browser probe on the FAP
+  example at 25.76-26.72° counted the peak-fit colour in the gutter: 1123 device pixels
+  before, 0 after.
+
+  *Measured* (worktree `[dev]` venv plus playwright, macOS arm64). vitest 718 passed,
+  svelte-check 0 errors, `node --test tests/rxplot.test.mjs` 19 passed. Every
+  `tests/*_browser.py` with `test_gui_palette`, `test_watch_app`, `test_compare_ui` and
+  `test_gui_dist`: 346 passed, 0 skipped. Fast suite through the serial lock: 14622 passed, 410 skipped, 32 xfailed,
+  2 failed. `test_no_parameters_control_moves_the_layout[stacked]` passed alone; the suite
+  ran at a load average near 26. `test_every_page_has_a_twin_that_keeps_the_contract` fails
+  on an `origin/main` snapshot too: the `theory/estimation` twin is 50 048 characters, over
+  its 50 000 cap. This branch changes no page, so that one is main's.
+  `python -m tests.reader_output` exit 0, unchanged. ruff clean; Vale 0 errors, its
+  warnings all on lines this branch did not write.
+
+  Next: the maintainer merges. The graph window's clutter is its own piece, filed on
+  2026-11-10.
 - **2026-11-10** — built, PR #1517. The GUI now opens in the site's palette, light and
   dark: warm neutrals, an orange calculated curve, observed points in the ink, a grey
   difference. `rietx watch` and `rietx compare` read the same stylesheet and changed with it.
