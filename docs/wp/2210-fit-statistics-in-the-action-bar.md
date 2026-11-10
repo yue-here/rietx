@@ -1,6 +1,6 @@
 # WP-2210 — fit statistics in the action bar
 
-Milestone: gui-overhaul · Status: ⬜
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — claimed by a ghostshift runner
 Depends on: 2123
 Priority: P3 2026-11-10 — a view over what the fit already knows: with the graphs hidden, reopening them shows the numbers
 
