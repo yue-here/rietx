@@ -297,12 +297,6 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 - **The tab strips are data in `lib/tabs.ts`** (`TABS`, nine panels; `GRAPH_TABS`,
   WP-2123; `BOTTOM_TABS`, WP-2206), written into the panel corpus so the manual must name
   each.
-- **Words that change length live in a slot that takes the room left** (WP-2207): the run
-  state is `panels/StatusBar.svelte`'s `flex: 1 1 0` slot, ellipsised, with Cancel at the
-  bar's end, so a run's first status moves nothing. `test_a_first_run_moves_nothing` holds it.
-- **The bottom panel's panes stay mounted while hidden** (WP-2206), so a pane that scrolls
-  to its end is told when it shows (`panels/Console.svelte`'s `shown`): hidden, it has no
-  scroll height.
 - **Both side panels collapse, each from a button on its own side; one always shows**
   (WP-2123, replacing WP-1034's `Split | Full`). The layout is session-local and
   unpersisted: a view choice, not a setting.
