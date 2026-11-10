@@ -1,6 +1,6 @@
 """Export a finished refinement in the forms other codes and people consume.
 
-Three artefacts, all built from state the refinement already computed and would
+Four artefacts, all built from state the refinement already computed and would
 otherwise discard:
 
 - a **reflection table** — one row per (emission line, reflection): hkl, d, 2θ,
@@ -15,6 +15,10 @@ otherwise discard:
   against itself (export → re-read is the cheapest correctness test).
 - a **QPA table** — the Hill-Howard weight fractions, carrying the
   "crystalline modelled content only" caveat into the file, not just the API.
+- a **correlation table** — the full parameter correlation matrix at the
+  answer, labelled by dot-path on both axes (WP-1990): the numbers
+  ``Identifiability.correlation`` carries, of which ``top_correlations`` and
+  the ``HIGH_CORRELATION`` rows are the worst few.
 
 References
 ----------
@@ -47,6 +51,7 @@ from ..schemas.instrument import (
 )
 from ..schemas.pattern import PatternData, require_two_theta
 from ..schemas.results import (
+    CorrelationMatrix,
     PhaseAgreement,
     QuantitativePhaseAnalysis,
     RefinementResult,
@@ -313,6 +318,63 @@ def write_qpa_table(qpa: QuantitativePhaseAnalysis, path: str | Path, *,
     # already opens this way; this one did not.
     with p.open("w", newline="", encoding="utf-8") as fh:
         fh.write(qpa_table_csv(qpa, delimiter=delimiter))
+
+
+# ======================================================================
+# correlation table
+# ======================================================================
+
+
+def _correlation_of(source: RefinementResult | CorrelationMatrix) -> CorrelationMatrix:
+    """The matrix a result carries, or a refusal saying why it carries none."""
+    if isinstance(source, CorrelationMatrix):
+        return source
+    ident = source.identifiability
+    if ident is None or ident.correlation is None:
+        raise ValueError(
+            "this result carries no correlation matrix: it was not measured "
+            "(fewer than two free parameters, no correlation formed, a joint "
+            "multi-histogram fit, or a replayed node)")
+    return ident.correlation
+
+
+def correlation_table_csv(source: RefinementResult | CorrelationMatrix, *,
+                          delimiter: str = ",") -> str:
+    """The correlation matrix as CSV text: a labelled square, one row and one
+    column per free parameter in table order.
+
+    The first row is ``path`` followed by every dot-path; each later row is a
+    path followed by its ρ against each.  The matrix is written whole, both
+    halves and the unit diagonal, so a spreadsheet or a plotting call reads
+    it as it stands.  An empty cell is a pair the data does not determine
+    (:class:`~rietx.schemas.results.CorrelationMatrix`), never a zero.
+    """
+    import io as _io
+
+    corr = _correlation_of(source)
+    m = corr.matrix()
+    buf = _io.StringIO()
+    w = csv.writer(buf, delimiter=delimiter)
+    w.writerow(["path", *corr.paths])
+    for path, row in zip(corr.paths, m):
+        w.writerow([path, *("" if not np.isfinite(v) else _g(v) for v in row)])
+    return buf.getvalue()
+
+
+def write_correlation_table(source: RefinementResult | CorrelationMatrix,
+                            path: str | Path, *, delimiter: str | None = None) -> None:
+    """Write the correlation matrix to CSV/TSV (delimiter inferred from suffix).
+
+    ``source`` is a result or its ``identifiability.correlation``.  Raises
+    ``ValueError`` when the result carries none, saying why one may be absent.
+    """
+    p = Path(path)
+    if delimiter is None:
+        delimiter = "\t" if p.suffix.lower() in (".tsv", ".tab") else ","
+    # newline="": the csv writer's own \r\n must not be translated again
+    # (write_qpa_table's comment, WP-1002)
+    with p.open("w", newline="", encoding="utf-8") as fh:
+        fh.write(correlation_table_csv(source, delimiter=delimiter))
 
 
 # ======================================================================

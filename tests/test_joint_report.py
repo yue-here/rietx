@@ -287,6 +287,10 @@ def test_each_histogram_gets_its_own_report(two_patterns):
         assert (result.for_histogram(h).identifiability.background_absorption
                 == mine)
         assert report.background.worst_absorption == max(mine.values())
+        # the parameter-space screens do not run on a joint fit, so the
+        # matrix is "not measured" there, never an empty one (WP-1990)
+        assert result.for_histogram(h).identifiability.correlation is None
+    assert result.identifiability.correlation is None
 
 
 def test_a_cancelled_second_fit_leaves_the_first_report_alone(two_patterns):
