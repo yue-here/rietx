@@ -6,6 +6,7 @@ editors, panels, 3D viewer, theming. Loads when a session works under `gui/`;
 pipeline and package-wide invariants; `docs/milestones/v1.0.md` holds the
 narrative of how these panels landed; the WP files (1008…1015, 1029) hold the
 measured detail behind each rule below.
+How the GUI looks and behaves, with each rule's motive, is `gui/STYLE.md` (WP-2142): read it before changing either.
 
 ## Defaults
 

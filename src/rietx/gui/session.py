@@ -3020,6 +3020,15 @@ class GuiSession:
         self._require_idle()
         return preview.evaluate(self._need_project(), body)
 
+    def background(self) -> Packed:
+        """The background curve and the band it may move in, writing nothing
+        (WP-2129). Idle-only, like every verb that compiles;
+        :mod:`rietx.gui.background` has the band's derivation."""
+        from . import background
+
+        self._require_idle()
+        return background.answer(self._need_project())
+
     def report(self, plan: str | None = None) -> dict:
         """The three-layer :class:`FitReport` for the last fit, plus what applies.
 
@@ -4172,4 +4181,3 @@ def _as_plan_argument(plan: Any):
                            f"available: {sorted(PLAN_PRESETS)}", where=["plan"])
         return plan
     return _validate(PlanSpec, plan, "plan").to_plan()
-

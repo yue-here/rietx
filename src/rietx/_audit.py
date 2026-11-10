@@ -187,7 +187,8 @@ NOT_WALKED: dict[str, str] = {
     "examples.py": "the shipped example projects",
     "gui": ("beyond its import pre-fill and its symmetry edit gates: the server and 3D "
             "viewer's ports, payload caps and drawing tolerances"),
-    "help.py": "the explanation text",
+    "help.py": "the explanation text, and OPT_IN's declarations, which embed "
+               "no threshold",
     "history": "the history tree's storage, and its event summary's printed row count and read chunk",
     "io": ("beyond the walked files, which repair, sniff, translate or write a number another "
            "program computes from: foreign formats' byte offsets, field widths, unit factors "
@@ -5395,7 +5396,7 @@ ROWS: tuple[Row, ...] = (
                   "(gaussian_width_inequalities, lorentzian_width_inequalities) that TRF "
                   "has no vocabulary for")),
     Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=2),
-    Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
+    Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=3),
     Row("STAGE_SLOW_DESCENT.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: points at the findings that name a shallow direction, "
                   "HIGH_CORRELATION and a bound hit, and defers the remedy to their own "

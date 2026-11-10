@@ -134,11 +134,25 @@ SHOTS: tuple[Shot, ...] = (
         selector=".plotcol",
     ),
     Shot(
+        "background-tab",
+        "The Background graph tab: the data greyed, the background curve, the "
+        "band it may move in, and the per-term holds under it.",
+        selector=".plotcol",
+        tab="Background",
+    ),
+    Shot(
         "parameters",
         "The Parameters panel: a band per phase with its space group, the "
         "cell's held edges folded into one line, and one row per atom.",
         selector=".side",
         tab="Parameters",
+    ),
+    Shot(
+        "interactive",
+        "The Interactive tab at rest: a slider per value a person adjusts by "
+        "hand, grouped under the instrument and each phase.",
+        selector=".side",
+        tab="Interactive",
     ),
     Shot(
         "plan-ladder",
@@ -166,6 +180,15 @@ SHOTS: tuple[Shot, ...] = (
         "The project as an `.rxt` document, where `@` frees a parameter.",
         selector=".side",
         tab="Text",
+    ),
+    # Last of the fitted pass: it switches the graph strip, and every shot of
+    # the graph column above wants the Pattern tab.
+    Shot(
+        "single-peaks",
+        "The Single peaks graph: three windows on single reflections at the "
+        "last fit's scale.",
+        selector=".plotcol",
+        tab="Single peaks",
     ),
 )
 

@@ -162,9 +162,9 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-09-16  gui/CLAUDE.md                1028 -> 1036 for WP-1425's one rule: the watch page's
 #                                                          port of lib/resize.ts, pinned by a text-compared
 #                                                          case table, and the dist digest that hashes tests
-#   2026-11-09  gui/CLAUDE.md                1060 -> 1067 for WP-2133: the File menu's three rules, each a seam
+#   2026-11-09  gui/CLAUDE.md                1061 -> 1068 for WP-2133: the File menu's three rules, each a seam
 #                                                          a later verb must keep. Approved by the maintainer
-#                                                          2026-11-09; landed 1067, no headroom
+#                                                          2026-11-09; landed 1068, no headroom
 #   2026-09-03  docs/ROADMAP.md               621 -> 645  for the 2026-09-03 issue triage (1332-1341): ten rows
 #                                                          across three existing sections and one new one, landed 641
 #   2026-09-08  docs/ROADMAP.md               645 -> 648  for WP-1343 (issue #277, the magnetic
@@ -620,10 +620,12 @@ SIZE_CAPS: dict[str, int | None] = {
     # +3 (WP-1442): the node floor the dist build needs.
     # +4 (WP-1470): the scene rules' Python twin, which a session editing
     # structure3d.ts meets only as a red vitest otherwise.
-    # 1060 -> 1067 (WP-2133, approved by the maintainer 2026-11-09): the File
+    # +1 (WP-2142): the pointer to gui/STYLE.md, the style guide the maintainer
+    # ruled on 2026-11-09, which a session changing how the GUI looks reads.
+    # 1061 -> 1068 (WP-2133, approved by the maintainer 2026-11-09): the File
     # menu's three rules, each a seam a later verb must keep (the paths a move
-    # repoints, the destination gate, the close mark).  Landed 1067, no headroom.
-    "gui/CLAUDE.md": 1067,   # WP-2133's File menu rules; process.md § The caps diary
+    # repoints, the destination gate, the close mark).  Landed 1068, no headroom.
+    "gui/CLAUDE.md": 1068,   # WP-2133's File menu rules; process.md § The caps diary
     # 275 -> 283 (WP-1426): a third way a guard goes quiet, and the only one of
     # the three that is about the instrument rather than the assertion — a
     # browser's layout-shift entry cannot see inside a plotly div, so a

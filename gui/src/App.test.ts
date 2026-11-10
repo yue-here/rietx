@@ -1895,8 +1895,8 @@ describe("disclosure and the command palette", () => {
     // hidden, not unmounted — a layout click must not purge the drawn window
     expect(host.querySelector(".plotcol")?.classList.contains("hidden")).toBe(true);
     expect(host.querySelector(".plot")).not.toBeNull();
-    // the panel tabs travel with the column, nine since WP-1016
-    expect(host.querySelectorAll(".side nav.tabs button").length).toBe(9);
+    // the panel tabs travel with the column, ten since WP-2128
+    expect(host.querySelectorAll(".side nav.tabs button").length).toBe(10);
     // …and no splitter, because there is nothing on the other side of it
     expect(host.querySelector('.side > .grip[data-grow="left"]')).toBeNull();
     // the last side showing cannot hide too
@@ -1920,7 +1920,7 @@ describe("disclosure and the command palette", () => {
     expect(host.querySelector("header")?.lastElementChild).toBe(model);
   });
 
-  it("carries nine tabs with no label shortened and every panel reachable", async () => {
+  it("carries ten tabs with no label shortened and every panel reachable", async () => {
     const stub = server({ ...boot(), ...FITTED });
     vi.stubGlobal("fetch", stub.fetcher);
     app = mount(App, { target: host });
@@ -1928,8 +1928,8 @@ describe("disclosure and the command palette", () => {
 
     const tabs = [...host.querySelectorAll<HTMLButtonElement>(".side nav.tabs button")];
     expect(tabs.map((b) => b.textContent?.trim())).toEqual([
-      "Parameters", "Plan", "Peaks", "Model", "Text", "Series", "Report",
-      "History", "Build"]);
+      "Parameters", "Interactive", "Plan", "Peaks", "Model", "Text", "Series",
+      "Report", "History", "Build"]);
     // the overflow rule is `flex-wrap` plus `min-width: max-content`: a strip
     // that hides a tab or elides its name is worse than the mode buttons it
     // replaced, so the *count* and the *labels* are the assertion jsdom can make
@@ -1947,7 +1947,7 @@ describe("disclosure and the command palette", () => {
     }
     // every panel is still in the document after the tour — switching must not
     // throw away a filter, a pending edit or a two-node comparison
-    expect(host.querySelectorAll(".side .panel").length).toBe(9);
+    expect(host.querySelectorAll(".side .panel").length).toBe(10);
   });
 
   it("stamps an explicit theme on the root and persists the choice", async () => {
@@ -4086,7 +4086,7 @@ describe("the structure viewer", () => {
     await flush();
     expect(lifecycle.disposed).toBe(given + 1);
     const before = stub.calls.filter((c) => c.path === "/api/structure3d").length;
-    expect(host.querySelector('input[type="range"]')).toBeNull();
+    expect(host.querySelector('.viewer input[type="range"]')).toBeNull();
     field("phases.0.cell.a").value = "4.3";
     field("phases.0.cell.a").dispatchEvent(new Event("input", { bubbles: true }));
     await flush();
@@ -6224,5 +6224,97 @@ describe("the first-run checklist (WP-1017)", () => {
     await flush();
 
     expect(host.querySelector(".checklist")).toBeNull();
+  });
+});
+
+describe("the Interactive tab (WP-2128)", () => {
+  /** What `POST /api/preview` answers: the model at the asked values over the
+   *  fitted channels, and the residuals the curves route sends. */
+  const preview = () => ({ body: pack(
+    { evaluated: "frozen", head: "n0002", rwp: 0.183, values: {}, phases: ["NAC"],
+      ticks: {}, tick_hkl: {} },
+    { two_theta: [9, 9.4], y_calc: [1.1, 1.9], y_background: [0, 0],
+      delta: [0.1, -0.1], delta_raw: [0.1, -0.1], cumulative_chi2: [0.01, 0.02] }) });
+
+  async function openInteractive() {
+    const stub = server({ ...boot(), ...FITTED, "/api/preview": preview });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    button("Interactive")!.click();
+    await flush();
+    return stub;
+  }
+
+  /** The action bar's own button, never another panel's of the same name. */
+  function bar(label: string): HTMLButtonElement {
+    return [...host.querySelectorAll<HTMLButtonElement>(".actions button")]
+      .find((b) => b.textContent?.trim() === label)!;
+  }
+
+  function panel(): HTMLElement {
+    return [...host.querySelectorAll<HTMLElement>(".side .panel")]
+      .find((p) => !p.classList.contains("hidden"))!;
+  }
+
+  it("gives a slider to each refinable value of a family, and none to a tied one", async () => {
+    await openInteractive();
+    const tracks = panel().querySelectorAll('input[type="range"]');
+    // w, the scale and a: b follows a and gets none, alpha is locked, Biso is
+    // not a slider family
+    expect(tracks.length).toBe(3);
+    expect(panel().textContent).toContain("Instrument");
+  });
+
+  it("previews a drag, says it is a preview, and commits nothing until Apply", async () => {
+    const stub = await openInteractive();
+    const track = panel().querySelector<HTMLInputElement>('input[type="range"]')!;
+    track.value = "900";
+    track.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+
+    const asked = stub.calls.filter((c) => c.path === "/api/preview");
+    expect(asked.length).toBe(1);
+    expect(asked[0].method).toBe("POST");
+    expect(Object.keys(asked[0].body.values)).toEqual(["instrument.profile.w"]);
+    // the title line says what the graph shows, with both statistics
+    const title = host.querySelector(".gtitle")!.textContent!.replace(/\s+/g, " ");
+    expect(title).toContain("Preview, not refined");
+    expect(title).toContain("18.300%");
+    expect(title).toContain("last fit 21.600%");
+    expect(stub.calls.some((c) => c.method === "PATCH")).toBe(false);
+
+    bar("Apply").click();
+    await flush();
+    const patch = stub.calls.find((c) => c.method === "PATCH" && c.path === "/api/params")!;
+    expect(Object.keys(patch.body.values)).toEqual(["instrument.profile.w"]);
+    expect(host.querySelector(".gtitle")!.textContent).not.toContain("Preview");
+  });
+
+  it("takes a typed value, and Revert takes the preview down", async () => {
+    const stub = await openInteractive();
+    panel().querySelector<HTMLButtonElement>("button.num")!.click();
+    await flush();
+    const input = panel().querySelector<HTMLInputElement>("input.typed")!;
+    input.value = "0.005";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    const asked = stub.calls.filter((c) => c.path === "/api/preview");
+    expect(asked.at(-1)!.body.values).toEqual({ "instrument.profile.w": 0.005 });
+
+    bar("Revert").click();
+    await flush();
+    expect(host.querySelector(".gtitle")!.textContent).toContain("Last fit");
+    expect(stub.calls.some((c) => c.method === "PATCH")).toBe(false);
+  });
+
+  it("frames single peaks in a graph tab of their own", async () => {
+    await openInteractive();
+    button("Single peaks")!.click();
+    await flush();
+    // the two-channel fixture has no ticks, so the graph says why it is empty
+    expect(host.textContent).toContain("No fitted peaks to frame yet.");
   });
 });
