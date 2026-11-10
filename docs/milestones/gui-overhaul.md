@@ -30,6 +30,7 @@ redesign is ported in five pieces, in this order:
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
 | Edit recovery | [2209](../wp/2209-unapplied-edits-survive-a-close.md) | unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs; reopening offers them (ruled 2026-11-09) |
+| — | [2213](../wp/2213-text-and-model-edits-join-the-recovery-copy.md) | the Text panel's buffer and the Model panel's forms join the recovery copy, the Text buffer first (ruled 2026-11-10; after WP-2209) |
 | — | [2211](../wp/2211-the-history-table.md) | the History table in the bottom panel: one row per node, the node count on the tab, Compare as an overlay on the pattern, Restore as pending edits (after WP-2206) |
 | — | [2212](../wp/2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt on the calls the window ran, and the console exported as a `.py` script (after WP-2206) |
 
