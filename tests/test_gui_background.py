@@ -186,7 +186,7 @@ def test_the_hold_arm_holds_and_releases(tmp_path_factory, tmp_path):
     with pytest.raises(GuiError, match="instrument.background.c99") as excinfo:
         session.params_patch({"hold": {"instrument.background.c99": True}})
     assert excinfo.value.status == 400
-    with pytest.raises(GuiError, match="'hold' maps"):
+    with pytest.raises(GuiError, match="'hold' map dot-path"):
         session.params_patch({"hold": ["instrument.background.c2"]})
 
 

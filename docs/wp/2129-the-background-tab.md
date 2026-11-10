@@ -180,6 +180,18 @@ npm --prefix gui test && npm --prefix gui run check
 
 ## Handover log
 
+- **2026-11-10** — Merged main (#1479, #1484, #1483, #1490, #1498 and others) into this branch.
+  The two `hold` arms on `PATCH /api/params` are now one: WP-2126's. Its
+  `_apply_param_arms` survives as the one authority, with `session.rehearse` running every arm
+  on `Refinement._trial(record=False)` first, so a PATCH is all or nothing. It already had this
+  WP's contract (a glob maps to `true` to hold and `false` to release; releases run before the
+  vary flags and holds after them) and the same `_holding` helper. This branch's inline arm
+  inside `params_patch` and its second copy of `_holding` were deleted. The Background tab sends
+  a hold-only body, which the surviving arm serves unchanged. One test moved:
+  `test_gui_background.py`'s malformed-body refusal now matches main's combined sentence
+  ("'vary' and 'hold' map dot-path glob → bool"). The dist and every screenshot were rebuilt
+  on the merged tree.
+
 - **2026-11-09** — The GUI now has a Background graph tab. It shows the background curve over
   the greyed pattern, with a shaded band for where the curve may move when the free parameters
   refine. The band is rietx's own esd of the curve through the whole covariance, so a free scale

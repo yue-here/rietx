@@ -202,6 +202,13 @@ while a run is in flight, and that refusal outranks body validation. The
 package's frozen-per-stage rule is enforced structurally rather than by
 discipline.
 
+A request that changes several things is applied whole or not at all.
+`PATCH /api/params` with values, vary flags, holds, limits and restraints
+records a history node per verb, and a refusal from any of them leaves the
+model and the history as they were. The refusal names the path in `where` and
+the arm it came from in `details`. `POST /api/project`, `PUT /api/textdoc` and
+`POST /api/history/branch` follow the same rule.
+
 Non-finite floats are spelled as strings (`"Infinity"`, `"-Infinity"`, `"NaN"`)
 in responses and event frames alike, because `JSON.parse` rejects the bare
 tokens Python writes by default.
@@ -219,9 +226,10 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/capabilities` | what this build can do: backends, solvers, plans, formats, contract versions |
 | `GET /api/version` | the package version |
 | `GET /api/help` | the help corpus the popovers and the [parameter map](parameters.md) are written from |
-| `GET /api/spacegroup` | what one symbol constrains; the wizard's typed-cell step needs it before a project exists |
+| `GET /api/spacegroup` | what one symbol constrains; the New project dialog's typed cell needs it before a project exists |
 | `GET /api/settings` · `POST /api/settings` | the person's own settings, the theme among them, stored beside the recent list rather than in the project; not behind the 409 |
-| `GET /api/recent` | the list of recently opened projects |
+| `GET /api/recent` | the list of recently opened projects, newest first, with a project that has moved marked `missing` |
+| `POST /api/recent/remove` | take one path off that list; a path that is not on it is no error |
 | `GET /api/fs` | the filesystem browser's listing, confined to the home directory and the working directory |
 | `GET /api/examples` | the example projects shipped in the wheel |
 | `POST /api/examples/open` · `POST /api/examples/reset` | build one into the state directory and open it; throw a copy away and rebuild it |
@@ -233,7 +241,7 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/project/new` · `POST /api/project/open` | create; open, replacing the session's |
 | `GET /api/project` · `POST /api/project` | the project document; a merge into its settings |
 | `POST /api/project/save` | write the settings file |
-| `GET /api/params` · `PATCH /api/params` | every parameter row; value, vary and hold edits |
+| `GET /api/params` · `PATCH /api/params` | every parameter row; value, vary, hold, limit and restraint edits |
 | `GET /api/plan` · `PUT /api/plan` · `GET /api/plans` | the plan; replace it; the presets |
 | `GET /api/plan/resolve` | the ladder: per stage, what it frees and what stays held |
 | `GET /api/structure` · `PATCH /api/structure` | the model, its sites and its symmetry; a whole validated replacement |
