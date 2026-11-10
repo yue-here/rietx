@@ -254,11 +254,9 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   (`structure3d._oklab_distance` is the package's one distance) and names the pairs the
   shipped set misses. No free hue is left for a further mark that carries a quantity
   (WP-1211).
-- **State rides on the mark's shape, never a second colour** (WP-1210): one ink per layer.
-  On the pattern a peak mark is a lens over each line the search uses and none over a
-  line left out; the fit windows keep a hollow lens for an unused line (WP-2202, the
-  maintainer's rounds 11b-11d). A mark that is not data never borrows the recessive
-  `--muted`.
+- **State rides on the mark's shape, never a second colour** (WP-1210): one ink per layer;
+  a lens over a used line, none over an unused one, hollow in a fit window (WP-2202). A
+  mark that is not data never borrows the recessive `--muted`.
 - **A mark carrying no quantity takes chrome ink** (WP-1213): the pointer line is solid
   `--fg`, since dotted `--muted` is the excluded-region edge. `rxplot.panes` sets
   `.u-cursor-x` inline for every chart on every page.
@@ -394,8 +392,7 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   verb has a non-pointer route** (WP-1027). The gestures are stated while the tab is up.
   Right-click removes a peak (WP-1032).
 - **The move gesture's grab radius is min(10 px, 1.5× median fitted FWHM)**
-  (`grabToleranceDeg`, WP-1027). A σ whisker, if one is drawn again, is capped at 3×FWHM;
-  the lens marks of WP-2202 draw none.
+  (`grabToleranceDeg`, WP-1027). A σ whisker, if ever drawn again, is capped at 3×FWHM.
 - **`/api/index` and `/api/index/extinction` are run kinds on the one machine** (WP-1027).
   A cancelled search returns what it has; its status is read off the token. The screen is
   gated on neither the adopt verdict nor a phase.

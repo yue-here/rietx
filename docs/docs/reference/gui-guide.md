@@ -580,7 +580,10 @@ history node's label: that it is not the gate's pick, its grade and its caveats.
 `Judge` shows one candidate at a time, with `‹` and `›` to step through the
 list: its cell with esds, its grade and caveats (a caveat that refutes the cell
 in red), the Le Bail check, every figure of merit with its blind spot a click
-away, and the engines that found it.
+away, and the engines that found it. A cell the data cannot tell from another
+names the other cell and the 2θ values where their lines part. When those lie
+beyond the measured range, the step says how far in 2θ to collect. The candidate's own
+diagnostics follow.
 
 `Screen extinctions` ranks the extinction classes the lattice allows by ΔBIC,
 with how many of each class's absences the data could test. A refuted class
