@@ -30,6 +30,8 @@ redesign is ported in five pieces, in this order:
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
 | The palette | [2200](../wp/2200-the-palette.md) | the site's palette as the default theme, light and dark: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Named themes (Solarized, Monokai) in Settings come later; the emitter leaves their seam. `gui/STYLE.md`'s rules that describe a new role in words take its tokens (WP-2142) |
+| — | [2211](../wp/2211-the-history-table.md) | the History table in the bottom panel: one row per node, the node count on the tab, Compare as an overlay on the pattern, Restore as pending edits (after WP-2206) |
+| — | [2212](../wp/2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt on the calls the window ran, and the console exported as a `.py` script (after WP-2206) |
 
 Every merge leaves a working GUI. No existing panel or route becomes unreachable at any piece;
 a panel moves into the new shell as it is, and is redesigned by its own piece.
@@ -75,7 +77,8 @@ the piece that touches it or a WP of its own.
 
 - The extinction screen is refused on a project with no phase: `GuiSession.run` groups the kind
   `extinction` with the refinement kinds, though WP-1027 ruled the screen ungated, and the
-  refusal reads "a extinction run".
+  refusal reads "a extinction run". WP-2124 took `extinction` out of the refusal, so a
+  pattern-only project screens a candidate.
 - Adopt is gated to `best_or_none()` (`ADOPT_GATED`). The maintainer ruled on 2026-11-08 that a
   person may adopt any candidate, with its grade and caveats shown beside Adopt and recorded in
   the history node. WP-2124 lifted the gate on the route and WP-2130 offers Adopt on every row.
@@ -83,15 +86,19 @@ the piece that touches it or a WP of its own.
   diagnostics whenever there are candidates, against WP-1042's rule that what was not reached
   is said loudly. WP-2130 says it above the list in every case.
 - `.rxt` renders no block for user variables, and its tie refusal names only symmetry ties.
+  WP-2121 made the refusal name a user tie's own verbs, `ref.untie()` and `ref.tie()`. The
+  block for user variables is still owed.
 - The Le Bail check's absent lines arrive in its own refined frame, about 0.011° from the
   candidate's ticks on fluorapatite; they should be served as tick indices.
 - `supercell_checks` names a relation for 8 of fluorapatite's 12 candidates (measured by WP-2124
   on 63d7c120a; naming the other four is WP-2124's follow-up); lattice relations between
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
-- `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
+- `PeakEditor.curves` serves only each group's sum; per-line curves need a route. In PR #1526
+  (WP-2202), which serves them as `lines` on each group.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
-- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits. WP-2200 carries it.
+- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits. WP-2200 carries it, in PR #1517.
 - The pick route takes only `shoulders`; the 2θ range and `flag_contamination` need to reach it.
+  WP-2124 added both to the route, and `pick_options` records all three.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08.
 - A GUI series lives in session memory only; several series gaps wait on the series fitting
