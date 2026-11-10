@@ -29,6 +29,7 @@ redesign is ported in five pieces, in this order:
 | 3 | [2127](../wp/2127-the-plan-tab.md) | the Plan tab on the existing plan routes, read top to bottom as a recipe |
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
+| The palette | [2200](../wp/2200-the-palette.md) | the site's palette as the default theme, light and dark: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Named themes (Solarized, Monokai) in Settings come later; the emitter leaves their seam |
 
 Every merge leaves a working GUI. No existing panel or route becomes unreachable at any piece;
 a panel moves into the new shell as it is, and is redesigned by its own piece.
@@ -44,7 +45,7 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 
 | Piece | What it builds | Ruled |
 |---|---|---|
-| The palette | The site's palette as the default theme: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Theme machinery in Settings for established themes (Solarized light and dark, Monokai and others) | 2026-11-06, 2026-11-09 |
+| Named themes | Established themes (Solarized light and dark, Monokai and others) listed in Settings after Match system, Light and Dark, on the seam WP-2200 leaves | 2026-11-06, 2026-11-09 |
 | Sentence-case headings | One `app.css` rule at the start screen's register, app-wide | 2026-11-09 |
 | Peaks and indexing | The redesign in four steps (pick peaks, fit peaks, index, judge), the eight-column candidate table, lens peak marks, per-line curves in the fit windows | 2026-11-08, 2026-11-09 |
 | Structure tab | The 3D structure as one of the graph tabs | 2026-11-07 |
@@ -89,7 +90,7 @@ the piece that touches it or a WP of its own.
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
 - `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
-- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits.
+- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits. WP-2200 carries it.
 - The pick route takes only `shoulders`; the 2θ range and `flag_contamination` need to reach it.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08.
