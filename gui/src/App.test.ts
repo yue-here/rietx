@@ -806,6 +806,13 @@ function button(text: string): HTMLButtonElement | undefined {
   return [...host.querySelectorAll("button")].find((b) => b.textContent?.trim() === text);
 }
 
+/** Choose one of the Peaks tab's four steps by its name (WP-2202). */
+async function step(name: string): Promise<void> {
+  [...host.querySelectorAll<HTMLButtonElement>("nav.steps button")]
+    .find((b) => b.textContent!.replace(/^\s*\d+\s*/, "").trim() === name)!.click();
+  await flush();
+}
+
 /** The action bar's filled primary (WP-2123), which replaced the header's Run. */
 function refineButton(): HTMLButtonElement | null {
   return host.querySelector<HTMLButtonElement>(".actions button.refine");
@@ -4480,7 +4487,7 @@ describe("the view survives a redraw (WP-1044)", () => {
     await dragOver(10, 14);
     const zoomed = xRange();
     const fetched = curvesFetched(stub);
-    const boxes = [...host.querySelectorAll<HTMLInputElement>('td.use input[type="checkbox"]')];
+    const boxes = [...host.querySelectorAll<HTMLInputElement>('td.ck input[type="checkbox"]')];
     boxes[1].dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
 
@@ -4540,7 +4547,7 @@ describe("the view survives a redraw (WP-1044)", () => {
 
     // the table's own zoom verb: 8 FWHM either side of the line (WP-1027)
     const zoomTo = [...host.querySelectorAll<HTMLButtonElement>("button")]
-      .filter((b) => b.title === "zoom the plot to this line");
+      .filter((b) => b.classList.contains("pos"));
     zoomTo[0].click();
     await flush();
     const eight = 8 * PEAKS_PAYLOAD.peaks[0].fwhm;
@@ -4600,34 +4607,38 @@ describe("the peaks tab (WP-1027)", () => {
     button("Peaks")!.click();
     await flush();
 
-    expect(host.textContent).toContain("2 of 3 lines usable");
+    // the filter says how many lines the search uses (WP-2202)
+    const shown = [...host.querySelectorAll<HTMLElement>('.segmented[aria-label="Lines shown"] button')]
+      .map((b) => b.textContent!.trim());
+    expect(shown).toEqual(["All 3", "Used 2", "Not used 1"]);
     // the fitter's own explanation of a strong peak's shape stays visible, as
     // the corpus's label rather than the flag's name (WP-1209)…
-    const chips = [...host.querySelectorAll<HTMLElement>("td.flags .chip")]
+    const chips = [...host.querySelectorAll<HTMLElement>("td.note .word")]
       .map((c) => c.textContent!.trim());
     expect(chips).toEqual(["not separable", "manual"]);
     expect(host.textContent).not.toContain("not_separable");
     // …and the name is one click away, restored by the popover the label hid it from
-    host.querySelector<HTMLElement>("td.flags .help")!.click();
+    host.querySelector<HTMLElement>("td.note .help")!.click();
     await flush();
     const popover = host.ownerDocument.querySelector(".popover")!.textContent!;
     expect(popover).toContain("Improves the group as a shape");
     expect(popover).toContain("Name");
     expect(popover).toContain("not_separable");
     // …but a label that *is* the name hid nothing, so no Name row (code review)
-    host.querySelectorAll<HTMLElement>("td.flags .help")[1]!.click();
+    host.querySelectorAll<HTMLElement>("td.note .help")[1]!.click();
     await flush();
     const origin = host.ownerDocument.querySelector(".popover")!.textContent!;
     expect(origin).toContain("Placed by a person");
     expect(origin).not.toContain("Name");
 
-    // the seven columns, use on its own; the picker's notes folded to a count
+    // the tickbox first, then the four columns of round 11; the picker's notes
+    // folded to a count
     const heads = [...host.querySelectorAll<HTMLElement>(".panel:not(.hidden) thead th")]
       .map((th) => th.textContent!.trim());
-    expect(heads).toEqual(["#", "2θ (°)", "d (Å)", "I (rel)", "flags", "use", ""]);
-    expect(host.querySelectorAll('td.use input[type="checkbox"]').length).toBe(3);
-    expect(host.querySelector("details.notes summary")!.textContent!.replace(/\s+/g, " ").trim())
-      .toBe("1 note from the picker");
+    expect(heads).toEqual(["", "2θ (°)", "d (Å)", "I (rel)", "Note", ""]);
+    expect(host.querySelectorAll('td.ck input[type="checkbox"]').length).toBe(3);
+    expect(host.querySelector("details.fold summary")!.textContent!.replace(/\s+/g, " ").trim())
+      .toBe("Notes from the picker (1)");
     expect(host.textContent).toContain("PEAK_LIST_TOO_SHORT");
 
     // the numbers: every fixture line has the same area, so each is 100.0 of
@@ -4636,6 +4647,33 @@ describe("the peaks tab (WP-1027)", () => {
       ".panel:not(.hidden) tbody tr")].map((tr) => tr.children[col].textContent!.trim());
     expect(cells(3)).toEqual(["100.0", "100.0", "100.0"]);
     expect(cells(1)).toEqual(["10.0000(11)", "12.0000(11)", "14.0000(11)"]);
+  });
+
+  it("shows the group fits for Fit peaks, and the pattern for the other steps (WP-2202)",
+     async () => {
+    // A step is a jump the person asked for, so it may change the graph tab;
+    // the fit windows are drawn where the single-peak comparison is
+    const withGroups = { ...PEAKS_PAYLOAD, groups: [
+      { group: 0, two_theta: [9.5, 10, 10.5], y_fit: [1, 5, 1], y_env: [1, 1, 1],
+        delta: [0, 0, 0], chi2_red: 12, n_components: 1,
+        lines: [{ index: 0, y: [0, 4, 0] }] },
+    ], peaks: PEAKS_PAYLOAD.peaks.map((p) => ({ ...p, group: p.index })) };
+    vi.stubGlobal("fetch", server({
+      ...boot(), "/api/peaks": () => ({ body: withGroups }),
+    }).fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    button("Peaks")!.click();
+    await flush();
+
+    const graph = () => host.querySelector(".gtitle .what")!.textContent!.trim();
+    await step("Fit peaks");
+    expect(graph()).toBe("Peak fits");
+    // the side lists the group worth a look, by its χ²ᵣ above 10
+    expect([...host.querySelectorAll(".groups tbody tr")].length).toBe(1);
+    expect(host.querySelector(".fits figcaption")!.textContent).toContain("9.50–10.50°");
+    await step("Index");
+    expect(graph()).not.toBe("Peak fits");
   });
 
   it("sends the overrule verb from the use-for-indexing checkbox", async () => {
@@ -4651,7 +4689,7 @@ describe("the peaks tab (WP-1027)", () => {
     button("Peaks")!.click();
     await flush();
 
-    const boxes = [...host.querySelectorAll<HTMLInputElement>('td.use input[type="checkbox"]')];
+    const boxes = [...host.querySelectorAll<HTMLInputElement>('td.ck input[type="checkbox"]')];
     expect(boxes.length).toBe(3);
     boxes[1].dispatchEvent(new Event("change", { bubbles: true }));
     await flush();
@@ -4987,6 +5025,7 @@ describe("the peaks tab (WP-1027)", () => {
       run: IDLE_RUN as any, busy: false,
     } });
     await flush();
+    await step("Index");
 
     // Yue's ruling B (2026-11-08): any candidate can be adopted, and one the
     // gate did not pick says its grade and caveats beside the button
@@ -5022,6 +5061,7 @@ describe("the peaks tab (WP-1027)", () => {
       run: IDLE_RUN as any, busy: false,
     } });
     await flush();
+    await step("Index");
 
     const coverage = host.querySelector(".coverage")!.textContent!;
     expect(coverage).toContain("Searched: cubic, hexagonal, trigonal");
@@ -5050,10 +5090,11 @@ describe("the peaks tab (WP-1027)", () => {
       run: IDLE_RUN as any, busy: false,
     } });
     await flush();
+    await step("Index");
 
     const adopt = button("Adopt")!;
     expect(adopt.disabled).toBe(false);
-    expect(host.textContent).toContain("best_or_none()");
+    expect(host.textContent).toContain("rietx's pick");
     adopt.click();
     await flush();
     expect(stub.calls.find((c) => c.path === "/api/index/adopt")?.body)
@@ -5146,13 +5187,14 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
     await flush();
     button("Peaks")!.click();
     await flush();
+    await step("Index");
     // before anything is selected the model is on screen and nothing is fetched
     expect(drawn()).toContain("calc");
     expect(stub.calls.some((c) => c.path === "/api/index/ticks")).toBe(false);
 
     // the disclosure *is* the selection: one control, because "show me this
     // cell" means the caveats and where it says the lines are
-    host.querySelector<HTMLElement>(".candidates tbody button.ghost")!.click();
+    host.querySelector<HTMLElement>(".candidates tbody button.pick")!.click();
     await flush();
 
     expect(stub.calls.find((c) => c.path === "/api/index/ticks")?.url)
@@ -5173,7 +5215,7 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
     expect(host.textContent).toContain("2 predicted lines");
 
     // deselecting puts back exactly what was there, and takes the lines off
-    host.querySelector<HTMLElement>(".candidates tbody button.ghost")!.click();
+    host.querySelector<HTMLElement>(".candidates tbody button.pick")!.click();
     await flush();
     expect(drawn()).toContain("calc");
     expect(lines()).toBeNull();
@@ -5192,6 +5234,7 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
     await flush();
     button("Peaks")!.click();
     await flush();
+    await step("Index");
 
     const row = () => host.querySelector<HTMLElement>(".candidates tbody tr")!;
     row().dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }));
@@ -5205,7 +5248,7 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
     expect(lines()).toBeNull();
 
     // select, then leave the tab: the layer goes with it
-    host.querySelector<HTMLElement>(".candidates tbody button.ghost")!.click();
+    host.querySelector<HTMLElement>(".candidates tbody button.pick")!.click();
     await flush();
     button("Parameters")!.click();
     await flush();
@@ -5215,6 +5258,7 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
     // …and comes back with it, off the cache: one fetch for three showings
     button("Peaks")!.click();
     await flush();
+    await step("Index");
     expect(lines()).not.toBeNull();
     expect(stub.calls.filter((c) => c.path === "/api/index/ticks").length).toBe(1);
   });
@@ -5243,8 +5287,9 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
     await flush();
     button("Peaks")!.click();
     await flush();
+    await step("Index");
 
-    host.querySelector<HTMLElement>(".candidates tbody button.ghost")!.click();
+    host.querySelector<HTMLElement>(".candidates tbody button.pick")!.click();
     await flush();
     // in flight: the model is still on screen and there is nothing over it
     expect(drawn()).toContain("calc");
@@ -5270,13 +5315,14 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
     await flush();
     button("Peaks")!.click();
     await flush();
+    await step("Index");
 
-    host.querySelector<HTMLElement>(".candidates tbody button.ghost")!.click();
+    host.querySelector<HTMLElement>(".candidates tbody button.pick")!.click();
     await flush();
     expect(drawn()).toContain("calc");
     expect(lines()).toBeNull();
-    // …and the detail row still opened, so the click was not a no-op
-    expect(host.querySelector(".candidates tr.detail")).toBeTruthy();
+    // …and the row is still selected, so the click was not a no-op
+    expect(host.querySelector(".candidates tr.sel")).toBeTruthy();
   });
 
   it("asks once for a row the pointer crosses twice before the answer lands",
@@ -5296,6 +5342,7 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
     await flush();
     button("Peaks")!.click();
     await flush();
+    await step("Index");
 
     const row = () => host.querySelector<HTMLElement>(".candidates tbody tr")!;
     for (let i = 0; i < 3; i++) {
@@ -5332,7 +5379,8 @@ describe("an indexing candidate on the plot (WP-1211)", () => {
     await flush();
     button("Peaks")!.click();
     await flush();
-    host.querySelector<HTMLElement>(".candidates tbody button.ghost")!.click();
+    await step("Index");
+    host.querySelector<HTMLElement>(".candidates tbody button.pick")!.click();
     await flush();
 
     expect(host.textContent).toContain("2 of 92103 predicted lines");
@@ -5425,7 +5473,8 @@ describe("the hover readout (WP-1213)", () => {
     await flush();
     button("Peaks")!.click();
     await flush();
-    host.querySelector<HTMLElement>(".candidates tbody button.ghost")!.click();
+    await step("Index");
+    host.querySelector<HTMLElement>(".candidates tbody button.pick")!.click();
     await flush();
 
     await pointAt(9.4);
@@ -5454,6 +5503,10 @@ describe("the extinction screen table (WP-1027)", () => {
       run: IDLE_RUN as any, busy: false,
     } });
     await flush();
+    await step("Index");
+    host.querySelector<HTMLElement>(".candidates tbody button.pick")!.click();
+    await flush();
+    await step("Judge");
 
     // the gate's abstention is the headline, not an error
     expect(host.textContent).toContain("No class is singled out");
@@ -5466,15 +5519,20 @@ describe("the extinction screen table (WP-1027)", () => {
     expect(host.textContent).toContain("not screened");
     // a screened class shows its measured testable count; an unscreened one
     // shows a dash, because nobody asked (WP-1077)
-    expect(host.textContent).toContain("4/6");
-    expect(host.textContent).toContain("—/6");
-    // both members of the class render — the singleton is unmeasurable…
-    expect(host.textContent).toContain("P 63/m");
-    expect(host.textContent).toContain("P 63");
+    expect(host.textContent).toContain("4 of 6");
+    expect(host.textContent).toContain("– of 6");
+    // no class is chosen for the reader when the gate abstains…
+    expect(host.querySelector('.segmented[aria-label="Space group"]')).toBeNull();
     // …and any candidate can be adopted (Yue's ruling B, 2026-11-08), so an
-    // unrefuted class's members are buttons even off the gate's pick, while a
-    // refuted class's stay facts
-    expect(button("P 63")).toBeTruthy();
+    // unrefuted class can be chosen off the gate's pick, and both its members
+    // are offered — the singleton is unmeasurable — while a refuted class
+    // stays a fact
+    button("P 63/m - -")!.click();
+    await flush();
+    const groups = [...host.querySelectorAll<HTMLButtonElement>(
+      '.segmented[aria-label="Space group"] button')].map((b) => b.textContent!.trim());
+    expect(groups).toEqual(["P 63", "P 63/m"]);
+    expect(button("P 63/m c m")).toBeFalsy();
     expect(button("P 63 c m")).toBeFalsy();
     // the not-separable info must be shown (it is information, not a footnote)
     expect(host.textContent).toContain("EXTINCTION_GROUPS_NOT_SEPARABLE");
@@ -5499,14 +5557,25 @@ describe("the extinction screen table (WP-1027)", () => {
       run: IDLE_RUN as any, busy: false,
     } });
     await flush();
+    await step("Index");
+    host.querySelector<HTMLElement>(".candidates tbody button.pick")!.click();
+    await flush();
+    await step("Judge");
 
-    expect(host.textContent).toContain("best_or_none()");
-    const chip = button("P 63/m")!;
-    expect(chip).toBeTruthy();
-    chip.click();
+    expect(host.textContent).toContain("rietx's pick");
+    // the gate's class is chosen, in its representative (round 11 call 10)
+    const adopt = button("Adopt as a Le Bail start")!;
+    adopt.click();
     await flush();
     expect(stub.calls.find((c) => c.path === "/api/index/adopt")?.body)
       .toEqual({ candidate: 0, space_group: "P 63/m" });
+    // another member of the class is one click away
+    button("P 63")!.click();
+    await flush();
+    adopt.click();
+    await flush();
+    expect(stub.calls.filter((c) => c.path === "/api/index/adopt").at(-1)?.body)
+      .toEqual({ candidate: 0, space_group: "P 63" });
     // a refuted class's members never act, whatever the verdict
     expect(button("P 63 c m")).toBeFalsy();
   });
@@ -5873,24 +5942,27 @@ describe("the search controls (WP-1045)", () => {
     await flush();
     button("Peaks")!.click();
     await flush();
+    await step("Index");
 
     const details = host.querySelector("details.search")!;
     expect(details).toBeTruthy();
     // one checkbox per registered engine, one per crystal system — quoted
-    // from capabilities, so a fourth engine appears with no GUI change
+    // from capabilities, so a fourth engine appears with no GUI change. The
+    // systems are the first of the three settings round 11 keeps in view
     const engineBoxes = [...details.querySelectorAll(".block")[0]
       .querySelectorAll('input[type="checkbox"]')];
     expect(engineBoxes.length).toBe(3);
-    const systemBoxes = [...details.querySelectorAll(".block")[1]
-      .querySelectorAll('input[type="checkbox"]')];
+    const systemBoxes = [...host.querySelectorAll('.form .field.wrap input[type="checkbox"]')];
     expect(systemBoxes.length).toBe(7);
-    // the preset select offers the registry plus "default — quick"
-    const preset = numInput("preset") as unknown as HTMLSelectElement;
-    expect([...preset.options].map((o) => o.value)).toEqual(["", "quick", "full"]);
+    // the time limit offers each preset by its ceiling, as a time
+    const limits = [...host.querySelectorAll<HTMLButtonElement>(
+      '.segmented[aria-label="Time limit"] button')].map((b) => b.textContent!.trim());
+    expect(limits).toEqual(["2 minutes", "None"]);
+    expect(host.querySelector('input[aria-label="Largest cell volume"]')).toBeTruthy();
     // every numeric control is present, and its label is a help term rather
     // than a `title=` (WP-1203's no-mute-fields rule, retargeted): the key
     // itself is crossed against the corpus in `controls.test.ts`
-    for (const start of ["min axis", "max axis", "min volume", "max volume",
+    for (const start of ["min axis", "max axis", "min volume",
                          "unindexed allowed", "search lines", "k·σ window",
                          "shift allowance", "max candidates", "seed",
                          "budget / slice", "total budget", "check top"]) {
@@ -5909,6 +5981,7 @@ describe("the search controls (WP-1045)", () => {
     await flush();
     button("Peaks")!.click();
     await flush();
+    await step("Index");
 
     const box = numInput("unindexed allowed");
     box.value = "4";
@@ -5932,6 +6005,7 @@ describe("the search controls (WP-1045)", () => {
     await flush();
     button("Peaks")!.click();
     await flush();
+    await step("Index");
 
     const input = [...host.querySelectorAll<HTMLInputElement>("input")]
       .find((i) => i.placeholder.startsWith("a b c"))!;

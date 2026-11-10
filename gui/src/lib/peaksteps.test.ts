@@ -12,7 +12,6 @@ import {
   clock,
   filterPeaks,
   groupRows,
-  peakNote,
   unindexedOf,
   type Candidate,
   type GroupCurve,
@@ -48,16 +47,6 @@ describe("filterPeaks", () => {
   });
   it("keeps a row ticked since the filter was chosen", () => {
     expect(filterPeaks(rows, "unused", new Set([0])).map((p) => p.index)).toEqual([1, 0]);
-  });
-});
-
-describe("peakNote", () => {
-  it("names who placed a line, then its flags in the corpus's words", () => {
-    const label = (f: string) => `<${f}>`;
-    expect(peakNote(row(0, 1, { origin: "manual", flags: ["weak_line"] }), label))
-      .toBe("added by you, <weak_line>");
-    expect(peakNote(row(0, 1, { origin: "edited" }), label)).toBe("moved by you");
-    expect(peakNote(row(0, 1), label)).toBe("");
   });
 });
 

@@ -55,6 +55,10 @@ export interface PeaksPayload {
   source?: "fitted" | "positions";
   wavelength?: number;
   api_call?: string;
+  /** the options the stored list was picked with (WP-2124) */
+  pick_options?: { shoulders?: boolean; flag_contamination?: boolean;
+                   two_theta_range?: [number, number] | null };
+  created_utc?: string;
 }
 
 /**
@@ -275,6 +279,8 @@ export interface Candidate {
     absent_source?: "line_screen" | "fitted_background";
     n_lines_screened?: number | null;
     predicted_but_absent_uncancellable_in_window?: number | null;
+    /** observed peaks no calculated line explains */
+    unmatched_observed?: number;
   } | null;
   diagnostics: Array<{ level: string; code: string; message: string }>;
   supercell_checks?: Array<{ parent_cell: number[]; index: number; verdict: string }> | null;
@@ -407,15 +413,6 @@ export function filterPeaks(rows: readonly PeakRow[], filter: PeakFilter,
     .filter((p) => filter === "all" || keep.has(p.index)
       || (filter === "used") === p.usable)
     .sort((a, b) => a.two_theta - b.two_theta);
-}
-
-/** The words a row's note column says: who placed it, then its flags. */
-export function peakNote(p: PeakRow, label: (flag: string) => string): string {
-  const words: string[] = [];
-  if (p.origin === "manual") words.push("added by you");
-  else if (p.origin === "edited") words.push("moved by you");
-  for (const f of p.flags) words.push(label(f));
-  return words.join(", ");
 }
 
 /** A group whose window fit is worth a look has a reduced χ² above this. */

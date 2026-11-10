@@ -38,21 +38,25 @@
   import { labelFor, type HelpCorpus } from "../lib/help";
   import { clone } from "../lib/model";
   import {
-    absentText,
-    caveatTone,
+    PEAK_STEPS,
+    absentOf,
+    candidateRelation,
+    cellLine,
     cellText,
+    clock,
     collectTo,
-    confidenceTone,
-    flagTone,
-    fomColumns,
+    filterPeaks,
     fomOf,
     formatHkl,
     formatIntensity,
     formatPosition,
+    groupRows,
     intensityScale,
     searchCoverage,
+    unindexedOf,
     type AdoptVerdict,
     type Candidate,
+    type PeakFilter,
     type PeaksPayload,
   } from "../lib/peaks";
   import type { RunState } from "../lib/stream";
@@ -78,6 +82,8 @@
     oncandidate = () => {},
     oncandidatehover = () => {},
     onproject = () => {},
+    ongraph = () => {},
+    onfitgroups = () => {},
   }: {
     peaks: PeaksPayload | null;
     indexAnswer: any;
@@ -111,7 +117,53 @@
     oncandidatehover?: (index: number | null) => void;
     /** the document changed server-side (a controls patch landed) */
     onproject?: () => void;
+    /** show this graph tab: Fit peaks is drawn in the group windows, the
+     *  other steps on the pattern (round 11, call 1) */
+    ongraph?: (id: "pattern" | "single") => void;
+    /** the overlap groups the fit windows draw, and the one chosen */
+    onfitgroups?: (groups: number[], focused: number | null) => void;
   } = $props();
+
+  // ------------------------------------------------------------------
+  // the four steps (WP-2202): one shows at a time, under a step strip.
+  // Choosing a step is a jump the person asked for, so it may change the
+  // graph tab; nothing else here does (`gui/STYLE.md` principle 4).
+  // ------------------------------------------------------------------
+  let step = $state(0);
+  function goStep(i: number) {
+    step = i;
+    ongraph(i === 1 ? "single" : "pattern");
+  }
+
+  /** Pick peaks: which rows the table lists, and the rows ticked since */
+  let filter = $state<PeakFilter>("all");
+  let keep = $state(new Set<number>());
+  function setFilter(f: PeakFilter) {
+    filter = f;
+    keep = new Set();
+  }
+
+  /** the picker's three options, as typed; re-read from the stored list
+   *  only when a new list arrives (keyed on its creation time) */
+  let popt = $state({ lo: "", hi: "", shoulders: true, contamination: true });
+  let confirming = $state(false);
+  $effect(() => {
+    void peaks?.created_utc;
+    const o = untrack(() => peaks?.pick_options);
+    const rng = o?.two_theta_range ?? null;
+    popt = {
+      lo: rng ? String(rng[0]) : "", hi: rng ? String(rng[1]) : "",
+      shoulders: o?.shoulders ?? true, contamination: o?.flag_contamination ?? true,
+    };
+    confirming = false;
+  });
+
+  /** Fit peaks: the groups worth a look, or all of them */
+  let groupFilter = $state<"look" | "all">("look");
+
+  /** Judge: the extinction class chosen, and the space group within it */
+  let chosenClass = $state<number | null>(null);
+  let chosenGroup = $state<string | null>(null);
 
   let failure = $state("");
   let expanded = $state<number | null>(null);
@@ -261,23 +313,49 @@
   }
 
   const rows = $derived(peaks?.peaks ?? []);
-  const unusable = $derived(peaks?.unusable_flags ?? []);
   const diagnostics = $derived(peaks?.diagnostics ?? []);
   /** the 100 of the relative intensity scale: the strongest *measured* line */
   const imax = $derived(intensityScale(rows));
-  /** the loudest level among the picker's notes, which tones the fold's count */
-  const noteTone = $derived(
-    diagnostics.some((d) => d.level === "error") ? "bad"
-      : diagnostics.some((d) => d.level === "warning") ? "warn" : "note");
   const indexing = $derived(busy && run?.run?.kind === "index");
   const screening = $derived(busy && run?.run?.kind === "extinction");
   const candidates = $derived<Candidate[]>(indexAnswer?.result?.candidates ?? []);
   const refuting = $derived<string[]>(indexAnswer?.refuting_caveats ?? []);
   const verdicts = $derived<AdoptVerdict[]>(indexAnswer?.adopt ?? []);
-  const columns = $derived(fomColumns(candidates));
-  /** the Z column shows when the run read a formula: every candidate then
-   *  carries its formula units, and none does otherwise (WP-2030) */
-  const zColumn = $derived(indexAnswer?.result?.formula != null);
+  const shown = $derived(filterPeaks(rows, filter, keep));
+  const nUsed = $derived(rows.filter((p) => p.usable).length);
+  /** the lines a person placed, moved or left out: what a re-pick replaces */
+  const nEdits = $derived(rows.filter((p) => p.origin !== "fitted"
+    || p.flags.includes("excluded")).length);
+  const groupList = $derived(groupRows(peaks?.groups ?? [], rows));
+  const groupsShown = $derived(groupFilter === "all" ? groupList
+    : groupList.filter((g) => g.look));
+  /** the group chosen in the list; the windows draw six from it onward */
+  let focusedGroup = $state<number | null>(null);
+  const FIT_WINDOWS = 6;
+  $effect(() => {
+    const k = Math.max(0, groupsShown.findIndex((g) => g.group === focusedGroup));
+    onfitgroups(groupsShown.slice(k, k + FIT_WINDOWS).map((g) => g.group), focusedGroup);
+  });
+  const flagWord = (f: string) => labelFor(corpus, `peak_flags:${f}`);
+  /** the time limit is a preset's ceiling, said as a time */
+  const limitWord = (s: number | null | undefined) =>
+    s == null ? "None" : s % 60 === 0 ? `${s / 60} minutes` : `${s} s`;
+  const preset = $derived(draft?.search.preset ?? defaultPreset);
+  const budget = $derived(draft?.search.total_budget_seconds
+    ?? presetsVocab.find((p) => p.name === preset)?.total_budget_seconds ?? null);
+  /** the systems the run asked for, and each one's state off the stream */
+  const asked = $derived<string[]>(draft?.search.systems ?? systemsVocab);
+  function systemState(s: string): string {
+    if (shortlists.some((snap) => snap.system === s)) return "searched";
+    if (run?.run?.stage?.includes(s)) return "searching…";
+    return "waiting";
+  }
+  /** the candidate Judge shows: the one selected in Index */
+  const judged = $derived(expanded);
+  /** the two figures of merit the literature names by a symbol */
+  const FOM_LABEL: Record<string, string> = { m20: "M₂₀", f_n: "F_N" };
+  const caveatWords = (c: Candidate) =>
+    c.confidence_caveats.map((k) => k.replaceAll("_", " "));
   /** the gate's pick, a badge on one row of the list and never the list's
    *  answer: every row can be adopted (Yue's ruling B, 2026-11-08) */
   const best = $derived(verdicts.findIndex((v) => v.picked));
@@ -297,8 +375,27 @@
    */
   function selectCandidate(index: number | null) {
     expanded = index;
+    chosenClass = null;
+    chosenGroup = null;
     oncandidate(index);
   }
+
+  /** A class of the screen chosen; until one is, the gate's pick is. */
+  function chooseClass(k: number) {
+    chosenClass = k;
+    chosenGroup = null;
+  }
+  const activeClass = $derived<number | null>(chosenClass
+    ?? (extinction?.candidate === judged ? extinction?.best ?? null : null));
+  /** the space group Adopt sends: the one chosen, else the class's
+   *  representative (round 11 calls 10 and 12) */
+  const activeGroup = $derived.by<string | null>(() => {
+    if (chosenGroup !== null) return chosenGroup;
+    const cls = activeClass === null ? null : screen?.candidates?.[activeClass];
+    if (!cls) return null;
+    return cls.space_groups.includes(cls.representative)
+      ? cls.representative : cls.space_groups[0] ?? null;
+  });
 
   // A new answer renumbers the candidates, so the open row and the drawn lines
   // are both about a cell that no longer has that index — the same staleness
@@ -319,7 +416,38 @@
     }
   }
 
-  const pick = () => verb(() => api.pickPeaks());
+  /** Pick with the three options; a range needs both ends or neither. */
+  function pick() {
+    const lo = popt.lo.trim(), hi = popt.hi.trim();
+    if ((lo === "") !== (hi === "")) {
+      failure = "give the 2θ range both ends, or neither for the whole pattern";
+      return;
+    }
+    const body: Parameters<typeof api.pickPeaks>[0] = {
+      shoulders: popt.shoulders, flag_contamination: popt.contamination };
+    if (lo !== "") body.two_theta_range = [Number(lo), Number(hi)];
+    confirming = false;
+    verb(() => api.pickPeaks(body));
+  }
+  /** Pick peaks again: replaces the list, so it says how many edits first */
+  function repick() {
+    if (nEdits && !confirming) confirming = true;
+    else pick();
+  }
+  async function stop() {
+    try {
+      await api.cancel();
+      say("token.cancel()");
+    } catch (error) {
+      failure = (error as Error).message;
+    }
+  }
+  function setLimit(name: string) {
+    if (!draft) return;
+    draft.search.preset = name === defaultPreset ? null : name;
+    draft.search.total_budget_seconds = null;
+    commit();
+  }
   const remove = (index: number) => verb(() => api.removePeak(index));
 
   function addTyped() {
@@ -331,8 +459,10 @@
     addAt = "";
     verb(() => api.addPeak(tt));
   }
-  const toggleUse = (index: number, usable: boolean) =>
+  function toggleUse(index: number, usable: boolean) {
+    keep = new Set([...keep, index]);
     verb(() => api.flagPeak(index, { use_for_indexing: !usable }));
+  }
   const refit = (group: number) => verb(() => api.refitGroup(group));
 
   async function startIndex() {
@@ -371,39 +501,467 @@
   }
 </script>
 
-<section>
-  <div class="controls">
-    <button class="ghost" onclick={pick} disabled={busy}
-      title="fit every detectable line; replaces the stored list, edits included">
-      {rows.length ? "Re-pick peaks" : "Pick peaks"}
-    </button>
-    <button class="ghost" onclick={startIndex} disabled={busy || !rows.length}
-      title="run every indexing engine on the usable lines; agreement is the confidence">
-      Index
-    </button>
-    {#if peaks?.peaks}
-      <input class="add" type="text" inputmode="decimal" placeholder="add at 2θ…"
-        bind:value={addAt} disabled={busy}
-        onkeydown={(ev) => ev.key === "Enter" && addTyped()}
-        title="seed a component at this 2θ and refit the group it lands in
-(the plot's click does the same)" />
-    {/if}
-    {#if indexing}
-      <span class="muted">
-        {run?.run?.stage ?? "starting"}
-        {#if run?.run?.stage_index}({run.run.stage_index}/{run.run.n_stages}){/if}
-      </span>
-    {/if}
-  </div>
+<section class="peaks">
+  <!-- The four steps, as the maintainer named them (2026-11-07). A step is
+       one of N views over the same tab, so it is drawn as a tab (WP-2202). -->
+  <nav class="steps" aria-label="Steps">
+    {#each PEAK_STEPS as name, i (name)}
+      <button class="tab" class:on={step === i}
+        aria-current={step === i ? "step" : undefined}
+        onclick={() => goStep(i)}><span class="n mono">{i + 1}</span> {name}</button>
+    {/each}
+  </nav>
   {#if failure}<p class="bad">{failure}</p>{/if}
 
-  {#if draft}
-    <details class="search">
-      <summary>
-        Search controls
-        {#if digest}<span class="muted">· {digest}</span>{/if}
-      </summary>
+  {#snippet pickOptions()}
+    <div class="form">
+      <span class="lab">2θ range</span>
+      <span class="field">
+        <input type="text" inputmode="decimal" aria-label="Lowest 2θ" disabled={busy}
+          placeholder="start" bind:value={popt.lo} />
+        <span class="muted">to</span>
+        <input type="text" inputmode="decimal" aria-label="Highest 2θ" disabled={busy}
+          placeholder="end" bind:value={popt.hi} />
+        <span class="muted">°</span>
+      </span>
+      <span class="lab">Shoulders</span>
+      <label class="opt"><input type="checkbox" disabled={busy}
+        bind:checked={popt.shoulders} /> Look for shoulders</label>
+      <span class="lab">Contamination</span>
+      <label class="opt"><input type="checkbox" disabled={busy}
+        bind:checked={popt.contamination} /> Flag Kβ and tungsten lines</label>
+    </div>
+  {/snippet}
 
+  {#if step === 0}
+    <!-- 1. Pick peaks -->
+    {#if !peaks?.peaks}
+      <h3>Picking settings</h3>
+      {@render pickOptions()}
+      <div class="foot">
+        <button class="ghost" onclick={pick} disabled={busy}>Pick peaks</button>
+      </div>
+    {:else}
+      <div class="bar">
+        <div class="segmented" role="group" aria-label="Lines shown">
+          {#each [["all", `All ${rows.length}`], ["used", `Used ${nUsed}`],
+                  ["unused", `Not used ${rows.length - nUsed}`]] as [k, t] (k)}
+            <button class:on={filter === k} aria-pressed={filter === k}
+              onclick={() => setFilter(k as PeakFilter)}>{t}</button>
+          {/each}
+        </div>
+        <input class="add mono" type="text" inputmode="decimal" placeholder="add at 2θ"
+          aria-label="Add a line at 2θ" bind:value={addAt} disabled={busy}
+          onkeydown={(ev) => ev.key === "Enter" && addTyped()} />
+        {#if peaks.source === "positions"}
+          <span class="warn"><Help for="diagnostics:PEAK_SIGMA_ASSUMED">σ assumed</Help></span>
+        {/if}
+      </div>
+      <div class="scroll">
+        <table class="tabular lines">
+          <thead>
+            <tr><th class="ck"></th><th class="r">2θ (°)</th><th class="r">d (Å)</th>
+              <th class="r">I (rel)</th><th>Note</th><th></th></tr>
+          </thead>
+          <tbody>
+            {#each shown as p (p.index)}
+              {@const pos = formatPosition(p.two_theta, p.two_theta_esd)}
+              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+              <tr class:out={!p.usable} class:lit={hovered === p.index}
+                onmouseenter={() => onhover(p.index)}
+                onmouseleave={() => onhover(null)}>
+                <td class="ck">
+                  <input type="checkbox" checked={p.usable} disabled={busy}
+                    aria-label="Use {p.two_theta.toFixed(3)}° in the search"
+                    onchange={() => toggleUse(p.index, p.usable)} />
+                </td>
+                <td class="r">
+                  <button class="pick pos" onclick={() => zoomTo(p.two_theta, p.fwhm)}
+                    >{pos.value}<span class="muted">{pos.esd}</span></button>
+                </td>
+                <td class="r">{p.d.toFixed(4)}</td>
+                <td class="r">{formatIntensity(p.intensity, imax, p.flags)}</td>
+                <!-- who placed the line, then its flags, each in the corpus's
+                     words with its explanation one click away (WP-1209) -->
+                <td class="note muted">
+                  {#if p.origin !== "fitted"}<span class="word"><Help for="peak_origins:{p.origin}"
+                    >{labelFor(corpus, `peak_origins:${p.origin}`)}</Help></span>{/if}
+                  {#each p.flags as f (f)}<span class="word"><Help for="peak_flags:{f}"
+                    >{flagWord(f)}</Help></span>{/each}
+                </td>
+                <td class="acts">
+                  <button class="ghost" disabled={busy} title="Remove this line"
+                    onclick={() => remove(p.index)}>×</button>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+      {#if diagnostics.length}
+        <details class="fold">
+          <summary>Notes from the picker ({diagnostics.length})</summary>
+          <ul class="strip">
+            {#each diagnostics as d (d.code + d.message)}
+              <li class={d.level}><span class="mono">
+                <Help for="diagnostics:{d.code}">{d.code}</Help></span> {d.message}</li>
+            {/each}
+          </ul>
+        </details>
+      {/if}
+      <details class="fold">
+        <summary>Picking settings</summary>
+        {@render pickOptions()}
+        <div class="foot">
+          {#if confirming}
+            <span class="muted why">Picking again replaces the list, with the {nEdits}
+              {nEdits === 1 ? "line" : "lines"} you added, moved or left out.</span>
+            <button class="ghost" onclick={() => (confirming = false)}>Cancel</button>
+          {/if}
+          <button class="ghost" onclick={repick} disabled={busy}>Pick peaks</button>
+        </div>
+      </details>
+    {/if}
+
+  {:else if step === 1}
+    <!-- 2. Fit peaks: each overlap group's window fit, drawn in the graph -->
+    {#if !peaks?.peaks}
+      <div class="empty"><button class="ghost" onclick={() => goStep(0)}>Pick peaks first</button></div>
+    {:else}
+      <div class="bar">
+        <div class="segmented" role="group" aria-label="Groups shown">
+          <button class:on={groupFilter === "look"} aria-pressed={groupFilter === "look"}
+            onclick={() => (groupFilter = "look")}
+            >To look at {groupList.filter((g) => g.look).length}</button>
+          <button class:on={groupFilter === "all"} aria-pressed={groupFilter === "all"}
+            onclick={() => (groupFilter = "all")}>All groups {groupList.length}</button>
+        </div>
+      </div>
+      <div class="scroll">
+        <table class="tabular groups">
+          <thead>
+            <tr><th class="r">2θ (°)</th><th class="r">Lines</th>
+              <th class="r">χ²ᵣ</th>
+              <th>Note</th><th></th></tr>
+          </thead>
+          <tbody>
+            {#each groupsShown as g (g.group)}
+              <tr class:sel={focusedGroup === g.group}>
+                <td class="r">
+                  <button class="pick" onclick={() => (focusedGroup = g.group)}
+                    >{g.lo.toFixed(2)}–{g.hi.toFixed(2)}</button>
+                </td>
+                <td class="r">{g.n}</td>
+                <td class="r" class:hi={g.chi2_red > 10}>{g.chi2_red.toFixed(1)}</td>
+                <td class="note muted">{g.flags.map(flagWord).join(", ")}</td>
+                <td class="acts">
+                  <button class="ghost" disabled={busy}
+                    title="Refit this group under the picker's own judgement"
+                    onclick={() => refit(g.group)}>↻</button>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+
+  {:else if step === 2}
+    <!-- 3. Index: the settings show before a list exists; Index waits for one -->
+      {#if draft}
+        <div class="form" class:frozen={busy}>
+          <span class="lab"><Help for={searchHelp(field("systems"))}>Crystal systems</Help></span>
+          <span class="field wrap">
+            {#each systemsVocab as s (s)}
+              <label class="opt">
+                <input type="checkbox" disabled={busy}
+                  checked={draft.search.systems === null || draft.search.systems.includes(s)}
+                  onchange={() => toggleSystem(s)} /> {s}
+              </label>
+            {/each}
+          </span>
+          <span class="lab"><Help for={searchHelp(field("max_volume"))}>Largest volume</Help></span>
+          <span class="field">
+            <input type="text" inputmode="decimal" disabled={busy} placeholder="from data"
+              aria-label="Largest cell volume"
+              value={draft.search.max_volume ?? ""}
+              onchange={(ev) => setSearch("max_volume",
+                numOrNull((ev.currentTarget as HTMLInputElement).value))} />
+            <span class="muted">Å³</span>
+          </span>
+          <span class="lab"><Help for={searchHelp(field("preset"))}>Time limit</Help></span>
+          <span class="field">
+            <div class="segmented" role="group" aria-label="Time limit">
+              {#each presetsVocab as p (p.name)}
+                {@const on = draft.search.total_budget_seconds == null && preset === p.name}
+                <button class:on={on} aria-pressed={on} disabled={busy}
+                  onclick={() => setLimit(p.name)}>{limitWord(p.total_budget_seconds)}</button>
+              {/each}
+            </div>
+          </span>
+        </div>
+        {@render moreSettings()}
+        {#if controlsError}<p class="bad">{controlsError}</p>{/if}
+      {/if}
+
+      {#if indexing}
+        <h3>Searching</h3>
+        <table class="tabular sys">
+          <tbody>
+            {#each asked as s (s)}
+              {@const state = systemState(s)}
+              <tr><td>{s}</td><td class="muted" class:on={state === "searching…"}>{state}</td></tr>
+            {/each}
+          </tbody>
+        </table>
+        {#if shortlists.some((snap) => snap.candidates.length)}
+          <h3>Found so far</h3>
+          <ul class="strip found">
+            {#each shortlists as snap (snap.system)}
+              {#each snap.candidates.slice(0, 3) as c, i (i)}
+                <li><span class="mono">{cellText(c.cell)}</span>
+                  <span class="muted">{snap.system}</span></li>
+              {/each}
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+
+      {#if indexAnswer && !indexing}
+        <!-- What the search covered, above any answer: a run stopped at its
+             ceiling reads like a finished one unless this is said (WP-1042).
+             Shown whether or not there are candidates (WP-2130). -->
+        <div class="coverage" class:short={coverage.incomplete.length
+          || (indexAnswer.result?.diagnostics ?? []).some((d: any) => d.level !== "info")}>
+          <p>Searched: {coverage.searched.join(", ") || "none"}</p>
+          {#if coverage.incomplete.length}
+            <p class="warn">Search incomplete in {coverage.incomplete.join(", ")}:
+              a negative result there is not evidence.</p>
+          {/if}
+          <ul class="strip">
+            {#each indexAnswer.result?.diagnostics ?? [] as d (d.code + d.message)}
+              <li class={d.level}><span class="mono"><Help for="diagnostics:{d.code}">{d.code}</Help></span>
+                {d.message}
+                <!-- keyed by position: two `where` entries can be one string -->
+                {#each d.where ?? [] as w, j (j)}<span class="where">{w}</span>{/each}</li>
+            {/each}
+          </ul>
+        </div>
+        {#if !candidates.length}
+          <p class="muted">No candidate cells.
+            {#if quality?.abstained_reason}{quality.abstained_reason}{/if}</p>
+        {:else}
+          <h3>Candidates <span class="muted">{candidates.length}, ranked by rietx</span></h3>
+          {#if best < 0}
+            <!-- best_or_none() returned None: the expected first outcome on
+                 real lab data, so it is said as a fact, not an error -->
+            <p class="muted">No candidate reaches the gate; the list below is ranked, not chosen.</p>
+          {/if}
+          <div class="scroll">
+            <table class="tabular candidates">
+              <thead>
+                <tr>
+                  <th class="r">#</th><th>Cell</th><th>Lattice</th><th class="r">V (Å³)</th>
+                  <th class="r">M₂₀</th><th class="r">Unindexed</th>
+                  <th class="r">Absent</th><th class="r">Rwp</th><th>Grade</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+                {#each candidates as c, i (i)}
+                  {@const m20 = fomOf(c, "m20")}
+                  {@const ab = absentOf(c)}
+                  {@const rel = candidateRelation(candidates, i)}
+                  <tr class:sel={judged === i} class:lit={shownCandidate === i}
+                    onmouseenter={() => oncandidatehover(i)}
+                    onmouseleave={() => oncandidatehover(null)}>
+                    <td class="r">
+                      <button class="pick" aria-label="Select candidate {i + 1}"
+                        onclick={() => selectCandidate(judged === i ? null : i)}>{i + 1}</button>
+                    </td>
+                    <td class="cell">
+                      <button class="pick mono" onclick={() => selectCandidate(judged === i ? null : i)}
+                        >{cellLine(c)}</button>
+                      {#if rel}<span class="muted rel">{rel}</span>{/if}
+                      <!-- a row the gate did not pick says why, in the
+                           sentence its adoption records (WP-2124, WP-2130) -->
+                      {#if verdicts[i]?.why}<span class="muted why">{verdicts[i].why}</span>{/if}
+                    </td>
+                    <td>{c.system} {c.centring}</td>
+                    <td class="r">{c.volume.toFixed(0)}</td>
+                    <td class="r">{m20 === null ? "–" : m20.toFixed(1)}</td>
+                    <td class="r">{unindexedOf(c)}</td>
+                    <td class="r">{#if ab}{ab.absent} <span class="muted">of {ab.of}</span>{:else}–{/if}</td>
+                    <td class="r">{c.lebail ? `${(c.lebail.rwp * 100).toFixed(1)} %` : "–"}</td>
+                    <td>{c.confidence}{#if i === best}<span class="mark">rietx's pick</span>{/if}</td>
+                    <!-- every row can be adopted (Yue's ruling B, 2026-11-08) -->
+                    <td>
+                      <button class="ghost" disabled={busy}
+                        title="Adopt this cell as a Le Bail start (one history node)"
+                        onclick={() => adopt(i)}>Adopt</button>
+                    </td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        {/if}
+      {/if}
+
+      <div class="foot">
+        {#if indexing}
+          <button class="ghost" onclick={stop}>Stop</button>
+          <span class="muted mono why">{clock(run?.run?.elapsed ?? 0)} elapsed{#if budget != null}
+            · about {clock(Math.max(0, budget - (run?.run?.elapsed ?? 0)))} left{/if}</span>
+        {:else}
+          {#if candidates.length}
+            <button class="ghost" disabled={judged === null} onclick={() => goStep(3)}
+              >Judge{judged === null ? "" : ` #${judged + 1}`} ›</button>
+          {/if}
+          {#if !rows.length}<span class="muted why">Pick peaks first.</span>{/if}
+          <button class="ghost" onclick={startIndex} disabled={busy || !rows.length}
+            >{indexAnswer ? "Index again" : "Index"}</button>
+        {/if}
+      </div>
+
+  {:else}
+    <!-- 4. Judge -->
+    {#if judged === null || !candidates[judged]}
+      <div class="empty"><button class="ghost" onclick={() => goStep(2)}
+        >Choose a candidate in Index</button></div>
+    {:else}
+      {@const i = judged}
+      {@const c = candidates[i]}
+      {@const ab = absentOf(c)}
+      <div class="nav">
+        <button class="ghost" aria-label="Previous candidate" disabled={i === 0}
+          onclick={() => selectCandidate(i - 1)}>‹</button>
+        <span><strong>#{i + 1}</strong> <span class="muted">of {candidates.length}</span></span>
+        <button class="ghost" aria-label="Next candidate" disabled={i >= candidates.length - 1}
+          onclick={() => selectCandidate(i + 1)}>›</button>
+        <span class="grow"></span>
+        <span class="muted">{c.system} {c.centring}</span>
+      </div>
+      <p class="mono cellline">{cellLine(c, true)}, V = {c.volume.toFixed(1)} Å³</p>
+      <!-- the relation line keeps its height when empty, so stepping between
+           candidates moves nothing below it (round 11) -->
+      <p class="muted rel">{candidateRelation(candidates, i) || " "}</p>
+
+      <h3>Grade <span class="muted">{c.confidence}</span></h3>
+      <p class="caveats">
+        {#each c.confidence_caveats as k (k)}
+          <span class:bad={refuting.includes(k)}>{k.replaceAll("_", " ")}</span>
+        {:else}<span class="muted">no caveats</span>{/each}
+      </p>
+
+      <h3>Le Bail check</h3>
+      {#if c.lebail}
+        <dl class="kv">
+          <dt>Rwp</dt><dd class="mono">{(c.lebail.rwp * 100).toFixed(1)} %</dd>
+          <dt>Predicted lines with no peak</dt>
+          <dd><span class="mono">{ab?.absent}</span> of <span class="mono">{ab?.of}</span></dd>
+          <dt>Peaks no line explains</dt><dd class="mono">{c.lebail.unmatched_observed ?? "–"}</dd>
+        </dl>
+      {:else}
+        <p class="muted">Not checked by a Le Bail fit.</p>
+      {/if}
+
+      <h3>Figures of merit</h3>
+      <dl class="kv">
+        {#each c.fom as f (f.name)}
+          <!-- each figure's blind spot is one click away (round 11) -->
+          <dt>{#if f.blind_spot}<Help text={f.blind_spot}>{FOM_LABEL[f.name] ?? f.name}</Help>
+            {:else}{FOM_LABEL[f.name] ?? f.name}{/if}</dt>
+          <dd class="mono">{f.value == null ? "–" : f.value.toFixed(2)}</dd>
+        {/each}
+        <dt>Found by</dt><dd>{c.found_by.join(", ")}</dd>
+      </dl>
+      {#if collectTo(c) !== null}
+        <p class="warn">Collect to 2θ ≈ {collectTo(c)?.toFixed(1)}° to tell this cell
+          from its partner; the lines that separate them lie beyond the measured range.</p>
+      {/if}
+
+      <h3>Space group</h3>
+      {#if extinction?.candidate !== i || !screen}
+        <button class="ghost" disabled={busy} onclick={() => screenExtinctions(i)}
+          >{screening ? "Screening extinctions…" : "Screen extinctions"}</button>
+      {:else}
+        <p class="muted">Against {screen.lattice_group}, absence-free:
+          {screen.n_screened} of {screen.n_classes} classes fitted,
+          2θ {screen.two_theta_range[0].toFixed(1)}–{screen.two_theta_range[1].toFixed(1)}°</p>
+        {#if extinction.best === null}
+          <!-- refuted classes, an indecisive ΔBIC margin or unfitted classes
+               leave an unasked question, which must not read as an answer -->
+          <p class="muted">No class is singled out; the list below is ranked, not chosen.</p>
+        {/if}
+        <div class="scroll">
+          <table class="tabular classes">
+            <thead>
+              <tr><th>Class</th>
+                <th class="r">ΔBIC</th>
+                <th class="r">Tested</th><th>Groups</th></tr>
+            </thead>
+            <tbody>
+              {#each screen.candidates as cls, k (cls.symbol + k)}
+                <!-- a refuted class stays in the table, muted, as evidence
+                     (round 11 call 17); it cannot be chosen -->
+                <tr class:out={cls.refuted} class:sel={activeClass === k}>
+                  <td class="cell">
+                    {#if cls.refuted}<span class="mono">{cls.symbol}</span>
+                    {:else}<button class="pick mono" onclick={() => chooseClass(k)}
+                      >{cls.symbol}</button>{/if}
+                    {#if extinction.best === k}<span class="mark">rietx's pick</span>{/if}
+                    {#if cls.refuted && cls.n_present}
+                      <span class="why">refuted by {(cls.forbidden_hkl ?? []).slice(0, 3)
+                        .map((hkl: number[], j: number) =>
+                          `${formatHkl(hkl)} ${cls.forbidden_two_theta?.[j]?.toFixed(2) ?? "?"}°`)
+                        .join(", ")}</span>
+                    {/if}
+                  </td>
+                  <td class="r">{cls.screened ? cls.delta_bic.toFixed(1) : "–"}</td>
+                  <td class="r">{#if cls.n_absent}{cls.screened ? cls.n_testable : "–"} <span
+                    class="muted">of {cls.n_absent}</span>{:else}–{/if}</td>
+                  <td class="muted">{cls.refuted ? "refuted" : !cls.screened ? "not screened"
+                    : cls.space_groups.join(", ")}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        <ul class="strip">
+          {#each screen.diagnostics ?? [] as d (d.code + d.message)}
+            <li class={d.level}><span class="mono"><Help for="diagnostics:{d.code}"
+              >{d.code}</Help></span> {d.message}</li>
+          {/each}
+        </ul>
+        {#if activeClass !== null && screen.candidates[activeClass]}
+          {@const cls = screen.candidates[activeClass]}
+          <div class="form">
+            <span class="lab">Adopt in</span>
+            <span class="field">
+              <div class="segmented sgs" role="group" aria-label="Space group">
+                {#each cls.space_groups as sg (sg)}
+                  <button class:on={activeGroup === sg} aria-pressed={activeGroup === sg}
+                    onclick={() => (chosenGroup = sg)}>{sg}</button>
+                {/each}
+              </div>
+            </span>
+          </div>
+        {/if}
+      {/if}
+
+      <div class="foot">
+        <button class="ghost" disabled={busy}
+          onclick={() => adopt(i, activeGroup ?? undefined)}>Adopt as a Le Bail start</button>
+        <span class="muted why">Grade {c.confidence}{caveatWords(c).length
+          ? `: ${caveatWords(c).join(", ")}` : ""}{activeGroup ? `, in ${activeGroup}` : ""}</span>
+      </div>
+    {/if}
+  {/if}
+
+  {#snippet moreSettings()}
+    <details class="fold search">
+      <summary>More settings{#if digest}<span class="muted"> · {digest}</span>{/if}</summary>
       <div class="grid" class:frozen={busy}>
         <div class="block">
           <span class="lab"><Help for={searchHelp(field("engines"))}
@@ -411,56 +969,32 @@
           {#each enginesVocab as e (e.name)}
             <label class="opt" title={e.description}>
               <input type="checkbox" disabled={busy}
-                checked={draft.engines === null || draft.engines.includes(e.name)}
+                checked={draft!.engines === null || draft!.engines.includes(e.name)}
                 onchange={() => toggleEngine(e.name)} />
               {e.name}
             </label>
           {/each}
         </div>
-
-        <div class="block">
-          <span class="lab"><Help for={searchHelp(field("systems"))}
-            >{field("systems").label}</Help></span>
-          {#each systemsVocab as s (s)}
-            {@const on = draft.search.systems === null
-              || draft.search.systems.includes(s)}
-            <span class="sys">
-              <label class="opt">
-                <input type="checkbox" disabled={busy} checked={on}
-                  onchange={() => toggleSystem(s)} />
-                {s}
-              </label>
-              {#if on && (centringsVocab[s]?.length ?? 0) > 1}
-                {#each centringsVocab[s] as letter (letter)}
-                  {@const cOn = !draft.search.centrings?.[s]
-                    || draft.search.centrings[s].includes(letter)}
-                  <button class="ghost" class:on={cOn} disabled={busy}
-                    title="try this centring in this system"
-                    onclick={() => toggleCentring(s, letter)}>{letter}</button>
-                {/each}
-              {/if}
-            </span>
-          {/each}
-        </div>
-
-        <div class="row">
-          <label class="num">
-            <Help for={searchHelp(field("preset"))}>{field("preset").label}</Help>
-            <select disabled={busy}
-              value={draft.search.preset ?? ""}
-              onchange={(ev) => setSearch("preset",
-                (ev.currentTarget as HTMLSelectElement).value || null)}>
-              <option value="">default — {defaultPreset}</option>
-              {#each presetsVocab as p (p.name)}
-                <option value={p.name} title={p.when_to_use}>{p.title}</option>
+        {#each systemsVocab as s (s)}
+          {#if (draft!.search.systems === null || draft!.search.systems.includes(s))
+            && (centringsVocab[s]?.length ?? 0) > 1}
+            <div class="block">
+              <span class="lab">Centrings, {s}</span>
+              {#each centringsVocab[s] as letter (letter)}
+                {@const cOn = !draft!.search.centrings?.[s]
+                  || draft!.search.centrings[s].includes(letter)}
+                <label class="opt"><input type="checkbox" disabled={busy} checked={cOn}
+                  onchange={() => toggleCentring(s, letter)} /> {letter}</label>
               {/each}
-            </select>
-          </label>
+            </div>
+          {/if}
+        {/each}
+        <div class="row">
           <label class="num">
             <Help for={searchHelp(field("total_budget_seconds"))}
               >{field("total_budget_seconds").label}</Help>
             <input type="text" inputmode="decimal" disabled={busy}
-              value={draft.search.total_budget_seconds ?? ""}
+              value={draft!.search.total_budget_seconds ?? ""}
               onchange={(ev) => setSearch("total_budget_seconds",
                 numOrNull((ev.currentTarget as HTMLInputElement).value))} />
           </label>
@@ -468,7 +1002,7 @@
             <Help for={searchHelp(field("budget_seconds"))}
               >{field("budget_seconds").label}</Help>
             <input type="text" inputmode="decimal" disabled={busy}
-              value={draft.search.budget_seconds}
+              value={draft!.search.budget_seconds}
               onchange={(ev) => setSearch("budget_seconds",
                 numOrNull((ev.currentTarget as HTMLInputElement).value)
                   ?? draft!.search.budget_seconds)} />
@@ -477,7 +1011,7 @@
             <Help for={searchHelp(field("validate_candidates"))}
               >{field("validate_candidates").label}</Help>
             <input type="checkbox" disabled={busy}
-              checked={draft.validate_candidates}
+              checked={draft!.validate_candidates}
               onchange={(ev) => {
                 draft!.validate_candidates =
                   (ev.currentTarget as HTMLInputElement).checked;
@@ -487,7 +1021,7 @@
           <label class="num">
             <Help for={searchHelp(field("check_top"))}>{field("check_top").label}</Help>
             <input type="text" inputmode="numeric" disabled={busy}
-              value={draft.check_top ?? ""}
+              value={draft!.check_top ?? ""}
               onchange={(ev) => {
                 draft!.check_top =
                   numOrNull((ev.currentTarget as HTMLInputElement).value);
@@ -495,11 +1029,10 @@
               }} />
           </label>
         </div>
-
         <div class="row">
-          {#each [["min_d_axis", draft.search.min_d_axis],
-                  ["max_d_axis", draft.search.max_d_axis],
-                  ["min_volume", draft.search.min_volume]] as [name, value] (name)}
+          {#each [["min_d_axis", draft!.search.min_d_axis],
+                  ["max_d_axis", draft!.search.max_d_axis],
+                  ["min_volume", draft!.search.min_volume]] as [name, value] (name)}
             <label class="num">
               <Help for={searchHelp(field(name as string))}
                 >{field(name as string).label}</Help>
@@ -510,14 +1043,6 @@
                     ?? value)} />
             </label>
           {/each}
-          <label class="num">
-            <Help for={searchHelp(field("max_volume"))}
-              >{field("max_volume").label}</Help>
-            <input type="text" inputmode="decimal" disabled={busy}
-              value={draft.search.max_volume ?? ""}
-              onchange={(ev) => setSearch("max_volume",
-                numOrNull((ev.currentTarget as HTMLInputElement).value))} />
-          </label>
           <!-- the specimen's formula sits beside the volume limits it would
                set (WP-2030); a temperature without one is refused, so its
                box waits for a formula -->
@@ -525,7 +1050,7 @@
             <Help for={searchHelp(field("formula"))}>{field("formula").label}</Help>
             <input type="text" spellcheck="false" disabled={busy}
               placeholder="e.g. CuSO4·5H2O"
-              value={draft.formula ?? ""}
+              value={draft!.formula ?? ""}
               onchange={(ev) => {
                 setFormula(draft!,
                   (ev.currentTarget as HTMLInputElement).value);
@@ -536,8 +1061,8 @@
             <Help for={searchHelp(field("temperature"))}
               >{field("temperature").label}</Help>
             <input type="text" inputmode="decimal"
-              disabled={busy || draft.formula === null}
-              value={draft.temperature ?? ""}
+              disabled={busy || draft!.formula === null}
+              value={draft!.temperature ?? ""}
               onchange={(ev) => {
                 draft!.temperature =
                   numOrNull((ev.currentTarget as HTMLInputElement).value);
@@ -545,14 +1070,13 @@
               }} />
           </label>
         </div>
-
         <div class="row">
-          {#each [["n_unindexed", draft.search.n_unindexed],
-                  ["n_search_lines", draft.search.n_search_lines],
-                  ["k_sigma", draft.search.k_sigma],
-                  ["shift_allowance_deg", draft.search.shift_allowance_deg],
-                  ["max_candidates", draft.search.max_candidates],
-                  ["seed", draft.search.seed]] as [name, value] (name)}
+          {#each [["n_unindexed", draft!.search.n_unindexed],
+                  ["n_search_lines", draft!.search.n_search_lines],
+                  ["k_sigma", draft!.search.k_sigma],
+                  ["shift_allowance_deg", draft!.search.shift_allowance_deg],
+                  ["max_candidates", draft!.search.max_candidates],
+                  ["seed", draft!.search.seed]] as [name, value] (name)}
             <label class="num">
               <Help for={searchHelp(field(name as string))}
                 >{field(name as string).label}</Help>
@@ -567,7 +1091,7 @@
             <Help for={searchHelp(field("shift_template"))}
               >{field("shift_template").label}</Help>
             <select disabled={busy}
-              value={draft.search.shift_template ?? ""}
+              value={draft!.search.shift_template ?? ""}
               onchange={(ev) => setSearch("shift_template",
                 (ev.currentTarget as HTMLSelectElement).value || null)}>
               <option value="">none</option>
@@ -575,33 +1099,29 @@
             </select>
           </label>
         </div>
-
         <div class="block">
           <span class="lab"><Help for={searchHelp(field("prior_cells"))}
             >{field("prior_cells").label}</Help></span>
-          {#each draft.search.prior_cells ?? [] as cell, i (i)}
+          {#each draft!.search.prior_cells ?? [] as cell, i (i)}
             <span class="tagged">
-              <span class="chip note">{priorCellText(cell)}</span>
-              <button class="ghost" disabled={busy}
-                title="drop this prior"
+              <span class="mono">{priorCellText(cell)}</span>
+              <button class="ghost" disabled={busy} title="Drop this prior"
                 onclick={() => removePriorCell(i)}>×</button>
             </span>
           {/each}
           <input class="add" type="text" disabled={busy}
-            placeholder="a b c α β γ…" bind:value={priorText}
+            placeholder="a b c α β γ" bind:value={priorText}
             onkeydown={(ev) => ev.key === "Enter" && addPriorCell()} />
           <button class="ghost" disabled={busy || !priorText.trim()}
-            onclick={addPriorCell}>add</button>
+            onclick={addPriorCell}>Add</button>
         </div>
-
         <div class="block">
           <span class="lab"><Help for={searchHelp(field("prior_spacegroups"))}
-  >{field("prior_spacegroups").label}</Help></span>
-          {#each draft.search.prior_spacegroups ?? [] as sg, i (sg + i)}
+            >{field("prior_spacegroups").label}</Help></span>
+          {#each draft!.search.prior_spacegroups ?? [] as sg, i (sg + i)}
             <span class="tagged">
-              <span class="chip note">{sg}</span>
-              <button class="ghost" disabled={busy}
-                title="drop this prior"
+              <span class="mono">{sg}</span>
+              <button class="ghost" disabled={busy} title="Drop this prior"
                 onclick={() => removePriorSg(i)}>×</button>
             </span>
           {/each}
@@ -609,497 +1129,150 @@
             placeholder="e.g. R -3 c" bind:value={sgText}
             onkeydown={(ev) => ev.key === "Enter" && addPriorSg()} />
           <button class="ghost" disabled={busy || !sgText.trim()}
-            onclick={addPriorSg}>add</button>
+            onclick={addPriorSg}>Add</button>
         </div>
       </div>
-      {#if controlsError}<p class="bad">{controlsError}</p>{/if}
     </details>
-  {/if}
-
-  {#if shortlists.length}
-    <div class="stream">
-      <h2>{indexing ? "Streaming — completed systems" : "Streamed shortlists"}</h2>
-      {#each shortlists as snap (snap.system)}
-        <p class="tabular">
-          <strong>{snap.system}</strong>
-          {#if !snap.candidates.length}
-            <span class="muted">— nothing of this symmetry fits</span>
-          {:else}
-            {#each snap.candidates.slice(0, 3) as c, i (i)}
-              <span class="chip note" title="streamed grade — conservative: it
-can rise when validation and ambiguity run, never fall">
-                {cellText(c.cell)} <em>{c.confidence}</em></span>
-            {/each}
-          {/if}
-        </p>
-      {/each}
-    </div>
-  {/if}
-
-  {#if !peaks?.peaks}
-    <p class="muted hint">
-      No peak list yet. <strong>Pick peaks</strong> fits every detectable line;
-      afterwards, click the plot to add one the fitter missed, drag a marker to
-      correct one, shift-click to exclude.
-    </p>
-  {:else}
-    <p class="muted tabular">
-      {peaks.n_usable} of {peaks.n_total} lines usable for indexing
-      {#if peaks.source === "positions"}
-        · <span class="chip warn"
-          ><Help for="diagnostics:PEAK_SIGMA_ASSUMED">σ assumed</Help></span>
-      {/if}
-    </p>
-
-    <!-- The picker's notes about the *list*, folded (WP-1209): a strip of
-         three codes and their sentences read as an interruption above the
-         table, and the count says whether there is anything to open. The
-         count is a chip because it is a fact with a level; the summary is
-         what acts. -->
-    {#if diagnostics.length}
-      <details class="notes">
-        <summary>
-          <span class="chip {noteTone}">{diagnostics.length}</span>
-          {diagnostics.length === 1 ? "note" : "notes"} from the picker
-        </summary>
-        <ul class="strip">
-          {#each diagnostics as d (d.code + d.message)}
-            <li class={d.level}>
-              <span class="mono">
-                <Help for="diagnostics:{d.code}">{d.code}</Help>
-              </span> {d.message}
-            </li>
-          {/each}
-        </ul>
-      </details>
-    {/if}
-
-    <!-- Seven columns (WP-1209): the numbers a peak table is read in, the
-         flags, then `use` on its own — the one cell that is a decision — and
-         the verbs last. 2θ is four places with the esd in the last place, or
-         none from `POSITION_ESD_MAX_DEG` (1°) up, where the flag says why;
-         I is the relative scale. -->
-    <div class="scroll">
-      <table class="tabular">
-        <thead>
-          <tr>
-            <th>#</th><th>2θ (°)</th><th>d (Å)</th><th class="rel">I (rel)</th>
-            <th>flags</th><th>use</th><th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each rows as p (p.index)}
-            {@const pos = formatPosition(p.two_theta, p.two_theta_esd)}
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <tr class:out={!p.usable} class:lit={hovered === p.index}
-              onmouseenter={() => onhover(p.index)}
-              onmouseleave={() => onhover(null)}>
-              <td class="muted">{p.index}</td>
-              <td>
-                <button class="ghost pos" title="zoom the plot to this line"
-                  onclick={() => zoomTo(p.two_theta, p.fwhm)}>
-                  {pos.value}<span class="muted">{pos.esd}</span>
-                </button>
-              </td>
-              <td>{p.d.toFixed(4)}</td>
-              <td class="rel">{formatIntensity(p.intensity, imax, p.flags)}</td>
-              <td class="flags">
-                {#if p.origin !== "fitted"}
-                  <span class="chip accent">
-                    <Help for="peak_origins:{p.origin}"
-                      >{labelFor(corpus, `peak_origins:${p.origin}`)}</Help>
-                  </span>
-                {/if}
-                {#each p.flags as f (f)}
-                  <span class="chip {flagTone(f, unusable)}">
-                    <Help for="peak_flags:{f}">{labelFor(corpus, `peak_flags:${f}`)}</Help>
-                  </span>
-                {/each}
-              </td>
-              <td class="use">
-                <input type="checkbox" checked={p.usable} disabled={busy}
-                  title={p.usable ? "exclude from indexing" :
-                         "use for indexing (overrules the fitter's flags)"}
-                  onchange={() => toggleUse(p.index, p.usable)} />
-              </td>
-              <td class="acts">
-                {#if p.n_in_group > 1}
-                  <button class="ghost" disabled={busy}
-                    title="refit group {p.group} ({p.n_in_group} components) under the picker's own judgement"
-                    onclick={() => refit(p.group)}>↻</button>
-                {/if}
-                <button class="ghost" disabled={busy} title="remove this line"
-                  onclick={() => remove(p.index)}>×</button>
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  {/if}
-
-  {#if indexAnswer}
-    <h2>Indexing</h2>
-    <!-- What the search covered, above any answer: a run stopped at its
-         ceiling reads like a finished one unless this is said (WP-1042).
-         Shown whether or not there are candidates (WP-2130). -->
-    <div class="coverage">
-      <p class="muted">Searched: {coverage.searched.join(", ") || "none"}</p>
-      {#if coverage.incomplete.length}
-        <p class="warn">Search incomplete in {coverage.incomplete.join(", ")}:
-          a negative result there is not evidence.</p>
-      {/if}
-      <ul class="strip">
-        {#each indexAnswer.result?.diagnostics ?? [] as d (d.code + d.message)}
-          <li class={d.level}><span class="mono"><Help for="diagnostics:{d.code}">{d.code}</Help></span>
-            {d.message}
-            <!-- keyed by position: two `where` entries can be one string
-                 (INDEX_MULTIPLE_SOLUTIONS names each high cell by system,
-                 centring and volume to 0.1 Å³) -->
-            {#each d.where ?? [] as w, j (j)}<span class="where">{w}</span>{/each}</li>
-        {/each}
-      </ul>
-    </div>
-    {#if !candidates.length}
-      <p class="hint muted">
-        No candidate cells.
-        {#if quality?.abstained_reason}{quality.abstained_reason}{/if}
-      </p>
-    {:else}
-      {#if best < 0}
-        <p class="hint muted" title="best_or_none() returned None — the expected
-          outcome until the evidence singles one cell out">
-          No candidate reaches the gate; the list below is ranked, not chosen.
-        </p>
-      {/if}
-      <div class="scroll">
-        <table class="tabular candidates">
-          <thead>
-            <tr>
-              <th></th><th>cell</th><th>lattice</th>
-              {#if zColumn}<th><Help for="search_fields:formula">Z</Help></th>{/if}
-              {#each columns as name (name)}<th>{name}</th>{/each}
-              <th>Rwp</th><th title="lines predicted where the pattern has no
-                intensity, of the lines screened; 'in window' is the count the
-                predicted_but_absent caveat caps on — the oversized-cell detector">absent</th>
-              <th>engines</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            {#each candidates as c, i (i)}
-              <tr class:best={i === best} class:lit={shownCandidate === i}
-                onmouseenter={() => oncandidatehover(i)}
-                onmouseleave={() => oncandidatehover(null)}>
-                <td>
-                  <!-- one control, two effects, because they are one thought:
-                       "show me this cell" means the caveats *and* where it says
-                       the lines are.  A second button would be a second
-                       selection state to keep in step with this one. -->
-                  <button class="ghost" title="details, caveats and ambiguity —
-and this cell's predicted lines through the data"
-                    onclick={() => selectCandidate(expanded === i ? null : i)}>
-                    {expanded === i ? "▾" : "▸"}
-                  </button>
-                </td>
-                <td class="cell">{cellText(c.cell)}
-                  <span class="chip {confidenceTone(c.confidence)}">{c.confidence}</span>
-                  {#if i === best}<span class="chip ok">best_or_none()</span>{/if}
-                  <!-- a row the gate did not pick says why under its grade, in
-                       the sentence its adoption records (WP-2124); here and not
-                       in the Adopt column, which would widen the table past the
-                       side panel and cut the sentence off (WP-2130) -->
-                  {#if verdicts[i]?.why}<span class="muted why">{verdicts[i].why}</span>{/if}
-                </td>
-                <td>{c.centring} {c.system}<br /><span class="muted">{c.volume.toFixed(1)} Å³</span></td>
-                {#if zColumn}
-                  <td>{c.formula_units == null ? "—" : c.formula_units.toFixed(2)}</td>
-                {/if}
-                {#each columns as name (name)}
-                  {@const v = fomOf(c, name)}
-                  <td>{v === null ? "—" : v.toFixed(1)}</td>
-                {/each}
-                <td>{c.lebail ? (c.lebail.rwp * 100).toFixed(1) + "%" : "—"}</td>
-                <td>{c.lebail ? absentText(c.lebail) : "—"}</td>
-                <td class="flags">
-                  {#each c.found_by as e (e)}<span class="chip note">{e}</span>{/each}
-                </td>
-                <!-- every row can be adopted (Yue's ruling B, 2026-11-08) -->
-                <td>
-                  <button class="ghost" disabled={busy}
-                    title="adopt this cell as the model (a Le Bail scaffold; one history node)"
-                    onclick={() => adopt(i)}>Adopt</button>
-                </td>
-              </tr>
-              {#if expanded === i}
-                <tr class="detail">
-                  <td></td>
-                  <td colspan={7 + columns.length + (zColumn ? 1 : 0)}>
-                    {#if c.confidence_caveats.length}
-                      <p class="flags">
-                        {#each c.confidence_caveats as caveat (caveat)}
-                          <span class="chip {caveatTone(caveat, refuting)}">{caveat}</span>
-                        {/each}
-                      </p>
-                    {/if}
-                    {#each c.ambiguity as partner, k (k)}
-                      <p>
-                        geometrically indistinguishable: {cellText(partner.cell)}
-                        ({partner.system}, index {partner.index})
-                        {#if partner.discriminating_two_theta?.length}
-                          — separable at 2θ ≈
-                          {partner.discriminating_two_theta.slice(0, 4).map((t: number) => t.toFixed(2)).join(", ")}°
-                        {/if}
-                      </p>
-                    {/each}
-                    {#if collectTo(c) !== null}
-                      <p class="warn">collect to 2θ ≈ {collectTo(c)?.toFixed(1)}°
-                        to break the ambiguity — the discriminating lines are beyond
-                        the measured range</p>
-                    {/if}
-                    <p>
-                      <button class="ghost" disabled={busy}
-                        title="rank the extinction classes this lattice allows: one shared
-profile fit, then one Le Bail per class — the answer is a ranked list of
-classes, and every class lists all its space groups (WP-1025)"
-                        onclick={() => screenExtinctions(i)}>Screen extinctions</button>
-                      {#if extinction?.candidate === i && screen}
-                        <span class="muted">screened — table below</span>
-                      {/if}
-                    </p>
-                    <ul class="strip">
-                      {#each c.diagnostics as d (d.code + d.message)}
-                        <li class={d.level}><span class="mono">{d.code}</span> {d.message}</li>
-                      {/each}
-                    </ul>
-                  </td>
-                </tr>
-              {/if}
-            {/each}
-          </tbody>
-        </table>
-      </div>
-    {/if}
-
-    {#if screening && !screen}
-      <p class="muted">screening extinction classes…</p>
-    {/if}
-    {#if screen}
-      <h2>Extinction — candidate {extinction.candidate}</h2>
-      <p class="muted tabular">
-        reference {screen.lattice_group} (absence-free) ·
-        {screen.n_screened} of {screen.n_classes} classes fitted ·
-        2θ {screen.two_theta_range[0].toFixed(1)}–{screen.two_theta_range[1].toFixed(1)}°
-      </p>
-      {#if extinction.best === null}
-        <p class="hint muted" title="best_or_none() returned None — refuted
-          classes, an indecisive ΔBIC margin, or unfitted classes leave an
-          unasked question, which must not read as a clean answer">
-          No class is singled out; the list below is ranked, not chosen.
-        </p>
-      {/if}
-      <div class="scroll">
-        <table class="tabular">
-          <thead>
-            <tr>
-              <th>class</th>
-              <th title="BIC(class) − BIC(absence-free reference); negative favours the class">ΔBIC</th>
-              <th title="absences the data could test / absences the class asserts —
-an absence outside the range, under a neighbour, or in a window this class's own
-fit already fills with a tail is not an observation.  Needs the fit, so an
-unscreened class shows —">testable</th>
-              <th title="testable forbidden positions carrying intensity; each one refutes the class">refuting</th>
-              <th title="every space group in the class — a powder cannot
-distinguish them, so a singleton here would be unmeasurable">space groups</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each screen.candidates as cls, k (cls.symbol + k)}
-              <tr class:out={cls.refuted} class:best={extinction.best === k}>
-                <td class="mono">{cls.symbol}
-                  {#if extinction.best === k}<span class="chip ok">best_or_none()</span>{/if}
-                  {#if cls.refuted}
-                    <span class="chip bad" title={cls.refuted_reason ?? ""}>refuted</span>
-                  {:else if !cls.screened}
-                    <span class="chip warn" title="left unfitted (cap or cancel) —
-an unasked question, so the gate abstains">not screened</span>
-                  {/if}
-                </td>
-                <td>{cls.screened ? cls.delta_bic.toFixed(1) : "—"}</td>
-                <td>{cls.screened ? cls.n_testable : "—"}/{cls.n_absent}</td>
-                <td>
-                  {#if cls.n_present}
-                    {cls.n_present}:
-                    {(cls.forbidden_hkl ?? []).slice(0, 3)
-                      .map((hkl: number[], j: number) =>
-                        `${formatHkl(hkl)} ${cls.forbidden_two_theta?.[j]?.toFixed(2) ?? "?"}°`)
-                      .join(" ")}
-                  {:else}—{/if}
-                </td>
-                <td class="flags">
-                  {#each cls.space_groups as sg (sg)}
-                    {#if !cls.refuted}
-                      <button class="ghost" disabled={busy}
-                        title="adopt candidate {extinction.candidate} as a Le Bail scaffold
-in {sg} — the class cannot distinguish its members, so this choice is a
-convention, not a measurement"
-                        onclick={() => adopt(extinction.candidate, sg)}>{sg}</button>
-                    {:else}
-                      <span class="chip">{sg}</span>
-                    {/if}
-                  {/each}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-      <ul class="strip">
-        {#each screen.diagnostics ?? [] as d (d.code + d.message)}
-          <li class={d.level}><span class="mono">{d.code}</span> {d.message}</li>
-        {/each}
-      </ul>
-    {/if}
-  {/if}
+  {/snippet}
 </section>
 
 <style>
   section {
-    padding: 8px 10px;
+    padding: 0 var(--s3) var(--s3);
     overflow: auto;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--s2);
   }
 
-  .controls {
+  /* the step strip: a tab strip whose words carry their number */
+  .steps {
+    flex: 0 0 auto;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--panel);
     display: flex;
-    gap: 8px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--line);
+  }
+  .steps .n {
+    color: var(--muted);
+    margin-right: var(--s1);
+  }
+
+  h3 {
+    margin: var(--s3) 0 0;
+  }
+
+  .bar, .foot, .nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2);
     align-items: center;
     flex: 0 0 auto;
   }
-
-  .add {
-    width: 90px;
-    font: var(--mono);
+  .foot {
+    position: sticky;
+    bottom: calc(-1 * var(--s3));
+    background: var(--panel);
+    padding: var(--s2) 0;
+    border-top: 1px solid var(--line);
+    margin-top: var(--s2);
+  }
+  .grow { flex: 1 1 auto; }
+  .why {
+    flex: 1 1 12em;
+    min-width: 0;
+  }
+  .empty {
+    display: flex;
+    justify-content: center;
+    padding: var(--s3) 0;
   }
 
-  /* -- the search-controls disclosure (WP-1045) ---------------------- */
-  details.search {
-    flex: 0 0 auto;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: 2px 8px 4px;
-  }
-
-  details.search summary {
-    cursor: pointer;
+  /* a form: labels in one column that fits the longest, fields after */
+  .form {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--s2) var(--s3);
+    align-items: center;
     font-size: var(--text-sm);
+  }
+  .form.frozen, .grid.frozen { opacity: 0.6; }
+  .lab { color: var(--muted); }
+  .field {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s1);
+    min-width: 0;
+  }
+  .field.wrap { flex-wrap: wrap; gap: var(--s1) var(--s3); }
+  .field input[type="text"] {
+    width: 8ch;
+    font-family: var(--mono-family, monospace);
+  }
+  .add {
+    width: 10ch;
+  }
+  .opt {
+    display: inline-flex;
+    gap: var(--s1);
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  details.fold {
+    flex: 0 0 auto;
+    font-size: var(--text-sm);
+  }
+  details.fold summary {
+    cursor: pointer;
+    color: var(--muted);
     user-select: none;
+    padding: var(--s1) 0;
   }
 
   .grid {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 6px 0 2px;
+    gap: var(--s2);
+    padding: var(--s1) 0;
   }
-
-  /* the 409 is the server's; this is only its shadow on the pointer */
-  .grid.frozen {
-    opacity: 0.6;
-  }
-
-  /* rows of controls, so they are control-sized: a field's label rides with
-     the field rather than reading as prose about it */
-  .block {
+  .block, .row {
     display: flex;
-    gap: 6px;
+    gap: var(--s2);
     flex-wrap: wrap;
     align-items: center;
-    font-size: var(--text-sm);
   }
-
-  .lab {
-    color: var(--muted);
-    min-width: 108px;
-  }
-
-  .opt {
-    display: inline-flex;
-    gap: 3px;
-    align-items: center;
-    white-space: nowrap;
-  }
-
-  .sys {
-    display: inline-flex;
-    gap: 2px;
-    align-items: center;
-  }
-
-  .row {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    font-size: var(--text-sm);
-  }
-
+  .row { align-items: flex-end; }
   .num {
     display: inline-flex;
     flex-direction: column;
     gap: 1px;
     color: var(--muted);
   }
-
-  .num input[type="text"] {
-    width: 76px;
-    font: var(--mono);
+  .num input[type="text"] { width: 9ch; }
+  .num input[type="checkbox"] { align-self: flex-start; }
+  .tagged {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s1);
   }
 
-  .num input[type="checkbox"] {
-    align-self: flex-start;
-  }
-
-  .stream {
-    flex: 0 0 auto;
-  }
-
-  h2 {
-    margin: var(--s3) 0 var(--s1);
-  }
-
-  /* Each table gets a bounded window of its own rather than a share of the
-     section: as flex children with min-height 0, three stacked tables shrank
-     each other proportionally, and the 71-row extinction table came up as a
-     70 px sliver (measured). No shrink + a 45vh cap keeps a short table at
-     its content height, a long one at ~20 rows under its sticky header, and
-     the section's own scrollbar handles the rest. */
+  /* each table scrolls in a window of its own (WP-1032's measurement) */
   .scroll {
     overflow: auto;
     flex: 0 0 auto;
     max-height: 45vh;
   }
-
   table {
     border-collapse: collapse;
     font-size: var(--text-sm);
     width: 100%;
   }
-
-  /* `z-index` is the whole of WP-1032's reported "headings clash with the list
-     on scroll", and it is *not* the transparency the report guessed at: this
-     backdrop is opaque in both themes (measured #1e1e1e / #ffffff).  What puts a
-     row on top of it is `tr.out td { opacity: 0.55 }` two rules down — an
-     element with opacity < 1 paints as though it were positioned at z-index 0,
-     and `tbody` follows `thead` in tree order, so a *dimmed* row wins the tie
-     against a sticky header left at `z-index: auto`.  Which is why only the
-     excluded rows ever clashed, and why the fix belongs here rather than on the
-     rows: dimming a row is a statement about the row, not about paint order.
-     (Measured: `elementFromPoint` inside the header band returned the chip.) */
   th {
     text-align: left;
     font-weight: 600;
@@ -1110,110 +1283,76 @@ convention, not a measurement"
     z-index: 1;
     background: var(--panel);
   }
-
   td {
     padding: 1px 6px;
-    border-top: 1px solid var(--line);
     white-space: nowrap;
     vertical-align: top;
   }
-
-  tr.out td {
-    opacity: 0.55;
-  }
-
-  tr.best td {
-    background: color-mix(in srgb, var(--ok) 8%, transparent);
-  }
-
-  /* the hover link, both ways: this row and the plot's ring name one line */
-  tr.lit td {
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
-  }
-
-  /* The candidate table's own lit row is the overlay's ink, not the chrome
-     accent (WP-1210's rule): the row and the lines drawn from it are one
-     statement, and a reader has to be able to see that they are. */
+  th.r, td.r { text-align: right; }
+  td.ck, th.ck { width: 1.5em; padding-right: var(--s2); }
+  td.note { white-space: normal; }
+  /* a greyed row stays clickable: it is dimmed by colour, never by
+     pointer-events (round 11's fault) */
+  tr.out td { color: var(--muted); }
+  tr.lit td { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  tr.sel td { background: color-mix(in srgb, var(--accent) 18%, transparent); }
   .candidates tr.lit td {
     background: color-mix(in srgb, var(--plot-candidate) 16%, transparent);
   }
-
-  .pos {
-    padding: 0;
-    font: inherit;
-  }
-
-  /* a fact and the verb that acts on it, side by side: a chip is
-     non-interactive, so a control inside one would be two registers in one box */
-  .tagged {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--s1);
-  }
-
-  .flags {
-    display: flex;
-    gap: 3px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .strip {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    font-size: var(--text-sm);
-    flex: 0 0 auto;
-  }
-
-  /* the folded notes: a summary at control size, its count a chip */
-  details.notes {
-    flex: 0 0 auto;
-    font-size: var(--text-sm);
-  }
-
-  details.notes summary {
-    cursor: pointer;
-    color: var(--muted);
-    user-select: none;
-  }
-
-  /* numbers read down a column: the relative intensity right-aligns so its
-     decimals line up, as 2θ's fixed four places already do.  Not `.num`: that
-     is the search form's label (`display: inline-flex`), and a `td` wearing it
-     stops being a table cell — the browser wraps it and the flex `td.flags`
-     beside it into *one* anonymous cell, so the chips sat under the number in
-     a column headed by nothing (measured in Chrome, invisible to jsdom). */
-  .rel {
-    text-align: right;
-  }
-
-  .strip li {
-    padding: 1px 0;
-    color: var(--muted);
-  }
-
-  .strip li.warning { color: var(--warn); }
-  .strip li.error { color: var(--bad); }
-
-  /* a diagnostic's `where` is the part that names what was not reached */
-  .strip .where::before { content: " · "; }
-
-  .coverage p { margin: 0; }
-
-  /* the gate's sentence wraps under the grade, so a long caveat list makes
-     the row taller and never the table wider */
-  td.cell .why {
+  td.hi { color: var(--warn); }
+  td.on { color: var(--fg); }
+  .pos { font: inherit; }
+  td.cell { white-space: normal; min-width: 12em; }
+  td.cell .rel, td.cell .why {
     display: block;
     overflow-wrap: anywhere;
   }
-
+  .mark {
+    margin-left: var(--s2);
+    color: var(--accent);
+  }
   .acts {
     display: flex;
     gap: 2px;
     align-items: center;
   }
 
+  .coverage { flex: 0 0 auto; }
+  .coverage.short {
+    border-left: 2px solid var(--warn);
+    padding-left: var(--s2);
+  }
+  .coverage p { margin: 0; }
+  .strip {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: var(--text-sm);
+  }
+  .strip li { padding: 1px 0; color: var(--muted); }
+  .strip li.warning { color: var(--warn); }
+  .strip li.error { color: var(--bad); }
+  .strip .where::before { content: " · "; }
+
+  .cellline { margin: var(--s1) 0 0; }
+  p.rel { margin: 0; min-height: 1.4em; }
+  .caveats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s1) var(--s3);
+    margin: var(--s1) 0;
+    font-size: var(--text-sm);
+  }
+  .caveats .bad { color: var(--bad); }
+  dl.kv {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 2px var(--s3);
+    margin: var(--s1) 0;
+    font-size: var(--text-sm);
+  }
+  dl.kv dt { color: var(--muted); }
+  dl.kv dd { margin: 0; }
+  .sgs { flex-wrap: wrap; }
   p { margin: var(--s1) 0; }
-  td.cell { white-space: normal; min-width: 150px; }
 </style>
