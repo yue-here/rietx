@@ -29,6 +29,8 @@ redesign is ported in five pieces, in this order:
 | 3 | [2127](../wp/2127-the-plan-tab.md) | the Plan tab on the existing plan routes, read top to bottom as a recipe |
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
+| — | [2207](../wp/2207-the-status-bar.md) | the status bar along the window's foot: the console toggle at its left, the run state and Cancel moved out of the header |
+| — | [2206](../wp/2206-the-bottom-panel.md) | the bottom panel, toggled from the status bar: Console (the Python the window runs) and History, moved in from the model column |
 
 Every merge leaves a working GUI. No existing panel or route becomes unreachable at any piece;
 a panel moves into the new shell as it is, and is redesigned by its own piece.
@@ -50,8 +52,6 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 | Structure tab | The 3D structure as one of the graph tabs | 2026-11-07 |
 | Workflow menu | The top bar's workflow menu, with placeholders for peaks and indexing, series, structure solution and rigid bodies | 2026-11-07 |
 | Settings dialog | Theme, density and number format | 2026-11-07 |
-| Bottom panel | Console (the Python the window runs) and History (Compare, Restore), toggled from the status bar | 2026-11-07 |
-| Status bar | The bar along the window's foot, with the console toggle | 2026-11-07 |
 | Fixing plan stages | A plan stage that fixes as well as frees (WP-2127 records the ruling) | 2026-11-09 |
 | Edit recovery | Unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 |
 | Fit statistics in the action bar | Rwp, GoF and the not-a-fit chip beside Refine while the graphs are hidden ("try B"). WP-2123 left them hidden with the graphs (its item 6) | 2026-11-09 |
