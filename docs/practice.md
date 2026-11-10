@@ -1016,6 +1016,27 @@ a row of buttons. Only the Claude app drops to one column below a width; the mai
 that behaviour on 2026-11-07. The refinement programs offer no model for any of this: TOPAS works
 through a text editor, and FullProf's and GSAS-II's windows are fixed panes (recall).
 
+## Where a GUI keeps its secondary controls
+
+Gathered 2026-11-11 for WP-2214, the GUI rebuild's inventory, which gives every control of the
+old GUI a home in the new design. Every row is recall (from use, not re-read).
+
+| Program | Commands | An object's actions | Facts and live state | A plot's options and export |
+|---|---|---|---|---|
+| VS Code | a command palette holding every command with its key | a right-click menu on every item | the status bar: language mode, encoding and the Problems count on the right, each opening a menu or its panel | — |
+| Figma | a quick-actions search | a right-click menu on every object; a properties panel showing only what fits the selection | — | — |
+| Origin, Igor Pro | the menu bar | — | Origin's status bar reads the cursor's coordinates | a right-click menu on the plot (copy, export, axis options) and a plot-details dialog |
+| ImageJ, QGIS, GIMP | the menu bar | — | the status bar reads the pointer's coordinates and the value under it | — |
+| GraphPad Prism | the menu bar | — | — | a format dialog opened from the graph; the graph window shows only the graph |
+| GSAS-II 5.8.4 | the menu bar | a right-click menu on a plot for a few actions | — | — |
+| Gmail, GitHub | single-letter keys for frequent verbs; `?` lists them | — | — | — |
+| macOS | ⌘. cancels the operation in progress (Human Interface Guidelines) | — | — | — |
+
+The practice these add up to: the window shows the work and few controls. An object's actions
+sit on that object, behind a right-click or a selection. A command palette or a list of keys
+holds every command. The status bar carries facts about the document and the pointer. No
+refinement program draws its window this way, so the rebuild follows the desktop applications.
+
 ## The start screen and the New project flow
 
 Surveyed 2026-11-08 for the maintainer's round-9 GUI design and restated 2026-11-09 for WP-2131.
