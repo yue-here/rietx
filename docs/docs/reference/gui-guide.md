@@ -218,7 +218,9 @@ shows the preview's residual. The y range stays the last fit's, so a peak the
 preview grows runs off the top of its window. A comparison that rescaled with
 each drag would hide the change you are trying to see.
 
-Before any fit there is nothing to frame, and the tab says so.
+Before any fit there is nothing to frame, and the tab says so. While the
+`Peaks` tab is up, this graph shows the peak picker's group fits instead, under
+the title `Peak fits` (see [Fitting lines](#fitting-lines)).
 
 ```{image} ../screenshots/single-peaks-light.png
 :class: only-light
@@ -455,10 +457,29 @@ the preset menu included, while the cursor is outside a text field.
 
 ## Peaks
 
-Two jobs: fitting individual lines, and finding a cell when you have no
-structure.
+Finding a cell when you have no structure, in four steps across the top of the
+tab: `Pick peaks`, `Fit peaks`, `Index` and `Judge`. A step shows one view at a
+time, and choosing `Fit peaks` puts the `Single peaks` graph on the group fits.
 
 ### Picking lines
+
+Before the first pick the step offers the picker's three settings: a 2θ range,
+`Look for shoulders`, and `Flag Kβ and tungsten lines`. `Pick peaks` fits every
+line it can find and fills the table. Afterwards the settings sit under
+`Picking settings`, and picking again replaces the list. When you have added,
+moved or left out lines, it first says how many it replaces.
+
+The table lists 2θ, d, the intensity relative to the strongest measured line,
+and a note: who placed the line, then the fitter's flags in words, each one a
+click from its explanation. `All`, `Used` and `Not used` filter the rows. A row
+you tick or untick stays in the filtered list until you choose a filter again,
+so a tick never moves the table under the pointer. Click a 2θ to zoom the plot
+to that line.
+
+Each line the search uses has a lens above the pattern, standing just clear of
+the highest count near it. A line left out has no mark; its row is its route.
+Lines closer than a lens's width stack upward, so a duplicate never hides under
+its twin.
 
 The plot becomes an editing surface while this tab is up, and prints its four
 gestures across the top whenever it is:
@@ -479,18 +500,38 @@ at a whole-pattern view a drag is always a zoom. Zoom first, then
 correct. Before that radius existed, a drag starting near a marker could move a
 line by degrees.
 
-A line the fitter could not resolve is drawn differently rather than hidden, and
-the flag on its row says why. That is the fitter explaining the shape of a
-strong peak. A pasted position list carries the badge `σ assumed`, and its σ is a stated
+A pasted position list carries the badge `σ assumed`, and its σ is a stated
 assumption rather than a property of your data.
+
+### Fitting lines
+
+The picker fits overlapping lines together, one window per group. `Fit peaks`
+lists the groups `To look at`, or `All groups`, with each group's 2θ span, its
+number of lines, its reduced χ² and the fitter's flags. A group is worth a look
+when its reduced χ² is above 10, or when the fitter flagged the fit itself: a
+position at its bound, an unresolved shoulder or split, a capped width, a group
+it could not separate, or a Kα2 residual. Asymmetry alone does not count: on
+fluorapatite it is on 36 lines, so it picks out nothing. `↻` refits a group
+under the picker's own judgement.
+
+The graph shows six group windows, from the group you chose onward. Each draws
+the data, the group's fit, its background envelope, a mark per line and the
+residual in esd with the ±3 band. Every line's own curve is drawn under the sum
+as a tinted fill, and the numbered buttons over a window show or hide each one.
+The curves are the server's, and they add up to the group's fit.
 
 ### Indexing
 
-The `Search controls` disclosure is `ProjectDoc.indexing` as a form: which
-engines and crystal systems to search, centrings, a preset, bounds and budgets,
-and two editors for what you already know. Its vocabularies come from the
-build's own capabilities, so a fourth engine would appear here with no new
-control written.
+`Index` keeps three settings in view: the crystal systems to search, the
+largest cell volume, and a time limit. Each time limit is a search preset,
+named by its ceiling. `More settings` holds the rest of `ProjectDoc.indexing`:
+the engines, centrings, bounds and budgets, the formula and temperature, and two
+editors for what you already know. Its vocabularies come from the build's own
+capabilities, so a fourth engine would appear here with no new control written.
+
+While a search runs, the step lists each crystal system as waiting, searching
+or searched, the cells found so far, the time spent and the time left, and
+`Stop`.
 
 Three things to understand before reading an answer:
 
@@ -505,19 +546,14 @@ Three things to understand before reading an answer:
 - State what you already know. A prior cell or space group narrows the search
   honestly, where widening the tolerances does not.
 
-Beside the volume limits, `formula` takes the specimen's chemical formula and
-`temperature (K)` the temperature the pattern was measured at, and the project
-stores both. The temperature box waits for a formula, since a temperature only
-scales the formula's volumes. Emptying the formula box clears the temperature with it. A run with a formula adds a `Z` column to the
-candidate table: the formula units each cell's volume holds by Hofmann's average
-atomic volumes. Z moves no search and no rank. A correct inorganic cell reads
-0.4 to 0.9 of its true Z, so read it as a guide rather than a test.
-
-`Screen extinctions` lives in a candidate's expanded row: one row per extinction
-class, every space group in the class listed, and the reflections that refute it
-named. The teaching point is the package's own. The extinction symbol is what a
-powder measures, and a single space group out of a class is a convention you
-choose rather than a measurement the table made.
+`formula` takes the specimen's chemical formula and `temperature (K)` the
+temperature the pattern was measured at, and the project stores both. The
+temperature box waits for a formula, since a temperature only scales the
+formula's volumes. Emptying the formula box clears the temperature with it. A
+run with a formula adds a `Z` column to the candidate table: the formula units
+each cell's volume holds by Hofmann's average atomic volumes. Z moves no search
+and no rank. A correct inorganic cell reads 0.4 to 0.9 of its true Z, so read
+it as a guide rather than a test.
 
 Above the candidate table the panel says what the search covered: the crystal
 systems searched, the ones whose search did not finish, and every run-level
@@ -525,10 +561,33 @@ diagnostic with the systems it names. A run that stopped at its ceiling says
 which systems it never reached, so a short list there is not evidence that no
 cell exists in them.
 
+The table ranks every candidate in eight columns: the cell's free lengths and
+angles, the lattice, the volume, de Wolff's M₂₀, the lines it leaves unindexed,
+the predicted lines with no peak (of the lines screened), the Le Bail Rwp and the
+grade. A row that repeats another's cell, or that rietx checked as a supercell
+of one, says so under its cell. Selecting a row draws its predicted lines on the
+plot.
+
 `Adopt` turns a candidate into a Le Bail scaffold and flips the mode. Every row
-has it. The candidate `best_or_none()` picks wears that name as a badge. Every
-other row prints, under its grade, the sentence its adoption writes into the
+has it. The candidate `best_or_none()` picks is marked `rietx's pick`. Every
+other row prints, under its cell, the sentence its adoption writes into the
 history node's label: that it is not the gate's pick, its grade and its caveats.
+
+### Judging a candidate
+
+`Judge` shows one candidate at a time, with `‹` and `›` to step through the
+list: its cell with esds, its grade and caveats (a caveat that refutes the cell
+in red), the Le Bail check, every figure of merit with its blind spot a click
+away, and the engines that found it.
+
+`Screen extinctions` ranks the extinction classes the lattice allows by ΔBIC,
+with how many of each class's absences the data could test. A refuted class
+stays in the table, muted, with the reflections that refute it named. The
+teaching point is the package's own. The extinction symbol is what a powder
+measures, and a single space group out of a class is a convention you choose
+rather than a measurement the table made. Choosing a class offers its space
+groups, its representative first chosen, and `Adopt as a Le Bail start` adopts
+the candidate in the space group chosen.
 
 ## Model
 

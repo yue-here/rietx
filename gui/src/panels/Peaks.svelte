@@ -352,6 +352,8 @@
   }
   /** the candidate Judge shows: the one selected in Index */
   const judged = $derived(expanded);
+  /** a run with a formula adds Z, the formula units each cell holds (WP-2030) */
+  const zColumn = $derived(indexAnswer?.result?.formula != null);
   /** the two figures of merit the literature names by a symbol */
   const FOM_LABEL: Record<string, string> = { m20: "M₂₀", f_n: "F_N" };
   const caveatWords = (c: Candidate) =>
@@ -762,6 +764,7 @@
               <thead>
                 <tr>
                   <th class="r">#</th><th>Cell</th><th>Lattice</th><th class="r">V (Å³)</th>
+                  {#if zColumn}<th class="r"><Help for="search_fields:formula">Z</Help></th>{/if}
                   <th class="r">M₂₀</th><th class="r">Unindexed</th>
                   <th class="r">Absent</th><th class="r">Rwp</th><th>Grade</th><th></th>
                 </tr>
@@ -789,6 +792,8 @@
                     </td>
                     <td>{c.system} {c.centring}</td>
                     <td class="r">{c.volume.toFixed(0)}</td>
+                    {#if zColumn}<td class="r">{c.formula_units == null ? "–"
+                      : c.formula_units.toFixed(2)}</td>{/if}
                     <td class="r">{m20 === null ? "–" : m20.toFixed(1)}</td>
                     <td class="r">{unindexedOf(c)}</td>
                     <td class="r">{#if ab}{ab.absent} <span class="muted">of {ab.of}</span>{:else}–{/if}</td>
