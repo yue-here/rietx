@@ -33,11 +33,35 @@ redesign is ported in five pieces, in this order:
 Every merge leaves a working GUI. No existing panel or route becomes unreachable at any piece;
 a panel moves into the new shell as it is, and is redesigned by its own piece.
 
-Three decisions wait on the maintainer before the piece that needs them:
+Every piece is judged against `gui/STYLE.md`, the style guide WP-2142 writes. The maintainer
+ruled on 2026-11-09 for "a consistent style that hews very close to the workshop version",
+achieved through a concise guide that states each rule's motive, so a piece completes what the
+prototype left unfinished by the guide rather than by copying the prototype.
+
+### Designed, not yet filed
+
+The design rounds drew these and no WP builds them yet. Each is filed when its turn comes.
+
+| Piece | What it builds | Ruled |
+|---|---|---|
+| The palette | The site's palette as the default theme: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Theme machinery in Settings for established themes (Solarized light and dark, Monokai and others) | 2026-11-06, 2026-11-09 |
+| Sentence-case headings | One `app.css` rule at the start screen's register, app-wide | 2026-11-09 |
+| Peaks and indexing | The redesign in four steps (pick peaks, fit peaks, index, judge), the eight-column candidate table, lens peak marks, per-line curves in the fit windows | 2026-11-08, 2026-11-09 |
+| Structure tab | The 3D structure as one of the graph tabs | 2026-11-07 |
+| Workflow menu | The top bar's workflow menu, with placeholders for peaks and indexing, series, structure solution and rigid bodies | 2026-11-07 |
+| Settings dialog | Theme, density and number format | 2026-11-07 |
+| Bottom panel | Console (the Python the window runs) and History (Compare, Restore), toggled from the status bar | 2026-11-07 |
+| Status bar | The bar along the window's foot, with the console toggle | 2026-11-07 |
+| Fixing plan stages | A plan stage that fixes as well as frees (WP-2127 records the ruling) | 2026-11-09 |
+| Edit recovery | Unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 |
+| Fit statistics in the action bar | Rwp and GoF beside Refine while the graphs are hidden ("try B") | 2026-11-09 |
+
+Three decisions went to the maintainer before the piece that needs them. The first is now ruled, and two still wait:
 
 - A plan stage that fixes as well as frees. The maintainer wants it (2026-11-07); in rietx it is
   a `turn_off` list on `StageSpec` and a `fix` clause in `.rxt`, both stored-format changes, so
-  piece 3 asks for the go-ahead in its WP.
+  piece 3 asks for the go-ahead in its WP. Ruled required on 2026-11-09, the mechanism left to
+  Claude; the build is the "Fixing plan stages" row above.
 - A background drawn through points the user places. rietx has no such background type; a new
   one is a stored-format change.
 - A text file kept beside the project, which the maintainer deferred to the port on 2026-11-07.
@@ -65,7 +89,7 @@ the piece that touches it or a WP of its own.
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
 - `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
-- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer.
+- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits.
 - The pick route takes only `shoulders`; the 2θ range and `flag_contamination` need to reach it.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08.
@@ -95,3 +119,5 @@ when all are met on one tree.
 | 8 | The plan reads top to bottom as a recipe, on the existing plan routes | 3 | a browser pass over a five-stage plan |
 | 9 | A preview is drawn at the last fit's scale and never moves the comparison | 4 | the preview route's timing and a browser pass |
 | 10 | The maintainer has looked at each piece on screen before its merge | every piece | the PR's review |
+| 11 | Where the prototype drew a panel fully, the piece's PR puts its screenshot beside the prototype's at the same window size (ruled 2026-11-09) | every piece after WP-2142 | a review aid in the PR, not a pixel test |
+| 12 | Every rule in `gui/STYLE.md` names its motive and who stated it, and names only tokens and tests that exist | 2142, then every piece | `tests/test_gui_style_guide.py` |
