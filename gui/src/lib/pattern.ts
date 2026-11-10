@@ -84,6 +84,10 @@ export interface Overlay {
   held: Window | null;
 }
 
+/** A pane's plot area in CSS px from the top of the chart's host. */
+export interface PaneBox { top: number; height: number }
+export type Geometry = Record<"main" | "ticks" | "resid", PaneBox>;
+
 export interface ChartOptions {
   scale: Scale;
   kind: ResidualKind;
@@ -131,9 +135,10 @@ export class PatternChart {
       rawResidual: () => this.groupResidual(),
       layers: {
         main: { under: [shade, (u) => this.candidateLines(u)],
-                over: [(u) => this.previewLines(u), (u) => this.peakFit(u), (u) => this.peakMarkers(u), (u) => this.placeRing(u)] },
-        ticks: { under: [shade] },
-        resid: { under: [shade] },
+                over: [(u) => this.previewLines(u), (u) => this.peakFit(u), (u) => this.peakMarkers(u), (u) => this.placeRing(u),
+                       () => this.laidOut()] },
+        ticks: { under: [shade], over: [() => this.laidOut()] },
+        resid: { under: [shade], over: [() => this.laidOut()] },
       },
     });
   }
@@ -237,6 +242,36 @@ export class PatternChart {
 
   destroy(): void {
     this.fig.destroy();
+  }
+
+  /** Called with the panes' plot areas after a draw moved them (WP-2213). */
+  onlayout: ((g: Geometry) => void) | null = null;
+  private layoutAsked = false;
+
+  /**
+   * Each pane's plot area, in CSS px from the top of the host, and the tick
+   * band's rows. The legend beside the plot reads it, so a label sits by the
+   * pane its curve is drawn in, and a resize or a scale switch (a new pane,
+   * `rxplot` finding 5) moves the labels with the panes.
+   */
+  geometry(): Geometry {
+    const dpr = devicePixelRatio, out = {} as Geometry;
+    for (const key of ["main", "ticks", "resid"] as const) {
+      const u = this.fig.panes[key];
+      out[key] = { top: (u.root as HTMLElement).offsetTop + u.bbox.top / dpr,
+                   height: u.bbox.height / dpr };
+    }
+    return out;
+  }
+
+  /** One report a frame, however many panes drew in it. */
+  private laidOut(): void {
+    if (this.layoutAsked || !this.onlayout) return;
+    this.layoutAsked = true;
+    requestAnimationFrame(() => {
+      this.layoutAsked = false;
+      if (this.fig) this.onlayout?.(this.geometry());
+    });
   }
 
   // -- layers -----------------------------------------------------------

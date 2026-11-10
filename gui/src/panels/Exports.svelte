@@ -1,23 +1,11 @@
 <script lang="ts">
   /**
-   * A figure's four exports (WP-1461, D6): a PNG and an SVG file, the picture
-   * on the clipboard, and what is in view as tab-separated columns. The chart
-   * module does the work (`png`, `svg`, `copyImage`, `tsv`), each on the
-   * figure as drawn now, at the reader's zoom. This is its place in a control
-   * row, and the line beside it says what happened, a refusal included, since
-   * a clipboard can refuse.
-   *
-   * Nothing here is imported at boot. The chart module is a chunk the first
-   * draw fetches, and a static import here put it on the boot path, so
-   * `download` comes from it on a press, when a figure has already loaded it.
-   * svgcanvas is imported on the first SVG, a chunk that a session which never
-   * exports never fetches.
+   * A figure's four exports as a row of buttons, for the Series panel
+   * (WP-1461, D6). The work is `lib/exports.ts`, which the Pattern tab's view
+   * menu calls too (WP-2213); the line beside the buttons says what happened.
    */
   import type { Group } from "rxplot";
-
-  async function download(blob: Blob, file: string): Promise<void> {
-    (await import("rxplot")).download(blob, file);
-  }
+  import { exportFigure, type ExportKind } from "../lib/exports";
 
   let { figure, name }: {
     /** the figure on screen, or null before one is drawn */
@@ -28,37 +16,13 @@
 
   let said = $state("");
 
-  async function act(label: string, run: (fig: Group) => Promise<string>): Promise<void> {
-    const fig = figure();
-    if (!fig) {
-      said = "nothing is drawn yet";
-      return;
-    }
-    try {
-      said = await run(fig);
-    } catch (e) {
-      said = `${label} failed: ${(e as Error).message}`;
-    }
-  }
-
-  const png = () => act("PNG", async (fig) => {
-    await download(await fig.png(), `${name()}.png`);
-    return "saved a PNG";
-  });
-  const svg = () => act("SVG", async (fig) => {
-    const text = await fig.svg(() => import("svgcanvas"));
-    await download(new Blob([text], { type: "image/svg+xml" }), `${name()}.svg`);
-    return "saved an SVG";
-  });
-  const image = () => act("copy image", async (fig) => {
-    await fig.copyImage();
-    return "copied the figure";
-  });
-  const data = () => act("copy data", async (fig) => {
-    const text = fig.tsv();
-    await navigator.clipboard.writeText(text);
-    return `copied ${text.split("\n").length - 1} rows`;
-  });
+  const act = (kind: ExportKind) => async () => {
+    said = await exportFigure(kind, figure(), name());
+  };
+  const png = act("png");
+  const svg = act("svg");
+  const image = act("image");
+  const data = act("data");
 </script>
 
 <div class="exports" role="group" aria-label="export">

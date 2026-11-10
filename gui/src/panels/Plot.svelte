@@ -19,7 +19,9 @@
   import { untrack } from "svelte";
 
   import { ApiError } from "../api";
-  import Exports from "./Exports.svelte";
+  import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
+  import { EXPORTS, exportFigure, type ExportKind } from "../lib/exports";
+  import { portal } from "../lib/portal";
   import { grabToleranceDeg, nearestPeak, type PeaksPayload } from "../lib/peaks";
   import {
     RESIDUAL_KINDS,
@@ -41,7 +43,7 @@
     type Scale,
     type Window,
   } from "../lib/plot";
-  import type { Curves, Overlay, PatternChart } from "../lib/pattern";
+  import type { Curves, Geometry, Overlay, PatternChart } from "../lib/pattern";
   import type { Theme } from "../lib/theme";
   import type { PreviewAnswer } from "../lib/interactive";
 
@@ -70,7 +72,13 @@
     onprotocol = () => {},
     preview = null,
     oncurves = () => {},
+    bar = null,
+    active = true,
   }: {
+    /** the shell's title line, where this tab's view controls are drawn (WP-2213) */
+    bar?: HTMLElement | null;
+    /** this is the graph tab on screen, so its controls show on the title line */
+    active?: boolean;
     result: any;
     plotKey: number;
     /** a 2θ window another panel asked for (a report region, an unindexed peak);
@@ -326,7 +334,10 @@
         scale: untrack(() => scale),
         kind: untrack(() => kind),
         labels: {
-          y: () => (scale === "linear" ? "intensity" : `intensity (${scale})`),
+          // no title: the Intensity control on the title line says the scale,
+          // and the prototype draws none (WP-2213, the 2026-11-10 ruling on
+          // text that serves no decision)
+          y: () => "",
           // an axis title names what is plotted: on the raw view that is each
           // peak group's own residual, since there is no model to take one from,
           // and nothing where that residual is not drawn (`PatternChart.groupResidual`)
@@ -339,6 +350,7 @@
       chart.fig.onCursor = (hit) => hovering(hit ? hit.x : null);
       chart.fig.onSelect = (lo, hi) => { if (arm) selected(lo, hi); };
       chart.fig.setMode(arm ? "select" : "zoom");
+      chart.onlayout = laidOut;
       const p = untrack(() => preview);
       if (p) chart.setPreview(p.curves);
     } else {
@@ -530,29 +542,232 @@
   /** A pattern to draw before any fit, as a boolean so a peak edit is not a change. */
   const hasPattern = $derived(!!peaks?.pattern?.two_theta?.length);
 
-  // -- the typed route (WP-1033) -------------------------------------
-  // Empty means "no limit", which is why the placeholder is the measured
-  // extent rather than a zero: a blank box says the whole pattern is fitted,
-  // and that is also what `limits none` means in the .rxt document.
+  // -- the protocol as objects on the plot (WP-1033, WP-2213) ----------
+  /**
+   * The fitted range and each excluded region are objects on the plot, as the
+   * interaction rules make every placed thing (adopted 2026-11-08): a click on
+   * a band selects it, and a bar over the band edits it, with typed bounds,
+   * the fitted-channel count and Delete. Esc, × or a click elsewhere closes it.
+   * The shading stays whatever is selected (rule 4: a left-out region's
+   * position is the information).
+   *
+   * A selection is an index into `protocol.regions`, so it is dropped whenever
+   * the protocol moves: an index into a list that changed is a different band.
+   */
+  type Selection = { kind: "region"; index: number } | { kind: "limits" };
+  let sel = $state<Selection | null>(null);
   let loText = $state("");
   let hiText = $state("");
   $effect(() => {
     void protocolKey;
-    loText = protocol.limits ? String(protocol.limits[0]) : "";
-    hiText = protocol.limits ? String(protocol.limits[1]) : "";
+    untrack(() => (sel = null));
   });
 
-  /** Send the typed range. A half-filled or unparseable pair is sent as it
+  /** What a click at 2θ `tt` lands on: an excluded region, the shading
+   *  outside the fitted range, or nothing. Regions first, since one can sit
+   *  inside the outer shading's edge. */
+  function bandAt(tt: number): Selection | null {
+    const i = protocol.regions.findIndex(([a, b]) => tt >= Math.min(a, b) && tt <= Math.max(a, b));
+    if (i >= 0) return { kind: "region", index: i };
+    const lim = protocol.limits;
+    if (lim && extent && tt >= extent[0] && tt <= extent[1] && (tt < lim[0] || tt > lim[1])) {
+      return { kind: "limits" };
+    }
+    return null;
+  }
+
+  /** The selected object's bounds: a region's own, or the fitted range's. */
+  function boundsOf(s: Selection): [number, number] | null {
+    if (s.kind === "limits") return protocol.limits;
+    return protocol.regions[s.index] ?? null;
+  }
+
+  function select(s: Selection | null) {
+    sel = s;
+    const b = s && boundsOf(s);
+    loText = b ? String(b[0]) : "";
+    hiText = b ? String(b[1]) : "";
+  }
+
+  /** Send the typed bounds. A half-filled or unparseable pair is sent as it
    *  reads and refused by the document's own validator — this client has no
    *  opinion about validity, which is WP-1013's rule for the text pane and the
    *  same rule here: two validators would be two answers. */
-  function applyLimits() {
-    if (!loText.trim() && !hiText.trim()) {
-      onprotocol({ two_theta_limits: null });
+  function applyBounds() {
+    if (!sel) return;
+    const num = (text: string) => (text.trim() === "" ? NaN : Number(text));
+    const pair: [number, number] = [num(loText), num(hiText)];
+    if (sel.kind === "limits") {
+      onprotocol({ two_theta_limits: !loText.trim() && !hiText.trim() ? null : pair });
+    } else {
+      const i = sel.index;
+      onprotocol({ excluded_regions: protocol.regions.map((r, k) => (k === i ? pair : r)) });
+    }
+  }
+
+  /** Delete the selection: a region stops being excluded, the range is the whole pattern again. */
+  function removeSelected() {
+    const s = sel;
+    sel = null;
+    if (!s) return;
+    if (s.kind === "limits") onprotocol({ two_theta_limits: null });
+    else onprotocol({ excluded_regions: protocol.regions.filter((_, k) => k !== s.index) });
+  }
+
+  /** The bar's left edge in px from the figure's left, centred on the band and
+   *  kept inside the plot. Read from the chart, so it follows a zoom. */
+  const barLeft = $derived.by(() => {
+    void geom;
+    const b = sel && boundsOf(sel);
+    if (!b || !chart) return null;
+    const u = chart.fig.panes.main;
+    const lo = Math.max(b[0], u.scales.x.min), hi = Math.min(b[1], u.scales.x.max);
+    const mid = lo < hi ? (lo + hi) / 2 : (b[0] + b[1]) / 2;
+    return (u.over as HTMLElement).offsetLeft + u.valToPos(mid, "x");
+  });
+
+  // -- the legend (WP-2213) --------------------------------------------
+  /**
+   * The curves are switched from their labels in a gutter right of the plot,
+   * each beside the pane its curve is drawn in, as the prototype draws them
+   * (the maintainer's fourth review, 2026-11-07, "every curve and the data can
+   * be hidden and shown"; `gui/STYLE.md` § Plots). The panes' positions come
+   * from the chart after each draw, so a resize or a scale switch moves the
+   * labels with them.
+   */
+  let geom = $state<Geometry | null>(null);
+  /** whether the view is narrower than the whole pattern, which is when Show all acts */
+  let zoomed = $state(false);
+
+  function laidOut(g: Geometry) {
+    if (JSON.stringify(g) !== JSON.stringify(geom)) geom = g;
+    const u = chart?.fig.panes.main, tt = curves?.arrays.two_theta;
+    zoomed = !!(u && tt && tt.length
+      && (u.scales.x.min > tt[0] + 1e-9 || u.scales.x.max < tt[tt.length - 1] - 1e-9));
+  }
+
+  /** The swatch each curve wears in the legend, in the ink the chart paints it. */
+  type Swatch = { shape: "dot" | "line" | "dash" | "tick" | "ring"; ink: string; faint?: boolean };
+  function swatchOf(id: string, phaseRow: number, phases: number): Swatch {
+    if (id === "obs") return { shape: "dot", ink: "var(--plot-obs)" };
+    if (id === "masked") return { shape: "dot", ink: "var(--muted)", faint: true };
+    if (id === "calc") return { shape: "line", ink: "var(--plot-calc)" };
+    if (id === "bkg") return { shape: "dash", ink: "var(--plot-bkg)" };
+    if (id === "diff") return { shape: "line", ink: "var(--plot-diff)" };
+    if (id === "peaks") return { shape: "ring", ink: "var(--plot-peak)" };
+    if (id === "peakfit") return { shape: "dash", ink: "var(--plot-peakfit)" };
+    // a single phase's ticks are neutral ink (`rxplot.phaseInk`)
+    return { shape: "tick", ink: phases <= 1 ? "var(--plot-obs)" : `var(--phase-${phaseRow % 4})` };
+  }
+
+  /** Each label's place: the main pane's stacked from its top, the residual's
+   *  at its middle, a phase's at its tick row. Null until the chart has drawn. */
+  const legend = $derived.by(() => {
+    if (!geom) return [];
+    const phases = toggles.filter((t) => t.id.startsWith("ticks:"));
+    const row = geom.ticks.height / Math.max(1, phases.length);
+    let k = 0;
+    return toggles.map((t) => {
+      let top: number;
+      if (t.id === "diff") top = geom!.resid.top + geom!.resid.height / 2 - 10;
+      else if (t.id.startsWith("ticks:")) {
+        const r = phases.indexOf(t);
+        top = geom!.ticks.top + (r + 0.5) * row - 10;
+        return { ...t, top, swatch: swatchOf(t.id, r, phases.length) };
+      } else top = geom!.main.top + 2 + 22 * k++;
+      return { ...t, top, swatch: swatchOf(t.id, 0, phases.length) };
+    });
+  });
+
+  // -- the view menu and the context menu (WP-2213) ---------------------
+  /**
+   * The rarer view controls, one menu away: the residual, data only, the
+   * protocol's routes and the exports. The maintainer asked on 2026-11-10 for
+   * "concealing a lot of these cluttered buttons"; the prototype draws none of
+   * them on the graph. Right-click on the plot opens the protocol's half, with
+   * the band under the pointer's own actions first (interaction rule 12).
+   */
+  let menu = $state<{ at: MenuAt; entries: MenuEntry[]; label: string } | null>(null);
+  let moreEl: HTMLButtonElement | undefined = $state();
+
+  const RESIDUAL_WORDS: Record<ResidualKind, string> = {
+    weighted: "Difference as Δ/σ", delta: "Difference as Δ", cumulative: "Difference as cumulative χ²",
+  };
+
+  function protocolEntries(): MenuEntry[] {
+    return [
+      { id: "arm:exclude", label: "Exclude a region…", disabled: busy || !extent,
+        title: "then drag across the plot; Esc cancels" },
+      { id: "arm:limits", label: "Set the fitted range…", disabled: busy || !extent,
+        title: "then drag across the plot; Esc cancels" },
+      { id: "limits:all", label: "Fit the whole pattern", disabled: busy || !protocol.limits,
+        title: "fit every measured channel again" },
+    ];
+  }
+
+  function moreEntries(): MenuEntry[] {
+    const fit = !!held && !held.raw;
+    return [
+      ...RESIDUAL_KINDS.map((r) => ({ id: `kind:${r.id}`, label: RESIDUAL_WORDS[r.id],
+        checked: kind === r.id, radio: true, disabled: !fit, title: r.title })),
+      "-",
+      { id: "dataonly", label: "Show the data only", checked: dataOnly,
+        disabled: toggles.length <= 1, title: "hide every curve but the measured points" },
+      "-",
+      ...protocolEntries(),
+      "-",
+      ...EXPORTS.map((e) => ({ id: `export:${e.id}`, label: e.label, title: e.title })),
+    ];
+  }
+
+  function openMore() {
+    if (menu) { menu = null; return; }
+    const r = moreEl!.getBoundingClientRect();
+    menu = { at: { x: r.right, y: r.bottom + 4, align: "right" }, entries: moreEntries(),
+             label: "Pattern view" };
+  }
+
+  /** What a menu row does. The checkbox row stays open, so its entries are rebuilt. */
+  function choose(id: string) {
+    if (id.startsWith("kind:")) kind = id.slice(5) as ResidualKind;
+    else if (id === "dataonly") {
+      showDataOnly();
+      if (menu) menu = { ...menu, entries: moreEntries() };
+    }
+    else if (id === "arm:exclude" || id === "arm:limits") { sel = null; arm = id === "arm:exclude" ? "exclude" : "limits"; }
+    else if (id === "limits:all") onprotocol({ two_theta_limits: null });
+    else if (id === "band:edit" && ctxBand) select(ctxBand);
+    else if (id === "band:delete" && ctxBand) { sel = ctxBand; removeSelected(); }
+    else if (id.startsWith("export:")) void exportAs(id.slice(7) as ExportKind);
+  }
+
+  /** The band a context menu was opened on, for its own rows. */
+  let ctxBand: Selection | null = null;
+
+  // -- notes over the plot -----------------------------------------------
+  /** What the last export said, shown over the plot for a moment: a line of
+   *  its own would move the layout (principle 4). */
+  let said = $state("");
+  let saidTimer: ReturnType<typeof setTimeout> | undefined;
+
+  async function exportAs(which: ExportKind) {
+    const line = await exportFigure(which, chart?.fig ?? null, "pattern");
+    said = line;
+    clearTimeout(saidTimer);
+    saidTimer = setTimeout(() => (said = ""), 2500);
+  }
+
+  function keydown(ev: KeyboardEvent) {
+    if (ev.key === "Escape") {
+      if (arm) arm = null;
+      else if (sel && !menu) sel = null;
       return;
     }
-    const num = (text: string) => (text.trim() === "" ? NaN : Number(text));
-    onprotocol({ two_theta_limits: [num(loText), num(hiText)] });
+    const typing = (ev.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable]");
+    if (sel && !typing && (ev.key === "Delete" || ev.key === "Backspace")) {
+      ev.preventDefault();
+      removeSelected();
+    }
   }
 
   /** The `zoom` prop this panel has already acted on, by **identity**.

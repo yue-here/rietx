@@ -278,24 +278,24 @@ export function curveToggles(w: Window,
                              residualLabel = "Δ",
                              layer?: PeakLayer | null): CurveToggle[] {
   const out: CurveToggle[] = [
-    { id: "obs", label: "obs", title: "the measured points" },
+    { id: "obs", label: "Observed", title: "the measured points" },
   ];
   if (w.excluded?.two_theta?.length) {
     // a *curve* toggle for the excluded points, not for the shading: hiding
     // them is a drawing choice, while the region itself is protocol and is
     // switched off only by removing it (WP-1033)
-    out.push({ id: "masked", label: "masked",
+    out.push({ id: "masked", label: "Excluded",
       title: "the measured points outside the fit range or inside an excluded "
         + "region — drawn recessively, and in no residual" });
   }
   if (!w.raw) {
-    out.push({ id: "calc", label: "calc", title: "the model" });
+    out.push({ id: "calc", label: "Last fit", title: "the model" });
     if (w.y_background?.length) {
-      out.push({ id: "bkg", label: "bkg", title: "the background, drawn additively — "
+      out.push({ id: "bkg", label: "Background", title: "the background, drawn additively — "
         + "it is held or co-refined, never subtracted from the data" });
     }
-    out.push({ id: "diff", label: residualLabel,
-      title: "the residual in the lower panel" });
+    out.push({ id: "diff", label: "Difference",
+      title: `the residual in the lower panel, as ${residualLabel}` });
     for (const phase of Object.keys(w.ticks ?? {})) {
       out.push({ id: `ticks:${phase}`, label: phase,
         title: `reflection positions for ${phase} — every emission line, `
@@ -309,11 +309,11 @@ export function curveToggles(w: Window,
       ? undefined
       : "drawn on the Peaks tab, where a marker can be moved, excluded or "
         + "removed — a click on this plot means something else here";
-    out.push({ id: "peaks", label: "peaks", absent,
+    out.push({ id: "peaks", label: "Peaks", absent,
       title: "the picked lines, at the measured intensity under each position — "
         + "hollow where the line is not used" });
     if (layer.groups) {
-      out.push({ id: "peakfit", label: "peak fit", absent,
+      out.push({ id: "peakfit", label: "Peak fit", absent,
         title: "the profile fitted to each group of picked lines, dashed — it is "
           + "what the positions were measured from, not the refined model" });
     }
@@ -375,10 +375,10 @@ export const RESIDUAL_KINDS: { id: ResidualKind; label: string; title: string }[
 ];
 
 export const SCALES: { id: Scale; label: string; title: string }[] = [
-  { id: "linear", label: "lin", title: "intensity as measured" },
-  { id: "sqrt", label: "√", title: "square root — the weak peaks a strong one hides, "
+  { id: "linear", label: "Linear", title: "intensity as measured" },
+  { id: "sqrt", label: "Square root", title: "square root — the weak peaks a strong one hides, "
     + "with the axis still labelled in intensity" },
-  { id: "log", label: "log", title: "logarithmic; non-positive points are not drawable "
+  { id: "log", label: "Log", title: "logarithmic; non-positive points are not drawable "
     + "and are dropped" },
 ];
 
