@@ -2105,6 +2105,154 @@ FINDINGS_IN_EVERY_VIEW = frozenset({
     "PARAMETRIC_FORM_REJECTED", "STAGE_PATH_UNKNOWN"})
 
 
+class ReflectionOutside(Base):
+    """One reflection the fitted model put at or past a cut (WP-2075).
+
+    ``line`` is the emission line's index (0 the primary), ``fwhm`` the
+    reflection's combined FWHM at the answer (° 2θ) and ``fraction_outside``
+    the share of its profile area that lies in the unfitted span.  The
+    fraction is read off the peak's **symmetric** TCH pseudo-Voigt (Γ, η) at
+    the answer, :meth:`~rietx.model.forward.CompiledModel.peak_gamma_eta`'s
+    reading: an axial-divergence asymmetry is not in it, so a low-angle
+    reflection's tail on its low side is understated.
+    """
+
+    phase: str
+    hkl: list[int]
+    line: int = 0
+    two_theta: float
+    fwhm: float
+    fraction_outside: float
+
+
+class OutsideSpan(Base):
+    """One contiguous stretch of the file's channels that the fit left out
+    (WP-2075), and what lies in it.
+
+    ``kind`` says why: ``"below"`` runs from the file's first channel to the
+    fitted range's start, ``"above"`` from its end to the file's last channel,
+    and ``"excluded"`` is a stretch with fitted channels on both sides.  A
+    range end and an excluded region that touch are one span, because the
+    channels they leave out are one stretch.  ``lo``/``hi`` are its first and
+    last channels (° 2θ), ``n_points`` its channel count and ``count_share``
+    the share of the file's summed intensity it holds.
+
+    The rest are facts about the data and the cut, with no null and no
+    threshold; nothing reads them to decide anything.  Each ratio divides by
+    the median observed intensity over the fitted channels:
+
+    * ``level_ratio``: the span's median, over the whole span;
+    * ``level_ratio_at_cut``: the median of the span's channels within
+      :data:`~rietx.report.fit_range.CUT_WINDOW_DEG` of the cut, and
+      ``level_ratio_far``: the same at the span's other end (a range end's
+      span only; ``None`` on an excluded band, which has a cut at each end);
+    * ``slope_at_cut``: the least-squares slope of the observed intensity over
+      that window, per degree, as a fraction of the window's mean, signed so
+      that positive rises away from the fitted range;
+    * ``background_slope_at_cut``: the fitted background's slope over the
+      same width *inside* the fitted range, in the same units and sign, so the
+      two say whether the background was heading where the data outside go;
+    * ``peak_two_theta`` / ``peak_sigma``: the span's largest excess over the
+      rolling low-quantile envelope
+      (:func:`~rietx.background.diagnostics.background_envelope`), in σ, and
+      where it is.  A location, not a detection: the envelope is a low
+      quantile and sits under the background, and the largest of N channels
+      exceeds any one, so a featureless span still reads several σ here;
+      compare spans, or read the value against the same number inside the
+      fitted range, never against a fixed bar;
+    * ``reflections``: every reflection the fitted model generated with its
+      centre in the span or within
+      :data:`~rietx.report.fit_range.STRADDLE_FWHM` FWHM of a cut, with the
+      share of its profile in the span.  The list ignores intensity, and a
+      declared sharp peak (``PeakComponent``) is not in it.
+      ``reflections_searched`` is the part of the span the model's reflection
+      list covers, approximately (the generation window is a Bragg angle at
+      the shortest line): every interior band, but past a range end only the
+      model's generation margin, so an empty list beyond it says nothing about
+      reflections further out.
+
+    A fact the span cannot give is ``None``: a window holding fewer than two
+    channels, or a fit with no compiled model behind it.
+    """
+
+    kind: Literal["below", "above", "excluded"]
+    lo: float
+    hi: float
+    n_points: int
+    count_share: float
+    level_ratio: float | None = None
+    level_ratio_at_cut: float | None = None
+    level_ratio_far: float | None = None
+    slope_at_cut: float | None = None
+    background_slope_at_cut: float | None = None
+    peak_two_theta: float | None = None
+    peak_sigma: float | None = None
+    reflections: list[ReflectionOutside] = Field(default_factory=list)
+    reflections_searched: tuple[float, float] | None = None
+
+
+class FitRange(Base):
+    """Which part of its file a fit fitted (WP-2075, issue #1219).
+
+    The caller's own act, restated: the file's range and point count
+    (``file_range``, ``n_file``), the 2θ limits asked for
+    (``limits_requested``, the ``two_theta_limits`` handed to ``fit``) and the
+    span they left after clipping to the file (``limits_applied``), the
+    excluded regions on the pattern (``excluded_declared``) and those that
+    removed a channel the limits kept (``excluded_applied``, each clipped to
+    the limits), the first and last fitted channel (``fitted_range``) with the
+    count of fitted channels (``n_fitted``, equal to ``len(result.two_theta)``),
+    and the summed observed intensity in the file and in the fitted channels.
+
+    ``cut_window_deg`` and ``straddle_fwhm`` are the two reporting widths
+    the spans' facts were read with (``None`` where nothing was cut, or no
+    reflection list was at hand), so a stored result says what "at the cut"
+    meant when it was written.
+
+    ``outside`` holds one :class:`OutsideSpan` per stretch the fit left out:
+    empty when nothing was cut, which is the one case where ``fitted_range``
+    equals ``file_range`` with nothing else to say.  Before WP-2075 a result
+    said none of this: the fitted ends could be read off ``two_theta``, but
+    not that a cut happened or what it removed.
+
+    Every angle is in degrees 2θ (``fit`` is a 2θ-only entry).  ``None`` on
+    the result for anything not built by :meth:`Refinement.fit
+    <rietx.refine.Refinement.fit>` or ``run_stage``: a joint multi-histogram
+    fit, a replay, a result written before schema 0.61.
+    """
+
+    file_range: tuple[float, float]
+    n_file: int
+    limits_requested: tuple[float, float] | None = None
+    limits_applied: tuple[float, float] | None = None
+    excluded_declared: list[tuple[float, float]] = Field(default_factory=list)
+    excluded_applied: list[tuple[float, float]] = Field(default_factory=list)
+    fitted_range: tuple[float, float]
+    n_fitted: int
+    counts_file: float
+    counts_fitted: float
+    outside: list[OutsideSpan] = Field(default_factory=list)
+    cut_window_deg: float | None = None
+    straddle_fwhm: float | None = None
+
+    @property
+    def count_share_outside(self) -> float:
+        """The share of the file's summed intensity the fit left out."""
+        return float(sum(s.count_share for s in self.outside))
+
+    def line(self) -> str:
+        """The one protocol line ``Refinement.summary()`` prints."""
+        lo, hi = self.fitted_range
+        flo, fhi = self.file_range
+        text = (f"fit range: {lo:.2f}-{hi:.2f}° of the file's {flo:.2f}-{fhi:.2f}° "
+                f"({self.n_fitted} of {self.n_file} points)")
+        if self.outside:
+            text += (f"; {100.0 * self.count_share_outside:.1f} % of the file's "
+                     f"counts outside, in {len(self.outside)} span"
+                     f"{'s' if len(self.outside) > 1 else ''}")
+        return text
+
+
 def _names_histogram(d: Diagnostic, h: int) -> bool:
     """Whether a joint result's top-level finding belongs in histogram
     ``h``'s view (:meth:`RefinementResult.for_histogram`, WP-2028)."""
@@ -2365,6 +2513,13 @@ class RefinementResult(Base):
             value = dict(value)
             value["n_background_components"] = value["n_extra_components"]
         return value
+
+    #: Which part of its file the fit fitted, and what lies outside each cut
+    #: (WP-2075) — see :class:`FitRange`.  Written by ``Refinement.fit`` and
+    #: ``run_stage``, the places the whole
+    #: :class:`~rietx.schemas.pattern.PatternData` is at hand; ``None`` for
+    #: any other result and for one written before 0.61.
+    fit_range: FitRange | None = None
 
     # Per-histogram slices of a multi-histogram joint refinement (WP-0308);
     # empty for an ordinary single-histogram fit.  ``statistics`` above is then

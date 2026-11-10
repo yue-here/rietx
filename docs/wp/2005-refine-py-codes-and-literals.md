@@ -44,6 +44,12 @@ its tier.
 
 ### Inherited
 
+- **From WP-2075 (2026-11-09, PR #1480): `RefinementResult.fit_range` exists on that branch**,
+  so the `LOW_ANGLE_UNMODELLED` retext can point at it once #1480 merges. A "below" span
+  (`fit_range.outside[*]`, `kind == "below"`) carries `count_share`, `level_ratio_at_cut`
+  and `level_ratio_far`; `summary()` prints `fit range: … of the file's …` beside
+  `excluded:`. Nothing in WP-2075 touched the code, its message or its `suggestion=` site.
+
 - **From WP-2003 (2026-11-02, fifth session, PR #1310): every `error`-level code now drives a
   chain action.** Batch C2 question 5 landed `schemas.sequential._rejected`: a kept attempt
   that diverged *or carries any diagnostic at level `error`* escalates the series ladder and,
