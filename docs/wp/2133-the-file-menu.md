@@ -78,6 +78,20 @@ tooltip (2026-11-07, repeated 2026-11-08); sentence-case headings (2026-11-06); 
 warnings, and asking-to-choose is kept apart from confirming (interaction rule 11, adopted
 2026-11-08).
 
+### The maintainer's rulings of 2026-11-09
+
+Two questions this branch raised were ruled by the maintainer on 2026-11-09.
+
+1. **The unapplied-edit draft follows the software field's practice.** The maintainer's words:
+   "I would like to follow the software field's best practice, not necessarily diffraction". The
+   brief showed that VS Code (hot exit), Blender and Office AutoRecover keep a recovery copy apart
+   from the real file. So the draft of pending edits goes in rietx's state directory, keyed by the
+   project's path, and the project format does not change. The draft does not travel with Save a
+   copy or with a move. Nothing is built here: the draft is a follow-up WP.
+2. **The `gui/CLAUDE.md` cap rises by 7 lines** for the File menu's three standing rules: "go".
+   The bump carries its diary row in `tests/test_docs_consistency.py` and its paragraph in
+   `docs/milestones/process.md`.
+
 ### Rulebook seams
 
 - **The 409 contract** (`gui/CLAUDE.md`, WP-1008): a mutating verb returns 409 while a run is in
@@ -100,8 +114,9 @@ Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`
 ## Non-goals
 
 - A draft of pending edits that survives close and crash. The server keeps none today (pending
-  edits are browser state, WP-2123), and adding one is a stored-format change to the project.
-  Listed as next.
+  edits are browser state, WP-2123). Ruled by the maintainer on 2026-11-09: the draft lives in
+  rietx's state directory, keyed by the project's path, with no project-format change. It is a
+  follow-up WP.
 - `.rxt` beside the project (deferred by the maintainer, 2026-11-07).
 - Registering `.rex` as a macOS package, Show in Finder, ⌘N and ⌘W, and dragging a file onto the
   window: the desktop app's.
@@ -146,7 +161,8 @@ npm --prefix gui test && npm --prefix gui run check
   flight. An export can now go to a folder the person picks, and replaces a file there only when
   asked. Closing a project now survives a relaunch: the next `rietx gui` shows the start screen.
   The header's `Open…` button is gone. A pending edit still does not survive a close or a crash,
-  because the server keeps no draft. That is the next item.
+  because the server keeps no draft. That is the next item, ruled on 2026-11-09 (§ The
+  maintainer's rulings of 2026-11-09).
 
   *Done.* Server: `project_copy`, `project_rename`, `project_move`, `project_close` and
   `recent_clear` in `session.py`, five routes, and `export` taking `directory`/`overwrite`.
@@ -201,8 +217,9 @@ npm --prefix gui test && npm --prefix gui run check
       which the desktop app and the plot's own buttons hold.
 
   Next: (1) review and merge #1498, then this one, #1502; (2) a draft of pending edits that survives
-  close and crash, which is a stored-format change to the project and so the maintainer's call
-  before any code; (3) the maintainer's rulings on the visual calls above.
+  close and crash. Ruled 2026-11-09: it goes in the state directory, keyed by the project's path,
+  with no project-format change, as a follow-up WP; (3) the maintainer's rulings on the visual
+  calls above.
 
 - **2026-11-09** — filed by a ghostshift runner, as 2133 because 2132 was taken on `main` the same
   day. No open WP owned the File menu: WP-2131's non-goals name it as a later WP, and the
