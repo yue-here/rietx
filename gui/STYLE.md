@@ -80,8 +80,8 @@ The drawings live in `gui/src/app.css`. Each kind below means one thing (princip
 
 | Kind | Means | How it is drawn | Source |
 |---|---|---|---|
-| Primary button | The one action of a view (Apply and refine, Create) | Filled in the accent's text role, with ink on a fill. One per view | [Yue 2026-11-06] |
-| Button | Any other action | Outlined in the strong rule, the hover ground on hover | [Yue 2026-11-06] |
+| Primary button | The one action of a view (Apply and refine, Create) | Filled in the accent's text role (`--accent-ink`), inked in `--panel`. One per view | [Yue 2026-11-06] |
+| Button | Any other action | Outlined in the strong rule (`--line-strong`) with ink text, the hover ground (`--hover`) on hover | [Yue 2026-11-06] |
 | Icon button | An action whose icon is familiar | No border at rest, a border on hover. A word beside it where the icon is unfamiliar | [inferred] |
 | Segmented choice | One of N views or modes | A sunken track with one raised option, so a choice never looks like an action (`.segmented`) | [Yue 2026-11-07] |
 | Tab | One of N panels | A word over a rule. The current word is ink over an accent underline | [inferred, from the site] |
@@ -89,7 +89,7 @@ The drawings live in `gui/src/app.css`. Each kind below means one thing (princip
 | Padlock | A parameter is held | A cell with a checkbox cell's geometry, so locking moves no number. No column heading | [Yue 2026-11-07] |
 | Editable value | A number you can change | A tinted cell, the whole cell the target. Its editor floats over the cell and shows the whole number | [Yue 2026-11-07] |
 | Dialog field | A value typed into a form | A bordered box, because it is a control. The label column fits the longest label | [inferred; Yue 2026-11-08 on the overlapping label] |
-| Link | Go somewhere | The accent's text role, underlined where it sits in running text | [inferred, from the site] |
+| Link | Go somewhere | The accent's text role (`--accent-ink`), underlined where it sits in running text | [inferred, from the site] |
 | Help term | An explanation is one click away | The help cursor and no other mark. A click opens the term's `rietx.help` entry | [inferred, WP-1203] |
 | Fact | A grade, a flag, a state | Words, in a state colour where the tone is a judgement, with no border. A bordered box is a control, so `.chip` and `.pill` go as their panels are redrawn | [inferred, from principle 2 and the site] |
 

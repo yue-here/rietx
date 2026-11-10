@@ -29,7 +29,7 @@ redesign is ported in five pieces, in this order:
 | 3 | [2127](../wp/2127-the-plan-tab.md) | the Plan tab on the existing plan routes, read top to bottom as a recipe |
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
-| The palette | [2200](../wp/2200-the-palette.md) | the site's palette as the default theme, light and dark: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Named themes (Solarized, Monokai) in Settings come later; the emitter leaves their seam |
+| The palette | [2200](../wp/2200-the-palette.md) | the site's palette as the default theme, light and dark: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Named themes (Solarized, Monokai) in Settings come later; the emitter leaves their seam. `gui/STYLE.md`'s rules that describe a new role in words take its tokens (WP-2142) |
 
 Every merge leaves a working GUI. No existing panel or route becomes unreachable at any piece;
 a panel moves into the new shell as it is, and is redesigned by its own piece.
@@ -55,7 +55,7 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 | Status bar | The bar along the window's foot, with the console toggle | 2026-11-07 |
 | Fixing plan stages | A plan stage that fixes as well as frees (WP-2127 records the ruling) | 2026-11-09 |
 | Edit recovery | Unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 |
-| Fit statistics in the action bar | Rwp and GoF beside Refine while the graphs are hidden ("try B") | 2026-11-09 |
+| Fit statistics in the action bar | Rwp, GoF and the not-a-fit chip beside Refine while the graphs are hidden ("try B"). WP-2123 left them hidden with the graphs (its item 6) | 2026-11-09 |
 
 Three decisions went to the maintainer before the piece that needs them. The first is now ruled, and two still wait:
 
@@ -102,6 +102,31 @@ the piece that touches it or a WP of its own.
 - A run started from the Report or Series panel, or by the `.` key, does not apply the
   Parameters edits waiting in the action bar. The bar's Refine, the `r` key (WP-2123) and the
   Plan panel's `Run this stage` (WP-2127) do.
+- The Parameters panel has no formula editor: no route serves `add_variable` or an expression
+  tie, so the popover's "=" button (design 13) waits for both routes (WP-2126's follow-up).
+- The popover offers no limits for a coordinate DOF, whose entry stores no `min`/`max`, and
+  refuses them by name for a texture or background coefficient. Both need the path-to-model map
+  that lives only inside `ParameterTable`'s write-back (WP-2126's follow-up).
+- The panel's Apply sends `PATCH /api/params` and then one `POST /api/structure/position` per
+  moved atom, so a refused position leaves the PATCH applied. A `positions` arm on the PATCH
+  makes it one rehearsed request; the Model panel's value-then-model sequence has the same shape
+  (WP-2126's follow-up).
+- No group toggle in the Parameters panel shows which plan stage frees it. WP-2126 left the
+  badges to the Plan tab and WP-2127 left them to the panel.
+- `gui/src/lib/spacegroup.ts:typesetSpaceGroup` (WP-2126) and
+  `gui/src/lib/symmetry.ts:symbolTokens` (WP-2131) typeset a space-group symbol by the same
+  rules into two token types. One should go.
+- The Plan tab adds a glob by typing it. The prototype's grouped picker ("Cell (2)", "All Biso")
+  and its "never freed" row both need the refinable set, which `GET /api/plan/resolve` does not
+  serve. Its "Save as new plan…" needs a store for named plans, and rietx keeps one plan per
+  project (WP-2127's non-goals).
+- New project cannot add a phase from a TOPAS, FullProf or GSAS-II project file, which the
+  round-9 design offers. A browser upload carries one file, and such a project names a data
+  file beside it (WP-2131's settled call 2).
+- `gui/CLAUDE.md` still holds 36 visual rules that belong in `gui/STYLE.md`. WP-2134's § What
+  `gui/STYLE.md` covers of these sorts them: drop the covered ones from the rulebook, merge the
+  partly covered ones into the guide, and bring the departures and the uncovered ones to the
+  maintainer, since visual questions go to him (WP-2134's and WP-2142's next step).
 
 ## Acceptance
 

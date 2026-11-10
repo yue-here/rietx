@@ -1,8 +1,7 @@
 # WP-2129 — the Background tab
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — PR #1488 open for review; stacks on #1476 and #1479; nine settled calls wait on the maintainer
+Milestone: gui-overhaul · Status: ✅ 2026-11-10 — the Background tab and its covariance band merged in #1488
 Depends on: 2123, 2125 (the shell it draws in, and the preview route whose compile cache it reuses)
-Priority: P2 2026-11-09 — piece 5 of the gui-overhaul milestone, the last of the five
 
 ## Goal
 
@@ -179,6 +178,21 @@ npm --prefix gui test && npm --prefix gui run check
 - Eilers & Marx (1996), *Stat. Sci.* **11**, 89-121: the P-spline penalty whose rows enter J.
 
 ## Handover log
+
+- **2026-11-10, close** — closed. PR #1488 merged on 2026-11-10, with the fix for the substring
+  tab selectors that #1487 had broken. The fifth and last of the milestone's five pieces is on
+  `main`: the Background tab draws the background curve with rietx's own esd band, holds a
+  Chebyshev term and edits a P-spline's λ. No task is open and no follow-up was named.
+
+  *Leftovers, and where each went.* The background drawn through points a person places (design
+  5) was already the second of the three decisions in `docs/milestones/gui-overhaul.md`
+  § Designed, not yet filed, since it needs a new background type. The tab's colours (settled
+  call 3) follow the palette piece's row, which re-measures the plot palette. The nine settled
+  calls were reviewed with the PR at its merge. The narrative went to
+  `docs/milestones/v1.12.md`.
+
+  Closed by the batch close-out of the port's merged WPs, PR #1516. Docs only; no test moved.
+  Next: none here.
 
 - **2026-11-10** — Merged main (#1479, #1484, #1483, #1490, #1498 and others) into this branch.
   The two `hold` arms on `PATCH /api/params` are now one: WP-2126's. Its
