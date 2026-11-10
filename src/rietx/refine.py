@@ -7934,16 +7934,19 @@ def _constraint_diagnostics(stage_name: str, outcome) -> list[Diagnostic]:
         return []
     # which block bound each step, by its label (WP-1938 D7): the Stephens
     # cone's end in ``.microstrain``, the Γ_G² floor's start with
-    # ``instrument.profile``
+    # ``instrument.profile (`` (the Γ_L floor's with ``instrument.profile
+    # Lorentzian``).  A joint fit prefixes a histogram's block with
+    # ``hist.{h} `` (WP-1325), read past here.
     by = getattr(outcome, "truncated_by", None) or {}
     which = "; ".join(f"{label}: {k}" for label, k in sorted(by.items()))
+    bare = [re.sub(r"^hist\.\d+ ", "", label) for label in by]
     suggestion = ("Vary the starting seed and quote the values only if they "
                   "survive.")
-    if any(label.endswith(".microstrain") for label in by):
+    if any(label.endswith(".microstrain") for label in bare):
         suggestion += (" The STEPHENS_STRAIN_NOT_POSITIVE protocol row "
                        "applies to the strain cone, although that guard stays "
                        "silent while the default LM driver holds the cone.")
-    if any(label.startswith("instrument.profile") for label in by):
+    if any(label.startswith("instrument.profile (") for label in bare):
         suggestion += (" At some reflection the data asked for no Gaussian "
                        "width (the Γ_G² floor, 1e-8 deg²), so U, V, W and the "
                        "phase's Gaussian size and strain describe that floor.")
@@ -9154,13 +9157,17 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # tested, so a tied row — in `parameters`, absent from the free vector —
     # reports None, and so does every row when no guard ran at all
     # (`replay`).  A free row on a floor of 0 is tested like any other bound
-    # (WP-1938), and reads True under either code (WP-1929).
-    tested = set(table.free_paths) if guard is not None else set()
+    # (WP-1938), and reads True under either code (WP-1929).  A tied row the
+    # LM step held on its own limit is a finding too (WP-1325,
+    # ``staged.tied_bound_findings``), so it reads True rather than None.
     on_bound = {p for f in guard.at_bounds for p in f.paths} if guard is not None else set()
+    tested = set(table.free_paths) | on_bound if guard is not None else set()
     # the FLOOR_HIT half of the same findings, read by the microstructure
     # block below (WP-1914).  With no guard (``replay``) the recorded
     # FLOOR_HIT diagnostics are the test, as ``cell_runaway`` falls back to
-    # them below, so the table cannot contradict a warning the result carries
+    # them below, so the table cannot contradict a warning the result carries.
+    # A tied width the LM step held on its own floor is named here directly
+    # (WP-1325), and ``floored_paths`` adds the ones tied to a floored source
     floors = floored_paths(table, (
         {p for f in guard.at_bounds if f.code == "FLOOR_HIT" for p in f.paths}
         if guard is not None else

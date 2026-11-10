@@ -1632,7 +1632,9 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.results.StageResult.n_constraint_truncations", "action", tier=1, ambiguity=1,
         evidence=("physics: a strain variance and a pole density are non-negative (Stephens 1999; "
                   "WP-1960 D4); the Gamma_G^2 floor's value is tiered on "
-                  "caglioti._MIN_GAMMA_G2's row")),
+                  "caglioti._MIN_GAMMA_G2's row; a tied parameter's own min/max are the "
+                  "caller's or the schema's declaration, which the write-back enforces "
+                  "exactly (WP-1325)")),
     Row("rietx.schemas.results.StageResult.n_degenerate_cell_probes", "action", tier=1, ambiguity=1,
         evidence=("arithmetic: a cell of zero or negative volume has no metric, so the residual is "
                   "undefined there and the step must be rejected (issue #283)")),
@@ -3189,6 +3191,19 @@ ROWS: tuple[Row, ...] = (
         grounds=("B2 option 2: the difference step of the test that keeps the moment sizes' "
                  "esds free of the stopping-point artefact (ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.optimize.least_squares.TIED_BOUND_MARGIN", "constant", tier=3, value=1e-09,
+        evidence=("arithmetic against lm._POLISH_FEASIBLE (1e-10), the most an accepted step "
+                  "leaves a row, so the write-back's exact bound check never meets a held tied "
+                  "value past its bound; the two scales differ (this one is the row at the "
+                  "start, the polish's is per step), the factor 10 is free, and the value it "
+                  "moves is 1e-9 of the row's scale, far under any esd; measured on the "
+                  "single-fit and five-pattern held fits of test_tied_bound_rows, the second "
+                  "through the later stages of mccusker_structural that start from the held "
+                  "value; a miss raises the write-back error every fit raised before WP-1325"),
+        grounds=("A numerical setting whose tier-1 evidence the generality review rated weak "
+                 "(a margin measured once against the row's starting scale, a free factor "
+                 "of 10); tier 3, ruled by Yue 2026-11-09 (WP-1325)."),
+        approved="2026-11-09"),
     Row("rietx.optimize.least_squares.XTOL", "constant", tier=3, value=1e-12,
         evidence=("a tolerance defaulted inside opt-in solver='trf' (default 'lm', "
                   "DEFAULT_SOLVER), four orders under SciPy's own 1e-8; WP-1109 tried 1e-8: "
