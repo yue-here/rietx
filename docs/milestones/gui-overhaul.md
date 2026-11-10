@@ -89,7 +89,7 @@ the piece that touches it or a WP of its own.
   candidates ("c doubled", "a × √3", "same cell") belong in rietx.
 - `PeakEditor.curves` serves only each group's sum; per-line curves need a route.
 - `set_flags(..., use_for_indexing=True)` forgets which flags a person overruled.
-- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits.
+- `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it moves with the palette piece, since the blue was chosen as the complement of orange fits. It is the row "The palette" above.
 - The pick route takes only `shoulders`; the 2θ range and `flag_contamination` need to reach it.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the
   maintainer adopted both rules on 2026-11-08.
