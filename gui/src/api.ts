@@ -87,8 +87,10 @@ async function upload(kind: string, file: File | null,
  * A route answering float64 arrays rather than JSON (WP-1461, D4): the curves,
  * every channel once. A refusal is still the JSON error envelope.
  */
-async function arrays(path: string): Promise<ArrayBuffer> {
-  const response = await fetch(path);
+async function arrays(path: string, body?: unknown): Promise<ArrayBuffer> {
+  const response = await fetch(path, body === undefined ? undefined : {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
   if (response.ok) return response.arrayBuffer();
   const text = await response.text();
   let payload: any = null;
@@ -248,6 +250,10 @@ export const api = {
   /** The pattern's every channel and the fit's curves on the ones it kept, as
    *  `rxplot.mjs`'s `unpack` reads them; before a fit, the pattern alone. */
   curves: () => arrays("/api/result/curves"),
+  /** The curves at values nobody has applied, writing nothing (WP-2125): the
+   *  fitted channels, the model, its background, each phase, the three
+   *  residuals and the ticks, with the Rwp there. */
+  preview: (values: Record<string, number>) => arrays("/api/preview", { values }),
   /** The three layers **plus** an `apply` arm parallel to `suggested_actions`:
    *  whether the server would act on each one, and what it would run.  Idle-only
    *  (Layers 1-2 read the compiled model a stage would be rewriting), so this

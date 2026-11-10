@@ -397,6 +397,95 @@ def test_a_refine_moves_nothing_while_it_runs_or_after(browser, tmp_path_factory
     assert not moved, moved
 
 
+#: The Interactive tab's own rows (WP-2128): a drag or a typed value changes a
+#: number and a thumb, and never where a row sits.
+SLIDER_ROWS = [".side .panel:not(.hidden) .slider", ".side .panel:not(.hidden) .slider .line > *"]
+
+#: Every `rx-preview-redraw` entry's duration, in ms: from the moment a slider's
+#: values were set to the second frame after the preview was drawn.
+REDRAWS = """() => performance.getEntriesByName("rx-preview-redraw").map((e) => e.duration)"""
+
+
+def _drag(page, track, frac_from: float, frac_to: float, steps: int = 24) -> None:
+    """A real pointer drag along a range input, from one track fraction to another."""
+    box = track.bounding_box()
+    # the thumb's centre runs from 8 px to 8 px short of the box's ends
+    x = lambda f: box["x"] + 8 + (box["width"] - 16) * f  # noqa: E731
+    y = box["y"] + box["height"] / 2
+    page.mouse.move(x(frac_from), y)
+    page.mouse.down()
+    for k in range(1, steps + 1):
+        page.mouse.move(x(frac_from + (frac_to - frac_from) * k / steps), y)
+        _frames(page, 1)
+    page.mouse.up()
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_a_slider_drag_previews_and_moves_nothing(browser, gui, state):
+    """WP-2128: a drag, a typed value, the range pop-up and a peak window's step
+    each change what is drawn and never where anything sits. The drag is a real
+    pointer drag, so its redraws are what a person would wait for, and their
+    latencies are printed as a range."""
+    url, _ = gui
+    page = _open(browser, url, WIDTHS[state])
+    _press(page, "Interactive")
+    page.wait_for_selector(".side .panel:not(.hidden) .slider")
+    _frames(page)
+    marks = LANDMARKS + SLIDER_ROWS
+    before = page.evaluate(SNAP, marks)
+    failures = []
+
+    track = page.locator('.side .panel:not(.hidden) input[type="range"]').first
+    value = int(track.input_value()) / 1000
+    _drag(page, track, value, min(1.0, value + 0.3))
+    page.wait_for_function(
+        "document.querySelector('.gtitle .what').textContent === 'Preview, not refined'")
+    _frames(page)
+    failures += [f"drag: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+    assert "pending" in page.locator(".actions .pending").text_content()
+
+    # a typed value: the number is a button, and typing opens over it. The
+    # first row's, because a click on a row out of view scrolls the panel, and
+    # a scroll moves every row without moving the layout
+    page.locator(".side .panel:not(.hidden) button.num").first.click()
+    page.wait_for_selector(".side .panel:not(.hidden) input.typed")
+    page.wait_for_function("document.activeElement?.classList.contains('typed')")
+    # ArrowRight to the end of the selected text. End is a scroll key in a mac
+    # text field, and it scrolled the panel 47 px with the caret unmoved
+    page.keyboard.press("ArrowRight")
+    page.keyboard.type("1")
+    page.keyboard.press("Enter")
+    _frames(page)
+    failures += [f"typed: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+
+    # the range pop-up from the parameter's name, closed the way a person does
+    page.locator(".side .panel:not(.hidden) button.pname").first.click()
+    page.wait_for_selector(".rangepop")
+    _frames(page)
+    failures += [f"pop-up: {m}" for m in _moved(before, page.evaluate(SNAP, marks))]
+    page.keyboard.press("Escape")
+
+    # the Single peaks graph, stepped once while the preview is drawn
+    _press(page, "Single peaks")
+    page.wait_for_selector(".peakwins canvas")
+    page.locator('.peakwins button[aria-label="Next peak"]').first.click()
+    _frames(page)
+    failures += [f"single peaks: {m}" for m in _moved(before, page.evaluate(SNAP, LANDMARKS))]
+
+    redraws = page.evaluate(REDRAWS)
+    page.locator(".actions button", has_text="Revert").click()
+    page.wait_for_function("document.querySelector('.gtitle .what').textContent === 'Last fit'")
+    assert not page.errors, page.errors
+    page.close()
+    assert redraws, "no preview was drawn"
+    # a runaway guard on one redraw, never a timer: the route answers in tens
+    # of ms on this synthetic pattern
+    assert max(redraws) < 5000, redraws
+    print(f"\n[{state}] {len(redraws)} preview redraws, drag to redraw "
+          f"{min(redraws):.0f}-{max(redraws):.0f} ms")
+    assert not failures, "\n".join(failures)
+
+
 # ---------------------------------------------------------------------------
 # WP-2127: the Plan tab
 # ---------------------------------------------------------------------------
