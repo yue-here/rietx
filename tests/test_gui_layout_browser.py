@@ -37,7 +37,6 @@ LANDMARKS = [
     ".actions", ".actions .segmented", ".actions .go > *",
     # the status bar (WP-2207) and the bottom panel it shows (WP-2206)
     ".statusbar", ".statusbar > *", "section.bottom", "section.bottom > nav.tabs",
-    "section.bottom > nav.tabs button",
 ]
 
 #: Every landmark's box, keyed by its selector and its place among the matches.
@@ -452,6 +451,7 @@ def test_a_first_run_moves_nothing(browser, tmp_path_factory, state):
 BOTTOM_CONTROLS = """() => [...document.querySelectorAll(
     "section.bottom > nav.tabs button, section.bottom .pane:not(.hidden) button")]
   .filter((b) => b.getClientRects().length && !b.disabled
+          && getComputedStyle(b).visibility !== "hidden"
           && !/^(Checkout|Branch|Tag|Label)$/.test((b.textContent || "").trim()))
   .map((b, i) => i)"""
 

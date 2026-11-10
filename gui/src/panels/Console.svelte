@@ -16,9 +16,13 @@
   let {
     lines,
     dropped,
+    shown = true,
   }: {
     lines: string[];
     dropped: number;
+    /** Whether the pane is on screen. A hidden pane has no scroll height, so
+     *  lines that arrived while it was hidden are followed when it shows. */
+    shown?: boolean;
   } = $props();
 
   let node: HTMLDivElement | undefined = $state();
@@ -27,7 +31,7 @@
 
   $effect(() => {
     lines;
-    if (pinned && node) node.scrollTop = node.scrollHeight;
+    if (shown && pinned && node) node.scrollTop = node.scrollHeight;
   });
 
   function onScroll() {

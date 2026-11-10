@@ -75,7 +75,7 @@
     {/each}
   </nav>
   <div class="pane" class:hidden={tab !== "console"}>
-    <Console {lines} {dropped} />
+    <Console {lines} {dropped} shown={open && tab === "console"} />
   </div>
   <div class="pane" class:hidden={tab !== "history"}>
     <History {head} {busy} {say} {onmoved} />
