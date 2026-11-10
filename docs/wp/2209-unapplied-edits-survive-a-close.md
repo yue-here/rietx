@@ -174,6 +174,43 @@ The milestone's row 10: the maintainer looks at the offer on screen before the m
 
 ## Handover log
 
+### 2026-11-10 — the maintainer's five rulings applied; PR #1523 waits on the merge
+
+The maintainer answered the five open questions on 2026-11-10 (§ Ruled by Yue 2026-11-10).
+Two changed the dialog. Escape now closes it and keeps the copy: nothing is restored or
+discarded, and the next open of the project offers the copy again. The line shown when the
+project's head has moved now reads "The project has been refined or edited since. Restored
+values will replace the current ones." The manual's § Edits not yet applied says both. The
+follow-up for the Text buffer and the Model forms is filed as WP-2213, in this PR. Origin/main
+was merged in, with no conflict.
+
+*Done.* `panels/Recovery.svelte` calls a new `onlater` on Escape, and `App.svelte`'s
+`setAsideKept` clears the offer and prints one console line. A vitest in `App.test.ts`'s
+WP-2209 block presses Escape, makes an edit, and reopens the project from the start screen.
+`tests/test_gui_recovery_browser.py` gains the same story by real keys and clicks: Escape,
+Close project from the File menu, the recent row, offered again. The reworded line is
+asserted in the vitest that covers a moved head. No screenshot shows the dialog, so none was
+regenerated. Dist rebuilt.
+
+*A consequence of ruling 2, settled by Claude.* After Escape the writer stays disarmed until
+the project is next opened. So an edit made after Escape is not kept, and a crash before the
+next open loses it. Arming the writer instead would let that edit overwrite the copy the
+person set aside, which ruling 2 keeps. The manual says that such edits are not kept. A
+mutation that arms the writer on Escape turns the new vitest red.
+
+*Measured* (darwin/arm64, `[dev]` venv plus `playwright` 1.65 installed locally, node
+v24.22.1). vitest 733 passed (732 before, +1). svelte-check 419 files, 0 errors. ruff clean.
+`tests/test_gui_recovery.py`, `test_gui_manual.py` and `test_gui_dist.py` 35 passed.
+`tests/test_gui_recovery_browser.py` 3 passed, run alone. Fast suite (`-m "not slow"`,
+through ghostshift's `serial.py`, browser files included, load 8 to 25): 14631 passed, 410
+skipped, 32 xfailed, 1 failed, 14:35. The failure is
+`test_manual.py::test_every_page_has_a_twin_that_keeps_the_contract`: the twin of
+`theory/estimation` builds to 50 048 characters against a 50 000 cap. It fails the same way
+on a snapshot of origin/main (68fd06973), so it is not this branch's. `python -m
+tests.reader_output` exit 0. Vale at warning level: no alert on a line this branch wrote.
+
+Next: the merge.
+
 ### 2026-11-10 — the recovery copy built and offered; PR #1523, waiting on the maintainer's look
 
 An edit in the action bar's count now survives a closed project, a closed tab and a killed
