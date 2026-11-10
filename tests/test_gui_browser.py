@@ -47,7 +47,10 @@ TOKENS = """() => {
 #: What each of the pattern's three panes painted since the record was last
 #: cleared, as sets of [op, style, dashed].
 PANES = """() => {
-  const panes = [...document.querySelectorAll(".plot canvas")].map((c) => window.__canvasId(c));
+  // The pattern plot's panes. The Structure tab's WebGL canvas (WP-2203) is mounted
+  // beside them, hidden, and paints nothing through the 2D context recorded here.
+  const panes = [...document.querySelectorAll(".plot canvas")]
+    .filter((c) => !c.closest(".viewer")).map((c) => window.__canvasId(c));
   return panes.map((id) => window.__ink.filter((m) => m.canvas === id)
     .map((m) => [m.op, m.style, m.dash, m.alpha]));
 }"""
@@ -94,7 +97,7 @@ def page(browser, gui):
     page.on("pageerror", lambda exc: errors.append(str(exc)))
     page.add_init_script(RECORD)
     page.goto(url)
-    page.wait_for_function("document.querySelectorAll('.plot canvas').length >= 3")
+    page.wait_for_function("document.querySelectorAll('.plot canvas:not(.viewer *)').length >= 3")
     _frames(page)
     yield page
     page.close()
@@ -163,7 +166,7 @@ def test_the_peak_layer_is_painted_on_the_peaks_tab_in_its_own_two_inks(page, gu
     _, client = gui
     assert client.post("/api/peaks", {})[0] == 200
     page.reload()
-    page.wait_for_function("document.querySelectorAll('.plot canvas').length >= 3")
+    page.wait_for_function("document.querySelectorAll('.plot canvas:not(.viewer *)').length >= 3")
     _frames(page)
     ink = page.evaluate(TOKENS)
     main, _, _ = page.evaluate(PANES)
