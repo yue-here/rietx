@@ -1,8 +1,7 @@
 # WP-2131 — the start screen and the New project dialog
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — all seven tasks landed; PR #1498 open, awaiting review
+Milestone: gui-overhaul · Status: ✅ 2026-11-10 — the start screen and the New project dialog merged in #1498; sentence case app-wide is the milestone's row
 Depends on: 2123
-Priority: P2 2026-11-09 — a piece of the open gui-overhaul milestone, the maintainer's round-9 design; the window a person first meets
 
 ## Goal
 
@@ -173,6 +172,24 @@ a typed cell gives Le Bail, so WP-1206's refusal stays unreachable. An assumed
 instrument is tagged `assumed` where shown: unmarked, a wrong anode moves cells.
 
 ## Handover log
+
+- **2026-11-10** — closed. PR #1498 merged on 2026-11-10, so `rietx gui` with no project shows
+  the round-9 start screen, and New project is one dialog of four rows that asks for no mode and
+  no plan. The File menu this WP named next has also merged, as WP-2133. Close took over settled
+  call 9, so "the last project" now means the one open at quit.
+
+  *Leftovers, and where each went.* Sentence-case headings app-wide (ruled 2026-11-09, option
+  A) is the row "Sentence-case headings" in `docs/milestones/gui-overhaul.md` § Designed, not
+  yet filed. Adding a phase from a TOPAS, FullProf or GSAS-II project file (settled call 2) went
+  to § Owed to the port: a browser upload cannot bring the data file such a project names.
+  Dragging a file onto the window and Show in Finder (calls 3 and 10) wait for the desktop app,
+  the milestone after this one, and are not carried here. The layout flake recorded in the
+  second round needs a second failure with the same message before a probe; nothing carries it.
+  The settled calls were reviewed with the PR at its merge. The narrative went to
+  `docs/milestones/v1.12.md`.
+
+  Closed by the batch close-out of the port's merged WPs, PR #1516. Docs only; no test moved.
+  Next: none here.
 
 - **2026-11-09, ruling** — Yue Wu ruled on the app-wide heading register, by choosing option A.
   Sentence-case headings apply to the whole app. One `app.css` rule carries them at this WP's
