@@ -1225,12 +1225,13 @@ def test_a_verb_refusing_an_unknown_path_names_the_nearest(verb, arg):
 
 @pytest.mark.parametrize("path, hint", [
     ("phases.0.extinction",
-     "; it exists only once extinction is declared on phase 0, with "
-     "phase.extinction = 0.0."),
+     "; it is a parameter of extinction, which phase 0 does not declare. "
+     "Declare it with phase.extinction = 0.0."),
     ("phases.0.atoms.1.u11",
-     "; it exists only once an anisotropic displacement tensor is declared on "
-     "atom 1 of phase 0, with atom.biso.vary = False; atom.aniso = "
-     "AnisoU.isotropic(atom.biso.value / (8 * math.pi**2), phase.cell)."),
+     "; it is a parameter of an anisotropic displacement tensor, which atom 1 "
+     "of phase 0 does not declare. Declare it with atom.biso.vary = False; "
+     "atom.aniso = AnisoU.isotropic(atom.biso.value / (8 * math.pi**2), "
+     "phase.cell)."),
     # no phase 3: the declaration could not create it, so no hint
     ("phases.3.extinction", ""),
     # a capillary refuses roughness, so the declaration would raise
@@ -1250,9 +1251,9 @@ def test_roughness_on_a_plate_names_its_declaration():
     structure, ins = perturbed_models()
     ins.geometry = rx.Geometry(kind="bragg_brentano", goniometer_radius_mm=240.0)
     ref = rx.Refinement(structure, ins, history=False)
-    with pytest.raises(ValueError, match=r"Suortti surface roughness is declared on "
-                       r"the geometry, with instrument\.geometry\.surface_roughness "
-                       r"= RoughnessSuortti\(\)\.$"):
+    with pytest.raises(ValueError, match=r"Suortti surface roughness, which the "
+                       r"geometry does not declare\. Declare it with instrument\."
+                       r"geometry\.surface_roughness = RoughnessSuortti\(\)\.$"):
         ref.set_vary(["instrument.geometry.surface_roughness.a"], True)
 
 
@@ -1282,9 +1283,9 @@ def test_a_stage_literal_of_an_undeclared_opt_in_names_its_declaration(pattern):
     unknown = [d for d in result.diagnostics if d.code == "STAGE_PATH_UNKNOWN"]
     assert len(unknown) == 1
     assert unknown[0].message.endswith(
-        "It exists only once extinction is declared on phase 0, with "
-        "phase.extinction = 0.0.")
-    assert unknown[0].suggestion.startswith("Declare the correction")
+        "It is a parameter of extinction, which phase 0 does not declare.")
+    assert unknown[0].suggestion.startswith(
+        "Declare it with phase.extinction = 0.0, or write a glob")
 
 
 def test_a_tied_path_beside_its_own_source_stays_silent(pattern):

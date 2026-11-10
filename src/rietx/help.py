@@ -1338,7 +1338,9 @@ OPT_IN: tuple[OptIn, ...] = (
           "phase.extinction = 0.0"),
     OptIn("March-Dollase preferred orientation", "phases.*",
           ("phases.*.preferred_orientation.r",),
-          "phase.preferred_orientation = PreferredOrientation(axis=(0, 0, 1))"),
+          # the axis is the crystallites' habit, so it prints as a placeholder
+          "phase.preferred_orientation = PreferredOrientation(axis=(h, k, l))"),
+    # order 4 is what report.layer2 already prints for a texture action
     OptIn("spherical-harmonics texture", "phases.*", ("phases.*.texture.*",),
           "phase.texture = SphericalHarmonicTexture(order=4)"),
     OptIn("Stephens anisotropic strain", "phases.*",

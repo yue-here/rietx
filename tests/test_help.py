@@ -469,7 +469,9 @@ def _declare(row, structure, instrument) -> None:
     """Run ``row.declaration`` as the error prints it, on phase 0 and atom 0."""
     phase = structure.phases[0]
     exec(row.declaration, {**vars(rx), "math": math, "phase": phase,
-                           "atom": phase.atoms[0], "instrument": instrument})
+                           "atom": phase.atoms[0], "instrument": instrument,
+                           # the axis placeholder, filled as GSAS-II pre-fills it
+                           "h": 0, "k": 0, "l": 1})
 
 
 @pytest.mark.parametrize("row", OPT_IN, ids=lambda r: r.name)
@@ -493,10 +495,18 @@ def test_a_geometry_bound_declaration_is_refused_off_its_geometry(row):
     """``geometry`` and ``source`` are claims about the schema's refusals, so
     the declaration raises on any other kind, which is why the hint stays
     silent there."""
+    assert (row.geometry, row.source) == ("bragg_brentano", "xray_cw")
     structure, instrument = _undeclared_models()
     instrument.geometry = Geometry(kind="debye_scherrer")
-    with pytest.raises(ValueError, match=row.geometry):
+    with pytest.raises(ValueError, match="bragg_brentano"):
         _declare(row, structure, instrument)
+    # the source half: the same plate under a neutron beam
+    from rietx.schemas.instrument import NeutronSource
+    structure, instrument = _undeclared_models()
+    _declare(row, structure, instrument)
+    with pytest.raises(ValueError, match="X-ray correction"):
+        Instrument(source=NeutronSource(wavelength=1.5),
+                   geometry=instrument.geometry)
 
 
 def test_every_family_an_undeclared_model_lacks_is_opt_in_or_says_why():

@@ -8259,8 +8259,10 @@ def _path_hint(path: str, known, instrument=None) -> str:
         return f"it is a spelling retired after v1.2, now spelled {current!r}."
     if (hit := undeclared_opt_in(path, known, instrument)) is not None:
         row, owner = hit
-        return (f"it exists only once {row.name} is declared on "
-                f"{_owner_words(owner)}, with {row.declaration}.")
+        # "a parameter of", never "exists once declared": an indexed family
+        # (a texture term, a Stephens or ADP DOF) need not hold this index
+        return (f"it is a parameter of {row.name}, which {_owner_words(owner)} "
+                f"does not declare. Declare it with {row.declaration}.")
     return did_you_mean(path, known, n=1)
 
 
@@ -8635,11 +8637,12 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
                 level="warning", code="STAGE_PATH_UNKNOWN",
                 message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
                          "names no parameter of this model, so nothing was freed "
-                         f"for it. It exists only once {row.name} is declared on "
-                         f"{_owner_words(owner)}, with {row.declaration}."),
+                         f"for it. It is a parameter of {row.name}, which "
+                         f"{_owner_words(owner)} does not declare."),
                 where=[path],
-                suggestion=("Declare the correction, or write a glob if the stage "
-                            "should reach it only on models that declare it."),
+                suggestion=(f"Declare it with {row.declaration}, or write a glob "
+                            "if the stage should reach it only on models that "
+                            "declare it."),
             ))
             continue
         hint = did_you_mean(path, known, n=1)

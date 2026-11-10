@@ -187,7 +187,8 @@ NOT_WALKED: dict[str, str] = {
     "examples.py": "the shipped example projects",
     "gui": ("beyond its import pre-fill and its symmetry edit gates: the server and 3D "
             "viewer's ports, payload caps and drawing tolerances"),
-    "help.py": "the explanation text",
+    "help.py": "the explanation text, and OPT_IN's declarations, which embed "
+               "no threshold",
     "history": "the history tree's storage, and its event summary's printed row count and read chunk",
     "io": ("beyond the walked files, which repair, sniff, translate or write a number another "
            "program computes from: foreign formats' byte offsets, field widths, unit factors "
