@@ -107,6 +107,10 @@
    *  under every read `buildScene` and the hover make */
   let geo = $state.raw<Geometry | null>(null);
   let error = $state("");
+  /** The server's sentence for a model with nothing to draw (no phase yet),
+   *  shown as an empty state rather than as an error.  Its own field, beside
+   *  `error`, for the rule `pngError` keeps. */
+  let absent = $state("");
   /** Has a first load *settled*? — see `load`. */
   let ready = $state(false);
   let seq = 0;
@@ -191,7 +195,16 @@
    *  key says whether anything moved meanwhile, so a look at another tab costs
    *  no request. */
   let fetchedFor = "";
+  /** The project the phase index and the chemistry were chosen in.  The viewer
+   *  outlives an open (it sits in the shell, under an `{#if project}` that
+   *  stays true), so phase 2 of the last project would be asked of the next
+   *  one, which may have one. */
+  let chosenIn: string | null | undefined = undefined;
   $effect(() => {
+    if (projectPath !== chosenIn) {
+      if (chosenIn !== undefined) untrack(() => { phase = 0; clearChemistry(); });
+      chosenIn = projectPath;
+    }
     const key = JSON.stringify([projectPath, head, stamp, phase, tolerance, disorder,
                                 centres, ligands]);
     if (!active || key === fetchedFor) return;
@@ -256,11 +269,18 @@
       const payload = await api.structure3d(phase, tolerance, disorder, centres, ligands);
       if (mine !== seq) return;
       geo = at(payload, level);
-      error = "";
+      error = absent = "";
     } catch (exc) {
       if (mine !== seq) return;
-      if (exc instanceof ApiError && exc.empty) geo = null;
-      else error = (exc as Error).message;
+      // nothing to draw is a state, not a failure: no project, or a project
+      // with no phase yet (the server's 404 says which).  The picture is
+      // cleared either way, or the last project's structure stays on the
+      // canvas beside the sentence saying there is none
+      if (exc instanceof ApiError && (exc.empty || exc.code === "NOT_FOUND")) {
+        geo = null;
+        error = "";
+        absent = exc.empty ? "" : exc.message;
+      } else error = (exc as Error).message;
     } finally {
       if (mine === seq) ready = true;
     }
@@ -565,7 +585,7 @@
   {:else if error}
     <p class="bad">{error}</p>
   {:else if !geo}
-    <p class="muted">{ready ? "no structure yet" : "loading the structure…"}</p>
+    <p class="muted">{absent || (ready ? "no structure yet" : "loading the structure…")}</p>
   {:else}
     <div class="legend">
       {#each entries as entry (entry.species)}

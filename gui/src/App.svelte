@@ -111,8 +111,9 @@
   let hideModel = $state(false);
   /** The graph strip's tab (`lib/tabs.ts`). */
   let graphTab = $state<GraphTab>("pattern");
-  /** Bumped by every model-pane reload, which the Structure tab follows: one
-   *  SSE frame earlier than the head (WP-2203, `panels/Structure3D.svelte`). */
+  /** Bumped by every model-pane reload after its own write, which the
+   *  Structure tab follows: one SSE frame earlier than the head (WP-2203,
+   *  `panels/Structure3D.svelte`). */
   let modelStamp = $state(0);
   /** The window's width, and whether it has dropped to one column. */
   let windowWidth = $state(0);

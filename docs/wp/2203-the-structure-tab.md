@@ -75,7 +75,7 @@ No flag, threshold or automatic action is added. The one rule this WP adds is wh
       `structure-tab` screenshot, and every shot showing the graph strip regenerated.
 - [x] `gui/CLAUDE.md` § Structure viewer: the third-column rule replaced.
 - [x] The dist rebuilt.
-- [ ] Skill: none. The agent skill drives the python API, and nothing an agent calls moves.
+- [x] Skill: none. The agent skill drives the python API, and nothing an agent calls moves.
 
 ## Acceptance
 

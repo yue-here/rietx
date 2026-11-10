@@ -80,7 +80,7 @@
     varyStillPending,
     type ParamRow,
   } from "../lib/table";
-  import { MODEL_MIN, fitColumns, modelStacks } from "../lib/resize";
+  import { GRIP, MODEL_MIN, fitColumns, modelStacks } from "../lib/resize";
   import Splitter from "./Splitter.svelte";
 
   let {
@@ -111,8 +111,10 @@
     say?: (line: string) => void;
     oncolumns?: (widths: number[], done: boolean) => void;
     onmoved?: () => void;
-    /** every successful `load()`: the Structure graph tab redraws on it, one
-     *  SSE frame before the head reaches the shell (WP-2203) */
+    /** every successful `load()` after a write of this pane's own: the
+     *  Structure graph tab redraws on it, one SSE frame before the head
+     *  reaches the shell (WP-2203).  A reload the head drove does not call
+     *  it, since the tab follows the head itself and would fetch twice. */
     onreloaded?: () => void;
   } = $props();
 
@@ -153,7 +155,7 @@
    *  stored; the instrument column keeps its floor and takes the rest. */
   const cols = $derived(stacked
     ? null
-    : fitColumns((colLocal ?? columns)?.slice(0, 1), editorsWidth, COL_MIN, COL_MIN));
+    : fitColumns((colLocal ?? columns)?.slice(0, 1), editorsWidth, COL_MIN, COL_MIN + GRIP));
 
   /** The rendered width of column `i`, in px — its stored value if it has one,
    *  else whatever the flex default is currently producing. */
@@ -335,7 +337,7 @@
   const projectKey = $derived(project?.path ?? null);
   $effect(() => {
     void head;
-    if (projectKey !== null && active) load();
+    if (projectKey !== null && active) load(true);
   });
 
   /** The `site` column's own effect, beside `load`'s rather than inside it
@@ -354,7 +356,7 @@
     if (projectKey !== null && active) loadLetters();
   });
 
-  async function load() {
+  async function load(followsHead = false) {
     try {
       const [s, i, p] = await Promise.all([api.structure(), api.instrument(),
                                            api.params()]);
@@ -368,11 +370,11 @@
       symPreview = null;
       symbolDraft = null;
       profileSaved = "";
-      // the signal the Structure tab follows: this runs on every head move
-      // *and* immediately after every local write, which is one frame earlier
-      // than the head reaches the shell
+      // the site letters follow `stamp` on every head move and every local
+      // write; the Structure tab hears only the local write, one frame
+      // earlier than the head reaches the shell, and follows the head itself
       stamp += 1;
-      onreloaded();
+      if (!followsHead) onreloaded();
     } catch (exc) {
       if (!(exc instanceof ApiError && exc.empty)) loadError = (exc as Error).message;
     }
@@ -1126,7 +1128,7 @@
       <!-- no grip between rows: stacked, a column's width is the pane's -->
       {#if !stacked}
         <Splitter size={colWidth(0)} grow="right" min={COL_MIN}
-          keep={COL_MIN} flow="inline"
+          keep={COL_MIN + GRIP} flow="inline"
           extent={() => editorsEl?.clientWidth ?? 0}
           onsize={(next, done) => dragColumn(next, done)}
           title="drag to resize the structure column" />
@@ -1355,8 +1357,8 @@
      Equal `flex: 1 1 0` shares looked fair and was not: at a 1000 px pane it
      gave the structure column 306 px against the 472 its atom table needs,
      while the two columns that needed less had more than enough (measured in a
-     browser, WP-1034).  A basis is not a maximum — a drag still overrides both
-     with `flex: 0 0 Npx`.  The 3D column that took a 1.25 share of free space
+     browser, WP-1034).  A basis is not a maximum — a drag still overrides the
+     structure column's with `flex: 0 0 Npx`.  The 3D column that took a 1.25 share of free space
      here is a graph tab since WP-2203. */
   .column {
     /* the basis is `MODEL_MIN.form`, handed down as `--col-min` (the fallback is

@@ -739,8 +739,8 @@ def build(structure, phase: int = 0, *, probability: float = DEFAULT_PROBABILITY
     if not phases:
         # Phrased for the state, not for a bad index: a pattern-only project
         # has no phase *yet* (WP-1207), which is a different thing from asking
-        # for phase 7 of a three-phase model, and the client hides the viewer
-        # on it rather than reporting an error.
+        # for phase 7 of a three-phase model, and the client shows it as the
+        # viewer's empty state rather than as an error.
         raise IndexError("this project has no phase to draw yet — index the "
                          "pattern and adopt a cell, or add a phase")
     if not 0 <= phase < len(phases):

@@ -3983,6 +3983,33 @@ describe("the structure viewer", () => {
     return { promise, open };
   }
 
+  it("says a phase-free model has nothing to draw as an empty state, and clears the picture", async () => {
+    // WP-2203 took away the Model pane's `noPhases` gate, which used to unmount
+    // the viewer: the tab is now always there, so the server's 404 for a model
+    // with no phase is the viewer's empty state, never a red error, and the
+    // last structure drawn does not stay on the canvas beside it
+    let phases = true;
+    const stub = await openViewer({
+      "/api/structure3d": () => (phases ? { body: GEOMETRY }
+        : { status: 404, body: { error: { code: "NOT_FOUND",
+            message: "this project has no phase to draw yet" } } }),
+    });
+    const before = stub.calls.filter((c) => c.path === "/api/structure3d").length;
+    phases = false;
+    // the bond tolerance is a server-owned knob, so its release refetches
+    await openKnobs();
+    const slider = host.querySelector<HTMLInputElement>('input[type="range"]')!;
+    slider.value = "1.25";
+    slider.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    expect(stub.calls.filter((c) => c.path === "/api/structure3d").length).toBe(before + 1);
+    const viewer = host.querySelector(".viewer")!;
+    expect(viewer.querySelector(".bad")).toBeNull();
+    expect(viewer.querySelector("p.muted")!.textContent)
+      .toBe("this project has no phase to draw yet");
+    expect(last().scene.atoms.length).toBe(0);
+  });
+
   it("drops an answer a later request has already overtaken", async () => {
     // WP-1013's rule, one panel over: two quick releases of the bond slider put
     // two requests in flight, and the picture must agree with the control that
