@@ -60,6 +60,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2127](2127-the-plan-tab.md) | The Plan tab | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2131](2131-the-start-screen-and-new-project.md) | The start screen and the New project dialog | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2142](2142-the-gui-style-guide.md) | The GUI style guide | 2026-11-09 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -508,6 +509,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2127](2127-the-plan-tab.md) | The Plan tab | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
 | [2130](2130-the-peaks-panel-gaps.md) | The Peaks panel's gaps: the search coverage always said, Adopt on every row, the peak-mark colour | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md), [2124](2124-the-gui-port-server-defects.md) |
 | [2131](2131-the-start-screen-and-new-project.md) | The start screen and the New project dialog | 🔄 2026-11-09 | P2 | [2123](2123-the-layout-shell.md) |
+| [2142](2142-the-gui-style-guide.md) | The GUI style guide | 🔄 2026-11-09 | P2 | — |
 
 ## <a id="unscheduled"></a>Unscheduled
 
