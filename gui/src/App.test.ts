@@ -793,6 +793,15 @@ const flush = async () => {
 let host: HTMLDivElement;
 let app: any;
 
+/** The start screen over an open project, through the palette (WP-2133). */
+async function toStart() {
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true, bubbles: true }));
+  await flush();
+  [...document.querySelectorAll<HTMLButtonElement>("button")]
+    .find((b) => b.textContent?.includes("Open or create a project"))!.click();
+  await flush();
+}
+
 function button(text: string): HTMLButtonElement | undefined {
   return [...host.querySelectorAll("button")].find((b) => b.textContent?.trim() === text);
 }
@@ -863,7 +872,8 @@ describe("the shell", () => {
 
     // the start screen is the window (WP-2131): New, Open, Recent, the links
     expect(host.querySelector(".start")).toBeTruthy();
-    expect(host.querySelector("header .project")?.textContent).toBe("No project");
+    // the name is the File menu's trigger, with or without a project (WP-2133)
+    expect(host.querySelector("header .project .fm-name")?.textContent).toBe("No project▾");
     expect(button("New project…")?.className).not.toContain("ghost");
     expect(button("Open…")?.className).toContain("ghost");
     expect(host.querySelector(".start .row .name")?.textContent).toBe("a");
@@ -2762,8 +2772,9 @@ describe("the start screen and the New project dialog", () => {
 
   it("is reachable over an open project, with a way back", async () => {
     // WP-1034: with a project open there must be a route to another one short
-    // of restarting the program.  The header's Open… shows the start screen,
-    // and the project's panes stay mounted behind it.
+    // of restarting the program.  The palette's "Open or create a project"
+    // shows the start screen (the header's Open… became the File menu,
+    // WP-2133), and the project's panes stay mounted behind it.
     const other = { ...PROJECT, path: "/tmp/nac.rex",
                     data: { ...PROJECT.data, filename: "nac.fxye" } };
     const stub = server({
@@ -2776,8 +2787,7 @@ describe("the start screen and the New project dialog", () => {
     await flush();
     expect(host.querySelector(".start")).toBeNull();   // not until asked
 
-    button("Open…")!.click();
-    await flush();
+    await toStart();
     expect(host.querySelector(".start")).toBeTruthy();
     expect(host.querySelector(".panes")?.classList.contains("hidden")).toBe(true);
     button("Back to the project")!.click();
@@ -2785,8 +2795,7 @@ describe("the start screen and the New project dialog", () => {
     expect(host.querySelector(".start")).toBeNull();
     expect(host.querySelector(".panes")?.classList.contains("hidden")).toBe(false);
 
-    button("Open…")!.click();
-    await flush();
+    await toStart();
     rowFor("nac").querySelector<HTMLButtonElement>("button.row")!.click();
     await flush();
     expect(stub.calls.find((c) => c.path === "/api/project/open")!.body)
@@ -2928,8 +2937,7 @@ describe("the start screen and the New project dialog", () => {
     }).fetcher);
     app = mount(App, { target: host });
     await flush();
-    button("Open…")!.click();
-    await flush();
+    await toStart();
     rowFor("nac").querySelector<HTMLButtonElement>("button.row")!.click();
     await flush();
     // verbatim: every Project.open refusal names a different remedy (WP-1008)
@@ -3013,8 +3021,7 @@ describe("the start screen and the New project dialog", () => {
     await flush();
     button("Model")!.click();
     await flush();
-    button("Open…")!.click();      // the header's
-    await flush();
+    await toStart();
     host.querySelector<HTMLButtonElement>(".start .left button.ghost")!.click();   // Start's Open…
     await flush();
     [...host.querySelectorAll<HTMLButtonElement>(".backdrop button.pick")]
@@ -3047,6 +3054,126 @@ describe("the start screen and the New project dialog", () => {
     await flush();
     expect(fields()[1].value).toBe("/home/me");
     expect(fields()[0].value).toBe("nac");
+  });
+});
+
+describe("the File menu on the project name", () => {
+  // WP-2133, after the maintainer's save model A (2026-11-07)
+  function trigger(): HTMLButtonElement {
+    return host.querySelector<HTMLButtonElement>("header .fm-name")!;
+  }
+  function entry(label: string): HTMLButtonElement | undefined {
+    return [...host.querySelectorAll<HTMLButtonElement>(".fm-menu button.item")]
+      .find((b) => b.querySelector(".label")?.textContent === label);
+  }
+
+  it("opens from the name, and Escape closes it without touching the run", async () => {
+    const stub = server({ ...boot(), "/api/recent": () => ({ body: { recent: [] } }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    expect(trigger().textContent).toBe("lab6▾");
+    // the header's own Open… is gone: File › Open… is its place now
+    expect([...host.querySelectorAll("header button")].some((b) => b.textContent === "Open…"))
+      .toBe(false);
+
+    trigger().click();
+    await flush();
+    expect(host.querySelector(".fm-menu")).toBeTruthy();
+    expect(entry("Save a copy…")?.disabled).toBe(false);
+    expect(entry("Open recent")?.disabled).toBe(true);    // nothing else to open
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flush();
+    expect(host.querySelector(".fm-menu")).toBeNull();
+    expect(stub.calls.some((c) => c.path === "/api/run/cancel")).toBe(false);
+  });
+
+  it("renames in place and keeps the project open", async () => {
+    const renamed = { ...PROJECT, path: "/tmp/hexaboride.rex" };
+    const stub = server({ ...boot(), "/api/recent": () => ({ body: { recent: [] } }),
+                          "/api/project/rename": () => ({ body: renamed }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    trigger().click();
+    await flush();
+    entry("Rename…")!.click();
+    await flush();
+    const box = host.querySelector<HTMLInputElement>("header input.fm-rename")!;
+    expect(box.value).toBe("lab6");
+    box.value = "hexaboride";
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect(stub.calls.find((c) => c.path === "/api/project/rename")!.body)
+      .toEqual({ name: "hexaboride" });
+    expect(trigger().textContent).toBe("hexaboride▾");
+    expect(host.querySelector(".start")).toBeNull();
+    expect(host.textContent).toContain('Path("/tmp/lab6.rex").rename("/tmp/hexaboride.rex")');
+  });
+
+  it("asks before replacing an export, with the dialog's own button", async () => {
+    let tries = 0;
+    const stub = server({
+      ...boot(), "/api/recent": () => ({ body: { recent: [] } }),
+      "/api/export/instrument_profile": (call) => (tries++ === 0
+        ? { status: 409, body: { error: { code: "DESTINATION_EXISTS",
+                                          message: "/tmp/instrument_profile.json exists" } } }
+        : { body: { path: `${call.body.directory}/${call.body.filename}`,
+                    name: call.body.filename } }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    trigger().click();
+    await flush();
+    entry("Export")!.click();
+    await flush();
+    // no fit yet: only the instrument profile, which the project answers
+    expect(entry("Refined structure (CIF)…")?.disabled).toBe(true);
+    entry("Instrument profile (JSON)…")!.click();
+    await flush();
+    const dialog = host.querySelector<HTMLElement>('[role="dialog"][aria-labelledby="fm-title"]')!;
+    const inputs = [...dialog.querySelectorAll<HTMLInputElement>("input")];
+    expect(inputs.map((i) => i.value)).toEqual(["instrument_profile.json", "/tmp"]);
+    const submit = () => dialog.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    expect(submit().textContent?.trim()).toBe("Export");
+    submit().click();
+    await flush();
+    expect(dialog.textContent).toContain("exists");
+    expect(submit().textContent?.trim()).toBe("Replace");
+    submit().click();
+    await flush();
+    const sent = stub.calls.filter((c) => c.path === "/api/export/instrument_profile");
+    expect(sent.map((c) => c.body.overwrite)).toEqual([false, true]);
+    expect(host.querySelector('[aria-labelledby="fm-title"]')).toBeNull();
+    expect(host.querySelector(".fm-toast")?.textContent).toBe("Exported instrument_profile.json");
+  });
+
+  it("closes to the start screen", async () => {
+    const stub = server({ ...boot(), "/api/recent": () => ({ body: { recent: [] } }),
+                          "/api/project/close": () => ({ body: { closed: "/tmp/lab6.rex" } }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    trigger().click();
+    await flush();
+    entry("Close project")!.click();
+    await flush();
+    expect(stub.calls.some((c) => c.path === "/api/project/close")).toBe(true);
+    expect(host.querySelector(".start")).toBeTruthy();
+    expect(trigger().textContent).toBe("No project▾");
+  });
+
+  it("answers ⌘S with Saved, there being nothing unsaved", async () => {
+    const stub = server({ ...boot(), "/api/project/save": () => ({ body: PROJECT }) });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "s", metaKey: true, bubbles: true }));
+    await flush();
+    expect(stub.calls.some((c) => c.path === "/api/project/save")).toBe(true);
+    expect(host.querySelector(".fm-toast")?.textContent).toBe("Saved");
   });
 });
 

@@ -827,3 +827,68 @@ def test_the_start_screen_and_dialog_never_scroll_sideways(browser, start):
     page.close()
     assert on_start <= 0 and on_dialog <= 0, (on_start, on_dialog)
     assert width <= 420 - 32 + 1, width
+
+
+@pytest.fixture
+def filemenu(tmp_path_factory):
+    """A project of its own, since this test renames its folder."""
+    httpd, client = _serve(tmp_path_factory, "filemenu")
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}/", client
+    finally:
+        httpd.shutdown()
+
+
+@pytest.mark.parametrize("state", list(WIDTHS))
+def test_the_file_menu_moves_nothing(browser, filemenu, state):
+    """The File menu on the project name (WP-2133): the menu, both submenus,
+    the Save a copy dialog and the rename box are overlays, so walking through
+    them with the mouse moves no landmark, and a rename lands in place."""
+    url, client = filemenu
+    page = _open(browser, url, WIDTHS[state])
+    before = page.evaluate(SNAP, LANDMARKS)
+    moved: dict[str, list[str]] = {}
+
+    def look(step: str) -> None:
+        _frames(page)
+        hit = _moved(before, page.evaluate(SNAP, LANDMARKS))
+        if hit:
+            moved[step] = hit[:4]
+
+    name = page.locator("header .fm-name")
+    name.click()
+    look("open the menu")
+    menu = page.locator(".fm-menu").first
+    labels = menu.locator("button.item .label").all_text_contents()
+    menu.get_by_role("menuitem", name="Open recent").hover()
+    look("hover Open recent")
+    menu.get_by_role("menuitem", name="Export").hover()
+    look("hover Export")
+    kinds = page.locator(".fm-sub button.item .label").all_text_contents()
+    menu.get_by_role("menuitem", name="Save a copy…").click()
+    page.wait_for_selector('[aria-labelledby="fm-title"]')
+    look("Save a copy dialog")
+    fields = page.locator('[aria-labelledby="fm-title"] input').evaluate_all(
+        "els => els.map((e) => e.value)")
+    page.locator('[aria-labelledby="fm-title"]').get_by_role("button", name="Cancel").click()
+    look("cancel the dialog")
+
+    name.click()
+    page.locator(".fm-menu").get_by_role("menuitem", name="Rename…").click()
+    box = page.locator("header input.fm-rename")
+    box.wait_for()
+    look("rename box")
+    box.fill("sample2")
+    box.press("Enter")
+    page.wait_for_selector("header .fm-name:text('sample2')")
+    look("renamed")
+    status, doc = client.get("/api/project")
+    assert not page.errors, page.errors
+    page.close()
+
+    assert labels == ["New project…", "Open…", "Open recent", "Save a copy…", "Rename…",
+                      "Move to…", "Export", "Close project"], labels
+    assert len(kinds) == 6, kinds
+    assert fields[0] == "sample copy", fields
+    assert status == 200 and doc["path"].endswith("sample2.rex"), doc
+    assert not moved, moved
