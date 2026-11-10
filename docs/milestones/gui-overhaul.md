@@ -127,6 +127,9 @@ the piece that touches it or a WP of its own.
   `gui/STYLE.md` covers of these sorts them: drop the covered ones from the rulebook, merge the
   partly covered ones into the guide, and bring the departures and the uncovered ones to the
   maintainer, since visual questions go to him (WP-2134's and WP-2142's next step).
+- `rietx watch`'s state pills set their text in a state colour over an 18 % wash of the same
+  colour. On the light theme `.running` is 3.90:1 and `.cancelled` 4.45:1, under AA. The fix
+  is a pill design call, so WP-2200 left it for whichever piece redraws the chips.
 
 ## Acceptance
 

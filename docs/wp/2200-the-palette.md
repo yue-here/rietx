@@ -1,6 +1,6 @@
 # WP-2200 — The palette
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-10 — claimed by a ghostshift runner
+Milestone: gui-overhaul · Status: 🔄 2026-11-10 — built, PR #1517; six colour questions wait on the maintainer's look
 Depends on: 2142 (the style guide)
 Priority: P2 2026-11-10 — a gui-overhaul piece the maintainer ruled for on 2026-11-06 and 2026-11-09; the peak-mark colour waits on it
 
@@ -115,9 +115,9 @@ action on data.
 - [x] 4. `test_gui_palette.py`: the named pairs with their measured values; every text
   colour against each ground; ink on the primary fill.
 - [x] 5. `gui/STYLE.md` § Colour states what now holds.
-- [ ] 6. Dist rebuilt; vitest, svelte-check, every `tests/*_browser.py`, the fast suite,
+- [x] 6. Dist rebuilt; vitest, svelte-check, every `tests/*_browser.py`, the fast suite,
   `python -m tests.reader_output`.
-- [ ] 7. Screenshots of the built GUI beside the prototype's at the same window size, light
+- [x] 7. Screenshots of the built GUI beside the prototype's at the same window size, light
   and dark, in the PR (acceptance rows 4, 11 and 12).
 
 ## Acceptance
@@ -127,7 +127,7 @@ tests/test_gui_dist.py` green; `npm --prefix gui test && npm --prefix gui run ch
 the screenshots in the PR; the maintainer's look before merge (milestone row 10).
 
 ## Handover log
-- **2026-11-10** — built, PR #PRNUM. The GUI now opens in the site's palette, light and
+- **2026-11-10** — built, PR #1517. The GUI now opens in the site's palette, light and
   dark: warm neutrals, an orange calculated curve, observed points in the ink, a grey
   difference. `rietx watch` and `rietx compare` read the same stylesheet and changed with it.
   The filled primary button now carries legible ink (5.84:1), where white on the orange
@@ -142,8 +142,20 @@ the screenshots in the PR; the maintainer's look before merge (milestone row 10)
   `test_gui_palette`, `test_gui_style_guide` and `test_docs_consistency`: 64 passed. The
   GUI-adjacent files (`test_gui_dist`, `test_watch_app`, `test_compare_ui`,
   `test_gui_manual`, `test_gui_server`): 352 passed. Every `tests/*_browser.py`: 152 passed,
-  0 failed (40 + 18 + 94 over three runs). `python -m tests.reader_output` exit 0, unchanged.
-  FASTCOUNT
+  0 failed (40 + 18 + 94 over three runs). After the review's fixes, `test_compare_browser`
+  and `test_watch_browser` passed again, 59. `python -m tests.reader_output` exit 0,
+  unchanged. FASTCOUNT
+
+  *Review* (`/code-review high --fix`, nine findings). Fixed: `rietx watch` and `rietx
+  compare` still set links, a pill, `code` and their filled buttons in `--accent`. On the
+  light theme that is under AA (4.05:1 and 4.22:1), and white on the dark orange is 2.06:1.
+  They now take `--accent-ink`, and a test reads every page's stylesheet for the accent as
+  text or fill. The dark peak fit `#2e5e9a` was 2.67:1 on the panel. It is now `#516494`
+  (3.02:1), and a test holds every curve to 3:1. `test_compare_ui` no longer allows `#fff`.
+  Stale comments were fixed. Declined: the watcher's state pills set text in a state colour
+  over an 18 % wash of it (`.running` 3.90:1, `.cancelled` 4.45:1 on light). Changing the
+  wash is a pill design call outside the token swap. Questions 2 and 5 below hold the other
+  two findings.
 
   *Open visual questions for the maintainer.* Each is one value in `viz/theme.py` to change.
   The pictures are `2200-screenshots/gui-*.png` beside `prototype-*.png`.
@@ -161,8 +173,8 @@ the screenshots in the PR; the maintainer's look before merge (milestone row 10)
   4. The zero line takes the site's zero grey (`#cfcfcf` / `#4a4a4a`). The prototype draws
      it in its rule colour.
   5. On the light theme the difference curve is `--muted` exactly, as in the prototype. The
-     series trajectory wore the difference colour, so it now wears the observed ink, apart
-     from the backward chain's `--muted`.
+     grey was shared twice. The series trajectory's forward chain wore it, and now wears the
+     observed ink. The dotted edge of an excluded region still wears it.
   6. Every non-primary button is outlined in `--line-strong` with ink text, from the
      2026-11-06 ruling. The look is unconfirmed.
 
