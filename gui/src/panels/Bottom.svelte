@@ -34,6 +34,8 @@
     open?: boolean;
     tab?: BottomTab;
     height?: number;
+    /** the height of the panes above, measured when a drag starts; this
+     *  panel adds its own drawn height to it */
     extent?: () => number;
     onresize?: (height: number) => void;
     lines: string[];
@@ -49,25 +51,34 @@
   /** The panes above must keep this much of the window through a drag. */
   const KEEP = 240;
 
-  /** what a drag set locally; `null` means whatever was saved */
+  /** The height a double-click resets to, and the shell's default. */
+  const BOTTOM_DEFAULT = 200;
+
+  /** what a live drag sets; `null` once it lands, so the panel follows
+   *  `height` again and another project's stored height is not overridden */
   let local = $state<number | null>(null);
   const size = $derived(Math.max(BOTTOM_MIN, local ?? height));
+  /** The height the panel is drawn at, 0 while hidden. The CSS `max-height`
+   *  can hold it under `size`, so a drag starts from this one, or the grip
+   *  does nothing until the pointer has crossed the difference. */
+  let drawn = $state(0);
 
   function sized(next: number, done: boolean) {
-    local = next;
+    local = done ? null : next;
     if (done) onresize(next);
   }
 
   function reset() {
-    local = 200;
-    onresize(200);
+    local = null;
+    onresize(BOTTOM_DEFAULT);
   }
 </script>
 
 <section class="bottom" class:hidden={!open} style:flex="0 0 {size}px"
-  aria-label="console and history">
-  <Splitter {size} grow="up" min={BOTTOM_MIN} keep={KEEP} onsize={sized} onreset={reset}
-    {extent} title="drag to resize the console and history; double-click resets it" />
+  bind:offsetHeight={drawn} aria-label="console and history">
+  <Splitter size={drawn || size} grow="up" min={BOTTOM_MIN} keep={KEEP} onsize={sized}
+    onreset={reset} extent={() => extent() + drawn}
+    title="drag to resize the console and history; double-click resets it" />
   <nav class="tabs" aria-label="console and history">
     {#each BOTTOM_TABS as entry (entry.id)}
       <button class="tab" class:on={tab === entry.id} onclick={() => (tab = entry.id)}

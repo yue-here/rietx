@@ -418,7 +418,9 @@ def test_a_first_run_moves_nothing(browser, tmp_path_factory, state):
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
     try:
         page = _open(browser, url, WIDTHS[state])
-        assert page.locator(".statusbar .run").text_content().strip() == "idle"
+        # the words are empty until the first run-state frame lands
+        page.wait_for_function(
+            "document.querySelector('.statusbar .run')?.textContent.trim() === 'idle'")
         page.locator(".actions button", has_text="One cycle").click()
         page.locator(".statusbar button.toggle").click()
         _frames(page)

@@ -35,6 +35,8 @@
 
   const mod = modifier(typeof navigator === "undefined" ? "" : navigator.platform ?? "");
   const words = $derived(project ? runWords(run) : "");
+  /** Closing a project leaves the shell's `open` set, with no panel to show. */
+  const shown = $derived(project && open);
   const tone = $derived(
     run?.state === "cancelling" ? "warn"
       : run?.state === "running" ? "live"
@@ -42,17 +44,18 @@
 </script>
 
 <footer class="statusbar">
-  <button class="ghost toggle" aria-pressed={project && open} disabled={!project}
-    onclick={ontoggle} aria-label={open ? "Hide the console" : "Show the console"}
-    title={toggleTitle(project, open, mod)}>
+  <button class="ghost toggle" aria-pressed={shown} disabled={!project}
+    onclick={ontoggle} aria-label={shown ? "Hide the console" : "Show the console"}
+    title={toggleTitle(project, shown, mod)}>
     <svg viewBox="0 0 16 16" aria-hidden="true">
       <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
       <rect class="fill" x="2" y="9.5" width="12" height="3.5" /><path d="M1.5 9h13" />
     </svg>
     Console
   </button>
+  <!-- `title` holds the words a narrow window cuts with an ellipsis -->
   <span class="run mono" data-state={run?.state ?? "idle"} data-tone={tone}
-    role="status">{words}</span>
+    role="status" title={words}>{words}</span>
   <button class="ghost" onclick={oncancel} disabled={!busy}>Cancel</button>
 </footer>
 

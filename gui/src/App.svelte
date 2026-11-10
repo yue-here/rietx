@@ -334,8 +334,9 @@
     // gets the strip once. Only `false` hides it (WP-1017).
     firstRun = project?.doc?.ui?.first_run !== false;
     // the bottom panel's height since WP-2206, under the key the Console's own
-    // pane stored it in; a pane shut to its header (26 px) opens at the floor
-    consoleHeight = Math.max(90, project?.doc?.ui?.console_height ?? 200);
+    // pane stored it in; a pane shut to its header (26 px) opens at the
+    // panel's floor, which `Bottom.svelte` applies
+    consoleHeight = project?.doc?.ui?.console_height ?? 200;
     sideWidth = project?.doc?.ui?.side_width ?? null;
     modelColumns = project?.doc?.ui?.model_columns ?? null;
   }
@@ -924,7 +925,8 @@
       disabled: !project, run: () => (tab = "report") },
     { id: "history", label: "Show the history", echo: "ref.history.summary()", key: "h",
       disabled: !project, run: () => showBottom("history") },
-    { id: "console", label: bottomOpen ? "Hide the console and history" : "Show the console",
+    { id: "console",
+      label: bottomOpen ? "Hide the console and history" : "Show the console and history",
       echo: "# a layout choice, not a setting", key: "⌘J", disabled: !project,
       run: toggleBottom },
     { id: "text", label: "Edit the project as text",
@@ -1520,7 +1522,7 @@
      nothing in it. -->
 {#if project}
   <Bottom open={bottomOpen} bind:tab={bottomTab} height={consoleHeight}
-    extent={() => (mainEl?.clientHeight ?? 0) + consoleHeight}
+    extent={() => mainEl?.clientHeight ?? 0}
     onresize={setConsoleHeight} {lines} {dropped} {head} {busy} {say} onmoved={moved} />
 {/if}
 <StatusBar project={!!project} open={bottomOpen} {run} {busy}
