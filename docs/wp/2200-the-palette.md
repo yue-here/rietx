@@ -144,7 +144,10 @@ the screenshots in the PR; the maintainer's look before merge (milestone row 10)
   `test_gui_manual`, `test_gui_server`): 352 passed. Every `tests/*_browser.py`: 152 passed,
   0 failed (40 + 18 + 94 over three runs). After the review's fixes, `test_compare_browser`
   and `test_watch_browser` passed again, 59. `python -m tests.reader_output` exit 0,
-  unchanged. FASTCOUNT
+  unchanged. Fast suite on the tree merged with main at e0405b2d6, through the serial lock: 14624
+  passed, 410 skipped, 32 xfailed. The branch adds five test functions (nine cases), all in
+  `test_gui_palette.py`, 0.04 s together; it removed the grandfathered-pairs test for the
+  named-pairs one. No baseline was run for the exact delta.
 
   *Review* (`/code-review high --fix`, nine findings). Fixed: `rietx watch` and `rietx
   compare` still set links, a pill, `code` and their filled buttons in `--accent`. On the
