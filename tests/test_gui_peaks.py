@@ -131,6 +131,17 @@ def test_the_peak_verbs_round_trip_with_their_echoes(served, client):
     assert picked["groups"] and all(
         len(g["two_theta"]) == len(g["y_fit"]) == len(g["delta"])
         for g in picked["groups"])
+    # each line's own curve (WP-2202): one per component, naming its row, and
+    # together they are the group's model, since the model is linear in the
+    # areas: the lines sum to y_fit minus the envelope
+    rows = {p["index"]: p for p in picked["peaks"]}
+    for g in picked["groups"]:
+        assert len(g["lines"]) == g["n_components"]
+        assert all(rows[ln["index"]]["group"] == g["group"] for ln in g["lines"])
+        model = np.asarray(g["y_fit"]) - np.asarray(g["y_env"])
+        summed = np.sum([ln["y"] for ln in g["lines"]], axis=0)
+        np.testing.assert_allclose(summed, model, rtol=1e-9,
+                                   atol=1e-9 * max(1.0, float(np.max(np.abs(model)))))
 
     # add — between the first two lines, which lands in fresh window territory
     # or an existing group; either way the component is the human's

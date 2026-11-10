@@ -122,7 +122,7 @@ suggestions, and this is none of them).
 ## Tasks
 
 - [x] 1. File this WP and give it the milestone's "Peaks and indexing" row.
-- [ ] 2. Per-line curves: `PeakEditor.curves` serves `lines` per group; a pytest holds their sum
+- [x] 2. Per-line curves: `PeakEditor.curves` serves `lines` per group; a pytest holds their sum
   to the group's model.
 - [ ] 3. `lib/peaks.ts` helpers for the steps, filters, groups to look at, the candidate columns
   and relations; vitest.
