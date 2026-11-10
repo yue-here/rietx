@@ -33,6 +33,8 @@
   import Peaks from "./panels/Peaks.svelte";
   import Plan from "./panels/Plan.svelte";
   import Plot from "./panels/Plot.svelte";
+  import Background from "./panels/Background.svelte";
+  import { backgroundTitle } from "./lib/background";
   import Report from "./panels/Report.svelte";
   import Series from "./panels/Series.svelte";
   import Splitter from "./panels/Splitter.svelte";
@@ -1323,7 +1325,8 @@
              (WP-1029 item c).  The judgement is the *report's* — `maturity`
              quotes `MATURITY_MAX_RWP` — so nothing here decides anything. -->
         <div class="gtitle">
-          <strong class="what">{previewAnswer ? "Preview, not refined"
+          <strong class="what">{graphTab === "background" ? backgroundTitle(busy)
+            : previewAnswer ? "Preview, not refined"
             : busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
           <div class="stats tabular mono" class:immature={immature}>
             {#if previewAnswer}
@@ -1343,6 +1346,7 @@
             {/if}
           </div>
         </div>
+        <!-- each graph stays mounted while another is up, as the panels do -->
         <div class="gview" class:hidden={graphTab !== "pattern"}>
         <Plot {result} {plotKey} {zoom} {theme} error={resultError}
           peaks={peaksData} peaksActive={tab === "peaks"} hovered={hoveredPeak}
@@ -1356,6 +1360,12 @@
         <div class="gview" class:hidden={graphTab !== "single"}>
           <PeakWindows curves={baseCurves} preview={previewAnswer} {theme}
             active={graphTab === "single" && !hideGraphs} />
+        </div>
+        <div class="gview" class:hidden={graphTab !== "background"}>
+          <Background {head} {busy} {theme} {say} onmoved={moved}
+            protocol={JSON.stringify([project?.doc?.mode ?? null, protocol.limits,
+                                      protocol.regions])}
+            active={graphTab === "background" && !hideGraphs} />
         </div>
         {#if hideModel}{@render actions()}{/if}
       </div>
@@ -1592,6 +1602,17 @@
   /* The graph's title line (WP-2123): what the view shows, then the fit's
      statistic held to the right.  The title gives way first, with an ellipsis,
      so the statistic never wraps under it. */
+  .gview {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gview.hidden {
+    display: none;
+  }
+
   .gtitle {
     display: flex;
     align-items: baseline;

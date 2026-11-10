@@ -28,7 +28,7 @@ redesign is ported in five pieces, in this order:
 | 2 | [2126](../wp/2126-the-parameters-panel.md) | the Parameters panel: one row per atom, number slots that never move, the padlock as `hold`, the floating editor |
 | 3 | [2127](../wp/2127-the-plan-tab.md) | the Plan tab on the existing plan routes, read top to bottom as a recipe |
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
-| 5 | not yet filed | the Background tab: a route serving the preview's matrices, a held Chebyshev term, the P-spline |
+| 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
 
 Every merge leaves a working GUI. No existing panel or route becomes unreachable at any piece;
 a panel moves into the new shell as it is, and is redesigned by its own piece.
