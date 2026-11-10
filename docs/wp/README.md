@@ -79,6 +79,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2106](2106-an-equation-fitted-to-a-series-trajectory.md) | An equation fitted to a series trajectory | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2107](2107-an-equation-over-a-reflection.md) | An equation over a reflection | P2 | [1964](1964-a-parametric-equation-the-user-writes.md) | [parametric](#parametric) |
 | [2140](2140-every-atom-is-named-by-its-unique-label.md) | Every atom is named by its unique label | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | P2 | [2127](2127-the-plan-tab.md) | [gui-overhaul](#gui-overhaul) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -507,6 +508,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2131](2131-the-start-screen-and-new-project.md) | The start screen and the New project dialog | ✅ 2026-11-10 | — | [2123](2123-the-layout-shell.md) |
 | [2133](2133-the-file-menu.md) | The File menu on the project name | ✅ 2026-11-10 | — | [2131](2131-the-start-screen-and-new-project.md) |
 | [2142](2142-the-gui-style-guide.md) | The GUI style guide | ✅ 2026-11-10 | — | — |
+| [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | ⬜ | P2 | [2127](2127-the-plan-tab.md) |
 
 ## <a id="unscheduled"></a>Unscheduled
 
