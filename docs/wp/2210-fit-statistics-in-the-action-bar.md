@@ -83,10 +83,10 @@ nothing reads the data or decides for a fit. The judgement shown is the report's
 
 ## Tasks
 
-- [ ] One component draws the fit's statistics (`panels/FitStats.svelte`): Rwp, GoF and the
+- [x] One component draws the fit's statistics (`panels/FitStats.svelte`): Rwp, GoF and the
   report's judgement as words in `--bad`, its message one click away through `<Help>`. The
   title line uses it while the graphs show.
-- [ ] The action bar carries it beside Refine while the graphs are hidden, in a slot
+- [x] The action bar carries it beside Refine while the graphs are hidden, in a slot
   reserved at its widest content, so a fit finishing moves nothing.
 - [ ] Vitest: the bar shows the statistics only while the graphs are hidden, and the
   judgement is words, not a chip. Browser: the slot holds its longest content, a refine with

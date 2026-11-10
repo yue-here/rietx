@@ -19,8 +19,8 @@
   import { onMount, setContext } from "svelte";
 
   import { ApiError, api } from "./api";
-  import Help from "./Help.svelte";
   import ActionBar from "./panels/ActionBar.svelte";
+  import FitStats from "./panels/FitStats.svelte";
   import Checklist from "./panels/Checklist.svelte";
   import Console from "./panels/Console.svelte";
   import History from "./panels/History.svelte";
@@ -1203,7 +1203,16 @@
   <ActionBar bind:mode={refineMode} touched={pendingTotal} invalid={pendingInvalid}
     {busy} blocked={noPhases ? NO_PHASES_REASON : null}
     onapply={applyPending} onrevert={revertPending}
-    onrefine={() => refine()} />
+    onrefine={() => refine()} stats={hideGraphs ? barStats : null} />
+{/snippet}
+
+<!-- The fit's statistics have one home per layout (WP-2210): the graph title
+     line while the graphs show, and the action bar beside Refine while they
+     are hidden (the maintainer's "try B" of 2026-11-09).  The bar quotes the
+     fit alone: a preview's Rwp stays with the title line, which is what tells
+     a preview from a fit. -->
+{#snippet barStats()}
+  <FitStats {rwp} {gof} {immature} message={result?.maturity?.message ?? ""} reserve />
 {/snippet}
 
 <svelte:window onkeydown={keydown} onclick={clickAway} onresize={reanchor}
@@ -1348,21 +1357,14 @@
           <strong class="what">{graphTab === "background" ? backgroundTitle(busy)
             : previewAnswer ? "Preview, not refined"
             : busy ? "Refining" : result ? "Last fit" : "Observed pattern"}</strong>
-          <div class="stats tabular mono" class:immature={immature}>
+          <div class="stats">
             {#if previewAnswer}
-              Rwp <strong>{(previewAnswer.curves.header.rwp * 100).toFixed(3)}%</strong>
-              {#if rwp !== null}<span class="muted">last fit {(rwp * 100).toFixed(3)}%</span>{/if}
+              Rwp <strong class="mono tabular">{(previewAnswer.curves.header.rwp * 100).toFixed(3)}%</strong>
+              {#if rwp !== null}<span class="muted">last fit <span class="mono tabular">{(rwp * 100).toFixed(3)}%</span></span>{/if}
             {:else if previewError}
               <span class="muted">preview refused: {previewError}</span>
             {:else if rwp !== null}
-              Rwp <strong>{(rwp * 100).toFixed(3)}%</strong>
-              {#if gof !== null}<span class="muted">GoF {gof.toFixed(3)}</span>{/if}
-              {#if immature}
-                <span class="chip bad">
-                  <Help text={result.maturity.message} title="Not a fit yet"
-                    >⚠ not a fit yet</Help>
-                </span>
-              {/if}
+              <FitStats {rwp} {gof} {immature} message={result?.maturity?.message ?? ""} />
             {/if}
           </div>
         </div>
@@ -1657,10 +1659,6 @@
     align-items: baseline;
     gap: 6px;
     white-space: nowrap;
-  }
-
-  .stats.immature strong {
-    color: var(--warn);
   }
 
   .controls {

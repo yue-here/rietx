@@ -13,6 +13,12 @@
    * width of its longer label, so "Refine" becoming "Apply and refine" on the
    * first edit pushes no neighbour.
    *
+   * While the graphs are hidden the bar also carries the fit's statistics,
+   * right of Refine (WP-2210, the maintainer's "try B" of 2026-11-09), handed
+   * in as `stats`. They come and go with the collapse click, which asks for a
+   * layout change, and their slot reserves its widest content, so a fit
+   * finishing moves nothing. A third group, so a narrow bar wraps it whole.
+   *
    * The bar owns no state of its own beyond the refine choice: the pending
    * edits are the Parameters panel's, and the run is the shell's. It reports
    * presses and lets those owners act, `Splitter.svelte`'s rule.
@@ -26,6 +32,7 @@
     onapply = () => {},
     onrevert = () => {},
     onrefine = () => {},
+    stats = null,
   }: {
     /** how many edits the Parameters panel holds */
     touched?: number;
@@ -39,6 +46,8 @@
     onapply?: () => void;
     onrevert?: () => void;
     onrefine?: () => void;
+    /** the fit's statistics, drawn beside Refine while the graphs are hidden */
+    stats?: import("svelte").Snippet | null;
   } = $props();
 
   const CHOICES = [
@@ -73,6 +82,7 @@
     <button class="refine" disabled={busy || !!invalid || !!blocked} title={blocked}
       onclick={onrefine}>{touched ? "Apply and refine" : "Refine"} <kbd>⌘⏎</kbd></button>
   </div>
+  {#if stats}<div class="fit" role="group" aria-label="fit statistics">{@render stats()}</div>{/if}
 </div>
 
 <style>
