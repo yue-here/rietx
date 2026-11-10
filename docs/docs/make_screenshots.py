@@ -57,7 +57,7 @@ EXAMPLE = "fap"
 
 #: Where the window is measured.  Wide enough that the panel column is at a
 #: comfortable width rather than its floor — the model form stacks below
-#: 1256 px (WP-1216) and the history compare row side-scrolls below about a
+#: 991 px (WP-1216, WP-2203) and the history compare row side-scrolls below about a
 #: 400 px sidebar (WP-1217), so a narrower shot would document the reflow
 #: rather than the panel.
 VIEWPORT = {"width": 1440, "height": 900}
@@ -181,7 +181,7 @@ SHOTS: tuple[Shot, ...] = (
         selector=".side",
         tab="Text",
     ),
-    # Last of the fitted pass: it switches the graph strip, and every shot of
+    # Last of the fitted pass, these two: they switch the graph strip, and every shot of
     # the graph column above wants the Pattern tab.
     Shot(
         "single-peaks",
@@ -189,6 +189,13 @@ SHOTS: tuple[Shot, ...] = (
         "last fit's scale.",
         selector=".plotcol",
         tab="Single peaks",
+    ),
+    Shot(
+        "structure-tab",
+        "The Structure graph tab: the model in 3D at its working values, the "
+        "species and polyhedra legends, and the view-down buttons under it.",
+        selector=".plotcol",
+        tab="Structure",
     ),
 )
 

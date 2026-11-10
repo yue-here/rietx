@@ -544,7 +544,8 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 `src/rietx/gui/structure3d.py`, `lib/structure3d.ts`, `lib/gl3d.ts`,
 `panels/Structure3D.svelte`, `src/rietx/viz/figure3d/scene.py`.
 
-- **The viewer is the Model pane's third column**, never a tab (WP-1015).
+- **The viewer is a graph tab** (WP-2203, replacing WP-1015's Model-pane column). It
+  fetches only while shown, keyed on the head, `Model`'s reload and the project path.
 - **Everything hard stays on the server** (WP-1015). The payload is Cartesian points,
   3×3 matrices and index pairs; the browser draws `pos + M·v` over one unit sphere.
 - **`symmetry.expand_orbit` returns the operation with the position** (WP-1015): an image

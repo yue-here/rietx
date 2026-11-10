@@ -13,7 +13,7 @@ control behaves as it does, and when you should reach for it.
 ## The shape of the window
 
 Two sides. The graphs are on the left, under their own tab strip. It holds
-three tabs, `Pattern`, `Single peaks` and `Background`. A title line under it says what the
+four tabs, `Pattern`, `Single peaks`, `Background` and `Structure`. A title line under it says what the
 graph shows. On the pattern it reads `Observed pattern` before any fit, `Last fit` after one, and
 `Refining` while a run is in flight. While the Interactive tab has values
 waiting, it says `Preview, not refined`. The panel column is on the right, with
@@ -271,6 +271,132 @@ A hold is `Refinement.hold`, and a release `Refinement.unhold`. Each records a
 history node, and the console echoes the call. The Parameters panel offers no
 switch per coefficient, since one coefficient alone means little. The family and
 the number of Chebyshev terms are set in Model.
+
+## The structure
+
+The `Structure` graph tab draws the model in 3D. It draws the working values,
+the ones the next run starts from, and the title line says so. An edit applied
+in any panel redraws it. An edit not yet applied does not. The server computes
+the geometry, and the browser draws it with rietx's own WebGL2 renderer, so
+every sphere, ellipsoid and stick is exact at any zoom.
+
+```{image} ../screenshots/structure-tab-light.png
+:class: only-light
+:alt: The Structure tab on the fluorapatite example, the cell drawn in balls with PO4 tetrahedra, the species legend, the view-down buttons and the caption under the picture
+```
+
+```{image} ../screenshots/structure-tab-dark.png
+:class: only-dark
+:alt: The Structure tab on the fluorapatite example, the cell drawn in balls with PO4 tetrahedra, the species legend, the view-down buttons and the caption under the picture
+```
+ Two modes: balls, and displacement
+ellipsoids.
+The projection is parallel and there is no axis box, so the cell's own a, b, c
+edges are the frame of reference. Drag to rotate (a free trackball), shift-drag
+or right-drag to pan, and scroll to zoom. The buttons view down a, b or c.
+The line under the picture names the atom or bond under the pointer.
+
+In ellipsoid mode each anisotropic site also shows its three principal
+ellipses, the rings of an ORTEP drawing. An isotropic site shows none, because
+its axes point nowhere in particular. Where a site displaces equally in two
+directions, as on a threefold or higher axis, two of its rings could sit at any
+angle round the third. One of them is drawn through the lattice vector nearest
+their plane, and each symmetry copy of the site shows the copy of those rings.
+Every machine draws the same picture.
+
+Ball mode also draws coordination polyhedra: the shape the nearest anions make
+around a cation, such as SiO₄ or AlF₆. Shells of four to six ligands are drawn
+by default, which are the tetrahedra and octahedra of a framework. Larger
+shells, such as NAC's CaF₈, start switched off. The row under the species
+legend holds a `polyhedra` switch and one button per formula. A species with
+two shapes, such as a CaO₆ site beside a CaO₈ one, has two buttons. A formula
+whose ligands would take the picture past the 400 atoms the viewer draws keeps
+its button, greyed out, and the note under the picture counts it. The switch
+is held per mode, so polyhedra start on in ball mode and off in ellipsoid mode,
+where the faces would cover the ellipsoids. A drawn polyhedron takes the place
+of its centre's sticks. It also brings the ligands it needs outside the cell,
+and they go when it is switched off. A centre outside the cell carries no
+polyhedron, so it is drawn only while its site's polyhedra are off, as in
+VESTA. Pointing at a face names the polyhedron,
+its ligand count, its mean distance and its gap. When a second gap is nearly as
+large and would close a shell of its own, the line names it too, as `next gap
+×1.15 after 4`. Brunner and Schwarzenbach (1971) call two such gaps
+approximately equal, and the shell drawn is then a choice the data barely
+makes. The caption lists what is drawn and what is off.
+
+A centre is a metal, or a non-metal bonded to a more electronegative one, as P
+is in PO₄. A ligand is any other non-metal except hydrogen. A non-metal bonded
+to a metal and to one more electronegative atom is a ligand too, as the C of a
+cyanide or a carbonyl is. The ligands are searched out to three times the
+nearest one's distance. An atom bonded to one of the centre's own ligands, and
+lying behind it, is part of that ligand and is left out, as a cyanide's N is.
+The shell ends at the largest jump in the sorted distances. It is drawn only
+when that jump is at least 1.15 times, every ligand is a corner, and the centre
+is inside. On 21 test phases, from spinel to gypsum, this draws the picture a
+chemist would, and Prussian blue's C-bonded iron draws FeC₆. It does not cover
+three cases:
+
+- An intermetallic has no anions, so it draws no polyhedra.
+- A split site draws none. That is a shell holding two partly occupied ligands
+  closer to each other than to the centre.
+- A split pair can still get a stick. Two non-metals closer than 0.7 times
+  their radius sum are read as one atom over two positions: no stick joins
+  them, and neither makes the other a cation. With a metal in the pair, the
+  bound is 0.5, since uranyl's U=O sits at 0.67. Two partly occupied non-metals
+  further apart lose their stick when they sit closer to each other than to an
+  atom both are bonded to, as a disordered nitrate's O do round Na. A pair that
+  meets no test keeps its stick, as Prussian blue's C and a vacancy's water O
+  do, and Ag β-alumina's Ag and O4 do at 0.6 to 0.7 of their radius sum. A
+  file's disorder groups settle those, where it has them.
+
+A CIF that states disorder groups is drawn with every alternative, and the
+viewer reads the groups. It draws no stick between two sites the file says are
+never occupied together, and no polyhedron holding both.
+`major alternative only`, under `drawing`, draws each assembly's most occupied
+group alone, and the caption says how many sites it left out. A group with a
+minus prefix is a site disordered about a special position: its symmetry
+copies are its alternatives, and that button leaves them all drawn.
+
+The rule can be overridden, as Mercury's central and ligand element lists
+override its own. Under `drawing`, the `round` row holds one button per element
+for the atoms a polyhedron is drawn round, and the `corners` row one per element
+for the atoms at its corners. Both start as the rule picks them. Any element
+may go in either row, so F round with Ca at the corners draws fluorite's
+anion-centred FCa₄. Cs round with Cs and Cl at the corners finds CsCl's
+14-atom environment, and its legend button starts off, as every shell of more
+than six does. An intermetallic's environments are asked for the same way.
+Double-clicking an atom draws that atom's environment alone: its shell
+among every element, as Daams and Villars (1993) draw an atomic environment.
+Double-clicking empty space ends it. `chemistry` goes back to the rule, and so does a change of phase. The
+caption says when the lists are your own.
+
+`PNG` renders the picture again, 3000 pixels on its long side, with the a, b, c
+letters drawn in. That is a 17 cm figure at 300 dpi with room to crop.
+`transparent PNG`, under `drawing`, leaves the background out.
+
+Two things here will mislead you if nobody says them:
+
+- The bond threshold is a drawing threshold rather than chemistry. Bonds are
+  drawn at a fraction of the sum of covalent radii, and no single value is right
+  for both an ionic solid and an organic. LaB₆ at the default draws every La–B
+  contact and looks like a cage; one turn of the slider down and the B₆
+  octahedron appears. It sits behind the `drawing` disclosure, and a first-time
+  user needs it. No stick joins a metal to a cation at any threshold, so
+  forsterite's Mg is never joined to the Si of its SiO₄ neighbours.
+- The ellipsoids are a diagnostic. Their axes are refined quantities, so a
+  background flexible enough to imitate the peaks arrives here as balloons,
+  while improving Rwp. A non-positive-definite tensor arrives as a flat disc,
+  and the line under the picture gives the reason when you point at it. Six ordinary-looking numbers in the parameter
+  table are obvious in the picture.
+
+The probability selector scales the ellipsoids. The `× size` factor beside it is
+a drawing multiplier and no ellipsoid stands above 100 %. A figure exported at a
+multiplier other than 1 is not an ORTEP-quotable surface, and the caption prints
+both numbers so it cannot be quoted as one by accident.
+
+Element colours are chosen per phase rather than per element, so the same
+element can be drawn in two colours in two phases. The familiar assignments
+never move; the rest are separated against whatever else is in that phase.
 
 ## Parameters
 
@@ -532,7 +658,8 @@ history node's label: that it is not the gate's pick, its grade and its caveats.
 
 ## Model
 
-The structure and the instrument, and a 3D view of the cell.
+The structure and the instrument. The 3D view of the cell is the `Structure`
+graph tab.
 
 The split explains why some edits feel different. If the parameter table has the
 path, the parameter table owns it: a lattice parameter, an occupancy, a Biso, a profile
@@ -564,119 +691,6 @@ invalidate before it commits: incompatible values with their nearest allowed
 ones, coordinates that would be dropped, and the consequences a table diff
 cannot see, which are a setting change, an orbit collision, or the cell's atom
 count doubling under a symbol with the same number of free parameters.
-
-### The 3D view
-
-A third column of this panel, on by default. The server computes the geometry,
-and the browser draws it with rietx's own WebGL2 renderer, so every sphere,
-ellipsoid and stick is exact at any zoom. Two modes: balls, and displacement
-ellipsoids.
-The projection is parallel and there is no axis box, so the cell's own a, b, c
-edges are the frame of reference. Drag to rotate (a free trackball), shift-drag
-or right-drag to pan, and scroll to zoom. The buttons view down a, b or c.
-The line under the picture names the atom or bond under the pointer.
-
-In ellipsoid mode each anisotropic site also shows its three principal
-ellipses, the rings of an ORTEP drawing. An isotropic site shows none, because
-its axes point nowhere in particular. Where a site displaces equally in two
-directions, as on a threefold or higher axis, two of its rings could sit at any
-angle round the third. One of them is drawn through the lattice vector nearest
-their plane, and each symmetry copy of the site shows the copy of those rings.
-Every machine draws the same picture.
-
-Ball mode also draws coordination polyhedra: the shape the nearest anions make
-around a cation, such as SiO₄ or AlF₆. Shells of four to six ligands are drawn
-by default, which are the tetrahedra and octahedra of a framework. Larger
-shells, such as NAC's CaF₈, start switched off. The row under the species
-legend holds a `polyhedra` switch and one button per formula. A species with
-two shapes, such as a CaO₆ site beside a CaO₈ one, has two buttons. A formula
-whose ligands would take the picture past the 400 atoms the viewer draws keeps
-its button, greyed out, and the note under the picture counts it. The switch
-is held per mode, so polyhedra start on in ball mode and off in ellipsoid mode,
-where the faces would cover the ellipsoids. A drawn polyhedron takes the place
-of its centre's sticks. It also brings the ligands it needs outside the cell,
-and they go when it is switched off. A centre outside the cell carries no
-polyhedron, so it is drawn only while its site's polyhedra are off, as in
-VESTA. Pointing at a face names the polyhedron,
-its ligand count, its mean distance and its gap. When a second gap is nearly as
-large and would close a shell of its own, the line names it too, as `next gap
-×1.15 after 4`. Brunner and Schwarzenbach (1971) call two such gaps
-approximately equal, and the shell drawn is then a choice the data barely
-makes. The caption lists what is drawn and what is off.
-
-A centre is a metal, or a non-metal bonded to a more electronegative one, as P
-is in PO₄. A ligand is any other non-metal except hydrogen. A non-metal bonded
-to a metal and to one more electronegative atom is a ligand too, as the C of a
-cyanide or a carbonyl is. The ligands are searched out to three times the
-nearest one's distance. An atom bonded to one of the centre's own ligands, and
-lying behind it, is part of that ligand and is left out, as a cyanide's N is.
-The shell ends at the largest jump in the sorted distances. It is drawn only
-when that jump is at least 1.15 times, every ligand is a corner, and the centre
-is inside. On 21 test phases, from spinel to gypsum, this draws the picture a
-chemist would, and Prussian blue's C-bonded iron draws FeC₆. It does not cover
-three cases:
-
-- An intermetallic has no anions, so it draws no polyhedra.
-- A split site draws none. That is a shell holding two partly occupied ligands
-  closer to each other than to the centre.
-- A split pair can still get a stick. Two non-metals closer than 0.7 times
-  their radius sum are read as one atom over two positions: no stick joins
-  them, and neither makes the other a cation. With a metal in the pair, the
-  bound is 0.5, since uranyl's U=O sits at 0.67. Two partly occupied non-metals
-  further apart lose their stick when they sit closer to each other than to an
-  atom both are bonded to, as a disordered nitrate's O do round Na. A pair that
-  meets no test keeps its stick, as Prussian blue's C and a vacancy's water O
-  do, and Ag β-alumina's Ag and O4 do at 0.6 to 0.7 of their radius sum. A
-  file's disorder groups settle those, where it has them.
-
-A CIF that states disorder groups is drawn with every alternative, and the
-viewer reads the groups. It draws no stick between two sites the file says are
-never occupied together, and no polyhedron holding both.
-`major alternative only`, under `drawing`, draws each assembly's most occupied
-group alone, and the caption says how many sites it left out. A group with a
-minus prefix is a site disordered about a special position: its symmetry
-copies are its alternatives, and that button leaves them all drawn.
-
-The rule can be overridden, as Mercury's central and ligand element lists
-override its own. Under `drawing`, the `round` row holds one button per element
-for the atoms a polyhedron is drawn round, and the `corners` row one per element
-for the atoms at its corners. Both start as the rule picks them. Any element
-may go in either row, so F round with Ca at the corners draws fluorite's
-anion-centred FCa₄. Cs round with Cs and Cl at the corners finds CsCl's
-14-atom environment, and its legend button starts off, as every shell of more
-than six does. An intermetallic's environments are asked for the same way.
-Double-clicking an atom draws that atom's environment alone: its shell
-among every element, as Daams and Villars (1993) draw an atomic environment.
-Double-clicking empty space ends it. `chemistry` goes back to the rule, and so does a change of phase. The
-caption says when the lists are your own.
-
-`PNG` renders the picture again, 3000 pixels on its long side, with the a, b, c
-letters drawn in. That is a 17 cm figure at 300 dpi with room to crop.
-`transparent PNG`, under `drawing`, leaves the background out.
-
-Two things here will mislead you if nobody says them:
-
-- The bond threshold is a drawing threshold rather than chemistry. Bonds are
-  drawn at a fraction of the sum of covalent radii, and no single value is right
-  for both an ionic solid and an organic. LaB₆ at the default draws every La–B
-  contact and looks like a cage; one turn of the slider down and the B₆
-  octahedron appears. It sits behind the `drawing` disclosure, and a first-time
-  user needs it. No stick joins a metal to a cation at any threshold, so
-  forsterite's Mg is never joined to the Si of its SiO₄ neighbours.
-- The ellipsoids are a diagnostic. Their axes are refined quantities, so a
-  background flexible enough to imitate the peaks arrives here as balloons,
-  while improving Rwp. A non-positive-definite tensor arrives as a flat disc,
-  and the line under the picture gives the reason when you point at it. Six ordinary-looking numbers in the parameter
-  table are obvious in the picture.
-
-The probability selector scales the ellipsoids. The `× size` factor beside it is
-a drawing multiplier and no ellipsoid stands above 100 %. A figure exported at a
-multiplier other than 1 is not an ORTEP-quotable surface, and the caption prints
-both numbers so it cannot be quoted as one by accident.
-
-Element colours are chosen per phase rather than per element, so the same
-element can be drawn in two colours in two phases. The familiar assignments
-never move; the rest are separated against whatever else is in that phase.
 
 ## Text
 

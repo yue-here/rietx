@@ -71,10 +71,10 @@ No flag, threshold or automatic action is added. The one rule this WP adds is wh
       and the stored column widths follow two columns.
 - [x] Tests: the vitest viewer block opens the tab, a hidden tab asks for nothing, and the layout
       test presses the viewer's controls; `tests/test_structure3d_browser.py` opens the tab.
-- [ ] The manual: the graph tabs name Structure, § The 3D view moves under the graph tabs, a
+- [x] The manual: the graph tabs name Structure, § The 3D view moves under the graph tabs, a
       `structure-tab` screenshot, and every shot showing the graph strip regenerated.
-- [ ] `gui/CLAUDE.md` § Structure viewer: the third-column rule replaced.
-- [ ] The dist rebuilt.
+- [x] `gui/CLAUDE.md` § Structure viewer: the third-column rule replaced.
+- [x] The dist rebuilt.
 - [ ] Skill: none. The agent skill drives the python API, and nothing an agent calls moves.
 
 ## Acceptance

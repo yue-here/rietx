@@ -80,7 +80,7 @@ of ten tabs, all mounted at once:
 | `Interactive` | sliders that move a parameter and show the pattern before you apply it |
 | `Plan` | the stages the fit will run, and what each one frees |
 | `Peaks` | picked lines, and indexing a pattern that has no structure yet |
-| `Model` | the structure and the instrument, and a 3D view of the cell |
+| `Model` | the structure and the instrument |
 | `Text` | the whole project as one editable text document |
 | `Series` | many patterns refined as a chain |
 | `Report` | what the package will say about the last fit |
