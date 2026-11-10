@@ -17,7 +17,7 @@ three tabs, `Pattern`, `Single peaks` and `Background`. A title line under it sa
 graph shows. On the pattern it reads `Observed pattern` before any fit, `Last fit` after one, and
 `Refining` while a run is in flight. While the Interactive tab has values
 waiting, it says `Preview, not refined`. The panel column is on the right, with
-ten tabs, the action bar and the console. Every panel is mounted at once, so a filter you typed, an
+nine tabs and the action bar. Every panel is mounted at once, so a filter you typed, an
 edit you have not applied and a text buffer you are half way through all survive
 a look at another tab.
 
@@ -33,6 +33,11 @@ Below 760 px of window the two sides cannot both meet their floors, 420 px of
 graph and 340 px of panel, so they stack. The graphs go on top and the panels
 below, and the sash then drags up and down.
 
+Across the foot of the window, under both sides, are the bottom panel and the
+status bar. The bottom panel holds two tabs, `Console` and `History`, and starts
+hidden. The status bar shows and hides it. Drag the panel's top edge to change its
+height, which is persisted per project; a double-click there resets it.
+
 ## The header
 
 | Control | Does |
@@ -42,12 +47,21 @@ below, and the sash then drags up and down.
 | the two collapse buttons | hide the graphs (left end) or the panel column (right end) |
 | `Simple \| Advanced` | whether the Plan, Model, Series and Report panels show their advanced controls |
 | `◐ ☀ ☾` | theme: follow the system, light, dark |
-| the run pill | the stage and its number while busy; the last status otherwise |
-| `Cancel` | stop the run between iterations |
 | `⌘K` | every command, with the Python call it makes |
 
 `Rwp` and `GoF` are on the title line over the pattern. `⚠ not a fit yet`
 appears beside them past an Rwp of {{ MATURITY_MAX_RWP }}.
+
+### The status bar
+
+The bar along the foot of the window. It never changes shape, so its controls
+never move.
+
+| Control | Does |
+|---|---|
+| `Console` | show or hide the bottom panel; `⌘J` |
+| the run state | the stage and its number while a run is in flight; the last run's status otherwise |
+| `Cancel` | stop the run between iterations; `Esc` |
 
 ### The File menu
 
@@ -788,10 +802,19 @@ and no other panel shows them.
   panel's per-stage Run takes and records one history node. Undo is a checkout,
   which throws the fitted curves away for the same reason an edit does.
 
+## Console
+
+A tab of the bottom panel. Every control you press prints the Python call that
+does the same thing, and the engine prints each stage and evaluation as it runs.
+Read top to bottom, it is the script you could have written. `Copy` puts the
+whole log on the clipboard. Scroll up and the log stops following the newest
+line; `Follow` takes it back to the end.
+
 ## History
 
-Every state the refinement has passed through, drawn as a graph. What this panel
-changes is what you are free to try.
+A tab of the bottom panel: every state the refinement has passed through, drawn
+as a graph, with the selected node and any comparison beside it. What this panel
+changes is what you are free to try. `h` opens it.
 
 After a Le Bail run that alternated, each node carries a `pass k` chip. The chip
 is green on the pass the fit kept, and the head stands in it. It is orange on the

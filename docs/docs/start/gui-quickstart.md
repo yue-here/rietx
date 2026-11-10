@@ -72,7 +72,7 @@ refinement starts to need a plan rather than a button.
 ## What is on the screen
 
 The window is two columns. On the left is the pattern; on the right is a column
-of ten tabs, all mounted at once:
+of nine tabs, all mounted at once:
 
 | Tab | Is |
 |---|---|
@@ -84,7 +84,6 @@ of ten tabs, all mounted at once:
 | `Text` | the whole project as one editable text document |
 | `Series` | many patterns refined as a chain |
 | `Report` | what the package will say about the last fit |
-| `History` | every state the refinement has passed through |
 | `Build` | what this build of the package can do |
 
 On a project's first open a `Getting started` strip sits above the tabs. It is
@@ -108,12 +107,12 @@ written.
 
 ```{image} ../screenshots/first-fit-light.png
 :class: only-light
-:alt: The whole window after a run: the fitted pattern with its difference curve on the left, the parameter table on the right, the console below
+:alt: The whole window after a run: the fitted pattern with its difference curve on the left, the parameter table on the right, the status bar along the foot
 ```
 
 ```{image} ../screenshots/first-fit-dark.png
 :class: only-dark
-:alt: The whole window after a run: the fitted pattern with its difference curve on the left, the parameter table on the right, the console below
+:alt: The whole window after a run: the fitted pattern with its difference curve on the left, the parameter table on the right, the status bar along the foot
 ```
 
 Each side has a collapse button at its own end of the header. The left one
@@ -126,15 +125,20 @@ a three-way theme control (`◐` follow the system, `☀` light, `☾` dark). Ov
 pattern, the `Pattern` tab and a title line say what the graph shows. Once a fit
 has run, `Rwp` and `GoF` sit on that line.
 
+Along the foot of the window is the status bar. Its `Console` button, or `⌘J`,
+shows the bottom panel, which holds two tabs: `Console` and `History`. `History`
+is every state the refinement has passed through. The panel starts hidden.
+
 ## Run the fit
 
 Under the panel column is the action bar. Press its `Refine` button, or `⌘⏎`
 (`Ctrl+Enter` off a Mac), or the `r` key. With `Staged plan` chosen beside it,
 a refine runs the project's plan.
 
-The run pill in the header names the stage and counts them off. Underneath the
-tab column, the console prints each stage as it starts and finishes, and beside
-each one the Python call that would have done the same thing. That echo is the
+The status bar names the stage and counts them off, with `Cancel` at its right
+end. The `Console` tab of the bottom panel prints each stage as it starts and
+finishes, and beside each one the Python call that would have done the same
+thing. That echo is the
 on-ramp described in [](../reference/gui-power.md). You can always find out what a button you
 pressed actually did.
 
@@ -145,7 +149,7 @@ defines Rwp beside the expected value it is judged against.
 :::{admonition} A hopeless fit says so
 :class: note
 Past an Rwp of {{ MATURITY_MAX_RWP }} the header shows `⚠ not a fit yet` beside
-the number, and the run's own status pill may still read `converged`. Both are true: the
+the number, and the run's own status in the status bar may still read `converged`. Both are true: the
 optimiser stopped moving, and the model is not yet describing the data. Believe
 the warning, and go to the Report.
 :::
@@ -230,7 +234,7 @@ has it in full.
 
 ## Where to go next
 
-- [](../reference/gui-guide.md): the ten panels, and when to branch the history.
+- [](../reference/gui-guide.md): the panels, and when to branch the history.
 - [](../reference/gui-power.md): the `.rxt` text document, the keyboard, and the routes.
 - [](tutorials.md): the same fluorapatite pattern fitted in Python, one step a notebook cell.
 - [](../guides/index.md): one task a page, each done from a Python script.

@@ -170,8 +170,8 @@ SHOTS: tuple[Shot, ...] = (
     Shot(
         "history-graph",
         "The history after a second strategy was tried from an earlier node: "
-        "two lanes, and the compare table for two selected nodes under them.",
-        selector=".side",
+        "two lanes, and the compare table for two selected nodes beside them.",
+        selector="section.bottom",
         tab="History",
         when="forked",
     ),
@@ -260,10 +260,11 @@ def _run_once(page) -> None:
     (WP-2123 retired the header's Run).
     """
     page.click(".actions button.refine")
-    pill = 'header .pill[data-state="idle"]'
-    page.wait_for_selector('header .pill[data-state="running"]', timeout=30_000)
-    page.wait_for_selector(pill, timeout=600_000)
-    # the curves arrive on the run's own reload, one fetch after the pill
+    # the run state is the status bar's since WP-2207
+    idle = '.statusbar .run[data-state="idle"]'
+    page.wait_for_selector('.statusbar .run[data-state="running"]', timeout=30_000)
+    page.wait_for_selector(idle, timeout=600_000)
+    # the curves arrive on the run's own reload, one fetch after the state
     page.wait_for_timeout(2_500)
 
 
@@ -326,10 +327,27 @@ def _shrink(path: Path) -> tuple[int, int]:
     return before, path.stat().st_size
 
 
+#: The bottom panel's tabs (WP-2206), which open only once the status bar's
+#: toggle has shown the panel.
+BOTTOM_TABS = ("Console", "History")
+
+#: The bottom panel's height in its shots: tall enough for the history's two
+#: lanes and a compare table, where its 200 px default shows a strip.
+BOTTOM_SHOT_HEIGHT = 380
+
+
+def _open_tab(page, label: str) -> None:
+    """Click a tab by its label, showing the bottom panel first for one of its own."""
+    if label in BOTTOM_TABS and not page.locator("section.bottom").is_visible():
+        page.click(".statusbar button.toggle")
+        page.wait_for_timeout(300)
+    page.click(f'.tab:text-is("{label}")')
+    page.wait_for_timeout(900)
+
+
 def _shoot(page, shot: Shot, theme: str) -> None:
     if shot.tab:
-        page.click(f'.tab:text-is("{shot.tab}")')
-        page.wait_for_timeout(900)
+        _open_tab(page, shot.tab)
     page.wait_for_timeout(500)
     SHOTS_DIR.mkdir(parents=True, exist_ok=True)
     out = SHOTS_DIR / f"{shot.name}-{theme}.png"
@@ -403,7 +421,10 @@ def main() -> int:
                         _shoot(page, shot, theme)
 
                 # The curves die with the checkout, so every shot that shows
-                # them is already taken by here.
+                # them is already taken by here.  The bottom panel's height is
+                # read on load, and the fork reloads.
+                page.request.post(f"{url}api/project",
+                                  data={"ui": {"console_height": BOTTOM_SHOT_HEIGHT}})
                 _fork(page, url)
                 for shot in SHOTS:
                     if shot.when != "forked":
@@ -414,8 +435,7 @@ def main() -> int:
                     # otherwise click `text-is("None")` and wait out the
                     # timeout.
                     if shot.tab:
-                        page.click(f'.tab:text-is("{shot.tab}")')
-                        page.wait_for_timeout(900)
+                        _open_tab(page, shot.tab)
                     _compare_two(page)
                     _shoot(page, shot, theme)
 

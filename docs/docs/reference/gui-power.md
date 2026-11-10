@@ -157,7 +157,8 @@ into the filter box does not start a fit.
 | `m` | the Model tab |
 | `t` | the Text tab |
 | `?` | the Report tab |
-| `h` | the History tab |
+| `h` | the History tab, in the bottom panel |
+| `⌘J` / `Ctrl-J` | show or hide the bottom panel |
 | `⌘K` / `Ctrl-K` | the command palette |
 | `⌘O` / `Ctrl-O` | the folder browser, to open a project |
 | `⇧⌘S` / `Ctrl-Shift-S` | `Save a copy…` |
