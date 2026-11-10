@@ -29,6 +29,7 @@ redesign is ported in five pieces, in this order:
 | 3 | [2127](../wp/2127-the-plan-tab.md) | the Plan tab on the existing plan routes, read top to bottom as a recipe |
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
+| Edit recovery | [2209](../wp/2209-unapplied-edits-survive-a-close.md) | unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs; reopening offers them (ruled 2026-11-09) |
 
 Every merge leaves a working GUI. No existing panel or route becomes unreachable at any piece;
 a panel moves into the new shell as it is, and is redesigned by its own piece.
@@ -53,7 +54,6 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 | Bottom panel | Console (the Python the window runs) and History (Compare, Restore), toggled from the status bar | 2026-11-07 |
 | Status bar | The bar along the window's foot, with the console toggle | 2026-11-07 |
 | Fixing plan stages | A plan stage that fixes as well as frees (WP-2127 records the ruling) | 2026-11-09 |
-| Edit recovery | Unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 |
 | Fit statistics in the action bar | Rwp, GoF and the not-a-fit chip beside Refine while the graphs are hidden ("try B"). WP-2123 left them hidden with the graphs (its item 6) | 2026-11-09 |
 
 Three decisions went to the maintainer before the piece that needs them. The first is now ruled, and two still wait:
