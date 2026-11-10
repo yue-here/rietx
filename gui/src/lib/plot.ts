@@ -423,6 +423,19 @@ export function residual(kind: ResidualKind, w: Window): Residual {
   };
 }
 
+/** A lens centred on (x, y), pointed at both ends: two quadratic arcs whose
+ *  control points sit `w` either side of the axis. The shape of rietx's
+ *  reflection ticks, used for a peak mark on the pattern and in the group
+ *  fit windows (WP-2202); here, off the chart chunk, so both can import it. */
+export function lens(ctx: CanvasRenderingContext2D, x: number, y: number,
+                     h: number, w: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x, y - h / 2);
+  ctx.quadraticCurveTo(x + w, y, x, y + h / 2);
+  ctx.quadraticCurveTo(x - w, y, x, y - h / 2);
+  ctx.closePath();
+}
+
 // ----------------------------------------------------------------------
 // the readout strip (WP-1213)
 // ----------------------------------------------------------------------

@@ -18,6 +18,7 @@ import { channelIndex } from "./interactive";
 import { joinCurves, type GroupCurve, type PeakRow } from "./peaks";
 import {
   curveColors,
+  lens,
   maskShapes,
   nearestIndex,
   type CandidateOverlay,
@@ -370,7 +371,9 @@ export class PatternChart {
       const x = u.valToPos(p.two_theta, "x", true);
       let level = 0;
       while (marks.some((m) => m.level === level && Math.abs(m.x - x) < near)) level++;
-      const y = Math.max(top, u.valToPos(h, "y", true) - gap - H / 2 - level * row);
+      // at the plot's top the stack turns downward, so a twin under the
+      // strongest line still clears its partner rather than landing on it
+      const y = Math.max(top + level * row, u.valToPos(h, "y", true) - gap - H / 2 - level * row);
       marks.push({ x, y, level });
     }
     ctx.save();
@@ -435,16 +438,6 @@ export class PatternChart {
 export const LENS_HEIGHT = 18;
 export const LENS_WIDTH = 4.5;
 export const LENS_GAP = 7;
-
-/** A lens centred on (x, y), pointed at both ends: two quadratic arcs whose
- *  control points sit `w` either side of the axis. */
-function lens(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, w: number): void {
-  ctx.beginPath();
-  ctx.moveTo(x, y - h / 2);
-  ctx.quadraticCurveTo(x + w, y, x, y + h / 2);
-  ctx.quadraticCurveTo(x - w, y, x, y - h / 2);
-  ctx.closePath();
-}
 
 function readColors(): ReturnType<typeof curveColors> {
   const style = getComputedStyle(document.body);

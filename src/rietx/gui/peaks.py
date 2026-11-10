@@ -460,7 +460,10 @@ class PeakEditor:
         (:func:`~rietx.indexing.peakfit.group_profile`), so drawing costs no
         solve.  ``y_fit`` includes the frozen envelope because the panel draws
         it over the measured counts; ``delta`` is (y − env − model)/σ, the same
-        weighting the group was fitted under.
+        weighting the group was fitted under.  ``y_obs`` is the counts the
+        group was fitted to, every channel of the window: the pattern the
+        payload carries beside the groups is decimated, and a window a few
+        tenths of a degree wide would show a fraction of its channels.
 
         ``lines`` is each component's own curve over the same window, model
         only (no envelope), lowest 2θ first, each with the row ``index`` it
@@ -482,16 +485,21 @@ class PeakEditor:
             ordered = sorted(members, key=lambda p: p.two_theta)
             lines = []
             for j, peak in enumerate(ordered):
-                one = np.zeros_like(fit.intensity)
-                one[j] = fit.intensity[j]
-                y = group_profile(det, pg, self.instrument,
-                                  dataclasses.replace(fit, intensity=one))
+                if len(ordered) == 1:
+                    # a singleton's one line is the group's model itself
+                    y = model
+                else:
+                    one = np.zeros_like(fit.intensity)
+                    one[j] = fit.intensity[j]
+                    y = group_profile(det, pg, self.instrument,
+                                      dataclasses.replace(fit, intensity=one))
                 lines.append({"index": rows[id(peak)], "y": y.tolist()})
             sl = slice(pg.i0, pg.i1)
             y_fit = det.envelope[sl] + model
             out.append({
                 "group": g,
                 "two_theta": det.two_theta[sl].tolist(),
+                "y_obs": det.intensity[sl].tolist(),
                 "y_fit": y_fit.tolist(),
                 "y_env": det.envelope[sl].tolist(),
                 "delta": ((det.intensity[sl] - y_fit) / det.sigma[sl]).tolist(),

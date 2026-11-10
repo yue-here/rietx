@@ -27,6 +27,8 @@ export interface PeakRow {
 export interface GroupCurve {
   group: number;
   two_theta: number[];
+  /** the counts the group was fitted to, every channel of its window */
+  y_obs?: number[];
   y_fit: number[];
   y_env: number[];
   delta: number[];

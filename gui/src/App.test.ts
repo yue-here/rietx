@@ -5049,6 +5049,32 @@ describe("the peaks tab (WP-1027)", () => {
       .toEqual({ candidate: 0 });
   });
 
+  it("says in Judge which cell the data cannot tell this one from, and its notes", async () => {
+    // the old expanded row showed both; the four steps must not lose them
+    const twin = { ...MEDIUM_CANDIDATE,
+      ambiguity: [{ cell: [8.2436, 8.2436, 4.3307, 90, 90, 120], system: "trigonal",
+                    index: 3, discriminating_two_theta: [21.47, 33.02] }],
+      diagnostics: [{ level: "warning", code: "INDEX_SHIFT_ASSUMED",
+                      message: "the zero shift was assumed, not measured" }] };
+    vi.stubGlobal("fetch", server({}).fetcher);
+    app = mount(Peaks, { target: host, props: {
+      peaks: PEAKS_PAYLOAD as any,
+      indexAnswer: { result: { candidates: [twin], diagnostics: [], quality: null },
+        adopt: [{ picked: false, why: "" }], refuting_caveats: [], running: false },
+      run: IDLE_RUN as any, busy: false,
+    } });
+    await flush();
+    await step("Index");
+    host.querySelector<HTMLButtonElement>(".candidates button.pick")!.click();
+    await flush();
+    await step("Judge");
+    const partner = host.querySelector(".partner")!.textContent!.replace(/\s+/g, " ");
+    expect(partner).toContain("Geometrically indistinguishable from");
+    expect(partner).toContain("(trigonal, index 3)");
+    expect(partner).toContain("they separate at 2θ ≈ 21.47, 33.02°");
+    expect(host.textContent).toContain("the zero shift was assumed, not measured");
+  });
+
   it("says what the search covered even when it found candidates (WP-1042, WP-2130)", async () => {
     vi.stubGlobal("fetch", server({}).fetcher);
     app = mount(Peaks, { target: host, props: {

@@ -38,6 +38,7 @@
   import { labelFor, type HelpCorpus } from "../lib/help";
   import { clone } from "../lib/model";
   import {
+    LOOK_CHI2_RED,
     PEAK_STEPS,
     absentOf,
     candidateRelation,
@@ -147,8 +148,11 @@
    *  only when a new list arrives (keyed on its creation time) */
   let popt = $state({ lo: "", hi: "", shoulders: true, contamination: true });
   let confirming = $state(false);
+  // keyed by value: every edit replaces the payload, and an effect reading
+  // `peaks` itself would wipe what was typed on each tick or removal
+  const pickedAt = $derived(peaks?.created_utc);
   $effect(() => {
-    void peaks?.created_utc;
+    void pickedAt;
     const o = untrack(() => peaks?.pick_options);
     const rng = o?.two_theta_range ?? null;
     popt = {
@@ -459,7 +463,14 @@
     }
     const body: Parameters<typeof api.pickPeaks>[0] = {
       shoulders: popt.shoulders, flag_contamination: popt.contamination };
-    if (lo !== "") body.two_theta_range = [Number(lo), Number(hi)];
+    if (lo !== "") {
+      const bad = [lo, hi].find((t) => !Number.isFinite(Number(t)));
+      if (bad !== undefined) {
+        failure = `"${bad}" is not a 2θ`;
+        return;
+      }
+      body.two_theta_range = [Number(lo), Number(hi)];
+    }
     confirming = false;
     verb(() => api.pickPeaks(body));
   }
@@ -686,7 +697,7 @@
                     >{g.lo.toFixed(2)}–{g.hi.toFixed(2)}</button>
                 </td>
                 <td class="r">{g.n}</td>
-                <td class="r" class:hi={g.chi2_red > 10}>{g.chi2_red.toFixed(1)}</td>
+                <td class="r" class:hi={g.chi2_red > LOOK_CHI2_RED}>{g.chi2_red.toFixed(1)}</td>
                 <td class="note muted">{g.flags.map(flagWord).join(", ")}</td>
                 <td class="acts">
                   <button class="ghost" disabled={busy}
@@ -916,10 +927,20 @@
         {/each}
         <dt>Found by</dt><dd>{c.found_by.join(", ")}</dd>
       </dl>
+      <!-- a cell the data cannot tell from another is said with the other
+           cell and where they part (WP-1024), and the candidate's own notes
+           follow: both lived in the old expanded row -->
+      {#each c.ambiguity ?? [] as partner, k (k)}
+        <p class="partner">Geometrically indistinguishable from <span class="mono"
+          >{cellText(partner.cell)}</span> ({partner.system}, index {partner.index}){#if
+          partner.discriminating_two_theta?.length}; they separate at 2θ ≈ {partner
+          .discriminating_two_theta.slice(0, 4).map((t: number) => t.toFixed(2)).join(", ")}°{/if}.</p>
+      {/each}
       {#if collectTo(c) !== null}
         <p class="warn">Collect to 2θ ≈ {collectTo(c)?.toFixed(1)}° to tell this cell
           from its partner; the lines that separate them lie beyond the measured range.</p>
       {/if}
+      {@render searchNotes(c.diagnostics ?? [])}
 
       <h3>Space group</h3>
       {#if extinction?.candidate !== i || !screen}
@@ -1403,6 +1424,7 @@
 
   .cellline { margin: var(--s1) 0 0; }
   p.rel { margin: 0; min-height: 1.4em; }
+  p.partner { margin: 0; }
   .caveats {
     display: flex;
     flex-wrap: wrap;

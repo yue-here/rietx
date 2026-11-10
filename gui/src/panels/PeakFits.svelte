@@ -12,7 +12,7 @@
    * `lines`), which sum to the group's fit less its envelope. An unused line
    * keeps a hollow mark here, where its curve is part of the fit (call 34).
    */
-  import { curveColors } from "../lib/plot";
+  import { curveColors, lens } from "../lib/plot";
   import type { GroupCurve, PeakRow, PeaksPayload } from "../lib/peaks";
 
   let {
@@ -71,15 +71,6 @@
       canvases.forEach((cv, i) => cv && windows[i] && draw(cv, windows[i].g, windows[i].members)));
   });
 
-  /** a lens, pointed at both ends: the shape of rietx's reflection ticks */
-  function lens(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, w: number) {
-    ctx.beginPath();
-    ctx.moveTo(x, y - h / 2);
-    ctx.quadraticCurveTo(x + w, y, x, y + h / 2);
-    ctx.quadraticCurveTo(x - w, y, x, y - h / 2);
-    ctx.closePath();
-  }
-
   function draw(cv: HTMLCanvasElement, g: GroupCurve, members: PeakRow[]) {
     const ctx = cv.getContext?.("2d");
     if (!ctx || !peaks) return;
@@ -96,7 +87,10 @@
     const L = 8, R = 8, T = 24, STRIP = 44, AXIS = 18, B = STRIP + AXIS;
     const ph = H - T - B, pw = W - L - R;
     const px = (x: number) => L + ((x - lo) / (hi - lo)) * pw;
-    const obsT = peaks.pattern.two_theta, obsY = peaks.pattern.y_obs;
+    // the group's own channels; the payload's pattern is decimated, so it is
+    // only the fallback for a server that sends no `y_obs`
+    const obsT = g.y_obs ? tt : peaks.pattern.two_theta;
+    const obsY = g.y_obs ?? peaks.pattern.y_obs;
     let top = 0;
     for (let i = 0; i < obsT.length; i++)
       if (obsT[i] >= lo && obsT[i] <= hi) top = Math.max(top, obsY[i]);
@@ -214,6 +208,9 @@
 <div class="fits" bind:clientWidth={width}>
   {#if !peaks?.groups?.length}
     <p class="muted">No group fits yet. Pick peaks first.</p>
+  {:else if !windows.length}
+    <!-- "To look at" can be empty on a clean pattern: say so, not a blank pane -->
+    <p class="muted">No group in the list. Show all groups to see their fits.</p>
   {:else}
     {#each windows as { g, members }, slot (g.group)}
       <figure class:on={focused === g.group}>
