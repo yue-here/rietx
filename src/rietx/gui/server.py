@@ -214,7 +214,14 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/project"): lambda s, q, b: s.project_doc(),
     ("POST", "/api/project"): lambda s, q, b: s.project_patch(b),
     ("POST", "/api/project/save"): lambda s, q, b: s.project_save(),
+    # the File menu (WP-2133): each acts on the project's folder
+    ("POST", "/api/project/copy"): lambda s, q, b: s.project_copy(b),
+    ("POST", "/api/project/rename"): lambda s, q, b: s.project_rename(b),
+    ("POST", "/api/project/move"): lambda s, q, b: s.project_move(b),
+    ("POST", "/api/project/close"): lambda s, q, b: s.project_close(),
     ("GET", "/api/recent"): lambda s, q, b: {"recent": s.recent()},
+    ("POST", "/api/recent/remove"): lambda s, q, b: s.recent_remove(b),
+    ("POST", "/api/recent/clear"): lambda s, q, b: s.recent_clear(),
     # the "Open…" browser's own listing (WP-1205): read-only, confined to the
     # home directory and the process's cwd — see GuiSession.fs
     ("GET", "/api/fs"): lambda s, q, b: s.fs((q.get("path") or [None])[0]),
@@ -227,6 +234,10 @@ ROUTES: dict[tuple[str, str], Any] = {
     # *person's* rather than a project's (WP-1044)
     ("GET", "/api/settings"): lambda s, q, b: s.settings(),
     ("POST", "/api/settings"): lambda s, q, b: s.settings_patch(b),
+    # the open project's recovery copy of unapplied edits (WP-2209), in the
+    # state directory beside the settings and, like them, not behind the 409
+    ("GET", "/api/recovery"): lambda s, q, b: s.recovery(),
+    ("PUT", "/api/recovery"): lambda s, q, b: s.recovery_put(b),
 
     ("GET", "/api/params"): lambda s, q, b: s.params(),
     ("PATCH", "/api/params"): lambda s, q, b: s.params_patch(b),
@@ -267,6 +278,8 @@ ROUTES: dict[tuple[str, str], Any] = {
     ("GET", "/api/result/curves"): lambda s, q, b: s.result_curves(),
     # the curves at values nobody has applied, writing nothing (WP-2125)
     ("POST", "/api/preview"): lambda s, q, b: s.preview(b),
+    # the background curve and its band from the fit's covariance (WP-2129)
+    ("GET", "/api/background"): lambda s, q, b: s.background(),
     ("GET", "/api/report"): _report,
     ("POST", "/api/report/apply"): lambda s, q, b: s.report_apply(b),
 
@@ -740,13 +753,17 @@ def main(argv: list[str] | None = None) -> int:
         try:
             project = Project.open(source, backend=args.backend,
                                    solver=args.solver)
-        except (FileNotFoundError, ValueError) as exc:
+        except (OSError, ValueError) as exc:
             # the refusal messages name seven different remedies; printing the
             # one that applies is the whole value of them
             print(f"rietx gui: {exc}")
             return 2
     session = GuiSession(project, backend=args.backend, solver=args.solver,
                          state_dir=args.state_dir)
+    if project is None:
+        # no project named: return to the last one, as VS Code and JetBrains
+        # do, and start on the start screen when there is none (WP-2131)
+        session.reopen_last()
     serve(session, port=args.port, open_browser=args.open_browser,
           machine=args.machine, scratch_of=scratch_of)
     return 0
