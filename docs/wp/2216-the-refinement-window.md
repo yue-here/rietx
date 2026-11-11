@@ -1,6 +1,6 @@
 # WP-2216 — the refinement window: the Pattern graph, Parameters and the action bar at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — filed; the first PR builds the Pattern graph, the Parameters tab, the action bar and the recovery offer
+Milestone: gui-overhaul · Status: 🔄 2026-11-11 — first PR open (Pattern graph, Parameters, action bar, recovery); the phase and atom menus follow in a second
 Depends on: 2215 (the frame)
 Priority: P2 2026-11-11 — a feature the open milestone was opened for: the screen a person spends most time in
 
@@ -54,16 +54,16 @@ How the Pattern graph reads, restated from the prototype and the design the grap
 
 ## Tasks
 
-- [ ] File the WP; WP-2214's checklist names it.
-- [ ] The Pattern graph at `/next`: title line, view menu, legend gutter, context menu, the
+- [x] File the WP; WP-2214's checklist names it.
+- [x] The Pattern graph at `/next`: title line, view menu, legend gutter, context menu, the
   fitted range and excluded regions as plot objects, the hover readout in the status bar's
   right half and the findings count at rest. Vitest mount cases.
-- [ ] The Parameters tab mounted, and the action bar with one Apply (rows 18-24, with Rwp and
+- [x] The Parameters tab mounted, and the action bar with one Apply (rows 18-24, with Rwp and
   GoF beside Refine while the graphs are hidden), ⌘Enter, and the recovery offer.
-- [ ] Settings' About version set in the mono face (`gui/STYLE.md` § Type: numbers are mono).
-- [ ] Browser cases in `tests/test_gui_layout_browser.py` against `/next`: no click on the new
+- [x] Settings' About version set in the mono face (`gui/STYLE.md` § Type: numbers are mono).
+- [x] Browser cases in `tests/test_gui_layout_browser.py` against `/next`: no click on the new
   controls moves the layout.
-- [ ] Screenshots at 1440 × 900, light and dark, under `docs/wp/2216-screenshots/`, the hover
+- [x] Screenshots at 1440 × 900, light and dark, under `docs/wp/2216-screenshots/`, the hover
   readout boxed with a zoomed crop.
 - [ ] The phase band's ⋯ menu and the atom row's context menu (rows 121-131): Rename…, Change
   space group… with its preview, Replace from CIF…, Add atom…, Rename…, Change species…,
@@ -83,7 +83,20 @@ the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Questions
 
-Filled in by the session that builds each PR.
+Filled in by the session that builds each PR. The first PR's three, each built the plainest
+way and waiting on the maintainer's look:
+
+1. **The hover readout in the status bar** (the ruling asked to check it built). With the
+   pointer on a peak the right half reads `2θ 31.8600°  d 2.8064 Å  obs 19693  calc 20307.2
+   bkg 174.975  Δ/σ -4.3765  fluorapatite (3 −1 1) +0.0121°`, set from the right end. Picture:
+   `2216-screenshots/next-hover-statusbar-light.png`. Does it look good?
+2. **The readout's words and digits are today's.** The labels are today's short forms (obs,
+   calc, bkg, Δ/σ) and each number carries today's digits, from the shared plot module. Keep
+   them, or should the rebuild spell the labels out and cut the digits (for example
+   `calc 20307`, `Δ/σ −4.38`)?
+3. **"2 findings" at rest counts the report's errors and warnings, not its notes**, and shows
+   "No findings" when a fit has none, and nothing before a fit. It is text, not yet a button:
+   opening the report from it is the report piece's. Is that the count wanted?
 
 ## References
 
@@ -92,6 +105,36 @@ Filled in by the session that builds each PR.
   `docs/milestones/gui-overhaul.md`.
 
 ## Handover log
+
+- **2026-11-11** — a ghostshift runner built the first of R2's two PRs. The rebuilt page can
+  now be refined in: the Pattern graph draws the fit with Rwp and GoF on its title line, a ⋯
+  view menu, a legend beside the panes, and the fitted range and excluded regions as objects a
+  click selects and a key deletes. Parameters edits values, the action bar applies and refines,
+  and unapplied edits come back through the recovery offer. The hover readout takes the status
+  bar's right half while the pointer is on the plot, and the findings count holds it at rest.
+  The phase ⋯ menu and the atom right-click menu (rows 121-131) are the second PR's, split
+  under WP-2214 rule 3 because this one is already a whole screen.
+  - *Done*: `gui/src/next/Pattern.svelte`, `ActionBar.svelte` (a copy of today's, plus the Rwp
+    and GoF slots while the graphs are hidden), `lib/exports.ts` (lifted from the graph-window
+    branch at eaabe834f), the wiring in `Frame.svelte`, About in mono. `Window.test.ts` (8 vitest
+    cases) and four browser cases in `tests/test_gui_layout_browser.py`. Today's `app.js` is
+    byte-identical; only the `next*` chunks and `build-info.json` moved.
+  - *Review*: `/code-review high --fix` found ten; nine fixed in one commit (Parameters stays
+    mounted while the model column is hidden; a run's end read off its outcome; the shared
+    recovery copy keeps today's Interactive and Plan arms; opens flush the writer; typed bounds
+    send only a change and follow the region's new index; Delete defers to
+    `isShortcutTarget`; zoom judged on the drawn payload; Apply refetches nothing; `exports.ts`
+    loses an unused list). Declined: switching today's `panels/Exports.svelte` to the shared
+    helper, since a shared panel is not edited for `/next` (gui/CLAUDE.md).
+  - *Measured*: see the PR body for the gate counts (venv and platform named there).
+  - *Gotchas*: the first browser run caught the status bar's right half growing 756 px when the
+    readout replaced the count; it is now `flex: 1 1 0` with `justify-content: safe flex-end`, so
+    a narrow window loses the reading's right end rather than 2θ. A browser driver that applies
+    an edit before taking the other theme's hover shot sees the new node; take the hover shots
+    first.
+  - *Next*: the second PR, rows 121-131: the phase band's ⋯ menu and the atom row's context menu,
+    with the space-group preview reusing `GET /api/structure`'s `causes`. Then the maintainer's
+    answers to § Questions.
 
 - **2026-11-11** — filed by a ghostshift runner from WP-2214's piece R2. No open WP owned the
   refinement window: WP-2214's plan names it as the second piece and leaves it to be filed. The

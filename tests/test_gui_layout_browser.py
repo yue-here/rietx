@@ -952,6 +952,9 @@ def _open_next(browser, url: str, width: int):
     page = browser.new_page(viewport={"width": width, "height": 900})
     page.errors = []
     page.on("pageerror", lambda exc: page.errors.append(str(exc)))
+    # /next mounts Parameters and its recovery offer (WP-2216), so a copy another
+    # test left would hold every click behind the offer's backdrop
+    _keep_no_edits(page)
     page.goto(url + "next")
     page.wait_for_selector("section.graphs .tabs button")
     page.evaluate("document.fonts.ready")
