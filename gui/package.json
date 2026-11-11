@@ -6,7 +6,7 @@
   "description": "Frontend workspace for `rietx gui`. Never ships in the wheel — the build output under src/rietx/gui/static is committed, so installing rietx[gui] needs no node.",
   "scripts": {
     "dev": "vite",
-    "build": "python3 scripts/vendor.py && vite build && python3 scripts/build_info.py",
+    "build": "python3 scripts/vendor.py && vite build && vite build --mode next && python3 scripts/build_info.py",
     "test": "vitest run",
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },

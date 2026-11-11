@@ -97,7 +97,10 @@ def test_the_page_references_no_external_asset():
     html = (DIST / "index.html").read_text(encoding="utf-8")
     # every built script, not just the entry: WP-1013 added chunks, and a
     # vendored library is exactly where a CDN fallback or a sourcemap URL hides
-    built = [("index.html", html)] + [(p.name, p.read_text(encoding="utf-8"))
+    built = [("index.html", html),
+             # the rebuild's page (WP-2215) is held to the same guarantee
+             ("next.html", (DIST / "next.html").read_text(encoding="utf-8"))]
+    built += [(p.name, p.read_text(encoding="utf-8"))
                                       for p in sorted((DIST / "assets").glob("*.js"))]
     for name, text in built:
         remote = re.findall(r"""["'(]((?:https?:)?//[^"')\s]+)""", text)
@@ -180,7 +183,7 @@ def test_the_sources_the_digest_covers_are_the_ones_that_matter(build_info):
     covered = {build_info.relative(p, GUI_DIR)
                for p in build_info.source_files(GUI_DIR)}
     assert {"vite.config.ts", "tsconfig.json", "package.json",
-            "package-lock.json", "index.html",
+            "package-lock.json", "index.html", "next.html",
             "scripts/build_info.py", "scripts/vendor.py"} <= covered
     assert any(name.endswith(".svelte") for name in covered)
     assert any(name.endswith(".test.ts") for name in covered)
@@ -223,8 +226,8 @@ def test_nothing_gitignores_the_dist():
     """
     import subprocess
 
-    files = [DIST / "index.html", DIST / "build-info.json",
-             DIST / "assets" / "app.css", *sorted((DIST / "assets").glob("*.js"))]
+    files = [DIST / "index.html", DIST / "next.html", DIST / "build-info.json",
+             DIST / "assets" / "app.css", DIST / "assets" / "next.css", *sorted((DIST / "assets").glob("*.js"))]
     # --no-index because check-ignore consults the index first, and answers for
     # a *tracked* file without asking the ignore rules at all: every file here
     # is committed, so without it this test was green while asking nothing
@@ -251,6 +254,7 @@ def test_nothing_gitignores_the_dist():
 #: the entry point go missing — so they are enumerated.
 BUILD_INPUTS = (
     "index.html",          # vite's entry module; the one that broke
+    "next.html",           # the rebuild's page, a second entry (WP-2215)
     "vite.config.ts",
     "svelte.config.js",
     "tsconfig.json",
@@ -327,6 +331,7 @@ def test_the_dist_is_in_the_wheel(wheel_names):
     """
     inside = wheel_names
     wanted = ["rietx/gui/static/index.html", "rietx/gui/static/assets/app.css",
+              "rietx/gui/static/next.html", "rietx/gui/static/assets/next.css",
               "rietx/gui/static/build-info.json"]
     # every chunk, so a new one cannot ship as a 404 at the moment the pane that
     # needs it is opened
