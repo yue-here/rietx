@@ -145,6 +145,12 @@ stage included.
   decisions: all five stand as built (each marked in the entry below), and approved merging the
   stored-format change. Main merged in (WP-2211 and WP-2212 filed there, no conflict in code).
   Next: the lead merges #1520 once CI is green; the series WPs revisit the collapse (decision 2).
+  - *2026-11-11, after #1517 and #1523 merged*: the GUI frontend job failed 1 of 737 vitests,
+    "fixes in a stage …", reading `body.plan` off `undefined`. The test took the first PUT of any
+    path, and #1523's recovery copy is a `PUT /api/recovery` on a 500 ms timer, so on a slow
+    runner it came before Apply's. The lookup now names `/api/plan`, as its two siblings do.
+    Reproduced by shortening the recovery delay to 1 ms: the old lookup fails with CI's error,
+    the new one passes. The plan-ladder screenshots were retaken on the merged build.
 
 - **2026-11-10** — built end to end by a ghostshift runner; PR #1520. A stage of a plan can now
   fix parameters as well as free them, in python (`Stage(..., turn_off=[...])`), in the `.rxt`

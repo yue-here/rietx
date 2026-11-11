@@ -1574,7 +1574,9 @@ describe("the plan editor", () => {
     await flush();
     bar("Apply")!.click();
     await flush();
-    const put = stub.calls.find((call) => call.method === "PUT");
+    // by path: the recovery copy (WP-2209) is a PUT too, sent on a 500 ms timer,
+    // so on a slow machine it lands before Apply's
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/plan");
     expect(put?.body.plan.stages[1].turn_off).toEqual(["instrument.profile.*"]);
     expect(put?.body.plan.stages[1].turn_on).toEqual(["phases.*.cell.*"]);
   });
