@@ -28,7 +28,8 @@
    * - the intensity opens on square root, as the prototype's does, until the
    *   project remembers another choice.
    *
-   * The chart is today's `lib/pattern.ts` figure, drawn without the peak layer,
+   * The chart is today's `lib/pattern.ts` figure, through its `/next` copy
+   * (`next/pattern.ts`, drawn to the prototype by the polish), drawn without the peak layer,
    * which the peaks-and-indexing workflow brings (R6). The three-effect split
    * (fetch, knob, mode) is `panels/Plot.svelte`'s, for the same reasons.
    */
@@ -42,7 +43,7 @@
     residual, shows, toggleCurve,
     type Protocol, type ResidualKind, type Scale, type Window,
   } from "../lib/plot";
-  import type { Curves, Overlay, PatternChart } from "../lib/pattern";
+  import type { Curves, Overlay, PatternChart } from "./pattern";
   import type { Theme } from "../lib/theme";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
   import { statusReadout, type StatusReadout } from "./readout";
@@ -107,7 +108,7 @@
 
   let host: HTMLDivElement | undefined = $state();
   let chart: PatternChart | null = null;
-  let chartModule: typeof import("../lib/pattern") | null = null;
+  let chartModule: typeof import("./pattern") | null = null;
   let curves: Curves | null = null;
   let held: Window | null = $state.raw(null);
   let loadError = $state("");
@@ -170,10 +171,10 @@
   async function drawChart() {
     if (!host) return;
     const seq = ++fetchSeq;
-    let mod: typeof import("../lib/pattern");
+    let mod: typeof import("./pattern");
     let c: Curves;
     try {
-      mod = chartModule ??= await import("../lib/pattern");
+      mod = chartModule ??= await import("./pattern");
       c = await mod.fetchCurves();
     } catch (exc) {
       if (seq !== fetchSeq) return;
@@ -204,10 +205,10 @@
       // the x title is the chart module's own string, and uPlot reads the
       // live pane's axis at each draw: blank it there. Its strip stays, so
       // nothing under the plot moves, and the x hint sits in it
-      const xAxis = chart.fig.panes.resid?.axes?.[0];
+      const xAxis = chart.fig.panes.ticks?.axes?.[0];
       if (xAxis) {
         xAxis.label = () => (exporting ? "2θ (°)" : "");
-        chart.fig.panes.resid.redraw(false, false);
+        chart.fig.panes.ticks.redraw(false, false);
       }
       applied = untrack(() => ({ kind, scale, theme }));
       chart.fig.onCursor = (hit) => (hoverAt = hit ? hit.x : null);
@@ -775,7 +776,7 @@
           </button>
         {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <span class="hint xhint" style:top="{geom.resid.top + geom.resid.height + X_TICKS}px"
+        <span class="hint xhint" style:top="{geom.ticks.top + geom.ticks.height + X_TICKS}px"
           style:height="{X_STRIP}px" style:right="calc(100% - {plotX.left + plotX.width}px)"
           onpointerenter={(e) => showTip("x", e.currentTarget, false)} onpointerleave={hideTip}
           >{hints.x}</span>
@@ -927,10 +928,13 @@
     color: var(--bad);
   }
 
+  /* the plot is a card on the window's ground, as the prototype draws it */
   .plot {
     position: relative;
     flex: 1 1 auto;
     min-height: 300px;
+    border-radius: 6px;
+    background: var(--panel);
   }
 
   .host {

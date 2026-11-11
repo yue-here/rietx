@@ -1606,7 +1606,10 @@
     gap: 6px;
   }
 
+  /* a unit is quieter and smaller than the number it qualifies */
   .unit {
+    color: var(--muted);
+    font-size: 0.87em;
     white-space: nowrap;
   }
 
@@ -1860,6 +1863,11 @@
 
   .atomtab td.faint .ink {
     color: var(--muted);
+  }
+
+  /* a column's boxes take its own numbers' width, never the rows' one width */
+  .atomtab .ink {
+    min-width: 0;
   }
 
   .atomtab .lk {
