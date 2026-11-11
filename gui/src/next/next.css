@@ -10,9 +10,9 @@
      2026-11-06 and 2026-11-09; `next/style.test.ts` guards it);
    - a selected tab keeps its weight, since a bolder word is wider and moves
      what follows it (`gui/STYLE.md` § Type);
-   - words are set in Instrument Sans, with IBM Plex Sans for Greek
-     (`gui/STYLE.md` § Type). The faces are not served by the app yet; a
-     machine without them falls back to the system face. */
+   - words are set in Instrument Sans, with IBM Plex Sans for Greek, and
+     numbers and code in IBM Plex Mono (`gui/STYLE.md` § Type). The app serves
+     all three; `fonts.css` declares them. */
 
 :root {
   --text: 14px;
@@ -20,6 +20,8 @@
   --frame-h: 36px;
   --status-h: 24px;
   --tab-h: 36px;
+  /* Greek in a number or a path takes Plex Sans, as it does in words */
+  --mono-family: "IBM Plex Mono", "IBM Plex Sans", ui-monospace, "SF Mono", Menlo, monospace;
   /* the bars' ground: a step off the panel, as the prototype's frame is */
   --bar: color-mix(in srgb, var(--fg) 4%, var(--bg));
 }

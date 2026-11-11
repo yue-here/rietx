@@ -23,6 +23,9 @@ import { defineConfig } from "vitest/config";
 // was and give each page its own script and stylesheet.
 export default defineConfig(({ mode }) => ({
   plugins: [svelte()],
+  // the rebuild's fonts and their licences, copied as they are into the dist's
+  // `fonts/` by the second pass alone, so today's page is unchanged
+  publicDir: mode === "next" ? "src/next/static" : false,
   build: {
     outDir: "../src/rietx/gui/static",
     emptyOutDir: mode !== "next",

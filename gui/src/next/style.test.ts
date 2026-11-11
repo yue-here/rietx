@@ -9,11 +9,12 @@ const DIR = new URL(".", import.meta.url).pathname;
 
 function sheets(): Array<[string, string]> {
   const out: Array<[string, string]> = [];
+  // files only: `static/` holds the fonts the second pass copies
   for (const name of readdirSync(DIR).sort()) {
+    if (!/\.(css|svelte)$/.test(name)) continue;
     const text = readFileSync(DIR + name, "utf-8");
     if (name.endsWith(".css")) out.push([name, text]);
-    else if (name.endsWith(".svelte"))
-      out.push([name, /<style>([\s\S]*?)<\/style>/.exec(text)?.[1] ?? ""]);
+    else out.push([name, /<style>([\s\S]*?)<\/style>/.exec(text)?.[1] ?? ""]);
   }
   return out.map(([n, t]) => [n, t.replace(/\/\*[\s\S]*?\*\//g, "")]);
 }
