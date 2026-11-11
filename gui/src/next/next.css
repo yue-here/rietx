@@ -44,6 +44,28 @@ h3 {
   color: var(--fg);
 }
 
+/* Buttons at the prototype's size: 30 px, at the words' size and weight, the
+   filled primary at the weight of a label. The registers keep their meaning
+   from app.css (one filled primary, every other action outlined); only the
+   geometry is the rebuild's. */
+button:not(.pick, .tab, .link, .ib, .mbtn) {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: var(--text);
+  font-weight: 500;
+}
+
+button.ghost:not(.pick, .tab, .link, .ib, .mbtn) {
+  font-weight: 400;
+}
+
+@media (hover: hover) {
+  button.ghost:hover:not(:disabled) {
+    background: var(--hover);
+  }
+}
+
 /* An icon button: no border at rest, a border on hover (`gui/STYLE.md`
    § Components). The panel toggles fill their half while it shows. */
 .ib {
@@ -147,7 +169,10 @@ h3 {
 }
 
 .tabs .tab {
+  height: auto;
   padding: 0 12px;
+  border-radius: 0;
+  font-weight: 400;
   font-size: var(--text);
   border-bottom-width: 2px;
 }

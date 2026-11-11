@@ -19,6 +19,7 @@
 
   import { ApiError, api } from "../api";
   import FileMenu from "../panels/FileMenu.svelte";
+  import NewProject from "../panels/NewProject.svelte";
   import Splitter from "../panels/Splitter.svelte";
   import { modifier, runWords, toggleTitle } from "../lib/statusbar";
   import { consoleLine, follow, type EngineEvent, type RunState } from "../lib/stream";
@@ -27,6 +28,7 @@
   import Console from "./Console.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Settings from "./Settings.svelte";
+  import Start from "./Start.svelte";
   import { BOTTOM_TABS, GRAPH_TABS, MODEL_TABS,
            type BottomTab, type GraphTab, type ModelTab } from "./tabs";
 
@@ -35,6 +37,12 @@
   let run = $state<RunState | null>(null);
   let lines = $state<string[]>([]);
   let dropped = $state(0);
+  let capabilities = $state<any>(null);
+  let docsUrl = $state<string | null>(null);
+  let recent = $state<any[]>([]);
+  let examples = $state<any[]>([]);
+  let openError = $state("");
+  let newOpen = $state(false);
 
   let showGraphs = $state(true);
   let showModel = $state(true);
@@ -88,18 +96,66 @@
     } catch (error) {
       project = null;
       if (!(error instanceof ApiError && error.code === "NO_PROJECT"))
-        say(`# ${(error as Error).message}`);
+        openError = (error as Error).message;
+      await loadLists();
     }
+  }
+
+  /** The start screen's two lists; an unreadable one is empty, not an error. */
+  async function loadLists() {
+    try {
+      recent = (await api.recent()).recent ?? [];
+    } catch {
+      recent = [];
+    }
+    try {
+      examples = (await api.examples()).examples ?? [];
+    } catch {
+      examples = [];
+    }
+  }
+
+  function opened(doc: any) {
+    project = doc;
+    openError = "";
+    newOpen = false;
   }
 
   async function open(path: string): Promise<string> {
     try {
-      project = await api.openProject(path);
+      opened(await api.openProject(path));
       say(`p = rx.Project.open(${JSON.stringify(path)})`);
       return "";
     } catch (error) {
-      return (error as Error).message;
+      openError = (error as Error).message;
+      return openError;
     }
+  }
+
+  async function openExample(name: string, reset = false): Promise<string> {
+    try {
+      const doc = reset ? await api.resetExample(name) : await api.openExample(name);
+      opened(doc);
+      say(`p = rx.Project.open(${JSON.stringify(doc.path)})  # the ${name} example`);
+      return "";
+    } catch (error) {
+      openError = (error as Error).message;
+      return openError;
+    }
+  }
+
+  async function removeRecent(path: string) {
+    try {
+      recent = (await api.removeRecent(path)).recent ?? [];
+    } catch (error) {
+      openError = (error as Error).message;
+    }
+  }
+
+  async function closed() {
+    project = null;
+    showBottom = false;
+    await loadLists();
   }
 
   /** Graphs and model cannot both be hidden (`gui/STYLE.md` § Layout). */
@@ -167,6 +223,12 @@
         // an unreadable store is the default choice, not a boot failure
       }
       version = await api.version();
+      capabilities = await api.capabilities();
+      try {
+        docsUrl = (await api.help())?.docs_url ?? null;
+      } catch {
+        docsUrl = null;
+      }
       await loadProject();
       run = await api.runState();
     })();
@@ -207,8 +269,8 @@
     {workflow(wf).name}<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"
       ><path d="M4.5 6.5 8 10l3.5-3.5" /></svg></button>
   <span class="proj">
-    <FileMenu {project} {busy} {say} onopen={open} onproject={(doc) => (project = doc)}
-      onclosed={() => (project = null)} />
+    <FileMenu {project} {busy} {say} onnew={() => (newOpen = true)} onopen={open}
+      onproject={(doc) => (project = doc)} onclosed={closed} />
   </span>
   <span class="gap"></span>
   <button class="ib" aria-label="Settings" title="Settings&#10;{mod},"
@@ -223,8 +285,15 @@
 </header>
 
 <div class="main" bind:this={mainEl}>
+  {#if !project}
+    <!-- with no project the start screen is the window (WP-2131), between the
+         bars, which keep their shape so opening a project moves nothing -->
+    <Start {recent} {examples} {busy} {docsUrl} error={openError}
+      onnew={() => (newOpen = true)} onopen={open} onexample={openExample}
+      onremove={removeRecent} />
+  {:else}
   <div class="app" bind:this={appEl}>
-    {#if showGraphs || !project}
+    {#if showGraphs}
       <section class="graphs" aria-label="Graphs">
         <div class="tabs" role="tablist" aria-label="Graphs">
           {#each GRAPH_TABS as t (t.id)}
@@ -235,9 +304,9 @@
         <div class="pane"></div>
       </section>
     {/if}
-    {#if showModel || !project}
+    {#if showModel}
       <section class="model" aria-label="Model"
-        style:flex={showGraphs || !project ? `0 0 ${modelWidth}px` : "1 1 auto"}>
+        style:flex={showGraphs ? `0 0 ${modelWidth}px` : "1 1 auto"}>
         {#if showGraphs && project}
           <Splitter size={modelWidth} grow="left" min={360} keep={360}
             extent={() => appEl?.clientWidth ?? 0}
@@ -267,6 +336,7 @@
     {/if}
   </div>
 
+  {/if}
   {#if project && showBottom}
     <section class="bottom" aria-label="Console and history" style:flex="0 0 {bottomHeight}px">
       <Splitter size={bottomHeight} grow="up" min={90} keep={240}
@@ -306,6 +376,10 @@
   <Menu at={wfAt} label="Workflows" anchor={wfButton}
     items={WORKFLOWS.map((w) => ({ id: w.id, label: menuLabel(w), checked: w.id === wf, radio: true }))}
     onchoose={chooseWorkflow} onclose={() => (wfAt = null)} />
+{/if}
+
+{#if newOpen}
+  <NewProject {capabilities} {busy} {say} onclose={() => (newOpen = false)} onopened={opened} />
 {/if}
 
 {#if settingsOpen}

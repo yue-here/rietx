@@ -23,6 +23,10 @@ vi.mock("../api", () => ({
       return project;
     },
     runState: async () => run,
+    capabilities: async () => ({}),
+    help: async () => ({ docs_url: "https://example.invalid/docs/" }),
+    recent: async () => ({ recent: [] }),
+    examples: async () => ({ examples: [{ name: "fap", title: "Fluorapatite", built: false }] }),
     cancel: () => cancel(),
     events: async () => ({ events: [] }),
   },
@@ -38,7 +42,7 @@ let app: ReturnType<typeof mount> | null = null;
 
 async function boot() {
   app = mount(Frame, { target: document.body });
-  for (let i = 0; i < 6; i++) await tick();
+  for (let i = 0; i < 16; i++) await tick();
   flushSync();
 }
 
@@ -80,6 +84,17 @@ describe("the top bar", () => {
     expect(byLabel("Hide the model")!.disabled).toBe(true);
     expect(document.querySelector<HTMLButtonElement>("button.mbtn.wf")!.disabled).toBe(true);
     expect(byLabel("Show the console")!.disabled).toBe(true);
+  });
+
+  it("frames the start screen with no project, without the wordmark or the version", async () => {
+    project = null;
+    await boot();
+    const start = document.querySelector('section[aria-label="Start"]')!;
+    expect(start).not.toBeNull();
+    expect(document.querySelector('section[aria-label="Graphs"]')).toBeNull();
+    expect(start.textContent).toContain("New project…");
+    expect(start.textContent).not.toContain("9.9.9");
+    expect(start.querySelector(".wordmark")).toBeNull();
   });
 });
 
