@@ -24,6 +24,15 @@
    * one history node (WP-1011). Edits gather until the action bar's Apply
    * (WP-2123), which sends one `PATCH /api/params`.
    *
+   * Structural edits live in two menus (the maintainer's ruling of
+   * 2026-11-11, WP-2214 rows 121-131): a phase band's ⋯ holds Rename…,
+   * Change space group…, Add atom… and Replace from CIF…, and an atom row's
+   * context menu holds Rename…, Change species…, Anisotropic ADPs and Delete.
+   * Each acts at once, one history node through today's verb (interaction
+   * rules 11 and 12), and waits while edits are pending, since a deleted atom
+   * renumbers the paths a pending edit names. The filter row's ⋯ holds the
+   * bulk Free and Fix.
+   *
    * The layout rule (2026-11-07): no click moves the layout unless it asks
    * to. So the editor and its popover float (`position: fixed`), a pending
    * edit is a tint, a box and a padlock share one 18 px slot, and every
@@ -31,6 +40,7 @@
    */
   import { ApiError, api } from "../api";
   import Help from "../Help.svelte";
+  import { clone, newAtom } from "../lib/model";
   import { paramKey, resolve, type HelpCorpus } from "../lib/help";
   import { editText, expText, numParts, slotWidth, slotsFor, type NumParts,
            type Slots } from "../lib/numslot";
@@ -40,6 +50,9 @@
   import { typesetSpaceGroup } from "../lib/spacegroup";
   import { asGlob, editState, heldGlyph, matches, normalize, selection,
            validateEdit, varyEdit, varyOf, type ParamRow } from "../lib/table";
+  import Ask, { type AskField } from "./Ask.svelte";
+  import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
+  import SpaceGroup from "./SpaceGroup.svelte";
   import { shortTitle, unitText } from "./words";
 
   let {
@@ -48,6 +61,7 @@
     corpus = null,
     say = (_line: string) => {},
     onpending = (_touched: number, _invalid: string) => {},
+    onmoved = () => {},
   }: {
     head?: string | null;
     busy?: boolean;
@@ -56,6 +70,8 @@
     /** the pending edits, reported to the shell's action bar (WP-2123): how
      *  many, and the first invalid one's reason or "" */
     onpending?: (touched: number, invalid: string) => void;
+    /** a structural edit landed: the head moved under the shell */
+    onmoved?: () => void;
   } = $props();
 
   type Limits = [number | null, number | null];
@@ -381,6 +397,212 @@
 
   export const freeSelection = () => bulkVary(true);
   export const fixSelection = () => bulkVary(false);
+
+  // ---------------------------------------------------------------- menus
+
+  /** The menu open: the filter row's, a phase band's, or an atom row's. */
+  type Open =
+    | { kind: "filter"; at: MenuAt; anchor: HTMLElement }
+    | { kind: "phase"; phase: number; at: MenuAt; anchor: HTMLElement }
+    | { kind: "atom"; phase: number; atom: number; at: MenuAt; anchor: HTMLElement | null };
+  let menu = $state<Open | null>(null);
+  /** The small form a menu row opened, and the space-group dialog. */
+  let ask = $state<{ at: { x: number; y: number }; label: string; fields: AskField[];
+                     submit: string; send: (v: Record<string, string>) => Promise<string> } | null>(null);
+  let sgFor = $state<number | null>(null);
+  let cifInput: HTMLInputElement | undefined = $state();
+
+  /** Why a structural edit waits, or "" when it can go. */
+  const structuralWait = $derived(busy ? "A run is in flight"
+    : touched ? "Apply or revert the pending edits first" : "");
+
+  function below(el: HTMLElement, alignRight = false): MenuAt {
+    const r = el.getBoundingClientRect();
+    return alignRight ? { x: r.right, y: r.bottom + 4, align: "right" } : { x: r.left, y: r.bottom + 4 };
+  }
+
+  /** A click on the button that opened a menu closes it; the menu itself
+   *  ignores that click, so this is the one toggle. */
+  function toggleMenu(next: Open) {
+    menu = menu && menu.anchor === next.anchor ? null : next;
+  }
+
+  function phaseOf(section: Section): number {
+    return Number(section.key.split(".")[1]);
+  }
+
+  function atomMenu(event: MouseEvent, phase: number, atom: number) {
+    event.preventDefault();
+    const row = event.currentTarget as HTMLElement;
+    // a keyboard's menu key fires at the focused cell with no pointer position
+    const at = event.clientX || event.clientY ? { x: event.clientX, y: event.clientY }
+      : below(row);
+    menu = { kind: "atom", phase, atom, at, anchor: null };
+  }
+
+  const bulkLabel = (verb: string, n: number) =>
+    query.trim() ? `${verb} ${n} matching` : `${verb} all ${n}`;
+
+  function siteOf(phase: number, atom: number): any {
+    return sites.find((s: any) => s.path === `phases.${phase}.atoms.${atom}`) ?? null;
+  }
+
+  const menuItems = $derived.by<MenuEntry[]>(() => {
+    const m = menu;
+    if (!m) return [];
+    const wait = structuralWait;
+    const gate = { disabled: !!wait, title: wait || undefined };
+    if (m.kind === "filter") {
+      const why = `One set_vary on ${glob}, one history node`;
+      return [
+        { id: "free", label: bulkLabel("Free", bulk.toFree), disabled: busy || !bulk.toFree, title: why },
+        { id: "fix", label: bulkLabel("Fix", bulk.toFix), disabled: busy || !bulk.toFix, title: why },
+      ];
+    }
+    if (m.kind === "phase") {
+      return [
+        { id: "rename", label: "Rename…", ...gate },
+        { id: "spacegroup", label: "Change space group…", ...gate },
+        { id: "add", label: "Add atom…", ...gate },
+        "-",
+        { id: "cif", label: "Replace from CIF…", disabled: !!wait,
+          title: wait || "Replace the whole structure, every phase, with a CIF's" },
+      ];
+    }
+    const aniso = siteOf(m.phase, m.atom)?.aniso ?? false;
+    return [
+      { id: "rename", label: "Rename…", ...gate },
+      { id: "species", label: "Change species…", ...gate },
+      { id: "aniso", label: "Anisotropic ADPs", checked: aniso, ...gate },
+      "-",
+      { id: "delete", label: "Delete", ...gate },
+    ];
+  });
+
+  function chooseMenu(id: string) {
+    const m = menu;
+    if (!m) return;
+    // the Anisotropic ADPs row is a checkbox, which keeps a menu open; this
+    // one acts on the model and the panel reloads, so every row closes it
+    menu = null;
+    if (m.kind === "filter") {
+      if (id === "free") void bulkVary(true);
+      else if (id === "fix") void bulkVary(false);
+      return;
+    }
+    const r = m.anchor?.getBoundingClientRect();
+    const at = r ? { x: Math.max(4, r.right - 260), y: r.bottom + 4 } : { x: m.at.x, y: m.at.y };
+    if (m.kind === "phase") {
+      const phase = m.phase, current = structure?.phases?.[phase];
+      if (id === "rename") {
+        ask = { at, label: "Rename the phase", submit: "Rename",
+                fields: [{ id: "name", label: "Name", value: current?.name ?? "" }],
+                send: (v) => editStructure((s) => { s.phases[phase].name = v.name.trim(); },
+                  `renamed phase ${phase}`,
+                  `structure.phases[${phase}].name = ${JSON.stringify(v.name.trim())}  # ref.edit(structure=…)`,
+                  v.name.trim() ? "" : "A phase needs a name.") };
+      } else if (id === "spacegroup") {
+        sgFor = phase;
+      } else if (id === "add") {
+        ask = { at, label: "Add an atom", submit: "Add",
+                fields: [{ id: "label", label: "Label", value: "", mono: true },
+                         { id: "species", label: "Species", value: "", mono: true },
+                         { id: "x", label: "x", value: "0", mono: true },
+                         { id: "y", label: "y", value: "0", mono: true },
+                         { id: "z", label: "z", value: "0", mono: true }],
+                send: (v) => addAtom(phase, v) };
+      } else if (id === "cif") {
+        cifInput?.click();
+      }
+      return;
+    }
+    const { phase, atom } = m;
+    const a = structure?.phases?.[phase]?.atoms?.[atom];
+    if (!a) return;
+    if (id === "rename" || id === "species") {
+      const field = id === "rename" ? "label" : "species";
+      ask = { at, label: id === "rename" ? `Rename ${a.label}` : `Change the species of ${a.label}`,
+              submit: id === "rename" ? "Rename" : "Change",
+              fields: [{ id: field, label: id === "rename" ? "Label" : "Species",
+                         value: a[field] ?? "", mono: true }],
+              send: (v) => editStructure((s) => { s.phases[phase].atoms[atom][field] = v[field].trim(); },
+                `${a.label}: ${field}`,
+                `structure.phases[${phase}].atoms[${atom}].${field} = ${JSON.stringify(v[field].trim())}  # ref.edit(structure=…)`,
+                v[field].trim() ? "" : `An atom needs a ${field}.`) };
+    } else if (id === "aniso") {
+      void toggleAniso(`phases.${phase}.atoms.${atom}`, !(siteOf(phase, atom)?.aniso ?? false));
+    } else if (id === "delete") {
+      void deleteAtom(phase, atom, a.label);
+    }
+  }
+
+  /** A whole-model edit through `PATCH /api/structure`, built on a fresh read:
+   *  the model on screen may predate the last apply (today's `Model.svelte`). */
+  async function editStructure(change: (s: any) => void, label: string, echo: string,
+                               refused = ""): Promise<string> {
+    if (refused) return refused;
+    try {
+      const next = clone((await api.structure()).structure);
+      change(next);
+      await api.patchStructure(next, label);
+      say(echo);
+      refusal = "";
+      await landed();
+      return "";
+    } catch (exc) {
+      return exc instanceof ApiError && exc.busy ? "A run is in flight." : (exc as Error).message;
+    }
+  }
+
+  async function addAtom(phase: number, v: Record<string, string>): Promise<string> {
+    const label = v.label.trim(), species = v.species.trim();
+    if (!label || !species) return "A new atom needs a label and a species.";
+    const xyz = [v.x, v.y, v.z].map(Number);
+    if (xyz.some((n) => !Number.isFinite(n))) return "A position is three numbers.";
+    const atom = newAtom(label, species, xyz);
+    return editStructure((s) => { s.phases[phase].atoms.push(atom); }, `added ${label}`,
+      `structure.phases[${phase}].atoms.append(Atom(${JSON.stringify(label)}, ${JSON.stringify(species)}, ${xyz.join(", ")}))`);
+  }
+
+  /** Delete acts at once (interaction rule 12); History's Restore brings it back. */
+  async function deleteAtom(phase: number, atom: number, label: string) {
+    refusal = await editStructure((s) => { s.phases[phase].atoms.splice(atom, 1); },
+      `removed ${label}`, `del structure.phases[${phase}].atoms[${atom}]  # ${label}`);
+  }
+
+  async function toggleAniso(base: string, on: boolean) {
+    try {
+      await api.aniso(base, on);
+      say(`# ${base}: aniso ${on ? "on, AnisoU.isotropic(Uiso, cell)" : "off, Biso from U_eq"}`);
+      refusal = "";
+      await landed();
+    } catch (exc) {
+      refusal = (exc as Error).message;
+    }
+  }
+
+  /** Replace from CIF…: the whole structure, in one node (today's verb). */
+  async function replaceFromCif(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      const preview = await api.uploadFile("cif", file);
+      await api.patchStructure({ upload: preview.upload }, `structure from ${file.name}`);
+      say(`ref.edit(structure=structure_from_cif(${JSON.stringify(file.name)}))`);
+      refusal = "";
+      await landed();
+    } catch (exc) {
+      refusal = (exc as Error).message;
+    } finally {
+      input.value = "";
+    }
+  }
+
+  async function landed() {
+    onmoved();
+    await load();
+  }
 
   // ---------------------------------------------------------------- display
 
@@ -835,6 +1057,10 @@
   {/if}
 {/snippet}
 
+{#snippet dots()}
+  <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" /><circle cx="8" cy="8" r="1" /><circle cx="12.5" cy="8" r="1" /></svg>
+{/snippet}
+
 {#snippet padlock(on: boolean)}
   <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
     <rect x="2.5" y="6" width="9" height="6.5" rx="1.5"
@@ -895,7 +1121,7 @@
   {/if}
 {/snippet}
 
-{#snippet atomTable(item: { key: string; atoms: AtomRow[] })}
+{#snippet atomTable(item: { key: string; phase: number; atoms: AtomRow[] })}
   {@const allDofs = item.atoms.filter((a) => !atomHeld(a)).flatMap((a) => a.dofs)}
   {@const occs = item.atoms.map((a) => a.occ).filter((r): r is ParamRow => !!r && (r.refinable || r.vary))}
   {@const bisos = item.atoms.map((a) => a.biso).filter((r): r is ParamRow => !!r && (r.refinable || r.vary))}
@@ -934,7 +1160,7 @@
       </thead>
       <tbody>
         {#each item.atoms as atom (atom.key)}
-          <tr data-atom={atom.path}>
+          <tr data-atom={atom.path} oncontextmenu={(e) => atomMenu(e, item.phase, atom.index)}>
             <td class="aname">{atom.label}</td>
             <td>{atom.species}</td>
             <td title={atom.siteSymmetry ? `site symmetry ${atom.siteSymmetry}` : null}>{atom.wyckoff}</td>
@@ -977,15 +1203,20 @@
     <input id="param-filter" placeholder="Filter, for example biso or Ca1"
       bind:value={query} disabled={!rows.length} />
     <span class="muted count">{nFree} free of {rows.length}</span>
-    <button class="ghost" disabled={busy || !bulk.toFree} onclick={() => bulkVary(true)}
-      title="one set_vary call on the filter's glob, one history node">Free {bulk.toFree}</button>
-    <button class="ghost" disabled={busy || !bulk.toFix} onclick={() => bulkVary(false)}
-      >Fix {bulk.toFix}</button>
+    <button class="ib" aria-label="Free or fix" aria-haspopup="menu"
+      aria-expanded={menu?.kind === "filter"} disabled={!rows.length}
+      title="Free or fix what the filter matches"
+      onclick={(e) => toggleMenu({ kind: "filter", at: below(e.currentTarget, true), anchor: e.currentTarget })}
+      >{@render dots()}</button>
   </header>
 
   {#if error || refusal}<p class="bad">{refusal || error}</p>{/if}
 
   <div class="scroller" bind:this={scroller} onscroll={scrolled} style:--inkw="{inkWidth + 1}ch">
+    {#if structure && !(structure.phases ?? []).length && rows.length}
+      <p class="muted pad">No phase yet. <button class="link" disabled={!!structuralWait}
+        onclick={() => cifInput?.click()}>Add one from a CIF…</button></p>
+    {/if}
     {#if loading && !rows.length}
       <p class="muted pad">Loading the table…</p>
     {:else if !rows.length}
@@ -1013,6 +1244,16 @@
             {#if section.system}<span class="muted">{section.system}</span>{/if}
           </button>
           <span class="muted nfree">{freeCount(section)} free</span>
+          {#if section.kind === "phase"}
+            <button class="ib" aria-label="{section.title} actions" aria-haspopup="menu"
+              aria-expanded={menu?.kind === "phase" && menu.phase === phaseOf(section)}
+              title="Rename, change the space group, add an atom"
+              onclick={(e) => toggleMenu({ kind: "phase", phase: phaseOf(section),
+                at: below(e.currentTarget, true), anchor: e.currentTarget })}>{@render dots()}</button>
+          {:else}
+            <!-- the ⋯'s slot, kept so every band's count sits in one column -->
+            <span class="ibslot" aria-hidden="true"></span>
+          {/if}
         </div>
         {#if isOpen(section.key)}
           {#each section.items as item (item.key)}
@@ -1025,6 +1266,25 @@
     {/if}
   </div>
 </section>
+
+{#if menu}
+  <Menu at={menu.at} label={menu.kind === "filter" ? "Free or fix" : menu.kind === "phase" ? "Phase" : "Atom"}
+    anchor={menu.anchor} items={menuItems} onchoose={chooseMenu} onclose={() => (menu = null)} />
+{/if}
+
+{#if ask}
+  <Ask at={ask.at} label={ask.label} fields={ask.fields} submit={ask.submit}
+    onsubmit={ask.send} onclose={() => (ask = null)} />
+{/if}
+
+{#if sgFor !== null && structure?.phases?.[sgFor]}
+  <SpaceGroup phase={sgFor} name={structure.phases[sgFor].name}
+    current={structure.phases[sgFor].space_group} {say}
+    onchanged={() => void landed()} onclose={() => (sgFor = null)} />
+{/if}
+
+<input type="file" accept=".cif" class="filepick" bind:this={cifInput} onchange={replaceFromCif}
+  tabindex="-1" aria-hidden="true" />
 
 {#if editor}
   <input class="editor mono" bind:this={editorInput} bind:value={editorText}
@@ -1156,6 +1416,16 @@
   .nfree {
     font-size: var(--text-sm);
     white-space: nowrap;
+  }
+
+  .ibslot {
+    flex: none;
+    width: 28px;
+  }
+
+  /* the file picker Replace from CIF… opens: never drawn */
+  .filepick {
+    display: none;
   }
 
   .chev {

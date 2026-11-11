@@ -62,8 +62,11 @@
     if (event.key !== "Escape") return;
     event.stopPropagation();
     event.preventDefault();
+    // read before closing: the opener's props are getters over the state
+    // onclose clears, so the anchor is gone once it has run
+    const back = anchor;
     onclose();
-    anchor?.focus();
+    back?.focus();
   }
 
   function away(event: MouseEvent) {
