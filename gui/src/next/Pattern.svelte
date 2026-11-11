@@ -413,7 +413,7 @@
         : scale === "log" ? "Intensity on a log scale. Points at or below zero are not drawn."
         : "Intensity on a linear scale, in counts.", "Click to choose the scale"],
     resid: [kind === "cumulative" ? "Cumulative χ², summed from the left edge of the view."
-            : `Difference over σ, (observed − calculated)/σ. ${sigmaFrom}`,
+            : `Δ/σ = (observed − calculated)/σ. ${sigmaFrom}`,
             "Click to choose what the difference shows"],
   });
 
