@@ -113,10 +113,13 @@ the prototype's (WP-2214 § How the maintainer reviews).
   `/next` until R6 and R7; `?` boxes on the tab strips (row 246) wait for the help piece.
 
   *Measured* (`[dev]` venv, darwin arm64; another shift's sessions may have shared the
-  machine). Fast suite before the review fixes: 14557 passed, 424 skipped, 32 xfailed, 8:00.
+  machine). Fast suite on the final tree: 14557 passed, 424 skipped, 32 xfailed, 8-8.5 min,
+  the same total (14981) as before the review fixes; the one added python case,
+  `test_the_rebuilt_page_is_served_beside_todays`, costs 0.03 s. The browser module skips at
+  import without python `playwright`, so its two new cases add no count here.
   vitest 762 passed in 37 files (14 new in `next/`, 3 in `lib/workflows.test.ts`, the carried
   statusbar cases); svelte-check 433 files, 0 errors. `tests.reader_output`: unchanged. Vale:
-  0 errors. GUI browser files: see the PR.
+  0 errors. The six GUI browser files (python `playwright` installed): 87 passed, 0 skipped, 2 new.
 
   *Review.* `/code-review high --fix` found nine; six fixed in one commit (stacked dialogs,
   the second pass's chunk names, an unguarded boot, the banner, the duplicated page branch,
@@ -130,7 +133,7 @@ the prototype's (WP-2214 § How the maintainer reviews).
   the runner's scratch. A browser test needs python `playwright` in the worktree venv
   (`uv pip install --python .venv/bin/python playwright`), or the module skips green.
 
-  Next: the maintainer looks at the screens beside the prototype's (paths in the PR). Then
+  Next: the maintainer looks at the screens beside the prototype's (paths in PR #1534). Then
   R2, which takes the action bar, the recovery offer and the hover readout, and decides
   whether `.ib` and `.mbtn` join the register table and its guard.
 - **2026-11-11** — filed by a ghostshift runner from WP-2214's piece R1, the last task of that
