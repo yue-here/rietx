@@ -12,11 +12,12 @@ control behaves as it does, and when you should reach for it.
 
 ## The shape of the window
 
-Two sides. The graphs are on the left, under their own tab strip. Today it
-holds one tab, `Pattern`. A title line under it says what the graph shows:
-`Observed pattern` before any fit, `Last fit` after one, and `Refining` while a
-run is in flight. The panel column is on the right, with nine tabs, the action
-bar and the console. Every panel is mounted at once, so a filter you typed, an
+Two sides. The graphs are on the left, under their own tab strip. It holds
+three tabs, `Pattern`, `Single peaks` and `Background`. A title line under it says what the
+graph shows. On the pattern it reads `Observed pattern` before any fit, `Last fit` after one, and
+`Refining` while a run is in flight. While the Interactive tab has values
+waiting, it says `Preview, not refined`. The panel column is on the right, with
+ten tabs, the action bar and the console. Every panel is mounted at once, so a filter you typed, an
 edit you have not applied and a text buffer you are half way through all survive
 a look at another tab.
 
@@ -36,8 +37,8 @@ below, and the sash then drags up and down.
 
 | Control | Does |
 |---|---|
-| the project chip | names the `.rex`, its data file, the point count, the intensity mode, and whether σ came from the file or from counting statistics |
-| `Open…` | the import wizard, with the recent list in it |
+| the project's name | opens the File menu, below; `No project` when none is open |
+| the project line | the data file, the point count, the intensity mode, and whether σ came from the file or from counting statistics |
 | the two collapse buttons | hide the graphs (left end) or the panel column (right end) |
 | `Simple \| Advanced` | whether the Plan, Model, Series and Report panels show their advanced controls |
 | `◐ ☀ ☾` | theme: follow the system, light, dark |
@@ -48,6 +49,37 @@ below, and the sash then drags up and down.
 `Rwp` and `GoF` are on the title line over the pattern. `⚠ not a fit yet`
 appears beside them past an Rwp of {{ MATURITY_MAX_RWP }}.
 
+### The File menu
+
+Click the project's name to open the File menu. Work saves itself as you go, so
+the menu has no Save. `⌘S` answers `Saved` and does nothing else.
+
+| Item | Does |
+|---|---|
+| `New project…` | the New project dialog |
+| `Open…` | the folder browser, to open another `.rex`; `⌘O` |
+| `Open recent` | the other projects on the recent list, and `Clear the list` |
+| `Save a copy…` | copies the whole `.rex` folder with its history, under a name and into a folder you choose; the window stays on the original; `⇧⌘S` |
+| `Rename…` | turns the name into a text box; `Enter` renames the folder, and `Esc` keeps the old name |
+| `Move to…` | moves the folder into another folder you choose |
+| `Export` | writes one of the six exports into a folder you choose, starting beside the project |
+| `Close project` | returns to the start screen |
+
+The folders come from the folder browser, which lists only your home directory
+and the working directory. A page in a browser cannot open the system's own save
+dialog. None of these items replaces a folder that already exists. An export
+refuses a file of the same name once, and the dialog's button then reads
+`Replace`. Every item that changes the folder is refused while a run is in
+flight.
+
+An export that needs a fit stays disabled until there is one. The instrument
+profile is the exception, because it is read from the project. Phase fractions
+also needs a Rietveld fit with two phases or more.
+
+After `Close project`, the next `rietx gui` with no project named shows the start
+screen. The `Open or create a project` palette command shows the start screen
+over an open project, with `Back to the project` to return.
+
 ## The action bar
 
 One row under the panel column, on every tab.
@@ -55,8 +87,8 @@ One row under the panel column, on every tab.
 | Control | Does |
 |---|---|
 | `One cycle \| Staged plan` | what a refine runs: one stage on exactly the ticked parameters, or the project's plan |
-| the pending count | how many Parameters edits wait, plus one for an edited plan, and the first refusal if one is invalid |
-| `Revert` / `Apply` | drop or apply the pending edits: the Parameters edits first, then the plan |
+| the pending count | how many Parameters and Interactive edits wait, plus one for an edited plan, and the first refusal if one is invalid |
+| `Revert` / `Apply` | drop or apply the pending edits: the Parameters edits first, then the Interactive values, then the plan |
 | `Refine` | run the choice; it reads `Apply and refine` while edits wait, and applies them first |
 
 `⌘⏎` (`Ctrl+Enter` off a Mac) presses `Refine`, except inside the Text
@@ -65,12 +97,35 @@ replaces the vary flags, so a parameter you ticked by hand stays free under
 `One cycle` and may be held again under `Staged plan`. The Plan tab's ladder
 shows which.
 
-There is no menu bar and no Save button, and neither is an omission. Settings
+There is no Save command, and that is not an omission. Settings
 persist on the verb. The moment you tick a box or drag a region it is written to
-the project, so there is nothing to save and nothing to lose on close.
+the project, so there is nothing to save on close.
 `Save the project` exists as a palette command for the one case that is not
 covered, which is writing out the settings file after an edit made from
 elsewhere.
+
+### Edits not yet applied
+
+An edit in the action bar's count stays pending until `Apply`. The window keeps
+the pending edits in a recovery copy, in the application's own state directory
+beside the recent list and apart from the project, as editors such as VS Code
+keep theirs. The copy is written half a second after each change, and again
+before the project closes. So closing the project, opening another, closing the
+browser tab or stopping the server keeps them.
+
+Opening the project again shows `Unapplied edits`, with how many and when they
+were made. `Restore` puts them back as pending edits, and `Discard` deletes
+them. `Escape` closes the dialog and keeps the copy without restoring it. The
+dialog comes back the next time the project opens. Edits you make before then
+are not kept. If the project has been refined or edited since, for example by a
+fit run from Python, the dialog adds "The project has been refined or edited
+since. Restored values will replace the current ones." Restored edits still
+wait in the action bar until you apply them.
+
+The copy is deleted once the edits are applied, reverted or discarded. It
+follows the project through `Rename…` and `Move to…`. `Save a copy…`, and a
+folder moved outside the app, leave it behind. The Model panel's forms and the
+Text document apply through their own buttons, so they are not kept.
 
 The theme belongs to you and not to the project. It lives beside the recent list
 in the application's own settings, so it follows you across projects, ports and
@@ -171,6 +226,75 @@ curve keeps its column. The legend is in neither picture, so name the curves
 in your caption. The line beside the buttons says what each press did, and
 says so when a browser refuses the clipboard.
 
+## Single peaks
+
+The second graph tab frames three reflections, one window each. The pattern is
+cut into twelve equal ranges of 2θ. Each range offers its strongest reflection,
+ranked by the last fit's height above its background. The windows open on one
+low, one middle and one high reflection, and `‹` and `›` step a window to the
+next one. A window spans five peak widths either side of its reflection.
+
+Each window draws the observed points, the last fit and the normalised residual
+in a strip below. While the Interactive tab has values waiting, the preview is
+drawn solid and the last fit dashed in the same colour. The residual strip then
+shows the preview's residual. The y range stays the last fit's, so a peak the
+preview grows runs off the top of its window. A comparison that rescaled with
+each drag would hide the change you are trying to see.
+
+Before any fit there is nothing to frame, and the tab says so.
+
+```{image} ../screenshots/single-peaks-light.png
+:class: only-light
+:alt: Three windows on single reflections, each with observed crosses, the fitted curve and a residual strip, and arrows beside each caption to step to the next reflection
+```
+
+```{image} ../screenshots/single-peaks-dark.png
+:class: only-dark
+:alt: Three windows on single reflections, each with observed crosses, the fitted curve and a residual strip, and arrows beside each caption to step to the next reflection
+```
+
+## The background
+
+The `Background` graph tab draws the background on its own. The observed
+pattern is greyed behind it, and the frame is set by the curve, so the peaks
+run off the top. The curve is drawn at the working values, the ones the next
+run starts from, and the title line says so.
+
+The shaded band is where the curve may move when the free parameters refine.
+It is the curve's esd at each channel, taken through the whole covariance of
+every free parameter: equation {eq}`est-derived` of
+[Esds of derived quantities](../theory/estimation.md#esds-of-derived-quantities),
+with the background curve as the derived quantity. `rietx.gui.background`
+computes it. A free scale or Biso that trades against the background
+therefore widens it. The band is drawn at ±3 esd, and `×5` and `×20` draw it
+wider still. A multiplier exaggerates the picture and is not a probability. The
+band is linearised at the current values, so before a fit converges it
+describes the curvature there and nothing more. With no background term free
+there is no band, and the `Band ±3 esd` label opens a note saying why. The route
+behind it is `GET /api/background`.
+
+```{image} ../screenshots/background-tab-light.png
+:class: only-light
+:alt: The Background tab after one fit, the greyed pattern behind a falling background curve with a narrow band, and six hold boxes c0 to c5 under it beside the band's multiplier
+```
+
+```{image} ../screenshots/background-tab-dark.png
+:class: only-dark
+:alt: The Background tab after one fit, the greyed pattern behind a falling background curve with a narrow band, and six hold boxes c0 to c5 under it beside the band's multiplier
+```
+
+The controls under the plot follow the background family.
+
+| family | control | what it does |
+|---|---|---|
+| Chebyshev | a `Hold` box per term, `c0` upwards | holds the term at its value from the previous cycle; no plan stage frees it until it is released |
+| P-spline | `Smoothness λ` | the penalty's weight, applied on Enter or when the box loses focus; larger is stiffer |
+
+A hold is `Refinement.hold`, and a release `Refinement.unhold`. Each records a
+history node, and the console echoes the call. The Parameters panel offers no
+switch per coefficient, since one coefficient alone means little. The family and
+the number of Chebyshev terms are set in Model.
+
 ## Parameters
 
 Every parameter the model has, grouped the way a refinement is read. The panel
@@ -240,6 +364,64 @@ counts them.
 :alt: The Parameters panel: a band for fluorapatite with its space group, the Scale row, the Cell group with its folded symmetry line, Size and strain, and the atom table with one row per atom
 ```
 
+## Interactive
+
+Sliders for the values you would adjust by hand before a fit: the scale and
+cell lengths of each phase, the zero shift and sample displacement, the axial
+apertures, and the peak-width terms. Each parameter the table could free gets
+one. A tied, locked or force-fixed parameter gets none, so under a hexagonal
+cell `b` follows `a` and has no slider. Atom positions, occupancies, Biso, cell
+angles and the background are left to the Parameters table.
+
+Moving a slider changes nothing in the project. The graphs redraw at the new
+values through `POST /api/preview`, and the title line says `Preview, not
+refined` with the preview's Rwp beside the last fit's. The values wait in the
+action bar like a Parameters edit. `Apply` writes them as one `set_values`
+history node, `Apply and refine` writes them and runs, and `Revert` drops them.
+When both tabs have edits waiting, the Parameters edits are applied first and
+the sliders second, so a slider wins on a parameter both tabs touched. The
+sliders also start from the head's values, so a typed Parameters edit is not
+drawn in the preview until it is applied.
+
+A drag asks the server for one preview at a time. While one is out, only the
+newest position waits, so a fast drag never queues behind itself. On a pattern
+past 150 000 channels the preview is drawn on the same thinned channels as the
+pattern.
+
+Each slider opens on a range set by the last fit:
+
+| Parameter | Range | Track |
+|---|---|---|
+| a phase scale | half to double | logarithmic |
+| a cell length | the change that moves the highest-angle peak by two peak widths | linear |
+| the zero shift | two peak widths either way | linear |
+| the sample displacement | 0.1 mm either way | linear |
+| the axial apertures | 0 to three times the value, or to 0.05 | linear |
+| a Gaussian width term (U, V, W, size, strain) | a quarter to four times | logarithmic |
+| a Lorentzian width term (X, Y, size, strain) | half to double | logarithmic |
+
+A Gaussian term is in squared degrees, so a quarter to four times its value is
+half to double the peak width. A term at zero opens on a linear track one peak
+width wide. Every range stops at the parameter's own bounds. Click the
+parameter's name to set the range and the track yourself. A range you set is
+kept when a fit moves the values, and `Default` gives the measured one back.
+
+Click the number to type a value. `Enter` takes it and `Esc` leaves it. A value
+outside the parameter's bounds is refused with the bound it crossed. Each number
+keeps one format for its whole range, so the digits stay put while you drag. `↺`
+puts one slider back at the last fit, and the tick on the track marks where that
+is.
+
+```{image} ../screenshots/interactive-light.png
+:class: only-light
+:alt: The Interactive tab, with sliders grouped under Instrument and the phase name, each showing its parameter name, its value and a track with the last fit marked
+```
+
+```{image} ../screenshots/interactive-dark.png
+:class: only-dark
+:alt: The Interactive tab, with sliders grouped under Instrument and the phase name, each showing its parameter name, its value and a track with the last fit marked
+```
+
 ## Plan
 
 The stage list, and what each stage will actually do.
@@ -252,8 +434,10 @@ locks and the mode's force-fixes shown are the ones you will get.
 
 Under the last stage the panel names the closing stage every plan ends with.
 It frees every stage's globs once more, on peak windows that drop 0.10% of
-each peak, and its Rwp is the answer's. The plan's `closing` line in the text
-document sets the fraction, and `none` removes the stage.
+each peak, and its Rwp is the answer's. When a stage fixes a parameter that no
+later stage frees again, the closing stage keeps it fixed and says how many it
+keeps. The plan's `closing` line in the text document sets the fraction, and
+`none` removes the stage.
 
 The plan reads top to bottom, one stage to a row. Each row holds:
 
@@ -265,9 +449,14 @@ The plan reads top to bottom, one stage to a row. Each row holds:
 - `×`, which removes the stage. The last stage has none.
 - the globs the stage frees, each with a `×` beside it, and a field where you
   type another glob and press Enter.
+- the globs the stage fixes, in a `Fixes` row of the same shape. `+ Fix` at
+  the end of the frees opens the row when the stage fixes nothing yet. The stage
+  fixes them after it frees its own globs, so a stage that frees `phases.*`
+  and fixes `phases.*.atoms.*.biso` frees all of the phase but its
+  displacements. A parameter stays fixed until a later stage frees it again.
 - the stage's line of the ladder: how many parameters it frees on top of the
-  stages above, the running count of free ones, how many stay held, and the
-  stage's Rwp from the last run. Open it for the paths.
+  stages above, how many it fixes (`−N`), the running count of free ones, how
+  many stay held, and the stage's Rwp from the last run. Open it for the paths.
 
 The `Preset` menu replaces the stages with a preset's. `+ Stage` adds an empty
 stage at the end and puts the cursor in its name.

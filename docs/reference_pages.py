@@ -61,7 +61,7 @@ PARAMETER_GROUPS = (
      (("Cell",
        "The space group ties the lattice parameters together. "
        "A cubic phase refines one length, and an angle the symmetry fixes is locked.",
-       ("phases.*.cell.*",)),
+       ("phases.*.cell.*", "phases.*.parent_cell.strain.*")),
       ("Atoms",
        "An atom's coordinates x, y and z refine within its site symmetry. "
        "rietx refines the directions the site lets the atom move, the `dof` parameters, "
@@ -141,6 +141,16 @@ PARAMETER_GROUPS = (
 )
 
 
+#: Generated body -> the `PARAMETER_GROUPS` headings it shows.  One page held
+#: them all until it reached the page contract's 50 000-character cap (WP-2087),
+#: so the phase side and the instrument side are two pages.
+PARAMETER_PAGES = {
+    "parameters.md": ("Cell and structure", "Phase amount and intensity corrections",
+                      "Microstructure", "Named variables"),
+    "parameters-instrument.md": ("Instrument", "Time of flight", "Background"),
+}
+
+
 def parameter_groups(entries: list[dict] | None = None) -> list[tuple]:
     """`PARAMETER_GROUPS` with each leaf's globs replaced by its registry entries.
 
@@ -214,10 +224,22 @@ def _parameter_definitions(members: list[dict]) -> list[str]:
     return lines
 
 
-def parameter_map() -> str:
-    """The body of `reference/parameters.md`: one table per group, then its definitions."""
+def parameter_map(body: str = "parameters.md") -> str:
+    """One parameter-map body: one table per group it shows, then its definitions.
+
+    Raises naming every group heading that no body shows, or that two show.
+    """
+    shown = [h for headings in PARAMETER_PAGES.values() for h in headings]
+    headings = [g[0] for g in PARAMETER_GROUPS]
+    wrong = sorted({h for h in headings if shown.count(h) != 1} | (set(shown) - set(headings)))
+    if wrong:
+        raise RuntimeError(
+            "PARAMETER_PAGES in docs/reference_pages.py must show each group exactly "
+            f"once: {wrong}")
     out = [_BANNER.format(source="rietx.help"), ""]
     for heading, lead, leaves in parameter_groups():
+        if heading not in PARAMETER_PAGES[body]:
+            continue
         out += [f"## {heading}", "", lead, ""]
         for subheading, sublead, members in leaves:
             if subheading:
@@ -985,7 +1007,7 @@ def api_everything_else() -> str:
 
 #: Generated body file name -> the function that writes it.
 BODIES = {
-    "parameters.md": parameter_map,
+    **{name: _functools.partial(parameter_map, name) for name in PARAMETER_PAGES},
     "settings.md": vocabularies,
     "result-fields.md": result_field_page,
     "plans.md": plan_ladder,

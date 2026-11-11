@@ -287,7 +287,7 @@
     // `--line`: a hairline border colour is invisible against the page in a 3D
     // scene, and the first browser run drew a box nobody could see.  The a/b/c
     // letters take the same colour, so frame and labels read as one object.
-    const cell = style.getPropertyValue("--accent").trim() || "#1f5fa8";
+    const cell = style.getPropertyValue("--accent").trim() || "#c65d0a";
     scene = buildScene(theme === "dark" ? onDarkGround(geometry) : geometry,
                        { mode, hidden, showBoundary, exaggeration, cell, polyhedra: shown });
     renderer?.setScene(scene);
@@ -333,7 +333,7 @@
       at = at.parentElement;
     }
     const token = getComputedStyle(document.body).getPropertyValue("--bg").trim();
-    return rgb(token || "#fbfbfa");
+    return rgb(token || "#fbfaf8");
   }
 
   /** The a, b, c letters as DOM over the canvas (D3): crisp, and in the
@@ -484,7 +484,7 @@
     const labels = scene.labels.map((label, k) => {
       const [x, y] = project(scene!, view, width, height, label.pos);
       const style = labelNodes[k] ? getComputedStyle(labelNodes[k]) : null;
-      return { text: label.text, x, y, color: style?.color || "#1f5fa8",
+      return { text: label.text, x, y, color: style?.color || "#a34c06",
                font: style?.font || "600 12px sans-serif" };
     });
     exportError = "";
@@ -754,7 +754,7 @@
     position: absolute;
     left: 0;
     top: 0;
-    color: var(--accent);
+    color: var(--accent-ink);
     font-weight: 600;
     font-size: var(--text-sm);
   }
