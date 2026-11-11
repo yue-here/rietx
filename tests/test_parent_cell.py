@@ -603,6 +603,17 @@ def test_a_strain_nothing_planted_returns_to_zero_and_a_held_one_cannot_fit():
     esd is the curvature's artefact (6e-3 to 2e-2 measured) — which is why this
     asserts the value and not the esd.  Held at zero on the strained pattern,
     nothing else can take up the shear.
+
+    The 1.8e-5 is this noise draw's own minimum, not where a solver stopped
+    (#1108's review asked, since a margin of 5.6× is under ~10×; measured
+    2026-11-11, Mac arm64, `[dev,jax]`): 20 independent starts (seed ±1e-3,
+    3e-4, 5e-4 and 2e-3; parent a ×0.9995 to ×1.001) all land at
+    |s| = 1.81557e-5, within 3.0e-10, the sign the seed's.  Over 12 other
+    draws |s| is < 1e-7 on 6 (zero is the minimum) and 1.3e-5 to 3.3e-5 on 6.
+    So the < 1e-7 before WP-2002 reads as a stop on the stationary point at
+    zero (inferred, not re-run).  Planted at 1e-4 and 2e-4 a strain comes back
+    at 1.0007e-4 and 1.9960e-4 (esd 2.9e-6, 1.8e-6), so the bound sits where
+    the fit resolves a strain.
     """
     _, null = _refit(0.0, free_strain=True)
     assert abs(_row(null, "phases.0.parent_cell.strain.0").value) < 1e-4
@@ -939,6 +950,61 @@ def test_naming_the_strain_silences_it_and_so_does_a_stage_with_no_edges():
     assert _held_findings(["phases.*.scale"]) == []
 
 
+JOINT_WAVELENGTHS = ((1.540598, 10.0, 40.0), (0.7093, 5.0, 20.0))
+
+
+@functools.lru_cache(maxsize=1)
+def _joint_patterns() -> tuple[PatternData, ...]:
+    phase = _child((0.5, 0.5, 0), "S1", "(rank 2)#3").phase
+    out = []
+    for wavelength, lo, hi in JOINT_WAVELENGTHS:
+        inst = Instrument(source=Source(lines=[EmissionLine(wavelength=wavelength)]))
+        y = np.asarray(rx.Refinement(Structure(phases=[phase.model_copy(deep=True)]),
+                                     inst).predict(np.arange(lo, hi, 0.04)))
+        out.append(PatternData(two_theta=np.arange(lo, hi, 0.04).tolist(),
+                               intensity=(y / y.max() * 5e3 + 30.0).tolist()))
+    return tuple(out)
+
+
+def _joint_held(stages, sharing=None):
+    from rietx.multi import MultiHistogramRefinement
+
+    phase = _child((0.5, 0.5, 0), "S1", "(rank 2)#3").phase
+    seeded = rx.Refinement(Structure(phases=[phase.model_copy(deep=True)]),
+                           INSTRUMENT.model_copy(deep=True))
+    seeded.set_values({STRAIN_0: SEED})
+    instruments = [Instrument(source=Source(lines=[EmissionLine(wavelength=w)]))
+                   for w, _, _ in JOINT_WAVELENGTHS]
+    joint = MultiHistogramRefinement(seeded.structure, instruments, sharing=sharing)
+    plan = rx.RefinementPlan(stages=[rx.Stage(name=n, turn_on=g, max_iter=5)
+                                     for n, g in stages])
+    result = joint.fit(list(_joint_patterns()), plan=plan, telemetry=False)
+    return [d for d in result.diagnostics if d.code == "PARENT_STRAIN_HELD"]
+
+
+def test_a_joint_fit_says_the_strain_was_held_too():
+    """``PARENT_STRAIN_HELD`` on a joint fit, both of its readings (#1108 round 7).
+
+    Shared edges arrive bare, and the first arm fails without the call in
+    ``multi.py``.  Edges made per histogram arrive as
+    ``hist.h.phases.0.parent_cell.cell.a``, and the second arm fails without
+    the ``hist.h.`` stripping.  It is stripped twice, by ``multi.py``'s
+    ``_unscoped`` and by the helper itself, so either alone keeps it green
+    (measured: removing the call, or both strippings, turns this red).
+    Freeing the strain silences it.
+    """
+    from rietx.params.multi import SharingMap
+
+    scale, cell = ["phases.*.scale"], ["phases.*.scale", "phases.*.cell.*"]
+    (shared,) = _joint_held([("scale", scale), ("cell", cell)])
+    assert shared.where == [STRAIN_0] and shared.level == "info"
+    per_histogram = SharingMap(per_histogram=["phases.*.parent_cell.cell.*"])
+    (earlier,) = _joint_held([("cell", cell), ("scale", scale)], per_histogram)
+    assert earlier.where == [STRAIN_0]
+    assert _joint_held([("scale", scale),
+                        ("cell", cell + ["phases.*.parent_cell.strain.*"])]) == []
+
+
 def _cell_glob_findings(phase, glob):
     from rietx.refine import _site_glob_diagnostics
 
@@ -962,6 +1028,98 @@ def test_a_cell_glob_that_frees_nothing_is_reported_on_a_parent_cell_phase():
     assert "phases.0.parent_cell.cell.*" in found.suggestion
     # a glob over every phase stays unchecked, as it is for sites
     assert not _cell_glob_findings(phase, "phases.*.cell.*")
+
+
+def test_a_stage_naming_the_cell_both_ways_is_answered_and_stays_silent():
+    """``phases.0.cell.*`` beside ``phases.0.parent_cell.cell.*`` frees the cell.
+
+    Round 6 of #1108's review: the stage got the parent's edges, and the
+    warning's own suggestion named the glob it already carried.  As for the
+    ``biso``/``adp.*`` pair, either spelling answers the other, but only where
+    the parent's glob frees a row: beside a parent angle the parent's group
+    fixes it still fires, so the silence is the freed edge's, not the name's.
+    """
+    from rietx.refine import _site_glob_diagnostics
+
+    phase = _child((0.5, 0.5, 0), "S1", "(rank 2)#3").phase
+    ref = rx.Refinement(Structure(phases=[phase.model_copy(deep=True)]),
+                        INSTRUMENT.model_copy(deep=True))
+    table = ParameterTable(ref.structure, ref.instrument)
+
+    def findings(*globs):
+        return _site_glob_diagnostics([rx.Stage(name="cell", turn_on=list(globs))],
+                                      table, {})
+
+    assert findings("phases.0.cell.*", "phases.0.parent_cell.cell.*") == []
+    assert findings("phases.0.cell.*", "phases.*.parent_cell.cell.*") == []
+    (found,) = findings("phases.0.cell.*", "phases.0.parent_cell.cell.alpha")
+    assert found.code == "STAGE_PATH_NOT_FREE" and found.where == ["phases.0.cell.*"]
+    # the verb a user calls, which reads the same helper
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        freed = ref.set_vary(["phases.0.cell.*", "phases.0.parent_cell.cell.*"])
+    assert PARENT_A in freed
+    assert not [w for w in caught if "nothing was freed" in str(w.message)]
+    with pytest.warns(UserWarning, match="nothing was freed"):
+        ref.set_vary(["phases.0.cell.*"])
+
+
+def test_the_gui_names_the_derivation_as_what_holds_a_parent_cell_childs_cell():
+    """``held_causes`` explains a derived cell by ``parent_cell`` (#1108's review).
+
+    Before, a child stated through its parent under a named symbol had its
+    locked cell explained by its own group's ties ("b follows a"), which the
+    table never asks; and an unnamed child's group has no cell constraints at
+    all, so the whole phase, atoms included, went unexplained.  The parent's
+    rows take the parent's setting, which is what does constrain them.
+    """
+    from rietx.gui import symmetry as gui_symmetry
+
+    _, through = _restated("P 63/m m c", (3.2, 3.2, 5.2, 90.0, 90.0, 120.0))
+    causes = gui_symmetry.held_causes(Structure(phases=[through]))
+    for name in CELL_NAMES:
+        assert "Phase.parent_cell" in causes[f"phases.0.cell.{name}"]
+        assert "phases.0.parent_cell.cell.*" in causes[f"phases.0.cell.{name}"]
+    assert "follows a" not in causes["phases.0.cell.b"]
+    assert "strain" not in causes["phases.0.cell.b"]             # P = I: no strain
+    assert causes["phases.0.parent_cell.cell.b"] == "P 63/m m c is hexagonal, so b follows a"
+    assert "γ is fixed at 120°" in causes["phases.0.parent_cell.cell.gamma"]
+
+    phase = _child((0.5, 0.5, 0), "S1", "(rank 2)#3").phase
+    structure = Structure(phases=[phase])
+    causes = gui_symmetry.held_causes(structure)
+    assert "phases.0.parent_cell.strain.*" in causes["phases.0.cell.alpha"]
+    assert "α is fixed at 90°" in causes["phases.0.parent_cell.cell.alpha"]
+    assert any(".atoms." in path for path in causes)
+    assert set(causes) <= {e.path for e in ParameterTable(structure, INSTRUMENT).entries}
+
+
+@pytest.mark.parametrize("writer", [
+    "rietx.io.projects.gsas:write_gsas_exp",
+    "rietx.io.projects.gsas2:write_gsas2_phase_cif",
+    "rietx.io.projects.topas:write_topas_inp",
+    "rietx.io.projects.fullprof:write_fullprof_pcr",
+])
+def test_a_project_writer_refuses_a_parent_cell_phase_by_name(writer, tmp_path):
+    """No foreign format states a cell through its parent (#1108's review).
+
+    A plain-symbol child is the case the group refusals miss: ``P n m a``
+    through itself wrote with no refusal, and TOPAS got ``a ! 5.7``, the
+    parent's edges gone.  ``refuse_distortion_modes`` is the precedent, and the
+    way out its message names writes the cell as it stands.
+    """
+    import importlib
+
+    module, name = writer.split(":")
+    write = getattr(importlib.import_module(module), name)
+    _, through = _restated("P n m a", (5.7, 7.7, 5.5, 90.0, 90.0, 90.0))
+    with pytest.raises(ValueError, match=r"derived from its parent's \(Phase\.parent_cell"):
+        write(Structure(phases=[through]), tmp_path / "out")
+    assert not (tmp_path / "out").exists()
+    plain = through.model_copy(update={"parent_cell": None})
+    write(Structure(phases=[plain]), tmp_path / "out")
 
 
 def test_a_cell_glob_on_an_ordinary_phase_is_silent_unless_it_reaches_only_fixed_rows():
