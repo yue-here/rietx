@@ -61,10 +61,9 @@ describe("the status bar's hover readout", () => {
     expect(statusReadout(W, null, { kind: "weighted" })).toBeNull();
   });
 
-  it("gives every count one slot from the payload, so a sweep moves no label", () => {
-    const slots = new Set(read(31.85).items.filter((i) => ["obs", "calc", "bkg"].includes(i.id))
-      .map((i) => i.slot));
-    expect([...slots]).toEqual([5]);
+  it("sizes each curve's slot from its own payload, so a sweep moves no label", () => {
+    const slots = Object.fromEntries(read(31.85).items.map((i) => [i.id, i.slot]));
+    expect([slots.obs, slots.calc, slots.bkg, slots.diff]).toEqual([5, 5, 3, 5]);
   });
 });
 

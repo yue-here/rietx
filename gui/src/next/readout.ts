@@ -115,20 +115,21 @@ export function statusReadout(w: Window | null, x: number | null,
     v == null || !Number.isFinite(v) ? EMPTY : signed(Math.round(v), 0);
   // a masked channel is in no result, so there is no model at it to quote
   const fit = (v: number | undefined | null) => (masked ? EMPTY : count(v));
-  const counts = Math.max(
-    slotOf(w, "obs", w.y_obs, 0), slotOf(w, "xobs", w.excluded?.y_obs, 0),
-    slotOf(w, "calc", w.y_calc, 0), slotOf(w, "bkg", w.y_background, 0));
-
+  // each curve's own widest value, so a background of hundreds is not set in
+  // a slot sized for peaks of tens of thousands
   if (shows(hidden, "obs")) {
-    items.push({ id: "obs", label: CURVE_WORDS.obs, slot: counts,
+    items.push({ id: "obs", label: CURVE_WORDS.obs,
+      slot: Math.max(slotOf(w, "obs", w.y_obs, 0), slotOf(w, "xobs", w.excluded?.y_obs, 0)),
       value: count(masked ? w.excluded?.y_obs?.[k] : w.y_obs?.[k]) });
   }
   if (!w.raw) {
     if (shows(hidden, "calc")) {
-      items.push({ id: "calc", label: CURVE_WORDS.calc, value: fit(w.y_calc?.[k]), slot: counts });
+      items.push({ id: "calc", label: CURVE_WORDS.calc, value: fit(w.y_calc?.[k]),
+        slot: slotOf(w, "calc", w.y_calc, 0) });
     }
     if (w.y_background?.length && shows(hidden, "bkg")) {
-      items.push({ id: "bkg", label: CURVE_WORDS.bkg, value: fit(w.y_background[k]), slot: counts });
+      items.push({ id: "bkg", label: CURVE_WORDS.bkg, value: fit(w.y_background[k]),
+        slot: slotOf(w, "bkg", w.y_background, 0) });
     }
     if (shows(hidden, "diff")) {
       const res = residual(inputs.kind, w);
