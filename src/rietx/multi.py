@@ -119,6 +119,7 @@ from .refine import (
     _onto_flat_meridian,
     _origin_diagnostics,
     _parameter_row,
+    _parent_strain_held_diagnostics,
     _peak_columns_flat_at_answer,
     _peak_only_instrument_path,
     _phase_agreement,
@@ -359,6 +360,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "never both on one histogram, and a shared row fixed in "
                 "several tables is one finding"),
     # -- deliberately not computed ---------------------------------------------
+    "_parent_strain_held_diagnostics": (
+        (FIT,), "a parent-cell phase's strains are shared model parameters, "
+                "so the held-strain record is the fit's, read off the plan's "
+                "freed paths (WP-1419)"),
     "_site_glob_diagnostics": (
         (ABSENT,), "not called from multi.py yet: a single fit reports a glob "
                    "naming one site that frees nothing (WP-1951), and wiring it "
@@ -2693,6 +2698,9 @@ class MultiHistogramRefinement:
         # (WP-2028): a record of the hold, read off the answer's stage
         diagnostics = diagnostics + _per_pattern_hold_diagnostics(
             stage_results, mt, self.mtable.structures[0])
+        diagnostics = diagnostics + _parent_strain_held_diagnostics(
+            stage_results, [_unscoped(p) for p in mt.free_paths],
+            self.mtable.structures[0])
         # a phase whose scales and B no histogram's range can separate, and
         # what its fraction is conditional on (WP-1534)
         diagnostics = diagnostics + _scale_b_ridge_diagnostics(
