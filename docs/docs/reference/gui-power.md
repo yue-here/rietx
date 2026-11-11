@@ -88,7 +88,7 @@ Document-level keywords:
 | `passes` | the Le Bail cap (`lebail_passes`); written only above 1, and absent means one pass |
 | `support` | the absent-phase hold's threshold in esds (`phase_support_sigma`), or `none` for no significance hold (a phase with no line in range is still held); written only away from 3, and absent means 3 |
 | `closing` | the closing stage's window area fraction (`closing_window_tol`), or `none` for no closing stage; always written, and absent means 1e-3 |
-| `stage` | one stage: its name, then `free` and a comma-separated glob list |
+| `stage` | one stage: its name, then `free` and a comma-separated glob list, then optionally `fix` and the globs the stage fixes after its frees (`turn_off`) |
 | `phase` | opens a phase block: its index, then its name quoted |
 | `instrument` | opens the instrument block |
 | `peaks` | opens the picked-line block |
@@ -159,7 +159,10 @@ into the filter box does not start a fit.
 | `?` | the Report tab |
 | `h` | the History tab |
 | `⌘K` / `Ctrl-K` | the command palette |
-| `Esc` | close the help popover; otherwise cancel a running fit |
+| `⌘O` / `Ctrl-O` | the folder browser, to open a project |
+| `⇧⌘S` / `Ctrl-Shift-S` | `Save a copy…` |
+| `⌘S` / `Ctrl-S` | says `Saved`; the project is already saved |
+| `Esc` | close the File menu, its dialog or the help popover; otherwise cancel a running fit |
 | `⌘⏎` | apply the `.rxt` document, in the Text tab |
 
 `Esc` is handled before the shortcut table, and its two meanings are in that
@@ -226,9 +229,11 @@ indices int32, so a browser reads each array without copying it.
 | `GET /api/capabilities` | what this build can do: backends, solvers, plans, formats, contract versions |
 | `GET /api/version` | the package version |
 | `GET /api/help` | the help corpus the popovers and the [parameter map](parameters.md) are written from |
-| `GET /api/spacegroup` | what one symbol constrains; the wizard's typed-cell step needs it before a project exists |
+| `GET /api/spacegroup` | what one symbol constrains; the New project dialog's typed cell needs it before a project exists |
 | `GET /api/settings` · `POST /api/settings` | the person's own settings, the theme among them, stored beside the recent list rather than in the project; not behind the 409 |
-| `GET /api/recent` | the list of recently opened projects |
+| `GET /api/recent` | the list of recently opened projects, newest first, with a project that has moved marked `missing` |
+| `POST /api/recent/remove` | take one path off that list; a path that is not on it is no error |
+| `POST /api/recent/clear` | empty that list |
 | `GET /api/fs` | the filesystem browser's listing, confined to the home directory and the working directory |
 | `GET /api/examples` | the example projects shipped in the wheel |
 | `POST /api/examples/open` · `POST /api/examples/reset` | build one into the state directory and open it; throw a copy away and rebuild it |
@@ -240,6 +245,10 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/project/new` · `POST /api/project/open` | create; open, replacing the session's |
 | `GET /api/project` · `POST /api/project` | the project document; a merge into its settings |
 | `POST /api/project/save` | write the settings file |
+| `POST /api/project/copy` | copy the `.rex` folder, history included, to a `directory` under a `name`; the session stays on the original |
+| `POST /api/project/rename` · `POST /api/project/move` | rename the folder in place; move it into another `directory` |
+| `POST /api/project/close` | close the project; the next launch shows the start screen |
+| `GET /api/recovery` · `PUT /api/recovery` | the open project's pending edits, kept in the state directory apart from the project; `PUT` takes `{project, head, draft}` for any project folder, including the one that closed a moment ago, and `draft: null` deletes the copy; not behind the 409 |
 | `GET /api/params` · `PATCH /api/params` | every parameter row; value, vary, hold, limit and restraint edits |
 | `GET /api/plan` · `PUT /api/plan` · `GET /api/plans` | the plan; replace it; the presets |
 | `GET /api/plan/resolve` | the ladder: per stage, what it frees and what stays held |
@@ -259,7 +268,8 @@ indices int32, so a browser reads each array without copying it.
 | `POST /api/run` · `POST /api/cancel` · `GET /api/run/state` | start the plan; ask it to stop between iterations; where it is |
 | `GET /api/result` | the fit's numbers, without the curves |
 | `GET /api/result/curves` | every channel of the pattern and, after a fit, its curves on the channels it kept |
-| `POST /api/preview` | the calculated curve, the background, each phase and the ticks at values sent in the body and never applied; writes nothing, and says whether it evaluated the last compile, resized its windows or compiled afresh |
+| `POST /api/preview` | the calculated curve, the background, each phase, the three residuals and the ticks at values sent in the body and never applied; writes nothing, and says whether it evaluated the last compile, resized its windows or compiled afresh |
+| `GET /api/background` | the background curve at the working state's values, the observed pattern, and the curve's esd at each fitted channel through the whole covariance of the free parameters; writes nothing |
 | `GET /api/report` · `POST /api/report/apply` | the `FitReport`; run the stage one of its suggestions names |
 
 ### Peaks and indexing
@@ -301,4 +311,11 @@ only an opaque token crosses back, never a path. So the wizard can show you what
 a file contains and what the reader made of it before you commit to a project.
 
 [](../guides/export.md) documents what each export contains; the routes above only choose
-where it is written.
+where it is written. Without a body, an export goes into the project's `exports/`
+and replaces a file of the same name there. With a `directory` and a `filename`,
+it goes into that folder, which must lie under the folder browser's two roots,
+and a file already there is refused unless the body says `overwrite`.
+
+The folder verbs share three refusals. A destination folder that exists is
+refused, and a folder is never replaced. A destination outside the folder
+browser's roots is refused. A folder cannot be copied or moved into itself.
