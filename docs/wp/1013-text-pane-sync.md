@@ -160,6 +160,37 @@ npm --prefix gui test
 - WP-1009 (format + parser — normative); Profex's synced-text behaviour as
   the UX precedent.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **text pane** (WP-1013, `gui/src/panels/Text.svelte`, `gui/src/lib/`) is the
+`.rxt` document in CodeMirror 6, a tab of the one column (WP-1034), and the one panel
+whose content is line-oriented, the format's columns being aligned precisely so a
+rectangular selection can hit one field. It stays mounted while hidden (a typed
+buffer survives a look at the parameter table) and builds its editor on first
+entry. Four rules. **The head is the reload signal** — no third SSE frame type was
+added, because the head already moves for every writer and the parameter table
+already reloads on it. **There is no merge and no force-apply**: a stale buffer
+re-reads and re-applies, which is also what the server's 409 `STALE_REVISION`
+says, and the reason is sharper than "merging is hard" — the loser's document
+carries the winner's *old* values for every row it did not touch, so applying it
+would silently revert them. **Only the server decides validity**: `lib/rxt.ts` has
+no `error` token to emit (asserted from both sides, with the shared vocabulary
+pinned to `textdoc._KEYWORDS` and `StageSpec.model_fields` by
+`test_the_highlighter_quotes_the_parsers_words`), and *indentation is the parser's
+own dispatch*, so an indented `plan` is a parameter named `plan`. And **a response
+carrying an older `seq` is dropped** — a 300 ms debounce puts two validations in
+flight across one pause and they can land out of order. CodeMirror is a separate
+committed chunk (`assets/vendor-cm.js`, 328 kB) imported *dynamically*, so it
+stays off the boot path; `tests/test_gui_dist.py` asserts the split, because a stray static import would
+inline the library and no byte count would say so. The editor's document and its diagnostics are `$effect`s
+over the sync state, never pushed — pushing let a head move wipe a squiggle while
+the problem list still named the line.
+
 ## Handover log
 
 - **2026-07-29** — created from the v1.0 GUI plan.

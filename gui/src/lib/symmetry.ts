@@ -155,3 +155,35 @@ export function shortPath(path: string): string {
 export function symbolChanged(typed: string, current: string): boolean {
   return typed.trim() !== "" && typed.trim() !== (current ?? "").trim();
 }
+
+/** One piece of a typeset Hermann-Mauguin symbol. */
+export type SymbolToken =
+  | { kind: "letter"; text: string }
+  | { kind: "digit"; text: string }
+  | { kind: "bar"; text: string }
+  | { kind: "screw"; text: string; sub: string }
+  | { kind: "slash"; text: "/" };
+
+/**
+ * A Hermann-Mauguin symbol as the International Tables print it (WP-2131).
+ *
+ * The maintainer ruled on 2026-11-08 that a space group is typeset in a serif
+ * face: letters italic, a rotoinversion as a digit under a bar, a screw axis
+ * as a digit with its subscript. The words of gemmi's spelling are joined
+ * without spaces, so `P 21/c` reads P2₁/c. A setting such as the `H` of
+ * `R -3 c:H` comes back beside the symbol rather than typeset.
+ */
+export function symbolTokens(symbol: string): { tokens: SymbolToken[]; ext: string } {
+  const [body, ext = ""] = (symbol ?? "").split(":");
+  const tokens: SymbolToken[] = [];
+  for (const word of body.trim().split(/\s+/).filter(Boolean)) {
+    word.split("/").forEach((part, i) => {
+      if (i) tokens.push({ kind: "slash", text: "/" });
+      if (/^-\d$/.test(part)) tokens.push({ kind: "bar", text: part[1] });
+      else if (/^\d\d$/.test(part)) tokens.push({ kind: "screw", text: part[0], sub: part[1] });
+      else if (/^\d$/.test(part)) tokens.push({ kind: "digit", text: part });
+      else if (part) tokens.push({ kind: "letter", text: part });
+    });
+  }
+  return { tokens, ext: ext.trim() };
+}

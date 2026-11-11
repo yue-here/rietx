@@ -34,10 +34,12 @@ with more than one phase was regenerated in that WP.
 
 **The extra roles a page needs are derived, never declared.**  The watcher wants
 a row hover, a selected row, a focus ring, four grip states and six state pills,
-and none of them is a new token: they are ``color-mix`` over the nine chrome
-tokens, the way ``app.css`` already writes its one hover.  A token the GUI never
-reads would be a declared name with no writer (root CLAUDE.md), and this file is
-the one place that temptation arrives.
+and none of them is a new token: they are ``color-mix`` over the chrome
+tokens.  A token the GUI never reads would be a declared name with no writer
+(root CLAUDE.md), and this file is the one place that temptation arrives.
+WP-2200 added three of the site's roles, each because a register reads it and
+no mix reproduces it: the accent's text role, a control's border and a hover
+ground.
 
 Regenerate the stylesheet with::
 
@@ -79,50 +81,78 @@ THEME_TITLES: dict[str, str] = {
 #: answer to a question CSS already answers correctly.
 THEMES = ("light", "dark")
 
-#: The custom properties, in the order they are emitted.  Both themes declare
+#: The ``color-scheme`` each palette in :data:`TOKENS` is drawn for, which is
+#: what native controls (a ``select`` popup, a scrollbar) follow.  This is the
+#: seam a named theme enters by (WP-2200; the maintainer's ruling of
+#: 2026-11-09 builds light and dark first and Solarized, Monokai and the rest
+#: later): a palette under a new key in :data:`TOKENS` and its scheme here, and
+#: :func:`tokens_css` emits its ``data-theme`` block.  Listing it as a choice
+#: is the Settings piece's.
+SCHEMES: dict[str, str] = {"light": "light", "dark": "dark"}
+
+#: The custom properties, in the order they are emitted.  Every theme declares
 #: exactly this set; :func:`tokens_css` asserts it.
+#:
+#: **The site's palette** since WP-2200 (``docs/landing/src/tokens.css``, the
+#: one authority for the landing page and the manual): the maintainer ruled on
+#: 2026-11-06 that the site is the reference for the GUI's visual language and
+#: that its default theme is consistent with it.  A chrome token takes the
+#: site's value for the same job, under the GUI's own name: ``--fg`` is the
+#: site's ``--ink``, ``--panel`` its ``--surface``, ``--line`` its ``--rule``,
+#: ``--bad`` its ``--danger``.  Three of the site's roles arrived with readers
+#: in the same WP and keep the site's job: ``--accent-ink`` (the accent as text
+#: and the primary button's fill, since white on the orange accent is 4.22:1),
+#: ``--line-strong`` (a control's border) and ``--hover`` (a hover ground).
+#: The site's other roles (a second ink, a faint ink, a tinted ground, an info
+#: state) wait for a reader: a token nothing reads is a name with no writer.
 TOKENS: dict[str, dict[str, str]] = {
     "light": {
-        "--fg": "#1b1b1b",
-        "--bg": "#fbfbfa",
+        "--fg": "#1c1917",
+        "--bg": "#fbfaf8",
         "--panel": "#ffffff",
-        "--line": "#dcdcd6",
-        "--muted": "#6b6b66",
-        "--accent": "#1f5fa8",
-        "--ok": "#2e8b57",
-        "--warn": "#b3541e",
-        "--bad": "#c23b22",
-        "--plot-obs": "#8a8a8a",
-        "--plot-calc": "#c23b22",
-        "--plot-bkg": "#6b7280",
-        "--plot-diff": "#1f5fa8",
-        "--plot-zero": "#88888888",
-        "--plot-peak": "#8c257e",
-        "--plot-peakfit": "#c158b0",
+        "--hover": "#ece7e0",
+        "--line": "#e6e0d8",
+        "--line-strong": "#d1c9bf",
+        "--muted": "#6b6259",
+        "--accent": "#c65d0a",
+        "--accent-ink": "#a34c06",
+        "--ok": "#2a7d2a",
+        "--warn": "#7d5f00",
+        "--bad": "#b4271f",
+        "--plot-obs": "#1c1917",
+        "--plot-calc": "#c65d0a",
+        "--plot-bkg": "#b5793a",
+        "--plot-diff": "#6b6259",
+        "--plot-zero": "#cfcfcf",
+        "--plot-peak": "#0072b2",
+        "--plot-peakfit": "#6f83e6",
         "--plot-candidate": "#1a8f45",
-        "--plot-mask": "#1b1b1b14",
+        "--plot-mask": "#1c191714",
         "--lane-l": "0.58",
         "--lane-c": "0.15",
     },
     "dark": {
-        "--fg": "#e6e6e2",
-        "--bg": "#151515",
-        "--panel": "#1e1e1e",
-        "--line": "#333333",
-        "--muted": "#9a9a94",
-        "--accent": "#7fb2ea",
-        "--ok": "#6cc08b",
-        "--warn": "#e0955c",
-        "--bad": "#e8776a",
-        "--plot-obs": "#909090",
-        "--plot-calc": "#e56a52",
-        "--plot-bkg": "#6e6e66",
-        "--plot-diff": "#5897dd",
-        "--plot-zero": "#88888888",
-        "--plot-peak": "#e687d5",
-        "--plot-peakfit": "#b156a2",
+        "--fg": "#f1ece5",
+        "--bg": "#15110d",
+        "--panel": "#1d1813",
+        "--hover": "#2e2820",
+        "--line": "#312a22",
+        "--line-strong": "#463d32",
+        "--muted": "#a0968a",
+        "--accent": "#ff9d4d",
+        "--accent-ink": "#ffb679",
+        "--ok": "#5fd45f",
+        "--warn": "#e3c25b",
+        "--bad": "#ff8f86",
+        "--plot-obs": "#d2c9bd",
+        "--plot-calc": "#ff9d4d",
+        "--plot-bkg": "#c99a6a",
+        "--plot-diff": "#8f8f8f",
+        "--plot-zero": "#4a4a4a",
+        "--plot-peak": "#008ad5",
+        "--plot-peakfit": "#516494",
         "--plot-candidate": "#4ccf8a",
-        "--plot-mask": "#e6e6e214",
+        "--plot-mask": "#f1ece514",
         "--lane-l": "0.72",
         "--lane-c": "0.15",
     },
@@ -135,9 +165,11 @@ TOKENS: dict[str, dict[str, str]] = {
 #: **Okabe-Ito** (Okabe & Ito 2002; Wong, *Nature Methods* **8**, 441, 2011),
 #: which is the categorical standard a scientific figure reaches for, and four
 #: of its eight, because the Rietveld plot has already spent the rest.  Measured
-#: in OKLab against every curve role and page of both themes on both surfaces:
-#: blue lands 0.053 from the difference curve, orange 0.061 from the figures'
-#: calculated curve, vermillion 0.065 from the app's.  What is left is bluish
+#: in OKLab against every curve role and page of both themes on both surfaces
+#: (WP-1438): blue landed 0.053 from the difference curve, orange 0.061 from the
+#: figures' calculated curve, vermillion 0.065 from the app's.  Since WP-2200 the
+#: calculated curve is orange in the app too, and blue is the picked-peak
+#: marks'.  What is left is bluish
 #: green, reddish purple, sky blue and yellow.  Black is not a member: it is the
 #: *single-phase* row's neutral, which is
 #: :data:`~rietx.viz.plots.PALETTES`'s ``tick`` and follows the theme.
@@ -178,21 +210,24 @@ PHASE_TOKENS: dict[str, str] = {
 #: them — the notes came out of ``app.css`` with WP-1429 and are emitted into
 #: the generated stylesheet, which is a file people read.
 NOTES: dict[str, str] = {
-    "--plot-obs": """The pattern plot's curves (WP-1029) — the Rietveld
-convention: recessive grey observations and background, red calculated, blue
-difference.  The greys are *meant* to sit below the chroma floor a categorical
-palette would demand; identity there is carried by the mark (points / dotted
-line).  Each theme's set is validated against its own surface, not flipped.""",
-    "--plot-peak": """The picked-peak layer (WP-1210).  It had no colours of
-its own: the markers took `--accent` and the fitted curve `--bad`, and on the
-light theme those *are* `--plot-diff` and `--plot-calc` to the last digit — two
-curves the reader has to tell apart, drawn in one red.  One hue (334° in OKLab)
-and two tones, because the layer is one thing; the markers take the stronger
-contrast against the page in either theme and the fitted curve sits a step in,
-dashed.  Every value here clears the phase palette's 0.13 OKLab floor against
-every other plot colour, asserted in `tests/test_gui_palette.py` — measured, the
-free hue space is this magenta and green alone: violet lands 0.10-0.12 from
-`--plot-diff` and the alert tone `--warn` 0.053 from `--plot-calc`.""",
+    "--plot-obs": """The pattern plot's curves (WP-1029, redrawn in the site's
+palette by WP-2200): observed points in the ink, the calculated curve in the
+accent, the background dashed in the figures' brown, the difference in the
+muted grey, as the design rounds drew them and as rietx's own figures do
+(`viz/plots.PALETTES`).  The brown sits under the 0.13 OKLab floor from the
+orange curve (0.065 light, 0.092 dark) and from the dark difference grey
+(0.110): the dash carries its identity, as the point marks carry the
+observations', and `tests/test_gui_palette.py` names the three pairs and holds
+each to its measured distance.""",
+    "--plot-peak": """The picked-peak layer (WP-1210, recoloured by WP-2200).
+The marks take Okabe-Ito blue, the complement of the orange fits, which the
+maintainer chose in the design rounds of 2026-11-08 (`#0072b2`).  Its dark
+twin there was `#56b4e9`, which is `--phase-2` exactly, so the dark marks take
+the same hue lifted for the dark ground, the nearest blue that clears 0.13 from
+every curve and every phase.  One hue and two tones, because the layer is one
+thing: the markers take the stronger contrast against the page in either theme
+and the fitted curve sits a step in, dashed.  The fit cannot take the accent as
+the prototype drew it, because it shares the pane with the calculated curve.""",
     "--plot-candidate": """An indexing candidate's predicted lines (WP-1211) —
 the last of the free hue space the note above measured, spent rather than
 borrowed.  It could not take the peak layer's: these two layers are up at the
@@ -259,8 +294,9 @@ def _declarations(theme: str, *, notes: bool) -> list[str]:
 def _phase_declarations() -> list[str]:
     """The phase palette, declared once because it does not follow the theme."""
     note = ("One colour per phase, both themes: four of Okabe-Ito's eight. "
-            "Orange, vermillion and blue are out because the calculated and "
-            "difference curves have spent them, and black is the single-phase "
+            "Orange and vermillion are out because the calculated curves have "
+            "spent them, blue because the picked-peak marks have, and black "
+            "is the single-phase "
             "row's neutral rather than a member. `viz/theme.py` carries the "
             "measurement and the order.")
     return [_wrap_comment(note)] + [f"  {token}: {value};"
@@ -289,21 +325,34 @@ def tokens_css() -> str:
     choosing light on a dark system leaves a page of dark dropdowns.  The GUI
     sets it inline as well (``lib/theme.ts``), which wins and agrees; the two
     Python pages have no such code and take it from here.
+
+    Every palette past ``light`` gets a ``data-theme`` block of its own, in
+    :data:`TOKENS`' order, with the scheme :data:`SCHEMES` gives it: that is
+    the seam a named theme enters by (WP-2200).  ``light`` is ``:root`` itself,
+    so its attribute block carries the scheme alone.
     """
-    if set(TOKENS["light"]) != set(TOKENS["dark"]):
-        raise ValueError("the two themes declare different tokens: "
-                         f"{sorted(set(TOKENS['light']) ^ set(TOKENS['dark']))}")
+    if set(TOKENS) != set(SCHEMES):
+        raise ValueError("every palette needs a colour scheme: "
+                         f"{sorted(set(TOKENS) ^ set(SCHEMES))}")
+    for name in TOKENS:
+        if set(TOKENS[name]) != set(TOKENS["light"]):
+            raise ValueError(f"{name} declares different tokens from light: "
+                             f"{sorted(set(TOKENS[name]) ^ set(TOKENS['light']))}")
     light = "\n".join(_declarations("light", notes=True) + _phase_declarations())
     dark = "\n".join(_declarations("dark", notes=False))
     dark_indented = "\n".join("  " + line if line.strip() else line
                               for line in dark.splitlines())
+    blocks = "".join(
+        f"\n:root[data-theme=\"{name}\"] {{\n  color-scheme: {SCHEMES[name]};\n"
+        + "\n".join(_declarations(name, notes=False)) + "\n}\n"
+        for name in TOKENS if name != "light")
     return (
         f"{_HEADER}"
         f":root {{\n  color-scheme: light dark;\n{light}\n}}\n"
         f"\n@media (prefers-color-scheme: dark) {{\n"
         f"  :root:not([data-theme=\"light\"]) {{\n{dark_indented}\n  }}\n}}\n"
         f"\n:root[data-theme=\"light\"] {{\n  color-scheme: light;\n}}\n"
-        f"\n:root[data-theme=\"dark\"] {{\n  color-scheme: dark;\n{dark}\n}}\n"
+        f"{blocks}"
     )
 
 

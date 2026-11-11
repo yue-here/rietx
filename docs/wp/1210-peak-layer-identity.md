@@ -71,6 +71,38 @@ present and each identifiable without the legend.
 
 - WP-1032 (hiding is by exception), WP-1029 (OKLab distance).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**The peak layer** (WP-1210, `lib/plot.ts`, `panels/Plot.svelte`, `app.css`).
+Four rules. **A layer is drawn where it can be edited** — the markers and their
+fitted curve are on the plot only while the Peaks tab is up, which is already
+the only tab a click there means anything on (WP-1027); `peaksActive` is
+therefore a *drawing* input and belongs in the repaint effect, or leaving the
+tab redraws nothing. **A curve that cannot be drawn is listed and disabled
+carrying the reason**, never dropped: `CurveToggle.absent` is that sentence, and
+`dataOnlyHidden` covers absent ids too, or a hidden layer arrives drawn the
+moment its tab comes up. **Chrome is not a palette**: `--accent` and `--bad` are
+`--plot-diff` and `--plot-calc` **exactly** on the light theme, which is how the
+picked-peak fit and the model came to be one red line, so a plot mark takes a
+`--plot-*` token of its own — `tests/test_gui_palette.py` holds every one to the
+phase palette's 0.13 OKLab floor against every other plot colour, in Python
+because `structure3d._oklab_distance` is the one distance this package has. It
+also names the two pairs the shipped set already misses rather than exempting
+them quietly. And **state rides on the mark, not on a second colour**: one ink
+for the whole layer with hollow for unusable and diamond for human-placed, so
+it spends two colours and the palette stays separable — measured while
+choosing, the free hue space is magenta and green alone (violet is 0.10-0.12
+from `--plot-diff`, `--warn` 0.053 from `--plot-calc`). The corollary is where
+that rule was broken and caught in review: a mark that is **not** the data may
+not borrow the recessive `--muted`, which is 0.032 from `--plot-obs` on the
+dark theme — fine for the masked points, which *are* measured data, and wrong
+for a marker sitting on top of them.
+
 ## Handover log
 
 ### 2026-08-27 — the layer has its own colours, its own tab and a way off
