@@ -37,3 +37,22 @@ The readout follow-up's pictures, as ruled on 2026-11-11 ("try b"):
 Taken 2026-11-11 on macOS (arm64) with the cached chromium, against the dist this branch
 commits, with `RIETX_STATE_DIR` pointed at a temporary directory. Every menu, drag, edit and
 hover was made by a real click, key press or pointer move.
+
+The menus-and-axes pictures (`r2b-*`), light and dark, the `fap` example after one staged fit:
+
+- `r2b-rest-*.png`: the window at rest. No axis carries a title. A muted hint sits by each
+  axis: `√` left of the intensity's top label, `σ` left of the difference's, and `° 2θ` after
+  the last 2θ label. The title line holds Rwp, GoF, Show all and ⋯, with no Intensity control.
+- `r2b-intensity-axis-*.png`: after a click on the intensity axis. Its menu offers Linear,
+  Square root and Log, with Square root ticked; the axis strip takes the hover tint.
+- `r2b-difference-axis-*.png`: after a click on the difference axis. Its menu offers
+  Difference in esd (Δ/σ) and Cumulative χ².
+- `r2b-sigma-hint-*.png`: the pointer resting on the difference axis. The tip reads
+  `Δ/σ = (observed − calculated)/σ. σ from Poisson counting statistics.`, since this
+  example's file carries no esd column.
+- `r2b-phase-menu-*.png`: Parameters, after a click on the fluorapatite band's ⋯: Rename…,
+  Change space group…, Add atom…, then Replace from CIF….
+- `r2b-atom-menu-*.png`: a right-click on the CA2 row: Rename…, Change species…,
+  Anisotropic ADPs, then Delete.
+
+Taken 2026-11-11 the same way, by `shots.py` in the runner's scratch directory.
