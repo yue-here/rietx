@@ -6,9 +6,10 @@ seeded in the driving irrep, and every displacive statement now carries
 ``Phase.parent_cell``: the parent's cell plus the Γ strains the child's group
 allows, held.  What is pinned, and against what:
 
-* **Howard & Stokes's six perovskite children** (Howard & Stokes 1998, *Acta
-  Cryst.* B54, 782; #996's test set): R4+ (a,0,0) I4/mcm, (a,a,a) R-3c,
-  (a,a,0) Imma, Γ4− (a,0,0) P4mm, (a,a,a) R3m, (a,a,0) Amm2.  Each seed's
+* **Six cubic-perovskite children** (#996's test set): the R4+ tilts
+  (a,0,0) I4/mcm, (a,a,a) R-3c, (a,a,0) Imma of Howard & Stokes 1998
+  (*Acta Cryst.* B54, 782, Table 1), and the Γ4− polar children (a,0,0)
+  P4mm, (a,a,a) R3m, (a,a,0) Amm2, which that tilt paper does not list.  Each seed's
   stabiliser in the parent group is the candidate's group, and the block
   reaches every free coordinate of the child (a span test both ways).
 * **NaTaO₃ P4/mbm at 843 K** through the candidate route (Kennedy,
@@ -93,7 +94,8 @@ def _candidates(name):
     raise KeyError(name)
 
 
-#: (candidate set, irrep, Howard & Stokes's child, its IT number)
+#: (candidate set, irrep, the child, its IT number); the R4+ three are Howard &
+#: Stokes's (1998, Table 1), the Γ4− three are not in that paper
 HOWARD_STOKES = (("r", "S10", "I4/mcm", 140), ("r", "S10", "R-3c", 167),
                  ("r", "S10", "Imma", 74), ("gamma", "S9", "P4mm", 99),
                  ("gamma", "S9", "R3m", 160), ("gamma", "S9", "Amm2", 38))
