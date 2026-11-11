@@ -329,6 +329,34 @@
     }
   }
 
+  /** Keep a view choice with the project, in `ProjectDoc.ui` (WP-1044: a
+   *  `ui` key belongs to what it is about). A refusal, such as the 409 while a
+   *  run is in flight, leaves the choice on screen and unkept. */
+  async function saveUi(patch: Record<string, unknown>) {
+    if (!project) return;
+    const path = project.path;
+    try {
+      const doc = await api.patchProject({ ui: patch });
+      if (project?.path === path) project = doc;
+      for (const [key, value] of Object.entries(patch))
+        say(`project.doc.ui[${JSON.stringify(key)}] = ${JSON.stringify(value)}`);
+    } catch (error) {
+      say(`# not kept: ${(error as Error).message}`);
+    }
+  }
+
+  /** A structural edit landed (a menu on a phase or an atom): the head moved,
+   *  so the document (`n_phases`) and the curves are read again, as today's
+   *  `App.svelte:moved` does. */
+  async function structureMoved() {
+    try {
+      project = await api.project();
+    } catch {
+      // the panel reloads itself; the document answers next time
+    }
+    await loadResult();
+  }
+
   /** Apply the pending edits. A refusal is drawn in the Parameters panel,
    *  so a refused apply brings that tab, and the model panel, forward. The
    *  result is not refetched: a `set_values` keeps the last fit (today's
@@ -634,7 +662,8 @@
         <div class="pane">
           {#if graphTab === "pattern"}
             <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
-              {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)} />
+              {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)}
+              projectPath={project?.path ?? null} ui={project?.doc?.ui ?? null} onui={saveUi} />
           {:else}
             <p class="unbuilt">Not built yet.</p>
           {/if}
@@ -671,7 +700,7 @@
           </div>
         {/if}
         <div class="pane" class:gone={!!unbuilt || modelTab !== "params"}>
-          <Params bind:this={paramsPanel} {head} {busy} {corpus} {say}
+          <Params bind:this={paramsPanel} {head} {busy} {corpus} {say} onmoved={structureMoved}
             onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
         </div>
         {#if !unbuilt}

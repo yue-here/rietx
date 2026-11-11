@@ -6,10 +6,15 @@
    * rarer control one gesture away (WP-2214 rows 25-58):
    *
    * - the title line says what the graph shows, with Rwp and GoF, and holds
-   *   the view's own controls: Intensity on one segmented track, Show all
-   *   (enabled while zoomed) and ⋯, the view menu;
-   * - the view menu holds the difference's form, Show only the data, and the
-   *   two range gestures;
+   *   the view's own controls: Show all (enabled while zoomed) and ⋯, the
+   *   view menu;
+   * - the view menu holds Show only the data and the two range gestures;
+   * - the axes carry no titles. Each carries a muted unit hint by its tick
+   *   labels (`° 2θ`, `√` or `log` on the intensity, `σ` on the difference),
+   *   a hover explains the hint, and a click on the intensity or the
+   *   difference axis opens a small menu of that axis's choices, the one
+   *   place each is chosen. The choice is kept per project in
+   *   `ProjectDoc.ui` (the maintainer's ruling of 2026-11-11, "Yes, build it");
    * - each legend label sits beside the pane its curve is drawn in and is its
    *   curve's switch (`gui/STYLE.md` § Plots);
    * - the fitted range and each excluded region is an object on the plot
@@ -20,7 +25,8 @@
    * - the hover readout is handed to the frame, which shows it in the status
    *   bar's right half (the maintainer's ruling of 2026-11-11, question 5), in
    *   the legend's words (`./readout.ts`, ruled "try b" the same day);
-   * - the intensity opens on square root, as the prototype's does.
+   * - the intensity opens on square root, as the prototype's does, until the
+   *   project remembers another choice.
    *
    * The chart is today's `lib/pattern.ts` figure, drawn without the peak layer,
    * which the peaks-and-indexing workflow brings (R6). The three-effect split
@@ -33,7 +39,7 @@
   import { isShortcutTarget } from "../lib/palette";
   import {
     curveColors, curveToggles, dataOnlyHidden, isDataOnly, mergeRegions, normalizeRegion,
-    residual, shows, toggleCurve, RESIDUAL_KINDS,
+    residual, shows, toggleCurve,
     type Protocol, type ResidualKind, type Scale, type Window,
   } from "../lib/plot";
   import type { Curves, Overlay, PatternChart } from "../lib/pattern";
@@ -53,6 +59,9 @@
     protocolError = "",
     onprotocol = () => {},
     onreadout = () => {},
+    projectPath = null,
+    ui = null,
+    onui = () => {},
   }: {
     result: any;
     /** bumped when the curves moved: a run landed or the history moved */
@@ -72,16 +81,27 @@
     }) => void | Promise<void>;
     /** the hover readout, or null when the pointer leaves the plot */
     onreadout?: (reading: StatusReadout | null) => void;
+    /** the open project's path: the axes' remembered choices are read when it changes */
+    projectPath?: string | null;
+    /** the project's `ui` keys, where the axes' choices are kept */
+    ui?: Record<string, unknown> | null;
+    /** persist an axis choice in the project's `ui` keys */
+    onui?: (patch: Record<string, unknown>) => void;
   } = $props();
 
-  /** How the difference reads in the view menu. */
-  const DIFFERENCE: Record<ResidualKind, string> = {
-    weighted: "Difference in esd (Δ/σ)", delta: "Difference in counts (Δ)",
-    cumulative: "Cumulative χ²",
-  };
+  /** The difference axis's choices: the three today's page draws
+   *  (`lib/plot.ts`'s `RESIDUAL_KINDS`, in its order), in the view menu's
+   *  words they had here before the axis took them. */
+  const DIFFERENCES: { id: ResidualKind; label: string }[] = [
+    { id: "weighted", label: "Difference in esd (Δ/σ)" }, { id: "delta", label: "Difference in counts (Δ)" },
+    { id: "cumulative", label: "Cumulative χ²" },
+  ];
   const SCALES: { id: Scale; label: string }[] = [
     { id: "linear", label: "Linear" }, { id: "sqrt", label: "Square root" }, { id: "log", label: "Log" },
   ];
+  /** The `ProjectDoc.ui` keys the axes' choices are kept under. */
+  const UI_SCALE = "intensity_scale";
+  const UI_DIFFERENCE = "difference";
   const GUTTER = 112;
   const LEGEND_ROW = 20;
 
@@ -101,7 +121,23 @@
   let hoverAt = $state<number | null>(null);
   let arm = $state<null | "limits" | "exclude">(null);
   let zoomed = $state(false);
-  let geom = $state.raw<Record<"main" | "ticks" | "resid", { top: number; height: number }> | null>(null);
+  let geom = $state.raw<Record<"main" | "ticks" | "resid", { top: number; height: number; pad: number }> | null>(null);
+  /** The plot area's left edge and width in the host, shared by every pane. */
+  let plotX = $state.raw<{ left: number; width: number } | null>(null);
+  /** The axis whose menu is open, and where. */
+  let axisAt = $state<{ axis: "y" | "resid"; at: MenuAt } | null>(null);
+  let axisButtons: Record<"y" | "resid", HTMLButtonElement | undefined> = $state({ y: undefined, resid: undefined });
+  /** A hint's explanation, floating beside it while it is hovered or focused. */
+  let tip = $state<{ axis: "x" | "y" | "resid"; left: number; top: number } | null>(null);
+  /** The x axis's tick labels take this height under the plot, and the strip
+   *  uPlot keeps for a title sits under them (`rxplot.mjs`, X_LABELS, TITLE). */
+  const X_TICKS = 24;
+  const X_STRIP = 18;
+  let tipTimer: ReturnType<typeof setTimeout> | undefined;
+  /** An SVG export redraws the panes from their spec, and a figure that
+   *  leaves the window keeps its axis titles: the label functions return them
+   *  only while one is being made. */
+  let exporting = false;
   let colors = $state.raw<ReturnType<typeof curveColors> | null>(null);
   let viewAt = $state<MenuAt | null>(null);
   let viewButton: HTMLButtonElement | undefined = $state();
@@ -158,11 +194,21 @@
       chart = new mod.PatternChart(host, c, overlayNow(), {
         scale: untrack(() => scale),
         kind: untrack(() => kind),
+        // no titles on screen (2026-11-11): each axis carries a hint instead
         labels: {
-          y: () => (scale === "linear" ? "intensity" : `intensity (${scale === "sqrt" ? "√" : "log"})`),
-          resid: () => (held && !held.raw ? residual(kind, held).title : ""),
+          y: () => (!exporting ? "" : scale === "linear" ? "intensity"
+            : `intensity (${scale === "sqrt" ? "√" : "log"})`),
+          resid: () => (exporting && held && !held.raw ? residual(kind, held).title : ""),
         },
       });
+      // the x title is the chart module's own string, and uPlot reads the
+      // live pane's axis at each draw: blank it there. Its strip stays, so
+      // nothing under the plot moves, and the x hint sits in it
+      const xAxis = chart.fig.panes.resid?.axes?.[0];
+      if (xAxis) {
+        xAxis.label = () => (exporting ? "2θ (°)" : "");
+        chart.fig.panes.resid.redraw(false, false);
+      }
       applied = untrack(() => ({ kind, scale, theme }));
       chart.fig.onCursor = (hit) => (hoverAt = hit ? hit.x : null);
       chart.fig.onSelect = (lo, hi) => { if (arm) armed(lo, hi); };
@@ -209,9 +255,15 @@
         const u = chart.fig.panes[key];
         if (!u) continue;
         out[key] = { top: (u.root as HTMLElement).offsetTop + u.bbox.top / dpr,
-                     height: u.bbox.height / dpr };
+                     height: u.bbox.height / dpr, pad: u.bbox.top / dpr };
       }
       geom = out;
+      const main = chart.fig.panes.main;
+      if (main && host) {
+        plotX = { left: (main.over as HTMLElement).getBoundingClientRect().left
+                    - host.getBoundingClientRect().left,
+                  width: main.bbox.width / dpr };
+      }
     });
   }
 
@@ -311,9 +363,6 @@
   }
 
   const viewItems = $derived<MenuEntry[]>([
-    ...RESIDUAL_KINDS.map((r) => ({ id: `kind:${r.id}`, label: DIFFERENCE[r.id],
-      checked: kind === r.id, radio: true, disabled: !held || held.raw })),
-    "-",
     { id: "data", label: "Show only the data", checked: dataOnly, disabled: !held },
     "-",
     ...rangeItems(),
@@ -328,9 +377,85 @@
   }
 
   function chooseView(id: string) {
-    if (id.startsWith("kind:")) kind = id.slice(5) as ResidualKind;
-    else if (id === "data") toggleDataOnly();
+    if (id === "data") toggleDataOnly();
     else act(id);
+  }
+
+  // -- the axes: hints, their explanations and their menus -------------------
+
+  // the project's remembered choices, read when another project opens; a
+  // value this page does not know (an older page's, a hand edit) is ignored
+  $effect(() => {
+    void projectPath;
+    untrack(() => {
+      const s = ui?.[UI_SCALE], k = ui?.[UI_DIFFERENCE];
+      scale = SCALES.some((o) => o.id === s) ? (s as Scale) : "sqrt";
+      kind = DIFFERENCES.some((o) => o.id === k) ? (k as ResidualKind) : "weighted";
+    });
+  });
+
+  /** What each axis's hint says: a unit, or a scale's mark. Linear intensity
+   *  has no mark, since counts are what an intensity axis is read in. */
+  const hints = $derived({
+    x: "° 2θ",
+    y: scale === "sqrt" ? "√" : scale === "log" ? "log" : "",
+    resid: kind === "cumulative" ? "Σχ²" : kind === "delta" ? "counts" : "σ",
+  });
+
+  /** Where σ comes from, read off the route's `weighted` flag (WP-1029):
+   *  the file's esd column, or Poisson's √max(y, 1). Never re-derived. */
+  const sigmaFrom = $derived((held as Window | null)?.weighted === false
+    ? "σ from Poisson counting statistics." : "σ from the file.");
+
+  /** Each hint's explanation, in plain words, and what a click does. */
+  const tips = $derived<Record<"x" | "y" | "resid", [string, string]>>({
+    x: ["2θ in degrees.", ""],
+    y: [scale === "sqrt" ? "Intensity on a square-root scale. The ticks are counts."
+        : scale === "log" ? "Intensity on a log scale. Points at or below zero are not drawn."
+        : "Intensity on a linear scale, in counts.", "Click to choose the scale"],
+    resid: [kind === "cumulative" ? "Cumulative χ², summed from the left edge of the view."
+            : kind === "delta" ? "Δ = observed − calculated, in counts."
+            : `Δ/σ = (observed − calculated)/σ. ${sigmaFrom}`,
+            "Click to choose what the difference shows"],
+  });
+
+  function showTip(axis: "x" | "y" | "resid", target: HTMLElement, now: boolean) {
+    clearTimeout(tipTimer);
+    if (axisAt) return;
+    const r = target.getBoundingClientRect(), hr = host!.getBoundingClientRect();
+    // under a y hint, and above the x hint, which sits at the foot
+    const at = { axis, left: (axis === "x" ? r.right : r.left) - hr.left,
+                 top: (axis === "x" ? r.top - 4 : r.bottom + 4) - hr.top };
+    if (now) tip = at;
+    else tipTimer = setTimeout(() => (tip = at), 450);
+  }
+
+  function hideTip() {
+    clearTimeout(tipTimer);
+    tip = null;
+  }
+
+  function openAxis(axis: "y" | "resid") {
+    hideTip();
+    if (axisAt?.axis === axis) return (axisAt = null);
+    const r = axisButtons[axis]!.getBoundingClientRect();
+    axisAt = { axis, at: { x: r.right + 4, y: r.top } };
+  }
+
+  const axisItems = $derived<MenuEntry[]>(axisAt?.axis === "y"
+    ? SCALES.map((o) => ({ id: o.id, label: o.label, checked: scale === o.id, radio: true }))
+    : DIFFERENCES.map((o) => ({ id: o.id, label: o.label, checked: kind === o.id, radio: true })));
+
+  function chooseAxis(id: string) {
+    if (axisAt?.axis === "y") {
+      if (id === scale) return;
+      scale = id as Scale;
+      onui({ [UI_SCALE]: id });
+    } else {
+      if (id === kind) return;
+      kind = id as ResidualKind;
+      onui({ [UI_DIFFERENCE]: id });
+    }
   }
 
   /** The verbs the view menu and the context menu share. */
@@ -349,7 +474,12 @@
   }
 
   async function exportAs(what: ExportKind) {
-    note = await exportFigure(what, chart?.fig ?? null, "pattern");
+    exporting = what === "svg";
+    try {
+      note = await exportFigure(what, chart?.fig ?? null, "pattern");
+    } finally {
+      exporting = false;
+    }
     setTimeout(() => (note = ""), 2500);
   }
 
@@ -594,14 +724,6 @@
       {#if held?.stale}<span>fitted over other channels</span>{/if}
     </div>
     <div class="gctl">
-      <span class="vg">Intensity
-        <span class="segmented" role="group" aria-label="Intensity">
-          {#each SCALES as s (s.id)}
-            <button class:on={scale === s.id} aria-pressed={scale === s.id} disabled={!held}
-              onclick={() => (scale = s.id)}>{s.label}</button>
-          {/each}
-        </span>
-      </span>
       <button class="ghost" disabled={!zoomed} onclick={showAll}
         title="Show the whole pattern">Show all</button>
       <button class="ib" bind:this={viewButton} aria-label="View" aria-haspopup="menu"
@@ -622,6 +744,49 @@
       <div class="host" bind:this={host} bind:clientWidth={hostWidth} onpointerdowncapture={down}
         onpointerupcapture={up} oncontextmenu={context}
         onpointerleave={() => (hoverAt = null)}></div>
+      {#if geom && plotX && held}
+        <!-- each axis is its own control: its tick labels and its hint open its
+             choices, the hint's explanation shows on hover and on focus -->
+        <button class="axis" bind:this={axisButtons.y} style:--pad="{geom.main.pad}px"
+          style:top="{geom.main.top - geom.main.pad}px" style:height="{geom.main.height + geom.main.pad}px"
+          style:width="{plotX.left}px"
+          aria-label="Intensity scale" aria-haspopup="menu" aria-expanded={axisAt?.axis === "y"}
+          aria-describedby={tip?.axis === "y" ? "axis-tip" : undefined}
+          onclick={() => openAxis("y")}
+          onpointerenter={(e) => showTip("y", e.currentTarget.firstElementChild as HTMLElement, false)}
+          onpointerleave={hideTip}
+          onfocus={(e) => showTip("y", e.currentTarget.firstElementChild as HTMLElement, true)}
+          onblur={hideTip}>
+          <span class="hint" class:blank={!hints.y}>{hints.y || "\u00a0"}</span>
+        </button>
+        {#if !held.raw}
+          <button class="axis" bind:this={axisButtons.resid}
+            style:--pad="{geom.resid.pad}px"
+            style:top="{geom.resid.top - geom.resid.pad}px" style:height="{geom.resid.height + geom.resid.pad}px"
+            style:width="{plotX.left}px"
+            aria-label="Difference axis" aria-haspopup="menu" aria-expanded={axisAt?.axis === "resid"}
+            aria-describedby={tip?.axis === "resid" ? "axis-tip" : undefined}
+            onclick={() => openAxis("resid")}
+            onpointerenter={(e) => showTip("resid", e.currentTarget.firstElementChild as HTMLElement, false)}
+            onpointerleave={hideTip}
+            onfocus={(e) => showTip("resid", e.currentTarget.firstElementChild as HTMLElement, true)}
+            onblur={hideTip}>
+            <span class="hint">{hints.resid}</span>
+          </button>
+        {/if}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <span class="hint xhint" style:top="{geom.resid.top + geom.resid.height + X_TICKS}px"
+          style:height="{X_STRIP}px" style:right="calc(100% - {plotX.left + plotX.width}px)"
+          onpointerenter={(e) => showTip("x", e.currentTarget, false)} onpointerleave={hideTip}
+          >{hints.x}</span>
+      {/if}
+      {#if tip && !axisAt}
+        <div id="axis-tip" class="tip" class:above={tip.axis === "x"} role="tooltip"
+          style:left="{tip.left}px" style:top="{tip.top}px">
+          <span>{tips[tip.axis][0]}</span>
+          {#if tips[tip.axis][1]}<span class="muted">{tips[tip.axis][1]}</span>{/if}
+        </div>
+      {/if}
       <div class="gutter" aria-label="Curves">
         {#each legend as l (l.id)}
           <button class="gut" style:top="{l.top}px" aria-pressed={shows(hidden, l.id)}
@@ -685,6 +850,12 @@
   <Menu at={ctx.at} label="Plot" items={ctxItems} onchoose={act} onclose={() => (ctx = null)} />
 {/if}
 
+{#if axisAt}
+  <Menu at={axisAt.at} label={axisAt.axis === "y" ? "Intensity scale" : "Difference axis"}
+    anchor={axisButtons[axisAt.axis]} items={axisItems} onchoose={chooseAxis}
+    onclose={() => (axisAt = null)} />
+{/if}
+
 <style>
   .pattern {
     flex: 1 1 auto;
@@ -739,13 +910,6 @@
     color: var(--muted);
   }
 
-  .vg {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
-  }
-
   .view {
     flex: 1 1 auto;
     min-height: 0;
@@ -776,6 +940,84 @@
 
   .plot.armed .host :global(.u-over) {
     cursor: col-resize;
+  }
+
+  /* an axis's tick labels and its hint, as one target over the margin the
+     chart leaves at the plot's left: transparent, so the chart's own ticks
+     show through it */
+  .axis {
+    position: absolute;
+    left: 0;
+    z-index: 1;
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  @media (hover: hover) {
+    .axis:hover {
+      background: color-mix(in srgb, var(--hover) 60%, transparent);
+    }
+  }
+
+  .axis[aria-expanded="true"] {
+    background: color-mix(in srgb, var(--hover) 60%, transparent);
+  }
+
+  /* the hint: muted and small, by the tick labels, in the strips the chart
+     keeps where a title used to be, so it moves nothing: a y axis's at the
+     plot's top in the strip left of its labels (over the top label it
+     collided with a tick at the plot's edge), the x axis's after its last
+     label in the strip under them */
+  .hint {
+    display: inline-block;
+    padding: 0 2px;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    line-height: 18px;
+    white-space: nowrap;
+  }
+
+  .axis .hint {
+    position: absolute;
+    top: var(--pad);
+    left: 0;
+  }
+
+  .hint.blank {
+    visibility: hidden;
+  }
+
+  .xhint {
+    position: absolute;
+    z-index: 1;
+    cursor: default;
+  }
+
+  .tip {
+    position: absolute;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 280px;
+    padding: 5px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--fg) 14%, transparent);
+    font-size: var(--text-sm);
+    pointer-events: none;
+  }
+
+  .tip.above {
+    transform: translate(-100%, -100%);
   }
 
   .gutter {

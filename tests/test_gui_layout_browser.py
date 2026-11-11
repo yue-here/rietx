@@ -1056,8 +1056,8 @@ def _regions(client) -> list:
 
 
 def test_no_pattern_control_moves_the_refinement_window(browser, gui):
-    """The view menu, a residual choice, a legend label and the intensity scale,
-    each pressed with a real click, move no place in the window (WP-2216)."""
+    """The view menu, a legend label and each axis's menu and choices, each
+    pressed with a real click, move no place in the window (WP-2216)."""
     url, _ = gui
     page = _open_window(browser, url)
     before = page.evaluate(SNAP, WINDOW_LANDMARKS)
@@ -1071,19 +1071,24 @@ def test_no_pattern_control_moves_the_refinement_window(browser, gui):
 
     page.get_by_role("button", name="View", exact=True).click()
     check("view menu")
-    page.get_by_role("menuitemradio", name="Difference in counts (Δ)").click()
-    check("difference in counts")
-    page.get_by_role("button", name="View", exact=True).click()
-    page.get_by_role("menuitemradio", name="Difference in esd (Δ/σ)").click()
+    page.keyboard.press("Escape")
     background = page.locator(".gutter .gut", has_text="Background")
     background.click()
     check("a legend label")
     assert background.get_attribute("aria-pressed") == "false"
     background.click()
-    page.get_by_role("button", name="Square root", exact=True).click()
-    check("square root")
-    page.get_by_role("button", name="Linear", exact=True).click()
-    check("linear")
+    for axis, choices in (("Intensity scale", ("Linear", "Log", "Square root")),
+                          ("Difference axis", ("Difference in counts (Δ)", "Cumulative χ²",
+                                               "Difference in esd (Δ/σ)"))):
+        page.get_by_role("button", name=axis, exact=True).click()
+        check(f"{axis} menu")
+        page.keyboard.press("Escape")
+        _frames(page)
+        assert not page.locator(".rx-menu").count(), f"Esc left the {axis} menu open"
+        for choice in choices:
+            page.get_by_role("button", name=axis, exact=True).click()
+            page.get_by_role("menuitemradio", name=choice, exact=True).click()
+            check(choice)
     assert not page.errors, page.errors
     page.close()
     assert not failures, "\n".join(failures)
@@ -1176,3 +1181,52 @@ def test_a_pending_edit_moves_nothing_in_the_rebuilt_action_bar(browser, gui):
     assert not page.errors, page.errors
     page.close()
     assert not moved, moved
+
+
+def test_the_structural_menus_and_axis_hints_move_nothing(browser, gui):
+    """The filter row's ⋯, a phase band's ⋯, an atom row's context menu and a
+    hover on the σ hint each float over the window (WP-2216, ruling 1 on
+    #1529 and the axis ruling of 2026-11-11): nothing moves, and Esc closes
+    each menu."""
+    url, _ = gui
+    page = _open_window(browser, url)
+    page.locator("section.model .tabs button", has_text="Parameters").first.click()
+    page.wait_for_selector("tr[data-atom]")
+    _frames(page)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    failures = []
+
+    def check(label):
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+        if moved:
+            failures.append(f"{label!r}: " + "; ".join(moved[:4]))
+
+    def closes(label):
+        page.keyboard.press("Escape")
+        _frames(page)
+        if page.locator(".rx-menu").count():
+            failures.append(f"Esc left the {label} open")
+
+    def items():
+        return [i.strip() for i in page.locator(".rx-menu [role^=menuitem]").all_text_contents()]
+
+    page.get_by_role("button", name="Free or fix", exact=True).click()
+    assert [i.split()[0] for i in items()] == ["Free", "Fix"], items()
+    check("filter menu")
+    closes("filter menu")
+    page.locator(".band button.ib").first.click()
+    assert items() == ["Rename…", "Change space group…", "Add atom…", "Replace from CIF…"], items()
+    check("phase menu")
+    closes("phase menu")
+    page.locator("tr[data-atom]").first.click(button="right")
+    assert items() == ["Rename…", "Change species…", "Anisotropic ADPs", "Delete"], items()
+    check("atom menu")
+    closes("atom menu")
+    page.get_by_role("button", name="Difference axis", exact=True).hover()
+    page.wait_for_selector("#axis-tip")
+    assert "σ from the file." in page.locator("#axis-tip").inner_text()
+    check("σ hint hover")
+    assert not page.errors, page.errors
+    page.close()
+    assert not failures, "\n".join(failures)
