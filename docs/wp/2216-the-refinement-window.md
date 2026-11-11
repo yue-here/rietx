@@ -1,6 +1,6 @@
 # WP-2216 — the refinement window: the Pattern graph, Parameters and the action bar at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-12 — #1535, #1536 and #1537 merged; the polish PR open (#PRNUM)
+Milestone: gui-overhaul · Status: 🔄 2026-11-12 — #1535, #1536 and #1537 merged; the polish PR open (#1538)
 Depends on: 2215 (the frame)
 Priority: P2 2026-11-11 — a feature the open milestone was opened for: the screen a person spends most time in
 
@@ -183,7 +183,7 @@ Filled in by the session that builds each PR.
 
 ## Handover log
 
-- **2026-11-12** — a ghostshift runner built the polish PR, #PRNUM, under the ruling "Merge,
+- **2026-11-12** — a ghostshift runner built the polish PR, #1538, under the ruling "Merge,
   then polish" (§ Rulings).
   - *Done*: `gui/src/next/Params.svelte` drawn to the prototype (§ Rulings lists each
     difference). The chart draws through `/next`'s own copies, `gui/src/next/rxplot.mjs` and
