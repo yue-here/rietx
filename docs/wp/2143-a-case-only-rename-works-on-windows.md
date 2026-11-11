@@ -54,7 +54,7 @@ one place. A case-insensitive answer is right for that question on Windows, so t
 
 ## Tasks
 
-- [ ] `project_rename` compares the folder names as strings, so a case-only rename reaches the move on Windows
+- [x] `project_rename` compares the folder names as strings, so a case-only rename reaches the move on Windows
 - [ ] `recovery.move` keys the old copy by the path it was given, never a re-resolved one; a test makes the old name resolve to the moved folder, as Windows does, on every platform
 - [ ] Skill: none. The File menu is a GUI surface and the skill drives the Python API.
 
