@@ -126,7 +126,13 @@ way and waiting on the maintainer's look:
     `isShortcutTarget`; zoom judged on the drawn payload; Apply refetches nothing; `exports.ts`
     loses an unused list). Declined: switching today's `panels/Exports.svelte` to the shared
     helper, since a shared panel is not edited for `/next` (gui/CLAUDE.md).
-  - *Measured*: see the PR body for the gate counts (venv and platform named there).
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]`, Python 3.12): fast suite 14720 passed,
+    415 skipped, 32 xfailed in 21 min, with other sessions' work on the machine; the four added
+    browser cases cost 14.2 s in that run. vitest 770 passed in 38 files (+8);
+    svelte-check 0 errors; every `tests/*_browser.py` at `-n 4`: 160 passed, 2 failed, one
+    fixed in the branch (a kept recovery copy behind a frame toggle) and one
+    (`test_structure3d_browser.py`, today's page) passing alone, a load flake.
+  - *PR*: #1535.
   - *Gotchas*: the first browser run caught the status bar's right half growing 756 px when the
     readout replaced the count; it is now `flex: 1 1 0` with `justify-content: safe flex-end`, so
     a narrow window loses the reading's right end rather than 2θ. A browser driver that applies
