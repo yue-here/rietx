@@ -42,6 +42,7 @@
     type Slider,
     type Track,
   } from "../lib/interactive";
+  import type { InteractiveDraft } from "../lib/recovery";
   import { normalize, type ParamRow } from "../lib/table";
 
   let {
@@ -283,6 +284,18 @@
     error = "";
     ask();
     return true;
+  }
+
+  /** The slider values, for the recovery copy (WP-2209), or `null`. */
+  export function draft(): InteractiveDraft | null {
+    return edits.size ? { values: Object.fromEntries(edits) } : null;
+  }
+
+  /** Put recovered slider values back as pending values. */
+  export function restoreDraft(d: InteractiveDraft) {
+    edits = new Map(Object.entries(d.values ?? {}));
+    error = "";
+    ask();
   }
 
   /** Drop every slider value: the graphs go back to the last fit. */

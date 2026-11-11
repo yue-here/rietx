@@ -30,6 +30,8 @@ redesign is ported in five pieces, in this order:
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
 | The palette | [2200](../wp/2200-the-palette.md) | the site's palette as the default theme, light and dark: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Named themes (Solarized, Monokai) in Settings come later; the emitter leaves their seam. `gui/STYLE.md`'s rules that describe a new role in words take its tokens (WP-2142) |
+| Edit recovery | [2209](../wp/2209-unapplied-edits-survive-a-close.md) | unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs; reopening offers them (ruled 2026-11-09) |
+| — | [2213](../wp/2213-text-and-model-edits-join-the-recovery-copy.md) | the Text panel's buffer and the Model panel's forms join the recovery copy, the Text buffer first (ruled 2026-11-10; after WP-2209) |
 | — | [2211](../wp/2211-the-history-table.md) | the History table in the bottom panel: one row per node, the node count on the tab, Compare as an overlay on the pattern, Restore as pending edits (after WP-2206) |
 | — | [2212](../wp/2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt on the calls the window ran, and the console exported as a `.py` script (after WP-2206) |
 
@@ -56,7 +58,6 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 | Bottom panel | Console (the Python the window runs) and History (Compare, Restore), toggled from the status bar | 2026-11-07 |
 | Status bar | The bar along the window's foot, with the console toggle | 2026-11-07 |
 | Fixing plan stages | A plan stage that fixes as well as frees (WP-2127 records the ruling) | 2026-11-09 |
-| Edit recovery | Unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 |
 | Fit statistics in the action bar | Rwp, GoF and the not-a-fit chip beside Refine while the graphs are hidden ("try B"). WP-2123 left them hidden with the graphs (its item 6) | 2026-11-09 |
 
 Three decisions went to the maintainer before the piece that needs them. The first is now ruled, and two still wait:
