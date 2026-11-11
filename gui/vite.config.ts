@@ -36,7 +36,10 @@ export default defineConfig(({ mode }) => ({
         ? { input: fileURLToPath(new URL("next.html", import.meta.url)) } : {}),
       output: {
         entryFileNames: mode === "next" ? "assets/next.js" : "assets/app.js",
-        chunkFileNames: "assets/[name].js",
+        // the second pass writes beside the first with nothing emptied, so its
+        // chunks take a prefix: an `assets/vendor-uplot.js` of its own would
+        // replace the one `app.js` imports, whose export names it does not share
+        chunkFileNames: mode === "next" ? "assets/next-[name].js" : "assets/[name].js",
         // Application code is still one chunk.  CodeMirror — its first real
         // dependency (WP-1013) — is not, and splitting it *serves* the
         // one-chunk decision rather than reversing it: a committed dist has to

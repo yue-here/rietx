@@ -301,12 +301,17 @@ describe("`title=` is no longer how this app explains a name", () => {
     "panels/Report.svelte": 4,       // report statistics
     "panels/Series.svelte": 11,      // series settings and status chips
     "panels/Structure3D.svelte": 4,  // drawing thresholds, not physics
+    "next/Console.svelte": 1,        // the event ring's size, as panels/Console's
+    "next/Frame.svelte": 2,          // the two splitters' drag gesture
   };
 
   function markupFiles(): Array<[string, string]> {
+    // the rebuilt page's files too (WP-2215): the budget is per file, and a
+    // second page is not a way around it
     const files = ["App.svelte",
-                   ...readdirSync(`${SRC}panels`).filter((f) => f.endsWith(".svelte"))
-                     .sort().map((f) => `panels/${f}`)];
+                   ...["panels", "next"].flatMap((dir) =>
+                     readdirSync(`${SRC}${dir}`).filter((f) => f.endsWith(".svelte"))
+                       .sort().map((f) => `${dir}/${f}`))];
     return files.map((rel) => [rel, readFileSync(`${SRC}${rel}`, "utf-8")]);
   }
 

@@ -225,11 +225,16 @@
     { id: "keys", label: "Keyboard shortcuts", echo: "", key: "?", run: () => (keysOpen = true) },
   ]);
 
+  /** Whether a modal layer is up. A key never opens a second one over it:
+   *  each layer takes Esc on the window, so two open at once close together. */
+  const layered = $derived(settingsOpen || paletteOpen || keysOpen || newOpen || !!wfAt);
+
   /** The frame's keys (WP-2214 rows 12, 228, 239, 240): ⌘1 and ⌘2 the side
    *  panels, ⌘J the bottom panel, ⌘, Settings, ⌘K the palette, ⌘. stops a
    *  run, and `?` lists them. Ctrl elsewhere. Esc is each layer's own. */
   function keydown(event: KeyboardEvent) {
     if (event.key === "?" && isShortcutTarget(event)) {
+      if (layered) return;
       event.preventDefault();
       keysOpen = true;
       return;
@@ -239,8 +244,8 @@
       "1": toggleGraphs,
       "2": toggleModel,
       j: toggleBottom,
-      k: () => (paletteOpen = !paletteOpen),
-      ",": () => (settingsOpen = !settingsOpen),
+      k: () => (paletteOpen || !layered) && (paletteOpen = !paletteOpen),
+      ",": () => (settingsOpen || !layered) && (settingsOpen = !settingsOpen),
       ".": stop,
     };
     const fn = act[event.key.toLowerCase()];
@@ -260,8 +265,18 @@
       } catch {
         // an unreadable store is the default choice, not a boot failure
       }
-      version = await api.version();
-      capabilities = await api.capabilities();
+      // neither is a reason to skip loading the project: a failure leaves the
+      // About line empty and New project without its vocabularies
+      try {
+        version = await api.version();
+      } catch {
+        version = null;
+      }
+      try {
+        capabilities = await api.capabilities();
+      } catch {
+        capabilities = null;
+      }
       try {
         docsUrl = (await api.help())?.docs_url ?? null;
       } catch {

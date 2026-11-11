@@ -56,6 +56,20 @@ STATIC_DIR = Path(__file__).parent / "static"
 #: one is the project in the other.
 NEXT_PAGES = ("/next", "/next/")
 
+
+def _page_file(path: str) -> Path | None:
+    """The built page a request path names, or ``None`` when it names none.
+
+    ``/`` is today's GUI; :data:`NEXT_PAGES` the rebuilt one (WP-2214,
+    WP-2215), a second page of the same build over the same session, until it
+    replaces ``index.html``.
+    """
+    if path in ("/", "/index.html"):
+        return STATIC_DIR / "index.html"
+    if path in NEXT_PAGES:
+        return STATIC_DIR / "next.html"
+    return None
+
 _ALLOWED_HOSTS = frozenset({"127.0.0.1", "localhost", "[::1]", "::1"})
 
 _SSE_HEARTBEAT = 15.0  # seconds between ``: keepalive`` comments
@@ -528,20 +542,10 @@ def _handler(session: GuiSession, holder: dict):
 
         # -- static --------------------------------------------------
         def _static(self, path: str) -> None:
-            index = STATIC_DIR / "index.html"
-            if path in NEXT_PAGES:
-                # the rebuilt GUI (WP-2214, WP-2215), a second page of the same
-                # build over the same session, until it replaces index.html
-                page = STATIC_DIR / "next.html"
+            page = _page_file(path)
+            if page is not None:
                 if page.is_file():
                     self._send(page.read_bytes(), "text/html; charset=utf-8")
-                else:
-                    self._send(_PLACEHOLDER.encode("utf-8"),
-                               "text/html; charset=utf-8")
-                return
-            if path in ("/", "/index.html"):
-                if index.is_file():
-                    self._send(index.read_bytes(), "text/html; charset=utf-8")
                 else:
                     self._send(_PLACEHOLDER.encode("utf-8"),
                                "text/html; charset=utf-8")
@@ -657,7 +661,8 @@ def serve(session: GuiSession, *, port: int = DEFAULT_PORT,
     """
     httpd = build_server(session, port=port)
     actual = httpd.server_address[1]
-    url = f"http://127.0.0.1:{actual}{NEXT_PAGES[0] if new else '/'}"
+    route = NEXT_PAGES[0] if new else "/"
+    url = f"http://127.0.0.1:{actual}{route}"
     if machine:
         # one line, first, so a supervising process (Tauri) can read the port
         # without parsing prose
@@ -676,7 +681,7 @@ def serve(session: GuiSession, *, port: int = DEFAULT_PORT,
         if scratch_of is not None:
             print(f"  scratch copy — {scratch_of} is not written to",
                   flush=True)
-        if not (STATIC_DIR / "index.html").is_file():
+        if not _page_file(route).is_file():
             print("  frontend: not built — run `npm --prefix gui run build`; "
                   "the HTTP API is live either way", flush=True)
         print("  Ctrl-C to stop", flush=True)

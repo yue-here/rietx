@@ -196,6 +196,19 @@ describe("the palette and the keys", () => {
     expect(rows.length).toBeGreaterThanOrEqual(7);
     expect(rows.map((r) => r.textContent)).toContain("Keyboard shortcuts?");
   });
+
+  it("opens no second layer over one already up, so one Esc backs out of one", async () => {
+    await boot();
+    key(",");
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
+    key("k");
+    flushSync();
+    expect(document.querySelectorAll('[role="dialog"]').length).toBe(1);
+    expect(document.querySelector('[aria-labelledby="keys-title"]')).toBeNull();
+    expect(document.querySelector(".panel li")).toBeNull();
+    key(",");
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
 });
 
 describe("Settings", () => {
