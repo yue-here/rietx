@@ -881,8 +881,11 @@
   /* the bar's free room whatever it holds, so the readout replacing the
      findings count resizes no box; set from the right end, and from the left
      (2θ first) when a narrow window cannot hold the whole reading */
+  /* the bar's full height whatever it holds, so the readout's mixed faces
+     never change the half's box (1 px, measured in the browser) */
   .right {
     position: relative;
+    align-self: stretch;
     flex: 1 1 0;
     display: flex;
     justify-content: safe flex-end;
