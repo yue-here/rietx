@@ -1,6 +1,6 @@
 # WP-1952 — the xy reader says what it skipped
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — the six tasks landed (PR #1504); the inherited σ ≤ 0 rule and its record field remain
+Milestone: unscheduled · Status: 🔄 2026-11-12 — claimed by a ghostshift runner for the σ ≤ 0 rule and its record field
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-11 — a decimal-comma file reads as a different pattern with no word, and a dropped mid-file row goes unreported; a fine step usually trips the duplicate-2θ refusal, and the reporter keeps their own reader
