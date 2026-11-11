@@ -938,3 +938,91 @@ def test_the_file_menu_moves_nothing(browser, filemenu, state):
     assert fields[0] == "sample copy", fields
     assert status == 200 and doc["path"].endswith("sample2.rex"), doc
     assert not moved, moved
+
+
+#: The rebuilt page's frame (WP-2215): its bars, its two columns and their tab
+#: strips. A pane's own content is not here: a later piece fills it.
+NEXT_LANDMARKS = [
+    "header.topbar", "header.topbar > *", "section.graphs", "section.graphs > .tabs",
+    "section.model", "section.model > .tabs", "footer.statusbar", "footer.statusbar > *",
+]
+
+
+def _open_next(browser, url: str, width: int):
+    page = browser.new_page(viewport={"width": width, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda exc: page.errors.append(str(exc)))
+    page.goto(url + "next")
+    page.wait_for_selector("section.graphs .tabs button")
+    page.evaluate("document.fonts.ready")
+    _frames(page)
+    return page
+
+
+def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
+    """Every tab, menu and dialog of the rebuilt frame, pressed with a real click (WP-2215).
+
+    Choosing a placeholder workflow swaps the model panel's tab strip for its
+    steps, so it is pressed too: the strip must keep its height. The workflow
+    button is as wide as the workflow's name, as the prototype's is, so a new
+    workflow moves the project name beside it and only the bars are held there.
+    """
+    url, _ = gui
+    failures = []
+
+    def pressing(label, act, close=None, landmarks=NEXT_LANDMARKS):
+        page = _open_next(browser, url, 1300)
+        before = page.evaluate(SNAP, landmarks)
+        act(page)
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, landmarks))
+        if moved:
+            failures.append(f"{label!r}: " + "; ".join(moved[:4]))
+        if close:
+            close(page)
+        assert not page.errors, page.errors
+        page.close()
+
+    page = _open_next(browser, url, 1300)
+    tabs = page.locator("section .tabs button").all_text_contents()
+    page.close()
+    assert len(tabs) == 8, tabs
+    for name in tabs:
+        pressing(name, lambda p, n=name: p.locator("section .tabs button", has_text=n).first.click())
+
+    def escape(p):
+        p.keyboard.press("Escape")
+
+    def series(p):
+        p.locator("button.mbtn.wf").click()
+        p.get_by_role("menuitemradio", name="Series · placeholder").click()
+
+    pressing("workflow menu", lambda p: p.locator("button.mbtn.wf").click(), escape)
+    pressing("File menu", lambda p: p.locator("header .fm-name").click(), escape)
+    pressing("Settings", lambda p: p.get_by_role("button", name="Settings", exact=True).click(),
+             escape)
+    pressing("Series workflow", series, landmarks=[
+        s for s in NEXT_LANDMARKS if s != "header.topbar > *"] + [
+        "header.topbar > button.ib"])
+    assert not failures, "\n".join(failures)
+
+
+def test_a_frame_toggle_stays_where_it_was(browser, gui):
+    """A collapse toggle asks for a move, and is itself never moved by it (WP-2215)."""
+    url, _ = gui
+    page = _open_next(browser, url, 1300)
+    toggles = {"graphs": "header.topbar > button.ib >> nth=0",
+               "model": "header.topbar > button.ib >> nth=-1",
+               "console": "footer.statusbar > button.console"}
+    boxes = {k: page.locator(sel).bounding_box() for k, sel in toggles.items()}
+    moved = []
+    for press in ("graphs", "graphs", "model", "model", "console", "console"):
+        page.locator(toggles[press]).click()
+        _frames(page)
+        for k, sel in toggles.items():
+            box = page.locator(sel).bounding_box()
+            if any(abs(box[c] - boxes[k][c]) > 1 for c in ("x", "y", "width", "height")):
+                moved.append(f"{k} after pressing {press}: {box} from {boxes[k]}")
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
