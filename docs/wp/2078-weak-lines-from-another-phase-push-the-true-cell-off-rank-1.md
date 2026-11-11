@@ -77,12 +77,12 @@ exists.
   low-Q pool of `SEARCH_POOL_MULTIPLE` × 20. Scoring reads every usable line.
   WP-1039 measured that raising N bought nothing and that the rank, not the
   count, fixed `11BM_NAC.fxye`.
-- `PEAK_UNDRIVEN_FLAGS = {"weak_line"}` (`schemas/indexing.py:858`) is the
+- `PEAK_UNDRIVEN_FLAGS = {"weak_line"}` (`schemas/indexing.py:872`; `:858` at `992b7048f`) is the
   existing "scored, never driven" seam (#934): a flagged line stays in
   `usable()` and never enters the driven set. Below `DRIVEN_MIN_LINES` = 6
   unflagged lines the strongest flagged ones come back. `weak_line` is a
   significance screen (Benjamini–Hochberg on I/σ_I at `PEAK_FDR_Q` = 0.01,
-  `:303`). The issue measured that the harmful lines pass it: moving the q
+  `:314`). The issue measured that the harmful lines pass it: moving the q
   from 0.001 to 0.05 moved the false-kept count only from 139 to 151.
 - `DEFAULT_N_UNINDEXED` = 2 (`engines.py:173`): a cell is accepted only if
   all but two driven lines index. Reading, not measured: a third non-host line
@@ -112,6 +112,23 @@ GSAS-II, WinPLOTR for FullProf) offers an intensity threshold when it builds
 an indexing list is not checked. `docs/practice.md` has no indexing
 line-selection section.
 
+**Folded from `### Inherited` on 2026-11-12.** Both entries still hold at
+`a86dcf9d4`; they now sit here and in task 4.
+- **A pure-phase sibling (issue #1382, finding 2; triage 2026-11-05).** On
+  `tests._synthetic_silicon.silicon_pattern("flat")` the picker splits the 111
+  line into extra components at 28.60° and 28.77°, so the list has 10 usable
+  lines where the range holds eight. At `541f0daf7` a trigonal R 3.841/9.380
+  ranked first with 9 of 10 lines and cubic F 5.431 second with 8 of 10, all
+  three engines finding both. Pawley separated them (R: Rwp 0.118, GoF 4.45;
+  F: Rwp 0.0299, GoF 1.12) and the rank did not read it. Here the lines the
+  host does not own are picker artefacts, not a second phase. Task 4 measures
+  it as fixture (d). The issue's finding 1 is WP-2113.
+- **The dichotomy rows are pre-#1301 (WP-2066, closed 2026-11-03).** The
+  reporter's one real-data re-measure after #1301, a private orthorhombic-F
+  lab list (#1258), moved dichotomy's ranking down: the truth went 5th → 6th
+  on its grid cells, and `index_pattern` returned no truth on either tree.
+  Task 4 measures dichotomy on `main`, never against the issue's table.
+
 **Tier and the maintainer's gates.** Three gates belong to the maintainer and
 none is settled by this file.
 1. **The floor's value is a new constant.** Unless the survey finds it as
@@ -137,25 +154,7 @@ each arm's search or cuts trailing systems. That cost is unmeasured.
 
 ### Inherited
 
-- **2026-11-05, from the issue triage (issue #1382, finding 2): the same failure on a pure phase,
-  with lines the picker made from the phase's own Kα1 peak.** On
-  `tests._synthetic_silicon.silicon_pattern("flat")`, `pick_peaks` gives 10 usable lines where the
-  range holds eight, because the 111 line carries extra components at 28.60° and 28.77°. Its Kα2 is at
-  about 28.52°. Reproduced at `541f0daf7` (`[dev]`, arm64 Mac, `preset="quick"`): trigonal R
-  3.841/9.380 ranks first with 9 of 10 lines, and cubic F 5.431 second with 8 of 10. All three engines
-  find both. Their Pawley validations separate them: the R cell at Rwp 0.118, GoF 4.45, and the F cell
-  at Rwp 0.0299, GoF 1.12. The rank does not read that gap. This is a cheap public fixture for this
-  WP's Goal, and it carries no second phase, so "weak lines the host does not own" here means picker
-  artefacts. The issue's finding 1 is WP-2113.
-
-- **2026-11-03, from WP-2066 (closed).** #1301 has merged, so this WP's
-  dichotomy rows are pre-#1301 numbers. The reporter's one real-data
-  re-measure after it, a private orthorhombic-F lab list (#1258,
-  2026-11-02), moved dichotomy's ranking down. On the truth's grid cells
-  the truth went 5th → 6th. On the whole frontier at equal boxes the wrong
-  cells above it went 49 → 112, and it left the 60-candidate engine pool.
-  `index_pattern` returned no truth there on either tree. Re-run the
-  dichotomy rows on `main` before comparing an arm against them.
+(none)
 
 ## Non-goals
 
