@@ -57,7 +57,7 @@
       </div>
     </div>
     <div class="foot">
-      <span class="about">rietx {version}</span>
+      <span class="about">rietx <span class="num">{version}</span></span>
       <button class="ghost" bind:this={done} onclick={onclose}>Done</button>
     </div>
   </div>
@@ -108,5 +108,10 @@
 
   .about {
     color: var(--muted);
+  }
+
+  /* a number, so mono (`gui/STYLE.md` § Type) */
+  .about .num {
+    font-family: var(--mono-family);
   }
 </style>
