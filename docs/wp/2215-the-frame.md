@@ -1,6 +1,6 @@
 # WP-2215 — the frame: the rebuild's first piece, served at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — the frame is built at `/next`; it waits on the maintainer's look beside the prototype
+Milestone: gui-overhaul · Status: 🔄 2026-11-11 — the frame is built at `/next`; the maintainer's review rulings are applied, and it waits on the merge
 Depends on: 2214 (the rebuild's plan and inventory)
 Priority: P2 2026-11-11 — a feature the open milestone was opened for: every later piece of the rebuild mounts in this frame
 
@@ -78,6 +78,28 @@ npm --prefix gui test && npm --prefix gui run check
 The piece closes when every task is ticked and the maintainer has looked at its screens beside
 the prototype's (WP-2214 § How the maintainer reviews).
 
+## Questions
+
+Answered by the maintainer on 2026-11-11, on PR #1534. Each item keeps its question and ends
+with the ruling in the maintainer's words.
+
+1. **The workflow menu's mark for an unbuilt workflow.** R1 wrote "placeholder" after each
+   workflow that is not built. The maintainer had ruled on 2026-11-10 that such an entry says
+   "not built yet" everywhere. **Ruled 2026-11-11: "Yes."** R1 merges once the menu, the
+   palette and every other label in `gui/src/next/` say "not built yet". Done:
+   `lib/workflows.ts:NOT_BUILT_MARK`.
+2. **The fonts.** `gui/STYLE.md` § Type sets words in Instrument Sans, Greek in IBM Plex Sans
+   and numbers in IBM Plex Mono, each served by the app itself. R1 named the faces but shipped
+   no files, so a machine without them drew the system face. Settled by Claude under the
+   2026-11-06 type ruling and STYLE's "every font is served by the app itself": ship them as
+   files, as the manual does. **Ruled 2026-11-11: "Agree."** Done: the manual's
+   Instrument Sans and Plex Mono files byte for byte, a Greek-only Plex Sans in weights 400,
+   500 and 600, each with its OFL text, under `gui/src/next/static/fonts/` and declared in
+   `gui/src/next/fonts.css` alone.
+3. **The status bar when no fit runs.** The review asked whether the idle bar should say the
+   last run's status (`runWords` can). The frame leaves it empty. **Ruled 2026-11-11:
+   "Agree."** It stays empty; nothing to build.
+
 ## References
 
 - [WP-2214](2214-the-gui-rebuild-plan-and-inventory.md), the plan and the inventory; `gui/STYLE.md`;
@@ -85,6 +107,34 @@ the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
 
+- **2026-11-11** — The maintainer's three review rulings on PR #1534 are applied (§ Questions).
+  The workflow menu and the command palette now mark each unbuilt workflow "not built yet",
+  and no label in `gui/src/next/` says "placeholder". The frame now draws in its own faces:
+  Instrument Sans for words, IBM Plex Mono for numbers and code, and IBM Plex Sans for Greek.
+  The idle status bar stays empty.
+
+  *Done.* The fonts are 13 woff2 files and 3 licence texts (218 638 bytes) under
+  `gui/src/next/static/fonts/`. The second build pass copies them into the dist's `fonts/`
+  (vite's `publicDir`, set for that pass only), and `gui/src/next/fonts.css` declares them
+  with `font-display: swap` and a unicode-range each. Ten files are the manual's, byte for
+  byte. The three Plex Sans Greek files come from `@fontsource/ibm-plex-sans` 5.3.0 on npm
+  (tarball sha256 `232592af…3213`), the source WP-2021 used. `next.css` points
+  `--mono-family` at Plex Mono, with Plex Sans after it for Greek. Today's page is byte for
+  byte as it was: the build changed `next.css`, `next.js` and `build-info.json` and added
+  `fonts/`, nothing else. `tests/test_gui_dist.py` gains one case: the shared files equal the
+  manual's, every family has its licence, the rebuild's stylesheet declares exactly the files
+  shipped, and `app.css` declares none. Its remote-host check now reads the stylesheets too.
+  The wheel carries the fonts, so ATTRIBUTION.md says so.
+
+  *Measured* (`[dev]` venv, darwin arm64). vitest 762 passed in 37 files (unchanged: the
+  edits renamed labels); svelte-check 433 files, 0 errors; `tests/test_gui_dist.py` 16 passed
+  (one new); every `tests/*_browser.py` file, python `playwright` installed: 158 passed, 0
+  skipped. No Python outside `tests/` changed, so the fast suite was not rerun. The screens
+  under `docs/wp/2215-screenshots/` were retaken with the fonts loaded. `gui/CLAUDE.md` takes
+  no fonts rule: it sits at its 667-line cap, and the rule lives in `vite.config.ts`,
+  `fonts.css` and the test.
+
+  Next: the maintainer merges #1534; R2 follows.
 - **2026-11-11** — The rebuilt GUI now has a frame you can open:
   `rietx gui --new` serves it at `/next`, beside today's page, which is unchanged. It has the
   prototype's top bar and status bar, the graphs and model columns with their tab strips,

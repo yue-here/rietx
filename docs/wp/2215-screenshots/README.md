@@ -17,5 +17,7 @@ prototype pictures stay outside the repository; the pull request names where the
 
 Taken 2026-11-11 on macOS (arm64) with the cached chromium, against the dist this branch
 commits, with `RIETX_STATE_DIR` pointed at a temporary directory. Every menu and dialog
-was opened by a real click or key press. The panes are empty because their contents are
+was opened by a real click or key press. Retaken the same day after the review, with the
+page's own fonts loaded before each shot: Instrument Sans for words, IBM Plex Mono for keys
+and code, and IBM Plex Sans for the Greek in New project's `Cu Kα1/Kα2`. The panes are empty because their contents are
 the later pieces' work (WP-2214, R2 to R4).
