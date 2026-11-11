@@ -1,6 +1,6 @@
 # WP-2216 — the refinement window: the Pattern graph, Parameters and the action bar at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — first PR open (Pattern graph, Parameters, action bar, recovery); the phase and atom menus follow in a second
+Milestone: gui-overhaul · Status: 🔄 2026-11-11 — first PR merged (#1535) and the readout follow-up open; the phase and atom menus follow in a third
 Depends on: 2215 (the frame)
 Priority: P2 2026-11-11 — a feature the open milestone was opened for: the screen a person spends most time in
 
@@ -65,9 +65,12 @@ How the Pattern graph reads, restated from the prototype and the design the grap
   controls moves the layout.
 - [x] Screenshots at 1440 × 900, light and dark, under `docs/wp/2216-screenshots/`, the hover
   readout boxed with a zoomed crop.
+- [x] The hover readout as the maintainer ruled it ("try b", 2026-11-11), and the consent
+  list's Parameters, scale and findings items (§ Rulings). A follow-up PR.
 - [ ] The phase band's ⋯ menu and the atom row's context menu (rows 121-131): Rename…, Change
   space group… with its preview, Replace from CIF…, Add atom…, Rename…, Change species…,
-  Anisotropic ADPs, Delete. A second PR, since the first is already a whole screen.
+  Anisotropic ADPs, Delete. With them, Parameters' Free and Fix buttons move into a menu.
+  A third PR, since the first is already a whole screen.
 
 ## Acceptance
 
@@ -81,22 +84,35 @@ npm --prefix gui test && npm --prefix gui run check
 The piece closes when every task is ticked and the maintainer has looked at its screens beside
 the prototype's (WP-2214 § How the maintainer reviews).
 
+## Rulings
+
+The first PR's three questions, answered on 2026-11-11.
+
+- **The hover readout: option (b), "try b"** (the maintainer, 2026-11-11, after a mock-up of
+  exactly this). With the pointer on a peak the status bar's right half reads
+  `2θ 31.860°   d 2.806 Å   Observed 19693   Last fit 20307   Background 175   Difference −4.4σ
+  fluorapatite (3 −1 1) +0.012°`. The labels are the legend's own words, in the text face and
+  the muted colour; the numbers are in the mono face and the ink. 2θ, d and a reflection's
+  offset take three decimals. Counts are whole and ungrouped, because the mono grouping space
+  looked wide. The difference takes one decimal in σ. The nearest reflection keeps its offset.
+  A narrow window drops items from the right: the reflection first, then Background.
+- **Settled by Claude, Yue did not object, 2026-11-11** (a consent list sent with the readout
+  question):
+  - Parameters' filter reads "Filter, for example biso or Ca1", as the prototype's does.
+  - Units read `° 2θ` and `°² 2θ`, never `deg 2θ`.
+  - The broadening rows read "Lorentzian size", "Lorentzian strain", "Gaussian size" and
+    "Gaussian strain", each on one line.
+  - Parameters' Free and Fix buttons move into a menu. They wait for the phase and atom menus'
+    PR.
+  - The intensity scale opens on square root.
+  - "N findings" counts errors plus warnings, as VS Code's Problems count does.
+
 ## Questions
 
-Filled in by the session that builds each PR. The first PR's three, each built the plainest
-way and waiting on the maintainer's look:
+Filled in by the session that builds each PR.
 
-1. **The hover readout in the status bar** (the ruling asked to check it built). With the
-   pointer on a peak the right half reads `2θ 31.8600°  d 2.8064 Å  obs 19693  calc 20307.2
-   bkg 174.975  Δ/σ -4.3765  fluorapatite (3 −1 1) +0.0121°`, set from the right end. Picture:
-   `2216-screenshots/next-hover-statusbar-light.png`. Does it look good?
-2. **The readout's words and digits are today's.** The labels are today's short forms (obs,
-   calc, bkg, Δ/σ) and each number carries today's digits, from the shared plot module. Keep
-   them, or should the rebuild spell the labels out and cut the digits (for example
-   `calc 20307`, `Δ/σ −4.38`)?
-3. **"2 findings" at rest counts the report's errors and warnings, not its notes**, and shows
-   "No findings" when a fit has none, and nothing before a fit. It is text, not yet a button:
-   opening the report from it is the report piece's. Is that the count wanted?
+1. **Axis titles on the Pattern graph.** The prototype draws none; `/next` draws today's
+   (`intensity (√)`, `(obs−calc)/σ`). Keep them, or drop them as the prototype does? Open.
 
 ## References
 
@@ -105,6 +121,38 @@ way and waiting on the maintainer's look:
   `docs/milestones/gui-overhaul.md`.
 
 ## Handover log
+
+- **2026-11-11** — a ghostshift runner built the readout follow-up, PR #1536. The status bar's
+  hover readout reads as ruled ("try b"), Parameters at `/next` takes the prototype's filter
+  text, units and row names, and the intensity opens on square root.
+  - *Done*: `gui/src/next/readout.ts` formats the reading: `lib/plot.ts:readout`'s questions
+    (nearest drawn channel over both arms, rows only for drawn curves, the nearest tick per
+    phase by index) with the ruled digits, and `dropsFor`, the narrow-window rule, measured as
+    ink against room in `Frame.svelte`. `gui/src/next/words.ts` holds the legend's words, which
+    the readout reads. `gui/src/panels/Params.svelte` moved into `gui/src/next/Params.svelte`
+    under gui/CLAUDE.md's rule for a shared panel the rebuild changes, so today's `app.js` is
+    byte-identical. The copy differs in the placeholder, the filter's text face, `unitText`
+    (`deg` becomes `°` wherever it stands as a word, so cell angles read `°` and Caglioti U, V
+    and W read `°² 2θ`), `shortTitle` (a trailing " broadening" goes, magnetic rows included),
+    and the space-group symbol's 0.015 em tracking, which the rebuild's style test refuses.
+    `readout.test.ts` holds the mock-up's line verbatim.
+  - *Not generalised*: today's strip (`lib/plot.ts:readout`) keeps today's labels and digits
+    until the swap. The help popover still prints the corpus's own unit (`deg 2θ`), since
+    `Help.svelte` is shared and its words are `rietx.help`'s.
+  - *Difference under the other two views*: the readout follows the difference the plot
+    draws. Δ/σ reads to one decimal with σ (the ruling); Δ in counts reads whole; cumulative χ²
+    reads to one decimal from the view's left edge.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright, Python 3.12): vitest
+    782 passed in 39 files (+12); svelte-check 0 errors in 441 files;
+    `tests/test_gui_layout_browser.py` with `tests/test_gui_browser.py` at `-n 4`: 39 passed.
+    The readout drops the reflection at 880 px and Background at 800 px, with the model panel
+    hidden. No Python outside `tests/` changed, so the fast suite was not run.
+  - *Gotchas*: the readout's two faces made the status bar's right half 1 px taller than the
+    findings count, which the region browser case caught; the half now stretches to the bar.
+    Counts first shared one slot, which set "Background 175" in a five-digit slot; each count
+    now takes its own curve's widest value.
+  - *Next*: the phase and atom menus PR, with Free and Fix into a menu; the axis-titles
+    question.
 
 - **2026-11-11** — a ghostshift runner built the first of R2's two PRs. The rebuilt page can
   now be refined in: the Pattern graph draws the fit with Rwp and GoF on its title line, a ⋯

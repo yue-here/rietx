@@ -1144,7 +1144,8 @@ def test_the_hover_readout_takes_the_status_bar_and_gives_it_back(browser, gui):
     page.mouse.move(box["x"] + box["width"] * 0.4, box["y"] + box["height"] * 0.5)
     _frames(page)
     reading = right.inner_text()
-    assert "°" in reading and "obs" in reading, reading
+    # the legend's words, as ruled on 2026-11-11 ("try b")
+    assert "°" in reading and "Observed" in reading and "Last fit" in reading, reading
     moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
     page.mouse.move(box["x"] + box["width"] * 0.4, 5)
     _frames(page)

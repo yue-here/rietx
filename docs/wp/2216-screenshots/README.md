@@ -20,6 +20,20 @@ stay outside the repository; the pull request names where they are.
 - `next-applied-light.png`: after Apply. The values are the model's, without esds; the
   graph keeps the last fit until the next run, as today's page does.
 
+The readout follow-up's pictures, as ruled on 2026-11-11 ("try b"):
+
+- `readout-hover-*.png`: the `fap` example after one staged fit, zoomed to 29-35° 2θ by a
+  drag, the pointer on the (3 −1 1) peak at 31.86°. The status bar's right half reads
+  `2θ 31.860°  d 2.806 Å  Observed 19693  Last fit 20307  Background 175  Difference −4.4σ
+  fluorapatite (3 −1 1) +0.012°`. The intensity opens on square root. Parameters shows the
+  filter text, the `° 2θ` units and the one-line broadening rows.
+- `readout-statusbar-light.png`: that status bar's right half at twice the size. The labels are
+  Instrument Sans in the muted colour, the numbers IBM Plex Mono in the ink, and θ and σ come
+  from IBM Plex Sans.
+- `readout-narrow-880-light.png`: the same hover at 880 px with the model panel hidden. The
+  reflection has dropped.
+- `readout-narrow-800-light.png`: at 800 px. Background has dropped as well.
+
 Taken 2026-11-11 on macOS (arm64) with the cached chromium, against the dist this branch
 commits, with `RIETX_STATE_DIR` pointed at a temporary directory. Every menu, drag, edit and
 hover was made by a real click, key press or pointer move.

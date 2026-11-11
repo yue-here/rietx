@@ -88,6 +88,15 @@ describe("the status bar's right half", () => {
   });
 });
 
+describe("the Parameters panel at /next", () => {
+  it("is the rebuild's own, with the prototype's filter text", async () => {
+    await boot();
+    const filter = document.querySelector<HTMLInputElement>("#param-filter")!;
+    expect(filter.placeholder).toBe("Filter, for example biso or Ca1");
+    expect(filter.classList.contains("mono")).toBe(false);
+  });
+});
+
 describe("the action bar", () => {
   it("ends the model panel with Revert, Apply and Refine, the first two idle without edits", async () => {
     await boot();
