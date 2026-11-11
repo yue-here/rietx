@@ -117,37 +117,41 @@ button {
   letter-spacing: normal;
   padding: var(--s1) var(--s3);
   border-radius: var(--r-control);
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  /* Not white (WP-1438). The accent is a dark blue on the light theme and a
-     *light* blue on the dark one, where white measures 2.22:1 against it —
-     under WCAG AA at any size. `--panel` is white on light and near-black on
-     dark, so one token is the legible ink on both fills: 6.44:1 and 7.51:1.
-     Found by the watcher's own no-colour-literals guard, which this
-     stylesheet has no equivalent of. */
+  /* Filled in the accent's text role, never the accent itself (the
+     maintainer's ruling of 2026-11-06, WP-2200): white on the orange accent
+     is 4.22:1, under WCAG AA, and on `--accent-ink` 5.84:1.  The ink is
+     `--panel`, not white (WP-1438): white on the dark theme's light orange is
+     unreadable, and `--panel` is white on light and near-black on dark, so one
+     token is the legible ink on both fills (5.84:1 and 10.25:1). */
+  border: 1px solid var(--accent-ink);
+  background: var(--accent-ink);
   color: var(--panel);
   cursor: pointer;
 }
 
+/* Every other action is outlined, as on the site: the strong rule for its
+   border and the ink for its words, so only the primary carries the accent
+   (the maintainer's ruling of 2026-11-06). */
 button.ghost {
   background: transparent;
-  color: var(--accent);
+  border-color: var(--line-strong);
+  color: var(--fg);
   font-weight: 400;
 }
 
 /* The one hover in the app, and it belongs to the register rather than to the
    one panel that had written it out (`Peaks`' adopt chips).  A ghost is a
    transparent box, so without this a control that acts is pointer-identical to
-   a chip that does not. */
+   a chip that does not.  The site's hover ground (WP-2200). */
 button.ghost:hover:not(:disabled),
 .file > span:hover {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: var(--hover);
 }
 
 /* a toggle that is engaged — a state, and it reads as the primary does */
 button.on {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
   color: var(--panel);      /* the primary's ink, and for its reason */
   font-weight: 600;
 }
@@ -178,8 +182,8 @@ button:disabled {
   letter-spacing: normal;
   padding: var(--s1) var(--s3);
   border-radius: var(--r-control);
-  border: 1px solid var(--accent);
-  color: var(--accent);
+  border: 1px solid var(--line-strong);
+  color: var(--fg);
   cursor: pointer;
 }
 
@@ -309,7 +313,7 @@ button:disabled {
 }
 
 .chip.accent {
-  color: var(--accent);
+  color: var(--accent-ink);
   border-color: var(--accent);
 }
 
@@ -354,7 +358,7 @@ button:disabled {
   padding: 0;
   font: inherit;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-ink);
   cursor: pointer;
 }
 
@@ -540,7 +544,7 @@ kbd {
    are the same custom properties every other surface uses, so the pane follows
    the system theme with everything else. */
 .tok-keyword {
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 

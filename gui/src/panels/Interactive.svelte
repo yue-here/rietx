@@ -42,6 +42,7 @@
     type Slider,
     type Track,
   } from "../lib/interactive";
+  import type { InteractiveDraft } from "../lib/recovery";
   import { normalize, type ParamRow } from "../lib/table";
 
   let {
@@ -285,6 +286,18 @@
     return true;
   }
 
+  /** The slider values, for the recovery copy (WP-2209), or `null`. */
+  export function draft(): InteractiveDraft | null {
+    return edits.size ? { values: Object.fromEntries(edits) } : null;
+  }
+
+  /** Put recovered slider values back as pending values. */
+  export function restoreDraft(d: InteractiveDraft) {
+    edits = new Map(Object.entries(d.values ?? {}));
+    error = "";
+    ask();
+  }
+
   /** Drop every slider value: the graphs go back to the last fit. */
   export function revert() {
     edits = new Map();
@@ -412,7 +425,7 @@
   }
   .pname:hover,
   .pname[aria-expanded="true"] {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
   .caret {
     color: var(--muted);
@@ -427,10 +440,10 @@
     white-space: nowrap;
   }
   .num:hover {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
   .changed .num {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
   .num.ghosted {
     visibility: hidden;

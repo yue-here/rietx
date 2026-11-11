@@ -59,6 +59,7 @@
     type Stage, Undo, addGlobs, dropIndex, moveStage, newStageName, planDiffers,
     resolvedPrefix, slideOffset,
   } from "../lib/plan";
+  import type { PlanDraft } from "../lib/recovery";
   import { STAGE_INT_WORDS, STAGE_NULLABLE_WORDS, STAGE_WORDS } from "../lib/rxt";
 
   let {
@@ -312,6 +313,20 @@
     if (!edited) return true;
     say(`project.doc.plan = PlanSpec(stages=[${stages.length}], correlation_guard=${guard})`);
     return put({ plan: { ...extra, stages: $state.snapshot(stages), correlation_guard: guard } });
+  }
+
+  /** The edited plan, for the recovery copy (WP-2209), or `null`. */
+  export function draft(): PlanDraft | null {
+    return edited ? { stages: $state.snapshot(stages) as Stage[], guard } : null;
+  }
+
+  /** Put a recovered plan back on screen as the pending edit; one undo step. */
+  export function restoreDraft(d: PlanDraft) {
+    if (!Array.isArray(d.stages)) return;
+    remember();
+    stages = structuredClone(d.stages) as Stage[];
+    guard = typeof d.guard === "number" ? d.guard : guard;
+    clampSelected();
   }
 
   /** The action bar's Revert: the plan the project holds, back on screen. */
@@ -827,7 +842,7 @@
   }
 
   li.selected .step {
-    color: var(--accent);
+    color: var(--accent-ink);
     font-weight: 600;
   }
 
