@@ -1026,3 +1026,149 @@ def test_a_frame_toggle_stays_where_it_was(browser, gui):
     assert not page.errors, page.errors
     page.close()
     assert not moved, moved
+
+
+#: The refinement window's own places (WP-2216): the graph's title line and its
+#: controls, the plot, the legend gutter, the action bar and the status bar.
+WINDOW_LANDMARKS = NEXT_LANDMARKS + [
+    ".ghead", ".gctl", ".gctl > *", ".plot", ".plot .host", ".gutter",
+    ".actions", ".actions .segmented", ".actions .go > *", "footer.statusbar .right",
+]
+
+
+def _open_window(browser, url: str):
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda exc: page.errors.append(str(exc)))
+    _keep_no_edits(page)
+    page.goto(url + "next")
+    page.wait_for_selector(".gutter .gut")
+    page.evaluate("document.fonts.ready")
+    _frames(page)
+    return page
+
+
+def _regions(client) -> list:
+    return client.get("/api/project")[1]["doc"].get("excluded_regions") or []
+
+
+def test_no_pattern_control_moves_the_refinement_window(browser, gui):
+    """The view menu, a residual choice, a legend label and the intensity scale,
+    each pressed with a real click, move no place in the window (WP-2216)."""
+    url, _ = gui
+    page = _open_window(browser, url)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    failures = []
+
+    def check(label):
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+        if moved:
+            failures.append(f"{label!r}: " + "; ".join(moved[:4]))
+
+    page.get_by_role("button", name="View", exact=True).click()
+    check("view menu")
+    page.get_by_role("menuitemradio", name="Difference in counts (Δ)").click()
+    check("difference in counts")
+    page.get_by_role("button", name="View", exact=True).click()
+    page.get_by_role("menuitemradio", name="Difference in esd (Δ/σ)").click()
+    background = page.locator(".gutter .gut", has_text="Background")
+    background.click()
+    check("a legend label")
+    assert background.get_attribute("aria-pressed") == "false"
+    background.click()
+    page.get_by_role("button", name="Square root", exact=True).click()
+    check("square root")
+    page.get_by_role("button", name="Linear", exact=True).click()
+    check("linear")
+    assert not page.errors, page.errors
+    page.close()
+    assert not failures, "\n".join(failures)
+
+
+def test_a_region_is_drawn_selected_and_deleted_in_place(browser, gui):
+    """An excluded region is an object on the plot (WP-2216): armed from the
+    context menu, dragged, selected with a click, deleted with a key. The
+    selection bar floats over the plot, so the window does not move."""
+    url, client = gui
+    page = _open_window(browser, url)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    box = page.locator(".plot .host .u-over").first.bounding_box()
+    page.mouse.click(box["x"] + box["width"] * 0.5, box["y"] + 40, button="right")
+    page.get_by_role("menuitem", name="Exclude a region…").click()
+    x0, x1 = box["x"] + box["width"] * 0.70, box["x"] + box["width"] * 0.76
+    y = box["y"] + box["height"] * 0.5
+    page.mouse.move(x0, y)
+    page.mouse.down()
+    for k in range(1, 13):
+        page.mouse.move(x0 + (x1 - x0) * k / 12, y)
+    page.mouse.up()
+    for _ in range(60):
+        if _regions(client):
+            break
+        _frames(page)
+    assert len(_regions(client)) == 1, _regions(client)
+    # the page learns of the region from the verb's answer, a moment after
+    # the server holds it, so the select click is repeated until it lands
+    for _ in range(20):
+        page.mouse.click((x0 + x1) / 2, y)
+        _frames(page)
+        if page.locator(".selbar").count():
+            break
+    assert "channels" in page.locator(".selbar").inner_text()
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+    page.keyboard.press("Delete")
+    for _ in range(60):
+        if not _regions(client):
+            break
+        _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert _regions(client) == []
+    assert not moved, moved
+
+
+def test_the_hover_readout_takes_the_status_bar_and_gives_it_back(browser, gui):
+    """The status bar's right half reads the pointer while it is over the plot
+    and the findings count at rest (Yue's ruling, WP-2216), moving nothing."""
+    url, _ = gui
+    page = _open_window(browser, url)
+    right = page.locator("footer.statusbar .right")
+    rest = right.inner_text().strip()
+    assert rest.endswith(("finding", "findings")), rest
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    box = page.locator(".plot .host .u-over").first.bounding_box()
+    page.mouse.move(box["x"] + box["width"] * 0.4, box["y"] + box["height"] * 0.5)
+    _frames(page)
+    reading = right.inner_text()
+    assert "°" in reading and "obs" in reading, reading
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+    page.mouse.move(box["x"] + box["width"] * 0.4, 5)
+    _frames(page)
+    assert right.inner_text().strip() == rest
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def test_a_pending_edit_moves_nothing_in_the_rebuilt_action_bar(browser, gui):
+    """The first Parameters edit fills the pending slot and renames Refine,
+    both reserved, so nothing moves (WP-2216, today's rule on the new bar)."""
+    url, _ = gui
+    page = _open_window(browser, url)
+    page.locator("section.model .tabs button", has_text="Parameters").first.click()
+    _frames(page)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    page.locator(".params .row button.ink").first.click()
+    page.keyboard.press("End")
+    page.keyboard.type("1")
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert "pending" in page.locator(".actions .pending").text_content()
+    assert "Apply and refine" in page.locator(".actions button.refine").text_content()
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+    page.locator(".actions button", has_text="Revert").click()
+    _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved

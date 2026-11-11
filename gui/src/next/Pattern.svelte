@@ -558,7 +558,8 @@
 
 <div class="pattern">
   <div class="ghead">
-    <div class="gtitle" title={title}>
+    <!-- the whole line as its tooltip, since the title is what gives way (B1) -->
+    <div class="gtitle" title={held?.stale ? `${title}, fitted over other channels` : title}>
       {#if title}<b>{title}</b>{/if}
       {#if held && !held.raw && stats}
         <span class="stat">Rwp <span class="num">{stats.rwp == null ? "" : (stats.rwp * 100).toFixed(2)} %</span></span>

@@ -658,7 +658,6 @@
     <button class="ghost" class:gone={!busy} disabled={!busy} onclick={stop}
       title="Stop the run&#10;{mod}.">Stop</button>
   </span>
-  <span class="gap"></span>
   <span class="right" role="status">
     {#if reading}
       <span class="ro"><span class="k">2θ</span><span class="v w9">{reading.position}</span></span>
@@ -821,8 +820,13 @@
   /* the right half: the findings count at rest, the hover readout while the
      pointer is over a plot. Every value has a slot in ch, so a sweep moves no
      label (WP-1213's strip rule, one bar down) */
+  /* the bar's free room whatever it holds, so the readout replacing the
+     findings count resizes no box; set from the right end, and from the left
+     (2θ first) when a narrow window cannot hold the whole reading */
   .right {
+    flex: 1 1 0;
     display: flex;
+    justify-content: safe flex-end;
     align-items: center;
     gap: 14px;
     min-width: 0;
