@@ -425,7 +425,7 @@
   }
   .pname:hover,
   .pname[aria-expanded="true"] {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
   .caret {
     color: var(--muted);
@@ -440,10 +440,10 @@
     white-space: nowrap;
   }
   .num:hover {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
   .changed .num {
-    color: var(--accent);
+    color: var(--accent-ink);
   }
   .num.ghosted {
     visibility: hidden;

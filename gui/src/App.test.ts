@@ -717,8 +717,8 @@ const MASKED_CURVES = {
 /** The theme's plot inks as `curveColors` falls back to them: jsdom loads no
  *  stylesheet, so these are what the panel paints with here. */
 const INK = {
-  obs: "#8a8a8a", calc: "#c23b22", diff: "#1f5fa8", mask: "#1b1b1b14", edge: "#6b6b66",
-  peak: "#8c257e", peakfit: "#c158b0", candidate: "#1a8f45",
+  obs: "#1c1917", calc: "#c65d0a", diff: "#6b6259", mask: "#1c191714", edge: "#6b6259",
+  peak: "#0072b2", peakfit: "#6f83e6", candidate: "#1a8f45",
   phase: ["#009e73", "#cc79a7"],
 };
 
@@ -2025,7 +2025,7 @@ describe("disclosure and the command palette", () => {
       expect(ink("main", 1)).toBe("#112233");
       expect(ink("resid", 1)).toBe(INK.diff);
       // …and the zero line under the residual, in a token of its own
-      expect(pane("resid").marks.some((m) => m.op === "stroke" && m.style === "#88888888"))
+      expect(pane("resid").marks.some((m) => m.op === "stroke" && m.style === "#cfcfcf"))
         .toBe(true);
 
       const fetched = curvesFetched(stub);
@@ -4935,6 +4935,46 @@ describe("the peaks tab (WP-1027)", () => {
     expect(host.querySelector<HTMLElement>(".rx-ring")!.style.borderColor).toBe(probe.style.color);
   });
 
+  it("clips every layer it draws to the plot area, at a zoom that cuts one", async () => {
+    // the report (WP-2200): zoomed into a peak, the peak fit's dashes ran left
+    // of the y axis into its gutter. uPlot clips its own series and leaves a
+    // hook's strokes alone, so every layer is held to the pane's plot area.
+    const withGroups = {
+      ...PEAKS_PAYLOAD,
+      groups: [{ two_theta: [8.5, 9.5, 10.5], y_fit: [1, 5, 1], delta: [0, 0, 0] }],
+    };
+    const stub = server({
+      ...boot(), ...FITTED,
+      "/api/result/curves": fitCurves({
+        two_theta: [3, 6, 9, 9.4, 10, 12, 14, 18, 23.995], y_obs: [1, 2, 1, 2, 5, 3, 4, 1, 1],
+        header: { ticks: { NAC: [9.1, 12], CaF2: [9.3] } } }),
+      "/api/peaks": () => ({ body: withGroups }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await dragOver(9, 14);
+
+    const box = (u: StubPlot) => [u.bbox.left, u.bbox.top, u.bbox.width, u.bbox.height];
+    /** Every pane's strokes and fills beyond uPlot's own series, each under its pane's clip. */
+    const unclipped = () => (["main", "ticks", "resid"] as const).flatMap((key) =>
+      pane(key).marks.filter((m) => m.op !== "series" && JSON.stringify(m.clip) !== JSON.stringify(box(pane(key))))
+        .map((m) => `${key} ${m.op} ${m.style}`));
+    // the model's view: the tick rows and the residual's zero line
+    expect(tickInks().length).toBeGreaterThan(0);
+    expect(pane("resid").marks.some((m) => m.op === "stroke")).toBe(true);
+    expect(unclipped()).toEqual([]);
+
+    button("Peaks")!.click();
+    await flush();
+    const main = pane("main");
+    const fit = main.marks.find((m) => m.op === "stroke" && m.style === INK.peakfit)!;
+    // the zoom cut the group: its first point is left of the plot area
+    expect(fit.points!.some(([x]) => x < main.bbox.left)).toBe(true);
+    expect(main.marks.some((m) => m.style === INK.peak)).toBe(true);
+    expect(unclipped()).toEqual([]);
+  });
+
   it("clears the plot to the data and puts back what was there before", async () => {
     // "an easy way to hide everything except the data" — and the way back is
     // the state the plot was in, not everything on: a user who had already
@@ -5558,7 +5598,7 @@ describe("the series panel", () => {
   }
 
   /** `--warn` as the panel falls back to it: jsdom loads no stylesheet. */
-  const WARN = "#b7791f";
+  const WARN = "#7d5f00";
 
   /** The panel's icon buttons, which have no label to search by. */
   function icons(glyph: string): HTMLButtonElement[] {
@@ -5676,7 +5716,7 @@ describe("the series panel", () => {
     // the backward chain beside it, muted and dotted
     const marks = seriesPane("traj").marks;
     const strokes = (style: string) => marks.filter((m) => m.op === "stroke" && m.style === style);
-    expect(strokes(INK.diff).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
+    expect(strokes(INK.obs).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
     expect(strokes(WARN).some((m) => m.dash)).toBe(false);
     expect(strokes(WARN).some((m) => m.points!.some((p) => p.length === 3))).toBe(true);
     expect(strokes(INK.edge).some((m) => m.dash)).toBe(true);

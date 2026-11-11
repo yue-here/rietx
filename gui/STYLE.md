@@ -37,18 +37,17 @@ Each rule ends with a marker in brackets.
 ## Colour
 
 The default theme is the site's palette: warm neutrals, an orange accent, an orange calculated curve and a grey difference curve.
-Other established themes (Solarized light and dark, Monokai and others) ship as data through theme machinery in Settings.
-`theme.py` still holds the first GUI's blue and red.
-The palette piece moves it, and adds the site's roles the GUI lacks: a second text ink, a faint ink, a strong rule for control borders, a tinted ground, a hover ground, the accent as text, ink on a fill, and an info state. [Yue 2026-11-06, 2026-11-09]
+Each chrome token takes the site's value for the same job. [Yue 2026-11-06, 2026-11-09; WP-2200]
+Other established themes (Solarized light and dark, Monokai and others) come later, as further palettes in `theme.py`. [Yue 2026-11-06, 2026-11-09]
 
 - Settings offers the theme as three choices: Match system, Light and Dark. Match system is the default. Light and dark are built first. Named themes such as Solarized come later, and Settings lists them after the three. [Yue 2026-11-09]
 - A colour is chosen by its job, never by its look. [Yue 2026-11-06, adopting the site's rule]
-- The chrome tokens are `--fg`, `--bg`, `--panel`, `--line`, `--muted`, `--accent`, `--ok`, `--warn` and `--bad`. A page's extra role (a hover, a focus ring, a sunken track) is a `color-mix` over them and never a token of its own. [inferred, WP-1429]
-- The accent marks things and sets no running words. It marks the current tab's underline, the focus ring, a ticked box's tick, a selection on a plot, and the calculated curve. Links take the accent's text role. [Yue 2026-11-06 for the curve; inferred, from the site, for the rest]
-- The state colours (`--ok`, `--warn`, `--bad`, and info once it exists) mean states and nothing else. A warning is ochre, so it never reads as the brand. [inferred, from the site]
+- The chrome tokens are `--fg`, `--bg`, `--panel`, `--hover`, `--line`, `--line-strong`, `--muted`, `--accent`, `--accent-ink`, `--ok`, `--warn` and `--bad`. A page's extra role (a focus ring, a sunken track, a tinted cell) is a `color-mix` over them. A site role enters as a token only when a register reads it and no mix gives it, as the accent's text role, the control border and the hover ground did. [inferred, WP-1429, WP-2200]
+- The accent marks things and sets no running words. It marks the current tab's underline, the focus ring, a ticked box's tick, a selection on a plot, and the calculated curve. Text that the accent would colour, such as a link, takes the accent's text role, `--accent-ink`. [Yue 2026-11-06 for the curve; inferred, from the site, for the rest]
+- The state colours (`--ok`, `--warn`, `--bad`) mean states and nothing else. A warning is ochre, so it never reads as the brand. An info state joins them when a panel first needs one. [inferred, from the site]
 - No number is judged by colour. Rwp and GoF are plain numbers, and no row turns green because a value moved. [inferred, WP-1217]
-- Every text colour clears 4.5:1 against each ground it sits on, and the accent clears 3:1 as a mark. A test measures only ink on the accent fill today, so the palette piece adds a test for the other pairs as it moves them. [inferred, from the site]
-- A plot mark takes a `--plot-*` token of its own, and every plot colour stays at least the floor in `tests/test_gui_palette.py` from every other one. When the accent becomes orange, today's `--plot-calc` and `--warn` fall under that floor, so the plot palette moves with the chrome in the same piece. [inferred, WP-1210]
+- Every text colour clears 4.5:1 against each ground it sits on, and the accent clears 3:1 as a mark. `tests/test_gui_palette.py` measures each pair. [inferred, from the site]
+- A plot mark takes a `--plot-*` token of its own, and every plot colour stays at least the floor in `tests/test_gui_palette.py` from every other one. The pairs under it are named there with their measured distance and may only improve. The dashed background is one of them, since its dash carries what its colour cannot. [inferred, WP-1210, WP-2200]
 - Phases take `--phase-0` onwards in order, with the most legible first. A single phase's ticks are neutral ink. [inferred, WP-1029]
 - `rietx watch` and `rietx compare` read the same `theme.py`, so they change colour with the GUI. Their layout is outside this guide. [inferred, WP-1429]
 
@@ -81,8 +80,8 @@ The drawings live in `gui/src/app.css`. Each kind below means one thing (princip
 
 | Kind | Means | How it is drawn | Source |
 |---|---|---|---|
-| Primary button | The one action of a view (Apply and refine, Create) | Filled in the accent's text role, with ink on a fill. One per view | [Yue 2026-11-06] |
-| Button | Any other action | Outlined in the strong rule, the hover ground on hover | [Yue 2026-11-06] |
+| Primary button | The one action of a view (Apply and refine, Create) | Filled in the accent's text role (`--accent-ink`), inked in `--panel`. One per view | [Yue 2026-11-06] |
+| Button | Any other action | Outlined in the strong rule (`--line-strong`) with ink text, the hover ground (`--hover`) on hover | [Yue 2026-11-06] |
 | Icon button | An action whose icon is familiar | No border at rest, a border on hover. A word beside it where the icon is unfamiliar | [inferred] |
 | Segmented choice | One of N views or modes | A sunken track with one raised option, so a choice never looks like an action (`.segmented`) | [Yue 2026-11-07] |
 | Tab | One of N panels | A word over a rule. The current word is ink over an accent underline | [inferred, from the site] |
@@ -90,7 +89,7 @@ The drawings live in `gui/src/app.css`. Each kind below means one thing (princip
 | Padlock | A parameter is held | A cell with a checkbox cell's geometry, so locking moves no number. No column heading | [Yue 2026-11-07] |
 | Editable value | A number you can change | A tinted cell, the whole cell the target. Its editor floats over the cell and shows the whole number | [Yue 2026-11-07] |
 | Dialog field | A value typed into a form | A bordered box, because it is a control. The label column fits the longest label | [inferred; Yue 2026-11-08 on the overlapping label] |
-| Link | Go somewhere | The accent's text role, underlined where it sits in running text | [inferred, from the site] |
+| Link | Go somewhere | The accent's text role (`--accent-ink`), underlined where it sits in running text | [inferred, from the site] |
 | Help term | An explanation is one click away | The help cursor and no other mark. A click opens the term's `rietx.help` entry | [inferred, WP-1203] |
 | Fact | A grade, a flag, a state | Words, in a state colour where the tone is a judgement, with no border. A bordered box is a control, so `.chip` and `.pill` go as their panels are redrawn | [inferred, from principle 2 and the site] |
 
@@ -166,10 +165,11 @@ Claude inferred rules 1 to 12 from the rulings on background points and peak pic
 - Every curve and the data can be hidden and shown. Their labels sit in a right-hand gutter and act as the switches. A hidden curve is not remembered, so a curve a later build adds arrives drawn. [Yue 2026-11-07; inferred, WP-1032]
 - A preview is drawn in the accent, and the last fit turns grey only while a preview exists. [inferred]
 - No gridlines, no title inside the plot, no shadow. [Yue 2026-11-07, adopting rietx's plot conventions]
+- Every curve and mark stays inside the plot area at any zoom. Nothing is drawn into the axis margins. [inferred, WP-2200]
 - A legend puts its symbols in one column on the left, with the labels aligned after them. A colour key goes in empty space inside the plot, never in a margin of its own. [Yue 2026-11-08]
 - The hover readout is a strip under the plot, never a box that follows the pointer. [inferred, WP-1213]
 - Shading for an excluded region spans every pane and stops at the measured range. [inferred, WP-1033]
-- Peak marks are lenses that echo the reflection ticks, larger and higher above the peak. A used peak's mark is filled and an unused one has no mark on the pattern. Their colour waits for the palette piece. [Yue 2026-11-08; Yue 2026-11-09 on the colour]
+- Peak marks are lenses that echo the reflection ticks, larger and higher above the peak. A used peak's mark is filled and an unused one has no mark on the pattern. They are blue, the complement of the orange fits, and the picked peaks' fitted curve is a second tone of that blue, because it shares the pane with the calculated curve. [Yue 2026-11-08; Yue 2026-11-09 on the colour; inferred, WP-1210, for the fitted curve]
 - A selected mark is drawn larger, with a ring in the text ink (`--fg`). Red, the danger colour, marks only a peak no line explains, and it is the layer's only state colour. Orange stays the fit's alone. [Yue 2026-11-09, provisional]
 - A colour scale is perceptually uniform, and a residual map uses a diverging scale centred on zero. [inferred]
 - The 3D structure follows crystallography's drawing: its projection, cell edges, bonds and ellipsoids. The cell frame takes the accent, because a hairline vanishes in a scene. [inferred, WP-1015, WP-1462]
@@ -179,7 +179,7 @@ Claude inferred rules 1 to 12 from the rulings on background points and peak pic
 
 These tests hold the rules a machine can check cheaply. A new rule that a machine can check gets a test here.
 
-- `tests/test_gui_palette.py`: the token values and the generated `gui/src/tokens.css`, the plot palette's floor, and the contrast of ink on the accent fill.
+- `tests/test_gui_palette.py`: the token values and the generated `gui/src/tokens.css`, the plot palette's floor, every text colour's contrast on its grounds, and the ink on the primary fill.
 - `tests/test_gui_layout_browser.py`: no click moves the layout, collapse buttons stay where they were, and a phone-width window never scrolls sideways.
 - `gui/src/lib/style.test.ts`: no panel sets a register's size, padding or radius, and no size falls outside the steps.
 - `tests/test_gui_dist.py`: no built file names a remote host, so every font is the app's own.
