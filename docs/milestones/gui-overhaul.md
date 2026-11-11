@@ -27,6 +27,7 @@ redesign is ported in five pieces, in this order:
 | 1 | [2123](../wp/2123-the-layout-shell.md) | the layout shell: graphs on the left in tabs with a title line, the model panel on the right in tabs with a sash, both panels collapsible, a one-row action bar with Apply and refine, the segmented register redrawn, new colour tokens, a one-column layout for a narrow window, and a browser test that no click moves the layout unless it asks to |
 | 2 | [2126](../wp/2126-the-parameters-panel.md) | the Parameters panel: one row per atom, number slots that never move, the padlock as `hold`, the floating editor |
 | 3 | [2127](../wp/2127-the-plan-tab.md) | the Plan tab on the existing plan routes, read top to bottom as a recipe |
+| 3, follow-up | [2208](../wp/2208-a-plan-stage-that-fixes.md) | a plan stage that fixes as well as frees: `StageSpec.turn_off`, a `fix` clause in `.rxt`, and fix chips in the Plan tab (ruled 2026-11-09) |
 | 4 | [2125](../wp/2125-the-pattern-at-values-nobody-has-applied.md), [2128](../wp/2128-the-model-moved-by-hand.md) | previews: a route evaluating the pattern at unsaved values, the interactive sliders, and the Pattern and Peaks previews drawn at the last fit's scale |
 | 5 | [2129](../wp/2129-the-background-tab.md) | the Background tab: a route serving the band from rietx's covariance, a held Chebyshev term, the P-spline's λ |
 | The palette | [2200](../wp/2200-the-palette.md) | the site's palette as the default theme, light and dark: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour. Named themes (Solarized, Monokai) in Settings come later; the emitter leaves their seam. `gui/STYLE.md`'s rules that describe a new role in words take its tokens (WP-2142) |
@@ -57,7 +58,6 @@ The design rounds drew these and no WP builds them yet. Each is filed when its t
 | Settings dialog | Theme, density and number format | 2026-11-07 |
 | Bottom panel | Console (the Python the window runs) and History (Compare, Restore), toggled from the status bar | 2026-11-07 |
 | Status bar | The bar along the window's foot, with the console toggle | 2026-11-07 |
-| Fixing plan stages | A plan stage that fixes as well as frees (WP-2127 records the ruling) | 2026-11-09 |
 | Fit statistics in the action bar | Rwp, GoF and the not-a-fit chip beside Refine while the graphs are hidden ("try B"). WP-2123 left them hidden with the graphs (its item 6) | 2026-11-09 |
 
 Three decisions went to the maintainer before the piece that needs them. The first is now ruled, and two still wait:
@@ -65,7 +65,7 @@ Three decisions went to the maintainer before the piece that needs them. The fir
 - A plan stage that fixes as well as frees. The maintainer wants it (2026-11-07); in rietx it is
   a `turn_off` list on `StageSpec` and a `fix` clause in `.rxt`, both stored-format changes, so
   piece 3 asks for the go-ahead in its WP. Ruled required on 2026-11-09, the mechanism left to
-  Claude; the build is the "Fixing plan stages" row above.
+  Claude; WP-2208 builds it, piece 3's follow-up in the table above.
 - A background drawn through points the user places. rietx has no such background type; a new
   one is a stored-format change.
 - A text file kept beside the project, which the maintainer deferred to the port on 2026-11-07.

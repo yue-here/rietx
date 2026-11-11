@@ -564,7 +564,8 @@ PLAN_LANDMARKS = LANDMARKS + PLAN_BAR + ["section[aria-label=plan] li.stage"]
 
 #: The Plan tab's controls, each with a label the failure can name and whether
 #: pressing it asks for the layout to change. Adding or removing a stage or a
-#: glob and opening a stage's path list ask; the rest move nothing. A stage's
+#: glob, opening a stage's path list and opening its fix row (`+ Fix`, WP-2208)
+#: ask; the rest move nothing. A stage's
 #: run button starts a fit, which the shell's refine test already covers.
 PLAN_CONTROLS = """() => {
   const plan = document.querySelector("section[aria-label=plan]");
@@ -573,7 +574,8 @@ PLAN_CONTROLS = """() => {
     if (!e.getClientRects().length || e.disabled) return;
     const text = (e.getAttribute("aria-label") || e.textContent || e.tagName).trim();
     if (text === "Run this stage") return;
-    const asks = e.tagName === "SUMMARY" || text === "+ Stage" || /^Remove /.test(text);
+    const asks = e.tagName === "SUMMARY" || text === "+ Stage" || text === "+ Fix"
+      || /^Remove /.test(text);
     out.push({index: i, text, asks});
   });
   return out;
@@ -703,6 +705,36 @@ def test_a_plan_edit_moves_nothing(browser, gui, state):
     moved = _moved(before, page.evaluate(SNAP, PLAN_LANDMARKS))
     page.locator(".actions button", has_text="Revert").click()
     _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def test_a_fix_typed_into_a_stage_lands_in_its_own_row(browser, gui):
+    """WP-2208: `+ Fix` opens a stage's fix row with the cursor in its field;
+    a glob typed there and entered becomes a chip in that row, the frees row
+    keeps its chips, the edit is one pending edit, and nothing above the stage
+    moves."""
+    url, _ = gui
+    page = _open_plan(browser, url, WIDTHS["wide"])
+    stage = page.locator("section[aria-label=plan] li.stage").nth(1)
+    frees = stage.locator(".frees:not(.fixing) .chip").all_text_contents()
+    assert stage.locator(".fixing").count() == 0
+    above = ["section[aria-label=plan] li.stage:first-child", *LANDMARKS, *PLAN_BAR]
+    before = page.evaluate(SNAP, above)
+    stage.get_by_role("button", name="+ Fix", exact=True).click()
+    _frames(page)
+    assert page.evaluate("document.activeElement.matches('input.add.fix')")
+    page.keyboard.type("instrument.zero_shift")
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert stage.locator(".fixing .chip").all_text_contents() == ["instrument.zero_shift"]
+    assert stage.locator(".frees:not(.fixing) .chip").all_text_contents() == frees
+    assert page.locator(".actions .pending").text_content() == "1 pending edit"
+    moved = _moved(before, page.evaluate(SNAP, above))
+    page.locator(".actions button", has_text="Revert").click()
+    _frames(page)
+    assert stage.locator(".fixing").count() == 0
     assert not page.errors, page.errors
     page.close()
     assert not moved, moved

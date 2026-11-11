@@ -511,6 +511,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.RefinementResult.y_obs",
     "rietx.schemas.results.StageResult.cost_final",
     "rietx.schemas.results.StageResult.cost_initial",
+    "rietx.schemas.results.StageResult.fixed",
     "rietx.schemas.results.StageResult.freed",
     "rietx.schemas.results.StageResult.held_reach",
     "rietx.schemas.results.StageResult.n_iterations",
@@ -4581,7 +4582,10 @@ ROWS: tuple[Row, ...] = (
                   "(t = -268); recorded in RefinementResult.stages as the stage named "
                   "'closing'; solve_magnetic runs it on its winner too, when the package "
                   "chose the plan and the verdict is solved, after ranking every trial "
-                  "without it (2026-10-22)"),
+                  "without it (2026-10-22); since WP-2208 it is free but for the paths the "
+                  "declared stages leave fixed (a turn_off whose glob matched last, "
+                  "staged.fixed_at_end), which it keeps fixed and records in its "
+                  "StageResult.fixed"),
         grounds=("The maintainer's ruling (the sixth round's Q2, option 3, 2026-10-21): every "
                  "plan ends with a closing stage at tight windows, which removes the 2 % "
                  "window's error from the answer and most of a staged plan's start dependence; "
@@ -4601,6 +4605,8 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.schemas.plan.StageSpec:turn_on", "default", tier=1, ambiguity=1, value=(),
         evidence="arithmetic: the empty container"),
+    Row("rietx.schemas.plan.StageSpec:turn_off", "default", tier=1, ambiguity=1, value=(),
+        evidence="arithmetic: the empty container; a stage fixes nothing unless it says so (WP-2208)"),
     Row("rietx.schemas.plan.StageSpec:max_iter", "default", tier="invariant", ambiguity=1, value=100,
         evidence=("answer-invariant: caps evaluations at max_iter x NFEV_PER_ITERATION, "
                   "never iterations; the worst stage under the shipped schedule ran 48 "

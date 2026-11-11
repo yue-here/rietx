@@ -434,8 +434,10 @@ locks and the mode's force-fixes shown are the ones you will get.
 
 Under the last stage the panel names the closing stage every plan ends with.
 It frees every stage's globs once more, on peak windows that drop 0.10% of
-each peak, and its Rwp is the answer's. The plan's `closing` line in the text
-document sets the fraction, and `none` removes the stage.
+each peak, and its Rwp is the answer's. When a stage fixes a parameter that no
+later stage frees again, the closing stage keeps it fixed and says how many it
+keeps. The plan's `closing` line in the text document sets the fraction, and
+`none` removes the stage.
 
 The plan reads top to bottom, one stage to a row. Each row holds:
 
@@ -447,9 +449,14 @@ The plan reads top to bottom, one stage to a row. Each row holds:
 - `×`, which removes the stage. The last stage has none.
 - the globs the stage frees, each with a `×` beside it, and a field where you
   type another glob and press Enter.
+- the globs the stage fixes, in a `Fixes` row of the same shape. `+ Fix` at
+  the end of the frees opens the row when the stage fixes nothing yet. The stage
+  fixes them after it frees its own globs, so a stage that frees `phases.*`
+  and fixes `phases.*.atoms.*.biso` frees all of the phase but its
+  displacements. A parameter stays fixed until a later stage frees it again.
 - the stage's line of the ladder: how many parameters it frees on top of the
-  stages above, the running count of free ones, how many stay held, and the
-  stage's Rwp from the last run. Open it for the paths.
+  stages above, how many it fixes (`−N`), the running count of free ones, how
+  many stay held, and the stage's Rwp from the last run. Open it for the paths.
 
 The `Preset` menu replaces the stages with a preset's. `+ Stage` adds an empty
 stage at the end and puts the cursor in its name.

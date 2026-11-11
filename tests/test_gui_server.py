@@ -2184,6 +2184,32 @@ def test_plan_resolve_is_the_ladder_a_cumulative_plan_climbs(blank, tmp_path,
     assert tied["held_because"].startswith("tied: =")
 
 
+def test_plan_resolve_names_what_a_stage_fixes(blank, tmp_path, pattern_file):
+    """A stage's ``turn_off`` (WP-2208): ``fixes`` names the free paths it took,
+    the free count falls by them, and the buckets still partition the frees."""
+    session, client = blank
+    _open(session, tmp_path / "fixes.rex", pattern_file)
+    plan = {"stages": [
+        {"name": "one", "turn_on": ["phases.*.scale", "instrument.background.*",
+                                    "instrument.zero_shift"]},
+        {"name": "two", "turn_on": ["phases.*.cell.*"],
+         "turn_off": ["instrument.zero_shift"]}]}
+    status, payload = client.put("/api/plan", {"plan": plan})
+    assert status == 200, payload
+    assert payload["plan"]["stages"][1]["turn_off"] == ["instrument.zero_shift"]
+    ladder = _ladder(client)
+    one, two = ladder["stages"]
+    # the closing stage keeps the fix, as a literal path
+    assert ladder["closing"]["fixes"] == ["instrument.zero_shift"]
+    assert one["fixes"] == [] and "instrument.zero_shift" in one["frees"]
+    assert two["fixes"] == ["instrument.zero_shift"]
+    assert two["turn_off"] == ["instrument.zero_shift"]
+    assert two["n_free"] == one["n_free"] + len(two["frees"]) - 1
+    for stage in (one, two):
+        assert (len(stage["frees"]) + len(stage["already"]) + len(stage["held"])
+                == stage["n_matched"]), stage["name"]
+
+
 def test_plan_resolve_matches_exactly_the_way_fnmatch_does(blank, tmp_path,
                                                            pattern_file):
     """The route's matcher is the corpus's, over the corpus's own globs.

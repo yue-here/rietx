@@ -633,6 +633,22 @@ def test_veto_helper_is_pure_annotation():
     assert out[0].confidence == 0.9         # and the reasoning is preserved
 
 
+def test_veto_reads_a_plan_that_fixes_by_its_last_glob():
+    """A stage's ``turn_off`` (WP-2208): what the plan leaves fixed is not refined."""
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage("all", ["phases.*.scale", "instrument.*"],
+                 turn_off=["instrument.profile.*"])])
+
+    def action(paths):
+        return rx.SuggestedAction(kind="refine_profile_widths", confidence=0.9,
+                                  rationale="x", parameter_paths=paths)
+
+    fixed, freed = apply_strategy_veto(
+        [action(["instrument.profile.w"]), action(["instrument.zero_shift"])], plan)
+    assert fixed.vetoed_by is None
+    assert freed.vetoed_by is not None
+
+
 # ----------------------------------------------------------------------
 # texture → typed action (the WP-0307 orphan, claimed by WP-0602)
 # ----------------------------------------------------------------------
