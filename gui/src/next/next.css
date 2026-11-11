@@ -121,6 +121,15 @@ button.ghost:not(.pick, .tab, .link, .ib, .mbtn) {
 
 /* A menu button: a word and a chevron, the menu's name on the bar. The File
    menu's name button takes the same drawing. */
+/* A segmented choice at the prototype's size: a control on a title line or
+   the action bar, set at the size of the words beside it (`.segmented` is
+   app.css's register; only its geometry is the rebuild's). */
+.segmented button {
+  height: 26px;
+  padding: 0 10px;
+  font-size: var(--text-sm);
+}
+
 .mbtn,
 .topbar .proj .fm-name {
   display: inline-flex;

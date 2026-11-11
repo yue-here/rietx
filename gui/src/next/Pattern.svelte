@@ -1,0 +1,887 @@
+<script lang="ts">
+  /**
+   * The rebuild's Pattern graph (WP-2216, piece R2 of WP-2214's plan).
+   *
+   * One title line, the plot, and a legend gutter at its right, with every
+   * rarer control one gesture away (WP-2214 rows 25-58):
+   *
+   * - the title line says what the graph shows, with Rwp and GoF, and holds
+   *   the view's own controls: Intensity on one segmented track, Show all
+   *   (enabled while zoomed) and ⋯, the view menu;
+   * - the view menu holds the difference's form, Show only the data, and the
+   *   two range gestures;
+   * - each legend label sits beside the pane its curve is drawn in and is its
+   *   curve's switch (`gui/STYLE.md` § Plots);
+   * - the fitted range and each excluded region is an object on the plot
+   *   (interaction rules 1, 3, 4, 12): a click on its shading selects it, its
+   *   selection bar holds the typed bounds and the channel count, Delete or
+   *   Option-click removes it, and right-click opens its menu;
+   * - the plot's context menu holds the exports and the range gestures;
+   * - the hover readout is handed to the frame, which shows it in the status
+   *   bar's right half (the maintainer's ruling of 2026-11-11, question 5).
+   *
+   * The chart is today's `lib/pattern.ts` figure, drawn without the peak layer,
+   * which the peaks-and-indexing workflow brings (R6). The three-effect split
+   * (fetch, knob, mode) is `panels/Plot.svelte`'s, for the same reasons.
+   */
+  import { untrack } from "svelte";
+
+  import { ApiError } from "../api";
+  import { exportFigure, type ExportKind } from "../lib/exports";
+  import {
+    curveColors, curveToggles, dataOnlyHidden, isDataOnly, mergeRegions, normalizeRegion,
+    readout, residual, shows, toggleCurve, RESIDUAL_KINDS,
+    type Protocol, type Readout, type ResidualKind, type Scale, type Window,
+  } from "../lib/plot";
+  import type { Curves, Overlay, PatternChart } from "../lib/pattern";
+  import type { Theme } from "../lib/theme";
+  import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
+
+  let {
+    result,
+    plotKey,
+    theme = "light",
+    protocol = { limits: null, regions: [] },
+    extent = null,
+    wavelengths = null,
+    busy = false,
+    protocolError = "",
+    onprotocol = () => {},
+    onreadout = () => {},
+  }: {
+    result: any;
+    /** bumped when the curves moved: a run landed or the history moved */
+    plotKey: number;
+    theme?: Theme;
+    protocol?: Protocol;
+    extent?: [number, number] | null;
+    wavelengths?: number[] | null;
+    busy?: boolean;
+    /** the last refusal of a range or a region, in the verb's own words */
+    protocolError?: string;
+    onprotocol?: (patch: {
+      two_theta_limits?: [number, number] | null;
+      excluded_regions?: [number, number][];
+    }) => void;
+    /** the hover readout, or null when the pointer leaves the plot */
+    onreadout?: (reading: Readout | null) => void;
+  } = $props();
+
+  /** The legend's words. `lib/plot.ts`'s labels are today's buttons, which
+   *  today's page keeps until the swap, so the words are this page's. */
+  const WORDS: Record<string, string> = {
+    obs: "Observed", masked: "Excluded", calc: "Last fit", bkg: "Background",
+    diff: "Difference",
+  };
+  /** How the difference reads in the view menu. */
+  const DIFFERENCE: Record<ResidualKind, string> = {
+    weighted: "Difference in esd (Δ/σ)", delta: "Difference in counts (Δ)",
+    cumulative: "Cumulative χ²",
+  };
+  const SCALES: { id: Scale; label: string }[] = [
+    { id: "linear", label: "Linear" }, { id: "sqrt", label: "Square root" }, { id: "log", label: "Log" },
+  ];
+  const GUTTER = 112;
+  const LEGEND_ROW = 20;
+
+  let host: HTMLDivElement | undefined = $state();
+  let chart: PatternChart | null = null;
+  let chartModule: typeof import("../lib/pattern") | null = null;
+  let curves: Curves | null = null;
+  let held: Window | null = $state.raw(null);
+  let loadError = $state("");
+  let empty = $state(false);
+  let kind = $state<ResidualKind>("weighted");
+  let scale = $state<Scale>("linear");
+  let hidden = $state<string[]>([]);
+  let beforeDataOnly = $state<string[] | null>(null);
+  let hoverAt = $state<number | null>(null);
+  let arm = $state<null | "limits" | "exclude">(null);
+  let zoomed = $state(false);
+  let geom = $state.raw<Record<"main" | "ticks" | "resid", { top: number; height: number }> | null>(null);
+  let colors = $state.raw<ReturnType<typeof curveColors> | null>(null);
+  let viewAt = $state<MenuAt | null>(null);
+  let viewButton: HTMLButtonElement | undefined = $state();
+  let ctx = $state<{ at: MenuAt; region: Selection | null } | null>(null);
+  /** The plot object selected: the fitted range, or one excluded region. */
+  type Selection = { kind: "range" } | { kind: "region"; index: number };
+  let selection = $state<Selection | null>(null);
+  let note = $state("");
+
+  const toggles = $derived(held ? curveToggles(held, residual(kind, held).label) : []);
+  const dataOnly = $derived(isDataOnly(toggles, hidden));
+  const stats = $derived(result?.statistics ?? null);
+  const immature = $derived(Boolean(result?.maturity?.immature));
+
+  /** What the graph shows, in words (`gui/STYLE.md` § Layout: the title says it). */
+  const title = $derived.by(() =>
+    loadError ? "The pattern could not be drawn"
+    : !held ? "" : held.raw ? "Observed pattern" : "Last fit");
+
+  // -- the chart ---------------------------------------------------------
+
+  function overlayNow(): Overlay {
+    return { protocol, extent, peaks: null, groups: null, peaksActive: false,
+             candidate: null, hidden, held: untrack(() => held) };
+  }
+
+  let fetchSeq = 0;
+  let applied: { kind: ResidualKind; scale: Scale; theme: Theme } | null = null;
+
+  async function drawChart() {
+    if (!host) return;
+    const seq = ++fetchSeq;
+    let mod: typeof import("../lib/pattern");
+    let c: Curves;
+    try {
+      mod = chartModule ??= await import("../lib/pattern");
+      c = await mod.fetchCurves();
+    } catch (exc) {
+      if (seq !== fetchSeq) return;
+      dropChart();
+      empty = exc instanceof ApiError && exc.empty;
+      loadError = empty ? "" : (exc as Error).message;
+      return;
+    }
+    if (seq !== fetchSeq || !host) return;
+    loadError = "";
+    empty = false;
+    held = mod.windowOf(c);
+    if (!chart) {
+      chart = new mod.PatternChart(host, c, overlayNow(), {
+        scale: untrack(() => scale),
+        kind: untrack(() => kind),
+        labels: {
+          y: () => (scale === "linear" ? "intensity" : `intensity (${scale === "sqrt" ? "√" : "log"})`),
+          resid: () => (held && !held.raw ? residual(kind, held).title : ""),
+        },
+      });
+      applied = untrack(() => ({ kind, scale, theme }));
+      chart.fig.onCursor = (hit) => (hoverAt = hit ? hit.x : null);
+      chart.fig.onSelect = (lo, hi) => { if (arm) armed(lo, hi); };
+      chart.fig.setMode(arm ? "select" : "zoom");
+      watchZoom(chart);
+    } else {
+      chart.setCurves(c, mod.sameGrid(curves, c));
+      chart.update(overlayNow());
+    }
+    curves = c;
+    relayout();
+  }
+
+  function dropChart() {
+    fetchSeq++;
+    chart?.destroy();
+    chart = null;
+    curves = null;
+    applied = null;
+    held = null;
+    geom = null;
+    zoomed = false;
+  }
+
+  /** Whether the view is narrower than the pattern: every x move passes
+   *  through the group's `setX`, a drag, a wheel, a reset and Show all alike. */
+  function watchZoom(c: PatternChart) {
+    const fig = c.fig, setX = fig.setX.bind(fig);
+    fig.setX = (lo: number, hi: number) => {
+      setX(lo, hi);
+      const x = curves?.arrays?.two_theta ?? held?.two_theta;
+      const n = x?.length ?? 0;
+      zoomed = n > 1 && (lo > x![0] + 1e-9 || hi < x![n - 1] - 1e-9);
+    };
+  }
+
+  /** Each pane's plot area from the top of the host, which places the legend
+   *  beside the pane its curve is drawn in. Read after a draw, since a scale
+   *  switch builds a new pane. */
+  function relayout() {
+    requestAnimationFrame(() => {
+      if (!chart) return;
+      const dpr = devicePixelRatio, out: any = {};
+      for (const key of ["main", "ticks", "resid"] as const) {
+        const u = chart.fig.panes[key];
+        if (!u) continue;
+        out[key] = { top: (u.root as HTMLElement).offsetTop + u.bbox.top / dpr,
+                     height: u.bbox.height / dpr };
+      }
+      geom = out;
+    });
+  }
+
+  $effect(() => {
+    if (!host) return;
+    const observer = new ResizeObserver(() => relayout());
+    observer.observe(host);
+    return () => observer.disconnect();
+  });
+
+  $effect(() => () => {
+    fetchSeq++;
+    chart?.destroy();
+    chart = null;
+  });
+
+  const protocolKey = $derived(JSON.stringify([protocol.limits, protocol.regions]));
+  const extentKey = $derived(JSON.stringify(extent));
+
+  // fetch on what moves the curves: a run, a move in the history, the mask
+  $effect(() => {
+    void plotKey;
+    void protocolKey;
+    void result;
+    untrack(() => drawChart());
+  });
+
+  // a knob applies what moved, and fetches nothing
+  $effect(() => {
+    const k = kind, s = scale, h = hidden, t = theme;
+    void protocolKey;
+    void extentKey;
+    const o = untrack(overlayNow);
+    untrack(() => {
+      if (!chart || !applied) return;
+      if (applied.kind !== k) chart.fig.setResidual(k);
+      if (applied.scale !== s) {
+        chart.fig.setY(s === "linear" ? "lin" : s);
+        relayout();
+      }
+      if (applied.theme !== t) void chart.retheme();
+      applied = { kind: k, scale: s, theme: t };
+      chart.fig.setHidden(h);
+      chart.update(o);
+    });
+  });
+
+  // the legend's swatches read the plot's own colours, after the theme lands
+  $effect(() => {
+    void theme;
+    queueMicrotask(() => {
+      const css = getComputedStyle(document.documentElement);
+      colors = curveColors((name) => css.getPropertyValue(name).trim());
+    });
+  });
+
+  $effect(() => {
+    const mode = arm ? "select" : "zoom";
+    untrack(() => chart?.fig.setMode(mode));
+  });
+
+  // -- the readout, handed to the frame's status bar ----------------------
+
+  $effect(() => {
+    const reading = readout(held, hoverAt, {
+      kind, wavelengths, peaks: null, peaksActive: false, hidden,
+      chi2Base: untrack(() => chart?.fig.chi2Base() ?? 0),
+    });
+    untrack(() => onreadout(hoverAt === null ? null : reading));
+  });
+
+  // -- the view's controls ------------------------------------------------
+
+  function showAll() {
+    chart?.fig.reset();
+  }
+
+  function toggleDataOnly() {
+    if (dataOnly && beforeDataOnly) {
+      hidden = beforeDataOnly;
+      beforeDataOnly = null;
+    } else {
+      beforeDataOnly = hidden;
+      hidden = dataOnlyHidden(toggles);
+    }
+  }
+
+  function toggle(id: string) {
+    hidden = toggleCurve(hidden, id);
+    beforeDataOnly = null;
+  }
+
+  function openView() {
+    if (viewAt) return (viewAt = null);
+    const r = viewButton!.getBoundingClientRect();
+    viewAt = { x: r.right, y: r.bottom + 4, align: "right" };
+  }
+
+  const viewItems = $derived<MenuEntry[]>([
+    ...RESIDUAL_KINDS.map((r) => ({ id: `kind:${r.id}`, label: DIFFERENCE[r.id],
+      checked: kind === r.id, radio: true, disabled: !held || held.raw })),
+    "-",
+    { id: "data", label: "Show only the data", checked: dataOnly, disabled: !held },
+    "-",
+    ...rangeItems(),
+  ]);
+
+  function rangeItems(): MenuEntry[] {
+    return [
+      { id: "arm:limits", label: "Set the fitted range…", disabled: !held || busy },
+      { id: "arm:exclude", label: "Exclude a region…", disabled: !held || busy },
+      { id: "whole", label: "Fit the whole pattern", disabled: !protocol.limits || busy },
+    ];
+  }
+
+  function chooseView(id: string) {
+    if (id.startsWith("kind:")) kind = id.slice(5) as ResidualKind;
+    else if (id === "data") toggleDataOnly();
+    else act(id);
+  }
+
+  /** The verbs the view menu and the context menu share. */
+  function act(id: string) {
+    if (id === "arm:limits" || id === "arm:exclude") {
+      selection = null;
+      arm = id === "arm:limits" ? "limits" : "exclude";
+    } else if (id === "whole") {
+      onprotocol({ two_theta_limits: null });
+      selection = null;
+    } else if (id === "delete" && ctx?.region) {
+      remove(ctx.region);
+    } else if (id.startsWith("export:")) {
+      void exportAs(id.slice(7) as ExportKind);
+    }
+  }
+
+  async function exportAs(what: ExportKind) {
+    note = await exportFigure(what, chart?.fig ?? null, "pattern");
+    setTimeout(() => (note = ""), 2500);
+  }
+
+  // -- the fitted range and the excluded regions as objects ----------------
+
+  function armed(a: number, b: number) {
+    const pair = normalizeRegion([a, b]);
+    const which = arm;
+    arm = null;
+    if (!pair || !which) return;
+    if (which === "limits") {
+      onprotocol({ two_theta_limits: pair });
+      selection = { kind: "range" };
+    } else {
+      onprotocol({ excluded_regions: mergeRegions(protocol.regions, pair) });
+    }
+  }
+
+  /** The object under 2θ `x`: an excluded region first, then the shading
+   *  outside the fitted range. */
+  function objectAt(x: number): Selection | null {
+    const i = protocol.regions.findIndex(([lo, hi]) => x >= lo && x <= hi);
+    if (i >= 0) return { kind: "region", index: i };
+    const l = protocol.limits;
+    if (l && (x < l[0] || x > l[1])) return { kind: "range" };
+    return null;
+  }
+
+  function remove(s: Selection) {
+    if (s.kind === "region") {
+      onprotocol({ excluded_regions: protocol.regions.filter((_, i) => i !== s.index) });
+    } else {
+      onprotocol({ two_theta_limits: null });
+    }
+    selection = null;
+  }
+
+  let downAt: { x: number; y: number } | null = null;
+
+  function down(ev: PointerEvent) {
+    downAt = ev.button === 0 ? { x: ev.clientX, y: ev.clientY } : null;
+  }
+
+  /** A click, not a drag: select the object under it, or clear the selection. */
+  function up(ev: PointerEvent) {
+    const d = downAt;
+    downAt = null;
+    if (arm || !d || !chart || Math.hypot(ev.clientX - d.x, ev.clientY - d.y) > 3) return;
+    const x = chart.thetaOf(ev.clientX);
+    const hit = x === null ? null : objectAt(x);
+    if (hit && ev.altKey) {
+      remove(hit);
+      return;
+    }
+    selection = hit;
+  }
+
+  function context(ev: MouseEvent) {
+    if (!chart || arm) return;
+    ev.preventDefault();
+    const x = chart.thetaOf(ev.clientX);
+    const hit = x === null ? null : objectAt(x);
+    if (hit) selection = hit;
+    ctx = { at: { x: ev.clientX, y: ev.clientY }, region: hit };
+  }
+
+  const ctxItems = $derived<MenuEntry[]>([
+    ...(ctx?.region
+      ? [{ id: "delete", label: ctx.region.kind === "region" ? "Delete the region" : "Fit the whole pattern" }, "-" as const]
+      : []),
+    { id: "export:image", label: "Copy image" },
+    { id: "export:data", label: "Copy data" },
+    { id: "export:png", label: "Save as PNG…" },
+    { id: "export:svg", label: "Save as SVG…" },
+    "-",
+    ...rangeItems().filter((e) => e === "-" || e.id !== "whole"),
+  ]);
+
+  function keydown(ev: KeyboardEvent) {
+    const t = ev.target as HTMLElement | null;
+    if (t && (t.tagName === "INPUT" || t.isContentEditable)) return;
+    if (ev.key === "Escape" && arm) {
+      arm = null;
+      ev.preventDefault();
+    } else if (ev.key === "Escape" && selection) {
+      selection = null;
+    } else if ((ev.key === "Delete" || ev.key === "Backspace") && selection && !busy) {
+      ev.preventDefault();
+      remove(selection);
+    }
+  }
+
+  /** The selected object's bounds and where its bar sits over the plot. */
+  const chosen = $derived.by(() => {
+    const s = selection;
+    if (!s) return null;
+    if (s.kind === "region") {
+      const r = protocol.regions[s.index];
+      return r ? { lo: r[0], hi: r[1] } : null;
+    }
+    return protocol.limits ? { lo: protocol.limits[0], hi: protocol.limits[1] } : null;
+  });
+
+  // a selection whose object went (a refit, a removal elsewhere) clears itself
+  $effect(() => {
+    if (selection && !chosen) selection = null;
+  });
+
+  let loText = $state("");
+  let hiText = $state("");
+  $effect(() => {
+    // one place more than the data resolves, as the old pills said them
+    loText = chosen ? chosen.lo.toFixed(3) : "";
+    hiText = chosen ? chosen.hi.toFixed(3) : "";
+  });
+
+  /** The channels in [lo, hi], fitted and excluded together. */
+  function count(lo: number, hi: number): number {
+    let n = 0;
+    for (const xs of [held?.two_theta, held?.excluded?.two_theta]) {
+      if (!xs) continue;
+      for (let i = 0; i < xs.length; i++) if (xs[i] >= lo && xs[i] <= hi) n++;
+    }
+    return n;
+  }
+
+  const counted = $derived.by(() => {
+    if (!chosen || !selection) return "";
+    const total = (held?.two_theta?.length ?? 0) + (held?.excluded?.two_theta?.length ?? 0);
+    const n = count(chosen.lo, chosen.hi);
+    return selection.kind === "range" ? `${n} of ${total} channels` : `${n} channels`;
+  });
+
+  function typed() {
+    const s = selection;
+    const lo = Number(loText), hi = Number(hiText);
+    if (!s || !loText.trim() || !hiText.trim()) return;
+    if (s.kind === "range") {
+      onprotocol({ two_theta_limits: [lo, hi] });
+    } else {
+      const rest = protocol.regions.filter((_, i) => i !== s.index);
+      const pair = normalizeRegion([lo, hi]);
+      if (pair) onprotocol({ excluded_regions: mergeRegions(rest, pair) });
+    }
+  }
+
+  /** Where a selected object's bar sits: over the object's middle, at the top
+   *  of the plot area, kept inside the plot. */
+  let barWidth = $state(0);
+  let hostWidth = $state(0);
+  const span = $derived.by(() => {
+    if (!chosen || !chart || !geom) return null;
+    void zoomed;
+    const u = chart.fig.panes.main, dpr = devicePixelRatio;
+    // the plot area's left edge from the host's, read off the DOM: the pane's
+    // own offsets do not include where the chart module placed it
+    const left = (u.over as HTMLElement).getBoundingClientRect().left - host!.getBoundingClientRect().left;
+    const width = u.bbox.width / dpr;
+    const lo = Math.max(chosen.lo, u.scales.x.min), hi = Math.min(chosen.hi, u.scales.x.max);
+    if (hi <= lo) return null;
+    const a = left + Math.max(0, Math.min(width, u.valToPos(lo, "x")));
+    const b = left + Math.max(0, Math.min(width, u.valToPos(hi, "x")));
+    return { left: a, width: b - a, top: geom.main.top,
+             height: (geom.resid?.top ?? geom.main.top) + (geom.resid?.height ?? geom.main.height) - geom.main.top };
+  });
+  /** The bar sits over the object's middle, kept inside the plot's column. */
+  const barLeft = $derived.by(() => {
+    if (!span) return 0;
+    const mid = span.left + span.width / 2;
+    return Math.max(barWidth / 2, Math.min(hostWidth - barWidth / 2, mid));
+  });
+
+  // -- the legend ------------------------------------------------------------
+
+  /** Each label's top, beside its pane: the main pane's curves from its top,
+   *  the difference at its pane's middle, one tick row per phase. */
+  const legend = $derived.by(() => {
+    if (!geom) return [];
+    const out: { id: string; label: string; top: number; absent?: string }[] = [];
+    let main = geom.main.top, tick = 0;
+    const phases = toggles.filter((t) => t.id.startsWith("ticks:")).length;
+    for (const t of toggles) {
+      const label = WORDS[t.id] ?? t.label;
+      if (t.id === "diff") {
+        out.push({ id: t.id, label, top: geom.resid.top + geom.resid.height / 2 - LEGEND_ROW / 2 });
+      } else if (t.id.startsWith("ticks:")) {
+        const row = geom.ticks.height / Math.max(phases, 1);
+        out.push({ id: t.id, label, top: geom.ticks.top + row * (tick + 0.5) - LEGEND_ROW / 2 });
+        tick++;
+      } else {
+        out.push({ id: t.id, label, top: main, absent: t.absent });
+        main += LEGEND_ROW;
+      }
+    }
+    return out;
+  });
+
+  function swatchColor(id: string): string {
+    const c = colors;
+    if (!c) return "currentColor";
+    if (id.startsWith("ticks:")) {
+      const phases = toggles.filter((t) => t.id.startsWith("ticks:"));
+      const i = phases.findIndex((t) => t.id === id);
+      return phases.length > 1 ? c.phase[i % c.phase.length] : c.obs;
+    }
+    return ({ obs: c.obs, masked: c.obs, calc: c.calc, bkg: c.bkg, diff: c.diff } as any)[id]
+      ?? "currentColor";
+  }
+</script>
+
+<svelte:window onkeydown={keydown} />
+
+<div class="pattern">
+  <div class="ghead">
+    <div class="gtitle" title={title}>
+      {#if title}<b>{title}</b>{/if}
+      {#if held && !held.raw && stats}
+        <span class="stat">Rwp <span class="num">{stats.rwp == null ? "" : (stats.rwp * 100).toFixed(2)} %</span></span>
+        <span class="stat">GoF <span class="num">{stats.gof?.toFixed(2)}</span></span>
+      {/if}
+      {#if held && !held.raw && immature}<span class="bad">Not a fit yet</span>{/if}
+      {#if held?.stale}<span>fitted over other channels</span>{/if}
+    </div>
+    <div class="gctl">
+      <span class="vg">Intensity
+        <span class="segmented" role="group" aria-label="Intensity">
+          {#each SCALES as s (s.id)}
+            <button class:on={scale === s.id} aria-pressed={scale === s.id} disabled={!held}
+              onclick={() => (scale = s.id)}>{s.label}</button>
+          {/each}
+        </span>
+      </span>
+      <button class="ghost" disabled={!zoomed} onclick={showAll}
+        title="Show the whole pattern">Show all</button>
+      <button class="ib" bind:this={viewButton} aria-label="View" aria-haspopup="menu"
+        aria-expanded={!!viewAt} disabled={!held} onclick={openView}>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1" /><circle cx="8" cy="8" r="1" /><circle cx="12.5" cy="8" r="1" /></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="view">
+    {#if empty}
+      <p class="empty">No pattern to draw.</p>
+    {:else if loadError}
+      <p class="empty bad">{loadError}</p>
+    {/if}
+    <div class="plot" class:armed={!!arm} style:--gutter="{GUTTER}px">
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="host" bind:this={host} bind:clientWidth={hostWidth} onpointerdowncapture={down}
+        onpointerupcapture={up} oncontextmenu={context}
+        onpointerleave={() => (hoverAt = null)}></div>
+      <div class="gutter" aria-label="Curves">
+        {#each legend as l (l.id)}
+          <button class="gut" style:top="{l.top}px" aria-pressed={shows(hidden, l.id)}
+            disabled={!!l.absent} title={l.absent ?? `${shows(hidden, l.id) ? "Hide" : "Show"} ${l.label}`}
+            onclick={() => toggle(l.id)}>
+            <svg class="sw" viewBox="0 0 16 12" aria-hidden="true" style:color={swatchColor(l.id)}>
+              {#if l.id === "obs" || l.id === "masked"}
+                <path d="M5 3l6 6M11 3l-6 6" class:faint={l.id === "masked"} />
+              {:else if l.id.startsWith("ticks:")}
+                <path d="M8 1.5v9" />
+              {:else if l.id === "bkg"}
+                <path d="M0 6h4M6 6h4M12 6h4" />
+              {:else}
+                <path d="M0 6h16" />
+              {/if}
+            </svg><span class="t">{l.label}</span>
+          </button>
+        {/each}
+      </div>
+      {#if arm}
+        <div class="armnote" role="status">Drag across the plot to {arm === "limits" ? "set the fitted range" : "exclude a region"}. Esc cancels.</div>
+      {/if}
+      {#if span && selection}
+        <!-- the selected object's outline: a DOM mark, so selecting repaints no pane -->
+        <div class="chosen" style:left="{span.left}px" style:width="{span.width}px"
+          style:top="{span.top}px" style:height="{span.height}px"></div>
+      {/if}
+      {#if chosen && selection}
+        <div class="selbar" style:left="{barLeft}px" bind:clientWidth={barWidth} role="toolbar"
+          aria-label={selection.kind === "range" ? "Fitted range" : "Excluded region"}>
+          <input class="num" aria-label="From" bind:value={loText} disabled={busy}
+            onchange={typed} onkeydown={(e) => e.key === "Enter" && typed()} />
+          <span>–</span>
+          <input class="num" aria-label="To" bind:value={hiText} disabled={busy}
+            onchange={typed} onkeydown={(e) => e.key === "Enter" && typed()} />
+          <span class="unit">° 2θ</span>
+          <span class="muted num">{counted}</span>
+          <button class="ib" aria-label={selection.kind === "range" ? "Fit the whole pattern" : "Delete the region"}
+            title={selection.kind === "range" ? "Fit the whole pattern" : "Delete the region"}
+            disabled={busy} onclick={() => remove(selection!)}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.7 8.5h5.6l.7-8.5" /></svg>
+          </button>
+          <button class="ib" aria-label="Close" title="Close" onclick={() => (selection = null)}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
+          </button>
+        </div>
+      {/if}
+      {#if note || protocolError}
+        <div class="toast" role="status" class:bad={!note && !!protocolError}>{note || protocolError}</div>
+      {/if}
+    </div>
+  </div>
+</div>
+
+{#if viewAt}
+  <Menu at={viewAt} label="View" anchor={viewButton} items={viewItems}
+    onchoose={chooseView} onclose={() => (viewAt = null)} />
+{/if}
+
+{#if ctx}
+  <Menu at={ctx.at} label="Plot" items={ctxItems} onchoose={act} onclose={() => (ctx = null)} />
+{/if}
+
+<style>
+  .pattern {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* one row: what the graph shows on the left, the view's controls on the
+     right; the title gives way first, with an ellipsis (B1, 2026-11-09) */
+  .ghead {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+    padding: 2px 16px;
+  }
+
+  .gtitle {
+    flex: 1 1 0;
+    min-width: 9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .gtitle b {
+    font-weight: 600;
+  }
+
+  .gtitle > span {
+    margin-left: 10px;
+    color: var(--muted);
+    font-size: var(--text-sm);
+  }
+
+  .gtitle .num {
+    font-family: var(--mono-family);
+  }
+
+  .gtitle .bad {
+    color: var(--bad);
+  }
+
+  .gctl {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--text-sm);
+    color: var(--muted);
+  }
+
+  .vg {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .view {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0 16px 12px;
+  }
+
+  .empty {
+    margin: 0 0 8px;
+    color: var(--muted);
+  }
+
+  .empty.bad {
+    color: var(--bad);
+  }
+
+  .plot {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 300px;
+  }
+
+  .host {
+    position: absolute;
+    inset: 0 var(--gutter) 0 0;
+  }
+
+  .plot.armed .host :global(.u-over) {
+    cursor: col-resize;
+  }
+
+  .gutter {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--gutter);
+  }
+
+  /* a legend reads symbol first: symbols in one column, labels aligned after
+     them (2026-11-08); the label is the switch (2026-11-07) */
+  .gut {
+    position: absolute;
+    left: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(var(--gutter) - 4px);
+    height: 20px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: var(--fg);
+    font: inherit;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .gut .t {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (hover: hover) {
+    .gut:hover:not(:disabled) {
+      background: var(--hover);
+    }
+  }
+
+  .gut[aria-pressed="false"] {
+    color: var(--muted);
+  }
+
+  .gut[aria-pressed="false"] .t {
+    text-decoration: line-through;
+  }
+
+  .gut[aria-pressed="false"] .sw {
+    opacity: 0.3;
+  }
+
+  .gut:disabled {
+    color: var(--muted);
+    cursor: default;
+  }
+
+  .sw {
+    flex: none;
+    width: 16px;
+    height: 12px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+  }
+
+  .sw .faint {
+    opacity: 0.45;
+  }
+
+  /* floating layers: the panel ground, a hairline and one shadow */
+  .armnote,
+  .selbar,
+  .toast {
+    position: absolute;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--fg) 14%, transparent);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+  }
+
+  .armnote {
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .selbar {
+    top: 4px;
+    transform: translateX(-50%);
+  }
+
+  .chosen {
+    position: absolute;
+    z-index: 2;
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  .selbar input {
+    width: 9ch;
+    height: 24px;
+    padding: 0 4px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-control);
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--mono-family);
+    font-size: var(--text-sm);
+  }
+
+  .selbar .num {
+    font-family: var(--mono-family);
+  }
+
+  .toast {
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .toast.bad {
+    color: var(--bad);
+  }
+</style>

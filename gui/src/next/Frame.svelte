@@ -15,21 +15,28 @@
    * Later pieces fill the panes; this one owns where they are and how they
    * show and hide.
    */
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
 
   import { ApiError, api } from "../api";
   import FileMenu from "../panels/FileMenu.svelte";
   import NewProject from "../panels/NewProject.svelte";
   import Palette from "../panels/Palette.svelte";
+  import Params from "../panels/Params.svelte";
+  import Recovery from "../panels/Recovery.svelte";
+  import type { HelpCorpus } from "../lib/help";
+  import type { Readout } from "../lib/plot";
+  import { RecoveryWriter, combine, readDraft, type Draft } from "../lib/recovery";
   import { isShortcutTarget, type Command } from "../lib/palette";
   import Splitter from "../panels/Splitter.svelte";
   import { modifier, runWords, toggleTitle } from "../lib/statusbar";
   import { consoleLine, follow, type EngineEvent, type RunState } from "../lib/stream";
   import { applyTheme, readChoice, resolveTheme, type ThemeChoice } from "../lib/theme";
   import { WORKFLOWS, menuLabel, workflow, type WorkflowId } from "../lib/workflows";
+  import ActionBar from "./ActionBar.svelte";
   import Console from "./Console.svelte";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
+  import Pattern from "./Pattern.svelte";
   import Settings from "./Settings.svelte";
   import Start from "./Start.svelte";
   import { BOTTOM_TABS, GRAPH_TABS, MODEL_TABS,
@@ -46,6 +53,20 @@
   let examples = $state<any[]>([]);
   let openError = $state("");
   let newOpen = $state(false);
+  let corpus = $state<HelpCorpus | null>(null);
+
+  /** The last fit (`/api/result`), and a key bumped whenever its curves moved. */
+  let result = $state.raw<any>(null);
+  let plotKey = $state(0);
+  let protocolError = $state("");
+  /** The hover readout the Pattern graph hands up, or null off the plot. */
+  let reading = $state.raw<Readout | null>(null);
+  /** The action bar's refine choice and the Parameters panel's pending edits. */
+  let refineMode = $state<"cycle" | "plan">("plan");
+  let pendingTouched = $state(0);
+  let pendingInvalid = $state("");
+  let paramsPanel = $state<any>(null);
+  let refining = false;
 
   let showGraphs = $state(true);
   let showModel = $state(true);
@@ -77,13 +98,50 @@
   const busy = $derived(run?.state === "running" || run?.state === "cancelling");
   const runText = $derived(project && busy ? runWords(run) : "");
   const unbuilt = $derived(workflow(wf).steps ?? null);
+  const head = $derived(run?.head ?? project?.head ?? null);
+  const noPhases = $derived(project ? (project.n_phases ?? 1) === 0 : false);
+  const blocked = $derived(noPhases ? "Add a phase before refining" : null);
+  const protocol = $derived({
+    limits: (project?.doc?.two_theta_limits ?? null) as [number, number] | null,
+    regions: (project?.doc?.excluded_regions ?? []) as [number, number][],
+  });
+  const extent = $derived((project?.data?.two_theta_range ?? null) as [number, number] | null);
+  const wavelengths = $derived((project?.data?.wavelengths ?? null) as number[] | null);
+  const theme = $derived(resolveTheme(themeChoice, systemDark));
+  /** The report's count of findings: the result's errors and warnings, which
+   *  the status bar's right half shows at rest (the maintainer's ruling of
+   *  2026-11-11, question 3). */
+  const findings = $derived(result
+    ? (result.diagnostics ?? []).filter((d: any) => d.level === "error" || d.level === "warning").length
+    : null);
+  const findingsText = $derived(findings === null ? ""
+    : findings === 0 ? "No findings" : findings === 1 ? "1 finding" : `${findings} findings`);
+  /** Rwp and GoF ride on the action bar only while the graphs are hidden ("try B"). */
+  const barStats = $derived(!showGraphs && result
+    ? { rwp: result.statistics?.rwp ?? null, gof: result.statistics?.gof ?? null,
+        immature: Boolean(result.maturity?.immature) }
+    : null);
+
+  /** The recovery copy of the pending edits (WP-2209), as today's page keeps
+   *  it: armed once the kept copy has been offered and answered, and handed
+   *  every change of the Parameters panel's pending map. */
+  const recoveryWriter = new RecoveryWriter(
+    (path, at, draft) => api.putRecovery(path, at, draft));
+  let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
+                           moved: boolean } | null>(null);
+  $effect(() => {
+    const path = project?.path ?? null;
+    const draft = combine(pendingTouched, paramsPanel?.draft() ?? null, null, null);
+    const at = head;
+    untrack(() => recoveryWriter.schedule(path, at, draft));
+  });
 
   function say(line: string) {
     lines = [...lines.slice(-400), line];
   }
 
   $effect(() => {
-    applyTheme(resolveTheme(themeChoice, systemDark), document.documentElement);
+    applyTheme(theme, document.documentElement);
   });
 
   async function chooseTheme(next: ThemeChoice) {
@@ -95,9 +153,21 @@
     }
   }
 
+  async function loadResult() {
+    try {
+      result = (await api.result()).result;
+    } catch {
+      // no fit yet is an empty state; the graph says what it can draw
+      result = null;
+    }
+    plotKey += 1;
+  }
+
   async function loadProject() {
     try {
       project = await api.project();
+      await loadResult();
+      await offerRecovery();
     } catch (error) {
       project = null;
       if (!(error instanceof ApiError && error.code === "NO_PROJECT"))
@@ -120,10 +190,137 @@
     }
   }
 
-  function opened(doc: any) {
+  async function opened(doc: any) {
+    await leaveEdits();
     project = doc;
     openError = "";
     newOpen = false;
+    await loadResult();
+    await offerRecovery();
+  }
+
+  /** Leave the open project's pending edits behind as its recovery copy, and
+   *  clear them from the panel, which stays mounted across an open. */
+  async function leaveEdits() {
+    await recoveryWriter.flush();
+    recoveryWriter.disarm();
+    offer = null;
+    paramsPanel?.revert();
+  }
+
+  /** Offer the open project's kept edits, or start keeping new ones. */
+  async function offerRecovery() {
+    const path = project?.path;
+    if (!path) return;
+    recoveryWriter.disarm();
+    let kept: any = null;
+    try {
+      kept = await api.recovery();
+    } catch {
+      // an unreadable copy is no copy
+    }
+    if (project?.path !== path) return;
+    const draft = readDraft(kept?.draft);
+    if (draft?.params) {
+      offer = { path, draft, savedUtc: kept.saved_utc ?? null,
+                moved: !!kept.head && kept.head !== kept.head_now };
+      return;
+    }
+    recoveryWriter.arm(path, null);
+  }
+
+  function restoreKept() {
+    const o = offer;
+    if (!o) return;
+    offer = null;
+    if (o.draft.params) paramsPanel?.restoreDraft(o.draft.params);
+    recoveryWriter.arm(o.path, o.draft);
+    modelTab = "params";
+    say(`# ${o.draft.count === 1 ? "1 unapplied edit" : `${o.draft.count} unapplied edits`} restored`);
+  }
+
+  async function discardKept() {
+    const o = offer;
+    if (!o) return;
+    offer = null;
+    try {
+      await api.putRecovery(o.path, null, null);
+    } catch (error) {
+      say(`refused: ${(error as Error).message}`);
+      if (project?.path === o.path) {
+        recoveryWriter.arm(o.path, o.draft);
+        recoveryWriter.schedule(o.path, head, null);
+      }
+      return;
+    }
+    if (project?.path === o.path) recoveryWriter.arm(o.path, null);
+  }
+
+  /** Escape on the offer: kept on the server, offered at the next open. */
+  function setAsideKept() {
+    if (!offer) return;
+    offer = null;
+    say("# unapplied edits kept; offered again when the project next opens");
+  }
+
+  function pageHidden() {
+    const unsent = recoveryWriter.takeUnsent();
+    if (unsent) api.putRecoveryOnHide(unsent.project, unsent.head, unsent.draft);
+  }
+
+  /** A range or a region from the Pattern graph, persisted on the verb (WP-1033). */
+  async function setProtocol(patch: Record<string, unknown>) {
+    if (!project || busy) return;
+    try {
+      project = await api.patchProject(patch);
+      if ("two_theta_limits" in patch) {
+        const limits = patch.two_theta_limits as number[] | null;
+        say(`project.doc.two_theta_limits = ${limits ? `(${limits.join(", ")})` : "None"}`);
+      }
+      if ("excluded_regions" in patch)
+        say(`project.set_excluded_regions(${JSON.stringify(patch.excluded_regions)})`);
+      protocolError = "";
+    } catch (error) {
+      protocolError = (error as Error).message;
+      say(`refused: ${(error as Error).message}`);
+    }
+  }
+
+  /** Apply the pending edits. A refusal is drawn in the Parameters panel,
+   *  so a refused apply brings that tab forward. */
+  async function applyPending(): Promise<boolean> {
+    const ok = !!(await paramsPanel?.apply());
+    if (!ok) {
+      modelTab = "params";
+      return false;
+    }
+    await loadResult();
+    return true;
+  }
+
+  function revertPending() {
+    paramsPanel?.revert();
+  }
+
+  /** The action bar's primary: apply the pending edits, then refine. `cycle`
+   *  is one stage on what is ticked; `plan` is the project's plan. */
+  async function refine(mode: "cycle" | "plan" = refineMode) {
+    if (refining || busy || noPhases || pendingInvalid || !project) return;
+    refining = true;
+    try {
+      if (pendingTouched && !(await applyPending())) return;
+      if (mode === "plan") {
+        run = await api.run({ kind: "fit" });
+        say("ref.fit(data, plan=…)");
+      } else {
+        run = await api.run({ kind: "stage", stage: { name: "cycle", turn_on: [] } });
+        say('ref.run_stage(Stage("cycle", turn_on=[]))');
+      }
+    } catch (error) {
+      say(`refused: ${(error as Error).message}`);
+    } finally {
+      refining = false;
+    }
   }
 
   async function open(path: string): Promise<string> {
@@ -158,7 +355,9 @@
   }
 
   async function closed() {
+    await leaveEdits();
     project = null;
+    result = null;
     showBottom = false;
     await loadLists();
   }
@@ -210,6 +409,13 @@
       key: `${mod}J`, disabled: !project, run: toggleBottom },
     { id: "stop", label: "Stop the run", echo: "token.cancel()", key: `${mod}.`,
       disabled: !busy, run: stop },
+    { id: "refine", label: pendingTouched ? "Apply the edits and refine" : "Refine",
+      echo: "ref.fit(data, plan=…)", key: `${mod}Enter`,
+      disabled: !project || busy || noPhases || !!pendingInvalid, run: () => refine() },
+    { id: "apply", label: "Apply the edits", echo: "ref.set_values(…)",
+      disabled: !pendingTouched || busy || !!pendingInvalid, run: () => applyPending() },
+    { id: "revert", label: "Revert the edits", echo: "",
+      disabled: !pendingTouched, run: revertPending },
     { id: "new", label: "New project…", echo: "rx.Project.create(…)", disabled: busy,
       run: () => (newOpen = true) },
     ...WORKFLOWS.map((w): Command => ({
@@ -227,7 +433,7 @@
 
   /** Whether a modal layer is up. A key never opens a second one over it:
    *  each layer takes Esc on the window, so two open at once close together. */
-  const layered = $derived(settingsOpen || paletteOpen || keysOpen || newOpen || !!wfAt);
+  const layered = $derived(settingsOpen || paletteOpen || keysOpen || newOpen || !!wfAt || !!offer);
 
   /** The frame's keys (WP-2214 rows 12, 228, 239, 240): ⌘1 and ⌘2 the side
    *  panels, ⌘J the bottom panel, ⌘, Settings, ⌘K the palette, ⌘. stops a
@@ -240,6 +446,12 @@
       return;
     }
     if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+    if (event.key === "Enter") {
+      if (layered) return;
+      event.preventDefault();
+      void refine();
+      return;
+    }
     const act: Record<string, () => void> = {
       "1": toggleGraphs,
       "2": toggleModel,
@@ -278,7 +490,8 @@
         capabilities = null;
       }
       try {
-        docsUrl = (await api.help())?.docs_url ?? null;
+        corpus = await api.help();
+        docsUrl = (corpus as any)?.docs_url ?? null;
       } catch {
         docsUrl = null;
       }
@@ -287,7 +500,15 @@
     })();
     const unfollow = follow(
       (event: EngineEvent) => say(consoleLine(event)),
-      (frame: RunState) => (run = frame),
+      (frame: RunState) => {
+        const was = run?.state;
+        run = frame;
+        // a run just ended: the result and the head moved
+        if (was && was !== "idle" && frame.state === "idle") {
+          void loadResult();
+          void api.project().then((doc) => (project = doc)).catch(() => {});
+        }
+      },
       { poll: (since) => api.events(since) },
     );
     return () => {
@@ -297,7 +518,7 @@
   });
 </script>
 
-<svelte:window onkeydown={keydown} />
+<svelte:window onkeydown={keydown} onpagehide={pageHidden} />
 
 {#snippet sideIcon(side: "left" | "right" | "bottom", on: boolean)}
   <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -354,7 +575,14 @@
               onclick={() => (graphTab = t.id)}>{t.label}</button>
           {/each}
         </div>
-        <div class="pane"></div>
+        <div class="pane">
+          {#if graphTab === "pattern"}
+            <Pattern {result} {plotKey} {theme} {protocol} {extent} {wavelengths} {busy}
+              {protocolError} onprotocol={setProtocol} onreadout={(r) => (reading = r)} />
+          {:else}
+            <p class="unbuilt">Not built yet.</p>
+          {/if}
+        </div>
       </section>
     {/if}
     {#if showModel}
@@ -383,7 +611,16 @@
                 onclick={() => (modelTab = t.id)}>{t.label}</button>
             {/each}
           </div>
-          <div class="pane"></div>
+          <div class="pane" class:gone={modelTab !== "params"}>
+            <Params bind:this={paramsPanel} {head} {busy} {corpus} {say}
+              onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
+          </div>
+          {#if modelTab !== "params"}
+            <div class="pane"><p class="unbuilt">Not built yet.</p></div>
+          {/if}
+          <ActionBar bind:mode={refineMode} touched={pendingTouched} invalid={pendingInvalid}
+            {busy} {blocked} stats={barStats} onapply={() => applyPending()}
+            onrevert={revertPending} onrefine={() => refine()} />
         {/if}
       </section>
     {/if}
@@ -422,7 +659,18 @@
       title="Stop the run&#10;{mod}.">Stop</button>
   </span>
   <span class="gap"></span>
-  <span class="right"></span>
+  <span class="right" role="status">
+    {#if reading}
+      <span class="ro"><span class="k">2θ</span><span class="v w9">{reading.position}</span></span>
+      {#if reading.d}<span class="ro"><span class="k">d</span><span class="v w9">{reading.d}</span></span>{/if}
+      {#each reading.rows as row (row.id)}
+        <span class="ro"><span class="k">{row.label}</span><span class="v"
+          class:w9={!row.id.startsWith("ticks:")} class:w16={row.id.startsWith("ticks:")}>{row.value}</span></span>
+      {/each}
+    {:else}
+      {findingsText}
+    {/if}
+  </span>
 </footer>
 
 {#if wfAt}
@@ -441,6 +689,11 @@
 
 {#if keysOpen}
   <Keys {commands} onclose={() => (keysOpen = false)} />
+{/if}
+
+{#if offer}
+  <Recovery draft={offer.draft} savedUtc={offer.savedUtc} moved={offer.moved}
+    onrestore={restoreKept} ondiscard={discardKept} onlater={setAsideKept} />
 {/if}
 
 {#if settingsOpen}
@@ -558,6 +811,45 @@
   .stopslot button.gone {
     display: inline-block;
     visibility: hidden;
+  }
+
+  .unbuilt {
+    margin: 16px;
+    color: var(--muted);
+  }
+
+  /* the right half: the findings count at rest, the hover readout while the
+     pointer is over a plot. Every value has a slot in ch, so a sweep moves no
+     label (WP-1213's strip rule, one bar down) */
+  .right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .ro {
+    display: inline-flex;
+    gap: 5px;
+  }
+
+  .ro .v {
+    display: inline-block;
+    color: var(--fg);
+    font-family: var(--mono-family);
+    font-size: var(--text-sm);
+    text-align: right;
+  }
+
+  .ro .w9 {
+    min-width: 9ch;
+  }
+
+  .ro .w16 {
+    min-width: 16ch;
+    text-align: left;
   }
 
   .console {
