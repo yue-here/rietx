@@ -1,6 +1,6 @@
 # WP-2216 — the refinement window: the Pattern graph, Parameters and the action bar at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — first PR merged (#1535) and the readout follow-up open; the phase and atom menus follow in a third
+Milestone: gui-overhaul · Status: 🔄 2026-11-11 — #1535 and the readout follow-up #1536 merged; the menus-and-axes PR open (#PRNUM)
 Depends on: 2215 (the frame)
 Priority: P2 2026-11-11 — a feature the open milestone was opened for: the screen a person spends most time in
 
@@ -67,10 +67,13 @@ How the Pattern graph reads, restated from the prototype and the design the grap
   readout boxed with a zoomed crop.
 - [x] The hover readout as the maintainer ruled it ("try b", 2026-11-11), and the consent
   list's Parameters, scale and findings items (§ Rulings). A follow-up PR.
-- [ ] The phase band's ⋯ menu and the atom row's context menu (rows 121-131): Rename…, Change
+- [x] The phase band's ⋯ menu and the atom row's context menu (rows 121-131): Rename…, Change
   space group… with its preview, Replace from CIF…, Add atom…, Rename…, Change species…,
   Anisotropic ADPs, Delete. With them, Parameters' Free and Fix buttons move into a menu.
   A third PR, since the first is already a whole screen.
+- [x] The axes as ruled on 2026-11-11 (§ Rulings): no titles, a muted unit hint by each axis's
+  ticks, an explanation on hover, the axis's choices on a click, each kept in the project.
+  The same third PR.
 
 ## Acceptance
 
@@ -106,13 +109,29 @@ The first PR's three questions, answered on 2026-11-11.
     PR.
   - The intensity scale opens on square root.
   - "N findings" counts errors plus warnings, as VS Code's Problems count does.
+- **The axes: "Yes, build it"** (the maintainer, 2026-11-11, answering § Questions 1 with a
+  proposal). The three axis titles go. A muted hint sits by each axis's tick labels: the x
+  unit; `√` or `log` for the intensity, nothing for linear; `σ` for the difference. Hovering a
+  hint explains it, and the σ one says Δ/σ and where σ came from (the curves route's
+  `weighted` flag: "σ from the file", else Poisson counting statistics). A click on an axis
+  opens its choices: the intensity offers Linear, Square root and Log; the difference offers
+  Δ/σ and cumulative χ² only; x offers only the units supported today, so it opens nothing.
+  The Intensity segmented control leaves the title line. Each choice is kept per project in
+  `project.json`'s `ui` keys (`intensity_scale`, `difference`), with no Settings entry. The
+  menu is reachable from the keyboard, and Esc closes it.
+- **Free and Fix live in the filter row's ⋯**, settled by Claude under the consent list above
+  ("move into a menu") and gui/CLAUDE.md's "the filter box is the selection" (WP-1011): the
+  verbs act on what the filter matches, so they sit at its row's end. The rows read "Free N
+  matching" and "Fix N matching" while a filter is typed, and "Free all N" and "Fix all N"
+  otherwise.
 
 ## Questions
 
 Filled in by the session that builds each PR.
 
-1. **Axis titles on the Pattern graph.** The prototype draws none; `/next` draws today's
-   (`intensity (√)`, `(obs−calc)/σ`). Keep them, or drop them as the prototype does? Open.
+1. **Axis titles on the Pattern graph.** The prototype draws none; `/next` drew today's
+   (`intensity (√)`, `(obs−calc)/σ`). Keep them, or drop them as the prototype does?
+   Answered 2026-11-11: drop them for unit hints with menus (§ Rulings, "Yes, build it").
 
 ## References
 
@@ -121,6 +140,32 @@ Filled in by the session that builds each PR.
   `docs/milestones/gui-overhaul.md`.
 
 ## Handover log
+
+- **2026-11-11** — a ghostshift runner built the third PR, #PRNUM: the phase and atom menus,
+  Free and Fix in a menu, and the axes as ruled.
+  - *Done*: `gui/src/next/Params.svelte` gains a ⋯ on each phase band (Rename…, Change space
+    group…, Add atom…, Replace from CIF…), a context menu on each atom row (Rename…, Change
+    species…, Anisotropic ADPs, Delete) and the filter row's ⋯ (Free, Fix), all on R1's one
+    `next/Menu.svelte`. A typed value opens `next/Ask.svelte`, a small floating form; the space
+    group opens `next/SpaceGroup.svelte`, the old page's preview in a dialog. Each structural
+    edit is one whole-model verb (`PATCH /api/structure`, `POST /api/structure/aniso`,
+    `POST /api/structure/symmetry`) that lands at once, and waits while a run is in flight or
+    an edit is pending. `next/Pattern.svelte` draws no axis titles: a muted hint by each axis,
+    a tip on hover or focus, a radio menu on a click, kept through `Frame.svelte`'s `saveUi`.
+    An SVG export keeps the titles. `menus.test.ts` (12 vitest cases); two browser cases in
+    `tests/test_gui_layout_browser.py` (one rewritten for the axis menus, one new for the
+    structural menus and the σ hint). Today's `app.js` is byte-identical.
+  - *Not generalised*: the Instrument dialog is R3's. U^ij rows are not placed under their
+    atom. Δ in counts leaves `/next`, as ruled; today's page keeps it.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright, Python 3.12): see the
+    PR body. No Python outside `tests/` changed, so the fast suite was not run.
+  - *Gotchas*: R1's `Menu.svelte` focused its anchor after `onclose`, by which time the
+    opener's props getter read cleared state and threw; it reads the anchor first now. The
+    difference axis and the legend's Difference label were both buttons named "Difference";
+    the axis is "Difference axis". A hint right-aligned over the y axis's top tick label
+    collided with it, so the y hints sit in the strip left of the labels.
+  - *Next*: the maintainer's look at the screens (`docs/wp/2216-screenshots/r2b-*.png`) and
+    the PR's questions.
 
 - **2026-11-11** — a ghostshift runner built the readout follow-up, PR #1536. The status bar's
   hover readout reads as ruled ("try b"), Parameters at `/next` takes the prototype's filter
