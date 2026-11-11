@@ -169,6 +169,8 @@ PRIORITIES = wp_index.PRIORITIES
 #                                                          only, grouped by the file they govern; each old
 #                                                          paragraph moved verbatim to its WP file. Landed
 #                                                          662 with #1490 #1498 #1502 #1514 folded, +1 headroom
+#   2026-11-11  gui/CLAUDE.md                 663 -> 667  for WP-2215: the rebuild's second page, its
+#                                                          second build pass and its two seams; landed at the cap
 #   2026-09-03  docs/ROADMAP.md               621 -> 645  for the 2026-09-03 issue triage (1332-1341): ten rows
 #                                                          across three existing sections and one new one, landed 641
 #   2026-09-08  docs/ROADMAP.md               645 -> 648  for WP-1343 (issue #277, the magnetic
@@ -634,7 +636,9 @@ SIZE_CAPS: dict[str, int | None] = {
     # moved verbatim to that WP's "Moved from gui/CLAUDE.md" section.  A rule
     # added later enters the rulebook with its anchor and leaves its evidence
     # in its WP, per the admission rule above.  Landed 662, +1 headroom.
-    "gui/CLAUDE.md": 663,   # process.md § The caps diary
+    # 663 -> 667 (WP-2215, 2026-11-11): the rebuild's second page and its
+    # second build pass, the line WP-2214's plan names.  Landed at the cap.
+    "gui/CLAUDE.md": 667,   # process.md § The caps diary
     # 275 -> 283 (WP-1426): a third way a guard goes quiet, and the only one of
     # the three that is about the instrument rather than the assertion — a
     # browser's layout-shift entry cannot see inside a plotly div, so a

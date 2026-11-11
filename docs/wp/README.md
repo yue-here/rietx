@@ -58,7 +58,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2200](2200-the-palette.md) | The palette | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2208](2208-a-plan-stage-that-fixes.md) | A plan stage that fixes as well as frees | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
 | [2209](2209-unapplied-edits-survive-a-close.md) | Unapplied edits survive a close or a crash | 2026-11-10 | P2 | [gui-overhaul](#gui-overhaul) |
-| [2214](2214-the-gui-rebuild-plan-and-inventory.md) | The GUI rebuild: its plan, and a home for every feature of today's GUI | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
+| [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 2026-11-11 | P2 | [gui-overhaul](#gui-overhaul) |
 
 ## Next, by priority
 
@@ -518,7 +518,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2211](2211-the-history-table.md) | The History table: Compare on the pattern, Restore as pending edits | ⬜ | P3 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
 | [2212](2212-console-lines-by-kind.md) | Console lines by kind: the `>>>` prompt and the session as a script | ⬜ | P3 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
 | [2213](2213-text-and-model-edits-join-the-recovery-copy.md) | The Text buffer and the Model forms join the recovery copy | ⬜ | P2 | [2209](2209-unapplied-edits-survive-a-close.md), #1523 |
-| [2214](2214-the-gui-rebuild-plan-and-inventory.md) | The GUI rebuild: its plan, and a home for every feature of today's GUI | 🔄 2026-11-11 | P2 | — |
+| [2214](2214-the-gui-rebuild-plan-and-inventory.md) | The GUI rebuild: its plan, and a home for every feature of today's GUI | ✅ 2026-11-11 | — | — |
+| [2215](2215-the-frame.md) | The frame: the rebuild's first piece, served at `/next` | 🔄 2026-11-11 | P2 | [2214](2214-the-gui-rebuild-plan-and-inventory.md) |
 
 ## <a id="unscheduled"></a>Unscheduled
 
