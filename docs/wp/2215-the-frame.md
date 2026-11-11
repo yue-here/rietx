@@ -1,6 +1,6 @@
 # WP-2215 — the frame: the rebuild's first piece, served at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — filed from WP-2214's piece R1; the page, its bars and panels first
+Milestone: gui-overhaul · Status: 🔄 2026-11-11 — the frame is built at `/next`; it waits on the maintainer's look beside the prototype
 Depends on: 2214 (the rebuild's plan and inventory)
 Priority: P2 2026-11-11 — a feature the open milestone was opened for: every later piece of the rebuild mounts in this frame
 
@@ -47,21 +47,24 @@ What it carries from closed work (WP-2214 § What happens to the open GUI pull r
 
 ## Tasks
 
-- [ ] The page: `gui/next.html` and `gui/src/next/`, a second entry of the Vite build; the
-  server serves it at `/next`; `rietx gui --new` opens the browser there; the manual's route
-  partition lists `/next` among the exclusions with its reason. `/` is unchanged.
-- [ ] The frame: top bar, status bar, the graphs and model columns with their tab strips,
+- [x] The page: `gui/next.html` and `gui/src/next/`, built in a second Vite pass; the server
+  serves it at `/next`; `rietx gui --new` opens the browser there. `/` is unchanged. The
+  manual's route partition needs no entry: `/next` is a page like `/`, outside the route
+  table `test_gui_manual.py` partitions.
+- [x] The frame: top bar, status bar, the graphs and model columns with their tab strips,
   their collapse toggles (⌘1, ⌘2) and the sash, the bottom panel with the Console (⌘J); the
   run state and Stop in the status bar (⌘.).
-- [ ] One menu component and the workflow menu on it.
-- [ ] The File menu and the project name, mounted from today's `FileMenu`.
-- [ ] Settings (⌘,): theme as Match system, Light, Dark; the About line with the version.
-- [ ] The command palette (⌘K) and the keys (rows 228-240), with `?` listing them.
-- [ ] The start screen, New project and the recovery offer mounted in the frame.
-- [ ] The action bar (rows 18-24) as the model panel's foot.
-- [ ] `gui/CLAUDE.md` gains a `gui/src/next/` line; the `style.test.ts` sentence-case guard
+- [x] One menu component and the workflow menu on it.
+- [x] The File menu and the project name, mounted from today's `FileMenu`.
+- [x] Settings (⌘,): theme as Match system, Light, Dark; the About line with the version.
+- [x] The command palette (⌘K) and the keys (rows 228-240), with `?` listing them.
+- [x] The start screen and New project mounted in the frame. The recovery offer moves to
+  R2: it offers pending edits back, and `/next` has none until R2 brings the edit verbs.
+- [x] The action bar (rows 18-24) moves to R2, whose row in WP-2214 § The pieces names "the
+  action bar with one Apply": every control in it acts on edits R2 brings.
+- [x] `gui/CLAUDE.md` gains a `gui/src/next/` line; the `style.test.ts` sentence-case guard
   covers `gui/src/next/`.
-- [ ] Screenshots of each screen beside the prototype's, light and dark, at 1440 × 900, under
+- [x] Screenshots of each screen beside the prototype's, light and dark, at 1440 × 900, under
   `docs/wp/2215-screenshots/` (the prototype's own stay in the runner's scratch).
 
 ## Acceptance
@@ -82,6 +85,54 @@ the prototype's (WP-2214 § How the maintainer reviews).
 
 ## Handover log
 
+- **2026-11-11** — The rebuilt GUI now has a frame you can open:
+  `rietx gui --new` serves it at `/next`, beside today's page, which is unchanged. It has the
+  prototype's top bar and status bar, the graphs and model columns with their tab strips,
+  toggles and sash, the bottom panel with the Console, the workflow and File menus, Settings,
+  the command palette and the list of keys, and the start screen with New project. The panes
+  are empty: the later pieces fill them. Two tasks moved to R2 because they act on edits, and
+  `/next` has none until R2 brings them: the action bar and the recovery offer.
+
+  *Done.* The page is a second Vite pass (`vite build --mode next`), because one multi-entry
+  pass made today's page load a shared chunk. The second pass prefixes its own chunks
+  (`next-*`), so it can never overwrite a chunk `app.js` imports; today's dist stayed byte
+  for byte. The server serves `/next` through one page lookup that the not-built banner
+  shares. The frame carries `lib/statusbar.ts` (#1521) and `lib/workflows.ts` (#1524) with
+  their tests, `Menu.svelte` from branch `wp2213-the-graph-window`, and #1521's Console. Its
+  stylesheet `gui/src/next/next.css` draws the prototype's sizes over `app.css`: 14 px words,
+  36 px bars and tab strips, 30 px buttons, icon buttons with a border on hover only, tabs
+  that keep their weight when selected. A key never opens a second dialog over one already
+  up. Screens: `docs/wp/2215-screenshots/`.
+
+  *Settled under `gui/STYLE.md` or the plan* (each listed in the PR):
+  the action bar and the recovery offer go to R2 (WP-2214's R2 row names the action bar);
+  Settings has the theme and About only, density and number format waiting for the pieces
+  that draw what they change (the milestone row now says so); the workflow button is as wide
+  as its name, as the prototype's is, so the project name beside it moves when the workflow
+  changes; the File menu keeps today's `▾` caret; index and series show as placeholders in
+  `/next` until R6 and R7; `?` boxes on the tab strips (row 246) wait for the help piece.
+
+  *Measured* (`[dev]` venv, darwin arm64; another shift's sessions may have shared the
+  machine). Fast suite before the review fixes: 14557 passed, 424 skipped, 32 xfailed, 8:00.
+  vitest 762 passed in 37 files (14 new in `next/`, 3 in `lib/workflows.test.ts`, the carried
+  statusbar cases); svelte-check 433 files, 0 errors. `tests.reader_output`: unchanged. Vale:
+  0 errors. GUI browser files: see the PR.
+
+  *Review.* `/code-review high --fix` found nine; six fixed in one commit (stacked dialogs,
+  the second pass's chunk names, an unguarded boot, the banner, the duplicated page branch,
+  the `title=` budget). Declined: the Console's dropped-frames count is always 0, here and in
+  `App.svelte`, because `follow()` does not report its losses (a `lib/stream.ts` change for
+  R5, which owns the bottom panel); `lib/style.test.ts`'s register guards do not scan
+  `gui/src/next/` yet, which needs a call on whether `.ib` and `.mbtn` are registers; the
+  status bar shows nothing when idle, where `runWords` can say the last run's status.
+
+  *Gotchas.* The worktree guard refuses heredocs with `${`; edits went through scripts in
+  the runner's scratch. A browser test needs python `playwright` in the worktree venv
+  (`uv pip install --python .venv/bin/python playwright`), or the module skips green.
+
+  Next: the maintainer looks at the screens beside the prototype's (paths in the PR). Then
+  R2, which takes the action bar, the recovery offer and the hover readout, and decides
+  whether `.ib` and `.mbtn` join the register table and its guard.
 - **2026-11-11** — filed by a ghostshift runner from WP-2214's piece R1, the last task of that
   WP, which closes with it. No open WP owned the frame: WP-2214's plan names it as the first
   piece and leaves it to be filed. The number was checked against `origin/main`, the remote
