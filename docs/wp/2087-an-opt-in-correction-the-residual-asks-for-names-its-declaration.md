@@ -1,9 +1,8 @@
 # WP-2087 — An opt-in correction the residual asks for names its declaration in the docs
 
-Milestone: unscheduled · Status: 🔄 2026-11-10 — all tasks done (PR #1515); waits on the maintainer's review of the unknown-path texts and the Biso help-text call
+Milestone: unscheduled · Status: ✅ 2026-11-12 — all six tasks merged (PRs #1505, #1515); the maintainer approved the Biso help text and the unknown-path texts as written
 Track: What fires, and what stays silent
 Depends on: [1944](1944-the-structural-plan-frees-extinction-only-where-declared.md)
-Priority: P3 2026-11-05 — WP-1944 closed, so nothing blocks it; three opt-in corrections are documented without the declaration a user writes, and nothing is wrong in any number
 
 ## Goal
 
@@ -44,7 +43,9 @@ WP-1944's handover log. Three gaps remain.
   geometry takes: roughness on a Bragg-Brentano plate, µR on a capillary,
   µt on a flat plate (root CLAUDE.md: a correction belongs to a geometry).
   The diagnostic's own `suggestion` stays as it is, because a change to it
-  is a reader-output change this rescope does not make.
+  is a reader-output change this rescope does not make. The two help
+  entries print as a notebook diagnostic's explanation, so they are reader
+  output too. The maintainer approved them as written on 2026-11-09 (PR #1505).
 
 **Which way an undeclared extinction moves Biso** (folded 2026-11-09 from
 WP-1944's inherited entry). `model/extinction.py`'s docstring and the theory
@@ -83,8 +84,9 @@ row per correction. `tests/test_help.py` executes each row's declaration
 and crosses the rows against the families a model declaring nothing
 lacks, both ways. A roughness row answers only on an X-ray Bragg-Brentano
 instrument, the one the schema accepts. A retired spelling keeps priority. The change is to
-error and warning text, which is reader output, so the maintainer reviews
-the before and after texts in the PR body before merge.
+error and warning text, which is reader output. The maintainer approved the
+before and after texts in PR #1515's body as written on 2026-11-10, before
+its merge.
 
 ## Non-goals
 
@@ -118,6 +120,35 @@ the before and after texts in the PR body before merge.
 ```
 
 ## Handover log
+
+- **2026-11-12** — closed by a ghostshift runner (PR #1540). Both pull requests
+  merged: #1505 on 2026-11-09 (`817553965`) and #1515 on 2026-11-10
+  (`67e70ed02`). A user can now find, in the help and the manual, the line
+  that declares Stephens strain, an anisotropic displacement tensor, or the
+  absorption or roughness correction a Biso anomaly points to. A user who
+  guesses an undeclared correction's parameter name is told that line. The
+  two calls the earlier entries left for the maintainer are answered, so
+  nothing remains. Nothing was run or measured in this session.
+
+  *Rulings recorded.* Both are in Context, beside what they govern.
+  (1) The `BISO_NEGATIVE` and `BISO_UNUSUALLY_LARGE` help text, which a
+  notebook prints as the diagnostic's explanation, may land as written. The
+  maintainer approved it on 2026-11-09, before #1505 merged. (2) The
+  unknown-path error and `STAGE_PATH_UNKNOWN` texts in #1515's "What a
+  reader receives" were approved as written on 2026-11-10, before its merge.
+  Whether `refine._path_hint` names the declaration at all was settled by
+  Claude on 2026-11-09, as Context says, and stands.
+
+  *Done.* Status set to ✅ and the Priority line removed. No § Inherited
+  to clear. The 2026-11-09 entry left one known defect: the retired
+  `using/glossary` address redirects to the phase page of the parameter map,
+  so an old link to an instrument entry lands there without its anchor. That
+  went to [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md)'s
+  § Inherited, since 1986 owns the retired addresses. The refinement page
+  still does not mention the opt-in answer, for want of 154 characters; the
+  parameter-table page does, so that stays a record, not a task.
+
+  *Next:* none.
 
 - **2026-11-10** — the unknown-path answer, by a ghostshift
   runner (PR #1515). A user who guesses the name of an opt-in correction's
