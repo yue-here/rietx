@@ -111,8 +111,13 @@ def read(state_dir: str | Path, project_path: str | Path) -> dict | None:
     The stored path must equal the project's, so a copy is never offered to a
     project it was not made in, whatever the file name says.
     """
-    record = _load(path_for(state_dir, project_path))
-    if record is None or record.get("project") != project_key(project_path):
+    return _read_key(state_dir, project_key(project_path))
+
+
+def _read_key(state_dir: str | Path, key: str) -> dict | None:
+    """The copy stored under ``key``, only when its record names that key."""
+    record = _load(_file_for_key(state_dir, key))
+    if record is None or record.get("project") != key:
         return None
     return record
 
@@ -181,13 +186,13 @@ def move(state_dir: str | Path, source: str | Path, target: str | Path) -> bool:
     copy was moved.
     """
     key = str(source)
-    old = _file_for_key(state_dir, key)
-    record = _load(old)
-    if record is None or record.get("project") != key:
+    record = _read_key(state_dir, key)
+    if record is None:
         return False
     record["project"] = project_key(target)
     destination = path_for(state_dir, target)
     _replace(destination, record)
+    old = _file_for_key(state_dir, key)
     if old != destination:
         _guarded_unlink(old, old.parent)
     return True
