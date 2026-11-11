@@ -126,14 +126,14 @@ describe("the panels", () => {
 });
 
 describe("the workflow menu", () => {
-  it("lists the five, checks the current, and shows a placeholder's steps across the model panel", async () => {
+  it("lists the five, checks the current, and shows an unbuilt one's steps across the model panel", async () => {
     await boot();
     document.querySelector<HTMLButtonElement>("button.mbtn.wf")!.click();
     flushSync();
     const items = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')];
     expect(items.map((b) => b.textContent!.trim())).toEqual([
-      "Refinement", "Peaks and indexing · placeholder", "Series · placeholder",
-      "Structure solution · placeholder", "Rigid bodies · placeholder"]);
+      "Refinement", "Peaks and indexing · not built yet", "Series · not built yet",
+      "Structure solution · not built yet", "Rigid bodies · not built yet"]);
     expect(items[0].getAttribute("aria-checked")).toBe("true");
     items[3].click();
     flushSync();
@@ -174,7 +174,7 @@ describe("the palette and the keys", () => {
     expect(labels).toEqual(expect.arrayContaining([
       "Hide the graphs", "Hide the model", "Show the console", "Stop the run",
       "New project…", "Settings…", "Theme: Match system", "Keyboard shortcuts",
-      "Workflow: Series · placeholder"]));
+      "Workflow: Series · not built yet"]));
     const console_ = [...document.querySelectorAll(".panel li")]
       .find((li) => li.querySelector(".label")!.textContent === "Show the console")!;
     expect(console_.querySelector("kbd")!.textContent).toMatch(/J$/);

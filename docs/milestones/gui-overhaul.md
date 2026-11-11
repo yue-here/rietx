@@ -93,7 +93,7 @@ the 22xx block, or now lives in a rebuild piece. Where to find each since 2026-1
 | Sentence-case headings | one `app.css` rule at the start screen's register, app-wide | 2026-11-09 | R1; PR #1522 (WP-2201) closes as a source |
 | Peaks and indexing | the redesign in four steps (pick peaks, fit peaks, index, judge), the eight-column candidate table, lens peak marks, per-line curves in the fit windows | 2026-11-08, 2026-11-09 | R6; PR #1526 (WP-2202) stays open as a source until R6 starts |
 | Structure tab | the 3D structure as one of the graph tabs | 2026-11-07 | R3; PR #1519 (WP-2203) closes as a source |
-| Workflow menu | the top bar's workflow menu, with placeholders for structure solution and rigid bodies | 2026-11-07 | R1; PR #1524 (WP-2204) closes as a source |
+| Workflow menu | the top bar's workflow menu, with structure solution and rigid bodies marked "not built yet" | 2026-11-07 | R1; PR #1524 (WP-2204) closes as a source |
 | Settings dialog | theme, density and number format | 2026-11-07 | R1 for the theme; density and number format with the first piece that draws what they change |
 | Bottom panel and status bar | Console (the Python the window runs) and History, toggled from the status bar along the window's foot | 2026-11-07 | R1 and R5; PR #1521 (WP-2206, WP-2207) closes as a source |
 | Fixing plan stages | a plan stage that fixes as well as frees: `StageSpec.turn_off`, a `fix` clause in `.rxt` | 2026-11-09 | [WP-2208](../wp/2208-a-plan-stage-that-fixes.md), PR #1520, merged 2026-11-11; R4 draws it |

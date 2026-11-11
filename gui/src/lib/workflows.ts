@@ -7,10 +7,11 @@
  *
  * In the rebuilt page Refinement is the only workflow built so far. Peaks and
  * indexing is piece R6 and Series is R7 (WP-2214 § The pieces); until each
- * lands it is a placeholder like structure solution and rigid bodies, and says
- * so, so a workflow that is not built never reads as one that is. The steps
- * and their words are the design round's (round 4, 2026-11-07), restated in
- * WP-2204.
+ * lands it is not built yet, like structure solution and rigid bodies, and says
+ * so, so a workflow that is not built never reads as one that is. The mark is
+ * "not built yet", never "placeholder" (the maintainer's ruling, 2026-11-10).
+ * The steps and their words are the design round's (round 4, 2026-11-07),
+ * restated in WP-2204.
  */
 export type WorkflowId = "refine" | "index" | "series" | "solve" | "rigid";
 
@@ -24,7 +25,7 @@ export interface Step {
 export interface Workflow {
   id: WorkflowId;
   name: string;
-  /** the steps a placeholder shows; absent for a built workflow */
+  /** the steps an unbuilt workflow shows; absent for a built one */
   steps?: readonly Step[];
 }
 
@@ -72,18 +73,18 @@ export const WORKFLOWS: readonly Workflow[] = [
   },
 ];
 
-/** The word a placeholder carries after its name, in the menu. */
-export const PLACEHOLDER_MARK = "placeholder";
+/** The words an unbuilt workflow carries after its name, in the menu. */
+export const NOT_BUILT_MARK = "not built yet";
 
 export function workflow(id: WorkflowId): Workflow {
   return WORKFLOWS.find((w) => w.id === id)!;
 }
 
-export function isPlaceholder(id: WorkflowId): boolean {
+export function isNotBuilt(id: WorkflowId): boolean {
   return !!workflow(id).steps;
 }
 
 /** The menu's label for an entry: its name, and the mark when it is not built. */
 export function menuLabel(w: Workflow): string {
-  return w.steps ? `${w.name} · ${PLACEHOLDER_MARK}` : w.name;
+  return w.steps ? `${w.name} · ${NOT_BUILT_MARK}` : w.name;
 }

@@ -962,7 +962,7 @@ def _open_next(browser, url: str, width: int):
 def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
     """Every tab, menu and dialog of the rebuilt frame, pressed with a real click (WP-2215).
 
-    Choosing a placeholder workflow swaps the model panel's tab strip for its
+    Choosing a workflow that is not built yet swaps the model panel's tab strip for its
     steps, so it is pressed too: the strip must keep its height. The workflow
     button is as wide as the workflow's name, as the prototype's is, so a new
     workflow moves the project name beside it and only the bars are held there.
@@ -995,7 +995,7 @@ def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
 
     def series(p):
         p.locator("button.mbtn.wf").click()
-        p.get_by_role("menuitemradio", name="Series · placeholder").click()
+        p.get_by_role("menuitemradio", name="Series · not built yet").click()
 
     pressing("workflow menu", lambda p: p.locator("button.mbtn.wf").click(), escape)
     pressing("File menu", lambda p: p.locator("header .fm-name").click(), escape)

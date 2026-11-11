@@ -76,7 +76,7 @@
   const mod = modifier(typeof navigator === "undefined" ? "" : navigator.platform ?? "");
   const busy = $derived(run?.state === "running" || run?.state === "cancelling");
   const runText = $derived(project && busy ? runWords(run) : "");
-  const placeholder = $derived(workflow(wf).steps ?? null);
+  const unbuilt = $derived(workflow(wf).steps ?? null);
 
   function say(line: string) {
     lines = [...lines.slice(-400), line];
@@ -366,15 +366,15 @@
             onsize={(size) => (modelWidth = size)} onreset={() => (modelWidth = MODEL_DEFAULT)}
             title="Drag to resize the panels; double-click resets them" />
         {/if}
-        {#if placeholder}
+        {#if unbuilt}
           <nav class="tabs steps" aria-label="Steps">
-            {#each placeholder as s, i (s.name)}
+            {#each unbuilt as s, i (s.name)}
               <button class="tab" aria-current={step === i ? "step" : undefined}
                 onclick={() => (step = i)}>{s.name}</button>
             {/each}
           </nav>
           <div class="pane wfpane">
-            <p class="box">{placeholder[step].body}</p>
+            <p class="box">{unbuilt[step].body}</p>
           </div>
         {:else}
           <div class="tabs" role="tablist" aria-label="Model">
