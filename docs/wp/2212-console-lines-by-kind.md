@@ -1,8 +1,8 @@
 # WP-2212 — console lines by kind: the `>>>` prompt and the session as a script
 
 Milestone: gui-overhaul · Status: ⬜
-Depends on: 2206 (the bottom panel); #1521 (its pull request)
-Priority: P3 2026-11-10 — P2 (a feature the open milestone was opened for), down a rung: it builds on the bottom panel, so nothing starts until PR #1521 (WP-2206) merges
+Depends on: 2214 (the rebuild's plan: it builds on piece R1's bottom panel)
+Priority: P3 2026-11-11 — P2 (a feature the open milestone was opened for), down a rung: it builds on the bottom panel, so nothing starts until the rebuild's R1 lands (re-pointed 2026-11-11 by WP-2214)
 
 ## Goal
 
@@ -86,6 +86,16 @@ The prototypes are not published, so the design is restated here.
 ### Tier
 
 Nothing here reads the data or decides for a fit, so no row joins `rietx._audit`.
+
+### Inherited
+
+- **2026-11-11, from WP-2214** (the rebuild's plan). The maintainer ruled the same night to
+  rebuild the GUI's front end beside today's instead of porting it piece by piece. PR #1521
+  (WP-2206, WP-2207) closes as a source and never merges, so this WP builds in the new front
+  end, on the bottom panel its piece R1 builds, as part of piece R5. The design above stands;
+  what it says about `panels/History.svelte` and `panels/Console.svelte` describes today's GUI,
+  which the new page replaces at the swap. WP-2214's inventory gives the homes this WP must
+  keep reachable.
 
 ## Non-goals
 
