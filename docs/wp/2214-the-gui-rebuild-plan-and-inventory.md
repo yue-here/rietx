@@ -671,6 +671,7 @@ inventory follows the prototype or a written rule, named in its row.
 - [x] The maintainer answers § Questions (2026-11-11, on PR #1529).
 - [x] R1 filed, once the answers are in, as [WP-2215](2215-the-frame.md). Each later piece is
   filed when its turn comes.
+- [x] R2 filed as [WP-2216](2216-the-refinement-window.md).
 
 ## Acceptance
 
