@@ -295,7 +295,7 @@ describe("`title=` is no longer how this app explains a name", () => {
     // docs/reference_pages.py `_VOCABULARIES`, the regenerated help_keys.json),
     // and a WP of its own.
     "panels/Peaks.svelte": 10,
-    "panels/Plan.svelte": 6,         // the reorder handle, the add field, an unapplied
+    "panels/Plan.svelte": 7,         // the reorder handle, the two add fields, an unapplied
                                      // stage, the closing stage, set-aside, correlation_guard
     "panels/Plot.svelte": 3,         // fit-range fields — WP-1212
     "panels/Report.svelte": 4,       // report statistics

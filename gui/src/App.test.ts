@@ -717,8 +717,8 @@ const MASKED_CURVES = {
 /** The theme's plot inks as `curveColors` falls back to them: jsdom loads no
  *  stylesheet, so these are what the panel paints with here. */
 const INK = {
-  obs: "#8a8a8a", calc: "#c23b22", diff: "#1f5fa8", mask: "#1b1b1b14", edge: "#6b6b66",
-  peak: "#8c257e", peakfit: "#c158b0", candidate: "#1a8f45",
+  obs: "#1c1917", calc: "#c65d0a", diff: "#6b6259", mask: "#1c191714", edge: "#6b6259",
+  peak: "#0072b2", peakfit: "#6f83e6", candidate: "#1a8f45",
   phase: ["#009e73", "#cc79a7"],
 };
 
@@ -1500,7 +1500,7 @@ describe("the plan editor", () => {
     expect(rows()).toHaveLength(3);
     expect(host.querySelectorAll<HTMLInputElement>("li.stage input.name")[2].value)
       .toBe("stage 3");
-    const add = host.querySelectorAll<HTMLInputElement>("li.stage input.add")[2];
+    const add = host.querySelectorAll<HTMLInputElement>("li.stage input.add:not(.fix)")[2];
     add.value = "phases.*.atoms.*.biso, instrument.zero_shift";
     add.dispatchEvent(new Event("input", { bubbles: true }));
     await flush();
@@ -1519,6 +1519,90 @@ describe("the plan editor", () => {
     expect(rows()).toHaveLength(1);
     expect(host.querySelector<HTMLButtonElement>(
       'li.stage button[aria-label^="Remove stage"]')!.disabled).toBe(true);
+  });
+
+  it("fixes in a stage: a row of its own, stored as turn_off, undone by ⌘Z", async () => {
+    // WP-2208: a stage fixes its turn_off after it frees its turn_on
+    const stub = await openPlan(PROJECT, {
+      "/api/plan": (call: Call) =>
+        ({ body: call.method === "PUT" ? { ...PLAN, preset: null } : PLAN }),
+    });
+    const second = () => host.querySelector("ol.stages > li.stage:nth-child(2)")!;
+    // a stage that fixes nothing has no Fixes row, as in the workshop
+    // prototype; `+ Fix` opens one and puts the cursor in its field
+    expect(second().querySelector(".fixing")).toBeNull();
+    const open = [...second().querySelectorAll<HTMLButtonElement>(".frees button.ghost")]
+      .find((b) => b.textContent?.trim() === "+ Fix")!;
+    open.click();
+    await flush();
+    const row = second().querySelector(".fixing")!;
+    expect(row.textContent).toContain("Fixes");
+    expect(row.querySelectorAll(".chip")).toHaveLength(0);
+    // opening a row is no edit
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+
+    const fix = second().querySelector<HTMLInputElement>("input.add.fix")!;
+    expect(document.activeElement).toBe(fix);
+    fix.value = "instrument.profile.*";
+    fix.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    fix.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    expect([...second().querySelectorAll(".fixing .chip")].map((n) => n.textContent))
+      .toEqual(["instrument.profile.*"]);
+    // the frees row is untouched, and the stage has lost its resolved facts
+    expect([...second().querySelectorAll(".frees:not(.fixing) .chip")]
+      .map((n) => n.textContent)).toEqual(["phases.*.cell.*"]);
+    expect(summaries()[1]).toBe("not applied");
+
+    // the open row has no `+ Fix` beside the frees any more
+    expect([...second().querySelectorAll(".frees button")].map((b) => b.textContent?.trim()))
+      .not.toContain("+ Fix");
+
+    // ⌘Z takes the fix back, and the plan is the stored one again
+    host.querySelector("section[aria-label=plan]")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true }));
+    await flush();
+    expect(second().querySelectorAll(".fixing .chip")).toHaveLength(0);
+    expect(host.querySelector(".actions .pending")?.textContent).toBe("");
+
+    // typed again and applied: the PUT carries the fix
+    fix.value = "instrument.profile.*";
+    fix.dispatchEvent(new Event("input", { bubbles: true }));
+    await flush();
+    fix.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await flush();
+    bar("Apply")!.click();
+    await flush();
+    // by path: the recovery copy (WP-2209) is a PUT too, sent on a 500 ms timer,
+    // so on a slow machine it lands before Apply's
+    const put = stub.calls.find((call) => call.method === "PUT" && call.path === "/api/plan");
+    expect(put?.body.plan.stages[1].turn_off).toEqual(["instrument.profile.*"]);
+    expect(put?.body.plan.stages[1].turn_on).toEqual(["phases.*.cell.*"]);
+  });
+
+  it("counts what a stage fixed in its rung and in the closing stage", async () => {
+    const resolve = structuredClone(PLAN_RESOLVE) as any;
+    resolve.stages[1].turn_off = ["instrument.zero_shift"];
+    resolve.stages[1].fixes = ["instrument.zero_shift"];
+    resolve.closing = { name: "closing", window_area_tol: 0.001,
+                        fixes: ["instrument.zero_shift"], rwp: 0.44 };
+    const plan = structuredClone(PLAN) as any;
+    plan.plan.stages[1].turn_off = ["instrument.zero_shift"];
+    await openPlan(PROJECT, {
+      "/api/plan": () => ({ body: plan }),
+      "/api/plan/resolve": () => ({ body: resolve }),
+    });
+    expect(summaries()[1]).toContain("+1 −1 → 3 free");
+    // a stored fix draws its row with no `+ Fix` press
+    expect([...host.querySelectorAll("ol.stages > li.stage:nth-child(2) .fixing .chip")]
+      .map((n) => n.textContent)).toEqual(["instrument.zero_shift"]);
+    expect(host.querySelector("ol.stages > li.stage:nth-child(1) .fixing")).toBeNull();
+    const body = host.querySelector("ol.stages > li.stage:nth-child(2) .rung .body")!;
+    expect(body.textContent).toContain("fixed here");
+    expect(body.textContent).toContain("instrument.zero_shift");
+    expect(host.querySelector("li.closing")!.textContent!.replace(/\s+/g, " "))
+      .toContain("keeps 1 fixed");
   });
 });
 
@@ -2025,7 +2109,7 @@ describe("disclosure and the command palette", () => {
       expect(ink("main", 1)).toBe("#112233");
       expect(ink("resid", 1)).toBe(INK.diff);
       // …and the zero line under the residual, in a token of its own
-      expect(pane("resid").marks.some((m) => m.op === "stroke" && m.style === "#88888888"))
+      expect(pane("resid").marks.some((m) => m.op === "stroke" && m.style === "#cfcfcf"))
         .toBe(true);
 
       const fetched = curvesFetched(stub);
@@ -4935,6 +5019,46 @@ describe("the peaks tab (WP-1027)", () => {
     expect(host.querySelector<HTMLElement>(".rx-ring")!.style.borderColor).toBe(probe.style.color);
   });
 
+  it("clips every layer it draws to the plot area, at a zoom that cuts one", async () => {
+    // the report (WP-2200): zoomed into a peak, the peak fit's dashes ran left
+    // of the y axis into its gutter. uPlot clips its own series and leaves a
+    // hook's strokes alone, so every layer is held to the pane's plot area.
+    const withGroups = {
+      ...PEAKS_PAYLOAD,
+      groups: [{ two_theta: [8.5, 9.5, 10.5], y_fit: [1, 5, 1], delta: [0, 0, 0] }],
+    };
+    const stub = server({
+      ...boot(), ...FITTED,
+      "/api/result/curves": fitCurves({
+        two_theta: [3, 6, 9, 9.4, 10, 12, 14, 18, 23.995], y_obs: [1, 2, 1, 2, 5, 3, 4, 1, 1],
+        header: { ticks: { NAC: [9.1, 12], CaF2: [9.3] } } }),
+      "/api/peaks": () => ({ body: withGroups }),
+    });
+    vi.stubGlobal("fetch", stub.fetcher);
+    app = mount(App, { target: host });
+    await flush();
+    await dragOver(9, 14);
+
+    const box = (u: StubPlot) => [u.bbox.left, u.bbox.top, u.bbox.width, u.bbox.height];
+    /** Every pane's strokes and fills beyond uPlot's own series, each under its pane's clip. */
+    const unclipped = () => (["main", "ticks", "resid"] as const).flatMap((key) =>
+      pane(key).marks.filter((m) => m.op !== "series" && JSON.stringify(m.clip) !== JSON.stringify(box(pane(key))))
+        .map((m) => `${key} ${m.op} ${m.style}`));
+    // the model's view: the tick rows and the residual's zero line
+    expect(tickInks().length).toBeGreaterThan(0);
+    expect(pane("resid").marks.some((m) => m.op === "stroke")).toBe(true);
+    expect(unclipped()).toEqual([]);
+
+    button("Peaks")!.click();
+    await flush();
+    const main = pane("main");
+    const fit = main.marks.find((m) => m.op === "stroke" && m.style === INK.peakfit)!;
+    // the zoom cut the group: its first point is left of the plot area
+    expect(fit.points!.some(([x]) => x < main.bbox.left)).toBe(true);
+    expect(main.marks.some((m) => m.style === INK.peak)).toBe(true);
+    expect(unclipped()).toEqual([]);
+  });
+
   it("clears the plot to the data and puts back what was there before", async () => {
     // "an easy way to hide everything except the data" — and the way back is
     // the state the plot was in, not everything on: a user who had already
@@ -5558,7 +5682,7 @@ describe("the series panel", () => {
   }
 
   /** `--warn` as the panel falls back to it: jsdom loads no stylesheet. */
-  const WARN = "#b7791f";
+  const WARN = "#7d5f00";
 
   /** The panel's icon buttons, which have no label to search by. */
   function icons(glyph: string): HTMLButtonElement[] {
@@ -5676,7 +5800,7 @@ describe("the series panel", () => {
     // the backward chain beside it, muted and dotted
     const marks = seriesPane("traj").marks;
     const strokes = (style: string) => marks.filter((m) => m.op === "stroke" && m.style === style);
-    expect(strokes(INK.diff).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
+    expect(strokes(INK.obs).some((m) => !m.dash && m.points!.length === 2)).toBe(true);
     expect(strokes(WARN).some((m) => m.dash)).toBe(false);
     expect(strokes(WARN).some((m) => m.points!.some((p) => p.length === 3))).toBe(true);
     expect(strokes(INK.edge).some((m) => m.dash)).toBe(true);

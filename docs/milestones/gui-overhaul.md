@@ -88,7 +88,7 @@ the 22xx block, or now lives in a rebuild piece. Where to find each since 2026-1
 
 | Piece | What it builds | Ruled | Now |
 |---|---|---|---|
-| The palette | the site's palette as the default theme, light and dark: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour | 2026-11-06, 2026-11-09 | WP-2200, PR #1517, merging as planned |
+| The palette | the site's palette as the default theme, light and dark: warm neutrals, orange accent and calculated curve, grey difference, the plot palette re-measured against its floor, the peak-mark colour | 2026-11-06, 2026-11-09 | [WP-2200](../wp/2200-the-palette.md), PR #1517, merged 2026-11-11 |
 | Named themes | established themes (Solarized light and dark, Monokai and others) listed in Settings after Match system, Light and Dark, on the seam WP-2200 leaves | 2026-11-06, 2026-11-09 | after the swap |
 | Sentence-case headings | one `app.css` rule at the start screen's register, app-wide | 2026-11-09 | R1; PR #1522 (WP-2201) closes as a source |
 | Peaks and indexing | the redesign in four steps (pick peaks, fit peaks, index, judge), the eight-column candidate table, lens peak marks, per-line curves in the fit windows | 2026-11-08, 2026-11-09 | R6; PR #1526 (WP-2202) stays open as a source until R6 starts |
@@ -96,7 +96,7 @@ the 22xx block, or now lives in a rebuild piece. Where to find each since 2026-1
 | Workflow menu | the top bar's workflow menu, with placeholders for structure solution and rigid bodies | 2026-11-07 | R1; PR #1524 (WP-2204) closes as a source |
 | Settings dialog | theme, density and number format | 2026-11-07 | R1 |
 | Bottom panel and status bar | Console (the Python the window runs) and History, toggled from the status bar along the window's foot | 2026-11-07 | R1 and R5; PR #1521 (WP-2206, WP-2207) closes as a source |
-| Fixing plan stages | a plan stage that fixes as well as frees: `StageSpec.turn_off`, a `fix` clause in `.rxt` | 2026-11-09 | WP-2208, PR #1520, merging as planned; R4 draws it |
+| Fixing plan stages | a plan stage that fixes as well as frees: `StageSpec.turn_off`, a `fix` clause in `.rxt` | 2026-11-09 | [WP-2208](../wp/2208-a-plan-stage-that-fixes.md), PR #1520, merged 2026-11-11; R4 draws it |
 | Edit recovery | unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 | [WP-2209](../wp/2209-unapplied-edits-survive-a-close.md), PR #1523, merged 2026-11-11; its follow-up [WP-2213](../wp/2213-text-and-model-edits-join-the-recovery-copy.md) (the Text buffer and Model forms join the copy) shrinks, since R4 makes a Text edit a pending edit |
 | Fit statistics in the action bar | Rwp, GoF and the not-a-fit judgement beside Refine while the graphs are hidden ("try B") | 2026-11-09 | R2; PR #1518 (WP-2210) closes as a source |
 | The graph window | curves switched from a legend, a view menu, the fitted range and excluded regions as plot objects | 2026-11-10 | R2; the branch `wp2213-the-graph-window` is a source, and its WP number is retired because PR #1523 files WP-2213 |
@@ -106,7 +106,7 @@ Three decisions went to the maintainer before the piece that needs them. The fir
 - A plan stage that fixes as well as frees. The maintainer wants it (2026-11-07); in rietx it is
   a `turn_off` list on `StageSpec` and a `fix` clause in `.rxt`, both stored-format changes, so
   piece 3 asked for the go-ahead in its WP. Ruled required on 2026-11-09, the mechanism left to
-  Claude; WP-2208 builds it.
+  Claude; WP-2208 built it, merged 2026-11-11 in PR #1520.
 - A background drawn through points the user places. rietx has no such background type; a new
   one is a stored-format change.
 - A text file kept beside the project, which the maintainer deferred to the port on 2026-11-07.
@@ -141,7 +141,7 @@ rebuild piece that touches it, or a WP of its own.
 - `--plot-peak` (purple) loses to the data crosses as a mark colour. WP-2130 measured the ruled
   blue against the palette and took the choice to the maintainer, who ruled on 2026-11-09 that it
   moves with the palette piece, since the blue was chosen as the complement of orange fits.
-  WP-2200 carries it, in PR #1517.
+  WP-2200 carried it, merged 2026-11-11 in PR #1517.
 - The pick route takes only `shoulders`; the 2θ range and `flag_contamination` need to reach it.
   WP-2124 added both to the route, and `pick_options` records all three.
 - Right-click on a plot object opens no context menu, and peak edits have no undo, though the

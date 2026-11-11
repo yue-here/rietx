@@ -1297,7 +1297,7 @@ class GuiSession:
         stages, 4200 channels; WP-1208's handover has the matrix).  A node is
         matched to a ladder rung by **position and identity**: the last run of
         ``stage`` nodes on the head's lineage, aligned from its start, each
-        required to carry this stage's name *and* its ``turn_on``.  Anything
+        required to carry this stage's name *and* its ``turn_on`` and ``turn_off``.  Anything
         else — a plan edited since the run, a single stage run from a state no
         plan describes, a checkout — leaves ``rwp`` null rather than printing
         the wrong stage's number.  Between the head and that run,
@@ -1337,8 +1337,18 @@ class GuiSession:
                        if mode_fixed_column(reach.get(path, [path]), mode)]
             if dropped:
                 table.set_vary(dropped, False)
+            # the stage's fixes, after its frees, as ``_run_stage`` applies
+            # them (WP-2208); ``fixes`` names the free paths they took
+            pre_fix = set(table.free_paths)
+            fixed_here = (set(table.set_vary(list(stage.turn_off), False))
+                          if stage.turn_off else set())
             after = set(table.free_paths)
+            fixes = [path for path in rows
+                     if path in fixed_here and path in pre_fix]
 
+            # a path the stage frees and fixes is the stage's own fix, under
+            # ``fixes``, so the three buckets below still partition ``matched``
+            matched = [path for path in matched if path not in fixed_here]
             held, already, frees = [], [], []
             for path in matched:
                 if path not in after:
@@ -1352,19 +1362,26 @@ class GuiSession:
                     frees.append(path)
             stages.append({
                 "name": stage.name, "turn_on": globs,
+                "turn_off": list(stage.turn_off),
                 "frees": frees, "already": already, "held": held,
+                "fixes": fixes,
                 "n_matched": len(matched), "n_free": len(after),
             })
 
-        rwps = self._stage_rwp(p, plan)
+        rwps = self._stage_rwp(p, plan, paths=list(rows))
         for entry, rwp in zip(stages, rwps, strict=False):
             entry["rwp"] = rwp
         # the stage the plan appends (WP-2002, the sixth round's Q1 and Q2):
         # every glob again at tight windows, read-only here, and its Rwp is
         # the answer's, which the last declared rung's is not
-        closing = plan.closing_stage()
+        closing = plan.closing_stage(list(rows))
+        # the rows the closing stage's fix takes back from its frees: a tied,
+        # locked or held row its literals name was never free to keep fixed
         closing_entry = None if closing is None else {
             "name": closing.name, "window_area_tol": plan.closing_window_tol,
+            "fixes": [path for path in closing.turn_off
+                      if rows[path].refinable
+                      and any(fnmatchcase(path, g) for g in closing.turn_on)],
             "rwp": rwps[-1]}
         reached = {path for entry in stages for path in entry["frees"]}
         set_aside = [row.path for row in rows.values()
@@ -1388,7 +1405,8 @@ class GuiSession:
                                   "set_variable"})
 
     @classmethod
-    def _stage_rwp(cls, p: Project, plan) -> list[float | None]:
+    def _stage_rwp(cls, p: Project, plan,
+                   paths: list[str] | None = None) -> list[float | None]:
         """One Rwp per stage the plan runs, off the history nodes the run recorded.
 
         Parallel to ``plan.run_stages()``: the declared stages, then the
@@ -1398,7 +1416,14 @@ class GuiSession:
         the first run, and the honest one whenever the plan on screen is not
         the plan that ran.
         """
-        stages = plan.run_stages()
+        # the closing stage of a plan that fixes records its fixes as the
+        # model's paths (WP-2208), so the plan is read over them too; a
+        # caller already holding them passes them in
+        if not any(s.turn_off for s in plan.stages):
+            paths = None
+        elif paths is None:
+            paths = [row.path for row in p.parameters()]
+        stages = plan.run_stages(paths=paths)
         blank: list[float | None] = [None] * len(stages)
         tree = p.refinement.history
         head = p.refinement._head_id
@@ -1433,7 +1458,8 @@ class GuiSession:
                 break
             node = run[k]
             if (node.action.name != stage.name
-                    or list(node.action.turn_on) != list(stage.turn_on)):
+                    or list(node.action.turn_on) != list(stage.turn_on)
+                    or list(node.action.turn_off) != list(stage.turn_off)):
                 break
             stats = node.metrics.statistics
             out[k] = None if stats is None else float(stats.rwp)

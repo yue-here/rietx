@@ -345,6 +345,7 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
 - **Shading spans every pane's full height and is clipped to the measured extent**
   (WP-1033). `viz/` does not shade: an exported figure shows exclusion as absence.
 - **A tick belongs to the model** (WP-1032): its own band between pattern and residual.
+- **A pattern pane's hooks draw clipped to its plot area, at one seam** (`rxplot.clipped`, WP-2200).
 - **Hiding a curve is by exception** (WP-1032): `curveToggles`/`hidden`, unpersisted.
 - **A layer is drawn where it can be edited** (WP-1210): peak markers and their curve
   only while the Peaks tab is up, so `peaksActive` is a drawing input of the repaint.
@@ -451,7 +452,7 @@ visual rules in this section are listed in WP-2134 for the GUI style guide.
   Refine drops a hand-freed row no stage names; `Run this stage` keeps it. `set_aside`
   names that difference.
 - **A stage's Rwp is its history node's** (WP-1208), matched to a rung by position and by
-  the stage's name and `turn_on`, else absent.
+  the stage's name, `turn_on` and `turn_off` (WP-2208), else absent.
 - **An edited plan keeps the facts of the stages above its first change only**
   (WP-2127, `lib/plan.ts:resolvedPrefix`), and is one pending edit in the shell's action
   bar, never a Save of its own.

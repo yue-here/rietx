@@ -97,6 +97,9 @@ class NodeAction(Base):
     state it left: the whole tie register lives on
     :attr:`RefinementState.ties`, which is what a checkout restores — exactly as
     ``turn_on`` describes a ``set_vary`` whose result is read off ``free_paths``.
+    A ``"stage"`` node's ``turn_off`` is the stage's fixes (WP-2208), applied
+    after its ``turn_on``; for the closing stage of a plan that fixes, they are
+    the model's paths the declared stages left fixed.
     ``held``/``unheld`` (WP-1435) are ``"set_hold"``'s, on that same pattern,
     against :attr:`RefinementState.holds`.
 
@@ -162,7 +165,9 @@ class NodeAction(Base):
                  ("strain_seed", self.strain_seed, 0.0),
                  ("restraint_weight_scale", self.restraint_weight_scale, 1.0),
                  ("ftol", self.ftol, None),
-                 ("window_slack_deg", self.window_slack_deg, None))
+                 ("window_slack_deg", self.window_slack_deg, None),
+                 # the stage's fixes (WP-2208), a stage's own as of that WP
+                 ("turn_off", list(self.turn_off), []))
                 if v != off)
             # the plan settings are run_stage's keywords, not the Stage's, so
             # they follow the Stage's parenthesis, on the same rule.  Compared
