@@ -17,8 +17,8 @@ stay outside the repository; the pull request names where they are.
   accent colour and its bar floats over the plot with typed bounds and the channel count.
 - `next-graphs-hidden-light.png`: the graph column hidden. Rwp and GoF move to the action bar.
 - `next-pending-light.png`: one Parameters edit, before Apply.
-- `next-applied-light.png`: after Apply. The edit made a new history node, so the last fit
-  no longer describes the model and the graph shows the observed pattern.
+- `next-applied-light.png`: after Apply. The values are the model's, without esds; the
+  graph keeps the last fit until the next run, as today's page does.
 
 Taken 2026-11-11 on macOS (arm64) with the cached chromium, against the dist this branch
 commits, with `RIETX_STATE_DIR` pointed at a temporary directory. Every menu, drag, edit and
