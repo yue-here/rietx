@@ -1,6 +1,6 @@
 # WP-2078 — Weak lines from another phase push the true cell off rank 1
 
-Milestone: unscheduled · Status: 🔄 2026-11-05 — task 2 done (PR #1341, merged at `4eecc6632`): the three fixtures and the truth's rank on `main`; the WP stays open, task 1 is free, and the first Linux nightly owes a reading of the as-picked row
+Milestone: unscheduled · Status: 🔄 2026-11-12 — claimed by ghostshift (MacBook-Air-c4aacd); tasks 1, 3 and 4 to the maintainer decision
 Track: What fires, and what stays silent
 Depends on: — (1969 soft: the inlier rule answers the same failure by another mechanism; 2066 soft: the reporter's dichotomy rows predate it)
 Priority: P2 2026-11-02 — a ranking defect with a hand workaround: on the reporter's private benchmark the true cell ranks first on 48 of 172 host and one-impurity lists under all three engines, and on 75 when the search is given only the lines at or above 1 % of the strongest; thinning the list by hand is the workaround
