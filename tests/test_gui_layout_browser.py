@@ -104,11 +104,25 @@ def _open(browser, url: str, width: int):
     page.on("pageerror", lambda exc: page.errors.append(str(exc)))
     # a dialog left open would hold every later click; none is expected here
     page.on("dialog", lambda dialog: dialog.dismiss())
+    _keep_no_edits(page)
     page.goto(url)
     page.wait_for_selector(".actions button.refine")
     page.evaluate("document.fonts.ready")
     _frames(page)
     return page
+
+
+def _keep_no_edits(page) -> None:
+    """Answer the recovery route in the page, so no test inherits another's pending edit.
+
+    A fixture here serves one session to many tests, and a test that leaves an
+    edit pending leaves a recovery copy (WP-2209). The next page would offer it
+    in a modal dialog over every control. Clearing the copy before each page
+    races the closing page's own last write, so the route never reaches the
+    server. Recovery is tested in ``tests/test_gui_recovery_browser.py``.
+    """
+    page.route("**/api/recovery", lambda route: route.fulfill(
+        status=200, content_type="application/json", body='{"draft": null}'))
 
 
 def _frames(page, n: int = 3) -> None:

@@ -99,10 +99,33 @@ shows which.
 
 There is no Save command, and that is not an omission. Settings
 persist on the verb. The moment you tick a box or drag a region it is written to
-the project, so there is nothing to save and nothing to lose on close.
+the project, so there is nothing to save on close.
 `Save the project` exists as a palette command for the one case that is not
 covered, which is writing out the settings file after an edit made from
 elsewhere.
+
+### Edits not yet applied
+
+An edit in the action bar's count stays pending until `Apply`. The window keeps
+the pending edits in a recovery copy, in the application's own state directory
+beside the recent list and apart from the project, as editors such as VS Code
+keep theirs. The copy is written half a second after each change, and again
+before the project closes. So closing the project, opening another, closing the
+browser tab or stopping the server keeps them.
+
+Opening the project again shows `Unapplied edits`, with how many and when they
+were made. `Restore` puts them back as pending edits, and `Discard` deletes
+them. `Escape` closes the dialog and keeps the copy without restoring it. The
+dialog comes back the next time the project opens. Edits you make before then
+are not kept. If the project has been refined or edited since, for example by a
+fit run from Python, the dialog adds "The project has been refined or edited
+since. Restored values will replace the current ones." Restored edits still
+wait in the action bar until you apply them.
+
+The copy is deleted once the edits are applied, reverted or discarded. It
+follows the project through `Rename…` and `Move to…`. `Save a copy…`, and a
+folder moved outside the app, leave it behind. The Model panel's forms and the
+Text document apply through their own buttons, so they are not kept.
 
 The theme belongs to you and not to the project. It lives beside the recent list
 in the application's own settings, so it follows you across projects, ports and
