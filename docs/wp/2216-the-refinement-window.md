@@ -1,6 +1,6 @@
 # WP-2216 — the refinement window: the Pattern graph, Parameters and the action bar at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — #1535 and the readout follow-up #1536 merged; the menus-and-axes PR open (#PRNUM)
+Milestone: gui-overhaul · Status: 🔄 2026-11-11 — #1535 and the readout follow-up #1536 merged; the menus-and-axes PR open (#1537)
 Depends on: 2215 (the frame)
 Priority: P2 2026-11-11 — a feature the open milestone was opened for: the screen a person spends most time in
 
@@ -141,7 +141,7 @@ Filled in by the session that builds each PR.
 
 ## Handover log
 
-- **2026-11-11** — a ghostshift runner built the third PR, #PRNUM: the phase and atom menus,
+- **2026-11-11** — a ghostshift runner built the third PR, #1537: the phase and atom menus,
   Free and Fix in a menu, and the axes as ruled.
   - *Done*: `gui/src/next/Params.svelte` gains a ⋯ on each phase band (Rename…, Change space
     group…, Add atom…, Replace from CIF…), a context menu on each atom row (Rename…, Change
