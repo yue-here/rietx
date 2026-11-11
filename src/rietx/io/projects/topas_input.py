@@ -889,6 +889,7 @@ def from_structure_refined(structure, *, free: Any = None, scale: str | None = N
         _sign_first,
         refuse_distortion_modes,
         refuse_operation_list,
+        refuse_parent_cell,
         topas_species,
     )
 
@@ -905,6 +906,7 @@ def from_structure_refined(structure, *, free: Any = None, scale: str | None = N
                              f"`.inp`: it carries a double quote or a line break")
         refuse_operation_list(phase, "a TOPAS `.inp`")
         refuse_distortion_modes(phase, "a TOPAS `.inp`")
+        refuse_parent_cell(phase, "a TOPAS `.inp`")
         for atom in phase.atoms:
             if any(ch.isspace() or ch == "'" for ch in atom.label + atom.species):
                 raise ValueError(
