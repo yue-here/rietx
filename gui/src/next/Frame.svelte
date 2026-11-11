@@ -21,10 +21,8 @@
   import FileMenu from "../panels/FileMenu.svelte";
   import NewProject from "../panels/NewProject.svelte";
   import Palette from "../panels/Palette.svelte";
-  import Params from "../panels/Params.svelte";
   import Recovery from "../panels/Recovery.svelte";
   import type { HelpCorpus } from "../lib/help";
-  import type { Readout } from "../lib/plot";
   import { RecoveryWriter, combine, readDraft, type Draft, type InteractiveDraft,
            type PlanDraft } from "../lib/recovery";
   import { isShortcutTarget, type Command } from "../lib/palette";
@@ -37,7 +35,9 @@
   import Console from "./Console.svelte";
   import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
+  import Params from "./Params.svelte";
   import Pattern from "./Pattern.svelte";
+  import { dropsFor, type StatusReadout } from "./readout";
   import Settings from "./Settings.svelte";
   import Start from "./Start.svelte";
   import { BOTTOM_TABS, GRAPH_TABS, MODEL_TABS,
@@ -61,7 +61,12 @@
   let plotKey = $state(0);
   let protocolError = $state("");
   /** The hover readout the Pattern graph hands up, or null off the plot. */
-  let reading = $state.raw<Readout | null>(null);
+  let reading = $state.raw<StatusReadout | null>(null);
+  /** The readout's items a narrow window drops, and the room they are
+   *  measured against: the status bar's right half. */
+  let readoutDrops = $state.raw<ReadonlySet<string>>(new Set());
+  let readoutEl: HTMLSpanElement | undefined = $state();
+  let readoutRoom = $state(0);
   /** The action bar's refine choice and the Parameters panel's pending edits. */
   let refineMode = $state<"cycle" | "plan">("plan");
   let pendingTouched = $state(0);
@@ -117,6 +122,24 @@
     : null);
   const findingsText = $derived(findings === null ? ""
     : findings === 0 ? "No findings" : findings === 1 ? "1 finding" : `${findings} findings`);
+  // A narrow window drops the readout's items from the right, the reflections
+  // first and Background next ("try b"). Measured as ink against room: each
+  // item's box, laid out even while dropped, against the half's own width,
+  // never `scrollWidth`, which equals `clientWidth` wherever overflow shows.
+  $effect(() => {
+    const r = reading, room = readoutRoom, el = readoutEl;
+    if (!r || !el) return;
+    untrack(() => {
+      const widths = new Map<string, number>();
+      for (const item of el.querySelectorAll<HTMLElement>(".ro")) {
+        widths.set(item.dataset.id ?? "", item.getBoundingClientRect().width);
+      }
+      const gap = parseFloat(getComputedStyle(el).columnGap) || 0;
+      const next = dropsFor(r.items.map((i) => i.id), widths, gap, room, r.dropOrder);
+      if ([...next].join() !== [...readoutDrops].join()) readoutDrops = next;
+    });
+  });
+
   /** Rwp and GoF ride on the action bar only while the graphs are hidden ("try B"). */
   const barStats = $derived(!showGraphs && result
     ? { rwp: result.statistics?.rwp ?? null, gof: result.statistics?.gof ?? null,
@@ -694,13 +717,12 @@
     <button class="ghost" class:gone={!busy} disabled={!busy} onclick={stop}
       title="Stop the run&#10;{mod}.">Stop</button>
   </span>
-  <span class="right" role="status">
+  <span class="right" role="status" bind:this={readoutEl} bind:clientWidth={readoutRoom}>
     {#if reading}
-      <span class="ro"><span class="k">2θ</span><span class="v w9">{reading.position}</span></span>
-      {#if reading.d}<span class="ro"><span class="k">d</span><span class="v w9">{reading.d}</span></span>{/if}
-      {#each reading.rows as row (row.id)}
-        <span class="ro"><span class="k">{row.label}</span><span class="v"
-          class:w9={!row.id.startsWith("ticks:")} class:w16={row.id.startsWith("ticks:")}>{row.value}</span></span>
+      {#each reading.items as it (it.id)}
+        <span class="ro" class:dropped={readoutDrops.has(it.id)} data-id={it.id}><span
+          class="k">{it.label}</span><span class="v" class:left={it.left}
+          style:min-width="{it.slot}ch">{it.value}</span></span>
       {/each}
     {:else}
       {findingsText}
@@ -860,6 +882,7 @@
      findings count resizes no box; set from the right end, and from the left
      (2θ first) when a narrow window cannot hold the whole reading */
   .right {
+    position: relative;
     flex: 1 1 0;
     display: flex;
     justify-content: safe flex-end;
@@ -870,26 +893,31 @@
     white-space: nowrap;
   }
 
+  /* a label in the text face and the muted colour, its number in the mono
+     face and the ink ("try b", 2026-11-11) */
   .ro {
     display: inline-flex;
+    align-items: baseline;
     gap: 5px;
+    font-size: var(--text-sm);
   }
 
   .ro .v {
     display: inline-block;
     color: var(--fg);
     font-family: var(--mono-family);
-    font-size: var(--text-sm);
     text-align: right;
   }
 
-  .ro .w9 {
-    min-width: 9ch;
+  .ro .v.left {
+    text-align: left;
   }
 
-  .ro .w16 {
-    min-width: 16ch;
-    text-align: left;
+  /* dropped from the right when the room is short: still laid out, so its
+     width is measured on the next sweep, but it takes no room */
+  .ro.dropped {
+    position: absolute;
+    visibility: hidden;
   }
 
   .console {

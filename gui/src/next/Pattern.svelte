@@ -18,7 +18,9 @@
    *   Option-click removes it, and right-click opens its menu;
    * - the plot's context menu holds the exports and the range gestures;
    * - the hover readout is handed to the frame, which shows it in the status
-   *   bar's right half (the maintainer's ruling of 2026-11-11, question 5).
+   *   bar's right half (the maintainer's ruling of 2026-11-11, question 5), in
+   *   the legend's words (`./readout.ts`, ruled "try b" the same day);
+   * - the intensity opens on square root, as the prototype's does.
    *
    * The chart is today's `lib/pattern.ts` figure, drawn without the peak layer,
    * which the peaks-and-indexing workflow brings (R6). The three-effect split
@@ -31,12 +33,14 @@
   import { isShortcutTarget } from "../lib/palette";
   import {
     curveColors, curveToggles, dataOnlyHidden, isDataOnly, mergeRegions, normalizeRegion,
-    readout, residual, shows, toggleCurve, RESIDUAL_KINDS,
-    type Protocol, type Readout, type ResidualKind, type Scale, type Window,
+    residual, shows, toggleCurve, RESIDUAL_KINDS,
+    type Protocol, type ResidualKind, type Scale, type Window,
   } from "../lib/plot";
   import type { Curves, Overlay, PatternChart } from "../lib/pattern";
   import type { Theme } from "../lib/theme";
   import Menu, { type MenuAt, type MenuEntry } from "./Menu.svelte";
+  import { statusReadout, type StatusReadout } from "./readout";
+  import { CURVE_WORDS } from "./words";
 
   let {
     result,
@@ -67,15 +71,9 @@
       excluded_regions?: [number, number][];
     }) => void | Promise<void>;
     /** the hover readout, or null when the pointer leaves the plot */
-    onreadout?: (reading: Readout | null) => void;
+    onreadout?: (reading: StatusReadout | null) => void;
   } = $props();
 
-  /** The legend's words. `lib/plot.ts`'s labels are today's buttons, which
-   *  today's page keeps until the swap, so the words are this page's. */
-  const WORDS: Record<string, string> = {
-    obs: "Observed", masked: "Excluded", calc: "Last fit", bkg: "Background",
-    diff: "Difference",
-  };
   /** How the difference reads in the view menu. */
   const DIFFERENCE: Record<ResidualKind, string> = {
     weighted: "Difference in esd (Δ/σ)", delta: "Difference in counts (Δ)",
@@ -95,7 +93,9 @@
   let loadError = $state("");
   let empty = $state(false);
   let kind = $state<ResidualKind>("weighted");
-  let scale = $state<Scale>("linear");
+  /** square root first, as the prototype opens: the weak peaks a strong one
+   *  hides are the ones a refinement is judged on */
+  let scale = $state<Scale>("sqrt");
   let hidden = $state<string[]>([]);
   let beforeDataOnly = $state<string[] | null>(null);
   let hoverAt = $state<number | null>(null);
@@ -276,11 +276,11 @@
   // -- the readout, handed to the frame's status bar ----------------------
 
   $effect(() => {
-    const reading = readout(held, hoverAt, {
-      kind, wavelengths, peaks: null, peaksActive: false, hidden,
+    const reading = statusReadout(held, hoverAt, {
+      kind, wavelengths, hidden,
       chi2Base: untrack(() => chart?.fig.chi2Base() ?? 0),
     });
-    untrack(() => onreadout(hoverAt === null ? null : reading));
+    untrack(() => onreadout(reading));
   });
 
   // -- the view's controls ------------------------------------------------
@@ -551,7 +551,7 @@
     let main = geom.main.top, tick = 0;
     const phases = toggles.filter((t) => t.id.startsWith("ticks:")).length;
     for (const t of toggles) {
-      const label = WORDS[t.id] ?? t.label;
+      const label = CURVE_WORDS[t.id] ?? t.label;
       if (t.id === "diff") {
         out.push({ id: t.id, label, top: geom.resid.top + geom.resid.height / 2 - LEGEND_ROW / 2 });
       } else if (t.id.startsWith("ticks:")) {
