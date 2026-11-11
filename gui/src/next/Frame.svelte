@@ -25,7 +25,8 @@
   import Recovery from "../panels/Recovery.svelte";
   import type { HelpCorpus } from "../lib/help";
   import type { Readout } from "../lib/plot";
-  import { RecoveryWriter, combine, readDraft, type Draft } from "../lib/recovery";
+  import { RecoveryWriter, combine, readDraft, type Draft, type InteractiveDraft,
+           type PlanDraft } from "../lib/recovery";
   import { isShortcutTarget, type Command } from "../lib/palette";
   import Splitter from "../panels/Splitter.svelte";
   import { modifier, runWords, toggleTitle } from "../lib/statusbar";
@@ -129,9 +130,21 @@
     (path, at, draft) => api.putRecovery(path, at, draft));
   let offer = $state.raw<{ path: string; draft: Draft; savedUtc: string | null;
                            moved: boolean } | null>(null);
+  /** The kept copy's Interactive and Plan arms, which today's page wrote and
+   *  this page has no panel for. The copy is one per project and shared by
+   *  both pages, so they ride on every write from here: a Parameters edit on
+   *  this page never drops the other page's unapplied edits. */
+  const NO_CARRY = { interactive: null, plan: null } as const;
+  let carried = $state.raw<{ interactive: InteractiveDraft | null;
+                             plan: PlanDraft | null }>(NO_CARRY);
+  const carriedCount = $derived(
+    (carried.interactive ? Object.keys(carried.interactive.values ?? {}).length : 0)
+    + (carried.plan ? 1 : 0));
   $effect(() => {
     const path = project?.path ?? null;
-    const draft = combine(pendingTouched, paramsPanel?.draft() ?? null, null, null);
+    const extra = carried;
+    const draft = combine(pendingTouched + carriedCount, paramsPanel?.draft() ?? null,
+                          extra.interactive, extra.plan);
     const at = head;
     untrack(() => recoveryWriter.schedule(path, at, draft));
   });
@@ -205,6 +218,7 @@
     await recoveryWriter.flush();
     recoveryWriter.disarm();
     offer = null;
+    carried = NO_CARRY;
     paramsPanel?.revert();
   }
 
@@ -221,12 +235,15 @@
     }
     if (project?.path !== path) return;
     const draft = readDraft(kept?.draft);
+    carried = draft?.interactive || draft?.plan
+      ? { interactive: draft.interactive, plan: draft.plan } : NO_CARRY;
     if (draft?.params) {
       offer = { path, draft, savedUtc: kept.saved_utc ?? null,
                 moved: !!kept.head && kept.head !== kept.head_now };
       return;
     }
-    recoveryWriter.arm(path, null);
+    // the server holds `draft`, which this page only carries
+    recoveryWriter.arm(path, draft);
   }
 
   function restoreKept() {
@@ -253,7 +270,10 @@
       }
       return;
     }
-    if (project?.path === o.path) recoveryWriter.arm(o.path, null);
+    if (project?.path === o.path) {
+      carried = NO_CARRY;
+      recoveryWriter.arm(o.path, null);
+    }
   }
 
   /** Escape on the offer: kept on the server, offered at the next open. */
@@ -287,14 +307,16 @@
   }
 
   /** Apply the pending edits. A refusal is drawn in the Parameters panel,
-   *  so a refused apply brings that tab forward. */
+   *  so a refused apply brings that tab, and the model panel, forward. The
+   *  result is not refetched: a `set_values` keeps the last fit (today's
+   *  `App.svelte:moved` says why). */
   async function applyPending(): Promise<boolean> {
     const ok = !!(await paramsPanel?.apply());
     if (!ok) {
       modelTab = "params";
+      showModel = true;
       return false;
     }
-    await loadResult();
     return true;
   }
 
@@ -324,8 +346,10 @@
   }
 
   async function open(path: string): Promise<string> {
+    // a write still on the timer lands first, for the project it was made in
+    await recoveryWriter.flush();
     try {
-      opened(await api.openProject(path));
+      await opened(await api.openProject(path));
       say(`p = rx.Project.open(${JSON.stringify(path)})`);
       return "";
     } catch (error) {
@@ -335,9 +359,12 @@
   }
 
   async function openExample(name: string, reset = false): Promise<string> {
+    // a write still on the timer lands first: after a reset it would otherwise
+    // re-create the copy the server has just discarded (WP-2209)
+    await recoveryWriter.flush();
     try {
       const doc = reset ? await api.resetExample(name) : await api.openExample(name);
-      opened(doc);
+      await opened(doc);
       say(`p = rx.Project.open(${JSON.stringify(doc.path)})  # the ${name} example`);
       return "";
     } catch (error) {
@@ -498,16 +525,22 @@
       await loadProject();
       run = await api.runState();
     })();
+    /** The run outcome this page has already reacted to; null until the first
+     *  frame, so a reload does not reload for a run that ended before it. */
+    let seen: string | null = null;
     const unfollow = follow(
       (event: EngineEvent) => say(consoleLine(event)),
       (frame: RunState) => {
-        const was = run?.state;
         run = frame;
-        // a run just ended: the result and the head moved
-        if (was && was !== "idle" && frame.state === "idle") {
+        // a run just ended, keyed on its outcome rather than on having seen a
+        // `running` frame: a stage that starts and ends between two frames
+        // sends one idle frame with a new status (today's `App.svelte`)
+        const key = `${frame.state}:${frame.run?.status ?? ""}:${frame.run?.node_id ?? ""}`;
+        if (seen !== null && key !== seen && frame.state === "idle" && frame.run?.status) {
           void loadResult();
           void api.project().then((doc) => (project = doc)).catch(() => {});
         }
+        seen = key;
       },
       { poll: (since) => api.events(since) },
     );
@@ -585,8 +618,10 @@
         </div>
       </section>
     {/if}
-    {#if showModel}
-      <section class="model" aria-label="Model"
+    <!-- mounted while hidden, so hiding the model or choosing a workflow not
+         built yet keeps the Parameters panel's pending edits (and the recovery
+         copy the effect above writes from them) -->
+      <section class="model" class:gone={!showModel} aria-label="Model"
         style:flex={showGraphs ? `0 0 ${modelWidth}px` : "1 1 auto"}>
         {#if showGraphs && project}
           <Splitter size={modelWidth} grow="left" min={360} keep={360}
@@ -611,10 +646,12 @@
                 onclick={() => (modelTab = t.id)}>{t.label}</button>
             {/each}
           </div>
-          <div class="pane" class:gone={modelTab !== "params"}>
-            <Params bind:this={paramsPanel} {head} {busy} {corpus} {say}
-              onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
-          </div>
+        {/if}
+        <div class="pane" class:gone={!!unbuilt || modelTab !== "params"}>
+          <Params bind:this={paramsPanel} {head} {busy} {corpus} {say}
+            onpending={(n, why) => { pendingTouched = n; pendingInvalid = why; }} />
+        </div>
+        {#if !unbuilt}
           {#if modelTab !== "params"}
             <div class="pane"><p class="unbuilt">Not built yet.</p></div>
           {/if}
@@ -623,7 +660,6 @@
             onrevert={revertPending} onrefine={() => refine()} />
         {/if}
       </section>
-    {/if}
   </div>
 
   {/if}

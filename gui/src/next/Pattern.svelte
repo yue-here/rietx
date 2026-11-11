@@ -28,6 +28,7 @@
 
   import { ApiError } from "../api";
   import { exportFigure, type ExportKind } from "../lib/exports";
+  import { isShortcutTarget } from "../lib/palette";
   import {
     curveColors, curveToggles, dataOnlyHidden, isDataOnly, mergeRegions, normalizeRegion,
     readout, residual, shows, toggleCurve, RESIDUAL_KINDS,
@@ -59,10 +60,12 @@
     busy?: boolean;
     /** the last refusal of a range or a region, in the verb's own words */
     protocolError?: string;
+    /** may return the verb's promise, so a typed edit can follow the
+     *  region it moved */
     onprotocol?: (patch: {
       two_theta_limits?: [number, number] | null;
       excluded_regions?: [number, number][];
-    }) => void;
+    }) => void | Promise<void>;
     /** the hover readout, or null when the pointer leaves the plot */
     onreadout?: (reading: Readout | null) => void;
   } = $props();
@@ -147,6 +150,10 @@
     loadError = "";
     empty = false;
     held = mod.windowOf(c);
+    // the new payload is `curves` before the figure takes it: `watchZoom`
+    // reads it inside the figure's own `setX`, which `setCurves` calls
+    const keep = mod.sameGrid(curves, c);
+    curves = c;
     if (!chart) {
       chart = new mod.PatternChart(host, c, overlayNow(), {
         scale: untrack(() => scale),
@@ -162,10 +169,9 @@
       chart.fig.setMode(arm ? "select" : "zoom");
       watchZoom(chart);
     } else {
-      chart.setCurves(c, mod.sameGrid(curves, c));
+      chart.setCurves(c, keep);
       chart.update(overlayNow());
     }
-    curves = c;
     relayout();
   }
 
@@ -423,8 +429,7 @@
   ]);
 
   function keydown(ev: KeyboardEvent) {
-    const t = ev.target as HTMLElement | null;
-    if (t && (t.tagName === "INPUT" || t.isContentEditable)) return;
+    if (!isShortcutTarget(ev)) return;
     if (ev.key === "Escape" && arm) {
       arm = null;
       ev.preventDefault();
@@ -452,12 +457,16 @@
     if (selection && !chosen) selection = null;
   });
 
+  /** The bounds as the boxes show them: one place more than the data
+   *  resolves, as the old pills said them. Strings, so a new-but-equal
+   *  protocol (every reload of the project) leaves a half-typed box alone. */
+  const loShown = $derived(chosen ? chosen.lo.toFixed(3) : "");
+  const hiShown = $derived(chosen ? chosen.hi.toFixed(3) : "");
   let loText = $state("");
   let hiText = $state("");
   $effect(() => {
-    // one place more than the data resolves, as the old pills said them
-    loText = chosen ? chosen.lo.toFixed(3) : "";
-    hiText = chosen ? chosen.hi.toFixed(3) : "";
+    loText = loShown;
+    hiText = hiShown;
   });
 
   /** The channels in [lo, hi], fitted and excluded together. */
@@ -477,16 +486,32 @@
     return selection.kind === "range" ? `${n} of ${total} channels` : `${n} channels`;
   });
 
-  function typed() {
+  /** Send the typed bounds. Enter and the box's change both land here, so
+   *  an unedited pair sends nothing: the shown text is rounded, and sending it
+   *  back would move the bound by the rounding. */
+  let sending = false;
+  async function typed() {
     const s = selection;
     const lo = Number(loText), hi = Number(hiText);
-    if (!s || !loText.trim() || !hiText.trim()) return;
-    if (s.kind === "range") {
-      onprotocol({ two_theta_limits: [lo, hi] });
-    } else {
-      const rest = protocol.regions.filter((_, i) => i !== s.index);
+    if (!s || sending || !loText.trim() || !hiText.trim()) return;
+    if (loText === loShown && hiText === hiShown) return;
+    sending = true;
+    try {
+      if (s.kind === "range") {
+        await onprotocol({ two_theta_limits: [lo, hi] });
+        return;
+      }
       const pair = normalizeRegion([lo, hi]);
-      if (pair) onprotocol({ excluded_regions: mergeRegions(rest, pair) });
+      if (!pair) return;
+      const before = protocol.regions;
+      await onprotocol({ excluded_regions: mergeRegions(before.filter((_, i) => i !== s.index), pair) });
+      // the merge sorts the list, so the region moved has a new index; a
+      // refused edit leaves the list, and the selection, as they were
+      if (protocol.regions === before) return;
+      const i = protocol.regions.findIndex(([a, b]) => a <= pair[0] && b >= pair[1]);
+      selection = i >= 0 ? { kind: "region", index: i } : null;
+    } finally {
+      sending = false;
     }
   }
 
@@ -562,7 +587,7 @@
     <div class="gtitle" title={held?.stale ? `${title}, fitted over other channels` : title}>
       {#if title}<b>{title}</b>{/if}
       {#if held && !held.raw && stats}
-        <span class="stat">Rwp <span class="num">{stats.rwp == null ? "" : (stats.rwp * 100).toFixed(2)} %</span></span>
+        <span class="stat">Rwp <span class="num">{stats.rwp == null ? "" : `${(stats.rwp * 100).toFixed(2)} %`}</span></span>
         <span class="stat">GoF <span class="num">{stats.gof?.toFixed(2)}</span></span>
       {/if}
       {#if held && !held.raw && immature}<span class="bad">Not a fit yet</span>{/if}

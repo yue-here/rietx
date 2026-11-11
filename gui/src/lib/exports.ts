@@ -4,8 +4,10 @@
  * does the work, on the figure as drawn now, at the reader's zoom. Each answers
  * with the line a panel shows, a refusal included, since a clipboard can refuse.
  *
- * Shared by the Pattern tab's view menu and the Series panel's buttons
- * (`panels/Exports.svelte`), so the two say the same thing (WP-2213).
+ * The rebuilt Pattern graph's menus call it. It is `panels/Exports.svelte`'s
+ * logic, lifted out of that shared panel rather than edited in it (`gui/CLAUDE.md`
+ * § Build: a shared panel is not edited for the new page's sake); the panel
+ * can call it at the swap.
  *
  * Nothing here is imported at boot: the chart module is a chunk the first draw
  * fetches, and svgcanvas one the first SVG fetches.
@@ -13,13 +15,6 @@
 import type { Group } from "rxplot";
 
 export type ExportKind = "png" | "svg" | "image" | "data";
-
-export const EXPORTS: { id: ExportKind; label: string; title: string }[] = [
-  { id: "png", label: "Save as PNG", title: "save the figure as a PNG, as drawn" },
-  { id: "svg", label: "Save as SVG", title: "save the figure as an SVG, redrawn as vectors" },
-  { id: "image", label: "Copy image", title: "copy the figure to the clipboard as a PNG" },
-  { id: "data", label: "Copy data", title: "copy what is in view as tab-separated columns" },
-];
 
 const LABELS: Record<ExportKind, string> = {
   png: "PNG", svg: "SVG", image: "copy image", data: "copy data",

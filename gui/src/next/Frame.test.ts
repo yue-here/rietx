@@ -110,7 +110,8 @@ describe("the panels", () => {
     byLabel("Show the graphs")!.click();
     flushSync();
     key("2");
-    expect(document.querySelector('section[aria-label="Model"]')).toBeNull();
+    // hidden, never unmounted: the Parameters panel keeps its pending edits
+    expect(document.querySelector('section[aria-label="Model"]')!.classList.contains("gone")).toBe(true);
   });
 
   it("show the bottom panel from the status bar and ⌘J, hidden at first", async () => {
