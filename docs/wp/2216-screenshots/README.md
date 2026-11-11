@@ -56,3 +56,22 @@ The menus-and-axes pictures (`r2b-*`), light and dark, the `fap` example after o
   Anisotropic ADPs, then Delete.
 
 Taken 2026-11-11 the same way, by `shots.py` in the runner's scratch directory.
+
+The polish pictures (`polish-*`), light and dark, after Yue's ruling of 2026-11-11 ("Merge,
+then polish"): the same six states as `r2b-*` plus the readout hover, so each pairs with the
+picture taken before the polish. The `fap` example after one staged fit:
+
+- `polish-rest-*.png` pairs with `r2b-rest-*.png`. Parameters has the filter box, the row of
+  links to each band, 44 px bands with a strong rule, 32 px rows, the drawn checkboxes and tinted
+  value boxes. The atom table reads Atom, Species, Wyckoff, Position, Occ, Biso Å², Mult. The
+  plot is a card. The reflection ticks are lenses at the foot, under a 76 px difference pane,
+  and carry the 2θ labels. The intensity labels read 1, 50, 200, 500, 1k, 2k, 5k, 10k, 20k.
+  Observed points are crosses, and no gridlines are drawn. The action bar reads
+  "Staged plan, 6 stages".
+- `polish-phase-menu-*.png`, `polish-atom-menu-*.png`, `polish-intensity-axis-*.png` and
+  `polish-difference-axis-*.png` pair with their `r2b-*` namesakes.
+- `polish-readout-hover-*.png` pairs with `readout-hover-*.png`: zoomed by a drag across the
+  middle tenth of the plot, the pointer resting inside it. The ±3 esd band shows behind the
+  difference.
+
+Taken 2026-11-12 the same way, by `shots.py` in the runner's scratch directory.

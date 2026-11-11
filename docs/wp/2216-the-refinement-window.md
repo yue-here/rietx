@@ -1,6 +1,6 @@
 # WP-2216 — the refinement window: the Pattern graph, Parameters and the action bar at `/next`
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — #1535 and the readout follow-up #1536 merged; the menus-and-axes PR open (#1537)
+Milestone: gui-overhaul · Status: 🔄 2026-11-12 — #1535, #1536 and #1537 merged; the polish PR open (#PRNUM)
 Depends on: 2215 (the frame)
 Priority: P2 2026-11-11 — a feature the open milestone was opened for: the screen a person spends most time in
 
@@ -134,6 +134,32 @@ The first PR's three questions, answered on 2026-11-11.
   matching" and "Fix N matching" while a filter is typed, and "Free all N" and "Fix all N"
   otherwise.
 
+- **The polish: the prototype is the ruling** (the maintainer, 2026-11-11, "Merge, then
+  polish"). For every visible difference between `/next` and the prototype on R2's screens,
+  `/next` takes the prototype's. Where that would break a written rule, the rule wins
+  (`gui/STYLE.md` principle 9), and the difference is listed below with its rule.
+  - *Fixed in the polish PR*: Parameters' filter box, and a row of links that scrolls to each
+    band; bands 44 px tall in the band face under a strong rule; 32 px rows, indented by
+    depth; each group head counting its free members ("2 free"); drawn checkboxes; value
+    boxes tinted and sized by their own column; units muted and smaller; the atom table's
+    header reads Wyckoff and Biso Å², with each column's box beside its word, the atom's name
+    in the medium weight and its Wyckoff letter muted. On the graph: the reflection ticks are
+    lenses at the foot, under the difference, and carry the 2θ labels; the difference pane is
+    76 px over a ±3 esd band; observed points are crosses; intensity tick labels abbreviate
+    thousands (20k), and a √ or log axis takes 1, 2 and 5 times each power of ten; the plot
+    is a card on the window's ground. The action bar reads "Staged plan, N stages".
+  - *Kept, each by a written rule or ruling*: no horizontal gridlines (`gui/STYLE.md`
+    § Plots); Rwp and every axis label in the mono face (§ Type); the Intensity control in the
+    axis menu, the axis hints and bare 2θ labels with one `° 2θ` hint (§ Rulings, "Yes, build
+    it"); the ⋯ menus (§ Rulings, Free and Fix); Background drawn by default (the readout ruling
+    reads Background); "2 findings" in the status bar (the first PR's consent list). Real data
+    stays: "20 free of 81", no Extinction row, the project name `fap`. No empty User variables
+    band is drawn, since `fap` has none and adding one is a feature.
+  - *A rule to reconcile*: `gui/CLAUDE.md` (WP-1032) puts a tick in "its own band between
+    pattern and residual", which describes today's page. `gui/STYLE.md` § Plots and the
+    prototype put the ticks at the foot. The polish follows STYLE.md at `/next`; the swap
+    rewrites the gui/CLAUDE.md clause.
+
 ## Questions
 
 Filled in by the session that builds each PR.
@@ -141,6 +167,13 @@ Filled in by the session that builds each PR.
 1. **Axis titles on the Pattern graph.** The prototype draws none; `/next` drew today's
    (`intensity (√)`, `(obs−calc)/σ`). Keep them, or drop them as the prototype does?
    Answered 2026-11-11: drop them for unit hints with menus (§ Rulings, "Yes, build it").
+2. **Three things `/next` draws and the prototype does not: keep or drop each.** The polish
+   left them alone for the maintainer.
+   - The atom table's Mult column (each site's multiplicity). At a 1440 px window the table
+     is 800 px wide in a 784 px panel, so Mult runs 16 px past the edge and the table scrolls
+     sideways. Without it the table is 760 px and fits.
+   - The legend's "Excluded" entry, for the observed points outside the fitted range.
+   - GoF on the graph's title line, after Rwp.
 
 ## References
 
@@ -149,6 +182,25 @@ Filled in by the session that builds each PR.
   `docs/milestones/gui-overhaul.md`.
 
 ## Handover log
+
+- **2026-11-12** — a ghostshift runner built the polish PR, #PRNUM, under the ruling "Merge,
+  then polish" (§ Rulings).
+  - *Done*: `gui/src/next/Params.svelte` drawn to the prototype (§ Rulings lists each
+    difference). The chart draws through `/next`'s own copies, `gui/src/next/rxplot.mjs` and
+    `gui/src/next/pattern.ts`, under gui/CLAUDE.md's rule for a shared module the rebuild
+    changes, so today's page, `rietx watch` and `rietx compare` are untouched. The copy's
+    header lists what differs from the original. `ActionBar.svelte` takes the plan's stage
+    count from `project.json`'s plan. Pictures: `docs/wp/2216-screenshots/polish-*.png`, each
+    paired with an `r2b-*` or `readout-hover-*` picture taken before.
+  - *Not generalised*: `src/rietx/viz/static/rxplot.mjs` keeps gridlines, square markers and
+    the tick band between the panes, for today's page, `rietx watch` and `rietx compare`. The
+    swap decides whether those pages follow.
+  - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright, Python 3.12): see the
+    PR body. The atom table with Mult: 800 px in a 784 px panel at a 1440 px window.
+  - *Gotchas*: next.css gives every plain button a 30 px height, which a value box inherited;
+    the box sets its own. A √ axis's splits are measured in pixels, and before the first layout
+    the plot has no height, so the 22 px thinning waits for it.
+  - *Next*: the maintainer's look at the `polish-*` pictures, and § Questions 2.
 
 - **2026-11-11** — a ghostshift runner built the third PR, #1537: the phase and atom menus,
   Free and Fix in a menu, and the axes as ruled.
