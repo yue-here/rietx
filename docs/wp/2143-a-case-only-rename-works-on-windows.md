@@ -1,9 +1,8 @@
 # WP-2143 — a case-only rename works on Windows, and its recovery copy follows the folder
 
-Milestone: unscheduled · Status: 🔄 2026-11-12 — claimed by the ghostshift runner main-nightly-windows
+Milestone: unscheduled · Status: ✅ 2026-11-12 — both fixes landed; the first Windows nightly after the merge is the check
 Track: The repo's own process
 Depends on: —
-Priority: P1 2026-11-12 — a required check red on main: the nightly Windows fast job, a release gate, red on 2026-11-10 and 2026-11-11
 
 ## Goal
 
@@ -45,6 +44,9 @@ given.
 What was not generalised: the other `Path` equalities in the GUI (`project_move`'s no-op
 test, `project_copy`'s and `project_move`'s "into itself" tests) ask whether two paths name
 one place. A case-insensitive answer is right for that question on Windows, so they stay.
+`_project_name` adds `.rex` unless the name already ends in it, case-sensitively, so a name
+typed as `Sample.REX` becomes `Sample.REX.rex` on every platform. That is a naming question
+rather than a case-insensitive volume's, and it is left as it is.
 
 ## Non-goals
 
@@ -76,6 +78,49 @@ any platform:
 
 ## Handover log
 
+- **2026-11-12** — closed. On Windows, renaming a project from `sample.rex` to `Sample.rex`
+  now renames the folder. The person's unapplied edits follow it. Before, the folder kept its
+  old name, and on that rename the edits were left where the project could not find them.
+  Neither fault reached a release, since the File menu and the recovery copy are both new
+  since v1.11. The fix is checked on Windows only by the nightly, so the first Windows
+  nightly after the merge is the acceptance. PR #1539.
+
+  *Done.* `project_rename` compares the old and new folder names as text. `recovery.move`
+  keys the old copy by the resolved path its caller took before the move, through a new
+  `_read_key` that `read` shares. The case-only rename test now writes a draft first and
+  checks it follows the folder. A new test makes the old name resolve to the moved folder
+  through a symlink, as Windows does, so it runs on every platform.
+
+  *Reproduced?* Not as a failure. The test runs here, because APFS is case-insensitive, and
+  it passes on main's code: `pathlib` compares POSIX paths with case, so the rename reaches
+  the move. The cause was shown instead: `PureWindowsPath("C:/t/work/sample.rex") ==
+  PureWindowsPath("C:/t/work/Sample.rex")` is `True` and the POSIX pair is `False`. The new
+  recovery test failed on main's `recovery.py` (`move` returned `False`) and passes on the fix.
+
+  *Measured* (`[dev]`, macOS arm64, main `a86dcf9d4` merged in, other sessions' suites
+  queued on the same machine). Fast selection: 14 558 passed, 424 skipped, 32 xfailed, plus
+  1 failed, the stale WP index, regenerated and green on its rerun (`test_docs_consistency.py`,
+  26 passed). One test added, 0.01 s. `tests/test_gui_file_menu.py` and
+  `tests/test_gui_recovery.py`: 24 passed. The full selection did not run: the change is GUI
+  server code and moves no measured number. `python -m tests.reader_output`: exit 0,
+  unchanged. Lint as CI runs it: ruff, format, `skill_caps`, `skill_surface`, `audit_delta`
+  all exit 0; Vale 0 errors, 268 warnings, none on a line this WP wrote.
+
+  *Review.* `/code-review high --fix` found no correctness bug. Applied: the shared key
+  check, and the draft in the end-to-end test. Declined: normalising `source` inside `move`,
+  which would bring back the re-resolve this WP removed; `_relocate` swallowing an `OSError`
+  from the move, and the case-sensitive `.rex` suffix test, both older than this WP (the
+  suffix is in Context's list of what was not generalised).
+
+  *Generality.* Not dispatched: `_audit.py` untouched, and nothing here reads a pattern.
+
+  *Elsewhere.* WP-2209's `### Inherited` says `move` now keys by the path it is given. The
+  nightly of 2026-11-11 was also red on the Linux `full` job, on
+  `test_pair_diagnostic_class.py::test_the_two_site_winner_finds_each_site_its_own_moment`
+  (0.699 against 3.5 ± 0.01); that row is not this WP's and nothing here touches it.
+
+  Next: read the Windows row of the first nightly after #1539 merges. If
+  `test_gui_file_menu.py` is still red there, reopen this WP.
 - **2026-11-12** — created by the ghostshift runner main-nightly-windows from the nightly's
   red Windows row. No open WP owns it: WP-2133 is closed, and WP-2036's open PR #1425 closes
   that WP.
