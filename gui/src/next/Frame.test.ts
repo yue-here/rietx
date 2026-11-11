@@ -166,6 +166,38 @@ describe("the status bar", () => {
   });
 });
 
+describe("the palette and the keys", () => {
+  it("opens the palette on ⌘K, every frame command in it with its key", async () => {
+    await boot();
+    key("k");
+    const labels = [...document.querySelectorAll(".panel li .label")].map((e) => e.textContent);
+    expect(labels).toEqual(expect.arrayContaining([
+      "Hide the graphs", "Hide the model", "Show the console", "Stop the run",
+      "New project…", "Settings…", "Theme: Match system", "Keyboard shortcuts",
+      "Workflow: Series · placeholder"]));
+    const console_ = [...document.querySelectorAll(".panel li")]
+      .find((li) => li.querySelector(".label")!.textContent === "Show the console")!;
+    expect(console_.querySelector("kbd")!.textContent).toMatch(/J$/);
+    console_.querySelector("button")!.click();
+    flushSync();
+    expect(document.querySelector('section[aria-label="Console and history"]')).not.toBeNull();
+  });
+
+  it("lists the keys on ?, and not while typing", async () => {
+    await boot();
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
+    flushSync();
+    expect(document.querySelector('[aria-labelledby="keys-title"]')).toBeNull();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
+    flushSync();
+    const rows = [...document.querySelectorAll('[aria-labelledby="keys-title"] tr')];
+    expect(rows.length).toBeGreaterThanOrEqual(7);
+    expect(rows.map((r) => r.textContent)).toContain("Keyboard shortcuts?");
+  });
+});
+
 describe("Settings", () => {
   it("opens on ⌘, with the theme as three choices and the version as its About line", async () => {
     await boot();

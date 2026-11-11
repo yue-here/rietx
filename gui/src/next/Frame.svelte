@@ -20,12 +20,15 @@
   import { ApiError, api } from "../api";
   import FileMenu from "../panels/FileMenu.svelte";
   import NewProject from "../panels/NewProject.svelte";
+  import Palette from "../panels/Palette.svelte";
+  import { isShortcutTarget, type Command } from "../lib/palette";
   import Splitter from "../panels/Splitter.svelte";
   import { modifier, runWords, toggleTitle } from "../lib/statusbar";
   import { consoleLine, follow, type EngineEvent, type RunState } from "../lib/stream";
   import { applyTheme, readChoice, resolveTheme, type ThemeChoice } from "../lib/theme";
   import { WORKFLOWS, menuLabel, workflow, type WorkflowId } from "../lib/workflows";
   import Console from "./Console.svelte";
+  import Keys from "./Keys.svelte";
   import Menu, { type MenuAt } from "./Menu.svelte";
   import Settings from "./Settings.svelte";
   import Start from "./Start.svelte";
@@ -65,6 +68,8 @@
   let wfAt = $state<MenuAt | null>(null);
   let wfButton: HTMLButtonElement | undefined = $state();
   let settingsOpen = $state(false);
+  let paletteOpen = $state(false);
+  let keysOpen = $state(false);
   let themeChoice = $state<ThemeChoice>("system");
   let systemDark = $state(false);
 
@@ -194,14 +199,47 @@
     step = 0;
   }
 
-  /** The frame's keys (WP-2214 rows 12, 239): ⌘1 and ⌘2 the side panels, ⌘J
-   *  the bottom panel, ⌘, Settings, ⌘. stops a run. Ctrl elsewhere. */
+  /** Every command the frame has, each with its key and the Python it runs
+   *  where it runs any (WP-2214 rows 241-242). Later pieces add theirs. */
+  const commands = $derived<Command[]>([
+    { id: "graphs", label: showGraphs ? "Hide the graphs" : "Show the graphs", echo: "",
+      key: `${mod}1`, disabled: !project || !showModel, run: toggleGraphs },
+    { id: "model", label: showModel ? "Hide the model" : "Show the model", echo: "",
+      key: `${mod}2`, disabled: !project || !showGraphs, run: toggleModel },
+    { id: "console", label: showBottom ? "Hide the console" : "Show the console", echo: "",
+      key: `${mod}J`, disabled: !project, run: toggleBottom },
+    { id: "stop", label: "Stop the run", echo: "token.cancel()", key: `${mod}.`,
+      disabled: !busy, run: stop },
+    { id: "new", label: "New project…", echo: "rx.Project.create(…)", disabled: busy,
+      run: () => (newOpen = true) },
+    ...WORKFLOWS.map((w): Command => ({
+      id: `wf:${w.id}`, label: `Workflow: ${menuLabel(w)}`, echo: "", disabled: !project,
+      run: () => chooseWorkflow(w.id) })),
+    { id: "settings", label: "Settings…", echo: "", key: `${mod},`,
+      run: () => (settingsOpen = true) },
+    ...(["system", "light", "dark"] as const).map((t): Command => ({
+      id: `theme:${t}`, label: `Theme: ${t === "system" ? "Match system" : t[0].toUpperCase() + t.slice(1)}`,
+      echo: "", run: () => chooseTheme(t) })),
+    { id: "palette", label: "Show all commands", echo: "", key: `${mod}K`,
+      run: () => (paletteOpen = true) },
+    { id: "keys", label: "Keyboard shortcuts", echo: "", key: "?", run: () => (keysOpen = true) },
+  ]);
+
+  /** The frame's keys (WP-2214 rows 12, 228, 239, 240): ⌘1 and ⌘2 the side
+   *  panels, ⌘J the bottom panel, ⌘, Settings, ⌘K the palette, ⌘. stops a
+   *  run, and `?` lists them. Ctrl elsewhere. Esc is each layer's own. */
   function keydown(event: KeyboardEvent) {
+    if (event.key === "?" && isShortcutTarget(event)) {
+      event.preventDefault();
+      keysOpen = true;
+      return;
+    }
     if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
     const act: Record<string, () => void> = {
       "1": toggleGraphs,
       "2": toggleModel,
       j: toggleBottom,
+      k: () => (paletteOpen = !paletteOpen),
       ",": () => (settingsOpen = !settingsOpen),
       ".": stop,
     };
@@ -380,6 +418,14 @@
 
 {#if newOpen}
   <NewProject {capabilities} {busy} {say} onclose={() => (newOpen = false)} onopened={opened} />
+{/if}
+
+{#if paletteOpen}
+  <Palette {commands} onclose={() => (paletteOpen = false)} />
+{/if}
+
+{#if keysOpen}
+  <Keys {commands} onclose={() => (keysOpen = false)} />
 {/if}
 
 {#if settingsOpen}
