@@ -146,7 +146,9 @@ describe("the filter is the selection", () => {
     const glob = asGlob("cell");
     const { shown } = flatten(ROWS, { glob });
     expect(shown).toBe(selection(ROWS, glob).matched);
-    expect(shown).toBe(6);
+    // a phase's six cell rows, and the six of a phase whose cell is stated
+    // through its parent's (`parent_cell.cell.*`, WP-1419)
+    expect(shown).toBe(12);
   });
 
   it("excludes locked and tied rows from a free/fix count", () => {
