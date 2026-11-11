@@ -370,11 +370,11 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "row and STAGE_FREED_NOTHING on one where it matched none, "
                 "never both on one histogram, and a shared row fixed in "
                 "several tables is one finding"),
-    # -- deliberately not computed ---------------------------------------------
     "_parent_strain_held_diagnostics": (
         (FIT,), "a parent-cell phase's strains are shared model parameters, "
                 "so the held-strain record is the fit's, read off the plan's "
                 "freed paths (WP-1419)"),
+    # -- deliberately not computed ---------------------------------------------
     "_site_glob_diagnostics": (
         (ABSENT,), "not called from multi.py yet: a single fit reports a glob "
                    "naming one site that frees nothing (WP-1951), and wiring it "
