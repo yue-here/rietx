@@ -1686,7 +1686,7 @@ Their numbers are as reported and were not re-measured here.
 
 ## Handover log
 
-### 2026-11-12 (twelfth session) — closed: PR #1497 merged
+### 2026-11-12 (twelfth session) — closed: PR #1497 merged (this close is PR #1540)
 
 The maintainer merged PR #1497 on 2026-11-10 (`cf6594baa`). It carried the
 two tasks the parametric milestone left here. A parametric equation can no

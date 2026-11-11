@@ -121,7 +121,7 @@ its merge.
 
 ## Handover log
 
-- **2026-11-12** — closed by a ghostshift runner. Both pull requests
+- **2026-11-12** — closed by a ghostshift runner (PR #1540). Both pull requests
   merged: #1505 on 2026-11-09 (`817553965`) and #1515 on 2026-11-10
   (`67e70ed02`). A user can now find, in the help and the manual, the line
   that declares Stephens strain, an anisotropic displacement tensor, or the
