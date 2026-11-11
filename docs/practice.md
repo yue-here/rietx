@@ -635,6 +635,79 @@ Neither program estimates a volume from the formula, so the volume range is alwa
 `from_formula`'s ceiling therefore rests on no program default; its audit row is tier 2 on
 Hofmann's citation and the 21 published cells it was checked against.
 
+## Which lines an indexing search is given
+
+Surveyed 2026-11-12 for WP-2078, on whether a relative intensity floor on the picked list is
+practice. "Checked" means read in the program's documentation or source, or in the paper; the
+TOPAS and Conograph programs were not run. Bergmann et al.'s Table 5 was read from the rendered
+page, because the PDF's text layer drops its minus signs.
+
+- TOPAS (Technical Reference v9, "Keywords in detail", the `index_*` keywords), checked. Each
+  line is an `index_th2` or `index_d`, optionally with `index_I`. The manual says `index_I`
+  weights the line. Coelho (2003, *J. Appl. Cryst.* 36, 86) eq. 4 puts it into the minimised
+  quantity as a factor. The keyword list has no intensity floor and no line count. The controls
+  are `index_max_Nc_on_No` and `index_max_th2_error`, and a `good` flag marks a line as not an
+  impurity. Coelho's examples feed every observed peak. In one he notes three small peaks that
+  "would not normally be included". `lp_search` fits the pattern itself, so it takes no list.
+- GSAS-II 5.8.4, checked. `OnReload` (`GSASIIpwdGUI.py:4210-4222`) copies every fitted peak
+  into the indexing list with `use` set. The `use` checkbox is the only selection
+  (`GSASIIpwdGUI.py:4280-4286`). `GSASIIindex.py` never reads the intensity column, and
+  `calc_M20` (`:163-191`) scores the first twenty rows in list order. The controls offer no
+  intensity threshold.
+- DICVOL06 and DICVOL14 (FullProf suite), checked. Card 2's N is the number of lines that
+  drive the search, "e.g. N = 20", below the total supplied (`dicvol06.inf:83-91`). The
+  solutions are then reviewed against every line. The input has no intensity field. Boultif &
+  Louër (2004, *J. Appl. Cryst.* 37, 724) §3.4: with DICVOL91 the advice for suspected spurious
+  lines was to omit low-intensity lines in a first run. DICVOL04 replaced that advice with an
+  impurity-line tolerance.
+- TREOR90 (FullProf suite), checked. Intensity "is never used by the indexing program"
+  (`treor90.inf:309-311`). The manual recommends the first 25 well-measured lines (`:72-74`).
+  `USE`, the lines in trial indexing, defaults to 19 with a maximum of 20 (`:716-726`). Werner,
+  Eriksson & Westdahl (1985, *J. Appl. Cryst.* 18, 367) used the first 25 lines.
+- ITO15 (FullProf suite), checked. It uses at most the first 40 lines, in ascending 2θ
+  (`ito15.inf:127-133`). An optional intensity field is read and no calculation uses it
+  (`:238-248`).
+- WinPLOTR, FullProf's front end to the three, checked in `WINPLOTR.pdf` §5.4.1 and §5.4.9-11.
+  Its peak search has a detection threshold relative to the largest derivative amplitude
+  (default 0.02). That is a picker's sensitivity, not a cut on I/Imax. The export dialogs offer
+  no intensity cut. The dialogs were read, not run.
+- McMaille (Le Bail 2004, *Powder Diffr.* 19, 249), checked. The automatic mode takes twenty
+  lines with intensities, and its score is the share of observed intensity a cell leaves
+  unexplained. Impurities are tolerated while they hold under 10-15 % of the total intensity.
+  Weak lines therefore count for little in the score, and none is removed.
+- Conograph (Oishi-Tomiyasu 2014, *J. Appl. Cryst.* 47, 593), checked. By default it takes the
+  48 smallest q values, chosen by position. The paper argues for more lines, not fewer.
+- N-TREOR09 in EXPO, checked only through ITC Vol. H ch. 3.4 (Altomare, Cuocci, Moliterni &
+  Rizzi). EXPO passes its indexer "the first 43 peaks" with intensities above "a default
+  threshold". The chapter states no value. This is the one automatic intensity floor found.
+- ITC Vol. H ch. 3.4, checked. M₂₀'s twenty lines are "a compromise (coming from experience)"
+  (§3.4.2.1). The introduction suggests setting overlapping peaks aside in a first attempt. No
+  sentence recommends a general intensity floor.
+- Bergmann, Le Bail, Shirley & Zlokazov (2004, *Z. Kristallogr.* 219, 783), the bethanechol
+  round robin, checked. Every program was given "the 20 first lines, or the first 20 lines with
+  I ≥ 5 % (I/Imax)" (p. 786). Set A is the raw list and set B the 5 % list. Two ICDD entries
+  were used, one with 8 impurity lines among its first 26 and one with 3 among its first 35.
+  Table 5 scores each run −1 (not in the first ten), 0 (found, not first) or +1 (first). Over
+  ITO13, DICVOL91, TREOR90 and McMaille, two entries and two modes, A to B gave 5 runs better,
+  1 worse and 10 unchanged. The worse run is McMaille's default run on the second entry, which
+  went from first to not found. After a zero correction (sets C to D) the floor gave 4 better,
+  0 worse and 12 unchanged. The manual runs also tolerated up to 8-10 unindexed lines, so the
+  gains are not the floor's alone. The paper's conclusion: removing weak peaks "should not be
+  done routinely" and is worth a try when the full list gives no clear answer (p. 789).
+- Not held on this machine, so no claim made: de Wolff (1968), Shirley's Crysfire guide and his
+  2003 newsletter article, Altomare et al. (2009) on N-TREOR09, Coelho (2017) on `lp_search`,
+  Boultif & Louër (1991). X-Cell was not read.
+
+So the programs choose the search lines by count and by position: the first twenty, then every
+line to review or score. TOPAS and McMaille let intensity weight a line, and nothing else lets
+it act at all. One program applies an intensity floor by default, EXPO's N-TREOR09, at a value
+its documentation does not state. The literature offers a floor as a second attempt after the
+full list fails, at 5 % of Imax, and its one benchmark measured a small gain on impurity-laden
+lists with one loss. A floor applied to every search before it runs is therefore rietx's own
+(tier 3). A floor tried after the full list finds nothing has precedent (tier 2, Bergmann et
+al. 2004 and DICVOL91's advice). rietx drives with the strongest twenty from a low-angle pool
+and scores on every line (WP-1039), which keeps the convention's count and changes its order.
+
 ## The doublet ratio and asymmetry a peak picker holds
 
 Surveyed 2026-11-06 for WP-2055, on whether `pick_peaks` should refine the Kα2/Kα1 ratio or

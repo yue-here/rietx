@@ -100,17 +100,21 @@ exists.
 - `tests/reader_output.py` diffs a Rietveld fit's printed text. It does not
   cover `str(IndexingResult)`, so this WP shows that diff by hand.
 
-**Prior art, recall plus one in-tree find, not yet surveyed.** The issue found
-no relative-intensity floor in ITO, TREOR, DICVOL, SVD-Index, Conograph or
-McMaille, whose line limits are counts (M₂₀'s first twenty). One find in this
-tree: the bethanechol round robin (Bergmann, Le Bail, Shirley & Zlokazov
-2004, *Z. Kristallogr.* 219, 783-790; `tests/data/README.md`) presents each
-pattern raw (set A) and as "lines with I ≥ 5 % of Imax" (set B), and its
-Table 5 scores eleven programs on both. That is a relative floor used as a
-benchmark treatment, not a program default. Whether a GUI front end (TOPAS,
-GSAS-II, WinPLOTR for FullProf) offers an intensity threshold when it builds
-an indexing list is not checked. `docs/practice.md` has no indexing
-line-selection section.
+**Prior art, surveyed 2026-11-12** (task 1; `docs/practice.md` § Which lines
+an indexing search is given). Every program read chooses its search lines by
+count and position, the first twenty or so, and reviews or scores with every
+line. TOPAS and McMaille let intensity weight a line. GSAS-II, DICVOL, TREOR,
+ITO and Conograph never read it. One program floors by intensity by default:
+EXPO's N-TREOR09, at a value its chapter does not state (secondhand, through
+ITC Vol. H ch. 3.4). No front end read (GSAS-II, WinPLOTR) offers an
+intensity threshold when it builds the list. The literature offers a floor as
+a *second attempt*: Bergmann et al. (2004) gave every program both the raw
+list and the I ≥ 5 % Imax list, and called removing weak peaks a retry, not a
+routine step. Their Table 5, four standalone programs × two entries × two
+modes: 5 runs better, 1 worse (McMaille, first → not found), 10 unchanged;
+after a zero correction 4 better, 0 worse, 12 unchanged. Both entries carry
+known impurity lines. So a floor applied before every search is tier 3; a
+floor tried after the full list fails has precedent (tier 2).
 
 **Folded from `### Inherited` on 2026-11-12.** Both entries still hold at
 `a86dcf9d4`; they now sit here and in task 4.
@@ -171,7 +175,7 @@ each arm's search or cuts trailing systems. That cost is unmeasured.
 
 ## Tasks
 
-- [ ] Practice survey into `docs/practice.md`, a new section on which lines an
+- [x] Practice survey into `docs/practice.md`, a new section on which lines an
       indexing search is given. Rows: TOPAS (LSI and SVD index), GSAS-II's
       indexing, FullProf's WinPLOTR front end to DICVOL, TREOR and ITO,
       Conograph, McMaille, and the indexing literature (International Tables
@@ -179,6 +183,7 @@ each arm's search or cuts trailing systems. That cost is unmeasured.
       Bergmann et al. (2004) Table 5 for whether the 5 % sets scored better
       than the raw ones. Mark each claim checked or inferred. The section says
       whether a relative floor is practice (tier 2) or new (tier 3).
+      *Done 2026-11-12: tier 3 as a default, tier 2 as a retry (Context).*
 - [x] Synthetic fixtures, built in-test from rietx's forward model (the
       reporter offered to write them). (a) A host with an injected weak
       second phase, where the floor must move the truth to rank 1. (b) A
