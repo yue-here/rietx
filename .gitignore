@@ -51,6 +51,8 @@ htmlcov/
 # at all.  Found by CI on the first clean-clone build (PR #17), never locally,
 # because the file exists on every machine that has ever run the build.
 !gui/index.html
+# The rebuild's second page (WP-2215), the eighth.
+!gui/next.html
 # The watcher's page is files in the package too (WP-1430), and `*.html` took
 # its `index.html` exactly as it took the two above — the sixth time that one
 # rule has swallowed a committed file.  Here it would have shipped a wheel

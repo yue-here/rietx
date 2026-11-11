@@ -299,6 +299,15 @@ the tree that day.
 
 ### Inherited
 
+- **2026-11-12, from [2087](2087-an-opt-in-correction-the-residual-asks-for-names-its-declaration.md)
+  (closed): the `using/glossary` redirect loses an instrument entry's anchor.** PR #1505
+  split the parameter map into `reference/parameters` (phases) and
+  `reference/parameters-instrument` (instrument and background), because the single page had
+  reached the manual's page-size cap. `docs/docs_versions.py` still sends `using/glossary` to
+  `reference/parameters`, so an old link to an instrument entry lands on the phase page and
+  its fragment matches nothing there. Found by 2087's code review and left alone there. Not
+  re-measured here. The stub carries the fragment over by script, so a fix could pick the page
+  by fragment.
 - **2026-10-23, from [1510](1510-what-the-chemist-knows-reaches-the-search.md) (closed): guide
   18's wait on WP-1510 is now a wait on [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md).**
   The findings guide 18 would document on the shipped fluorapatite pattern are 2030's: the

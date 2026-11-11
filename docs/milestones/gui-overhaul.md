@@ -52,8 +52,8 @@ prototype at 1440 × 900:
 
 | Piece | WP | What it builds |
 |---|---|---|
-| R1 | to file; the maintainer answered WP-2214's questions on 2026-11-11 | the frame: the `/next` page, top bar, status bar, side and bottom panels, the workflow and File menus, Settings, the command palette and keys, one menu and context-menu component; the start screen, New project, the recovery offer and the Console mounted in it |
-| R2 | — | the refinement window: the Pattern graph (legend gutter, view menu, the fitted range and excluded regions as plot objects, the plot's context menu), the Parameters tab with the phase and atom menus, the action bar with one Apply |
+| R1 | [WP-2215](../wp/2215-the-frame.md), in flight | the frame: the `/next` page, top bar, status bar, side and bottom panels, the workflow and File menus, Settings, the command palette and keys, one menu and context-menu component; the start screen, New project and the Console mounted in it |
+| R2 | [WP-2216](../wp/2216-the-refinement-window.md), in flight | the refinement window: the Pattern graph (legend gutter, view menu, the fitted range and excluded regions as plot objects, the plot's context menu), the Parameters tab with the phase and atom menus, the action bar with one Apply, and the recovery offer for the edits it brings (moved from R1 by WP-2215) |
 | R3 | — | hand fitting and the other graphs: the Interactive tab, the Peaks, Background and Structure graphs, the Instrument dialog |
 | R4 | — | the Plan tab with Free and Fix rows, and the Text tab whose edits ride the action bar |
 | R5 | [2211](../wp/2211-the-history-table.md), [2212](../wp/2212-console-lines-by-kind.md) | History as a table, Console lines by kind, and the report |
@@ -93,8 +93,8 @@ the 22xx block, or now lives in a rebuild piece. Where to find each since 2026-1
 | Sentence-case headings | one `app.css` rule at the start screen's register, app-wide | 2026-11-09 | R1; PR #1522 (WP-2201) closes as a source |
 | Peaks and indexing | the redesign in four steps (pick peaks, fit peaks, index, judge), the eight-column candidate table, lens peak marks, per-line curves in the fit windows | 2026-11-08, 2026-11-09 | R6; PR #1526 (WP-2202) stays open as a source until R6 starts |
 | Structure tab | the 3D structure as one of the graph tabs | 2026-11-07 | R3; PR #1519 (WP-2203) closes as a source |
-| Workflow menu | the top bar's workflow menu, with placeholders for structure solution and rigid bodies | 2026-11-07 | R1; PR #1524 (WP-2204) closes as a source |
-| Settings dialog | theme, density and number format | 2026-11-07 | R1 |
+| Workflow menu | the top bar's workflow menu, with structure solution and rigid bodies marked "not built yet" | 2026-11-07 | R1; PR #1524 (WP-2204) closes as a source |
+| Settings dialog | theme, density and number format | 2026-11-07 | R1 for the theme; density and number format with the first piece that draws what they change |
 | Bottom panel and status bar | Console (the Python the window runs) and History, toggled from the status bar along the window's foot | 2026-11-07 | R1 and R5; PR #1521 (WP-2206, WP-2207) closes as a source |
 | Fixing plan stages | a plan stage that fixes as well as frees: `StageSpec.turn_off`, a `fix` clause in `.rxt` | 2026-11-09 | [WP-2208](../wp/2208-a-plan-stage-that-fixes.md), PR #1520, merged 2026-11-11; R4 draws it |
 | Edit recovery | unapplied edits kept across a close or crash in a recovery copy in rietx's state directory, apart from the project, as editors such as VS Code keep theirs | 2026-11-09 | [WP-2209](../wp/2209-unapplied-edits-survive-a-close.md), PR #1523, merged 2026-11-11; its follow-up [WP-2213](../wp/2213-text-and-model-edits-join-the-recovery-copy.md) (the Text buffer and Model forms join the copy) shrinks, since R4 makes a Text edit a pending edit |
