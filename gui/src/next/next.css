@@ -17,6 +17,9 @@
 :root {
   --text: 14px;
   --text-sm: 13px;
+  /* a band's name in Parameters: where the next phase starts, findable at a
+     glance (the prototype's 17 px) */
+  --text-band: 17px;
   --frame-h: 36px;
   --status-h: 24px;
   --tab-h: 36px;
