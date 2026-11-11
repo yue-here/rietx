@@ -119,6 +119,7 @@ from .refine import (
     _onto_flat_meridian,
     _origin_diagnostics,
     _parameter_row,
+    _parent_strain_held_diagnostics,
     _peak_columns_flat_at_answer,
     _peak_only_instrument_path,
     _phase_agreement,
@@ -359,6 +360,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "never both on one histogram, and a shared row fixed in "
                 "several tables is one finding"),
     # -- deliberately not computed ---------------------------------------------
+    "_parent_strain_held_diagnostics": (
+        (FIT,), "a parent-cell phase's strains are shared model parameters, "
+                "so the held-strain record is the fit's, read off the plan's "
+                "freed paths (WP-1419)"),
     "_site_glob_diagnostics": (
         (ABSENT,), "not called from multi.py yet: a single fit reports a glob "
                    "naming one site that frees nothing (WP-1951), and wiring it "
@@ -1953,7 +1958,9 @@ class MultiHistogramRefinement:
         report_sigma = _reported_support_sigma(phase_support_sigma)
         # the declared stages and the closing one, the single runner's
         # schedule (WP-2002, the sixth round's Q1 and Q2)
-        stages = plan.run_stages()
+        # every row under both names the joint table matches a glob against,
+        # for the closing stage of a plan that fixes (WP-2208)
+        stages = plan.run_stages(paths=self.mtable.row_names())
         n_stages = len(stages)
         for index, (stage, ftol, window_tol) in enumerate(
                 zip(stages, plan.stage_ftols(), plan.stage_window_tols(),
@@ -1964,11 +1971,16 @@ class MultiHistogramRefinement:
                 # the floating-origin hold (WP-1912), which the origin
                 # diagnostics report from
                 blocked_by_hold = self.mtable.blocked_by_hold(stage.turn_on)
+                if stage.turn_off:
+                    # a path the same stage fixes was not wanted free (WP-2208)
+                    unwanted = set(self.mtable.blocked_by_hold(stage.turn_off))
+                    blocked_by_hold = [p for p in blocked_by_hold if p not in unwanted]
                 # what the stage asked for and did not get (WP-1414): a literal
                 # no histogram has or a retired spelling, and — the joint fit's
                 # own case — a histogram the stage's globs reached nothing of
                 # while reaching another's
-                unknown_paths = self.mtable.unknown_paths(stage.turn_on)
+                unknown_paths = self.mtable.unknown_paths(
+                    [*stage.turn_on, *stage.turn_off])
                 unreached = self.mtable.unreached_histograms(stage.turn_on)
                 # what the previous stage's answer held, which the support hold
                 # reads as tried and flat (WP-2049, the single runner's ``tried``)
@@ -1980,6 +1992,19 @@ class MultiHistogramRefinement:
                     # and a cumulative plan need not name its cell again
                     self.mtable.set_vary(carried_hold, True)
                     carried_hold = []
+                # the stage's fixes, after its frees and the lift above, the
+                # single runner's order (``_run_stage``, WP-2208)
+                # ``fixed`` names only what the fix took out of the free set
+                fixed: list[str] = []
+                if stage.turn_off:
+                    was_free = {self.mtable._canonical(h, e.path)
+                                for h, tab in enumerate(self.mtable.tables)
+                                for e in tab.entries if e.vary and e.tie is None}
+                    fixed = [p for p in self.mtable.set_vary(stage.turn_off, False)
+                             if p in was_free]
+                if fixed:
+                    gone = set(fixed)
+                    freed = [p for p in freed if p not in gone]
                 seeded: dict[str, float] = {}
                 if stage.seed:
                     seeded = dict.fromkeys(
@@ -2264,7 +2289,7 @@ class MultiHistogramRefinement:
                     moment_flat_axes=kept_axes,
                     moment_turned=[b for b in kept_axes if b in moment_turned],
                     unknown_paths=unknown_paths, unreached_histograms=unreached,
-                    seeded=seeded, blocked_by_hold=blocked_by_hold,
+                    seeded=seeded, blocked_by_hold=blocked_by_hold, fixed=fixed,
                     moment_angle_tests=outcome.moment_angle_tests,
                     cell_reset=cell_reset, collapsed=restored,
                     window_loss=max(losses) if losses else None, rwp=rwp,
@@ -2673,6 +2698,9 @@ class MultiHistogramRefinement:
         # (WP-2028): a record of the hold, read off the answer's stage
         diagnostics = diagnostics + _per_pattern_hold_diagnostics(
             stage_results, mt, self.mtable.structures[0])
+        diagnostics = diagnostics + _parent_strain_held_diagnostics(
+            stage_results, [_unscoped(p) for p in mt.free_paths],
+            self.mtable.structures[0])
         # a phase whose scales and B no histogram's range can separate, and
         # what its fraction is conditional on (WP-1534)
         diagnostics = diagnostics + _scale_b_ridge_diagnostics(

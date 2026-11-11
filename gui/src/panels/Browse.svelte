@@ -13,11 +13,18 @@
 
   let {
     mode = "open",
+    heading = "",
+    start = undefined,
     onclose = () => {},
     onopen = async (_path: string) => "",
     onpick = (_path: string) => {},
   }: {
     mode?: "open" | "pick";
+    /** the heading, where the pick is for something else than a new project
+     *  (the File menu's Move to and its dialogs' folder, WP-2133) */
+    heading?: string;
+    /** the folder to list first; the home directory when absent */
+    start?: string;
     onclose?: () => void;
     onopen?: (path: string) => Promise<string>;
     onpick?: (path: string) => void;
@@ -48,7 +55,11 @@
     }
   }
 
-  go();
+  // the first listing only: later changes to `start` are not a navigation.  A
+  // start the browser may not list (a project outside the two roots, a typed
+  // Where) falls back to home, so the dialog never opens with nothing to pick
+  const first = () => start;
+  go(first()).then(() => { if (first() && path === null) go(); });
 
   async function openHere(target: string) {
     error = await onopen(target);
@@ -68,7 +79,7 @@
   <div class="panel" role="dialog" aria-label="browse the filesystem" tabindex="-1"
        onclick={(event) => event.stopPropagation()}>
     <header>
-      <h2>{mode === "pick" ? "Choose a project directory" : "Open a project"}</h2>
+      <h2>{heading || (mode === "pick" ? "Choose a project directory" : "Open a project")}</h2>
       <button class="ghost" onclick={onclose}>Close</button>
     </header>
 

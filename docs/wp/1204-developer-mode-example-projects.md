@@ -101,6 +101,36 @@ git status --short   # clean after the run
 - `tests/data/README.md`: provenance and reference values for the four
   inputs; the example descriptions quote it.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **examples** (WP-1204, `rietx.examples`; `GET /api/examples`, `POST
+/api/examples/open`, `POST /api/examples/reset`) are the empty state's other
+list, for the person who has nothing of their own to open. Six rules. Upstream
+of the route, **an example project *is* a `compare.py` standard**
+(`src/rietx/examples.py`), so no protocol is restated here —
+`tests/test_compare_ui.py` already pins those to the acceptance suites, and
+`list_examples()`'s membership is `STANDARDS` filtered by what is in
+`src/rietx/data/examples/`, so a file added to the wheel adds an example. An
+**example is a project like any other from the moment it exists** — the open
+verb *ends in* `project_open` and returns exactly what it returns, so nothing
+downstream can tell. They build into **`state_dir/examples/`**, for the reason
+`recent.json` lives there: an example is a project the person then edits, while
+package data is read-only, shared between environments and replaced by the next
+upgrade. `name` arrives in a request body and is joined into a path, so it is
+**checked against the example list, never sanitised** — a membership test
+cannot be escaped, and `example_reset` is the one destructive verb on this
+surface. `built` rides on the listing because a first click is not free (the
+11-BM example copies and re-reads 2.5 MB) and the empty state has to be able to
+say so. And **a `.pick` row has to carry its own hover**: the register gives up
+its box because the row is the target, so a list that gives the row no
+background reads as prose that happens to be clickable — found in the browser,
+and invisible to jsdom, which has neither hover nor cursor.
+
 ## Handover log
 
 ### 2026-08-25 (3rd session) — SRM 660c is not an example

@@ -243,6 +243,54 @@ multiplicity gap — see the handover.
 - `docs/wp/1025-extinction-symbol.md` — why a single space group is never a
   measurement.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**Symmetry, surfaced and editable** (WP-1035, `src/rietx/gui/symmetry.py`,
+`gui/src/lib/symmetry.ts`) is the phase's space group stopping being one
+read-only string quoted in three places while everything it *does* — a tied `b`,
+a locked angle, two DOFs instead of three — showed in the parameter table as an
+effect with no named cause. Five rules. **Two tiers, split by a measurement**:
+the phase facts are one `get_spacegroup` call, so they ride on `GET
+/api/structure` beside `sites` as `symmetry` + `causes`, while a Wyckoff letter
+is spglib per atom (**1.8-8.7 ms**, measured, and an orbit expansion is another
+0.4-1.3) and lives on the deliberately-opened `GET /api/structure/symmetry` — the
+escape that route's own docstring had already named. **`causes` names the
+symmetry and stays silent where symmetry is not the subject**: it supplies the
+missing subject of `held_because`'s "structurally fixed by symmetry **or by the
+model**", so a locked `lor_strain` (the Stephens block's) keeps the anonymous
+version rather than getting a wrong cause. **The preview is a diff of two
+`ParameterTable`s and duplicates no rule** — the raises *are* the incompatibility
+list, nearest-allowed values included, and since a table stops at the first bad
+item the per-atom pass probes one atom at a time against a *real* table rather
+than parsing a sentence this package owns elsewhere. **The gate is
+`Refinement.edit`'s, not this layer's** — the failure was never a GUI one, so it
+was fixed where it lived (root CLAUDE.md), and all `GuiSession._edit` adds is the
+**address**: the refusal's leading dot-path, which a form needs to highlight the
+field. And **the notes are for what a table diff structurally cannot see**: a
+setting change, a centring change, `_free_paths` casualties (dropped *and*
+renumbered — `…dof.k` is positional), an orbit collision, and the **orbit
+multiplicity**, which a browser found by taking NAC from `I 21 3` to `I 41 3 2` —
+same orders, same DOFs, same ties, same centring, empty diff, and 84 atoms in the
+cell becoming 168. Two corollaries: a **blocked** preview is given no
+consequences at all, since they would be computed from operators the model cannot
+carry; and **a shared orbit is judged as a group, by its occupancies**. Atoms the
+symmetry merges are one *site*, so the members are the connected components of
+the coincidence relation and the verdict is the sum over the whole group — three
+atoms at 0.4 are over-occupied where no pair of them is, which makes pairwise not
+a coarser answer but a wrong one. Over 1 blocks; at or under it the same geometry
+is a legal mixed site and F is right for it. **No prior art to copy, checked**:
+GSAS-II recomputes every site symmetry on a space-group change
+(`G2spc.UpdateSytSym`) and runs no such check, and TOPAS's `occ_merge` rescales
+occupancies continuously during *structure solution* rather than refusing an edit
+— deliberately not copied, because it silently rewrites a number the user typed,
+which is the objection that made `check_cell_angles` refuse rather than
+normalise.
+
 ## Handover log
 
 - **2026-08-05 (second pass, on review)** — two things the reviewer would not

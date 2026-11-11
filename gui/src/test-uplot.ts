@@ -9,7 +9,7 @@
  * It keeps uPlot's state (data, scales, series, cursor, select), fires the
  * hooks the chart module registers, and runs the draw hooks on every paint
  * against a context that **records** each stroke and fill with the style it
- * was made in. It draws no series itself; a paint records one `series` entry
+ * was made in, and the clip it was made under. It draws no series itself; a paint records one `series` entry
  * per shown series with its resolved stroke instead. The plot area is 1000 by
  * 300 CSS px at every size, so a test can aim a pointer at a 2θ.
  *
@@ -27,6 +27,9 @@ export interface Mark {
   points?: number[][];
   /** the series' index, for a `series` entry */
   index?: number;
+  /** the clip in force as `[x, y, width, height]` in canvas px, or null for
+   *  none: the last `rect` before a `clip`, until the `restore` that undoes it */
+  clip?: number[] | null;
 }
 
 const W = 1000;
@@ -37,27 +40,29 @@ type Hook = (u: StubPlot, ...args: any[]) => void;
 function recorder(marks: () => Mark[]) {
   let path: number[][] = [];
   let dash: number[] = [];
+  let lastRect: number[] | null = null;
+  let clip: number[] | null = null;
   const stack: any[] = [];
   const ctx: any = {
     strokeStyle: "#000000", fillStyle: "#000000", lineWidth: 1, globalAlpha: 1,
-    save() { stack.push({ s: ctx.strokeStyle, f: ctx.fillStyle, w: ctx.lineWidth, d: dash }); },
+    save() { stack.push({ s: ctx.strokeStyle, f: ctx.fillStyle, w: ctx.lineWidth, d: dash, c: clip }); },
     restore() {
       const top = stack.pop();
-      if (top) { ctx.strokeStyle = top.s; ctx.fillStyle = top.f; ctx.lineWidth = top.w; dash = top.d; }
+      if (top) { ctx.strokeStyle = top.s; ctx.fillStyle = top.f; ctx.lineWidth = top.w; dash = top.d; clip = top.c; }
     },
     setLineDash(d: number[]) { dash = [...d]; },
     getLineDash() { return [...dash]; },
     beginPath() { path = []; },
     closePath() {},
-    clip() { path = []; },
+    clip() { clip = lastRect; path = []; },
     moveTo(x: number, y: number) { path.push([x, y]); },
     lineTo(x: number, y: number) { path.push([x, y]); },
     arc(x: number, y: number, r: number) { path.push([x, y, r]); },
-    rect(x: number, y: number) { path.push([x, y]); },
-    stroke() { marks().push({ op: "stroke", style: ctx.strokeStyle, dash: dash.length > 0, points: path }); },
-    fill() { marks().push({ op: "fill", style: ctx.fillStyle, points: path }); },
+    rect(x: number, y: number, w: number, h: number) { path.push([x, y]); lastRect = [x, y, w, h]; },
+    stroke() { marks().push({ op: "stroke", style: ctx.strokeStyle, dash: dash.length > 0, points: path, clip }); },
+    fill() { marks().push({ op: "fill", style: ctx.fillStyle, points: path, clip }); },
     fillRect(x: number, y: number, w: number, h: number) {
-      marks().push({ op: "fillRect", style: ctx.fillStyle, points: [[x, y], [x + w, y + h]] });
+      marks().push({ op: "fillRect", style: ctx.fillStyle, points: [[x, y], [x + w, y + h]], clip });
     },
     clearRect() {},
   };
