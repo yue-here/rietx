@@ -83,7 +83,12 @@ def project_key(project_path: str | Path) -> str:
 
 def path_for(state_dir: str | Path, project_path: str | Path) -> Path:
     """The copy's file: the sha256 of the resolved project path, in hex."""
-    digest = hashlib.sha256(project_key(project_path).encode("utf-8")).hexdigest()
+    return _file_for_key(state_dir, project_key(project_path))
+
+
+def _file_for_key(state_dir: str | Path, key: str) -> Path:
+    """The copy's file for a key already resolved."""
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
     return root(state_dir) / f"{digest}.json"
 
 
@@ -168,16 +173,21 @@ def discard(state_dir: str | Path, project_path: str | Path) -> bool:
 def move(state_dir: str | Path, source: str | Path, target: str | Path) -> bool:
     """Re-key a copy when the app renames or moves its project.
 
-    ``source`` is the old resolved path; the project already stands at
-    ``target``.  ``True`` when a copy was moved.
+    ``source`` is the old resolved path, taken before the move, and is the
+    old key as given.  Resolved again now it can name the new folder: Windows
+    resolves a path to the spelling on disk, so after ``sample.rex`` became
+    ``Sample.rex`` the old name resolves to the new one, the key of no copy
+    (WP-2143).  The project already stands at ``target``.  ``True`` when a
+    copy was moved.
     """
-    record = read(state_dir, source)
-    if record is None:
+    key = str(source)
+    old = _file_for_key(state_dir, key)
+    record = _load(old)
+    if record is None or record.get("project") != key:
         return False
     record["project"] = project_key(target)
     destination = path_for(state_dir, target)
     _replace(destination, record)
-    old = path_for(state_dir, source)
     if old != destination:
         _guarded_unlink(old, old.parent)
     return True
