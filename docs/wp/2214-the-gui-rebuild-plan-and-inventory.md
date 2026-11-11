@@ -1,6 +1,6 @@
 # WP-2214 — the GUI rebuild: its plan, and a home for every feature of today's GUI
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-11 — the inventory and the plan written; five rows wait on the maintainer
+Milestone: gui-overhaul · Status: 🔄 2026-11-11 — the inventory and the plan written; the maintainer ruled on its five questions; R1 to file
 Depends on: —
 Priority: P2 2026-11-11 — a feature the open milestone was opened for, ruled the same night: every later GUI piece starts from this plan
 
@@ -109,8 +109,8 @@ by where the feature lives today. The open pull requests add a few features (#15
 
 Columns: **Today** is where the feature sits now. **Home** is where it lives in the new design.
 **Rests on** names the prototype, a `gui/STYLE.md` rule, a ruling or the practice above. **F**
-marks a row that waits on the maintainer, numbered as in § Questions; every other row is settled
-on its grounds. "Kept" means the prototype draws it in the same place. A "one-line empty state"
+marks a row that waited on the maintainer, numbered as in § Questions, where each ruling of
+2026-11-11 is recorded; every other row is settled on its grounds. "Kept" means the prototype draws it in the same place. A "one-line empty state"
 is a short sentence and the action that fills the view, as VS Code's empty views have.
 
 ### Top bar
@@ -123,8 +123,8 @@ is a short sentence and the action that fills the view, as VS Code's empty views
 | 4 | The version | header | Settings, as an About line | VS Code's About | 4 |
 | 5 | The project name, which opens the File menu | header | top bar, after the workflow menu | prototype; macOS document title | |
 | 6 | The data file's name and point count | header | removed from the bar; the project name's tooltip | "infoslop" ruling | 4 |
-| 7 | The refinement mode (Rietveld, Le Bail, Pawley) | header | status bar, right half | VS Code's language mode | 3 |
-| 8 | Where σ comes from ("σ from file", "σ Poisson") | header | status bar, right half | VS Code's encoding item | 3 |
+| 7 | The refinement mode (Rietveld, Le Bail, Pawley) | header | removed | the maintainer, 2026-11-10 (dropped from the header as clutter) and 2026-11-11 (not in the status bar) | 3 |
+| 8 | Where σ comes from ("σ from file", "σ Poisson") | header | removed | the maintainer, 2026-11-10 (dropped from the header as clutter) and 2026-11-11 (not in the status bar) | 3 |
 | 9 | Simple or Advanced | header | removed; each advanced field sits behind its own disclosure or popover | the maintainer, 2026-11-08 (an advanced mode "probably not needed if we're judicious"); prototype | |
 | 10 | Theme | header | Settings: Match system, Light, Dark | the maintainer, 2026-11-09 | |
 | 11 | Run state (idle, stage i of n, Le Bail pass) | header; status bar in #1521 | status bar, left, in words, only while a run is in flight | prototype; #1521 | |
@@ -172,7 +172,7 @@ is a short sentence and the action that fills the view, as VS Code's empty views
 | 43 | "N of M channels fitted" | protocol row | the selection bar of the range or a region | WP-1033 | |
 | 44 | "Fitted over a different set of channels" | protocol row | the title's state until the next run | STYLE: the title says what the graph shows | |
 | 45 | A refused range or region | protocol row | a toast beside the selection bar | prototype's toast | |
-| 46 | The hover readout (2θ, d, observed, calculated, background, difference, hkl) | a strip under the plot | the status bar's right half while the pointer is over a plot | ImageJ, QGIS and Origin | 5 |
+| 46 | The hover readout (2θ, d, observed, calculated, background, difference, hkl) | a strip under the plot | the status bar's right half while the pointer is over a plot | ImageJ, QGIS and Origin; the maintainer, 2026-11-11 (looked at once built) | 5 |
 | 47 | A crosshair shared by every pane | chart | kept | WP-1213 | |
 | 48 | Drag to zoom | chart | kept | interaction rule 6 | |
 | 49 | Wheel zoom, Shift-wheel and Alt-drag pan | chart | kept; sideways scroll pans, and ‹ › appear while zoomed | prototype | |
@@ -215,7 +215,7 @@ is a short sentence and the action that fills the view, as VS Code's empty views
 | 71 | Which phase | over the canvas | a menu on the title line, drawn only with two or more phases | STYLE: a control exists only while it can act | |
 | 72 | Drag rotates, Shift-drag or right-drag pans, wheel zooms | canvas | kept | WP-1015 | |
 | 73 | Double-click an atom to show its coordination | canvas | click selects the atom; its selection bar holds Show coordination; double-click resets the view | interaction rules 3 and 6 | |
-| 74 | The atom or bond under the pointer | a line under the canvas | the status bar's right half, as row 46 | ImageJ, QGIS and Origin | 5 |
+| 74 | The atom or bond under the pointer | a line under the canvas | the status bar's right half, as row 46 | ImageJ, QGIS and Origin; the maintainer, 2026-11-11 | 5 |
 | 75 | The cell's a, b, c letters | canvas | kept | WP-1015 | |
 | 76 | One button per species | under the canvas | the colour key on the title line, each entry a switch | prototype; STYLE § Plots (legend as switch) | |
 | 77 | Polyhedra on or off, and per formula | under the canvas | entries in that key | prototype (Atoms and Polyhedra) | |
@@ -516,7 +516,7 @@ person spends most time in.
 | Piece | What it builds | Inventory rows | Carries from |
 |---|---|---|---|
 | R1. The frame | the `/next` page and `--new`; top bar, status bar, the two side panels and the bottom panel with their toggles and sashes; the workflow menu, the File menu, Settings; the command palette and the keys; one menu component and one context-menu service every later piece uses; the start screen, New project and the recovery offer mounted in it; the Console | 1-24, 147-151, 212-242 | #1521 (`lib/statusbar.ts`, the Console's Copy and Follow), #1524 (`lib/workflows.ts`), the graph-window branch (`panels/Menu.svelte`, `lib/portal.ts`), #1522's style guard |
-| R2. The refinement window | the Pattern graph (title line, legend gutter, view menu, the fitted range and excluded regions as plot objects, the plot's context menu, the hover readout); the Parameters tab with the phase and atom menus; the action bar with one Apply | 25-58, 83-97, 118-138 | #1518's slot widths; the graph-window branch (`lib/exports.ts`, `PatternChart.geometry`, its design) |
+| R2. The refinement window | the Pattern graph (title line, legend gutter, view menu, the fitted range and excluded regions as plot objects, the plot's context menu, the hover readout in the status bar's right half, shown in the piece's screenshots); the Parameters tab with the phase and atom menus; the action bar with one Apply | 25-58, 83-97, 118-138 | #1518's slot widths; the graph-window branch (`lib/exports.ts`, `PatternChart.geometry`, its design) |
 | R3. Hand fitting and the other graphs | the Interactive tab; the Peaks, Background and Structure graphs; the Instrument dialog | 59-82, 98-103, 133-136 | #1519 (the Structure tab's fetch-while-shown key) |
 | R4. Plan and Text | the Plan tab with Free and Fix rows and stage menus; the Text tab whose edits ride the action bar | 104-117, 139-146 | #1520 (the routes' `turn_off`, merged) |
 | R5. History and the report | the History table (WP-2211), Console lines by kind (WP-2212), the Report | 152-173 | WP-2211, WP-2212 |
@@ -592,26 +592,39 @@ Deleting a branch is the maintainer's call.
 
 ## Questions
 
-Five rows of the inventory wait on the maintainer. Each is a placement on the main surface the
-prototype did not draw, or a conflict between two written rules.
+Answered by the maintainer on 2026-11-11, on PR #1529. Five rows of the inventory waited on the
+maintainer. Each was a placement on the main surface the prototype did not draw, or a conflict
+between two written rules. Each item keeps its proposal and ends with the ruling in the
+maintainer's words.
 
 1. **The Model tab dissolves** (rows 118-138). The prototype has no Model tab. Proposed: values
    stay in Parameters; structural edits (space group, rename, species, add or delete an atom,
    ADPs, Replace from CIF) move to the phase band's ⋯ menu and the atom row's context menu;
    source and geometry open in an Instrument dialog on the form New project already draws.
+   **Ruled 2026-11-11: "Yes."** The proposal stands.
 2. **The report's home** (rows 161-171). The prototype draws no report. Proposed: a Report tab in
    the bottom panel beside Console and History, its count of findings in the status bar, which
    opens it, as VS Code's Problems panel does.
+   **Ruled 2026-11-11: "Yes."** The proposal stands.
 3. **The status bar's right half** (rows 7, 8). Empty in the prototype. Proposed: the refinement
    mode and the σ source sit there, as VS Code shows a file's language and encoding, beside the
    report's count.
+   **Ruled 2026-11-11: "No."** The right half shows the report's count of findings only. The mode
+   and the σ source do not move there, because the maintainer's 2026-11-10 ruling dropped them
+   from the header as clutter. Rows 7 and 8 now read "removed".
 4. **What goes as chrome text** (rows 3, 4, 6, 37, 54, 81, 118, 120, 132, 138, 146, 157, 162, 175,
    179, 192, 199, 213, 247, 248). The list the 2026-11-10 ruling asked for. Proposed: each is
    removed, and an empty state keeps one line and its action.
+   **Ruled 2026-11-11: "Yes, work it out as you go."** The audit list goes as one decision. Each of
+   its rows is settled while its piece is built, under the "infoslop" ruling and the prototype,
+   and listed in that piece's PR under "Settled by Claude".
 5. **The hover readout** (rows 46, 74). `gui/STYLE.md` puts it in a strip under the plot; the
    prototype has none and says no readout restates the plot. Proposed: the status bar's right half
    reads the pointer's 2θ, d, intensities and hkl while it is over a plot, as ImageJ and Origin
    do, and the strip goes.
+   **Ruled 2026-11-11: "Yes, but check it looks good when you build it."** The readout takes the
+   right half in place of the findings count while the pointer is over a plot. R2's last PR shows
+   it in its screenshots, boxed with a zoomed crop, for the maintainer's look.
 
 ## Settled by Claude
 
@@ -656,7 +669,7 @@ inventory follows the prototype or a written rule, named in its row.
 - [x] File the WP; the inventory; the plan; the dispositions.
 - [x] `docs/milestones/gui-overhaul.md` rewritten to the rebuild.
 - [x] `docs/practice.md` § Where a GUI keeps its secondary controls.
-- [ ] The maintainer answers § Questions.
+- [x] The maintainer answers § Questions (2026-11-11, on PR #1529).
 - [ ] R1 filed, once the answers are in. Each later piece is filed when its turn comes.
 
 ## Acceptance
@@ -701,3 +714,11 @@ The WP closes when the maintainer has answered § Questions and R1 is filed.
     reach `main`, when they can become links.
   - *Next*: the maintainer answers § Questions. Then file R1, the frame, with the carry-overs its
     row names, and build it.
+- **2026-11-11** — the maintainer ruled on the five questions, recorded in § Questions with the
+  words: yes to 1, 2 and 4, no to 3, yes to 5 with a look once built. A ghostshift runner wrote
+  them in and merged `main` into the branch, which conflicted nowhere.
+  - *Done*: § Questions answered; rows 7 and 8 now read "removed", since the status bar's right
+    half shows the findings count only; rows 46 and 74 and R2's row name the look the readout
+    gets; the status line, the task list and the milestone's R1 row follow.
+  - *Next*: file R1, the frame, with the carry-overs its row names, and build it. Each row of
+    question 4's list is settled while its piece is built.
