@@ -985,6 +985,31 @@ no magnetic model declared.
 
 ## Handover log
 
+### 2026-11-12 — the two-site row on the Linux nightly (PR #1542)
+
+The Linux nightly went red on 2026-11-11 on the two-site row of issue #1424. Two PRs merged
+the day before were suspected, and neither caused it: the arithmetic of this solve did not
+move on a Mac, and no numerical package moved on the runner. The row is decided by
+rounding, because the sweep compares where its starts stopped and the stops scatter about
+ten times wider than the gap between the two site assignments. Nothing was fixed, because
+the fix is a design call on the magnetic path. The nightly stays red on this row until it
+is made.
+
+*Done.* The evidence is under `### Inherited`, in the #1424 entry's 2026-11-12 paragraph.
+No checklist item is ticked, and no code changed. A ghostshift runner wrote this entry.
+
+*Measured.* arm64 Mac, `[dev]` venv: `tests/test_pair_diagnostic_class.py` on `e0c969887`,
+1 failed (the row) and 2 passed. `tests/test_docs_consistency.py`, 26 passed.
+`python -m tests.reader_output`, exit 0.
+
+*Next.* The decision goes to Michael on issue #1424, drafted for the maintainer to post:
+"The two-site Pnma row now fails on the Linux nightly too (2026-11-11). Under a 1e-14 nudge
+the truth won 2 of 8 runs. The truth's deepest stop is 0.08 below the swap's, and the starts
+stop up to 0.9 above their own minimum. Should `solve_magnetic` converge each start before
+comparing, report both assignments when it cannot separate them, or both? And what may the
+test assert once it does?" Once ruled, the fix lands in `strategy/magnetic.py`'s `_starts`
+and `_best_start`, with the test rewritten to what the ruling allows.
+
 ### 2026-11-01 (2nd session) — #1197, a candidate names its own handedness
 
 A magnetic candidate at k ≠ 0 now carries the BNS number of its own
