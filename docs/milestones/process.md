@@ -871,6 +871,14 @@ bullets of § Model, their two paragraphs to WP-2131's and WP-2133's files,
 and the pointer to `gui/STYLE.md` in the header.  Landed
 662, 44 703 bytes, about 11 200 tokens, +1 headroom.
 
+663 -> 667 for WP-2215 (2026-11-11): the GUI rebuild's second page.  WP-2214's
+plan names the line R1 owes the rulebook, and it is a standing rule a session
+editing `gui/` needs before its first build: the rebuild lives in
+`gui/src/next/`, builds in a second `vite build --mode next` pass because one
+multi-entry pass makes today's page load a shared chunk, moves a shared panel
+before changing it, and keeps its tab names out of the manual's corpus until
+the swap.  Four lines, landed at the cap.
+
 ### `tests/CLAUDE.md`
 
 180 -> 198 for WP-1070 (2026-08-15): the running ladder.  It is a rule

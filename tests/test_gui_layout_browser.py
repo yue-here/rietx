@@ -938,3 +938,295 @@ def test_the_file_menu_moves_nothing(browser, filemenu, state):
     assert fields[0] == "sample copy", fields
     assert status == 200 and doc["path"].endswith("sample2.rex"), doc
     assert not moved, moved
+
+
+#: The rebuilt page's frame (WP-2215): its bars, its two columns and their tab
+#: strips. A pane's own content is not here: a later piece fills it.
+NEXT_LANDMARKS = [
+    "header.topbar", "header.topbar > *", "section.graphs", "section.graphs > .tabs",
+    "section.model", "section.model > .tabs", "footer.statusbar", "footer.statusbar > *",
+]
+
+
+def _open_next(browser, url: str, width: int):
+    page = browser.new_page(viewport={"width": width, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda exc: page.errors.append(str(exc)))
+    # /next mounts Parameters and its recovery offer (WP-2216), so a copy another
+    # test left would hold every click behind the offer's backdrop
+    _keep_no_edits(page)
+    page.goto(url + "next")
+    page.wait_for_selector("section.graphs .tabs button")
+    page.evaluate("document.fonts.ready")
+    _frames(page)
+    return page
+
+
+def test_no_frame_control_moves_the_rebuilt_layout(browser, gui):
+    """Every tab, menu and dialog of the rebuilt frame, pressed with a real click (WP-2215).
+
+    Choosing a workflow that is not built yet swaps the model panel's tab strip for its
+    steps, so it is pressed too: the strip must keep its height. The workflow
+    button is as wide as the workflow's name, as the prototype's is, so a new
+    workflow moves the project name beside it and only the bars are held there.
+    """
+    url, _ = gui
+    failures = []
+
+    def pressing(label, act, close=None, landmarks=NEXT_LANDMARKS):
+        page = _open_next(browser, url, 1300)
+        before = page.evaluate(SNAP, landmarks)
+        act(page)
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, landmarks))
+        if moved:
+            failures.append(f"{label!r}: " + "; ".join(moved[:4]))
+        if close:
+            close(page)
+        assert not page.errors, page.errors
+        page.close()
+
+    page = _open_next(browser, url, 1300)
+    tabs = page.locator("section .tabs button").all_text_contents()
+    page.close()
+    assert len(tabs) == 8, tabs
+    for name in tabs:
+        pressing(name, lambda p, n=name: p.locator("section .tabs button", has_text=n).first.click())
+
+    def escape(p):
+        p.keyboard.press("Escape")
+
+    def series(p):
+        p.locator("button.mbtn.wf").click()
+        p.get_by_role("menuitemradio", name="Series · not built yet").click()
+
+    pressing("workflow menu", lambda p: p.locator("button.mbtn.wf").click(), escape)
+    pressing("File menu", lambda p: p.locator("header .fm-name").click(), escape)
+    pressing("Settings", lambda p: p.get_by_role("button", name="Settings", exact=True).click(),
+             escape)
+    pressing("Series workflow", series, landmarks=[
+        s for s in NEXT_LANDMARKS if s != "header.topbar > *"] + [
+        "header.topbar > button.ib"])
+    assert not failures, "\n".join(failures)
+
+
+def test_a_frame_toggle_stays_where_it_was(browser, gui):
+    """A collapse toggle asks for a move, and is itself never moved by it (WP-2215)."""
+    url, _ = gui
+    page = _open_next(browser, url, 1300)
+    toggles = {"graphs": "header.topbar > button.ib >> nth=0",
+               "model": "header.topbar > button.ib >> nth=-1",
+               "console": "footer.statusbar > button.console"}
+    boxes = {k: page.locator(sel).bounding_box() for k, sel in toggles.items()}
+    moved = []
+    for press in ("graphs", "graphs", "model", "model", "console", "console"):
+        page.locator(toggles[press]).click()
+        _frames(page)
+        for k, sel in toggles.items():
+            box = page.locator(sel).bounding_box()
+            if any(abs(box[c] - boxes[k][c]) > 1 for c in ("x", "y", "width", "height")):
+                moved.append(f"{k} after pressing {press}: {box} from {boxes[k]}")
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+#: The refinement window's own places (WP-2216): the graph's title line and its
+#: controls, the plot, the legend gutter, the action bar and the status bar.
+WINDOW_LANDMARKS = NEXT_LANDMARKS + [
+    ".ghead", ".gctl", ".gctl > *", ".plot", ".plot .host", ".gutter",
+    ".actions", ".actions .segmented", ".actions .go > *", "footer.statusbar .right",
+]
+
+
+def _open_window(browser, url: str):
+    page = browser.new_page(viewport={"width": 1440, "height": 900})
+    page.errors = []
+    page.on("pageerror", lambda exc: page.errors.append(str(exc)))
+    _keep_no_edits(page)
+    page.goto(url + "next")
+    page.wait_for_selector(".gutter .gut")
+    page.evaluate("document.fonts.ready")
+    _frames(page)
+    return page
+
+
+def _regions(client) -> list:
+    return client.get("/api/project")[1]["doc"].get("excluded_regions") or []
+
+
+def test_no_pattern_control_moves_the_refinement_window(browser, gui):
+    """The view menu, a legend label and each axis's menu and choices, each
+    pressed with a real click, move no place in the window (WP-2216)."""
+    url, _ = gui
+    page = _open_window(browser, url)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    failures = []
+
+    def check(label):
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+        if moved:
+            failures.append(f"{label!r}: " + "; ".join(moved[:4]))
+
+    page.get_by_role("button", name="View", exact=True).click()
+    check("view menu")
+    page.keyboard.press("Escape")
+    background = page.locator(".gutter .gut", has_text="Background")
+    background.click()
+    check("a legend label")
+    assert background.get_attribute("aria-pressed") == "false"
+    background.click()
+    for axis, choices in (("Intensity scale", ("Linear", "Log", "Square root")),
+                          ("Difference axis", ("Difference in counts (Δ)", "Cumulative χ²",
+                                               "Difference in esd (Δ/σ)"))):
+        page.get_by_role("button", name=axis, exact=True).click()
+        check(f"{axis} menu")
+        page.keyboard.press("Escape")
+        _frames(page)
+        assert not page.locator(".rx-menu").count(), f"Esc left the {axis} menu open"
+        for choice in choices:
+            page.get_by_role("button", name=axis, exact=True).click()
+            page.get_by_role("menuitemradio", name=choice, exact=True).click()
+            check(choice)
+    assert not page.errors, page.errors
+    page.close()
+    assert not failures, "\n".join(failures)
+
+
+def test_a_region_is_drawn_selected_and_deleted_in_place(browser, gui):
+    """An excluded region is an object on the plot (WP-2216): armed from the
+    context menu, dragged, selected with a click, deleted with a key. The
+    selection bar floats over the plot, so the window does not move."""
+    url, client = gui
+    page = _open_window(browser, url)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    box = page.locator(".plot .host .u-over").first.bounding_box()
+    page.mouse.click(box["x"] + box["width"] * 0.5, box["y"] + 40, button="right")
+    page.get_by_role("menuitem", name="Exclude a region…").click()
+    x0, x1 = box["x"] + box["width"] * 0.70, box["x"] + box["width"] * 0.76
+    y = box["y"] + box["height"] * 0.5
+    page.mouse.move(x0, y)
+    page.mouse.down()
+    for k in range(1, 13):
+        page.mouse.move(x0 + (x1 - x0) * k / 12, y)
+    page.mouse.up()
+    for _ in range(60):
+        if _regions(client):
+            break
+        _frames(page)
+    assert len(_regions(client)) == 1, _regions(client)
+    # the page learns of the region from the verb's answer, a moment after
+    # the server holds it, so the select click is repeated until it lands
+    for _ in range(20):
+        page.mouse.click((x0 + x1) / 2, y)
+        _frames(page)
+        if page.locator(".selbar").count():
+            break
+    assert "channels" in page.locator(".selbar").inner_text()
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+    page.keyboard.press("Delete")
+    for _ in range(60):
+        if not _regions(client):
+            break
+        _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert _regions(client) == []
+    assert not moved, moved
+
+
+def test_the_hover_readout_takes_the_status_bar_and_gives_it_back(browser, gui):
+    """The status bar's right half reads the pointer while it is over the plot
+    and the findings count at rest (Yue's ruling, WP-2216), moving nothing."""
+    url, _ = gui
+    page = _open_window(browser, url)
+    right = page.locator("footer.statusbar .right")
+    rest = right.inner_text().strip()
+    assert rest.endswith(("finding", "findings")), rest
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    box = page.locator(".plot .host .u-over").first.bounding_box()
+    page.mouse.move(box["x"] + box["width"] * 0.4, box["y"] + box["height"] * 0.5)
+    _frames(page)
+    reading = right.inner_text()
+    # the legend's words, as ruled on 2026-11-11 ("try b")
+    assert "°" in reading and "Observed" in reading and "Last fit" in reading, reading
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+    page.mouse.move(box["x"] + box["width"] * 0.4, 5)
+    _frames(page)
+    assert right.inner_text().strip() == rest
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def test_a_pending_edit_moves_nothing_in_the_rebuilt_action_bar(browser, gui):
+    """The first Parameters edit fills the pending slot and renames Refine,
+    both reserved, so nothing moves (WP-2216, today's rule on the new bar)."""
+    url, _ = gui
+    page = _open_window(browser, url)
+    page.locator("section.model .tabs button", has_text="Parameters").first.click()
+    _frames(page)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    page.locator(".params .row button.ink").first.click()
+    page.keyboard.press("End")
+    page.keyboard.type("1")
+    page.keyboard.press("Enter")
+    _frames(page)
+    assert "pending" in page.locator(".actions .pending").text_content()
+    assert "Apply and refine" in page.locator(".actions button.refine").text_content()
+    moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+    page.locator(".actions button", has_text="Revert").click()
+    _frames(page)
+    assert not page.errors, page.errors
+    page.close()
+    assert not moved, moved
+
+
+def test_the_structural_menus_and_axis_hints_move_nothing(browser, gui):
+    """The filter row's ⋯, a phase band's ⋯, an atom row's context menu and a
+    hover on the σ hint each float over the window (WP-2216, ruling 1 on
+    #1529 and the axis ruling of 2026-11-11): nothing moves, and Esc closes
+    each menu."""
+    url, _ = gui
+    page = _open_window(browser, url)
+    page.locator("section.model .tabs button", has_text="Parameters").first.click()
+    page.wait_for_selector("tr[data-atom]")
+    _frames(page)
+    before = page.evaluate(SNAP, WINDOW_LANDMARKS)
+    failures = []
+
+    def check(label):
+        _frames(page)
+        moved = _moved(before, page.evaluate(SNAP, WINDOW_LANDMARKS))
+        if moved:
+            failures.append(f"{label!r}: " + "; ".join(moved[:4]))
+
+    def closes(label):
+        page.keyboard.press("Escape")
+        _frames(page)
+        if page.locator(".rx-menu").count():
+            failures.append(f"Esc left the {label} open")
+
+    def items():
+        return [i.strip() for i in page.locator(".rx-menu [role^=menuitem]").all_text_contents()]
+
+    page.get_by_role("button", name="Free or fix", exact=True).click()
+    assert [i.split()[0] for i in items()] == ["Free", "Fix"], items()
+    check("filter menu")
+    closes("filter menu")
+    page.locator(".band button.ib").first.click()
+    assert items() == ["Rename…", "Change space group…", "Add atom…", "Replace from CIF…"], items()
+    check("phase menu")
+    closes("phase menu")
+    page.locator("tr[data-atom]").first.click(button="right")
+    assert items() == ["Rename…", "Change species…", "Anisotropic ADPs", "Delete"], items()
+    check("atom menu")
+    closes("atom menu")
+    page.get_by_role("button", name="Difference axis", exact=True).hover()
+    page.wait_for_selector("#axis-tip")
+    assert "σ from the file." in page.locator("#axis-tip").inner_text()
+    check("σ hint hover")
+    assert not page.errors, page.errors
+    page.close()
+    assert not failures, "\n".join(failures)
