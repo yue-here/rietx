@@ -115,10 +115,19 @@ The first PR's three questions, answered on 2026-11-11.
   hint explains it, and the σ one says Δ/σ and where σ came from (the curves route's
   `weighted` flag: "σ from the file", else Poisson counting statistics). A click on an axis
   opens its choices: the intensity offers Linear, Square root and Log; the difference offers
-  Δ/σ and cumulative χ² only; x offers only the units supported today, so it opens nothing.
+  what today's page draws; x offers only the units supported today, so it opens nothing.
   The Intensity segmented control leaves the title line. Each choice is kept per project in
   `project.json`'s `ui` keys (`intensity_scale`, `difference`), with no Settings entry. The
   menu is reachable from the keyboard, and Esc closes it.
+  - *Amended 2026-11-11 by the lead*: the ruling's words offered the difference as "Δ/σ and
+    cumulative χ² only". That rested on the lead's wrong premise that today's page draws no
+    Δ in counts. Today's page draws all three (`lib/plot.ts`'s `RESIDUAL_KINDS`: Δ/σ, Δ, Σχ²),
+    and the rule is to offer what is drawn today. So the difference axis offers all three in
+    the view menu's former words, and its hint reads `counts` when Δ is chosen.
+- **Structural edits land at once**, each through its own menu row or dialog, as one undoable
+  history node. Settled by Claude, accepted by the lead on 2026-11-11 pending Yue's look: a
+  pending structural edit would leave pending values pointing at atoms or a symmetry it
+  changes, and today's Model tab also applies at once. This departs from row 21's wording.
 - **Free and Fix live in the filter row's ⋯**, settled by Claude under the consent list above
   ("move into a menu") and gui/CLAUDE.md's "the filter box is the selection" (WP-1011): the
   verbs act on what the filter matches, so they sit at its row's end. The rows read "Free N
@@ -156,7 +165,10 @@ Filled in by the session that builds each PR.
     `tests/test_gui_layout_browser.py` (one rewritten for the axis menus, one new for the
     structural menus and the σ hint). Today's `app.js` is byte-identical.
   - *Not generalised*: the Instrument dialog is R3's. U^ij rows are not placed under their
-    atom. Δ in counts leaves `/next`, as ruled; today's page keeps it.
+    atom.
+  - *Restored after review*: the PR first dropped Δ in counts, as the ruling's words said; the
+    lead traced those words to a wrong premise, and the difference axis offers all three
+    (§ Rulings, the amendment).
   - *Measured* (macOS arm64, worktree `.venv` `[dev]` plus playwright, Python 3.12): see the
     PR body. No Python outside `tests/` changed, so the fast suite was not run.
   - *Gotchas*: R1's `Menu.svelte` focused its anchor after `onclose`, by which time the

@@ -1078,7 +1078,8 @@ def test_no_pattern_control_moves_the_refinement_window(browser, gui):
     assert background.get_attribute("aria-pressed") == "false"
     background.click()
     for axis, choices in (("Intensity scale", ("Linear", "Log", "Square root")),
-                          ("Difference axis", ("Cumulative χ²", "Difference in esd (Δ/σ)"))):
+                          ("Difference axis", ("Difference in counts (Δ)", "Cumulative χ²",
+                                               "Difference in esd (Δ/σ)"))):
         page.get_by_role("button", name=axis, exact=True).click()
         check(f"{axis} menu")
         page.keyboard.press("Escape")

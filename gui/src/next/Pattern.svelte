@@ -89,11 +89,12 @@
     onui?: (patch: Record<string, unknown>) => void;
   } = $props();
 
-  /** The difference axis's choices: only what the axis draws in esd or sums
-   *  from it, since the residual is always Δ/σ (WP-1029, the 2026-11-11
-   *  ruling). Δ in counts is not offered here. */
+  /** The difference axis's choices: the three today's page draws
+   *  (`lib/plot.ts`'s `RESIDUAL_KINDS`, in its order), in the view menu's
+   *  words they had here before the axis took them. */
   const DIFFERENCES: { id: ResidualKind; label: string }[] = [
-    { id: "weighted", label: "Difference in esd (Δ/σ)" }, { id: "cumulative", label: "Cumulative χ²" },
+    { id: "weighted", label: "Difference in esd (Δ/σ)" }, { id: "delta", label: "Difference in counts (Δ)" },
+    { id: "cumulative", label: "Cumulative χ²" },
   ];
   const SCALES: { id: Scale; label: string }[] = [
     { id: "linear", label: "Linear" }, { id: "sqrt", label: "Square root" }, { id: "log", label: "Log" },
@@ -398,7 +399,7 @@
   const hints = $derived({
     x: "° 2θ",
     y: scale === "sqrt" ? "√" : scale === "log" ? "log" : "",
-    resid: kind === "cumulative" ? "Σχ²" : "σ",
+    resid: kind === "cumulative" ? "Σχ²" : kind === "delta" ? "counts" : "σ",
   });
 
   /** Where σ comes from, read off the route's `weighted` flag (WP-1029):
@@ -413,6 +414,7 @@
         : scale === "log" ? "Intensity on a log scale. Points at or below zero are not drawn."
         : "Intensity on a linear scale, in counts.", "Click to choose the scale"],
     resid: [kind === "cumulative" ? "Cumulative χ², summed from the left edge of the view."
+            : kind === "delta" ? "Δ = observed − calculated, in counts."
             : `Δ/σ = (observed − calculated)/σ. ${sigmaFrom}`,
             "Click to choose what the difference shows"],
   });

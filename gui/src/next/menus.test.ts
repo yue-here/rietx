@@ -114,11 +114,15 @@ describe("the Pattern graph's axes", () => {
     expect(document.querySelector("button.axis .hint")!.textContent).toBe("log");
   });
 
-  it("offers the difference as Δ/σ or cumulative χ², and nothing in counts", async () => {
+  it("offers the three differences today's page draws, and hints counts for Δ", async () => {
     await draw();
     named("Difference axis")!.click();
     flushSync();
-    expect(menuLabels()).toEqual(["Difference in esd (Δ/σ)", "Cumulative χ²"]);
+    expect(menuLabels()).toEqual(["Difference in esd (Δ/σ)", "Difference in counts (Δ)", "Cumulative χ²"]);
+    named("Difference in counts (Δ)")!.click();
+    flushSync();
+    expect(onui).toHaveBeenCalledWith({ difference: "delta" });
+    expect(document.querySelectorAll(".hint")[1].textContent!.trim()).toBe("counts");
   });
 
   it("opens on the project's remembered choices", async () => {

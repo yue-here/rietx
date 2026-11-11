@@ -46,7 +46,7 @@ The menus-and-axes pictures (`r2b-*`), light and dark, the `fap` example after o
 - `r2b-intensity-axis-*.png`: after a click on the intensity axis. Its menu offers Linear,
   Square root and Log, with Square root ticked; the axis strip takes the hover tint.
 - `r2b-difference-axis-*.png`: after a click on the difference axis. Its menu offers
-  Difference in esd (Δ/σ) and Cumulative χ².
+  Difference in esd (Δ/σ), Difference in counts (Δ) and Cumulative χ².
 - `r2b-sigma-hint-*.png`: the pointer resting on the difference axis. The tip reads
   `Δ/σ = (observed − calculated)/σ. σ from Poisson counting statistics.`, since this
   example's file carries no esd column.
