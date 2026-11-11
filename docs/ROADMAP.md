@@ -107,7 +107,7 @@ opened 2026-09-18 as v1.6; [generality](#generality--every-decision-rietx-makes-
 opened 2026-10-18; [parametric](#parametric--a-parametric-refinement-written-by-hand-ports-to-rietx)
 opened 2026-11-04; [gui-overhaul](#gui-overhaul--the-gui-redesigned-around-the-pattern-and-the-model) opened 2026-11-08; rietview, rigid-bodies and structure-solution were queued as v1.7, v1.8 and v1.9. Threads #286, #426, #561 and #562 quote those
 numbers, so each row in § Milestones says which it was. **Neutron TOF stays at
-[§ v2+](#v2--fenced)** behind issue #193, but for its T-1 cut ([1927](wp/1927-tof-t1-the-axis-and-its-readers.md), 2026-10-08).
+[§ v2+](#v2--fenced)** behind issue #193, but for T-1 ([1927](wp/1927-tof-t1-the-axis-and-its-readers.md), 2026-10-08) and T-2/T-3 (2026-11-11).
 
 **Ten silent-answer fixes have landed since 1.5.0** (1434, 1435, 1432,
 1342, 1415, 1442, 1414, 1454, 1456, 1465), staged in the notes and narrated
@@ -386,7 +386,7 @@ The order the rungs land in, set in #286, is in the
 **Neutron TOF is not here.** It stays fenced at [§ v2+](#v2--fenced) behind
 issue #193, which its own reporter filed that way. A fence moves by a recorded
 decision, the way magnetic structures left it on 2026-09-02, and not by work
-existing.
+existing. What closes the milestone: [record](milestones/magnetic.md#acceptance) (2026-11-11).
 
 The WPs are in [the index](wp/README.md#magnetic).
 
@@ -570,8 +570,8 @@ scope creep. Each item names what fenced it.
   resonant absorption at S(Q), #113) — **built through rather than deferred**: the
   fork's branch is visible (`tof-cleanroom-20260923`); **decided 2026-09-24: held until magnetic
   closes**, then cut T-1, T-2/T-3, T-5; **amended 2026-10-08: T-1 (axis, readers) cut as
-  [1927](wp/1927-tof-t1-the-axis-and-its-readers.md)**, closed 2026-10-23 with T-2's inheritance in its Context; the rest still waiting, with #442 (a bank's CW
-  width rows) decided inside T-1, and #618 (Mantid's instrument values: with provenance,
+  [1927](wp/1927-tof-t1-the-axis-and-its-readers.md)**, closed 2026-10-23 with T-2's inheritance in its Context; **amended 2026-11-11: T-2/T-3 opens, #1108
+  merged** (one TOF PR at a time; after #1503; T-5, T-6 each after the last merges; #193); with #442 (a bank's CW width rows) decided inside T-1, and #618 (Mantid's instrument values: with provenance,
   never the files), and #1067 (TOF pulse shapes as a registry, after T-2/T-3) — and issue #362 lists the constant-wavelength reads
   (`CompiledModel.tt`, `line_wavelengths`, `sigma_measured`; `viz/snapshot.py` and
   23 more sites) a second compiled-model class meets, so the accessor seam it

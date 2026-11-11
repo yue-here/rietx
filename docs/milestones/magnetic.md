@@ -111,3 +111,11 @@ set by someone who has not read the WP is a bar set too low.
   Diagnostic codes included, so `diagnostics.md`'s remaining headroom never
   has to absorb them, and the merge result of the whole set is measured once
   before the first PR is cut rather than at the sixth merge.
+
+**What closes it** (ruled 2026-11-11 on #193, Proposal 2): 1419's C3b merged
+and every row above met as worded or as amended. The 2026-10-20 amendments
+3a–3g are answered row by row on that thread, separately. Three open items
+no row names move to a follow-on milestone and do not gate the close: 1418's
+M-8 (the k-search, #795), 1327's analytic moment branch, and 1343's choice of
+fix for `MAGNETIC_WIDTH_UNMODELLED`'s silence where every magnetic reflection
+is also nuclear, whose strict xfail is the record.

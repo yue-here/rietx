@@ -1,6 +1,6 @@
 # WP-1418 — the magnetic structure is determined, not only stated
 
-Milestone: magnetic · Status: 🔄 2026-11-01 — #1197's right-handed magnetic cell in review (PR #1296); M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082); M-8, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
+Milestone: magnetic · Status: 🔄 2026-11-01 — #1197's right-handed magnetic cell in review (PR #1296); M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082); M-8, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain (M-8 does not gate the milestone's close: #193, 2026-11-11)
 Depends on: PR #290's `crystallography.magnetic` (landed 2026-09-10);
 1326 (the k candidates) for the k-search rung; 1327 (the moment, the hold)
 for the determination verb. The irrep and isotropy rungs depend on nothing
@@ -890,6 +890,21 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
   decision 4 changes neither. All four are still the maintainer's and
   unanswered. Checked against the tree at d87c8cc91: no `search_kvector`
   exists, and M-8 is unticked.
+
+- 2026-11-11, the maintainer's ruling (issue #795, decisions 1 and 2; issue
+  #193, Proposal 2). **Decision 1:** the k-grid lives in
+  `indexing/kvector.py` under `src/rietx/indexing/CLAUDE.md`, with
+  `report/satellites.py` as its consumer and no second generator there.
+  **Decision 2:** K1a ships the rational grid now, through the existing
+  generator (`irreps.K_MAX_DENOMINATOR` = 64); real k is K3, after WP-1993's
+  N-W3a. The condition: the grid is about 0.016 apart beside simple
+  fractions against a measured k resolution of ±0.004 (a 0.02 grid lost a
+  general k in 40 of 40), so K1a's result carries its grid step and the
+  strata searched and claims no coverage of a general k; `K_SEARCH_AT_CHANCE`
+  is K1b's, so until K1b lands that statement is the only guard. K1a may
+  start. Decisions 3 and 4 still wait, gating only K1b and later. **M-8 no
+  longer gates the magnetic milestone's close** (#193, Proposal 2); it lands
+  when ready, after the close if need be.
 
 - 2026-10-31, from the issue triage (issue #1197): the BNS label of an
   enantiomorphic candidate named the mirror type. Fixed 2026-11-01 (PR #1296);
