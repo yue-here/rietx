@@ -122,6 +122,28 @@ def test_a_rename_takes_the_draft_and_a_copy_does_not(served):  # noqa: F811
     assert recovery.read(root / "state", payload["path"]) is None
 
 
+def test_a_move_keys_the_old_copy_by_the_path_it_was_given(tmp_path):
+    """Windows resolves a case-only rename's old name to the new folder (WP-2143).
+
+    A symlink at the old name makes it resolve there on every platform, so a
+    move that re-resolved its source would find no copy and leave the edits
+    under a key nothing reads.
+    """
+    work = tmp_path.resolve() / "work"
+    source, target = work / "sample.rex", work / "Sample2.rex"
+    source.mkdir(parents=True)
+    state = tmp_path / "state"
+    recovery.write(state, source, DRAFT, "n1")
+    source.rename(target)
+    try:
+        source.symlink_to(target, target_is_directory=True)
+    except OSError:
+        pytest.skip("this volume cannot make a symlink")
+    assert recovery.move(state, source, target)
+    assert recovery.read(state, target)["draft"] == DRAFT
+    assert len(list(recovery.root(state).glob("*.json"))) == 1
+
+
 def test_the_routes_are_not_behind_the_run_409(served, monkeypatch):  # noqa: F811
     session, client, root = served
     monkeypatch.setattr(session, "_state", "running")

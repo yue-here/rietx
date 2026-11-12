@@ -1,6 +1,6 @@
 # WP-2005 — `refine.py`'s codes and its inline literals
 
-Milestone: generality · Status: ⬜
+Milestone: generality · Status: 🔄 2026-11-09 — part 1 (the inventory, no tiers) in PR #1486; part 2 waits on the maintainer's answer on the gate after 2004
 Track: The audits
 Depends on: 2002
 Priority: P3 2026-10-23 — 2002 closed, its last item touching no code here; codes, not actions; a verdict here is a flag the caller reads, and the workaround is to read past it
@@ -26,6 +26,14 @@ second review: `< 0.7` in the flat-plate thickness test (`ABSORPTION_PLATE_THICK
 2001's tripwire, which walks module-level constants, so this WP lifts each that gates a
 verdict into a named constant with its value in the table, or records why it is tier 1 (a
 count, a dimension, a physical limit).
+
+*Superseded in part, 2026-11-09 (part 1, at `5ae35232c`):* `refine.py` is 12 241 lines and
+raises 69 codes, so with the five below the WP covers 74. Of 34 numeric literals in the
+raising functions and the same-file functions they call, 5 are thresholds, 4 of them in
+`refine.py`: the two above (now ~lines 8889 and 10696), the two-FWHM edge of the low-angle
+region (~10672) and the half of sin θ_min that sets `ROUGHNESS_OUTSIDE_REGIME`'s info band
+(~11905). The other 29 are units, arithmetic, counts, listing caps and numerical floors.
+`2005-batch/README.md` has the counts and what the walk cannot see.
 
 **Five codes no seam names come here too**, since each is raised beside a fit rather than
 in a reader or a report: `BACKGROUND_ORDER_AT_CAP` (`background/select.py`),
@@ -110,11 +118,14 @@ its tier.
 
 ## Tasks
 
-- [ ] Inventory: the 61 codes with raise site, `level`, the threshold or condition, the
+- [x] Inventory: the 61 codes with raise site, `level`, the threshold or condition, the
       explanation's claim, the kind of ambiguity its verdict has (DESIGN.md § Rules, 1),
-      and how many tests touch it.
+      and how many tests touch it. 74 codes on 2026-11-09: `2005-batch/inventory.json`.
 - [ ] The inline literals: each lifted to a named constant (table row with value) or
-      recorded tier 1 with the reason.
+      recorded tier 1 with the reason. The 29 tier-1 literals are recorded with their
+      reasons in `2005-batch/judgements.json`; the 4 thresholds in `refine.py` wait for
+      their tiers, since a new constant enters the table tiered. The fifth threshold
+      refuses a Chebyshev scan in `background/select.py` and gates no code, so it stays.
 - [ ] Tier each code per part, with evidence and families.
 - [ ] The batch to the maintainer; rulings dated into the table.
 - [ ] Approved demotions: `level` to `info`, or, where the threshold was the trigger, the
@@ -141,6 +152,61 @@ its tier.
 - `docs/milestones/generality.md`; WP-1985; WP-1076 (a declared name is a claim).
 
 ## Handover log
+
+- **2026-11-09** — part 1, the inventory, in PR #1486 (ghostshift runner, unattended).
+  WP-2005 now has a measured inventory of what it audits, built from the tree by a script
+  rather than counted by hand. It covers 74 codes, not 61. It also shows that the "about 30"
+  inline literals were mostly units and arithmetic: only four literals in `refine.py` gate a
+  verdict or its suggestion. So lifting literals into named constants is a four-row job, and
+  the WP's weight is in tiering 64 unaudited codes. The inventory's first reading puts 59 of
+  the 74 verdicts in the kind the data settle (an act recorded, a fact of the arithmetic, a
+  published range), 4 in the kind the data can rank, and 11 in the kind the data cannot settle.
+  Those 15 are where demotions would come from. Nothing was tiered, lifted or demoted.
+  *Question for the maintainer*: the milestone puts a gate after 2004 (generality.md § The
+  order: the maintainer decides on 2002–2004's counts whether 2005 to 2007 run). WP-2004 is
+  still ⬜, so this session stopped at part 1, as WP-2006's part 1 did. Should part 2 (the tiers,
+  the four lifts, the batch) wait for that gate, or go ahead now?
+  *Done*: `docs/wp/2005-batch/` after `2006-batch/`. `collate_inventory.py` derives raise sites,
+  levels, guarding conditions, the named constants each raising function and its same-file helpers read
+  (with tier and value), the explanation's first sentence, the code's audit rows and the tests naming it.
+  `judgements.json` holds the hand-written part: condition and kind of ambiguity per code,
+  role per literal. The script refuses a code or literal with no judgement, a judgement for one
+  that is gone, and a text cut short. The Context's 2026-10-18 counts are superseded in place,
+  dated. Task 1 is ticked. On task 2, the 29 tier-1 literals are recorded with reasons; the 4
+  thresholds are left, since a new constant in `refine.py` enters the table tiered
+  (`tests/audit_delta.py`).
+  *Measured* (at `5ae35232c`, darwin arm64, `.venv` `[dev]`, Python 3.12): 69 codes in
+  `refine.py` (12 241 lines) plus the WP's five, at 78 raise sites; 64 codes `unaudited`, 8 tier
+  1, 2 tier 3. 39 named constants read by a raising function or a helper it calls: 21 unaudited, 10
+  tier 3, 4 tier 2, 3 tier 1, 1 invariant. Literals: 12 unit, 8 arithmetic, 3 count, 3 listing cap, 3 numerical floor, 5
+  threshold. The four gating ones are `0.7` (`ABSORPTION_PLATE_THICKNESS`, ~8889), the 2σ
+  channel test (`LOW_ANGLE_UNMODELLED`'s suggestion, ~10696), the two-FWHM low-angle edge
+  (~10672) and the half of sin θ_min (`ROUGHNESS_OUTSIDE_REGIME`'s info band, ~11905). The fifth
+  refuses a Chebyshev scan in `background/select.py`. Fast selection
+  (`-m "not slow"`, `-n 2` through the Mac test gate, pearl not answering): 14 341 passed,
+  415 skipped, 32 xfailed in 992 s, on `48acd5cd0`; the branch adds no test, and the review's
+  fixes after it touched only `docs/wp/` (`tests/test_docs_consistency.py` 25 passed after them).
+  *Review*: an Opus subagent reviewed the branch diff in place of `/code-review`, which cannot be
+  pointed at a worktree from a ghostshift runner. It reproduced `inventory.json` byte for byte
+  and re-derived every count. Its five should-fix findings were all taken (commit `cf2fa9d6e`):
+  the walk now lists early-exit guards, resolves re-exported and attribute-read constants, reads
+  helpers' constants and counts tests reaching a code through a same-file helper; one count in
+  the README was wrong (ten, not four); `ABSORPTION_PLATE_THICKNESS` moved to kind 1 beside
+  `ABSORPTION_THICKNESS_MATTERS`. Of its nits, five condition texts were corrected and the
+  README's limits gained three; none was declined.
+  *Not done, on purpose*: the WP's `### Inherited` was not pruned (wp-start step 5), because
+  PR #1480 (WP-2075) adds an entry there and a prune would conflict with it. No tier, no
+  `_audit` row, no `src/` change. No generality judge: the branch adds no row and no heuristic.
+  *Gotchas*: guard codes take their thresholds from `strategy/staged.py` and `schemas/plan.py`,
+  and `PATTERN_DEAD_CHANNELS` from `background/diagnostics.py`. The inventory's `note` names
+  them, but `constants_read` sees only names read in the raising function's own file, one call
+  deep. The kinds
+  are this session's reading for part 2 to check, not rulings. Ten, every code already tiered, copy
+  the ambiguity their audit row carries.
+  Next: the maintainer's answer to the gate question. If part 2 goes ahead: tier each code per
+  part (statistic, threshold, action) with families, starting with the 15 kind-2 and kind-3
+  codes and the B13 constants they read. Then lift the four thresholds with their rows, pinned
+  bit-identical before and after, and send the batch.
 
 - **2026-10-18** — created, from the milestone's opening session, split out of 2002 on the
   second review's finding that one WP over 9 587 lines of actions *and* codes is too big

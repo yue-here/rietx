@@ -68,6 +68,18 @@ reads.
   inside `report/body_misfit.rigid_body_misfit` (`released_phase`, line 256),
   with no public builder. The public arm builder is a new public name.
 
+- 2026-11-12, from WP-1806 part 2 (PR #1545): the tie half of the proposal
+  above works on the real acridine pattern, measured. The free-atom control
+  in `tests/test_acceptance_acridine_ix.py` (`_fit` with the body removed)
+  frees the 14 heavy atoms' `dof.*` and ties each H's `dof.k` to its
+  carrier's, with no offset and the cell free. The H then takes its
+  carrier's shift and keeps its fractional C–H vector. It converges unrestrained (Rwp
+  0.05780 against the body's 0.05842), and two starts land 0.0002 Å apart.
+  The body's own H leave their carrier's shift by at most 0.0015 Å. So a
+  shift tie keeps riding H riding to that size, at a free cell, without
+  #759's riding-on-a-free-atom. The soft dependency on WP-1806 is
+  discharged: the public case and its pdCIF reader are on main.
+
 ## Non-goals
 
 - The "right body does not fire" arm, which the issue says is unaffected.
