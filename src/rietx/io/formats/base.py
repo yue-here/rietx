@@ -161,6 +161,14 @@ READER_OPTIONS: dict[str, ReaderOption] = {
         help="the data block to read, by substring match on its name — a pdCIF "
              "carrying both a _meas and a _calc block is a different pattern "
              "depending on it"),
+    "nonpositive_sigma": ReaderOption(
+        name="nonpositive_sigma", kind="str",
+        help="what a point whose esd is zero or negative becomes: 'exclude' "
+             "(the default) leaves it out of the fit, since such an esd "
+             "states no weight; 'poisson' weights it by σ = √max(y, 1), one "
+             "count at a zero count, for a file that wrote σ = √0 for a "
+             "channel that counted nothing. Taken by the formats whose σ is "
+             "the file's own column"),
     "scan": ReaderOption(
         name="scan", kind="int",
         help="which measurement to read, counting from 0, in a file that holds "

@@ -1765,9 +1765,11 @@ class BackgroundFixedPlusChebyshev(_InheritsDeclaredDefaults):
         return cls(
             fixed_two_theta=[float(v) for v in blank.tt()[keep]],
             fixed_intensity=[float(v) for v in blank.y()[keep]],
+            # ``sig()`` only where the blank has esds: it is the file's σ
+            # wherever that is positive, and a σ ≤ 0 is either excluded by
+            # ``keep`` or one the caller asked to weight as Poisson (WP-1952)
             fixed_sigma=(None if blank.sigma is None else
-                         [float(v) for v, k in zip(blank.sigma, keep, strict=True)
-                          if k]),
+                         [float(v) for v in blank.sig()[keep]]),
             fixed_source=source,
             scale=Parameter(value=scale, vary=vary_scale, min=0.0),
             chebyshev=BackgroundChebyshev.with_terms(n_terms, vary=True),

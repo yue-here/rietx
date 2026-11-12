@@ -523,7 +523,7 @@ XY = PatternFormat(
     sigma="the third column when present and positive, else the Poisson "
           "fallback; a FullProf XYDATA heading's INTER fac_y multiplies y and "
           "σ alike",
-    options=("axis",),
+    options=("axis", "nonpositive_sigma"),
     # last, but no longer *total*: a file with a NUL in its first 4 kB is not
     # claimed, so a binary vendor pattern reaches identify_format's refusal —
     # which names the formats this build reads — instead of reaching

@@ -345,9 +345,9 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   whose esd it could not honestly give. Conversions stay in `caglioti.py`; the answer is
   a **coherent domain size**, never `particle_radius_um`, quoted as an order of magnitude
   with its K and beside its separability verdict.
-- **Weights**: the file's esd column when present (readers), Poisson √max(y,1) only as fallback.
-  Never subtract an estimated background — hold it additively (`BackgroundFixedPlusChebyshev`) or
-  co-refine it under a smoothness penalty (`BackgroundPSpline`).
+- **Weights**: the file's esd column when present (readers), Poisson √max(y,1) only as fallback; a
+  σ ≤ 0 is no weight and leaves the fit, never a floor (WP-1952). Never subtract an estimated
+  background — hold it additively (`BackgroundFixedPlusChebyshev`) or co-refine it under a smoothness penalty (`BackgroundPSpline`).
 - **The observation count is reflections, not points — and it gates nothing** (WP-1071).
   `n_points` is the algorithm's N; McCusker §9's warning is that refining against it outruns the
   data in silence (22 003 points against 132 reflections on 11-BM NAC). `optimize.statistics` is

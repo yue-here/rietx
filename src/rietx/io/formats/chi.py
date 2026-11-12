@@ -155,4 +155,5 @@ CHI = PatternFormat(
     sigma="a third column when the writer emitted one, else the Poisson fallback",
     matches=looks_chi,
     read=read_chi,
+    options=("nonpositive_sigma",),
 )

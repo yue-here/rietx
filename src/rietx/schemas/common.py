@@ -710,6 +710,13 @@ from .._nearmiss import did_you_mean
 #: Additive and defaulted to ``None``, the 0.25 → 0.26 rule, so every stored
 #: document loads and refines as before; an older build refuses a phase
 #: carrying it.
+#: Also in 0.61 (WP-1952, WP-2002 B5 and B14): ``PatternData.nonpositive_sigma``
+#: (``"exclude"`` or ``"poisson"``, default ``"exclude"``), what a σ ≤ 0
+#: becomes, and ``RefinementResult.sigma_rule`` / ``HistogramResult.sigma_rule``,
+#: a ``SigmaRule`` of three counts.  Additive and defaulted, the 0.25 → 0.26
+#: rule; an older build refuses a document carrying either key.  The default
+#: moves no stored value but moves a fit: a σ ≤ 0 used to weigh about 10⁶ times
+#: its neighbours and now leaves the fit.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

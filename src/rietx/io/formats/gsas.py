@@ -601,17 +601,11 @@ def _read_bank(p: Path, lines: list[str],
 
     n = min(len(x), nchan) if type_flag != "FXYE" else len(x)
     x, y = x[:n], y[:n]
-    sigma = None
-    if sig is not None:
-        sig = sig[:n]
-        sigma = sig.tolist() if np.any(sig > 0) else None
-    # drop zero-esd leading/trailing channels (detector gaps); a non-finite
-    # esd is kept for ``ascending``, which drops it and says so (WP-2079)
-    if sigma is not None:
-        s = np.asarray(sigma)
-        good = (s > 0) | ~np.isfinite(s)
-        x, y = x[good], y[good]
-        sigma = np.asarray(sigma)[good].tolist()
+    # an esd of zero or below (a detector gap) is kept: ``read_pattern`` leaves
+    # it out of the fit and says so, for every format (WP-1952), where this
+    # reader used to drop the channel in silence; a non-finite esd is kept for
+    # ``ascending``, which drops it and says so (WP-2079)
+    sigma = None if sig is None else sig[:n]
     x, y, sig = ascending(x, y, sigma, path=p, fmt=GSAS, axis=axis,
                           diagnostics=diagnostics)
     return pattern_data(p, x, y, sig, axis=axis,
@@ -1099,5 +1093,5 @@ GSAS = PatternFormat(
            "takes the Poisson fallback"),
     matches=looks_gsas,
     read=read_gsas,
-    options=("bank",),
+    options=("bank", "nonpositive_sigma"),
 )

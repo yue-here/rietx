@@ -70,23 +70,6 @@ documentation only.
 
 ### Inherited
 
-- **From WP-2002 (2026-10-23, 8th session, PR #1113): the σ rule's record field.** WP-2002's B14 (option 3, ruled 2026-10-20) asked for a `RefinementResult` field naming which σ rule fired, with the channel counts: the file's esd column, the Poisson fallback √max(y, 1) (`schemas.pattern.POISSON_FLOOR_COUNTS`) or the floor at 10⁻³ of the median esd (`SIGMA_FLOOR_RELATIVE`). It was not built there, because this WP replaces the floor it would report; build it with the σ ≤ 0 rule, so the field reports the rule that ships.
-
-- **2026-10-13, from the issue triage (#897, JulesOpp's two files of
-  2026-10-12, checked at c3d0367).** Both rebuilt byte for byte and read with
-  `rx.read_pattern(path, diagnostics=[])`. (1) One `10.06 150.3  # …` row
-  among clean rows is dropped in silence (9 of 10 points), its third token
-  being `#`; their reader keeps the point. It is a test case for tasks 1 and
-  4. (2) A third column with one `0` is adopted as σ, and
-  `schemas.pattern._floor_sigma` raises it to a thousandth of the column's
-  median positive esd (0.003 there), so that point weighs about 10⁶× its
-  neighbours, with no diagnostic. That case is in no task: report a
-  non-positive esd by line, beside `PATTERN_SIGMA_CONSTANT`, and decide
-  between floor, drop and refuse (the pdCIF reader drops a weight column with
-  any zero). The reporter checked on 1.5.0; both reproduce on c3d0367.
-
-- **From WP-2002 (2026-10-19, PR #1050), ruled.** The maintainer ruled B5: "fix anything obviously wrong, warn during ingestion, and give the option to correct. Don't spend too much effort on this." Today `schemas.pattern._floor_sigma` (~line 43) raises a σ ≤ 0 to 10⁻³ of the column's median esd, about a million times its neighbours' weight (#897's file). The ruling as read: a channel with σ ≤ 0 takes no weight by default, the reader warns with the count and the lines, and a reader option keeps such channels at σ of one count instead. No per-format classifier. Practice, read 2026-10-19 (`2002-batch/rulings.md` § B5): GSAS-II's fxye reader zero-weights σ ≤ 0 or y ≤ 0; its xye reader zero-weights y ≤ 0, replaces σ = 0 by 1/y, and on a negative σ skips the line after storing its 2θ, so every later point pairs with the wrong angle (`imports/G2pwd_xye.py:170-186`; a defect noted here, never filed upstream). FullProf 8.20 treats σ = 0 as 1 and a negative σ as its absolute value, silently. TOPAS is silent on σ ≤ 0. The `_floor_sigma` row in `src/rietx/_audit.py` names this WP as its replacement.
-
 - **From WP-2002 (2026-10-20, PR #1050), a contributor's second read of its batch (B5.2), agreed by the maintainer.** The Poisson fallback √max(y, 1) gives every channel weight 1 on a file normalised below one count that carries no σ column, which a GSAS-II user meets with a rescaled pattern. The proposal: the reader warns when the intensity column does not look like counts (its maximum about 1 or less, or non-integer values at low counts). It fits beside the warning this WP adds for σ ≤ 0, and B5's "don't spend too much effort" bounds it. B5.1's per-format classifier was the option the maintainer declined.
 
 - 2026-10-26 issue triage: #1064 (mustachefeeling, 2026-10-20), the remainder after PR #1080. Checked against the tree at c0e32ab29: PR #1080 (`4b93ccda6`) reads FullProf's `XYDATA` heading (`io/formats/xy.py:139-185`), carries `TEMP` into `metadata["temperature_k"]`, and refuses an `INTER` multiplier other than 1 or `Interpol = 1` by name; reproduced, a file with `fac_y = 2` raises naming the value. Two parts remain. (1) Apply `fac_x` to x and `fac_y` to y and σ, with an info diagnostic naming the factor, as the FullProf manual (2001, p. 74, `Ins = 10`) defines them; `Interpol = 1` stays refused. The PR deferred this only because a new code needed `help.py` and `_audit.py` rows while #1050 rewrote them, and #1050 merged 2026-10-20. The new code takes an `_audit` row at tier 1 (the format's own definition). (2) An `axis` reader option (`"two_theta"` or `"tof"`) the ASCII reader honours as the caller's declaration, recorded in `metadata` as declared, and refused with both quoted where the file states a contradicting unit. Reproduced: a headerless 2000-18000 µs bank raises "x axis runs 2000° to 18000° … not 2θ", and `axis="tof"` raises "unknown reader option 'axis'" (`READER_OPTIONS` is `bank`, `block`, `scan`, `io/formats/base.py:142`). A new option needs its `help.py` entry and a `PatternFormat.options` row (`io/CLAUDE.md` § Options). The PR's open question: real `XYDATA` files write two values on the `TEMP` line and the manual names one; the reader takes the first.
@@ -149,6 +132,21 @@ documentation only.
       reads unchanged with no new diagnostic.
 - [x] Skill: the diagnostics reference row for any new code. Nothing else
       expected.
+- [x] The σ ≤ 0 rule (Inherited, WP-2002 B5, ruled 2026-10-19), for every
+      format: a channel whose σ ≤ 0 takes no weight by default
+      (`PatternData.nonpositive_sigma = "exclude"`, read by
+      `in_range_mask`), `read_pattern` warns with the count and the 2θ
+      (`PATTERN_SIGMA_NONPOSITIVE`), and the `nonpositive_sigma="poisson"`
+      reader option keeps such channels at √max(y, 1). The floor
+      (`_floor_sigma`, `SIGMA_FLOOR_RELATIVE`) goes, and so does `gsas`'s
+      silent drop of such channels.
+- [x] The σ-rule record field (Inherited, WP-2002 B14):
+      `RefinementResult.sigma_rule` and `HistogramResult.sigma_rule`, a
+      `SigmaRule` of three counts, built by `PatternData.sigma_rule` at
+      compile.
+- [ ] The counts warning (Inherited, WP-2002 B5.2): a file with no σ column
+      whose intensities do not look like counts. Not built with the two
+      above; see the 2026-11-12 handover entry.
 
 ## Acceptance
 
