@@ -505,8 +505,11 @@ def read_xy(path: str | Path, *, axis: str | None = None,
         if sigma is not None:
             sigma = sigma * fac_y
         if diagnostics is not None:
-            diagnostics.append(_inter_applied(p, fac_x, fac_y, axis,
-                                              sigma is not None))
+            # a column with no positive σ is declined on read_pattern's hook,
+            # so it is not a σ the multiplier reached (WP-1952)
+            diagnostics.append(_inter_applied(
+                p, fac_x, fac_y, axis,
+                sigma is not None and bool(np.any(sigma > 0))))
     x, y, sig = ascending(arr[:, 0], arr[:, 1], sigma, path=p, fmt=XY,
                           axis=axis, diagnostics=diagnostics)
     return pattern_data(p, x, y, sig, axis=axis, source_file=p.name, format="xy",

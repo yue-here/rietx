@@ -4290,7 +4290,12 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     tt, y_obs, sigma = tt_all[mask], y_all[mask], s_all[mask]
     sigma_rule = pattern.sigma_rule(window)
     if len(tt) < 10:
-        raise ValueError("fewer than 10 points remain in the fit range")
+        why = ""
+        if sigma_rule.n_nonpositive_excluded:
+            why = (f"; {sigma_rule.n_nonpositive_excluded} of them were left out "
+                   "because their σ is zero or below (nonpositive_sigma='exclude'), "
+                   "so set nonpositive_sigma='poisson' or sigma=None to weight them")
+        raise ValueError(f"fewer than 10 points remain in the fit range{why}")
     tt_min, tt_max = float(tt[0]), float(tt[-1])
 
     lams = tuple(line.wavelength.value for line in instrument.source.lines)

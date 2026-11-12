@@ -858,11 +858,13 @@ def _lab6_monitor_normalised(*, dead: tuple[int, ...] = (), seed: int = 0):
 
 
 @pytest.mark.parametrize("rule", ["exclude", "poisson"])
-def test_a_nonpositive_sigma_channel_is_not_read_as_a_dead_cell(rule, tmp_path):
-    """A channel the file gives σ = 0 carries no σ of the file's to judge. Under
-    ``"exclude"`` it has left the fit and ``PATTERN_SIGMA_NONPOSITIVE`` named
-    it; under ``"poisson"`` its σ is the stand-in √max(y, 1), which
-    ``dead_channels`` refuses to read (WP-1952). Either way no dead cell."""
+def test_a_nonpositive_sigma_channel_is_judged_by_the_weight_the_fit_uses(
+        rule, tmp_path):
+    """Under ``"exclude"`` a σ = 0 channel has left the fit and
+    ``PATTERN_SIGMA_NONPOSITIVE`` named it, so it is no dead cell to exclude.
+    Under ``"poisson"`` it is fitted at σ = √max(0, 1) = 1 beside a
+    background whose σ is ~50, a weight ~2500 times its neighbours', and the
+    reader says so as the fit's own check does (WP-1952)."""
     from rietx.io.readers import read_pattern
 
     data = _monitor_normalised()
@@ -875,7 +877,7 @@ def test_a_nonpositive_sigma_channel_is_not_read_as_a_dead_cell(rule, tmp_path):
     found: list = []
     read_pattern(str(path), diagnostics=found, nonpositive_sigma=rule)
     codes = [d.code for d in found]
-    assert "PATTERN_DEAD_CHANNELS" not in codes
+    assert ("PATTERN_DEAD_CHANNELS" in codes) == (rule == "poisson")
     assert ("PATTERN_SIGMA_NONPOSITIVE" in codes) == (rule == "exclude")
 
 

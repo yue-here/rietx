@@ -33,6 +33,7 @@ from .formats import (
     read_pdcif,
     reader_options_for,
 )
+from .formats.base import _point_runs
 
 __all__ = [
     "PATTERN_FORMATS",
@@ -170,22 +171,16 @@ def _apply_nonpositive_sigma(data: PatternData, rule: str,
                         "χ² and esds knowing the weights are assumed."))]
     if rule != "exclude":
         return []
-    x = data.x()
     unit = "°" if data.axis == "two_theta" else " µs"
     label = "2θ" if data.axis == "two_theta" else "flight time"
-    idx = np.flatnonzero(bad)
-    runs = np.split(idx, np.flatnonzero(np.diff(idx) > 1) + 1)
-    spans = [(float(x[r[0]]), float(x[r[-1]])) for r in runs]
-    shown = ", ".join(f"{lo:g}-{hi:g}{unit}" if lo != hi else f"{lo:g}{unit}"
-                      for lo, hi in spans[:3])
-    more = f", and {len(spans) - 3} more range(s)" if len(spans) > 3 else ""
+    spans, shown = _point_runs(data.x(), np.flatnonzero(bad), unit)
     n = int(bad.sum())
     has = "has" if n == 1 else "have"
     n_y0 = int((data.y()[bad] == 0).sum())
     return [Diagnostic(
         level="warning", code="PATTERN_SIGMA_NONPOSITIVE",
         message=(f"{name}: {n} of {sigma.size} points {has} a σ of zero or "
-                 f"below ({what}), at {label} {shown}{more}. {n_y0} of them "
+                 f"below ({what}), at {label} {shown}. {n_y0} of them "
                  f"record an intensity of zero. Such a σ states no weight, so "
                  f"these points are left out of the fit."),
         where=[f"{lo:.3f}-{hi:.3f}" for lo, hi in spans],
@@ -289,10 +284,12 @@ def _dead_channel_diagnostics(data: PatternData, name: str) -> list[Diagnostic]:
 
     if data.sigma is None or data.axis != "two_theta":
         return []  # the run and window lengths are degrees of 2θ
-    # a σ ≤ 0 channel carries no file σ to judge: under "exclude" it has left
-    # the fit and PATTERN_SIGMA_NONPOSITIVE named it, and under "poisson" its σ
-    # is the stand-in dead_channels refuses to read (WP-1952)
-    keep = ~data.nonpositive_sigma_mask()
+    # a channel the σ ≤ 0 rule left out of the fit is not a dead cell to
+    # exclude: PATTERN_SIGMA_NONPOSITIVE has named it.  Under "poisson" it is
+    # fitted at its stand-in σ, and the fit's own check (refine) reads that
+    # weight, so this one does too and the two agree (WP-1952)
+    keep = (~data.nonpositive_sigma_mask() if data.nonpositive_sigma == "exclude"
+            else np.ones(len(data.intensity), dtype=bool))
     out = []
     for run in dead_channels(data.tt()[keep], data.y()[keep], data.sig()[keep]):
         lo, hi = _dead_interval(run)

@@ -224,10 +224,14 @@ class PatternData(Base):
 
     def nonpositive_sigma_mask(self) -> np.ndarray:
         """True per channel whose stated σ is zero or negative; all False when
-        the pattern carries no σ."""
+        the pattern carries no σ.
+
+        Written as "not positive", the test :func:`_poisson_where_nonpositive`
+        replaces by, so a channel :meth:`sig` does not weight by the file's σ
+        is never counted as the file's in :meth:`sigma_rule`."""
         if self.sigma is None:
             return np.zeros(len(self.intensity), dtype=bool)
-        return np.asarray(self.sigma, dtype=np.float64) <= 0
+        return ~(np.asarray(self.sigma, dtype=np.float64) > 0)
 
     def in_range_mask(self) -> np.ndarray:
         """True for points kept in the fit: excluded_regions removed, and under
