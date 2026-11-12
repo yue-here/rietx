@@ -985,6 +985,34 @@ no magnetic model declared.
 
 ## Handover log
 
+### 2026-11-12 (2nd session) — M-8's machinery half, K1a (`indexing/kvector.py`, #795)
+
+Under the maintainer's 2026-11-11 rulings on #795 (decision 1: `indexing/kvector.py` under
+the indexing rulebook; decision 2: the rational grid now, through the existing generator),
+K1a lands the calls an agent composes by hand and nothing that ranks or chooses:
+`kgrid_strata` (rational k of step 1/n, n ≤ `K_MAX_DENOMINATOR`, one representative per
+class modulo the centred L*, strata from the little co-group), `kgrid_positions`,
+`score_kvector` and `score_kgrid` (the local Poisson-binomial score), `kgrid_null` (the
+per-pattern shuffle null, whole sample reported) and `kvector_equivalents` (star, −k,
+G − k, and the metric's near-symmetric partners, with `K_SEARCH_PARTNER`). The radius,
+denominator, strata, band, exclusion windows, shuffle count, percentile, seed and partner
+tolerance are required arguments. Per the maintainer's condition, every grid record carries
+its grid step, the strata searched and left, and a `coverage` sentence claiming nothing
+about k off the grid. M-8 stays unticked: the ranking, `best_or_none()`, the default
+radius and the two warnings are K1b's.
+
+*Measured.* arm64 Mac, `.venv-test` `[dev]`: `tests/test_indexing_kvector.py` and the
+audit, help and docs-consistency files green (counts in the PR). On the 1/64 Pnma grid
+(35 936 k = 33³ − 1, Γ excluded) a planted (0, 18/64, 0) with ten clean satellites scores
+9.61 against a 100-shuffle 99th percentile of 5.09 (+4.52 decades); positions build in
+14 s and the null costs 7 s more per pattern. Without satellites, a 10 % profile misfit put
+0 of 200 grid maxima above their thresholds at about four unexplained peaks each, and 2 of
+40 at about 26 (binomial expectation 0.4): shoulders just outside the exclusion windows
+are not uniform, which the exclusion half-width the caller passes decides.
+
+*Next.* K1b (`search_kvector`, the ranking, `K_SEARCH_AT_CHANCE`, the few-peaks floor)
+once this merges and #795's decisions 3 and 4 are ruled.
+
 ### 2026-11-12 — the two-site row on the Linux nightly (PR #1542)
 
 The Linux nightly went red on 2026-11-11 on the two-site row of issue #1424. Two PRs merged

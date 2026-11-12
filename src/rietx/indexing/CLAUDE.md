@@ -10,24 +10,24 @@ lands here; it earns a clause at root only if it changes behavior outside
 ## The governing rule
 
 The FitReport's rule one rank up: an indexer must never hand back one cell confidently —
-`IndexingResult` has **no** `.cell`/`.best`, only a gated `best_or_none()`; geometrical
-ambiguity (Mighell & Santoro 1975) is reported with the reflections that would break the
-tie, never silently resolved; coverage is scored in *both* directions (share-of-observed
-alone puts a 390-line wrong phase above the truth); a restricted search reports
-`systems_searched` rather than concluding anything about the sample. Engines supply the
-confidence by **agreeing** (`direction="both"`'s device) — three of them (two until
-WP-1040), `high` meaning *every* engine that ran found the lattice, so adding one raises
-the bar. They must fail differently for that to mean anything, and they do: wide domain
-(dichotomy), poisoned base line (trial_error), bad starting basin (svd). One step
-further: the **extinction symbol**, not the space group, is what a powder measures —
-`determine_extinction_symbol` answers with ranked classes, each carrying a *list* of
-space groups; there the singleton is not unsupported but unmeasurable. Its absence test
-can only speak where its own null model is silent — a σ threshold is counting noise, not
-model error, and a forbidden position inside a neighbour's tail measures the *profile*,
-which refuted certified corundum's own `R -3 c` (WP-1077; `_model_is_quiet` and the
-sham-probe measurement are in `extinction.py`'s docstring; `n_testable` is `None` until the
-class's own fit runs). Its reference fit is gated on the picker's envelope
-(`REFERENCE_NET_RWP_MAX`). **A raised fit is no evidence**: its class stays unscored (WP-2076).
+`IndexingResult` has **no** `.cell`/`.best`, only a gated `best_or_none()`; geometrical ambiguity
+(Mighell & Santoro 1975) is reported with the reflections that would break the tie, never silently
+resolved; coverage is scored in *both* directions (share-of-observed alone puts a 390-line wrong phase
+above the truth); a restricted search reports `systems_searched` rather than concluding anything about
+the sample. Engines supply the confidence by **agreeing** (`direction="both"`'s device) — three of
+them (two until WP-1040), `high` meaning *every* engine that ran found the lattice, so adding one
+raises the bar. They must fail differently for that to mean anything, and they do: wide domain
+(dichotomy), poisoned base line (trial_error), bad starting basin (svd). One step further: the
+**extinction symbol**, not the space group, is what a powder measures — `determine_extinction_symbol`
+answers with ranked classes, each carrying a *list* of space groups; there the singleton is not
+unsupported but unmeasurable. Its absence test can only speak where its own null model is silent — a σ
+threshold is counting noise, not model error, and a forbidden position inside a neighbour's tail
+measures the *profile*, which refuted certified corundum's own `R -3 c` (WP-1077; `_model_is_quiet`
+and the sham-probe measurement are in `extinction.py`'s docstring; `n_testable` is `None` until the
+class's own fit runs). Its reference fit is gated on the picker's envelope (`REFERENCE_NET_RWP_MAX`).
+**A raised fit is no evidence**: its class stays unscored (WP-2076). **A k is a position hypothesis
+too** (WP-1418 M-8): `kvector.py` scores k against a known parent, its null is per pattern, no call in
+it picks a k, and a grid record claims nothing about a k off its grid.
 
 ## The pipeline
 
