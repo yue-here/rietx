@@ -1,6 +1,6 @@
 # WP-2078 — Weak lines from another phase push the true cell off rank 1
 
-Milestone: unscheduled · Status: 🔄 2026-11-12 — claimed by ghostshift (MacBook-Air-c4aacd); tasks 1, 3 and 4 to the maintainer decision
+Milestone: unscheduled · Status: 🔄 2026-11-12 — tasks 1-4 done (PR #1543); waits on the maintainer decision written in the 2026-11-12 handover entry
 Track: What fires, and what stays silent
 Depends on: — (1969 soft: the inlier rule answers the same failure by another mechanism; 2066 soft: the reporter's dichotomy rows predate it)
 Priority: P2 2026-11-02 — a ranking defect with a hand workaround: on the reporter's private benchmark the true cell ranks first on 48 of 172 host and one-impurity lists under all three engines, and on 75 when the search is given only the lines at or above 1 % of the strongest; thinning the list by hand is the workaround
@@ -334,6 +334,90 @@ position-only list returns the same candidates as on `main`.
   driven).
 
 ## Handover log
+
+- **2026-11-12** — tasks 1, 3 and 4, by a ghostshift runner, in PR #1543. A
+  floor on line intensity is not what other indexing programs do by default.
+  They search the first twenty or so lines and score with all of them, and the
+  literature tries a 5 % floor only as a second attempt after the full list
+  fails. On public data, a floor applied before every search does fix the
+  trace-phase fixture and the picker-artefact silicon. It also discards the
+  superlattice fixture's own ordering lines from 1 %, and it changes the grades
+  on SRM 660c LaB₆. The two gentler forms the WP proposed keep the superlattice
+  but do not fix the trace phase. So the design now waits on one decision.
+
+  *Done:* the practice survey (`docs/practice.md`); the families and the
+  measurement (Context, "The families" and "Measured"); the Inherited prune;
+  a note to WP-1969 (LaB₆ + cBN ends in no cell).
+  *The nightly reading the 2026-11-05 entry owed cannot be taken from the
+  log*: the full job runs pytest without `-rs`, so a skip is not named, and
+  neither weak-lines row is among the 25 slowest (the 25th took 141 s on
+  2026-11-06 and 138 s on 2026-11-11). Each row therefore took under ~140 s
+  there, which a cut search and a finished one both satisfy. Still owed; a
+  `-rs` on the nightly, or a junit artifact, would answer it.
+  *Gotchas:* on a shared machine most real-data runs under `quick` reach the
+  120 s ceiling. Read a cut run (`*` in the table) as load, and rerun with the
+  host's system declared, as the table's "only" rows do.
+
+  **Decision for the maintainer (the task "Decision (maintainer)").** The
+  question: how should rietx treat weak lines when it indexes? A fixed
+  intensity floor before every search, a floor tried only when the full list
+  gives no answer, or nothing? Sent because it sets a new default constant and
+  changes what `str(IndexingResult)` ranks, and both are the maintainer's gate
+  (Context, "Tier and the maintainer's gates").
+  - *Why it matters.* The indexer drives its search with the strongest twenty
+    lines and scores every candidate on all of them. A second phase present at
+    a trace, or a peak the picker split in two, adds lines no cell of the host
+    explains, and the true cell then ranks below wrong cells or vanishes
+    (fixture (a): absent; fixture (d): second behind a trigonal cell). A
+    superlattice has weak lines of its own, and those are what tell its true
+    cell from a subcell (fixture (b)). Trace lines and ordering lines overlap in
+    intensity: (a)'s oxide sits under 0.6 % of the host's strongest line, and
+    (b)'s ordering lines run 0.1-2.3 %. A user would see either a wrong cell
+    ranked first on a slightly impure sample, or a subcell ranked first on an
+    ordered one. Moderate: a hand workaround exists (thin the list), and a
+    wrong cell here is graded `low`.
+  - *Aim.* Ranking the host's cell first for someone indexing a real sample
+    with a minor impurity, without losing ordered structures.
+  - *Options.* (A) A fixed floor before every search (the issue's form).
+    Measured: fixes (a) and (d) at 0.5, 1 and 2 %. Keeps (b) at 0.5 % but
+    loses it from 1 %. On SRM 660c it removes one `kalpha2_residual` line at
+    1 % and grades the truth and its known half-volume tetragonal rival both
+    `high`; at 2 % the rival ranks first. Tier 3, since no program does it by
+    default except EXPO's N-TREOR09, whose value is unstated. (B) The same
+    floor as a retry, run only when the full list's search yields no answer.
+    This is Bergmann et al.'s practice and DICVOL91's old advice, so tier 2.
+    (b) and SRM 660c would not trigger it, since both rank their truth first
+    unfloored. Not measured: what "no answer" means is the open part. Absent
+    truth and an all-`low` list both occur on correct runs here (SRM 660c is
+    all `low`), so the trigger needs its own measurement. (C) Nothing. The
+    hand workaround stays, and the WP closes with this record. Dropped as
+    measured failures: driving with the floored lines through the #934 seam,
+    and a second search per engine (each leaves (a)'s truth 2nd-9th; the
+    second costs about twice the time and lost one answer to the ceiling).
+    The inlier rule as default helped no list and dropped SRM 660c to 4th.
+  - *Practice.* `docs/practice.md` § Which lines an indexing search is
+    given: count-and-position line choice everywhere; a floor as a
+    second chance in the bethanechol round robin (5 runs better, 1 worse,
+    10 unchanged of 16 at 5 % of Imax).
+  - *Recommendation.* Lean (B). The crux is that no fixed value separates a
+    trace phase from a superlattice's own weak lines, because their
+    intensities overlap. (A) must then lose one of the two at any value, and
+    it also moves the absolute anchor's grades. (B) acts only on lists that
+    already failed, which is where practice uses a floor. Its cost is a
+    trigger rule to measure before the value is set. A measurement showing
+    that every usable trigger also fires on correct runs, such as SRM 660c's
+    all-`low` list, would flip this to (C).
+
+  *Settled by the runner, each reversible:* (d) searched with no system
+  declared, as #1382 reproduced it (declared cubic it ranks first already);
+  per-engine runs only on (a) and (d) (cost; elsewhere `found_by` on the
+  truth says which engines found it); 0.5 and 2 % floors on the fixtures and
+  six real lists only; the cut lists rerun with the host's system declared
+  rather than a larger ceiling (the device task 2's rows use); the harness
+  left as scratch, with each candidate's construction written in Context.
+  *Next:* the maintainer's answer to the decision above. Then, for (B),
+  measure a trigger rule on these lists before choosing the value; for (C),
+  close the WP.
 
 - **2026-11-05** (post-merge record) — PR #1341 merged at `4eecc6632`. It
   carries task 2's own entry, the second of the two below. Task 2 is done and
