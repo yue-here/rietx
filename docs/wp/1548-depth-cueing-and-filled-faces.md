@@ -201,7 +201,13 @@ visual questions. Bring each with a picture:
   bit-identical to the numpy path, shipped as rietx-kernels 1.5.0
   (`docs/RELEASING.md` § The kernel wheel). The floor rises and `draw` stops
   taking the numpy path for fog only once the maintainer publishes it.
-- [ ] Fog in `gl3d.ts`, and the parity case with fog on.
+- [x] Fog in `gl3d.ts`, and the parity case with fog on. *(2026-11-12:
+  `scene.fog_span`/`fogSpan` twins held equal by 8 corpus cases; a FOG
+  chunk in all four fragment shaders, clamping before it blends as the
+  raster does; `render_structure(depth_cue=)` and the drawer's "depth cue"
+  box, R3 not having landed. Parity 0.81 levels cued, 0.87 plain; the cued
+  row also asserts the viewer fogged, since fog moves the canvas less than
+  the bar. A transparent export draws without fog until D3 is ruled.)*
 - [ ] Ring perception and the planarity test, with unit tests on
   paracetamol (`tests/data/cod_2104364.cif`, one benzene ring) and on a
   structure with no rings. Measure the planarity spread on the organic

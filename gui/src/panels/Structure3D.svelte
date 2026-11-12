@@ -148,6 +148,9 @@
   let polyFormulas = $state(new Map<string, boolean>());
   /** Export the PNG on a transparent background rather than the panel's. */
   let transparent = $state(false);
+  /** depth cueing (WP-1548): off by default, a drawing choice like the rest of
+   *  the drawer, so session-local and never stored in the project */
+  let depthCue = $state(false);
   /** What is under the pointer: the readout strip's one line (WP-1213's rule —
    *  a box over the picture covers the thing it describes). */
   let reading = $state("");
@@ -196,6 +199,7 @@
     if (!canvas) return;
     renderer = createRenderer(canvas);
     unsupported = renderer === null;
+    renderer?.setDepthCue(untrack(() => depthCue));
     const observer = typeof ResizeObserver === "undefined"
       ? null : new ResizeObserver(() => schedule());
     observer?.observe(canvas);
@@ -682,6 +686,15 @@
           <input type="checkbox" checked={showBoundary}
             onchange={(e) => (showBoundary = (e.currentTarget as HTMLInputElement).checked)} />
           images outside the cell
+        </label>
+        <label class="inline">
+          <input type="checkbox" checked={depthCue}
+            onchange={(e) => {
+              depthCue = (e.currentTarget as HTMLInputElement).checked;
+              renderer?.setDepthCue(depthCue);
+              schedule();
+            }} />
+          depth cue
         </label>
         <label class="inline">
           <input type="checkbox" checked={transparent}

@@ -57,7 +57,12 @@ CELL_INK = "#1f5fa8"
 #: principal ring is where the smallest unit-frame coordinate is under
 #: ``ring_width``, inked lighter (``ring_lighten`` toward white) on an atom
 #: whose luminance is under ``ring_dark`` and darker (``ring_darken``) on the
-#: rest.  ``luma`` is Rec. 709's.
+#: rest.  ``luma`` is Rec. 709's.  Depth cueing (WP-1548 D1, off unless asked)
+#: fades each surface toward the background linearly in depth: from nothing at
+#: ``fog_start`` of the drawn atoms' depth span, measured from the front, to
+#: ``fog_max`` at ``fog_end`` (:func:`fog_span`).  The start and end are
+#: ChimeraX's defaults for its ramp; ``fog_max`` is below 1 so the back layer
+#: stays legible (``docs/practice.md`` § Depth cueing).
 LOOK: dict[str, Any] = {
     "light": [-0.40, 0.55, 0.73],
     "ambient": 0.45,
@@ -70,6 +75,9 @@ LOOK: dict[str, Any] = {
     "ring_lighten": 0.6,
     "ring_darken": 0.3,
     "luma": [0.2126, 0.7152, 0.0722],
+    "fog_start": 0.5,
+    "fog_end": 1.0,
+    "fog_max": 0.7,
 }
 
 #: The opening view's eye and up, before ``look_from`` (``openingView``).
@@ -107,6 +115,30 @@ def _hypot3(v: Sequence[float]) -> float:
 def _cross(u: Sequence[float], v: Sequence[float]) -> list[float]:
     return [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
             u[0] * v[1] - u[1] * v[0]]
+
+
+def fog_span(scene: Mapping, rotation: Sequence[float]) -> list[float] | None:
+    """``fogSpan``: where depth cueing starts and ends, as view-space depths.
+
+    ``rotation`` is row-major, nine numbers, as :func:`look_from` returns it.
+    Depths are the GUI's, ``R·(p − center)``'s third component, z toward the
+    viewer; the raster's view coordinates are ``R·p`` and add ``(R·center)``'s.
+    The span is the drawn atoms' centres along the line of sight, front to back.  The fog starts ``fog_start`` of
+    the way from the front and reaches ``fog_max`` ``fog_end`` of the way, so it
+    follows the picture as it turns, as ChimeraX's ramp follows its clip planes
+    (WP-1548 D1).  ``None`` where the atoms span no depth, one atom or a layer
+    seen edge on, since then there is nothing to cue.
+    """
+    r, c = rotation[6:9], scene["center"]
+    depths = [r[0] * (a["pos"][0] - c[0]) + r[1] * (a["pos"][1] - c[1])
+              + r[2] * (a["pos"][2] - c[2]) for a in scene["atoms"]]
+    if not depths:
+        return None
+    front, back = max(depths), min(depths)
+    if not front > back:
+        return None
+    span = front - back
+    return [front - LOOK["fog_start"] * span, front - LOOK["fog_end"] * span]
 
 
 def atom_transform(geometry: Mapping, atom: Mapping, mode: str,

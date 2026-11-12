@@ -484,7 +484,10 @@ export const POLY_ALPHA = 0.55;
  * ring is where the smallest unit-frame coordinate is under `ring_width`,
  * inked `ring_lighten` of the way to white on an atom whose luminance is under
  * `ring_dark` and at `ring_darken` of its colour on the rest, or a violet atom
- * hides its rings.  The keys are Python's, because Python owns the corpus.
+ * hides its rings.  Depth cueing (WP-1548, off unless asked) fades a surface
+ * toward the background linearly in depth, from nothing at `fog_start` of the
+ * drawn atoms' depth span to `fog_max` at `fog_end` (`fogSpan`).  The keys are
+ * Python's, because Python owns the corpus.
  */
 export const LOOK = {
   light: [-0.40, 0.55, 0.73],
@@ -498,7 +501,29 @@ export const LOOK = {
   ring_lighten: 0.6,
   ring_darken: 0.3,
   luma: [0.2126, 0.7152, 0.0722],
+  fog_start: 0.5,
+  fog_end: 1.0,
+  fog_max: 0.7,
 } as const;
+
+/**
+ * Where depth cueing starts and ends, as view-space depths about the scene's
+ * centre (`rotation·(p − center)`'s z, toward the viewer): `fog_start` and
+ * `fog_end` of the way back through the drawn atoms' centres, front to back,
+ * in this view, so the ramp turns with the picture (WP-1548 D1).  `null` where
+ * the atoms span no depth.  Python's `scene.fog_span` is the twin.
+ */
+export function fogSpan(scene: Scene, rotation: Mat3): [number, number] | null {
+  const [r0, r1, r2] = [rotation[6], rotation[7], rotation[8]];
+  const c = scene.center;
+  const depths = scene.atoms.map((a) =>
+    r0 * (a.pos[0] - c[0]) + r1 * (a.pos[1] - c[1]) + r2 * (a.pos[2] - c[2]));
+  if (depths.length === 0) return null;
+  const front = Math.max(...depths), back = Math.min(...depths);
+  if (!(front > back)) return null;
+  const span = front - back;
+  return [front - LOOK.fog_start * span, front - LOOK.fog_end * span];
+}
 
 /** A polyhedron's edges, in CSS pixels, drawn as the cell frame's quads (D9). */
 export const EDGE_WIDTH_PX = 1.25;

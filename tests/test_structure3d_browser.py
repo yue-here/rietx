@@ -205,8 +205,10 @@ def test_the_polyhedra_are_painted_and_give_way_to_their_switch(page, tmp_path):
 PARITY_LEVELS = 2.0
 
 
-def test_the_python_renderer_draws_the_viewers_picture(page):
-    """WP-1470: one scene and one view drawn by both renderers.
+@pytest.mark.parametrize("depth_cue", [False, True], ids=["plain", "depth-cued"])
+def test_the_python_renderer_draws_the_viewers_picture(page, depth_cue):
+    """WP-1470: one scene and one view drawn by both renderers, and WP-1548's
+    depth cue drawn by both, ticked in the drawer and asked of ``draw``.
 
     The Python side takes the GUI's framing (``gui_frame``: its zoom-1 fit
     and centre) and the canvas's clear colour, and the DOM letters are hidden
@@ -220,6 +222,11 @@ def test_the_python_renderer_draws_the_viewers_picture(page):
     from rietx.viz.figure3d.render import _png, gui_frame
 
     page.add_style_tag(content=".viewer .letters { display: none; }")
+    if depth_cue:
+        page.get_by_role("button", name="drawing").click()
+        page.get_by_label("depth cue").check()
+        # the drawer opened above the canvas and moved it; close it again
+        page.get_by_role("button", name="drawing").click()
     _settle(page)
     css_w, css_h, width, height = page.locator(".viewer canvas").evaluate(
         "c => [c.clientWidth, c.clientHeight, c.width, c.height]")
@@ -238,18 +245,34 @@ def test_the_python_renderer_draws_the_viewers_picture(page):
                            cell=accent)
     rotation = np.asarray(sc.opening_view()).reshape(3, 3)
     frame = gui_frame(scene, rotation, width, height, css_w)
-    ours = raster.draw(scene, rotation, frame, supersample=4,
-                       background=tuple(float(v) for v in shown[0, 0]))
+    ground = tuple(float(v) for v in shown[0, 0])
+    fog = None
+    if depth_cue:
+        span = sc.fog_span(scene, sc.opening_view())
+        shift = float(rotation[2] @ np.asarray(scene["center"]))
+        fog = (span[0] + shift, span[1] + shift, sc.LOOK["fog_max"], ground)
+    ours = raster.draw(scene, rotation, frame, supersample=4, background=ground, fog=fog)
     out = Path(__file__).parent / "output" / "figure3d"
     out.mkdir(parents=True, exist_ok=True)
-    _png(out / "parity_python.png", ours, None)
+    tag = "_cued" if depth_cue else ""
+    _png(out / f"parity_python{tag}.png", ours, None)
     theirs = np.concatenate([np.round(shown * 255), np.full(shown.shape[:2] + (1,), 255)],
                             axis=-1).astype(np.uint8)
-    _png(out / "parity_gui.png", theirs, None)
+    _png(out / f"parity_gui{tag}.png", theirs, None)
     assert shown.shape[:2] == (height, width) == (css_h, css_w)
     levels = float(np.abs(ours[..., :3] / 255 - shown).mean() * 255)
-    print(f"parity: canvas {css_w}x{css_h} css px, mean |Δ| {levels:.2f} levels")
+    print(f"parity{tag}: canvas {css_w}x{css_h} css px, mean |Δ| {levels:.2f} levels")
     assert levels < PARITY_LEVELS
+    if depth_cue:
+        # the fog moves the whole canvas by less than the bar above, most of it
+        # being background, so ask also that the viewer fogged: over the drawn
+        # pixels it is nearer Python's fogged picture than its plain one
+        # (measured 5.9 against 13.8 levels, WP-1548)
+        plain = raster.draw(scene, rotation, frame, supersample=4, background=ground)
+        ink = np.abs(plain[..., :3] / 255 - plain[0, 0, :3] / 255).sum(axis=2) > 0.06
+        near = float(np.abs(ours[..., :3] / 255 - shown)[ink].mean() * 255)
+        far = float(np.abs(plain[..., :3] / 255 - shown)[ink].mean() * 255)
+        assert near < 0.5 * far, (near, far)
 
 
 def test_the_png_is_rendered_again_at_3000_pixels(page, tmp_path):

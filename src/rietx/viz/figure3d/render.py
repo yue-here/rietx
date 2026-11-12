@@ -722,7 +722,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
                      exaggeration: float = 1.0, stick: float = 1.0,
                      hidden=(), boundary: bool = True, cell: bool = True, polyhedra=None,
                      axis_labels: bool = True, atom_labels: bool = False,
-                     outline: bool = False, background="white", pad: float = FIT_PAD,
+                     outline: bool = False, depth_cue: bool = False,
+                     background="white", pad: float = FIT_PAD,
                      path=None, dpi: float | None = None) -> StructureFigure:
     """Draw one phase of a structure as the GUI's structure viewer draws it.
 
@@ -778,7 +779,12 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     the room a line's half-width, the a, b, c and any atom labels need.  ``background``
     is ``"white"``, ``"black"``, ``"#rrggbb"``, three channels in 0..1, or
     ``None`` for transparent.  ``outline=True`` inks silhouettes, off by
-    default because the GUI draws none.  ``atom_labels=True`` writes each site
+    default because the GUI draws none.  ``depth_cue=True`` fades each surface
+    toward the background with its depth, linearly from half-way back through
+    the drawn atoms to the rearmost, where it is ``scene.LOOK["fog_max"]`` of
+    the way there, as the GUI's toggle does (WP-1548).  It needs an opaque
+    ``background``, there being no colour to fade toward over a transparent
+    one.  ``atom_labels=True`` writes each site
     label beside its atom, in the first of eight places around it clear of
     atoms, bonds and the labels before it.  The report counts what each label
     still meets.  ``path`` writes a PNG, with ``dpi`` only in its ``pHYs``
@@ -801,6 +807,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
             or not 0 <= pad < 0.5):
         raise ValueError(f"pad {pad!r}: the share of each side left empty, from 0 "
                          "(cropped to the ink) up to but not including 0.5")
+    if not isinstance(depth_cue, bool):
+        raise ValueError(f"depth_cue {depth_cue!r}: True or False")
     if dpi is not None and not 0 < float(dpi) < 1e6:
         raise ValueError(f"dpi {dpi!r}: a positive resolution, in dots per inch")
     if (isinstance(stick, bool) or not isinstance(stick, (int, float, np.integer, np.floating))
@@ -878,8 +886,18 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     if outline:
         step = sc.stick_radius(geometry, mode, exaggeration, float(stick))
         ol = (OUTLINE_CSS * frame.px_scale, step, sc.rgb(tokens["--fg"]))
+    fog = None
+    if depth_cue:
+        if bg is None:
+            raise ValueError("depth_cue=True fades toward the background, and "
+                             "background=None has no colour to fade toward; "
+                             "give an opaque background")
+        span = sc.fog_span(scene, [float(v) for v in np.asarray(R).reshape(-1)])
+        if span is not None:
+            shift = float(R[2] @ np.asarray(scene["center"], dtype=np.float64))
+            fog = (span[0] + shift, span[1] + shift, sc.LOOK["fog_max"], bg)
     image = raster.draw(scene, R, frame, supersample=s, background=bg, text=strokes,
-                        outline=ol)
+                        outline=ol, fog=fog)
     atoms = []
     for a in scene["atoms"]:
         c = R @ np.asarray(a["pos"], dtype=np.float64)
@@ -943,7 +961,7 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         "max_atoms": max_atoms, "exaggeration": exaggeration, "stick": stick,
         "hidden": hidden_asked, "boundary": boundary, "cell": cell, "polyhedra": polyhedra,
         "axis_labels": asked_axis_labels, "atom_labels": atom_labels, "outline": outline,
-        "background": background, "pad": pad, "dpi": dpi}.items()}
+        "depth_cue": depth_cue, "background": background, "pad": pad, "dpi": dpi}.items()}
     return StructureFigure(image=image, rotation=views.as_list(R),
                            pixels_per_angstrom=frame.ppa, origin=[float(frame.x0), float(frame.y0)],
                            atoms=atoms, letters=letters,

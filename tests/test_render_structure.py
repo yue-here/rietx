@@ -142,6 +142,20 @@ def _cases(payloads: dict[str, dict]) -> tuple[list, list]:
     return scenes, shown
 
 
+def _fog(scenes: list[dict]) -> list[dict]:
+    """``fog_span`` over the first scene of each payload, seen two ways: the
+    opening view, and down the first lattice vector (WP-1548)."""
+    cases, seen = [], set()
+    for k, case in enumerate(scenes):
+        if case["payload"] in seen:
+            continue
+        seen.add(case["payload"])
+        for rotation in (sc.opening_view(), sc.look_from((1, 0, 0), (0, 0, 1))):
+            cases.append({"scene": k, "rotation": rotation,
+                          "span": sc.fog_span(case["scene"], rotation)})
+    return cases
+
+
 def _views(payloads: dict[str, dict]) -> dict:
     pairs = [((1, 0, 0), (0, 0, 1)), ((0, 0, 1), (0, 1, 0)), ((1, 2, 3), (0, 0, 1)),
              ((-2, 0.5, 1), (1, 1, 0)), ((0, 0, 1), (0, 0, 1))]   # up ∥ eye: degenerate
@@ -173,6 +187,7 @@ def _corpus(payloads: dict[str, dict] | None = None) -> dict:
         "scenes": scenes,
         "shown": shown,
         "views": _views(payloads),
+        "fog": _fog(scenes),
     })
 
 
