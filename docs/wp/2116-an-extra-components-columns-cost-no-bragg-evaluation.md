@@ -1,6 +1,6 @@
 # WP-2116 — an extra component's columns cost no Bragg evaluation
 
-Milestone: unscheduled · Status: 🔄 2026-11-09 — task 1 done (PR #1441). Ruled by Yue 2026-11-09, "many users fit humps": the WP stays open and unscheduled for the analytic hump columns (tasks 2-5)
+Milestone: unscheduled · Status: 🔄 2026-11-12 — claimed by ghostshift (MacBook-Air-c4aacd); tasks 2-5, the analytic hump columns
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-11-09 — a cost-only item: 18-24 % of a fit that frees a hump (acridine), on a path many users run (Yue, 2026-11-09); it changes no number
