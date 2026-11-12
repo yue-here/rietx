@@ -787,31 +787,22 @@ over the step. Near 1 the step is in the data, and near 0 the chain made it.
 
 Above the plot, a strip draws the series on the experiment's own axis: the
 series coordinate against the pattern index, one point per pattern, a failed
-one included. The strip marks where the series' own findings fired. Every mark
-is read from the series answer, and the panel draws nothing the answer does not
-say:
+one included. Every mark is read from the series answer:
 
-| mark | label | reads | what it says |
-|---|---|---|---|
-| `SERIES_PATTERN_FAILED` | failed | the series' diagnostics | every attempt raised, so this pattern has no fit and no point on any trajectory |
-| `SEQUENTIAL_UNRECOVERED` | unrecovered | the series' diagnostics | the fit diverged on every attempt, so its values aren't a measurement |
-| `SEQUENTIAL_RESEED` | reseeded | the series' diagnostics | a good fit from the initial model, not from its neighbour |
-| `findings` | findings | each pattern's own diagnostics | a bar as tall as the number of codes that pattern's fit raised |
-| `largest_step` | largest step | the series' steps | the pair of patterns between which the parameter on show moved most, in its esds |
+| mark | label | what it says |
+|---|---|---|
+| `SERIES_PATTERN_FAILED` | failed | every attempt raised: no fit, no point on any trajectory |
+| `SEQUENTIAL_UNRECOVERED` | unrecovered | the fit diverged on every attempt |
+| `SEQUENTIAL_RESEED` | reseeded | a good fit from the initial model, not from its neighbour |
+| `findings` | findings | a bar as tall as the number of codes that pattern's fit raised |
+| `largest_step` | largest step | where the parameter on show moved most, in its esds: a rank, never a verdict |
 
 A series diagnostic marks a pattern when it names that pattern. One that names a
 parameter or nothing, such as `SEQUENTIAL_PERSISTENT_FINDING`, stays in the banner
-and the Fences list, because it describes the chain rather than a point of it.
-A code the table doesn't list still gets a mark, a short tick named by its
-code. The largest step is a rank, never a verdict: every parameter has one, and
-it says only where that parameter moved most.
+and the Fences list.
 
-Drag along the strip to scrub. The plot below follows as one pattern's own fit,
-its observed and calculated curves and the residual, and keeps your zoom from pattern to pattern, so a
-peak you're watching stays in view while it splits. The arrow keys step one
-pattern at a time when the strip has focus. Each pattern's curves are fetched
-once and kept. The pattern's row in the table below stays one click away, with
-its history tree.
+Drag along the strip to scrub. The plot below follows as that pattern's own fit
+and keeps your zoom. The arrow keys step one pattern when the strip has focus.
 
 A series does not persist. Its patterns are staged uploads and its answer lives
 in the session, so closing the window loses the staged list. Say what you need
