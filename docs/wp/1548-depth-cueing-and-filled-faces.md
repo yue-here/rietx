@@ -75,22 +75,24 @@ is the precedent: both renderers, off by default, one parity case.
   background. Fog toward the background colour therefore has no target in
   a transparent PNG. D3 decides that case.
 
-### Prior art (recalled, not checked)
+### Prior art
 
-None of the following has been read from a manual for this WP. The first
-task reads them and adds the survey to `docs/practice.md`.
+Read from the manuals on 2026-11-12, and kept in `docs/practice.md`
+§ Depth cueing, and filled rings and faces, in a structure figure, which
+replaces the recalled list this section held. Several recalled claims were
+wrong: Mol\* documents no fog, PyMOL and VMD give no default, and only
+ChimeraX turns depth cueing on unasked. What bears on the decisions:
 
-- **Depth cueing.** PyMOL fogs by default (`depth_cue`, `fog_start`). ChimeraX
-  fades toward the background by default (`lighting depthCue`, with a start
-  and an end as fractions of the scene's depth). VMD offers linear,
-  exponential and squared-exponential fog, off by default. Mol\* has fog in
-  its renderer settings, on by default. Jmol has `zShade`. VESTA's setting
-  is not recalled.
-- **Filled rings.** PyMOL's `cartoon_ring_mode` fills rings, mainly for
-  nucleic acids. ChimeraX fills rings in its nucleotide and small-molecule
-  styles. ChemDraw-style circles inside a ring are a 2D convention. Mercury
-  draws mean planes through named atoms. Jmol's `draw polygon` and its
-  `polyhedra` over named atoms make an arbitrary face.
+- **Depth cueing** is linear wherever a form is stated (ChimeraX, VESTA),
+  between a start and an end given as fractions of the scene's depth.
+  ChimeraX measures them against its clip slab, with defaults 0.5 and 1.0.
+  VESTA measures them against the bounding sphere. VESTA and Jmol fade
+  toward the background, and ChimeraX toward a fog colour that defaults to
+  black. No program says what fog does over a transparent background.
+- **Filled rings.** No program tests planarity. ChimeraX fills rings of up
+  to six members, Jmol fills what a SMARTS query matches, and Mercury and
+  VESTA fit a plane through atoms the user picks. A fill's default colour
+  and opacity are almost never documented.
 - **Aromaticity from coordinates.** A CIF carries no bond orders as a rule,
   and `crystallography/fragments.py` already records that a coordinate-only
   source "cannot tell an aromatic ring from a chain". So rietx cannot
@@ -104,12 +106,20 @@ task reads them and adds the survey to `docs/practice.md`.
   at the scene's far side, and the shaded colour becomes
   `(1 − f)·colour + f·background`. The constants (start, end, maximum) are
   shared look values in `scene.LOOK`, identical in Python and TypeScript.
-  Linear first because it is what the recalled defaults do. The task that
-  reads the manuals confirms or changes this.
+  The survey confirms linear (named practice: ChimeraX, VESTA). rietx draws
+  no clip planes, so the ramp is measured against the depth the drawn scene
+  spans along the line of sight, as VESTA measures against its bounding
+  sphere. The start and end take ChimeraX's defaults, 0.5 and 1.0 of that
+  span, until the before-and-after pairs say otherwise. *2026-11-12:*
+  `raster.draw(fog=...)` takes the start and end as view-space depths, so
+  the span is chosen by the caller, `render_structure`.
 - **D2. A ring is a planar cycle of the drawn bond graph, never an
   "aromatic" claim.** Perceive the smallest set of smallest rings on the
   drawn bonds, keep rings of a size range (5 and 6 to start) whose atoms lie
-  within a tolerance of their mean plane, and fill those. The planarity
+  within a tolerance of their mean plane, and fill those. Testing planarity
+  goes past what any surveyed program does, which only caps the size
+  (ChimeraX at six), so the test is new judgement and needs its own
+  measurement. The planarity
   tolerance is a heuristic number, so it gets a row in `rietx._audit` with
   its measurement. The surface must not call the result aromatic, because
   the package cannot tell (fragments.py). *The surface name is the
@@ -178,10 +188,10 @@ visual questions. Bring each with a picture:
 
 ## Tasks
 
-- [ ] Read the depth-cueing and ring-filling sections of the PyMOL,
+- [x] Read the depth-cueing and ring-filling sections of the PyMOL,
   ChimeraX, VMD, Mol\*, Jmol, VESTA and Mercury manuals. Replace the
   "recalled" list above with what they say, and add the survey to
-  `docs/practice.md`. Never open ChimeraX's source (WP-1537, 1538).
+  `docs/practice.md`. Never open ChimeraX's source (WP-1537, 1538). *(2026-11-12: VMD unreachable, its host failing TLS through the proxy.)*
 - [x] Fog in the numpy raster path, with unit tests: the near and far
   copies of one atom differ by the expected blend, and fog off is
   bit-identical to today. *(2026-11-12: `raster.draw(fog=(z_start, z_end,

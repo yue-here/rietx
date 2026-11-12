@@ -1189,6 +1189,49 @@ Surveyed 2026-11-10 for WP-2208, one agent. GSAS-II 5.8.4 source and scripting m
 
 No program has a plan whose steps declare "fix this" as a separate list from "free this". GSAS-II comes closest and is the only one with the shape the maintainer describes: a step dict with both `set` and `clear`, flags kept in the project and carried forward, and `set` applied before `clear` within a step. `once` is its way to make a flag last for one step only. TOPAS, FullProf and RIETAN-FP all keep the recipe outside the program, as an edit of the input file between runs, except that RIETAN-FP's `NAUTO=1` list is a built-in schedule in which each cycle refines only its own group, which fixes the earlier groups. For a series, GSAS-II builds the vary list per histogram and has per-histogram fix lists, FullProf reuses one set of codes for every pattern, and TOPAS rereads the INP each run. For Pawley then Rietveld, the three documented routes are two runs with a file edit between them, with GSAS-II alone doing it as steps of one job.
 
+## Depth cueing, and filled rings and faces, in a structure figure
+
+Surveyed 2026-11-12 for WP-1548, one agent reading each program's user documentation on the
+web, never source (ChimeraX's source is never opened, WP-1537). These are structure viewers,
+not refinement programs, because the question is how a still picture shows depth and draws a
+ring. The ChimeraX ramp and VESTA's formula were re-read by the lead. VMD's user guide was
+unreachable (its host failed TLS through the proxy) and is absent. Mercury was read from its
+user-guide PDF. Jmol was read from the data file its documentation page loads
+(`docs/cmds_.js`), which is the documentation text. PyMOL's `Cartoon` page was read as raw
+wikitext, as the rendered page returned an error.
+
+**Depth cueing**
+
+| Program | Default | Form | Start and end measured against | Blends toward | Transparent background |
+|---|---|---|---|---|---|
+| ChimeraX | on (`lighting simple`, and auto-styling applies it) | linear: "depth-cueing shading increases linearly from start to end" | fractions of the span between the front (0.0) and back (1.0) clip planes; `depthCueStart 0.5`, `depthCueEnd 1.0` | `depthCueColor`, black by default | `save … transparentBackground true`; the docs do not say what fog does there (checked: `commands/lighting.html`, `autostyle.html`, `save.html`) |
+| VESTA | not stated | linear: f = (end − z)/(end − start), C′ = f·C + (1 − f)·C_fog | scene depth, normalised so the bounding sphere has radius 0.9 about 0; beyond `end` an object is "completely invisible" | the background colour, assigned automatically | not stated (checked: manual § 13.4, eq. 13.2) |
+| Jmol | off, and reset to off on a model load | not stated; `zShadePower` (default 3) strengthens it | `zSlab` (fully opaque) to `zDepth` (fully faded), as percent of the model's depth from front (0) to rear (100) | "the background" | `write PNGT`; the docs advise an unusual background colour (checked: `set zShade`, `zShadePower`, `zSlab`, `zDepth`) |
+| PyMOL | not stated | not stated | `fog_start` 0.01–0.99 "in the plane of view", default 0.45 on one page and 0.5 on another; the rear clip plane moves it | not stated | `ray_opaque_background off` (checked: `Depth_cue`, `Fog`, `Fog_start`, `Ray_trace_fog`, `Ray_opaque_background`) |
+| Mercury | not stated | not stated: the front is shown "more brightly" | Front and Back brightness, each 0.00–2.00 | brightness scaling | its POV-Ray render offers a transparent PNG and implements no depth cueing (checked: user guide § 7.1.1-7.1.2) |
+| Mol\* | not found in the viewer or plugin docs | | | | image export has a transparency option (checked) |
+
+**Filled rings and faces**
+
+| Program | What fills | Default | What counts as a ring | Default fill |
+|---|---|---|---|---|
+| ChimeraX | `style … ringFill thick\|thin\|on\|off`, per residue; `nucleotides fill`; `color … target f` colours the fill apart from the atoms | not stated | "rings of up to six members can be filled"; nothing on planarity, aromaticity or bond orders | not stated (checked: `commands/style.html`, `nucleotides.html`, `color.html`) |
+| Jmol | `draw polygon` over named atoms; the docs' example fills "the 5- and 6-membered aromatic rings" with a SMARTS query in `draw POLYHEDRON` | off | whatever the user's SMARTS query matches | not stated (checked) |
+| Mercury | a least-squares mean plane through picked atoms, or through a whole ring picked with one click; a separate aromatic-ring circle | planes off | the circle needs every ring bond typed aromatic | colour, and a transparency switch whose default is not stated (checked: § 7.6, § 8.2-8.4) |
+| VESTA | a best plane through three or more selected atoms (the manual's figure is an aromatic ring), and lattice planes | off | a least-squares plane through what the user selects | colour and opacity as four 0-255 integers, default not stated (checked: § 9.2-9.2.2) |
+| PyMOL | `cartoon_ring_mode` 0-6 and `cartoon_ring_transparency` 0-1, nucleic-acid bases only | not stated | not stated | not stated (checked) |
+| Mol\* | no ring fill; MolViewSpec `mesh` primitives from explicit vertices | | none: the caller gives the vertices | white, opacity 1 (checked: `mol-view-spec-docs/tree-schema`) |
+
+**The practice these add up to.** Every program that states a form for depth cueing states a
+linear one, ChimeraX and VESTA. The ramp runs between a start and an end given as fractions of
+the scene's depth, measured against the clip slab in ChimeraX and the bounding sphere in VESTA.
+VESTA and Jmol fade toward the background colour, and ChimeraX toward a fog colour that is black
+by default. Only ChimeraX turns it on by default. No program says what fog does over a
+transparent background. No ring-filling program tests planarity. ChimeraX caps a ring at six
+members, Jmol fills what a query matches, and Mercury and VESTA fit a plane through atoms the
+user picks. Bond orders matter only to Mercury's aromatic circle. A fill's default colour and
+opacity are almost never documented.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
@@ -1231,3 +1274,4 @@ A stage that fixes a parameter (WP-2208, read 2026-11-10):
 - FullProf 8.20 manual `~/Code/rietx-bench/tools/fullprof/files/Docs/FullProf_Manual.pdf`, lines of its `pdftotext` dump: 285-296 (CYC sequential), 326 (`.new`), 589-596 (codewords), 610-640 (staged order, profile matching first), 674-692 (`Jbt=2` recipe), 3494-3508 (`Aut`)
 - RIETAN-FP manual `~/Code/rietx-bench/tools/rietan/RIETAN_VENUS/documents/RIETAN-FP_manual.pdf`: § 4.1.4 (text line 2830), § 11.3 (5116), § 17.3.17 (8625)
 - MAUD: `~/Code/rietx-bench/tools/maud/Maud.app/Contents/Java/Maud.jar`, classes `it/unitn/ing/rista/comp/launchRefineWizard` and `it/unitn/ing/rista/diffr/FilePar`, string table only (no Java runtime on this Mac, no source)
+- WP-1548 (structure figure): ChimeraX user docs https://www.rbvi.ucsf.edu/chimerax/docs/user/commands/ (`lighting`, `autostyle`, `save`, `style`, `nucleotides`, `color`); VESTA manual https://jp-minerals.org/vesta/archives/VESTA_Manual.pdf § 9.2, § 13.4; Jmol https://chemapps.stolaf.edu/jmol/docs/ (`cmds_.js`); PyMOL wiki https://pymolwiki.org/ (`Depth_cue`, `Fog`, `Fog_start`, `Ray_trace_fog`, `Ray_opaque_background`, `Cartoon_ring_mode`, `Cartoon_ring_transparency`); Mercury user guide https://www.ccdc.cam.ac.uk/media/mercury-1.pdf § 7.1, § 7.6, § 8.2-8.4; Mol* https://molstar.org/viewer-docs/ and https://molstar.org/mol-view-spec-docs/tree-schema/
