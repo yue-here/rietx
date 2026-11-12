@@ -10,8 +10,8 @@ above this module may branch on whether they ran.
 
 The wheel carries two more, the structure figure's rasteriser
 (``render_rows`` and ``id_plane``, from 1.1.0), and from 1.5.0 a third,
-``render_rows_cued``, which is ``render_rows`` with depth cueing (WP-1548).  They load, decline and switch
-off with the model's five, so a process takes one path for both, and
+``render_rows_cued``, which is ``render_rows`` with depth cueing (WP-1548).
+They load, decline and switch off with the model's five, so a process takes one path for both, and
 ``viz/figure3d/raster.py`` calls them through :func:`_kernels` and
 :func:`_pool`.  They call no library function, so their bar against the numpy
 oracle is the bit on every platform (``tests/test_raster_kernels.py``).

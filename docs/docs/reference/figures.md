@@ -161,6 +161,7 @@ The crop is part of the fit, so `atoms`, `letters`, `to_px` and `recipe` stay ri
 | `axis_labels` | `True` | the a, b and c on the cell's edges |
 | `atom_labels` | `False` | each site's label beside its atom |
 | `outline` | `False` | inks the silhouettes, which the GUI does not |
+| `depth_cue` | `False` | fades each surface toward the background with its depth, as the GUI's toggle does; needs an opaque `background` |
 | `background` | `"white"` | `"white"`, `"black"`, `"#rrggbb"`, three channels from 0 to 1, or `None` for transparent |
 | `bond_tolerance` | 1.15 | the bond threshold, as a multiple of the sum of the two atoms' radii |
 | `max_atoms` | 400 | the most atoms the cell may draw, its face copies included |

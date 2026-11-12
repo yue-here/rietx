@@ -22,8 +22,8 @@ GUI draws on an opaque canvas.
 **Two paths, one picture.**  The wheel's ``render_rows``
 (``kernels/src/raster.rs``, ``rietx-kernels`` from 1.1.0) draws a band of rows,
 and the bands spread over the compiled tier's shared pool; a fogged picture
-calls its twin ``render_rows_cued`` (from 1.5.0, WP-1548) the same way.  :func:`_band_numpy`
-is the same arithmetic vectorised over each primitive's box.  It is the oracle
+calls its twin ``render_rows_cued`` (from 1.5.0, WP-1548) the same way.
+:func:`_band_numpy` is the same arithmetic vectorised over each primitive's box.  It is the oracle
 the kernel is held to, and the path wherever the wheel did not load.  Neither
 calls a library function: ``sqrt`` is an IEEE operation, the specular power is
 repeated squaring, and the box filter adds the samples in one order.  So the
@@ -520,8 +520,11 @@ def draw(scene: dict, rotation, frame: Frame, *, supersample: int = 2,
         if not z_start > z_end:
             raise ValueError(f"fog starts at z = {z_start!r}, which is not in front of "
                              f"where it ends, z = {z_end!r}")
-        fog = (float(z_start), float(z_end), float(f_max),
-               np.ascontiguousarray(colour, dtype=np.float64))
+        colour = np.ascontiguousarray(colour, dtype=np.float64)
+        # the wheel's refusal too, so both paths refuse one colour alike
+        if colour.shape != (3,):
+            raise ValueError(f"fog colour has {colour.size} entries, not 3")
+        fog = (float(z_start), float(z_end), float(f_max), colour)
     kernel = _kernel("render_rows" if fog is None else "render_rows_cued")
     if kernel is None:
         cue = {} if fog is None else {"fog": fog}

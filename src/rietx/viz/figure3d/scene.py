@@ -123,8 +123,8 @@ def fog_span(scene: Mapping, rotation: Sequence[float]) -> list[float] | None:
     ``rotation`` is row-major, nine numbers, as :func:`look_from` returns it.
     Depths are the GUI's, ``R·(p − center)``'s third component, z toward the
     viewer; the raster's view coordinates are ``R·p`` and add ``(R·center)``'s.
-    The span is the drawn atoms' centres along the line of sight, front to back.  The fog starts ``fog_start`` of
-    the way from the front and reaches ``fog_max`` ``fog_end`` of the way, so it
+    The span is the drawn atoms' centres along the line of sight, front to
+    back.  The fog starts ``fog_start`` of the way from the front and reaches ``fog_max`` ``fog_end`` of the way, so it
     follows the picture as it turns, as ChimeraX's ramp follows its clip planes
     (WP-1548 D1).  ``None`` where the atoms span no depth, one atom or a layer
     seen edge on, since then there is nothing to cue.

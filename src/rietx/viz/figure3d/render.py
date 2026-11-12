@@ -809,6 +809,10 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
                          "(cropped to the ink) up to but not including 0.5")
     if not isinstance(depth_cue, bool):
         raise ValueError(f"depth_cue {depth_cue!r}: True or False")
+    if depth_cue and background is None:
+        raise ValueError("depth_cue=True fades toward the background, and "
+                         "background=None has no colour to fade toward; "
+                         "give an opaque background")
     if dpi is not None and not 0 < float(dpi) < 1e6:
         raise ValueError(f"dpi {dpi!r}: a positive resolution, in dots per inch")
     if (isinstance(stick, bool) or not isinstance(stick, (int, float, np.integer, np.floating))
@@ -887,11 +891,7 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         step = sc.stick_radius(geometry, mode, exaggeration, float(stick))
         ol = (OUTLINE_CSS * frame.px_scale, step, sc.rgb(tokens["--fg"]))
     fog = None
-    if depth_cue:
-        if bg is None:
-            raise ValueError("depth_cue=True fades toward the background, and "
-                             "background=None has no colour to fade toward; "
-                             "give an opaque background")
+    if depth_cue:            # an opaque background, refused above otherwise
         span = sc.fog_span(scene, [float(v) for v in np.asarray(R).reshape(-1)])
         if span is not None:
             shift = float(R[2] @ np.asarray(scene["center"], dtype=np.float64))
