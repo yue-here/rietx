@@ -37,17 +37,23 @@ temporary directory.
 
 ## Start with an example
 
-With no project open, the screen is the import panel, and it offers three ways
-in: a list of projects you opened recently, a `Browse for a project…` button,
-and a list of example projects shipped inside the package. Start from an example
-if you have no data of your own.
+`rietx gui` with no project named reopens the project you had open last, unless
+you closed it from the File menu. Otherwise it shows the start screen. On the left are `New project…`, `Open…`, and
+links to this manual and its tutorials. On the right are the projects you opened
+recently and the example projects shipped inside the package. A first run has no
+recent list, so it shows the examples alone. Start from an example if you have
+no data of your own.
+
+Each row opens with one click. Its `⋯` button, or a right-click, offers the
+rest: `Remove from list` on a recent project, and `Open a fresh copy` on an
+example you have opened before. A project that has moved since you last opened
+it stays on the list as `Not found`, with `Locate…` to find it again.
 
 The package ships {{ N_EXAMPLES }} of them. Each is a real specimen with a
 published reference value, and each carries the refinement protocol its
 acceptance suite measures, so a fit of one is comparable with a number somebody
 else recorded. Opening one makes your own copy, so anything you change stays
-yours; a `Reset` button beside an example you have already opened throws that
-copy away and builds it again.
+yours. `Open a fresh copy` throws that copy away and builds it again.
 
 Open the fluorapatite example. It is an ordinary laboratory pattern from an
 ordinary diffractometer, with seven atomic sites. That is the point at which a
@@ -55,22 +61,23 @@ refinement starts to need a plan rather than a button.
 
 ```{image} ../screenshots/empty-state-light.png
 :class: only-light
-:alt: The panel with no project open: the shipped example projects with their descriptions, a Browse button, and the four numbered wizard steps below
+:alt: The start screen: the wordmark, New project, Open and the two links on the left, and the shipped example projects with their descriptions on the right
 ```
 
 ```{image} ../screenshots/empty-state-dark.png
 :class: only-dark
-:alt: The panel with no project open: the shipped example projects with their descriptions, a Browse button, and the four numbered wizard steps below
+:alt: The start screen: the wordmark, New project, Open and the two links on the left, and the shipped example projects with their descriptions on the right
 ```
 
 ## What is on the screen
 
 The window is two columns. On the left is the pattern; on the right is a column
-of nine tabs, all mounted at once:
+of ten tabs, all mounted at once:
 
 | Tab | Is |
 |---|---|
 | `Parameters` | every parameter, with the one control that frees it |
+| `Interactive` | sliders that move a parameter and show the pattern before you apply it |
 | `Plan` | the stages the fit will run, and what each one frees |
 | `Peaks` | picked lines, and indexing a pattern that has no structure yet |
 | `Model` | the structure and the instrument, and a 3D view of the cell |
@@ -185,41 +192,45 @@ a confident wrong number.
 
 ## Then your own data
 
-`New project…` in the Model panel's header, or `Open…` in the app header, opens
-a four-step wizard:
+`New project…` on the start screen opens one dialog of four rows:
 
-1. `Pattern`. Choose a data file. The step names the reader that claimed it, in
-   the reader's own words, and shows the options that reader accepts. So a
-   multi-scan vendor file grows a scan picker here and a two-column text file
-   does not. Read the diagnostics it prints: this is where you find out that a
-   scan was stored backwards, or that an attenuator factor has been applied to
-   the counts.
-2. `Structure`. A CIF file, a typed space group and cell, or `None yet`. The
-   typed form offers only the cell parameters the symmetry leaves free, so a `b`
-   under a tetragonal symbol is not a value you can get wrong. `None yet` makes
-   a project with no phase, which is the right start when the pattern is what
-   you have and the cell is what you are looking for. See
+1. `Pattern`. Choose a data file. The row names the reader that claimed it, the
+   point count, the 2θ range and step, and where the esds come from, and draws
+   the pattern small. A multi-scan vendor file grows a scan picker here and a
+   two-column text file does not. `How the file was read` holds the reader's
+   options and its diagnostics: this is where you find out that a scan was
+   stored backwards, or that an attenuator factor has been applied to the
+   counts.
+2. `Phases`. `Add phase` takes a CIF or a typed space group and cell, as many as
+   the specimen holds. The typed form offers only the cell parameters the
+   symmetry leaves free, so a `b` under a tetragonal symbol is not a value you
+   can get wrong. With no phase the project starts from the pattern alone,
+   which is the right start when the cell is what you are looking for. See
    [Peaks](../reference/gui-guide.md#peaks) in the panel guide.
-3. `Instrument`. A preset per geometry and anode, or a saved instrument profile.
-   The step pre-fills from the data file's own header where it can, and says why
-   it chose what it chose. Where it says nothing, that silence is deliberate: a
-   header whose anode name and wavelength disagree gets no suggestion, because a
-   wrong pre-fill looks like it was read.
-4. `Project`. Where the `.rex` directory goes, the intensity mode, and the plan.
-   Nothing is written until you press `Create project`.
+3. `Instrument`. One line says the geometry and the source, and a tag says where
+   that came from: the data file's header, a saved instrument profile, or
+   `assumed`. `Change…` opens the form.
+4. `Project`. The name and the folder the `.rex` directory goes in. Both follow
+   the data file until you type in them.
 
-:::{admonition} Choose the anode yourself
+The dialog asks for no intensity mode and no plan. A typed cell has no atoms,
+so a project with one is Le Bail and every other project is Rietveld. The plan
+is the default until you open the Plan tab. Nothing is written until you press
+`Create project`, and the sentence beside the button says what is still missing.
+
+:::{admonition} Check an assumed anode
 :class: warning
-The wizard refuses to default the instrument. A wavelength nobody chose ends up
-in every cell parameter you go on to refine, and it is invisible in Rwp. The fit
-is as good as ever and the numbers are wrong.
+Where the file's header names no anode, the dialog assumes Bragg-Brentano with a
+Cu Kα1/Kα2 anode and tags the line `assumed`. A wrong wavelength ends up in
+every cell parameter you go on to refine, and it is invisible in Rwp. The fit is
+as good as ever and the numbers are wrong.
 [The wavelength–cell degeneracy](../theory/peak-positions.md#the-wavelengthcell-degeneracy)
 has it in full.
 :::
 
 ## Where to go next
 
-- [](../reference/gui-guide.md): the nine panels, and when to branch the history.
+- [](../reference/gui-guide.md): the ten panels, and when to branch the history.
 - [](../reference/gui-power.md): the `.rxt` text document, the keyboard, and the routes.
 - [](tutorials.md): the same fluorapatite pattern fitted in Python, one step a notebook cell.
 - [](../guides/index.md): one task a page, each done from a Python script.

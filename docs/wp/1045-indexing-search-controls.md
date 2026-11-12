@@ -210,6 +210,38 @@ npm --prefix gui test && npm --prefix gui run check
   — the two bijection precedents this WP's meta-test copies.
 - `indexing/engines.py` `SearchSpec` — the one object all three views expose.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+The **search controls** (WP-1045, `gui/src/lib/controls.ts`, the Peaks
+panel's disclosure) are `ProjectDoc.indexing` rendered as a form — the same
+`SearchSpecSpec` the agent request carries, so the two chairs are two views
+of one spec. Five rules. **The document is the authority and the commit is
+whole-object**: every change POSTs the entire `indexing` block on the verb (a
+partial merge could let two half-specs disagree), and the draft re-syncs from
+the document on every head move — including after a refusal, so the form
+never shows a value the server refused. **Vocabularies come from
+`/api/capabilities`** (`indexing_engines`, `crystal_systems` in search order,
+`centrings`, `shift_templates`, `search_presets`), never from literals — a
+fourth engine appears with no GUI change. **The field inventory is the
+bijection's GUI leg**: `controls.ts` declares every field with its widget
+kind, label and `title` (WP-1029's no-mute-fields rule, pinned), and
+`controls.test.ts` replays the committed corpus
+`tests/data/gui/index_controls.json` (the fnmatch mechanism — python owns the
+model, TS proves the form states it). **A prior cell is parsed locally**
+(six numbers, refused with a reason in the form's own error field — which is
+deliberately not the peak verbs' failure field), while a prior space-group
+symbol is validated server-side and refused in gemmi's words. And **the
+streamed shortlists are the shell's to fold**: `consensus:<system>`
+`stage_end` frames collect in App (cleared on `index_start`, kept after the
+run so the anytime answer stays readable beside the final one) and render
+with the conservative-grade caveat in the tooltip — a streamed grade can
+rise, never fall.
+
 ## Handover log
 
 - **2026-08-08** — the whole WP in one session (started 2026-08-07 on the

@@ -8,7 +8,7 @@ The table walks both models, gives every `Parameter` it finds a name, and record
 {eq}`par-affine` is the mapping, p<sub>phys</sub> = C·p<sub>free</sub> + d.
 The table is rebuilt from the models at every stage boundary, so a row is never stale against the objects it came from.
 
-[Parameter map](parameters.md) lists every name with its unit, default and typical range.
+[Parameter map](parameters.md) and [Instrument parameter map](parameters-instrument.md) list every name with its unit, default and typical range.
 [About parameters](../concepts/parameters.md) groups them by what they belong to.
 
 ## Names
@@ -70,7 +70,7 @@ Two atoms and a default instrument make 41 rows, of which 24 could be freed.
 | `ParameterRow.mode_fixed` | `bool` | fixed by the Le Bail or Pawley mode |
 | `ParameterRow.needs_held_cell` | `bool` | a wavelength that cannot be freed while this pattern's cell is free |
 | `ParameterRow.origin_axis` | `(int, int, int)` or `None` | the direction along which this row holds a polar group's floating origin |
-| `ParameterRow.help_key` | `str` or `None` | the [parameter map](parameters.md) entry that describes this row's family |
+| `ParameterRow.help_key` | `str` or `None` | the [parameter map](parameters.md) or [instrument parameter map](parameters-instrument.md) entry that describes this row's family |
 
 The first eight fields mirror the solver's own row type field for field, and a test holds the two equal.
 The rest are deliberate additions.
@@ -360,6 +360,8 @@ A literal path to a row you held raises `ValueError`, saying to `Refinement.unho
 A row the current mode fixes is the exception to the matching rule: `set_vary` frees it, and the next stage drops it again and reports it as `mode_fixed`.
 
 A literal path the model lacks raises `ValueError` and names the nearest real path, as `Refinement.hold`, `Refinement.tie`, `Refinement.untie` and `Refinement.set_values` do.
+A path of an opt-in correction the model does not declare names the declaration instead.
+For extinction on a phase that declares none, it names `phase.extinction = 0.0`.
 `set_vary` checks every literal in the call before it changes anything, so a list with one wrong name leaves the model and the history as they were.
 A pattern that matches nothing returns `[]` in silence, since plans reach components that some models lack.
 
@@ -379,7 +381,7 @@ It raises `ValueError` on four refusals, each with its own remedy.
 
 | Refusal | Message | Remedy |
 |---|---|---|
-| unknown path | `unknown parameter path(s): [...]`, with the nearest real path for each | correct the name |
+| unknown path | `unknown parameter path(s): [...]`, with the nearest real path for each, or the declaration an opt-in correction needs | correct the name, or declare the correction |
 | locked | `... is structurally fixed (symmetry, or a representation that owns this channel) and cannot be set` | none; the structure owns the value |
 | tied | `... follows 'phases.0.cell.a' as an affine tie; set that instead` | set the source |
 | out of bounds | `... lies outside its bounds [0.0, inf]` | a value inside them, since the bounded solver cannot start outside |
