@@ -61,7 +61,7 @@ PARAMETER_GROUPS = (
      (("Cell",
        "The space group ties the lattice parameters together. "
        "A cubic phase refines one length, and an angle the symmetry fixes is locked.",
-       ("phases.*.cell.*",)),
+       ("phases.*.cell.*", "phases.*.parent_cell.strain.*")),
       ("Atoms",
        "An atom's coordinates x, y and z refine within its site symmetry. "
        "rietx refines the directions the site lets the atom move, the `dof` parameters, "

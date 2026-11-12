@@ -133,6 +133,23 @@ export const api = {
   settings: () => call("GET", "/api/settings"),
   patchSettings: (ui: Record<string, unknown>) => call("POST", "/api/settings", { ui }),
 
+  /** The open project's kept unapplied edits (WP-2209): `draft` is `null`
+   *  when there are none; `head` is the node they were made against and
+   *  `head_now` the project's. */
+  recovery: () => call("GET", "/api/recovery"),
+  /** Keep a project's pending edits, or delete the copy with `null`.  The
+   *  write names its project, so the last one for a project just left lands. */
+  putRecovery: (project: string, head: string | null, draft: unknown) =>
+    call("PUT", "/api/recovery", { project, head, draft }),
+  /** The same write from a page being closed: `keepalive` lets it outlive the
+   *  page, and nobody is left to read its answer. */
+  putRecoveryOnHide: (project: string, head: string | null, draft: unknown) => {
+    fetch("/api/recovery", {
+      method: "PUT", keepalive: true, headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project, head, draft }),
+    }).catch(() => {});
+  },
+
   /** Stage a file and get it back described — phase one of an import. */
   uploadFile: (kind: string, file: File, options: Record<string, string> = {}) =>
     upload(kind, file, options),

@@ -162,10 +162,15 @@ def test_a_case_only_rename_is_not_refused_as_an_existing_folder(served):
     probe = root / "work" / "SAMPLE.rex"
     if not probe.exists():
         pytest.skip("a case-sensitive volume: the two names are two folders")
+    draft = {"edits": {"phases.0.cell.a": 4.2}}
+    client.request("PUT", "/api/recovery",
+                   {"project": str(root / "work" / "sample.rex"), "draft": draft})
     status, payload = client.post("/api/project/rename", {"name": "Sample"})
     assert status == 200, payload
     assert Path(payload["path"]).name == "Sample.rex"
     assert [p.name for p in (root / "work").iterdir()] == ["Sample.rex"]
+    # the pending edits follow the folder (WP-2143)
+    assert client.get("/api/recovery")[1]["draft"] == draft
 
 
 def test_project_doc_path_is_absolute_for_a_relative_open(served, monkeypatch):

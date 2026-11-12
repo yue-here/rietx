@@ -298,13 +298,74 @@ def test_a_non_default_set_is_reported_and_skipped(tmp_path):
 
 
 def test_prcf_set_numbers_must_be_the_documented_ones(tmp_path):
-    """N = 1 … NTYP; a blank or zero set number is not a documented
-    key, and without set 1 the default is unstated."""
-    blank = [line.replace("PRCF1", "PRCF ") for line in prcf(1, 1, 3, TYPE3)]
+    """N = 1 … NTYP; a zero set number is not a documented key, and
+    without set 1 the default is unstated."""
+    zero = [line.replace("PRCF1", "PRCF0") for line in prcf(1, 1, 3, TYPE3)]
     with pytest.raises(ValueError, match="set number"):
-        read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=blank))))
+        read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=zero))))
     with pytest.raises(ValueError, match="without set 1"):
         read_gsas_tof_iparm(write(tmp_path, iparm(bank(1, profile=prcf(1, 2, 3, TYPE3)))))
+
+
+#: The shape of an older ISIS GEM calibration file (a COMM line, ``BNKPAR`` with
+#: its trailing fields, ``I ITYP 0``, and a PRCF set written with no set
+#: number: ``PRCF  `` then ``PRCF 1`` … ``PRCF 4``), with invented numbers.
+UNNUMBERED_PRCF = (
+    "COMM  synthetic, laid out as an older ISIS writer's file\n"
+    "INS   BANK  1\n"
+    "INS   HTYPE   PNTR\n"
+    "INS  1 ICONS    500.00     -0.10     -1.00\n"
+    "INS  1BNKPAR    2.0000      9.00      0.00    .00000     .3000    1    1\n"
+    "INS  1I ITYP    0    1.000     25.000       2\n"
+    "INS  1PRCF      2   15   0.00100\n"
+    "INS  1PRCF 1   0.000000E+00   0.200000E+00   0.300000E+02   0.500000E+02\n"
+    "INS  1PRCF 2   0.000000E+00   0.150000E+03   0.000000E+00   0.000000E+00\n"
+    "INS  1PRCF 3   0.000000E+00   0.000000E+00   0.000000E+00   0.000000E+00\n"
+    "INS  1PRCF 4   0.000000E+00   0.000000E+00   0.000000E+00\n"
+)
+
+
+def test_a_prcf_set_without_its_number_is_declined_and_the_bank_read(tmp_path):
+    """An older writer's file omits the set number in column 11.  The bank's
+    calibration is read; the set is declined with the set-number reason (not
+    read as set 1, which the file does not say it is), and the profile is
+    left at zero as for a bank with no set."""
+    notes = []
+    got = read_gsas_tof_iparm(write(tmp_path, UNNUMBERED_PRCF), diagnostics=notes)
+    src = got[1].source
+    assert (src.difc.value, src.difa.value, src.tzero.value) == (500.0, -0.1, -1.0)
+    assert src.two_theta_bank_deg == 9.0
+    assert src.profile_tof == ProfileTOF()
+    declined = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
+    assert len(declined) == 1
+    assert declined[0].level == "warning"
+    assert "set number in column 11" in declined[0].message
+    # beside a numbered set 1, the unnumbered one is only reported
+    notes = []
+    both = UNNUMBERED_PRCF + "\n".join(prcf(1, 1, 3, TYPE3)) + "\n"
+    got = read_gsas_tof_iparm(write(tmp_path, both, "both.iparm"), diagnostics=notes)
+    assert got[1].source.profile_tof.alpha1.value == 0.45
+    declined = [n for n in notes if n.code == "GSAS_IPARM_PROFILE_DECLINED"]
+    assert [n.level for n in declined] == ["info"]
+
+
+def test_the_whole_older_isis_shape_reads_through_the_legacy_reader(tmp_path):
+    """The real file also writes a wide TTHETA one column across the
+    TTHETA/TILT boundary on its high-angle banks.  The strict reader refuses
+    that record (§ Column overrun); the legacy reader re-reads it by tokens,
+    and with the unnumbered set declined the whole file comes back."""
+    from rietx.io.legacy import read_lansce_iparm
+    text = UNNUMBERED_PRCF.replace(
+        "INS  1BNKPAR    2.0000      9.00      0.00",
+        "INS  1BNKPAR    2.0000      99.00     0.00")
+    with pytest.raises(ValueError, match="runs across the boundary"):
+        read_gsas_tof_iparm(write(tmp_path, text))
+    notes = []
+    got = read_lansce_iparm(write(tmp_path, text), diagnostics=notes)
+    assert got[1].source.two_theta_bank_deg == 99.0
+    assert got[1].source.profile_tof == ProfileTOF()
+    assert {n.code for n in notes} >= {"GSAS_IPARM_LEGACY_LAYOUT",
+                                       "GSAS_IPARM_PROFILE_DECLINED"}
 
 
 def test_the_profile_is_the_same_whether_or_not_diagnostics_were_asked_for(tmp_path):

@@ -1,8 +1,7 @@
 # WP-2131 — the start screen and the New project dialog
 
-Milestone: gui-overhaul · Status: 🔄 2026-11-09 — all seven tasks landed; PR #1498 open, awaiting review
+Milestone: gui-overhaul · Status: ✅ 2026-11-10 — the start screen and the New project dialog merged in #1498; sentence case app-wide is the milestone's row
 Depends on: 2123
-Priority: P2 2026-11-09 — a piece of the open gui-overhaul milestone, the maintainer's round-9 design; the window a person first meets
 
 ## Goal
 
@@ -147,7 +146,50 @@ npm --prefix gui test && npm --prefix gui run check
 - The maintainer's rulings of 2026-11-06 to 2026-11-08, restated above with their dates.
 - `docs/practice.md` § The start screen and the New project flow.
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-10 WP-2134 folded this WP's additions to `gui/CLAUDE.md` into the
+condensed rulebook as standing rules, each still naming this WP. The text below is
+the paragraph that file carried for this WP until then, verbatim. Where it and the
+rulebook disagree, the rulebook is current.
+
+**The filesystem browser** (WP-1205, `GET /api/fs`, `Browse.svelte`) is the empty
+state's third way to reach a project, beside the recent list and the examples:
+read-only, confined to `Path.home()` and the process's cwd, and not behind the
+409 like `/api/recent`. **The gate is containment, not a blocklist** — `path` is
+resolved (symlinks included) before it is checked against the two roots, the same
+shape `GuiSession._export_target` already used for the exports directory. Browse
+is **one modal, two jobs**: `mode="open"` opens a `.rex` entry, `mode="pick"`
+hands a directory to New project's Where field (a browser can say where a project
+lives, never name it). **`Model` is mounted once in `App.svelte`**, never per
+branch of `{#if project}`, and **every opener settles what is drawn over the
+project in the shell's `open`/`opened`**: a second instance or a self-settling
+opener once left a wizard over a freshly opened project. **The start screen and
+the New project dialog** (WP-2131, `panels/Start.svelte`, `NewProject.svelte`)
+keep three rules. A moved recent project stays listed as `missing`, with Locate…
+and Remove (`POST /api/recent/remove`). The mode follows the phases, never asked:
+a typed cell gives Le Bail, so WP-1206's refusal stays unreachable. An assumed
+instrument is tagged `assumed` where shown: unmarked, a wrong anode moves cells.
+
 ## Handover log
+
+- **2026-11-10** — closed. PR #1498 merged on 2026-11-10, so `rietx gui` with no project shows
+  the round-9 start screen, and New project is one dialog of four rows that asks for no mode and
+  no plan. The File menu this WP named next has also merged, as WP-2133. Close took over settled
+  call 9, so "the last project" now means the one open at quit.
+
+  *Leftovers, and where each went.* Sentence-case headings app-wide (ruled 2026-11-09, option
+  A) is the row "Sentence-case headings" in `docs/milestones/gui-overhaul.md` § Designed, not
+  yet filed. Adding a phase from a TOPAS, FullProf or GSAS-II project file (settled call 2) went
+  to § Owed to the port: a browser upload cannot bring the data file such a project names.
+  Dragging a file onto the window and Show in Finder (calls 3 and 10) wait for the desktop app,
+  the milestone after this one, and are not carried here. The layout flake recorded in the
+  second round needs a second failure with the same message before a probe; nothing carries it.
+  The settled calls were reviewed with the PR at its merge. The narrative went to
+  `docs/milestones/v1.12.md`.
+
+  Closed by the batch close-out of the port's merged WPs, PR #1516. Docs only; no test moved.
+  Next: none here.
 
 - **2026-11-09, ruling** — Yue Wu ruled on the app-wide heading register, by choosing option A.
   Sentence-case headings apply to the whole app. One `app.css` rule carries them at this WP's

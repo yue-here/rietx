@@ -123,7 +123,12 @@ VALUE_DIGITS = 12
 #: and a bump would instead refuse every document already stored, since the
 #: parser compares this constant for equality.
 STAGE_KEYS = tuple(k for k in StageSpec.model_fields
-                   if k not in ("name", "turn_on"))
+                   if k not in ("name", "turn_on", "turn_off"))
+#: The clause a stage line writes ``turn_off`` as (WP-2208): globs, like the
+#: frees, so it is a word of its own rather than a ``<key> <number>`` pair.
+#: Rendered only when the stage fixes, so every stored document renders byte
+#: for byte as before.
+STAGE_FIX_WORD = "fix"
 #: The subset that must come back as ``int``.
 STAGE_INT_KEYS = ("max_iter", "lebail_cycles")
 
@@ -487,6 +492,8 @@ def _render_plan(doc: ProjectDoc, geometry: str | None = None) -> list[str]:
     for stage in spec.stages:
         parts = [f"stage {stage.name.ljust(width)}  free "
                  + ", ".join(stage.turn_on)]
+        if stage.turn_off:
+            parts.append(f"{STAGE_FIX_WORD} " + ", ".join(stage.turn_off))
         for key in STAGE_KEYS:
             value = getattr(stage, key)
             if value != getattr(default, key):
@@ -857,24 +864,36 @@ def _parse_stage(n: int, rest: list[str], raw: str, fail) -> StageSpec | None:
         return None
     rest = rest[1:]
     keys = STAGE_KEYS
-    cut = next((i for i, token in enumerate(rest) if token in keys), len(rest))
+    stops = (*keys, STAGE_FIX_WORD)
+    cut = next((i for i, token in enumerate(rest) if token in stops), len(rest))
     globs = [g for g in " ".join(rest[:cut]).replace(",", " ").split() if g]
-    if not globs:
-        fail(n, f"stage {name!r} frees nothing", raw, name)
-        return None
-    fields: dict[str, Any] = {}
     tail = rest[cut:]
+    fixes: list[str] = []
+    fields: dict[str, Any] = {}
     while tail:
         key = tail.pop(0)
+        if key == STAGE_FIX_WORD and not fixes:
+            # ``fix <globs>``: the stage's turn_off, after its frees (WP-2208),
+            # read up to the next key wherever the clause sits on the line
+            cut = next((i for i, token in enumerate(tail) if token in keys), len(tail))
+            fixes = [g for g in " ".join(tail[:cut]).replace(",", " ").split() if g]
+            tail = tail[cut:]
+            if not fixes:
+                fail(n, f"stage {name!r}: 'fix' takes '<glob>[, <glob>…]'", raw, name)
+                return None
+            continue
         if key not in keys or not tail or _number(tail[0]) is None:
             fail(n, f"stage {name!r}: expected '<{'|'.join(keys)}> <number>' "
                     f"but found {key!r}", raw, name)
             return None
         fields[key] = float(tail.pop(0))
+    if not globs and not fixes:
+        fail(n, f"stage {name!r} frees nothing", raw, name)
+        return None
     for key in STAGE_INT_KEYS:
         if key in fields:
             fields[key] = int(fields[key])
-    return StageSpec(name=name, turn_on=globs, **fields)
+    return StageSpec(name=name, turn_on=globs, turn_off=fixes, **fields)
 
 
 # ----------------------------------------------------------------------
