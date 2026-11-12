@@ -10,12 +10,14 @@ Use it for a value you know from elsewhere, such as a standard's certified latti
 Each stage of a plan sets the refine flags afresh from its own list of parameters.
 A parameter you set to `vary=False` by hand is freed again by the first stage whose list includes it.
 The fit refines it, and nothing reports that your setting was replaced.
+A stage's `turn_off` list fixes a parameter inside one plan, and a later stage of that plan can free it again ([Fix parameters in a stage](plan.md#fix-parameters-in-a-stage)).
+A hold lasts across every plan.
 
 ## Hold the parameter
 
 Pass `hold` a parameter's name, such as `phases.0.cell.a`, or a list of names.
 A `*` in a name matches any run of characters, dots included, so `phases.0.cell.*` is every lattice parameter of the first phase.
-[Parameter map](../reference/parameters.md) lists every name.
+[Parameter map](../reference/parameters.md) and [Instrument parameter map](../reference/parameters-instrument.md) list every name.
 It returns the paths it held.
 
 ```python

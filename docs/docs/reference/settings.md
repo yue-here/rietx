@@ -4,7 +4,7 @@ This page lists the names rietx uses besides its parameters, plans, diagnostic c
 
 The entries are generated from `rietx.help`, the one place each is written.
 The GUI puts the same sentence beside the same control, so this page and a tooltip cannot disagree.
-Parameters are on the [parameter map](parameters.md), plans on [Plan presets](plans.md), diagnostic codes on [Diagnostic codes](diagnostics.md) and result fields on [Result fields](result-fields.md).
+Parameters are on the [parameter map](parameters.md) and the [instrument parameter map](parameters-instrument.md), plans on [Plan presets](plans.md), diagnostic codes on [Diagnostic codes](diagnostics.md) and result fields on [Result fields](result-fields.md).
 
 ## Looking one up in code
 

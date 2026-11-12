@@ -38,7 +38,7 @@ from .model.forward import (
     recorded_window_tol,
     window_loss,
 )
-from .model.microstructure import microstructure_table
+from .model.microstructure import floored_paths, microstructure_table
 from .optimize.blocked import BlockJacobian
 from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import (
@@ -119,6 +119,7 @@ from .refine import (
     _onto_flat_meridian,
     _origin_diagnostics,
     _parameter_row,
+    _parent_strain_held_diagnostics,
     _peak_columns_flat_at_answer,
     _peak_only_instrument_path,
     _phase_agreement,
@@ -192,7 +193,9 @@ from .strategy.staged import (
     check_resolution_supported,
     check_stephens_positive,
     check_texture_positive,
+    pressed_tied_paths,
     resolve_plan,
+    tied_bound_findings,
 )
 
 #: A diagnostic reported **once per histogram**, on
@@ -357,6 +360,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "never both on one histogram, and a shared row fixed in "
                 "several tables is one finding"),
     # -- deliberately not computed ---------------------------------------------
+    "_parent_strain_held_diagnostics": (
+        (FIT,), "a parent-cell phase's strains are shared model parameters, "
+                "so the held-strain record is the fit's, read off the plan's "
+                "freed paths (WP-1419)"),
     "_site_glob_diagnostics": (
         (ABSENT,), "not called from multi.py yet: a single fit reports a glob "
                    "naming one site that frees nothing (WP-1951), and wiring it "
@@ -1951,7 +1958,9 @@ class MultiHistogramRefinement:
         report_sigma = _reported_support_sigma(phase_support_sigma)
         # the declared stages and the closing one, the single runner's
         # schedule (WP-2002, the sixth round's Q1 and Q2)
-        stages = plan.run_stages()
+        # every row under both names the joint table matches a glob against,
+        # for the closing stage of a plan that fixes (WP-2208)
+        stages = plan.run_stages(paths=self.mtable.row_names())
         n_stages = len(stages)
         for index, (stage, ftol, window_tol) in enumerate(
                 zip(stages, plan.stage_ftols(), plan.stage_window_tols(),
@@ -1962,11 +1971,16 @@ class MultiHistogramRefinement:
                 # the floating-origin hold (WP-1912), which the origin
                 # diagnostics report from
                 blocked_by_hold = self.mtable.blocked_by_hold(stage.turn_on)
+                if stage.turn_off:
+                    # a path the same stage fixes was not wanted free (WP-2208)
+                    unwanted = set(self.mtable.blocked_by_hold(stage.turn_off))
+                    blocked_by_hold = [p for p in blocked_by_hold if p not in unwanted]
                 # what the stage asked for and did not get (WP-1414): a literal
                 # no histogram has or a retired spelling, and — the joint fit's
                 # own case — a histogram the stage's globs reached nothing of
                 # while reaching another's
-                unknown_paths = self.mtable.unknown_paths(stage.turn_on)
+                unknown_paths = self.mtable.unknown_paths(
+                    [*stage.turn_on, *stage.turn_off])
                 unreached = self.mtable.unreached_histograms(stage.turn_on)
                 # what the previous stage's answer held, which the support hold
                 # reads as tried and flat (WP-2049, the single runner's ``tried``)
@@ -1978,6 +1992,19 @@ class MultiHistogramRefinement:
                     # and a cumulative plan need not name its cell again
                     self.mtable.set_vary(carried_hold, True)
                     carried_hold = []
+                # the stage's fixes, after its frees and the lift above, the
+                # single runner's order (``_run_stage``, WP-2208)
+                # ``fixed`` names only what the fix took out of the free set
+                fixed: list[str] = []
+                if stage.turn_off:
+                    was_free = {self.mtable._canonical(h, e.path)
+                                for h, tab in enumerate(self.mtable.tables)
+                                for e in tab.entries if e.vary and e.tie is None}
+                    fixed = [p for p in self.mtable.set_vary(stage.turn_off, False)
+                             if p in was_free]
+                if fixed:
+                    gone = set(fixed)
+                    freed = [p for p in freed if p not in gone]
                 seeded: dict[str, float] = {}
                 if stage.seed:
                     seeded = dict.fromkeys(
@@ -2193,6 +2220,10 @@ class MultiHistogramRefinement:
                         n_iterations=outcome.n_iterations + second.n_iterations,
                         n_constraint_truncations=(outcome.n_constraint_truncations
                                                   + second.n_constraint_truncations),
+                        truncated_by={k: (outcome.truncated_by.get(k, 0)
+                                          + second.truncated_by.get(k, 0))
+                                      for k in {**outcome.truncated_by,
+                                                **second.truncated_by}},
                         # summed for the same reason the truncations are: the stage
                         # ran twice and the count is a fact about its whole search
                         n_degenerate_cell_probes=(outcome.n_degenerate_cell_probes
@@ -2258,7 +2289,7 @@ class MultiHistogramRefinement:
                     moment_flat_axes=kept_axes,
                     moment_turned=[b for b in kept_axes if b in moment_turned],
                     unknown_paths=unknown_paths, unreached_histograms=unreached,
-                    seeded=seeded, blocked_by_hold=blocked_by_hold,
+                    seeded=seeded, blocked_by_hold=blocked_by_hold, fixed=fixed,
                     moment_angle_tests=outcome.moment_angle_tests,
                     cell_reset=cell_reset, collapsed=restored,
                     window_loss=max(losses) if losses else None, rwp=rwp,
@@ -2547,6 +2578,22 @@ class MultiHistogramRefinement:
             mt.bounds(), mt.free_paths, outcome.theta,
             cos=outcome.residual_cosine, esd=outcome.stderr_internal,
             active=_exact_active_bounds(outcome))
+        # a tied value the LM step held on its own limit, per histogram, a
+        # shared entry once and bare (WP-1325, ``staged.tied_bound_findings``)
+        pressed = pressed_tied_paths(outcome.truncated_by)
+        if pressed and per_esds:
+            seen_shared: set[str] = set()
+            for h, table in enumerate(mt.tables):
+                for f in tied_bound_findings(table, pressed, per_esds[h],
+                                             scope=f"hist.{h}."):
+                    base = f.paths[0].removeprefix(f"hist.{h}.")
+                    e = table.entries[table._paths[base]]
+                    if _row_shared(mt, e):
+                        if base in seen_shared:
+                            continue
+                        seen_shared.add(base)
+                        f = dataclasses.replace(f, paths=(base,), message=base)
+                    at_bounds.append(f)
         # Histogram 0's physical esds, built once in the loop above and read by
         # two consumers (WP-1131): the shared rows of ``_parameters``, and the
         # microstructure block, which reads histogram 0 because its value scale
@@ -2651,6 +2698,9 @@ class MultiHistogramRefinement:
         # (WP-2028): a record of the hold, read off the answer's stage
         diagnostics = diagnostics + _per_pattern_hold_diagnostics(
             stage_results, mt, self.mtable.structures[0])
+        diagnostics = diagnostics + _parent_strain_held_diagnostics(
+            stage_results, [_unscoped(p) for p in mt.free_paths],
+            self.mtable.structures[0])
         # a phase whose scales and B no histogram's range can separate, and
         # what its fraction is conditional on (WP-1534)
         diagnostics = diagnostics + _scale_b_ridge_diagnostics(
@@ -2692,7 +2742,8 @@ class MultiHistogramRefinement:
             microstructure=microstructure_table(
                 mt.structures[0], per_values[0],
                 wavelength=_longest_line_wavelength(models[0]),
-                esds=esd_hist0),
+                esds=esd_hist0,
+                floors=floored_paths(mt.tables[0], _hist0_floors(at_bounds))),
             # each histogram's background screen, ``hist.<h>.``-scoped, so
             # ``for_histogram`` hands a report its own (WP-1341); ``None``
             # where nothing was screened, the single fit's empty state
@@ -2822,8 +2873,9 @@ class MultiHistogramRefinement:
         # per-histogram rows `hist.h.…` — which is exactly how
         # `MultiParameterTable.free_paths` spells them, so the projection keys
         # on the row path and needs no second naming convention (WP-1076).
-        tested = set(mt.free_paths)
         on_bound = {p for f in at_bounds for p in f.paths}
+        # a held tied row is tested too (``staged.tied_bound_findings``)
+        tested = set(mt.free_paths) | on_bound
         # which equation set each row, keyed on the same row path (WP-1325)
         equations = _equation_rows(mt)
         # shared parameters reported once, from histogram 0's covariance (its
@@ -2896,6 +2948,19 @@ def _row_shared(mtable, entry) -> bool:
     """Whether a table entry is one column of the joint fit
     (:func:`~rietx.params.multi.row_shared`, read with ``mtable``'s map)."""
     return row_shared(mtable.sharing, entry)
+
+
+def _hist0_floors(at_bounds) -> set[str]:
+    """Histogram 0's paths whose ``FLOOR_HIT`` fired, as its values spell them.
+
+    The joint findings name a shared row bare and a per-histogram row
+    ``hist.h.…`` (``_parameters`` keys on the same spelling), and the
+    microstructure block reads histogram 0's own dict, so a shared floor
+    passes through and a ``hist.0.`` one loses its prefix (WP-1914).
+    """
+    return {_unscoped(p) for f in at_bounds if f.code == "FLOOR_HIT"
+            for p in f.paths
+            if p.startswith("hist.0.") or not p.startswith("hist.")}
 
 
 #: the entries that move an ADP site: the free columns, and the U^ij rows
@@ -3097,12 +3162,22 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
     its own bounds (WP-1325).
 
     The WP-1119 hazard one rank up: a pattern's target is Σ_j Φ_kj·c_j over
-    unbounded coefficients, so the solve never sees the target's own
-    ``min``/``max``.  A ``constant`` declaration's one coefficient carries the
-    target's box itself (``MultiParameterTable._install_parametric``), but a
-    sum of several terms has no box that holds it.  So the answer is read:
-    one warning per declaration, naming every subset pattern whose dependent
-    left its declared range, at the value it took.  ``value`` is how many.
+    unbounded coefficients.  A ``constant`` declaration's one coefficient
+    carries the target's box itself (``MultiParameterTable._install_parametric``),
+    and under the default LM driver a linear target's bounds are rows held
+    inside the step (``least_squares._joint_tied_bound_inequalities``).  So the
+    answer is read: one warning per declaration, naming every subset pattern
+    whose dependent left its declared range, at the value it took.  ``value``
+    is how many.
+
+    It fires under TRF and for an ``expression`` target, which take no rows.
+    The write-back after each stage clamps the target into the model at the
+    bound it crossed (``MultiParameterTable.apply_to_models``), so the fit
+    finishes, and this table keeps the equation's value, which the warning
+    quotes and the result's rows carry.  Under the default LM driver a linear
+    target cannot reach it.  Settled by Claude 2026-11-09 under the Stephens
+    cone's precedent (a constraint LM holds in the step is a guard where it
+    cannot) and the declared-name rule (WP-1076); the maintainer may reverse it.
     """
     out: list[Diagnostic] = []
     # an expression's target is as unbounded as a sum of terms (WP-1964)
@@ -3123,7 +3198,8 @@ def _parametric_range_diagnostics(mtable) -> list[Diagnostic]:
             where=[f"hist.{h}.{r.target}" for h, *_ in bad], value=float(len(bad)),
             message=(f"Parametric equation {r.name!r} puts {r.target} outside its own "
                      f"bounds in {len(bad)} of {len(r.patterns)} patterns: "
-                     f"{shown}{more}."),
+                     f"{shown}{more}. The model there holds the bound the value "
+                     f"crossed."),
             suggestion=("Narrow the subset to where the form holds, or bound the "
                         "variables so the expression stays inside the range."
                         if r.equation.basis == "expression" else

@@ -187,7 +187,8 @@ NOT_WALKED: dict[str, str] = {
     "examples.py": "the shipped example projects",
     "gui": ("beyond its import pre-fill and its symmetry edit gates: the server and 3D "
             "viewer's ports, payload caps and drawing tolerances"),
-    "help.py": "the explanation text",
+    "help.py": "the explanation text, and OPT_IN's declarations, which embed "
+               "no threshold",
     "history": "the history tree's storage, and its event summary's printed row count and read chunk",
     "io": ("beyond the walked files, which repair, sniff, translate or write a number another "
            "program computes from: foreign formats' byte offsets, field widths, unit factors "
@@ -510,6 +511,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.RefinementResult.y_obs",
     "rietx.schemas.results.StageResult.cost_final",
     "rietx.schemas.results.StageResult.cost_initial",
+    "rietx.schemas.results.StageResult.fixed",
     "rietx.schemas.results.StageResult.freed",
     "rietx.schemas.results.StageResult.held_reach",
     "rietx.schemas.results.StageResult.n_iterations",
@@ -945,6 +947,19 @@ ROWS: tuple[Row, ...] = (
                   "default where the caller set none (multi.py:2316-2322), and applies no "
                   "threshold of its own (WP-1325)")),
     Row("PARAMETRIC_TARGET_UNSEEN", "code"),
+    Row("PARENT_STRAIN_HELD", "code", tier=3, ambiguity=1,
+        evidence=("info; fires when a stage frees a Phase.parent_cell phase's cell edges while a "
+                  "strain stays held: phases.*.cell.* reaches the edges and never a strain, since "
+                  "zero is a stationary point of a strain while the child's atoms and moments keep the "
+                  "parent's symmetry, and a distortion gives it only a small gradient there "
+                  "(test_parent_cell.py)"),
+        grounds=("The glob's choice to leave a strain held is the package's own act, so it is said "
+                 "out loud with the held paths and the verbs that free them; Yue ruled the hold "
+                 "stays and is reported (PR #1108, 2026-10-27), naming a dissenting refiner who "
+                 "would free the strain."),
+        approved="2026-10-27", response="info",
+        responds=("read the child's cell as the parent's carried through the transform; seed the "
+                  "strain off zero with set_values and free it to test for a shear")),
     Row("PATTERN_DEAD_CHANNELS", "code"),
     Row("PATTERN_DUPLICATE_POINTS", "code"),
     Row("PATTERN_INTENSITY_NET", "code", tier=1, ambiguity=1,
@@ -1345,6 +1360,7 @@ ROWS: tuple[Row, ...] = (
                   "symmetry-tied row whose sources the same stage does not free "
                   "(refine._fixed_literal_diagnostics, WP-1414), or a glob whose fixed "
                   "leading segments name one existing site (phases.<i>.atoms.<j>.) "
+                  "or one existing phase's cell (phases.<i>.cell., #1108) "
                   "matches no row the stage can free (refine._site_glob_diagnostics, "
                   "issue #896, WP-1951; single fits, the joint fit asking the literal "
                   "branch alone until WP-2028); no threshold, and no shipped preset "
@@ -1616,7 +1632,9 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.results.StageResult.n_constraint_truncations", "action", tier=1, ambiguity=1,
         evidence=("physics: a strain variance and a pole density are non-negative (Stephens 1999; "
                   "WP-1960 D4); the Gamma_G^2 floor's value is tiered on "
-                  "caglioti._MIN_GAMMA_G2's row")),
+                  "caglioti._MIN_GAMMA_G2's row; a tied parameter's own min/max are the "
+                  "caller's or the schema's declaration, which the write-back enforces "
+                  "exactly (WP-1325)")),
     Row("rietx.schemas.results.StageResult.n_degenerate_cell_probes", "action", tier=1, ambiguity=1,
         evidence=("arithmetic: a cell of zero or negative volume has no metric, so the residual is "
                   "undefined there and the step must be rejected (issue #283)")),
@@ -2089,6 +2107,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.magnetic.scattering.METRIC_TOL", "constant", value=0.001),
     Row("rietx.crystallography.magnetic.scattering.P_MAGNETIC_FM", "constant", value=2.695),
     Row("rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL", "constant", value=0.0001),
+    Row("rietx.crystallography.metric.COSINE_SNAP", "constant", tier=1, value=1e-12,
+        evidence=("numerical floor: P^T.G.P puts a symmetry-forced cosine within ~2e-16 of 0 or +-1/2 "
+                  "(hexagonal gamma 119.99999999999999 unsnapped); 1e-12 on a cosine is 6e-11 deg at 90, "
+                  "far below any refined departure. The literal main's _child_cell_parameters already "
+                  "used. test_the_cosine_snap_removes_round_off_and_nothing_physical")),
     Row("rietx.crystallography.neutron.NEUTRON_LAMBDA_EV_ANGSTROM", "constant", value=0.286014),
     Row("rietx.crystallography.neutron.SIGMA_ABS_REFERENCE_WAVELENGTH", "constant", value=1.798),
     Row("rietx.crystallography.representation.distortion.DISTORTION_SEED", "constant",
@@ -3173,6 +3196,19 @@ ROWS: tuple[Row, ...] = (
         grounds=("B2 option 2: the difference step of the test that keeps the moment sizes' "
                  "esds free of the stopping-point artefact (ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.optimize.least_squares.TIED_BOUND_MARGIN", "constant", tier=3, value=1e-09,
+        evidence=("arithmetic against lm._POLISH_FEASIBLE (1e-10), the most an accepted step "
+                  "leaves a row, so the write-back's exact bound check never meets a held tied "
+                  "value past its bound; the two scales differ (this one is the row at the "
+                  "start, the polish's is per step), the factor 10 is free, and the value it "
+                  "moves is 1e-9 of the row's scale, far under any esd; measured on the "
+                  "single-fit and five-pattern held fits of test_tied_bound_rows, the second "
+                  "through the later stages of mccusker_structural that start from the held "
+                  "value; a miss raises the write-back error every fit raised before WP-1325"),
+        grounds=("A numerical setting whose tier-1 evidence the generality review rated weak "
+                 "(a margin measured once against the row's starting scale, a free factor "
+                 "of 10); tier 3, ruled by Yue 2026-11-09 (WP-1325)."),
+        approved="2026-11-09"),
     Row("rietx.optimize.least_squares.XTOL", "constant", tier=3, value=1e-12,
         evidence=("a tolerance defaulted inside opt-in solver='trf' (default 'lm', "
                   "DEFAULT_SOLVER), four orders under SciPy's own 1e-8; WP-1109 tried 1e-8: "
@@ -3546,6 +3582,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.params.parametric.RANK_RTOL", "constant", tier=1, value=3.162277660168379e-08,
         evidence=("numerical floor: sqrt(PINV_RCOND) = 3.2e-8, the R diagonal at which the "
                   "covariance's pinv would discard the direction anyway (docstring derivation)")),
+    Row("rietx.params.parent_cell._DEG", "constant", tier=1, value=0.017453292519943295,
+        evidence="arithmetic: degrees to radians"),
     Row("rietx.params.vector.CELL_MIN_LENGTH_A", "constant", tier=2, value=1.5,
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): a, b, c floored "
                   "at Max(1.5, ...)"
@@ -3605,6 +3643,17 @@ ROWS: tuple[Row, ...] = (
         evidence=("linear-algebra round-off: R.v - v of an allowed mode vector is ~1e-15, a "
                   "forbidden one O(1) (docstring, WP-1419); tests/test_distortion_block.py::"
                   "test_a_mode_vector_its_site_does_not_allow_is_refused")),
+    Row("rietx.params.vector.PARENT_STRAIN_PD_MARGIN", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: the box sum 2|s_j|.|E_j|_2 < lambda_min(C) keeps the child metric "
+                  "positive definite (Weyl's inequality, Horn & Johnson, Matrix Analysis, 2nd ed., "
+                  "Thm 4.3.1), and its edge can be singular; the bound sits a relative 1e-9 inside it, "
+                  "so at the edge lambda_min(C + 2E) >= 1e-9 lambda_min(C), about six decades above "
+                  "eigvalsh round-off, as STEPHENS_CONE_TOL. A tighter strain bound is the caller's "
+                  "(Parameter.min/max, kept where tighter). test_parent_cell.py")),
+    Row("rietx.params.vector.PARENT_CELL_DRIFT_TOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: the builder and every write-back store the derived child cell itself, "
+                  "so a stored cell agrees to the bit; 1e-9 relative sits above a 1e-13 round-off and below "
+                  "a 1e-6 deg edit. test_the_drift_tolerance_refuses_any_edit_and_passes_round_off")),
     Row("rietx.params.vector.SIZE_CAP_ARM_RTOL", "constant", tier=1, value=1e-06,
         evidence=("numerical floor: as STRAIN_CAP_ARM_RTOL; hysteresis pinned by "
                   "test_strain_cap.py:414")),
@@ -4533,7 +4582,10 @@ ROWS: tuple[Row, ...] = (
                   "(t = -268); recorded in RefinementResult.stages as the stage named "
                   "'closing'; solve_magnetic runs it on its winner too, when the package "
                   "chose the plan and the verdict is solved, after ranking every trial "
-                  "without it (2026-10-22)"),
+                  "without it (2026-10-22); since WP-2208 it is free but for the paths the "
+                  "declared stages leave fixed (a turn_off whose glob matched last, "
+                  "staged.fixed_at_end), which it keeps fixed and records in its "
+                  "StageResult.fixed"),
         grounds=("The maintainer's ruling (the sixth round's Q2, option 3, 2026-10-21): every "
                  "plan ends with a closing stage at tight windows, which removes the 2 % "
                  "window's error from the answer and most of a staged plan's start dependence; "
@@ -4553,6 +4605,8 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.schemas.plan.StageSpec:turn_on", "default", tier=1, ambiguity=1, value=(),
         evidence="arithmetic: the empty container"),
+    Row("rietx.schemas.plan.StageSpec:turn_off", "default", tier=1, ambiguity=1, value=(),
+        evidence="arithmetic: the empty container; a stage fixes nothing unless it says so (WP-2208)"),
     Row("rietx.schemas.plan.StageSpec:max_iter", "default", tier="invariant", ambiguity=1, value=100,
         evidence=("answer-invariant: caps evaluations at max_iter x NFEV_PER_ITERATION, "
                   "never iterations; the worst stage under the shipped schedule ran 48 "
@@ -5244,6 +5298,10 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in, as its code: names three changes to the caller's own declaration "
                   "(subset, order, basis) and picks none (multi.py:2334-2336)")),
     Row("PARAMETRIC_TARGET_UNSEEN.suggestion", "suggestion", value=1),
+    Row("PARENT_STRAIN_HELD.suggestion", "suggestion", tier=3, ambiguity=1, value=1,
+        evidence="names the two verbs that free a held strain: set_values to seed it, turn_on to free it",
+        grounds="Says how to test for the strain the glob left held (PR #1108, ruled 2026-10-27).",
+        approved="2026-10-27"),
     Row("PATTERN_DEAD_CHANNELS.suggestion", "suggestion", value=2),
     Row("PATTERN_INTENSITY_SCALED.suggestion", "suggestion", value=6),
     Row("PATTERN_MULTISCAN_DEFAULTED.suggestion", "suggestion", value=1),
@@ -5252,7 +5310,7 @@ ROWS: tuple[Row, ...] = (
                   "_pd_proc_intensity_bkg_calc where the file states one, an empty stretch "
                   "of baseline otherwise) and names each reading's fix; it prescribes "
                   "neither branch, so no dissenter is left; takes no action itself")),
-    Row("PATTERN_ROWS_DROPPED.suggestion", "suggestion", value=2),
+    Row("PATTERN_ROWS_DROPPED.suggestion", "suggestion", value=3),
     Row("PATTERN_SIGMA_CONSTANT.suggestion", "suggestion", value=1),
     Row("PATTERN_UNDERSAMPLED.suggestion", "suggestion", value=1),
     Row("PATTERN_X_AXIS_ASSUMED.suggestion", "suggestion", value=1),
@@ -5379,8 +5437,8 @@ ROWS: tuple[Row, ...] = (
                   "driver's Gaussian and Lorentzian width floors "
                   "(gaussian_width_inequalities, lorentzian_width_inequalities) that TRF "
                   "has no vocabulary for")),
-    Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=2),
-    Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
+    Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=3),
+    Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=3),
     Row("STAGE_SLOW_DESCENT.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: points at the findings that name a shallow direction, "
                   "HIGH_CORRELATION and a bound hit, and defers the remedy to their own "

@@ -979,7 +979,10 @@ class MicrostructureTerm(Base):
     rather than zero):
 
     * ``"at_zero"`` — the coefficient is at its off state, where a size is
-      infinite and a strain is a perfect lattice.  True, and not a number;
+      infinite and a strain is a perfect lattice.  True, and not a number.
+      Stored as zero, or on its floor of zero by the bound test
+      (``FLOOR_HIT``), so ``coefficient`` may be a tiny positive number where
+      ``solver="trf"`` stopped just above it (WP-1914);
     * ``"no_wavelength"`` — a size needs a λ and the source declares none
       (never reaches a strain, which has no λ in it);
     * ``"not_measured"`` — the coefficient carries no esd, so ``value`` stands
@@ -1215,8 +1218,9 @@ class StageResult(Base):
     #: runners that build a ``StageResult``.
     termination: str | None = None
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
-    #: Stephens strain cone, or the Γ_G² floor of WP-1938 D7) during this
-    #: stage: the step for the box alone crossed a row, and the step solved
+    #: Stephens strain cone, the Γ_G² floor of WP-1938 D7, the Γ_L floor of
+    #: WP-2002, or a tied parameter's own bounds of WP-1325) during this
+    #: stage, in a joint fit too: the step for the box alone crossed a row, and the step solved
     #: over the box and the rows replaced it (WP-1938 D8; the name is from
     #: before D8, when such a step was truncated).  Always 0 under
     #: TRF, which has no such vocabulary.  Nonzero in the *final* stage means
@@ -1362,8 +1366,18 @@ class StageResult(Base):
     #: This one is the caller's, and it persists until ``unhold``.
     #:
     #: Empty on every fit where no hold was declared, which is every fit that
-    #: predates this field.  It feeds ``HOLD_BLOCKED_PLAN``.
+    #: predates this field.  It feeds ``HOLD_BLOCKED_PLAN``.  A path the
+    #: same stage's ``turn_off`` matches is left out: the stage did not want
+    #: it free (WP-2208).
     blocked_by_hold: list[str] = Field(default_factory=list)
+    #: paths this stage's ``turn_off`` fixed after its frees (WP-2208), in
+    #: table order: the free paths it took, never a row that was already
+    #: fixed or held; a joint fit names them as :attr:`freed` does.  Disjoint
+    #: from :attr:`freed`.  Empty for a stage that declares no ``turn_off``,
+    #: which is every stage before the field, and the empty list is then the
+    #: truth: no stage could fix anything.  Writers: the three runners that
+    #: build a ``StageResult``.
+    fixed: list[str] = Field(default_factory=list)
     #: the **literal** paths, and the retired spellings, in this stage's
     #: ``turn_on`` that name no parameter of the model, in plan order
     #: (WP-1414, issue #265).  A literal is a ``turn_on`` entry with no

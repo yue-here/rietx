@@ -97,6 +97,26 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-1044 (the view handed back), WP-1033 (shapes and autorange), WP-1032
   (a hover link costs a restyle).
 
+## Moved from gui/CLAUDE.md
+
+On 2026-11-09 WP-2134 condensed `gui/CLAUDE.md` to its standing rules, each still
+naming this WP. The text below is what that file carried for this WP until then,
+verbatim: the rules with the measurements, stories and examples behind them. Where it
+and the rulebook disagree, the rulebook is current.
+
+**A redraw never moves the axes** (WP-1212, `panels/Plot.svelte`,
+`App.svelte:setProtocol`). Its plotly repairs went with plotly in WP-1461: the
+axis pinning, reading `ax._rl`, `movedAxes`, the hover ring kept out of the
+WebGL scene, and the `.select-outline` override. Three rules outlived them.
+**Arming is the figure's mode** (`setMode`) and repaints nothing; under plotly
+`dragmode` was a layout key, and routing it through the repaint cost two of the
+four reacts an exclude drag took. **A `$derived` off `project` is a new object
+on every settings PATCH**, so an effect keyed on `extent` repaints for two
+numbers that did not change — key it by value, beside `protocolKey`. **Two
+`$state` assignments either side of an `await` are two flushes**, which is why
+`setProtocol` reads the peak list before publishing either (`readPeaks`); one
+exclude drag is one fetch and moves no axis.
+
 ## Handover log
 
 ### 2026-08-27 — closed: what jitters is what nobody zoomed

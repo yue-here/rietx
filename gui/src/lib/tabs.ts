@@ -7,7 +7,9 @@
  * `tests/test_gui_manual.py` fails when a GUI chapter does not name a tab, so a
  * renamed panel breaks the docs build rather than the reader's trust.
  *
- * The nine panels, and the reasons the strip is what it is.
+ * The panels, and the reasons the strip is what it is. Interactive (WP-2128)
+ * sits beside Parameters because both edit the same values, one typed and
+ * one dragged, and the action bar applies the two as one set of edits.
  *
  * Model and Text joined the strip in WP-1034 — an edit and the fit it changes
  * are now one glance, which is what every other panel already had. WP-1013 and
@@ -26,6 +28,7 @@
  */
 export const TABS = [
   { id: "params", label: "Parameters" },
+  { id: "interactive", label: "Interactive" },
   { id: "plan", label: "Plan" },
   { id: "peaks", label: "Peaks" },
   { id: "model", label: "Model" },
@@ -42,11 +45,18 @@ export type Tab = (typeof TABS)[number]["id"];
  *
  * The maintainer ruled on 2026-11-07 that the graphs sit on the left in tabs
  * and the model panel on the right, and that each graph says in a title line
- * what it shows. One tab today; the Peaks preview, the Background view and the
+ * what it shows. Two tabs since WP-2128; the Peaks preview, the Background view and the
  * Structure view join it in later pieces of the gui-overhaul milestone. It is
  * data here for the reason `TABS` is: `tabs.test.ts` writes it into the panel
  * corpus, so the manual must name every graph tab too.
  */
-export const GRAPH_TABS = [{ id: "pattern", label: "Pattern" }] as const;
+export const GRAPH_TABS = [
+  { id: "pattern", label: "Pattern" },
+  // the single-peak comparison (WP-2128); "Peaks" is the side strip's
+  // picker, and the manual's corpus is keyed by label
+  { id: "single", label: "Single peaks" },
+  // WP-2129: the background curve and the band it may move in
+  { id: "background", label: "Background" },
+] as const;
 
 export type GraphTab = (typeof GRAPH_TABS)[number]["id"];

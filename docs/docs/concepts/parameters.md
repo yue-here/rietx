@@ -1,7 +1,7 @@
 # About parameters
 
 rietx groups its parameters the way a crystallographer does: cell and structure, phase amount, microstructure, instrument and background.
-The [parameter map](../reference/parameters.md) lists every parameter in each group with its unit, default and typical range.
+The [parameter map](../reference/parameters.md) and the [instrument parameter map](../reference/parameters-instrument.md) list every parameter in each group with its unit, default and typical range.
 This page says what each group is for, what it belongs to, and how the background differs from the rest.
 
 ## The groups
@@ -16,9 +16,9 @@ A calibrated instrument carries over to every sample measured on it, and a backg
 | [Atoms](../reference/parameters.md#atoms) | atom | the relative intensities | per hkl, with no smooth angular form |
 | [Phase amount and intensity corrections](../reference/parameters.md#phase-amount-and-intensity-corrections) | phase or specimen | how strong the phase is, and smooth or hkl-selective rescaling | smooth in Q, or per hkl for texture |
 | [Microstructure](../reference/parameters.md#microstructure) | phase | the width the specimen adds | size as 1/cos θ, strain as tan θ |
-| [Instrument peak positions](../reference/parameters.md#peak-positions) | instrument and specimen position | where every peak sits | constant, cos θ, sin 2θ or cos 2θ |
-| [Instrument peak shape](../reference/parameters.md#peak-shape) | instrument | the instrument's own width and asymmetry | Gaussian FWHM² as U tan²θ + V tan θ + W |
-| [Background](../reference/parameters.md#background) | this measurement | the intensity under the peaks | smooth in 2θ, plus any declared humps |
+| [Instrument peak positions](../reference/parameters-instrument.md#peak-positions) | instrument and specimen position | where every peak sits | constant, cos θ, sin 2θ or cos 2θ |
+| [Instrument peak shape](../reference/parameters-instrument.md#peak-shape) | instrument | the instrument's own width and asymmetry | Gaussian FWHM² as U tan²θ + V tan θ + W |
+| [Background](../reference/parameters-instrument.md#background) | this measurement | the intensity under the peaks | smooth in 2θ, plus any declared humps |
 | [Named variables](../reference/parameters.md#named-variables) | the refinement | whatever is tied to them | none of their own |
 
 Symmetry decides how many parameters a group has.

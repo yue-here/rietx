@@ -843,6 +843,42 @@ examples route restates no protocol.  Root kept the half that governs
 command.  The other two root GUI rules needed no lines: the 409 and the
 theme's scope were already stated here in full.
 
+1061 -> 1068 for WP-2133 (2026-11-09, approved by the maintainer the same
+day): the File menu acts on the project folder, and three of its facts are
+seams a later verb must keep.  A rename or a move keeps the session's
+`Project` and repoints the two paths a live one holds, so a third such field
+has to join `GuiSession._relocate`.  A destination passes the folder
+browser's containment gate and the name check, and an existing folder is
+refused rather than replaced.  Close is a mark on the recent list's head,
+which `reopen_last` reads.  The refusal list, the review's nine findings and
+the browser measurements are in the WP.  Landed 1068, no headroom.
+
+1068 -> 663 for WP-2134 (2026-11-10): the consolidation pass, by the
+method of WP-1031 and WP-1060 above.  The file had grown to 1059 lines and
+78 154 bytes, about 19 500 tokens at 4 bytes a token, paid by every session
+working under `gui/`.  Each paragraph had become a WP's whole story: the rule,
+the measurement that found it, the browser session and the numbers.  The pass
+moved all 41 such paragraphs, verbatim, into a "Moved from gui/CLAUDE.md"
+section of the 37 WP files they named, and rewrote the rulebook as standing
+rules grouped by the file a session edits, each naming its WP.  Nothing was
+deleted that had no second copy.  Six rules had drifted from the tree and were
+restated against it, and `test_gui_rulebook_paths_resolve` now fails on a path
+the rulebook names that has gone.  The visual-style rules keep their wording:
+WP-2134 lists them for the GUI style guide, which takes them next.  The
+merge of `main` folded in what WP-2130, 2131, 2133 and 2142 had added (#1490,
+#1498, #1502, #1514): the start screen's and the File menu's six rules as
+bullets of § Model, their two paragraphs to WP-2131's and WP-2133's files,
+and the pointer to `gui/STYLE.md` in the header.  Landed
+662, 44 703 bytes, about 11 200 tokens, +1 headroom.
+
+663 -> 667 for WP-2215 (2026-11-11): the GUI rebuild's second page.  WP-2214's
+plan names the line R1 owes the rulebook, and it is a standing rule a session
+editing `gui/` needs before its first build: the rebuild lives in
+`gui/src/next/`, builds in a second `vite build --mode next` pass because one
+multi-entry pass makes today's page load a shared chunk, moves a shared panel
+before changing it, and keeps its tab names out of the manual's corpus until
+the swap.  Four lines, landed at the cap.
+
 ### `tests/CLAUDE.md`
 
 180 -> 198 for WP-1070 (2026-08-15): the running ladder.  It is a rule

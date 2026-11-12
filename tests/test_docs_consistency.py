@@ -162,6 +162,15 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-09-16  gui/CLAUDE.md                1028 -> 1036 for WP-1425's one rule: the watch page's
 #                                                          port of lib/resize.ts, pinned by a text-compared
 #                                                          case table, and the dist digest that hashes tests
+#   2026-11-09  gui/CLAUDE.md                1061 -> 1068 for WP-2133: the File menu's three rules, each a seam
+#                                                          a later verb must keep. Approved by the maintainer
+#                                                          2026-11-09; landed 1068, no headroom
+#   2026-11-10  gui/CLAUDE.md                1068 -> 663  for WP-2134, the consolidation pass: standing rules
+#                                                          only, grouped by the file they govern; each old
+#                                                          paragraph moved verbatim to its WP file. Landed
+#                                                          662 with #1490 #1498 #1502 #1514 folded, +1 headroom
+#   2026-11-11  gui/CLAUDE.md                 663 -> 667  for WP-2215: the rebuild's second page, its
+#                                                          second build pass and its two seams; landed at the cap
 #   2026-09-03  docs/ROADMAP.md               621 -> 645  for the 2026-09-03 issue triage (1332-1341): ten rows
 #                                                          across three existing sections and one new one, landed 641
 #   2026-09-08  docs/ROADMAP.md               645 -> 648  for WP-1343 (issue #277, the magnetic
@@ -614,9 +623,22 @@ SIZE_CAPS: dict[str, int | None] = {
     # them. It governs work outside the WP that measured it — an edit to a
     # token here is a rebuild, and an edit in the wrong file is a test
     # failure nobody can act on without the rule. Landed at 1045.
+    # +3 (WP-1442): the node floor the dist build needs.
     # +4 (WP-1470): the scene rules' Python twin, which a session editing
     # structure3d.ts meets only as a red vitest otherwise.
-    "gui/CLAUDE.md": 1060,   # +3: the node floor the dist build needs (WP-1442)
+    # +1 (WP-2142): the pointer to gui/STYLE.md, the style guide the maintainer
+    # ruled on 2026-11-09, which a session changing how the GUI looks reads.
+    # 1061 -> 1068 (WP-2133, approved by the maintainer 2026-11-09): the File
+    # menu's three rules, each a seam a later verb must keep (the paths a move
+    # repoints, the destination gate, the close mark).  Landed 1068, no headroom.
+    # 1068 -> 663 (WP-2134, 2026-11-10): the consolidation pass.  The file
+    # keeps standing rules, each naming its WP; every paragraph it carried
+    # moved verbatim to that WP's "Moved from gui/CLAUDE.md" section.  A rule
+    # added later enters the rulebook with its anchor and leaves its evidence
+    # in its WP, per the admission rule above.  Landed 662, +1 headroom.
+    # 663 -> 667 (WP-2215, 2026-11-11): the rebuild's second page and its
+    # second build pass, the line WP-2214's plan names.  Landed at the cap.
+    "gui/CLAUDE.md": 667,   # process.md § The caps diary
     # 275 -> 283 (WP-1426): a third way a guard goes quiet, and the only one of
     # the three that is about the instrument rather than the assertion — a
     # browser's layout-shift entry cannot see inside a plotly div, so a
@@ -997,6 +1019,64 @@ def test_every_handover_entry_is_in_a_form_the_session_hook_can_read():
                     f"{path.name}: heading in the handover log does not open "
                     f"with a date, so the scan cannot see it: {line!r}"
                 )
+
+
+GUI_RULEBOOK = "gui/CLAUDE.md"
+# Where a path the GUI rulebook writes may be rooted: `lib/plot.ts` is under
+# gui/src, `gui/session.py` under src/rietx.  A path under a runtime directory
+# names something a run writes, never a file in the tree.
+_RULEBOOK_BASES = ("", "gui", "gui/src", "src/rietx", "src/rietx/gui")
+_RUNTIME_DIRS = ("live/", "state_dir/")
+_RULEBOOK_PATH = re.compile(
+    r"^((?:[\w.-]+/)+[\w.-]*(?:\{[\w.,-]+\})?[\w.-]*"
+    r"\.(?:ts|svelte|py|mjs|cjs|js|json|jsonl|css|md|html|yml|yaml|toml|rs))"
+    r"(?:::?([\w.]+))?$"
+)
+# A directory: written with a trailing slash, or three segments deep with no
+# extension (`src/rietx/gui/static`), which no route or prose token is.
+_RULEBOOK_DIR = re.compile(r"^(?:(?:[\w.-]+/)+|(?:[\w.-]+/){2,}[\w-]+)$")
+
+
+def test_gui_rulebook_paths_resolve():
+    """Every path the GUI rulebook writes with a directory exists (WP-2134).
+
+    The rulebook is rules keyed by the files they govern, so a renamed file
+    leaves a rule pointing at nothing and nothing goes red.  A bare file name
+    is ambiguous and is not checked; `lib/plot.ts` is, and so is a directory
+    such as `gui/scripts/`.  A `file:symbol` (or a pytest `file::test`) also
+    asks that the symbol is still in that file as a whole word, so a comment
+    saying "cloned" does not keep `lib/model.ts:clone` alive.
+    """
+    text = (ROOT / GUI_RULEBOOK).read_text(encoding="utf-8")
+    problems = []
+    for token in sorted(set(re.findall(r"`([^`\n]+)`", text))):
+        if token.startswith(_RUNTIME_DIRS):
+            continue
+        if _RULEBOOK_DIR.match(token):
+            if not any((ROOT / b / token).is_dir() for b in _RULEBOOK_BASES):
+                problems.append(f"`{token}`: no directory under {_RULEBOOK_BASES}")
+            continue
+        m = _RULEBOOK_PATH.match(token)
+        if not m:
+            continue
+        path, symbol = m.groups()
+        brace = re.search(r"\{([^}]+)\}", path)
+        paths = ([path[:brace.start()] + alt + path[brace.end():]
+                  for alt in brace.group(1).split(",")] if brace else [path])
+        for p in paths:
+            hits = [ROOT / b / p for b in _RULEBOOK_BASES if (ROOT / b / p).is_file()]
+            if not hits:
+                problems.append(f"`{token}`: no file {p} under {_RULEBOOK_BASES}")
+            elif symbol and not any(
+                all(re.search(rf"\b{re.escape(part)}\b", h.read_text(encoding="utf-8"))
+                    for part in symbol.split("."))
+                for h in hits
+            ):
+                problems.append(f"`{token}`: {symbol} is not in {p}")
+    assert not problems, (
+        f"{GUI_RULEBOOK} names what the tree no longer has; rewrite the rule "
+        "against the code it governs:\n  " + "\n  ".join(problems)
+    )
 
 
 def test_template_declares_both_handover_entry_forms():

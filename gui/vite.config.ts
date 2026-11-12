@@ -12,20 +12,37 @@ import { defineConfig } from "vitest/config";
 //   * no sourcemaps and no build timestamp anywhere, so rebuilding unchanged
 //     sources produces a byte-identical tree and `git diff --exit-code` means
 //     "the dist is stale", not "someone rebuilt".
-export default defineConfig({
+//
+// Two pages since WP-2215: today's GUI (`index.html`) and the rebuild
+// (`next.html`, served at /next until the swap). The rebuild is a second pass,
+// `vite build --mode next`, writing `next.html`, `assets/next.js` and
+// `assets/next.css` beside the first pass's output. One multi-entry pass would
+// split the code both pages import into a shared chunk and a shared
+// stylesheet, so today's page would load files it never loaded and the
+// rebuild's global rules would reach it; two passes leave today's dist as it
+// was and give each page its own script and stylesheet.
+export default defineConfig(({ mode }) => ({
   plugins: [svelte()],
+  // the rebuild's fonts and their licences, copied as they are into the dist's
+  // `fonts/` by the second pass alone, so today's page is unchanged
+  publicDir: mode === "next" ? "src/next/static" : false,
   build: {
     outDir: "../src/rietx/gui/static",
-    emptyOutDir: true,
+    emptyOutDir: mode !== "next",
     sourcemap: false,
     target: "es2022",
     // one CSS file: the styles are ~700 lines and splitting them would trade a
     // reviewable dist for a load time nobody can measure on localhost
     cssCodeSplit: false,
     rollupOptions: {
+      ...(mode === "next"
+        ? { input: fileURLToPath(new URL("next.html", import.meta.url)) } : {}),
       output: {
-        entryFileNames: "assets/app.js",
-        chunkFileNames: "assets/[name].js",
+        entryFileNames: mode === "next" ? "assets/next.js" : "assets/app.js",
+        // the second pass writes beside the first with nothing emptied, so its
+        // chunks take a prefix: an `assets/vendor-uplot.js` of its own would
+        // replace the one `app.js` imports, whose export names it does not share
+        chunkFileNames: mode === "next" ? "assets/next-[name].js" : "assets/[name].js",
         // Application code is still one chunk.  CodeMirror — its first real
         // dependency (WP-1013) — is not, and splitting it *serves* the
         // one-chunk decision rather than reversing it: a committed dist has to
@@ -46,7 +63,8 @@ export default defineConfig({
             : /node_modules[\\/]uplot[\\/]/.test(id) ? "vendor-uplot"
             : /node_modules[\\/]svgcanvas[\\/]/.test(id) ? "vendor-svgcanvas" : undefined,
         assetFileNames: (info) =>
-          info.names?.[0]?.endsWith(".css") ? "assets/app.css" : "assets/[name][extname]",
+          !info.names?.[0]?.endsWith(".css") ? "assets/[name][extname]"
+            : mode === "next" ? "assets/next.css" : "assets/app.css",
       },
     },
   },
@@ -70,4 +88,4 @@ export default defineConfig({
     // rule about which ones may go in it
     setupFiles: ["src/test-setup.ts"],
   },
-});
+}));

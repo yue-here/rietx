@@ -703,6 +703,13 @@ from .._nearmiss import did_you_mean
 #: Additive and defaulted to ``None``, a linear tie, the 0.25 → 0.26 rule; so
 #: every stored tie opens as the linear tie it was.  An older build refuses a
 #: document carrying the key.
+#: Also in 0.61 (WP-1419, C2): ``Phase.parent_cell``, a ``ParentCell`` (the
+#: parent's ``space_group``, the parent → child ``transform``, the parent's
+#: ``cell`` and one ``strain`` amplitude per Γ strain the child's group
+#: allows), which makes the child's six cell parameters derived and locked.
+#: Additive and defaulted to ``None``, the 0.25 → 0.26 rule, so every stored
+#: document loads and refines as before; an older build refuses a phase
+#: carrying it.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
