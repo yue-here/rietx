@@ -47,11 +47,11 @@ from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import (
     DEFAULT_SOLVER,
     SOLVERS,
+    _joint_aux_paths,
     _longest_line_wavelength,
     _multi_closures,
     covariance_estimates,
     covariance_jacobian,
-    joint_aux_paths,
     rechart_outcome,
     run_multi_least_squares,
     stationary_columns,
@@ -2610,7 +2610,7 @@ class MultiHistogramRefinement:
             np.concatenate([m.y_obs for m in models]),
             np.concatenate(per_ycalc),
             np.concatenate([m.sigma for m in models]),
-            n_free=len(mt.free_paths) + len(joint_aux_paths(models)),
+            n_free=len(mt.free_paths) + len(_joint_aux_paths(models)),
             y_background=np.concatenate(per_ybkg))
         # the joint solve's convergence figure, copied and never derived
         # (WP-1341; ``_final_shift_over_esd_multi`` says why it is defined)
@@ -3578,7 +3578,7 @@ def _parametric_form_tests(models, mtable, at_bounds, weights,
         reach = table.entry_reach()
         usable.append(all(set(reach.get(p, ())) <= written for p in variables))
     return form_tests(mtable.parametric, jacobian(x), residual(x), n_data,
-                      mtable.free_paths + joint_aux_paths(models), unseen, hold,
+                      mtable.free_paths + _joint_aux_paths(models), unseen, hold,
                       expressions=mtable.expressions,
                       values=values, usable=usable, scope=mtable._canonical)
 

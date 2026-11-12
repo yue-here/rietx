@@ -3503,7 +3503,7 @@ def _joint_aux_slices(models: list[CompiledModel], n_table: int) -> list[slice]:
     return [slice(int(a), int(b)) for a, b in zip(off[:-1], off[1:], strict=True)]
 
 
-def joint_aux_paths(models: list[CompiledModel]) -> list[str]:
+def _joint_aux_paths(models: list[CompiledModel]) -> list[str]:
     """A name per joint intensity column, ``hist.<h>.pawley.<k>``, in vector
     order.  Not table paths: a reader that counts free columns (the form
     test's χ²_red) or aligns a matrix with names reads these after

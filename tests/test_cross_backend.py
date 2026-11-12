@@ -1859,7 +1859,7 @@ def _multi_state(mode: str = "rietveld"):
     ``(models, mtable, theta, labels)``."""
     key = f"state:{mode}"
     if key not in _MULTI_CACHE:
-        from rietx.optimize.least_squares import joint_aux_paths
+        from rietx.optimize.least_squares import _joint_aux_paths
         from rietx.params.multi import MultiParameterTable
         from tests.test_multi_histogram import perturbed_inputs, synthesize
 
@@ -1887,7 +1887,7 @@ def _multi_state(mode: str = "rietveld"):
                                 n_cycles=_pawley_seed_cycles(Stage("seed", [])))
                 m.build_pawley_restraint()
             theta = np.concatenate([theta, *[m.pawley_x0() for m in models]])
-        labels = list(mtable.free_paths) + joint_aux_paths(models)
+        labels = list(mtable.free_paths) + _joint_aux_paths(models)
         _MULTI_CACHE[key] = (models, mtable, theta, labels)
     return _MULTI_CACHE[key]
 
