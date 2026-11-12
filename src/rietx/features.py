@@ -55,9 +55,11 @@ FEATURES: dict[str, Feature] = {
             "phases.*.cell.alpha",
             "phases.*.cell.beta",
             "phases.*.cell.gamma",
+            "phases.*.parent_cell.strain.*",
         ),
         theory=(
             "peak-positions § Lattice metric and Bragg's law",
+            "peak-positions § A child's cell through its parent",
         ),
     ),
     "wavelength": Feature(
