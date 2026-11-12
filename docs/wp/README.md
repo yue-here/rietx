@@ -417,6 +417,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1536](1536-the-structure-figure-as-an-svg.md) | The structure figure as an SVG | ⬜ | P3 | — |
 | [1537](1537-the-structure-scene-for-a-ray-tracer.md) | The structure scene for a ray tracer: POV-Ray and glTF | ⬜ | P3 | — ([1536](1536-the-structure-figure-as-an-svg.md) soft) |
 | [1538](1538-ambient-occlusion-in-the-structure-figure.md) | Ambient occlusion in the structure figure | ⬜ | P3 | — |
+| [1548](1548-depth-cueing-and-filled-faces.md) | Depth cueing, and filled rings and faces, in the structure figure | ⬜ | P3 | — ([2111](2111-what-the-structure-figure-still-misleads.md) soft) |
 
 ## <a id="rigid-bodies"></a>rigid-bodies — a fragment refined as one body
 
