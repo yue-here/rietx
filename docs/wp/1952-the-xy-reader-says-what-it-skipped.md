@@ -1,6 +1,6 @@
 # WP-1952 — the xy reader says what it skipped
 
-Milestone: unscheduled · Status: 🔄 2026-11-12 — claimed by a ghostshift runner for the σ ≤ 0 rule and its record field
+Milestone: unscheduled · Status: 🔄 2026-11-12 — σ ≤ 0 rule and record field in PR #1541; B5.2, the second TEMP value and the pdCIF naming remain
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-11 — a decimal-comma file reads as a different pattern with no word, and a dropped mid-file row goes unreported; a fine step usually trips the duplicate-2θ refusal, and the reporter keeps their own reader
@@ -165,6 +165,76 @@ same arrays and no new diagnostic.
 - Issue #897.
 
 ## Handover log
+
+### 2026-11-12 — the σ ≤ 0 rule and its record field land (PR #1541, ghostshift runner)
+
+A point whose esd in the file is zero or negative now takes no weight. Until now rietx floored such an esd at a thousandth of the column's median, which gave the point about a million times its neighbours' weight, in silence (#897). On a synthetic LaB6 with one σ = 0 at the strongest channel, that floor held the fit at its iteration limit with the cell 1.75e-3 Å from the truth. With the rule the fit converges to within 2e-4 Å. The point stays in the pattern with the file's own number, and the reader warns with `PATTERN_SIGMA_NONPOSITIVE`, naming how many points, how many record an intensity of zero, and where they sit in 2θ. The read option `nonpositive_sigma="poisson"` keeps them instead, at the Poisson σ = √max(y, 1). A column with no positive esd at all is not read, and the Poisson σ applies to the whole pattern. Every fit's result now carries `sigma_rule`, three counts of how many fitted points the file's σ, the Poisson σ and the exclusion covered. The counts warning (B5.2) is not built here.
+
+*Done* (commits `69bb437fc`, `7411431ed`, `cc00ce9f6` on top of the claim):
+- Task 1, the σ ≤ 0 rule (WP-2002 B5). It lives once, on `read_pattern`'s post-read hook (`_apply_nonpositive_sigma`), for every format, and the schema enforces it through `PatternData.in_range_mask`. `PatternData.nonpositive_sigma` is the new field, default `"exclude"`. `SIGMA_FLOOR_RELATIVE` and `_floor_sigma` are gone, and `RefinementResult.sig()` follows the same rule. Four readers declined or dropped such a σ themselves and now hand it to the hook: `gsas` dropped every σ ≤ 0 channel in silence, and `xy` and `chi` declined a column with no positive entry in silence.
+- Task 2, the record field (B14). `SigmaRule` (`n_file_sigma`, `n_poisson_sigma`, `n_nonpositive_excluded`) is built by `PatternData.sigma_rule` over the fit's own window in `compile_model`, and copied to `RefinementResult.sigma_rule` and `HistogramResult.sigma_rule`. `SCHEMA_VERSION` 0.61 carries an "Also in 0.61" note.
+- Siblings fixed. The dead-channel check at read time leaves out the channels the rule excluded, and under `"poisson"` it reads the stand-in σ the fit will use, so it agrees with the fit's own check. `BackgroundFixedPlusChebyshev.from_pattern` follows the rule. `compile_model`'s "fewer than 10 points" refusal names the σ rule when the rule emptied the range. A project made before this WP on a GSAS file with σ ≤ 0 channels still opens (`project._pre_1952_gsas_fingerprint`), because the reader now keeps channels it used to drop.
+- Audit table: code row `PATTERN_SIGMA_NONPOSITIVE` (tier 1), its suggestion row, and the action row `RefinementResult.sigma_rule` (tier 2, kind 3, `approved` 2026-10-19). The `SIGMA_FLOOR_RELATIVE` row is deleted. `help.py`, the manual's pattern-files and result pages, the skill's diagnostics row, `docs/practice.md` § A zero or negative esd, `io/CLAUDE.md`'s repair table and the root CLAUDE.md's Weights bullet are updated. The `io/CLAUDE.md` line cap moves 571 → 572, logged.
+- Tests: in `tests/test_schemas.py` (the LaB6 fit, plotted to `tests/output/sigma_rule_lab6_fit.png`), `tests/test_readers_robust.py`, `tests/test_data_support.py` and `tests/test_project.py`. The dead-channel and old-project tests were each made to fail once on purpose, and failed with the expected message.
+
+*Outside this WP's files*: `src/rietx/refine.py` and `src/rietx/multi.py` each gained one line, `sigma_rule=model.sigma_rule,`, where they build the result. Another runner works in `refine.py`; this is a keyword argument and nothing else.
+
+*Measured*:
+- LaB6 probe (above), against `main`'s tree in a scratch snapshot: `main` stops at max_iter at a = 4.15835 Å (truth 4.1566, start 4.1585); the branch converges at a = 4.15662 Å.
+- Census of the tracked pattern files `read_pattern` opens: only the two ILL D1B `.dat` files under `tests/data/d1b_co3o4_quench/` carry σ = 0, at y = 0 on the edge channels 0.79-0.89° and 128.59°. These are unmeasured channels. They were floored before and are now excluded with the warning. No tracked text file has a third column without a positive entry, so the `xy`/`chi` change moves no fixture.
+- `python -m tests.reader_output`: exit 0, unchanged. It covers one standard fit's printed text.
+- FAST_COUNTS_PLACEHOLDER
+
+*What a reader receives* (for the maintainer, per the 2026-11-01 ruling on reader output):
+- A new warning, `PATTERN_SIGMA_NONPOSITIVE`, in two forms. "N of M points have a σ of zero or below (k zero and j negative), at 2θ …. n of them record an intensity of zero. Such a σ states no weight, so these points are left out of the fit." And "every one of its M σ values is zero or negative (…), so the column states no weight and was not read. The Poisson σ = √max(y, 1) is used instead."
+- A new refusal: "reader option nonpositive_sigma= takes one of …".
+- New fields: `RefinementResult.sigma_rule`, `HistogramResult.sigma_rule`, `PatternData.nonpositive_sigma`.
+- A changed refusal: "fewer than 10 points remain in the fit range" gains a clause naming the σ rule when it is the cause.
+- The fit itself moves wherever a file carries σ ≤ 0: those points used to weigh ~10⁶× their neighbours and now carry none.
+
+*Review*: `/code-review high --fix` raised nine findings. It fixed four (a stale `from_pattern` docstring, a duplicated span builder now shared as `formats.base._point_runs`, the XYDATA `INTER` message on a declined column, and NaN in `nonpositive_sigma_mask`). This session fixed three more (old GSAS projects, the read/fit dead-channel disagreement, the too-few-points message). Two are declined. The `where` list of run strings is uncapped, as `PATTERN_ROWS_DROPPED`'s already is, and capping one alone would make them differ. `compile_model` converts σ to an array three times, an O(N) cost per compile that is small beside a fit.
+
+*Generality*:
+
+The judge ran on the branch at `69bb437fc`, before `7411431ed`. Its report is condensed here: every verdict and finding is kept, and the per-question tables are cut. The author's answers follow it.
+
+> **`PATTERN_SIGMA_NONPOSITIVE` (code row) — holds.** It reports an arithmetic fact with no threshold. Two findings. The tier-2 citation (GSAS-II's `fxye` zero weight, checked in 5.8.4's source) backs the action, not the warning, and no surveyed program warns; a threshold-free fact is tier 1. And the "every σ ≤ 0" branch could not fire for `xy` or `chi`, whose readers declined such a column in silence (`xy.py:463`, `chi.py:90`), while the manual's row said it fires.
+>
+> **`PATTERN_SIGMA_NONPOSITIVE.suggestion` — weak.** Whether the points counted zero is a fact about the writing software, so kind 3, not 1. The message gives only 2θ positions, not the numbers that separate the cases: y at those points, or σ²/y over the rest of the column. On D1B the zeros sit at y = 0, unmeasured, and following the suggestion there weights each ~3000× its neighbours (inferred).
+>
+> **`RefinementResult.sigma_rule` (action row) — weak.** The default is the stronger case against Poisson, but three things are wrong. Its kind is 1 while its own grounds name dissenters (GSAS-II's `xye` reader, FullProf), so it is kind 3. Its only measurement compares exclusion with the deleted floor, not with Poisson; the D1B case is the one that separates them. And `approved` quotes the batch lead's reading of the ruling, not a sentence of the maintainer's naming the default.
+>
+> **`SIGMA_FLOOR_RELATIVE` (deleted) — holds.** Nothing supports keeping it.
+>
+> **A column with no positive σ is not read — holds, with a coverage gap.** Same `xy`/`chi` gap. A hand-built `PatternData` with every σ = 0 fails in `compile_model` with "fewer than 10 points remain", which does not name σ.
+>
+> **The `"poisson"` value √max(y, 1) — holds** on raw counts. On scaled data one count is not one unit, a limit the declined σ²/y test would have covered. `POISSON_FLOOR_COUNTS`' evidence does not name this consumer.
+>
+> **GSAS no longer drops σ ≤ 0 channels — holds.** Same χ², now reported. A project made before sees matching bytes and a different fingerprint.
+>
+> **The dead-channel check skips excluded channels — holds.** No test covers the skip. Under `"poisson"` the stand-in σ reaches `dead_channels`, which its docstring refuses.
+
+Author's answers, landed in `7411431ed` and `cc00ce9f6`:
+- `xy`/`chi` gap: both readers now hand the column to the hook, and the "every σ ≤ 0" test is parametrized over `xy`, `chi` and `gsas_esd`. No tracked file changes (census above).
+- Kinds and tier: the code row is tier 1. The action and suggestion rows are kind 3, with the grounds saying why a default must still act and how the warning and the option answer that. `POISSON_FLOOR_COUNTS`' evidence names the new consumer.
+- Suggestion: the message now says how many flagged points record y = 0. The σ²/y test stays declined under the little-effort ruling.
+- Approval: brought to the maintainer below.
+- Hand-built all-zero σ: the refusal now names the σ rule. The column is not set aside inside `PatternData`, since that would change what a σ the caller wrote means.
+- Old projects: `Project.open` also accepts the pre-WP-1952 `gsas` fingerprint.
+- Dead-channel check: under `"poisson"` it now reads the stand-in σ the fit uses, so it agrees with the fit's own check rather than skipping. Tested both ways.
+
+*Settled for you* (each could have gone the other way):
+- The `"poisson"` option weights a σ ≤ 0 point at √max(y, 1), not at a literal σ = 1. Grounds: rietx's own no-σ fallback and TOPAS's 1/Max(Yobs, 1). The alternative was FullProf's σ = 1, which agrees at y ≤ 1.
+- The `"poisson"` option reports nothing. Grounds: the caller asked by name, and the 2026-11-01 ruling against reports nobody needs. The alternative was an info line.
+- A column with no positive esd is not read, rather than excluding every point. Grounds: the `pdcif` reader's precedent (`PATTERN_WEIGHT_UNUSABLE`) and that excluding all leaves nothing to fit. The alternative was refusing the file.
+- The rule lives in the schema plus one reader hook, not per reader and not as `excluded_regions`. Grounds: io/CLAUDE.md's rule that a repair is reported where it is made, and the project rule that `excluded_regions` are the caller's settings. The alternative was writing the points into `excluded_regions`, which a project would then save as settings.
+- The message counts how many flagged points record y = 0, so the reader can judge the suggestion's "if these counted zero". Grounds: the generality review. The alternative was B5's σ²/y ratio test, declined as more effort than the ruling allows.
+
+*Decision for the maintainer*: the action row's `approved` date quotes your 2026-10-19 words ("fix anything obviously wrong, warn during ingestion, and give the option to correct"). The default itself, no weight rather than Poisson weight, is the batch lead's reading of those words (`docs/wp/2002-batch/rulings.md` lines 76-83). The generality review noted no sentence of yours names the default. If you meant Poisson by default, the change is one literal in `PatternData.nonpositive_sigma`.
+
+*Not built*: the counts warning (B5.2). It is a heuristic of its own with a threshold to audit, and the ruling asked for little effort. It stays in Inherited.
+
+*Next*: the counts warning (B5.2), the second `TEMP` value, and the pdCIF naming in this reader's refusal once PR #1471 merges (with or after WP-1933's sniff).
 
 ### 2026-11-09 — the six tasks land (PR #1504, ghostshift runner)
 

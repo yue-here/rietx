@@ -149,7 +149,7 @@ If the column is a placeholder, set `PatternData.sigma` to `None` to use the Poi
 The fit weights each point by the file's esd where the file has one, and by Poisson σ = √max(y, 1) otherwise.
 An esd of zero or below gives no weight, so by default such a point leaves the fit, as an excluded region's points do (`PatternData.in_range_mask`).
 `PatternData.nonpositive_sigma = "poisson"` weights such points by √max(y, 1) instead, and `PatternData.nonpositive_sigma_mask` says which points they are.
-GSAS-II's `fxye` reader gives such a point zero weight too; FullProf 8.20 and GSAS-II's `xye` reader replace its esd silently (`docs/practice.md`).
+GSAS-II's `fxye` reader gives such a point zero weight too; FullProf 8.20 and GSAS-II's `xye` reader replace its esd and report nothing (`docs/practice.md`).
 `PatternData.sigma_rule` counts the points each rule weights, and a fit stores that count as `RefinementResult.sigma_rule`, a `SigmaRule`: `n_file_sigma` points weighted by the file's esd, `n_poisson_sigma` by the Poisson σ, and `n_nonpositive_excluded` left out.
 The Poisson fallback is right for raw counts and wrong by a factor √t for a rate already divided by a counting time t.
 So a reader decides which of the two a file holds:
