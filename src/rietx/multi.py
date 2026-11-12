@@ -3561,10 +3561,11 @@ def _parametric_form_tests(models, mtable, at_bounds, weights,
         return None, None
     residual, jacobian, n_data = _multi_closures(models, mtable, weights=weights,
                                                  layout="blocked")
-    # a Pawley block is free on both sides of the test, so its columns and
-    # names ride after the table's (WP-2104)
-    x = np.concatenate([mtable.x0(), *[m.pawley_x0() for m in models
-                                       if m.pawley is not None]])
+    # at the answer: ``mtable.x0()`` is the cache the last stage started from
+    # (``_joint_theta``).  A Pawley block is free on both sides of the test,
+    # so its columns and names ride after the table's (WP-2104)
+    x = np.concatenate([_joint_theta(mtable), *[m.pawley_x0() for m in models
+                                                if m.pawley is not None]])
     index = {p: i for i, p in enumerate(mtable.free_paths)}
     hold = sorted({index[p] for f in at_bounds for p in f.paths if p in index})
     variables = {p for r in mtable.expressions for p in r.paths}
