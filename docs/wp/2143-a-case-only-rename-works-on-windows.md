@@ -98,7 +98,7 @@ any platform:
   recovery test failed on main's `recovery.py` (`move` returned `False`) and passes on the fix.
 
   *Measured* (`[dev]`, macOS arm64, main `a86dcf9d4` merged in, other sessions' suites
-  queued on the same machine). Fast selection: 14 558 passed, 424 skipped, 32 xfailed, plus
+  queued on the same machine; main `59a4f96ba`, one WP file, merged after). Fast selection: 14 558 passed, 424 skipped, 32 xfailed, plus
   1 failed, the stale WP index, regenerated and green on its rerun (`test_docs_consistency.py`,
   26 passed). One test added, 0.01 s. `tests/test_gui_file_menu.py` and
   `tests/test_gui_recovery.py`: 24 passed. The full selection did not run: the change is GUI
@@ -117,7 +117,7 @@ any platform:
   *Elsewhere.* WP-2209's `### Inherited` says `move` now keys by the path it is given. The
   nightly of 2026-11-11 was also red on the Linux `full` job, on
   `test_pair_diagnostic_class.py::test_the_two_site_winner_finds_each_site_its_own_moment`
-  (0.699 against 3.5 ± 0.01); that row is not this WP's and nothing here touches it.
+  (0.699 against 3.5 ± 0.01). WP-1418 took that row up in PR #1542; nothing here touches it.
 
   Next: read the Windows row of the first nightly after #1539 merges. If
   `test_gui_file_menu.py` is still red there, reopen this WP.
