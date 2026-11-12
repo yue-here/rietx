@@ -74,7 +74,7 @@ truth.
 - [x] `multi.py`'s diagnostic rows, and `force-fix` of intensity paths under
   `mode_fixed` across histograms.
 - [x] A cross-backend config, if a new derivative path appears. (No new branch: the joint Pawley Jacobian stacks the single fit's columns. Its stacked layout joins the matrix as a `pawley` row of `test_multi_histogram_stacked_jacobian_matches_analytic`.)
-- [ ] Manual: `reference/joint.md`, `reference/parametric.md`.
+- [x] Manual: `reference/joint.md`, `reference/parametric.md`.
 - [x] Skill: the series reference's row.
 
 ## Acceptance
